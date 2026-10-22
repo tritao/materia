@@ -1380,7 +1380,7 @@
       {
        "name": "interfaces",
        "kind": "var",
-       "signature": ":{width:Float, baseHoles:Array<HzMotionHole>}",
+       "signature": ":{width:Float, baseHoles:Array<HzMotionHole>, ?bearingCentreZ:Float, ?boltSeatY:Float}",
        "optional": true
       }
      ]
@@ -2324,8 +2324,7 @@
       {
        "name": "designRequirements",
        "kind": "var",
-       "signature": ":Array<machinekit.design.DesignRequirement>",
-       "optional": true
+       "signature": ":Array<machinekit.design.DesignRequirement>"
       }
      ],
      "doc": "The MachineKit facts of one assembly level. Every member reference is a path below that level, so\na record may name a member of a subassembly (`arm/link1`)."
@@ -3249,7 +3248,8 @@
        "name": "blockThreadDepth",
        "kind": "var",
        "signature": ":Float",
-       "final": true
+       "final": true,
+       "doc": "The carriage's tapped mounting depth from its table, NaN when the table gives none."
       },
       {
        "name": "motorWasher",
@@ -3261,7 +3261,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(mount:RbkMotorMount, motor:NemaStepper, screw:LeadScrew, nut:LeadScrewNut, support:VallderBf12Support, rail:LinearRail, block:LinearRailBlock, blockThreadDepth:Float, ?motorWasher:Bool):Void"
+       "signature": "(mount:RbkMotorMount, motor:NemaStepper, screw:LeadScrew, nut:LeadScrewNut, support:VallderBf12Support, rail:LinearRail, block:LinearRailBlock, ?motorWasher:Bool):Void"
       },
       {
        "name": "check",
@@ -3799,13 +3799,13 @@
       {
        "name": "rail",
        "kind": "var",
-       "signature": ":HgRail",
+       "signature": ":LinearRail",
        "final": true
       },
       {
        "name": "block",
        "kind": "var",
-       "signature": ":HgBlock",
+       "signature": ":LinearRailBlock",
        "final": true
       },
       {
@@ -4371,6 +4371,28 @@
        "signature": "(designation:String):CatalogMetadata"
       }
      ]
+    },
+    {
+     "name": "PinnedCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/catalog/PinnedCad.hx",
+     "doc": "Reviewed supplier CAD files pinned by content: geometry loads only a file whose SHA-256 matches its review.",
+     "fields": [
+      {
+       "name": "sha256",
+       "kind": "method",
+       "signature": "(path:String):String",
+       "static": true,
+       "doc": "Lower-case hex SHA-256 of the file at `path`."
+      },
+      {
+       "name": "require",
+       "kind": "method",
+       "signature": "(path:String, digest:String, prepare:String):String",
+       "static": true,
+       "doc": "`path`, once it exists and matches `digest`; `prepare` says how to fetch it."
+      }
+     ]
     }
    ]
   },
@@ -4594,6 +4616,20 @@
      ]
     },
     {
+     "name": "ComponentClassification",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/component/ComponentClassification.hx",
+     "doc": "How MachineKit's built-in recipes are filed for catalogues and part pickers: a category within each package\n(the id's second segment) and a kind. Categories are listed here in display order. A recipe added to\n`MachineKitComponents` without a row here fails RecipeContractTests.",
+     "fields": [
+      {
+       "name": "apply",
+       "kind": "method",
+       "signature": "(registry:ComponentRegistry):Void",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "ComponentDetail",
      "kind": "enum",
      "file": "machinekit/haxe/src/machinekit/component/ComponentDetail.hx",
@@ -4774,6 +4810,43 @@
        "name": "create",
        "kind": "method",
        "signature": "(variantId:String, ?values:ComponentValues):MachineComponent"
+      }
+     ]
+    },
+    {
+     "name": "ComponentKind",
+     "kind": "abstract",
+     "file": "machinekit/haxe/src/machinekit/component/ComponentKind.hx",
+     "underlying": "String",
+     "doc": "What a component recipe stands for, for catalogues and part pickers.",
+     "fields": [
+      {
+       "name": "Generic",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "A reusable parametric recipe, sized by its inputs or a standard catalogue."
+      },
+      {
+       "name": "Supplier",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "A named supplier's product, with that supplier's data."
+      },
+      {
+       "name": "Reference",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "A drawing, study or reference envelope: geometry to check against, not a part to buy or make."
+      },
+      {
+       "name": "MachinePart",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "A part designed for one machine (an example's frame, guard or bracket)."
       }
      ]
     },
@@ -5138,6 +5211,29 @@
        "signature": "(id:String):ComponentType"
       },
       {
+       "name": "classify",
+       "kind": "method",
+       "signature": "(id:String, category:String, kind:ComponentKind):Void",
+       "doc": "Files a registered type under a category (a heading within its package, such as \"Linear guides\") and a kind,\nfor catalogues and part pickers. MachineKit's built-ins are all classified (`ComponentClassification`)."
+      },
+      {
+       "name": "categoryNames",
+       "kind": "method",
+       "signature": "():Array<String>",
+       "doc": "Every category, in the order types were first filed under it (the display order)."
+      },
+      {
+       "name": "category",
+       "kind": "method",
+       "signature": "(id:String):Null<String>",
+       "doc": "The type's category, or null when it has not been classified."
+      },
+      {
+       "name": "kind",
+       "kind": "method",
+       "signature": "(id:String):Null<ComponentKind>"
+      },
+      {
        "name": "all",
        "kind": "method",
        "signature": "():Array<ComponentType>",
@@ -5365,6 +5461,54 @@
      ]
     },
     {
+     "name": "ComponentView",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/component/ComponentView.hx",
+     "doc": "How a component is best looked at on its own (catalogue thumbnails, part previews): which of its local\ndirections points up on screen, and which faces the viewer's side. A component declares one through\n`MachineComponent.presentationView` when its shape alone does not say; otherwise `derive` chooses from its\nbounds. Directions are unit vectors in the component's CAD frame and must be perpendicular.",
+     "fields": [
+      {
+       "name": "up",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Shown pointing up."
+      },
+      {
+       "name": "front",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Shown facing the viewer's side; the camera then looks at the part from a little to one side and above."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(up:Array<Float>, front:Array<Float>):Void"
+      },
+      {
+       "name": "upright",
+       "kind": "method",
+       "signature": "():ComponentView",
+       "static": true,
+       "doc": "Standing as modelled: +Z up, -Y towards the viewer."
+      },
+      {
+       "name": "lengthAlongZ",
+       "kind": "method",
+       "signature": "():ComponentView",
+       "static": true,
+       "doc": "Lying down for a part that runs along its local +Z with its working face towards +Y (rails, racks, screws,\nprofiles, keys): +Y up and the length running across the view."
+      },
+      {
+       "name": "derive",
+       "kind": "method",
+       "signature": "(minimum:Array<Float>, maximum:Array<Float>):ComponentView",
+       "static": true,
+       "doc": "The view for a part with these CAD bounds: lying down when it is much longer along Z than across, else upright."
+      }
+     ]
+    },
+    {
      "name": "Connector",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/component/Connector.hx",
@@ -5486,6 +5630,12 @@
      ]
     },
     {
+     "name": "EffectiveDensities",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/component/EffectiveDensities.hx",
+     "doc": "Assumed effective densities (kg/m³) of purchased parts whose envelope is a housing around air, electronics and\nterminals: datasheet mass over envelope volume for reference products of the class (2026-10-21). They replace\nthe mass of a solid block of the housing material, which overstates such parts five to ten times. A catalogue\nrow's datasheet mass, where one is known, overrides them (`MachineComponent.declareMass`)."
+    },
+    {
      "name": "EnclosurePanelBom",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/component/BomItem.hx",
@@ -5597,6 +5747,43 @@
        "kind": "method",
        "signature": "(parts:Array<Part>):CollisionHullFacet",
        "static": true
+      }
+     ]
+    },
+    {
+     "name": "GeometryFidelity",
+     "kind": "abstract",
+     "file": "machinekit/haxe/src/machinekit/component/GeometryFidelity.hx",
+     "underlying": "String",
+     "doc": "How faithfully a component's preview geometry represents the real part.",
+     "fields": [
+      {
+       "name": "Envelope",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "The preview is a placeholder of the part's size: one primitive solid such as a box, cylinder or ring."
+      },
+      {
+       "name": "Nominal",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Recognisable features in generic proportions."
+      },
+      {
+       "name": "Datasheet",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "Key dimensions from a cited standard or datasheet."
+      },
+      {
+       "name": "Supplier",
+       "kind": "var",
+       "signature": ":String",
+       "static": true,
+       "doc": "The supplier's own CAD."
       }
      ]
     },
@@ -5776,6 +5963,12 @@
        "signature": "(spec:String):Void"
       },
       {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<ComponentView>",
+       "doc": "How this part is best looked at on its own, when its shape alone does not say (see `ComponentView.derive`);\nnull leaves the choice to its bounds."
+      },
+      {
        "name": "hasGeometry",
        "kind": "method",
        "signature": "():Bool"
@@ -5790,6 +5983,12 @@
        "kind": "method",
        "signature": "(?detail:ComponentDetail):String",
        "doc": "Names the geometry `geometry(detail)` builds, for a cache of it: the same for every component made from the same recipe\ninputs and material, which build the same shape, and for a component without a recipe (nothing says which components are\nalike) its own."
+      },
+      {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():GeometryFidelity",
+       "doc": "How faithful the preview is. Derived where the geometry shows it: a preview that is one primitive solid (six\nfaces or fewer: a box, a cylinder, a ring or a tube) is a placeholder of the part's size, `Envelope`; any other\nis `Nominal`. Parts dimensioned from a cited standard or datasheet declare `Datasheet`, imports of supplier CAD\n`Supplier`."
       }
      ]
     },
@@ -5906,6 +6105,18 @@
        "name": "Declared",
        "kind": "case",
        "signature": ""
+      },
+      {
+       "name": "EffectiveDensity",
+       "kind": "case",
+       "signature": "(kgPerCubicMetre:Float)",
+       "doc": "A purchased part's mass: its envelope's volume at an assumed effective density (kg/m³) for its product class\n(`EffectiveDensities`), not its drawn housing. An authored value, like `Declared`."
+      },
+      {
+       "name": "Modelled",
+       "kind": "case",
+       "signature": "",
+       "doc": "Computed from a simplified solid that stands in for the part's mass (`MachineComponent.massGeometry`), at its\nmaterial's density, so drawing detail does not move it. An authored model, like `Declared`."
       }
      ]
     },
@@ -6199,6 +6410,11 @@
        "name": "hasGeometry",
        "kind": "method",
        "signature": "():Bool"
+      },
+      {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():GeometryFidelity"
       },
       {
        "name": "geometry",
@@ -6636,6 +6852,11 @@
        "name": "componentType",
        "kind": "method",
        "signature": "():Null<ComponentType>"
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>"
       },
       {
        "name": "geometry",
@@ -7083,7 +7304,12 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(holes:Array<HoleInterface>, datums:Array<DesignDatum>, material:Array<DesignEnvelope>):Void"
+       "signature": "(holes:Array<HoleInterface>, datums:Array<DesignDatum>, material:Array<DesignEnvelope>, ?precision:Array<materia.casting.InterfaceRequirement>):Void"
+      },
+      {
+       "name": "precisionRequirements",
+       "kind": "method",
+       "signature": "():Array<materia.casting.InterfaceRequirement>"
       },
       {
        "name": "of",
@@ -7146,18 +7372,7 @@
      "name": "DesignReference",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/design/DesignRequirement.hx",
-     "fields": [
-      {
-       "name": "member",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "feature",
-       "kind": "var",
-       "signature": ":String"
-      }
-     ]
+     "alias": "materia.assembly.AssemblyFeatureReference"
     },
     {
      "name": "DesignRequirement",
@@ -7173,6 +7388,23 @@
        "name": "AccessPath",
        "kind": "case",
        "signature": "(id:String, anchor:DesignReference, envelopes:Array<DesignEnvelope>, pose:Array<DesignJointValue>, obstacles:DesignObstacles)"
+      },
+      {
+       "name": "InterfaceAlignment",
+       "kind": "case",
+       "signature": "(id:String, relationship:materia.casting.InterfaceRelationship)",
+       "doc": "id identifies this assembly occurrence; relationship.id identifies the\ndesign relationship referenced by the source interfaces, across occurrences."
+      },
+      {
+       "name": "FoundationConnection",
+       "kind": "case",
+       "signature": "(id:String, joint:materia.casting.FoundationJoint)"
+      },
+      {
+       "name": "Coaxial",
+       "kind": "case",
+       "signature": "(id:String, first:DesignReference, second:DesignReference, toleranceMm:Float)",
+       "doc": "Nominal hole/connector axes; physical metrology is a separate requirement."
       }
      ]
     },
@@ -7221,6 +7453,34 @@
        "name": "SocketVolume",
        "kind": "case",
        "signature": "(radius:Float, start:Float, end:Float, mouthRadius:Float, mouthEnd:Float)"
+      }
+     ]
+    },
+    {
+     "name": "FoundationJointDesignChecks",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/design/FoundationJointDesignChecks.hx",
+     "doc": "Native source resolution followed by the same nominal checks as tooling.",
+     "fields": [
+      {
+       "name": "check",
+       "kind": "method",
+       "signature": "(out:Diagnostics, id:String, authored:FoundationJoint, members:Map<String, MachineComponent>, state:AssemblyState):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "FoundationJointSourceSupport",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/design/FoundationJointSourceSupport.hx",
+     "doc": "Copy source components, never infer hole patterns or support dimensions.",
+     "fields": [
+      {
+       "name": "capture",
+       "kind": "method",
+       "signature": "(instances:Array<FoundationJointOccurrence>, members:Map<String, MachineComponent>, state:AssemblyState, worldToFoundation:AssemblyFrame):FoundationJointSources",
+       "static": true
       }
      ]
     },
@@ -7342,6 +7602,26 @@
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/design/ThreadedHolePolicy.hx",
      "alias": "materia.casting.InsertMaterial"
+    },
+    {
+     "name": "InterfaceSourceSupport",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/design/InterfaceSourceSupport.hx",
+     "doc": "One reference resolver for design diagnostics and detached tooling snapshots.",
+     "fields": [
+      {
+       "name": "precision",
+       "kind": "method",
+       "signature": "(members:Map<String, MachineComponent>, partId:String, interfaceId:String, definitionId:String):materia.casting.InterfaceRequirement",
+       "static": true
+      },
+      {
+       "name": "axis",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, id:String):KinematicJoint",
+       "static": true
+      }
+     ]
     },
     {
      "name": "ResolvedHoleLimits",
@@ -11826,6 +12106,12 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail."
       }
      ]
     },
@@ -12013,6 +12299,73 @@
      ]
     },
     {
+     "name": "MillBeltSpindle",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillBeltSpindle.hx",
+     "implements": [
+      "MillSpindlePackage"
+     ],
+     "doc": "BT30 cartridge driven by a timing belt from a servo beside it (`MillSpindleHead`).",
+     "fields": [
+      {
+       "name": "HEAD_HEIGHT",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "Compact VMC head block: clamps the cartridge and carries the motor carrier feet."
+      },
+      {
+       "name": "MAXIMUM_RPM",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true
+      },
+      {
+       "name": "motorAdjustment",
+       "kind": "var",
+       "signature": ":Null<Float>",
+       "final": true
+      },
+      {
+       "name": "drive",
+       "kind": "var",
+       "signature": ":Null<MillSpindleDrivePart>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(?motorAdjustment:Float, ?drive:MillSpindleDrivePart):Void",
+       "doc": "`drive` defaults to the installed Leadshine selection for the layout's head height."
+      },
+      {
+       "name": "seat",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "diameter",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "headHeight",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "maximumRpm",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "assembly",
+       "kind": "method",
+       "signature": "(l:MillZAxisLayout):MachineAssembly"
+      }
+     ]
+    },
+    {
      "name": "MillCapacityLayout",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/milling/MillCapacityLayout.hx",
@@ -12175,6 +12528,18 @@
        "final": true
       },
       {
+       "name": "toolChangeHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "spindle",
+       "kind": "var",
+       "signature": ":MillSpindlePackage",
+       "final": true
+      },
+      {
        "name": "payloadTargetKg",
        "kind": "var",
        "signature": ":Float",
@@ -12249,7 +12614,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(?xTravel:Float, ?yTravel:Float, ?zTravel:Float):Void"
+       "signature": "(?xTravel:Float, ?yTravel:Float, ?zTravel:Float, ?options:MillCapacityOptions):Void"
       },
       {
        "name": "guidedXY",
@@ -12259,7 +12624,45 @@
       {
        "name": "zLayout",
        "kind": "method",
-       "signature": "():MillZAxisLayout"
+       "signature": "():MillZAxisLayout",
+       "doc": "Z zero is the top stop: the tool-change position when one is reserved, else the top of the working stroke."
+      }
+     ]
+    },
+    {
+     "name": "MillCapacityOptions",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/milling/MillCapacityLayout.hx",
+     "fields": [
+      {
+       "name": "spindle",
+       "kind": "var",
+       "signature": ":MillSpindlePackage",
+       "optional": true
+      },
+      {
+       "name": "headHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "fixtureHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "noseMin",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "toolChangeHeight",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
       }
      ]
     },
@@ -12359,6 +12762,12 @@
      "file": "machinekit/haxe/src/machinekit/milling/MillCastingDetails.hx",
      "doc": "Explicit mill casting intent, in mm; no Boolean extension margins.",
      "fields": [
+      {
+       "name": "anchorRule",
+       "kind": "var",
+       "signature": ":machinekit.structural.InsertAnchorPattern.InsertAnchorPatternRule",
+       "doc": "Source design rule, shared by all base and column inserts. A minimum\npair resists rotation; long seats add stations at four short-face widths.\nGeometric minima do not establish compound-specific anchor capacity."
+      },
       {
        "name": "shoulderClearance",
        "kind": "var",
@@ -12497,6 +12906,38 @@
        "signature": ":Float"
       },
       {
+       "name": "railHoleBudget",
+       "kind": "var",
+       "signature": ":machinekit.structural.InsertMountPattern.MountHoleErrorAllocation",
+       "doc": "RM0 accuracy allocations are user inputs, not inferred design-hole limits."
+      },
+      {
+       "name": "permittedRailHoleRoutes",
+       "kind": "var",
+       "signature": ":Array<materia.casting.InsertManufacturing.InsertHoleRoute>"
+      },
+      {
+       "name": "liftingPlateWidthMm",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "Source lifting connections; thread capacity and rigging remain unqualified."
+      },
+      {
+       "name": "liftingPlateDepthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "liftingPlateThicknessMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "liftingThread",
+       "kind": "var",
+       "signature": ":machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice"
+      },
+      {
        "name": "columnAnchorThread",
        "kind": "var",
        "signature": ":machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice"
@@ -12505,6 +12946,18 @@
        "name": "hatchAnchorThread",
        "kind": "var",
        "signature": ":machinekit.design.ThreadedHolePolicy.ThreadedHoleChoice"
+      },
+      {
+       "name": "minimumClearancePadSide",
+       "kind": "method",
+       "signature": "(diameterMm:Float):Float",
+       "doc": "A centred clearance bore retains the full policy wall on both sides."
+      },
+      {
+       "name": "minimumColumnPadDepth",
+       "kind": "method",
+       "signature": "(thicknessMm:Float):Float",
+       "doc": "Joint-pad minimum derived from access, policy edge wall, washer and cover."
       },
       {
        "name": "new",
@@ -13423,6 +13876,27 @@
      ]
     },
     {
+     "name": "MillLiftingPattern",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillLiftingPattern.hx",
+     "doc": "Four source connections enclose the foundation's nominal centre of mass.\nThe attachment footprint is a design declaration, never a capacity approval.",
+     "fields": [
+      {
+       "name": "asCastMass",
+       "kind": "method",
+       "signature": "(foundation:MineralFoundation):machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties",
+       "static": true,
+       "doc": "Native nominal mass in the pour state: transferred holes and finishing\nremoval do not yet exist. Embedded anchor hardware remains real components."
+      },
+      {
+       "name": "placements",
+       "kind": "method",
+       "signature": "(body:ComponentValues, existing:Array<CastInsertPlacement>, details:MillCastingDetails):Array<CastInsertPlacement>",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "MillMotorCover",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/milling/MillMotorCover.hx",
@@ -13635,6 +14109,33 @@
      ]
     },
     {
+     "name": "MillPlacedRail",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/milling/MillRailPlacement.hx",
+     "fields": [
+      {
+       "name": "memberId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "insertId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "rail",
+       "kind": "var",
+       "signature": ":LinearRail"
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ]
+    },
+    {
      "name": "MillPowerDrawbarPart",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/milling/MillPowerDrawbarPart.hx",
@@ -13663,6 +14164,52 @@
      ]
     },
     {
+     "name": "MillRailFasteners",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillRailFasteners.hx",
+     "doc": "Install real service screws from the actual placed rail and steel interfaces.\nNumerical engagement uses the same source policy as fixtures and anchors.",
+     "fields": [
+      {
+       "name": "install",
+       "kind": "method",
+       "signature": "(assembly:MachineAssembly, foundation:MineralFoundation, prefix:String, preferredLengths:Array<Float>):Void",
+       "static": true
+      },
+      {
+       "name": "idFor",
+       "kind": "method",
+       "signature": "(insertId:String, holeId:String):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "MillRailPlacement",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillRailPlacement.hx",
+     "doc": "Shared placement declarations for the axes and their casting-seat holes.",
+     "fields": [
+      {
+       "name": "fingerprint",
+       "kind": "method",
+       "signature": "(rail:LinearRail, memberId:String):String",
+       "static": true
+      },
+      {
+       "name": "y",
+       "kind": "method",
+       "signature": "(l:MillGuidedXYStage.MillGuidedXYLayout):Array<MillPlacedRail>",
+       "static": true
+      },
+      {
+       "name": "z",
+       "kind": "method",
+       "signature": "(l:MillZAxisLayout):Array<MillPlacedRail>",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "MillSaddle",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/milling/MillCasting.hx",
@@ -13674,6 +14221,112 @@
        "name": "new",
        "kind": "method",
        "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "MillScrewDrive",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillScrewDrive.hx",
+     "doc": "A supported ball-screw drive: HZMotion fixed motor mount, its floating support, servo and coupling.\nEvery mounting datum is read from the parts' catalogue and STEP review data; only the coupling\n(outside diameter, length, clamps and where it seats) is stated here. Nothing is sized for a load.",
+     "fields": [
+      {
+       "name": "fixed",
+       "kind": "var",
+       "signature": ":HzMotionComponent",
+       "final": true,
+       "doc": "Integrated motor mount with the fixed bearing pair."
+      },
+      {
+       "name": "floating",
+       "kind": "var",
+       "signature": ":HzMotionComponent",
+       "final": true
+      },
+      {
+       "name": "motor",
+       "kind": "var",
+       "signature": ":LeadshineServo",
+       "final": true
+      },
+      {
+       "name": "coupling",
+       "kind": "var",
+       "signature": ":ShaftCoupling",
+       "final": true
+      },
+      {
+       "name": "couplingSeat",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Motor face to the coupling origin, along the screw."
+      },
+      {
+       "name": "endProfile",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "HZMotion screw end machined for the fixed mount."
+      },
+      {
+       "name": "bearingDrop",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Motor face to fixed-bearing centre."
+      },
+      {
+       "name": "fixedEnd",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Screw's fixed end, shoulder to thread: the screw starts `fixed.spec.shoulderZ - fixedEnd` from the motor face."
+      },
+      {
+       "name": "floatingEnd",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Screw end to the floating bearing centre: the journal less half the bearing, which seats on its shoulder."
+      },
+      {
+       "name": "floatingBoltZ",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Floating support's bolt line and bolt offset."
+      },
+      {
+       "name": "floatingBoltX",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "fixedBoltSeat",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Bolt counterbore seats above each part's mounting base."
+      },
+      {
+       "name": "floatingBoltSeat",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(fixed:HzMotionComponent, floating:HzMotionComponent, motor:LeadshineServo, couplingLength:Float, couplingSeat:Float, ?couplingOutside:Float, ?couplingClamps:Array<ShaftCoupling.ShaftCouplingSetScrew>):Void"
+      },
+      {
+       "name": "m80eBk15",
+       "kind": "method",
+       "signature": "():MillScrewDrive",
+       "static": true,
+       "doc": "Mill Z: M80E-BK15-C / BF15, braked ELM2H-0750 servo, 48 mm coupling."
       }
      ]
     },
@@ -14018,6 +14671,43 @@
      ]
     },
     {
+     "name": "MillSpindlePackage",
+     "kind": "interface",
+     "file": "machinekit/haxe/src/machinekit/milling/MillSpindlePackage.hx",
+     "doc": "A spindle the Z head carries: the datums the layouts size the head and work envelope from, and the\nassembly it installs. Its gauge line sits `seat()` below the head's lower face, on the layout's spindle axis.",
+     "fields": [
+      {
+       "name": "seat",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Gauge line to the head's lower clamping face, mm."
+      },
+      {
+       "name": "diameter",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Spindle body diameter where the head clamps it, mm."
+      },
+      {
+       "name": "headHeight",
+       "kind": "method",
+       "signature": "():Float",
+       "doc": "Head block height that clamps this spindle and carries its drive, mm."
+      },
+      {
+       "name": "maximumRpm",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "assembly",
+       "kind": "method",
+       "signature": "(l:MillZAxisLayout):MachineAssembly",
+       "doc": "Installed spindle for `l`: a `spindle` member whose frame is the gauge line and a `holder` member the tool seats in."
+      }
+     ]
+    },
+    {
      "name": "MillSpindleXYEnvelope",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/milling/MillSpindleIntegrity.hx",
@@ -14113,6 +14803,56 @@
      ]
     },
     {
+     "name": "MillXYDrive",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/milling/MillXYDrive.hx",
+     "doc": "An X/Y drive selection: ball nut, screw supports, servo and coupling. `MillXYStageLayout` places the set.",
+     "fields": [
+      {
+       "name": "nut",
+       "kind": "var",
+       "signature": ":BallNut",
+       "final": true
+      },
+      {
+       "name": "fixed",
+       "kind": "var",
+       "signature": ":ScrewSupportUnit",
+       "final": true
+      },
+      {
+       "name": "floating",
+       "kind": "var",
+       "signature": ":ScrewSupportUnit",
+       "final": true
+      },
+      {
+       "name": "motor",
+       "kind": "var",
+       "signature": ":LeadshineServo",
+       "final": true
+      },
+      {
+       "name": "coupling",
+       "kind": "var",
+       "signature": ":ShaftCoupling",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(nut:BallNut, fixed:ScrewSupportUnit, floating:ScrewSupportUnit, motor:LeadshineServo, coupling:ShaftCoupling):Void"
+      },
+      {
+       "name": "bk12",
+       "kind": "method",
+       "signature": "():MillXYDrive",
+       "static": true,
+       "doc": "BK12/BF12 supports, preloaded 1605 nut and the ELM2H-0400 servo with a 14/12 coupling."
+      }
+     ]
+    },
+    {
      "name": "MillXYStage",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/milling/MillXYStage.hx",
@@ -14203,6 +14943,13 @@
        "final": true
       },
       {
+       "name": "yDrive",
+       "kind": "var",
+       "signature": ":Null<MillScrewDrive>",
+       "final": true,
+       "doc": "HZMotion-supported Y drive; null when Y uses the same BK12 set as X."
+      },
+      {
        "name": "supplierY",
        "kind": "var",
        "signature": ":Bool",
@@ -14211,7 +14958,7 @@
       {
        "name": "yMotor",
        "kind": "var",
-       "signature": ":ServoMotor",
+       "signature": ":LeadshineServo",
        "final": true
       },
       {
@@ -14251,33 +14998,39 @@
        "final": true
       },
       {
+       "name": "drive",
+       "kind": "var",
+       "signature": ":MillXYDrive",
+       "final": true
+      },
+      {
        "name": "nut",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":BallNut",
        "final": true
       },
       {
        "name": "fixed",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":ScrewSupportUnit",
        "final": true
       },
       {
        "name": "floating",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":ScrewSupportUnit",
        "final": true
       },
       {
        "name": "motor",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":LeadshineServo",
        "final": true
       },
       {
        "name": "coupling",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":ShaftCoupling",
        "final": true
       },
       {
@@ -14493,7 +15246,8 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(frame:MillFrameLayout, centreY:Float, ?profile:String, ?guideBlock:Null<LinearRailBlock>, ?supplierY:Bool):Void"
+       "signature": "(frame:MillFrameLayout, centreY:Float, ?profile:String, ?guideBlock:Null<LinearRailBlock>, ?yDrive:MillScrewDrive, ?drive:MillXYDrive):Void",
+       "doc": "`drive` defaults to `MillXYDrive.bk12()`; `yDrive` replaces it on Y with an HZMotion-supported screw."
       },
       {
        "name": "guided",
@@ -14873,27 +15627,39 @@
        "final": true
       },
       {
+       "name": "drive",
+       "kind": "var",
+       "signature": ":MillScrewDrive",
+       "final": true
+      },
+      {
+       "name": "spindle",
+       "kind": "var",
+       "signature": ":MillSpindlePackage",
+       "final": true
+      },
+      {
        "name": "nut",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":SfuNut",
        "final": true
       },
       {
        "name": "fixed",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":machinekit.assembly.HzMotionComponent",
        "final": true
       },
       {
        "name": "floating",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":machinekit.assembly.HzMotionComponent",
        "final": true
       },
       {
        "name": "motor",
        "kind": "var",
-       "signature": ":Dynamic",
+       "signature": ":LeadshineServo",
        "final": true
       },
       {
@@ -15158,6 +15924,24 @@
        "name": "overtravelLimit",
        "kind": "var",
        "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "drive",
+       "kind": "var",
+       "signature": ":MillScrewDrive",
+       "optional": true
+      },
+      {
+       "name": "nut",
+       "kind": "var",
+       "signature": ":SfuNut",
+       "optional": true
+      },
+      {
+       "name": "spindle",
+       "kind": "var",
+       "signature": ":MillSpindlePackage",
        "optional": true
       }
      ]
@@ -16036,6 +16820,12 @@
        "signature": "(?detail:ComponentDetail):Part"
       },
       {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail."
+      },
+      {
        "name": "recipeType",
        "kind": "method",
        "signature": "():ComponentType",
@@ -16277,6 +17067,12 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Mass of the motor's body with the brake, as before the body was drawn in detail."
       },
       {
        "name": "axisMotor",
@@ -17036,117 +17832,6 @@
      "doc": "A wrench at the centre of a rectangular four-block support. Forces are N, moments N m.\nLocal X spans the rails, Z follows travel, and Y is normal to the mounting plane."
     },
     {
-     "name": "HgBlock",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/HgBlock.hx",
-     "extends": [
-      "LinearRailBlock"
-     ],
-     "doc": "Detailed pinned HGH/HGW carriage references with generic named rail/mount interfaces.\nNo network access or fallback envelope during normal geometry generation.",
-     "fields": [
-      {
-       "name": "model",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(?model:String):Void"
-      },
-      {
-       "name": "referenceDirectory",
-       "kind": "method",
-       "signature": "():String",
-       "static": true
-      },
-      {
-       "name": "load",
-       "kind": "method",
-       "signature": "(model:String):Shape",
-       "static": true
-      },
-      {
-       "name": "geometry",
-       "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
-      },
-      {
-       "name": "mountThreadDepth",
-       "kind": "method",
-       "signature": "():Null<Float>",
-       "doc": "HGH table gives MxL; HGW table gives only M. Unknown thread depth stays unknown."
-      },
-      {
-       "name": "referenceRecipeType",
-       "kind": "method",
-       "signature": "():ComponentType",
-       "static": true
-      },
-      {
-       "name": "componentType",
-       "kind": "method",
-       "signature": "():Null<ComponentType>"
-      },
-      {
-       "name": "values",
-       "kind": "method",
-       "signature": "():ComponentValues"
-      }
-     ]
-    },
-    {
-     "name": "HgRail",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/HgRail.hx",
-     "extends": [
-      "LinearRail"
-     ],
-     "doc": "Exact per-size HG running sections, not scaled approximations. Offline geometry.\nX across, Y=-railHeight..0, Z=0..length. The table's default end margin determines drilling.\nReference identity does not qualify supplier load/preload or material.",
-     "fields": [
-      {
-       "name": "model",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(?model:String, ?length:Float):Void"
-      },
-      {
-       "name": "geometry",
-       "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
-      },
-      {
-       "name": "drilling",
-       "kind": "method",
-       "signature": "(model:String):Array<Float>",
-       "static": true,
-       "doc": "Through diameter, counterbore diameter/depth, from the rail table (HGR20 d=6.1)."
-      },
-      {
-       "name": "referenceRecipeType",
-       "kind": "method",
-       "signature": "():ComponentType",
-       "static": true
-      },
-      {
-       "name": "componentType",
-       "kind": "method",
-       "signature": "():Null<ComponentType>"
-      },
-      {
-       "name": "values",
-       "kind": "method",
-       "signature": "():ComponentValues"
-      }
-     ]
-    },
-    {
      "name": "HgReferenceData",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/motion/HgReferenceData.hx",
@@ -17194,7 +17879,7 @@
        "static": true
       },
       {
-       "name": "spec",
+       "name": "carriage",
        "kind": "method",
        "signature": "(model:String):LinearRailProfileSpec",
        "static": true
@@ -17202,133 +17887,27 @@
      ]
     },
     {
-     "name": "Hgr15RailGeometry",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/Hgr15RailGeometry.hx",
-     "doc": "HGR15R running section, in the rail-top datum. Analytic lines/arcs measured\nfrom the pinned Matis-hosted HIWIN reference (see linear-rail-reference/README).\nThis geometry does not qualify the generic catalog's load or material ratings.",
+     "name": "HousingStep",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/motion/RoundHousing.hx",
      "fields": [
       {
-       "name": "build",
-       "kind": "method",
-       "signature": "(length:Float, holes:Array<Float>):Part",
-       "static": true
+       "name": "z0",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "z1",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "diameter",
+       "kind": "var",
+       "signature": ":Float"
       }
-     ]
-    },
-    {
-     "name": "HiwinHgh15ca",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/HiwinHgh15ca.hx",
-     "extends": [
-      "LinearRailBlock"
      ],
-     "doc": "Pinned supplier reference in the existing rail frame: X across, Y mounting normal, Z travel.\nExplicit-path instances own their imported CAD: close after export/checks.\nSaved recipes load lazily and retain no native CAD owner. No downloads during generation.\nIntended as an explicit alternative to the generic HGR15 block, not a supplier certification.",
-     "fields": [
-      {
-       "name": "SHA256",
-       "kind": "var",
-       "signature": ":Dynamic",
-       "static": true
-      },
-      {
-       "name": "SOURCE",
-       "kind": "var",
-       "signature": ":Dynamic",
-       "static": true
-      },
-      {
-       "name": "MOUNT_THREAD_DEPTH",
-       "kind": "var",
-       "signature": ":Float",
-       "static": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(?path:String):Void"
-      },
-      {
-       "name": "referencePath",
-       "kind": "method",
-       "signature": "():String",
-       "static": true
-      },
-      {
-       "name": "referenceRecipeType",
-       "kind": "method",
-       "signature": "():ComponentType",
-       "static": true
-      },
-      {
-       "name": "componentType",
-       "kind": "method",
-       "signature": "():Null<ComponentType>"
-      },
-      {
-       "name": "values",
-       "kind": "method",
-       "signature": "():ComponentValues"
-      },
-      {
-       "name": "geometry",
-       "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
-      },
-      {
-       "name": "fileDigest",
-       "kind": "method",
-       "signature": "(path:String):String",
-       "static": true
-      },
-      {
-       "name": "close",
-       "kind": "method",
-       "signature": "():Void"
-      }
-     ]
-    },
-    {
-     "name": "HiwinHgr25Rail",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/HiwinHgr25Rail.hx",
-     "extends": [
-      "LinearRail"
-     ],
-     "doc": "Cut-length HGR25R, extruded from an undrilled section of the pinned supplier rail.\nMounting pattern follows the shared catalogue; load/preload ratings remain assumed.",
-     "fields": [
-      {
-       "name": "supplierRecipeType",
-       "kind": "method",
-       "signature": "():ComponentType",
-       "static": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(length:Float, ?expectedDigest:String):Void"
-      },
-      {
-       "name": "componentType",
-       "kind": "method",
-       "signature": "():Null<ComponentType>"
-      },
-      {
-       "name": "values",
-       "kind": "method",
-       "signature": "():ComponentValues"
-      },
-      {
-       "name": "geometry",
-       "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
-      },
-      {
-       "name": "profile",
-       "kind": "method",
-       "signature": "(length:Float, holes:Array<Float>):Part",
-       "static": true
-      }
-     ]
+     "doc": "One coaxial step of a round housing: a cylinder of `diameter` from z0 to z1."
     },
     {
      "name": "HzMotionDrawingScrew",
@@ -17370,6 +17949,27 @@
        "kind": "var",
        "signature": ":Float",
        "final": true
+      },
+      {
+       "name": "fixedEndFor",
+       "kind": "method",
+       "signature": "(endProfile:String):Float",
+       "static": true,
+       "doc": "Fixed end, shoulder to the thread run-out, for a profile."
+      },
+      {
+       "name": "floatingEndFor",
+       "kind": "method",
+       "signature": "(endProfile:String):Float",
+       "static": true,
+       "doc": "Floating journal length from the screw end."
+      },
+      {
+       "name": "couplingDiameterFor",
+       "kind": "method",
+       "signature": "(endProfile:String):Float",
+       "static": true,
+       "doc": "Coupling journal diameter at the fixed end."
       },
       {
        "name": "new",
@@ -17455,6 +18055,12 @@
        "signature": ":Float",
        "static": true,
        "doc": "Young's modulus of steel, Pa."
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>",
+       "doc": "A screw lies along its axis (+Z), whatever its length."
       },
       {
        "name": "relation",
@@ -18474,8 +19080,20 @@
      "extends": [
       "MachineComponent"
      ],
-     "doc": "A cut length of profile rail. HGR15 preview includes the HGR15R running section\nand bores; other profiles remain nominal. Mounting holes expose named connectors. CAD frame: the\nrail cross-section is centred on x=0, spans y=-railHeight..0, and runs along +Z.",
+     "doc": "A cut length of profile rail for a catalogue carriage. Its drawing is one of two, chosen explicitly and saved with\nit: `nominal`, the catalogue section with grooves (`ProfileRailShapes`), or `measured`, the running section taken\nfrom the pinned HIWIN CAD (HG rails). The drawing changes neither its part number nor its datasheet mass. Mounting\nholes are counterbored from the rail table and expose named connectors. CAD frame: the cross-section is centred\non x=0, spans y=-railHeight..0, and runs along +Z.",
      "fields": [
+      {
+       "name": "NOMINAL",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "MEASURED",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
       {
        "name": "spec",
        "kind": "var",
@@ -18495,16 +19113,52 @@
        "final": true
       },
       {
+       "name": "drawing",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "`NOMINAL` or `MEASURED`."
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>",
+       "doc": "Runs along +Z with its top (+Y) up, whatever its cut length."
+      },
+      {
        "name": "metric",
        "kind": "method",
-       "signature": "(profile:String, length:Float):LinearRail",
-       "static": true
+       "signature": "(profile:String, length:Float, ?drawing:String):LinearRail",
+       "static": true,
+       "doc": "The rail for carriage `profile`, drawn `measured` where the pinned CAD has its section and `nominal` otherwise,\nunless `drawing` says which."
       },
       {
        "name": "custom",
        "kind": "method",
        "signature": "(spec:LinearRailProfileSpec, length:Float):LinearRail",
        "static": true
+      },
+      {
+       "name": "hasMeasuredSection",
+       "kind": "method",
+       "signature": "(spec:LinearRailProfileSpec):Bool",
+       "static": true
+      },
+      {
+       "name": "mountingHole",
+       "kind": "method",
+       "signature": "():{diameter:Float, counterboreDiameter:Float, counterboreDepth:Float, reference:String}",
+       "doc": "The rail table's counterbored mounting hole."
+      },
+      {
+       "name": "mountingConnectors",
+       "kind": "method",
+       "signature": "():Array<machinekit.component.Connector>"
+      },
+      {
+       "name": "mountingThread",
+       "kind": "method",
+       "signature": "():cadkit.threads.ThreadSpec"
       },
       {
        "name": "hasGeometry",
@@ -18515,6 +19169,13 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "measuredSection",
+       "kind": "method",
+       "signature": "(rail:String, length:Float):Part",
+       "static": true,
+       "doc": "The undrilled running section of HG rail `rail` from the pinned CAD, `length` long along +Z. Supplier STEP\nendpoints differ by up to 0.00000024 mm (HGR45R): segments weld within that tolerance, never across a gap."
       },
       {
        "name": "recipeType",
@@ -18541,8 +19202,20 @@
      "extends": [
       "MachineComponent"
      ],
-     "doc": "Matching carriage block for a profile rail. Geometry is a nominal exterior envelope; the\ntwo mounting locations and rail axis are exact interface data from the profile catalog. CAD\nframe: the block is centred on z=0, with its rail-facing side at y=0.",
+     "doc": "A catalogue carriage block. Its drawing is chosen explicitly and saved with it: `nominal`, the catalogue outline\nwith end caps and tapped holes (`ProfileRailShapes`), or `supplier`, the pinned HIWIN CAD of HG carriages, loaded\non demand from the prepared reference directory. The drawing changes neither its part number nor its datasheet\nmass. The four mounting holes and the rail axis are interface data from the catalogue. CAD frame: centred on\nz=0, rail top at y=0, mounting face at blockHeight - railHeight.",
      "fields": [
+      {
+       "name": "NOMINAL",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "SUPPLIER",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
       {
        "name": "spec",
        "kind": "var",
@@ -18550,9 +19223,16 @@
        "final": true
       },
       {
+       "name": "drawing",
+       "kind": "var",
+       "signature": ":String",
+       "final": true,
+       "doc": "`NOMINAL` or `SUPPLIER`."
+      },
+      {
        "name": "metric",
        "kind": "method",
-       "signature": "(profile:String):LinearRailBlock",
+       "signature": "(profile:String, ?drawing:String):LinearRailBlock",
        "static": true
       },
       {
@@ -18560,6 +19240,24 @@
        "kind": "method",
        "signature": "(spec:LinearRailProfileSpec):LinearRailBlock",
        "static": true
+      },
+      {
+       "name": "hasSupplierCad",
+       "kind": "method",
+       "signature": "(spec:LinearRailProfileSpec):Bool",
+       "static": true
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<ComponentView>",
+       "doc": "Riding on its rail: mounting face (+Y) up and the travel (Z) running across the view."
+      },
+      {
+       "name": "mountThreadDepth",
+       "kind": "method",
+       "signature": "():Null<Float>",
+       "doc": "Full depth of the tapped mounting holes where the table gives it; HGW tables give only the thread."
       },
       {
        "name": "hasGeometry",
@@ -18570,6 +19268,20 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
+      },
+      {
+       "name": "referenceDirectory",
+       "kind": "method",
+       "signature": "():String",
+       "static": true,
+       "doc": "The prepared HG reference directory: `MATERIA_HG_REFERENCE`, else build/suppliers/vallder/hg-reference in the repository."
+      },
+      {
+       "name": "supplierCad",
+       "kind": "method",
+       "signature": "(model:String):Shape",
+       "static": true,
+       "doc": "Pinned HG model `model` (carriage or rail), checked against its review digest and frame. The caller owns it."
       },
       {
        "name": "recipeType",
@@ -18590,12 +19302,40 @@
      ]
     },
     {
+     "name": "LinearRailBore",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/motion/LinearRailProfile.hx",
+     "fields": [
+      {
+       "name": "through",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "counterbore",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "depth",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ],
+     "doc": "Counterbored rail mounting hole from the rail table: through bore d, counterbore D and depth h, in mm."
+    },
+    {
      "name": "LinearRailProfileSpec",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/motion/LinearRailProfile.hx",
      "fields": [
       {
        "name": "designation",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "rail",
        "kind": "var",
        "signature": ":String"
       },
@@ -18630,19 +19370,25 @@
        "signature": ":Float"
       },
       {
-       "name": "blockHolePitchB",
+       "name": "blockHoleSpacingAlong",
        "kind": "var",
        "signature": ":Float"
       },
       {
-       "name": "blockHolePitchC",
+       "name": "blockHoleSpacingAcross",
        "kind": "var",
        "signature": ":Float"
       },
       {
-       "name": "blockMountScrew",
+       "name": "blockMountThread",
        "kind": "var",
        "signature": ":String"
+      },
+      {
+       "name": "blockMountThreadDepth",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
       },
       {
        "name": "railHolePitch",
@@ -18660,9 +19406,24 @@
        "signature": ":String"
       },
       {
-       "name": "staticLoadCapacity",
+       "name": "railBore",
+       "kind": "var",
+       "signature": ":LinearRailBore"
+      },
+      {
+       "name": "blockMassKg",
        "kind": "var",
        "signature": ":Float"
+      },
+      {
+       "name": "railMassKgPerMetre",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "ratings",
+       "kind": "var",
+       "signature": ":Array<LinearRailRating>"
       },
       {
        "name": "preloadTarget",
@@ -18671,14 +19432,88 @@
        "optional": true
       }
      ],
-     "doc": "Catalog dimensions for a profile rail and its matching carriage block. Values are in mm."
+     "doc": "A profile-rail carriage and the rail it runs on, in mm and kg. `designation` names the carriage (HGH15CA, MGN12C)\nand `rail` the rail (HGR15R, MGNR12R); every carriage on one rail repeats that rail's fields."
+    },
+    {
+     "name": "LinearRailRating",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/motion/LinearRailProfile.hx",
+     "fields": [
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "reference",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "dynamicLoad",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "staticLoad",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lifeBasisKm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "rollMoment",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "pitchMoment",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "yawMoment",
+       "kind": "var",
+       "signature": ":Float",
+       "optional": true
+      },
+      {
+       "name": "original",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ],
+     "doc": "One published load rating of a carriage, as its source states it: basic dynamic (C) and static (C0) load ratings\nin N, and static rated moments in N·m where the source gives them. Sizing applies its own static safety factor\nto `staticLoad`; no derating is folded in here."
     },
     {
      "name": "LinearRailSystem",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/motion/LinearRailSystem.hx",
-     "doc": "Catalog-backed profile-rail guide assembly. This is an alternative to the round-rod\n`LinearGuideSystem`: the rail is fixed and one or more blocks travel along its axis. The\nprofile and mounting data are explicit, while the generated rail and block solids remain\nnominal envelopes suitable for layout and clearance checks.",
+     "doc": "Catalog-backed profile-rail guide assembly. This is an alternative to the round-rod\n`LinearGuideSystem`: the rail is fixed and one or more blocks travel along its axis. Rows are\nkeyed by carriage designation; each names its rail, the tables it comes from, and the load\nratings published for it.",
      "fields": [
+      {
+       "name": "HIWIN_MG",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "HIWIN_2008",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "HIWIN_2024",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
       {
        "name": "spec",
        "kind": "var",
@@ -18732,7 +19567,14 @@
        "kind": "method",
        "signature": "():Catalog<LinearRailProfileSpec>",
        "static": true,
-       "doc": "HIWIN MGN/MGW linear guideway dimensions used by the MGN12C profile row."
+       "doc": "Profile-rail carriages and their rails: HIWIN MGN miniature guides and the HG family."
+      },
+      {
+       "name": "rating",
+       "kind": "method",
+       "signature": "(spec:LinearRailProfileSpec):LinearRailRating",
+       "static": true,
+       "doc": "The rating sizing uses: the first one listed, the purchase source's."
       },
       {
        "name": "forProfile",
@@ -18858,6 +19700,12 @@
        "static": true
       }
      ]
+    },
+    {
+     "name": "MotorBody",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/motion/MotorBody.hx",
+     "doc": "A square-flanged motor housing as servo and spindle motors are built: a flange of side `face` and thickness\n`flange` with bolt holes, a housing with chamfered corners, a rear (encoder) cap, and a connector boss on the\nhousing's +Y side. Motor CAD frame: mounting face at z = 0, body towards -Z over `length`; the shaft is its own\npart. Everything lies inside the box `face` × `face` × `length` behind the face, the motor's envelope."
     },
     {
      "name": "MotorBrakeSpec",
@@ -19455,7 +20303,14 @@
       {
        "name": "geometry",
        "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
+       "signature": "(?detail:ComponentDetail):Part",
+       "doc": "The envelope is the bored housing cylinder. The preview has an input adapter at z = 0, the planetary housing\nand a bolted output flange at the far end, around the bore."
+      },
+      {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Its mass is that of the plain bored housing (the drawn steps and holes do not set it)."
       },
       {
        "name": "reducerSpec",
@@ -19688,6 +20543,28 @@
      ]
     },
     {
+     "name": "ProfileRailShapes",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/motion/ProfileRailShapes.hx",
+     "doc": "Nominal profile-rail and carriage-block shapes from catalogue data (`LinearRail.NOMINAL`, the nominal carriage).\nRail frame: section centred on x = 0, y from -railHeight to the rail top at 0, running along +Z. Block frame:\nrail-facing side at y = 0, top at blockHeight - railHeight, centred on z = 0. Rail bores come from the rail table,\ncarriage threads from the socket-head cap screw catalogue.",
+     "fields": [
+      {
+       "name": "rail",
+       "kind": "method",
+       "signature": "(spec:LinearRailProfileSpec, length:Float, holes:Array<Float>):Part",
+       "static": true,
+       "doc": "The rail: its rectangular section with chamfered top edges and a ball-track groove along each side (two on\nfour-row HG-type profiles, one on MGN-type miniature ones), and counterbored mounting holes at `holes` (z)."
+      },
+      {
+       "name": "block",
+       "kind": "method",
+       "signature": "(spec:LinearRailProfileSpec):Part",
+       "static": true,
+       "doc": "The carriage block above the rail top: a steel body with chamfered top edges, plastic end caps and seals at\nboth ends, and four tapped mounting holes at the catalogue's spacings across and along the rail."
+      }
+     ]
+    },
+    {
      "name": "ProximitySwitch",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/motion/ProximitySwitch.hx",
@@ -19755,7 +20632,14 @@
       {
        "name": "geometry",
        "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
+       "signature": "(?detail:ComponentDetail):Part",
+       "doc": "The envelope is the barrel's cylinder. The preview has a connector end at the mount (z = 0), a fine-pitch\nmetric threaded barrel (a cosmetic thread, M8x1 or M12x1) and the sensing cap at the face (z = length)."
+      },
+      {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Its mass is that of the plain barrel cylinder (the drawn connector and cap do not set it)."
       }
      ]
     },
@@ -20172,6 +21056,21 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):cadkit.modeling.Part"
+      }
+     ]
+    },
+    {
+     "name": "RoundHousing",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/motion/RoundHousing.hx",
+     "doc": "A round housing along +Z as reducers, gearboxes and encoders are built: coaxial steps (flanges, body, adapters),\nan optional through bore, and bolt holes through one flange on a circle. Every step lies inside the cylinder of\nthe largest diameter over the steps' span, the part's envelope.",
+     "fields": [
+      {
+       "name": "part",
+       "kind": "method",
+       "signature": "(steps:Array<HousingStep>, bore:Float, ?holeStep:Int, ?holes:Int, ?holeCircle:Float, ?holeDiameter:Float):Part",
+       "static": true,
+       "doc": "`holes` bolt holes of `holeDiameter` on a circle of `holeCircle` diameter, drilled through the step at index\n`holeStep`; none when `holes` is zero. `bore` zero leaves the housing solid."
       }
      ]
     },
@@ -21302,7 +22201,14 @@
       {
        "name": "geometry",
        "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
+       "signature": "(?detail:ComponentDetail):Part",
+       "doc": "The envelope is the housing cylinder. The preview has a clamping flange at the mount, the housing, a rear\ncover and the hollow bore it rides the shaft on."
+      },
+      {
+       "name": "massGeometry",
+       "kind": "method",
+       "signature": "():Null<Part>",
+       "doc": "Its mass is that of the plain housing cylinder (the drawn flange, cover and bore do not set it)."
       }
      ]
     },
@@ -21653,74 +22559,6 @@
        "kind": "method",
        "signature": "(length:Float):Part",
        "static": true
-      }
-     ]
-    },
-    {
-     "name": "SupplierRailAssets",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/SupplierRailAssets.hx",
-     "doc": "Pinned distributor-hosted HIWIN design references. No network access at runtime.",
-     "fields": [
-      {
-       "name": "digest",
-       "kind": "method",
-       "signature": "(name:String):String",
-       "static": true
-      },
-      {
-       "name": "fileDigest",
-       "kind": "method",
-       "signature": "(path:String):String",
-       "static": true
-      },
-      {
-       "name": "path",
-       "kind": "method",
-       "signature": "(name:String, ?explicit:String):String",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "SupplierRailBlock",
-     "kind": "class",
-     "file": "machinekit/haxe/src/machinekit/motion/SupplierRailBlock.hx",
-     "extends": [
-      "LinearRailBlock"
-     ],
-     "doc": "Imported HGH carriage with the shared rail/top/mount interfaces and a portable pinned recipe.\nGeometry is supplier-reference CAD; load/preload and homogeneous steel density remain assumed.",
-     "fields": [
-      {
-       "name": "supplierRecipeType",
-       "kind": "method",
-       "signature": "():ComponentType",
-       "static": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(profile:String, ?path:String, ?expectedDigest:String):Void"
-      },
-      {
-       "name": "geometry",
-       "kind": "method",
-       "signature": "(?detail:ComponentDetail):Part"
-      },
-      {
-       "name": "componentType",
-       "kind": "method",
-       "signature": "():Null<ComponentType>"
-      },
-      {
-       "name": "values",
-       "kind": "method",
-       "signature": "():ComponentValues"
-      },
-      {
-       "name": "close",
-       "kind": "method",
-       "signature": "():Void"
       }
      ]
     },
@@ -23887,6 +24725,11 @@
        "signature": "():Null<ComponentType>"
       },
       {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>"
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -23917,6 +24760,11 @@
        "name": "componentType",
        "kind": "method",
        "signature": "():Null<ComponentType>"
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>"
       },
       {
        "name": "geometry",
@@ -23965,6 +24813,45 @@
        "name": "volts",
        "kind": "method",
        "signature": "():Float"
+      }
+     ]
+    },
+    {
+     "name": "DinRailDevice",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/power/DinRailDevice.hx",
+     "doc": "The modular DIN-rail housing contactors, breakers and relays share, inside their envelope box: frame with x\nalong the rail, y from the back plate (-depth / 2) to the front (+depth / 2), z up the panel from 0 to height.\nA full-height rear body carries the 35 mm rail-clip slot; a stepped terminal shoulder with screw recesses at\ntop and bottom; and a 45 mm front window with a label recess.",
+     "fields": [
+      {
+       "name": "RAIL_WIDTH",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true
+      },
+      {
+       "name": "RAIL_DEPTH",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true
+      },
+      {
+       "name": "FRONT_WINDOW",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true
+      },
+      {
+       "name": "view",
+       "kind": "method",
+       "signature": "():machinekit.component.ComponentView",
+       "static": true,
+       "doc": "Seen as fitted: up the panel, its front window (+Y) towards the viewer."
+      },
+      {
+       "name": "part",
+       "kind": "method",
+       "signature": "(width:Float, depth:Float, height:Float):Part",
+       "static": true
       }
      ]
     },
@@ -35543,6 +36430,12 @@
        "signature": "():Bool"
       },
       {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -35806,6 +36699,12 @@
        "signature": "():Bool"
       },
       {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -35999,6 +36898,12 @@
        "signature": "(spec:String):Void"
       },
       {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -36155,6 +37060,12 @@
        "name": "hasGeometry",
        "kind": "method",
        "signature": "():Bool"
+      },
+      {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
       },
       {
        "name": "geometry",
@@ -36348,6 +37259,12 @@
        "signature": "():Bool"
       },
       {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -36511,6 +37428,12 @@
        "name": "hasGeometry",
        "kind": "method",
        "signature": "():Bool"
+      },
+      {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
       },
       {
        "name": "geometry",
@@ -36905,6 +37828,12 @@
        "signature": "(spec:String):Void"
       },
       {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
+      },
+      {
        "name": "geometry",
        "kind": "method",
        "signature": "(?detail:ComponentDetail):Part"
@@ -36962,7 +37891,7 @@
      "extends": [
       "MachineComponent"
      ],
-     "doc": "ISO 4026 flat-point set screw, nominal dimensions, no helical collision solid.\nLength/supplier qualification remains a fabrication input. Socket dimensions:\nhttps://www.accu.co.uk/flat-point-set-screws/4547-SSF-M6-5-A2\nhttps://cdn.mscdirect.com/global/images/ProductDataSheet/pds_sku_254996_productbrochure_manual%20data%20sheet.pdf",
+     "doc": "ISO 4026 flat-point set screw, nominal dimensions, no helical collision solid.\nLike the other fasteners its frame is at the drive end: the hex socket opens towards +z and the threaded body\nruns to the flat point at z = -length. Seat it in a bore with `boreSeat`.\nLength/supplier qualification remains a fabrication input. Socket dimensions:\nhttps://www.accu.co.uk/flat-point-set-screws/4547-SSF-M6-5-A2\nhttps://cdn.mscdirect.com/global/images/ProductDataSheet/pds_sku_254996_productbrochure_manual%20data%20sheet.pdf",
      "fields": [
       {
        "name": "thread",
@@ -37006,6 +37935,13 @@
        "signature": "(?input:ComponentValues):Void"
       },
       {
+       "name": "boreSeat",
+       "kind": "method",
+       "signature": "():materia.assembly.AssemblyRecord.AssemblyFrame",
+       "static": true,
+       "doc": "The screw's frame relative to a bore frame whose z = 0 is where the socket faces out and whose +z runs into\nthe bore: half a turn about x, so the body fills the bore and the socket stays at the open end."
+      },
+      {
        "name": "componentType",
        "kind": "method",
        "signature": "():Null<ComponentType>"
@@ -37014,6 +37950,12 @@
        "name": "hasGeometry",
        "kind": "method",
        "signature": "():Bool"
+      },
+      {
+       "name": "geometryFidelity",
+       "kind": "method",
+       "signature": "():machinekit.component.GeometryFidelity",
+       "doc": "Dimensioned from the standard and datasheets cited above."
       },
       {
        "name": "geometry",
@@ -37239,6 +38181,20 @@
        "static": true
       },
       {
+       "name": "manufacturedValues",
+       "kind": "method",
+       "signature": "(material:materia.casting.InsertMaterial):ComponentValues",
+       "static": true,
+       "doc": "Grade and the attached manufacturing choices are authored together, so a\nrecipe rebuild never depends on whether defaults were resolved beforehand."
+      },
+      {
+       "name": "precastHoles",
+       "kind": "method",
+       "signature": "(values:ComponentValues, encodedHoles:String):ComponentValues",
+       "static": true,
+       "doc": "Explicit source authoring for holes which must exist during the pour.\nBought-part mounting holes use their separate connector/clearance-budget route."
+      },
+      {
        "name": "bodySpec",
        "kind": "method",
        "signature": "():InsertBody"
@@ -37254,9 +38210,15 @@
        "signature": "():materia.casting.InsertMaterial.InsertMaterialSpec"
       },
       {
+       "name": "buildStage",
+       "kind": "method",
+       "signature": "():materia.casting.InsertStages.InsertStage"
+      },
+      {
        "name": "insertSpec",
        "kind": "method",
-       "signature": "():materia.casting.InsertSpec"
+       "signature": "():materia.casting.InsertSpec",
+       "doc": "Complete source design; the published physical facet follows buildStage."
       },
       {
        "name": "componentType",
@@ -37404,6 +38366,52 @@
        "name": "retain",
        "kind": "method",
        "signature": "(features:Array<CastingFeature>, supports:Array<Box3>):Array<CastingFeature>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CastingProfileCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/CastingProfileCad.hx",
+     "doc": "Shared exact source/panel boundary. Drawings use these same line/arc records.",
+     "fields": [
+      {
+       "name": "segment",
+       "kind": "method",
+       "signature": "(record:CastingSegment):Segment",
+       "static": true
+      },
+      {
+       "name": "wire",
+       "kind": "method",
+       "signature": "(profile:Array<CastingSegment>):Curve",
+       "static": true
+      },
+      {
+       "name": "drafted",
+       "kind": "method",
+       "signature": "(sections:materia.casting.CastingDraftSections.DraftedCastingSections):Part",
+       "static": true
+      },
+      {
+       "name": "prism",
+       "kind": "method",
+       "signature": "(profile:Array<CastingSegment>, z0:Float, z1:Float):Part",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CastingRegionCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/CastingRegionCad.hx",
+     "doc": "Native evaluation of neutral finished-region expressions. All temporaries\nclose on success and failure; zero-volume contacts are not solid material.",
+     "fields": [
+      {
+       "name": "part",
+       "kind": "method",
+       "signature": "(region:CastingRegion):Part",
        "static": true
       }
      ]
@@ -37567,6 +38575,20 @@
        "name": "geometry",
        "kind": "method",
        "signature": "(length:Float):Part"
+      }
+     ]
+    },
+    {
+     "name": "EmbeddedAnchorCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/EmbeddedAnchorCad.hx",
+     "doc": "Exact occupied volumes of real standard hardware, in casting coordinates.",
+     "fields": [
+      {
+       "name": "parts",
+       "kind": "method",
+       "signature": "(rows:Array<EmbeddedInsertAnchors>):Array<Part>",
+       "static": true
       }
      ]
     },
@@ -37780,9 +38802,9 @@
       {
        "name": "castingReview",
        "kind": "method",
-       "signature": "(foundation:MineralFoundation, document:materia.tooling.ToolingDocument):{diagnostics:Diagnostics, metrics:materia.tooling.process.CastingLevelOne.CastingDesignMetrics, validation:Array<materia.tooling.ToolingValidation>, proposals:Array<materia.tooling.process.CastabilityAnalysis.CastabilityProposal>, failures:Int, pending:Int, unsupported:Int}",
+       "signature": "(foundation:MineralFoundation, document:materia.tooling.ToolingDocument, ?context:materia.casting.CastingInterfaceContext):{diagnostics:Diagnostics, metrics:materia.tooling.process.CastingLevelOne.CastingDesignMetrics, validation:Array<materia.tooling.ToolingValidation>, proposals:Array<materia.tooling.process.CastabilityAnalysis.CastabilityProposal>, failures:Int, pending:Int, unsupported:Int}",
        "static": true,
-       "doc": "Source-bound level-1 casting checks enter the same design Diagnostics."
+       "doc": "Source-bound level-1 casting checks enter the same design Diagnostics.\nCapture context independently from the owning assembly, not the document.\nStandalone foundations can omit it."
       },
       {
        "name": "checkMounts",
@@ -37953,6 +38975,241 @@
      "doc": "Two members welded together, with the fillet leg in millimetres."
     },
     {
+     "name": "InsertAnchorChoice",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorHardware.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "holeId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "lengthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "insertionMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "locking",
+       "kind": "var",
+       "signature": ":InsertAnchorLock"
+      },
+      {
+       "name": "lockingReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorComponent",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorHardware.hx",
+     "fields": [
+      {
+       "name": "anchorId",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":InsertAnchorComponentKind"
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":MachineComponent"
+      },
+      {
+       "name": "pose",
+       "kind": "var",
+       "signature": ":AssemblyFrame"
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorComponentKind",
+     "kind": "abstract",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorHardware.hx",
+     "underlying": "String",
+     "fields": [
+      {
+       "name": "Bolt",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      },
+      {
+       "name": "Washer",
+       "kind": "var",
+       "signature": ":String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorContext",
+     "kind": "enum",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorPattern.hx",
+     "fields": [
+      {
+       "name": "FootprintOnly",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Casting",
+       "kind": "case",
+       "signature": "(body:Part, pose:materia.assembly.AssemblyRecord.AssemblyFrame)"
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorHardware",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorHardware.hx",
+     "doc": "Standard components are the dimension authority. Source choices reference\nholes already declared by InsertHoles; no anchor hole is invented here.",
+     "fields": [
+      {
+       "name": "backPattern",
+       "kind": "method",
+       "signature": "(source:CastInsert, thread:cadkit.threads.ThreadSpec, rules:InsertAnchorRules, points:Array<InsertBackAnchorChoice>):CastInsert",
+       "static": true,
+       "doc": "Source authoring: add only the declared back-hole pattern. Existing bought-part\nhole routes remain unchanged, including transfer drilling after casting."
+      },
+      {
+       "name": "choose",
+       "kind": "method",
+       "signature": "(spec:InsertSpec, rules:InsertAnchorRules, choices:Array<InsertAnchorChoice>):InsertAnchorage",
+       "static": true
+      },
+      {
+       "name": "parts",
+       "kind": "method",
+       "signature": "(spec:InsertSpec):Array<InsertAnchorComponent>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorPattern",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorPattern.hx",
+     "fields": [
+      {
+       "name": "minimumBandDepth",
+       "kind": "method",
+       "signature": "(openingMm:Float, thicknessMm:Float, material:materia.casting.InsertMaterial, rule:InsertAnchorPatternRule):Float",
+       "static": true,
+       "doc": "Minimum pad depth around a central access opening. Both anchor bands use\nthe same smallest stock-compatible thread and edge/cover rule as derive."
+      },
+      {
+       "name": "minimumOuterLand",
+       "kind": "method",
+       "signature": "(thicknessMm:Float, material:materia.casting.InsertMaterial, rule:InsertAnchorPatternRule):Float",
+       "static": true,
+       "doc": "Extra resin land beyond a steel plate edge for its outermost anchor."
+      },
+      {
+       "name": "derive",
+       "kind": "method",
+       "signature": "(id:String, source:CastInsert, rule:InsertAnchorPatternRule, context:InsertAnchorContext):CastInsert",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertAnchorPatternRule",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorPattern.hx",
+     "fields": [
+      {
+       "name": "minimumCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "maximumPitchInShortWidths",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "embedmentDiameters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "coverDiameters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "spacingDiameters",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "screwLengthsMm",
+       "kind": "var",
+       "signature": ":Array<Float>"
+      }
+     ],
+     "doc": "One source design rule, shared by every insert in a machine recipe. All\nlengths are derived from the chosen standard thread or the back footprint."
+    },
+    {
+     "name": "InsertBackAnchorChoice",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertAnchorHardware.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "xMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "yMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "lengthMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "insertionMm",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "locking",
+       "kind": "var",
+       "signature": ":InsertAnchorLock"
+      },
+      {
+       "name": "lockingReference",
+       "kind": "var",
+       "signature": ":Null<String>"
+      }
+     ]
+    },
+    {
      "name": "InsertBodies",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/structural/InsertBodies.hx",
@@ -37962,6 +39219,20 @@
        "name": "part",
        "kind": "method",
        "signature": "(body:InsertBody):Part",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertGeometry",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertGeometry.hx",
+     "doc": "Source and tooling realize the same neutral insert, without inventing a\ncomponent role, material or label to reconstruct contact geometry.",
+     "fields": [
+      {
+       "name": "part",
+       "kind": "method",
+       "signature": "(authored:InsertSpec, stage:InsertStage):Part",
        "static": true
       }
      ]
@@ -37999,7 +39270,7 @@
       {
        "name": "tappedBlind",
        "kind": "method",
-       "signature": "(choice:ThreadedHoleChoice, thickness:Float):String",
+       "signature": "(choice:ThreadedHoleChoice, thickness:Float, ?material:materia.casting.InsertMaterial):String",
        "static": true,
        "doc": "Flat-bottom blind bore (flat-bottom drill or end mill), followed by tapping.\nCylindrical depth includes the tip gap and bottoming-tap runout; back wall is\nchecked against the actual insert thickness before a recipe is emitted."
       },
@@ -38031,6 +39302,20 @@
        "name": "copy",
        "kind": "method",
        "signature": "(facet:DesignInterfaces):Array<InsertHole>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertMountPattern",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertMountPattern.hx",
+     "doc": "Source authoring only. Mounting positions come from placed component\nconnectors; the one stored hole frame is the intersection with finished steel.",
+     "fields": [
+      {
+       "name": "derive",
+       "kind": "method",
+       "signature": "(source:CastInsert, component:MachineComponent, componentPath:String, componentFingerprint:String, componentToInsert:AssemblyFrame, connectorIds:Array<String>, thread:cadkit.threads.ThreadSpec, ?clearanceDiameter:Float, ?clearanceReference:String, permitted:Array<InsertHoleRoute>, allocation:MountHoleErrorAllocation):CastInsert",
        "static": true
       }
      ]
@@ -38197,6 +39482,21 @@
        "signature": "(?detail:ComponentDetail):Part"
       },
       {
+       "name": "embeddedAnchors",
+       "kind": "method",
+       "signature": "():Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors>"
+      },
+      {
+       "name": "foundationDatumScheme",
+       "kind": "method",
+       "signature": "():Null<materia.casting.FoundationDatumScheme>"
+      },
+      {
+       "name": "precisionRequirements",
+       "kind": "method",
+       "signature": "():Array<materia.casting.InterfaceRequirement>"
+      },
+      {
        "name": "castingFeatures",
        "kind": "method",
        "signature": "():Array<CastingFeature>"
@@ -38266,6 +39566,48 @@
      ]
     },
     {
+     "name": "MountHoleErrorAllocation",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/structural/InsertMountPattern.hx",
+     "fields": [
+      {
+       "name": "placementOffsetMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "placementAngleRad",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "assemblyAdjustmentMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "cureBowMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "machiningErrorMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "pitchAccumulationMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      },
+      {
+       "name": "requiredMarginMm",
+       "kind": "var",
+       "signature": ":Null<Float>"
+      }
+     ]
+    },
+    {
      "name": "PlateSeat",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/structural/SeatedPlate.hx",
@@ -38308,6 +39650,12 @@
        "kind": "var",
        "signature": ":Float",
        "final": true
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>",
+       "doc": "Cut stock lies along its length (+Z), whatever the cut."
       },
       {
        "name": "new",
@@ -39744,9 +41092,15 @@
        "static": true
       },
       {
+       "name": "presentation",
+       "kind": "method",
+       "signature": "(p:MoldPlan, definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation",
+       "static": true
+      },
+      {
        "name": "assembly",
        "kind": "method",
-       "signature": "(p:MoldPlan, ?exploded:Bool):MachineAssembly",
+       "signature": "(p:MoldPlan):MachineAssembly",
        "static": true
       },
       {
@@ -39779,6 +41133,11 @@
        "signature": ":RemovalReport"
       },
       {
+       "name": "demoldingMotions",
+       "kind": "var",
+       "signature": ":Array<{id:String, x:Float, y:Float, z:Float}>"
+      },
+      {
        "name": "symmetricDifferenceMm3",
        "kind": "var",
        "signature": ":Float"
@@ -39806,6 +41165,108 @@
      ]
     },
     {
+     "name": "CastingFillAnalysis",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/CastingFillAnalysis.hx",
+     "doc": "The native BREP backend of the shared flat-free-surface process model.\nInput parts are borrowed. Pocket geometry names an exact source component,\nnever a box approximation. Additional output levels cannot affect trap IDs.",
+     "fields": [
+      {
+       "name": "fromPlan",
+       "kind": "method",
+       "signature": "(plan:materia.tooling.casting.CastingMoldPlan, settings:FillSourceSettings):FillAssessment",
+       "static": true,
+       "doc": "Bridge actual source and actual mold members into the one process pipeline."
+      },
+      {
+       "name": "analyze",
+       "kind": "method",
+       "signature": "(sourceId:String, source:Part, fillHeight:Float, settings:FillSourceSettings, ?boundaries:Array<NativeFillPart>, ?blockers:Array<NativeFillPart>, ?coreParts:Array<NativeFillPart>):FillReport",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "CastingFillGeometry",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/CastingFillGeometry.hx",
+     "doc": "Native geometry backend for the existing critical-level fill analysis.\nBounds size the clipping tools only. Every returned region, section and volume\nis an exact BREP Boolean; neither voxels nor sampled levels are introduced.\nThe caller owns returned parts and closes this backend independently.",
+     "fields": [
+      {
+       "name": "sourceId",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(sourceId:String, part:Part):Void"
+      },
+      {
+       "name": "heightInterval",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "Exact global height interval. Bounds only place enclosing planes; native\nshape distance determines the actual extrema, including curved edges."
+      },
+      {
+       "name": "criticalHeights",
+       "kind": "method",
+       "signature": "():Array<Float>",
+       "doc": "The complete height extrema of each conic/straight boundary edge, plus\nits vertices. Finite planes enclose the whole XY projection, so exact\nshape distance measures height rather than a distance to a plane edge.\nHigher-order boundary curves need a stationary-point solver; never use\ntheir bounds as a claimed critical level."
+      },
+      {
+       "name": "below",
+       "kind": "method",
+       "signature": "(height:Float):Part"
+      },
+      {
+       "name": "above",
+       "kind": "method",
+       "signature": "(height:Float):Part"
+      },
+      {
+       "name": "section",
+       "kind": "method",
+       "signature": "(height:Float):Model"
+      },
+      {
+       "name": "airComponents",
+       "kind": "method",
+       "signature": "(height:Float):Array<Part>",
+       "doc": "Boolean solids preserve positive-area connectivity. A mere point or edge\nat an event plane cannot join two air volumes into one solid."
+      },
+      {
+       "name": "componentKey",
+       "kind": "method",
+       "signature": "(part:Part):String",
+       "static": true,
+       "doc": "Geometry identity within one fingerprinted source/level. A duplicate key\namong disconnected components is rejected by the fill analysis rather\nthan resolved by native topology order. Rounding is for identity only."
+      },
+      {
+       "name": "highestPoint",
+       "kind": "method",
+       "signature": "():Vector"
+      },
+      {
+       "name": "projectedOpening",
+       "kind": "method",
+       "signature": "(height:Float):Model",
+       "doc": "Project all tooling at/above the fill plane, including a contacting face.\nThe existing exact swept-volume construction supplies the projection."
+      },
+      {
+       "name": "ceilingWidths",
+       "kind": "method",
+       "signature": "(opening:Model):Array<{widthMm:Float, face:Model}>",
+       "doc": "Conservative projected widths of potential ceiling patches. Refinement\njoins same-domain faces before measuring, so Boolean seams cannot turn a\nbroad roof into apparently narrow strips. A non-axial curved face uses\nits full projected width; it may overestimate its upward-facing portion."
+      },
+      {
+       "name": "close",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "CastingMoldAssessment",
      "kind": "typedef",
      "file": "machinekit/haxe/src/machinekit/tooling/CastingMoldCad.hx",
@@ -39829,9 +41290,30 @@
      "doc": "CAD bridge for neutral multi-core box plans. Frames and exact operations remain authoritative.",
      "fields": [
       {
+       "name": "plan",
+       "kind": "method",
+       "signature": "(document:materia.tooling.ToolingDocument, options:CastingMoldOptions):CastingMoldPlan",
+       "static": true,
+       "doc": "Native planning entry point; pure ManufacturingKit callers can retain\nthe exact box algebra or supply a different exact kernel explicitly."
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(encoded:String):CastingMoldPlan",
+       "static": true,
+       "doc": "Restore non-box plans without relying on a preceding planning call."
+      },
+      {
        "name": "source",
        "kind": "method",
        "signature": "(p:CastingMoldPlan):Part",
+       "static": true,
+       "doc": "Real source resin, including the exact standard anchor occupancy."
+      },
+      {
+       "name": "anchorComponents",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, ?owner:String):Array<{id:String, insertId:String, anchorId:String, part:machinekit.component.MachineComponent, pose:materia.assembly.AssemblyRecord.AssemblyFrame}>",
        "static": true
       },
       {
@@ -39865,9 +41347,15 @@
        "static": true
       },
       {
+       "name": "presentation",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation",
+       "static": true
+      },
+      {
        "name": "assembly",
        "kind": "method",
-       "signature": "(p:CastingMoldPlan, ?exploded:Bool):MachineAssembly",
+       "signature": "(p:CastingMoldPlan):MachineAssembly",
        "static": true
       },
       {
@@ -39970,6 +41458,44 @@
      ]
     },
     {
+     "name": "CastingSectionContours",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/CastingSectionContours.hx",
+     "doc": "Exact BREP sections in the declared plane's XY coordinates, shared by\ndrawings and machining. Only straight/circular boundaries become line/arc\nrecords; unsupported curves and ambiguous junctions never become polygons.",
+     "fields": [
+      {
+       "name": "normalFrame",
+       "kind": "method",
+       "signature": "(direction:{x:Float, y:Float, z:Float}, sourceId:String):AssemblyFrame",
+       "static": true,
+       "doc": "Right-handed section frame with local Z along a declared unit normal."
+      },
+      {
+       "name": "section",
+       "kind": "method",
+       "signature": "(part:Part, plane:AssemblyFrame, sourceId:String):Array<CastingSectionContour>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ContactTarget",
+     "kind": "enum",
+     "file": "machinekit/haxe/src/machinekit/tooling/ReplicationContactCad.hx",
+     "fields": [
+      {
+       "name": "RealizedContact",
+       "kind": "case",
+       "signature": "(part:Part)"
+      },
+      {
+       "name": "ContactUnsupported",
+       "kind": "case",
+       "signature": "(reason:String)"
+      }
+     ]
+    },
+    {
      "name": "DemoldingStepKind",
      "kind": "abstract",
      "file": "machinekit/haxe/src/machinekit/tooling/CastingMoldCad.hx",
@@ -39996,6 +41522,41 @@
      ]
     },
     {
+     "name": "FoundationAssemblyContext",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/FoundationAssemblyContext.hx",
+     "doc": "Explicit instance bindings preserve source ownership across assembly nesting.\nThis copies declared interface/axis facts, not casting strategies or tolerances.",
+     "fields": [
+      {
+       "name": "snapshot",
+       "kind": "method",
+       "signature": "(assembly:MachineAssembly, bodyMember:String, inserts:Array<{id:String, member:String}>):CastingInterfaceContext",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "FoundationJointCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/FoundationJointCad.hx",
+     "doc": "Finite tip-bearing coverage from actual source components. This checks nominal\ncontact only: stability, strength, tightening and measured fit remain separate.",
+     "fields": [
+      {
+       "name": "contacts",
+       "kind": "method",
+       "signature": "(source:FoundationJointSources, joint:FoundationJoint, local:(String) -> Part, pose:(String) -> AssemblyFrame):Array<{id:String, report:PlanarContactCad.PlanarCoverage}>",
+       "static": true
+      },
+      {
+       "name": "review",
+       "kind": "method",
+       "signature": "(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>",
+       "static": true,
+       "doc": "Reconstruct only standard/source geometry recorded in the fingerprint."
+      }
+     ]
+    },
+    {
      "name": "FoundationToolingAdapter",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/FoundationToolingAdapter.hx",
@@ -40004,7 +41565,7 @@
       {
        "name": "snapshot",
        "kind": "method",
-       "signature": "(foundation:MineralFoundation, id:String, revision:Int):CastingToolingInput",
+       "signature": "(foundation:MineralFoundation, id:String, revision:Int, ?context:materia.casting.CastingInterfaceContext):CastingToolingInput",
        "static": true
       }
      ]
@@ -40058,6 +41619,58 @@
      ]
     },
     {
+     "name": "InsertAnchorGeometry",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/InsertAnchorGeometry.hx",
+     "doc": "Native checks of source hardware. Strength, locking evidence and tooling\ninterference remain separate; source shape bounds never substitute for solids.",
+     "fields": [
+      {
+       "name": "reviewMold",
+       "kind": "method",
+       "signature": "(plan:materia.tooling.casting.CastingMoldPlan):Array<ToolingValidation>",
+       "static": true,
+       "doc": "Actual source hardware against every realized tooling member. The insert's\nown threaded engagement and its own screw/washer contact are intentional."
+      },
+      {
+       "name": "review",
+       "kind": "method",
+       "signature": "(input:CastingToolingInput):Array<ToolingValidation>",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertDrawing",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/InsertDrawing.hx",
+     "doc": "Nominal orthographic body views and source hole-entry projections, not CAM\ncontours. The hole schedule retains entry frames, depth, thread and route.\nCadKit's existing exporters render the same Drawing2D in both formats.",
+     "fields": [
+      {
+       "name": "review",
+       "kind": "method",
+       "signature": "(insert:CastingToolingInsert):InsertDrawingReview",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "InsertDrawingReview",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/InsertDrawing.hx",
+     "fields": [
+      {
+       "name": "drawing",
+       "kind": "var",
+       "signature": ":Drawing2D"
+      },
+      {
+       "name": "validation",
+       "kind": "var",
+       "signature": ":materia.tooling.ToolingValidation"
+      }
+     ]
+    },
+    {
      "name": "InsertFixtureCad",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/InsertFixtureCad.hx",
@@ -40099,6 +41712,11 @@
        "name": "releaseBeforeTranslation",
        "kind": "var",
        "signature": ":Array<String>"
+      },
+      {
+       "name": "directions",
+       "kind": "var",
+       "signature": ":Array<{id:String, x:Float, y:Float, z:Float}>"
       }
      ]
     },
@@ -40262,6 +41880,71 @@
      ]
     },
     {
+     "name": "NativeCastingMoldKernel",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/NativeCastingMoldKernel.hx",
+     "implements": [
+      "CastingMoldKernel"
+     ],
+     "doc": "Exact CAD queries used by non-box planning. Caches retain numbers only;\nevery native resource closes before a query returns, including throw paths.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "moments",
+       "kind": "method",
+       "signature": "(region:CastingRegion):CastingRegionMoments"
+      },
+      {
+       "name": "section",
+       "kind": "method",
+       "signature": "(region:CastingRegion, plane:materia.assembly.AssemblyRecord.AssemblyFrame, affectedId:String):Array<materia.casting.CastingSection.CastingSectionContour>"
+      },
+      {
+       "name": "prismaticSection",
+       "kind": "method",
+       "signature": "(region:CastingRegion, direction:{x:Float, y:Float, z:Float}, toleranceMm3:Float, affectedId:String):Null<materia.casting.CastingSection.CastingPrismSection>"
+      },
+      {
+       "name": "castingMass",
+       "kind": "method",
+       "signature": "(document:ToolingDocument):CastingMassProperties"
+      },
+      {
+       "name": "resinIntersection",
+       "kind": "method",
+       "signature": "(document:ToolingDocument, region:CastingRegion):Float"
+      }
+     ]
+    },
+    {
+     "name": "NativeFillPart",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/CastingFillAnalysis.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":Part"
+      },
+      {
+       "name": "sourceIds",
+       "kind": "var",
+       "signature": ":Array<String>",
+       "optional": true
+      }
+     ],
+     "doc": "Boundary owners supplement the globally unique member ID. Anchor IDs are\nlocal to their insert, so both source IDs accompany the hardware member."
+    },
+    {
      "name": "PanelCad",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/PanelCad.hx",
@@ -40270,7 +41953,7 @@
       {
        "name": "segment",
        "kind": "method",
-       "signature": "(s:PanelSegment):Segment",
+       "signature": "(s:CastingSegment):Segment",
        "static": true
       },
       {
@@ -40288,7 +41971,7 @@
       {
        "name": "contourPrism",
        "kind": "method",
-       "signature": "(contour:Array<PanelSegment>, z0:Float, z1:Float):Part",
+       "signature": "(contour:Array<CastingSegment>, z0:Float, z1:Float):Part",
        "static": true
       }
      ]
@@ -40313,9 +41996,15 @@
      "file": "machinekit/haxe/src/machinekit/tooling/PanelKit.hx",
      "fields": [
       {
+       "name": "presentation",
+       "kind": "method",
+       "signature": "(plan:PanelAssemblyRecord, definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation",
+       "static": true
+      },
+      {
        "name": "assembly",
        "kind": "method",
-       "signature": "(plan:PanelAssemblyRecord, ?exploded:Bool, ?material:String):MachineAssembly",
+       "signature": "(plan:PanelAssemblyRecord, ?material:String):MachineAssembly",
        "static": true
       },
       {
@@ -40330,6 +42019,59 @@
        "signature": "(plan:PanelAssemblyRecord, accesses:Array<{id:String, clearance:Part}>, ?contactVolumeToleranceMm3:Float):Void",
        "static": true,
        "doc": "Borrowed free-approach tool envelopes; contact/engagement belongs outside them."
+      }
+     ]
+    },
+    {
+     "name": "PlanarContactCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/PlanarContactCad.hx",
+     "doc": "Exact nominal planar face coverage, with the real boundaries and holes.\nA volume section through an interior plane is not a boundary contact.\nPhysical hardware, alignment evidence and replication chemistry stay separate.",
+     "fields": [
+      {
+       "name": "coverage",
+       "kind": "method",
+       "signature": "(support:Part, supportFrame:AssemblyFrame, target:Part, targetFrame:AssemblyFrame):PlanarCoverage",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PlanarCoverage",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/PlanarContactCad.hx",
+     "fields": [
+      {
+       "name": "status",
+       "kind": "var",
+       "signature": ":ToolingCheckStatus"
+      },
+      {
+       "name": "message",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "areas",
+       "kind": "var",
+       "signature": ":PlanarCoverageAreas"
+      }
+     ]
+    },
+    {
+     "name": "PlanarCoverageAreas",
+     "kind": "enum",
+     "file": "machinekit/haxe/src/machinekit/tooling/PlanarContactCad.hx",
+     "fields": [
+      {
+       "name": "NotEvaluated",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Evaluated",
+       "kind": "case",
+       "signature": "(targetMm2:Float, uncoveredMm2:Float)"
       }
      ]
     },
@@ -40388,6 +42130,20 @@
      ]
     },
     {
+     "name": "ReplicationContactCad",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ReplicationContactCad.hx",
+     "doc": "Native replication qualification uses the shared finite boundary checker.",
+     "fields": [
+      {
+       "name": "review",
+       "kind": "method",
+       "signature": "(input:CastingToolingInput, jigs:Array<ReplicationJig>):Array<ToolingValidation>",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "SocketFixtureCad",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/SocketFixtureCad.hx",
@@ -40413,9 +42169,16 @@
        "static": true
       },
       {
+       "name": "presentation",
+       "kind": "method",
+       "signature": "(plan:InsertPlatePlan, definition:AssemblyDefinition):AssemblyPresentation",
+       "static": true,
+       "doc": "Views refer to the single engineering assembly, in its length unit."
+      },
+      {
        "name": "assembly",
        "kind": "method",
-       "signature": "(plan:InsertPlatePlan, ?cured:Bool, ?exploded:Bool):MachineAssembly",
+       "signature": "(plan:InsertPlatePlan, ?cured:Bool):MachineAssembly",
        "static": true
       }
      ]
@@ -40424,7 +42187,7 @@
      "name": "SweptRemoval",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/SweptRemoval.hx",
-     "doc": "Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.\nPlanar and cylindrical panel boundary faces are supported. Other surfaces fail explicitly.",
+     "doc": "Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.\nPlanar/cylindrical faces and axial or transverse conical withdrawals are supported. Other surfaces fail explicitly.",
      "fields": [
       {
        "name": "sweep",
@@ -40511,6 +42274,20 @@
      ]
     },
     {
+     "name": "ToolingExplode",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingExplode.hx",
+     "doc": "Converts producer review displacements to the presentation's parent-frame coordinates.",
+     "fields": [
+      {
+       "name": "presentation",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, producer:String, displacements:Map<String, materia.assembly.AssemblyDefinition.AssemblyVector>):AssemblyPresentation",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "ToolingFabricationExport",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/ToolingFabricationExport.hx",
@@ -40529,10 +42306,50 @@
        "static": true
       },
       {
+       "name": "insertAnchorageReport",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, sourceFingerprint:String):Dynamic",
+       "static": true
+      },
+      {
+       "name": "foundationJointReport",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, sourceFingerprint:String):Dynamic",
+       "static": true
+      },
+      {
+       "name": "replicationReport",
+       "kind": "method",
+       "signature": "(p:CastingMoldPlan, sourceFingerprint:String):Dynamic",
+       "static": true
+      },
+      {
        "name": "write",
        "kind": "method",
        "signature": "(p:CastingMoldPlan, f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation>",
        "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolingFastenerFit",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingFastenerFit.hx",
+     "doc": "Nominal geometric engagement from the actual selected components. This does\nnot establish tightening, strip strength, load capacity or physical evidence.",
+     "fields": [
+      {
+       "name": "nutOverlap",
+       "kind": "method",
+       "signature": "(screw:SocketHeadCapScrew, screwPose:AssemblyFrame, nut:HexNut, nutPose:AssemblyFrame):Float",
+       "static": true,
+       "doc": "Exact coaxial interval overlap, using the screw's full threaded length\nmeasured from its tip. Nut CAD runs from local Z=0 to Z=height; screw CAD\nruns toward -Z from its head bearing face. Reversed nut placement is valid."
+      },
+      {
+       "name": "requireNut",
+       "kind": "method",
+       "signature": "(screw:SocketHeadCapScrew, screwPose:AssemblyFrame, nut:HexNut, nutPose:AssemblyFrame, id:String):Void",
+       "static": true,
+       "doc": "Require the entire nominal nut thickness to be on full screw thread.\nThis deliberately does not use the insert-steel engagement policy: the\nselected standard nut is a different component and its strength is separate."
       }
      ]
     },
@@ -40565,9 +42382,9 @@
       {
        "name": "fixtureScrew",
        "kind": "method",
-       "signature": "(a:MachineAssembly, id:String, thread:String, length:Float, pose:AssemblyFrame):Void",
+       "signature": "(a:MachineAssembly, id:String, hole:materia.casting.InsertHole, length:Float, pose:AssemblyFrame, holePose:AssemblyFrame):Void",
        "static": true,
-       "doc": "A cut-to-length study screw into a declared insert thread. Length excludes its washer."
+       "doc": "A nominal study screw into a real source hole. Length excludes its washer.\nValidate the actual standard component before mutating the assembly."
       }
      ]
     },
@@ -40579,6 +42396,12 @@
      "fields": [
       {
        "name": "component",
+       "kind": "method",
+       "signature": "(insert:CastingToolingInsert):CastInsert",
+       "static": true
+      },
+      {
+       "name": "serviceComponent",
        "kind": "method",
        "signature": "(insert:CastingToolingInsert):CastInsert",
        "static": true
@@ -40689,6 +42512,13 @@
        "signature": "(spec:String):Void"
       },
       {
+       "name": "boreSeat",
+       "kind": "method",
+       "signature": "(mask:MachineComponent):materia.assembly.AssemblyRecord.AssemblyFrame",
+       "static": true,
+       "doc": "A bore mask's frame in its hole's frame (z = 0 at the entry, +z into the bore): a pin already runs along\n+z; a threaded mask is a set screw, which is turned so its socket stays at the entry."
+      },
+      {
        "name": "boreMask",
        "kind": "method",
        "signature": "(hole:materia.casting.InsertHole, ?plugLength:Float):MachineComponent",
@@ -40702,6 +42532,32 @@
      ]
     },
     {
+     "name": "ToolingPresentation",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingPresentation.hx",
+     "doc": "Adapts planner order and world withdrawal directions; the viewer never sorts the steps.",
+     "fields": [
+      {
+       "name": "socket",
+       "kind": "method",
+       "signature": "(plan:InsertPlatePlan, artifact:SceneArtifactData, review:InsertFixtureCad.InsertFixtureReview, retainedScrewVolume:Float):AssemblyPresentation",
+       "static": true
+      },
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(plan:materia.tooling.casting.MoldPlan, artifact:SceneArtifactData, review:BoxMoldCad.BoxMoldReview):AssemblyPresentation",
+       "static": true
+      },
+      {
+       "name": "casting",
+       "kind": "method",
+       "signature": "(plan:materia.tooling.casting.CastingMoldPlan, artifact:SceneArtifactData, review:CastingMoldCad.CastingMoldReview):AssemblyPresentation",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "ToolingProcessExport",
      "kind": "class",
      "file": "machinekit/haxe/src/machinekit/tooling/ToolingProcessExport.hx",
@@ -40710,8 +42566,121 @@
       {
        "name": "write",
        "kind": "method",
-       "signature": "(p:CastingMoldPlan, spec:CastingProcessSpec, gravityMps2:Float, dir:String, ?review:machinekit.tooling.CastingMoldCad.CastingMoldReview, ?fabrication:materia.tooling.export.FabricationSpec, ?foundation:machinekit.structural.MineralFoundation):Array<ToolingValidation>",
+       "signature": "(p:CastingMoldPlan, spec:CastingProcessSpec, gravityMps2:Float, dir:String, ?review:machinekit.tooling.CastingMoldCad.CastingMoldReview, ?fabrication:materia.tooling.export.FabricationSpec, ?foundation:machinekit.structural.MineralFoundation, ?existing:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport, ?interfaceContext:materia.casting.CastingInterfaceContext):Array<ToolingValidation>",
        "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolingSectionDrawing",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingSectionDrawing.hx",
+     "doc": "Nominal section sheets from actual finished tooling, without stock-bound\nsilhouettes or cutter compensation. Existing CadKit exporters own text output.",
+     "fields": [
+      {
+       "name": "sheet",
+       "kind": "method",
+       "signature": "(volume:MoldVolume, frame:AssemblyFrame, levels:Array<Float>):ToolingSectionSheet",
+       "static": true
+      },
+      {
+       "name": "byDirection",
+       "kind": "method",
+       "signature": "(volume:MoldVolume, direction:{x:Float, y:Float, z:Float}):ToolingSectionSheet",
+       "static": true,
+       "doc": "Reference sections along a declared removal direction. Actual extrema,\nnot bounding-box faces, determine the end sections."
+      }
+     ]
+    },
+    {
+     "name": "ToolingSectionRecord",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingSectionReview.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "geometryFingerprint",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "sections",
+       "kind": "var",
+       "signature": ":Array<materia.casting.CastingSection>"
+      },
+      {
+       "name": "validation",
+       "kind": "var",
+       "signature": ":ToolingValidation"
+      }
+     ]
+    },
+    {
+     "name": "ToolingSectionReview",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingSectionReview.hx",
+     "doc": "Finished-tooling drawing evidence, separate from machining and physical fit.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(plan:CastingMoldPlan):ToolingSectionReviewResult",
+       "static": true
+      },
+      {
+       "name": "record",
+       "kind": "method",
+       "signature": "(review:ToolingSectionReviewResult, sourceFingerprint:String):Dynamic",
+       "static": true
+      },
+      {
+       "name": "filename",
+       "kind": "method",
+       "signature": "(id:String):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ToolingSectionReviewResult",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingSectionReview.hx",
+     "fields": [
+      {
+       "name": "records",
+       "kind": "var",
+       "signature": ":Array<ToolingSectionRecord>"
+      },
+      {
+       "name": "sheets",
+       "kind": "var",
+       "signature": ":Array<{id:String, sheet:ToolingSectionSheet}>"
+      },
+      {
+       "name": "validation",
+       "kind": "var",
+       "signature": ":Array<ToolingValidation>"
+      }
+     ]
+    },
+    {
+     "name": "ToolingSectionSheet",
+     "kind": "typedef",
+     "file": "machinekit/haxe/src/machinekit/tooling/ToolingSectionDrawing.hx",
+     "fields": [
+      {
+       "name": "drawing",
+       "kind": "var",
+       "signature": ":Drawing2D"
+      },
+      {
+       "name": "sections",
+       "kind": "var",
+       "signature": ":Array<CastingSection>"
       }
      ]
     },
@@ -40788,6 +42757,13 @@
        "kind": "method",
        "signature": "(v:MoldVolume):ToolingVolume",
        "static": true
+      },
+      {
+       "name": "fromCoreCutting",
+       "kind": "method",
+       "signature": "(id:String, cutting:materia.tooling.casting.CoreSupport.CoreCutting):ToolingVolume",
+       "static": true,
+       "doc": "Realize finished foam, never the rectangular cutting blank. Placement is\nthe record's stockToMold frame, supplied by the assembly caller."
       },
       {
        "name": "new",
@@ -41299,6 +43275,12 @@
      "doc": "Assumed catalogue-class normal-module helical rack. Dimensions mm; SI ratings unless stated.\nGeometry is a nominal layout envelope, not manufacturing or supplier geometry.",
      "fields": [
       {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>",
+       "doc": "Lies along its length (+Z) with its teeth (+Y) up."
+      },
+      {
        "name": "new",
        "kind": "method",
        "signature": "(?v:ComponentValues):Void"
@@ -41499,6 +43481,12 @@
        "signature": ":Float",
        "final": true,
        "doc": "Tangential reversal clearance at the pitch line, mm."
+      },
+      {
+       "name": "presentationView",
+       "kind": "method",
+       "signature": "():Null<machinekit.component.ComponentView>",
+       "doc": "Lies along its length (+Z) with its teeth (+Y) up."
       },
       {
        "name": "relation",
@@ -42351,6 +44339,55 @@
        "name": "values",
        "kind": "method",
        "signature": "():ComponentValues"
+      }
+     ]
+    },
+    {
+     "name": "ToothOutline",
+     "kind": "class",
+     "file": "machinekit/haxe/src/machinekit/transmission/ToothOutline.hx",
+     "doc": "A closed planar tooth outline (at z = 0) built from its true pieces: splines through sampled involutes,\narcs on tip and root circles, and straight lines. Unlike a polyline through samples, a flank is then one\nsmooth face, so shading and edge display show the tooth, not its sampling. Pieces must join end to start;\n`close` checks that the outline returns to its first point.",
+     "fields": [
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "line",
+       "kind": "method",
+       "signature": "(start:Vector, end:Vector):ToothOutline"
+      },
+      {
+       "name": "arc",
+       "kind": "method",
+       "signature": "(start:Vector, middle:Vector, end:Vector):ToothOutline",
+       "doc": "A circular arc from `start` through `middle` to `end`."
+      },
+      {
+       "name": "spline",
+       "kind": "method",
+       "signature": "(points:Array<Vector>):ToothOutline",
+       "doc": "An interpolating spline through `points`, in order."
+      },
+      {
+       "name": "close",
+       "kind": "method",
+       "signature": "():Curve",
+       "doc": "The closed wire. The pieces are consumed."
+      },
+      {
+       "name": "extrude",
+       "kind": "method",
+       "signature": "(z0:Float, z1:Float):Part",
+       "doc": "The outline extruded along +Z from z0 to z1: a ruled loft between two copies, so every piece becomes one face."
+      },
+      {
+       "name": "at",
+       "kind": "method",
+       "signature": "(z:Float, angle:Float):Location",
+       "static": true,
+       "doc": "The placement of a section at height `z`, turned by `angle` radians about +Z."
       }
      ]
     },

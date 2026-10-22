@@ -7987,7 +7987,7 @@
     {
      "name": "profile",
      "type": "text",
-     "value": "HGR15"
+     "value": "HGH15CA"
     },
     {
      "name": "material",
@@ -8048,7 +8048,7 @@
    "bom": {
     "description": "Welded Z carriage with central ball-nut shelf",
     "material": "steel",
-    "partNumber": "machinekit.milling.z-carriage|nutModel:11:generic1605|width:3:234|height:3:160|thickness:2:16|nutReach:2:53|nutCentreZ:2:80|nutPlate:2:10|headBoltX:2:65|headBoltZ:2:42|railSpacing:3:180|blockSpan:4:32.7|profile:5:HGR15"
+    "partNumber": "machinekit.milling.z-carriage|nutModel:11:generic1605|width:3:234|height:3:160|thickness:2:16|nutReach:2:53|nutCentreZ:2:80|nutPlate:2:10|headBoltX:2:65|headBoltZ:2:42|railSpacing:3:180|blockSpan:4:32.7|profile:7:HGH15CA"
    },
    "material": "machined-steel",
    "mass": {
@@ -10782,157 +10782,6 @@
    "fidelity": "nominal"
   },
   {
-   "id": "machinekit.motion.hg-block-reference",
-   "label": "Hg block reference",
-   "family": "motion",
-   "category": "Linear guides",
-   "kind": "reference",
-   "error": "Missing HG reference; run python3 tools/suppliers/hg.py --prepare build/suppliers/vallder/hg-reference"
-  },
-  {
-   "id": "machinekit.motion.hg-rail",
-   "label": "Hg rail",
-   "family": "motion",
-   "category": "Linear guides",
-   "kind": "generic",
-   "designation": "CUSTOM-HG-HGR15R-RW15-RH15-HP60-EM20-L400",
-   "description": "HG HGR15R profile rail, 400 mm long",
-   "parameters": [
-    {
-     "name": "model",
-     "type": "choice",
-     "value": "HGR15R",
-     "options": [
-      "HGR15R",
-      "HGR20R",
-      "HGR25R",
-      "HGR30R",
-      "HGR35R",
-      "HGR45R"
-     ]
-    },
-    {
-     "name": "length",
-     "type": "length",
-     "value": 400,
-     "unit": "mm",
-     "minimum": 0
-    },
-    {
-     "name": "material",
-     "type": "choice",
-     "value": "steel",
-     "options": [
-      "unspecified",
-      "painted steel",
-      "steel",
-      "steel C45",
-      "steel 8",
-      "steel 8.8",
-      "steel 10.9",
-      "stainless A2-70",
-      "steel 12.9",
-      "bearing steel",
-      "aluminium 6061",
-      "rubber",
-      "nitrile rubber NBR",
-      "PA12 nylon",
-      "plastic",
-      "device housing",
-      "device housing dark",
-      "polycarbonate",
-      "polyurethane PU",
-      "birch plywood",
-      "MDF",
-      "PMMA acrylic",
-      "EPS tooling",
-      "coated particleboard",
-      "mineral cast",
-      "carbide",
-      "cast iron",
-      "bronze",
-      "brass",
-      "spring steel",
-      "mild steel sheet",
-      "aluminium 5052-H32 sheet",
-      "Compact laminate",
-      "Glass reinforced plastic",
-      "Polypropylene",
-      "HDPE",
-      "UHMW polyethylene",
-      "FR aluminium composite panel",
-      "Aluminium honeycomb panel",
-      "Insulated sandwich panel",
-      "Stainless sheet",
-      "Panel adhesive"
-     ]
-    }
-   ],
-   "connectors": [
-    {
-     "name": "axis",
-     "role": "Axis"
-    },
-    {
-     "name": "base",
-     "role": "Mount"
-    },
-    {
-     "name": "mount1",
-     "role": "Mount"
-    },
-    {
-     "name": "mount2",
-     "role": "Mount"
-    },
-    {
-     "name": "mount3",
-     "role": "Mount"
-    },
-    {
-     "name": "mount4",
-     "role": "Mount"
-    },
-    {
-     "name": "mount5",
-     "role": "Mount"
-    },
-    {
-     "name": "mount6",
-     "role": "Mount"
-    },
-    {
-     "name": "mount7",
-     "role": "Mount"
-    }
-   ],
-   "bom": {
-    "description": "HG HGR15R profile rail, 400 mm long",
-    "material": "steel",
-    "partNumber": "machinekit.motion.hg-rail|model:6:HGR15R|length:3:400"
-   },
-   "material": "machined-steel",
-   "mass": {
-    "kg": 0.577641,
-    "source": "Computed(Preview)"
-   },
-   "model": "motion-hg-rail.glb",
-   "view": {
-    "environment": "/components/environment/studio-50.hdr",
-    "phi": 50,
-    "theta": 35
-   },
-   "fidelity": "nominal"
-  },
-  {
-   "id": "machinekit.motion.hgh15ca-reference",
-   "label": "Hgh15ca reference",
-   "family": "motion",
-   "category": "Linear guides",
-   "kind": "reference",
-   "error": "Missing HGH15CA reference: run python3 machinekit/examples/linear-rail-reference/prepare.py"
-  },
-  {
    "id": "machinekit.motion.hzmotion-bk12-screw-end-study",
    "label": "Hzmotion bk12 screw end study",
    "family": "motion",
@@ -11806,9 +11655,9 @@
    "label": "Linear rail",
    "family": "motion",
    "category": "Linear guides",
-   "kind": "generic",
-   "designation": "HIWIN-MGN12C-RAIL-L100",
-   "description": "HIWIN MGN12C profile rail, 100 mm long",
+   "kind": "supplier",
+   "designation": "HIWIN-MGNR12R-L100",
+   "description": "HIWIN MGNR12R profile rail, 100 mm long",
    "parameters": [
     {
      "name": "profile",
@@ -11816,11 +11665,20 @@
      "value": "MGN12C",
      "options": [
       "MGN12C",
-      "HGR15",
-      "HGR20",
-      "HGR25",
       "MGN12H",
-      "MGN9C"
+      "MGN9C",
+      "HGH15CA",
+      "HGW15CC",
+      "HGH20CA",
+      "HGW20CC",
+      "HGH25CA",
+      "HGW25CC",
+      "HGH30CA",
+      "HGW30CC",
+      "HGH35CA",
+      "HGW35CC",
+      "HGH45CA",
+      "HGW45CC"
      ]
     },
     {
@@ -11829,6 +11687,15 @@
      "value": 100,
      "unit": "mm",
      "minimum": 0
+    },
+    {
+     "name": "geometry",
+     "type": "choice",
+     "value": "nominal",
+     "options": [
+      "nominal",
+      "measured"
+     ]
     },
     {
      "name": "material",
@@ -11907,9 +11774,9 @@
     }
    ],
    "bom": {
-    "description": "HIWIN MGN12C profile rail, 100 mm long",
+    "description": "HIWIN MGNR12R profile rail, 100 mm long",
     "material": "steel",
-    "partNumber": "machinekit.motion.linear-rail|profile:6:MGN12C|length:3:100"
+    "partNumber": "machinekit.motion.linear-rail|profile:6:MGN12C|length:3:100|geometry:7:nominal"
    },
    "material": "machined-steel",
    "catalogs": [
@@ -11918,7 +11785,7 @@
      "rows": [
       {
        "designation": "MGN12C",
-       "source": "Dimensions: https://www.hiwin.com/wp-content/uploads/HIWIN-Linear-Guideway-Catalog.pdf; assumed 2.6 kN static block capacity, not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
        "verified": [
@@ -11927,53 +11794,308 @@
         "blockWidth",
         "blockHeight",
         "blockLength",
-        "blockMountScrew",
+        "blockMountThread",
         "railHolePitch",
         "railEndMargin",
         "railMountScrew"
        ]
       },
       {
-       "designation": "HGR15",
-       "source": "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
-       "designation": "HGR20",
-       "source": "Assumed HGR20 reference envelope and static block capacity; not vendor verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
-       "designation": "HGR25",
-       "source": "Assumed HGR25 preloaded envelope; conservative 20 kN static capacity, preload to be specified and verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
        "designation": "MGN12H",
-       "source": "Assumed MGN12H reference envelope and static block capacity; not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
+       "conformance": "NominalEnvelope",
        "verified": []
       },
       {
        "designation": "MGN9C",
-       "source": "Assumed MGN9C reference envelope and static block capacity; not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
+       "conformance": "NominalEnvelope",
        "verified": []
+      },
+      {
+       "designation": "HGH15CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW15CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH20CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW20CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH25CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW25CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH30CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW30CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH35CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW35CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH45CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW45CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       }
      ]
     }
    ],
    "mass": {
-    "kg": 0.07536,
-    "source": "Modelled"
+    "kg": 0.065,
+    "source": "Declared"
    },
    "model": "motion-linear-rail.glb",
    "view": {
@@ -11988,8 +12110,8 @@
    "label": "Linear rail block",
    "family": "motion",
    "category": "Linear guides",
-   "kind": "generic",
-   "designation": "HIWIN-MGN12C-BLOCK",
+   "kind": "supplier",
+   "designation": "HIWIN-MGN12C",
    "description": "HIWIN MGN12C carriage block",
    "parameters": [
     {
@@ -11998,11 +12120,29 @@
      "value": "MGN12C",
      "options": [
       "MGN12C",
-      "HGR15",
-      "HGR20",
-      "HGR25",
       "MGN12H",
-      "MGN9C"
+      "MGN9C",
+      "HGH15CA",
+      "HGW15CC",
+      "HGH20CA",
+      "HGW20CC",
+      "HGH25CA",
+      "HGW25CC",
+      "HGH30CA",
+      "HGW30CC",
+      "HGH35CA",
+      "HGW35CC",
+      "HGH45CA",
+      "HGW45CC"
+     ]
+    },
+    {
+     "name": "geometry",
+     "type": "choice",
+     "value": "nominal",
+     "options": [
+      "nominal",
+      "supplier"
      ]
     },
     {
@@ -12088,7 +12228,7 @@
    "bom": {
     "description": "HIWIN MGN12C carriage block",
     "material": "steel",
-    "partNumber": "HIWIN-MGN12C-BLOCK"
+    "partNumber": "HIWIN-MGN12C"
    },
    "material": "machined-steel",
    "catalogs": [
@@ -12097,7 +12237,7 @@
      "rows": [
       {
        "designation": "MGN12C",
-       "source": "Dimensions: https://www.hiwin.com/wp-content/uploads/HIWIN-Linear-Guideway-Catalog.pdf; assumed 2.6 kN static block capacity, not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
        "conformance": "NominalEnvelope",
        "verified": [
@@ -12106,53 +12246,308 @@
         "blockWidth",
         "blockHeight",
         "blockLength",
-        "blockMountScrew",
+        "blockMountThread",
         "railHolePitch",
         "railEndMargin",
         "railMountScrew"
        ]
       },
       {
-       "designation": "HGR15",
-       "source": "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
-       "designation": "HGR20",
-       "source": "Assumed HGR20 reference envelope and static block capacity; not vendor verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
-       "designation": "HGR25",
-       "source": "Assumed HGR25 preloaded envelope; conservative 20 kN static capacity, preload to be specified and verified",
-       "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
-       "verified": []
-      },
-      {
        "designation": "MGN12H",
-       "source": "Assumed MGN12H reference envelope and static block capacity; not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
+       "conformance": "NominalEnvelope",
        "verified": []
       },
       {
        "designation": "MGN9C",
-       "source": "Assumed MGN9C reference envelope and static block capacity; not vendor verified",
+       "source": "HIWIN MGN/MGW catalogue: https://damencnc.com/userdata/file/3455-3_HIWIN_MGN_and_MGW_Product_Catalog_2023.pdf",
        "dimensions": "Nominal",
-       "conformance": "GenericApproximation",
+       "conformance": "NominalEnvelope",
        "verified": []
+      },
+      {
+       "designation": "HGH15CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW15CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH20CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW20CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH25CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW25CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH30CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW30CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH35CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW35CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGH45CA",
+       "source": "Vallder HG tables (https://vallder.com/product/hgh-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
+      },
+      {
+       "designation": "HGW45CC",
+       "source": "Vallder HG tables (https://vallder.com/product/hgw-linear-block/, https://vallder.com/product/hgr-linear-guideways/)",
+       "dimensions": "Nominal",
+       "conformance": "NominalEnvelope",
+       "verified": [
+        "railWidth",
+        "railHeight",
+        "blockWidth",
+        "blockHeight",
+        "blockLength",
+        "blockHoleSpacingAlong",
+        "blockHoleSpacingAcross",
+        "blockMountThread",
+        "railHolePitch",
+        "railEndMargin",
+        "railMountScrew",
+        "railBore",
+        "blockMassKg",
+        "railMassKgPerMetre",
+        "ratings"
+       ]
       }
      ]
     }
    ],
    "mass": {
-    "kg": 0.036773,
-    "source": "Modelled"
+    "kg": 0.034,
+    "source": "Declared"
    },
    "model": "motion-linear-rail-block.glb",
    "view": {
@@ -15873,270 +16268,6 @@
     "theta": 35
    },
    "fidelity": "envelope"
-  },
-  {
-   "id": "machinekit.motion.supplier-hgh-block",
-   "label": "Supplier hgh block",
-   "family": "motion",
-   "category": "Linear guides",
-   "kind": "supplier",
-   "designation": "GENERIC-HG-HGR15-BLOCK-HIWIN-HGH15CA-STEP-3bc285a6e79d-HIWIN-HGH15CA-STEP-3bc285a6e79d",
-   "description": "GENERIC-HG HGR15 carriage block",
-   "parameters": [
-    {
-     "name": "profile",
-     "type": "choice",
-     "value": "HGR15",
-     "options": [
-      "HGR15",
-      "HGR25"
-     ]
-    },
-    {
-     "name": "cadSha256",
-     "type": "text",
-     "value": ""
-    },
-    {
-     "name": "material",
-     "type": "choice",
-     "value": "steel",
-     "options": [
-      "unspecified",
-      "painted steel",
-      "steel",
-      "steel C45",
-      "steel 8",
-      "steel 8.8",
-      "steel 10.9",
-      "stainless A2-70",
-      "steel 12.9",
-      "bearing steel",
-      "aluminium 6061",
-      "rubber",
-      "nitrile rubber NBR",
-      "PA12 nylon",
-      "plastic",
-      "device housing",
-      "device housing dark",
-      "polycarbonate",
-      "polyurethane PU",
-      "birch plywood",
-      "MDF",
-      "PMMA acrylic",
-      "EPS tooling",
-      "coated particleboard",
-      "mineral cast",
-      "carbide",
-      "cast iron",
-      "bronze",
-      "brass",
-      "spring steel",
-      "mild steel sheet",
-      "aluminium 5052-H32 sheet",
-      "Compact laminate",
-      "Glass reinforced plastic",
-      "Polypropylene",
-      "HDPE",
-      "UHMW polyethylene",
-      "FR aluminium composite panel",
-      "Aluminium honeycomb panel",
-      "Insulated sandwich panel",
-      "Stainless sheet",
-      "Panel adhesive"
-     ]
-    }
-   ],
-   "connectors": [
-    {
-     "name": "rail",
-     "role": "Axis"
-    },
-    {
-     "name": "axis",
-     "role": "Axis"
-    },
-    {
-     "name": "top",
-     "role": "Mount"
-    },
-    {
-     "name": "mount1",
-     "role": "Mount"
-    },
-    {
-     "name": "mount2",
-     "role": "Mount"
-    },
-    {
-     "name": "mount3",
-     "role": "Mount"
-    },
-    {
-     "name": "mount4",
-     "role": "Mount"
-    }
-   ],
-   "bom": {
-    "description": "GENERIC-HG HGR15 carriage block",
-    "material": "steel",
-    "partNumber": "GENERIC-HG-HGR15-BLOCK-HIWIN-HGH15CA-STEP-3bc285a6e79d-HIWIN-HGH15CA-STEP-3bc285a6e79d"
-   },
-   "material": "machined-steel",
-   "mass": {
-    "kg": 0.290814,
-    "source": "Computed(Preview)"
-   },
-   "model": "motion-supplier-hgh-block.glb",
-   "view": {
-    "environment": "/components/environment/studio-62.hdr",
-    "phi": 62,
-    "theta": 35
-   },
-   "fidelity": "nominal"
-  },
-  {
-   "id": "machinekit.motion.supplier-hgr25-rail",
-   "label": "Supplier hgr25 rail",
-   "family": "motion",
-   "category": "Linear guides",
-   "kind": "supplier",
-   "designation": "GENERIC-HG-HGR25-RAIL-L680-HIWIN-HGR25R-STEP-a5c25503c681",
-   "description": "GENERIC-HG HGR25 profile rail, 680 mm long",
-   "parameters": [
-    {
-     "name": "length",
-     "type": "length",
-     "value": 680,
-     "unit": "mm",
-     "minimum": 0
-    },
-    {
-     "name": "cadSha256",
-     "type": "text",
-     "value": ""
-    },
-    {
-     "name": "material",
-     "type": "choice",
-     "value": "steel",
-     "options": [
-      "unspecified",
-      "painted steel",
-      "steel",
-      "steel C45",
-      "steel 8",
-      "steel 8.8",
-      "steel 10.9",
-      "stainless A2-70",
-      "steel 12.9",
-      "bearing steel",
-      "aluminium 6061",
-      "rubber",
-      "nitrile rubber NBR",
-      "PA12 nylon",
-      "plastic",
-      "device housing",
-      "device housing dark",
-      "polycarbonate",
-      "polyurethane PU",
-      "birch plywood",
-      "MDF",
-      "PMMA acrylic",
-      "EPS tooling",
-      "coated particleboard",
-      "mineral cast",
-      "carbide",
-      "cast iron",
-      "bronze",
-      "brass",
-      "spring steel",
-      "mild steel sheet",
-      "aluminium 5052-H32 sheet",
-      "Compact laminate",
-      "Glass reinforced plastic",
-      "Polypropylene",
-      "HDPE",
-      "UHMW polyethylene",
-      "FR aluminium composite panel",
-      "Aluminium honeycomb panel",
-      "Insulated sandwich panel",
-      "Stainless sheet",
-      "Panel adhesive"
-     ]
-    }
-   ],
-   "connectors": [
-    {
-     "name": "axis",
-     "role": "Axis"
-    },
-    {
-     "name": "base",
-     "role": "Mount"
-    },
-    {
-     "name": "mount1",
-     "role": "Mount"
-    },
-    {
-     "name": "mount2",
-     "role": "Mount"
-    },
-    {
-     "name": "mount3",
-     "role": "Mount"
-    },
-    {
-     "name": "mount4",
-     "role": "Mount"
-    },
-    {
-     "name": "mount5",
-     "role": "Mount"
-    },
-    {
-     "name": "mount6",
-     "role": "Mount"
-    },
-    {
-     "name": "mount7",
-     "role": "Mount"
-    },
-    {
-     "name": "mount8",
-     "role": "Mount"
-    },
-    {
-     "name": "mount9",
-     "role": "Mount"
-    },
-    {
-     "name": "mount10",
-     "role": "Mount"
-    },
-    {
-     "name": "mount11",
-     "role": "Mount"
-    }
-   ],
-   "bom": {
-    "description": "GENERIC-HG HGR25 profile rail, 680 mm long",
-    "material": "steel",
-    "partNumber": "GENERIC-HG-HGR25-RAIL-L680-HIWIN-HGR25R-STEP-a5c25503c681"
-   },
-   "material": "machined-steel",
-   "mass": {
-    "kg": 2.223236,
-    "source": "Computed(Preview)"
-   },
-   "model": "motion-supplier-hgr25-rail.glb",
-   "view": {
-    "environment": "/components/environment/studio-50.hdr",
-    "phi": 50,
-    "theta": 35
-   },
-   "fidelity": "nominal"
   },
   {
    "id": "machinekit.motion.torque-motor",
@@ -27547,13 +27678,13 @@
    "family": "tooling",
    "category": "Casting tooling",
    "kind": "generic",
-   "designation": "MOLD-former-dd9343c01859",
+   "designation": "MOLD-former-5ca0826f3cda",
    "description": "Tooling former",
    "parameters": [
     {
      "name": "volume",
      "type": "text",
-     "value": "{\"format\":\"materia.mold-volume\",\"version\":3,\"volume\":{\"cuts\":[],\"id\":\"former\",\"material\":\"former\",\"pieces\":[{\"depth\":20,\"height\":20,\"width\":20,\"x\":0,\"y\":0,\"z\":0}],\"profiles\":[]}}"
+     "value": "{\"format\":\"materia.mold-volume\",\"version\":5,\"volume\":{\"cuts\":[],\"id\":\"former\",\"material\":\"former\",\"pieces\":[{\"depth\":20,\"height\":20,\"width\":20,\"x\":0,\"y\":0,\"z\":0}],\"profiles\":[],\"regions\":[]}}"
     },
     {
      "name": "material",
@@ -27614,7 +27745,7 @@
    "bom": {
     "description": "Tooling former",
     "material": "coated particleboard",
-    "partNumber": "machinekit.tooling.volume|volume:178:{\"format\":\"materia.mold-volume\",\"version\":3,\"volume\":{\"cuts\":[],\"id\":\"former\",\"material\":\"former\",\"pieces\":[{\"depth\":20,\"height\":20,\"width\":20,\"x\":0,\"y\":0,\"z\":0}],\"profiles\":[]}}"
+    "partNumber": "machinekit.tooling.volume|volume:191:{\"format\":\"materia.mold-volume\",\"version\":5,\"volume\":{\"cuts\":[],\"id\":\"former\",\"material\":\"former\",\"pieces\":[{\"depth\":20,\"height\":20,\"width\":20,\"x\":0,\"y\":0,\"z\":0}],\"profiles\":[],\"regions\":[]}}"
    },
    "material": "tooling-coated-board",
    "mass": {
