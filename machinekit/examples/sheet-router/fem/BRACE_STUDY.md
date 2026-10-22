@@ -1,3 +1,6 @@
+> Motion control labels and acceptance scope corrected on 2026-10-22: see
+> [MOTION_ENVELOPE.md](MOTION_ENVELOPE.md). Controlled J4 rows below are diagnostics.
+
 # Brace-reduction study
 
 Result: retain all sixteen braces on both beds. No tested reduction qualifies
@@ -46,7 +49,7 @@ categories and 100-million-cycle cut-off, including both load reversals.
 
 The J4 exports and source snapshots are pinned, with producer manifests and
 configuration hashes retained. They include the entire rapid entry and moving
-rapid-to-cut handover, nominal contours, 1.5×/3× override and hold/resume. Modal
+rapid-to-cut handover, nominal contours, override and hold/resume requests at t=1.5/3 s. Modal
 history is never reset at a segment or handover. Policies remain 2600 ZV and
 3150 unshaped with their selected axis jerks. The robustness screen varies
 frequency ±15% and damping from 0.5% to 3%; a coarse frequency screen cannot
@@ -88,7 +91,7 @@ identified governing poses. The other reduced layouts already have clear
 counterexamples, so this is a rejection screen rather than a converged release
 qualification for those layouts. Frequency is reported, never used as a gate.
 
-Motion columns include the full rapid-entry history, nominal, 1.5×/3× overrides
+Motion columns include the full rapid-entry history, nominal, override requests at t=1.5/3 s
 and hold/resume. The primary grid has three frequency scales × seven damping
 values; lower-plane removal on the long bed also has a 129 × seven sweep at
 three modal poses. The 0.04 mm reserve and 0.05 mm SR-D3 ceiling are distinct.
@@ -162,8 +165,8 @@ The full per-history dynamic contact rows are retained in the archive.
 
 The h=100 → 50 mm baseline first-six frequency change is at most 0.72% at the
 original modal poses. Timed errors are more phase-sensitive: finer-mesh observed
-contour peaks are **0.06320 mm** short (X0/Y1300, 3× override) and **0.04397 mm**
-long (X0/Y0, 3× hold/resume). The former exceeds 0.05 mm; both exceed the 0.04 mm
+contour peaks are **0.06320 mm** short (X0/Y1300, 75% feed request at t=3 s (old offline suffix)) and **0.04397 mm**
+long (X0/Y0, hold/resume at t=3 s (old offline stop)). The former exceeds 0.05 mm; both exceed the 0.04 mm
 reserve. Lower-plane removal still gives **0.06293 / 0.04315 mm** at the refined
 screened poses. This is why the old focused governing-pose policy pass cannot
 be extrapolated to the whole bed.
@@ -197,16 +200,28 @@ Do not adopt single-diagonal or front-open geometry from this screen. The next
 joint rack-support study must report the seat mass/compliance and the effect
 on the low Y-drive/beam mode before proposing any frozen-CAD change.
 
+## Motion-envelope correction
+
+The request suffixes `1p5` and `3` mean **seconds**, not feed multipliers.
+All four controlled J4 scenarios request 75% feed. They compile offline
+stop/retime/resume suffixes and do not establish the approved J5 ready-stop
+and executor-clock behaviour. These controlled histories are diagnostic only;
+see [MOTION_ENVELOPE.md](MOTION_ENVELOPE.md) for the corrected coverage.
+The user accepted retaining all braces.
+
 ## Evidence and reproduction
 
-The retained packet is `build/sheet-router-evidence/brace-reduction.tar.gz`,
+The retained packet is `build/sheet-router-evidence/brace-reduction-compact.tar.gz`,
 with its SHA256 in the adjacent `.sha256` file and
 [provenance.json](brace-results/provenance.json). It contains pinned SR7 mass
 packets, qualified SR6 native/preparation/stitch data, J4 CSV/manifests/source,
-serial solver decks/logs/compressed data, reactions, per-mode energy/body
+serial solver decks/logs, selected governing compressed data, reactions, per-mode energy/body
 reports, signed per-contact stress rows, numerical rejections, convergence
-checks and test results. Loose working packets are removed after archive
-verification. No tracked CAD or assembly geometry is changed by this commit.
+checks and test results. The compact archive retains all decks, logs, summaries, reactions and mode reports;
+337 reproducible bulk raw DAT files were removed after verifying all 1,872 retained
+regular files. Refined baseline and refined weld raw DAT are retained. The
+original hash inventory and retention manifest identify every omitted file.
+Loose working packets are removed after archive verification. No tracked CAD or assembly geometry is changed by this commit.
 
 The drivers consume extracted **regular files** from that archive:
 
@@ -219,5 +234,5 @@ python3 brace_checks.py
 ```
 
 Use the repository heavy-run gate and serial solver, keep output under root
-`build/`, and stop below 5 GB free. Exact commands/logs and mesh/pose selections
+`build/`, and stop below 8 GB free. Exact commands/logs and mesh/pose selections
 are retained. Do not write through symlinked extraction or snapshot paths.

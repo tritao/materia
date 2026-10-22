@@ -103,7 +103,7 @@ def diagnostics(model,path,result):
 
 def disk():
     free=shutil.disk_usage(Path.cwd()).free
-    if free<5_000_000_000:raise RuntimeError('STOP: root free space below 5 GB: '+str(free))
+    if free<8_000_000_000:raise RuntimeError('STOP: root free space below 8 GB: '+str(free))
 
 def checked_case(packet,joined,effective,pose,h,ccx,folder,count):
     result=qw.run_case(packet,joined,effective,pose,h,ccx,folder,count)

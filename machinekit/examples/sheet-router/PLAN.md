@@ -841,8 +841,8 @@ OM-R1 execution, measured-mode commissioning and cutting acceptance remain open.
 The populated SR7 mass (+30.72 kg fixed) and all nine poses are now replayed
 against the pinned J4 contour/override/hold histories, including rapid-entry
 modal history. Static stiffness still clears 2 N/µm. The finer-mesh observed
-contour peaks are 0.06320 mm (2600, X0/Y1300, 3× override) and 0.04397 mm
-(3150, X0/Y0, 3× hold/resume). The short bed exceeds SR-D3's 0.05 mm budget;
+contour peaks are 0.06320 mm (2600, X0/Y1300, 75% feed request at t=3 s (offline J4 suffix)) and 0.04397 mm
+(3150, X0/Y0, hold/resume at t=3 s (offline J4 stop)). The short bed exceeds SR-D3's 0.05 mm budget;
 both miss the requested 0.04 mm study reserve. These histories and poses extend
 the older freeze and focused SR7 evidence; the fixed J4 policies are not a
 full-envelope cutting acceptance. The long-bed baseline also reaches 13.03 MPa
@@ -1765,3 +1765,9 @@ Logs are under `build/sheet-router-evidence/unpacked/sheet-router-sr0/`. The rep
 rebuild or new build tree. Root free space is approximately 1.8 GiB. This closes
 SR4 under the stated reference assumptions. SR5 structural reactions, compliance
 and modes are next; SR0 full-baseline and supplier/hardware qualification remain open.
+
+Motion-envelope correction (2026-10-22): the brace-study suffixes 1p5/3 are request
+times in seconds, not override multipliers. The user accepted keeping all braces.
+Old offline J4 control histories are diagnostic, pending replacement by J5 ready
+stops and executor-clock exports. See [motion envelope audit](fem/MOTION_ENVELOPE.md).
+No frozen CAD change is authorised by the brace study. Keep root above 8 GB free.

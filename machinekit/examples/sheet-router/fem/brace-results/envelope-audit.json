@@ -1,0 +1,807 @@
+{
+  "policy": {
+    "hold": "ready jerk-limited published stop; normal planned resume",
+    "overrideAtOrBelowOne": "jerk-filtered executor clock; certify k derivatives with reserved V/A/J",
+    "overrideAboveOne": "next-window raised-feed replan within unchanged V/A/J and maximum feed; no k>1 clock scaling",
+    "missingCoverage": [
+      "J5 ready-stop/filtered-clock histories",
+      "raised-feed next-window replans"
+    ],
+    "status": "Nominal subset only; no full-envelope release"
+  },
+  "exports": [
+    {
+      "bedMm": 2600,
+      "history": "nominal",
+      "control": null,
+      "envelopeClass": "nominal",
+      "excludesWhy": null,
+      "durationS": 5.270061293,
+      "sampledAbsMax": {
+        "vx": 0.6666666619416892,
+        "vy": 0.3333333312835545,
+        "ax": 2.9999999611177843,
+        "ay": 2.999999965437187,
+        "jx": 210.36529833559945,
+        "jy": 57.8139215888093
+      },
+      "sha256": {
+        ".csv": "7a12112a8b1733aa69fbbe4c25c37e8f41033d168f55b92dc4eee19afc3beef3",
+        ".json": "d531e98f7c0d4e766150bfede8b3864312159742a3e4d6bffb54d2a39b8e5b68",
+        ".manifest.json": "b22581dd37a27e2a343e94184b2a87a9fa5363a9a27d653b13f05d14a5b6d717",
+        ".config.json": "e510bfb85c36f082ba00155ac80bf94d06d55ddaf4fbdd8129d59bb7cfb6337a"
+      }
+    },
+    {
+      "bedMm": 2600,
+      "history": "override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 5.836342012,
+      "sampledAbsMax": {
+        "vx": 0.6666666619416892,
+        "vy": 0.24999999885563595,
+        "ax": 3.0,
+        "ay": 2.6845261924424793,
+        "jx": 377.4213365252766,
+        "jy": 57.81392233467637
+      },
+      "sha256": {
+        ".csv": "35ff149a7e045b6a39c8e16e8cea5b845348d8a3414a604a82fe4abae2a87118",
+        ".json": "5174c776b0f584cbc0bb63cc6a515f676f10fe8c7cdc48756916aad5eaaebb80",
+        ".manifest.json": "0620554133c28ce8d320963c73382555a128fde6110dd61aa7f21429f06bb130",
+        ".config.json": "e4ba3e8c66985e4e327fa967d25ba72a4b4eb2db8737ce66d4040591053a35be"
+      }
+    },
+    {
+      "bedMm": 2600,
+      "history": "override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3.0,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 5.595362737,
+      "sampledAbsMax": {
+        "vx": 0.6666666619416892,
+        "vy": 0.3333333312835545,
+        "ax": 3.0,
+        "ay": 2.9999999531198207,
+        "jx": 377.4213365252766,
+        "jy": 57.81392233467637
+      },
+      "sha256": {
+        ".csv": "df550c558f6cac01dd4f7a9433668833171f50d87ccfbffee8988541f2ea1a37",
+        ".json": "791ce981d3d53c702e8351bfeaadd68a9c84ae2732472ea61902e4897704a5bb",
+        ".manifest.json": "aedbac2e0004a529763652f81585a9d10642d7c732164d9c11b2eb65cfe0b23a",
+        ".config.json": "223d714411382a332b366c0fb1bce7f0ae25534665c7b2ee584509fffb2676bd"
+      }
+    },
+    {
+      "bedMm": 2600,
+      "history": "hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 5.847247336000001,
+      "sampledAbsMax": {
+        "vx": 0.6666666619416892,
+        "vy": 0.2499999988738339,
+        "ax": 2.9999999547376017,
+        "ay": 2.9999999287188186,
+        "jx": 210.36529625472312,
+        "jy": 57.813920786609714
+      },
+      "sha256": {
+        ".csv": "75e325b052eef31fa66bab93f2be2569031da37f0d59f649fcb4284233c45e0a",
+        ".json": "ddc4aeea0b205de4729dc47fbff9b4526a5b295a47590972802c15b9edeef277",
+        ".manifest.json": "bca033d9723d8a92a3ec92feffcd6e976373a67da165c106a284852300e24346",
+        ".config.json": "e56e47c9b303efa27ef7aa104c08eb018c6a7368762d9a34fe024137cba2006d"
+      }
+    },
+    {
+      "bedMm": 2600,
+      "history": "hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3.0,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 5.619427166,
+      "sampledAbsMax": {
+        "vx": 0.6666666619416892,
+        "vy": 0.3333333312835545,
+        "ax": 3.0,
+        "ay": 2.9999999531198207,
+        "jx": 259.92315286231013,
+        "jy": 57.81392087253592
+      },
+      "sha256": {
+        ".csv": "f572046bff216cf4d474b6975d5206b2172667ea25c1ef9902b0549e8934f7e5",
+        ".json": "e3f3a7783e9b37dbc41f858e17807ec581ea612c1495d353154fb138990b4c00",
+        ".manifest.json": "4116d49edb7c96372cd40292d0575a474f88af1d9f61b2596a5172d74b9079a7",
+        ".config.json": "6fd4862215f3a10f02084a9d71f65cfd9f5dd7b2eb7cf23cf491c43151df7096"
+      }
+    },
+    {
+      "bedMm": 3150,
+      "history": "nominal",
+      "control": null,
+      "envelopeClass": "nominal",
+      "excludesWhy": null,
+      "durationS": 5.777883161,
+      "sampledAbsMax": {
+        "vx": 0.6666666626665528,
+        "vy": 0.3333333318805688,
+        "ax": 2.9999999714994874,
+        "ay": 2.1010141064398202,
+        "jx": 134.71235550750313,
+        "jy": 14.708999897379748
+      },
+      "sha256": {
+        ".csv": "29d97836bc622885fda9debbe55d77e11a93d9fbd843cd9e4279496e6048bd25",
+        ".json": "983b26ce98fe6c49a7b1a59701fe5dacaea11865e5e4499f1442f8a06f48a255",
+        ".manifest.json": "ab5d83a0fc04dff94f8af463709b70a52b47782cb629683a35d57ab876b9ccbf",
+        ".config.json": "c2ec52fad9ac147b307ab27b7043a3e34d9a0599e341a73e32f1e9fc8f4f3a48"
+      }
+    },
+    {
+      "bedMm": 3150,
+      "history": "override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 6.143073126,
+      "sampledAbsMax": {
+        "vx": 0.6666666626665528,
+        "vy": 0.24999999961911717,
+        "ax": 2.9999999714994874,
+        "ay": 1.9134478106160435,
+        "jx": 134.71235550750313,
+        "jy": 14.70899985078074
+      },
+      "sha256": {
+        ".csv": "07d5d3ec29f486419b1ab0a7a80a34b23f49d33be64efbc9316be365d3fafa9e",
+        ".json": "957eebaaa0c6b5c1df818485a78b00941858fe89c0012380c67f6089a35130d0",
+        ".manifest.json": "8493b0de9bef0668810a5105b7c42991b7bdb312074825cc8cea63468e96a934",
+        ".config.json": "1ad1dd539c29ba59900632f471c3f4d7ed25c1fbd436fc037176a2ad23874be9"
+      }
+    },
+    {
+      "bedMm": 3150,
+      "history": "override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3.0,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 6.022217984,
+      "sampledAbsMax": {
+        "vx": 0.6666666626665528,
+        "vy": 0.3333333318805688,
+        "ax": 2.9999999999999996,
+        "ay": 2.019527401040971,
+        "jx": 134.71235986184314,
+        "jy": 14.708999778723268
+      },
+      "sha256": {
+        ".csv": "70c2c5c14a94582dca5fdf303b836288ab2e2b69f1c7e81491c2ca6fc71497ce",
+        ".json": "8961390de60f7a70b75dc5e7c6e57eb55d40cd96b5bd8cb63a8e672a6e406cbc",
+        ".manifest.json": "7c0f78f18fc2ee848a05ae2ef55d3d2f23bf9aee5c00936f17e350603677a77b",
+        ".config.json": "fc1a162acb34f8967175e1c63081116213efbeac0062a9e62b0d095ea5e0089f"
+      }
+    },
+    {
+      "bedMm": 3150,
+      "history": "hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 6.2389498670000005,
+      "sampledAbsMax": {
+        "vx": 0.6666666626665528,
+        "vy": 0.24999999961911717,
+        "ax": 2.9999999714994874,
+        "ay": 1.913467833328306,
+        "jx": 134.71235986184308,
+        "jy": 14.70899985078074
+      },
+      "sha256": {
+        ".csv": "f0a0f3a3bbec51bc91b23983f2483cecce0a2dbec63028eea40c40b3076077e1",
+        ".json": "971dda93fe1676975712453a8d6a94b3426282f4bbdc29b377b7f76848357932",
+        ".manifest.json": "b42a09a9cbd96528e9a071536cde6a922d80c08c85a51fde1c7115152b31a27d",
+        ".config.json": "5b6df955d312461447586ab36afe5eecd472cdb8d676d42191deb0507959858e"
+      }
+    },
+    {
+      "bedMm": 3150,
+      "history": "hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3.0,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "envelopeClass": "excluded-offline-control",
+      "excludesWhy": "Not approved J5 ready-stop/executor-clock export",
+      "durationS": 6.173485182,
+      "sampledAbsMax": {
+        "vx": 0.6666666626665528,
+        "vy": 0.3333333318805688,
+        "ax": 3.0,
+        "ay": 2.019527401040971,
+        "jx": 134.71235986184314,
+        "jy": 14.708999778723268
+      },
+      "sha256": {
+        ".csv": "943ad46a49096cc9b4f3fb5a6c89a240be9db5eba2e933ca40a4e21a1babc782",
+        ".json": "13164aaac44af7f717b122266bcf240edb23ed0e1086ec78d9d0bde405c1f771",
+        ".manifest.json": "fb5fc83b3d17726bee410e8bda967fb347d92e7433a295adadce32c238ef53b1",
+        ".config.json": "1470c2699d9741d172156179133ff2ecc89e3fcf4ea773256e3d2b988e11baa0"
+      }
+    }
+  ],
+  "nominalBaseline": [
+    {
+      "bedMm": 2600,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.06408052368601924,
+      "poseMm": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x1600-y1300-h100.json",
+      "sourceSha256": "a8e7db8b6bfb96f3b4c4005a1589208eb671c0ce9a37b1b0b3a3f20313a7bb3b",
+      "passesReserve": false,
+      "passesBudget": false
+    },
+    {
+      "bedMm": 2600,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.04733018662338389,
+      "poseMm": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y2600-h100.json",
+      "sourceSha256": "e2156ab2ff7696e882f5e2811afce9b63aa4f1f30261fcbb7c513a0fe23f1d76",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.015118279475434692,
+      "poseMm": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y2600-h100.json",
+      "sourceSha256": "e2156ab2ff7696e882f5e2811afce9b63aa4f1f30261fcbb7c513a0fe23f1d76",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.06307114153617129,
+      "poseMm": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x1600-y1300-h50.json",
+      "sourceSha256": "db03b21b948721e114439c9fe9adc5ae9bf1203a6b50b8dd4dc847715457a100",
+      "passesReserve": false,
+      "passesBudget": false
+    },
+    {
+      "bedMm": 2600,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.04630321539597477,
+      "poseMm": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x800-y2600-h50.json",
+      "sourceSha256": "2c8fdd55be1b4a5be0dc2ab6ab2ce4b803c3e9dea701196db8274a4647d0bf94",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.015739868250187163,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y1300-h50.json",
+      "sourceSha256": "2702a9348c357260e2147899ce46b01adc506e2b2e450b96b3f350b7fb776390",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.04413120319086798,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "b6dd1d2e77447502a4670689fe5149637fccf417393012da2fd320910de04b9f",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.026737320614379678,
+      "poseMm": {
+        "x": 1600,
+        "y": 1575,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x1600-y1575-h100.json",
+      "sourceSha256": "9ab4d237200b50428c51693b554c6e37726a3ea536e2bfd8ae4dad354ae4f7fe",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.02283402874768134,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "b6dd1d2e77447502a4670689fe5149637fccf417393012da2fd320910de04b9f",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.04121914639132994,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "3cc8d435095b8b7a996c37c1d72ce0d076e0dd9632361fd4868b31172cdc272a",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.027831366114653068,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "3cc8d435095b8b7a996c37c1d72ce0d076e0dd9632361fd4868b31172cdc272a",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.0201368351731703,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "3cc8d435095b8b7a996c37c1d72ce0d076e0dd9632361fd4868b31172cdc272a",
+      "passesReserve": true,
+      "passesBudget": true
+    }
+  ],
+  "oldControlDiagnostic": [
+    {
+      "bedMm": 2600,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.06814518310008233,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "override-3",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y1300-h100.json",
+      "sourceSha256": "aaf89f54cca40dd5e3dfc82458f66d677ccfc2656a8b3c63d2644e0f0796c3c0",
+      "passesReserve": false,
+      "passesBudget": false
+    },
+    {
+      "bedMm": 2600,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.04733018662338389,
+      "poseMm": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y2600-h100.json",
+      "sourceSha256": "e2156ab2ff7696e882f5e2811afce9b63aa4f1f30261fcbb7c513a0fe23f1d76",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.027641923726150344,
+      "poseMm": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "override-3",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x1600-y2600-h100.json",
+      "sourceSha256": "c8903fde96e1b5aef3ac9f13223bf2a8939e972cc5aa361749c2be4d125059fc",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.06319547264765912,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "override-3",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y1300-h50.json",
+      "sourceSha256": "2702a9348c357260e2147899ce46b01adc506e2b2e450b96b3f350b7fb776390",
+      "passesReserve": false,
+      "passesBudget": false
+    },
+    {
+      "bedMm": 2600,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.04630321539597477,
+      "poseMm": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x800-y2600-h50.json",
+      "sourceSha256": "2c8fdd55be1b4a5be0dc2ab6ab2ce4b803c3e9dea701196db8274a4647d0bf94",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 2600,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.024826909572002485,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "history": "override-1p5",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y2600-baseline-x0-y1300-h50.json",
+      "sourceSha256": "2702a9348c357260e2147899ce46b01adc506e2b2e450b96b3f350b7fb776390",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.04413120319086798,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "b6dd1d2e77447502a4670689fe5149637fccf417393012da2fd320910de04b9f",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.026737320614379678,
+      "poseMm": {
+        "x": 1600,
+        "y": 1575,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x1600-y1575-h100.json",
+      "sourceSha256": "9ab4d237200b50428c51693b554c6e37726a3ea536e2bfd8ae4dad354ae4f7fe",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.02283402874768134,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 100,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "b6dd1d2e77447502a4670689fe5149637fccf417393012da2fd320910de04b9f",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "peakContourErrorMm",
+      "valueMm": 0.04397284555250798,
+      "poseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "history": "hold-resume-3",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x0-y0-h50.json",
+      "sourceSha256": "48548e2a03ede42ca90541c8717a3922fb4524f4f4af4f9d222d4f7bd67b0c72",
+      "passesReserve": false,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "movingHandoverPeakMm",
+      "valueMm": 0.027831366114653068,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "nominal",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "3cc8d435095b8b7a996c37c1d72ce0d076e0dd9632361fd4868b31172cdc272a",
+      "passesReserve": true,
+      "passesBudget": true
+    },
+    {
+      "bedMm": 3150,
+      "metric": "residualAfterStopMm",
+      "valueMm": 0.021403860472979763,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "history": "hold-resume-3",
+      "meshMm": 50,
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "3cc8d435095b8b7a996c37c1d72ce0d076e0dd9632361fd4868b31172cdc272a",
+      "passesReserve": true,
+      "passesBudget": true
+    }
+  ],
+  "fatigue": [
+    {
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "58539cbf8f0f2982bc3ee171592312a7e983e443b032e34918a8436a105f3e2a",
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "nominalOnly": true,
+      "rangeMPa": 11.797523838377083,
+      "history": "nominal",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "group": "W066",
+      "pieces": [
+        "lower1-p0",
+        "post13-p0"
+      ]
+    },
+    {
+      "source": "y3150-baseline-x800-y0-h100.json",
+      "sourceSha256": "58539cbf8f0f2982bc3ee171592312a7e983e443b032e34918a8436a105f3e2a",
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "nominalOnly": false,
+      "rangeMPa": 13.531919368899503,
+      "history": "override-3",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "group": "W064",
+      "pieces": [
+        "lower1-p0",
+        "post11-p0"
+      ]
+    },
+    {
+      "source": "y3150-baseline-x800-y0-h50-half.json",
+      "sourceSha256": "9895b12e7a7c002f1cf2741f31bd402468485ab40a7bb57bf5baac4b7e62f254",
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "nominalOnly": false,
+      "rangeMPa": 13.02925765883324,
+      "history": "hold-resume-3",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "group": "W066",
+      "pieces": [
+        "lower1-p0",
+        "post13-p0"
+      ]
+    },
+    {
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "4fedf6f87415d8738fa58fc3499d1a9e963fcaea8028b51cd028bca068bac743",
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "nominalOnly": true,
+      "rangeMPa": 10.816466290779722,
+      "history": "nominal",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "group": "W052",
+      "pieces": [
+        "lower0-p0",
+        "post01-p0"
+      ]
+    },
+    {
+      "source": "y3150-baseline-x800-y0-h50.json",
+      "sourceSha256": "4fedf6f87415d8738fa58fc3499d1a9e963fcaea8028b51cd028bca068bac743",
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "nominalOnly": false,
+      "rangeMPa": 13.02755138946272,
+      "history": "hold-resume-3",
+      "frequencyScale": 0.85,
+      "dampingRatio": 0.005,
+      "group": "W066",
+      "pieces": [
+        "lower1-p0",
+        "post13-p0"
+      ]
+    }
+  ]
+}
