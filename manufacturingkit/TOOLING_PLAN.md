@@ -257,25 +257,17 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   owners, insert holes from `DesignInterfaces`, design-owned interface
   requirements, datums, lifting inserts and foundation joints, then drafted,
   radiused and profiled features. Precedes the column.
-  Compilation recovery checkpoint (step 1 remains in progress): source features,
-  insert roles/finishes and hole patterns now use neutral `materia.casting` records;
-  old JSON boxes and boreDiameter recipes are rejected. Tooling schema 6 and
-  box/casting-mold schema 5 have no prior-format path. The shared box algebra is
-  used by fill, collision and section screening; planar cut/body intersection is
-  centralized and non-box cavities are rejected by feature ID by box consumers.
-  The adapter copies source facts and `DesignInterfaces` holes. The old hobber
-  receives only required type/import and recipe-key changes.
-  The remaining step-1 rules, core-fragment grouping, hole-pattern fixture
-  expansion and unified levelling-foot family are not claimed complete; steps 2
-  and 3 remain pending. Current fixtures still declare explicit setup strategies.
-  Validation: 1,712 neutral tooling/process assertions, 17 independent foundation
-  record/algebra assertions, 49 casting assertions and 375 native tooling
-  assertions pass. Full mill review passes 248 assertions and both package modes
-  pass manifest tamper checks (40 programs, 837 full-package artifacts). Frozen
-  pre-migration mill CAD and the sloped-foot cut/body intersection pass four
-  independent native assertions. Readiness remains false: 14 Pass, 250 Pending, 15 Unsupported;
-  no physical coupon trial is recorded.
-- [ ] Phase 8: mill column and independent pedestal example.
+  Steps 1 (records) and 2 (requirements) are code complete. The mill and
+  hobber use the shared typed feature, insert, hole-policy and levelling-foot
+  model. Source requirements, relationships, manufacturing records, derived
+  anchors, connector-derived rail holes and lifting declarations are integrated.
+  Step 3 supplies exact drafted/radiused line-arc features through CAD and
+  planning, native critical-level fill, source-bound section drawings and EPS
+  cutting records. Former CAM and non-box mold-shell allocation remain
+  unfinished; step 3 precedes column work. Detailed acceptance evidence and
+  current validation counts are recorded below. Production budgets, materials,
+  equipment and physical evidence remain open; no fabrication-ready claim.
+- [ ] Phase 8: mill column and independent hobber plinth.
 - [ ] Phase 9: physical calibration and release.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -2273,6 +2265,21 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   **5,153,140** bytes, **889 Pass / 402 Pending / 123 Unsupported / 74 Fail**;
   readiness stays **false**. Former blank decomposition remains the pending
   setup choice; the common conversion supports either declared route.
+- [x] Neutral island-clearing CAM: `CamJob.pocketContours` consumes the shared
+  neutral contour conversion, preserving feature provenance without a temporary
+  CAD face. `pocketFace` delegates to the same clearing algorithm. Independent
+  StockKit removal checks exposed gouging from chordal native offset corners;
+  offset edges now retain exact lines/arcs, including vertical entry when the
+  first boundary is curved. Raster/link clearance includes the chord-error
+  allowance on curved neutral boundaries; exact finishing removes that stock.
+  Focused island clearing **4,603**, full CamKit **12,589**
+  (panel CAM **263**), native **724** and all four CadKit CTest
+  suites pass. Both packages regenerate; all **265** artifact hashes verify,
+  with **24** program files changed and neutral geometry/drawings unchanged.
+  The kit has **5,228,256** bytes, **889 Pass / 402 Pending /
+  123 Unsupported / 74 Fail**; readiness stays **false**. The common
+  capability does not select the unresolved former blank decomposition or
+  complete former CAM.
 - [ ] Non-box envelope support and former CAM remain unfinished. These
   slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the

@@ -8,7 +8,7 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 
 /** Exact compensation belongs to CamKit. Native geometry uses mm for its tolerance.
- * The final centreline is sampled to the declared chord tolerance, in metres.
+ * Offset edges stay exact lines/arcs in metres; chord samples only check area.
  */
 class CamExactBoundary {
 	static function wire(contour:CamContour):Curve {
@@ -113,11 +113,34 @@ class CamExactBoundary {
 			if (outside ? Math.abs(sampled.signedArea) <= Math.abs(contour.signedArea) : Math.abs(sampled.signedArea) >= Math.abs(contour.signedArea))
 				throw "CAM exact offset has incorrect material side";
 			var result:Array<PathGeometry> = [];
-			for (i in 0...sampled.vertices.length) {
-				var a = sampled.vertices[i],
-					b = sampled.vertices[(i + 1) % sampled.vertices.length];
-				result.push(Line(new Point3(a.x, a.y, depth), new Point3(b.x, b.y, depth)));
+			for (edge in owned) {
+				var shape = edge.cloneShape();
+				try {
+					var kind = shape.curveKind();
+					var a = shape.positionAt(0), b = shape.positionAt(1);
+					if (Math.abs(a.get_z()) > 1e-7 || Math.abs(b.get_z()) > 1e-7)
+						throw "CAM exact offset is outside its work plane";
+					if (kind == CadKit.CurveKind.Line) {
+						result.push(Line(new Point3(a.get_x() * 0.001, a.get_y() * 0.001, depth),
+							new Point3(b.get_x() * 0.001, b.get_y() * 0.001, depth)));
+					} else if (kind == CadKit.CurveKind.Circle) {
+						var axis = shape.edgeAxis(), center = axis.get_origin(), radius = axis.get_radius();
+						if (Math.abs(axis.get_direction().get_z()) < 1 - 1e-9 || radius <= 0)
+							throw "CAM exact offset circle is outside its work plane";
+						// positionAt follows increasing curve parameters; edge topology
+						// can reverse tangentAt, so the axis determines the arc sign.
+						var sign = axis.get_direction().get_z() > 0 ? 1.0 : -1.0;
+						result.push(Arc(new Point3(center.get_x() * 0.001, center.get_y() * 0.001, depth),
+							radius * 0.001, Math.atan2(a.get_y() - center.get_y(), a.get_x() - center.get_x()),
+							sign * shape.edgeLength() / radius));
+					} else throw "CAM exact offset needs planar lines and arcs";
+					shape.close();
+				} catch (error:Dynamic) {
+					shape.close();
+					throw error;
+				}
 			}
+			result = connect(result);
 			for (e in owned)
 				e.close();
 			owned = [];
@@ -134,4 +157,39 @@ class CamExactBoundary {
 			throw e;
 		}
 	}
+
+	/** Native edge enumeration is unordered. Join exact endpoints, reversing
+	 * each line/arc as needed; never bridge a gap with an extra cutting move.
+	 */
+	static function connect(edges:Array<PathGeometry>):Array<PathGeometry> {
+		if (edges.length == 0) throw "CAM exact offset has no edges";
+		var remaining = edges.copy(), result = [remaining.shift()];
+		function point(edge:PathGeometry, end:Bool):Point3
+			return toolpathkit.path.GeometryTools.pointAt(edge,
+				end ? toolpathkit.path.GeometryTools.length(edge) : 0);
+		while (remaining.length > 0) {
+			var end = point(result[result.length - 1], true), match = -1, reverse = false;
+			for (index in 0...remaining.length) {
+				var forward = end.distanceTo(point(remaining[index], false)) < 1e-9;
+				var backward = end.distanceTo(point(remaining[index], true)) < 1e-9;
+				if (forward || backward) {
+					if (match >= 0 || (forward && backward)) throw "CAM exact offset has an ambiguous junction";
+					match = index;
+					reverse = backward;
+				}
+			}
+			if (match < 0) throw "CAM exact offset has an open boundary";
+			var edge = remaining.splice(match, 1)[0];
+			if (reverse) edge = switch edge {
+				case Line(a, b): Line(b, a);
+				case Arc(center, radius, start, sweep): Arc(center, radius, start + sweep, -sweep);
+				case _: throw "CAM exact offset needs planar lines and arcs";
+			};
+			result.push(edge);
+		}
+		if (point(result[result.length - 1], true).distanceTo(point(result[0], false)) >= 1e-9)
+			throw "CAM exact offset has an open boundary";
+		return result;
+	}
+
 }

@@ -1,5 +1,7 @@
 import cnckit.CncWriter;
 import camkit.CamJob;
+import camkit.CamCastingContours;
+import materia.casting.CastingProfiles;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
@@ -84,6 +86,7 @@ class CamIslandPocketFixture {
     }
     check(retracted, "tool retracts before crossing the raised boss");
     simulate(program, tool, check);
+    neutralContours(tool, machine, check);
 
     var cutterRadius = tool.diameter * 0.5;
     for (op in program.ops) switch op {
@@ -198,13 +201,80 @@ class CamIslandPocketFixture {
     face.close(); sketch.close(); outer.close(); boss.close();
   }
 
+  static function neutralContours(tool:Tool, machine:CamTestRig, check:Bool->String->Void):Void {
+    var outer = CamCastingContours.fromProfile(CastingProfiles.rectangle(0, 0, 40, 30), 0.00005);
+    var island = CamCastingContours.fromProfile(CastingProfiles.rectangle(15, 11, 10, 8), 0.00005);
+    var before = haxe.Json.stringify([outer.vertices, island.vertices]);
+    var program = new CamJob(0.005, 10000)
+      .pocketContours(outer, [island], tool, -0.002, 0.005, 0.001, 0.001, 0.001, "neutral-pocket").finish();
+    var source = true, moves = 0;
+    for (operation in program.ops) switch operation {
+      case Move(_, _, _, _, span):
+        moves++;
+        source = source && span.featureRef == "neutral-pocket" && span.operationId != null;
+      case _:
+    }
+    check(moves > 0 && source, "neutral island clearing retains its source identity on every move");
+    check(haxe.Json.stringify([outer.vertices, island.vertices]) == before,
+      "island clearing leaves its caller's neutral contour vertices intact");
+    var lowered = CamTestLowering.lower(program, machine);
+    check(lowered.program != null && lowered.diagnostics.length == 0,
+      "neutral contour clearing lowers through the existing motion pipeline");
+    var exactArcs = 0;
+    for (operation in program.ops) switch operation {
+      case Move(Cut, Arc(_, radius, _, _), _, _, _):
+        exactArcs++;
+        check(Math.abs(radius - tool.diameter / 2) < 1e-10,
+          "neutral island finishing retains the exact compensated corner radius");
+      case _:
+    }
+    check(exactArcs == 8,
+      "both depth levels retain four exact island-corner arcs with arc fitting disabled");
+    simulate(program, tool, (ok, message) -> check(ok, "neutral contours: " + message));
+    var roundIsland = CamCastingContours.fromProfile(CastingProfiles.circle(20, 15, 6), 0.00005);
+    var roundProgram = new CamJob(0.005, 10000)
+      .pocketContours(outer, [roundIsland], tool, -0.002, 0.005, 0.001, 0.001, 0.001, "round-island").finish();
+    simulate(roundProgram, tool, (ok, message) -> check(ok, "round neutral island: " + message), true);
+    var plain = new CamJob(0.005, 10000)
+      .pocket(outer, tool, -0.001, 0.005, 0.001, 0.001, 0.001, "neutral-plain").finish();
+    var empty = new CamJob(0.005, 10000)
+      .pocketContours(outer, [], tool, -0.001, 0.005, 0.001, 0.001, 0.001, "neutral-plain").finish();
+    check(machine.export(plain, CamTestSetup.standard()) == machine.export(empty, CamTestSetup.standard()),
+      "an empty island list preserves the existing pocket's complete CNC program");
+    var raised = CamCastingContours.fromProfile(CastingProfiles.rectangle(15, 11, 10, 8),
+      0.00005, false, 0, 0, 0, 0, 0.001);
+    var wrongPlane = new CamJob(0.005, 10000), message = "";
+    try wrongPlane.pocketContours(outer, [raised], tool, -0.001, 0.005, 0.001)
+    catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("must share a work plane") >= 0,
+      "neutral pocket rejects islands in a different work plane");
+    message = "";
+    try wrongPlane.finish() catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("CAM job has no operations") >= 0, "plane rejection leaves no partial CAM operation");
+    var outside = CamCastingContours.fromProfile(CastingProfiles.rectangle(45, 11, 10, 8), 0.00005);
+    var invalid = new CamJob(0.005, 10000);
+    message = "";
+    try invalid.pocketContours(outer, [outside], tool, -0.001, 0.005, 0.001)
+    catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("crosses its source contour") >= 0,
+      "neutral pocket rejects an island outside its removal boundary");
+    message = "";
+    try invalid.finish() catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("CAM job has no operations") >= 0, "containment rejection leaves no partial CAM operation");
+    message = "";
+    try new CamJob(0.005, 10000).pocketContours(outer, null, tool, -0.001, 0.005, 0.001)
+    catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("needs an island contour list") >= 0,
+      "a missing island list is not silently treated as empty");
+  }
+
   /**
     Cuts the program from a plate with StockKit and compares it with the
     finished part: nothing gouged, no rapid through stock, no shank contact,
     and leftover only in the pocket's four inside corners.
   **/
   static function simulate(program:toolpathkit.path.ToolpathProgram, tool:Tool,
-      check:Bool->String->Void):Void {
+      check:Bool->String->Void, roundBoss:Bool = false):Void {
     var solids:Array<Part> = [];
     function box(width:Float, depth:Float, height:Float, x:Float, y:Float, z:Float):Part {
       var local = Part.box(width, depth, height, Min, Min, Min);
@@ -214,7 +284,14 @@ class CamIslandPocketFixture {
       return placed;
     }
     var blank = box(0.05, 0.04, 0.01, -0.005, -0.005, -0.01);
-    var pocket = box(0.04, 0.03, 0.003, 0, 0, -0.002).subtract(box(0.01, 0.008, 0.005, 0.015, 0.011, -0.003));
+    var boss:Part;
+    if (roundBoss) {
+      var cylinder = Part.cylinder(0.006, 0.005);
+      boss = cylinder.translated(new Vector(0.02, 0.015, -0.003));
+      solids.push(cylinder);
+      solids.push(boss);
+    } else boss = box(0.01, 0.008, 0.005, 0.015, 0.011, -0.003);
+    var pocket = box(0.04, 0.03, 0.003, 0, 0, -0.002).subtract(boss);
     var part = blank.subtract(pocket);
     var mesh = part.shape.tessellate(1e-6, 0.1);
     solids.push(pocket);

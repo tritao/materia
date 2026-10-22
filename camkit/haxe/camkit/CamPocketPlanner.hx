@@ -15,7 +15,8 @@ class CamPocketPlanner {
 			minY = Math.min(minY, point.y);
 			maxY = Math.max(maxY, point.y);
 		}
-		var firstY = minY + radius, lastY = maxY - radius;
+		var outerRadius = clearanceRadius(contour, radius);
+		var firstY = minY + outerRadius, lastY = maxY - outerRadius;
 		if (firstY > lastY + 1e-10)
 			throw "Tool does not fit inside CAM pocket";
 		var rows:Array<Float> = [];
@@ -32,16 +33,16 @@ class CamPocketPlanner {
 		for (row in rows) {
 			var intervals = interiorIntervals(contour, row);
 			for (i in 0...vertices.length) {
-				var forbidden = capsuleSlice(vertices[i], vertices[(i + 1) % vertices.length], row, radius);
+				var forbidden = capsuleSlice(vertices[i], vertices[(i + 1) % vertices.length], row, outerRadius);
 				if (forbidden != null)
 					intervals = subtract(intervals, forbidden);
 			}
 			for (island in islands) {
 				for (blocked in interiorIntervals(island, row))
 					intervals = subtract(intervals, blocked);
-				var edgePoints = island.vertices;
+				var edgePoints = island.vertices, islandRadius = clearanceRadius(island, radius);
 				for (i in 0...edgePoints.length) {
-					var forbidden = capsuleSlice(edgePoints[i], edgePoints[(i + 1) % edgePoints.length], row, radius);
+					var forbidden = capsuleSlice(edgePoints[i], edgePoints[(i + 1) % edgePoints.length], row, islandRadius);
 					if (forbidden != null)
 						intervals = subtract(intervals, forbidden);
 				}
@@ -112,7 +113,8 @@ class CamPocketPlanner {
 			var t = square == 0 ? 0 : Math.max(0, Math.min(1, ((p.x - u.x) * dx + (p.y - u.y) * dy) / square));
 			return Math.sqrt(Math.pow(p.x - u.x - t * dx, 2) + Math.pow(p.y - u.y - t * dy, 2));
 		}
-		for (c in [contour].concat(islands))
+		for (c in [contour].concat(islands)) {
+			var guardedRadius = clearanceRadius(c, radius);
 			for (i in 0...c.vertices.length) {
 				var u = c.vertices[i],
 					v = c.vertices[(i + 1) % c.vertices.length];
@@ -123,11 +125,24 @@ class CamPocketPlanner {
 					if (t >= 0 && t <= 1 && q >= 0 && q <= 1)
 						return false;
 				}
-				if (Math.min(Math.min(pointDistance(a, u, v), pointDistance(b, u, v)), Math.min(pointDistance(u, a, b), pointDistance(v, a, b))) < radius
+				if (Math.min(Math.min(pointDistance(a, u, v), pointDistance(b, u, v)), Math.min(pointDistance(u, a, b), pointDistance(v, a, b))) < guardedRadius
 					- 1e-9)
 					return false;
 			}
+		}
 		return true;
+	}
+
+	/** Chordal clearing must stay on the removable side of the exact arcs.
+	 * Their declared maximum sagitta is a conservative boundary clearance;
+	 * the final offset pass still follows the exact finished boundary.
+	 */
+	static function clearanceRadius(contour:CamContour, radius:Float):Float {
+		if (contour.exactBoundary == null
+			|| contour.exactBoundary.filter(segment -> !segment.isLine()).length == 0) return radius;
+		if (!Math.isFinite(contour.chordTolerance) || contour.chordTolerance <= 0)
+			throw "CAM curved clearing needs a positive chord tolerance";
+		return radius + contour.chordTolerance;
 	}
 
 	static function interiorIntervals(contour:CamContour, row:Float):Array<{left:Float, right:Float}> {

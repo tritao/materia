@@ -270,17 +270,29 @@ class CamJob {
 	public function pocketFace(face:Face, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float = 0.002, ?unit:String = "mm",
 			?chordToleranceMetres:Float = 0.00005, ?plungeFeed:Null<Float>):CamJob {
 		var boundaries = CamContour.fromFaceBoundaries(face, unit, chordToleranceMetres);
-		var outer = boundaries[0];
-		if (boundaries.length == 1)
-			return pocket(outer, tool, depth, feed, stepOver, stepDown, plungeFeed, faceRef(face));
+		return pocketContours(boundaries[0], boundaries.slice(1), tool, depth, feed, stepOver, stepDown, plungeFeed, faceRef(face));
+	}
+
+	/** Clear explicit contour space while keeping its islands. All coordinates
+	 * are metres in one XY work plane; setup/stock validation remains with Setup.
+	 */
+	public function pocketContours(outer:CamContour, islands:Array<CamContour>, tool:Tool, depth:Float, feed:Float,
+			stepOver:Float, stepDown:Float = 0.002, ?plungeFeed:Null<Float>, ?featureRef:String):CamJob {
+		if (islands == null)
+			throw "CAM pocket needs an island contour list";
+		if (islands.length == 0)
+			return pocket(outer, tool, depth, feed, stepOver, stepDown, plungeFeed, featureRef);
 		require(outer, tool, depth, feed);
 		if (!Math.isFinite(stepOver) || stepOver <= 0.0 || stepOver > tool.diameter)
 			throw "CAM pocket step-over must be positive and no larger than tool diameter";
 		var entryFeed = checkedEntryFeed(feed, plungeFeed);
-		var islands = boundaries.slice(1), radius = tool.diameter * 0.5;
+		var radius = tool.diameter * 0.5;
 		var levels = depthLevels(outer.z, depth, stepDown);
-		for (island in islands)
+		for (island in islands) {
 			require(island, tool, depth, feed);
+			if (Math.abs(island.z - outer.z) > 1e-8)
+				throw "CAM pocket boundaries must share a work plane";
+		}
 		var passes = CamPocketPlanner.plan(outer, radius, stepOver, islands);
 		var outerPath = offsetPath(outer, radius, levels[0], false);
 		for (island in islands) {
@@ -291,7 +303,7 @@ class CamJob {
 				if (other != island)
 					GeometryOffset.validateProfile(other.vertices, islandPath, radius, false);
 		}
-		var span = nextSpan(faceRef(face));
+		var span = nextSpan(featureRef);
 		selectTool(tool, span);
 		for (index in 0...levels.length) {
 			var level = levels[index];
@@ -344,7 +356,12 @@ class CamJob {
 	function cutPocketBoundary(contour:CamContour, radius:Float, level:Float, prior:Float, feed:Float, plungeFeed:Float, span:Provenance, outside:Bool):Void {
 		var path = offsetPath(contour, radius, level, outside);
 		var start = GeometryTools.pointAt(path[0], 0.0);
-		var next = GeometryTools.pointAt(path[0], GeometryTools.length(path[0]));
+		// A chord across an arc can enter the retained island. Only a straight
+		// boundary supports the existing linear entry ramp; arcs enter vertically.
+		var next = switch path[0] {
+			case Line(_, end): end;
+			case _: start;
+		};
 		enterPocket(start, next, prior, contour.z, feed, plungeFeed, span);
 		for (geometry in path)
 			feedGeometry(geometry, feed, span);

@@ -33,6 +33,11 @@ class CamKitTests {
       '$message: expected $expected, got $actual');
 
   public static function main():Void {
+    if (Sys.getEnv("CAM_ONLY") == "island-pocket") {
+      CamIslandPocketFixture.run(check);
+      Sys.println('Island pocket tests passed ($assertions assertions)');
+      return;
+    }
     if (Sys.getEnv("CAM_ONLY") == "casting-contours") {
       Sys.println('Casting contour tests passed (${CamCastingContourTests.run()} assertions)');
       return;
