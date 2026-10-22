@@ -208,7 +208,7 @@ class FoundationDesignTests {
 		for (rounded in [false,true]) {
 			var feature=CastingPatterns.box(rounded ? "rounded-source" : "drafted-source",
 				materia.casting.CastingFeature.CastingFeatureKind.Lightening,[CastingPatterns.face("body.z-min")],20,20,20);
-			if (rounded) feature.cornerRadius=3; else feature.draft.degrees=3;
+			if (rounded) feature.cornerRadius=3; else feature.draft={degrees:3,axis:{x:0,y:0,z:-1}};
 			var source=new MineralCasting(new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",120)
 				.setToken("features",CastingPatterns.encode([feature])));
 			assertions++;
@@ -220,11 +220,11 @@ class FoundationDesignTests {
 				assertions++;
 				if (Math.abs(volume-expected)>1e-5) throw "Rounded source CAD differs from the analytic cavity volume";
 			} else {
-				var failed=false;
-				try {var body=source.geometry();body.close();}
-				catch (error:Dynamic) failed=Std.string(error).indexOf("Unsupported casting cavity geometry: drafted-source")>=0;
+				var body=source.geometry(),volume=body.volume();body.close();
+				var offset=20*Math.tan(3*Math.PI/180);
+				var expected=100*80*120-20*(400-40*offset+4*offset*offset/3);
 				assertions++;
-				if (!failed) throw "CAD must not silently omit an unrealized draft";
+				if (Math.abs(volume-expected)>1e-5) throw "Drafted source CAD differs from the analytic cavity volume";
 			}
 		}
 	}

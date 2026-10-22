@@ -411,6 +411,9 @@ class CastingMoldTests {
 		Reflect.setField(legacyOptions,"anchorage",new Array<Dynamic>());
 		rejects(() -> CastingMoldOptionsCodec.read(legacyOptions),"obsolete duplicate process anchorage rejected");
 		var raw:Dynamic = haxe.Json.parse(s);
+		Reflect.setField(raw, "version", 15);
+		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
+		raw = haxe.Json.parse(s);
 		Reflect.setField(raw, "version", 12);
 		rejects(() -> CastingMoldCodec.decode(haxe.Json.stringify(raw)), "previous mold schema rejected");
 		raw = haxe.Json.parse(s);
@@ -423,6 +426,7 @@ class CastingMoldTests {
 			id: "test-former",
 			material: FormerStock,
 			cuts: [],
+			regions: [],
 			profiles: [],
 			pieces: [
 				{
@@ -437,6 +441,22 @@ class CastingMoldTests {
 		};
 		var encoded = MoldVolumeCodec.encode(volume);
 		check(MoldVolumeCodec.encode(MoldVolumeCodec.decode(encoded)) == encoded, "volume recipe canonical");
+		raw=haxe.Json.parse(encoded);
+		Reflect.setField(raw,"version",3);
+		rejects(() -> MoldVolumeCodec.decode(haxe.Json.stringify(raw)),"previous volume schema rejected");
+		raw=haxe.Json.parse(encoded);
+		Reflect.deleteField(Reflect.field(raw,"volume"),"regions");
+		rejects(() -> MoldVolumeCodec.decode(haxe.Json.stringify(raw)),"region collection is required");
+		var shaped=MoldVolumeCodec.snapshot(volume);
+		shaped.pieces=[];
+		shaped.regions=[materia.casting.CastingRegion.Drafted("shaped-former",
+			materia.casting.CastingProfiles.rectangle(-20,-15,40,30),F.identity(),60,2)];
+		var shapedText=MoldVolumeCodec.encode(shaped);
+		check(MoldVolumeCodec.encode(MoldVolumeCodec.decode(shapedText))==shapedText,"region-only tooling volume round-trips without box stand-ins");
+		var stock=materia.tooling.casting.MoldVolumeBounds.pieces(shaped);
+		check(stock.length==1 && Math.abs(stock[0].width-40)<1e-7 && Math.abs(stock[0].depth-30)<1e-7
+			&& Math.abs(stock[0].height-60)<1e-7,"draft bounds describe stock only, not displaced material");
+
 		raw = haxe.Json.parse(encoded);
 		Reflect.setField(Reflect.field(raw, "volume"), "material", "mystery");
 		rejects(() -> MoldVolumeCodec.decode(haxe.Json.stringify(raw)), "unknown material rejected");

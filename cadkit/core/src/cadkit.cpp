@@ -552,6 +552,57 @@ cad_shape_kind shape_kind_from_occt(TopAbs_ShapeEnum kind) {
     return CAD_SHAPE_UNKNOWN;
 }
 
+// A ruled line/line loft is stored by OCCT as a degree-one B-spline even
+// when its complete boundary patch is planar. Coplanarity of every control
+// point certifies the whole patch (the rational basis is a convex combination);
+// checking corners or sampled normals alone would accept twisted surfaces.
+bool planar_bilinear_surface(const Handle(Geom_BSplineSurface)& surface) {
+    if (surface->UDegree() != 1 || surface->VDegree() != 1) {
+        return false;
+    }
+    const auto origin = surface->Pole(1, 1);
+    gp_Vec first;
+    double maximum_distance_squared = 0.0;
+    for (int u = 1; u <= surface->NbUPoles(); ++u) {
+        for (int v = 1; v <= surface->NbVPoles(); ++v) {
+            const gp_Vec delta(origin, surface->Pole(u, v));
+            if (delta.SquareMagnitude() > maximum_distance_squared) {
+                maximum_distance_squared = delta.SquareMagnitude();
+                first = delta;
+            }
+        }
+    }
+    if (maximum_distance_squared <= 1e-24) {
+        return false;
+    }
+    gp_Vec normal;
+    double maximum_cross_squared = 0.0;
+    for (int u = 1; u <= surface->NbUPoles(); ++u) {
+        for (int v = 1; v <= surface->NbVPoles(); ++v) {
+            const auto cross = first.Crossed(gp_Vec(origin, surface->Pole(u, v)));
+            if (cross.SquareMagnitude() > maximum_cross_squared) {
+                maximum_cross_squared = cross.SquareMagnitude();
+                normal = cross;
+            }
+        }
+    }
+    if (maximum_cross_squared <= 1e-24 * maximum_distance_squared) {
+        return false;
+    }
+    normal.Normalize();
+    // Round-off allowance for the control-point plane test, not a fit allowance.
+    const double tolerance = 128 * std::numeric_limits<double>::epsilon()
+        * std::max(1.0, std::sqrt(maximum_distance_squared));
+    for (int u = 1; u <= surface->NbUPoles(); ++u) {
+        for (int v = 1; v <= surface->NbVPoles(); ++v) {
+            if (std::abs(normal.Dot(gp_Vec(origin, surface->Pole(u, v)))) > tolerance) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 cad_surface_kind surface_kind_from_occt(const Handle(Geom_Surface)& surface) {
     if (surface.IsNull()) {
         return CAD_SURFACE_UNKNOWN;
@@ -575,6 +626,9 @@ cad_surface_kind surface_kind_from_occt(const Handle(Geom_Surface)& surface) {
         return CAD_SURFACE_BEZIER;
     }
     if (surface->IsKind(STANDARD_TYPE(Geom_BSplineSurface))) {
+        if (planar_bilinear_surface(Handle(Geom_BSplineSurface)::DownCast(surface))) {
+            return CAD_SURFACE_PLANE;
+        }
         return CAD_SURFACE_BSPLINE;
     }
     return CAD_SURFACE_UNKNOWN;

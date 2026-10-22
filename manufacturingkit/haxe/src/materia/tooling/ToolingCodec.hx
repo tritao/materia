@@ -726,6 +726,8 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.casting.CastingRegion))
+			return canonical(materia.casting.CastingRegion.CastingRegionCodec.record(cast value));
 		if (Std.isOfType(value,materia.tooling.process.FillAnalysis.FillPocketGeometry))
 			return canonical(materia.tooling.process.FillAnalysis.FillGeometryRecords.pocket(cast value));
 		if (Std.isOfType(value,materia.tooling.process.FillAnalysis.FillOpeningGeometry))

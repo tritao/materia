@@ -23,6 +23,34 @@ typedef CastingFace3 = {var id:String; var points:Array<{x:Float, y:Float, z:Flo
  * extruded along a coordinate axis (box, chamfered body, flared foot).
  */
 class CastingCavities {
+	/** Rebuildable exact expression for the region already derived here. */
+	public static function region(cavity:FinishedCastingCavity):CastingRegion return switch cavity.geometry {
+		case Prisms(pieces): envelopeRegion(pieces);
+		case SolidIntersection(body,feature,_): CastingRegion.Intersection([envelopeRegion(body),cutRegion(body,feature)]);
+		case UnsupportedGeometry(reason): throw "Unsupported casting cavity geometry: "+cavity.featureId+": "+reason;
+	};
+
+	public static function envelopeRegion(body:Array<CastingPrism>):CastingRegion {
+		if (body==null || body.length==0) throw "Casting region needs an envelope";
+		return CastingRegion.Union([for (prism in body) CastingRegion.Placed({
+			solid:CastingFeature.CastingGeometrySolid.Prism(CastingProfiles.polygon(prism.profile),prism.height),pose:prism.pose})]);
+	}
+
+	/** Tool realization of source intent, shared with the finished-region expression. */
+	public static function cutRegion(body:Array<CastingPrism>,feature:CastingFeature):CastingRegion {
+		if (feature.draft.degrees!=0) {
+			var section=CastingDraftSections.derive(body,feature);
+			return CastingRegion.Drafted(feature.id,section.opening,section.pose,section.depth,feature.draft.degrees);
+		}
+		return switch feature.geometry.solid {
+			case Insert(_):
+				if (feature.cornerRadius!=0) throw "Insert recess cannot modify its source exterior: "+feature.id;
+				CastingRegion.Placed(feature.geometry);
+			default: CastingRegion.Placed({solid:CastingFeature.CastingGeometrySolid.Prism(CastingFeatureContours.contour(feature),
+				CastingFeature.CastingGeometrySolids.height(feature.geometry.solid)),pose:feature.geometry.pose});
+		};
+	}
+
 	public static function bodyFaceNormal(body:Array<CastingPrism>, id:String):{x:Float, y:Float, z:Float} {
 		var faces = boundary(body).filter(face -> face.id == id);
 		if (faces.length == 0)
@@ -38,16 +66,11 @@ class CastingCavities {
 			for (opening in f.openings)
 				if (opening.kind == BodyFace && faces.filter(face -> face.id == opening.target).length == 0)
 					throw "Unknown casting body face: " + opening.target;
-			if (f.draft.degrees != 0) {
-				result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom,
-					geometry: UnsupportedGeometry("Drafted feature realization is not implemented")});
-				continue;
-			}
 			var connectedNonBox=f.openings.filter(opening -> opening.kind==Feature
 				&& CastingFeatureCodec.openingTargets(records,opening.target).filter(other ->
 					!CastingFeature.CastingGeometrySolids.isBox(other.geometry.solid)
 					|| other.draft.degrees!=0 || other.cornerRadius!=0).length>0).length>0;
-			if (!CastingFeature.CastingGeometrySolids.isBox(f.geometry.solid) || f.cornerRadius!=0 || connectedNonBox) {
+			if (!CastingFeature.CastingGeometrySolids.isBox(f.geometry.solid) || f.draft.degrees!=0 || f.cornerRadius!=0 || connectedNonBox) {
 					var envelope = [for (prism in body) {
 						id: prism.id, profile: [for (point in prism.profile) {x: point.x, y: point.y}],
 						height: prism.height, pose: CastingRecordCodec.frame(prism.pose)

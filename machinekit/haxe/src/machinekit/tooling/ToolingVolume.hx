@@ -24,6 +24,7 @@ class ToolingVolume extends MachineComponent {
 				id: "former",
 				material: materia.tooling.casting.CastingMoldPlan.MoldPartMaterial.FormerStock,
 				cuts: [],
+				regions: [],
 				profiles: [],
 				pieces: [
 					{
@@ -76,6 +77,8 @@ class ToolingVolume extends MachineComponent {
 	public static function geometryOf(v:MoldVolume):Part {
 		var pieces:Array<Part> = [];
 		return Solids.building(pieces, parts -> {
+			for (region in v.regions)
+				parts.push(machinekit.structural.CastingRegionCad.part(region));
 			for (b in v.pieces) {
 				parts.push(ToolingBlock.placedBox(b));
 			}

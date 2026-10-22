@@ -83,6 +83,7 @@ class CastingMoldExport {
 					id: id,
 					material: EPSStock,
 					cuts: [],
+					regions: [],
 					profiles: [],
 					pieces: [local]
 				});

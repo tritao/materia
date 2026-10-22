@@ -280,6 +280,7 @@ class CastingMoldCad {
 				id: c.id,
 				material: EPSStock,
 				cuts: [],
+				regions: [],
 				profiles: [],
 				pieces: c.foamLayers
 			}), pose);

@@ -13,6 +13,10 @@ import materia.assembly.AssemblyFrames as F;
 class MoldVolumeBounds {
 	public static function pieces(volume:MoldVolume):Array<MoldBox> {
 		var boxes = [for (box in volume.pieces) BoxAlgebra.copy(box)];
+		for (region in volume.regions) {
+			var bounds=materia.casting.CastingRegionBounds.box(region);
+			if (bounds!=null) boxes.push(bounds);
+		}
 		for (profile in volume.profiles) {
 			var bounds = CastingProfileGeometry.bounds(profile.contour);
 			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];

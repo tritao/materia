@@ -2143,12 +2143,27 @@ by `CastingMoldTests` and `LiftingSourceTests`. Non-box fill remains step 3.
   foundation CAD. Its **74** trapped-air pockets remain explicit failures;
   no non-box section or thermal qualification is credited. Process CAD export
   independently captures assembly context and rejects omitted/stale context.
+- [x] Draft source/portable-region slice: opening-sized
+  source drafts taper inward through shared exact line/arc sections. Source CAD
+  realizes the same authoritative cavity expression. Degree-one loft walls are
+  recognized as planar only when all control points are coplanar; a twisted
+  counterexample stays Unsupported by exact swept removal. Focused foundation
+  **455**, tooling **1,882**, draft/portable geometry **11**, existing profile
+  geometry **23** and native fill **67** pass. Mold-volume **4** and general
+  mold **16** reject their previous versions. Region-only tooling components
+  rebuild without a source-document copy; conservative stock bounds never
+  substitute for finished material. Full native **690**, casting **54**, design
+  **32**, CamKit **12,386**, mill **313**, rail **116**, lifting **457**, sockets
+  **110**, production mold **672** and all four CadKit CTest suites pass.
+  Regeneration retains **168** hash-verified artifacts and **40** programs;
+  readiness stays **false**, with the existing **74** trapped-air failures.
 - [ ] Profile-capable mold planning, drafted former walls and source/former
-  drawings/CAM remain unfinished. This slice does not complete step 3.
+  drawings/CAM remain unfinished. These slices do not complete step 3.
 - [x] Draft source convention confirmed: authored dimensions belong to the
   withdrawal opening; walls taper inward along the declared source-coordinate
   withdrawal axis. Finishing stock and process error budgets remain separate.
-  Draft realization and its release fixture remain in the next geometry slice.
+  Source draft realization is implemented; the drafted-mold release fixture
+  remains in the next geometry slice.
 
 ### Phase 7 records: shared levelling-foot family
 

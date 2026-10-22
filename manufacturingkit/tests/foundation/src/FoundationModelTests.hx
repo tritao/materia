@@ -35,6 +35,8 @@ class FoundationModelTests {
 
 	public static function main():Void {
 		CastingProfileTests.run();
+		CastingDraftSectionTests.run();
+		CastingRegionTests.run();
 		FoundationRequirementTests.main();
 		PourPlanningTests.run();
 		InterfaceStockTests.run();

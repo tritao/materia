@@ -347,6 +347,7 @@ class CastingMoldPlanner {
 				id: materia.tooling.ToolingIds.derive("datum-", i.id),
 				material: SteelStock,
 				cuts: [],
+				regions: [],
 				profiles: [],
 				pieces: BoxAlgebra.subtract(pieces, [])
 			};
@@ -373,6 +374,7 @@ class CastingMoldPlanner {
 					id: id,
 					material: FormerStock,
 					cuts: [],
+					regions: [],
 					profiles: [],
 					pieces: group
 				},
@@ -456,6 +458,7 @@ class CastingMoldPlanner {
 							id: id,
 							material: FormerStock,
 							cuts: [],
+							regions: [],
 							profiles: profiles,
 							pieces: groups[index]
 						},
@@ -766,8 +769,8 @@ class CastingMoldPlanner {
 		var resin = resinAtFill(p.document, p.envelope);
 		for (fixture in p.fixtures) {
 			MoldVolumeCodec.snapshot(fixture.datum);
-			if (fixture.datum.profiles.length > 0)
-				throw "Neutral datum/resin validation does not support datum profiles";
+			if (fixture.datum.profiles.length > 0 || fixture.datum.regions.length > 0)
+				throw "Neutral datum/resin validation does not support datum profiles or regions";
 			for (piece in fixture.datum.pieces)
 				for (resinPiece in resin)
 					if (BoxAlgebra.intersection(piece, resinPiece) != null)

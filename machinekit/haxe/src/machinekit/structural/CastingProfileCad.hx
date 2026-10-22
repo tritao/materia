@@ -34,6 +34,15 @@ class CastingProfileCad {
 		});
 	}
 
+	public static function drafted(sections:materia.casting.CastingDraftSections.DraftedCastingSections):Part {
+		return Scope.run(scope -> {
+			var inner=scope.own(wire(sections.inner)),opening=scope.own(wire(sections.opening));
+			var top=scope.own(opening.placed(cadkit.modeling.Location.translation(new Vector(0,0,sections.depth))));
+			var body=scope.own(Part.loft([inner,top],true));
+			return scope.own(machinekit.assembly.PosedParts.moved(body,sections.pose));
+		});
+	}
+
 	public static function prism(profile:Array<CastingSegment>,z0:Float,z1:Float):Part {
 		if (!Math.isFinite(z0+z1) || z1<=z0) throw "Invalid casting profile extrusion";
 		return Scope.run(scope -> {

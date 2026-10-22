@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "casting-draft-section-tests"
+  },
+  "entry": "CastingDraftSectionTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "manufacturingkit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/draft-sections"
+}

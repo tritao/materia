@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-draft-geometry-tests"
+  },
+  "entry": "DraftGeometryTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/draft-geometry"
+}

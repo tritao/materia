@@ -31,6 +31,7 @@ typedef MoldVolume = {
 	var id:String;
 	var material:MoldPartMaterial;
 	var pieces:Array<MoldBox>;
+	var regions:Array<materia.casting.CastingRegion>;
 	var profiles:Array<MoldVolumeProfile>;
 	var cuts:Array<MoldVolumeCut>;
 }

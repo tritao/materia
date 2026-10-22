@@ -12,7 +12,7 @@ import materia.tooling.casting.MoldPlan.MoldBox;
 /** Exact boxes and operation-derived sealing profiles; no tessellation or compensation. */
 class MoldVolumeCodec {
 	public static function encode(v:MoldVolume):String {
-		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 3, volume: snapshot(v)});
+		var s = ToolingCodec.canonical({format: "materia.mold-volume", version: 4, volume: snapshot(v)});
 		if (haxe.io.Bytes.ofString(s).length > 524288)
 			throw "Mold volume exceeds limit";
 		return s;
@@ -23,7 +23,7 @@ class MoldVolumeCodec {
 			throw "Mold volume exceeds limit";
 		var r:Dynamic = haxe.Json.parse(s);
 		object(r, ["format", "version", "volume"]);
-		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 3)
+		if (Reflect.field(r, "format") != "materia.mold-volume" || Reflect.field(r, "version") != 4)
 			throw "Unsupported mold volume format";
 		return read(Reflect.field(r, "volume"));
 	}
@@ -104,7 +104,7 @@ class MoldVolumeCodec {
 	}
 
 	static function read(r:Dynamic):MoldVolume {
-		object(r, ["id", "material", "pieces", "profiles", "cuts"]);
+		object(r, ["id", "material", "pieces", "regions", "profiles", "cuts"]);
 		var material:MoldPartMaterial = switch text(r, "material") {
 			case "eps": EPSStock;
 			case "steel": SteelStock;
@@ -155,12 +155,15 @@ class MoldVolumeCodec {
 				subtract: boxes(array(p, "subtract", 2048))
 			});
 		}
-		if (pieces.length == 0 && profiles.length == 0)
+		var regions=[for (region in array(r,"regions",128)) materia.casting.CastingRegion.CastingRegionCodec.snapshot(region)];
+		regions.sort((a,b) -> Reflect.compare(ToolingCodec.canonical(a),ToolingCodec.canonical(b)));
+		if (pieces.length == 0 && profiles.length == 0 && regions.length == 0)
 			throw "Invalid mold volume pieces";
 		return {
 			id: text(r, "id"),
 			material: material,
 			pieces: pieces,
+			regions: regions,
 			profiles: profiles,
 			cuts: cuts
 		};

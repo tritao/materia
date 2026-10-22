@@ -28,21 +28,8 @@ class CastingCavityCad {
 		});
 	}
 
-	static function cut(feature:CastingFeature):Part {
-		if (feature.draft.degrees != 0)
-			throw "Unsupported casting cavity geometry: " + feature.id;
-		return Scope.run(scope -> {
-			var local = scope.own(switch feature.geometry.solid {
-				case Insert(body):
-					if (feature.cornerRadius!=0) throw "Insert recess cannot modify its source exterior: "+feature.id;
-					InsertBodies.part(body);
-				default:
-					CastingProfileCad.prism(materia.casting.CastingFeatureContours.contour(feature),0,
-						CastingFeature.CastingGeometrySolids.height(feature.geometry.solid));
-			});
-			return scope.own(PosedParts.moved(local, feature.geometry.pose));
-		});
-	}
+	static function cut(feature:CastingFeature,body:Array<CastingPrism>):Part
+		return CastingRegionCad.part(CastingCavities.cutRegion(body,feature));
 
 	static function union(prisms:Array<CastingPrism>):Part {
 		return Scope.run(scope -> {
@@ -57,7 +44,7 @@ class CastingCavityCad {
 			case UnsupportedGeometry(reason): throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
 			case SolidIntersection(body, feature, features):
 				Scope.run(scope -> {
-					var envelope = scope.own(union(body)), tool = scope.own(cut(feature));
+					var envelope = scope.own(union(body)), tool = scope.own(cut(feature,body));
 					var common = scope.own(new Model(envelope.shape.common(tool.shape)));
 					if (common.shape.volume() <= CONTACT_VOLUME)
 						throw "Casting feature does not reach body: " + feature.id;
@@ -80,7 +67,7 @@ class CastingCavityCad {
 			var candidates = features.filter(other -> other.id == opening.target || other.derivedFrom == opening.target);
 			var meets = false;
 			for (other in candidates) {
-				var otherCut = scope.own(cut(other));
+				var otherCut = scope.own(cut(other,body));
 				var otherRegion = scope.own(new Model(envelope.shape.common(otherCut.shape)));
 				throughFeatures.push(otherRegion);
 				var common = scope.own(new Model(finished.shape.common(otherRegion.shape)));

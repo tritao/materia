@@ -73,6 +73,7 @@ class FeatureGeometryTests {
 	}
 
 	public static function main():Void {
+		DraftGeometryTests.run();
 		var body=CastingEnvelope.build(80,60,30);
 		var stepped=port(CastingProfiles.polygon([
 			{x:-20,y:-15},{x:20,y:-15},{x:20,y:0},{x:0,y:0},{x:0,y:15},{x:-20,y:15}
