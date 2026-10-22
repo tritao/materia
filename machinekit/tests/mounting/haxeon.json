@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-linear-mount-tests"},
+  "entry": "LinearMountTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/shared-mount-build"
+}

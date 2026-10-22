@@ -1,13 +1,10 @@
 package machinekit.milling;
 
 import machinekit.assembly.MachineAssembly;
-import machinekit.assembly.Diagnostics;
-import machinekit.design.DesignChecks;
 import machinekit.design.DesignInterfaces;
 import machinekit.design.DesignRequirement;
 import machinekit.motion.LinearRail;
 import machinekit.standard.SocketHeadCapScrew;
-import machinekit.standard.PropertyClass;
 import machinekit.structural.MineralFoundation;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -59,32 +56,8 @@ class MillRailFasteners {
 
 	static function select(id:String,rail:LinearRail,seat:AssemblyFrame,
 		hole:machinekit.design.DesignInterfaces.HoleInterface,holePose:AssemblyFrame,
-		preferredLengths:Array<Float>):SocketHeadCapScrew {
-		var thread=hole.thread;
-		if (thread==null) throw "Rail mounting needs a source steel thread: "+id;
-		var lengths=preferredLengths.copy();lengths.sort(Reflect.compare);
-		for (length in lengths) {
-			if (!Math.isFinite(length) || length<=0) throw "Invalid preferred service screw length";
-			var screw=SocketHeadCapScrew.metric(thread.spec.designation,length,PropertyClass.Steel88);
-			var geometry=rail.mountingHole();
-			if (geometry==null || screw.spec.headDiameter>geometry.counterboreDiameter
-				|| screw.spec.headHeight>geometry.counterboreDepth || screw.diameter>geometry.diameter)
-				throw "Rail mounting screw does not fit the declared bore and counterbore: "+id;
-			if (!screw.thread.matches(thread.spec) || !screw.thread.matches(rail.mountingThread()))
-				throw "Rail and insert threads differ: "+id;
-			var pose=F.compose(seat,F.inverse(screw.connector("head").frame));
-			var bearing=F.compose(pose,screw.bearingFrame()),axis=F.transformVector(bearing,0,0,1);
-			var grip=(holePose.x-bearing.x)*axis.x+(holePose.y-bearing.y)*axis.y+(holePose.z-bearing.z)*axis.z;
-			if (grip<=0) throw "Rail screw has no positive grip: "+id;
-			var checks=new Diagnostics();
-			DesignChecks.coaxial(checks,id,bearing,holePose,1e-6);
-			DesignChecks.blindFastener(checks,id,length,grip,thread.usableDepth,thread.cylindricalDepth,
-				thread.point,thread.stock,thread.minEngagement,thread.minTipGap,thread.minBack,
-				hole.relief==null ? null : hole.relief.start);
-			if (length-screw.threadLength>grip+1e-6)
-				checks.error("design.unthreaded-shank",id,"Unthreaded shank enters the insert thread");
-			if (!checks.hasErrors()) return screw;
-		}
-		throw "No preferred rail screw satisfies source engagement, tip gap and back wall: "+id;
-	}
+		preferredLengths:Array<Float>):SocketHeadCapScrew
+		return machinekit.structural.MountServiceScrews.select(id,
+			machinekit.structural.MountedElement.of(rail),seat,hole,holePose,preferredLengths);
+
 }
