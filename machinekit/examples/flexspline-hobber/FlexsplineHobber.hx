@@ -86,23 +86,23 @@ class FlexsplineHobber extends MachineAssembly {
     travel=[{id:"X",lower:minX,upper:HobberXLayout.RETRACT,initial:cutDistance},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:190,initial:0}];
     for(side in [-1,1]){
       var name=side<0?"Left":"Right",insert=side<0?"bed/railLeft":"bed/railRight";
-      fixAt("railX"+name,new HiwinHgr25Rail(HobberXLayout.front().railLength),AxisBuilder.orient(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
+      fixAt("railX"+name,LinearRail.metric("HGH25CA",HobberXLayout.front().railLength,LinearRail.MEASURED),AxisBuilder.orient(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
       precisionMounts.push({name:"railX"+name+"-mount",parent:insert});
     }
     addComponent("Xbridge",new HobberSaddle("GE-X-carriage"));zero.set("Xbridge",F.translation(centre,0,0));
     moving("X",Prismatic,"railXLeft","Xbridge",F.translation(0,0,242),[1.0,0,0],cutDistance,minX,HobberXLayout.RETRACT);
-    for(side in [-1,1])for(row in [HobberXLayout.BLOCK_FRONT,HobberXLayout.BLOCK_REAR])fixAt("blockX"+(side<0?"Left":"Right")+(row==HobberXLayout.BLOCK_FRONT?"":"Front"),new SupplierRailBlock("HGR25"),
+    for(side in [-1,1])for(row in [HobberXLayout.BLOCK_FRONT,HobberXLayout.BLOCK_REAR])fixAt("blockX"+(side<0?"Left":"Right")+(row==HobberXLayout.BLOCK_FRONT?"":"Front"),LinearRailBlock.metric("HGH25CA",LinearRailBlock.SUPPLIER),
       AxisBuilder.orient(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),"Xbridge",F.alongY(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,260,0,0,1));
     includeAt("column",column,F.fromRotationMatrix(centre+286,0,290,[0.0,-1,0,1,0,0,0,0,1]));
     fixExisting("column-mount","Xbridge","column/basePlate",F.alongY(centre+326,0,280,0,0,1));
     for(side in [-1,1]){
       var name=side<0?"Left":"Right",insert=side<0?"column/railLeft":"column/railRight";
-      fixAt("railZ"+name,LinearRail.metric("HGR15",480),AxisBuilder.orient(centre+161,side*145,295,[-1.0,0,0],[0.0,0,1]),insert,F.alongY(centre+176,side*145,295,-1,0,0));
+      fixAt("railZ"+name,LinearRail.metric("HGH15CA",480),AxisBuilder.orient(centre+161,side*145,295,[-1.0,0,0],[0.0,0,1]),insert,F.alongY(centre+176,side*145,295,-1,0,0));
       precisionMounts.push({name:"railZ"+name+"-mount",parent:insert});
     }
     addComponent("Zplate",new HobberSaddle("GE-Z-saddle"));zero.set("Zplate",F.translation(centre,0,363));
     moving("Z",Prismatic,"railZLeft","Zplate",F.translation(centre+161,0,363),[0.0,0,1],0,-10,190);
-    for(side in [-1,1])for(row in [0,110])fixAt("blockZ"+(side<0?"Left":"Right")+(row==0?"":"Upper"),new SupplierRailBlock("HGR15"),
+    for(side in [-1,1])for(row in [0,110])fixAt("blockZ"+(side<0?"Left":"Right")+(row==0?"":"Upper"),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),
       AxisBuilder.orient(centre+161,side*145,363+row,[-1.0,0,0],[0.0,0,1]),"Zplate",F.alongY(centre+148,side*145,363+row,-1,0,0));
     var swivelMotor=new TorqueMotor(new ComponentValues().setNumber("height",20).setNumber("ratedSpeed",Math.PI/12).setNumber("maxSpeed",Math.PI/6)
       .setNumber("torqueConstant",2).setNumber("backEmfConstant",2/Math.sqrt(3)));
@@ -111,11 +111,11 @@ class FlexsplineHobber extends MachineAssembly {
     fixExisting("swivel-mount","Zplate","swivel/housing",F.alongY(centre+135,0,363,1,0,0));
     var e0=[-1.0,0,0,0,0,-1,0,-1,0];
     fixAt("swivelPlate",new HobberSaddle("GE-swivel-plate"),F.translation(centre,0,363),"swivel/head",F.alongY(centre+100,0,363,-1,0,0));
-    for(side in [-1,1])fixAt(side<0?"railYLeft":"railYRight",LinearRail.metric("HGR15",220),
+    for(side in [-1,1])fixAt(side<0?"railYLeft":"railYRight",LinearRail.metric("HGH15CA",220),
       AxisBuilder.orient(centre+70,110,363+side*60,[-1.0,0,0],[0.0,-1,0]),"swivelPlate",F.alongY(centre+85,110,363+side*60,-1,0,0));
     addComponent("Yplate",new HobberSaddle("GE-Y-saddle"));zero.set("Yplate",F.translation(centre,0,363));
     moving("Y",Prismatic,"railYLeft","Yplate",F.translation(centre+70,0,363),[0.0,-1,0],0,-10,10);
-    for(side in [-1,1])for(row in [-40,40])fixAt("blockY"+(side<0?"Left":"Right")+(row<0?"":"Front"),new SupplierRailBlock("HGR15"),
+    for(side in [-1,1])for(row in [-40,40])fixAt("blockY"+(side<0?"Left":"Right")+(row<0?"":"Front"),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),
       AxisBuilder.orient(centre+70,row,363+side*60,[-1.0,0,0],[0.0,-1,0]),"Yplate",F.alongY(centre+57,row,363+side*60,-1,0,0));
     var rated=4000*2*Math.PI/60;
     var spindleMotor=new TorqueMotor(new ComponentValues().setNumber("outside",62).setNumber("bore",25).setNumber("height",100)

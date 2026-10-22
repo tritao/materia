@@ -39,7 +39,7 @@ class MotionFamilyTests(unittest.TestCase):
         c,_=fixture();r=hg.build(c)['recipes']
         self.assertEqual(len(r),12)
         self.assertEqual(sum(x['geometry_source']=='reference_cad' for x in r),8)
-        self.assertFalse(any(x['values']['model'] in ('HGH35CA','HGW45CC') for x in r))
+        self.assertFalse(any(x['values']['profile'] in ('HGH35CA','HGW45CC') for x in r))
         self.assertTrue(all(x['required_inputs']==['length'] for x in r if x['geometry_source']=='generator'))
 
     def test_changed_hg_evidence_fails(self):

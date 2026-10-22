@@ -13,12 +13,12 @@ class RailSeatTests {
 	static function check(ok:Bool,message:String):Void {assertions++;if (!ok) throw message;}
 
 	public static function main():Void {
-		var larger=new machinekit.motion.HgRail("HGR25R",400);
+		var larger=machinekit.motion.LinearRail.metric("HGH25CA",400,machinekit.motion.LinearRail.MEASURED);
 		var drilling=larger.mountingHole();
 		check(drilling!=null && drilling.diameter==7 && drilling.counterboreDiameter==11 && drilling.counterboreDepth==9,
 			"current HG family exposes its existing pinned drilling geometry");
 		check(larger.mountingThread().designation=="M6" && larger.mountingThread().internal,
-			"size-only mounting screw catalogue tokens produce a typed source thread");
+			"the rail table's mounting bolt produces a typed source thread");
 		var frame=MillMoldSetup.frame();
 		var assembly=new MachineAssembly();assembly.include("frame",frame);
 		var groups=[

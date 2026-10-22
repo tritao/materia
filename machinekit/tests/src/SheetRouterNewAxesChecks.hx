@@ -20,7 +20,7 @@ class SheetRouterNewAxesChecks {
     static function fixture(?options:GantryOptions,?x:GantryDrive,?y:GantryDrive,?z:GantryDrive):Gantry {
         var rack:GantryDrive=HelicalRack(1.5,20,20,Math.acos(3*Math.PI/10));
         var screw:GantryDrive=Screw(new LeadScrewThread(machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball,16,5,1,machinekit.motion.LeadScrewThread.LeadScrewHand.RightHand,13));
-        return new Gantry(new GantrySpec(300,200,100,x==null?rack:x,y==null?rack:y,z==null?screw:z,true,"HGR20",23,
+        return new Gantry(new GantrySpec(300,200,100,x==null?rack:x,y==null?rack:y,z==null?screw:z,true,"HGH20CA",23,
             "HFS5-4040","HFS5-4040",false,None,0.5,new machinekit.power.DcVoltage(560),16,0,0,0,0,options));
     }
     static function options():GantryOptions return {

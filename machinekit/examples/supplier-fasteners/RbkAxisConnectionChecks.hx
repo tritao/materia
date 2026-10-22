@@ -1,6 +1,5 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentValues;
-import machinekit.motion.HiwinHgh15ca;
 import machinekit.motion.LinearRailBlock;
 import machinekit.standard.HexNut;
 import cadkit.threads.Threads;
@@ -27,20 +26,18 @@ class RbkAxisConnectionChecks {
         check(Math.abs(oldPlate.volume()-plate.volume()-8*Math.PI*(3.75*3.75-2.25*2.25)*2.5)<0.001,
             "Only the eight 2.5 mm-deep block counterbores change carriage geometry");
         oldPlate.close();plate.close();
-        var block=new HiwinHgh15ca(),reference=block.geometry(),box=LinearRailBlock.metric("HGR15").geometry();
+        var block=LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),reference=block.geometry(),box=LinearRailBlock.metric("HGH15CA").geometry();
         check(reference.valid() && reference.shape.bounds().get_min().get_y()<-10,"Detailed block retains lower sides missing from the envelope");
-        check(HiwinHgh15ca.MOUNT_THREAD_DEPTH==5,"HGH15CA uses M4x5 mounting depth");
-        check(block.componentType()!=null && block.designation!=LinearRailBlock.metric("HGR15").designation,"Detailed block has a distinct saveable identity");
-        reference.close();box.close();block.close();
-        var explicit=new HiwinHgh15ca(HiwinHgh15ca.referencePath());
-        check(explicit.componentType()==null,"Explicit-path reference remains code-only for existing callers");explicit.close();
+        check(block.mountThreadDepth()==5,"HGH15CA uses M4x5 mounting depth");
+        check(block.componentType()!=null && block.designation==LinearRailBlock.metric("HGH15CA").designation,"Supplier drawing keeps the carriage's part identity");
+        reference.close();box.close();
         var axis=new RbkSfuAxis(),saved=axis.encode(),loaded=MachineAssembly.decode(saved,RbkSfuAxis.registry());
         var blocks=0,nuts=0;
         for(entry in loaded.components()) {
             if(Std.isOfType(entry.component,HexNut))nuts++;
-            if(Std.isOfType(entry.component,HiwinHgh15ca)) {
-                blocks++;var restored:HiwinHgh15ca=cast entry.component,p=restored.geometry();
-                check(p.valid() && p.shape.bounds().get_min().get_y()<-10,"Reload retains detailed block geometry");p.close();restored.close();
+            if(Std.isOfType(entry.component,LinearRailBlock)) {
+                blocks++;var restored:LinearRailBlock=cast entry.component,p=restored.geometry();
+                check(restored.drawing==LinearRailBlock.SUPPLIER && p.valid() && p.shape.bounds().get_min().get_y()<-10,"Reload retains detailed block geometry");p.close();
             }
         }
         check(blocks==2 && nuts==0,"Reloaded axis has two detailed blocks and no external hex nuts");

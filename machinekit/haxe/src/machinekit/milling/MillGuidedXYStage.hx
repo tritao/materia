@@ -68,7 +68,7 @@ class MillGuidedXYStage extends AxisBuilder {
   for(side in [-1,1])for(span in [-l.yBlockSpan,l.yBlockSpan])
    yp.push(horizontal(side*l.yRailSpacing/2,l.centreY+span,l.yRailPlane+g.railHeight,false));
   slide({id:"y",lower:-l.yHalfTravel,upper:l.yHalfTravel,initial:0},"railYLeft","blockY0",l.block,yp[0],{x:0,y:-1,z:0},yp.slice(1),l.yOvertravel);
-  var mountingSize=g.blockMountScrew.split("x")[0];
+  var mountingSize=g.blockMountThread;
   var screw=SocketHeadCapScrew.metric(mountingSize,16),clearance=screw.clearanceDiameter();
   saddle=new MillCrossSaddle(new ComponentValues().setNumber("width",l.saddleWidth).setNumber("depth",l.saddleDepth)
    .setNumber("height",l.saddleHeight).setNumber("bore",l.driveInterfaces?58:0).setNumber("boreZ",0)
@@ -76,7 +76,7 @@ class MillGuidedXYStage extends AxisBuilder {
    .setBoolean("nutBoss",l.driveInterfaces).setBoolean("nutServiceAccess",l.driveInterfaces)
    .setNumber("crossRailSpacing",l.xRailSpacing).setNumber("crossRailLength",l.xRail.length)
    .setNumber("crossRailWidth",g.railWidth).setNumber("guideSpacing",l.yRailSpacing).setNumber("blockSpan",l.yBlockSpan)
-   .setNumber("blockHolePitchB",g.blockHolePitchB).setNumber("blockHolePitchC",g.blockHolePitchC)
+   .setNumber("blockHolePitchB",g.blockHoleSpacingAlong).setNumber("blockHolePitchC",g.blockHoleSpacingAcross)
    .setNumber("blockClearance",clearance));
   attach("saddle",saddle,F.translation(0,l.centreY,saddleBottom),"blockY0");
   for(i in 1...4)attach('blockY$i',l.block,yp[i],"saddle");
@@ -93,7 +93,7 @@ class MillGuidedXYStage extends AxisBuilder {
   }
   slide({id:"x",lower:-l.xHalfTravel,upper:l.xHalfTravel,initial:0},"railXFront","blockX0",l.block,xp[0],{x:-1,y:0,z:0},xp.slice(1),l.xOvertravel);
   table=new MillCrossTable(l.tableDepth,l.xRailSpacing,l.tableWidth,l.tableThickness,l.riserHeight,
-   l.driveInterfaces?34:Math.max(34,g.blockHolePitchC+24),l.driveInterfaces);
+   l.driveInterfaces?34:Math.max(34,g.blockHoleSpacingAcross+24),l.driveInterfaces);
   attach("table",table,F.translation(0,l.centreY,tableBottom),"blockX0");
   for(i in 1...4)attach('blockX$i',l.block,xp[i],"table");
   exposeConnector("table","table","top");

@@ -118,7 +118,7 @@ class BenchMillGuideLoads {
 						(cuttingCase & 4) == 0 ? -CUTTING_FORCE : CUTTING_FORCE);
 					add(wrench, force.x, force.y, force.z, (tip.x - centre.x) * lengthScale,
 						(tip.y - centre.y) * lengthScale, (tip.z - centre.z) * lengthScale);
-					var used = support.requireCapacity(wrench, mill.guideBlock.spec.staticLoadCapacity, SAFETY_FACTOR);
+					var used = support.requireCapacity(wrench, machinekit.motion.LinearRailSystem.rating(mill.guideBlock.spec).staticLoad, SAFETY_FACTOR);
 					var previous = worst.get(study.axis);
 					worst.set(study.axis, previous == null ? used : Math.max(previous, used));
 					if (!overloadRejected) {

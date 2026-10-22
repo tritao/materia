@@ -47,7 +47,7 @@ class ZppComponent extends MachineComponent {
   if(!sources.exists(model)) {
    var path=directory()+"/"+model+".stp";
    if(!sys.FileSystem.exists(path))throw "Missing ZPP CAD; run python3 tools/suppliers/zppcnc.py --prepare";
-   if(machinekit.motion.HiwinHgh15ca.fileDigest(path)!=hash(model))throw "Unreviewed ZPP STEP: "+model;
+   if(machinekit.catalog.PinnedCad.sha256(path)!=hash(model))throw "Unreviewed ZPP STEP: "+model;
    sources.set(model,Shape.importStep(path));
   }
   return sources.get(model);

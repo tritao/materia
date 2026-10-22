@@ -35,8 +35,8 @@ def build(catalog):
         for variant in matching:
             rail = model['parent_id'] == 39276
             recipes.append(dict(supplier_id='vallder', sku=variant['sku'], supplier_product_id=variant['supplier_product_id'],
-                parent_id=model['parent_id'], type_id='machinekit.motion.hg-rail' if rail else 'machinekit.motion.hg-block-reference',
-                values={'model':model['model']}, required_inputs=['length'] if rail else [],
+                parent_id=model['parent_id'], type_id='machinekit.motion.linear-rail' if rail else 'machinekit.motion.linear-rail-block',
+                values={'profile':model['model'].replace('R','H',1)[:-1]+'CA','geometry':'measured'} if rail else {'profile':model['model'],'geometry':'supplier'}, required_inputs=['length'] if rail else [],
                 geometry_source='generator' if rail else 'reference_cad', compatibility='supplier_assumed',
                 source_url=parent['url'], reference_sha256=model['sha256'],
                 limits=['Load/preload and material are not qualified', 'Default rail cutting uses the table end margin; cut length requires supplier sourcing'] if rail else
@@ -59,18 +59,25 @@ def generated():
         for m in all_models:
             if field in m:lines.append('  case '+json.dumps(m['model'])+': '+json.dumps(m[field])+';')
         lines+=['  default: throw "Unknown HG reference: "+model;',' };']
-    lines.append(' public static function spec(model:String):LinearRailProfileSpec return switch model {')
+    lines.append(' public static function carriage(model:String):LinearRailProfileSpec return switch model {')
     for m in all_models:
-        n=m['model'];r=m['table_row']
-        if n.startswith('HGR'):r=next(x['table_row'] for x in all_models if x['model']==n.replace('HGR','HGH').replace('R','CA'))
-        w=n.startswith('HGW');i=0 if not w else 1
-        # Row indices shifted by HGW's extra T1 column after T.
-        vals=dict(designation=n,family='HG',railWidth=float(r[16+i]),railHeight=float(r[17+i]),
+        n=m['model']
+        if n.startswith('HGR'):continue
+        r=m['table_row'];i=1 if n.startswith('HGW') else 0
+        rail='HGR'+n[3:5]+'R';t=next(x['table_row'] for x in all_models if x['model']==rail)
+        thread=r[12].split('x')
+        # HGW rows carry an extra T1 column after T, shifting every later column by one.
+        vals=dict(designation=n,rail=rail,family='HIWIN',railWidth=float(t[4]),railHeight=float(t[5]),
                   blockWidth=float(r[4]),blockHeight=float(r[1]),blockLength=float(r[9]),
-                  blockHolePitchB=float(r[7]),blockHolePitchC=float(r[5]),blockMountScrew=r[12].split('x')[0],
-                  railHolePitch=float(r[21+i]),railEndMargin=float(r[22+i]),railMountScrew=r[23+i].split('x')[0],
-                  staticLoadCapacity=float(r[25+i].replace(',','.'))*1000)
-        lines.append('  case '+json.dumps(n)+': '+json.dumps(vals).replace('"designation":','designation:').replace('"family":','family:')+';')
+                  blockHoleSpacingAlong=float(r[7]),blockHoleSpacingAcross=float(r[5]),blockMountThread=thread[0])
+        if len(thread)==2:vals['blockMountThreadDepth']=float(thread[1])
+        vals.update(railHolePitch=float(t[9]),railEndMargin=float(t[10]),railMountScrew=t[11],
+                  railBore=dict(through=float(t[8]),counterbore=float(t[6]),depth=float(t[7])),
+                  blockMassKg=float(r[29+i]),railMassKgPerMetre=float(t[12]),
+                  ratings=[dict(source='Vallder',reference=m['source_url'],dynamicLoad=round(float(r[24+i])*1000,6),
+                      staticLoad=round(float(r[25+i])*1000,6),lifeBasisKm=50.0,rollMoment=round(float(r[26+i])*1000,6),
+                      pitchMoment=round(float(r[27+i])*1000,6),yawMoment=round(float(r[28+i])*1000,6),original=False)])
+        lines.append('  case '+json.dumps(n)+': '+json.dumps(vals)+';')
     lines+=['  default: throw "Unknown HG reference: "+model;',' };','}']
     # Haxe accepts quoted structure field names? Use identifiers for all keys.
     import re

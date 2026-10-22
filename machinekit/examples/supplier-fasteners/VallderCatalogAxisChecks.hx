@@ -15,7 +15,7 @@ class VallderCatalogAxisChecks {
   var root=Sys.getEnv("MATERIA_ROOT"),directory=root+"/build/suppliers/vallder/",registry=MachineKitComponents.standard();
   var text=sys.io.File.getContent(directory+"recipes.json"),bindings=new SupplierRecipeLibrary(text,registry),data:Dynamic=haxe.Json.parse(text),rows:Array<Dynamic> = data.recipes;
   var bound=0;
-  for(row in rows)if(["machinekit.motion.hg-rail","machinekit.motion.hg-block-reference","machinekit.motion.vallder-screw-support","machinekit.motion.sfu-nut","machinekit.motion.dsg-nut-housing","machinekit.motion.sfu-drawing-screw"].indexOf(row.type_id)>=0) {
+  for(row in rows)if(["machinekit.motion.linear-rail","machinekit.motion.linear-rail-block","machinekit.motion.vallder-screw-support","machinekit.motion.sfu-nut","machinekit.motion.dsg-nut-housing","machinekit.motion.sfu-drawing-screw"].indexOf(row.type_id)>=0) {
    var requested=new ComponentValues(),required:Array<String> = row.required_inputs;
    for(name in required)requested.setNumber(name,name=="length" ? 400 : name=="raceRootDiameter" ? 13 : 10);
    var component=bindings.create("vallder",row.sku,requested);
@@ -25,7 +25,7 @@ class VallderCatalogAxisChecks {
   check(bound==43,"Expected 43 new supplier bindings");
   var layout=new ScrewAxisLayout(250,500,400,160);
   var selected=new ScrewAxisComponents(new RbkMotorMount(),NemaStepper.model("23HS22-2804S"),new VallderSfu1605Screw(500),
-   new SfuNut("SFU1605",13),new VallderBf12Support(),new HgRail("HGR15R",400),new HgBlock("HGH15CA"),5,false);
+   new SfuNut("SFU1605",13),new VallderBf12Support(),LinearRail.metric("HGH15CA",400,LinearRail.MEASURED),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),false);
   var axis=new TwinRailScrewAxis(layout,selected);axis.validate();
   var saved=axis.encode(),loaded=MachineAssembly.decode(saved,registry),before=bom(axis);
   check(before==bom(loaded),"Catalog axis BOM survives persistence");

@@ -81,14 +81,9 @@ class ComponentClassification {
 		file(registry, "machinekit.milling.flat-end-mill", "Tooling and workholding", ComponentKind.Generic);
 		file(registry, "machinekit.milling.fixture-adapter", "Tooling and workholding", ComponentKind.MachinePart);
 		// motion
-		file(registry, "machinekit.motion.linear-rail", "Linear guides", ComponentKind.Generic);
-		file(registry, "machinekit.motion.linear-rail-block", "Linear guides", ComponentKind.Generic);
-		file(registry, "machinekit.motion.hg-rail", "Linear guides", ComponentKind.Generic);
+		file(registry, "machinekit.motion.linear-rail", "Linear guides", ComponentKind.Supplier);
+		file(registry, "machinekit.motion.linear-rail-block", "Linear guides", ComponentKind.Supplier);
 		file(registry, "machinekit.motion.linear-bearing", "Linear guides", ComponentKind.Generic);
-		file(registry, "machinekit.motion.supplier-hgr25-rail", "Linear guides", ComponentKind.Supplier);
-		file(registry, "machinekit.motion.supplier-hgh-block", "Linear guides", ComponentKind.Supplier);
-		file(registry, "machinekit.motion.hg-block-reference", "Linear guides", ComponentKind.Reference);
-		file(registry, "machinekit.motion.hgh15ca-reference", "Linear guides", ComponentKind.Reference);
 		file(registry, "machinekit.motion.ball-screw", "Screws and nuts", ComponentKind.Generic);
 		file(registry, "machinekit.motion.ball-nut", "Screws and nuts", ComponentKind.Generic);
 		file(registry, "machinekit.motion.lead-screw", "Screws and nuts", ComponentKind.Generic);

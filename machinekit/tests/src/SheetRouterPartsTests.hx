@@ -105,10 +105,9 @@ class SheetRouterPartsTests {
     near(reducer.jointTorque(2), 9.5, 1e-9, 'reducer output torque');
     near(reducer.backlashRadians(), Math.PI / 2160, 1e-12, 'arcmin to rad');
     near(reducer.outputDeflection(12), 0.001, 1e-12, 'torsional deflection');
-    for (profile in['HGR20', 'HGR25']) {
-      var metadata=LinearRailSystem.catalog().metadata(profile);
-      var verified=metadata.verifiedFields;
-      check(verified!=null && verified.length==0 && metadata.conformance==GenericApproximation,'unverified rail provenance '+profile);
+    for (profile in['HGH20CA', 'HGH25CA']) {
+      var spec=LinearRailSystem.catalog().get(profile),rating=LinearRailSystem.rating(spec);
+      check(rating.source=='Vallder' && !rating.original && rating.staticLoad>0 && spec.ratings.length==3,'sourced rail ratings '+profile);
       var rail = LinearRailSystem.forProfile(profile, 1000, 2);
       check(rail.bom().lines().length == 2, 'rail/block BOM ' + profile);
       for (entry in rail.components()) {
@@ -165,7 +164,7 @@ class SheetRouterPartsTests {
     var straightPinion=new SpurGear(2,20,20),straightRack=new Rack(2,20,20);
     near(straightPinion.pitchDiameter,40,1e-9,'existing spur pitch unchanged');
     near(Rack.relation(straightPinion,straightRack,1).ratio,0.05,1e-12,'existing straight-rack relation unchanged');
-    for(profile in ['MGN12C','MGN12H','MGN9C','HGR15'])
+    for(profile in ['MGN12C','MGN12H','MGN9C','HGH15CA'])
       check(LinearRailSystem.catalog().exists(profile),'existing rail row retained '+profile);
     near(new Spoilboard().permeabilityM2(),1e-12,1e-20,'spoilboard SI permeability');
     reject(()->new AtcSpindle(new ComponentValues().setNumber('releaseBore',32)),'undersized release cylinder');

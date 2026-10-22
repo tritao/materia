@@ -1918,8 +1918,8 @@ class MachineKitSmoke {
 		near(guide.spec.railHeight, 8, "MGN12 rail height");
 		near(guide.spec.blockWidth, 27, "MGN12 block width");
 		near(guide.spec.blockLength, 34.7, "MGN12 block length");
-		near(guide.spec.blockHolePitchB, 20, "MGN12 block hole pitch B");
-		near(guide.spec.blockHolePitchC, 15, "MGN12 block hole pitch C");
+		near(guide.spec.blockHoleSpacingAcross, 20, "MGN12 block hole spacing across");
+		near(guide.spec.blockHoleSpacingAlong, 15, "MGN12 block hole spacing along");
 		near(guide.travelMin, 27.35, "profile rail lower travel");
 		near(guide.travelMax, 272.65, "profile rail upper travel");
 		near(guide.stroke, 245.3, "profile rail stroke");
@@ -1927,7 +1927,7 @@ class MachineKitSmoke {
 		near(guide.rail.holePositions[0], 10, "profile rail first mounting hole");
 		near(guide.rail.holePositions[guide.rail.holePositions.length - 1], 285, "profile rail last mounting hole");
 		near(guide.rail.connector("mount1").frame.z, 10, "profile rail mount connector");
-		near(guide.blocks[0].connector("mount1").frame.z, -10, "profile block first mount connector");
+		near(guide.blocks[0].connector("mount1").frame.z, -7.5, "profile block first mount connector (C = 15 along the rail)");
 
 		var railPart = guide.rail.geometry(Envelope);
 		solid(railPart, "profile rail envelope");
@@ -1967,7 +1967,7 @@ class MachineKitSmoke {
 		check(definition.joints.length == 1, "profile rail joint count");
 		var state = model.initialState("linear-rail");
 		near(state.worldConnector("block1", "rail").z, guide.travelMin, "profile block starts at lower travel");
-		near(state.worldConnector("block1", "mount1").z, guide.travelMin - guide.spec.blockHolePitchB / 2,
+		near(state.worldConnector("block1", "mount1").z, guide.travelMin - guide.spec.blockHoleSpacingAlong / 2,
 			"profile block mounting pattern at lower travel");
 		guide.setTravel(state, guide.travelMax);
 		near(state.worldConnector("block1", "rail").z, guide.travelMax, "profile block reaches upper travel");

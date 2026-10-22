@@ -209,7 +209,7 @@ class Gantry extends AxisBuilder {
 		zPlateY = railZFace - (guide.blockHeight - guide.railHeight) - 4;
 		var carriageHeight = 100.0;
 		// Retain 3 mm of plate above the upper guide-block mounting row.
-		var carriageDrop = carriageHeight - guide.blockHolePitchC / 2 - 3;
+		var carriageDrop = carriageHeight - guide.blockHoleSpacingAlong / 2 - 3;
 		attach("zCarriage", new GantryPlate("Z carriage", spec.driveFootprint("z",80), 8 + toolReach, carriageHeight),
 			AssemblyFrames.translation(0, zPlateY - toolReach / 2, xPlateZ - railMargin - carriageDrop), "blockZ");
 		mountZero = AxisBuilder.orient(0, zPlateY - toolReach, xPlateZ - railMargin - carriageDrop - flange.thickness,

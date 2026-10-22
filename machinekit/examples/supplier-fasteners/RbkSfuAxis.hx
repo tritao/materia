@@ -10,7 +10,7 @@ class RbkSfuAxis extends TwinRailScrewAxis {
     public static function componentsFor(layout:ScrewAxisLayout,motorModel:String="OPENBUILDS-NEMA23-56",motorWasher:Bool=true):ScrewAxisComponents {
         return new ScrewAxisComponents(new RbkMotorMount("RBK12-57"),NemaStepper.model(motorModel),
             new VallderSfu1605Screw(layout.screwLength),new VallderSfu1605Nut(),new VallderBf12Support(),
-            LinearRail.metric("HGR15",layout.railLength),new HiwinHgh15ca(),HiwinHgh15ca.MOUNT_THREAD_DEPTH,motorWasher);
+            LinearRail.metric("HGH15CA",layout.railLength),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),motorWasher);
     }
     public function new() {
         var layout=new ScrewAxisLayout();

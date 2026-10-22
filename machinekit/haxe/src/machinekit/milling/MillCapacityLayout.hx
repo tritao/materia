@@ -1,6 +1,5 @@
 package machinekit.milling;
 
-import machinekit.motion.HgReferenceData;
 
 typedef MillCapacityOptions = {
  /** Spindle the head carries; defaults to the belt-driven BT30. */
@@ -72,7 +71,7 @@ class MillCapacityLayout {
 		toolChangeHeight = options.toolChangeHeight ?? 0;
 		for (v in [headHeight,fixtureHeight,noseMin]) if (!Math.isFinite(v) || v <= 0) throw "Capacity head, fixture and nose must be finite and positive";
 		if (!Math.isFinite(toolChangeHeight) || toolChangeHeight < 0) throw "Tool-change height must be finite and not negative";
-		var guide=HgReferenceData.spec("HGH25CA"), baseHeight=280.0, railPlane=baseHeight+4;
+		var guide=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA"), baseHeight=280.0, railPlane=baseHeight+4;
 		tableWidth=xTravel+300; tableDepth=yTravel+100;
 		xRailSpacing=tableDepth-140;
 		xRailLength=up(xTravel+2*(xBlockSpan+guide.blockLength/2+guide.railEndMargin+overtravel));
@@ -112,8 +111,8 @@ class MillCapacityLayout {
 
  public function guidedXY():MillGuidedXYStage.MillGuidedXYLayout return {
   centreY:spindleY,yRailSpacing:frame.yRailSpacing,yRailStart:frame.yRailStart,yRailPlane:frame.railPlane,
-  yRail:new machinekit.motion.HgRail("HGR25R",frame.yRailLength),xRail:new machinekit.motion.HgRail("HGR25R",xRailLength),
-  block:new machinekit.motion.HgBlock("HGH25CA"),xHalfTravel:xTravel/2,yHalfTravel:yTravel/2,
+  yRail:rail(frame.yRailLength),xRail:rail(xRailLength),
+  block:carriage(),xHalfTravel:xTravel/2,yHalfTravel:yTravel/2,
   xOvertravel:overtravel,yOvertravel:overtravel,xBlockSpan:xBlockSpan,yBlockSpan:yBlockSpan,xRailSpacing:xRailSpacing,
   saddleWidth:saddleWidth,saddleDepth:saddleDepth,saddleHeight:saddleHeight,
   tableWidth:tableWidth,tableDepth:tableDepth,tableThickness:tableThickness,riserHeight:riserHeight,driveInterfaces:false
@@ -121,11 +120,16 @@ class MillCapacityLayout {
 
 	/** Z zero is the top stop: the tool-change position when one is reserved, else the top of the working stroke. */
 	public function zLayout():MillZAxisLayout return new MillZAxisLayout(frame,headBottom+zTravel+toolChangeHeight,headHeight,spindleY,
-		-(zTravel+toolChangeHeight),"HGH25CA",new machinekit.motion.HgBlock("HGH25CA"),null,
+		-(zTravel+toolChangeHeight),"HGH25CA",carriage(),null,
 		{spindle:spindle,blockSpan:zBlockSpan,carriageWidth:carriageWidth,carriageHeight:carriageHeight,carriageThickness:carriageThickness,
-		 rail:new machinekit.motion.HgRail("HGR25R",frame.zRailLength),headBoltLength:25,overtravelLimit:overtravel,
+		 rail:rail(frame.zRailLength),headBoltLength:25,overtravelLimit:overtravel,
 		 head:new machinekit.component.ComponentValues().setNumber("width",headWidth).setNumber("noseWidth",180)
 		 .setNumber("reach",headDepth).setNumber("plate",20).setNumber("wall",16).setNumber("rearPlate",20).setNumber("boltZ",Math.min(80,headHeight/2-20))});
+
+	static function rail(length:Float):machinekit.motion.LinearRail
+		return machinekit.motion.LinearRail.metric("HGH25CA",length,machinekit.motion.LinearRail.MEASURED);
+	static function carriage():machinekit.motion.LinearRailBlock
+		return machinekit.motion.LinearRailBlock.metric("HGH25CA",machinekit.motion.LinearRailBlock.SUPPLIER);
 
 	static function up(v:Float):Float return Math.ceil(v/10)*10;
 }

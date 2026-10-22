@@ -39,12 +39,12 @@ class MillPartTests {
 		var rebuiltSupport:machinekit.motion.ScrewSupportUnit = cast floating.componentType().create(floating.values());
 		if (rebuiltSupport.support != Simple) throw "Support recipe must retain floating bearing";
 		near(fixed.connector("mount").frame.y, -25, "Support foot frame");
-		var rail = machinekit.motion.LinearRailSystem.forProfile("HGR15", 400, 2);
+		var rail = machinekit.motion.LinearRailSystem.forProfile("HGH15CA", 400, 2);
 		near(rail.stroke, 400 - 40 - 61.4, "Rail room defines travel");
 		near(rail.blocks[0].connector("mount1").frame.y, 13, "HGR15 block mounting plane");
-		var verified = machinekit.motion.LinearRailSystem.catalog().metadata("HGR15").verifiedFields;
-		if (verified == null || verified.length != 0)
-			throw "Assumed rail dimensions must not claim vendor verification";
+		var verified = machinekit.motion.LinearRailSystem.catalog().metadata("HGH15CA").verifiedFields;
+		if (verified == null || verified.indexOf("blockHoleSpacingAlong") < 0 || verified.indexOf("ratings") < 0)
+			throw "HG rows are checked against the supplier table";
 		var spindle = new machinekit.milling.SpindleCartridge();
 		near(spindle.connector("gaugeLine").frame.z, 0, "Spindle gauge line");
 		near(spindle.connector("pulley").frame.z, machinekit.milling.SpindleCartridge.LENGTH, "Spindle pulley seat");

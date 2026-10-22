@@ -56,7 +56,7 @@ typedef MillAxisDrive = {
  * current motor parts decide room, speed and acceleration every time the machine is compiled.
  */
 class BenchMill extends MachineAssembly {
-	public static inline var RAIL:String = "HGR15";
+	public static inline var RAIL:String = "HGH15CA";
 	public static inline var STOCK_WIDTH:Float = 60;
 	public static inline var STOCK_DEPTH:Float = 60;
 	public static inline var STOCK_HEIGHT:Float = 20;

@@ -15,13 +15,14 @@ class ScrewAxisComponents {
     public final support:VallderBf12Support;
     public final rail:LinearRail;
     public final block:LinearRailBlock;
+    /** The carriage's tapped mounting depth from its table, NaN when the table gives none. */
     public final blockThreadDepth:Float;
     /** Optional ISO7089 M4 washers; the selected motor must clear their 9 mm outside diameter. */
     public final motorWasher:Bool;
     public function new(mount:RbkMotorMount,motor:NemaStepper,screw:LeadScrew,nut:LeadScrewNut,
-        support:VallderBf12Support,rail:LinearRail,block:LinearRailBlock,blockThreadDepth:Float,motorWasher:Bool=true) {
+        support:VallderBf12Support,rail:LinearRail,block:LinearRailBlock,motorWasher:Bool=true) {
         this.mount=mount;this.motor=motor;this.screw=screw;this.nut=nut;this.support=support;
-        this.rail=rail;this.block=block;this.blockThreadDepth=blockThreadDepth;this.motorWasher=motorWasher;
+        this.rail=rail;this.block=block;var depth=block.mountThreadDepth();this.blockThreadDepth=depth==null ? Math.NaN : depth;this.motorWasher=motorWasher;
     }
     static function same(a:Float,b:Float,label:String):Void {
         if(!Math.isFinite(a) || Math.abs(a-b)>1e-6)throw "Incompatible axis "+label;
@@ -68,9 +69,9 @@ class ScrewAxisComponents {
         same(r.railWidth,15,"rail width");same(r.railHeight,15,"rail height");
         same(r.railHolePitch,60,"rail hole pitch");same(r.railEndMargin,20,"rail end margin");
         same(b.railWidth,r.railWidth,"block/rail width");same(b.railHeight,r.railHeight,"block/rail height");
-        same(b.blockHeight,28,"block assembly height");same(b.blockHolePitchB,26,"block longitudinal pattern");
-        same(b.blockHolePitchC,26,"block transverse pattern");
-        if(b.blockMountScrew.split("x")[0]!="M4" || b.blockLength>80 || b.blockWidth>34)throw "Incompatible axis block mounting envelope";
+        same(b.blockHeight,28,"block assembly height");same(b.blockHoleSpacingAlong,26,"block longitudinal pattern");
+        same(b.blockHoleSpacingAcross,26,"block transverse pattern");
+        if(b.blockMountThread!="M4" || b.blockLength>80 || b.blockWidth>34)throw "Incompatible axis block mounting envelope";
         if(!Math.isFinite(blockThreadDepth) || blockThreadDepth<5)throw "Axis block needs at least 5 mm known thread depth";
         for(component in ([mount,motor,screw,nut,support,rail,block]:Array<MachineComponent>))
             if(component.componentType()==null)throw "Axis components need saveable engineering recipes";

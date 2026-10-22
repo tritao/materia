@@ -147,7 +147,7 @@ class MillDesignStudy {
 									(cuttingCase & 4) == 0 ? -500 : 500);
 								add(cut, force.x, force.y, force.z, (tip.x - cx) * 0.001, (tip.y - cy) * 0.001, (tip.z - cz) * 0.001);
 								worst = Math.max(worst,
-									support.requireCapacity(cut, study.id == "z" ? z.block.spec.staticLoadCapacity : l.block.spec.staticLoadCapacity, 2));
+									support.requireCapacity(cut, machinekit.motion.LinearRailSystem.rating(study.id == "z" ? z.block.spec : l.block.spec).staticLoad, 2));
 							}
 						}
 					}

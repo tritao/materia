@@ -38,7 +38,7 @@ class LinearTrack extends AxisBuilder {
 			throw "Track needs positive finite travel and an initial coordinate inside it";
 		axis = {id: "track", lower: 0.0, upper: travel, initial: initial};
 		flange = new RobotFlange(63);
-		var guide = LinearRailBlock.metric("HGR15").spec;
+		var guide = LinearRailBlock.metric("HGH15CA").spec;
 		var blockOffset = 140.0;
 		railMargin = guide.railEndMargin + guide.blockLength / 2 + 50;
 		var start = -railMargin - blockOffset;
@@ -50,9 +50,9 @@ class LinearTrack extends AxisBuilder {
 		for (end in [0, 1]) attach('frameEnd$end', new GantryPlate("track end", 80, 420, 40),
 			AssemblyFrames.translation(end == 0 ? start - 40 : start + length + 40, 0, 0), "frameLeft");
 		var railTop = 80 + guide.railHeight;
-		for (side in ["Left", "Right"]) attach('rail$side', LinearRail.metric("HGR15", length),
+		for (side in ["Left", "Right"]) attach('rail$side', LinearRail.metric("HGH15CA", length),
 			AxisBuilder.orient(start, side == "Left" ? -170 : 170, railTop, up, along), 'frame$side');
-		slide(axis, "railLeft", "blockLeftRear", LinearRailBlock.metric("HGR15"),
+		slide(axis, "railLeft", "blockLeftRear", LinearRailBlock.metric("HGH15CA"),
 			AxisBuilder.orient(-blockOffset, -170, railTop, up, along), {x: 1.0, y: 0.0, z: 0.0});
 		var carriageBottom = railTop + guide.blockHeight - guide.railHeight;
 		attach("carriage", new GantryPlate("track carriage", 520, 560, 25),
@@ -60,7 +60,7 @@ class LinearTrack extends AxisBuilder {
 		for (side in ["Left", "Right"]) for (end in ["Rear", "Front"]) {
 			var id = 'block$side$end';
 			if (id == "blockLeftRear") continue;
-			attach(id, LinearRailBlock.metric("HGR15"), AxisBuilder.orient(end == "Rear" ? -blockOffset : blockOffset,
+			attach(id, LinearRailBlock.metric("HGH15CA"), AxisBuilder.orient(end == "Rear" ? -blockOffset : blockOffset,
 				side == "Left" ? -170 : 170, railTop, up, along), "carriage");
 		}
 		var flangeZero = AssemblyFrames.translation(0, 0, carriageBottom + 25 + flange.thickness);

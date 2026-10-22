@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
-"""Fetch pinned supplier reference CAD for local design inspection; no models are bundled."""
-import hashlib
-from pathlib import Path
-import urllib.request
+"""Fetch the pinned HG reference CAD for local design inspection; no models are bundled.
 
-ASSETS = {
-    "HGH25CA": "d1928e51da8a04694e98678ece89710cef6fa22dad3a6ddac47e54261fa491c6",
-    "HGR25R": "a5c25503c681841fbbee95b24a1ebcd890afcf2001b074ee4a5b817e1fc07909",
-    "HGH15CA": "3bc285a6e79d23be1a5d6408382785361402575449bf40175d2319b27a55c9d8",
-    "HGR15R": "2897086393c72de3ca2a1af658da9e471bfbe38e234605e89dbb8497283e4351",
-}
-ROOT = Path(__file__).resolve().parent / "build" / "supplier"
+Fills the one HG reference directory that rail and carriage drawings read,
+build/suppliers/vallder/hg-reference (or MATERIA_HG_REFERENCE), via tools/suppliers/hg.py.
+"""
+import os
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tools" / "suppliers"))
+import hg  # noqa: E402
 
 
 def main():
-    ROOT.mkdir(parents=True, exist_ok=True)
-    for name, digest in ASSETS.items():
-        path = ROOT / (name + ".step")
-        url = "https://www.matis.sk/data/CAD_modely/05_Kolejnicova_vedeni/HG/" + name + ".STP"
-        data = path.read_bytes() if path.exists() else urllib.request.urlopen(url, timeout=60).read()
-        if hashlib.sha256(data).hexdigest() != digest:
-            raise SystemExit("Supplier CAD changed; review before accepting: " + url)
-        if not data.startswith(b"ISO-10303-21;"):
-            raise SystemExit("Not a STEP model: " + url)
-        path.write_bytes(data)
-        print(path)
+    output = Path(os.environ.get("MATERIA_HG_REFERENCE") or ROOT / "build" / "suppliers" / "vallder" / "hg-reference")
+    hg.prepare(output)
+    print(output)
 
 
 if __name__ == "__main__":

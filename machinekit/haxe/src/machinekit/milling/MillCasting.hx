@@ -100,7 +100,7 @@ class MillCasting extends MachineComponent {
 		// The flanged X nut crosses the rail gap; recess both adjacent faces.
 		if (kind == Saddle || kind == Table) {
 			var nut = new machinekit.motion.BallNut();
-			var block = machinekit.motion.LinearRailBlock.metric("HGR15");
+			var block = machinekit.motion.LinearRailBlock.metric("HGH15CA");
 			var recess = (nut.flangeDiameter + 2) / 2 - block.spec.blockHeight / 2;
 			tools.push(Solids.named(Part.box(width + 2, nut.flangeDiameter + 2, recess + 1)
 				.translated(new Vector(0, 0, kind == Saddle ? height - recess : -1)), "x-nut-clearance"));

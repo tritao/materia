@@ -171,14 +171,14 @@ class MillXYStageIntegrity {
   */
  static function checkedRunningPair(axis:MillXYStage,blockId:String,railId:String,out:Diagnostics,cache:PosedParts):Bool {
   var block=axis.component(blockId),railComponent=axis.component(railId);
-  if(!Std.isOfType(block,machinekit.motion.HiwinHgh15ca)||!Std.isOfType(railComponent,machinekit.motion.LinearRail))return false;
-  var rail=cast(railComponent,machinekit.motion.LinearRail);
-  if(rail.spec.designation!="HGR15"||rail.spec.railWidth!=15||rail.spec.railHeight!=15)return false;
+  if(!Std.isOfType(block,machinekit.motion.LinearRailBlock)||!Std.isOfType(railComponent,machinekit.motion.LinearRail))return false;
+  var carriage=cast(block,machinekit.motion.LinearRailBlock),rail=cast(railComponent,machinekit.motion.LinearRail);
+  if(carriage.drawing!=machinekit.motion.LinearRailBlock.SUPPLIER||carriage.spec.rail!=rail.spec.rail||!machinekit.motion.LinearRail.hasMeasuredSection(rail.spec))return false;
   var railPose=axis.zeroPose(railId),blockPose=axis.zeroPose(blockId);
   var relative=materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(railPose),blockPose);
   var along=materia.assembly.AssemblyFrames.transformVector(relative,0,0,1),up=materia.assembly.AssemblyFrames.transformVector(relative,0,1,0);
   if(Math.abs(relative.x)>1e-6||Math.abs(relative.y)>1e-6||Math.abs(along.z-1)>1e-6||Math.abs(up.y-1)>1e-6)return false;
-  var raw=machinekit.motion.Hgr15RailGeometry.build(200,[]);
+  var raw=machinekit.motion.LinearRail.measuredSection(rail.spec.rail,200);
   var uniform=PosedParts.moved(raw,materia.assembly.AssemblyFrames.compose(railPose,materia.assembly.AssemblyFrames.translation(0,0,relative.z-100)));
   raw.close();
   var detailed=cache.posed(block,blockPose);

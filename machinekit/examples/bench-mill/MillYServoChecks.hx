@@ -1,7 +1,8 @@
 import machinekit.milling.*;
 import machinekit.assembly.*;
 import machinekit.component.*;
-import machinekit.motion.HiwinHgh15ca;
+import machinekit.motion.LinearRail;
+import machinekit.motion.LinearRailBlock;
 import cadkit.modeling.*;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -13,7 +14,7 @@ class MillYServoChecks {
 
  static function check(ok:Bool,message:String):Void {if(!ok)throw message;}
  static function checkDetailedBlockSection():Void {
-  var block=new HiwinHgh15ca().geometry(),raw=machinekit.motion.Hgr15RailGeometry.build(200,[]);
+  var block=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER).geometry(),raw=LinearRail.measuredSection("HGR15R",200);
   var rail=raw.translated(new Vector(0,0,-100));raw.close();
   var common=block.intersect(rail),clearance=common.volume();common.close();
   check(clearance<1e-5,"Detailed carriage clears the undrilled continuous running profile");
@@ -40,7 +41,7 @@ class MillYServoChecks {
    Sys.println("Selected mill preview and cosmetic screw thread passed");return;
   }
 
-  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=new HiwinHgh15ca(),z=MillFramePreview.zLayout(reference,f,guide);
+  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER),z=MillFramePreview.zLayout(reference,f,guide);
   var l=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12()),frame=new MillFrame(f,z,l),stage=new MillXYStage(l);
   stage.validate();
   var cache=new PosedParts(),rows:Array<Dynamic> = [],poses:Map<String,AssemblyFrame> = stage.solvedPoses();

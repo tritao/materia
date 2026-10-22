@@ -69,7 +69,7 @@ class MillZAxisLayout {
 	public final profile:String;
 
 	public function new(frame:MillFrameLayout, headBottom:Float, headHeight:Float, spindleY:Float,
-		lower:Float = -250, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null, crossDriveZ:Null<Float> = null, ?options:MillZAxisOptions) {
+		lower:Float = -250, profile:String = "HGH15CA", guideBlock:Null<LinearRailBlock> = null, crossDriveZ:Null<Float> = null, ?options:MillZAxisOptions) {
 		if (options == null) options = {};
 		if (frame == null) throw "Z axis needs frame datums";
 		for (v in [headBottom, headHeight, spindleY, lower]) if (!Math.isFinite(v)) throw "Z datums must be finite";

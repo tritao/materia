@@ -11,14 +11,14 @@ import materia.project.SceneArtifact;
  */
 class MillProject {
  public static function smallAssembly():MachineAssembly {
-  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=new HiwinHgh15ca();
+  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
   return MillFramePreview.concept(reference,new MillFrame(f,z,xy));
  }
  public static function small():Bytes {
   var reference=new BenchMill(false,false),frame=MillFramePreview.layout(reference);
-  var z=MillFramePreview.zLayout(reference,frame,new HiwinHgh15ca());
-  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,new HiwinHgh15ca(),MillScrewDrive.m60dBk12());
+  var z=MillFramePreview.zLayout(reference,frame,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER));
+  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER),MillScrewDrive.m60dBk12());
   return new MillMachiningSetup(smallAssembly(),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
    .scene("mill-small",["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]);
  }
@@ -29,15 +29,14 @@ class MillProject {
  }
 
  /** Shared writer retains each occurrence's hierarchy and cosmetic-thread data.
-  * Imported bearing/carriage mass substitutes are for display only, not sizing.
+  * Imported bearing mass substitutes are for display only, not sizing.
   */
  public static function scene(assembly:MachineAssembly,id:String,diagnostics:Array<String>):Bytes {
   assembly.validate();var model=new AssemblyModel("mm");assembly.addTo(model,"");
   var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
   for(row in assembly.components()) {
    var geometry=row.component.geometry(),mass:MassProperties;
-   if(Std.isOfType(row.component,HgBlock)||Std.isOfType(row.component,HiwinHgh15ca)||
-    (Std.isOfType(row.component,HzMotionComponent)&&cast(row.component,HzMotionComponent).spec.massKg==null)) {
+   if(Std.isOfType(row.component,HzMotionComponent)&&cast(row.component,HzMotionComponent).spec.massKg==null) {
     var props=geometry.massProperties();
     mass=new MassProperties(props.volume*1e-9*7850,props.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
    } else mass=row.component.massProperties();
@@ -47,14 +46,14 @@ class MillProject {
   var definition=model.definition(id);
   AssemblyPreview.preserveOwnership(definition,assembly.definition());
   return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:definition,
-   recipeDiagnostics:diagnostics.concat(["Imported bearing/carriage masses use display-only steel-volume estimates; not engineering sizing inputs."])});
+   recipeDiagnostics:diagnostics.concat(["Imported bearing masses use display-only steel-volume estimates; not engineering sizing inputs."])});
  }
 
  public static function main():Void {
   var root=Sys.getEnv("MATERIA_ROOT"),dir=root+"/machinekit/examples/bench-mill/build/mill";
   sys.FileSystem.createDirectory(dir);
   var assembly=smallAssembly(),reference=new BenchMill(false,false),f=MillFramePreview.layout(reference);
-  var z=MillFramePreview.zLayout(reference,f,new HiwinHgh15ca());
+  var z=MillFramePreview.zLayout(reference,f,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER));
   MillSpindleIntegrity.checkPayload(assembly,z).throwIfErrors();
   MillSpindleIntegrity.checkMotorRemoval(assembly).throwIfErrors();
   var bytes=small();

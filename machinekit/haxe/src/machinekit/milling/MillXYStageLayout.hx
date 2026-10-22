@@ -67,7 +67,7 @@ class MillXYStageLayout {
 	public static function stackHeight(profile:String):Float return 2 * LinearRailBlock.metric(profile).spec.blockHeight + SADDLE_HEIGHT + RISER_HEIGHT + TABLE_HEIGHT;
 
 	/** `drive` defaults to `MillXYDrive.bk12()`; `yDrive` replaces it on Y with an HZMotion-supported screw. */
-	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGR15", guideBlock:Null<LinearRailBlock> = null,
+	public function new(frame:MillFrameLayout, centreY:Float, profile:String = "HGH15CA", guideBlock:Null<LinearRailBlock> = null,
 		?yDrive:MillScrewDrive, ?drive:MillXYDrive) {
 		if (frame == null || !Math.isFinite(centreY)) throw "XY stage needs finite matching frame datums";
 		this.frame = frame;

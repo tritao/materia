@@ -14,11 +14,11 @@ class HgFamilyChecks {
  static function main():Void {
   var rows:Array<Dynamic> = [],assembly=new MachineAssembly();
   for(size in [15,20,25,30,35,45]) {
-   var model="HGR"+size+"R",rail=new HgRail(model,237),part=rail.geometry();
+   var model="HGR"+size+"R",rail=LinearRail.metric("HGH"+size+"CA",237,LinearRail.MEASURED),part=rail.geometry();
    check(part.solidCount()==1 && part.volume()>0,"Solid rail "+model);
-   var reference=new Part(HgBlock.load(model)),lo=HgReferenceData.low(model),hi=HgReferenceData.high(model);
+   var reference=new Part(LinearRailBlock.supplierCad(model)),lo=HgReferenceData.low(model),hi=HgReferenceData.high(model);
    // Reference holes are symmetric; regenerate at exactly the reference positions for equivalence.
-   var referenceLength=hi[2]-lo[2],shortRail=new HgRail(model,referenceLength);
+   var referenceLength=hi[2]-lo[2],shortRail=LinearRail.metric("HGH"+size+"CA",referenceLength,LinearRail.MEASURED);
    shortRail.holePositions.resize(0);
    var pitch=shortRail.spec.railHolePitch,first=referenceLength/2-Math.floor(referenceLength/2/pitch)*pitch;
    for(i in 0...Std.int(referenceLength/pitch)+1)if(first+i*pitch<referenceLength)shortRail.holePositions.push(first+i*pitch);
@@ -29,12 +29,12 @@ class HgFamilyChecks {
    check(Math.abs(difference-expected)<0.05,"Rail source equivalence "+model+": "+difference);
    missing.close();extra.close();translated.close();generated.close();
    for(z in rail.holePositions) {
-    var d=HgRail.drilling(model),tool=Part.cylinderAlongY(d[0]/2-0.02,-rail.spec.railHeight-1,1,0,z),common=part.intersect(tool);
+    var tool=Part.cylinderAlongY(rail.spec.railBore.through/2-0.02,-rail.spec.railHeight-1,1,0,z),common=part.intersect(tool);
     check(common.volume()<0.001,"Rail drill axes "+model);common.close();tool.close();
    }
    assembly.addComponent(model,rail,F.translation((size-15)*15,0,0));
    for(prefix in ["HGH","HGW"]) {
-    var name=prefix+size+(prefix=="HGH" ? "CA" : "CC"),block=new HgBlock(name),body=block.geometry();
+    var name=prefix+size+(prefix=="HGH" ? "CA" : "CC"),block=LinearRailBlock.metric(name,LinearRailBlock.SUPPLIER),body=block.geometry();
     check(body.volume()>0,"Detailed block "+name);
     var position=prefix=="HGH" ? 60.0 : 160.0,posed=body.translated(new Vector(0,0,position)),common=part.intersect(posed),overlap=common.volume();
     check(overlap<0.01,"Matching running section "+name+": "+overlap);common.close();posed.close();

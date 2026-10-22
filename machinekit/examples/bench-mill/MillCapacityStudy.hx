@@ -48,19 +48,9 @@ class MillCapacityStudy {
  static function boxPart(b:PartBox):Part return Part.box(b.maxX-b.minX,b.maxY-b.minY,b.maxZ-b.minZ)
   .translated(new Vector((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,b.minZ));
 
- // Extrude the catalog profile without mounting holes: a superset of the
- // running rail at every carriage station, including every drilled section.
- static function runningSection():Part {
-  var section=HgReferenceData.section("HGR25R"),edges:Array<Curve> = [];
-  var first=new Vector(section[0][0],section[0][1]);
-  for(i in 0...section.length) {
-   var row=section[i],p=new Vector(row[0],row[1]);
-   var q=i==section.length-1?first:new Vector(section[i+1][0],section[i+1][1]);
-   edges.push(row.length==4?Curve.line(p,q):Curve.arc(p,new Vector(row[4],row[5]),q));
-  }
-  var wire=Curve.wire(edges),face=Sketch.face(wire),part=face.extrude(300);
-  face.close();wire.close();for(edge in edges)edge.close();return part;
- }
+ // The undrilled measured profile: a superset of the running rail at every
+ // carriage station, including every drilled section.
+ static function runningSection():Part return LinearRail.measuredSection("HGR25R",300);
 
  static function drawing(l:MillCapacityLayout):String {
   var s=0.34,topX=270.0,topY=240.0,sideX=610.0,sideY=710.0;
@@ -138,7 +128,7 @@ class MillCapacityStudy {
   near(extendedRod.z-retractedRod.z,-MillDrawbarLayout.RELEASE_STROKE,"Shared pneumatic release inspection stroke");
   state.setJoint("spindle/drawbar-release",0);state.setJoint("spindle/pistonRod-release",0);state.forwardKinematics();
   // True continuous running-section check. Bounding boxes would fill the ball tracks.
-  var block=new HgBlock("HGH25CA").geometry(),rail=runningSection();
+  var block=LinearRailBlock.metric("HGH25CA",LinearRailBlock.SUPPLIER).geometry(),rail=runningSection();
   var uniform=rail.translated(new Vector(0,0,-150));rail.close();
   var common=block.intersect(uniform);check(common.volume()<1e-5,"HG25 block clears its running section");common.close();
   var misplaced=block.translated(new Vector(0,-2,0));common=misplaced.intersect(uniform);
@@ -165,7 +155,7 @@ class MillCapacityStudy {
   }
   for(row in rows)if(zMoving(row.id))for(other in rows)if(xyMoving(other.id))clear(row.id,other.id);
   // Guide support includes the overtravel and the full imported axial envelopes.
-  var guide=HgReferenceData.spec("HGH25CA"),lo=HgReferenceData.low("HGH25CA"),hi=HgReferenceData.high("HGH25CA");
+  var guide=LinearRailSystem.catalog().get("HGH25CA"),lo=HgReferenceData.low("HGH25CA"),hi=HgReferenceData.high("HGH25CA");
   check(l.xRailLength/2-l.xTravel/2-l.overtravel-l.xBlockSpan-Math.max(-lo[2],hi[2])>=guide.railEndMargin,"X guide end margins");
   check(l.spindleY-l.yTravel/2-l.overtravel-l.yBlockSpan+lo[2]-l.frame.yRailStart>=guide.railEndMargin,"Y front guide end margin");
   check(l.frame.yRailStart+l.frame.yRailLength-(l.spindleY+l.yTravel/2+l.overtravel+l.yBlockSpan+hi[2])>=guide.railEndMargin,"Y rear guide end margin");

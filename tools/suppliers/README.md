@@ -430,16 +430,15 @@ and 0.5 mm clearance within the published M4 x 5 mm block thread depth.
 The v2 fabrication recipe is distinct from v1; saved recipes lacking a revision
 continue to rebuild the original clearance-hole parts.
 
-`machinekit.motion.hgh15ca-reference` is a saveable, hash-pinned detailed block
-reference using the existing `HiwinHgh15ca` CAD wrapper. It retains the rail,
-top and mount connectors, and includes the sides and seals omitted by the generic
-box. The geometry is the Matis-hosted HIWIN reference, dimensionally compatible
+The carriage is `machinekit.motion.linear-rail-block` with profile `HGH15CA` and
+geometry `supplier`: the hash-pinned detailed HIWIN reference, with the same rail,
+top and mount connectors as the nominal drawing plus the sides and seals that drawing
+omits. The geometry is the Matis-hosted HIWIN reference, dimensionally compatible
 with Vallder's HGH_15CA table; it is not presented as Vallder's own STEP file or
 a claim about the purchased item's manufacturer. Prepare it with
 `python3 machinekit/examples/linear-rail-reference/prepare.py` before generation.
-Saved recipes load on demand from `MATERIA_HGH15CA_STEP`, or the reference example's
-build directory below `MATERIA_ROOT`. No network download occurs while modeling.
-Explicit-path, code-only callers retain their previous ownership API.
+It loads on demand from `MATERIA_HG_REFERENCE`, or `build/suppliers/vallder/hg-reference`
+below `MATERIA_ROOT`. No network download occurs while modeling.
 
 Run the connection and legacy-persistence regressions with:
 

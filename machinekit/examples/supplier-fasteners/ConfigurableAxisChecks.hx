@@ -48,7 +48,7 @@ class ConfigurableAxisChecks {
         rejects(() -> new ScrewAxisLayout(Math.NaN),"Reject nonfinite layout");
         rejects(() -> RbkSfuAxis.componentsFor(defaults,"34HS31-5504S").check(defaults),"Reject incompatible motor interface");
         var wrongNut=new ScrewAxisComponents(new RbkMotorMount(),NemaStepper.model("OPENBUILDS-NEMA23-56"),
-            new VallderSfu1605Screw(),new BallNut(),new VallderBf12Support(),LinearRail.metric("HGR15",300),new HiwinHgh15ca(),5);
+            new VallderSfu1605Screw(),new BallNut(),new VallderBf12Support(),LinearRail.metric("HGH15CA",300),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER));
         rejects(() -> wrongNut.check(defaults),"Reject nominal SFU nut with a different flange/length");
         var layout=new ScrewAxisLayout(300,500,400,160);
         var selected=RbkSfuAxis.componentsFor(layout);

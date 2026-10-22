@@ -17,16 +17,14 @@ class MillZCarriage extends MachineComponent {
 			P.choice("nutModel",["generic1605","SFU2005"],"generic1605"), P.length("width", 234), P.length("height", 160), P.length("thickness", 16),
 			P.length("nutReach", 53), P.length("nutCentreZ", 80), P.length("nutPlate", 10),
 			P.length("headBoltX", 65), P.length("headBoltZ", 42),
-			P.length("railSpacing", 180), P.length("blockSpan", 32.7), P.text("profile", "HGR15")];
+			P.length("railSpacing", 180), P.length("blockSpan", 32.7), P.text("profile", "HGH15CA")];
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.milling.z-carriage", parameters(), v -> new MillZCarriage(v));
 		return recipe;
 	}
 	public static function selectedNut(model:String):machinekit.motion.LeadScrewNut return model=="SFU2005"?new machinekit.motion.SfuNut(model,16):new BallNut();
 	static function guide(profile:String):machinekit.motion.LinearRailBlock return
-		machinekit.motion.HgReferenceData.blocks().indexOf(profile)>=0
-		? machinekit.motion.LinearRailBlock.custom(machinekit.motion.HgReferenceData.spec(profile))
-		: machinekit.motion.LinearRailBlock.metric(profile);
+		machinekit.motion.LinearRailBlock.metric(profile);
 
 	public function new(?values:ComponentValues) {
 		var v = P.resolve(parameters(), values), block = guide(v.token("profile")), nut = selectedNut(v.token("nutModel"));
@@ -55,9 +53,9 @@ class MillZCarriage extends MachineComponent {
 		for (point in nut.boltPattern()) tools.push(Part.cylinderSpan(nut.mountScrew=="M6"?3.35:2.75, face - shelf - 1, face + 1, point.x, reach + point.y));
 		var block = guide(parameterToken("profile"));
 		for (side in [-1, 1]) for (span in [-parameterNumber("blockSpan"), parameterNumber("blockSpan")])
-			for (x in [-block.spec.blockHolePitchC / 2, block.spec.blockHolePitchC / 2])
-				for (z in [-block.spec.blockHolePitchB / 2, block.spec.blockHolePitchB / 2])
-					tools.push(Part.cylinderAlongY(block.spec.blockMountScrew == "M6" ? 3.3 : 2.25, -t - 1, 1, side * parameterNumber("railSpacing") / 2 + x,
+			for (x in [-block.spec.blockHoleSpacingAcross / 2, block.spec.blockHoleSpacingAcross / 2])
+				for (z in [-block.spec.blockHoleSpacingAlong / 2, block.spec.blockHoleSpacingAlong / 2])
+					tools.push(Part.cylinderAlongY(block.spec.blockMountThread == "M6" ? 3.3 : 2.25, -t - 1, 1, side * parameterNumber("railSpacing") / 2 + x,
 						parameterNumber("nutCentreZ") + span + z));
 		// Blind nominal M6 taps match the head flange; retain the rear face of the carriage.
 		for (x in [-parameterNumber("headBoltX"), parameterNumber("headBoltX")])

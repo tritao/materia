@@ -45,8 +45,8 @@ class HobberDesignChecks {
         var axis=m.id.substr(5,1),railId="rail"+axis+(m.id.indexOf("Left")>=0?"Left":"Right");
         var rail:machinekit.motion.LinearRail=cast members.filter(p->p.id==railId)[0].component;
         var block:machinekit.motion.LinearRailBlock=cast m.component;
-        count++;if(!Std.isOfType(block,machinekit.motion.SupplierRailBlock))throw "hobber must use full supplier carriage geometry";
-        count++;if(axis=="X"&&!Std.isOfType(rail,machinekit.motion.HiwinHgr25Rail))throw "X must use matching supplier rail profile";
+        count++;if(block.drawing!=machinekit.motion.LinearRailBlock.SUPPLIER)throw "hobber must use full supplier carriage geometry";
+        count++;if(rail.drawing!=machinekit.motion.LinearRail.MEASURED)throw "rails must use the measured supplier running section";
         var relative=F.compose(F.inverse(poses.get(railId)),poses.get(m.id)),travel=machine.travel.filter(t->t.id==axis)[0];
         count++;if(Math.abs(relative.x)+Math.abs(relative.y)>1e-7)throw 'block off guide datum ${m.id}';
         var lo=relative.z+travel.lower-travel.initial-block.spec.blockLength/2-rail.spec.railEndMargin;

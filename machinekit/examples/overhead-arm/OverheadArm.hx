@@ -21,7 +21,7 @@ class OverheadArm extends Gantry {
 	public function new() {
 		var rack:GantryDrive = Rack(2, 20, 20);
 		super(new GantrySpec(TRAVEL_X, TRAVEL_Y, 300, rack, rack, null, false,
-			"HGR15", 34, "HFS5-4040", "HFS5-4040", false, None, 0.5,
+			"HGH15CA", 34, "HFS5-4040", "HFS5-4040", false, None, 0.5,
 			new machinekit.power.DcVoltage(48), 16, 800, 200, 1400, 650));
 		arm = new RobotArm(false, null, machinekit.robotics.IndustrialArmClass.Reach900, true);
 		var flange:machinekit.robotics.RobotFlange = cast component("flange");

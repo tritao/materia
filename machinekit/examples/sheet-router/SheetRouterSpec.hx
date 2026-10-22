@@ -25,9 +25,9 @@ class SheetRouterSpec {
     public function gantry():GantrySpec {
         var rack:GantryDrive=HelicalRack(1.5,20,20,Math.acos(3*Math.PI/10));
         var screw:GantryDrive=Screw(new LeadScrewThread(Ball,16,10,1,RightHand,13));
-        return new GantrySpec(workX,workY+rackZone,travelZ,rack,rack,screw,true,"HGR20",23,
+        return new GantrySpec(workX,workY+rackZone,travelZ,rack,rack,screw,true,"HGH20CA",23,
             "HFS5-4040","HFS5-4040",true,None,0.5,new machinekit.power.DcVoltage(560),16,300,100,200,180,{
-                railProfileY:"HGR25",yBlockSpacing:280,railPadHeight:12,
+                railProfileY:"HGH25CA",yBlockSpacing:280,railPadHeight:12,
                 beamFootThickness:30,beamFootMaterial:"steel",beamFootWelded:true,
                 frontGuides:{zGuideOffset:60,xRailSpacing:150,xBlockSpacing:300,zRailSpacing:180,zBlockSpacing:200,carriageThickness:40,movingThickness:20,zRibDepth:120,zRibWidth:25,zRibWall:6},
                 motor:Servo("GENERIC-HV-SERVO-750W"),motorX:Servo("GENERIC-HV-SERVO-750W"),motorZ:BrakedServo("750"),

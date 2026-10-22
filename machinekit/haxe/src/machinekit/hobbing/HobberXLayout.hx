@@ -25,7 +25,7 @@ class HobberXLayout {
   public static function front():HobberXDimensions {if(frontCache==null)frontCache=dimensions(RETRACT);return frontCache;}
   static function up10(v:Float):Float return Math.ceil(v/10)*10;
   public static function dimensions(retract:Float):HobberXDimensions {
-    var guide=LinearRailSystem.catalog().get("HGR25"),nut=new BallNut(),motor=ServoMotor.model("GENERIC-HV-SERVO-400W").rating;
+    var guide=LinearRailSystem.catalog().get("HGH25CA"),nut=new BallNut(),motor=ServoMotor.model("GENERIC-HV-SERVO-400W").rating;
     var railStart=MIN+BLOCK_FRONT-guide.blockLength/2-guide.railEndMargin-OVERTRAVEL;
     var railLength=up10(retract+BLOCK_REAR+guide.blockLength/2+guide.railEndMargin+OVERTRAVEL-railStart);
     var start=up10(NUT_DATUM+retract+nut.bodyLength/2+BallScrew.INPUT_JOURNAL_LENGTH+OVERTRAVEL+END_ALLOWANCE);

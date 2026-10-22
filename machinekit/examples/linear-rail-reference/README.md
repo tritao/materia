@@ -2,8 +2,9 @@
 
 For the expanded HG, BK/BF/FK/FF, SFU and DSG recipes, see [motion families](FAMILIES.md).
 
-This example compares nominal envelopes, a generated HGR15R running profile, and public supplier CAD.
-Download the pinned references, then run the CAD checks and export:
+This example checks the drawings of the one rail recipe (`machinekit.motion.linear-rail`) and the one carriage
+recipe (`machinekit.motion.linear-rail-block`) against public supplier CAD. Download the pinned references, then
+run the CAD checks and export:
 
 ```sh
 python3 machinekit/examples/linear-rail-reference/prepare.py
@@ -11,9 +12,9 @@ python3 machinekit/examples/linear-rail-reference/prepare.py
 ./app/run-built.sh --project="$PWD/machinekit/examples/linear-rail-reference/build/comparison.mtrg" --perspective
 ```
 
-The scene groups are `nominal` (left), `generated` (centre, with supplier carriage), and `supplier` (right). The rail length is
-150 mm and both carriages are centred at 75 mm. `build/comparison.json` records
-bounds, solid volumes, drilling patterns and the interference comparison.
+The scene groups are `nominal` (left), `measured` (centre, the measured rail with the supplier carriage), and
+`supplier` (right). The rail length is 150 mm and both carriages are centred at 75 mm. `build/comparison.json`
+records bounds, solid volumes and the interference comparison for the 15 and 25 sizes.
 
 ## Source and provenance
 
@@ -27,57 +28,46 @@ Matis provides these files on its [CAD downloads page](https://www.matis.sk/sk/i
 Retrieved 2026-10-18. The STEP header attributes the carriage model to HIWIN GmbH,
 dated 2007-01-11. These are distributor-hosted design references, not a current
 manufacturer approval. No STEP files are redistributed in this repository;
-`prepare.py` downloads to the ignored local build directory and rejects changed
-content. Public download availability does not establish redistribution rights.
+`prepare.py` downloads them into the one HG reference directory,
+`build/suppliers/vallder/hg-reference` (the same store `tools/suppliers/hg.py --prepare`
+fills), and rejects changed content. Public download availability does not establish redistribution rights.
 HIWIN's [current block dimensions](https://www.hiwin.de/en/Products/Linear-guideways/Blocks/Ball-guides/Series-HG-QH/HGH-QHH/c/4374)
 and [rail dimensions](https://www.hiwin.pl/en/Products/Linear-guideways/Profile-rails/Ball-guides/Series-HGR/c/4377)
-provide the dimensional cross-check. Load/preload ratings and material composition
-are not imported from the old STEP file.
+provide the dimensional cross-check. Load ratings, masses and preload come from the catalogue
+rows (`LinearRailSystem`), never from the STEP files.
 
-## Component integration
+## One recipe, three drawings
 
 ```haxe
-var block = new machinekit.motion.HiwinHgh15ca(pathToPinnedStep);
-// Use anywhere a LinearRailBlock is accepted, including AxisBuilder.slideOn.
-// Export geometry / perform checks while the component remains open.
-block.close();
+var rail = LinearRail.metric("HGH15CA", 400);                               // measured HGR15R section
+var nominal = LinearRail.metric("HGH15CA", 400, LinearRail.NOMINAL);         // catalogue section
+var block = LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER);    // pinned HGH15CA CAD
 ```
 
-For a saved assembly, `new HiwinHgh15ca()` selects the registered
-`machinekit.motion.hgh15ca-reference` recipe. It imports lazily, returns owned
-geometry copies and retains no imported native CAD owner between calls. The
-asset path comes from `MATERIA_HGH15CA_STEP` or the prepared directory under
-`MATERIA_ROOT`; the file hash and mounting frame are checked on load. Material
-is locked to unspecified for this recipe because the model contains several
-materials. Explicit-path constructors retain their original code-only API and
-caller-owned CAD lifetime. The mounting-hole thread depth is 5 mm (M4 x 5),
-consistent with the HGH15CA dimensional table; it is not inferred from a plain
-cylindrical hole in the STEP file.
-
-The wrapper retains the existing HGR15 block's rail, axis, top and four mount
-connectors, and is distinguished from the nominal block in geometry/BOM identity.
-It imports once, then returns owned copies from `geometry(Preview)`. The caller
-closes those copies as usual and closes the component after all exports/checks.
-`Envelope` is the complete conservative exterior box, including the rail channel;
-use actual Preview CAD for mating/contact checks. All dimensions are millimetres.
+Catalogue rows are keyed by carriage (`MGN12C`, `HGH15CA`, `HGW25CC`) and name their
+rail (`MGNR12R`, `HGR15R`). A rail's `geometry` is `nominal` or `measured`; HG rails
+default to `measured`, the analytic line/arc running section taken from the pinned
+HGR model (`HgReferenceData.section`), drilled with the rail table's bores. It needs
+no STEP file at runtime. A carriage's `geometry` is `nominal` (the default) or
+`supplier`, the pinned HGH/HGW CAD, imported on each `geometry()` call from
+`MATERIA_HG_REFERENCE` or `build/suppliers/vallder/hg-reference` and checked against
+its digest and reviewed frame. Saved assemblies record the choice; the drawing
+changes neither the part number nor the datasheet mass.
 
 The supplier carriage is already in our interface frame: X across, Y normal to the
 mounting face and Z along travel. Its upper mounting face remains at Y=13, but its
-sides reach Y=-10.7. The nominal block omits these lower sides. The reference rail
-is centred at Z=0 in its STEP and is shifted +75 mm for our start-at-zero frame.
+sides reach Y=-10.7. The nominal block omits these lower sides; the supplier
+drawing's `Envelope` is the complete exterior box, including the rail channel, so
+use the Preview CAD for mating/contact checks. The reference rail is centred at Z=0
+in its STEP and is shifted +75 mm for our start-at-zero frame. The HGH15CA tapped
+holes are M4 x 5 deep, from the dimensional table; HGW tables give no depth.
 
-The generated HGR15 preview uses an analytic line/arc section measured from the
-pinned HGR15R model, with 4.5 mm through holes and 7.5 mm counterbores, 5.3 mm deep.
-It needs no STEP file at runtime. Envelope detail remains a conservative box;
-the explicit `HiwinHgr25Rail` component extrudes an undrilled section of the pinned HGR25R model and adds its cut-length drilling pattern. Other profiles retain nominal geometry.
-
-The checks compare generated CAD against the supplier rail using matching holes,
+The checks compare the measured section against the supplier rail using matching holes,
 then check carriage clearance at three travel positions on each of 150, 237, 440
-and 600 mm rails. They also check envelopes, bore clearance and connector frames.
-The matching 150 mm pair has zero measured symmetric difference. Production cut
-lengths preserve the generator's fixed 20 mm first-hole / 60 mm pitch policy;
-the supplier reference instead uses 15/75/135 mm. Hole geometry follows the
-existing mount connectors. A cut-length change does not stretch the running section.
+and 600 mm rails, for both sizes. They also check envelopes, bores and tapped holes.
+Production cut lengths keep the fixed 20 mm first-hole / 60 mm pitch policy;
+the supplier reference instead uses 15/75/135 mm. A cut-length change does not
+stretch the running section.
 
 ## Hybrid mill preview
 
@@ -86,16 +76,15 @@ existing mount connectors. A cut-length change does not stretch the running sect
 ./app/run-built.sh --project="$PWD/machinekit/examples/linear-rail-reference/build/mill-hybrid.mtrg" --perspective
 ```
 
-This separate review scene fits all twelve HGH15CA carriages to the mill's
-generated HGR15 rails. XY and Z layouts accept an optional matching `LinearRailBlock`,
-so the supplier wrapper can be selected explicitly and shared for export. Callers
-own its lifetime. The normal mill build remains self contained and uses the
-nominal block; its HGR15 rail previews receive the improved generator automatically.
+This separate review scene fits all twelve carriages to the mill's measured HGR15
+rails with their supplier drawing. XY and Z layouts accept an optional matching
+`LinearRailBlock`. The normal mill build remains self contained and uses the
+nominal block.
 
 The reference fit checks qualify the rail/carriage interface only. They do not
 repeat the mill's complete structural swept-volume audit with the larger carriage
-exterior. Supplier CAD contains simplified internals and mixed real materials;
-CAD volume with a uniform steel density is not a verified carriage mass or inertia.
+exterior. Supplier CAD contains simplified internals and mixed real materials, so
+carriage and rail masses are the catalogue's datasheet values, not CAD volume.
 
 ## Ballscrew exterior details
 
@@ -116,16 +105,7 @@ against the other installed parts at 27 combinations of XYZ stops/midpoints.
 This sampled check supplements the geometry tests; it does not replace a complete
 continuous swept-volume audit of the detailed mill.
 
-## Portable supplier components
-
-`SupplierRailBlock("HGR15")` and `SupplierRailBlock("HGR25")` select full HGH15CA
-and HGH25CA supplier exteriors. `HiwinHgh15ca` remains a convenience constructor.
-`HiwinHgr25Rail(length)` selects the matching supplier-derived 25-series rail.
-Both recipes persist the profile/length, material and pinned source SHA-256;
-CAD paths are resolved locally rather than saved in assemblies. Registration is
-lazy and needs no assets. Geometry generation requires `prepare.py` first, or
-`MACHINEKIT_SUPPLIER_CAD` pointing at the four verified `.step` files. There are
-no downloads or nominal-geometry fallbacks during reconstruction.
+## Pinned references
 
 The additional pinned references, retrieved 2026-10-19, are:
 
@@ -134,7 +114,5 @@ The additional pinned references, retrieved 2026-10-19, are:
 - [HGR25R.STP](https://www.matis.sk/data/CAD_modely/05_Kolejnicova_vedeni/HG/HGR25R.STP),
   SHA-256 `a5c25503c681841fbbee95b24a1ebcd890afcf2001b074ee4a5b817e1fc07909`.
 
-Checks include supplier-profile equivalence, four 25-series cut lengths, carriage
-travel clearance, mounting bores, revision rejection and recipe reconstruction.
-Supplier CAD has simplified internals: uniform steel-density mass and catalogue
-load/preload assumptions remain engineering estimates.
+The other HG sizes (20, 30, 35, 45 and the HGW carriages) are pinned in
+`tools/suppliers/hg-reference.json`; see [motion families](FAMILIES.md).

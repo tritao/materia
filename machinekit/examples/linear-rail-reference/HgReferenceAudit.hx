@@ -2,7 +2,6 @@ import cadkit.Shape;
 import cadkit.PlanarRegion;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import machinekit.motion.HiwinHgh15ca;
 
 /** Extract exact line/arc running sections between holes; never scale another rail. */
 class HgReferenceAudit {
@@ -12,7 +11,7 @@ class HgReferenceAudit {
   for(size in [15,20,25,30,35,45]) for(prefix in ["HGR","HGH","HGW"]) {
    var model=prefix+size+(prefix=="HGR" ? "R" : prefix=="HGH" ? "CA" : "CC"),path=cache+model+".step";
    var raw=Shape.importStep(path),b=raw.bounds();
-   var row:Dynamic={model:model,sha256:HiwinHgh15ca.fileDigest(path),
+   var row:Dynamic={model:model,sha256:machinekit.catalog.PinnedCad.sha256(path),
     min:[b.get_min().get_x(),b.get_min().get_y(),b.get_min().get_z()],
     max:[b.get_max().get_x(),b.get_max().get_y(),b.get_max().get_z()],volume:raw.volume(),valid:CadKit.shapeValidChecked(raw.borrowHandle())!=0};
    if(prefix=="HGR") {

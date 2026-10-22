@@ -136,9 +136,10 @@ class MachineKitReferenceTests {
 		equal(rail.blockWidth, 27, "MGN12C block width");
 		equal(rail.blockHeight, 13, "MGN12C block height");
 		equal(rail.blockLength, 34.7, "MGN12C block length");
-		equal(rail.blockHolePitchB, 20, "MGN12C block hole pitch B");
-		equal(rail.blockHolePitchC, 15, "MGN12C block hole pitch C");
-		if (rail.blockMountScrew != "M3x8" || rail.railMountScrew != "M3x8")
+		equal(rail.blockHoleSpacingAcross, 20, "MGN12C block hole spacing B (across)");
+		equal(rail.blockHoleSpacingAlong, 15, "MGN12C block hole spacing C (along)");
+		equal(rail.blockMountThreadDepth ?? 0, 3.5, "MGN12C block thread depth");
+		if (rail.blockMountThread != "M3" || rail.railMountScrew != "M3x8")
 			throw "MGN12C mounting screw size";
 		equal(rail.railHolePitch, 25, "MGN12C rail hole pitch");
 		equal(rail.railEndMargin, 10, "MGN12C rail end margin");

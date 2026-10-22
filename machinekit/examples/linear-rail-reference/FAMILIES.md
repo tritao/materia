@@ -1,7 +1,8 @@
 # Vallder motion families
 
-The new recipes separate geometry/interface identity from optional Vallder sourcing.
-Existing HGR15, HGH15CA and SFU1605/BF12 recipe IDs remain unchanged.
+The recipes separate geometry/interface identity from optional Vallder sourcing.
+HG rails and carriages are rows of the one `linear-rail` / `linear-rail-block` recipe
+pair; their `geometry` input selects the measured section or the supplier CAD.
 
 | Family | Supported geometry | Vallder bindings in the cached catalogue |
 | --- | --- | --- |
@@ -15,9 +16,15 @@ Existing HGR15, HGH15CA and SFU1605/BF12 recipe IDs remain unchanged.
 
 No supplier variants are invented from table-only rows. These HG profiles are an
 explicitly checked reference family, not a promise that every supplier's similarly
-named part is interchangeable. Blocks and supports retain their mixed-material
-CAD and have material locked to unspecified. Rails generate offline; blocks and
-supports require their pinned local STEP assets.
+named part is interchangeable. Rail and carriage masses and load ratings are the
+catalogue rows' datasheet values; supports retain their mixed-material CAD with
+material locked to unspecified. Rails generate offline; supplier carriage drawings
+and supports require their pinned local STEP assets.
+
+Each carriage row lists its published ratings, the first being the one sizing uses:
+Vallder's table, which reproduces HIWIN's 2008 catalogue (G99TE13-0809), then HIWIN's
+2008 and 2024 (G99TE24-2410) editions where reviewed. The 2024 figures are 30 to 50 %
+higher; sizing applies its own static safety factor to the Vallder value.
 
 ## Prepare and verify
 
@@ -53,8 +60,8 @@ and three-state installation clearance report are exported alongside it.
 ## Code
 
 ```haxe
-var rail = new machinekit.motion.HgRail("HGR20R", 500);
-var carriage = new machinekit.motion.HgBlock("HGH20CA");
+var rail = machinekit.motion.LinearRail.metric("HGH20CA", 500);  // measured HGR20R section
+var carriage = machinekit.motion.LinearRailBlock.metric("HGH20CA", machinekit.motion.LinearRailBlock.SUPPLIER);
 var fixed = new machinekit.motion.VallderScrewSupport("BK15");
 var floating = new machinekit.motion.VallderScrewSupport("BF15");
 // Root/depth inputs here are explicit engineering assumptions, not supplier measurements.

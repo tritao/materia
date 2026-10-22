@@ -132,12 +132,12 @@ class HobberPartTests {
       var bad=FoundationIntegrity.checkMounts(foundation,[{name:"bad rail mount",parent:"casting"}]);
       check(bad.hasErrors()&&bad.items[0].subject=="bad rail mount","bad precision mount named");
       var fixture=new MachineAssembly();fixture.include("foundation",foundation);
-      fixture.addComponent("rail",LinearRail.metric("HGR15",200));
+      fixture.addComponent("rail",LinearRail.metric("HGH15CA",200));
       fixture.addMate("rail mount","fixed","foundation/railLeft","top","rail","base");
       check(!FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}],["rail mount"=>"rail mount"]).hasErrors(),"precision rail mount actually lands on steel");
       check(FoundationIntegrity.checkMounts(fixture,[{name:"rail mount",parent:"foundation/railLeft"}],
         ["rail mount"=>"missing joint"]).hasErrors(),"declared steel support does not excuse a missing physical connection");
-      fixture.addComponent("rogueRail",LinearRail.metric("HGR15",200));
+      fixture.addComponent("rogueRail",LinearRail.metric("HGH15CA",200));
       fixture.addMate("rogue rail mount","fixed","foundation/casting","top","rogueRail","base");
       check(FoundationIntegrity.checkMounts(fixture,[]).items.filter(i->i.subject=="rogue rail mount").length==1,"unlisted precision mount on casting is detected");
       var poses=foundation.solvedPoses(),pose=poses.get("railLeft");if(pose==null)throw "missing rail insert";
