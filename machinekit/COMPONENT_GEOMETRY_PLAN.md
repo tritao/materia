@@ -88,7 +88,7 @@ parts of one machine. 137 compute their mass from the preview geometry, 10 decla
 | G9 | **Missing models.** Give the cast-in insert and source casting representative defaults; decide per supplier reference whether its prepared CAD can be used at export (licence) or a datasheet preview replaces it. |
 | G10 | **Machine-owned envelopes.** Hobber and bench-mill reference envelopes and machine parts move to their machines' plans; the catalogue can hide machine parts by default once the generic set is complete. |
 
-## Status (2026-10-22)
+## Status (2026-10-23)
 
 - G0–G3 done. Generators in use: `MotorBody`, `ProfileRailShapes`, `RoundHousing`, `DinRailDevice`, and `RingParts`
   (bearings, ring encoders, frameless motors), which replaced the planned `BearingRings`.
@@ -96,8 +96,19 @@ parts of one machine. 137 compute their mass from the preview geometry, 10 decla
   drawn nominal, measured or from the pinned supplier CAD, with datasheet masses and load ratings by source
   (`LinearRailSystem`). The MGN rows were checked against HIWIN's 2023 MG catalogue. Bearings, the ring encoder,
   the torque motor and the linear scale keep their annulus or strip as the mass model. The read head is not drawn yet.
-- Next: G5 (electrical), then G6–G8; Vallder screw supports and HZMotion parts should follow the rail pattern
-  (one recipe per family, drawing as a variant, sourced masses).
+- G5 done: `DeviceHousing` (panel modules, enclosures, finned resistors) for drives, supplies, controllers and
+  sensors. G6 done: `PneumaticBodies` for valves, manifolds, vacuum generators, sensors, the FRL unit, suction cups
+  and rods. Screw supports and motor mounts became one recipe each, with sourced rows and drawing variants
+  (`ScrewSupportCatalog`, `MotorMount`), and Schmalz products became rows of their product kinds.
+- G7 and G8 done (2026-10-23): ATC spindle, collet, ER20 nut, ISO30 holder, tool setter, dust shoe, vacuum blower
+  and zone valve; nozzle, axial fan, finned hotend; arm-joint housing and tool-changer halves; hydraulic power
+  pack, valve, manifold, rod and cylinder. Each keeps its old solid as its mass model, so no mass changed.
+  Left as drawn: gripper body, jaws and fingers, wrist fork, frame bar and block brackets (made parts whose shape
+  is the design), heated bed, extruder, heater cartridge and thermistor (already their true shapes), tool rack
+  and fork.
+- Open: the push-in fitting and bayonet changer halves are still envelopes; hydraulic bodies and the vacuum
+  blower (170 kg as a solid) still take mass from solid steel and need G1's effective density; profile members
+  via `ProfileExtrusion`; G9, G10.
 
 Each batch regenerates the docs catalogue and is reviewed on a contact sheet of before and after thumbnails,
 alongside the editor.
