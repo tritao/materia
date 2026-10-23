@@ -12,7 +12,6 @@ typedef ThicknessFace = {var axis:SectionAxis; var planeMm:Float; var region:Mol
 typedef JunctionSearchSettings = {var diameterToleranceMm:Float; var maximumCells:Int;}
 
 typedef JunctionThicknessReport = {
-	var version:Int;
 	var sourceFingerprint:String;
 	var settings:JunctionSearchSettings;
 	var lowerDiameterMm:Float;
@@ -321,7 +320,6 @@ class JunctionThickness {
 						ids.push(id);
 		ids.sort(Reflect.compare);
 		return {
-			version: 1,
 			sourceFingerprint: fingerprint,
 			settings: {diameterToleranceMm: settings.diameterToleranceMm, maximumCells: settings.maximumCells},
 			lowerDiameterMm: 2 * best.radius,

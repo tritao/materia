@@ -41,7 +41,7 @@ class FoundationIntegrity {
 	public static function castingReview(foundation:MineralFoundation, document:materia.tooling.ToolingDocument,
 			?context:materia.casting.CastingInterfaceContext):{
 		diagnostics:Diagnostics,
-		metrics:materia.tooling.process.CastingLevelOne.CastingDesignMetrics,
+		metrics:materia.tooling.process.CastabilityAnalysis.CastingDesignMetrics,
 		validation:Array<materia.tooling.ToolingValidation>,
 		proposals:Array<materia.tooling.process.CastabilityAnalysis.CastabilityProposal>,
 		failures:Int,
@@ -51,7 +51,7 @@ class FoundationIntegrity {
 		var input = machinekit.tooling.FoundationToolingAdapter.snapshot(foundation, document.input.id, document.input.revision, context);
 		if (materia.tooling.ToolingCodec.inputFingerprint(input) != materia.tooling.ToolingCodec.inputFingerprint(document.input))
 			throw "Foundation casting review source differs from document";
-		var review = materia.tooling.process.CastingLevelOne.analyze(document);
+		var review = materia.tooling.process.CastabilityAnalysis.sourceReview(document);
 		review.validation=review.validation.concat(machinekit.tooling.InsertAnchorGeometry.review(input));
 		if (foundation.body.collisionHullQualification.status == Unsupported)
 			review.validation.push(materia.tooling.process.FillAnalysis.check("casting.collision-hull.unsupported." + input.id,

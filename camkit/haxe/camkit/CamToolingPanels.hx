@@ -147,7 +147,7 @@ class CamToolingPanels {
 	}
 
 	public static function build(input:PanelPlan, settings:PanelCamSettings):Array<PanelCamSetup> {
-		var p = PanelCodec.snapshot(input);
+		var p = PanelCodec.copy(input);
 		if (settings.cutDirection != CamCutDirection.Climb && settings.cutDirection != CamCutDirection.Conventional)
 			throw "Invalid panel CAM cut direction";
 		if (settings.travelSpace != MachineCoordinates && settings.travelSpace != WorkCoordinates)

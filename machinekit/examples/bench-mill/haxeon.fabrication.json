@@ -17,8 +17,7 @@
     "MillMoldPreview.hx",
     "MillMoldChecks.hx",
     "MillFabricationSetup.hx",
-    "MillFabricationPreview.hx",
-    "MillMoldStudy.hx"
+    "MillFabricationPreview.hx"
   ],
   "sourceRoots": [
     ".",

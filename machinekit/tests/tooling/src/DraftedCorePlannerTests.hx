@@ -52,7 +52,7 @@ class DraftedCorePlannerTests {
 		for (rule in ["coverage","assembly-graph","demolding-graph"])
 			check(review.validation.filter(row -> row.rule=="tooling.cad."+rule && row.status==Status.Pass).length==1,
 				"drafted EPS passes complete "+rule);
-		var processSpec=ProcessTests.spec();processSpec.sections=[];
+		var processSpec=ProcessTests.spec();
 		processSpec.recipeFingerprint=ToolingCodec.recipeFingerprint(document.recipe);
 		var process=materia.tooling.process.CastingProcessAnalysis.analyze(plan,processSpec,9.80665,null,
 			machinekit.tooling.CastingFillAnalysis.fromPlan),fill=process.fill;
@@ -60,25 +60,9 @@ class DraftedCorePlannerTests {
 		if (fill==null) throw "Missing drafted EPS fill report";
 		var uplift=fill.levels[fill.levels.length-1].cores.filter(row -> row.id==core.id)[0];
 		near(uplift.submergedVolumeMm3,expected,"drafted gross uplift uses the exact cavity volume");
-		var effort=materia.tooling.process.MoldOrientationStudy.metrics(plan,FabricationTests.spec());
+		var effort=materia.tooling.export.ToolingFabrication.effort(plan,FabricationTests.spec());
 		near(effort.mixMassKg,(240*180*100-expected)*document.recipe.mixDensityKgM3*1e-9,
 			"drafted orientation effort uses exact resin geometry");
-		var study=materia.tooling.process.MoldOrientationStudy.run([
-			{id:"drafted",document:document,options:options,process:processSpec}
-		],FabricationTests.spec(),candidate -> {
-			var checked=machinekit.tooling.CastingMoldCad.review(candidate);
-			return {planFingerprint:checked.fingerprint,assemblySteps:checked.assembly.assemblyOrder.length,
-				demoldingSteps:checked.demoldingSteps.length,assemblyBlockingEdges:checked.assembly.blocking.length,
-				demoldingBlockingEdges:checked.demolding.blocking.length,validation:checked.validation};
-		},machinekit.tooling.CastingFillAnalysis.fromPlan);
-		var candidate=study.rankedCandidates[0],quantities=candidate.effort;
-		check(candidate.planningSucceeded && candidate.geometryChecked,
-			"non-box orientation uses the real planner and complete CAD graph evidence");
-		check(candidate.fill!=null && candidate.sections==null,
-			"non-box orientation retains exact fill without inventing orthogonal sections");
-		check(quantities!=null,"non-box orientation keeps its effort metrics");
-		if (quantities==null) throw "Missing drafted orientation effort";
-		near(quantities.mixMassKg,effort.mixMassKg,"orientation and direct effort share exact resin quantities");
 		var shortStock=ToolingCodec.copy(document);shortStock.recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Y;
 		var message="";
 		try machinekit.tooling.CastingMoldCad.plan(shortStock,options) catch (error:Dynamic) message=Std.string(error);

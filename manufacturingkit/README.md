@@ -301,126 +301,51 @@ CamKit owns `CamToolingPanels`; neither this library nor MachineKit gains a CAM
 dependency. Coupon fabrication and physical evidence collection require a shop.
 
 
-### Casting process analysis (phase 6 foundation)
+### Casting process analysis
 
-`materia.tooling.process.CastingProcessAnalysis.analyze(plan, spec, gravity)`
-extends the real mold validation with `FillReport` and `CureReport`. The strict
-`ProcessSpecCodec` version 3 is independent of existing source/mold/fabrication
-encodings; its required recipe fingerprint rejects stale process inputs. Actual
-material values, evidence, temperatures, pour rate, ceiling escape-width limit,
-thermal boundaries and slab definitions are declared or explicitly unknown.
+`CastingProcessAnalysis.analyze` uses one source-bound pipeline for fill, pour
+quantities, geometric castability and the declared compound datasheet. Process,
+fabrication and castability plans stay in memory. The delivered package contains
+shop records and one validation report under its manifest format.
 
-Fill analysis supports the planner's exact orthogonal geometry. It constructs
-disjoint resin cells from the envelope and complete source cuts, then evaluates
-air components at every critical event plane in the symbolic right-hand limit.
-Positive-area contact connects cells; edge/point contact does not vent them.
-Newly trapped components report limiting volume, source-owned ceiling faces and
-a candidate vent location. Vent routing/sealing is not generated automatically.
-Additional output levels cannot change pocket detection. Reports include ideal
-fill-volume/mass/time curves, peak liquid head and per-core gross buoyancy, with
-no EPS-weight credit. Trapped gas, paste transport and compaction are not fluid
-simulations. Connected ceiling bounding widths are conservative for irregular
-faces; an undeclared escape-width threshold cannot pass.
+Fill uses exact disjoint-box algebra for axis-aligned regions and the native CAD
+backend for other regions at the same critical levels. Positive-area contact
+connects air cells; edge or point contact does not vent them. Trapped pockets
+retain the limiting volume, boundary source/hardware IDs and a vent or pre-pour
+sealing proposal. Extra output levels cannot change pocket detection. Reports
+include corrected fill volume/mass, per-panel liquid head and core uplift.
+A full export compares the fill domain with the actual foundation CAD.
 
-Cure analysis starts with an adiabatic remaining-reaction bound, accounting for
-the hottest declared initial/ambient/boundary temperature. An excessive upper
-bound is pending, not proof of overheating. Declared slabs can use cell-centred
-implicit conduction coupled to first-order Arrhenius conversion, with insulated,
-convection/resistance or fixed-temperature boundaries. The reaction enthalpy is
-per kilogram of resin; heat capacity/conductivity/density describe the whole mix.
-Missing kinetics or thermal properties remain pending. A finite simulation also
-reports remaining reaction energy; stopping before the peak cannot clear a limit.
-Nonconvergence is unsupported. Real-section time/space convergence, geometric
-section/junction coverage and thermocouple calibration remain explicit blockers.
-No steel heat-sink or panel conductivity is inferred from a display material.
+`CastingProcessSpec.compound` names a supplier datasheet, a maximum section OR
+layer thickness, and a maximum mass per lift. Undeclared values are typed
+unresolved inputs. The existing sequential mixer batches form one continuous
+lift: reducing mixer capacity does not reduce its layer thickness or total mass.
+No cooling or cure pause is inferred at a batch boundary. Missing mixer data
+leaves scheduling pending. Compound, weighed-mix and fabrication identities must
+agree. There is no kinetics, slab or thermal-coverage solver.
 
-The numerical fixtures verify insulated reaction energy, temperature-dependent
-reaction coupling, the analytical inert-slab Fourier series and timestep
-refinement. Independent native CAD fixtures verify fill volumes and connectivity:
+`OrthogonalSections` extracts opposing-face spans with exact source ownership.
+`JunctionThickness` bounds the largest inscribed diameter using exposed faces,
+an interior witness and a bounded search. The interval never accepts its
+midpoint: a safe upper bound can pass a declared section limit, a failing lower
+bound rejects it, and a straddling interval remains pending. Non-box sections
+report Unsupported with feature IDs. Geometric thickness does not predict cure.
+
+`CastabilityAnalysis.sourceReview` supplies the same source checks to foundation
+diagnostics and mold analysis. Findings retain typed proposals and source IDs;
+accepted edits require an actual adjustable source parameter and a fresh replan.
+Aggregate passage limits come from the recipe. Supplier section/lift limits come
+from the declared compound. Suggestions never mutate source geometry or qualify
+physical evidence.
+
+`PourPlanning` derives weighed ingredient quantities and mixer batches from the
+corrected fill curve. It checks mass balance, capacity, working time and each
+batch's level range. Unknown composition, equipment and working time stay
+pending. `ToolingFabrication.effort` retains production panel/sheet, core/former,
+hardware and mass/flip metrics. The former orientation study is removed; the
+mill's retained review setup and its reason are recorded in TOOLING_PLAN.md.
 
 ```sh
 ./haxeon/scripts/haxeon run --project=manufacturingkit/tests/tooling/haxeon.json
 ./haxeon/scripts/haxeon run --project=machinekit/tests/tooling/haxeon.process.json
 ```
-
-`OrthogonalSections` now extracts opposing-face planar material spans with exact
-three-axis coverage and source IDs, independently of Boolean box partition sizes.
-`cureSection` uses those dimensions only after the caller supplies explicit thermal
-boundaries. Rectangular solids have an exact shortest-dimension result; nonrectangular
-solids now receive the bounded junction analysis described below. The report is part of process
-validation and does not clear thermal calibration or geometric coverage requirements.
-
-`MoldOrientationStudy` compares explicit same-source candidates with real mold,
-fabrication and process checks. MachineKit supplies fingerprint-bound continuous
-CAD/sweep assessments. Deterministic ranking and effort metrics expose failures,
-pending inputs, source requests, production blank yield, cores/formers, logical
-hardware stacks and handling mass/flip. Unknown geometry stays unchecked; failed
-planning never receives invented fabrication metrics. The mill example supplies
-three orientations and static checked-order playback scenes.
-
-`CastabilityAnalysis` adds recipe-bound section screening and typed review
-suggestions to the same process report and orientation candidates. Version 3 of
-`CastingProcessSpec` requires `castability`: nullable maximum aggregate size,
-minimum passage/aggregate ratio, maximum section thickness and evidence. Versions
-1 and 2 are rejected; no thresholds or process properties are silently supplied.
-
-The minimum passage screen compares complete opposing-face spans against the
-aggregate size times the declared ratio. It is a conservative geometry screen,
-not a prediction of mix transport. A widening suggestion names the source faces,
-axis, measured/target separation and a representative material strip in mold mm.
-The maximum-section screen uses the inscribed-diameter interval for general
-orthogonal solids: a lower bound above the limit fails, an upper bound within it
-passes, and a straddling interval remains pending. Long-axis chords are never
-substituted for junction thickness. A declared section limit
-is an assumption for screening and cannot replace the independent cure gate.
-
-Trapped-air and broad-ceiling findings reuse the exact fill results. Suggested
-vents identify candidate points, not generated tooling penetrations; routing,
-sealing and any required casting revision still need explicit design. Former
-release suggestions retain the real planner's draft validations. EPS breakout
-remains pending until physical access/release trials exist. Suggestions have
-stable IDs, source IDs, an actual blocking rule and a typed action/owner. They
-are separate from accepted `DesignChangeRequest`s and never edit the source or
-clear readiness. The JSON and human-readable review join the hashed mill package.
-
-Remaining phase 6 work includes broader radius/cover/access rules, accepted
-source-parameter proposals and replan demonstrations, qualified 3D junction thermal
-coverage, and column orientation/design-study integration.
-
-
-### Junction thickness and thermal geometry coverage
-
-`JunctionThickness` computes Euclidean largest-inscribed-sphere bounds for an
-orthogonal solid union. It removes internal box faces, splits exposed rectangles
-by source ownership, and evaluates distance to those actual boundary rectangles.
-Adaptive subdivision retains an upper bound for every live cell using the
-1-Lipschitz distance field, tightened by distance to a fixed face. No maximum is
-accepted from sampled centres alone. The witness sphere supplies the lower bound;
-the largest remaining cell bound supplies the upper bound. Numerical defaults are
-0.5 mm diameter tolerance and 20,000 evaluated cells, selectable through
-`JunctionSearchSettings`. A work limit leaves a valid interval and `converged=false`.
-These are numerical settings, not recipe acceptance thresholds. Rectangular-solid
-scalar thickness remains exact; nonrectangular results are explicitly intervals.
-
-`OrthogonalSectionReport` version 2 includes these bounds, exposed faces, witness
-and nearby source IDs. `CastabilityReport` version 2 compares both bounds against
-the declared section limit. Geometry convergence does not establish a cooling
-boundary, a slab approximation at a junction, or cure safety.
-
-`ThermalCoverage` accounts exactly for the resin volume bound to authored slabs.
-Process-spec version 3 requires each `CureSection` to carry `spanIds` and
-`geometryFingerprint`. Empty span IDs and a null fingerprint describe an unbound
-solver example; source IDs alone cannot prove coverage. Use
-`OrthogonalSections.cureSection(span, left, right, evidence, report.geometryFingerprint)`
-to bind actual dimensions and faces after declaring their real thermal boundaries.
-Stale geometry, unknown spans, mismatched thickness/source faces, mixed axes and
-multiple assignments fail. Uncovered regions and their volume are exported.
-The geometry fingerprint is independent of the enclosing plan/document report
-stamp, so identical geometry in an orientation study retains its explicit binding.
-
-Full volume coverage is distinct from junction-model validity. Nonrectangular
-junction heat flow remains pending a qualified 3D model; a sphere is not a slab.
-An independently safe adiabatic bound needs no cooling-coverage proof, but invalid
-authored bindings still fail. Numerical convergence, supplier data and physical
-thermal calibration remain separate gates. No 3D cure model is invoked or inferred
-when its required material data and tier-2 trigger are unknown.

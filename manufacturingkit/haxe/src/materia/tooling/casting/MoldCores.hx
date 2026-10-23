@@ -61,7 +61,7 @@ class MoldCores {
 				panel.operations.push(materia.tooling.panel.PanelJoints.operation("core-opening-"+index,
 					InsideProfile,hole,r.panel.measuredThickness,r.routerDiameter));
 			}
-			return {panel:materia.tooling.panel.PanelCodec.snapshot(panel),
+			return {panel:materia.tooling.panel.PanelCodec.copy(panel),
 				pose:materia.assembly.AssemblyFrames.translation(bounds.x,bounds.y,z),withdrawal:{x:0,y:0,z:1}};
 		} catch (error:Dynamic) {throw "Core carrier "+core.featureId+": "+Std.string(error);}
 	}

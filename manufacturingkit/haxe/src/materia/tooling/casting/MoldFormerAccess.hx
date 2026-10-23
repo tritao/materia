@@ -67,7 +67,7 @@ class MoldFormerAccess {
 			contour,r.panel.measuredThickness,r.routerDiameter,MachiningSide.PositiveZ,true);
 		wall.panel.operations.push(operation);
 		wall.panel.contactOpenings.push(operation.id);
-		wall.panel=PanelCodec.snapshot(wall.panel);
+		wall.panel=PanelCodec.copy(wall.panel);
 		volume.profiles.push({panelId:wall.panel.id,operationId:operation.id,contour:operation.contour,
 			pose:wall.pose,depth:operation.depth,subtract:exclusions.copy()});
 		var bounds=CastingProfileGeometry.bounds(contour),margin=r.hardware.formerFlangeMargin;

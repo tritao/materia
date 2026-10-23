@@ -1,104 +1,218 @@
 package materia.tooling.process;
 
-enum abstract CureKineticsKind(String) to String {
-	var AutocatalyticArrhenius = "autocatalytic-arrhenius";
-	var FirstOrderArrhenius = "first-order-arrhenius";
+import materia.casting.CastingInput;
+import materia.casting.CastingInput.CastingTextInput;
+
+/** The supplier specifies a full section limit or a poured-layer limit.
+ * No thermal conductivity, kinetics or heat-transfer data are inferred. */
+enum CompoundThicknessLimit {
+  Unresolved(reason:String);
+  Section(maximumMm:Float);
+  Layer(maximumMm:Float);
 }
 
-typedef CureKinetics = {
-	var kind:CureKineticsKind;
-	var preExponentialPerSecond:Float;
-	var activationEnergyJPerMol:Float;
-	var initialConversion:Float;
-	var autocatalyticPreExponentialPerSecond:Float;
-	var autocatalyticExponentM:Float;
-	var reactionExponentN:Float;
+typedef CompoundDatasheet = {var reference: CastingTextInput;
+var thickness:CompoundThicknessLimit;
+var maximumMassPerLiftKg:CastingInput;
 }
 
-enum abstract ThermalBoundaryKind(String) to String {
-	var Insulated = "insulated";
-	var Convection = "convection";
-	var FixedTemperature = "fixed-temperature";
+typedef CastabilityLimits = {var maximumAggregateSizeMm: Null<Float>;
+var minimumPassageAggregateRatio:Null<Float>;
+var evidence:Array<String>;
 }
 
-/** Convection coefficient includes any declared panel/covering thermal resistance.
- * No board, EPS or steel conductivity is inferred from its material name.
- */
-typedef ThermalBoundary = {
-	var kind:ThermalBoundaryKind;
-	var temperatureC:Null<Float>;
-	var heatTransferWPerM2K:Null<Float>;
-	var evidence:Array<String>;
+/** In-memory process choices; shop records belong to the delivered package. */
+typedef CastingProcessSpec = {var id: String;
+var revision:Int;
+var recipeFingerprint:String;
+var pourRateMm3PerSecond:Null<Float>;
+var maximumAirEscapeWidthMm:Null<Float>;
+var mixComposition:Null<PourPlanning.MixComposition>;
+var mixer:Null<PourPlanning.PourMixerSpec>;
+var castability:CastabilityLimits;
+var compound:CompoundDatasheet;
 }
 
-typedef CureSection = {
-	var id:String;
-	var sourceIds:Array<String>;
+/** Value checks and explicit copies for in-memory process choices. */
+class ProcessSpecs {
+  static function positive(value:Float):Float {
+    if (!Math.isFinite(value) || value <= 0) throw "Invalid casting process number";
+    return value;
+  }
+  static function optional(value:Null<Float>, minimum:Float, maximum:Float):Null < Float> {
+    if (value != null
+      &&(!Math.isFinite(value) || value < minimum || value > maximum)) throw "Invalid casting process number";
+    return value;
+  }
+  public static function thicknessRecord(value:CompoundThicknessLimit):Dynamic return switch value {
+    case Unresolved(reason):
+      {kind: "unresolved", reason: reason};
+    case Section(maximum):
+      {kind: "section", maximumMm: maximum};
+    case Layer(maximum):
+      {kind: "layer", maximumMm: maximum};
+  };
+  public static function copy(input:CastingProcessSpec):CastingProcessSpec {
+    materia.tooling.ToolingIds.validate(input.id);
+    if (input.revision < 1 || input.revision > 100000000
+      || !~/^[a-f0-9]{64}$/.match(input.recipeFingerprint)) throw "Invalid process recipe fingerprint/revision";
+    var compound = input.compound;
+    var reference = materia.casting
+      .CastingInput.CastingInputs.text(materia.casting.CastingInput.CastingInputs.textRecord(compound.reference));
+    var mass = materia.casting.CastingInput
+      .CastingInputs.number(materia.casting.CastingInput.CastingInputs.record(compound.maximumMassPerLiftKg));
+    switch mass {
+      case Known(value):
+        positive(value);
+      case Unresolved(_):
+    }
+    var thickness:CompoundThicknessLimit = switch compound.thickness {
+      case Unresolved(reason):
+        materia.casting.CastingInput.CastingInputs.text({kind: "unresolved", reason: reason}
+        );
+        CompoundThicknessLimit.Unresolved(reason);
+      case Section(value):
+        CompoundThicknessLimit.Section(positive(value));
+      case Layer(value):
+        CompoundThicknessLimit.Layer(positive(value));
+    };
+    var limits = input.castability;
+    var evidence = limits.evidence.copy();
+    if (evidence.length>512) throw "Casting process array exceeds limit";
+    for (value in evidence) {
+      if (value == null || StringTools.trim(value).length == 0 || value.length > 2048
+        || materia.assembly.AssemblyCodec.containsNul(value)) throw "Invalid casting process evidence";
+    }
+    return {id: input.id,
+      revision: input.revision, recipeFingerprint: input.recipeFingerprint, pourRateMm3PerSecond: optional(
+        input.pourRateMm3PerSecond,
+        1e-12,
+        1e15
+      ), maximumAirEscapeWidthMm: optional(
+        input.maximumAirEscapeWidthMm,
+        1e-9,
+        1e6
+      ), mixComposition: input.mixComposition == null ? null : PourPlanning.copyComposition(input.mixComposition),
+      mixer : input.mixer == null ? null : PourPlanning.copyMixer(input.mixer), castability : {
+      maximumAggregateSizeMm : optional(
+        limits.maximumAggregateSizeMm,
+        1e-9,
+        1e6
+      ),
+      minimumPassageAggregateRatio : optional(
+        limits.minimumPassageAggregateRatio,
+        1,
+        1e6
+      ),
+      evidence : evidence
+    }, compound : {
+      reference : reference,
+      thickness : thickness,
+      maximumMassPerLiftKg : mass
+    }
+    };
+  }
+  static function inputNumber(raw:Dynamic,key:String):Null<Float> {
+    var value:Dynamic=Reflect.field(raw,key);
+    if (value==null) return null;
+    if ((!Std.isOfType(value,Float) && !Std.isOfType(value,Int)) || !Math.isFinite(value))
+      throw "Invalid casting process number";
+    return value;
+  }
+  public static function fromRecord(raw:Dynamic):CastingProcessSpec {
+    materia.casting.CastingFeatureCodec.fields(
+      raw,
+      [
+        "id",
+        "revision",
+        "recipeFingerprint",
+        "pourRateMm3PerSecond",
+        "maximumAirEscapeWidthMm",
+        "mixComposition",
+        "mixer",
+        "castability",
+        "compound"
+      ]
+    );
+    materia.casting.CastingFeatureCodec.fields(
+      Reflect.field(raw, "castability"),
+      [
+        "maximumAggregateSizeMm",
+        "minimumPassageAggregateRatio",
+        "evidence"
+      ]
+    );
+    var c:Dynamic = Reflect.field(raw, "compound");
+    materia.casting.CastingFeatureCodec.fields(c, ["reference", "thickness", "maximumMassPerLiftKg"]);
+    var t:Dynamic = Reflect.field(c, "thickness");
+    var thickness:CompoundThicknessLimit = switch materia.casting.CastingRecordCodec.string(t, "kind") {
+      case "unresolved":
+        materia.casting.CastingFeatureCodec.fields(t, ["kind", "reason"]);
+        CompoundThicknessLimit.Unresolved(materia.casting.CastingRecordCodec.string(t, "reason"));
+      case "section":
+        materia.casting.CastingFeatureCodec.fields(t, ["kind", "maximumMm"]);
+        CompoundThicknessLimit.Section(materia.casting.CastingRecordCodec.number(t, "maximumMm"));
+      case "layer":
+        materia.casting.CastingFeatureCodec.fields(t, ["kind", "maximumMm"]);
+        CompoundThicknessLimit.Layer(materia.casting.CastingRecordCodec.number(t, "maximumMm"));
+      default:
+        throw "Unknown compound thickness limit";
+    };
+    var limits:Dynamic = Reflect.field(raw, "castability");
+    var evidence:Array < String >=[];
+    for (value in materia.casting.CastingRecordCodec.array(limits, "evidence")) {
+      if (!Std.isOfType(value, String)) throw "Invalid casting process evidence";
+      var text:String = cast value;
+      evidence.push(text);
+    }
+    var result:CastingProcessSpec = {id: materia.casting.CastingRecordCodec.string(raw,
+      "id"), revision: materia.casting.CastingRecordCodec.integer(
+        raw,
+        "revision"
+      ), recipeFingerprint: materia.casting.CastingRecordCodec.string(
+        raw,
+        "recipeFingerprint"
+      ), pourRateMm3PerSecond: inputNumber(
+        raw,
+        "pourRateMm3PerSecond"
+      ), maximumAirEscapeWidthMm: inputNumber(
+        raw,
+        "maximumAirEscapeWidthMm"
+      ), mixComposition: Reflect.field(
+        raw,
+        "mixComposition"
+      ) == null ? null : PourPlanning.copyComposition(Reflect.field(
+        raw,
+        "mixComposition"
+      )), mixer : Reflect.field(
+        raw,
+        "mixer"
+      ) == null ? null : PourPlanning.copyMixer(Reflect.field(
+        raw,
+        "mixer"
+      )), castability : {
+      maximumAggregateSizeMm : inputNumber(
+        limits,
+        "maximumAggregateSizeMm"
+      ),
+      minimumPassageAggregateRatio : inputNumber(
+        limits,
+        "minimumPassageAggregateRatio"
+      ),
+      evidence : evidence
+    }, compound : {
+      reference : materia.casting.CastingInput.CastingInputs.text(Reflect.field(
+        c,
+        "reference"
+      )),
+      thickness : thickness,
+      maximumMassPerLiftKg : materia.casting.CastingInput.CastingInputs.number(Reflect.field(
+        c,
+        "maximumMassPerLiftKg"
+      ))
+    }
+    };
 
-	/** Exact extracted spans, empty for an unbound authored solver example. */
-	var spanIds:Array<String>;
-
-	var geometryFingerprint:Null<String>;
-
-	var thicknessMm:Float;
-	var left:ThermalBoundary;
-	var right:ThermalBoundary;
-	var evidence:Array<String>;
-}
-
-/** All physical properties may be unknown. Reaction enthalpy is per kg RESIN;
- * specific heat/conductivity refer to the whole aggregate/resin mix.
- */
-typedef ResinCureSpec = {
-	var reference:String;
-	var resinMassFraction:Null<Float>;
-	var heatOfReactionJPerKgResin:Null<Float>;
-	var mixSpecificHeatJPerKgK:Null<Float>;
-	var mixConductivityWPerMK:Null<Float>;
-	var resinMaximumTemperatureC:Null<Float>;
-	var gelMaximumTemperatureC:Null<Float>;
-	var kinetics:Null<CureKinetics>;
-	var evidence:Array<String>;
-}
-
-typedef CureSolverSettings = {
-	var cells:Int;
-	var timeStepSeconds:Float;
-	var durationSeconds:Float;
-	var maximumExtensionSeconds:Float;
-	var convergenceToleranceC:Float;
-	var maximumIterations:Int;
-	var remainingHeatToleranceC:Float;
-}
-
-/** Recipe-bound screening assumptions, not qualified process capacities.
- * Null limits leave the corresponding rule pending. Evidence records provenance.
- */
-typedef CastabilityLimits = {
-	var maximumAggregateSizeMm:Null<Float>;
-	var minimumPassageAggregateRatio:Null<Float>;
-	var maximumSectionThicknessMm:Null<Float>;
-	var evidence:Array<String>;
-}
-
-/** Versioned analysis inputs, bound to an exact recipe. Kept separate from the
- * existing source/mold and fabrication formats; never silently upgrades them.
- */
-typedef CastingProcessSpec = {
-	var id:String;
-	var revision:Int;
-	var recipeFingerprint:String;
-	var initialTemperatureC:Null<Float>;
-	var ambientTemperatureC:Null<Float>;
-	var temperatureMarginC:Null<Float>;
-	var pourRateMm3PerSecond:Null<Float>;
-	var maximumAirEscapeWidthMm:Null<Float>;
-	var mixComposition:Null<PourPlanning.MixComposition>;
-	var mixer:Null<PourPlanning.PourMixerSpec>;
-	var castability:CastabilityLimits;
-	var cure:ResinCureSpec;
-	var sections:Array<CureSection>;
-	var solver:CureSolverSettings;
-	var faceContacts:Array<{faceId:String, kind:ThermalBoundaryKind, evidence:Array<String>}>;
-	var openFaceContact:Null<{kind:ThermalBoundaryKind, evidence:Array<String>}>;
+    return copy(result);
+  }
 }

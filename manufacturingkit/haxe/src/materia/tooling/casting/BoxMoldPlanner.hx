@@ -198,7 +198,7 @@ class BoxMoldPlanner {
 			fixings.push({sourceHoleId: hole.id, hardwareId: id, panelId: bed.id, operationId: id,
 				entry: entry, engagement: cast materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement, threadSpec: thread.designation});
 		}
-		assembly.members[0].panel = PanelCodec.snapshot(bed);
+		assembly.members[0].panel = PanelCodec.copy(bed);
 		var location=DatumFixtureLocation.onBed(insert,d.setup.sourceToMold,face,assembly.members[0],b,fixings);
 		var result:MoldPlan = {
 			id: "single-pocket-box",

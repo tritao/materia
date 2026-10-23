@@ -63,7 +63,7 @@ class PanelAssemblyPlan {
 			throw "Invalid panel assembly count";
 		var members = new Map<String, PanelPlacement>();
 		for (m in plan.members) {
-			PanelCodec.snapshot(m.panel);
+			PanelCodec.copy(m.panel);
 			frame(m.pose);
 			if (members.exists(m.panel.id))
 				throw "Duplicate panel occurrence";

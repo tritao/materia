@@ -59,14 +59,14 @@ class RegionCorePlannerTests {
 	}
 
 	static function packageEvidence(plan:CastingMoldPlan,process:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport):Void {
-		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FabricationTests.spec());
+		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FabricationTests.spec(),process);
 		var directory=Sys.getCwd()+"/build/tooling/nonbox-core-"+fabrication.fingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(directory);
 		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory);
 		checks=checks.concat(machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
-			null,null,null,process));
+			null,FabricationTests.spec(),null,process));
 		var castability:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/castability-analysis.json"));
-		check(castability!=null && Reflect.field(castability,"version")==materia.tooling.process.CastabilityAnalysis.VERSION,
+		check(castability!=null && (cast Reflect.field(castability,"proposals"):Array<Dynamic>).length>0,
 			"native process export retains the real castability report without orthogonal section support");
 		check(Reflect.field(castability,"sourceFingerprint")==process.sourceFingerprint
 			&& Reflect.field(castability,"processFingerprint")==process.processFingerprint,
@@ -74,13 +74,11 @@ class RegionCorePlannerTests {
 		check(Reflect.field(castability,"minimumOpposingFaceSpanMm")==null
 			&& Reflect.field(castability,"maximumDiameterUpperMm")==null,
 			"exported unsupported section measurements remain null");
-		var version=process.castability.version;
-		try {
-			process.castability.version=version-1;
-			rejects(() -> machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
-				null,null,null,process),"Stale process export report");
-		} catch (error:Dynamic) {process.castability.version=version;throw error;}
-		process.castability.version=version;
+		var originalFingerprint=process.processFingerprint;
+		process.processFingerprint="stale";
+		rejects(() -> machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
+			null,FabricationTests.spec(),null,process),"Stale process export report");
+		process.processFingerprint=originalFingerprint;
 		var markdown=sys.io.File.getContent(directory+"/castability-review.md");
 		check(markdown.indexOf("process.castability.release.")>=0 && markdown.indexOf("process.level1.lifting-points")>=0,
 			"human review includes available release and source findings rather than only an Unsupported note");
@@ -140,9 +138,9 @@ class RegionCorePlannerTests {
 			"every real EPS stock piece has exact finished section drawings");
 		check(Math.abs(R.volume(core.cavity,core.id)-192000)<1e-5,
 			"gross triangular cavity agrees with its independent analytic volume");
-		var spec=ProcessTests.spec();spec.sections=[];
+		var spec=ProcessTests.spec();
 		spec.recipeFingerprint=ToolingCodec.recipeFingerprint(document.recipe);
-		var process=materia.tooling.process.CastingProcessAnalysis.analyze(plan,spec,9.80665,null,
+		var process=materia.tooling.process.CastingProcessAnalysis.analyze(plan,spec,9.80665,FabricationTests.spec(),
 			machinekit.tooling.CastingFillAnalysis.fromPlan);
 		var fill=process.fill;
 		check(fill!=null,"non-box EPS keeps the native fill analysis in the shared process pipeline");

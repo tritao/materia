@@ -23,11 +23,7 @@ typedef MixIngredient = {
 
 typedef MixComposition = {
 	var reference:String;
-	var cureReference:String;
-	/** The heat-of-reaction denominator may be base resin or mixed binder.
-	 * The source names the weighed ingredients belonging to that mass basis.
-	 */
-	var cureMassIngredientIds:Array<String>;
+	var compoundReference:String;
 	var ingredients:Array<MixIngredient>;
 }
 
@@ -68,14 +64,13 @@ typedef PourAssessment = {
 	var fillProcessFingerprint:String;
 	var mixingFingerprint:String;
 	var totalMixMassKg:Float;
-	var cureBasisMassKg:Null<Float>;
 	var quantities:Array<PourQuantity>;
 	var schedule:Null<PourSchedule>;
 	var validation:Array<ToolingValidation>;
 }
 
 /** Uses the existing corrected fill curve, not another geometry/fill pipeline.
- * These are planning checks; the process pipeline retains fill, cure and physical
+ * These are planning checks; the process pipeline retains fill, compound and physical
  * qualification checks. No supplier mix ratio, mixer or working time is defaulted.
  */
 class PourPlanning {
@@ -91,7 +86,7 @@ class PourPlanning {
 		var result:PourAssessment = {
 			sourceFingerprint: fill.sourceFingerprint, fillProcessFingerprint: fill.processFingerprint,
 			mixingFingerprint: haxe.crypto.Sha256.encode(materia.tooling.ToolingCodec.canonical({composition: recipe, mixer: equipment})),
-			totalMixMassKg: mass, cureBasisMassKg: recipe == null ? null : mass * cureMassFraction(recipe),
+			totalMixMassKg: mass,
 			quantities: quantities(recipe, mass), schedule: null, validation: []
 		};
 		result.validation.push(check(sourceId, "mix-quantities", recipe == null ? ToolingCheckStatus.Pending : ToolingCheckStatus.Pass,
@@ -203,7 +198,7 @@ class PourPlanning {
 			{ingredientId: i.id, materialReference: i.materialReference, massKg: mass * i.massFraction}];
 
 	public static function copyComposition(raw:Dynamic):MixComposition {
-		CastingFeatureCodec.fields(raw, ["reference", "cureReference", "cureMassIngredientIds", "ingredients"]);
+		CastingFeatureCodec.fields(raw, ["reference", "compoundReference", "ingredients"]);
 		var ingredients:Array<MixIngredient> = [], ids:Map<String,Bool> = [], total = 0.0;
 		var rows = CastingRecordCodec.array(raw, "ingredients");
 		if (rows.length == 0 || rows.length > 128) throw "Invalid mix ingredient count";
@@ -225,37 +220,7 @@ class PourPlanning {
 		}
 		if (Math.abs(total - 1) > RELATIVE_TOLERANCE) throw "Mix mass fractions must sum to one";
 		ingredients.sort((a, b) -> Reflect.compare(a.id, b.id));
-		var basis = CastingRecordCodec.identifiers(raw, "cureMassIngredientIds", 128);
-		if (basis.length == 0) throw "Mix must declare its cure mass basis";
-		for (id in basis) if (!ids.exists(id)) throw "Unknown ingredient in cure mass basis: " + id;
-		return {reference: text(raw, "reference"), cureReference: text(raw, "cureReference"),
-			cureMassIngredientIds: basis, ingredients: ingredients};
-	}
-
-	public static function cureMassFraction(composition:MixComposition):Float {
-		var fraction = 0.0;
-		for (ingredient in composition.ingredients)
-			if (composition.cureMassIngredientIds.indexOf(ingredient.id) >= 0) fraction += ingredient.massFraction;
-		return fraction;
-	}
-
-	/** Explicit denominator/reference agreement, separate from kinetics or calibration. */
-	public static function cureConsistency(sourceId:String, composition:Null<MixComposition>,
-			cureReference:String, resinMassFraction:Null<Float>):ToolingValidation {
-		materia.tooling.ToolingIds.validate(sourceId);
-		if (composition == null) return check(sourceId, "cure-mass-basis", ToolingCheckStatus.Pending,
-			"Declare the weighed ingredients used by the cure model's heat-of-reaction mass basis.");
-		var recipe = copyComposition(composition);
-		if (recipe.cureReference != cureReference) return check(sourceId, "cure-mass-basis", ToolingCheckStatus.Fail,
-			"The mix and cure model name different resin systems.");
-		if (resinMassFraction == null) return check(sourceId, "cure-mass-basis", ToolingCheckStatus.Pending,
-			"Declare the cure model's reactive mass fraction and heat-of-reaction denominator.");
-		var fraction:Float = resinMassFraction;
-		if (!Math.isFinite(fraction) || fraction < 0 || fraction > 1) throw "Invalid cure mass fraction";
-		var agrees = near(fraction, cureMassFraction(recipe), 1);
-		return check(sourceId, "cure-mass-basis", agrees ? ToolingCheckStatus.Pass : ToolingCheckStatus.Fail,
-			agrees ? "The cure mass fraction matches the explicitly selected weighed ingredients."
-			: "The cure mass fraction disagrees with its declared ingredient mass basis.");
+		return {reference:text(raw,"reference"),compoundReference:text(raw,"compoundReference"),ingredients:ingredients};
 	}
 
 	public static function copyMixer(raw:Dynamic):PourMixerSpec {

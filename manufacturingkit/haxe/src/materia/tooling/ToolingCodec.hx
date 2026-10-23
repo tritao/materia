@@ -84,7 +84,7 @@ class ToolingCodec {
 		return Sha256.encode(canonical(inputRecord(copyInput(input))));
 
 	public static function recipeFingerprint(recipe:ToolingRecipe):String
-		return Sha256.encode(canonical(recipeSnapshot(recipe)));
+		return Sha256.encode(canonical(copyRecipe(recipe)));
 
 	public static function documentFingerprint(document:ToolingDocument):String
 		return Sha256.encode(encode(document));
@@ -418,7 +418,7 @@ class ToolingCodec {
 		};
 	}
 
-	public static function recipeSnapshot(recipe:ToolingRecipe):ToolingRecipe
+	public static function copyRecipe(recipe:ToolingRecipe):ToolingRecipe
 		return readRecipe(recipe);
 
 	static function readRecipe(raw:Dynamic):ToolingRecipe {
@@ -752,6 +752,8 @@ class ToolingCodec {
 
 	/** Sort object keys as well as named records so field construction order is irrelevant. */
 	public static function canonical(value:Dynamic):String {
+		if (Std.isOfType(value,materia.tooling.process.CastingProcessSpec.CompoundThicknessLimit))
+			return canonical(materia.tooling.process.CastingProcessSpec.ProcessSpecs.thicknessRecord(cast value));
 		if (Std.isOfType(value,materia.casting.CastingInput))
 			return canonical(materia.casting.CastingInput.CastingInputs.record(cast value));
 		if (Std.isOfType(value,materia.casting.CastingInput.CastingTextInput))

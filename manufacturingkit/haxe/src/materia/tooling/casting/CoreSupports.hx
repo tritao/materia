@@ -240,7 +240,7 @@ class CoreSupports {
 		var bridge = PanelJoints.blank(materia.tooling.ToolingIds.derive("", c.id, "-bridge"), bw, bridgeDepth, r.panel, tool, l);
 		function placed(p:PanelPlan, x:Float, y:Float, z:Float):Void {
 			panels.push({
-				panel: PanelCodec.snapshot(p),
+				panel: PanelCodec.copy(p),
 				pose: F.translation(x, y, z),
 				withdrawal: {x: 0, y: 0, z: 1}
 			});
@@ -341,7 +341,7 @@ class CoreSupports {
 		rows.sort(Reflect.compare);
 		function place(panel:materia.tooling.panel.PanelPlan, x:Float, y:Float, z:Float):Void
 			panels.push({
-				panel: PanelCodec.snapshot(panel),
+				panel: PanelCodec.copy(panel),
 				pose: F.translation(x, y, z),
 				withdrawal: {
 					x: 0,

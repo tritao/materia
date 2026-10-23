@@ -30,7 +30,6 @@ typedef PlanarSectionSpan = {
 }
 
 typedef OrthogonalSectionReport = {
-	var version:Int;
 	var sourceFingerprint:String;
 	var geometryFingerprint:String;
 	var spans:Array<PlanarSectionSpan>;
@@ -109,33 +108,6 @@ class OrthogonalSections {
 			ids.push(sourceId);
 		ids.sort(Reflect.compare);
 		return ids;
-	}
-
-	/** Convert an extracted span only after the caller declares its two actual thermal boundaries.
-	 * This supplies geometric thickness/source IDs; it does not qualify 3D junction coverage.
-	 */
-	public static function cureSection(span:PlanarSectionSpan, left:CastingProcessSpec.ThermalBoundary, right:CastingProcessSpec.ThermalBoundary,
-			evidence:Array<String>, geometryFingerprint:String):CastingProcessSpec.CureSection {
-		ToolingIds.validate(span.id);
-		if (!Math.isFinite(span.thicknessMm) || span.thicknessMm <= 0 || Math.abs(span.endMm - span.startMm - span.thicknessMm) > EPS)
-			throw "Invalid extracted cure section";
-		var ids:Array<String> = [];
-		for (id in span.lowerSourceIds.concat(span.upperSourceIds))
-			if (ids.indexOf(id) < 0) {
-				ToolingIds.validate(id);
-				ids.push(id);
-			}
-		ids.sort(Reflect.compare);
-		return {
-			id: span.id,
-			sourceIds: ids,
-			spanIds: [span.id],
-			geometryFingerprint: geometryFingerprint,
-			thicknessMm: span.thicknessMm,
-			left: left,
-			right: right,
-			evidence: evidence.copy()
-		};
 	}
 
 	public static function analyze(sourceId:String, sourceFingerprint:String, region:Array<MoldBox>, boundaries:Array<FillBoundary>):OrthogonalSectionReport {
@@ -248,7 +220,6 @@ class OrthogonalSections {
 		var rectangular = Math.abs(w * d * h - volume) <= Math.max(1e-6, volume * 1e-10);
 		var junction = JunctionThickness.analyze(sourceId, sourceFingerprint, boxes, boundaries);
 		return {
-			version: 2,
 			sourceFingerprint: sourceFingerprint,
 			geometryFingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({spans: result, volumeMm3: volume})),
 			spans: result,

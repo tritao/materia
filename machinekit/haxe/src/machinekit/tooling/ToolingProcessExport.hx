@@ -16,57 +16,36 @@ class ToolingProcessExport {
 			?existing:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport,
 			?interfaceContext:materia.casting.CastingInterfaceContext):Array<ToolingValidation> {
 		var report=existing==null ? CastingProcessAnalysis.analyze(p,spec,gravityMps2,fabrication,CastingFillAnalysis.fromPlan) : existing;
-		if (report.version!=materia.tooling.process.ProcessSpecCodec.VERSION
-			|| report.sourceFingerprint!=materia.tooling.casting.CastingMoldPlanner.fingerprint(p)
+		if (report.sourceFingerprint!=materia.tooling.casting.CastingMoldPlanner.fingerprint(p)
 			|| report.processFingerprint!=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication)
-			|| report.castability==null
-			|| report.castability.version!=materia.tooling.process.CastabilityAnalysis.VERSION
 			|| report.castability.sourceFingerprint!=report.sourceFingerprint
 			|| report.castability.processFingerprint!=report.processFingerprint)
 			throw "Stale process export report";
-		var checks = report.validation.filter(v -> StringTools.startsWith(v.rule, "process."));
-		var fill=report.fill, sections=report.sections, thermalCoverage=report.thermalCoverage, castability=report.castability;
-		if (fill!=null) checks=checks.concat(cadVolume(p,fill,report.sourceFingerprint,dir,review,foundation,interfaceContext));
-		writeCastability(castability,sections,thermalCoverage,fill,dir);
-		if (fill==null || sections==null) {
-			if (fill==null) {
-				checks.push(FillAnalysis.check("process.fill.cad-volume-agreement",[p.document.input.id],ToolingCheckStatus.Unsupported,
-					"No exact fill region is available for comparison against foundation CAD.",[]));
-				sys.io.File.saveContent(dir+"/fill-foundation-cad-check.json","null\n");
-			}
-			sys.io.File.saveContent(dir+"/fill-analysis.json",ToolingCodec.canonical(fill)+"\n");
-			sys.io.File.saveContent(dir+"/casting-process-spec.json",materia.tooling.process.ProcessSpecCodec.encode(report.spec));
-			for (name in ["junction-thickness.json",
-				"thermal-coverage.json","section-geometry.json"])
-				sys.io.File.saveContent(dir+"/"+name,"null\n");
-			sys.io.File.saveContent(dir+"/cure-analysis.json",ToolingCodec.canonical(report.cure)+"\n");
-			writePour(report,dir);
-			sys.io.File.saveContent(dir+"/process-diagnostics.json",ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items)+"\n");
-			return checks;
+		var checks=report.validation.filter(v -> StringTools.startsWith(v.rule,"process."));
+		if (report.fill!=null) checks=checks.concat(cadVolume(p,report.fill,report.sourceFingerprint,dir,review,foundation,interfaceContext));
+		else {
+			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement",[p.document.input.id],Unsupported,
+				"No exact fill region is available for comparison against foundation CAD.",[]));
+			sys.io.File.saveContent(dir+"/fill-foundation-cad-check.json","null\n");
 		}
-		if (thermalCoverage==null)
-			throw "Supported process report lacks thermal coverage";
-
-		sys.io.File.saveContent(dir + "/casting-process-spec.json", materia.tooling.process.ProcessSpecCodec.encode(report.spec));
-		sys.io.File.saveContent(dir + "/fill-analysis.json", ToolingCodec.canonical(fill) + "\n");
-		writePour(report, dir);
-		sys.io.File.saveContent(dir + "/cure-analysis.json", ToolingCodec.canonical(report.cure) + "\n");
-		sys.io.File.saveContent(dir + "/junction-thickness.json", ToolingCodec.canonical(sections.junction) + "\n");
-		sys.io.File.saveContent(dir + "/thermal-coverage.json", ToolingCodec.canonical(thermalCoverage) + "\n");
-		sys.io.File.saveContent(dir + "/section-geometry.json", ToolingCodec.canonical(sections) + "\n");
-		sys.io.File.saveContent(dir + "/process-diagnostics.json", ToolingCodec.canonical(ToolingDiagnostics.fromValidation(checks).items) + "\n");
+		writeCastability(report.castability,report.sections,report.fill,dir);
+		sys.io.File.saveContent(dir+"/fill-analysis.json",ToolingCodec.canonical(report.fill)+"\n");
+		sys.io.File.saveContent(dir+"/casting-process-spec.json",ToolingCodec.canonical(report.spec)+"\n");
+		sys.io.File.saveContent(dir+"/compound-datasheet-check.json",ToolingCodec.canonical(report.compound)+"\n");
+		sys.io.File.saveContent(dir+"/junction-thickness.json",ToolingCodec.canonical(report.sections==null ? null : report.sections.junction)+"\n");
+		sys.io.File.saveContent(dir+"/section-geometry.json",ToolingCodec.canonical(report.sections)+"\n");
+		writePour(report,dir);
 		return checks;
 	}
 
 	static function writeCastability(castability:materia.tooling.process.CastabilityAnalysis.CastabilityReport,
 			sections:Null<materia.tooling.process.OrthogonalSections.OrthogonalSectionReport>,
-			thermalCoverage:Null<materia.tooling.process.ThermalCoverage.ThermalCoverageReport>,
 			fill:Null<materia.tooling.process.FillAnalysis.FillReport>,dir:String):Void {
 		sys.io.File.saveContent(dir + "/castability-analysis.json", ToolingCodec.canonical(castability) + "\n");
 		var text = [
 			"# Casting design feedback",
 			"",
-			"Review suggestions only. Source geometry is unchanged; cure, CAD and physical release checks remain independent.",
+			"Review suggestions only. Source geometry is unchanged; compound limits, CAD and physical release checks remain independent.",
 			"",
 			"All dimensions/points are in mold coordinates (mm).",
 			""
@@ -78,13 +57,6 @@ class ToolingProcessExport {
 				+ junction.witnessSourceIds.join(", ") + ".");
 		} else text.push("Orthogonal section and junction measurements are Unsupported; available source, fill and release findings follow.\n");
 		if (fill == null) text.push("Exact fill geometry is Unsupported; no air-pocket or vent locations are inferred.\n");
-		if (thermalCoverage != null) text.push("Declared slab geometry covers "
-			+ thermalCoverage.coveredVolumeMm3
-			+ " of "
-			+ thermalCoverage.totalVolumeMm3
-			+ " mm3; "
-			+ thermalCoverage.uncoveredVolumeMm3
-			+ " mm3 remains unbound. Junction heat flow and cure evidence are separate requirements.\n");
 		for (v in castability.validation)
 			text.push("- `" + v.rule + "` (" + v.status + ") [" + v.affectedIds.join(", ") + "]: " + v.message);
 		text.push("\n## Suggested actions\n");
@@ -167,11 +139,11 @@ class ToolingProcessExport {
 		var batches:Array<Array<String>> = [["batch", "mass_kg", "from_level_mm", "to_level_mm",
 			"mixing_start_s", "pour_start_s", "pour_end_s"]];
 		var batchQuantities:Array<Array<String>> = [["batch", "ingredient_id", "material_reference", "mass_kg"]];
-		var text = ["# Pour plan", "", "Review calculation; process and physical release checks remain in process-diagnostics.json.",
+		var text = ["# Pour plan", "", "Review calculation; process and physical release checks remain in fabrication-validation.json.",
 			"", "Total wet mix: " + pour.totalMixMassKg + " kg.", ""];
 		if (report.spec.mixComposition == null)
 			text.push("Weighed material quantities are pending the declared mix fractions.");
-		else text.push("Weighing quantities: pour-quantities.csv. The cure heat-denominator mass is " + pour.cureBasisMassKg + " kg.");
+		else text.push("Weighing quantities: pour-quantities.csv.");
 		var schedule = pour.schedule;
 		if (schedule == null)
 			text.push("Batch schedule is unresolved; see the validation records below.");

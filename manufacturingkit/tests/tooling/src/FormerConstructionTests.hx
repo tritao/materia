@@ -17,7 +17,7 @@ class FormerConstructionTests {
 		var reversed=stocks.copy();reversed.reverse();
 		check(ToolingCodec.canonical(FormerConstruction.solidStock(reversed,20,100,100))==ToolingCodec.canonical(faced),
 			"stock declaration order cannot select a different former blank");
-		var shellRecipe=ToolingCodec.recipeSnapshot(recipe);
+		var shellRecipe=ToolingCodec.copyRecipe(recipe);
 		shellRecipe.minimumLigament=2;
 		var shell=MoldPanels.formerBox("former-test",111,110,120,shellRecipe);
 		check(shell.members.length==5 && shell.joints.length==6,"hollow former has one cap and four repairable rabbeted walls");

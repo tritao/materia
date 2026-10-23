@@ -117,8 +117,8 @@ class FabricationTests {
 		check(ToolingFabrication.plan(p, s).validation.filter(c -> c.rule == "fabrication.materials.compatibility"
 			&& c.status == "fail").length == 1,
 			"styrene plus EPS fails outright");
-		check(f.validation.filter(c -> c.rule == "fabrication.materials.cure" && c.status == "pending").length == 1,
-			"fabrication cannot invent an assessed cure peak without a CureReport");
+		check(f.validation.filter(c -> c.rule == "process.compound.datasheet" && c.status == "pending").length == 1,
+			"fabrication cannot qualify undeclared compound and lift limits");
 		var core = p.cores[0],
 			load = f.loads.estimates.filter(v -> v.id == core.id)[0];
 		var expected = materia.tooling.casting.MoldRegions.volume(core.cavity,core.id) * 1e-9 * p.document.recipe.mixDensityKgM3 * s.gravityMps2 * s.loadFactor;

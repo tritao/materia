@@ -140,7 +140,7 @@ class PanelJoints {
 		};
 
 	public static function blank(id:String, width:Float, height:Float, stock:PanelStockSpec, router:Float = 6, ligament:Float = 6):PanelPlan
-		return PanelCodec.snapshot({
+		return PanelCodec.copy({
 			id: id,
 			revision: 1,
 			stock: stock,
@@ -220,7 +220,7 @@ class PanelJoints {
 			fixedFrame: F.fromRotationMatrix(s.offsetX + tabs[0].center, s.slotY, t / 2, [1, 0, 0, 0, 0, -1, 0, 1, 0]),
 			movingFrame: F.translation(tabs[0].center, t / 2, mt / 2)
 		};
-		return {fixed: PanelCodec.snapshot(fixed), moving: PanelCodec.snapshot(moving), joint: joint};
+		return {fixed: PanelCodec.copy(fixed), moving: PanelCodec.copy(moving), joint: joint};
 	}
 
 	public static function rebate(id:String, stock:PanelStockSpec, width:Float = 160, height:Float = 100, wallHeight:Float = 90, clearance:Float = 0.2,
@@ -260,7 +260,7 @@ class PanelJoints {
 			fixedFrame: F.fromRotationMatrix(width - t, 0, depth, [0, 0, 1, 1, 0, 0, 0, 1, 0]),
 			movingFrame: F.identity()
 		};
-		return {fixed: PanelCodec.snapshot(fixed), moving: PanelCodec.snapshot(moving), joint: joint};
+		return {fixed: PanelCodec.copy(fixed), moving: PanelCodec.copy(moving), joint: joint};
 	}
 
 	public static function pinBolt(id:String, stock:PanelStockSpec, pinDiameter:Float = 6, clearance:Float = 0.15, secondaryTravel:Float = 2,
@@ -321,7 +321,7 @@ class PanelJoints {
 			fixedFrame: F.translation(l.primary.x, l.primary.y, t),
 			movingFrame: F.translation(l.primary.x, l.primary.y, 0)
 		};
-		return {fixed: PanelCodec.snapshot(fixed), moving: PanelCodec.snapshot(moving), joint: joint};
+		return {fixed: PanelCodec.copy(fixed), moving: PanelCodec.copy(moving), joint: joint};
 	}
 
 	public static function validateClearance(clearance:Float, variation:Float, lining:Float, machining:Float):Void {

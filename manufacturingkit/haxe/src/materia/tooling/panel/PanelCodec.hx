@@ -40,8 +40,11 @@ class PanelCodec {
 		return read(panel);
 	}
 
-	public static function snapshot(panel:PanelPlan):PanelPlan
+	public static function copy(panel:PanelPlan):PanelPlan
 		return read(panel);
+
+	public static function snapshot(raw:Dynamic):PanelPlan
+		return read(raw);
 
 	public static function side(v:String):MachiningSide
 		return switch v {

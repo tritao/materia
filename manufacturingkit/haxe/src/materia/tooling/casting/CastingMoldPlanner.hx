@@ -675,7 +675,7 @@ class CastingMoldPlanner {
 					}
 			}
 		for (m in panels.members)
-			m.panel = PanelCodec.snapshot(m.panel);
+			m.panel = PanelCodec.copy(m.panel);
 		for (feature in result.features)
 			if (feature.kind == FormerFeature) {
 				var source = d.input.features.filter(f -> f.id == feature.featureId)[0],

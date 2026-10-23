@@ -40,7 +40,7 @@ class ToolingPanel extends MachineComponent {
             addConnector("cut-"+op.id,Mount,F.alongY(b.x+b.width/2,b.y+b.height/2,positive?p.stock.measuredThickness:0,0,0,positive?1:-1));
         }
     }
-    public function plan():PanelPlan return PanelCodec.snapshot(record);
+    public function plan():PanelPlan return PanelCodec.copy(record);
     override public function componentType():Null<ComponentType> return recipeType();
     override public function hasGeometry():Bool return true;
     override public function geometry(detail:ComponentDetail=Preview):Part {

@@ -20,6 +20,6 @@ class PanelCoupon {
                 PanelContours.relievedRectangle(35+50*i,40,30+c,stock.measuredThickness+c,router/2),
                 stock.measuredThickness,router,MachiningSide.PositiveZ,true,router));
         }
-        return {receiver:PanelCodec.snapshot(pair.fixed),plug:pair.moving,clearances:used};
+        return {receiver:PanelCodec.copy(pair.fixed),plug:pair.moving,clearances:used};
     }
 }

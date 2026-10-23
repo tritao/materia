@@ -8,7 +8,7 @@ import materia.tooling.ToolingDiagnostic.ToolingCheckStatus as Status;
 import materia.tooling.casting.CastingMoldPlan.CastingMoldOptions;
 import materia.tooling.casting.CastingMoldPlan.DesignChangeKind;
 import materia.tooling.process.CastabilityAnalysis.CastabilityAction;
-import materia.tooling.process.CastingLevelOne;
+import materia.tooling.process.CastabilityAnalysis;
 import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
 import machinekit.structural.InsertHoles;
@@ -58,7 +58,7 @@ class ProposalReplanTests {
 		check(first.handling.requiresFlip,"the fixture genuinely requires source lifting connections");
 		check(first.changeRequests.filter(row -> row.kind==DesignChangeKind.LiftingPoints).length==1,
 			"the unmodified casting has a lifting design request");
-		var candidates=CastingLevelOne.analyze(initial).proposals.filter(row -> row.action==CastabilityAction.DeclareLiftingPoint);
+		var candidates=CastabilityAnalysis.sourceReview(initial).proposals.filter(row -> row.action==CastabilityAction.DeclareLiftingPoint);
 		check(candidates.length==4,"the accepted locations come from the actual CoM-based proposal");
 		var placements:Array<CastInsertPlacement> =[];
 		var sourceFromMold=F.inverse(initial.setup.sourceToMold);

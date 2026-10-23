@@ -191,9 +191,9 @@ compatibility path for the old encoding.
 | `InsertFixturePlan` | Insert references, independent locating datums, fixing hardware, insert-sealed penetrations, threaded-hole protection, withdrawal and finishing allowance |
 | `PenetrationPlan` | Hole/slot reference, class (outside casting, insert-sealed, plugged, fill/vent opening), sealing face or plug, seal material |
 | `DesignChangeRequest` | Source feature/insert IDs, requested change (draft, lifting insert, split, radius, access), reason, blocking checks |
-| `ResinCureSpec` | Supplier/grade reference, solvent family, heat of reaction, kinetic model and parameters (or an adiabatic temperature-rise curve), resin mass fraction, mix density/specific heat/conductivity, gel and limit temperatures, evidence; each value or pending |
+| `CompoundDatasheet` | Declared supplier/product reference, maximum section OR layer thickness, maximum mass per continuous lift; typed known/unresolved values |
 | `FillReport` | Setup/source fingerprints, critical levels, level-volume curve, resin mass, trapped-air pockets (volume, ceiling faces, source/tooling IDs, proposed vent point), head and buoyancy per level, fill time when a pour rate is declared |
-| `CureReport` | Recipe/setup fingerprints, analysed sections (source IDs, thickness, boundary conditions), lumped estimate (not a spatial upper bound), 1D peak temperature and time, margin to each limit, 3D result reference when run, validation evidence |
+| `CastingProcessReport` | Source/process fingerprints, exact fill and pour records, one compound datasheet rule, geometric sections, castability and detailed validation; no independent format version |
 | `MoldPlan` | Panels, formers, cores, fixtures, braces, hardware, penetrations, steps, change requests, assumptions and source provenance |
 | `ToolingValidation` | Rule ID, affected IDs, severity, evidence, and pass/fail/pending/unsupported status |
 | `ToolingManifest` | Format version, units, revisions/hashes, generated files, validation status, quantities and replacement groups |
@@ -633,12 +633,11 @@ export the same definition as drawings. Thermal process tuning is FoamJob's.
 Model smooth release covering and sealed seams as a chosen process. Record
 compatibility and cure-temperature evidence for the actual resin/EPS/adhesive/
 release combination. Do not infer compatibility from the generic material name.
-Two combinations fail outright rather than waiting for evidence: a resin system
-declared as styrene-bearing (polyester, vinyl ester) with an EPS core or EPS-based
-adhesive, and a cure peak temperature, from the cure analysis, at or above the
-core stock's declared maximum temperature. The recipe therefore declares the solvent family and a
-`ResinCureSpec`; peak temperatures come from the cure analysis below, and are
-pending when its inputs are.
+Styrene-bearing resin (polyester/vinyl ester) with EPS cores or potentially
+EPS-containing adhesive fails outright. Actual chemical and observed cure-temperature
+compatibility with EPS/adhesive/release remains physical evidence, including the
+stock's declared temperature limit. The process inputs declare compound datasheet
+section/lift limits; no thermal prediction is inferred from nominal material names.
 
 Restrain cores with broad plates or mechanical bridges connected to the outer
 tooling. Calculate displaced volume once for overlapping features. Show uplift
@@ -923,41 +922,16 @@ The flat free surface is an idealisation: a vibrated paste traps at least these
 pockets, and may trap more under broad flat ceilings. The air-escape-width rule
 covers that case, and phase 9 compares predicted pockets with demolded voids.
 
-### Cure temperature
+### Compound datasheet limits
 
-The exotherm matters because EPS softens near its declared limit, resin systems
-have gel and limit temperatures, and temperature differences move inserts.
-Three levels of analysis; a screening result never clears coverage or junction checks:
-
-1. **Lumped estimate.** The remaining reaction rise w·H/c is a uniform-mix
-   estimate. Conduction can preheat unreacted material, so adding it to the
-   maximum initial/environment temperature is not a spatial upper bound. A
-   screening Pass requires a positive declared margin to every material/gel
-   limit; it cannot qualify a casting without the separate thermal-model and
-   physical-evidence checks.
-2. **Section model.** Transient 1D conduction through each section, with heat
-   generation from the `ResinCureSpec` kinetics and boundary conditions from the
-   mold: panel (board conductivity, thickness and convection), EPS (near
-   insulating), open face (convection) and steel inserts (heat sinks). Section
-   thicknesses come from the casting: distances between opposing planar faces for
-   walls and ribs, and the largest inscribed thickness at junctions. Other shapes
-   are unsupported until a medial-axis method exists. Implicit time stepping in
-   ManufacturingKit, verified against the insulated energy balance, convective reactive refinement
-   and analytical inert-slab cooling series. No slab Pass is allowed until the
-   remaining reaction heat is below its declared tolerance. A slab result does
-   not establish a junction result.
-3. **3D transient.** Only when a junction or thick block is within the recipe
-   margin after tier 2. Use the existing Gmsh/CalculiX pipeline and its
-   solver-fixture gate. Cure heat generation uses either a CalculiX DFLUX user
-   routine or a staggered external kinetics update, whichever passes the
-   adiabatic, 1D-slab and mesh-convergence fixtures; record the choice. Move the
-   shared deck writer out of the bench-mill example when this second consumer
-   needs it.
-
-Missing kinetics or mix properties leave thermal qualification pending. A lumped
-screening Pass never removes model coverage blockers. Physical-trial thermocouples (thickest section
-centre, core surface, a panel face) validate peak temperature and time to peak
-within a declared tolerance, attached to the recipe revision.
+Use one rule for the declared compound's maximum section or layer thickness and
+maximum mass per lift. Values remain typed unresolved inputs until the supplier
+datasheet is declared. Check geometric section bounds or the continuous pour's
+layer range, and its full mass. Sequential mixer batches are one continuous lift;
+no cooling/cure pause is inferred. Missing mixer data leaves scheduling Pending.
+Compound, weighed-mix and fabrication identities agree. Physical trials record
+actual temperatures and qualify the chosen process. Kinetic, slab and thermal
+coverage solvers are outside this release, as decided in cleanup item 8.
 
 ### Sequence playback
 
@@ -1049,27 +1023,23 @@ fabrication check.
 
 ### 6. Design-stage moldability feedback and process analysis
 
-Implement the castability rules, the moldability report, proposals on
-`DesignChangeRequest`, effort metrics and the candidate-orientation comparison
-described under design-stage feedback. Add the fill analysis, the adiabatic and
-1D cure tiers with `ResinCureSpec`, `FillReport` and `CureReport`, and sequence
-playback scenes. Expose them as foundation diagnostics and in `MillDesignStudy`.
-The 3D cure tier is built only if a mill section fails tier 2's margin.
+Implement the castability rules, typed proposals, effort metrics, exact fill,
+compound datasheet limits, pour planning and sequence playback. Expose the source
+checks as foundation diagnostics and in `MillDesignStudy`. Cleanup items 8/10
+replace the earlier thermal tiers and orientation-study machinery with the
+supplier-limit rule and the recorded setup decision.
 
-Acceptance: each castability rule has a passing and a failing fixture with the
-offending feature ID reported; the moldability report for the mill base equals
-the phase 4/5 validation for the same setup and recipe; accepting a proposed
-lifting-insert or draft change yields a new casting revision that re-plans and
-clears the request; metrics are deterministic and change when a pocket is added;
-the orientation comparison ranks the base's inverted setup against at least two
-alternatives with reasons. No rule reads a threshold that is not in the recipe.
-Fill analysis finds the pocket in a fixture with a downward-facing ceiling, its
-volume matching the analytic value, and none in its vented variant; it is
-unchanged when evaluated at extra non-critical levels; core uplift peaks at
-submersion. The 1D cure model matches the adiabatic bound with insulated faces
-and the analytical inert-slab series with no reaction; missing kinetics yields
-pending, never pass. The base and column orientation comparison includes trapped
-air and cure margin.
+Acceptance: each retained castability rule has passing/failing fixtures with
+source IDs; the moldability report agrees with the actual setup/recipe checks;
+accepting a mapped lifting/draft proposal creates a new revision that replans
+and clears its request; effort metrics are deterministic. Design thresholds come
+from the recipe; material limits come from the declared compound datasheet.
+Fill catches the analytic downward-ceiling pocket, clears its genuinely vented
+variant, is unchanged by extra levels, and reports peak core uplift. The compound
+rule rejects exceeded section/layer or full-lift mass limits, retains a straddling
+section interval as Pending and leaves undeclared supplier/equipment inputs
+Pending. The chosen orientation and reasons from the completed comparison remain
+recorded; the study and thermal solvers are deleted per the cleanup decisions.
 
 ### 7. Foundation design model
 
@@ -1147,7 +1117,7 @@ lists each deleted module with the check or record that still covers it.
    Missing-input lists come from the type, not from field names.
 2. [x] Enum tokens decode through a checked function that rejects unknown tokens;
    no `cast parameterToken(...)`.
-3. Each codec `snapshot` takes raw records only. It has no
+3. [x] Each codec `snapshot` takes raw records only. It has no
    `Std.isOfType(raw, …)` branch that also accepts an already-typed value, and
    callers copy typed values explicitly.
 4. [x] A test checks that every vocabulary `values()` list matches its codec tokens.
@@ -1171,7 +1141,7 @@ lists each deleted module with the check or record that still covers it.
    native rejection of a screened pattern is a defect in the screen, not a
    fallback to the next candidate. The selected patterns, and the kits, stay
    identical. Report selection time before and after.
-8. Delete the cure and thermal solvers (`CureAnalysis`, `ThermalCoverage`,
+8. [x] Delete the cure and thermal solvers (`CureAnalysis`, `ThermalCoverage`,
    `ThermalFaces`). Their kinetic inputs do not exist for any compound we can
    buy, so they can only report Pending. Replace them with one datasheet rule
    on the declared compound: maximum section or layer thickness and maximum
@@ -1181,11 +1151,11 @@ lists each deleted module with the check or record that still covers it.
    (a casting whose features are one box pocket), sharing its allocation,
    panels and records. Delete the separate planner, its codec and its options.
    Box-template kits stay identical.
-10. One castability pass. Fold the source screening in `CastingLevelOne` into
+10. [x] One castability pass. Fold the source screening in `CastingLevelOne` into
     `CastabilityAnalysis` and delete what they duplicate. Record the result of
     `MoldOrientationStudy` as a decision in this plan (the chosen orientation
     and why) and delete the study code and its configuration.
-11. Strict formats only at the boundaries: source casting features in, and the
+11. [x] Strict formats only at the boundaries: source casting features in, and the
     delivered package out (drawings, CAM, cut lists, shop and fixture records,
     the validation report, one manifest). Intermediate plans (mold plan, mold
     volumes, process, fabrication spec, castability and similar) stay in memory
@@ -1237,8 +1207,8 @@ demold against the fill analysis's predicted pockets, compaction method and its
 measured settings, and insert pull-out if tested. Include the rail edge trial
 from `machinekit/RAIL_MOUNTING.md` (RM6): a replicated pad about 1 m long, a
 real rail aligned with push screws, straightness before and after torque and
-after one week. Fit or confirm `ResinCureSpec`
-values from the traces and supplier data. Adjust recipe values from evidence.
+after one week. Confirm compound datasheet limits and the chosen process from
+supplier data and trial observations. Adjust recipe values from evidence.
 Review full mold loads, handling, insert anchorage and finishing.
 
 Acceptance: evidence is attached to the relevant recipe revision; full mill
@@ -1253,8 +1223,8 @@ meaningful checks. Do not mix unrelated machine or app work into these changes.
 
 Pure tests: unit/frame conversion, deterministic codec, joint fit across sheet
 thickness variation, sequence cycles, invalid/unsupported inputs and rectangular
-blank conversion, penetration classes, the hard resin/EPS rules, and the cure
-tiers against the adiabatic and inert-slab fixtures. Geometric
+blank conversion, penetration classes, the hard resin/EPS rules, compound limits
+and continuous-pour quantity/working-time checks. Geometric
 tests: cavity equivalence, insert fixture placement, rebate/slot material, swept
 volumes and the blocking graph, fill-analysis pockets at critical levels, and
 recipe reconstruction. Include negative
@@ -1296,6 +1266,10 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
+- Extreme integral JSON round-trips (observed 1e14 becoming 276447232) need a separate toolchain investigation; do not add another JSON parser to tooling.
+
+- Interrupted/multi-lift pours with cooling or cure pauses are outside this release; current mixer batches form one continuous lift.
+
 - Collapsible (knock-down) melamine cores for undrafted pockets that open to a face: a segmented box released by removing a key panel first, with joinery, bracing and take-apart sequence. This is a new core strategy, considered only after the core strategy comparison.
 - Structured recipe parameters: MachineKit components store structured records as JSON strings inside recipe tokens (`MineralCasting` `embeddedAnchors`, `datumScheme`, `interfaces`; `CastInsert` `origin`). This affects every component, so it needs its own MachineKit plan rather than a casting slice.
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
@@ -1306,7 +1280,7 @@ on main), CNC posts beyond CamKit's LinuxCNC writer, CAM for the steel inserts
 (CamKit has no tapping or facing yet; inserts are drawn and made or bought),
 general arc-native CAM IR, rotational removal paths, automatic hardware optimization, automatic application
 of design-change proposals, parting-surface search beyond listed orientations,
-the 3D cure tier unless a section needs it, printed mold pieces (a former
+printed mold pieces (a former
 strategy for shapes panels and foam cannot make, segmented to the printer's build
 volume and emitted as `Slicer` jobs), sand-cast metals, the items under "Not modelled", mold
 FEM beyond what closed-form checks cannot cover, full structural qualification and app
@@ -1432,3 +1406,20 @@ Former registration decision (2026-10-22): neck and flange sheets register again
 - Separately versioned mold and volume documents are removed. Exact in-memory
   plans, frozen CAD and portable fixture/component records retain reconstruction
   coverage. Shop inputs remain plain package records, without a separate format.
+
+- Orientation decision (cleanup): retain `base-inverted` as the mill review setup.
+  The last recorded study planned only that candidate; upright and side candidates
+  rejected the current recipe's shared bridges because the underside pockets did
+  not open onto their fill face. No candidate was qualified for fabrication.
+  The study code/configuration is removed; existing effort metrics move into
+  `ToolingFabrication.effort` for shop reporting and the core comparison.
+
+- Compound decision (cleanup): the existing sequential mixer batches form one
+  continuous lift. Datasheet layer thickness and mass limits apply to the complete
+  continuous pour; no curing or cooling pause is inferred from a batch boundary.
+  Compound identity and supplier limits remain typed unresolved inputs until declared.
+
+- Format decision (cleanup): process, fabrication and castability plans have no
+  independent format versions. Compound/pour shop records use the package format.
+  Exact panel and core-cutting readers remain because delivered panel/fixture and
+  cutting records use them for CAD restoration and manufacturing geometry checks.

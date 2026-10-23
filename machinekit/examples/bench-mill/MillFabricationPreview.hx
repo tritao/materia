@@ -40,7 +40,9 @@ class MillFabricationPreview {
 		if (index + 1 >= args.length || StringTools.startsWith(args[index + 1], "--") || args.lastIndexOf("--process-spec") != index)
 			throw "Expected one --process-spec JSON path";
 		var path = args[index + 1];
-		return materia.tooling.process.ProcessSpecCodec.decode(sys.io.File.getContent(path));
+		var text=sys.io.File.getContent(path);
+		if (haxe.io.Bytes.ofString(text).length>2097152) throw "Process shop record exceeds size limit";
+		return materia.tooling.process.CastingProcessSpec.ProcessSpecs.fromRecord(haxe.Json.parse(text));
 	}
 
 	public static function main():Void {
@@ -57,10 +59,9 @@ class MillFabricationPreview {
 		var process = processSpec(p.document.recipe);
 		var fabricationSpec = MillFabricationSetup.spec();
 		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan);
-		var f = ToolingFabrication.plan(p, fabricationSpec, processReport.cure);
+		var f = ToolingFabrication.plan(p, fabricationSpec, processReport);
 		if (process.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";
-		materia.tooling.process.CastingProcessAnalysis.validateSectionSources(p.document, process);
 		var checks:Array<ToolingValidation> = [];
 		var geometricReview:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview> = null;
 		if (!recordsOnly) {
@@ -224,7 +225,6 @@ class MillFabricationPreview {
 			+"\n## Former boards\n\nUse former-board-stock.csv for each single-board or hollow-box part, former-pocket-screws.csv for dry-side jig drilling and closure, and former-manufacturing.json for sealing faces and each board's program order. The per-former assembly files show the removable board construction. Neck and flange sheets register against the wall and use its external closure; hollow-body joints use internal pocket screws.\n"
 			+"\nFormer programs retain the declared fixed G54 work datum and spoilboard plane; each header states its actual stock-top Z. Thicker blanks therefore use a different top Z, not a different assumed datum. Machine and seal all listed contact surfaces; pocket-screw heads and access stay inside the dry cavity. Board/grip, jig, workholding and machine qualification remain pending.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base,processReport,MillMoldSetup.input(frame).interfaceContext));
-		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
 		ToolingPackageManifest.verify(dir);
 		Sys.println("Fabrication package integrity check passed");

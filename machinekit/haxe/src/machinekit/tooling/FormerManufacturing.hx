@@ -121,7 +121,7 @@ class FormerManufacturing {
 		var reasons:Array<String>=[];
 		for (sheet in stocks) {
 			try {
-				var selected=materia.tooling.ToolingCodec.recipeSnapshot(recipe);
+				var selected=materia.tooling.ToolingCodec.copyRecipe(recipe);
 				selected.panel=sheet;
 				var panels=materia.tooling.casting.MoldPanels.formerBox(former.volume.id,
 					body.widthMm,body.depthMm,body.heightMm,selected);

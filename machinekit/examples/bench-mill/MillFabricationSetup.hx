@@ -30,49 +30,15 @@ class MillFabricationSetup {
 			couponClearancesMm: [0.1, 0.2, 0.3]
 		};
 
-	/** Unmeasured supplier/process properties remain null, never nominal resin data. */
-	public static function process(recipe:materia.tooling.ToolingRecipe):materia.tooling.process.CastingProcessSpec
-		return {
-			id: "mill-base-process-review",
-			revision: 1,
-			recipeFingerprint: materia.tooling.ToolingCodec.recipeFingerprint(recipe),
-			initialTemperatureC: null,
-			ambientTemperatureC: null,
-			temperatureMarginC: null,
-			pourRateMm3PerSecond: null,
-			maximumAirEscapeWidthMm: null,
-			mixComposition: null,
-			mixer: null,
-			faceContacts: [],
-			openFaceContact: null,
-			castability: {
-				maximumAggregateSizeMm: null,
-				minimumPassageAggregateRatio: null,
-				maximumSectionThicknessMm: null,
-				evidence: []
-			},
-			cure: {
-				reference: recipe.resinSpec,
-				resinMassFraction: null,
-				heatOfReactionJPerKgResin: null,
-				mixSpecificHeatJPerKgK: null,
-				mixConductivityWPerMK: null,
-				resinMaximumTemperatureC: null,
-				gelMaximumTemperatureC: null,
-				kinetics: null,
-				evidence: []
-			},
-			sections: [],
-			solver: {
-				cells: 41,
-				timeStepSeconds: 30,
-				durationSeconds: 86400,
-				maximumExtensionSeconds: 86400,
-				convergenceToleranceC: 0.000001,
-				maximumIterations: 100,
-				remainingHeatToleranceC: 0.01
-			}
-		};
+	/** Production compound and workshop equipment are unresolved inputs. */
+	public static function process(recipe:materia.tooling.ToolingRecipe):materia.tooling.process.CastingProcessSpec return {
+		id:"mill-base-process-review",revision:1,recipeFingerprint:materia.tooling.ToolingCodec.recipeFingerprint(recipe),
+		pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,mixComposition:null,mixer:null,
+		castability:{maximumAggregateSizeMm:null,minimumPassageAggregateRatio:null,evidence:[]},
+		compound:{reference:materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
+			thickness:materia.tooling.process.CastingProcessSpec.CompoundThicknessLimit.Unresolved("Compound section or layer thickness limit"),
+			maximumMassPerLiftKg:materia.casting.CastingInput.Unresolved("Compound maximum mass per lift")}
+	};
 
 	public static function cam(panels:Array<PanelPlan>):PanelCamSettings {
 		if (panels.length == 0)

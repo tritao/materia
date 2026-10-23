@@ -91,7 +91,7 @@ class InsertAnchorTests {
 		var previous=materia.tooling.casting.CastingMoldPlanner.geometry;
 		materia.tooling.casting.CastingMoldPlanner.setGeometry(null);
 		try {
-			var screening=materia.tooling.process.CastingLevelOne.analyze(sourceOnly);
+			var screening=materia.tooling.process.CastabilityAnalysis.sourceReview(sourceOnly);
 			check(screening.proposals.filter(proposal -> proposal.action==CastabilityAction.DeclareLiftingPoint).length==4,
 				"box-plus-anchor source moments still produce lifting review positions without a native fill kernel");
 			check(screening.validation.filter(record -> record.rule=="process.level1.geometry.seat"
@@ -108,14 +108,14 @@ class InsertAnchorTests {
 		var interference=machinekit.tooling.InsertAnchorGeometry.reviewMold(cast assessment.plan);
 		check(interference.length==2 && interference.filter(record -> record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length==0,
 			"source anchor pairs clear every actual mold member");
-		var processSpec=ProcessTests.spec();processSpec.sections=[];
+		var processSpec=ProcessTests.spec();
 		processSpec.recipeFingerprint=materia.tooling.ToolingCodec.recipeFingerprint(document.recipe);
 		var process=materia.tooling.process.CastingProcessAnalysis.analyze(cast assessment.plan,processSpec,9.80665);
 		check(process.fill==null && process.sections==null && process.pour==null && !process.fabrication.ready,
 			"non-box source keeps unavailable process reports explicit without a box substitute or aborting the kit");
-		check(process.validation.filter(record -> record.rule=="process.cure.section-coverage"
+		check(process.validation.filter(record -> StringTools.startsWith(record.rule,"process.sections.geometry")
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
-			"non-box section coverage cannot become a thermal pass");
+			"non-box sections remain explicitly unsupported");
 		var nativeProcess=materia.tooling.process.CastingProcessAnalysis.analyze(cast assessment.plan,processSpec,9.80665,null,
 			machinekit.tooling.CastingFillAnalysis.fromPlan);
 		check(nativeProcess.fill!=null && nativeProcess.pour!=null && nativeProcess.sections==null,
@@ -130,9 +130,9 @@ class InsertAnchorTests {
 		check(nativeProcess.validation.filter(record -> record.rule=="process.fill.geometry"
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 			"native source geometry replaces the unavailable fill projection");
-		check(nativeProcess.cure.validation.filter(record -> record.rule=="process.cure.section-coverage"
+		check(nativeProcess.validation.filter(record -> StringTools.startsWith(record.rule,"process.sections.geometry")
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
-			"exact fill cannot clear unsupported thermal coverage");
+			"exact fill does not qualify unsupported geometric section measurements");
 		var processDirectory=Sys.getCwd()+"/build/tooling/anchor-process-"+nativeProcess.sourceFingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(processDirectory);
 		var exportChecks=machinekit.tooling.ToolingProcessExport.write(cast assessment.plan,processSpec,9.80665,
@@ -147,7 +147,7 @@ class InsertAnchorTests {
 			"export retains native fill quantities and pending mixer planning");
 		check(haxe.Json.parse(sys.io.File.getContent(processDirectory+"/section-geometry.json"))==null,
 			"unimplemented non-box orthogonal sections remain explicitly unavailable");
-		var changedSpec=materia.tooling.process.ProcessSpecCodec.snapshot(processSpec);
+		var changedSpec=materia.tooling.process.CastingProcessSpec.ProcessSpecs.copy(processSpec);
 		changedSpec.pourRateMm3PerSecond=12345;
 		rejects(() -> machinekit.tooling.ToolingProcessExport.write(cast assessment.plan,changedSpec,9.80665,
 			processDirectory,null,null,foundation,nativeProcess,context),"Stale process export report");
@@ -177,7 +177,7 @@ class InsertAnchorTests {
 			var resin=machinekit.tooling.CastingMoldCad.source(mold);owned.push(resin);
 			check(Math.abs(materia.tooling.casting.CastHandling.resinVolume(mold.document)-resin.volume())<1e-6,
 				"effort resin volume subtracts real exposed anchors from the shared source cavities");
-			var effort=materia.tooling.process.MoldOrientationStudy.metrics(mold,FabricationTests.spec());
+			var effort=materia.tooling.export.ToolingFabrication.effort(mold,FabricationTests.spec());
 			check(Math.abs(effort.mixMassKg-resin.volume()*mold.document.recipe.mixDensityKgM3*1e-9)<1e-6,
 				"anchored orientation mix mass agrees with actual foundation CAD");
 			var reconstructed=machinekit.tooling.CastingMoldCad.reconstructed(mold);owned.push(reconstructed);

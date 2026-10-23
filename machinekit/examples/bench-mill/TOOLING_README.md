@@ -206,91 +206,47 @@ its CAD/sequence check pending. Use the full command for the complete review.
 The existing phase 4 entry remains a geometry-only export without G-code.
 
 
-## Fill and cure checks (phase 6 foundation)
+## Fill, compound and pour checks
 
-The fabrication command also emits `casting-process-spec.json`,
-`fill-analysis.json`, `cure-analysis.json` and `process-diagnostics.json`.
-`MillFabricationSetup.process` binds these inputs to the exact mold recipe.
-Its supplier properties, mix/ambient temperatures, thermal margin, pour rate,
-air-escape width and slab definitions remain explicitly unknown.
+The fabrication command emits `casting-process-spec.json`, `fill-analysis.json`,
+`compound-datasheet-check.json`, pour quantities/batches and the single detailed
+`fabrication-validation.json`. Process inputs are plain shop records under the
+package manifest format; there is no separate intermediate process encoding.
+`MillFabricationSetup.process` binds them to the recipe. Production compound,
+section/layer and mass-per-lift limits, mix fractions, equipment, pour rate and
+air-escape width remain explicitly unresolved until supplied.
 
-The current inverted base has no disconnected air component under the exact
-orthogonal flat-free-surface model. This does not qualify paste flow: the
-broad-ceiling escape-width check remains pending until its limit is declared.
-The fill volume is checked against the exact source CAD review in a full export;
-a records-only run leaves that agreement pending. Candidate vents on a failing
-fixture are suggestions, not automatically drilled or sealed tooling holes.
+The fill model checks critical-level air connectivity and reports boundary
+source/hardware IDs, trapped volume, per-level panel head and core uplift.
+The current base has zero anchor traps; this does not qualify paste flow or
+compaction. A full export compares against actual foundation CAD; a records-only
+run leaves that agreement Pending. Vent/sealing suggestions do not edit geometry.
 
-Cure reports do not invent resin properties or claim that EPS is safe. The
-lumped adiabatic estimate requires a positive declared margin and is not a
-spatial upper bound: conduction can preheat unreacted material. It never clears
-thermal coverage or junction checks. The implicit 1D solver supports declared
-autocatalytic kinetics, checks remaining reaction heat before allowing a section
-Pass, and reports a global energy balance. First-order kinetics are kept for
-analytic fixtures only. Resin identity must match the fabrication solvent
-record, and gel/material limits include EPS-containing adhesive even without
-foam cores. `fabrication.materials.cure` derives only from CureReport; there is
-no second assessed-peak field. Material data, numerical convergence, geometry
-coverage and thermocouple evidence remain blocking.
+The compound check uses the supplier's section OR layer limit and mass per lift.
+The existing sequential mixer batches are one continuous lift: a smaller mixer
+does not create a cooling or cure pause or reduce the total lift mass. There is
+no thermal solver and no invented kinetics. Missing compound and workshop data
+remain Pending. Shop compatibility and physical coupon evidence remain required.
 
-The process analysis now includes extracted opposing-face planar spans, the
-orientation comparison and checked-order playback described below. Complex
-qualified junction heat flow, broader design rules, accepted source edits and column studies remain outstanding.
-The mold is still a review package.
-
-
-To supply declared process properties, copy `casting-process-spec.json` outside
-`build/`, preserve its recipe fingerprint and edit its explicit unknown values.
-Use supplier/trial references for the actual mix rather than generic resin data:
+To supply process inputs, copy `casting-process-spec.json` outside `build/`,
+preserve its recipe fingerprint and declare the actual supplier/workshop values:
 
 ```sh
 ./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.fabrication.json -- --process-spec /path/to/casting-process-spec.json --checks
 ```
 
-An old recipe fingerprint, unknown field/model or invalid physical input is
-rejected. Review exports may contain failing checks; always read final manifest
-readiness. No command executes a CNC program or accepts physical qualification.
+## Sections and sequence scenes
 
+A full package includes `section-geometry.json`, `sequence-playback.json` and
+ordered `.mtrg` snapshots under `sequence/`. Their order comes from the checked
+assembly and demolding graphs. The scenes do not simulate adhesion, EPS breakup,
+fastening or the actual flip trajectory.
 
-## Orientation comparison, sections and sequence scenes
-
-The full fabrication package now contains `orientation-comparison.json` and
-`.md`, `section-geometry.json`, `sequence-playback.json` and a `sequence/` folder
-of `.mtrg` snapshots. `sequence/README.md` lists scenes in order. The snapshots
-show states after each checked installation/removal, including prebonded groups,
-loose hardware, the cured casting and the final service-orientation endpoint.
-They are visual-only (no collision proxies or dynamics); exact collision and
-removal evidence remains in `review.json`. They do not simulate adhesion, EPS
-breakup, fastening or a flip trajectory.
-
-The comparison can also run independently:
-
-```sh
-./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.mold-study.json
-```
-
-This compares the same source and recipe in inverted, upright and side-on
-orientations under the existing feature strategies and support policy. The
-current inversion has a complete mold and exact CAD/swept-graph check. Upright
-avoids a flip, but upright/side-on cannot use the current fill-open shared core
-bridges. They need alternative support/fixture designs before a complete mold
-can be assessed. Source fill/cure reports remain available even if planning fails;
-failed candidates have no fabricated effort or source-change counts. Comparison
-never changes the selected setup or grants fabrication approval.
-
-`OrthogonalSections` measures continuous material between opposing planar faces
-on all three axes. It merges through Boolean partition boundaries, preserves
-source face IDs and verifies each axis covers the full mix volume. The output
-can supply `CureSection` thickness/source IDs when actual thermal boundary data
-are declared. Chord lengths do not establish a complex junction's inscribed
-thickness; the exposed-face search supplies bounded Euclidean thickness instead.
-
-Authored thermal section/boundary assignments apply to the selected orientation.
-Alternative candidates reuse material properties but require their own boundary
-assignments; the comparison does not silently rotate heat sinks or convection.
-Records-only exports contain no sequence scenes and leave every candidate's CAD
-assessment pending.
-
+The retained review setup is inverted. The removed orientation study planned
+only that candidate: upright and side candidates rejected the current recipe's
+shared bridges because the underside pockets were not fill-open. No candidate
+was fabrication-qualified. The decision is in TOOLING_PLAN.md; there is no study
+command or automatic setup switch.
 
 ## Castability feedback
 
@@ -316,33 +272,14 @@ report. Junction inscribed diameter now has explicit numerical bounds; junction 
 release and handling evidence remain independent requirements.
 
 
-## Junction bounds and thermal coverage
+## Geometric section bounds
 
-The full and records-only packages now include `junction-thickness.json` and
-`thermal-coverage.json`. The orientation comparison and `castability-review.md`
-show the same geometric bounds and unbound thermal volume. The initial mill search
-finds a largest-inscribed-diameter interval of 216.99–217.47 mm within a declared
-0.5 mm numerical tolerance. The witness and nearby source faces are recorded;
-full-mill acceptance checks its containment against the actual foundation CAD,
-checks that enlarging it crosses the boundary, and compares exposed surface area.
-
-This is a geometric thickness result. It does not claim that a 217 mm slab models
-the junction's heat flow. The present process setup declares no thermal sections,
-so all 70,107,544 mm3 remains unbound. Supplier data, actual boundary conditions,
-a junction thermal model and physical calibration are still needed.
-
-In a version-5 process file every authored section needs `spanIds` and
-`geometryFingerprint`. Use empty IDs and null for an unbound numerical example.
-For real coverage, take span IDs and the geometry fingerprint from
-`section-geometry.json` and match its thickness/source faces, while explicitly
-specifying the actual left/right thermal conditions. Unknown/stale references,
-wrong dimensions, mismatched face boundary kinds, repeated span assignments or
-overlapping coverage across section axes fail. EPS faces are insulated; the open
-face removes heat only when declared. `faceContacts` declares reviewed overrides
-by stable thermal-face ID; numerical heat-transfer data belongs to the section. Even complete slab volume
-coverage leaves nonrectangular junction modelling pending. Review exports may
-contain failures; no suggestion changes the source casting or releases fabrication.
-
+`junction-thickness.json` and `section-geometry.json` retain exact exposed faces,
+source ownership and an inscribed-diameter interval. A safe upper bound passes a
+declared compound section limit; a failing lower bound rejects it; a straddling
+interval stays Pending. No midpoint acceptance or box approximation is used.
+Non-box sections remain Unsupported with their feature IDs. These are geometric
+screens, with no thermal coverage or cure prediction.
 
 ## Manufacturing review corrections
 
@@ -384,41 +321,9 @@ subtracts sealed air and reports head for each panel at each level. A full expor
 writes `fill-foundation-cad-check.json`, with symmetric difference against the
 actual foundation CAD; the current result is zero.
 
-Orientation candidates that plan successfully use the same process analysis as
-the selected mold. Candidates without a plan report Unsupported; a process error
-fails that candidate without aborting the comparison. Only the CAD review's own
-four reconstruction, coverage and graph records establish geometry evidence.
-After feasibility gates the ranking compares failures and open change requests
-before trapped volume, worst cure margin, flip, panels and sheets, and records
-its deciding reason.
-
-The section screen also computes a thickness interval against heat-removing
-faces: an EPS-backed, one-side-cooled slab has twice its geometric thickness.
-Cure continues beyond the nominal duration until residual heat meets the declared
-tolerance or maximum extension is reached; the latter remains Pending. Unknown
-adhesive composition is treated as potentially containing EPS. The raw cure report
-and fabrication material check share coverage records and EPS assumptions.
-
-Source-level recipe thresholds cover sharp corners, insert cover/edge/access,
-lifting points and removal direction. They feed FoundationIntegrity Diagnostics
-and MillDesignStudy metrics. Proposals state a source parameter and value when
-supported; an explicitly accepted insert-width proposal can update the linked
-recess and replan. Unknown mappings remain explicit. Non-null precision finishing
-allowance is rejected until supported. Insert roles are required; labels are
-separate from their shared typed role vocabulary.
-
-Real panels with rebates/holes retain an explicit Unsupported structural model;
-supplying a plate support for one throws. Manifest v3 hashes readiness and
-validation, folds in hardware checks independently of caller forwarding, and
-verifies enum values, severity consistency and recomputed readiness. Current
-strict formats are Tooling v5, CastingMold v4 and Process v5; old encodings have
-no compatibility path.
-
-The latest full rerun passes 248 mill acceptance assertions and manifest tamper
-checks. Its 837 hashed artifacts include 40 review programs. Validation reports
-14 Pass, 250 Pending and 15 Unsupported, with zero foundation symmetric difference.
-
-**Not fabrication-ready; no coupon trial recorded.**
+Unknown adhesive composition is treated as potentially containing EPS. Styrene
+compatibility is checked independently of the compound datasheet limits. The
+single validation report retains every detailed source/process finding.
 
 ## Demand-sized insert anchors
 

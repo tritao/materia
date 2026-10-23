@@ -69,7 +69,7 @@ class MoldPanels {
 		seat(1,4,"west-north",depth-t-c,height-t/2,height-t,MachiningSide.PositiveZ);
 		seat(2,4,"east-north",0,height-t/2,height-t,MachiningSide.PositiveZ);
 		seat(2,3,"east-south",depth-t-c,height-t/2,height-t,MachiningSide.PositiveZ);
-		for (member in result.members) member.panel=PanelCodec.snapshot(member.panel);
+		for (member in result.members) member.panel=PanelCodec.copy(member.panel);
 		materia.tooling.panel.PanelAssemblyPlan.validate(result);
 		return result;
 	}
@@ -141,7 +141,7 @@ class MoldPanels {
 				plug: null
 			});
 			assembly.members.push({
-				panel: PanelCodec.snapshot(panel),
+				panel: PanelCodec.copy(panel),
 				pose: pose,
 				withdrawal: {x: 0, y: 0, z: 1}
 			});
@@ -207,7 +207,7 @@ class MoldPanels {
 			+ c,
 			b.depth
 			+ 2 * c);
-		assembly.members[0].panel = PanelCodec.snapshot(bed);
+		assembly.members[0].panel = PanelCodec.copy(bed);
 		return {panels: assembly, penetrations: penetrations};
 	}
 }

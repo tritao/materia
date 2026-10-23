@@ -4,6 +4,7 @@ import materia.tooling.export.FabricationSpec.FabricationSpecs;
 
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
+import materia.tooling.casting.CastHandling;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingValidation.ToolingReadiness;
@@ -17,6 +18,24 @@ import materia.tooling.panel.PanelJoints;
 import materia.sheet.SheetPartRequirement;
 import materia.tooling.export.FabricationSpec;
 import materia.tooling.export.ToolingLoads.LoadReport;
+
+typedef MoldEffortMetrics = {
+	var panels:Int;
+	var uniquePanels:Int;
+	var sheetCount:Int;
+
+	/** Bounding blank area / supplied sheet area, not contour nesting yield. */
+	var blankSheetUtilization:Float;
+
+	var formers:Int;
+	var epsCores:Int;
+	var sacrificialEPSVolumeMm3:Float;
+	var logicalHardwareStacks:Int;
+	var castingMassKg:Float;
+	var mixMassKg:Float;
+	var openChangeRequests:Int;
+	var requiresFlip:Bool;
+}
 
 typedef BlankPlacement = {
 	var panelId:String;
@@ -36,12 +55,9 @@ enum abstract ReplacementUse(String) to String {
 typedef ReplacementGroup = {var id:String; var use:ReplacementUse; var memberIds:Array<String>;}
 
 typedef FabricationPlan = {
-	var format:String;
-	var version:Int;
 	var lengthUnit:String;
 	var sourceFingerprint:String;
 	var fingerprint:String;
-	var cureFingerprint:Null<String>;
 	var spec:FabricationSpec;
 	var panelRequirements:Array<SheetPartRequirement>;
 	var sheetStock:materia.sheet.SheetStockSpec;
@@ -57,7 +73,7 @@ typedef FabricationPlan = {
 /** Pure fabrication inputs and reports. No CAD, CAM, drawing writers or inventory mutations. */
 class ToolingFabrication {
 	public static function requirement(p:PanelPlan, marginMm:Float, materialId:String):SheetPartRequirement {
-		p = PanelCodec.snapshot(p);
+		p = PanelCodec.copy(p);
 		if (!Math.isFinite(marginMm) || marginMm < 0)
 			throw "Invalid panel blank margin";
 		var b = CastingProfileGeometry.bounds(PanelContours.outside(p)), s = p.stock;
@@ -133,7 +149,7 @@ class ToolingFabrication {
 		return result;
 	}
 
-	public static function plan(p:CastingMoldPlan, authored:FabricationSpec, ?cure:materia.tooling.process.CureAnalysis.CureReport):FabricationPlan {
+	public static function plan(p:CastingMoldPlan, authored:FabricationSpec, ?process:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport):FabricationPlan {
 		CastingMoldPlanner.validate(p);
 		var s = FabricationSpecs.copy(authored),
 			checks = p.validation.copy();
@@ -141,20 +157,15 @@ class ToolingFabrication {
 		checks.push(ToolingLoads.check("fabrication.materials.compatibility", [p.document.recipe.id],
 			(eps || s.adhesiveContainsEPS != false)
 			&& s.solvent == StyreneBearing ? Fail : s.solvent == Unknown || s.compatibilityEvidence.length == 0 ? Pending : Pass,
-			"Styrene-bearing resin is incompatible with EPS; the actual resin/EPS/adhesive/release combination requires compatibility evidence.",
+			"Styrene-bearing resin is incompatible with EPS; the actual resin/EPS/adhesive/release combination requires chemical and observed cure-temperature compatibility evidence. When EPS is present, its declared stock limit is "
+			+p.document.recipe.core.maximumTemperatureC+" C.",
 			s.compatibilityEvidence));
-		if (cure != null
-			&& (cure.sourceFingerprint != CastingMoldPlanner.fingerprint(p)
-				|| cure.resinReference != s.resinReference
-				|| cure.hasEPS != (p.cores.length > 0 || s.adhesiveContainsEPS != false)))
-			throw "Stale fabrication cure report";
-		var cureChecks = cure == null ? [] : cure.validation;
-		var cureStatus:materia.tooling.ToolingDiagnostic.ToolingCheckStatus = Pending;
-		if (cureChecks.length > 0)
-			cureStatus = cureChecks.filter(v -> v.status == Fail).length > 0 ? Fail : cureChecks.filter(v -> v.status != Pass).length > 0 ? Pending : Pass;
-		checks.push(ToolingLoads.check("fabrication.materials.cure", [p.document.recipe.id], cureStatus,
-			"Derived exclusively from the source-bound CureReport, including limits, coverage and calibration.",
-			cure == null ? [] : [cure.processFingerprint]));
+		if (process!=null && (process.sourceFingerprint!=CastingMoldPlanner.fingerprint(p)
+			|| process.processFingerprint!=materia.tooling.process.CastingProcessAnalysis.fingerprint(p,process.spec,s.gravityMps2,s)))
+			throw "Stale fabrication process report";
+		checks.push(process==null
+			? materia.tooling.process.CastingProcessAnalysis.compoundPending(p.document.input.id)
+			: process.compound);
 		var loads = ToolingLoads.report(p, s);
 		checks = checks.concat(loads.validation);
 		for (c in p.changeRequests)
@@ -185,16 +196,13 @@ class ToolingFabrication {
 		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
 		var source = CastingMoldPlanner.fingerprint(p);
 		return {
-			format: "materia.tooling-fabrication",
-			version: 2,
 			lengthUnit: "mm",
 			sourceFingerprint: source,
 			fingerprint: haxe.crypto.Sha256.encode(ToolingCodec.canonical({
 				source: source,
 				spec: s,
-				cure: cure
+				process: process==null ? null : process.processFingerprint
 			})),
-			cureFingerprint: cure == null ? null : cure.processFingerprint,
 			spec: s,
 			panelRequirements: requirements,
 			sheetStock: {
@@ -239,4 +247,60 @@ class ToolingFabrication {
 			for (row in rows) [for (value in row) '"' + StringTools.replace(value, '"', '""') + '"'].join(",")
 		].join("\n") + "\n";
 	}
+	public static function effort(p:CastingMoldPlan, fabrication:FabricationSpec):MoldEffortMetrics {
+		return effortFrom(p, ToolingFabrication.plan(p, fabrication));
+	}
+
+	static function effortFrom(p:CastingMoldPlan, f:FabricationPlan):MoldEffortMetrics {
+		var panels = p.panels.members.concat(p.supportPanels),
+			unique:Array<String> = [];
+		var blanks = 0.0, sheets = 0, eps = 0.0;
+		for (m in panels) {
+			var panel = m.panel;
+			var key = ToolingCodec.canonical({
+				stock: panel.stock,
+				outline: PanelContours.outside(panel),
+				operations: [
+					for (op in panel.operations)
+						{
+							kind: op.kind,
+							contour: op.contour,
+							depth: op.depth,
+							through: op.through,
+							side: op.side,
+							toolDiameter: op.toolDiameter,
+							accessVia: op.accessVia
+						}
+				]
+			});
+			if (unique.indexOf(key) < 0)
+				unique.push(key);
+		}
+		// Exclude trial coupons from production effort, retain their layouts separately.
+		var production = f.panelRequirements.filter(r -> panels.filter(m -> m.panel.id == r.partId).length > 0);
+		for (r in production)
+			blanks += r.blankWidth * r.blankHeight;
+		var layout = ToolingFabrication.layout(production, p.document.recipe.panel.width, p.document.recipe.panel.height, f.spec.blankKerfMm);
+		for (placement in layout)
+			sheets = Std.int(Math.max(sheets, placement.sheet));
+		for (c in p.cores)
+			for (layer in c.layers) eps += layer.block.width*layer.block.depth*layer.block.height;
+		var mixVolume=CastHandling.resinVolume(p.document);
+		return {
+			panels: panels.length,
+			uniquePanels: unique.length,
+			sheetCount: sheets,
+			blankSheetUtilization: sheets == 0 ? 0 : blanks / (sheets * p.document.recipe.panel.width * p.document.recipe.panel.height),
+			formers: p.formers.length,
+			epsCores: p.cores.length,
+			sacrificialEPSVolumeMm3: eps,
+			logicalHardwareStacks: p.hardware.length,
+			castingMassKg: p.handling.castingMassKg,
+			mixMassKg: mixVolume * p.document.recipe.mixDensityKgM3 * 1e-9,
+			openChangeRequests: p.changeRequests.length,
+			requiresFlip: p.handling.requiresFlip
+		};
+	}
+
+
 }

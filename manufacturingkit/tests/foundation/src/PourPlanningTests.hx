@@ -22,7 +22,7 @@ class PourPlanningTests {
 		check(error.indexOf(expected)>=0,'Expected "$expected", got "$error"');
 	}
 	static function composition():MixComposition return {
-		reference:"synthetic mix by weight", cureReference:"synthetic resin system", cureMassIngredientIds:["resin"], ingredients:[
+		reference:"synthetic mix by weight", compoundReference:"synthetic resin system", ingredients:[
 			{id:"resin",kind:Resin,materialReference:"test resin",massFraction:0.1},
 			{id:"hardener",kind:Hardener,materialReference:"test hardener",massFraction:0.05},
 			{id:"aggregate",kind:Aggregate,materialReference:"test aggregate",massFraction:0.85}
@@ -63,21 +63,6 @@ class PourPlanningTests {
 		near(result.quantities.filter(q->q.ingredientId=="resin")[0].massKg,0.2,"resin quantity");
 		near(result.quantities.filter(q->q.ingredientId=="hardener")[0].massKg,0.1,"hardener quantity");
 		near(result.quantities.filter(q->q.ingredientId=="aggregate")[0].massKg,1.7,"aggregate quantity");
-		var basisMass = result.cureBasisMassKg;
-		if (basisMass == null) throw "Expected a declared cure mass basis";
-		near(basisMass,0.2,"heat denominator follows the explicitly selected ingredient mass");
-		check(PourPlanning.cureConsistency("cast",recipe,"synthetic resin system",0.1).status==ToolingCheckStatus.Pass,
-			"base resin heat denominator is explicit");
-		recipe.cureMassIngredientIds=["resin","hardener"];
-		check(PourPlanning.cureConsistency("cast",recipe,"synthetic resin system",0.15).status==ToolingCheckStatus.Pass,
-			"mixed binder heat denominator is explicit");
-		check(PourPlanning.cureConsistency("cast",recipe,"synthetic resin system",0.1).status==ToolingCheckStatus.Fail,
-			"mixed binder and base resin denominators cannot silently disagree");
-		check(PourPlanning.cureConsistency("cast",recipe,"other system",0.15).status==ToolingCheckStatus.Fail,
-			"cure resin identity must match the mixture");
-		check(PourPlanning.cureConsistency("cast",recipe,"synthetic resin system",null).status==ToolingCheckStatus.Pending,
-			"unknown physical heat basis remains pending");
-		recipe.cureMassIngredientIds=["resin"];
 		var dense=schedule(PourPlanning.analyze("cast",cube(100000,[for(i in 0...1001)i/10.0]),recipe,equipment));
 		for(i in 0...plan.batches.length) {
 			near(dense.batches[i].lowerHeightMm,plan.batches[i].lowerHeightMm,"dense level curve preserves batch start");

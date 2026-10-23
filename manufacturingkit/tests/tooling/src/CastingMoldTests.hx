@@ -72,7 +72,7 @@ class CastingMoldTests {
 			check(assessment.changeRequests[0].sourceIds.indexOf(feature.id) >= 0
 				&& assessment.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.id) >= 0).length == 1,
 				"unrealized request and Unsupported name the actual source feature");
-			var levelOne = materia.tooling.process.CastingLevelOne.analyze(d);
+			var levelOne = materia.tooling.process.CastabilityAnalysis.sourceReview(d);
 			check(levelOne.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.id) >= 0).length == 1,
 				"plan-free castability accepts the intent and reports its geometry capability gap");
 		}
@@ -81,7 +81,7 @@ class CastingMoldTests {
 		child.derivedFrom = "authored-pocket";
 		child.cornerRadius = 3;
 		family.setup.sourceFingerprint = ToolingCodec.inputFingerprint(family.input);
-		var review = materia.tooling.process.CastingLevelOne.analyze(family);
+		var review = materia.tooling.process.CastabilityAnalysis.sourceReview(family);
 		check(review.metrics.minimumCornerRadiusMm == 3
 			&& review.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf("authored-pocket") >= 0).length == 1,
 			"unrealized fragment castability reports its authored parent and preserves known radius metadata");
@@ -142,7 +142,7 @@ class CastingMoldTests {
 			"source lifting inserts clear the source design request independently of equipment");
 		check(p.validation.filter(check -> check.rule=="tooling.handling.flip" && check.status=="pending").length==1,
 			"source declarations do not qualify rigging, capacity or the flip procedure");
-		var levelOne=materia.tooling.process.CastingLevelOne.analyze(d);
+		var levelOne=materia.tooling.process.CastabilityAnalysis.sourceReview(d);
 		check(levelOne.validation.filter(row -> row.rule=="process.level1.lifting-points" && row.status=="pass"
 			&& row.affectedIds.length==1 && row.affectedIds[0]==d.input.id).length==1,
 			"the source-only lifting rule passes with the actual declared source ID");

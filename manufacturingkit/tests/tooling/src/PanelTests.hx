@@ -82,7 +82,7 @@ class PanelTests {
 		rejects(() -> PanelCoupon.make(stock, [0.1, 0.1]), "Invalid or duplicate coupon clearance");
 		var bad = PanelJoints.blank("bad", 100, 100, stock);
 		bad.operations[0].kind = cast "inferred";
-		rejects(() -> PanelCodec.snapshot(bad), "Unsupported panel operation kind");
+		rejects(() -> PanelCodec.copy(bad), "Unsupported panel operation kind");
 		var circle = PanelContours.circle(20, 20, 10);
 		CastingProfileGeometry.validate(circle);
 		check(Math.abs(CastingProfileGeometry.area(circle) - Math.PI * 100) < 1e-7, "exact arc area");
@@ -114,10 +114,10 @@ class PanelTests {
 		var skin = PanelJoints.blank("contact", 100, 100, stock);
 		skin.contactFace = ContactFace.PositiveZ;
 		rejects(() -> PanelCodec.encode(skin), "Label zone on contact face");
-		var wrongTool = PanelCodec.snapshot(coupon.receiver);
+		var wrongTool = PanelCodec.copy(coupon.receiver);
 		wrongTool.operations.filter(o -> o.kind == InsideProfile)[0].toolDiameter = 8;
 		rejects(() -> PanelCodec.encode(wrongTool), "Relief cutter must match operation tool");
-		var arc = PanelCodec.snapshot(coupon.plug);
+		var arc = PanelCodec.copy(coupon.plug);
 		var broken = arc.operations[0].contour.filter(s -> s.kind == "arc")[0];
 		// Keep all endpoints and neighboring segments valid; break only the arc.
 		broken.sweep += 0.1;
@@ -192,7 +192,7 @@ class PanelTests {
 		rejects(() -> PanelJoints.validateClearance(0.2, 0.1, 0.1, 0.05), "Joint clearance below stock variation and allowances");
 		var missing:Dynamic = PanelJoints.blank("missing", 120, 120, stock);
 		Reflect.deleteField(missing, "contactOpenings");
-		rejects(() -> PanelCodec.snapshot(cast missing), "Expected panel array contactOpenings");
+		rejects(() -> PanelCodec.copy(cast missing), "Expected panel array contactOpenings");
 		var nul = PanelJoints.blank("nul", 120, 120, stock);
 		var nulJson = PanelCodec.encode(nul).split("birch plywood").join("board" + "\\u0000");
 		rejects(() -> PanelCodec.decode(nulJson), "NUL");
