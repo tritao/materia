@@ -22,10 +22,10 @@ class VallderCatalogAxisChecks {
    var type=component.componentType();
    check(type!=null && type.id==row.type_id,"Registered supplier binding "+row.sku);bound++;
   }
-  // All 20 support sizes, BF12 included, bind to the one screw-support recipe.
-  check(bound==44,"Expected 44 supplier bindings");
+  // All 20 support sizes bind to the one screw-support recipe; SFU1605 lengths and nut to the SFU family recipes.
+  check(bound==65,"Expected 65 supplier bindings");
   var layout=new ScrewAxisLayout(250,500,400,160);
-  var selected=new ScrewAxisComponents(MotorMount.of("RBK12-57",null,"vallder"),NemaStepper.model("23HS22-2804S"),new VallderSfu1605Screw(500),
+  var selected=new ScrewAxisComponents(MotorMount.of("RBK12-57",null,"vallder"),NemaStepper.model("23HS22-2804S"),new SfuDrawingScrew("SFU1605",500,BallScrew.RACE_ROOT_DIAMETER),
    new SfuNut("SFU1605",13),ScrewSupportUnit.model("BF12","vallder"),LinearRail.metric("HGH15CA",400,LinearRail.MEASURED),LinearRailBlock.metric("HGH15CA",LinearRailBlock.SUPPLIER),false);
   var axis=new TwinRailScrewAxis(layout,selected);axis.validate();
   var saved=axis.encode(),loaded=MachineAssembly.decode(saved,registry),before=bom(axis);

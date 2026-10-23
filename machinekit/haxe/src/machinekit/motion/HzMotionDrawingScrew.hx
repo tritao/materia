@@ -68,6 +68,7 @@ class HzMotionDrawingScrew extends LeadScrew {
   var diameter=z<coupling?(endProfile=="BK15"?12.0:10.0):z<journal?(endProfile=="BK15"?13.8:10.8):z<fixedEnd?(endProfile=="BK15"?15.0:12.0):z<totalLength-floatingEnd?thread.rootDiameter():z>=totalLength-4 && z<=totalLength-2.85 && endProfile=="BK15"?14.3:endProfile=="BK15"?15.0:10.0;
   return YOUNGS_MODULUS/1e6*Math.PI*diameter*diameter/4;
  }
+ override public function inputDiameter():Float return couplingDiameterFor(endProfile);
  override public function axialStiffness():Float return 1/axialComplianceBetween(0,totalLength);
  override public function axialComplianceBetween(from:Float,to:Float):Float {
   if(!Math.isFinite(from+to)||Math.min(from,to)<0||Math.max(from,to)>totalLength)throw "Invalid HZ screw compliance interval";

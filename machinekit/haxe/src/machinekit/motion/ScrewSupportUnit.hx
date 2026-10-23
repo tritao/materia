@@ -47,14 +47,15 @@ class ScrewSupportUnit extends MachineComponent {
 
 	/**
 	 * The foot-mounted support sized for a ball screw of nominal `screwDiameter`, by the usual pairing of screw and
-	 * journal: SFU12 on BK10/BF10, SFU16 on BK12/BF12, SFU20 on BK15/BF15, SFU25 on BK20/BF20, SFU32 on BK25/BF25.
+	 * journal (Vallder's standard ends): SFU12 on BK10/BF10, SFU16 on BK12/BF12, SFU20 on BK15/BF15, SFU25 on BK17/BF17,
+	 * SFU32 on BK25/BF25.
 	 */
 	public static function forScrew(screwDiameter:Float, fixed:Bool, drawing:String = NOMINAL):ScrewSupportUnit {
 		var size = switch Math.round(screwDiameter) {
 			case 12: "10";
 			case 16: "12";
 			case 20: "15";
-			case 25: "20";
+			case 25: "17";
 			case 32: "25";
 			case _: throw 'No BK/BF support pairs with a ${screwDiameter} mm screw';
 		};

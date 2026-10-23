@@ -484,7 +484,7 @@ currently the pinned Vallder BF12 implementation.
 var layout = new ScrewAxisLayout(300, 500, 400, 160); // travel, screw, rail, spacing in mm
 var selected = new ScrewAxisComponents(
     new RbkMotorMount("RBK12-57"), NemaStepper.model("OPENBUILDS-NEMA23-56"),
-    new VallderSfu1605Screw(layout.screwLength), new VallderSfu1605Nut(),
+    new SfuDrawingScrew("SFU1605",layout.screwLength,BallScrew.RACE_ROOT_DIAMETER), new SfuNut("SFU1605",BallScrew.RACE_ROOT_DIAMETER),
     ScrewSupportUnit.model("BF12", "vallder"), LinearRail.metric("HGH15CA", layout.railLength),
     LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER));
 var axis = new TwinRailScrewAxis(layout, selected);

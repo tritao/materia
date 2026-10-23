@@ -3,19 +3,22 @@ import cadkit.modeling.Part;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
 
-/** Vallder's published SFU20/SFU25 standard ends, shared by the 5/10 mm lead variants.
+/** A rolled SFU ball screw with Vallder's published standard ends (SFU1605, and the SFU20/SFU25 ends shared by
+ * their 5/10 mm lead variants): coupling end, lock thread, fixed journal, race, floating journal and ring groove.
  * Semantic race; root envelope for the lock thread. Small chamfers/fillets omitted.
  * Root diameter is an explicit engineering assumption. Catalogue end option, not custom machining.
  */
 class SfuDrawingScrew extends LeadScrew {
  static var recipe:Null<ComponentType>;
- public static function models():Array<String> return ["SFU2005","SFU2010","SFU2505","SFU2510"];
+ public static function models():Array<String> return ["SFU1605","SFU1610","SFU2005","SFU2010","SFU2505","SFU2510"];
  public final model:String;
  public final fixedEnd:Float;
  public final floatingEnd:Float;
  public final couplingDiameter:Float;
  public final couplingLength:Float;
  public final journalDiameter:Float;
+ /** The floating end's journal, which may be smaller than the fixed one (SFU1605: 10 mm for BF12 against 12 mm for BK12). */
+ public final floatingJournalDiameter:Float;
  public final journalStart:Float;
  public final grooveStart:Float;
  public final grooveDepth:Float;
@@ -25,7 +28,7 @@ class SfuDrawingScrew extends LeadScrew {
   if(!Math.isFinite(length) || length<=end+floatEnd+s.length || length>4000)throw "SFU length must contain its standard ends and selected nut";
   super(new LeadScrewThread(Ball,s.diameter,s.pitch,1,RightHand,raceRootDiameter),length,"SFU-DRAWING-"+model+"-L"+Dimension.format(length));
   this.model=model;fixedEnd=end;floatingEnd=floatEnd;couplingDiameter=ends.couplingDiameter;couplingLength=ends.couplingLength;
-  journalDiameter=ends.journalDiameter;journalStart=ends.couplingLength+ends.threadReliefLength;
+  journalDiameter=ends.journalDiameter;floatingJournalDiameter=ends.floatingJournalDiameter;journalStart=ends.couplingLength+ends.threadReliefLength;
   grooveStart=length-floatEnd+ends.ringSeatLength;grooveDepth=ends.grooveDepth;
   addConnector("raceStart",Mount,Solids.axial(0,0,fixedEnd));
   addConnector("fixedJournalStart",Axis,Solids.axial(0,0,journalStart));
@@ -40,16 +43,17 @@ class SfuDrawingScrew extends LeadScrew {
    Solids.named(Part.cylinderSpan((d-2)/2,journalStart-2,journalStart),"relief"),
    Solids.named(Part.cylinderSpan(d/2,journalStart,fixedEnd),"fixed-journal"),
    Solids.named(Part.cylinderSpan(race,fixedEnd,l-floatingEnd),"race"),
-   Solids.named(Part.cylinderSpan(d/2,l-floatingEnd,grooveStart),"floating-journal"),
-   Solids.named(Part.cylinderSpan(d/2-grooveDepth,grooveStart,grooveStart+1.15),"ring-groove"),
-   Solids.named(Part.cylinderSpan(d/2,grooveStart+1.15,l),"tip")]);
+   Solids.named(Part.cylinderSpan(floatingJournalDiameter/2,l-floatingEnd,grooveStart),"floating-journal"),
+   Solids.named(Part.cylinderSpan(floatingJournalDiameter/2-grooveDepth,grooveStart,grooveStart+1.15),"ring-groove"),
+   Solids.named(Part.cylinderSpan(floatingJournalDiameter/2,grooveStart+1.15,l),"tip")]);
   try {var result=new Part(cadkit.threads.Threads.attach(body.shape,"race:cyl.side",thread.threadSpec(),AxisMinimum));body.close();return result;}catch(e:Dynamic){body.close();throw e;}
  }
+ override public function inputDiameter():Float return couplingDiameter;
  override public function axialStiffness():Float return 1/axialComplianceBetween(0,totalLength);
  override public function axialRigidityAt(z:Float):Float {
   if(!Math.isFinite(z) || z<0 || z>totalLength)throw "Invalid SFU shaft station";
   var d=z<couplingLength ? couplingDiameter : z<journalStart-2 ? journalDiameter-1.2 : z<journalStart ? journalDiameter-2 :
-   z<fixedEnd ? journalDiameter : z<totalLength-floatingEnd ? thread.rootDiameter() : z>=grooveStart && z<=grooveStart+1.15 ? journalDiameter-2*grooveDepth : journalDiameter;
+   z<fixedEnd ? journalDiameter : z<totalLength-floatingEnd ? thread.rootDiameter() : z>=grooveStart && z<=grooveStart+1.15 ? floatingJournalDiameter-2*grooveDepth : floatingJournalDiameter;
   return YOUNGS_MODULUS/1e6*Math.PI*d*d/4;
  }
  override public function axialComplianceBetween(from:Float,to:Float):Float {

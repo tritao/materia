@@ -267,6 +267,23 @@
   "end_profiles": [
     {
       "models": [
+        "SFU1605",
+        "SFU1610"
+      ],
+      "drawing": "products-sfu1605.png; SFU1610 assumed to share the 16 mm shaft's ends, as the SFU20 and SFU25 leads do",
+      "couplingDiameter": 10,
+      "couplingLength": 15,
+      "threadReliefLength": 14,
+      "fixedEnd": 54,
+      "journalDiameter": 12,
+      "floatingEnd": 11,
+      "ringSeatLength": 8,
+      "grooveWidth": 1.15,
+      "grooveDepth": 0.2,
+      "floatingJournalDiameter": 10
+    },
+    {
+      "models": [
         "SFU2005",
         "SFU2010"
       ],
@@ -279,7 +296,8 @@
       "floatingEnd": 13,
       "ringSeatLength": 9,
       "grooveWidth": 1.15,
-      "grooveDepth": 0.35
+      "grooveDepth": 0.35,
+      "floatingJournalDiameter": 15
     },
     {
       "models": [
@@ -295,7 +313,8 @@
       "floatingEnd": 16,
       "ringSeatLength": 12,
       "grooveWidth": 1.15,
-      "grooveDepth": 0.4
+      "grooveDepth": 0.4,
+      "floatingJournalDiameter": 17
     }
   ]
 }

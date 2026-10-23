@@ -36,9 +36,7 @@ class MotionComponents {
 		registry.register(BallScrew.ballRecipeType());
 		registry.register(BallScrewRetainer.recipeType());
 		registry.register(BallNut.ballRecipeType());
-		registry.register(VallderSfu1605Screw.drawingRecipeType());
 		registry.register(HzMotionDrawingScrew.recipeType());
-		registry.register(VallderSfu1605Nut.drawingRecipeType());
 		registry.register(ScrewSupportUnit.recipeType());
 		registry.register(LeadScrewNut.recipeType());
 		registry.register(DriveWheel.recipeType());

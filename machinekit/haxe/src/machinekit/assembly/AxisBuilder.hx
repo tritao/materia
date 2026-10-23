@@ -263,8 +263,8 @@ class AxisBuilder extends MachineAssembly {
         var stage=mountReducer(id,motor,pose,reducer);
         var gearing=reducer==null?null:reducer.reducerSpec();
         var shaft = gearing==null?mount.shaftDiameter:gearing.bore;
-		if (coupling == null) coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
-		if (coupling.boreA != shaft || coupling.boreB != screw.thread.screwDiameter)
+		if (coupling == null) coupling = new ShaftCoupling(shaft, screw.inputDiameter());
+		if (coupling.boreA != shaft || coupling.boreB != screw.inputDiameter())
 			throw "Screw coupling bores must fit the motor and screw shaft";
 		var grip = coupling.length / 2;
 		var couplingId = id + "Coupling";

@@ -46,14 +46,16 @@ class SfuFamilyChecks {
    posed.close();body.close();holder.close();
   }
   for(model in SfuDrawingScrew.models()) {
-   var large=StringTools.startsWith(model,"SFU25"),screw=new SfuDrawingScrew(model,500,large ? 21 : 16),p=screw.geometry();
+   var large=StringTools.startsWith(model,"SFU25"),screw=new SfuDrawingScrew(model,500,large ? 21 : StringTools.startsWith(model,"SFU16") ? 13 : 16),p=screw.geometry();
    check(p.valid() && p.solidCount()==1,"Drawing screw solid "+model);
    check(screw.axialComplianceBetween(0,500)>0 && Math.abs(screw.axialStiffness()*screw.axialComplianceBetween(0,500)-1)<1e-9,"Piecewise shaft compliance "+model);
-   check(screw.fixedEnd==(large ? 76 : 60) && screw.journalDiameter==(large ? 17 : 15) && screw.journalStart==(large ? 40 : 32),"Drawing screw ends "+model);
-   for(prefix in ["BK","BF"]) {
-    var support=ScrewSupportUnit.model(prefix+(large ? "17" : "15"),"vallder"),body=support.geometry();
-    check(support.spec.bore==screw.journalDiameter,"Journal/support diameter "+model);
-    var journal=Part.cylinderSpan(screw.journalDiameter/2-0.03,-0.5,0.5),common=body.intersect(journal);
+   var ends=SfuFamilyData.ends(model);
+   check(screw.fixedEnd==ends.fixedEnd && screw.journalDiameter==ends.journalDiameter && screw.journalStart==ends.couplingLength+ends.threadReliefLength,"Drawing screw ends "+model);
+   for(fixed in [true,false]) {
+    var support=ScrewSupportUnit.forScrew(screw.thread.screwDiameter,fixed,"vallder"),body=support.geometry();
+    var journalDiameter=fixed ? screw.journalDiameter : screw.floatingJournalDiameter;
+    check(support.spec.bore==journalDiameter,"Journal/support diameter "+model);
+    var journal=Part.cylinderSpan(journalDiameter/2-0.03,-0.5,0.5),common=body.intersect(journal);
     check(common.volume()<0.001,"Journal/support centre "+model);common.close();journal.close();body.close();
    }
    assembly.addComponent(model+"-screw",screw,F.translation((large ? 800 : 650)+(model.indexOf("10")>0 ? 75 : 0),0,0));p.close();

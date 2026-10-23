@@ -14,7 +14,7 @@ class HzMotionAxis extends MachineAssembly {
  public final mount=MotorMount.of("M60D-BK12-C",null,"hzmotion");
  public final motor=LeadshineServo.model("ELM2H-0400LA60F");
  public final screw=new HzMotionDrawingScrew(400);
- public final nut=new VallderSfu1605Nut();
+ public final nut=new SfuNut("SFU1605",BallScrew.RACE_ROOT_DIAMETER);
  public final coupling=new ShaftCoupling(14,10,25,32);
  public function new(supplierFloating:Bool=true) {
   super();

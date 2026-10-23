@@ -91,8 +91,6 @@ class ComponentClassification {
 		file(registry, "machinekit.motion.screw-support-unit", "Screws and nuts", ComponentKind.Supplier);
 		file(registry, "machinekit.motion.ballscrew-retainer", "Screws and nuts", ComponentKind.Generic);
 		file(registry, "machinekit.motion.dsg-nut-housing", "Screws and nuts", ComponentKind.Supplier);
-		file(registry, "machinekit.motion.vallder-sfu1605-screw", "Screws and nuts", ComponentKind.Supplier);
-		file(registry, "machinekit.motion.vallder-sfu1605-nut", "Screws and nuts", ComponentKind.Supplier);
 		file(registry, "machinekit.motion.sfu-drawing-screw", "Screws and nuts", ComponentKind.Reference);
 		file(registry, "machinekit.motion.hzmotion-bk12-screw-end-study", "Screws and nuts", ComponentKind.Reference);
 		file(registry, "machinekit.motion.flange-bearing-housing", "Bearings", ComponentKind.Generic);

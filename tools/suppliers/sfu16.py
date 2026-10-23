@@ -2,6 +2,8 @@
 import re
 
 BF12_HASH = '76ccf59477cad0fa0a33462842c34c0b3ff0eed99c2c60e70666bcad40a23c86'
+# The SFU1605 race root diameter the axis checks assume (BallScrew.RACE_ROOT_DIAMETER).
+RACE_ROOT_DIAMETER = 13
 
 
 def build(catalog, assets):
@@ -24,7 +26,8 @@ def build(catalog, assets):
         if not 111 < length <= 4000:
             raise ValueError('Invalid SFU1605 length')
         recipes.append({'supplier_id': 'vallder', 'sku': v['sku'], 'supplier_product_id': v['supplier_product_id'],
-            'parent_id': 3028, 'type_id': 'machinekit.motion.vallder-sfu1605-screw', 'values': {'length': length},
+            'parent_id': 3028, 'type_id': 'machinekit.motion.sfu-drawing-screw',
+            'values': {'model': 'SFU1605', 'length': length, 'raceRootDiameter': RACE_ROOT_DIAMETER},
             'required_inputs': [], 'geometry_source': 'generator', 'compatibility': 'supplier_assumed',
             'source_url': screw['url'], 'drawing_url': 'https://vallder.com/wp-content/uploads/2017/08/products-sfu1605.png',
             'custom_end_machining': False})
@@ -32,7 +35,7 @@ def build(catalog, assets):
     rows = [r for t in nut['specification_tables'] for r in t if r and r[0] == 'SFU 1605']
     if len(rows) != 1 or len(rows[0]) != 19 or rows[0][6:16] != ['28', '27.8', '48', '38', '5.5', '46', '10', '10', 'M6', '40']:
         raise ValueError('SFU1605 nut drawing/table dimensions changed')
-    for parent_id, sku, type_id, source in [(3061, rows[0][-1], 'machinekit.motion.vallder-sfu1605-nut', 'generator'),
+    for parent_id, sku, type_id, source in [(3061, rows[0][-1], 'machinekit.motion.sfu-nut', 'generator'),
                                            (2378, '1013002', 'machinekit.motion.screw-support-unit', 'supplier_cad')]:
         variants = [v for v in catalog['variants'] if v['parent_id'] == parent_id and v['sku'] == sku]
         if len(variants) != 1:
@@ -46,7 +49,8 @@ def build(catalog, assets):
                 raise ValueError('BF12 bore/shaft height evidence changed')
         recipes.append({'supplier_id': 'vallder', 'sku': sku, 'supplier_product_id': v['supplier_product_id'],
             'parent_id': parent_id, 'type_id': type_id,
-            'values': {'model': 'BF12', 'geometry': 'vallder'} if parent_id == 2378 else {}, 'required_inputs': [],
+            'values': {'model': 'BF12', 'geometry': 'vallder'} if parent_id == 2378 else {'model': 'SFU1605', 'raceRootDiameter': RACE_ROOT_DIAMETER},
+            'required_inputs': [],
             'geometry_source': source, 'compatibility': 'supplier_assumed', 'source_url': parents[parent_id]['url']})
     return {'schema_version': 1, 'recipes': recipes, 'compatibility_basis': 'supplier_intended_SFU16_RBK12_BF12',
         'custom_end_machining': False,

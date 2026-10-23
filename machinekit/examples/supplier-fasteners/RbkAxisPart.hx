@@ -5,7 +5,8 @@ import cadkit.modeling.Location;
 import machinekit.standard.SocketHeadCapScrew;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
-import machinekit.motion.VallderSfu1605Nut;
+import machinekit.motion.SfuNut;
+import machinekit.motion.BallScrew;
 import materia.assembly.AssemblyFrames as F;
 
 /** Fabricated parts for the worked 200 mm axis. X across, Y up, Z travel. */
@@ -73,7 +74,7 @@ class RbkAxisPart extends MachineComponent {
             case "nutBracket":
                 body=Solids.union([box(84,64,10,0,33,10),box(84,10,40,0,60,-20)]);owned.push(body);
                 tools.push(Part.cylinderSpan(14.1,9.9,20.1,0,25));
-                for(p in new VallderSfu1605Nut().boltPattern()) tools.push(revision=="v2-tapped" ? tapped("M5",10,p.x,25+p.y,20,false) : Part.cylinderSpan(2.75,9.9,20.1,p.x,25+p.y));
+                for(p in new SfuNut("SFU1605",BallScrew.RACE_ROOT_DIAMETER).boltPattern()) tools.push(revision=="v2-tapped" ? tapped("M5",10,p.x,25+p.y,20,false) : Part.cylinderSpan(2.75,9.9,20.1,p.x,25+p.y));
                 for(x in [-30.0,30]) for(z in [-10.0,10]) tools.push(revision=="v2-tapped" ? tapped("M6",10,x,65,z) : Part.cylinderAlongY(3.3,54.9,65.1,x,z));
             case "carriage":
                 body=box(180,10,80,0,5,-40);owned.push(body);

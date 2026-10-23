@@ -28,7 +28,7 @@ class Sfu16Tests(unittest.TestCase):
     def test_exact_variants_keep_standard_machining(self):
         result = sfu16.build(*fixture())
         self.assertEqual(len(result['recipes']), 3)
-        self.assertEqual(result['recipes'][0]['values'], {'length': 400})
+        self.assertEqual(result['recipes'][0]['values'], {'model': 'SFU1605', 'length': 400, 'raceRootDiameter': 13})
         self.assertFalse(result['custom_end_machining'])
         self.assertEqual(result['nut_mm']['overall_length'], 46)
 

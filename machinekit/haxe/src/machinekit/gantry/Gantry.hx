@@ -665,16 +665,29 @@ class Gantry extends AxisBuilder {
 			case Screw(thread):
                 var driveMargin=axis.id=="z"&&spec.frontGuides!=null?95.0:railMargin;
 				var ball = thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball;
+				// A ball screw is a rolled SFU screw with its maker's standard ends: the coupling grips the turned coupling
+				// end and the fixed BK support sits on the fixed journal, whose bore it matches.
+				var model = 'SFU${Math.round(thread.screwDiameter)}${StringTools.lpad(Std.string(Math.round(thread.lead)), "0", 2)}';
+				if (ball && machinekit.motion.SfuDrawingScrew.models().indexOf(model) < 0) throw 'Ball screw $model has no published standard ends';
+				var ends = ball ? machinekit.motion.SfuFamilyData.ends(model) : null;
 				var unit = ball ? ScrewSupportUnit.forScrew(thread.screwDiameter, true) : null;
-				var coupling = new ShaftCoupling(selectedMotor.shaftDiameter, thread.screwDiameter);
-				// Short-shaft motors cannot bury a long sleeve inside their pilot or mounting plate.
+				if (unit != null && ends != null && unit.boreDiameter != ends.journalDiameter) throw '${unit.designation} does not fit the $model fixed journal';
+				var shaftEnd = ends == null ? thread.screwDiameter : ends.couplingDiameter;
+				var couplingEnd = ends == null ? Math.POSITIVE_INFINITY : ends.couplingLength;
+				var coupling = new ShaftCoupling(selectedMotor.shaftDiameter, shaftEnd);
+				// Short-shaft motors cannot bury a long sleeve inside their pilot or mounting plate; nor can it grip past the coupling end.
 				if (ball) {
-					var engagement = Math.min(coupling.length / 2, shaft - MOTOR_PLATE_THICKNESS - DRIVE_CLEARANCE);
-					coupling = new ShaftCoupling(selectedMotor.shaftDiameter, thread.screwDiameter, null, 2 * engagement);
+					var engagement = Math.min(Math.min(coupling.length / 2, shaft - MOTOR_PLATE_THICKNESS - DRIVE_CLEARANCE), couplingEnd);
+					coupling = new ShaftCoupling(selectedMotor.shaftDiameter, shaftEnd, null, 2 * engagement);
 				}
 				var grip = coupling.length / 2;
-				// The bearing follows the coupling's screw-side grip. Keep its far face clear of the
-				// nut at the guide's full declared overtravel, without reducing usable guide travel.
+				// The support's centre and far face from the screw start, and where the race (the nut's travel) begins.
+				var journalStart = ends == null ? 0.0 : ends.couplingLength + ends.threadReliefLength;
+				var supportCentre = ends == null ? 0.0 : (journalStart + ends.fixedEnd) / 2;
+				var supportFar = unit == null ? 0.0 : supportCentre + unit.length / 2;
+				var raceStart = ends == null ? 0.0 : Math.max(ends.fixedEnd, supportFar);
+				// Keep the support's far face and the race start clear of the nut at the guide's full declared overtravel,
+				// without reducing usable guide travel.
 				var endRoom = 0.0;
 				if (unit != null && !(axis.id=="z"&&spec.frontGuides!=null)) {
 					var bounds = mountBounds(component(moving), zeroPose(moving));
@@ -684,23 +697,24 @@ class Gantry extends AxisBuilder {
 							leading = Math.min(leading, (x-origin[0])*direction[0] + (y-origin[1])*direction[1] + (z-origin[2])*direction[2]);
 					// The switch trigger extends 3 mm beyond the carriage along travel (buildSwitches).
 					leading -= axisOvertravel(axis.id) + 3;
-					endRoom = Math.max(0, grip + unit.length + DRIVE_CLEARANCE - driveMargin - leading);
+					endRoom = Math.max(0, raceStart + DRIVE_CLEARANCE - driveMargin - leading);
 				}
 				var start = point(-driveMargin - endRoom), face = point(-driveMargin - endRoom - shaft);
 				mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, direction), reducer == null ? null : reducer.n("diameter") + 2);
 				var screwId = "screw" + suffix;
-				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * driveMargin + endRoom),
+				var screwLength = axis.upper + 2 * driveMargin + endRoom;
+				var screw = ball ? new machinekit.motion.SfuDrawingScrew(model, screwLength, thread.rootDiameter()) : new LeadScrew(thread, screwLength);
+				driveScrew(axis, screwId, motorId, screw,
 					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver, coupling,reducer);
 				if (unit != null) {
-					// The catalogue BK support for the screw size; the generic screw is drawn without the journal it
-					// sits on (a declared fit in the clearance check). Its foot is carried back to the motor mounting plate.
-					var bearing = point(-driveMargin - endRoom + grip + unit.length / 2);
+					// The catalogue BK support on the fixed journal; its foot is carried back to the motor mounting plate.
+					var bearing = point(-driveMargin - endRoom + supportCentre);
 					var bearingPose = AxisBuilder.orient(bearing[0], bearing[1], bearing[2], transverse, direction);
 					var motorPlate:GantryPlate = cast component(motorId + "Plate");
 					var foot = unit.connector("mount").frame.y;
 					var thickness = motorPlate.height;
 					var begin = point(-driveMargin - endRoom - shaft + thickness);
-					var bracketLength = shaft - thickness + grip + unit.length;
+					var bracketLength = shaft - thickness + supportFar;
 					var drop = reducer == null ? 0 : Math.max(0, reducer.n("diameter") / 2 + DRIVE_CLEARANCE + foot);
 					var bracketPose = AxisBuilder.orient(begin[0] + transverse[0] * (foot - thickness / 2 - drop),
 						begin[1] + transverse[1] * (foot - thickness / 2 - drop),

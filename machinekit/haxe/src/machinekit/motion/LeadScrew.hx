@@ -62,6 +62,9 @@ class LeadScrew extends MachineComponent {
 	/** Shaft-only axial stiffness, N/mm, from the race root and full shaft length.
 	 * Nut and support compliance must be supplied by a measured transmission override.
 	 */
+	/** The diameter a coupling grips at the input end: the screw itself, unless the end is turned down. */
+	public function inputDiameter():Float return thread.screwDiameter;
+
 	public function axialStiffness():Float {
 		var root = thread.rootDiameter();
 		return YOUNGS_MODULUS / 1e6 * Math.PI * root * root / (4 * totalLength);
