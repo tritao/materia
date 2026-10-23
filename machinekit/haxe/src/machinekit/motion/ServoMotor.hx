@@ -108,7 +108,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 	public static function namedRecipeType():machinekit.component.ComponentType {
 		if (namedRecipe == null) namedRecipe = new machinekit.component.ComponentType("machinekit.motion.servo-motor",
 			[machinekit.component.ComponentRecipeSupport.choice("designation", [for (row in ratings()) row.designation],
-				"GENERIC-SERVO-200W")], v -> model(v.token("designation")));
+				"GENERIC-SERVO-200W")], v -> model(v.token("designation")), true);
 		return namedRecipe;
 	}
 

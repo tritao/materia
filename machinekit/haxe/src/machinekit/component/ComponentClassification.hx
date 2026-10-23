@@ -104,7 +104,6 @@ class ComponentClassification {
 		file(registry, "machinekit.motion.brake-servo", "Motors and gearboxes", ComponentKind.Generic);
 		file(registry, "machinekit.motion.gearbox", "Motors and gearboxes", ComponentKind.Generic);
 		file(registry, "machinekit.motion.planetary-reducer", "Motors and gearboxes", ComponentKind.Generic);
-		file(registry, "machinekit.motion.leadshine-servo", "Motors and gearboxes", ComponentKind.Supplier);
 		file(registry, "machinekit.motion.purchased-rotary-part", "Motors and gearboxes", ComponentKind.Supplier);
 		file(registry, "machinekit.motion.torque-motor", "Motors and gearboxes", ComponentKind.Reference);
 		file(registry, "machinekit.motion.motor-driver", "Drives and power", ComponentKind.Generic);

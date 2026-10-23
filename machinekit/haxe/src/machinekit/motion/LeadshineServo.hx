@@ -18,7 +18,6 @@ class LeadshineServo extends ServoMotor {
 	public static inline final SOURCE = "https://www.leadshine.com/upfiles/downloads/006a40c553d0c6fc60a1221d6a764222_1675822261873.pdf";
 	public static inline final MS1AE_SOURCE = "https://www.leadshine.com/product-detail/ELM2L-1500LA100FT-H%20MS1AE.html";
 	static var table:Null<Catalog<LeadshineServoSpec>>;
-	static var recipe:Null<ComponentType>;
 	public final spec:LeadshineServoSpec;
 	var massDeclared:Bool = false;
 
@@ -214,18 +213,13 @@ class LeadshineServo extends ServoMotor {
 		});
 	}
 
-	public static function recipeType():ComponentType {
-		if (recipe == null) recipe = new ComponentType("machinekit.motion.leadshine-servo",
-			[ComponentRecipeSupport.choice("designation", catalog().designations(), "ELM1H-0400MA60F")],
-			v -> model(v.token("designation")), true);
-		return recipe;
-	}
 	override public function toolSpecs():Array<machinekit.component.ToolSpec> return [new machinekit.component.ToolSpec("mountingCutout", [
 		ComponentRecipeSupport.toolDepth(10), ComponentRecipeSupport.length("pilotClearance", 0.2)])];
 	override function buildTool(name:String, values:ComponentValues):Part {
 		if (name == "mountingCutout") return mountingCutout(values.number("depth"), values.number("pilotClearance"));
 		return super.buildTool(name, values);
 	}
-	override public function componentType():Null<ComponentType> return recipeType();
+	/** A Leadshine motor saves as its row of the servo-motor recipe. */
+	override public function componentType():Null<ComponentType> return ServoMotor.namedRecipeType();
 	override public function values():ComponentValues return new ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());
 }
