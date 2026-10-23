@@ -107,6 +107,7 @@ class SweptRemoval {
 			pieces.push(part.translated(delta));
 			for (i in 0...part.shape.subshapeCount(CadKit.ShapeKind.Face)) {
 				var face = part.shape.subshape(CadKit.ShapeKind.Face, i);
+				var kind=face.surfaceKind();
 				try {
 					if (face.surfaceKind() == CadKit.SurfaceKind.Plane) {
 						if (Math.abs(Vector.fromNative(face.faceNormal()).dot(delta.normalized())) > 1e-10)
@@ -125,7 +126,7 @@ class SweptRemoval {
 					face.close();
 				} catch (e:Dynamic) {
 					face.close();
-					throw e;
+					throw 'Boundary face $i ($kind): '+Std.string(e);
 				}
 			}
 			var result = Solids.union(pieces);
@@ -202,7 +203,9 @@ class SweptRemoval {
 					throw 'Initial overlap ${members[i].id}/${members[j].id}';
 			}
 		for (a in members) {
-			var swept = sweep(a.part, a.direction.scale(travel));
+			var swept:Part;
+			try swept=sweep(a.part,a.direction.scale(travel)) catch (error:Dynamic)
+				throw 'Removal sweep ${a.id}: '+Std.string(error);
 			try {
 				for (b in members)
 					if (b.id != a.id && meets(swept, b.part)) {

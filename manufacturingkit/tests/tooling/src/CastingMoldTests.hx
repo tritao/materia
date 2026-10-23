@@ -358,6 +358,22 @@ class CastingMoldTests {
 		var bridgeBounds = materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(bridgePanels.filter(v ->
 			v.panel.id == "core-bridge-0")[0].panel));
 		check(Math.abs(bridgeBounds.height - extraCavity.depth / 2) < 1e-8, "row bridge uses the largest depth including a later core");
+		var rotatedPanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>=[];
+		var originalCore=bridgePlan.cores[0],layersBefore=ToolingCodec.canonical(originalCore.layers);
+		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity,bridgePlan.document.recipe,
+			[originalCore],rotatedPanels,[],materia.tooling.casting.MoldPanels.RaisedWalls.NorthSouth);
+		var carrier=rotatedPanels.filter(panel -> panel.panel.id==MoldCores.carrierId(originalCore))[0];
+		var carrierBounds=materia.casting.CastingProfileGeometry.bounds(materia.tooling.panel.PanelContours.outside(carrier.panel));
+		var actualCarrier=CastingMoldPlanner.box(carrierBounds.width,carrierBounds.height,carrier.panel.stock.measuredThickness,
+			F.compose(carrier.pose,F.translation(carrierBounds.width/2,carrierBounds.height/2,0)));
+		var expectedCarrier=MoldCores.stockBounds(originalCore.foamEnvelope,originalCore.id);
+		check(Math.abs(actualCarrier.x-expectedCarrier.x)+Math.abs(actualCarrier.y-expectedCarrier.y)
+			+Math.abs(actualCarrier.width-expectedCarrier.width)+Math.abs(actualCarrier.depth-expectedCarrier.depth)<1e-7,
+			"Rotated shared construction puts the carrier on the original foam footprint");
+		check(originalCore.support.bondAreaMm2>0 && originalCore.support.bridgeBondAreaMm2>0
+			&& originalCore.support.bridgeBondAreaMm2<=originalCore.support.bondAreaMm2,
+			"Rotated bonds use the transformed foam sections");
+		check(ToolingCodec.canonical(originalCore.layers)==layersBefore,"Bridge orientation never changes source wire-cut layers");
 		var narrowBridge = ToolingCodec.copy(d);
 		narrowBridge.recipe.hardware.minimumBridgeWidth = 1000;
 		rejects(() -> CastingMoldPlanner.plan(narrowBridge, options(narrowBridge)), "undersized bridge row rejected");

@@ -33,10 +33,12 @@ class MillFabricationPreview {
 	static function data(dir:String, name:String, value:Dynamic):Void
 		sys.io.File.saveContent(dir + "/" + name, ToolingCodec.canonical(value) + "\n");
 
-	static function processSpec(recipe:materia.tooling.ToolingRecipe):materia.tooling.process.CastingProcessSpec {
+	static function processSpec(recipe:materia.tooling.ToolingRecipe,id:String):materia.tooling.process.CastingProcessSpec {
 		var args = Sys.args(), index = args.indexOf("--process-spec");
-		if (index < 0)
-			return MillFabricationSetup.process(recipe);
+		if (index < 0) {
+			var result=MillFabricationSetup.process(recipe);result.id=id;
+			return result;
+		}
 		if (index + 1 >= args.length || StringTools.startsWith(args[index + 1], "--") || args.lastIndexOf("--process-spec") != index)
 			throw "Expected one --process-spec JSON path";
 		var path = args[index + 1];
@@ -46,17 +48,25 @@ class MillFabricationPreview {
 	}
 
 	public static function main():Void {
+		var frame=MillMoldSetup.frame();
+		write(MillMoldSetup.document(frame),MillMoldSetup.options(frame),frame.base,"base","mill-base-process-review",
+			(plan,review) -> MillMoldChecks.run(frame,plan,review));
+	}
+
+	public static function write(document:materia.tooling.ToolingDocument,
+			options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions,
+			foundation:machinekit.structural.MineralFoundation,stem:String,processId:String,
+			?extraChecks:materia.tooling.casting.CastingMoldPlan->machinekit.tooling.CastingMoldCad.CastingMoldReview->Void):Void {
 		var cwd = Sys.getCwd(),
 			root = sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/examples/bench-mill" : cwd;
 		var recordsOnly = Sys.args().indexOf("--records-only") >= 0;
-		var name = recordsOnly ? "base-fabrication-records" : "base-fabrication";
+		var name = stem+"-fabrication"+(recordsOnly ? "-records" : "");
 		var destination = root + "/build/tooling/" + name,
 			dir = destination + "-stage";
 		removeGenerated(dir);
 		machinekit.tooling.ToolingFiles.directory(dir);
-		var frame = MillMoldSetup.frame(),
-			p = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
-		var process = processSpec(p.document.recipe);
+		var p = machinekit.tooling.CastingMoldCad.plan(document,options);
+		var process = processSpec(p.document.recipe,processId);
 		var fabricationSpec = MillFabricationSetup.spec();
 		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan);
 		var f = ToolingFabrication.plan(p, fabricationSpec, processReport);
@@ -69,8 +79,8 @@ class MillFabricationPreview {
 			geometricReview = review;
 			if (review.fingerprint != f.sourceFingerprint)
 				throw "Stale geometric review";
-			if (Sys.args().indexOf("--checks") >= 0)
-				MillMoldChecks.run(frame, p, review);
+			if (Sys.args().indexOf("--checks") >= 0 && extraChecks!=null)
+				extraChecks(p,review);
 			CastingMoldExport.write(p, dir, review);
 			machinekit.tooling.MoldPlayback.write(p, review, dir);
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pass,
@@ -233,7 +243,8 @@ class MillFabricationPreview {
 			"# Panel machining review\n\nPrograms are LinuxCNC review outputs in mm. Settings originate in metres and m/s. Do not substitute relief cutters without regenerating the plan.\n\nEach program uses G54 with Z0 at the face being machined. XY starts at the raw blank lower left; the finished bounding profile is offset by the declared blank margin. Negative-Z setups reflect X about the finished profile midline: flip about local Y and re-establish the origin. Operation order clears named access pockets first and releases the outside profile last, after other faces. CAM checks supplied stock, fixtures and travel; an empty fixture list does not qualify workholding.\n\nRetain the part for the final contour with a qualified fixture/spoilboard or tabs specified by a revised operation plan. Through cuts include the declared breakthrough allowance into the declared spoilboard. Execute split single-tool programs in the cam-programs.json order, preserving access pockets and outside-last. Final outside cuts use the declared onion skin followed by its separate removal pass, or an evidenced vacuum area/holding-force assessment. G49 single-tool programs require touching off Z with that tool; no length offset applies. Fit-coupon programs and locator-coupon programs use the same settings. Resolve every blocking fabrication-validation.json record before fabrication release.\n"
 			+"\n## Release before assembly\n\nUse release-system.md and release-operations.csv to seal exposed board faces, cure, apply the declared wax/PVA sequence and dry all tooling before fitting source steel. Keep insert/anchor bonding faces uncoated and the listed adjacent contacts masked. Physical chemical coupon evidence remains required.\n\n## Former boards\n\nUse former-board-stock.csv for each single-board or hollow-box part, former-pocket-screws.csv for dry-side jig drilling and closure, and former-manufacturing.json for sealing faces and each board's program order. The per-former assembly files show the removable board construction. Neck and flange sheets register against the wall and use its external closure; hollow-body joints use internal pocket screws.\n"
 			+"\nFormer programs retain the declared fixed G54 work datum and spoilboard plane; each header states its actual stock-top Z. Thicker blanks therefore use a different top Z, not a different assumed datum. Machine and seal all listed contact surfaces; pocket-screw heads and access stay inside the dry cavity. Board/grip, jig, workholding and machine qualification remain pending.\n");
-		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base,processReport,MillMoldSetup.input(frame).interfaceContext));
+		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p,process,f.spec.gravityMps2,dir,
+			geometricReview,f.spec,foundation,processReport,p.document.input.interfaceContext));
 		ToolingPackageManifest.write(dir, f, checks, p, process);
 		ToolingPackageManifest.verify(dir);
 		Sys.println("Fabrication package integrity check passed");

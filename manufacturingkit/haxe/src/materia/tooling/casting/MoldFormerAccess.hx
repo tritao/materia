@@ -45,9 +45,50 @@ class MoldFormerAccess {
 
 	public static function add(plan:CastingMoldPlan,feature:CastingFeature,direction:FormerWithdrawal,
 			volume:MoldVolume,exclusions:Array<CastingRegion>):Array<CastingRegion> {
+		// Rigid bed-facing tools leave after the bed is removed. Registered
+		// EPS uses registeredBedAccess explicitly, before its material conversion.
 		if (Math.abs(direction.z)>1-EPS) return [];
 		try return build(plan,feature,direction,volume,exclusions) catch (error:Dynamic)
 			throw "Former access "+feature.id+": "+Std.string(error);
+	}
+
+	/** Bed access lives entirely outside the source envelope. A rectangular
+	 * removable neck can therefore include front-face backing without rounding
+	 * or enlarging the casting cavity. It uses the existing relieved profile.
+	 */
+	public static function registeredBedAccess(plan:CastingMoldPlan,feature:CastingFeature,volume:MoldVolume,
+			exclusions:Array<CastingRegion>):Array<CastingRegion> {
+		var d=plan.document,r=d.recipe,bed=plan.panels.members.filter(member -> member.panel.id=="bed")[0];
+		var bounds=MoldRegions.exactBounds(MoldRegions.feature(d,feature.id),feature.id);
+		var inner=bed.pose.z+r.panel.measuredThickness;
+		if (bounds.z<inner-EPS) throw "Source opening is below the mold bed: "+feature.id;
+		var margin=r.minimumLigament,cx=bounds.x+bounds.width/2,cy=bounds.y+bounds.depth/2;
+		var width=Math.max(bounds.width+2*margin,r.routerDiameter+2*margin);
+		var height=Math.max(bounds.depth+2*margin,r.routerDiameter+2*margin);
+		var contour=PanelContours.relievedRectangle(cx-bed.pose.x,cy-bed.pose.y,width,height,r.routerDiameter/2);
+		// The through-bed profile may enter a wall's dry bottom rebate.
+		// Above the bed it stops at the actual inner wall planes instead.
+		var neck:Null<CastingRegion>=bounds.z>inner+EPS ? Intersection([
+			Placed({solid:Prism(contour,bounds.z-inner),pose:F.compose(bed.pose,F.translation(0,0,r.panel.measuredThickness))}),
+			MoldRegions.box(plan.cavity)]) : null;
+		if (neck!=null && MoldRegions.volume(Intersection([neck,MoldRegions.envelope(d)]),feature.id)>EPS)
+			throw "Bed access would change source casting geometry: "+feature.id;
+		var operation=PanelJoints.operation(materia.tooling.ToolingIds.derive("access-",feature.id),InsideProfile,
+			contour,r.panel.measuredThickness,r.routerDiameter,MachiningSide.PositiveZ,true,r.routerDiameter);
+		bed.panel.operations.push(operation);bed.panel.contactOpenings.push(operation.id);
+		bed.panel=PanelCodec.copy(bed.panel);
+		var profile:MoldVolumeProfile={panelId:bed.panel.id,operationId:operation.id,contour:operation.contour,
+			pose:bed.pose,depth:operation.depth,subtract:exclusions.copy()};
+		volume.profiles.push(profile);
+		var flange:CastingRegion=Placed({solid:Cut(materia.casting.CastingSolid.Box(
+			width+2*r.hardware.formerFlangeMargin,height+2*r.hardware.formerFlangeMargin,r.hardware.formerFlangeThickness)),
+			pose:F.translation(cx,cy,bed.pose.z-r.hardware.formerFlangeThickness)});
+		var extensions:Array<CastingRegion>=[flange];
+		if (neck!=null) extensions.unshift(neck);
+		for (region in extensions) volume.regions.push(Difference(region,exclusions.copy()));
+		plan.openings.push({panelId:bed.panel.id,operationId:operation.id,kind:ToolingOpening,
+			sealingIds:[volume.id],protection:null,sealSpec:r.hardware.sealMaterial});
+		return extensions.concat([MoldRegions.profile(profile)]);
 	}
 
 	static function build(plan:CastingMoldPlan,feature:CastingFeature,direction:FormerWithdrawal,

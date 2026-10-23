@@ -19,6 +19,18 @@ import toolpathkit.setup.SetupStock;
 
 class ToolpathKitTests {
   static function main():Void {
+    // This non-quadrant arc makes length * samples / samples exceed length
+    // by one floating-point step. The terminal sample is the exact endpoint.
+    var endpointArc = PathGeometry.Arc(new Point3(0, 0, 0), 0.0035,
+      0, -0.8410686705678702);
+    toolpathkit.path.GeometryOffset.validateProfile([
+      new Point3(1, 1, 0), new Point3(2, 1, 0),
+      new Point3(2, 2, 0), new Point3(1, 2, 0)
+    ], [endpointArc], 0, false);
+    var outsideRejected = false;
+    try GeometryTools.pointAt(endpointArc, GeometryTools.length(endpointArc) + 1e-10)
+    catch (error:Dynamic) outsideRejected = Std.string(error).indexOf("outside its length") >= 0;
+    if (!outsideRejected) throw "genuinely out-of-range geometry queries remain invalid";
     var kit = new ToolpathKit();
     if (kit == null) throw "ToolpathKit failed to initialize";
     var line = PathGeometry.Line(new Point3(0, 0, 0), new Point3(3, 4, 0));
@@ -140,6 +152,6 @@ class ToolpathKitTests {
       case _: throw 'an S-curve becomes two arcs, got ${curve.length} operations';
     }
     var coverage = ToolpathCoreCoverage.run() + PrinterOpCoverage.run() + BeadSectionTests.run();
-    Sys.println('ToolpathKit tests passed (${22 + coverage} assertions)');
+    Sys.println('ToolpathKit tests passed (${24 + coverage} assertions)');
   }
 }

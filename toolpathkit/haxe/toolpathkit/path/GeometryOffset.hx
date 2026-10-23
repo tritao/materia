@@ -129,8 +129,9 @@ class GeometryOffset {
           var samples = Std.int(Math.max(32,
             Math.ceil(Math.abs(sweep) * 128.0)));
           for (sample in 0...(samples + 1)) {
+            // Preserve the exact endpoint; multiply/divide can round past it.
             var point = GeometryTools.pointAt(geometry,
-              length * sample / samples);
+              sample == samples ? length : length * sample / samples);
             for (i in 0...count)
               if (pointSegmentDistance(point, points[i],
                   points[(i + 1) % count]) < radius - 1e-8)

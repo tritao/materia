@@ -19,6 +19,30 @@ import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
  * No source insert thread or pin hole is invented.
  */
 class DatumFixtures {
+	/** Match an authored mounting plane to a real shell contact plane. The
+	 * subsequent contact and penetration checks prove the footprint and holes.
+	 */
+	public static function panelOnFace(panels:Array<PanelPlacement>,face:materia.assembly.AssemblyRecord.AssemblyFrame)
+			:Null<PanelPlacement> {
+		var matches:Array<PanelPlacement>=[];
+		for (panel in panels) {
+			var surface:Null<Float>=switch panel.panel.contactFace {
+				case materia.tooling.ToolingEnums.ContactFace.PositiveZ:panel.panel.stock.measuredThickness;
+				case materia.tooling.ToolingEnums.ContactFace.NegativeZ:0.0;
+				case materia.tooling.ToolingEnums.ContactFace.None:null;
+				default:throw "Unknown fixture panel contact face: "+panel.panel.id;
+			};
+			if (surface==null) continue;
+			var local=F.compose(F.inverse(panel.pose),face),normal=F.transformVector(local,0,0,1);
+			var expected=panel.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.PositiveZ ? -1.0 : 1.0;
+			if (Math.abs(local.z-surface)<1e-7 && normal.z*expected>1-1e-8
+				&& materia.casting.CastingProfileGeometry.inside(PanelContours.outside(panel.panel),local.x,local.y))
+				matches.push(panel);
+		}
+		if (matches.length>1) throw "Insert mounting plane matches multiple receiver panels";
+		return matches.length==0 ? null : matches[0];
+	}
+
 	/** Nominal access preference only; the native swept-removal graph verifies it.
 	 * Side fixtures expose the through bore toward the open core behind the seat.
 	 * Bed fixtures expose the mounting face. Blind holes always withdraw at entry.

@@ -62,6 +62,60 @@ class BoxPlannerTests {
 		check(datumPlan.validation.filter(v -> v.rule=="tooling.datum.contacts."+d.input.id
 			&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
 			"box planner preserves datum contact qualification gate");
+		var carrierPlan=CastingMoldPlanner.planSinglePocket(d),carrierBody=carrierPlan.cavity;
+		var sourceBefore=ToolingCodec.encode(carrierPlan.document),carrierFace=F.translation(0,70,102);
+		var carrier=CoreSupports.insertCarrier(carrierPlan,"dry-fixture",carrierFace,
+			{x:-20,y:60,z:90,width:40,depth:20,height:12});
+		check(carrier.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.NegativeZ,
+			"Upward source face contacts the dry carrier underside");
+		check(materia.tooling.casting.DatumFixtures.panelOnFace([carrier],carrierFace)==carrier,
+			"Dry carrier uses the same source-plane receiver selection");
+		var pads=carrierPlan.formers.filter(former -> former.volume.id.indexOf("fixture-carrier-dry-fixture-")==0);
+		check(pads.length==2,"Dry carrier has one physical support pad per side wall");
+		for (pad in pads) {
+			check(pad.volume.pieces.length==1 && pad.volume.pieces[0].height==2,
+				"Pad height comes from the source contact plane and actual wall top");
+			var piece=pad.volume.pieces[0];
+			check(piece.x+piece.width<=carrierBody.x+1e-7 || piece.x>=carrierBody.x+carrierBody.width-1e-7,
+				"Dry pads rest on wall tops outside the resin footprint");
+		}
+		check(sourceBefore==ToolingCodec.encode(carrierPlan.document),"Carrier construction never changes casting source geometry");
+		check(carrierPlan.validation.filter(row -> row.rule=="loads-handling" && row.status=="pending").length==1,
+			"Carrier construction preserves the existing load and handling qualification gate");
+		rejects(() -> CoreSupports.insertCarrier(carrierPlan,"low",F.translation(0,70,101),
+			{x:-20,y:60,z:90,width:40,depth:20,height:11}),"Carrier below dry clearance is rejected");
+		var blockedContact="";
+		try CoreSupports.insertCarrier(carrierPlan,"blocked-contact",F.translation(0,0,102),
+			{x:-20,y:-10,z:90,width:40,depth:20,height:12}) catch (error:Dynamic) blockedContact=Std.string(error);
+		check(blockedContact.indexOf("crosses the source insert contact plane")>=0,
+			"An existing core support cannot be cut through the insert contact face");
+		var crossing=materia.tooling.panel.PanelJoints.blank("cross-beam",80,40,d.recipe.panel,d.recipe.routerDiameter,2);
+		carrierPlan.supportPanels.push({panel:crossing,pose:F.translation(-40,50,118),withdrawal:{x:0,y:0,z:1}});
+		carrierPlan.cores[0].support.kind=Bridge;
+		carrierPlan.cores[0].support.bondedPanelIds=[crossing.id];
+		var cross=CoreSupports.insertCarrier(carrierPlan,"dry-cross",carrierFace,
+			{x:-20,y:60,z:90,width:40,depth:20,height:12});
+		var clearances=cross.panel.operations.filter(operation -> operation.id=="clear-cross-beam");
+		check(clearances.length==1 && clearances[0].kind==materia.tooling.panel.PanelPlan.PanelOperationKind.Rebate,
+			"Crossed dry carrier receives an explicit open rebate for the core bridge");
+		check(Math.abs(clearances[0].depth-(d.recipe.panel.measuredThickness-16+d.recipe.jointClearance))<1e-7,
+			"Carrier rebate depth follows actual support height plus the declared clearance");
+		check(cross.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.NegativeZ,
+			"Crossing relief preserves the source insert contact face");
+		crossing.operations[0].contour=materia.tooling.panel.PanelContours.circle(40,20,20);
+		var nonRectangle="";
+		try CoreSupports.insertCarrier(carrierPlan,"round-cross",carrierFace,
+			{x:-20,y:60,z:90,width:40,depth:20,height:12}) catch (error:Dynamic) nonRectangle=Std.string(error);
+		check(nonRectangle.indexOf("exact non-rectangular support intersection")>=0,
+			"A curved support is never cleared with its bounding rectangle");
+		var sidePlan=CastingMoldPlanner.planSinglePocket(d);
+		var arm=CoreSupports.insertCarrier(sidePlan,"right-arm",F.translation(60,70,102),
+			{x:40,y:60,z:90,width:40,depth:20,height:12});
+		check(arm.pose.x==40-d.recipe.minimumLigament,
+			"A source footprint wholly on one side gets a carrier arm to its adjacent wall");
+		var armPads=sidePlan.formers.filter(former -> former.volume.id.indexOf("fixture-carrier-right-arm-")==0);
+		check(armPads.length==1 && armPads[0].volume.pieces[0].x==sidePlan.cavity.x+sidePlan.cavity.width,
+			"A carrier arm has one real wall-top pad, with no floating opposite support");
 		var pattern = ToolingCodec.copy(d);
 		var second = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
 		pattern.input.inserts[0].holes[0].frame.x = -8;

@@ -141,6 +141,11 @@ class ToolingTests {
 	}
 
 	static function fixturePanelFaces():Void {
+		var rectangle=materia.tooling.panel.PanelContours.rectangle(0,0,100,40);
+		check(materia.casting.CastingProfileGeometry.containsRect(rectangle,20,0,40,40),
+			"Receiver footprint may touch its straight panel boundary");
+		check(!materia.casting.CastingProfileGeometry.containsRect(rectangle,20,-0.01,40,40.01),
+			"A real footprint breakout remains rejected");
 		var rotations=[
 			[1.0,0,0,0,1,0,0,0,1], [1.0,0,0,0,-1,0,0,0,-1],
 			[1.0,0,0,0,0,-1,0,1,0], [1.0,0,0,0,0,1,0,-1,0],
@@ -170,6 +175,20 @@ class ToolingTests {
 			check(location.unsupportedReasons.length==0 && location.report.rank==3,
 				"Every Cartesian panel face supplies only the three real plane constraints");
 			check(location.contacts.length==3,"Clearance access hole receives no lateral locating credit");
+			var placement={panel:panel,pose:pose,withdrawal:{x:0.0,y:0.0,z:1.0}};
+			check(materia.tooling.casting.DatumFixtures.panelOnFace([placement],face)==placement,
+				"Receiver selection follows every Cartesian mounting plane");
+			check(materia.tooling.casting.DatumFixtures.panelOnFace([placement],F.compose(face,F.translation(0,0,1)))==null,
+				"Parallel receiver off the mounting plane is rejected");
+			rejects(() -> materia.tooling.casting.DatumFixtures.panelOnFace([placement,placement],face),
+				"multiple receiver panels");
+			panel.contactFace=materia.tooling.ToolingEnums.ContactFace.NegativeZ;
+			placement.pose=F.compose(face,F.translation(-50,-50,0));
+			check(materia.tooling.casting.DatumFixtures.panelOnFace([placement],face)==placement,
+				"Negative-Z wall contact selects the same exact mounting plane");
+			var wallLocation=materia.tooling.casting.DatumFixtureLocation.onPanel(source,transform,face,placement,[]);
+			check(wallLocation.unsupportedReasons.length==0 && wallLocation.report.rank==3,
+				"Wall receiver preserves three real plane constraints");
 			for (contact in location.contacts) {
 				var point=F.transformPoint(F.inverse(stock),contact.point.x,contact.point.y,contact.point.z);
 				check(Math.abs(point.z-size.height)<1e-7,"Contact witness lies on the actual steel mouth plane");

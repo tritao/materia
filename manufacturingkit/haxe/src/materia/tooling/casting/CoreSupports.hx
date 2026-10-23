@@ -355,11 +355,113 @@ class CoreSupports {
 			throw "Invalid foot cutting definition";
 	}
 
+	/** Dry cross-carrier, supported on faced board pads over the wall tops.
+	 * Pads use the existing former stock/machining route; external end clamps
+	 * and board capacity retain the existing closure qualification requirement.
+	 */
+	public static function insertCarrier(p:CastingMoldPlan,insertId:String,
+			face:materia.assembly.AssemblyRecord.AssemblyFrame,footprint:MoldBox):PanelPlacement {
+		var b=p.cavity,r=p.document.recipe,t=r.panel.measuredThickness,l=r.minimumLigament;
+		if (face.z-p.document.setup.fillHeightMm<l-1e-7)
+			throw "Insert carrier has insufficient dry clearance above fill: "+insertId;
+		var width=Math.max(r.hardware.minimumBridgeWidth,footprint.depth+2*l);
+		if (width>b.depth) throw "Insert carrier exceeds the mold span: "+insertId;
+		var y=Math.max(b.y,Math.min(b.y+b.depth-width,face.y-width/2));
+		if (footprint.y<y-1e-7 || footprint.y+footprint.depth>y+width+1e-7)
+			throw "Insert carrier cannot cover the mounting face: "+insertId;
+		var id=materia.tooling.ToolingIds.derive("fixture-carrier-",insertId);
+		var left=b.x-t,right=b.x+b.width+t,center=b.x+b.width/2;
+		if (footprint.x>center+l) left=footprint.x-l;
+		else if (footprint.x+footprint.width<center-l) right=footprint.x+footprint.width+l;
+		var panel=PanelJoints.blank(id,right-left,width,r.panel,r.routerDiameter,l);
+		panel.contactFace=materia.tooling.ToolingEnums.ContactFace.NegativeZ;
+		panel.labelX=left>b.x ? right-left-2*r.hardware.labelOffset : 2*r.hardware.labelOffset;
+		panel.labelY=width/2;
+		var placed:PanelPlacement={panel:panel,pose:F.translation(left,y,face.z),withdrawal:{x:0,y:0,z:1}};
+		var bridgeIds:Array<String>=[];
+		for (core in p.cores) if (core.support.kind==Bridge)
+			for (member in core.support.bondedPanelIds) if (bridgeIds.indexOf(member)<0) bridgeIds.push(member);
+		for (other in p.supportPanels) if (bridgeIds.indexOf(other.panel.id)>=0) {
+			var relative=F.compose(F.inverse(placed.pose),other.pose),normal=F.transformVector(relative,0,0,1);
+			if (Math.abs(normal.z-1)>1e-8) throw "Dry carrier requires a parallel core support: "+other.panel.id;
+			if (relative.z>=t-1e-7 || relative.z+other.panel.stock.measuredThickness<=1e-7) continue;
+			var outline=PanelContours.outside(other.panel),u=F.transformVector(relative,1,0,0);
+			var bounds=materia.casting.CastingProfileGeometry.bounds(PanelContours.placed(outline,
+				Math.atan2(u.y,u.x),relative.x,relative.y));
+			var x0=Math.max(0,bounds.x),x1=Math.min(right-left,bounds.x+bounds.width);
+			var y0=Math.max(0,bounds.y),y1=Math.min(width,bounds.y+bounds.height);
+			if (x1-x0<=1e-7 || y1-y0<=1e-7) continue;
+			if (outline.length!=4 || outline.filter(edge -> edge.center!=null
+				|| Math.abs(edge.start.x-edge.end.x)>1e-7 && Math.abs(edge.start.y-edge.end.y)>1e-7).length>0)
+				throw "Dry carrier needs the exact non-rectangular support intersection: "+other.panel.id;
+			if (relative.z<=r.jointClearance)
+				throw "Core support crosses the source insert contact plane: "+insertId+"/"+other.panel.id;
+			var clearance=r.jointClearance,cutWidth=x1-x0+clearance,cutHeight=y1-y0+clearance;
+			var open=x0<=1e-7 || y0<=1e-7 || x1>=right-left-1e-7 || y1>=width-1e-7;
+			var contour=PanelContours.relievedRectangle((x0+x1)/2,(y0+y1)/2,cutWidth,cutHeight,r.routerDiameter/2);
+			panel.operations.push(PanelJoints.operation(materia.tooling.ToolingIds.derive("clear-",other.panel.id),
+				open ? Rebate : Pocket,contour,t-relative.z+clearance,r.routerDiameter,
+				MachiningSide.PositiveZ,false,r.routerDiameter));
+		}
+		for (wall in p.panels.members.filter(member -> member.panel.id=="east" || member.panel.id=="west")) {
+			if (wall.panel.id=="east" && right<b.x+b.width+t-1e-7
+				|| wall.panel.id=="west" && left>b.x-t+1e-7) continue;
+			var outline=materia.casting.CastingProfileGeometry.bounds(PanelContours.outside(wall.panel));
+			var top=F.transformPoint(wall.pose,0,outline.y+outline.height,0).z,gap=face.z-top;
+			if (gap< -1e-7) throw "Insert carrier intersects wall top: "+insertId+"/"+wall.panel.id;
+			if (gap>1e-7) {
+				var padId=materia.tooling.ToolingIds.derive("",id,"-"+wall.panel.id+"-pad");
+				p.formers.push({volume:{id:padId,material:FormerStock,cuts:[],regions:[],profiles:[],pieces:[{
+					x:wall.panel.id=="east" ? b.x+b.width : b.x-t,y:y,z:top,width:t,depth:width,height:gap
+				}]},featureIds:[],withdrawal:{x:0,y:0,z:1},draftDegrees:0});
+			}
+		}
+		placed.panel=PanelCodec.copy(placed.panel);
+		p.supportPanels.push(placed);
+		return placed;
+	}
+
 	public static function sharedBridges(b:MoldBox, r:ToolingRecipe, cores:Array<materia.tooling.casting.CastingMoldPlan.CastingMoldCore>,
-			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>):Void {
+			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>,
+			raised:MoldPanels.RaisedWalls=MoldPanels.RaisedWalls.EastWest):Void {
 		cores=cores.filter(core -> core.support.kind==Bridge);
 		if (cores.length == 0)
 			return;
+		if (raised==MoldPanels.RaisedWalls.NorthSouth) {
+			// Reuse one bridge construction in a rotated frame: the rails
+			// always seat on the raised pair of walls, including their ends.
+			var frame=F.fromRotationMatrix(0,0,0,[0,-1,0,1,0,0,0,0,1]),inverse=F.inverse(frame);
+			var localBox:CastingMoldPlan.MoldBox={x:b.y,y:-b.x-b.width,z:b.z,width:b.depth,depth:b.width,height:b.height};
+			var localCores:Array<CastingMoldCore>=[for (core in cores) {
+				id:core.id,featureId:core.featureId,cavity:MoldRegions.moved(core.cavity,inverse),
+				foamEnvelope:MoldRegions.moved(core.foamEnvelope,inverse),layers:[for (layer in core.layers) {
+					solid:layer.solid,block:layer.block,stockToMold:F.compose(inverse,layer.stockToMold),
+					wireDirection:layer.wireDirection,entryFace:layer.entryFace,exitFace:layer.exitFace
+				}],
+				coveringThickness:core.coveringThickness,support:core.support
+			}];
+			var localPanels:Array<PanelPlacement>=[],localHardware:Array<SupportHardware>=[];
+			sharedBridges(localBox,r,localCores,localPanels,localHardware);
+			for (panel in localPanels) {
+				for (operation in panel.panel.operations) if (operation.id=="wall-top-socket") {
+					// North/south walls include both corner laps, unlike the
+					// east/west walls. Their actual support span includes 2t.
+					var edge=2*r.minimumLigament+r.routerDiameter,pad=r.hardware.padDepth;
+					var right=panel.panel.id=="bridge-right-rail";
+					operation.contour=PanelContours.relievedRectangle(
+						right ? r.panel.measuredThickness/2 : pad+edge-r.panel.measuredThickness/2,
+						(localBox.depth+2*r.panel.measuredThickness+2*edge)/2,
+						r.panel.measuredThickness+r.jointClearance,
+						localBox.depth+2*r.panel.measuredThickness+r.jointClearance,r.routerDiameter/2);
+				}
+				panel.panel=PanelCodec.copy(panel.panel);
+				panel.pose=F.compose(frame,panel.pose);
+				panel.withdrawal=F.transformVector(frame,panel.withdrawal.x,panel.withdrawal.y,panel.withdrawal.z);
+				panels.push(panel);
+			}
+			for (item in localHardware) {item.pose=F.compose(frame,item.pose);hardware.push(item);}
+			return;
+		}
 		var t = r.panel.measuredThickness,
 			l = r.minimumLigament,
 			edge = 2 * l + r.routerDiameter,

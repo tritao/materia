@@ -46,8 +46,42 @@ cad_shape ball_section(cad_vec3 o,double offset,double r,double h,bool half) {
 cad_shape revolve(cad_shape face,cad_vec3 origin,double angle) {
     cad_shape solid=0; ok(cad_shape_revolve(face,origin,{0,0,1},angle,&solid)); return keep(solid);
 }
+
+void transverse_bore_faces() {
+    cad_shape outer=0, inner=0, tube=0;
+    ok(cad_cylinder(5,8,&outer)); keep(outer);
+    ok(cad_cylinder(3,8,&inner)); keep(inner);
+    ok(cad_cut(outer,inner,&tube)); keep(tube);
+    uint32_t faces=0, tested=0;
+    ok(cad_shape_subshape_count(tube,CAD_SHAPE_FACE,&faces));
+    for(uint32_t index=0;index<faces;++index) {
+        cad_shape face=0; ok(cad_shape_subshape_at(tube,CAD_SHAPE_FACE,index,&face)); keep(face);
+        cad_surface_kind kind=CAD_SURFACE_UNKNOWN; ok(cad_face_surface_kind(face,&kind));
+        if(kind!=CAD_SURFACE_CYLINDER) continue;
+        for(int sign:{-1,1}) {
+            cad_shape box=0, clip=0, common=0;
+            ok(cad_box(100,100,200,&box)); keep(box);
+            ok(cad_shape_translate(box,{sign<0 ? -100.0 : 0.0,0,-100},&clip)); keep(clip);
+            ok(cad_common(face,clip,&common)); keep(common);
+            uint32_t quarters=0; ok(cad_shape_subshape_count(common,CAD_SHAPE_FACE,&quarters));
+            check(quarters==1);
+            cad_shape quarter=0; ok(cad_shape_subshape_at(common,CAD_SHAPE_FACE,0,&quarter)); keep(quarter);
+            valid(quarter);
+            cad_bounds bounds{}; ok(cad_shape_bounds(quarter,&bounds));
+            const double expected=20*(bounds.max.y-bounds.min.y)*8;
+            cad_shape fast=0; ok(cad_shape_extrude(quarter,{20,0,0},&fast)); keep(fast); valid(fast);
+            double volume=0; ok(cad_shape_volume(fast,&volume)); near(volume,expected);
+            cad_operation operation=0; ok(cad_shape_extrude_operation(quarter,{20,0,0},&operation));
+            cad_shape result=0; ok(cad_operation_result_shape(operation,&result)); keep(result); valid(result);
+            ok(cad_shape_volume(result,&volume)); near(volume,expected);
+            cad_operation_destroy(operation); valid(quarter); ++tested;
+        }
+    }
+    check(tested==4);
+}
 }
 int main() {
+    transverse_bore_faces();
     cad_vec3 points[]={{-40,-25,0},{40,-25,0},{40,25,0},{-40,25,0}};
     cad_shape outer=0; ok(cad_polyline(points,4,1,&outer)); keep(outer);
     cad_shape_ref holes[4]; int i=0;

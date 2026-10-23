@@ -8,6 +8,7 @@ import machinekit.structural.MineralFoundation;
 import machinekit.component.ComponentValues;
 
 /** The shell bounds size stock; exact source body and filler regions size resin. */
+@:access(materia.tooling.casting.CastingMoldPlanner)
 class EnvelopeMoldTests {
 	static var assertions=0;
 	static function check(value:Bool,message:String):Void {
@@ -106,10 +107,38 @@ class EnvelopeMoldTests {
 			"Collar has a real swept removal path");
 	}
 
+	static function bandedFillers():Void {
+		var values=new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",120)
+			.setNumber("footWidth",160).setNumber("footHeight",40).setNumber("footShoulder",15);
+		var foundation=new MineralFoundation(values,[]),document=SinglePocketSetup.document();
+		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"banded-shell",1);
+		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
+		document.setup.sourceToMold=F.fromRotationMatrix(0,0,40,[1,0,0,0,0,-1,0,1,0]);
+		document.setup.features=[];document.setup.fillHeightMm=80;
+		var plan=CastingMoldCad.plan(document,options());
+		var outside=materia.casting.CastingRegion.Union([for (former in plan.formers)
+			materia.tooling.casting.MoldRegions.tooling(former.volume)]);
+		var interrupted=materia.casting.CastingRegion.Difference(outside,[materia.tooling.casting.MoldRegions.box(
+			{x:-80,y:-90,z:20,width:20,depth:20,height:10})]);
+		for (axis in [{x:1.0,y:0.0,z:0.0},{x:0.0,y:1.0,z:0.0},{x:0.0,y:0.0,z:1.0}])
+			check(CastingMoldPlanner.geometry.prismaticSection(interrupted,axis,1e-5,"banded-shell")==null,
+				"Interrupted complement genuinely needs more than one global prism");
+		plan.formers=[];
+		CastingMoldPlanner.addEnvelopeFormers(plan,interrupted);
+		check(plan.formers.length>2,"Exact band islands become independent physical fillers");
+		var target=machinekit.structural.CastingRegionCad.part(interrupted);
+		var rebuilt=machinekit.structural.CastingRegionCad.part(materia.casting.CastingRegion.Union(
+			[for (former in plan.formers) materia.tooling.casting.MoldRegions.tooling(former.volume)]));
+		var missing=target.subtractAll([rebuilt]),excess=rebuilt.subtractAll([target]);
+		check(missing.volume()+excess.volume()<1e-5,"Banded complement reconstruction has zero symmetric difference");
+		missing.close();excess.close();target.close();rebuilt.close();
+	}
+
 	static function main():Void {
 		fixture(true);
 		fixture(false);
 		stepped();
+		bandedFillers();
 		Sys.println('EnvelopeMoldTests: $assertions assertions passed');
 	}
 }

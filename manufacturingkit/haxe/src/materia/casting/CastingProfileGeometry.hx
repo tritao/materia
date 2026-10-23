@@ -317,6 +317,13 @@ class CastingProfileGeometry {
 			if (!inside(p, s.start.x, s.start.y))
 				return false;
 		for (s in p) {
+			// A straight boundary coincident with a rectangle side cannot
+			// enter its interior. Endpoint intersections with its adjacent
+			// sides are contact, not a transverse boundary crossing.
+			if (s.center==null && (
+				Math.abs(s.start.y-s.end.y)<=TOL && (Math.abs(s.start.y-y)<=TOL || Math.abs(s.start.y-y-h)<=TOL)
+				|| Math.abs(s.start.x-s.end.x)<=TOL && (Math.abs(s.start.x-x)<=TOL || Math.abs(s.start.x-x-w)<=TOL)))
+				continue;
 			for (v in extrema(s))
 				if (v.x > x + TOL && v.x < x + w - TOL && v.y > y + TOL && v.y < y + h - TOL)
 					return false;

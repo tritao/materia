@@ -637,15 +637,18 @@ class CastingMoldCad {
 					var v = fixtures[0].assemblyClearance;
 					member.direction = new Vector(v.x, v.y, v.z);
 				}
-				if (p.hardware.filter(h -> h.id == member.id
-					&& (h.kind == SupportHardwareKind.FixturePin || (h.kind == SupportHardwareKind.BoreMask && !threadedMask(p, h))))
-					.length == 1)
-					member.direction = new Vector(0, 0, p.hardware.filter(h -> h.id == member.id)[0].kind == SupportHardwareKind.FixturePin ? -1 : 1);
+				if (p.hardware.filter(h -> h.id==member.id && h.kind==SupportHardwareKind.FixturePin).length==1)
+					member.direction=new Vector(0,0,-1);
+				if (p.hardware.filter(h -> h.id==member.id && h.kind==SupportHardwareKind.BoreMask && !threadedMask(p,h)).length==1) {
+					var direction=boreMaskRecord(p,member.id).protection.withdrawal;
+					member.direction=new Vector(direction.x,direction.y,direction.z);
+				}
 			}
 			// Before casting, bed-facing tooling can approach downward from the open
 			// fill side. After cure those same pieces leave below the released bed.
 			for (m in members)
-				if (m.direction.z < -0.9 && p.hardware.filter(h -> h.id == m.id && h.kind == SupportHardwareKind.FixturePin).length == 0)
+				if (m.direction.z < -0.9 && p.hardware.filter(h -> h.id == m.id
+					&& (h.kind == SupportHardwareKind.FixturePin || h.kind==SupportHardwareKind.BoreMask)).length == 0)
 					m.direction = new Vector(0, 0, 1);
 			var assemblyMotions = [
 				for (m in members)

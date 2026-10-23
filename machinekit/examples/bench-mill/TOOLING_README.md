@@ -140,6 +140,29 @@ mold is not a structural or process qualification. Phase 5 adds the fabrication
 review and load/access checks below; phase 9 supplies physical evidence.
 
 
+## Column review (phase 8)
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.column-tooling.json
+./app/run-built.sh --project="$PWD/machinekit/examples/bench-mill/build/tooling/column/mold.mtrg" --perspective
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.column-tooling.json -- --fabrication --checks
+```
+
+`MillColumnMoldSetup` copies the actual `frame.column`, lays its front on the bed
+and fills toward its rear. The shared planner constructs exact flared-envelope
+fillers, source-thread datum carriers and bed/side EPS access. The preview checks
+source reconstruction and both continuous swept blocking graphs. Side-facing
+bore masks follow their source-hole axes during assembly. The fabrication entry
+uses the same writer as the base, including comparison with the actual column CAD.
+
+**Not fabrication-ready.** Two flared-envelope fillers currently report
+Unsupported board construction: the rectangular hollow-box interior breaks
+through their diagonal faces. Their finished volumes and withdrawal checks are
+preserved; no rectangular approximation or absent manufacturing check clears
+this finding. Source holes without a usable fixing thread retain their requests.
+Add `--records-only` to omit CAD/sequence verification explicitly; that
+package keeps its geometric review Pending.
+
 ## Fabrication review package (phase 5)
 
 ```sh

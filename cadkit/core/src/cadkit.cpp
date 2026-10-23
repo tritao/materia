@@ -761,6 +761,14 @@ cad_result collect_operation_history(
     const TopoDS_Shape* second,
     OperationData& out_data);
 
+TopoDS_Shape extrusion_source(const TopoDS_Shape& source) {
+    // A face extracted from a solid may inherit REVERSED orientation (a bore
+    // wall, for example). That parent orientation is not a different sweep
+    // region. MakePrism builds invalid side topology for reversed quarter-
+    // cylinder faces; use the same face geometry with a standalone orientation.
+    return source.ShapeType() == TopAbs_FACE ? source.Oriented(TopAbs_FORWARD) : source;
+}
+
 cad_result make_extruded_shape(
     cad_shape handle,
     const gp_Vec& delta,
@@ -778,7 +786,7 @@ cad_result make_extruded_shape(
     const auto& source = named.shape;
 
     try {
-        BRepPrimAPI_MakePrism operation(source, delta, true);
+        BRepPrimAPI_MakePrism operation(extrusion_source(source), delta, true);
         if (operation.Shape().IsNull()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "extrusion produced a null shape");
         }
@@ -850,7 +858,7 @@ cad_result make_extrusion_operation(
     const auto& source = named.shape;
 
     try {
-        BRepPrimAPI_MakePrism operation(source, delta, true);
+        BRepPrimAPI_MakePrism operation(extrusion_source(source), delta, true);
         if (operation.Shape().IsNull()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "extrusion produced a null shape");
         }

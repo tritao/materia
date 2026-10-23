@@ -66,7 +66,8 @@ class DraftGeometryTests {
 				var oblique=machinekit.tooling.SweptRemoval.sweep(rounded,new Vector(100,0,100));
 				oblique.close();
 			} catch (error:Dynamic) failure=Std.string(error);
-			check(failure=="Unsupported removal boundary surface","unimplemented oblique cone sweeps remain explicit");
+			check(failure.indexOf("Boundary face ")==0 && failure.indexOf("Unsupported removal boundary surface")>0,
+				"unimplemented oblique cone sweeps remain explicit: "+failure);
 			return rounded;
 		}).close();
 		Scope.run(scope -> {
