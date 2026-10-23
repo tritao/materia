@@ -113,7 +113,7 @@ class MillMoldSetup {
 				routerDiameter: 6,
 				minimumLigament: 2,
 				resinSpec: "pending binder",
-				releaseSpec: "pending release and seam system",
+				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
 				adhesiveSpec: "pending EPS compatible adhesive",
 				processEvidence: [],
 				designReview: {

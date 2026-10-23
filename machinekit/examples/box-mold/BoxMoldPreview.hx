@@ -116,6 +116,7 @@ class BoxMoldPreview {
 		var casting = BoxMoldCad.reconstructed(p);
 		casting.shape.exportStep(dir + "/reconstructed-casting.step");
 		casting.close();
+		machinekit.tooling.ToolingReleaseExport.write(p,machinekit.tooling.FormerShopExport.build(p),dir);
 		var assembled = BoxMoldCad.assembly(p),
 			saved = assembled.encode();
 		MachineAssembly.decode(saved).validate();
@@ -127,9 +128,9 @@ class BoxMoldPreview {
 		sys.io.File.saveContent(dir
 			+ "/procedure.md",
 			"# Box mold geometry review\n\nREVIEW ONLY. Physical qualification remains pending.\n\n"
-			+ "1. Measure stock and generate a fit coupon before manufacture. Seal cut edges and seams using the selected process.\n"
+			+ "1. Measure stock and generate a fit coupon before manufacture. Follow release-system.md: seal exposed board faces, cure, apply the declared wax/PVA sequence and dry before any insert is fitted.\n"
 			+
-			"2. Locate the insert independently against qualified datums; bolt through the bed with sealing washer/contact seal and plug the resin-facing bore end and protect unused threads. Nominal M6 hardware is a study envelope; thread engagement and finishing stock require confirmation.\n"
+			"2. Keep insert bonding faces clean and uncoated. Locate the insert against qualified datums; clamp through clearance-only bed/support holes into its declared source steel thread. Use the planned engagement and end protection, and protect unused holes.\n"
 			+ "3. Prebond suspended EPS to its bridge/carrier before installation when used. Panel/core/insert installation order from continuous sweeps: "
 			+ report.assembly.assemblyOrder.join(" -> ")
 			+

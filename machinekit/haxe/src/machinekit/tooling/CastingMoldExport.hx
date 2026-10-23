@@ -108,7 +108,7 @@ class CastingMoldExport {
 			"# Casting mold review — "
 			+ p.document.input.id
 			+ "\n\nREVIEW ONLY. Not approved for fabrication.\n\n"
-			+ "1. Qualify stock, EPS, adhesive/covering/release compatibility, compaction, closure and brace loads before pouring.\n"
+			+ "1. Prepare all tooling with the recipe release system before fitting any steel insert: seal exposed board faces, cure, coat, buff and dry, then optional PVA and drying. Keep insert and anchor bonding faces uncoated and mask adjacent contacts. Qualify stock, EPS, adhesive/covering/release compatibility, compaction, closure and brace loads before pouring.\n"
 			+
 			"2. Resolve all blocking validation records and design-change requests, including tooling fixture qualification, precision allowances and lifting/flip points. Datum fixtures place inserts nominally; they do not establish final precision.\n"
 			+

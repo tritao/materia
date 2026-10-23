@@ -261,6 +261,9 @@ class ToolingFabricationExport {
 		var formerShop=formerReport==null ? FormerShopExport.build(p) : formerReport;
 		FormerShopExport.applyValidation(formerShop,f,p);
 		FormerShopExport.write(formerShop,dir);
+		var chemical=f.validation.filter(row -> row.rule=="fabrication.materials.compatibility");
+		if (chemical.length!=1) throw "Missing single-source chemical compatibility check";
+		classificationChecks=classificationChecks.concat(ToolingReleaseExport.write(p,formerShop,dir,chemical[0]));
 		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir));
 		var sectionReview=ToolingSectionReview.build(p);
 		for (entry in sectionReview.sheets) drawing(dir,ToolingSectionReview.filename(entry.id),entry.sheet.drawing);

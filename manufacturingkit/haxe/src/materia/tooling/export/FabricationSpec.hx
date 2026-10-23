@@ -70,6 +70,8 @@ typedef FabricationSpec = {
 	var mixBearingStressMPa:Null<Float>;
 	var mixTensileStrengthMPa:Null<Float>;
 
+	/** Passing physical resin/EPS/adhesive/release coupon-trial references.
+	 * Product declarations or datasheets alone are not compatibility evidence. */
 	var compatibilityEvidence:Array<String>;
 	var gravityMps2:Float;
 	var loadFactor:Float;

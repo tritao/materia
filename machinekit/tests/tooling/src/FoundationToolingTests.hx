@@ -397,7 +397,7 @@ class FoundationToolingTests {
 				routerDiameter: 6,
 				minimumLigament: 15,
 				resinSpec: "unselected",
-				releaseSpec: "unselected",
+				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
 				adhesiveSpec: "unselected",
 				processEvidence: [],
 				designReview: {

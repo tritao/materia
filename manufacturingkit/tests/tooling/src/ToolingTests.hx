@@ -419,7 +419,7 @@ class ToolingTests {
 			routerDiameter: 6,
 			minimumLigament: 15,
 			resinSpec: "binder unselected",
-			releaseSpec: "covering unselected",
+			releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
 			adhesiveSpec: "adhesive unselected",
 			processEvidence: [],
 			designReview: {
@@ -506,8 +506,25 @@ class ToolingTests {
 				}
 	}
 
+	static function releaseContract():Void {
+		var source=fixture(),restored=ToolingCodec.decode(ToolingCodec.encode(source));
+		check(restored.recipe.releaseSystem.sealer.coats==2 && restored.recipe.releaseSystem.agent.coats==5,
+			"The complete source codec stores the declared release coat counts");
+		check(switch restored.recipe.releaseSystem.agent.drySeconds {
+			case Unresolved(reason):reason.indexOf("product timing")>=0;default:false;
+		},"Manufacturer timing remains an explicit unresolved source input after JSON roundtrip");
+		var before=ToolingCodec.recipeFingerprint(source.recipe);
+		restored.recipe.releaseSystem.agent.coats++;
+		check(ToolingCodec.recipeFingerprint(restored.recipe)!=before,"Release process changes enter the recipe fingerprint");
+		var raw:Dynamic=ToolingCodec.documentRecord(source);
+		Reflect.deleteField(raw.recipe,"releaseSystem");
+		Reflect.setField(raw.recipe,"releaseSpec","legacy placeholder");
+		rejects(() -> ToolingCodec.snapshot(raw),"Unknown recipe field: releaseSpec");
+	}
+
 	public static function main():Void {
 		vocabularyRoundTrips();
+		releaseContract();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
 		routedSocketFaces();
@@ -759,6 +776,8 @@ class ToolingTests {
 		check(ToolingReview.inspect(reusable).filter(d -> d.ruleId == "tooling.process" && d.status == "pending").length == 1,
 			"evidence references alone never qualify process");
 		Sys.println('ToolingTests: $assertions assertions passed');
+		ReleaseSystemTests.run();
+		ReleasePlanTests.run();
 		PanelTests.run();
 		BoxPlannerTests.run(fixture());
 		CastingMoldTests.run(fixture());

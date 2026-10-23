@@ -62,6 +62,9 @@ class HobberSocketFixture {
 			check(PanelCodec.encode(PanelCodec.decode(PanelCodec.encode(member.panel))) == PanelCodec.encode(member.panel),"Panel record roundtrip");
 		var assembly = SocketFixtureCad.assembly(plan,true), parts = assembly.components(), poses = assembly.solvedPoses();
 		check(assembly.validate().length == 0,"Fixture assembly validates");
+		var releaseChecks=machinekit.tooling.ToolingReleaseExport.writeAssembly(document,assembly,out);
+		check(releaseChecks.filter(row -> row.status=="fail").length==0,"Socket mold release derives complete coverage without coating its steel sockets");
+		validation=validation.concat(releaseChecks);
 		check(MachineAssembly.decode(assembly.encode()).components().length == parts.length,"Fixture assembly recipes roundtrip");
 		var removal = SocketFixtureCad.check(plan), cavity = SocketFixtureCad.cavity(plan);
 		check(removal.removal.removalOrder.length == parts.length-plan.document.input.inserts.length-1,

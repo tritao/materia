@@ -50,7 +50,7 @@ class HobberSocketFixtureSetup {
 					fixturePinSpacing:80,fixtureSlotToolDiameter:6},
 				coreWireAxis:Y,adhesiveLineThickness:0.2,mixDensityKgM3:2400,steelDensityKgM3:7850,handlingLoadFactor:1.5,
 				linerThickness:0,routerDiameter:6,minimumLigament:6,resinSpec:"binder selection pending",
-				releaseSpec:"mouth seal and mold release pending",adhesiveSpec:"no EPS adhesive in coupon",processEvidence:[],
+				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),adhesiveSpec:"no EPS adhesive in coupon",processEvidence:[],
 				designReview:{minimumCornerRadiusMm:null,minimumInsertCoverMm:null,minimumInsertEdgeMm:null,
 					minimumFixingAccessMm:null,minimumLiftingPoints:null,removalClearanceMm:null}
 			}

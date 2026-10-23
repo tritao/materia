@@ -107,7 +107,7 @@ class SinglePocketSetup {
 				routerDiameter: 6,
 				minimumLigament: 2,
 				resinSpec: "pending resin selection",
-				releaseSpec: "pending nonbonding seal and covering",
+				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
 				adhesiveSpec: "pending EPS compatible adhesive",
 				processEvidence: [],
 				designReview: {

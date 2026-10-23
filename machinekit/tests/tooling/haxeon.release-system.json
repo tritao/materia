@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-release-tests"
+  },
+  "entry": "ToolingReleaseTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/release-system",
+  "sources": [
+    "src/ToolingReleaseTests.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx"
+  ]
+}

@@ -67,7 +67,7 @@ typedef ToolingRecipe = {
 	var routerDiameter:Float;
 	var minimumLigament:Float;
 	var resinSpec:String;
-	var releaseSpec:String;
+	var releaseSystem:materia.tooling.ReleaseSystem;
 	var adhesiveSpec:String;
 	var processEvidence:Array<String>;
 }

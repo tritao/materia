@@ -45,7 +45,8 @@ typedef FormerShopReport = {
 	var version:Int;
 	var sourceFingerprint:String;
 	var sealSpec:String;
-	var releaseSpec:String;
+	/** Raw declared process; wetted-face assignment is delivered separately. */
+	var releaseSystem:Dynamic;
 	var formers:Array<FormerShopItem>;
 	var validation:Array<ToolingValidation>;
 	var pocketScrews:Array<{formerId:String,jointId:String,fixedBoard:String,movingBoard:String,
@@ -59,9 +60,9 @@ class FormerShopExport {
 	public static function build(plan:CastingMoldPlan):FormerShopReport {
 		if (materia.tooling.casting.CastingMoldPlanner.geometry==null)
 			materia.tooling.casting.CastingMoldPlanner.setGeometry(new NativeCastingMoldKernel());
-		var report:FormerShopReport={format:"materia.tooling.former-manufacturing",version:1,
+		var report:FormerShopReport={format:"materia.tooling.former-manufacturing",version:2,
 			sourceFingerprint:materia.tooling.casting.CastingMoldPlanner.fingerprint(plan),sealSpec:plan.document.recipe.hardware.sealMaterial,
-			releaseSpec:plan.document.recipe.releaseSpec,formers:[],validation:[],pocketScrews:[]};
+			releaseSystem:materia.tooling.ReleaseSystem.ReleaseSystems.record(plan.document.recipe.releaseSystem),formers:[],validation:[],pocketScrews:[]};
 		var scope=new Scope();
 		try {
 			var source=scope.own(ToolingSourceCasting.fromInput(plan.document.input).geometry());

@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: exact envelope tooling landed; release-system slice, column/hobber fixture integration and complete setups remain.
+- [ ] Phase 8: exact envelope tooling and geometry-derived release preparation landed; column/hobber fixture integration and complete setups remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1396,7 +1396,7 @@ Former corner decision (user, 2026-10-23): the source declares a corner radius o
 
 Corner contact decision (2026-10-23): the remaining three sharp inner loops coincide with temporary datum blocks or proud source steel. Rounding would change those mating contacts, so no source radius is applied there. Their exact disjoint box pieces are separate single-board formers with sealed contact joints; the original rectangular cavity and contact planes remain unchanged. The four deep foot-access tools use EPS, preserving the access flange and the independent datum clearance. No casting geometry correction is needed for these seven findings.
 
-**Release system slice (after the corner and EPS slice, before the rest of phase 8).**
+**Release system slice (complete; before the rest of phase 8).**
 Replace the `pending release and seam system` placeholder with a declared process:
 1. The recipe declares one release system: sealer for exposed board cores, the
    release agent, coat count, buff and drying times, and an optional PVA film.
@@ -1414,6 +1414,8 @@ Replace the `pending release and seam system` placeholder with a declared proces
    until a coupon trial records it. Readiness is unchanged.
 Acceptance: every resin-wetted tooling face is covered exactly once, no bonding
 face is coated, and an EPS-unsafe agent next to EPS fails with its face IDs.
+Release process decision (2026-10-23): examples declare two sealer coats, five wax coats and one optional PVA coat. Product references, manufacturer timing and EPS safety remain typed unresolved workshop inputs. The tape/film thickness is the existing EPS lining allowance; no source geometry or extra allowance is added. Seal exposed board faces first, then apply release only to their resin-wetted portions. Keep dry support/foot adhesive contacts bare and cure those bonds before release. Use the existing fabrication compatibility coupon references as the single chemical-evidence source.
+
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.

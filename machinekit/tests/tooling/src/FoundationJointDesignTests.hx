@@ -60,7 +60,7 @@ class FoundationJointDesignTests {
 	/** One hash-integrity regression covers every listed package artifact. */
 	static function packageIntegrity(directory:String):Void {
 		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
-		check(manifest.version==15,"the package has one strict boundary format");
+		check(manifest.version==16,"the package has one strict boundary format");
 		var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/tooling-section-drawings.json"));
 		var records:Array<Dynamic>=cast report.drawings;
 		var rendered=records.filter(record -> record.validation.status=="pass");

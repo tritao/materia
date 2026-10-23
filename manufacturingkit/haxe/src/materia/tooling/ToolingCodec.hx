@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 21;
+	public static inline var VERSION = 22;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -84,7 +84,7 @@ class ToolingCodec {
 		return Sha256.encode(canonical(inputRecord(copyInput(input))));
 
 	public static function recipeFingerprint(recipe:ToolingRecipe):String
-		return Sha256.encode(canonical(copyRecipe(recipe)));
+		return Sha256.encode(canonical(recipeRecord(copyRecipe(recipe))));
 
 	public static function documentFingerprint(document:ToolingDocument):String
 		return Sha256.encode(encode(document));
@@ -105,7 +105,7 @@ class ToolingCodec {
 	}
 
 	public static function documentRecord(document:ToolingDocument):Dynamic
-		return Json.parse(canonical({input:inputRecord(document.input),setup:document.setup,recipe:document.recipe}));
+		return Json.parse(canonical({input:inputRecord(document.input),setup:document.setup,recipe:recipeRecord(document.recipe)}));
 
 	public static function inputSnapshot(raw:Dynamic):CastingToolingInput return readInput(raw);
 
@@ -418,8 +418,21 @@ class ToolingCodec {
 		};
 	}
 
+	public static function recipeRecord(recipe:ToolingRecipe):Dynamic return {
+		id:recipe.id,revision:recipe.revision,panel:recipe.panel,core:recipe.core,
+		former:recipe.former,featureRules:recipe.featureRules,designReview:recipe.designReview,
+		jointClearance:recipe.jointClearance,jointLiningAllowance:recipe.jointLiningAllowance,
+		jointMachiningAllowance:recipe.jointMachiningAllowance,hardware:recipe.hardware,
+		coreWireAxis:recipe.coreWireAxis,adhesiveLineThickness:recipe.adhesiveLineThickness,
+		mixDensityKgM3:recipe.mixDensityKgM3,steelDensityKgM3:recipe.steelDensityKgM3,
+		handlingLoadFactor:recipe.handlingLoadFactor,linerThickness:recipe.linerThickness,
+		routerDiameter:recipe.routerDiameter,minimumLigament:recipe.minimumLigament,
+		resinSpec:recipe.resinSpec,releaseSystem:materia.tooling.ReleaseSystem.ReleaseSystems.record(recipe.releaseSystem),
+		adhesiveSpec:recipe.adhesiveSpec,processEvidence:recipe.processEvidence
+	};
+
 	public static function copyRecipe(recipe:ToolingRecipe):ToolingRecipe
-		return readRecipe(recipe);
+		return readRecipe(recipeRecord(recipe));
 
 	static function readRecipe(raw:Dynamic):ToolingRecipe {
 		object(raw, [
@@ -442,7 +455,7 @@ class ToolingCodec {
 			"jointMachiningAllowance",
 			"minimumLigament",
 			"resinSpec",
-			"releaseSpec",
+			"releaseSystem",
 			"adhesiveSpec",
 			"processEvidence",
 			"designReview"
@@ -566,7 +579,7 @@ class ToolingCodec {
 			routerDiameter: positive(raw, "routerDiameter"),
 			minimumLigament: positive(raw, "minimumLigament"),
 			resinSpec: string(raw, "resinSpec"),
-			releaseSpec: string(raw, "releaseSpec"),
+			releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.snapshot(Reflect.field(raw,"releaseSystem")),
 			adhesiveSpec: string(raw, "adhesiveSpec"),
 			processEvidence: evidence(raw, "processEvidence"),
 			designReview: {

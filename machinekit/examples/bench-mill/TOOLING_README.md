@@ -382,6 +382,25 @@ The base has 52 anchors and the column 54. The focused native run measured 92.1 
 The anchor-revision baseline has zero trapped pockets (previously 74), with the fill check unchanged. Its 265 artifacts include 40 panel review programs; validation was 626 Pass, 568 Pending, 119 Unsupported and 0 Fail. Fabrication readiness remains false: the recorded material strengths, workshop inputs and physical evidence are still unresolved.
 
 
+## Release and sealing
+
+The recipe declares two sealer coats, five wax coats and one optional PVA coat.
+Actual product references, manufacturer timing and EPS safety remain explicit
+unresolved workshop inputs. `release-system.json` derives wetted faces from CAD
+contact with the resin; its face IDs also identify exposed board surfaces for
+sealing and protected insert/anchor steel. Adjacent bonding faces are masked.
+
+Follow `release-operations.csv` and `release-system.md`: seal, dry/cure, cover the
+wetted EPS portions, wax/dry/buff, then PVA/drying before mold installation.
+Keep dry support/foot bond contacts bare and cure those bonds before release.
+The EPS tape/film uses the existing lining thickness; no extra geometry allowance
+is added. An EPS-unsafe agent fails with the actual affected face IDs.
+
+All preparation precedes fitting source steel. Never coat insert or anchor
+bonding faces. The existing fabrication `compatibilityEvidence` field holds
+passing physical resin/EPS/adhesive/release coupon references; product declarations
+alone do not qualify the system. Readiness remains false.
+
 ## Former board construction and CAM
 
 The recipe selects sacrificial EPS for a body-open pocket whose smallest blank
@@ -430,3 +449,10 @@ with **767 Pass / 615 Pending / 116 Unsupported / 0 Fail** and zero traps. All
 machining checks and 32 restraint checks for the separate parts; release
 qualification remains Pending. Removing the four hollow bodies removes their
 20 unsupported wall-model checks. Fabrication readiness remains false.
+
+The release-system revision has 563 artifacts and the same 88 programs, with
+**770 Pass / 620 Pending / 116 Unsupported / 0 Fail** and zero traps. The three additional Pass records cover release
+coverage, protected bonding faces and preparation before assembly. Five Pending
+records cover EPS safety and the four product/timing inputs; chemical coupon
+evidence remains in the existing compatibility check. All 475 prior CAD, drawing
+and CAM artifacts across the base, box and socket kits remain unchanged.
