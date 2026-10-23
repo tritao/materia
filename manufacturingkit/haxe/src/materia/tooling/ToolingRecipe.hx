@@ -12,7 +12,22 @@ enum abstract CoreWireAxis(String) to String {
 	var Z = "z";
 }
 
+/** Coplanar steel can use the real shell face; raised faces still need datums. */
+enum abstract FixtureReceiver(String) to String {
+	var IndependentDatums = "independent-datums";
+	var PanelWhenCoplanar = "panel-when-coplanar";
+}
+
+class FixtureReceivers {
+	public static function decode(token:String):FixtureReceiver return switch token {
+		case "independent-datums":FixtureReceiver.IndependentDatums;
+		case "panel-when-coplanar":FixtureReceiver.PanelWhenCoplanar;
+		default:throw "Unknown fixture receiver: "+token;
+	};
+}
+
 typedef ToolingHardware = {
+	var fixtureReceiver:FixtureReceiver;
 	var plugDepth:Float;
 	var plugMaterial:String;
 	var sealMargin:Float;

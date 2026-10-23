@@ -47,6 +47,7 @@ class HobberSocketFixtureSetup {
 					minimumBridgeWidth:80,locatingPinDiameter:6,supportScrewDiameter:6,supportClearanceDiameter:7,
 					secondaryPinTravel:2,padDepth:54,labelOffset:8,datumThickness:8,datumPostWidth:20,
 					formerFlangeThickness:12,formerFlangeMargin:10,fixturePinDiameter:6,fixturePinEmbed:3,
+					fixtureReceiver:materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
 					fixturePinSpacing:80,fixtureSlotToolDiameter:6},
 				coreWireAxis:Y,adhesiveLineThickness:0.2,mixDensityKgM3:2400,steelDensityKgM3:7850,handlingLoadFactor:1.5,
 				linerThickness:0,routerDiameter:6,minimumLigament:6,resinSpec:"binder selection pending",

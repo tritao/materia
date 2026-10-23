@@ -3,7 +3,6 @@ package machinekit.tooling;
 import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.tooling.casting.MoldCores;
 import machinekit.tooling.InsertAnchorGeometry;
-import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import materia.tooling.ToolingCodec;
 import materia.tooling.export.ToolingFabrication;
@@ -520,7 +519,12 @@ class ToolingFabricationExport {
 			]
 		];
 		for (i in p.document.input.inserts) {
-			var dimensions = InsertBodies.box(i.body, i.id);
+			// Stock/listing dimensions only. The delivered source and native CAD
+			// retain the full round/catalogue body instead of this local bound.
+			var region=materia.casting.CastingRegion.Placed({
+				solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(i.body),
+				pose:materia.assembly.AssemblyFrames.identity()});
+			var dimensions=materia.tooling.casting.MoldRegions.exactBounds(region,i.id);
 			insertRows.push([
 				i.id,
 				(i.role : String),

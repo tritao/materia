@@ -34,6 +34,17 @@ class MoldRegions {
 		return moved(materia.casting.CastingCavities.region(found[0]),document.setup.sourceToMold);
 	}
 
+	/** Full source steel envelope, including protected bores during the pour.
+	 * Stock bounds never replace cylindrical or catalogue retention geometry.
+	 */
+	public static function insert(document:materia.tooling.ToolingDocument,id:String):CastingRegion {
+		var matches=document.input.inserts.filter(insert -> insert.id==id);
+		if (matches.length!=1) throw "Expected one source insert: "+id;
+		var source=matches[0];
+		return Placed({solid:Insert(materia.casting.InsertSpec.InsertBodyCodec.copy(source.body)),
+			pose:F.compose(document.setup.sourceToMold,source.pose)});
+	}
+
 	public static function envelope(document:materia.tooling.ToolingDocument):CastingRegion
 		return moved(materia.casting.CastingCavities.envelopeRegion(document.input.envelope),document.setup.sourceToMold);
 

@@ -430,7 +430,8 @@ class ToolingTests {
 				formerFlangeMargin: 10,
 				fixturePinDiameter: 3,
 				fixturePinEmbed: 3,
-				fixturePinSpacing: 8,
+				fixtureReceiver:materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
+					fixturePinSpacing: 8,
 				fixtureSlotToolDiameter: 3
 			},
 			jointClearance: 0.3,
@@ -541,7 +542,45 @@ class ToolingTests {
 		rejects(() -> ToolingCodec.snapshot(raw),"Unknown recipe field: releaseSpec");
 	}
 
+	static function fixtureReceiverContract():Void {
+		var source=fixture(),before=ToolingCodec.recipeFingerprint(source.recipe);
+		for (choice in [materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
+			materia.tooling.ToolingRecipe.FixtureReceiver.PanelWhenCoplanar]) {
+			source.recipe.hardware.fixtureReceiver=choice;
+			var restored=ToolingCodec.decode(ToolingCodec.encode(source));
+			check(restored.recipe.hardware.fixtureReceiver==choice,"Fixture receiver choices survive the source boundary");
+		}
+		check(ToolingCodec.recipeFingerprint(source.recipe)!=before,"Fixture receiver selection enters the recipe fingerprint");
+		var raw:Dynamic=ToolingCodec.documentRecord(source);
+		raw.recipe.hardware.fixtureReceiver="unknown";
+		rejects(() -> ToolingCodec.snapshot(raw),"Unknown fixture receiver");
+		Reflect.deleteField(raw.recipe.hardware,"fixtureReceiver");
+		rejects(() -> ToolingCodec.snapshot(raw),"fixtureReceiver");
+	}
+
+	static function insertEnvelopeRecords():Void {
+		var document=fixture(),source=document.input.inserts[0];
+		source.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Cylinder(40,20));
+		var before=ToolingCodec.canonical(source);
+		var region=materia.tooling.casting.MoldRegions.insert(document,source.id);
+		check(materia.tooling.casting.MoldRegions.boxes(region)==null,
+			"Round steel envelopes never become rectangular material");
+		switch region {
+			case Placed(geometry):
+				check(ToolingCodec.canonical(geometry.pose)==ToolingCodec.canonical(F.compose(document.setup.sourceToMold,source.pose)),
+					"Insert envelope placement composes the source and mold frames");
+				check(ToolingCodec.canonical(geometry.solid)==ToolingCodec.canonical(
+					materia.casting.CastingFeature.CastingGeometrySolid.Insert(source.body)),
+					"Insert envelope retains the exact body variant");
+			default:throw "Insert envelope needs its placed source body";
+		}
+		check(before==ToolingCodec.canonical(source),"Insert envelope queries do not mutate source records");
+		rejects(() -> materia.tooling.casting.MoldRegions.insert(document,"absent"),"Expected one source insert");
+	}
+
 	public static function main():Void {
+		fixtureReceiverContract();
+		insertEnvelopeRecords();
 		vocabularyRoundTrips();
 		releaseContract();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}

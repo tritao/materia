@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 22;
+	public static inline var VERSION = 23;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -495,6 +495,7 @@ class ToolingCodec {
 			"fixturePinDiameter",
 			"fixturePinEmbed",
 			"fixturePinSpacing",
+			"fixtureReceiver",
 			"fixtureSlotToolDiameter"
 		], "tooling hardware");
 		var hardware:materia.tooling.ToolingRecipe.ToolingHardware = {
@@ -516,6 +517,7 @@ class ToolingCodec {
 			fixturePinDiameter: positive(hw, "fixturePinDiameter"),
 			fixturePinEmbed: positive(hw, "fixturePinEmbed"),
 			fixturePinSpacing: positive(hw, "fixturePinSpacing"),
+			fixtureReceiver: materia.tooling.ToolingRecipe.FixtureReceivers.decode(string(hw,"fixtureReceiver")),
 			fixtureSlotToolDiameter: positive(hw, "fixtureSlotToolDiameter")
 		};
 			if (hardware.supportClearanceDiameter <= hardware.supportScrewDiameter)

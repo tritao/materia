@@ -82,6 +82,12 @@ class CastingMoldPlanner {
 		return MoldRegions.exactBounds(region,document.input.id);
 	}
 
+	/** Layout/stock bounds only; material ownership uses MoldRegions.insert. */
+	public static function insertStockBounds(document:ToolingDocument,id:String):MoldBox {
+		var region=MoldRegions.insert(document,id),boxes=MoldRegions.boxes(region);
+		return boxes!=null && boxes.length==1 ? boxes[0] : MoldRegions.exactBounds(region,id);
+	}
+
 	public static function insertBox(document:ToolingDocument,id:String):MoldBox {
 		var matches=document.input.inserts.filter(insert -> insert.id==id);
 		if (matches.length!=1) throw "Expected one source insert: "+id;
@@ -141,11 +147,8 @@ class CastingMoldPlanner {
 		if (geometry==null) return false;
 		var strategies=CastingStrategies.resolve(d);
 		shellBounds(d);
-		for (insert in d.input.inserts) switch insert.body {
-			case Primitive(materia.casting.CastingSolid.Box(_,_,_)):
-			default:return false;
-		}
 		for (feature in d.input.features) {
+			if (feature.kind==CastingFeatureKind.InsertRecess) continue;
 			if (feature.draft.degrees>0 && materia.casting.CastingDraftSections.unsupportedReason(d.input.envelope,feature)!=null)
 				return false;
 			var region=MoldRegions.feature(d,feature.id);
@@ -163,7 +166,9 @@ class CastingMoldPlanner {
 
 	static function requiresRegions(d:ToolingDocument):Bool {
 		var body=MoldRegions.boxes(MoldRegions.envelope(d));
-		return body==null || body.length!=1 || materia.casting.CastingCavities.derive(d.input.envelope,d.input.features)
+		return body==null || body.length!=1
+			|| d.input.inserts.filter(insert -> MoldRegions.boxes(MoldRegions.insert(d,insert.id))==null).length>0
+			|| materia.casting.CastingCavities.derive(d.input.envelope,d.input.features)
 			.filter(cavity -> !materia.casting.CastingCavities.supportsBoxes(cavity)).length>0;
 	}
 
@@ -304,10 +309,9 @@ class CastingMoldPlanner {
 		var sideEPS=new Map<String,Bool>(),epsVolumes=new Map<String,String>();
 		var bodies = new Map<String, MoldBox>(), low = e.z,raisedWalls=RaisedWalls.EastWest;
 		for (i in d.input.inserts) {
-			var dimensions = InsertBodies.box(i.body, i.id);
 			var pose=F.compose(d.setup.sourceToMold,i.pose);
-			var b = CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height,pose);
-			var face=F.compose(pose,F.translation(0,0,dimensions.height)),normal=F.transformVector(face,0,0,1);
+			var b=insertStockBounds(d,i.id);
+			var face=F.compose(pose,F.translation(0,0,InsertBodies.height(i.body))),normal=F.transformVector(face,0,0,1);
 			// Dry cross-carriers span X. Keep their supporting side walls at
 			// the fill rim when source steel sits below the raised-wall lap.
 			if (normal.z>1-1e-8 && face.z>=e.z+e.height+l-1e-7 && face.z<e.z+e.height+t/2)
@@ -330,11 +334,10 @@ class CastingMoldPlanner {
 				.concat(FoundationJointQualification.analyze(d.input,o.foundationJointProcesses)),raisedWalls),panels=result.panels,bed=panels.members[0];
 		var epsBoxes:Array<MoldBox> = [], insertBoxes:Array<MoldBox> = [];
 		var epsRegions:Array<materia.casting.CastingRegion> = [];
-		for (i in d.input.inserts) {
-			var ib = bodies.get(i.id);
-			if (ib == null)
-				throw "Missing insert body";
-			insertBoxes.push(ib);
+		var insertRegions=[for (insert in d.input.inserts) MoldRegions.insert(d,insert.id)];
+		for (region in insertRegions) {
+			var boxes=MoldRegions.boxes(region);
+			if (boxes!=null) insertBoxes=insertBoxes.concat(boxes);
 		}
 		for (f in d.input.features)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
@@ -354,7 +357,7 @@ class CastingMoldPlanner {
 							sideEPS.set(f.id,true);
 							continue;
 						}
-						for (reserved in [for (box in insertBoxes) MoldRegions.box(box)].concat(epsRegions))
+						for (reserved in insertRegions.concat(epsRegions))
 							if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
 								throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
 						var cores=MoldCoreLayers.build(cavity,f.id,r);
@@ -372,6 +375,9 @@ class CastingMoldPlanner {
 						sideEPS.set(f.id,true);
 						continue;
 					}
+					if (exactRegions) for (reserved in insertRegions.concat(epsRegions))
+						if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
+							throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
 					if (BoxAlgebra.volume(BoxAlgebra.subtract([cb], insertBoxes.concat(epsBoxes))) < CastingMoldPlanner.volume(cb) - 1e-5)
 						throw "Intersecting EPS/insert cavities need an explicit allocation";
 					var core=MoldCoreLayers.box(cb,f.id,r,CoreSupportKind.Bridge),id=core.id;
@@ -393,15 +399,18 @@ class CastingMoldPlanner {
 		var ordered = ownershipOrder(d.input.features, strategies);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
 		for (i in d.input.inserts) {
-			var dimensions = InsertBodies.box(i.body, i.id);
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
-				face = F.compose(pose, F.translation(0, 0, dimensions.height)),
+				face = F.compose(pose, F.translation(0, 0, InsertBodies.height(i.body))),
 				normal = F.transformVector(face, 0, 0, 1),
 				body = bodies.get(i.id);
 			if (body == null)
 				throw "Missing insert body";
-			if (normal.z > -1 + 1e-8) {
-				var receiver=DatumFixtures.panelOnFace(result.panels.members.concat(result.supportPanels),face);
+			// A source mounting face already seated on a panel fixes through that
+			// panel, as in the single-pocket case. Separate datums bridge a gap.
+			var direct=r.hardware.fixtureReceiver==materia.tooling.ToolingRecipe.FixtureReceiver.PanelWhenCoplanar;
+			var receiver=direct || normal.z>-1+1e-8
+				? DatumFixtures.panelOnFace(result.panels.members.concat(result.supportPanels),face) : null;
+			if (receiver!=null || normal.z > -1 + 1e-8) {
 				if (receiver==null && normal.z>1-1e-8)
 					receiver=CoreSupports.insertCarrier(result,i.id,face,body);
 				if (receiver==null)
@@ -532,7 +541,7 @@ class CastingMoldPlanner {
 				fixtures.push(p);
 		var occupied = insertBoxes.concat(epsBoxes).concat(fixtures),
 			previous:Array<MoldBox> = [];
-		var occupiedRegions=[for (box in insertBoxes.concat(fixtures)) MoldRegions.box(box)].concat(epsRegions);
+		var occupiedRegions=insertRegions.concat([for (box in fixtures) MoldRegions.box(box)]).concat(epsRegions);
 		if (!requiresRegions(d)) {
 			var backing = BoxAlgebra.subtract([b], [e].concat(occupied));
 			for (group in BoxAlgebra.groups(backing)) {
@@ -660,7 +669,7 @@ class CastingMoldPlanner {
 					throw "Access former needs an explicit split for its sealing profile: " + f.id;
 				for (index in 0...groups.length) {
 					var remaining=exactRegions ? materia.casting.CastingRegion.Difference(
-						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),epsRegions.concat(previousRegions)) : null;
+						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),occupiedRegions.concat(previousRegions)) : null;
 					if (remaining!=null && MoldRegions.volume(remaining,f.id)<=1e-7) continue;
 					var id = materia.tooling.ToolingIds.derive("former-", f.id, "-" + index);
 					if (sideEPS.exists(f.id)) epsVolumes.set(id,f.id);
@@ -723,7 +732,7 @@ class CastingMoldPlanner {
 					if (volume.pieces.filter(v -> MoldRegions.overlaps(MoldRegions.box(v),cavity,1e-7,source.id)).length>0)
 						feature.memberIds.push(volume.id);
 				for (insert in d.input.inserts)
-					if (MoldRegions.overlaps(MoldRegions.box(bodies.get(insert.id)),cavity,1e-7,source.id))
+					if (MoldRegions.overlaps(MoldRegions.insert(d,insert.id),cavity,1e-7,source.id))
 						feature.memberIds.push(materia.tooling.ToolingIds.derive("insert-", insert.id));
 				feature.memberIds.sort(Reflect.compare);
 				if (feature.memberIds.length == 0) {

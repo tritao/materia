@@ -99,6 +99,7 @@ class SinglePocketSetup {
 					formerFlangeMargin: 10,
 					fixturePinDiameter: 3,
 					fixturePinEmbed: 3,
+					fixtureReceiver:materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
 					fixturePinSpacing: 8,
 					fixtureSlotToolDiameter: 3
 				},

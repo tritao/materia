@@ -54,7 +54,35 @@ class RegionMoldPlannerTests {
 		}
 	}
 
+	static function roundInsert():Void {
+		var document=SinglePocketSetup.document(),insert=document.input.inserts[0];
+		document.recipe.hardware.minimumBridgeWidth=30;
+		document.recipe.hardware.fixtureReceiver=materia.tooling.ToolingRecipe.FixtureReceiver.PanelWhenCoplanar;
+		insert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Cylinder(30,15));
+		for (feature in document.input.features) if (feature.owner==insert.id)
+			feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Insert(insert.body);
+		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
+		var options:CastingMoldOptions={replicationJigs:[],foundationJointProcesses:[],
+			precision:[{insertId:insert.id,jigReference:null,masterReference:null,masterFlatnessMm:null,
+				releaseSpec:null,holeProtectionReference:null,evidence:[]}],
+			compaction:{method:CompactionMethod.Undeclared,bedInterfaceReference:null,frequencyHz:null,amplitudeMm:null,
+				durationSeconds:null,evidence:[]},serviceOrientation:document.setup.sourceToMold,
+			overlapRule:OverlapRule.ReservedThenPriority,liftingEvidence:[]};
+		var previous=P.geometry;
+		try {
+			var plan=machinekit.tooling.CastingMoldCad.plan(document,options);
+			check(plan.fixtures.length==1,"Round source steel uses the shared source-thread fixture planner");
+			var review=machinekit.tooling.CastingMoldCad.review(plan);
+			check(review.symmetricDifferenceMm3<1e-5,"Round insert tooling reconstructs the actual source casting");
+			var expected=240.0*180*100-100*80*60-Math.PI*15*15*15;
+			check(Math.abs(review.sourceVolumeMm3-expected)<1e-5,
+				"Resin retains the corners outside cylindrical steel; no rectangular stock envelope removes them");
+		} catch (error:Dynamic) {P.setGeometry(previous);throw error;}
+		P.setGeometry(previous);
+	}
+
 	public static function main():Void {
+		roundInsert();
 		RegionCorePlannerTests.run();
 		DraftedCorePlannerTests.run();
 		var d=SinglePocketSetup.document(18,false,true);

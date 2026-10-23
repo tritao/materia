@@ -419,9 +419,10 @@ class CastingMoldTests {
 		for (f in p.formers)
 			for (b in f.volume.pieces)
 				negative.push(b);
-		for (f in p.fixtures)
-			for (b in MoldFixtures.datum(f).pieces)
-				negative.push(b);
+		for (fixture in p.fixtures) switch fixture.support {
+			case OnDatum(datum,_,_):for (piece in datum.pieces) negative.push(piece);
+			case OnPanel(_):
+		}
 		for (i in d.input.inserts) {
 			var dimensions = InsertBodies.box(i.body, i.id);
 			negative.push(materia.tooling.casting.CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height,
@@ -533,9 +534,10 @@ class CastingMoldTests {
 		for (f in rotatedPlan.formers)
 			for (b in f.volume.pieces)
 				rotatedNegative.push(b);
-		for (f in rotatedPlan.fixtures)
-			for (b in MoldFixtures.datum(f).pieces)
-				rotatedNegative.push(b);
+		for (fixture in rotatedPlan.fixtures) switch fixture.support {
+			case OnDatum(datum,_,_):for (piece in datum.pieces) rotatedNegative.push(piece);
+			case OnPanel(_):
+		}
 		for (i in rotated.input.inserts)
 			rotatedNegative.push(materia.tooling.casting.CastingMoldPlanner.box(InsertBodies.box(i.body, i.id).width, InsertBodies.box(i.body, i.id).depth, InsertBodies.box(i.body, i.id).height,
 				materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)));

@@ -4,7 +4,6 @@ import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
 import materia.tooling.casting.MoldCores;
 import machinekit.tooling.InsertAnchorGeometry;
-import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
@@ -141,7 +140,8 @@ class CastingMoldCad {
 			// Full envelopes include bores protected during pouring. Their actual
 			// masks are separate members in the assembly and demolding graphs.
 			for (i in p.document.input.inserts)
-				parts.push(box(insertBox(p, i.id)));
+				parts.push(machinekit.structural.CastingRegionCad.part(
+					materia.tooling.casting.MoldRegions.insert(p.document,i.id)));
 			for (part in anchorParts(p)) parts.push(part);
 			return Solids.cut(parts[0], parts.slice(1));
 		});
@@ -243,12 +243,6 @@ class CastingMoldCad {
 					return {protection: protection, hole: holes[0]};
 				}
 		throw "Unknown bore mask: " + id;
-	}
-
-	static function insertBox(p:CastingMoldPlan, id:String):MoldBox {
-		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
-		var dimensions = InsertBodies.box(i.body, i.id);
-		return materia.tooling.casting.CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, i.pose));
 	}
 
 	static function panelWorld(m:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement):Part {
