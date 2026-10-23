@@ -1422,7 +1422,16 @@ Column bed-access decision (2026-10-23): an EPS tool that withdraws through the 
 
 Fixture receiver decision (2026-10-23): the recipe explicitly chooses independent datums or a real coplanar shell receiver. The mill keeps its existing independent datum construction. The native round-insert study chooses shell receivers where the authored mounting face is coplanar; raised faces still need the shared datum/carrier construction. This option is available to the hobber integration. All screws enter source steel threads. Round and crimped insert occupancy uses its exact source body; rectangular stock bounds describe procurement and layout only.
 
-Parked hobber construction (2026-10-23): enclosed EPS regions, first encountered at `cable-route`, have no declared external withdrawal path. Do not invent source openings, cast-in support penetrations or a successful removal sweep. Their retained-core support/assembly disposition remains unresolved while independent phase-8 construction work proceeds.
+Hobber source hold (2026-10-23): exact connectivity of all non-insert cavities, after reserving source steel, gives eight void networks. `cable-route` joins an existing foot-access network; it is not itself an isolated void. Three groups derived from `core-1-0` remain fully enclosed even with every existing service opening included. The extents below locate them; their volumes come from the exact disjoint material, not the bounding boxes.
+
+| Enclosed region | X bounds (mm) | Y bounds (mm) | Z bounds (mm) | Exact void volume (L) |
+|---|---|---|---|---|
+| Front band | 17.5–440 | −375 to −275 | 85–775 | 28.528875 |
+| 5 mm web-side strip | 17.5–22.5 | −95 to 95 | 85–660 | 0.54625 |
+| Drive-side pocket | 52.5–270 | −95 to 95 | 85–660 | 23.210875 |
+
+Keep the EPS disposition and source geometry unchanged pending the source-support decision. The recommended direction is source-declared cast-in supports retaining the cavity shapes; new access passages are an alternative source change. Both need an approved source correction and corresponding frozen-CAD control. Do not invent support penetrations, omit the retained cores from a claimed assembly check, or report a successful withdrawal through solid material. Phase 8 remains open.
+
 
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
