@@ -12,7 +12,10 @@
     "../cnc-router/CncRouter.hx",
     "EnclosedBenchMill.hx",
     "MillBasePreview.hx",
-    "MillFramePreview.hx"
+    "MillFramePreview.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     ".",

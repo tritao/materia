@@ -62,7 +62,7 @@ class LevelingFootTests {
 		var layout = new machinekit.milling.MillFrameLayout({yRailSpacing:220, yRailStart:-270,
 			yRailLength:410, columnFront:180, columnHeight:600, zRailSpacing:180, zRailStart:40, zRailLength:400},
 			{footPockets:true, columnFootWidth:440});
-		var frame = new machinekit.milling.MillFrame(layout);
+		var frame = BenchMillFrame.create(layout);
 		frame.validate();
 		var poses = frame.solvedPoses();
 		var feet = frame.components().filter(row -> StringTools.startsWith(row.id,"levelingFoot"));
@@ -72,7 +72,7 @@ class LevelingFootTests {
 			var floor = materia.assembly.AssemblyFrames.compose(pose,row.component.connector("floor").frame);
 			var mount = materia.assembly.AssemblyFrames.compose(pose,row.component.connector("mount").frame);
 			check(Math.abs(floor.z+50)<1e-6,"installed mill floor remains -50 mm");
-			check(Math.abs(mount.z-layout.casting.footAccessFloor)<1e-6,"foot mount follows its source steel seat");
+			check(Math.abs(mount.z-frame.casting.footAccessFloor)<1e-6,"foot mount follows its source steel seat");
 			var local = row.component.geometry();
 			var actual = machinekit.assembly.PosedParts.moved(local,pose); local.close();
 			var old = Solids.union([Part.cylinderSpan(35,-50,-30,pose.x,pose.y),

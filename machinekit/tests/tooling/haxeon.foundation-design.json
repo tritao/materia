@@ -17,7 +17,10 @@
     "../../examples/bench-mill/MillMoldSetup.hx",
     "../../examples/bench-mill/MillMoldPreview.hx",
     "../../examples/bench-mill/MillMoldChecks.hx",
-    "src/FoundationDesignTests.hx"
+    "src/FoundationDesignTests.hx",
+    "../../examples/bench-mill/BenchMillFrame.hx",
+    "../../examples/bench-mill/MillCastingDetails.hx",
+    "../../examples/bench-mill/MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     "src",

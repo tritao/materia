@@ -15,7 +15,10 @@
     "MillFramePreview.hx",
     "MillFrameChecks.hx",
     "MillZAxisChecks.hx",
-    "../../tests/src/AxisBuilderChecks.hx"
+    "../../tests/src/AxisBuilderChecks.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     ".",

@@ -1,5 +1,3 @@
-package machinekit.milling;
-
 import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
 import machinekit.structural.MineralFoundation;

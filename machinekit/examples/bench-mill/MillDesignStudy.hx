@@ -32,7 +32,7 @@ class MillDesignStudy {
 		w.mz += x * fy - y * fx;
 	}
 
-	public static function guideLoads(assembly:MachineAssembly, frame:MillFrame):Array<Dynamic> {
+	public static function guideLoads(assembly:MachineAssembly, frame:BenchMillFrame):Array<Dynamic> {
 		if (frame.xyAxis == null || frame.zAxis == null)
 			throw "Design load study needs all three mechanical axes";
 		var model = new AssemblyModel("mm");
@@ -156,7 +156,7 @@ class MillDesignStudy {
 		return results;
 	}
 
-	public static function write(assembly:MachineAssembly, frame:MillFrame, directory:String):Void {
+	public static function write(assembly:MachineAssembly, frame:BenchMillFrame, directory:String):Void {
 		var folder = directory + "/design-review";
 		if (!sys.FileSystem.exists(folder))
 			sys.FileSystem.createDirectory(folder);

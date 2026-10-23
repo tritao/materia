@@ -5,7 +5,10 @@
   },
   "entry": "MillCapacityStudy",
   "sources": [
-    "MillCapacityStudy.hx"
+    "MillCapacityStudy.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     ".",

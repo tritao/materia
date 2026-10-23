@@ -1,5 +1,4 @@
 import materia.casting.BoxAlgebra;
-import machinekit.milling.MillFrame;
 import machinekit.tooling.CastingMoldCad;
 import machinekit.tooling.ToolingVolume;
 import machinekit.tooling.SweptRemoval;
@@ -31,7 +30,7 @@ class MillMoldChecks {
 		check(failed, label);
 	}
 
-	static function equivalent(frame:MillFrame, p:CastingMoldPlan):Void {
+	static function equivalent(frame:BenchMillFrame, p:CastingMoldPlan):Void {
 		var local = frame.base.body.geometry(),
 			original = PosedParts.moved(local, p.document.setup.sourceToMold);
 		local.close();
@@ -45,7 +44,7 @@ class MillMoldChecks {
 		original.close();
 	}
 
-	static function junctionGeometry(frame:MillFrame, p:CastingMoldPlan):Void {
+	static function junctionGeometry(frame:BenchMillFrame, p:CastingMoldPlan):Void {
 		var support=materia.tooling.casting.CastingBoxSupport.check(p.document.input,"process.junction.box-geometry");
 		if (support.filter(item -> item.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length>0) {
 			for (insert in p.document.input.inserts)
@@ -98,7 +97,7 @@ class MillMoldChecks {
 				part.close();
 	}
 
-	public static function run(frame:MillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
+	public static function run(frame:BenchMillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
 		check(p.cores.length == 6 && p.fixtures.length == 16, "actual mill pocket and insert inventory");
 		check(p.features.length == p.document.input.features.length && p.features.length == 35, "every full-frame feature classified");
 		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
@@ -166,7 +165,7 @@ class MillMoldChecks {
 			"mass/CoM and flip appear in demolding sequence");
 		for (corner in ["LeftFront", "LeftRear", "RightFront", "RightRear"]) {
 			var stems = p.document.input.features.filter(feature -> feature.id == "foot-stem-" + corner);
-			check(stems.length == 1 && stems[0].geometry.pose.z + materia.casting.CastingFeature.CastingGeometrySolids.height(stems[0].geometry.solid) == frame.layout.casting.footAccessFloor,
+			check(stems.length == 1 && stems[0].geometry.pose.z + materia.casting.CastingFeature.CastingGeometrySolids.height(stems[0].geometry.solid) == frame.casting.footAccessFloor,
 				"foot stem ends at its authored access-floor contact");
 		}
 
@@ -241,7 +240,7 @@ class MillMoldChecks {
 		var changed = CastingMoldPlanner.plan(MillMoldSetup.document(frame, 17.8), MillMoldSetup.options(frame));
 		check(CastingMoldPlanner.fingerprint(changed) != CastingMoldPlanner.fingerprint(p), "measured stock invalidates package");
 		equivalent(frame, changed);
-		var bare = new MillFrame(frame.layout),
+		var bare = BenchMillFrame.create(frame.layout,null,null,frame.casting),
 			simple = CastingMoldPlanner.plan(MillMoldSetup.document(bare), MillMoldSetup.options(bare));
 		check(simple.features.length < p.features.length && p.features.filter(f -> f.featureId == "rear-y-drive-seat").length == 1,
 			"optional XY interfaces come from full source instance");

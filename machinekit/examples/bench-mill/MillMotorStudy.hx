@@ -51,11 +51,11 @@ typedef MillMotorReport = {
 
 /** Visible, recipe-editable motor substitution in the actual mechanical mill. */
 class MillMotorStudy {
-	public static function context():{reference:BenchMill,frame:MillFrame} {
+	public static function context():{reference:BenchMill,frame:BenchMillFrame} {
 		var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),z=MillFramePreview.zLayout(reference,f);
-		return {reference:reference,frame:new MillFrame(f,z,new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL))};
+		return {reference:reference,frame:BenchMillFrame.create(f,z,new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL))};
 	}
-	public static function selection(frame:MillFrame, name:String="ELM2M-2900LD180FT-H", motorTeeth:Int=96, spindleTeeth:Int=18):MillSpindleDrivePart {
+	public static function selection(frame:BenchMillFrame, name:String="ELM2M-2900LD180FT-H", motorTeeth:Int=96, spindleTeeth:Int=18):MillSpindleDrivePart {
 		var z:MillZAxisLayout=frame.zAxis;
 		return new MillSpindleDrivePart(new ComponentValues().setToken("motor",name)
 			.setInteger("motorTeeth",motorTeeth).setInteger("spindleTeeth",spindleTeeth)
@@ -76,7 +76,7 @@ class MillMotorStudy {
 		return total;
 	}
 	/** These are CAD diagnostics, not a claim of sufficient stiffness or motor duty. */
-	public static function report(assembly:MachineAssembly, frame:MillFrame, drive:MillSpindleDrivePart, baselineMass:Float):MillMotorReport {
+	public static function report(assembly:MachineAssembly, frame:BenchMillFrame, drive:MillSpindleDrivePart, baselineMass:Float):MillMotorReport {
 		var z:MillZAxisLayout=frame.zAxis,motor=drive.motor(),mass=movingMass(assembly),delta=mass-baselineMass;
 		var belt=cast(assembly.components().filter(m->m.id=="spindle/belt")[0].component,TimingBelt);
 		var payload=MillSpindleIntegrity.checkPayload(assembly,z),removal=MillSpindleIntegrity.checkMotorRemoval(assembly);

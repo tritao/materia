@@ -13,7 +13,7 @@ class MillProject {
  public static function smallAssembly():MachineAssembly {
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
-  return MillFramePreview.concept(reference,new MillFrame(f,z,xy));
+  return MillFramePreview.concept(reference,BenchMillFrame.create(f,z,xy));
  }
  public static function small():Bytes {
   var reference=new BenchMill(false,false),frame=MillFramePreview.layout(reference);

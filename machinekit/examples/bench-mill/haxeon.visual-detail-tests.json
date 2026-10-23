@@ -14,7 +14,10 @@
     "MillBasePreview.hx",
     "MillFramePreview.hx",
     "MillSpindleChecks.hx",
-    "MillVisualDetailChecks.hx"
+    "MillVisualDetailChecks.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     ".",

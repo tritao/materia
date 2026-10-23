@@ -9,7 +9,7 @@ class LiftingSourceTests {
 		for (foundation in [frame.base,frame.column]) {
 			var rows=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==InsertRole.LiftingMount);
 			check(rows.length==4,"each mill foundation declares four source lifting connections");
-			var mass=machinekit.milling.MillLiftingPattern.asCastMass(foundation),xs=[for (row in rows) row.pose.x],ys=[for (row in rows) row.pose.y];
+			var mass=MillLiftingPattern.asCastMass(foundation),xs=[for (row in rows) row.pose.x],ys=[for (row in rows) row.pose.y];
 			xs.sort(Reflect.compare);ys.sort(Reflect.compare);
 			check(mass.mass>0 && mass.unaccounted.length==0 && mass.centreOfMass.x>xs[0]
 				&& mass.centreOfMass.x<xs[xs.length-1] && mass.centreOfMass.y>ys[0]

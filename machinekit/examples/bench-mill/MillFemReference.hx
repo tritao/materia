@@ -2,14 +2,13 @@ import cadkit.modeling.AssemblyState;
 import cadkit.modeling.AssemblyModel;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
-import machinekit.milling.MillFrame;
 import machinekit.milling.MillXYStageLayout;
 import machinekit.milling.MillZAxisLayout;
 import materia.assembly.AssemblyFrames as F;
 
 /** Independent physical records in the concept report for checking the FEM export. */
 class MillFemReference {
-	public static function capture(assembly:MachineAssembly,frame:MillFrame,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
+	public static function capture(assembly:MachineAssembly,frame:BenchMillFrame,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
 		var xy:MillXYStageLayout=frame.xyAxis, z:MillZAxisLayout=frame.zAxis;
 		var poses=[{x:0.0,y:0.0,z:0.0},{x:0.0,y:0.0,z:z.lower/2}];
 		for (x in [-xy.xHalfTravel,xy.xHalfTravel]) for (y in [-xy.yHalfTravel,xy.yHalfTravel])

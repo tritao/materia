@@ -42,7 +42,7 @@ class MillYServoChecks {
   }
 
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER),z=MillFramePreview.zLayout(reference,f,guide);
-  var l=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12()),frame=new MillFrame(f,z,l),stage=new MillXYStage(l);
+  var l=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12()),frame=BenchMillFrame.create(f,z,l),stage=new MillXYStage(l);
   stage.validate();
   var cache=new PosedParts(),rows:Array<Dynamic> = [],poses:Map<String,AssemblyFrame> = stage.solvedPoses();
   var framePoses:Map<String,AssemblyFrame> = frame.solvedPoses();

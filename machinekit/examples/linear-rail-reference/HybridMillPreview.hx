@@ -1,5 +1,4 @@
 import machinekit.motion.LinearRailBlock;
-import machinekit.milling.MillFrame;
 import machinekit.milling.MillXYStageLayout;
 import machinekit.assembly.AssemblyPreview;
 import materia.project.SceneArtifact;
@@ -18,7 +17,7 @@ class HybridMillPreview {
         var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference);
         var z = MillFramePreview.zLayout(reference, layout, block);
         var xy = new MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL, block);
-        var frame = new MillFrame(layout, z, xy);
+        var frame = BenchMillFrame.create(layout, z, xy);
         var assembly = MillFramePreview.concept(reference, frame);
         BallScrewDetailChecks.check(assembly, xy, z);
         var count = assembly.components().filter(row -> row.component == block).length;

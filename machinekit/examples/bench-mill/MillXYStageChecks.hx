@@ -53,7 +53,7 @@ class MillXYStageChecks {
 			reference,
 			f
 		);
-		var l = new MillXYStageLayout(f, z.spindleY, BenchMill.RAIL), axis = new MillXYStage(l), frame = new MillFrame(f, z, l);
+		var l = new MillXYStageLayout(f, z.spindleY, BenchMill.RAIL), axis = new MillXYStage(l), frame = BenchMillFrame.create(f, z, l);
 		axis.validate();
 		frame.validate();
 		near(l.tableTop, 448, "stack height");
@@ -223,7 +223,7 @@ class MillXYStageChecks {
 		var serviceAudit=MillYNutDesignChecks.check(blockedService,frame);
 		check(serviceAudit.items.filter(item->item.code=="design.access-blocked" && item.subject.indexOf("grease connector handling")>=0 && item.subject.indexOf("greaseHandlingObstruction")>=0).length>0,
 			"production service audit rejects blocked connector handling space");
-		var uncut = MillXYStageIntegrity.check(axis, new MillFrame(f, z));
+		var uncut = MillXYStageIntegrity.check(axis, BenchMillFrame.create(f, z));
 		check(uncut.hasErrors(), "missing bearing steel seats rejected");
 		check(uncut.items.filter(item -> item.code == "mill-xy.full-stroke-collision").length > 0, "unrecessed frame collides with raised Y drive");
 		near(l.yHalfTravel * 2, 160, "usable Y travel increases with table coverage retained");
@@ -231,14 +231,14 @@ class MillXYStageChecks {
 		near(f.columnFront - l.block.spec.railHeight - (l.centreY + l.yHalfTravel + l.tableDepth / 2), 3, "rear table clears lower Z rails");
 		check(l.yScrewZ + 33 + l.clearance <= l.yBayTop, "motor cage fits below base roof");
 		check(l.yBayTop > f.railPlane, "motor bay enters column sole above base");
-		var blocked = new MillFrame(f, z, l);
+		var blocked = BenchMillFrame.create(f, z, l);
 		blocked.addComponent("obstruction", new MillPanel(20, 20, 20), F.translation(0, l.centreY, l.tableBottom + 5));
 		var blockedAudit = MillXYStageIntegrity.check(axis, blocked);
 		check(
 			blockedAudit.items.filter(item -> item.code == "mill-xy.full-stroke-collision").length > 0,
 			"audit detects an actual obstructed XY sweep"
 		);
-		var extractionBlocked = new MillFrame(f, z, l);
+		var extractionBlocked = BenchMillFrame.create(f, z, l);
 		extractionBlocked.addComponent("extractionObstruction", new MillPanel(20, 20, 20), F.translation(0, l.yServiceRear + 20, l.yScrewZ - 10));
 		var extractionAudit = MillXYStageIntegrity.check(axis, extractionBlocked);
 		check(extractionAudit.items.filter(item -> item.subject.indexOf("rear motor extraction/frame/extractionObstruction") >= 0).length > 0,

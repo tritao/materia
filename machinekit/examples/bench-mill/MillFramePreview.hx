@@ -1,6 +1,5 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
-import machinekit.milling.MillFrame;
 import machinekit.milling.MillFrameLayout;
 import machinekit.milling.MillZAxis;
 import machinekit.milling.MillZAxisLayout;
@@ -54,7 +53,7 @@ class MillFramePreview {
 	}
 
 	/** Both the axis-only study and full concept use this same mechanical assembly. */
-	public static function structure(frame:MillFrame):MachineAssembly {
+	public static function structure(frame:BenchMillFrame):MachineAssembly {
 		if (frame.zAxis == null) throw "Z study needs a frame with drive interfaces";
 		var axis = new MillZAxis(frame.zAxis), result = new MachineAssembly();
 		result.include("frame", frame); result.include("zAxis", axis);
@@ -64,18 +63,18 @@ class MillFramePreview {
 			F.compose(F.inverse(framePoses.get("column/railZLeft")), plate));
 		result.addMemberConnector("zAxis/fixedMount", "frameSeat", F.identity());
 		result.addMate("z-on-column", "fixed", "frame/column/railZLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
-		machinekit.milling.MillRailFasteners.install(result,frame.column,"frame/column",frame.layout.casting.anchorRule.screwLengthsMm);
+		machinekit.milling.MillRailFasteners.install(result,frame.column,"frame/column",frame.casting.anchorRule.screwLengthsMm);
 		return result;
 	}
 
 	/** `spindle` defaults to the one the Z layout was sized for. */
-	public static function concept(reference:BenchMill, frame:MillFrame, ?spindle:machinekit.milling.MillSpindlePackage):MachineAssembly {
+	public static function concept(reference:BenchMill, frame:BenchMillFrame, ?spindle:machinekit.milling.MillSpindlePackage):MachineAssembly {
   if(frame.xyAxis==null)throw "Full mill concept needs XY steel drive seats";
   return assemble(reference,frame,new MillXYStage(frame.xyAxis),spindle);
  }
 
  /** Both sizes use the same frame/Z/spindle and guided cross-slide assembly path. */
- public static function assemble(reference:BenchMill,frame:MillFrame,xy:MillGuidedXYStage,
+ public static function assemble(reference:BenchMill,frame:BenchMillFrame,xy:MillGuidedXYStage,
    ?spindle:machinekit.milling.MillSpindlePackage):MachineAssembly {
   var result=structure(frame);
   attachSpindle(reference,result,frame.zAxis,spindle);
@@ -84,7 +83,7 @@ class MillFramePreview {
   result.addMemberConnector("frame/base/casting","stageSeat",F.compose(F.inverse(poses.get("base/casting")),xy.zeroPose("railYLeft")));
   result.addMemberConnector("xyStage/railYLeft","frameSeat",F.identity());
   result.addMate("xy-on-base","fixed","frame/base/casting","stageSeat","xyStage/railYLeft","frameSeat");
-  machinekit.milling.MillRailFasteners.install(result,frame.base,"frame/base",frame.layout.casting.anchorRule.screwLengthsMm);
+  machinekit.milling.MillRailFasteners.install(result,frame.base,"frame/base",frame.casting.anchorRule.screwLengthsMm);
   return result;
  }
 
@@ -128,7 +127,7 @@ class MillFramePreview {
 
 
     /** Same concept report schema for previews and same-build FEM reference packets. */
-    public static function writeReport(assembly:MachineAssembly,frame:MillFrame,directory:String,clearancesVerified:Bool,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
+    public static function writeReport(assembly:MachineAssembly,frame:BenchMillFrame,directory:String,clearancesVerified:Bool,?extraPose:{x:Float,y:Float,z:Float}):Dynamic {
         var l=frame.layout,z:MillZAxisLayout=frame.zAxis,xy:MillXYStageLayout=frame.xyAxis;
 		var report = {status: "mechanical XYZ concept; not qualified for manufacture", units: "mm",
 			analysisReference:MillFemReference.capture(assembly,frame,extraPose),
@@ -149,7 +148,7 @@ class MillFramePreview {
 
 	public static function main():Void {
 		var reference = new BenchMill(false, false), l = layout(reference);
-		var z = zLayout(reference, l), xy = new MillXYStageLayout(l, z.spindleY, BenchMill.RAIL), frame = new MillFrame(l, z, xy);
+		var z = zLayout(reference, l), xy = new MillXYStageLayout(l, z.spindleY, BenchMill.RAIL), frame = BenchMillFrame.create(l, z, xy);
 		MillZAxisIntegrity.check(new MillZAxis(z), frame).throwIfErrors();
 		MillXYStageIntegrity.check(new MillXYStage(xy), frame).throwIfErrors();
 		var root = Sys.getCwd(), directory = sys.FileSystem.exists(root + "/machinekit")

@@ -1,5 +1,3 @@
-package machinekit.milling;
-
 import materia.casting.CastingInput;
 
 /** Explicit mill casting intent, in mm; no Boolean extension margins. */

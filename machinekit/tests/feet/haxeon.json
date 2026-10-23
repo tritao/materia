@@ -1,9 +1,24 @@
 {
   "version": 1,
-  "package": {"name": "machinekit-leveling-foot-tests"},
+  "package": {
+    "name": "machinekit-leveling-foot-tests"
+  },
   "entry": "LevelingFootTests",
-  "sourceRoots": ["src"],
-  "dependencies": {"machinekit": {"path": "../.."}},
+  "sourceRoots": [
+    "src",
+    "../../examples/bench-mill"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
   "target": "host",
-  "outputDir": "build"
+  "outputDir": "build",
+  "sources": [
+    "src/LevelingFootTests.hx",
+    "../../examples/bench-mill/BenchMillFrame.hx",
+    "../../examples/bench-mill/MillCastingDetails.hx",
+    "../../examples/bench-mill/MillLiftingPattern.hx"
+  ]
 }

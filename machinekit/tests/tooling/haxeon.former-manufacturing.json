@@ -20,7 +20,10 @@
     "src/FoundationDesignTests.hx",
     "src/ProductionAnchorTests.hx",
     "src/FormerManufacturingTests.hx",
-    "../../examples/box-mold/SinglePocketSetup.hx"
+    "../../examples/box-mold/SinglePocketSetup.hx",
+    "../../examples/bench-mill/BenchMillFrame.hx",
+    "../../examples/bench-mill/MillCastingDetails.hx",
+    "../../examples/bench-mill/MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     "src",

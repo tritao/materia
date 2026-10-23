@@ -31,7 +31,7 @@ class MillZAxisChecks {
 		AxisBuilderChecks.run();
 		Sys.println("Shared axis builder regressions passed");
 		var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference);
-		var l = MillFramePreview.zLayout(reference, f), frame = new MillFrame(f, l, new MillXYStageLayout(f, l.spindleY, BenchMill.RAIL)), axis = new MillZAxis(l);
+		var l = MillFramePreview.zLayout(reference, f), frame = BenchMillFrame.create(f, l, new MillXYStageLayout(f, l.spindleY, BenchMill.RAIL)), axis = new MillZAxis(l);
 		axis.validate(); frame.validate();
 		rejects(() -> new MillZAxisLayout(f,l.headBottom,l.headHeight,l.spindleY,l.lower,l.profile,null,l.crossDriveZ,
 			{carriageWidth:1}), "reject carriage narrower than guide footprint");
@@ -104,7 +104,7 @@ class MillZAxisChecks {
 		}
 		var fullAudit=MillZAxisIntegrity.check(axis,frame);fullAudit.throwIfErrors();
 		check(!fullAudit.hasErrors(),"continuous CAD full-stroke audit");
-		var blocked = MillZAxisIntegrity.check(axis, new MillFrame(f));
+		var blocked = MillZAxisIntegrity.check(axis, BenchMillFrame.create(f));
 		check(blocked.hasErrors(), "audit rejects a column without the central channel");
 		check(blocked.items.filter(item -> item.code == "mill-z.full-stroke-collision").length > 0,
 			"negative control detects an actual swept-volume collision");

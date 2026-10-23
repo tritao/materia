@@ -1167,7 +1167,7 @@ lists each deleted module with the check or record that still covers it.
     the checks and artifacts it blocks. The per-instance records stay in the
     detailed report, and readiness is unchanged. The kit status (README and
     START-HERE) leads with this list.
-13. Mill-specific casting data belongs to the example, not the library.
+13. [x] Mill-specific casting data belongs to the example, not the library.
     `MillCastingDetails`, `MillLiftingPattern` and the casting parts of
     `MillFrame` move out of `machinekit.milling` into the bench-mill example's
     tooling setup. `machinekit.milling` keeps machine parts and their source
@@ -1437,3 +1437,26 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   These are two physical stages, separate from before/after-casting shop operations.
 - Anchor locking is a shoulder stop or a retaining process with a typed reference.
   No retaining product or cured-mix strength is chosen. Evidence remains Pending.
+
+- Mill source decision (cleanup): the bench-mill example constructs its
+  foundations in `BenchMillFrame`, using its own casting details and lifting
+  pattern. Library `MillFrame` retains the functional datums and the supplied
+  assembly; no library default or callback imports example casting data.
+- Haxeon currently has one package entry, so keep the used entry/test configs.
+  Delete the unreferenced base-only and motor-study preview configs; preserve
+  their source parts and all check suites. Do not add a multi-entry build feature.
+- Frame-check decision (cleanup): compare the actual steel interface connectors
+  and selected screw lengths. The earlier 20 mm/35 mm assumptions predated the
+  approved blind-tap stock and bolt-stack changes; unchanged main reproduced the
+  stale assertion. No casting dimensions change to satisfy it.
+- Corner-seat decision (cleanup): the non-pocketed base variant explicitly
+  declares the bottom and two side openings of its existing corner steel seats.
+  The strict breakout check stays unchanged; this repairs missing intent metadata
+  without changing the source cut or the production pocketed-base kit.
+- Build-input decision (cleanup): legacy explicit-source configs list the three
+  moved example source files. Lookup roots alone did not invalidate a cached
+  executable when one of those files changed; the declared inputs now do.
+- Mechanical-check decision (cleanup): keep unknown motor mounting covered by
+  an unconfigured motor fixture, separately from the named preset's explicit
+  assumed flange. Supplier CAD checks read the existing pinned shared libraries
+  through supported environment overrides; no geometry is substituted.

@@ -16,7 +16,10 @@
     "../../examples/bench-mill/MillFramePreview.hx",
     "../../examples/bench-mill/MillMoldSetup.hx",
     "../../examples/bench-mill/MillMoldPreview.hx",
-    "../../examples/bench-mill/MillMoldChecks.hx"
+    "../../examples/bench-mill/MillMoldChecks.hx",
+    "../../examples/bench-mill/BenchMillFrame.hx",
+    "../../examples/bench-mill/MillCastingDetails.hx",
+    "../../examples/bench-mill/MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     "src",

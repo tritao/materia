@@ -13,7 +13,10 @@
     "EnclosedBenchMill.hx",
     "MillBasePreview.hx",
     "MillFramePreview.hx",
-    "MillFrameChecks.hx"
+    "MillFrameChecks.hx",
+    "BenchMillFrame.hx",
+    "MillCastingDetails.hx",
+    "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
     ".",

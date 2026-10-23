@@ -29,7 +29,7 @@ class RailSeatTests {
 			var rails=new MachineAssembly();
 			for (placed in group.rails) rails.addComponent(placed.memberId,placed.rail,placed.pose);
 			assembly.include(group.name,rails);
-			MillRailFasteners.install(assembly,group.foundation,group.prefix,frame.layout.casting.anchorRule.screwLengthsMm);
+			MillRailFasteners.install(assembly,group.foundation,group.prefix,frame.casting.anchorRule.screwLengthsMm);
 		}
 		var poses=assembly.solvedPoses(),count=0;
 		for (group in groups) for (location in group.foundation.insertLocations()) {

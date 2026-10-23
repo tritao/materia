@@ -23,11 +23,11 @@ class MillFemExport {
 		return path;
 	}
 
-	public static function build():{assembly:MachineAssembly, frame:MillFrame} {
+	public static function build():{assembly:MachineAssembly, frame:BenchMillFrame} {
 		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference);
 		var z = MillFramePreview.zLayout(reference, layout);
 		var xy = new MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
-		var frame = new MillFrame(layout, z, xy);
+		var frame = BenchMillFrame.create(layout, z, xy);
 		return {assembly:MillFramePreview.concept(reference, frame), frame:frame};
 	}
 
@@ -116,7 +116,7 @@ class MillFemExport {
 	}
 
 
-	public static function write(assembly:MachineAssembly, frame:MillFrame, state:AssemblyState, folder:String,?capturedProvenance:Dynamic,?conceptPath:String):Dynamic {
+	public static function write(assembly:MachineAssembly, frame:BenchMillFrame, state:AssemblyState, folder:String,?capturedProvenance:Dynamic,?conceptPath:String):Dynamic {
         var zLayout:MillZAxisLayout=frame.zAxis;
         var referencePath=conceptPath==null?root()+"/"+DIRECTORY+"/build/mill-frame-concept.json":conceptPath;
         var referenceText=File.getContent(referencePath);

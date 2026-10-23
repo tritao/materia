@@ -1,7 +1,6 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.PosedParts;
 import machinekit.component.MachineKitComponents;
-import machinekit.milling.MillFrame;
 import machinekit.milling.MillFrameLayout;
 import machinekit.structural.FoundationIntegrity;
 import materia.assembly.AssemblyFrames as F;
@@ -51,7 +50,7 @@ class MillFrameChecks {
 		near(largerStage.yHalfTravel * 2, 240, "larger travel fits with deliberately increased spindle reach");
 		check(largerStage.yOvertravel >= largerTravel.overtravel, "larger travel retains overrun");
 		check(largerFrame.baseDepth > layout.baseDepth, "larger working envelope grows the structure");
-		var frame = new MillFrame(layout, z, xy);
+		var frame = BenchMillFrame.create(layout, z, xy);
 		frame.validate();
 		var poses = frame.solvedPoses();
 		for (foundation in [frame.base, frame.column]) {
@@ -77,19 +76,23 @@ class MillFrameChecks {
 			near(normal.y, -1, "Z mounting normal");
 			for (end in ["Front", "Rear"]) {
 				var id = side + end;
-				var lower = F.transformPoint(poses.get('base/column$id'), 0, 0, layout.insertThickness);
-				var upper = F.transformPoint(poses.get('column/foot$id'), 0, 0, layout.insertThickness);
+				var lowerSteel=frame.base.components().filter(m -> m.id=='column$id')[0].component;
+				var upperSteel=frame.column.components().filter(m -> m.id=='foot$id')[0].component;
+				var lower=F.compose(poses.get('base/column$id'),lowerSteel.connector("top").frame);
+				var upper=F.compose(poses.get('column/foot$id'),upperSteel.connector("top").frame);
 				near(lower.x, upper.x, "column steel pair X"); near(lower.y, upper.y, "column steel pair Y");
 				near(lower.z, upper.z, "column steel pair Z");
 				var foot = F.transformPoint(poses.get('base/foot$id'), 0, 0, layout.insertThickness);
-				near(foot.z, layout.footPockets ? 40 : 0, "foot steel plane");
+				near(foot.z, layout.footPockets ? frame.casting.footAccessFloor : 0, "foot steel plane");
 			}
 		}
   var insertState=new cadkit.modeling.AssemblyState(frame.definition());
   check(frame.column.insertLocations().filter(row->StringTools.startsWith(row.id,"drive")).length==0,"Z bearing regions are not extra physical inserts");
   for(side in ["Left","Right"]){
-   var id='railZ$side',member=frame.column.components().filter(m->m.id==id)[0].component;
-   near(member.parameterNumber("depth"),layout.zRailStart+layout.zRailLength+20,"Continuous strip spans lower anchor through upper anchor");
+   var id='railZ$side',member=frame.column.insertLocations().filter(row->row.id==id)[0].part;
+   var stock=materia.casting.InsertSpec.InsertBodyCodec.box(member.insertSpec().body,id);
+   near(stock.depth,layout.zRailStart+layout.zRailLength+frame.casting.zStripBearingExtension,
+    "Continuous strip spans lower anchor through upper anchor");
    for(end in ["Lower","Upper"]){
     var seat=insertState.worldConnector('column/$id','bearing${end}Face');
     near(seat.y,layout.columnFront,"Bearing mounting face preserved");
@@ -123,7 +126,10 @@ class MillFrameChecks {
 			var blocked=cadkit.modeling.Part.cylinderSpan(6,bolt.z+12,layout.railPlane+180,bolt.x,bolt.y);
 			var common=casting.intersect(blocked); check(common.volume()>1,"column taper stays closed above the bolt"); common.close(); blocked.close(); casting.close();
 			near(bolt.z,layout.railPlane+layout.insertThickness,"clamp head bears on steel sole");
-			check(bolt.z-35 < layout.railPlane && bolt.z-35 > layout.railPlane-layout.insertThickness,"clamp engages embedded steel anchor");
+			var screw:machinekit.standard.SocketHeadCapScrew=cast frame.components().filter(m -> m.id=='columnBolt$id')[0].component;
+			var tip:Float=bolt.z-screw.shankLength();
+			var anchor:AssemblyFrame=poses.get('base/column$id');
+			check(tip<layout.railPlane && tip>anchor.z,"actual clamp screw engages the declared embedded anchor");
 		}
 		var restored:MachineAssembly = MachineAssembly.decode(frame.encode(), MachineKitComponents.standard());
 		restored.validate();
@@ -148,7 +154,7 @@ class MillFrameChecks {
 		var interfaces:MillFrameInterfaces = {yRailSpacing: layout.yRailSpacing, yRailStart: layout.yRailStart,
 			yRailLength: layout.yRailLength, columnFront: layout.columnFront, columnHeight: layout.columnHeight,
 			zRailSpacing: layout.zRailSpacing, zRailStart: layout.zRailStart, zRailLength: layout.zRailLength};
-		var variant = new MillFrame(new MillFrameLayout(interfaces,
+		var variant = BenchMillFrame.create(new MillFrameLayout(interfaces,
 			{baseWidth: 620, baseHeight: 260, columnWidth: 360, columnDepth: 300}));
 		variant.validate();
 		var variantPoses:Map<String, AssemblyFrame> = variant.solvedPoses();

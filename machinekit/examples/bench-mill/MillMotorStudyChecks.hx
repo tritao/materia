@@ -19,7 +19,9 @@ class MillMotorStudyChecks {
 			near(mount.pilotDiameter,source.spec.pilotDiameter,"catalog pilot");
 			near(mount.holes.length,4,"catalog mounting holes");
 		}
-		var generic=machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W");
+		var assumed=machinekit.motion.ServoMotor.model("GENERIC-SERVO-400W");
+		if(assumed.mounting()==null)throw "Named assumed mounting must remain explicit";
+		var generic=new machinekit.motion.ServoMotor(assumed.rating,machinekit.transmission.ValueBasis.Assumed);
 		if(generic.mounting()!=null)throw "Unspecified mounting must remain unknown";
 		var sweep=generic.axialEnvelope(-50,10,true),bounds=PosedParts.boxOf(sweep);
 		near(bounds.minZ,-generic.rating.bodyLength-50,"generic sweep lower limit");

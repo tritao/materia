@@ -17,7 +17,7 @@ class MillCapacityStudy {
  static function near(a:Float,b:Float,label:String):Void check(Math.abs(a-b)<1e-5,label+": "+a+" vs "+b);
 
  public static function build(l:MillCapacityLayout,fixtureEnvelope:Bool=true):MachineAssembly {
-  var z=l.zLayout(),frame=new MillFrame(l.frame,z),xy=new MillGuidedXYStage(l.guidedXY());
+  var z=l.zLayout(),frame=BenchMillFrame.create(l.frame,z),xy=new MillGuidedXYStage(l.guidedXY());
   var a=MillFramePreview.assemble(new BenchMill(false,false),frame,xy);
   if(fixtureEnvelope) {
    a.addComponent("fixture-envelope",new MillPanel(200,150,l.fixtureHeight),F.translation(0,l.spindleY,l.tableTop));
@@ -104,7 +104,7 @@ class MillCapacityStudy {
 
  public static function main():Void {
   var l=new MillCapacityLayout(),a=build(l);a.validate();
-  var zLayout=l.zLayout(),zAxis=new MillZAxis(zLayout),zFrame=new MillFrame(l.frame,zLayout);
+  var zLayout=l.zLayout(),zAxis=new MillZAxis(zLayout),zFrame=BenchMillFrame.create(l.frame,zLayout);
   MillZAxisIntegrity.check(zAxis,zFrame,l.overtravel).throwIfErrors();
   check(true,"Shared Z assembly clears frame and stationary hardware through overtravel");
   var model=new AssemblyModel("mm");a.addTo(model,"");var state=new AssemblyState(model.definition("capacity"));

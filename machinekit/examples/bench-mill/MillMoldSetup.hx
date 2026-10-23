@@ -1,4 +1,3 @@
-import machinekit.milling.MillFrame;
 import machinekit.milling.MillXYStageLayout;
 import machinekit.tooling.FoundationToolingAdapter;
 import materia.tooling.casting.CastingToolingInput;
@@ -19,21 +18,21 @@ class MillMoldSetup {
 		return rules;
 	}
 
-	public static function frame():MillFrame {
+	public static function frame():BenchMillFrame {
 		var reference = new BenchMill(false, false),
 			layout = MillFramePreview.layout(reference);
 		var z = MillFramePreview.zLayout(reference, layout),
 			xy = new MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
-		return new MillFrame(layout, z, xy);
+		return BenchMillFrame.create(layout, z, xy);
 	}
 
-	public static function input(frame:MillFrame):CastingToolingInput {
+	public static function input(frame:BenchMillFrame):CastingToolingInput {
 		var context=machinekit.tooling.FoundationAssemblyContext.snapshot(frame,"base/casting",
 			[for (insert in frame.base.insertLocations()) {id:insert.id,member:"base/"+insert.id}]);
 		return FoundationToolingAdapter.snapshot(frame.base,"bench-mill-base",1,context);
 	}
 
-	public static function document(frame:MillFrame, thickness:Float = 18):ToolingDocument {
+	public static function document(frame:BenchMillFrame, thickness:Float = 18):ToolingDocument {
 		var input = input(frame),
 			height = frame.layout.railPlane,
 			stock = PanelJoints.stock(thickness);
@@ -127,7 +126,7 @@ class MillMoldSetup {
 		};
 	}
 
-	public static function options(frame:MillFrame):CastingMoldOptions {
+	public static function options(frame:BenchMillFrame):CastingMoldOptions {
 		var input = input(frame);
 		return {
 			replicationJigs: [],

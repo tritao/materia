@@ -12,7 +12,7 @@ class MillSpindleChecks {
 	static function near(a:Float,b:Float,label:String):Void check(Math.abs(a-b)<1e-6,'$label ($a vs $b)');
 	public static function main():Void {
 		var reference=new BenchMill(false,false), f=MillFramePreview.layout(reference), l=MillFramePreview.zLayout(reference,f);
-		var frame=new MillFrame(f,l,new MillXYStageLayout(f,l.spindleY,BenchMill.RAIL));
+		var frame=BenchMillFrame.create(f,l,new MillXYStageLayout(f,l.spindleY,BenchMill.RAIL));
 		var assembly=MillFramePreview.concept(reference,frame);
 		assembly.validate();
 		MillSpindleIntegrity.checkPayload(assembly,l).throwIfErrors();

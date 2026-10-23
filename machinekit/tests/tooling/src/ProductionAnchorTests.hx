@@ -6,7 +6,7 @@ class ProductionAnchorTests {
 	static var assertions = 0;
 	static function check(ok:Bool,message:String):Void {assertions++; if (!ok) throw message;}
 
-	static function checkMold(frame:machinekit.milling.MillFrame,foundation:machinekit.structural.MineralFoundation):Void {
+	static function checkMold(frame:BenchMillFrame,foundation:machinekit.structural.MineralFoundation):Void {
 		var document=MillMoldSetup.document(frame);
 		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,document.input.id,document.input.revision);
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
@@ -50,7 +50,7 @@ class ProductionAnchorTests {
 	}
 
 	public static function main():Void {
-		var rule = new machinekit.milling.MillCastingDetails().anchorRule;
+		var rule = new MillCastingDetails().anchorRule;
 		var plate = new CastInsert(CastInsert.boxValues(50,60,20).setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
 		var first = InsertAnchorGeometry.derive("plate",plate,rule,FootprintOnly,0);
 		var second = InsertAnchorGeometry.derive("plate",plate,rule,FootprintOnly,0);
@@ -146,8 +146,8 @@ class ProductionAnchorTests {
 		var frame = MillMoldSetup.frame();
 		Sys.println("ANCHOR-SOURCE-WALL-TIME "+(Sys.time()-sourceStart)+" seconds (complete frame construction)");
 		var foundations=[frame.base,frame.column];
-		var depth=Math.max(frame.layout.roof,frame.layout.casting.minimumColumnPadDepth(frame.layout.insertThickness));
-		check(depth>frame.layout.casting.columnBoltAccessDepth,"source pad retains resin lands beside its declared access opening");
+		var depth=Math.max(frame.layout.roof,frame.casting.minimumColumnPadDepth(frame.layout.insertThickness));
+		check(depth>frame.casting.columnBoltAccessDepth,"source pad retains resin lands beside its declared access opening");
 		for (foundation in foundations) {
 			var steel=machinekit.design.AssemblyDesignChecks.check(foundation);
 			check(!steel.hasErrors(),"production insert material walls: "+steel.items.map(item -> item.message).join("; "));
