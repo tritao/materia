@@ -51,7 +51,7 @@ class CastabilityTests {
 		var locations=report.proposals.filter(proposal -> proposal.action==DeclareLiftingPoint);
 		check(locations.length==4,"missing lifting connections get a complete CoM-based review pattern");
 		var envelope=materia.tooling.casting.CastingMoldPlanner.envelope(d);
-		var moments=materia.tooling.casting.CastHandling.moments(d,envelope),x=0.0,y=0.0;
+		var moments=materia.tooling.casting.CastHandling.moments(d),x=0.0,y=0.0;
 		for (location in locations) {
 			if (location.point==null) throw "Missing lifting candidate point";
 			var point:{x:Float,y:Float,z:Float}=cast location.point;

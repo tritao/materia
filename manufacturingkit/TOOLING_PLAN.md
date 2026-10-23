@@ -1513,3 +1513,19 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   Separate prism-section islands are physical fillers; exterior side fillers
   withdraw outward, bottom backing downward and a fill-open collar upward.
   Native complete sweeps confirm each declared direction without sampled poses.
+
+- Column recipe decision: put the front on the bed, use mold-Z foam wire, and
+  prefer source-Y service withdrawals. The rear motor bay owns its junction
+  before the selected shaft passage and then the Z channel; these explicit
+  feature overrides resolve shared negative space without changing the casting.
+
+- Panel-fixture record decision: use the source mounting frame and certified
+  contact witnesses for datum geometry. Remove the unused nominal quarter-point
+  `InsertDatums` copy; strict contact recomputation and the six-DOF report retain
+  the actual location check. Circular witnesses are certified inside the disk,
+  including thin annular mouths, rather than credited from its bounding square.
+
+- Panel-fixture hardware decision: all direct receivers use the shared source-hole
+  selector on the actual support frame, clearance-only panel bores and explicit
+  screw/mask/end-plug records. Plain masks facing a panel get clearance access
+  bores; resin-side receiver threads or counterbores are not introduced.

@@ -89,7 +89,7 @@ class NativeMoldKernelTests {
 			var corner=materia.tooling.casting.MoldRegions.box({x:17,y:17,z:10,width:2,depth:2,height:5});
 			check(!materia.tooling.casting.MoldRegions.overlaps(triangle,corner,0,"triangle-corner"),
 				"overlapping stock bounds cannot create a false material collision");
-			var handling=materia.tooling.casting.CastHandling.moments(document,{x:-55,y:-57,z:20,width:120,depth:100,height:80});
+			var handling=materia.tooling.casting.CastHandling.moments(document);
 			near(handling.massKg,mass.massKg,"handling uses the exact non-box kernel rather than stock bounds");
 			near(handling.centerOfMassMoldMm.z,mass.centerOfMassMoldMm.z,"handling preserves the exact non-box center");
 		} catch (error:Dynamic) {

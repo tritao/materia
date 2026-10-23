@@ -165,7 +165,7 @@ class ReviewContractTests {
 		rejects(() -> ToolingReadiness.evaluate([invalid]), "severity/status consistency");
 		var lower = ToolingCodec.copy(p.document);
 		lower.setup.fillHeightMm = p.envelope.z + p.envelope.height / 2;
-		check(CastingMoldPlanner.resinAtFill(lower, p.envelope).filter(b -> b.z + b.height > lower.setup.fillHeightMm + 1e-7).length == 0,
+		check(CastingMoldPlanner.resinAtFill(lower).filter(b -> b.z + b.height > lower.setup.fillHeightMm + 1e-7).length == 0,
 			"neutral datum/resin mask excludes material above fill height");
 		var bridges = CastingMoldPlanner.plan(p.document,p.options);
 		var wider = CastingMoldPlanner.plan(p.document,p.options).cores[0];

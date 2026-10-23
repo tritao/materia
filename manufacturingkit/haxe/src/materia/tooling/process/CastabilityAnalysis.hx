@@ -523,7 +523,7 @@ class CastabilityAnalysis {
 	 * Source authoring must verify material, access and actual anchor occupancy. */
 	static function liftingCandidates(d:ToolingDocument,envelope:MoldBox,count:Int):Array<CastabilityProposal> {
 		if (count>ToolingCodec.MAX_RECORDS) return []; // The source cannot contain more insert records.
-		var moments=materia.tooling.casting.CastHandling.moments(d,envelope);
+		var moments=materia.tooling.casting.CastHandling.moments(d);
 		var inverse=F.inverse(d.setup.sourceToMold),mold=moments.centerOfMassMoldMm;
 		var center=F.transformPoint(inverse,mold.x,mold.y,mold.z);
 		var source=CastingMoldPlanner.box(envelope.width,envelope.depth,envelope.height,

@@ -91,7 +91,7 @@ class EnvelopeMoldTests {
 		var volume=200*160*20+100*80*80;
 		check(Math.abs(plan.handling.castingMassKg-volume*document.recipe.mixDensityKgM3*1e-9)<1e-7,
 			"Disjoint-box handling retains the exact stepped body rather than its stock bounds");
-		var resin=CastingMoldPlanner.resinAtFill(document,plan.envelope);
+		var resin=CastingMoldPlanner.resinAtFill(document);
 		check(Math.abs(materia.casting.BoxAlgebra.volume(resin)-volume)<1e-7,
 			"Box resin analysis uses every exact body piece");
 		check(plan.formers.length==1 && plan.formers[0].withdrawal.z==1,

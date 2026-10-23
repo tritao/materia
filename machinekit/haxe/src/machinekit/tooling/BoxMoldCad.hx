@@ -223,7 +223,7 @@ class BoxMoldCad {
 							|| Math.abs(lo.z - p.cavity.z + core.support.embedDepth) > 1e-7)
 							throw "Core socket escapes sealing footprint";
 					} else {
-						CastingMoldPlanner.validateInsertSeal(p, record);
+						materia.tooling.casting.DatumFixtures.validatePanelSeal(p, record);
 					}
 					cut.close();
 				} catch (e:Dynamic) {

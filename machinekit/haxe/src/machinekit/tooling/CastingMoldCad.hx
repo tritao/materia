@@ -135,8 +135,8 @@ class CastingMoldCad {
 			// Fixture receivers are enclosed by the bed and sealed insert faces.
 			// They remain real clearance holes in the tooling, but are not pour
 			// space. The planner validates these full occupied volumes against resin.
-			for (f in p.fixtures)
-				for (piece in MoldFixtures.datum(f).pieces)
+			for (volume in MoldFixtures.allVolumes(p))
+				for (piece in volume.pieces)
 					parts.push(box(piece));
 			// Full envelopes include bores protected during pouring. Their actual
 			// masks are separate members in the assembly and demolding graphs.
@@ -194,18 +194,6 @@ class CastingMoldCad {
 				status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
 			}
 		];
-		if (p.construction==SinglePocket) {
-			for (fixture in p.fixtures) {
-				for (fixing in fixture.fixings) result[0].memberIds.push(fixing.hardwareId);
-				for (mask in fixture.boreMasks) {
-					result[0].memberIds.push(mask.hardwareId);
-					if (mask.farEndId!=null) result[0].memberIds.push(mask.farEndId);
-				}
-				for (record in MoldOpenings.records(p,fixture.insertId)) if (record.plug!=null)
-					result[0].memberIds.push(materia.tooling.ToolingIds.derive("resin-plug-",record.sourceHoleId));
-			}
-			result[0].memberIds.sort(Reflect.compare);
-		}
 		var previous = "release-loose-tooling";
 		var entryMasks = [for (h in p.hardware) if (threadedMask(p, h)) h.id];
 		if (entryMasks.length > 0) {
@@ -289,7 +277,8 @@ class CastingMoldCad {
 		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:b.height*(0.5+i*0.15)});
 		for(i in 0...p.cores.length)offsets.set(p.cores[i].id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
 		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
-		for(f in p.fixtures)offsets.set(MoldFixtures.datum(f).id,{x:MoldFixtures.withdrawal(f).x*b.width,y:0,z:MoldFixtures.withdrawal(f).z*b.height*1.4});
+		for(f in p.fixtures) for(volume in MoldFixtures.volumes(f))
+			offsets.set(volume.id,{x:MoldFixtures.withdrawal(f).x*b.width,y:0,z:MoldFixtures.withdrawal(f).z*b.height*1.4});
 		for(i in p.document.input.inserts)offsets.set(materia.tooling.ToolingIds.derive("insert-",i.id),{x:b.width*1.8,y:0,z:0});
 		for(hardware in anchorComponents(p))
 			offsets.set(hardware.id,offsets.get(materia.tooling.ToolingIds.derive("insert-",hardware.insertId)));
@@ -320,9 +309,9 @@ class CastingMoldCad {
 			var pose = F.identity();
 			a.addComponent(f.volume.id, ToolingVolume.fromVolume(f.volume), pose);
 		}
-		for (f in p.fixtures) {
+		for (volume in MoldFixtures.allVolumes(p)) {
 			var pose = F.identity();
-			a.addComponent(MoldFixtures.datum(f).id, ToolingVolume.fromVolume(MoldFixtures.datum(f)), pose);
+			a.addComponent(volume.id, ToolingVolume.fromVolume(volume), pose);
 		}
 		for (i in p.document.input.inserts) {
 			var pose = F.compose(p.document.setup.sourceToMold, i.pose);
@@ -556,11 +545,11 @@ class CastingMoldCad {
 					direction: new Vector(f.withdrawal.x, f.withdrawal.y, f.withdrawal.z)
 				});
 			}
-			for (f in p.fixtures) {
-				var shape = ToolingVolume.geometryOf(MoldFixtures.datum(f));
+			for (f in p.fixtures) for (volume in MoldFixtures.volumes(f)) {
+				var shape = ToolingVolume.geometryOf(volume);
 				parts.push(shape);
 				members.push({
-					id: MoldFixtures.datum(f).id,
+					id: volume.id,
 					part: shape,
 					direction: new Vector(MoldFixtures.withdrawal(f).x,MoldFixtures.withdrawal(f).y,MoldFixtures.withdrawal(f).z)
 				});
@@ -641,7 +630,7 @@ class CastingMoldCad {
 			}
 			members[0].direction = new Vector(0, 0, 1);
 			for (member in members) {
-				var fixtures = p.fixtures.filter(f -> MoldFixtures.datum(f).id == member.id);
+				var fixtures = p.fixtures.filter(f -> MoldFixtures.volumes(f).filter(volume -> volume.id==member.id).length==1);
 				if (fixtures.length == 1) {
 					var v = fixtures[0].assemblyClearance;
 					member.direction = new Vector(v.x, v.y, v.z);

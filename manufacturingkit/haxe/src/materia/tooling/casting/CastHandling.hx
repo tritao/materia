@@ -6,7 +6,6 @@ import materia.casting.BoxAlgebra;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 /** Exact box moments retain their algebraic path. Non-box source geometry
  * uses the application kernel, with results expressed in mm/kg. */
@@ -29,7 +28,7 @@ class CastHandling {
 	}
 
 	/** Existing source mass calculation shared by handling and lifting proposals. */
-	public static function moments(d:ToolingDocument,envelope:MoldBox):{
+	public static function moments(d:ToolingDocument):{
 		massKg:Float,centerOfMassMoldMm:{x:Float,y:Float,z:Float}
 	} {
 		var unsupported=CastingBoxSupport.check(d.input,"tooling.handling.geometry",false)
@@ -77,8 +76,8 @@ class CastHandling {
 		return {massKg:mass,centerOfMassMoldMm:{x:mx/mass,y:my/mass,z:mz/mass}};
 	}
 
-	public static function plan(d:ToolingDocument,o:CastingMoldOptions,envelope:MoldBox):HandlingPlan {
-		var source=moments(d,envelope);
+	public static function plan(d:ToolingDocument,o:CastingMoldOptions):HandlingPlan {
+		var source=moments(d);
 		var relative=F.compose(o.serviceOrientation,F.inverse(d.setup.sourceToMold));
 		var vertical=F.transformVector(relative,0,0,1);
 		return {requiresFlip:vertical.z<1-1e-8,moldToService:relative,

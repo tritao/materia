@@ -122,7 +122,8 @@ class CastingMoldTests {
 		manufacturing.mountingRequirements[0].budget.machiningErrorMm=Unresolved("machiningErrorMm");
 		manufacturing.holeRoutes=[];
 		var insertPose=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
-		var pending=materia.tooling.casting.InsertFixturePlanner.missingFixing(insert,insertPose,F.identity(),d.recipe.hardware);
+		var pending=materia.tooling.casting.InsertFixturePlanner.missingFixing(insert,insertPose,
+			F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]),d.recipe.hardware);
 		check(pending.change==null && pending.check.status=="pending"
 			&& pending.check.rule=="tooling.fixture.hole-stage."+insert.id,
 			"permitted pre-cast route awaiting budget inputs blocks the fixture as Pending, without a source-hole request");
@@ -340,11 +341,11 @@ class CastingMoldTests {
 		var handlingOptions = options(d);
 		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
 			[0, -1, 0, 1, 0, 0, 0, 0, 1]), d.setup.sourceToMold);
-		check(!materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip,
+		check(!materia.tooling.casting.CastHandling.plan(d, handlingOptions).requiresFlip,
 			"yaw preserves the vertical and does not require lifting/flip");
 		handlingOptions.serviceOrientation = materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0,
 			[1, 0, 0, 0, 0, -1, 0, 1, 0]), d.setup.sourceToMold);
-		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip, "changing vertical requires handling/flip");
+		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions).requiresFlip, "changing vertical requires handling/flip");
 		var bridgePlan = CastingMoldPlanner.plan(d,o);
 		var extraCore = CastingMoldPlanner.plan(d,o).cores[0];
 		var extraCavity=MoldCores.singleBox(extraCore.cavity,extraCore.id);

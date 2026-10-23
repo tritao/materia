@@ -56,7 +56,7 @@ typedef InsertPlatePlan = {
 	var masks:Array<{insertId:String,protection:materia.tooling.casting.CastingMoldPlan.BoreMaskProtection}>;
 }
 
-/** Both mold planners use the same source-thread access and axial depth budget. */
+/** All mold constructions use the same source-thread access and axial depth budget. */
 class InsertFixturePlanner {
 	public static function holes(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<InsertHole>
 		return materia.casting.InsertStages.holes({body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},
@@ -124,6 +124,7 @@ class InsertFixturePlanner {
 	public static function plate(document:materia.tooling.ToolingDocument, options:InsertPlateOptions):InsertPlatePlan {
 		var d = materia.tooling.ToolingCodec.copy(document);
 		options = copyOptions(options);
+		var supportFace=F.fromRotationMatrix(0,0,options.contactZ,[1,0,0,0,-1,0,0,0,-1]);
 		materia.tooling.ToolingIds.validate(options.id);
 		for (value in [options.edgeMargin, options.locatorEndInset, options.locatorSideInset])
 			if (!Math.isFinite(value) || value <= 0) throw "Fixture plate layout dimensions must be positive";
@@ -194,7 +195,7 @@ class InsertFixturePlanner {
 			validation = validation.concat(protectionValidation(insert));
 			var pose = F.compose(d.setup.sourceToMold, insert.pose);
 			for (hole in availableHoles(insert)) {
-				var fixing = select(hole, pose, F.translation(0,0,options.contactZ), hardware);
+				var fixing = select(hole, pose, supportFace, hardware);
 				if (fixing == null) continue;
 				var thread:InsertThread = cast hole.thread;
 				var sealRadius = switch materia.casting.InsertSpec.InsertBodyCodec.mouth(insert.body) {
@@ -245,7 +246,7 @@ class InsertFixturePlanner {
 				masks.push({insertId:id,protection:mask(hole,maskId,hardware.plugDepth,axis)});
 			}
 			if (sites.length == count) {
-				var decision=missingFixing(insert,pose,F.translation(0,0,options.contactZ),hardware),change=decision.change;
+				var decision=missingFixing(insert,pose,supportFace,hardware),change=decision.change;
 				if (change!=null) changes.push(change);
 				validation.push(decision.check);
 			}
@@ -331,6 +332,14 @@ class InsertFixturePlanner {
 	public static function minimumInsertion(hole:InsertHole):Float
 		return threadStart(hole)+InsertHoleCodec.threadLimits(hole).minEngagement;
 
+	/** Hole +Z points into steel; support-face +Z points out of steel. */
+	public static function facing(entry:AssemblyFrame,face:AssemblyFrame):Bool {
+		var axis=F.transformVector(entry,0,0,1),normal=F.transformVector(face,0,0,1);
+		var alignment=axis.x*normal.x+axis.y*normal.y+axis.z*normal.z;
+		var distance=(entry.x-face.x)*normal.x+(entry.y-face.y)*normal.y+(entry.z-face.z)*normal.z;
+		return alignment<=-1+1e-8 && Math.abs(distance)<=1e-7;
+	}
+
 	public static function select(hole:InsertHole, insertToMold:AssemblyFrame, supportFace:AssemblyFrame,
 			hardware:ToolingHardware):Null<{
 		entry:AssemblyFrame,
@@ -339,9 +348,8 @@ class InsertFixturePlanner {
 		clearanceDiameter:Float,
 		plug:Null<{diameter:Float, length:Float, materialSpec:String}>
 	}> {
-		var entry = F.compose(insertToMold, hole.frame), axis = F.transformVector(entry, 0, 0, 1);
-		if (hole.thread == null || axis.z < 1 - 1e-8 || Math.abs(entry.z - supportFace.z) > 1e-7)
-			return null;
+		var entry = F.compose(insertToMold, hole.frame);
+		if (hole.thread == null || !facing(entry,supportFace)) return null;
 		var thread:InsertThread = cast hole.thread;
 		if (hole.extent == Through && hardware.plugMaterial != "steel")
 			throw "Unsupported threaded fixing plug material: " + hardware.plugMaterial;

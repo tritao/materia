@@ -147,7 +147,10 @@ class FoundationToolingTests {
 			"catalogue retention capacity remains independently pending");
 		var sourceToMold = F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 		var selected = materia.tooling.casting.InsertFixturePlanner.select(input.inserts[0].holes[0],
-			F.compose(sourceToMold, input.inserts[0].pose), F.identity(), SinglePocketSetup.document().recipe.hardware);
+			F.compose(sourceToMold, input.inserts[0].pose),
+			F.compose(F.compose(sourceToMold,input.inserts[0].pose),F.translation(0,0,
+				materia.casting.InsertSpec.InsertBodyCodec.height(input.inserts[0].body))),
+			SinglePocketSetup.document().recipe.hardware);
 		check(selected != null && selected.engagement == 6 && selected.clearanceDiameter == 6.6 && selected.plug == null,
 			"shared source-hole selection fixes the socket through a clearance hole without a resin-side plug");
 		var document = SinglePocketSetup.document();

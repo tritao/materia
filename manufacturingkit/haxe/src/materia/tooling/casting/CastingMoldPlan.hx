@@ -36,17 +36,6 @@ enum abstract CoreRemoval(String) to String {
 	var BreakoutThroughBed = "breakout-through-bed";
 }
 
-typedef InsertDatums = {
-	var primarySupportPoints:Array<{
-		x:Float,
-		y:Float,
-		z:Float
-	}>;
-	var secondaryAxis:{x:Float, y:Float, z:Float};
-	var tertiaryAxis:{x:Float, y:Float, z:Float};
-}
-
-
 enum MoldConstruction {
 	SharedBridges;
 	SinglePocket;
@@ -253,7 +242,7 @@ typedef InsertFixtureFixing = {
 
 
 enum MoldFixtureSupport {
-	OnBed(panelId:String);
+	OnPanel(panelId:String);
 	OnDatum(volume:MoldVolume,withdrawal:{x:Float,y:Float,z:Float},
 		lateralLocation:{primaryId:String,secondaryId:String,baselineMm:Float});
 }
@@ -261,7 +250,6 @@ enum MoldFixtureSupport {
 typedef MoldInsertFixture = {
 	var insertId:String;
 	var location:DatumFixtureLocation.DatumLocationPlan;
-	var datums:InsertDatums;
 	var support:MoldFixtureSupport;
 	var mountingFace:AssemblyFrame;
 	var attachmentEvidence:Array<String>;
@@ -293,25 +281,25 @@ typedef CastingMoldPlan = {
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
 }
 
-/** Access explicit support variants; a bed fixture has no independent volume. */
+/** Access explicit support variants; a direct panel fixture has no independent volume. */
 class MoldFixtures {
 	public static function volumes(fixture:MoldInsertFixture):Array<MoldVolume> return switch fixture.support {
-		case OnBed(_):[]; case OnDatum(volume,_,_):[volume];
+		case OnPanel(_):[]; case OnDatum(volume,_,_):[volume];
 	};
 	public static function datum(fixture:MoldInsertFixture):MoldVolume return switch fixture.support {
-		case OnDatum(volume,_,_):volume; case OnBed(_):throw "Bed fixture has no separate datum volume: "+fixture.insertId;
+		case OnDatum(volume,_,_):volume; case OnPanel(_):throw "Panel fixture has no separate datum volume: "+fixture.insertId;
 	};
 	public static function withdrawal(fixture:MoldInsertFixture):{x:Float,y:Float,z:Float} return switch fixture.support {
 		case OnDatum(_,direction,_):direction;
-		case OnBed(_):materia.assembly.AssemblyFrames.transformVector(fixture.mountingFace,0,0,1);
+		case OnPanel(_):materia.assembly.AssemblyFrames.transformVector(fixture.mountingFace,0,0,1);
 	};
 	public static function lateral(fixture:MoldInsertFixture):{primaryId:String,secondaryId:String,baselineMm:Float}
 		return switch fixture.support {
 			case OnDatum(_,_,location):location;
-			case OnBed(_):throw "Bed fixture has no separate datum locating pins: "+fixture.insertId;
+			case OnPanel(_):throw "Panel fixture has no separate datum locating pins: "+fixture.insertId;
 		};
-	public static function bedId(fixture:MoldInsertFixture):String return switch fixture.support {
-		case OnBed(panelId):panelId; case OnDatum(_,_,_):throw "Fixture is supported by a datum: "+fixture.insertId;
+	public static function panelId(fixture:MoldInsertFixture):String return switch fixture.support {
+		case OnPanel(panelId):panelId; case OnDatum(_,_,_):throw "Fixture is supported by a datum: "+fixture.insertId;
 	};
 	public static function allVolumes(plan:CastingMoldPlan):Array<MoldVolume> {
 		var result:Array<MoldVolume>=[];

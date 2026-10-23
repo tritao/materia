@@ -117,7 +117,7 @@ class BoxPlannerTests {
 			case Catalogue(_):throw "Fabricated fixture expected";
 		}
 		var stageSealError="";
-		try CastingMoldPlanner.validateInsertSeal(forgedSeal,sourcePenetration) catch (error:Dynamic) stageSealError=Std.string(error);
+		try materia.tooling.casting.DatumFixtures.validatePanelSeal(forgedSeal,sourcePenetration) catch (error:Dynamic) stageSealError=Std.string(error);
 		check(stageSealError.indexOf("Insert penetration has no unique source hole")>=0,
 			"a service-only thread cannot qualify a pre-cast insert-sealed penetration");
 		var undecided=ToolingCodec.copy(d);
@@ -160,6 +160,16 @@ class BoxPlannerTests {
 		check(reserved.validation.filter(v -> v.rule==stockRule && v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1
 			&& reserved.changeRequests.filter(r -> r.id=="allowance-"+stocked.input.inserts[0].id).length==0,
 			"single-pocket mold uses the same source finishing-geometry decision");
+		var fixing=p.fixtures[0].fixings[0];
+		var screws=p.hardware.filter(item -> item.id==fixing.hardwareId);
+		check(screws.length==1 && screws[0].kind==materia.tooling.casting.CoreSupport.SupportHardwareKind.FixtureScrew,
+			"The shared receiver emits exactly one physical source-thread screw");
+		var badLength=CastingMoldPlanner.planSinglePocket(d);
+		badLength.hardware.filter(item -> item.id==fixing.hardwareId)[0].length+=1;
+		rejects(() -> CastingMoldPlanner.validate(badLength),"A forged fixture screw stack is rejected");
+		var missingCap=CastingMoldPlanner.planSinglePocket(d);
+		missingCap.hardware=missingCap.hardware.filter(item -> item.kind!=materia.tooling.casting.CoreSupport.SupportHardwareKind.BorePlug);
+		rejects(() -> CastingMoldPlanner.validate(missingCap),"A missing far-end source-thread plug is rejected");
 		check(p.fixtures[0].location.report.rank==3,"direct bed contact leaves three insert freedoms");
 		check(p.validation.filter(check -> check.rule=="tooling.fixture.location."+p.fixtures[0].insertId
 			&& check.status=="pending" && check.message.indexOf("translation-x")>=0).length==1,
@@ -167,7 +177,7 @@ class BoxPlannerTests {
 		var forged=CastingMoldPlanner.planSinglePocket(d),locationError="";
 		forged.fixtures[0].location.report.rank=6;
 		try CastingMoldPlanner.validate(forged) catch(error:Dynamic) locationError=Std.string(error);
-		check(locationError.indexOf("Box fixture location differs from source geometry")>=0,
+		check(locationError.indexOf("Panel fixture location differs from source geometry")>=0,
 			"a forged fully constrained box fixture is rejected");
 		check(p.panels.members.length == 5 && p.openings.length == 9, "all sockets/lands and fixing hole classified");
 		check(p.sourceFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");

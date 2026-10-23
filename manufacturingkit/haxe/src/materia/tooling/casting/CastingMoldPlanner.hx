@@ -191,7 +191,7 @@ class CastingMoldPlanner {
 		];
 		return {
 			construction:SharedBridges,
-			handling: CastHandling.plan(d, o, e),
+			handling: CastHandling.plan(d, o),
 			id: materia.tooling.ToolingIds.derive("", d.input.id, "-mold"),
 			document: d,
 			sourceFingerprint: ToolingCodec.documentFingerprint(d),
@@ -384,7 +384,7 @@ class CastingMoldPlanner {
 			if (body == null)
 				throw "Missing insert body";
 			if (normal.z > -1 + 1e-8)
-				throw "Box datum fixtures currently require downward mounting faces";
+				throw "Datum fixture needs a supported mounting-face direction: "+i.id;
 			var dt = r.hardware.datumThickness, pw = r.hardware.datumPostWidth;
 			var pocketId:Null<String> = null;
 			var pad:MoldBox = {
@@ -499,8 +499,8 @@ class CastingMoldPlanner {
 				"Bed pins register the nominal support only. Qualify insert XY location/clamping, datum accuracy and release. Screws use declared source threads only."));
 		}
 		var fixtures:Array<MoldBox> = [];
-		for (f in result.fixtures)
-			for (p in MoldFixtures.datum(f).pieces)
+		for (volume in MoldFixtures.allVolumes(result))
+			for (p in volume.pieces)
 				fixtures.push(p);
 		var occupied = insertBoxes.concat(epsBoxes).concat(fixtures),
 			previous:Array<MoldBox> = [];
@@ -667,9 +667,9 @@ class CastingMoldPlanner {
 				for (open in result.openings)
 					if (open.operationId == materia.tooling.ToolingIds.derive("access-", f.id)) {
 						open.sealingIds = ids.copy();
-						for (fixture in result.fixtures)
-							if (MoldFixtures.datum(fixture).pieces.filter(p -> BoxAlgebra.intersection(p, cb) != null).length > 0)
-								open.sealingIds.push(MoldFixtures.datum(fixture).id);
+						for (volume in MoldFixtures.allVolumes(result))
+							if (volume.pieces.filter(p -> BoxAlgebra.intersection(p, cb) != null).length > 0)
+								open.sealingIds.push(volume.id);
 					}
 			}
 		for (m in panels.members)
@@ -688,9 +688,9 @@ class CastingMoldPlanner {
 				for (core in result.cores)
 					if (MoldRegions.overlaps(core.cavity,cavity,1e-7,source.id))
 						feature.memberIds.push(core.id);
-				for (fixture in result.fixtures)
-					if (MoldFixtures.datum(fixture).pieces.filter(v -> MoldRegions.overlaps(MoldRegions.box(v),cavity,1e-7,source.id)).length>0)
-						feature.memberIds.push(MoldFixtures.datum(fixture).id);
+				for (volume in MoldFixtures.allVolumes(result))
+					if (volume.pieces.filter(v -> MoldRegions.overlaps(MoldRegions.box(v),cavity,1e-7,source.id)).length>0)
+						feature.memberIds.push(volume.id);
 				for (insert in d.input.inserts)
 					if (MoldRegions.overlaps(MoldRegions.box(bodies.get(insert.id)),cavity,1e-7,source.id))
 						feature.memberIds.push(materia.tooling.ToolingIds.derive("insert-", insert.id));
@@ -809,7 +809,7 @@ class CastingMoldPlanner {
 			throw "Conflicting design-change validation: "+check.rule;
 	}
 
-	public static function resinAtFill(document:ToolingDocument, envelope:MoldBox):Array<MoldBox> {
+	public static function resinAtFill(document:ToolingDocument):Array<MoldBox> {
 		var body=MoldRegions.boxes(MoldRegions.envelope(document));
 		if (body==null) throw "Box resin query does not support source envelope: "+document.input.id;
 		var wetted:Array<MoldBox>=[];
@@ -848,7 +848,7 @@ class CastingMoldPlanner {
 				joints: []
 			});
 		MoldOptions.copy(p.options);
-		if (ToolingCodec.canonical(p.handling) != ToolingCodec.canonical(CastHandling.plan(p.document, p.options, p.envelope)))
+		if (ToolingCodec.canonical(p.handling) != ToolingCodec.canonical(CastHandling.plan(p.document, p.options)))
 			throw "Stale source-derived handling plan";
 		DatumFixtures.validate(p);
 		var members = new Map<String, Bool>();
@@ -867,8 +867,8 @@ class CastingMoldPlanner {
 		}
 		for (f in p.formers)
 			member(f.volume.id);
-		for (f in p.fixtures)
-			member(MoldFixtures.datum(f).id);
+		for (volume in MoldFixtures.allVolumes(p))
+			member(volume.id);
 		for (i in p.document.input.inserts)
 			member(materia.tooling.ToolingIds.derive("insert-", i.id));
 		var ruleIds = [for (v in p.validation) v.rule];
@@ -953,21 +953,21 @@ class CastingMoldPlanner {
 			}
 		}
 		var exactResin=requiresRegions(p.document);
-		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document, p.envelope);
-		for (fixture in p.fixtures) {
-			MoldVolumeRecords.copy(MoldFixtures.datum(fixture));
-			if (MoldFixtures.datum(fixture).profiles.length > 0 || MoldFixtures.datum(fixture).regions.length > 0)
+		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document);
+		for (volume in MoldFixtures.allVolumes(p)) {
+			MoldVolumeRecords.copy(volume);
+			if (volume.profiles.length > 0 || volume.regions.length > 0)
 				throw "Neutral datum/resin validation does not support datum profiles or regions";
 			if (exactResin) {
-				if (geometry==null) throw "Exact tooling geometry kernel required: "+MoldFixtures.datum(fixture).id;
-				var region=materia.casting.CastingRegion.Union([for (piece in MoldFixtures.datum(fixture).pieces) MoldRegions.box(piece)]);
+				if (geometry==null) throw "Exact tooling geometry kernel required: "+volume.id;
+				var region=materia.casting.CastingRegion.Union([for (piece in volume.pieces) MoldRegions.box(piece)]);
 				if (geometry.resinIntersection(p.document,region)>1e-7)
-					throw "Datum fixture intersects resin: "+MoldFixtures.datum(fixture).id;
+					throw "Datum fixture intersects resin: "+volume.id;
 			}
-			for (piece in MoldFixtures.datum(fixture).pieces)
+			for (piece in volume.pieces)
 				for (resinPiece in resin)
 					if (BoxAlgebra.intersection(piece, resinPiece) != null)
-						throw "Datum fixture intersects resin: " + MoldFixtures.datum(fixture).id;
+						throw "Datum fixture intersects resin: " + volume.id;
 		}
 	}
 	/** Single-pocket construction: the individual bridge or routed bed socket. */
@@ -1044,8 +1044,7 @@ class CastingMoldPlanner {
 		var result=seed(d,singlePocketOptions(d),b,b,[],RaisedWalls.NorthSouth);
 		result.id="single-pocket-box";
 		result.construction=SinglePocket;
-		var assembly=result.panels,penetrations=MoldOpenings.records(result),bed=assembly.members[0].panel;
-		var ox=assembly.members[0].pose.x,oy=assembly.members[0].pose.y;
+		var assembly=result.panels,penetrations=MoldOpenings.records(result);
 		var supportPanels=result.supportPanels,cores=result.cores;
 		for (f in d.input.features)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
@@ -1070,30 +1069,10 @@ class CastingMoldPlanner {
 			|| normal.z > -1 + 1e-8
 			|| Math.abs(volume(clipped(ib, b)) - volume(ib)) > 1e-5)
 			throw "Insert mounting face must seat on bed with fixing bore";
-		var fixings:Array<materia.tooling.casting.CastingMoldPlan.InsertFixtureFixing> = [];
-		for (hole in InsertFixturePlanner.availableHoles(insert)) {
-			var selected = InsertFixturePlanner.select(hole, ip, face, r.hardware);
-			if (selected == null)
-				continue;
-			var entry = selected.entry;
-			var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-			var diameter = selected.clearanceDiameter;
-			var id = materia.tooling.ToolingIds.derive("insert-fixing-", hole.id);
-			var operation = PanelJoints.operation(id, Drill,
-				PanelContours.circle(entry.x - ox, entry.y - oy, diameter / 2), t, diameter);
-			operation.through = true;
-			bed.operations.push(operation);
-			bed.contactOpenings.push(operation.id);
-			penetrations.push({panelId: bed.id, operationId: operation.id, kind: InsertSealed,
-				insertId: insert.id, sourceHoleId: hole.id, coreId: null, sealMargin: r.hardware.sealMargin,
-				sealMaterial: r.hardware.sealMaterial, sealingFace: face,
-				plug: selected.plug});
-			fixings.push({sourceHoleId: hole.id, hardwareId: id, panelId: bed.id, operationId: id,
-				entry: entry, engagement: cast materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement, threadSpec: thread.designation});
-		}
-		assembly.members[0].panel = PanelCodec.copy(bed);
-		var location=DatumFixtureLocation.onBed(insert,d.setup.sourceToMold,face,assembly.members[0],b,fixings);
 		result.openings=[for (record in penetrations) MoldOpenings.fromRecord(record)];
+		for (core in cores) for (hardware in core.support.hardware) result.hardware.push(hardware);
+		DatumFixtures.addPanel(result,insert,face,assembly.members[0]);
+		var fixtureChecks=result.validation.copy();
 		result.coreUnits=coreUnits(d.input,cores);
 		result.features=[for (core in cores) {featureId:core.featureId,kind:EPSFeature,memberIds:[core.id]}];
 		for (feature in d.input.features) if (feature.kind==CastingFeatureKind.InsertRecess) {
@@ -1101,24 +1080,6 @@ class CastingMoldPlanner {
 			if (owner==null) throw "Insert recess needs its source owner: "+feature.id;
 			result.features.push({featureId:feature.id,kind:InsertFeature,memberIds:[owner]});
 		}
-		for (core in cores) for (hardware in core.support.hardware) result.hardware.push(hardware);
-		result.fixtures= [
-				{
-					insertId: insert.id,
-					location:location,
-					mountingFace: face,
-					support:OnBed(bed.id),
-					fixings: fixings,
-					boreMasks: [for (hole in InsertFixturePlanner.availableHoles(insert)) if (fixings.filter(f -> f.sourceHoleId == hole.id).length == 0) {
-						var entry = F.compose(F.compose(d.setup.sourceToMold, insert.pose), hole.frame), axis = F.transformVector(entry, 0, 0, 1);
-						InsertFixturePlanner.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id), r.hardware.plugDepth,
-							{x: -axis.x, y: -axis.y, z: -axis.z});
-					}],
-					attachmentEvidence: [],
-					assemblyClearance:{x:0,y:0,z:-1},
-					datums: datums(face, dimensions.width, dimensions.depth)
-				}
-			];
 		result.validation= [
 				materia.tooling.ToolingValidation.ToolingReadiness.pending("core-restraint", [cores[0].id],
 					"Adhesive, pad attachment and uplift capacity require qualification"),
@@ -1131,14 +1092,9 @@ class CastingMoldPlanner {
 				materia.tooling.ToolingValidation.ToolingReadiness.pending("loads-handling", [d.input.id],
 					"Compaction, closure loads and handling require qualification")
 			];
-		result.validation.push(DatumFixtureLocation.validation(insert.id,location));
+		result.validation=result.validation.concat(fixtureChecks);
 		result.validation = result.validation.concat(InterfaceQualification.source(d.input))
 			.concat(FoundationJointQualification.source(d.input));
-		if (fixings.length == 0) {
-			var decision=InsertFixturePlanner.missingFixing(insert,ip,face,r.hardware),change=decision.change;
-			if (change!=null) result.changeRequests.push(change);
-			result.validation.push(decision.check);
-		}
 		if (F.transformVector(d.setup.sourceToMold, 0, 0, 1).z < 0)
 			result.changeRequests.push({
 				id: "lifting-flip",
@@ -1147,7 +1103,6 @@ class CastingMoldPlanner {
 				reason: "Provide qualified lifting points and handling for the inverted casting",
 				blockingChecks: ["loads-handling"]
 			});
-		result.validation = result.validation.concat(InsertFixturePlanner.protectionValidation(insert));
 		result.validation = result.validation.concat(InsertQualifications.check(d.input.inserts));
 		result.validation = result.validation.concat(InsertQualifications.manufacturing(d.input.inserts));
 		for (source in d.input.inserts) {
@@ -1163,76 +1118,6 @@ class CastingMoldPlanner {
 		return result;
 	}
 
-	public static function datums(face:AssemblyFrame, width:Float, depth:Float):materia.tooling.casting.CastingMoldPlan.InsertDatums
-		return {
-			primarySupportPoints: [
-				F.transformPoint(face, -width / 4, -depth / 4, 0),
-				F.transformPoint(face, width / 4, -depth / 4, 0),
-				F.transformPoint(face, 0, depth / 4, 0)
-			],
-			secondaryAxis: F.transformVector(face, 1, 0, 0),
-			tertiaryAxis: F.transformVector(face, 0, 1, 0)
-		};
-
-	public static function validateInsertSeal(p:CastingMoldPlan, record:PenetrationPlan):Void {
-		var fixture = p.fixtures.filter(f -> f.insertId == record.insertId)[0],
-			i = p.document.input.inserts.filter(i -> i.id == record.insertId)[0];
-		var dimensions = InsertBodies.box(i.body, i.id);
-		var member = p.panels.members.filter(m -> m.panel.id == record.panelId)[0],
-			op = member.panel.operations.filter(o -> o.id == record.operationId)[0];
-		if (record.sealingFace == null || ToolingCodec.canonical(record.sealingFace) != ToolingCodec.canonical(fixture.mountingFace))
-			throw "Insert sealing face differs from fixture";
-		var holes = InsertFixturePlanner.availableHoles(i).filter(h -> h.id == record.sourceHoleId);
-		if (holes.length != 1)
-			throw "Insert penetration has no unique source hole";
-		var hole = holes[0], plug = record.plug;
-		var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-		if (hole.extent == materia.casting.InsertHole.HoleExtent.Through) {
-			if (plug == null || plug.diameter != thread.majorDiameter || plug.length <= 0
-				|| plug.length + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minTipGap > hole.depth + 1e-7
-				|| StringTools.trim(plug.materialSpec).length == 0)
-				throw "Invalid insert bore plug";
-		} else if (plug != null)
-			throw "Blind fixing hole needs no resin-side plug";
-		if (ToolingCodec.canonical(fixture.datums) != ToolingCodec.canonical(datums(fixture.mountingFace, dimensions.width, dimensions.depth)))
-			throw "Invalid insert fixture datums";
-		var inverse = F.inverse(fixture.mountingFace),
-			margin = record.sealMargin;
-		if (record.panelId != MoldFixtures.bedId(fixture) || fixture.fixings.filter(f -> f.operationId == record.operationId && f.sourceHoleId == hole.id).length != 1 || member.panel.id != "bed")
-			throw "Insert seal references wrong fixing hole";
-		var transform = F.compose(inverse, member.pose),
-			z = member.panel.stock.measuredThickness;
-		var ux = F.transformVector(transform, 1, 0, 0),
-			uy = F.transformVector(transform, 0, 1, 0),
-			sign = ux.x * uy.y - ux.y * uy.x;
-		if (Math.abs(Math.abs(sign) - 1) > 1e-7)
-			throw "Insert sealing face not parallel to bed";
-		var transformed = [
-			for (seg in op.contour) {
-				var s = F.transformPoint(transform, seg.start.x, seg.start.y, z), e = F.transformPoint(transform, seg.end.x, seg.end.y, z), center = seg.center;
-				var lc = center == null ? null : F.transformPoint(transform, center.x, center.y, z);
-				if (Math.abs(s.z) > 1e-7 || Math.abs(e.z) > 1e-7) throw "Insert sealing face misses opening";
-				{
-					kind: seg.kind,
-					start: {
-						x: s.x,
-						y: s.y
-					},
-					end: {x: e.x, y: e.y},
-					center: lc == null ? null : {x: lc.x, y: lc.y},
-					sweep: sign * seg.sweep
-				};
-			}
-		];
-		var bounds = materia.casting.CastingProfileGeometry.bounds(transformed);
-		if (bounds.x < -dimensions.width / 2 + margin
-			|| bounds.y < -dimensions.depth / 2 + margin
-			|| bounds.x + bounds.width > dimensions.width / 2 - margin
-			|| bounds.y + bounds.height > dimensions.depth / 2 - margin)
-			throw "Insert sealing margin exceeded";
-		if (!op.through || Math.abs(fixture.mountingFace.z - p.cavity.z) > 1e-7)
-			throw "Insert seal face misses bed";
-	}
 
 	static function validateSinglePocket(plan:CastingMoldPlan):Void {
 		InterfaceQualification.validate(plan.document.input,plan.validation);
@@ -1328,65 +1213,7 @@ class CastingMoldPlanner {
 				+ Math.abs(f.height + l + (bridge ? support.adhesiveThickness : 0) - cb.height) > 1e-7)
 				throw "Core covering does not reproduce cavity";
 		}
-		for (fixture in plan.fixtures) {
-			var insert = plan.document.input.inserts.filter(i -> i.id == fixture.insertId)[0];
-			var beds=plan.panels.members.filter(member -> member.panel.id==MoldFixtures.bedId(fixture));
-			if (beds.length!=1) throw "Missing fixture bed: "+MoldFixtures.bedId(fixture);
-			var location=DatumFixtureLocation.onBed(insert,plan.document.setup.sourceToMold,fixture.mountingFace,
-				beds[0],plan.cavity,fixture.fixings);
-			if (ToolingCodec.canonical(location)!=ToolingCodec.canonical(fixture.location))
-				throw "Box fixture location differs from source geometry: "+insert.id;
-			var expectedLocation=DatumFixtureLocation.validation(insert.id,location);
-			var locationChecks=plan.validation.filter(check -> check.rule==expectedLocation.rule);
-			if (locationChecks.length!=1 || ToolingCodec.canonical(locationChecks[0])!=ToolingCodec.canonical(expectedLocation))
-				throw "Box fixture location validation differs from source geometry: "+insert.id;
-			var seenHoles = new Map<String, Bool>();
-			if (fixture.fixings.length==0) InsertFixturePlanner.validateMissingFixing(insert,
-				F.compose(plan.document.setup.sourceToMold,insert.pose),fixture.mountingFace,plan.document.recipe.hardware,
-				plan.validation,plan.changeRequests);
-			if (fixture.fixings.length + fixture.boreMasks.length != InsertFixturePlanner.availableHoles(insert).length)
-				throw "Every pre-cast source hole needs a fixing screw or bore mask";
-			for (hole in InsertFixturePlanner.availableHoles(insert)) {
-				var fixingCount = fixture.fixings.filter(f -> f.sourceHoleId == hole.id).length;
-				var maskCount = fixture.boreMasks.filter(m -> m.sourceHoleId == hole.id).length;
-				if (fixingCount + maskCount != 1)
-					throw "Source hole protection must be unique";
-			}
-			for (mask in fixture.boreMasks) {
-				var holes = InsertFixturePlanner.availableHoles(insert).filter(h -> h.id == mask.sourceHoleId);
-				if (holes.length != 1)
-					throw "Bore mask requires a unique source hole";
-				var hole = holes[0];
-				var entry = F.compose(F.compose(plan.document.setup.sourceToMold, insert.pose), hole.frame);
-				var axis = F.transformVector(entry, 0, 0, 1);
-				var expectedMask = InsertFixturePlanner.mask(hole, materia.tooling.ToolingIds.derive("mask-", hole.id),
-					plan.document.recipe.hardware.plugDepth, {x: -axis.x, y: -axis.y, z: -axis.z});
-				if (ToolingCodec.canonical(mask) != ToolingCodec.canonical(expectedMask))
-					throw "Bore mask differs from source hole depth budget";
-			}
-			for (fixing in fixture.fixings) {
-				var holes = InsertFixturePlanner.availableHoles(insert).filter(h -> h.id == fixing.sourceHoleId);
-				if (holes.length != 1 || holes[0].thread == null || seenHoles.exists(fixing.sourceHoleId))
-					throw "Fixing requires a unique source steel thread";
-				seenHoles.set(fixing.sourceHoleId, true);
-				var hole = holes[0], thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
-				var entry = F.compose(F.compose(plan.document.setup.sourceToMold, insert.pose), hole.frame);
-				var panels = plan.panels.members.filter(member -> member.panel.id == fixing.panelId);
-				if (panels.length != 1)
-					throw "Fixing clearance references unknown panel";
-				var panel = panels[0], operations = panel.panel.operations.filter(op -> op.id == fixing.operationId);
-				var expected = PanelContours.circle(entry.x - panel.pose.x, entry.y - panel.pose.y,
-					hole.clearanceDiameter / 2);
-				if (operations.length != 1 || !operations[0].through || operations[0].kind != Drill
-					|| ToolingCodec.canonical(operations[0].contour) != ToolingCodec.canonical(expected))
-					throw "Fixing needs a source-sized clearance bore";
-				if (fixing.engagement != materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement || fixing.threadSpec != thread.designation
-					|| ToolingCodec.canonical(fixing.entry) != ToolingCodec.canonical(entry)
-					|| MoldOpenings.records(plan).filter(p -> p.insertId == insert.id && p.sourceHoleId == hole.id
-						&& p.operationId == fixing.operationId).length != 1)
-					throw "Fixture fixing differs from source hole";
-			}
-		}
+		for (fixture in plan.fixtures) DatumFixtures.validatePanel(plan,fixture);
 		for (opening in plan.openings) {
 			if (opening.protection!=null && opening.kind!=ToolingOpening)
 				throw "Protected opening must be tooling-sealed";
@@ -1405,7 +1232,7 @@ class CastingMoldPlanner {
 			if (p.kind == InsertSealed && (p.insertId == null || plan.fixtures.filter(f -> f.insertId == p.insertId).length != 1))
 				throw "Unknown sealing insert";
 			if (p.kind == InsertSealed)
-				validateInsertSeal(plan, p);
+				DatumFixtures.validatePanelSeal(plan, p);
 			if (p.kind == CoreSealed
 				&& (p.coreId == null
 					|| plan.cores.filter(c -> c.id == p.coreId && c.support.socketOperationId == p.operationId).length != 1))

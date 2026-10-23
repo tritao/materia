@@ -47,15 +47,83 @@ class ToolingTests {
 		hole.clearanceDiameter = 6.6;
 		hole.limits.threaded = {minEngagement: 6, minTipGap: 1};
 		var hardware = fixture().recipe.hardware;
-		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware) == null,
+		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]), hardware) == null,
 			"short blind thread has no tip clearance without an explicit relief");
 		hole.relief = {diameter: 6.2, start: 6};
-		var fixing = materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware);
+		var fixing = materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]), hardware);
 		check(fixing != null && fixing.engagement == 6 && fixing.clearanceDiameter == 6.6 && fixing.plug == null,
 			"source relief permits short-thread fixing without a buried plug");
 		hole.limits.threaded.minEngagement = 7;
-		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.identity(), hardware) == null,
+		check(materia.tooling.casting.InsertFixturePlanner.select(hole, F.identity(), F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]), hardware) == null,
 			"deep relief never contributes thread engagement");
+	}
+
+	static function fixtureFaces():Void {
+		var document=fixture(),hole=document.input.inserts[0].holes[0];
+		hole.diameter=5;hole.tapDrill=5;hole.depth=12;hole.extent=Blind;hole.threadDepth=9;
+		hole.thread={designation:"M6",majorDiameter:6,pitch:1,starts:1,hand:Right,
+			internal:true,toleranceClass:"6H",profile:Metric};
+		hole.clearanceDiameter=6.6;
+		hole.limits.threaded={minEngagement:6,minTipGap:1};
+		hole.frame=F.fromRotationMatrix(0,0,20,[1,0,0,0,-1,0,0,0,-1]);
+		var rotations=[
+			[1.0,0,0,0,1,0,0,0,1], [1.0,0,0,0,-1,0,0,0,-1],
+			[1.0,0,0,0,0,-1,0,1,0], [1.0,0,0,0,0,1,0,-1,0],
+			[0.0,0,1,0,1,0,-1,0,0], [0.0,0,-1,0,1,0,1,0,0]
+		];
+		for (rotation in rotations) {
+			var pose=F.fromRotationMatrix(31,-27,92,rotation);
+			var face=F.compose(pose,F.translation(0,0,20));
+			var selected=materia.tooling.casting.InsertFixturePlanner.select(hole,pose,face,document.recipe.hardware);
+			check(selected!=null && selected.engagement==6 && selected.clearanceDiameter==6.6,
+				"Source fixing works on every Cartesian support face");
+			var wrongFace=F.compose(face,F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]));
+			check(materia.tooling.casting.InsertFixturePlanner.select(hole,pose,wrongFace,document.recipe.hardware)==null,
+				"Opposite face orientation cannot select the source thread");
+			check(materia.tooling.casting.InsertFixturePlanner.select(hole,pose,F.compose(face,F.translation(0,0,1)),document.recipe.hardware)==null,
+				"A different parallel support plane cannot select the source thread");
+		}
+	}
+
+	static function fixturePanelFaces():Void {
+		var rotations=[
+			[1.0,0,0,0,1,0,0,0,1], [1.0,0,0,0,-1,0,0,0,-1],
+			[1.0,0,0,0,0,-1,0,1,0], [1.0,0,0,0,0,1,0,-1,0],
+			[0.0,0,1,0,1,0,-1,0,0], [0.0,0,-1,0,1,0,1,0,0]
+		];
+		var sample=fixture().input.inserts[0];
+		var size=materia.casting.InsertSpec.InsertBodyCodec.box(sample.body,sample.id);
+		var shapes=[materia.casting.CastingSolid.Box(size.width,size.depth,size.height),
+			materia.casting.CastingSolid.Cylinder(16,size.height),materia.casting.CastingSolid.Cylinder(8,size.height)];
+		for (shape in shapes) for (rotation in rotations) {
+			var document=fixture(),source=document.input.inserts[0];
+			source.body=materia.casting.InsertSpec.InsertBody.Primitive(shape);
+			var diameter:Null<Float>=switch shape {case Cylinder(d,_):d;case Box(_,_,_):null;};
+			var thin=diameter!=null && diameter==8;
+			if (thin) {source.holes[0].diameter=6;source.holes[0].clearanceDiameter=6.6;}
+			var transform=F.fromRotationMatrix(31,-27,92,rotation),stock=F.compose(transform,source.pose);
+			var face=F.compose(stock,F.translation(0,0,size.height)),thickness=document.recipe.panel.measuredThickness;
+			var pose=F.compose(F.compose(face,F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1])),
+				F.translation(-50,-50,-thickness));
+			var panel=materia.tooling.panel.PanelJoints.blank("face-fixture",100,100,document.recipe.panel,6,2);
+			panel.contactFace=materia.tooling.ToolingEnums.ContactFace.PositiveZ;
+			panel.operations.push(materia.tooling.panel.PanelJoints.operation("mask-access",materia.tooling.panel.PanelPlan.PanelOperationKind.Drill,
+				materia.tooling.panel.PanelContours.circle(50,50,thin ? 3.3 : 4.5),thickness,thin ? 6.6 : 9,
+				materia.tooling.ToolingEnums.MachiningSide.PositiveZ,true));
+			var location=materia.tooling.casting.DatumFixtureLocation.onPanel(source,transform,face,
+				{panel:panel,pose:pose,withdrawal:{x:0,y:0,z:1}},[]);
+			check(location.unsupportedReasons.length==0 && location.report.rank==3,
+				"Every Cartesian panel face supplies only the three real plane constraints");
+			check(location.contacts.length==3,"Clearance access hole receives no lateral locating credit");
+			for (contact in location.contacts) {
+				var point=F.transformPoint(F.inverse(stock),contact.point.x,contact.point.y,contact.point.z);
+				check(Math.abs(point.z-size.height)<1e-7,"Contact witness lies on the actual steel mouth plane");
+				check(diameter!=null ? point.x*point.x+point.y*point.y<=diameter*diameter/4+1e-7
+					: Math.abs(point.x)<=size.width/2 && Math.abs(point.y)<=size.depth/2,
+					"Contact witness lies on real steel, including circular mouths");
+				check(point.x*point.x+point.y*point.y>(thin ? 9 : 16),"Contact witness avoids the source bore");
+			}
+		}
 	}
 
 	static function unresolvedStockFixing():Void {
@@ -386,6 +454,9 @@ class ToolingTests {
 	public static function main():Void {
 		vocabularyRoundTrips();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
+		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
+		fixtureFaces();
+		fixturePanelFaces();
 		if (Sys.getEnv("TOOLING_ONLY") == "castability") {
 			var document = fixture();
 			document.recipe.minimumLigament = 2; // Same mold fixture as CastingMoldTests.run.
