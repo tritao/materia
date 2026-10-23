@@ -1105,8 +1105,12 @@ side by side. This adds no new core type and no library code beyond the recipe
 rule and fixtures. The user picks the production recipe from the results.
 
 Comparison status: [the EPS baseline and missing drafted route](../machinekit/examples/bench-mill/CORE_STRATEGY_COMPARISON.md)
-are recorded. The variant is parked under the recipe/fixture-only rule; the EPS
-default is unchanged. Continue phase 8 independently.
+are recorded. Closed by user decision (2026-10-23): pockets that open to a body
+face and are deeper than one board, including the four foot-access pockets, use
+sacrificial EPS like the lightening pockets. Rigid formers stay for features
+within one board thickness (seats, shoulders, stems, bed backing). The drafted
+route is not built. The panel-box construction stays as the rule for any former
+taller than the thickest declared board.
 
 **Cleanup slice (after step 3, before the core comparison and phase 8).**
 These are defects or excess weight in work already landed, so the scope freeze
@@ -1270,13 +1274,13 @@ directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
 
-- The drafted-core comparison needs source Draft adjustability and its mapped proposal/application, plus leaning hollow-former walls; these library changes are excluded from the comparison, so the variant is parked.
+- Drafted melamine formers (source Draft adjustability, its mapped proposal/application, leaning hollow-former walls): not built; the comparison closed on EPS (2026-10-23).
 
 - Extreme integral JSON round-trips (observed 1e14 becoming 276447232) need a separate toolchain investigation; do not add another JSON parser to tooling.
 
 - Interrupted/multi-lift pours with cooling or cure pauses are outside this release; current mixer batches form one continuous lift.
 
-- Collapsible (knock-down) melamine cores for undrafted pockets that open to a face: a segmented box released by removing a key panel first, with joinery, bracing and take-apart sequence. This is a new core strategy, considered only after the core strategy comparison.
+- Collapsible (knock-down) melamine cores for undrafted pockets that open to a face: a segmented box released by removing a key panel first, with joinery, bracing and take-apart sequence. This is a new core strategy, considered after phase 8 only if several castings of one design are planned, since reusable formers pay off over repeated pours. It builds on the screwed panel-box formers and the existing removal-sequence checks.
 - Structured recipe parameters: MachineKit components store structured records as JSON strings inside recipe tokens (`MineralCasting` `embeddedAnchors`, `datumScheme`, `interfaces`; `CastInsert` `origin`). This affects every component, so it needs its own MachineKit plan rather than a casting slice.
 - Generic catalogue recipe solid-count qualification: the bought Vallder BK12 assembly has 32 solids; the broad recipe test assumes one, outside casting phases 6–8.
 
@@ -1388,6 +1392,7 @@ Former spacing decision (2026-10-22): a short rebate gets one centred pocket scr
 Former assembly decision (2026-10-22): the portable assembly uses one deterministically selected parent joint per board; all rebate contacts and closure sites remain in the validated panel plan and shop records.
 Former tolerance decision (2026-10-22): on drafted faces, radial contour and reference-mesh deflection are limited to one twentieth of the declared tolerance multiplied by tan(draft), so shallow walls do not amplify discretisation beyond the vertical tolerance.
 Former source-dependent work parked (2026-10-22): cutter-fit rejects square internal corners in bed backing, the front bearing and rear drive seat formers, and the four foot-access neck/flange pairs. No source casting geometry or cutter-fit check was changed. These findings remain in the kit; selecting a geometry change waits for review while independent cleanup proceeds.
+Former corner decision (user, 2026-10-23): the source declares a corner radius on every casting edge formed by a concave former corner, at least the declared profile cutter's radius plus the recipe margin, using the existing source radius intent. Before applying it, check against the interface records that no mating part or datum touches a new radius; a conflict is reported, not rounded. Frozen-CAD comparisons record the radii as an approved source correction, as with the insert blanks.
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.
