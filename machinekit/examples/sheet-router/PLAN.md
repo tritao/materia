@@ -1870,3 +1870,13 @@ geometry, section cuts/joints, end caps and machine withdrawal/wrench corridors,
 supplier envelopes, geometry-derived compliance and new weld fatigue remain
 open. Frozen CAD and SR-D3/SR6-C gates are unchanged. Root crossed below 8 GB;
 implementation/builds paused and reproducible build output was removed.
+
+Motion coordination checkpoint (2026-10-23): use the forthcoming full-chain
+J7/J4/J5 curved-panel and J6 pose/control exports for the corrected-envelope
+rerun. [Audit](fem/rack-results/current-control-audit.json) verifies 24 currently
+available controlled histories, all explicitly offline compiler splices; none
+is admitted as runtime J5 acceptance. Request-time suffixes are not override
+multipliers. Nominal-only drive screens remain provisional. Keep >100% raised-
+feed next-window replan coverage separate from the promised ≤100% grid. Do not
+reuse the rejected thin-shelf mass/compliance for the new mount. The complete
+joint packet and new rerun remain pending; no frozen CAD change is approved.

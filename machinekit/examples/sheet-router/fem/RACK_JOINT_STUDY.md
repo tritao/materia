@@ -293,3 +293,31 @@ Numerical coverage/energy checks pass for 36 cases and 1440 modes. Eight study
 Python sources compile in memory. Catalogue focused checks passed separately;
 required-mount focused tests passed against the isolated patch. This is an
 engineering screen with stated assumptions, not measured machine acceptance.
+
+## Resume checkpoint — 2026-10-23
+
+The producer's currently available `j5-controlled-contours` directory contains
+24 hash/certificate-validated controlled exports. The [audit](rack-results/current-control-audit.json)
+confirms every one declares an **offline ordinary-compiler prefix/splice/tail**
+scope. Sampled V/A/J bounds also pass, but none establishes the approved runtime
+ready-stop/filtered-clock chain. The labels `1p5` and `3` still identify request
+times (1.5 and 3 seconds); these exports request 75% feed, not 150%/300% scaling.
+No controlled history is promoted to acceptance. Compact metadata/manifests and
+the reader are retained with [hashes](rack-results/current-control-evidence.json);
+producer CSV identities are recorded without duplicating the CSVs on root.
+
+The coordinating session will provide a new path after a curved panel passes
+the full J7/J4/J5 chain, followed by the J6 pose/control grid. Those exports,
+with manifests/hashes, replace the offline histories for the corrected-envelope
+rerun. Hold/resume uses the ready jerk-limited stop; ≤100% override uses filtered
+executor time scaling with derivative reserve; >100% requires next-window
+replanning within the unchanged axis limits/feed cap. Raised-feed coverage is
+not implied by the forthcoming ≤100% grid. Any intervening drive screen using
+nominal histories is provisional, not full-envelope acceptance.
+
+New local mounting geometry/mass is recorded in the [candidate](../mounting/PROPOSAL.md).
+Do not feed the old thin-shelf compliance or old +10.470 kg moving-mass witness
+into the new support rerun. Full-length/cut-section geometry, geometry-derived
+compliance and the complete joint packet still need preparation. No new drive
+option or full structural/dynamic pass is claimed here. Root crossed the 8 GB
+floor during this work; further implementation/builds paused as instructed.

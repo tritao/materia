@@ -1,0 +1,689 @@
+{
+  "producerRoot": "/home/joao/dev/materia-worktrees/jerk-timing/build/om-r1/j5-controlled-contours",
+  "readerSha256": "a4cd3fc479418a6f56deb450a3098b7c5d2b71272602b2d5eab165cb058b4dc0",
+  "exports": [
+    {
+      "name": "none-2600-x1p02-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.098430489,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "8d7328575484e8cc355dfe2676470007536fd12bac4de6e503c66ba527a5c98a",
+      "exportSha256": {
+        "none-2600-x1p02-hold-resume-1p5.csv": "ec0c3d17d0ac7f4e26a21954f67da49fcaf68879189fdc03e92e4985e0725d0f",
+        "none-2600-x1p02-hold-resume-1p5.json": "6bb54b169dff7c70b3058f5e118042cb1ee1c3fcd90365ca3ade1c3a883673a8"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666634619147,
+        "vy": 0.24999999959583463,
+        "ax": 2.9999999762331715,
+        "ay": 2.1517068119755076,
+        "jx": 121.48947163890561,
+        "jy": 18.6099252216202
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-2600-x1p02-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.028753337,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "9b166d3683b1d00d09d1393a61a230285f91823ec805ce1b569be9f0ed44072f",
+      "exportSha256": {
+        "none-2600-x1p02-hold-resume-3.csv": "ad1fd9bd294f0e334581dd73534f842828e1e86a9b96fa2477b5897d062bbe51",
+        "none-2600-x1p02-hold-resume-3.json": "95b858ea144eb3e656962cd6ca574852af5afa0f64876c5db8176e72dfe3e36c"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666634619147,
+        "vy": 0.33333333133878496,
+        "ax": 3.0,
+        "ay": 2.2824426351104217,
+        "jx": 121.48947163890561,
+        "jy": 18.609925182290773
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-2600-x1p02-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.0142343920000005,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "a15f64b5c524ef71d2fa261664aa9dfe5f713bd7d0a6e755096c202340abd21a",
+      "exportSha256": {
+        "none-2600-x1p02-override-1p5.csv": "9967e37d7522ebcf28ad1fd07609a30b9d96406b2c9782e7db46fa5fd01cc087",
+        "none-2600-x1p02-override-1p5.json": "66c73599cc8f36737c93d1c008de1d1696a9e9b1a540615e36e0b31b62ea65ec"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666634619147,
+        "vy": 0.24999999959583463,
+        "ax": 2.9999999762331715,
+        "ay": 2.1518212444044034,
+        "jx": 121.48946966659692,
+        "jy": 18.6099252216202
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-2600-x1p02-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.876057494,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "a34f310594cfad1ad6fa8c2d89e92b9c3374832daa0ae9db1bb49217919cf009",
+      "exportSha256": {
+        "none-2600-x1p02-override-3.csv": "6fc2746f325a3e61135d06bbd0117a74a24e7a915910a9da15ca11a9a2195fc6",
+        "none-2600-x1p02-override-3.json": "c8b5e09fe156edd822fcb1d8555baa8136a97873c72d853dbd287ce1e85a98de"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666634619147,
+        "vy": 0.33333333133878496,
+        "ax": 3.0,
+        "ay": 2.2824426351104217,
+        "jx": 121.48947163890561,
+        "jy": 18.609925182290773
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-3150-x1p01-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.029760241,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "b216b286ad6a0359a6195a06d3790e0b652a2c494ef7003aa2bb872c44212e3a",
+      "exportSha256": {
+        "none-3150-x1p01-hold-resume-1p5.csv": "450eaa156ce30f4db1df8133a20bcc4d1ce50052878d6af0a7b3744baa2967ed",
+        "none-3150-x1p01-hold-resume-1p5.json": "a18a85e99ee05703d0e3ae92e174f716f7f717e2e1fe8c0bde5b6a0b5fbced38"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666610814335,
+        "vy": 0.24999999960957936,
+        "ax": 2.9999999508664508,
+        "ay": 2.139117333312554,
+        "jx": 168.39043944553129,
+        "jy": 18.386249776585974
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-3150-x1p01-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.946929814000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "dc86cbd0e86c5f2f962ed38f2c1f49412da3e232646cb57533feea27beba8c68",
+      "exportSha256": {
+        "none-3150-x1p01-hold-resume-3.csv": "96f0458e76394fe39e5541f5a53d573c83eea0cf42be02cbdfa316d128550e0e",
+        "none-3150-x1p01-hold-resume-3.json": "71b2cc9dc49398b761ee8c7dc7b3201aa1864b69b51c9d62f303589ffe54c49f"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666610814335,
+        "vy": 0.33333333172610113,
+        "ax": 3.0,
+        "ay": 2.236498842667843,
+        "jx": 168.3904498273039,
+        "jy": 18.386249742487095
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-3150-x1p01-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.949861887,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "f259cfdec2b84d344d8717f4cf46acb5bd820ebbbdf235b045b73967deaeb973",
+      "exportSha256": {
+        "none-3150-x1p01-override-1p5.csv": "ed16916b788b241448116ae8d1cd124a2e20ce15231d430937633241642176de",
+        "none-3150-x1p01-override-1p5.json": "a38b0afd9afc54d10d000177985552b0fd756c5a7c2426e84c29487b4a44fbd1"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666610814335,
+        "vy": 0.24999999960957936,
+        "ax": 2.9999999508664508,
+        "ay": 2.138413652716653,
+        "jx": 168.39043944553129,
+        "jy": 18.386249776585974
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "none-3150-x1p01-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.7985556570000005,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "3130158643ef3b351fa6eaf2713475b386cfd0b92ce49b6d57ba9b1d6a380ba5",
+      "exportSha256": {
+        "none-3150-x1p01-override-3.csv": "51cf67d01f321d02f54ed180e1f03eca443b40dc420579c7658f224967d75e6d",
+        "none-3150-x1p01-override-3.json": "ab1f9a064f363ec2314bfb64937c7d3993a59cd8547d7c6803acb5a69ab26a92"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666610814335,
+        "vy": 0.33333333172610113,
+        "ax": 2.999999999999999,
+        "ay": 2.236498842667843,
+        "jx": 168.3904498273039,
+        "jy": 18.386249742487095
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-2600-x3p25-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.825157476,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "294977356db9db47e02ff3d59e2923ad096b6a4658653d850e59f4bab22b4e0f",
+      "exportSha256": {
+        "zv-2600-x3p25-hold-resume-1p5.csv": "7e451669969f3b4a4c027d639b1656148657ab080788e46c0e3cd71c4ad06fc8",
+        "zv-2600-x3p25-hold-resume-1p5.json": "1a36e3c8982fc8e9e17b597bc5e374cbd49ba26cb5c7a1d9da63e1dd27155ea8"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.66666666207636,
+        "vy": 0.24999999939948944,
+        "ax": 2.9999999688436203,
+        "ay": 2.9999999770061563,
+        "jx": 216.0329508513517,
+        "jy": 59.296330019761896
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-2600-x3p25-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.597105524000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "ed996224e31df1a245608cbbc03d915cb8e9c03845d1b0530fcc662b5338e1e6",
+      "exportSha256": {
+        "zv-2600-x3p25-hold-resume-3.csv": "5e21a29a281b8168cf69ec709eeb7003b06722c96f76e7b0aea690a321857e05",
+        "zv-2600-x3p25-hold-resume-3.json": "65cf521af6cab1752b5cabdaf30554c2f7eb8d7ecee7bf5f26dda229ba9e48ea"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.66666666207636,
+        "vy": 0.3333333321106589,
+        "ax": 2.9999999688436203,
+        "ay": 2.99999998626552,
+        "jx": 267.1659941045263,
+        "jy": 59.29633017512222
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-2600-x3p25-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.8138365080000005,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "7aac2178bfc4cdaa627dc52508e6c557e0ca8fabf5c306648e3ad82cd02acbc5",
+      "exportSha256": {
+        "zv-2600-x3p25-override-1p5.csv": "42d1c36256ac01fe3bbd4e9e7cbc4c71919dfd91f6b69ec94bf9670378ac2699",
+        "zv-2600-x3p25-override-1p5.json": "762a30a4d705d30ac624d599536e2d681adb74a71f223c39017046cdc63c5650"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.66666666207636,
+        "vy": 0.2499999989273501,
+        "ax": 3.0,
+        "ay": 2.726822728559627,
+        "jx": 387.0988066925913,
+        "jy": 59.29633059966807
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-2600-x3p25-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.571137220000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "aabad8fc3707c3604b18cca234fa10cfcbe5ab59d059250f6bef0b348fcc8984",
+      "exportSha256": {
+        "zv-2600-x3p25-override-3.csv": "89172a1c4565cc9b09c06b0140c6f267bf73a12700e6ee3cff2d20948de99991",
+        "zv-2600-x3p25-override-3.json": "33dbed08237bcf9b8808f2c2bed691b71b7997fb37e047bb2a5e6b0b758fbcc7"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.66666666207636,
+        "vy": 0.3333333321106589,
+        "ax": 3.0,
+        "ay": 2.9999999526882504,
+        "jx": 387.0988066925913,
+        "jy": 59.29633059966807
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-3150-x1p9-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.341755579,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "ed728a550f12b0fbd80d2bdc619e88549b57b3c051e00d0c7d4c03da8e0d8067",
+      "exportSha256": {
+        "zv-3150-x1p9-hold-resume-1p5.csv": "313ae7727319daf6b1938d6cd4754a02b700f42ab0b4d28621a9053ba1283ce7",
+        "zv-3150-x1p9-hold-resume-1p5.json": "7687319d2b3ae195e2f147348b06c39f4d002f2f9e4da24b5e5dbb845f564e14"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.666666664292976,
+        "vy": 0.24999999934877995,
+        "ax": 2.9999999788183924,
+        "ay": 2.619934441170893,
+        "jx": 177.7744699055858,
+        "jy": 34.58799460730089
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-3150-x1p9-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.259108368000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "bb950c979ec016c3ff83bfa3379d4ea13fa8c0848a564d5356d5318ad069a8bd",
+      "exportSha256": {
+        "zv-3150-x1p9-hold-resume-3.csv": "214f237b78848eadcdf5d3fd2397d3f68fff6b59d92ba674885d3014b829f27c",
+        "zv-3150-x1p9-hold-resume-3.json": "2a8abbd9f5e3415414d18df3b78b0c20573d07364ce907d231af920d5b91299a"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.666666664292976,
+        "vy": 0.333333332274665,
+        "ax": 3.0000000000000004,
+        "ay": 2.7408978880065504,
+        "jx": 316.7741081052224,
+        "jy": 34.58799460721563
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-3150-x1p9-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.2481289,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "856ad192c671dac12227b7177f939e5a9c51330810616d6de843db399d091b4a",
+      "exportSha256": {
+        "zv-3150-x1p9-override-1p5.csv": "3b9b4a0dbf85a580e48f678a255ce804bcab09c015b47cdc88631018c26c54c3",
+        "zv-3150-x1p9-override-1p5.json": "b152955891ccf576603fee867083997368dff755737bbb4073049c2491f41e90"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.666666664292976,
+        "vy": 0.24999999913939833,
+        "ax": 2.9999999999999996,
+        "ay": 2.619907570675124,
+        "jx": 220.63378336175538,
+        "jy": 34.58799450381768
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zv-3150-x1p9-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.136579405,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "235b7014b7cb71bfc9ce6af8774a40a097c8098bdfcfaab97bf43a87f14f3985",
+      "exportSha256": {
+        "zv-3150-x1p9-override-3.csv": "52eecb9f9090ace6533d55a5bf18eac1437925ebbf0229aca067d26f1e83e273",
+        "zv-3150-x1p9-override-3.json": "de3341f6eeda46d915d5e80dea2d21389e88b7eb98abb9e5723de7b822a5a550"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.666666664292976,
+        "vy": 0.333333332274665,
+        "ax": 3.0000000000000004,
+        "ay": 2.7408978880065504,
+        "jx": 316.7741081052224,
+        "jy": 34.58799448908347
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-2600-x5-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.814900539,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "97f7099921c8f9c2aff0747ac0cc00f1cdace98725cdd92ccbc270aa29851644",
+      "exportSha256": {
+        "zvd-2600-x5-hold-resume-1p5.csv": "978c9936910d2a508c685e974986ce146c436a0e25dc8d084845d19cdfa9a21c",
+        "zvd-2600-x5-hold-resume-1p5.json": "67fad32b69c8a92b5003fbd42a88707c32ac3ea01b44aebd640118f7aad54814"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666637748182,
+        "vy": 0.2499999986154969,
+        "ax": 2.999999976486683,
+        "ay": 2.999999943091977,
+        "jx": 317.5223116196396,
+        "jy": 86.71886595732474
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-2600-x5-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.623713046000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "49b5a0fa1f4604eaf78be6879e50825e5dc30816dff79383a59881fcdc578221",
+      "exportSha256": {
+        "zvd-2600-x5-hold-resume-3.csv": "38af6de0f735418204811a7be3c75d65098496bb2872ad15d4c14cabd3279b81",
+        "zvd-2600-x5-hold-resume-3.json": "c3fd59033483be8e0f3a4a82412111c8ecb197c650505b6656c5d54171331541"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666637748182,
+        "vy": 0.33333333109552943,
+        "ax": 2.999999976486683,
+        "ay": 2.999999943091977,
+        "jx": 317.5223116196396,
+        "jy": 86.71883710640661
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-2600-x5-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.705792211,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "4edb88b9f12bb30a1330fefd0da18e6596387600dfde63e86fb97e783cf15100",
+      "exportSha256": {
+        "zvd-2600-x5-override-1p5.csv": "1779dc5ac8172bccfb3d5b6f086ab0febf87d32c1b3d18a659466d8a9081644e",
+        "zvd-2600-x5-override-1p5.json": "f9fbdcb4ac834903015fdadf4563b24745fa495476ec2b61ff8b16db472abfce"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666637748182,
+        "vy": 0.2499999989004163,
+        "ax": 3.0,
+        "ay": 2.999999953033585,
+        "jx": 317.52230792774367,
+        "jy": 91.22511965032405
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-2600-x5-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 5.509316426000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "851829d265beaf73b705802be0e3ee70a03fbc504e23e3f4413a309d09c04797",
+      "exportSha256": {
+        "zvd-2600-x5-override-3.csv": "0217f9d30cffe921a0616a9db7b17c82fb69f9937f574a39bad394f97e1fd48a",
+        "zvd-2600-x5-override-3.json": "8f24736c149e447c7bc1278f833fc1bc52d2f296968e550d61ce4368985b7685"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666637748182,
+        "vy": 0.33333333109552943,
+        "ax": 3.0,
+        "ay": 2.999999953033585,
+        "jx": 317.52230792774566,
+        "jy": 91.22511965032405
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-3150-x2p5-hold-resume-1p5",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.430923247000001,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "c66db5c0a83031056ea364c63219100d625f81243bb0bfa06d6972df13ca08ae",
+      "exportSha256": {
+        "zvd-3150-x2p5-hold-resume-1p5.csv": "4833d7d8fbaf7c61dbfb23f31c3def16266faf02b93b6f6490815eb1535d1d1f",
+        "zvd-3150-x2p5-hold-resume-1p5.json": "6f7e5ab8a15142233ee798de477f49a1c89d7e239e063cb3c7d6f5555dd73eef"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666645664522,
+        "vy": 0.24999999909358192,
+        "ax": 2.9999999836428057,
+        "ay": 2.777089145272611,
+        "jx": 221.9455596819455,
+        "jy": 45.51051912638537
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-3150-x2p5-hold-resume-3",
+      "control": {
+        "action": "hold-resume",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0.05
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.3478579900000005,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "dfd8b6bc004a3c61f91ed2cbc4247320588f078146baf76b285712b3c8a065cf",
+      "exportSha256": {
+        "zvd-3150-x2p5-hold-resume-3.csv": "1f2be3196ec7aed6bc6d25ed8d04ab9a738dafecc1961086781844bd2faeb817",
+        "zvd-3150-x2p5-hold-resume-3.json": "36704469aa99f6205826fd5207210830db7ba988f6ec0001a1eb67ea0937c7d8"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666645664522,
+        "vy": 0.33333333181932434,
+        "ax": 3.0,
+        "ay": 2.826658289502019,
+        "jx": 221.9455596819455,
+        "jy": 45.510518840752525
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-3150-x2p5-override-1p5",
+      "control": {
+        "action": "override",
+        "atSeconds": 1.5,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.327648413,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "1df6a746008b8d2ab9eb3eeabb0084ee817e0c1ae24ce1ac1546f43ebf57754a",
+      "exportSha256": {
+        "zvd-3150-x2p5-override-1p5.csv": "915c6c8b0bc69e8e2d946126caf1e795ff001fae8ac274142497e05684220fb1",
+        "zvd-3150-x2p5-override-1p5.json": "ddc10b4bd46e5e89c55db7c99309c9ad450bd2abfcc88e8925b686ad9826669b"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666645664522,
+        "vy": 0.2499999999349259,
+        "ax": 3.0,
+        "ay": 2.7770763662652618,
+        "jx": 221.9455557344185,
+        "jy": 45.51051963586018
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    },
+    {
+      "name": "zvd-3150-x2p5-override-3",
+      "control": {
+        "action": "override",
+        "atSeconds": 3,
+        "feedRatio": 0.75,
+        "dwellSeconds": 0
+      },
+      "scope": "Offline ordinary compiler prefix/splice/tail certificate; runner measures runtime latency",
+      "durationS": 6.184217269,
+      "continuousAndSampledBoundsPass": true,
+      "producerManifestSha256": "e93ebf1afde3b80aa892fe801f631b67d56b4123680b6be329c9d4b945d7b245",
+      "exportSha256": {
+        "zvd-3150-x2p5-override-3.csv": "f5426ea5e5b8c648e6274b201fe48b2c13da90769f25af2a2080d2b4575c96d2",
+        "zvd-3150-x2p5-override-3.json": "17569819f10703adf0e2e051ddd16479191e2dba49fba076b83eb954568aa932"
+      },
+      "sourceSha256": "f75ffbdef132d7a1a04c18a48f976dc723e443bde9c0c0822c771853f88d9bd7",
+      "sampledMaxAbs": {
+        "vx": 0.6666666645664522,
+        "vy": 0.33333333181932434,
+        "ax": 3.0000000000000004,
+        "ay": 2.826658289502019,
+        "jx": 221.9455557344171,
+        "jy": 45.51051963586018
+      },
+      "admittedToJ5": false,
+      "classification": "offline-splice"
+    }
+  ],
+  "approvedEnvelope": {
+    "hold": "ready jerk-limited published stop; planned resume",
+    "overrideAtOrBelow100Percent": "filtered executor clock with derivative V/A/J reserve",
+    "overrideAbove100Percent": "raised-feed next-window replan under unchanged axis V/A/J and feed cap"
+  },
+  "admittedControlledExports": 0,
+  "missingCoverage": [
+    "runtime ready-stop/filtered-clock histories with provenance",
+    "above-100-percent raised-feed next-window replans"
+  ],
+  "conclusion": "Diagnostic controls only; nominal subset remains the structural acceptance screen. No full-envelope release."
+}

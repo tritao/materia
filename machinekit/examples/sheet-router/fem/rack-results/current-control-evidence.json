@@ -1,0 +1,263 @@
+{
+  "archive": "build/sheet-router-evidence/control-audit-20261023.tar.gz",
+  "sha256": "671fb45cd94a3d28520659d07c80931462838572e852f505170701c26a72756f",
+  "bytes": 25822,
+  "scope": "Classification audit with metadata/manifests. Producer CSV hashes retained; CSVs remain in producer worktree. No new dynamic replay result.",
+  "verifiedFiles": [
+    {
+      "path": "control_export_audit.py",
+      "sha256": "d8130655e2ade2c34b826c9706709b1828b2334680201be7c4dd726c2b4c0054",
+      "bytes": 4150
+    },
+    {
+      "path": "audit.json",
+      "sha256": "9b7bd299c7547d311624d68dcf935ab45bf2afb8d9ed2c5b78dc5df96b47b844",
+      "bytes": 27911
+    },
+    {
+      "path": "reader/curved_error.py",
+      "sha256": "a4cd3fc479418a6f56deb450a3098b7c5d2b71272602b2d5eab165cb058b4dc0",
+      "bytes": 11964
+    },
+    {
+      "path": "producer/none-2600-x1p02-hold-resume-1p5.json",
+      "sha256": "6bb54b169dff7c70b3058f5e118042cb1ee1c3fcd90365ca3ade1c3a883673a8",
+      "bytes": 6774
+    },
+    {
+      "path": "producer/none-2600-x1p02-hold-resume-1p5.manifest.json",
+      "sha256": "8d7328575484e8cc355dfe2676470007536fd12bac4de6e503c66ba527a5c98a",
+      "bytes": 1786
+    },
+    {
+      "path": "producer/none-2600-x1p02-hold-resume-3.json",
+      "sha256": "95b858ea144eb3e656962cd6ca574852af5afa0f64876c5db8176e72dfe3e36c",
+      "bytes": 6734
+    },
+    {
+      "path": "producer/none-2600-x1p02-hold-resume-3.manifest.json",
+      "sha256": "9b166d3683b1d00d09d1393a61a230285f91823ec805ce1b569be9f0ed44072f",
+      "bytes": 1777
+    },
+    {
+      "path": "producer/none-2600-x1p02-override-1p5.json",
+      "sha256": "66c73599cc8f36737c93d1c008de1d1696a9e9b1a540615e36e0b31b62ea65ec",
+      "bytes": 6574
+    },
+    {
+      "path": "producer/none-2600-x1p02-override-1p5.manifest.json",
+      "sha256": "a15f64b5c524ef71d2fa261664aa9dfe5f713bd7d0a6e755096c202340abd21a",
+      "bytes": 1774
+    },
+    {
+      "path": "producer/none-2600-x1p02-override-3.json",
+      "sha256": "c8b5e09fe156edd822fcb1d8555baa8136a97873c72d853dbd287ce1e85a98de",
+      "bytes": 6545
+    },
+    {
+      "path": "producer/none-2600-x1p02-override-3.manifest.json",
+      "sha256": "a34f310594cfad1ad6fa8c2d89e92b9c3374832daa0ae9db1bb49217919cf009",
+      "bytes": 1765
+    },
+    {
+      "path": "producer/none-3150-x1p01-hold-resume-1p5.json",
+      "sha256": "a18a85e99ee05703d0e3ae92e174f716f7f717e2e1fe8c0bde5b6a0b5fbced38",
+      "bytes": 6754
+    },
+    {
+      "path": "producer/none-3150-x1p01-hold-resume-1p5.manifest.json",
+      "sha256": "b216b286ad6a0359a6195a06d3790e0b652a2c494ef7003aa2bb872c44212e3a",
+      "bytes": 1785
+    },
+    {
+      "path": "producer/none-3150-x1p01-hold-resume-3.json",
+      "sha256": "71b2cc9dc49398b761ee8c7dc7b3201aa1864b69b51c9d62f303589ffe54c49f",
+      "bytes": 6726
+    },
+    {
+      "path": "producer/none-3150-x1p01-hold-resume-3.manifest.json",
+      "sha256": "dc86cbd0e86c5f2f962ed38f2c1f49412da3e232646cb57533feea27beba8c68",
+      "bytes": 1778
+    },
+    {
+      "path": "producer/none-3150-x1p01-override-1p5.json",
+      "sha256": "a38b0afd9afc54d10d000177985552b0fd756c5a7c2426e84c29487b4a44fbd1",
+      "bytes": 6523
+    },
+    {
+      "path": "producer/none-3150-x1p01-override-1p5.manifest.json",
+      "sha256": "f259cfdec2b84d344d8717f4cf46acb5bd820ebbbdf235b045b73967deaeb973",
+      "bytes": 1774
+    },
+    {
+      "path": "producer/none-3150-x1p01-override-3.json",
+      "sha256": "ab1f9a064f363ec2314bfb64937c7d3993a59cd8547d7c6803acb5a69ab26a92",
+      "bytes": 6509
+    },
+    {
+      "path": "producer/none-3150-x1p01-override-3.manifest.json",
+      "sha256": "3130158643ef3b351fa6eaf2713475b386cfd0b92ce49b6d57ba9b1d6a380ba5",
+      "bytes": 1766
+    },
+    {
+      "path": "producer/zv-2600-x3p25-hold-resume-1p5.json",
+      "sha256": "1a36e3c8982fc8e9e17b597bc5e374cbd49ba26cb5c7a1d9da63e1dd27155ea8",
+      "bytes": 6802
+    },
+    {
+      "path": "producer/zv-2600-x3p25-hold-resume-1p5.manifest.json",
+      "sha256": "294977356db9db47e02ff3d59e2923ad096b6a4658653d850e59f4bab22b4e0f",
+      "bytes": 1778
+    },
+    {
+      "path": "producer/zv-2600-x3p25-hold-resume-3.json",
+      "sha256": "65cf521af6cab1752b5cabdaf30554c2f7eb8d7ecee7bf5f26dda229ba9e48ea",
+      "bytes": 6785
+    },
+    {
+      "path": "producer/zv-2600-x3p25-hold-resume-3.manifest.json",
+      "sha256": "ed996224e31df1a245608cbbc03d915cb8e9c03845d1b0530fcc662b5338e1e6",
+      "bytes": 1770
+    },
+    {
+      "path": "producer/zv-2600-x3p25-override-1p5.json",
+      "sha256": "762a30a4d705d30ac624d599536e2d681adb74a71f223c39017046cdc63c5650",
+      "bytes": 6598
+    },
+    {
+      "path": "producer/zv-2600-x3p25-override-1p5.manifest.json",
+      "sha256": "7aac2178bfc4cdaa627dc52508e6c557e0ca8fabf5c306648e3ad82cd02acbc5",
+      "bytes": 1766
+    },
+    {
+      "path": "producer/zv-2600-x3p25-override-3.json",
+      "sha256": "33dbed08237bcf9b8808f2c2bed691b71b7997fb37e047bb2a5e6b0b758fbcc7",
+      "bytes": 6577
+    },
+    {
+      "path": "producer/zv-2600-x3p25-override-3.manifest.json",
+      "sha256": "aabad8fc3707c3604b18cca234fa10cfcbe5ab59d059250f6bef0b348fcc8984",
+      "bytes": 1757
+    },
+    {
+      "path": "producer/zv-3150-x1p9-hold-resume-1p5.json",
+      "sha256": "7687319d2b3ae195e2f147348b06c39f4d002f2f9e4da24b5e5dbb845f564e14",
+      "bytes": 6784
+    },
+    {
+      "path": "producer/zv-3150-x1p9-hold-resume-1p5.manifest.json",
+      "sha256": "ed728a550f12b0fbd80d2bdc619e88549b57b3c051e00d0c7d4c03da8e0d8067",
+      "bytes": 1774
+    },
+    {
+      "path": "producer/zv-3150-x1p9-hold-resume-3.json",
+      "sha256": "2a8abbd9f5e3415414d18df3b78b0c20573d07364ce907d231af920d5b91299a",
+      "bytes": 6772
+    },
+    {
+      "path": "producer/zv-3150-x1p9-hold-resume-3.manifest.json",
+      "sha256": "bb950c979ec016c3ff83bfa3379d4ea13fa8c0848a564d5356d5318ad069a8bd",
+      "bytes": 1765
+    },
+    {
+      "path": "producer/zv-3150-x1p9-override-1p5.json",
+      "sha256": "b152955891ccf576603fee867083997368dff755737bbb4073049c2491f41e90",
+      "bytes": 6559
+    },
+    {
+      "path": "producer/zv-3150-x1p9-override-1p5.manifest.json",
+      "sha256": "856ad192c671dac12227b7177f939e5a9c51330810616d6de843db399d091b4a",
+      "bytes": 1761
+    },
+    {
+      "path": "producer/zv-3150-x1p9-override-3.json",
+      "sha256": "de3341f6eeda46d915d5e80dea2d21389e88b7eb98abb9e5723de7b822a5a550",
+      "bytes": 6588
+    },
+    {
+      "path": "producer/zv-3150-x1p9-override-3.manifest.json",
+      "sha256": "235b7014b7cb71bfc9ce6af8774a40a097c8098bdfcfaab97bf43a87f14f3985",
+      "bytes": 1754
+    },
+    {
+      "path": "producer/zvd-2600-x5-hold-resume-1p5.json",
+      "sha256": "67fad32b69c8a92b5003fbd42a88707c32ac3ea01b44aebd640118f7aad54814",
+      "bytes": 6782
+    },
+    {
+      "path": "producer/zvd-2600-x5-hold-resume-1p5.manifest.json",
+      "sha256": "97f7099921c8f9c2aff0747ac0cc00f1cdace98725cdd92ccbc270aa29851644",
+      "bytes": 1770
+    },
+    {
+      "path": "producer/zvd-2600-x5-hold-resume-3.json",
+      "sha256": "c3fd59033483be8e0f3a4a82412111c8ecb197c650505b6656c5d54171331541",
+      "bytes": 6803
+    },
+    {
+      "path": "producer/zvd-2600-x5-hold-resume-3.manifest.json",
+      "sha256": "49b5a0fa1f4604eaf78be6879e50825e5dc30816dff79383a59881fcdc578221",
+      "bytes": 1762
+    },
+    {
+      "path": "producer/zvd-2600-x5-override-1p5.json",
+      "sha256": "f9fbdcb4ac834903015fdadf4563b24745fa495476ec2b61ff8b16db472abfce",
+      "bytes": 6603
+    },
+    {
+      "path": "producer/zvd-2600-x5-override-1p5.manifest.json",
+      "sha256": "4edb88b9f12bb30a1330fefd0da18e6596387600dfde63e86fb97e783cf15100",
+      "bytes": 1757
+    },
+    {
+      "path": "producer/zvd-2600-x5-override-3.json",
+      "sha256": "8f24736c149e447c7bc1278f833fc1bc52d2f296968e550d61ce4368985b7685",
+      "bytes": 6602
+    },
+    {
+      "path": "producer/zvd-2600-x5-override-3.manifest.json",
+      "sha256": "851829d265beaf73b705802be0e3ee70a03fbc504e23e3f4413a309d09c04797",
+      "bytes": 1750
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-hold-resume-1p5.json",
+      "sha256": "6f7e5ab8a15142233ee798de477f49a1c89d7e239e063cb3c7d6f5555dd73eef",
+      "bytes": 6780
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-hold-resume-1p5.manifest.json",
+      "sha256": "c66db5c0a83031056ea364c63219100d625f81243bb0bfa06d6972df13ca08ae",
+      "bytes": 1777
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-hold-resume-3.json",
+      "sha256": "36704469aa99f6205826fd5207210830db7ba988f6ec0001a1eb67ea0937c7d8",
+      "bytes": 6798
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-hold-resume-3.manifest.json",
+      "sha256": "dfd8b6bc004a3c61f91ed2cbc4247320588f078146baf76b285712b3c8a065cf",
+      "bytes": 1770
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-override-1p5.json",
+      "sha256": "ddc10b4bd46e5e89c55db7c99309c9ad450bd2abfcc88e8925b686ad9826669b",
+      "bytes": 6618
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-override-1p5.manifest.json",
+      "sha256": "1df6a746008b8d2ab9eb3eeabb0084ee817e0c1ae24ce1ac1546f43ebf57754a",
+      "bytes": 1765
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-override-3.json",
+      "sha256": "17569819f10703adf0e2e051ddd16479191e2dba49fba076b83eb954568aa932",
+      "bytes": 6578
+    },
+    {
+      "path": "producer/zvd-3150-x2p5-override-3.manifest.json",
+      "sha256": "e93ebf1afde3b80aa892fe801f631b67d56b4123680b6be329c9d4b945d7b245",
+      "bytes": 1758
+    }
+  ]
+}
