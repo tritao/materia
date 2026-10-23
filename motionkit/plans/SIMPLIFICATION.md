@@ -89,10 +89,48 @@ again with Descartes and returns the Descartes route.
 - the unused ladder and candidate exports: `mk_search_ladder`, `mk_search_ladder_filtered`,
   `mk_*_candidate_count`, `mk_sample_*_candidates[_compact]`.
 
-**Open decisions (user):**
-- Express the 7-DOF swivel as a lattice dimension before deleting `SwivelParameterization`.
-- The excavator `ToolpathPlanRunner` needs an orientation policy for position-coupled yaw. This
-  decision is already pending from PP.
+**7-DOF swivel (decided 2026-10-23).** The swivel becomes one more lattice dimension, handled the same
+way as an external axis in PP6.
+- The swivel is one periodic coordinate per sample.
+- PP6's per-sample centred grid and its de-quantizing band refinement carry over unchanged.
+- Branches at each fixed swivel value come from `NumericBranchIk` over
+  `KinematicGroup.solve(... atSwivel)`.
+- Centre the grid on the preferred swivel: the posture preference, elbow-up by default. Do not centre
+  it on the continuation value; PP6 found that continuation-centred free spin jumped at singularities.
+- No production machine has a 7-DOF arm, so the gate is the existing 7-axis MotionKit cases
+  (`ProgramTests`, `ToolFreedomTests`), ported and compared against their old results.
+- A closed-form SRS (stereo-SEW) per-swivel IK waits for a real 7-DOF arm. It slots in behind the same
+  branch interface.
+- Depends on the PP6 commit, which carries the band refinement.
+
+**Excavator (decided 2026-10-23).** This follows the deletions as the last PP9 item. It does not block
+them, because `ToolpathPlanRunner` uses RobotKit IK and `MoveJ(JointTarget)`, never `solvePath`.
+
+Problem:
+- The machine is a swing plus a planar boom/stick/bucket chain. Its heading is fixed by the TCP's
+  bearing from the swing axis; only the attack angle in the swing plane is free.
+- Today the code works around this:
+  - `DigCyclePlanner.poseAt` hand-sets yaw to `atan2(y, x)`.
+  - The swing is densified "to stay on the manifold".
+  - `ToolpathPlanRunner` emits exact-stop `MoveJ` per waypoint, with joint speeds from an
+    `angularDistance * 0.1` blend.
+  - Between entry and cut depth the bucket edge therefore follows a joint-interpolated curve, not the
+    straight sweep that `BucketSweep` applies to the terrain.
+
+Change:
+- **Orientation policy.** Add a policy for swing-plane machines: the caller supplies the attack angle
+  about the swing-plane normal, and the heading follows from position. It is generic for excavators,
+  backhoes and loader cranes.
+- **IK family.** Add an analytic family for a swing plus a planar 3R chain (about two branches) beside
+  `CartesianAnalyticIk`.
+- **Callers.** `DigCyclePlanner` authors position plus attack angle, and `ToolpathPlanRunner` emits
+  `FollowPath`.
+- **Delete** `poseAt`'s hand-set yaw, the swing densification and the per-point speed blend.
+
+Gate:
+- `ExcavatorTests` dig, grade and dump pass.
+- The cut follows the straight sweep that the terrain update applies.
+- Cycle times are reported against the current `MoveJ` runner.
 
 **Proof:**
 - ProcessKit weld/surface/handling, tending reach, the RobotKit construction skills (Paint), the
