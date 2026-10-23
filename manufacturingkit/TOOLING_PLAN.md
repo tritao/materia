@@ -1393,6 +1393,25 @@ Former assembly decision (2026-10-22): the portable assembly uses one determinis
 Former tolerance decision (2026-10-22): on drafted faces, radial contour and reference-mesh deflection are limited to one twentieth of the declared tolerance multiplied by tan(draft), so shallow walls do not amplify discretisation beyond the vertical tolerance.
 Former source-dependent work parked (2026-10-22): cutter-fit rejects square internal corners in bed backing, the front bearing and rear drive seat formers, and the four foot-access neck/flange pairs. No source casting geometry or cutter-fit check was changed. These findings remain in the kit; selecting a geometry change waits for review while independent cleanup proceeds.
 Former corner decision (user, 2026-10-23): the source declares a corner radius on every casting edge formed by a concave former corner, at least the declared profile cutter's radius plus the recipe margin, using the existing source radius intent. Before applying it, check against the interface records that no mating part or datum touches a new radius; a conflict is reported, not rounded. Frozen-CAD comparisons record the radii as an approved source correction, as with the insert blanks.
+
+**Release system slice (after the corner and EPS slice, before the rest of phase 8).**
+Replace the `pending release and seam system` placeholder with a declared process:
+1. The recipe declares one release system: sealer for exposed board cores, the
+   release agent, coat count, buff and drying times, and an optional PVA film.
+   EPS cores declare their covering (tape or film) and the covering thickness
+   already allowed for. The release system declares whether it is EPS-safe; an
+   EPS-unsafe agent on a face that touches EPS fails.
+2. Surfaces come from the tooling geometry, not from lists. Every resin-wetted
+   face of panels, formers and fixtures gets the release system. Faces in the
+   sealing list are sealed first. Insert and anchor surfaces that must bond are
+   listed as must-not-coat, with masking where they sit next to coated tooling.
+3. The shop record orders the steps (seal, cure, wax coats, PVA, assembly) per
+   part, and the mold assembly sequence applies release before inserts are
+   fitted.
+4. Chemical compatibility of resin, EPS, adhesive and release stays Pending
+   until a coupon trial records it. Readiness is unchanged.
+Acceptance: every resin-wetted tooling face is covered exactly once, no bonding
+face is coated, and an EPS-unsafe agent next to EPS fails with its face IDs.
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.
