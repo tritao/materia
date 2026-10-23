@@ -3,7 +3,9 @@ package machinekit.pneumatic;
 import cadkit.InertiaTensor;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
+import machinekit.component.Dimension;
 import machinekit.component.CollisionHullFacet;
 import machinekit.component.MachineComponent;
 import machinekit.component.PortKind;
@@ -11,9 +13,47 @@ import machinekit.component.Solids;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentType;
 
-/** One cut hose with an authored centreline in its member frame (millimetres).
- * The solid envelope follows the route; mass follows centreline length. */
+/** A maker's stock hose, sold by length: its tube sizes and mass per metre. */
+typedef HoseStockRow = {
+	var maker:String;
+	var designation:String;
+	var label:String;
+	var outerDiameterMm:Float;
+	var innerDiameterMm:Float;
+	var massPerMetreKg:Float;
+	var material:String;
+}
+
+/** One cut hose with an authored centreline in its member frame (millimetres): cut from a maker's stock
+ * (`stock`) or from custom tube sizes. The solid envelope follows the route; mass follows centreline length. */
 class RoutedHose extends MachineComponent {
+	public static inline var CUSTOM = "custom";
+	static var table:Null<Catalog<HoseStockRow>>;
+
+	public static function catalog():Catalog<HoseStockRow> {
+		if (table == null) table = new Catalog("hose stock", row -> row.designation, [{
+			maker: "Schmalz", designation: "10.07.09.00001", label: "VSL 4-2 PU MI-TR",
+			outerDiameterMm: 4, innerDiameterMm: 2, massPerMetreKg: 0.011, material: "polyurethane PU"
+		}], _ -> ({
+			source: "https://www.schmalz.co.jp/en-jp/products/vacuum-technology-for-automation-301607/vacuum-components-301608/filters-and-connections-308965/hoses-and-connections-309034/vacuum-compressed-air-hoses-vsl-309035/10.07.09.00001",
+			standard: null, standardEdition: null, dimensionKind: Nominal,
+			conformance: NominalEnvelope,
+			verifiedFields: ["outerDiameterMm", "innerDiameterMm", "massPerMetreKg"]
+		}));
+		return table;
+	}
+
+	/** A cut of stock `designation` along `route`; its part number is the stock and cut length. */
+	public static function stock(designation:String, route:Array<Vector>, serviceKind:PortKind = Vacuum):RoutedHose {
+		var row = catalog().get(designation), length = 0.0;
+		if (route != null) for (i in 0...route.length - 1)
+			if (route[i] != null && route[i + 1] != null) length += route[i + 1].subtract(route[i]).length();
+		return new RoutedHose('${row.designation}-L${Dimension.format(length)}', route, row.outerDiameterMm, row.innerDiameterMm, row.massPerMetreKg,
+			serviceKind, row.material, false, row);
+	}
+
+	/** The stock it is cut from, or null for a custom hose. */
+	public final stockRow:Null<HoseStockRow>;
 	static inline var COLLISION_SIDES:Int = 12;
 	public final route:Array<Vector>;
 	public final outerDiameterMm:Float;
@@ -24,7 +64,7 @@ class RoutedHose extends MachineComponent {
 
 	public function new(designation:String, route:Array<Vector>, outerDiameterMm:Float,
 			innerDiameterMm:Float, massPerMetreKg:Float, serviceKind:PortKind = Vacuum,
-			material:String = "polyurethane PU", codeOnly:Bool = true) {
+			material:String = "polyurethane PU", codeOnly:Bool = true, ?stockRow:HoseStockRow) {
 		if (route == null || route.length < 2 || !Math.isFinite(outerDiameterMm) ||
 			outerDiameterMm <= 0 || !Math.isFinite(innerDiameterMm) || innerDiameterMm <= 0 ||
 			innerDiameterMm >= outerDiameterMm || !Math.isFinite(massPerMetreKg) ||
@@ -47,6 +87,7 @@ class RoutedHose extends MachineComponent {
 		super(designation, 'Routed ${serviceKind == Vacuum ? "vacuum" : serviceKind == Pneumatic ? "air" : "screw delivery"} hose, ${Math.round(length)} mm cut',
 			material, codeOnly);
 		this.route = copied;
+		this.stockRow = stockRow;
 		this.outerDiameterMm = outerDiameterMm;
 		this.innerDiameterMm = innerDiameterMm;
 		this.lengthMm = length;
@@ -120,13 +161,18 @@ class RoutedHose extends MachineComponent {
 	static var recipeTypeCache:Null<ComponentType>;
 
 	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [ComponentRecipeSupport.text("designation", "HOSE"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [
+			ComponentRecipeSupport.choice("stock", [CUSTOM].concat(catalog().designations()), CUSTOM),
+			ComponentRecipeSupport.text("designation", "HOSE"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
 			ComponentRecipeSupport.length("outerDiameterMm", 4), ComponentRecipeSupport.length("innerDiameterMm", 2), ComponentRecipeSupport.scalar("massPerMetreKg", 0.01),
 			ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic", "ScrewFeed"], "Vacuum")],
-			v -> new RoutedHose(v.token("designation"), ComponentRecipeSupport.route(v.token("route")),
-				v.number("outerDiameterMm"), v.number("innerDiameterMm"), v.number("massPerMetreKg"),
-				v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service") == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed,
-				"polyurethane PU", false), true, false, ["route"]);
+			v -> {
+				var service = v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service") == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed;
+				// Stock sets the tube and part number; only the route and service are the cut's own.
+				return v.token("stock") != CUSTOM ? stock(v.token("stock"), ComponentRecipeSupport.route(v.token("route")), service)
+					: new RoutedHose(v.token("designation"), ComponentRecipeSupport.route(v.token("route")), v.number("outerDiameterMm"),
+						v.number("innerDiameterMm"), v.number("massPerMetreKg"), service, "polyurethane PU", false);
+			}, true, false, ["route"]);
 		return recipeTypeCache;
 	}
 
@@ -134,7 +180,8 @@ class RoutedHose extends MachineComponent {
 	override public function componentType():Null<ComponentType>
 		return Std.isExactType(this, RoutedHose) ? recipeType() : null;
 
-	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", designation)
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
+			.setToken("stock", stockRow == null ? CUSTOM : stockRow.designation).setToken("designation", designation)
 			.setToken("route", ComponentRecipeSupport.routeText(route))
 			.setNumber("outerDiameterMm", outerDiameterMm).setNumber("innerDiameterMm", innerDiameterMm)
 			.setNumber("massPerMetreKg", massPerMetreKg).setToken("service", Std.string(serviceKind)).setToken("material", materialSpec());

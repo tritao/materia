@@ -132,11 +132,8 @@ class ComponentClassification {
 		file(registry, "machinekit.pneumatic.suction-cup", "Vacuum", ComponentKind.Generic);
 		file(registry, "machinekit.pneumatic.vacuum-generator", "Vacuum", ComponentKind.Generic);
 		file(registry, "machinekit.pneumatic.vacuum-pressure-sensor", "Vacuum", ComponentKind.Generic);
-		file(registry, "machinekit.pneumatic.schmalz-suction-cup", "Vacuum", ComponentKind.Supplier);
-		file(registry, "machinekit.pneumatic.schmalz-vacuum-generator", "Vacuum", ComponentKind.Supplier);
 		file(registry, "machinekit.pneumatic.routed-hose", "Hoses and fittings", ComponentKind.Generic);
-		file(registry, "machinekit.pneumatic.schmalz-vacuum-hose", "Hoses and fittings", ComponentKind.Supplier);
-		file(registry, "machinekit.pneumatic.schmalz-push-in-fitting", "Hoses and fittings", ComponentKind.Supplier);
+		file(registry, "machinekit.pneumatic.push-in-fitting", "Hoses and fittings", ComponentKind.Supplier);
 		// power
 		file(registry, "machinekit.power.vfd", "Spindle drives", ComponentKind.Generic);
 		file(registry, "machinekit.power.brake-resistor", "Spindle drives", ComponentKind.Generic);
@@ -178,8 +175,8 @@ class ComponentClassification {
 		file(registry, "machinekit.robotics.tool-changer-master", "Tool changers", ComponentKind.Generic);
 		file(registry, "machinekit.robotics.tool-changer-tool", "Tool changers", ComponentKind.Generic);
 		file(registry, "machinekit.robotics.tool-service-module", "Tool changers", ComponentKind.Generic);
-		file(registry, "machinekit.robotics.schmalz-sxt-master", "Tool changers", ComponentKind.Supplier);
-		file(registry, "machinekit.robotics.schmalz-sxt-tool", "Tool changers", ComponentKind.Supplier);
+		file(registry, "machinekit.robotics.bayonet-changer-master", "Tool changers", ComponentKind.Supplier);
+		file(registry, "machinekit.robotics.bayonet-changer-tool", "Tool changers", ComponentKind.Supplier);
 		// routing
 		file(registry, "machinekit.routing.atc-spindle", "Spindle and tool change", ComponentKind.Generic);
 		file(registry, "machinekit.routing.tool-holder", "Spindle and tool change", ComponentKind.Generic);

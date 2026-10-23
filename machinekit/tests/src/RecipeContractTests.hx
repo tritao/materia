@@ -8,7 +8,6 @@ import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
 import machinekit.component.PortInterface;
 import machinekit.component.Bom;
-import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
 import machinekit.standard.ParallelKey;
 import machinekit.component.Bom.BomItem;
 import machinekit.component.ComponentDetail.*;
@@ -34,10 +33,12 @@ class RecipeContractTests {
 		check(hoseBom.lines().length == 1 && hoseBom.lines()[0].quantity == 2, "Equal-length hose routes must share one BOM line");
 		var cupBom = new Bom();
 		cupBom.addComponent(new SuctionCup(40, 18));
-		cupBom.addComponent(new SuctionCup(40, 18, null, null, null, PushIn(4)));
+		cupBom.addComponent(new SuctionCup(40, 18, null, null, PushIn(4)));
 		check(cupBom.lines().length == 2, "Different cup fittings must have different BOM identities");
-		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
-		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
+		checkRebuild(new SuctionCup(40, 18, 900, 0.2, Thread("G1/8")));
+		checkRebuild(SuctionCup.model("10.01.01.11401"));
+		checkRebuild(new VacuumGenerator(80, PushIn(4), Thread("G1/4")));
+		checkRebuild(VacuumGenerator.model("10.02.01.00563"));
 		// Only MachineKit's own recipes: applications may register unclassified ones into the default registry.
 		var builtIn = MachineKitComponents.standard();
 		for (type in builtIn.all())
@@ -126,7 +127,7 @@ class RecipeContractTests {
 				check(variant.bom.partNumber != baseline.bom.partNumber, '${type.id}: material variants alias the same part number');
 			}
 			checkRebuild(new RoutedHose("TEST-ROUTE", [new Vector(), new Vector(0, 0, 100), new Vector(100, 0, 100)], 4, 2, 0.011));
-			checkRebuild(new SchmalzVacuumHose("10.07.09.00001", [new Vector(), new Vector(0, 0, 100), new Vector(100, 0, 100)]));
+			checkRebuild(RoutedHose.stock("10.07.09.00001", [new Vector(), new Vector(0, 0, 100), new Vector(100, 0, 100)]));
 			checkRebuild(new ShaftCoupling(5, 8, null, null, [{z: 6, angle: 0}]));
 			checkRebuild(new SteppedShaft([{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}], [{name: "bearing", z: 10}],
 				[{name: "key", z0: 52, key: ParallelKey.forShaft(6, 6)}], [

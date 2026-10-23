@@ -3,10 +3,10 @@ package machinekit.robotics;
 import cadkit.modeling.Vector;
 import machinekit.component.Solids;
 import machinekit.pneumatic.VacuumPressureSensor;
-import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
-import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
-import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
-import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.pneumatic.PushInFitting;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.RoutedHose;
 
 /** Catalog suction tool with a physical flange adapter and inline vacuum sensor. */
 class SuctionTool extends EndEffector {
@@ -14,11 +14,11 @@ class SuctionTool extends EndEffector {
 		super();
 		addComponent("plate", new EndEffectorPlate(flange));
 		addComponent("bar", new FrameBar(30, 20, 90));
-		addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
-		addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
-		addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
+		addComponent("ejector", VacuumGenerator.model("10.02.01.00563"));
+		addComponent("cup", SuctionCup.model("10.01.01.11401"));
+		addComponent("fitting", new PushInFitting("10.08.02.00203"));
 		addComponent("sensor", new VacuumPressureSensor(4));
-		addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
+		addComponent("hose", RoutedHose.stock("10.07.09.00001", [
 			new Vector(20, 0, 40), new Vector(35, 0, 60),
 			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
 		mount("plate", "robot");

@@ -17,8 +17,8 @@ import machinekit.component.PortInterface;
 import materia.assembly.AssemblyFrames;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
-import machinekit.robotics.schmalz.SchmalzSxtMaster;
-import machinekit.robotics.schmalz.SchmalzSxtTool;
+import machinekit.robotics.BayonetChangerMaster;
+import machinekit.robotics.BayonetChangerTool;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import machinekit.transmission.GearPair;
@@ -373,7 +373,7 @@ class MachineAssemblyDescriptionTests {
 
 	static function suctionInterfaceRoundTrip():Void {
 		var assembly = new MachineAssembly();
-		assembly.addComponent("cup", new SuctionCup(20, 10, null, null, null, PushIn(4)));
+		assembly.addComponent("cup", new SuctionCup(20, 10, null, null, PushIn(4)));
 		var rebuilt = MachineAssembly.decode(assembly.encode());
 		switch rebuilt.components()[0].component.port("vacuum").iface {
 			case PushIn(size): if (size != 4) throw "Suction cup port diameter changed";
@@ -1094,14 +1094,14 @@ class MachineAssemblyDescriptionTests {
 
 	static function changerDocumentRoundTrip():Void {
 		var set = new EndEffectorSet();
-		set.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
+		set.addComponent("master", new BayonetChangerMaster("10.07.13.00013"));
 		set.mount("master", "robot");
 		set.exposePort("robotAir", "master", "airIn1");
 		set.exposePort("coupledAir", "master", "airOut1");
 		set.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
 		var tool = new EndEffector();
-		tool.addComponent("half", new SchmalzSxtTool("10.07.13.00018"));
-		tool.addComponent("generator", new VacuumGenerator(null, null, Thread("G1/8-M")));
+		tool.addComponent("half", new BayonetChangerTool("10.07.13.00018"));
+		tool.addComponent("generator", new VacuumGenerator(null, Thread("G1/8-M")));
 		tool.addMate("generator-mount", "fixed", "half", "payload", "generator", "mount");
 		tool.connectPorts("tool-air", "half", "airOut1", "generator", "air");
 		tool.mount("half", "master");

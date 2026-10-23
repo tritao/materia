@@ -15,9 +15,6 @@ class PneumaticComponents {
 		registry.register(PneumaticCylinderRod.recipeType());
 		registry.register(AirSupply.recipeType());
 		registry.register(SolenoidValve.recipeType());
-		registry.register(machinekit.pneumatic.schmalz.SchmalzPushInFitting.recipeType());
-		registry.register(machinekit.pneumatic.schmalz.SchmalzSuctionCup.recipeType());
-		registry.register(machinekit.pneumatic.schmalz.SchmalzVacuumGenerator.recipeType());
-		registry.register(machinekit.pneumatic.schmalz.SchmalzVacuumHose.recipeType());
+		registry.register(PushInFitting.recipeType());
 	}
 }

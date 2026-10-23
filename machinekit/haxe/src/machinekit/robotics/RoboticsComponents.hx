@@ -22,7 +22,7 @@ class RoboticsComponents {
 		registry.registerFamily(OffsetGripperFinger.family());
 		registry.register(ToolChangerMaster.recipeType());
 		registry.register(ToolChangerTool.recipeType());
-		registry.register(machinekit.robotics.schmalz.SchmalzSxtMaster.recipeType());
-		registry.register(machinekit.robotics.schmalz.SchmalzSxtTool.recipeType());
+		registry.register(BayonetChangerMaster.recipeType());
+		registry.register(BayonetChangerTool.recipeType());
 	}
 }

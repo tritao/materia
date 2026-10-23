@@ -13,6 +13,8 @@ class ComponentType {
 
 	final inputs:Array<ComponentParameter>;
 	final build:ComponentValues->MachineComponent;
+	/** The generator before the material input is applied: what material these inputs give by themselves. */
+	final naturalBuild:ComponentValues->MachineComponent;
 	final keepDesignation:Bool;
 	final materialInDesignation:Bool;
 	final defaultMaterial:String;
@@ -61,9 +63,11 @@ class ComponentType {
 			if (declared != defaultMaterial)
 				throw 'Component type "$id" material default differs from its generator';
 		}
+		naturalBuild = sourceBuild;
 		this.build = values -> {
 			var component = sourceBuild(values);
-			if (materialEditable)
+			// A material left at the recipe's default keeps the model's own: a catalogue row's product material.
+			if (materialEditable && values.token("material") != defaultMaterial)
 				component.setMaterial(values.token("material"));
 			return component;
 		};
@@ -164,9 +168,17 @@ class ComponentType {
 		return id + "|" + parts.join("|");
 	}
 
+	/** The designation stays the part number while the material is the one these inputs give by themselves. */
 	public function partNumber(component:MachineComponent):String
-		return keepDesignation
-			&& (component.materialSpec() == defaultMaterial || materialInDesignation) ? component.designation : key(valuesOf(component));
+		return keepDesignation && (materialInDesignation || component.materialSpec() == naturalMaterial(component))
+			? component.designation : key(valuesOf(component));
+
+	function naturalMaterial(component:MachineComponent):String {
+		if (component.materialSpec() == defaultMaterial) return defaultMaterial;
+		var values = valuesOf(component), inputs = new ComponentValues();
+		for (name in values.names()) if (name != "material") inputs.set(name, values.get(name));
+		return naturalBuild(resolve(inputs)).materialSpec();
+	}
 
 	static function seenIndex(inputs:Array<ComponentParameter>, name:String):Int {
 		for (i in 0...inputs.length)

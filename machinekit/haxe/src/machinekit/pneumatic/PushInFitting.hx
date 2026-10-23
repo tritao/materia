@@ -1,4 +1,4 @@
-package machinekit.pneumatic.schmalz;
+package machinekit.pneumatic;
 
 import cadkit.InertiaTensor;
 import cadkit.modeling.Part;
@@ -15,7 +15,8 @@ import machinekit.component.Solids;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentType;
 
-typedef SchmalzFittingSpec = {
+typedef PushInFittingRow = {
+	var maker:String;
 	var designation:String;
 	var label:String;
 	var envelopeDiameterMm:Float;
@@ -25,15 +26,15 @@ typedef SchmalzFittingSpec = {
 	var massKg:Float;
 }
 
-/** Straight G1/4 male to 4 mm OD tube fitting. Cylindrical envelope and
- * centre/inertia are approximations; the published weight is retained. */
-class SchmalzPushInFitting extends MachineComponent {
-	static var table:Null<Catalog<SchmalzFittingSpec>>;
-	public final spec:SchmalzFittingSpec;
+/** A threaded push-in fitting from a maker's catalogue: thread to tube OD. Cylindrical envelope and centre/inertia
+ * are approximations; the published weight is retained. */
+class PushInFitting extends MachineComponent {
+	static var table:Null<Catalog<PushInFittingRow>>;
+	public final spec:PushInFittingRow;
 
-	public static function catalog():Catalog<SchmalzFittingSpec> {
-		if (table == null) table = new Catalog("Schmalz push-in fitting", row -> row.designation, [{
-			designation: "10.08.02.00203", label: "STV-GE G1/4-AG 4",
+	public static function catalog():Catalog<PushInFittingRow> {
+		if (table == null) table = new Catalog("push-in fitting", row -> row.designation, [{
+			maker: "Schmalz", designation: "10.08.02.00203", label: "STV-GE G1/4-AG 4",
 			envelopeDiameterMm: 8.6, envelopeLengthMm: 19.6,
 			tubeOdMm: 4, thread: "G1/4-M", massKg: 0.015
 		}], _ -> ({
@@ -48,7 +49,7 @@ class SchmalzPushInFitting extends MachineComponent {
 
 	public function new(designation:String) {
 		var row = catalog().get(designation);
-		super(row.designation, 'Schmalz ${row.label} vacuum fitting', "brass");
+		super(row.designation, '${row.maker} ${row.label} vacuum fitting', "brass");
 		this.spec = row;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addPort({name: "hose", kind: Vacuum, role: Consumer, iface: PushIn(row.tubeOdMm), required: true});
@@ -63,15 +64,15 @@ class SchmalzPushInFitting extends MachineComponent {
 	static var recipeTypeCache:Null<ComponentType>;
 
 	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.schmalz-push-in-fitting",
-			[ComponentRecipeSupport.catalog("designation", SchmalzPushInFitting.catalog(), "10.08.02.00203")],
-			v -> new SchmalzPushInFitting(v.token("designation")), true);
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.push-in-fitting",
+			[ComponentRecipeSupport.catalog("designation", PushInFitting.catalog(), "10.08.02.00203")],
+			v -> new PushInFitting(v.token("designation")), true);
 		return recipeTypeCache;
 	}
 
 	/** Subclasses must declare their own recipe and saved values. */
 	override public function componentType():Null<ComponentType>
-		return Std.isExactType(this, SchmalzPushInFitting) ? recipeType() : null;
+		return Std.isExactType(this, PushInFitting) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());
 

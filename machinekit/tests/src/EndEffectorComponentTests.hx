@@ -5,12 +5,10 @@ import machinekit.component.MassProperties.MassSource;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
-import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
-import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
-import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
-import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
-import machinekit.robotics.schmalz.SchmalzSxtMaster;
-import machinekit.robotics.schmalz.SchmalzSxtTool;
+import machinekit.pneumatic.PushInFitting;
+import machinekit.pneumatic.RoutedHose;
+import machinekit.robotics.BayonetChangerMaster;
+import machinekit.robotics.BayonetChangerTool;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Part;
 import cadkit.parametric.GeometricConnectors;
@@ -47,18 +45,18 @@ import materia.project.SceneArtifact;
 
 class EndEffectorComponentTests {
 	public static function run():Void {
-		var vendorCup = new SchmalzSuctionCup("10.01.01.11401");
-		var vendorEjector = new SchmalzVacuumGenerator("10.02.01.00563");
-		var vendorFitting = new SchmalzPushInFitting("10.08.02.00203");
-		var cup30 = new SchmalzSuctionCup("10.01.01.11400");
-		var cup50 = new SchmalzSuctionCup("10.01.01.11441");
+		var vendorCup = SuctionCup.model("10.01.01.11401");
+		var vendorEjector = VacuumGenerator.model("10.02.01.00563");
+		var vendorFitting = new PushInFitting("10.08.02.00203");
+		var cup30 = SuctionCup.model("10.01.01.11400");
+		var cup50 = SuctionCup.model("10.01.01.11441");
 		if (cup30.massProperties().mass >= vendorCup.massProperties().mass ||
 			cup50.massProperties().mass <= vendorCup.massProperties().mass ||
 			(cast cup30.effectiveAreaMm2:Float) >= (cast vendorCup.effectiveAreaMm2:Float) ||
 			(cast cup50.effectiveAreaMm2:Float) <= (cast vendorCup.effectiveAreaMm2:Float))
 			throw "Catalog cup sizes must have distinct mass and rated area";
-		var sxtMaster = new SchmalzSxtMaster("10.07.13.00013");
-		var sxtTool = new SchmalzSxtTool("10.07.13.00018");
+		var sxtMaster = new BayonetChangerMaster("10.07.13.00013");
+		var sxtTool = new BayonetChangerTool("10.07.13.00018");
 		var masterHalf = sxtMaster.coupling(), toolHalf = sxtTool.coupling();
 		if (masterHalf == null || toolHalf == null || masterHalf.key != toolHalf.key ||
 			!PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
@@ -68,7 +66,7 @@ class EndEffectorComponentTests {
 			Math.abs(sxtMaster.massProperties().mass - 1.7) > 1e-9 ||
 			Math.abs(sxtTool.massProperties().mass - 0.55) > 1e-9)
 			throw "Schmalz SXT pair has incorrect fit, channels or mass";
-		var hose = new SchmalzVacuumHose("10.07.09.00001", [new Vector(0, 0, 0),
+		var hose = RoutedHose.stock("10.07.09.00001", [new Vector(0, 0, 0),
 			new Vector(0, 0, 100), new Vector(100, 0, 100)]);
 		if (Math.abs(hose.lengthMm - 200) > 1e-9 ||
 			Math.abs(hose.massProperties().mass - 0.0022) > 1e-9 ||

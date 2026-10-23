@@ -4,10 +4,10 @@ import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.Solids;
 import machinekit.pneumatic.VacuumPressureSensor;
-import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
-import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
-import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
-import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.pneumatic.PushInFitting;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.RoutedHose;
 
 /** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
  * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`, with an
@@ -28,11 +28,11 @@ class ArmSuctionTool implements ArmTool {
 		var result = new EndEffector();
 		result.addComponent("plate", new EndEffectorPlate(flange));
 		result.addComponent("bar", new FrameBar(30, 20, 90));
-		result.addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
-		result.addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
-		result.addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
+		result.addComponent("ejector", VacuumGenerator.model("10.02.01.00563"));
+		result.addComponent("cup", SuctionCup.model("10.01.01.11401"));
+		result.addComponent("fitting", new PushInFitting("10.08.02.00203"));
 		result.addComponent("sensor", new VacuumPressureSensor(4));
-		result.addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
+		result.addComponent("hose", RoutedHose.stock("10.07.09.00001", [
 			new Vector(20, 0, 40), new Vector(35, 0, 60),
 			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
 		result.mount("plate", "robot");

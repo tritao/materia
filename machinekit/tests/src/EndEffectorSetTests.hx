@@ -10,8 +10,8 @@ import machinekit.robotics.ToolChangerTool;
 import machinekit.robotics.ParallelGripper;
 import machinekit.robotics.ParallelGripperBody;
 import machinekit.robotics.ParallelGripperSpec;
-import machinekit.robotics.schmalz.SchmalzSxtMaster;
-import machinekit.robotics.schmalz.SchmalzSxtTool;
+import machinekit.robotics.BayonetChangerMaster;
+import machinekit.robotics.BayonetChangerTool;
 import materia.assembly.AssemblyFrames;
 import haxeon.Equality;
 import haxeon.wire.JsonWire;
@@ -143,13 +143,13 @@ class EndEffectorSetTests {
 			throw "End effector set diagnostics must report mount and changer faults";
 
 		var sxtSet = new EndEffectorSet();
-		sxtSet.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
+		sxtSet.addComponent("master", new BayonetChangerMaster("10.07.13.00013"));
 		sxtSet.mount("master", "robot");
 		sxtSet.exposePort("robotAir", "master", "airIn1");
 		sxtSet.exposePort("coupledAir", "master", "airOut1");
 		sxtSet.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
 		var sxtTool = new EndEffector();
-		sxtTool.addComponent("half", new SchmalzSxtTool("10.07.13.00018"));
+		sxtTool.addComponent("half", new BayonetChangerTool("10.07.13.00018"));
 		sxtTool.mount("half", "master");
 		sxtTool.exposePort("air", "half", "airIn1");
 		sxtSet.addTool("manual", sxtTool);
@@ -157,7 +157,7 @@ class EndEffectorSetTests {
 		var rebuiltSxt = EndEffectorSet.decode(savedSxt);
 		if (!Equality.equals(sxtSet.describe(), rebuiltSxt.describe()))
 			throw "SXT changer description changed after wire round trip";
-		sxtTool.addComponent("late", new SchmalzSxtTool("10.07.13.00018"));
+		sxtTool.addComponent("late", new BayonetChangerTool("10.07.13.00018"));
 		if (sxtSet.configuration("manual").components().length != 2)
 			throw "Changer retained a mutable tool builder";
 		var coupledSxt = sxtSet.configuration("manual");

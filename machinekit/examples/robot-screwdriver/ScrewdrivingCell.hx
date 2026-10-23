@@ -39,7 +39,7 @@ class ScrewdrivingCell extends MachineAssembly {
 		include("arm", arm);
 		addComponent("table", new ArmTable(700, 400, RobotArm.TABLE_TOP), AssemblyFrames.translation(0, -520, 0));
 		addComponent("controller", controller, AssemblyFrames.translation(-800, 200, 0));
-		addComponent("vacuum", new VacuumGenerator(60, null, null, machinekit.screwdriving.ScrewdrivingInterfaces.vacuum()),
+		addComponent("vacuum", new VacuumGenerator(60, null, machinekit.screwdriving.ScrewdrivingInterfaces.vacuum()),
 			AssemblyFrames.translation(-800, 350, 0));
 		include("work", work);
 		// The table constrains the tapped plate, not any screw or housing inferred from radius.

@@ -1,4 +1,4 @@
-package machinekit.robotics.schmalz;
+package machinekit.robotics;
 
 import cadkit.InertiaTensor;
 import cadkit.modeling.Part;
@@ -15,7 +15,8 @@ import machinekit.component.Solids;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentType;
 
-typedef SchmalzSxtToolSpec = {
+typedef BayonetChangerToolRow = {
+	var maker:String;
 	var designation:String;
 	var label:String;
 	var nominalPipeDiameterMm:Float;
@@ -26,15 +27,15 @@ typedef SchmalzSxtToolSpec = {
 	var outsideThread:String;
 }
 
-/** Male, tool-side Schmalz SXT 40 bayonet with three pneumatic passages.
- * Its cylindrical envelope and mass centre are estimates from published bounds. */
-class SchmalzSxtTool extends MachineComponent {
-	static var table:Null<Catalog<SchmalzSxtToolSpec>>;
-	public final spec:SchmalzSxtToolSpec;
+/** The tool-side half of a manual bayonet tool changer, from a maker's catalogue, with its pneumatic passages.
+ * Cylindrical envelope and mass centre are estimates from published bounds. */
+class BayonetChangerTool extends MachineComponent {
+	static var table:Null<Catalog<BayonetChangerToolRow>>;
+	public final spec:BayonetChangerToolRow;
 
-	public static function catalog():Catalog<SchmalzSxtToolSpec> {
-		if (table == null) table = new Catalog("Schmalz SXT tool-side bayonet", row -> row.designation, [{
-			designation: "10.07.13.00018", label: "SXT-QC-CON-40-M-3",
+	public static function catalog():Catalog<BayonetChangerToolRow> {
+		if (table == null) table = new Catalog("tool-side bayonet changer", row -> row.designation, [{
+			maker: "Schmalz", designation: "10.07.13.00018", label: "SXT-QC-CON-40-M-3",
 			nominalPipeDiameterMm: 40, channels: 3, envelopeDiameterMm: 68.3,
 			lengthMm: 156.5, massKg: 0.55, outsideThread: "G1/8-F"
 		}], _ -> ({
@@ -50,7 +51,7 @@ class SchmalzSxtTool extends MachineComponent {
 
 	public function new(designation:String) {
 		var row = catalog().get(designation);
-		super(row.designation, 'Schmalz ${row.label} tool-side bayonet', "aluminium 6061");
+		super(row.designation, '${row.maker} ${row.label} tool-side bayonet', "aluminium 6061");
 		this.spec = row;
 		addConnector("master", Mount, Solids.axial(0, 0, 0));
 		addConnector("payload", Mount, Solids.axial(0, 0, row.lengthMm));
@@ -71,15 +72,15 @@ class SchmalzSxtTool extends MachineComponent {
 	static var recipeTypeCache:Null<ComponentType>;
 
 	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.schmalz-sxt-tool",
-			[ComponentRecipeSupport.catalog("designation", SchmalzSxtTool.catalog(), "10.07.13.00018")],
-			v -> new SchmalzSxtTool(v.token("designation")), true);
+		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.bayonet-changer-tool",
+			[ComponentRecipeSupport.catalog("designation", BayonetChangerTool.catalog(), "10.07.13.00018")],
+			v -> new BayonetChangerTool(v.token("designation")), true);
 		return recipeTypeCache;
 	}
 
 	/** Subclasses must declare their own recipe and saved values. */
 	override public function componentType():Null<ComponentType>
-		return Std.isExactType(this, SchmalzSxtTool) ? recipeType() : null;
+		return Std.isExactType(this, BayonetChangerTool) ? recipeType() : null;
 
 	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());
 
