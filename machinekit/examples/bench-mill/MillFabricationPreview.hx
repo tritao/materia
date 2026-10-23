@@ -55,7 +55,7 @@ class MillFabricationPreview {
 		removeGenerated(dir);
 		machinekit.tooling.ToolingFiles.directory(dir);
 		var frame = MillMoldSetup.frame(),
-			p = CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
+			p = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var process = processSpec(p.document.recipe);
 		var fabricationSpec = MillFabricationSetup.spec();
 		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan);
@@ -104,6 +104,15 @@ class MillFabricationPreview {
 				validation.message=validation.status==Fail ? validation.message+"; "+message : message;
 				validation.status=Fail;validation.severity=materia.tooling.ToolingDiagnostic.ToolingSeverity.Error;
 				if (validation.affectedIds.indexOf(board.id)<0) validation.affectedIds.push(board.id);
+			}
+		}
+		for (former in formerShop.formers) {
+			var validation=formerShop.validation.filter(row -> row.rule=="fabrication.former-machining."+former.id)[0];
+			if (validation.status==Pending && former.boards.length>0
+				&& former.boards.filter(board -> board.programs.length==0).length==0) {
+				validation.status=Pass;
+				validation.severity=materia.tooling.ToolingDiagnostic.ToolingSeverity.Info;
+				validation.message="Exact board construction and controller CAM generated; cutter fit and access checked. Machine, workholding, board/grip and sealing qualification remain Pending in fabrication process checks.";
 			}
 		}
 		checks = checks.concat(ToolingFabricationExport.write(p, f, dir,formerShop));

@@ -10,7 +10,7 @@ class ProductionAnchorTests {
 		var document=MillMoldSetup.document(frame);
 		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,document.input.id,document.input.revision);
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
-		var plan=materia.tooling.casting.CastingMoldPlanner.plan(document,MillMoldSetup.options(frame));
+		var plan=machinekit.tooling.CastingMoldCad.plan(document,MillMoldSetup.options(frame));
 		var interference=machinekit.tooling.InsertAnchorGeometry.reviewMold(plan);
 		check(interference.length>0,"production mold checks every derived anchor");
 		for (finding in interference)

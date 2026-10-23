@@ -422,10 +422,11 @@ class FoundationDesignTests {
 			if (bolt.length != 40 || bolt.propertyClass != machinekit.standard.PropertyClass.Steel88)
 				throw "Mill column service screws must derive the 40 mm stack length and class 8.8";
 		}
-		var mold = materia.tooling.casting.CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
+		var mold = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		assertions++;
-		if (mold.coreUnits.length != 2 || mold.coreUnits.filter(unit -> unit.coreIds.length == 3 && unit.featureIds.length == 3).length != 2)
-			throw "Retained mill rail beams must preserve two authored core units with three foam fragments each";
+		if (mold.coreUnits.length != 6 || mold.coreUnits.filter(unit -> unit.coreIds.length == 3 && unit.featureIds.length == 3).length != 2
+			|| mold.coreUnits.filter(unit -> unit.coreIds.length == 1 && unit.featureIds.length == 1).length != 4)
+			throw "Retained mill rail beams preserve their two fragmented core units beside four single foot-access units";
 		var reference:Dynamic = haxe.Json.parse(sys.io.File.getContent(root + "/reference.json"));
 		if (Sys.args().indexOf("--audit-openings") >= 0)
 			for (source in [frame.base.body, frame.column.body])

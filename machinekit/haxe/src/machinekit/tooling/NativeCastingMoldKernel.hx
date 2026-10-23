@@ -96,6 +96,39 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 		} catch (error:Dynamic) {scope.close();throw error;}
 	}
 
+	public function prismaticBands(region:CastingRegion,width:Float,depth:Float,height:Float,id:String):Array<materia.casting.CastingSection.CastingSectionBand> {
+		var source=machinekit.structural.CastingRegionCad.part(region);
+		var levels:Array<Float>=[];
+		try {
+			// Every depth transition of a line/arc 2.5D prism has a vertex.
+			// The whole-band prism proof below rejects curved/hidden variations;
+			// these levels never approximate a non-prismatic surface.
+			for (index in 0...source.shape.subshapeCount(CadKit.ShapeKind.Vertex)) {
+				var vertex=source.shape.subshape(CadKit.ShapeKind.Vertex,index);
+				try levels.push(vertex.position().get_z()) catch (error:Dynamic) {vertex.close();throw error;}
+				vertex.close();
+			}
+			source.close();
+		} catch (error:Dynamic) {source.close();throw error;}
+		levels.sort(Reflect.compare);
+		var unique:Array<Float>=[];
+		for (level in levels) if (unique.length==0 || level-unique[unique.length-1]>1e-7) unique.push(level);
+		levels=unique;
+		if (levels.length<2) throw "Solid has no positive prismatic depth: "+id;
+		levels[0]=0;levels[levels.length-1]=height;
+		var bands:Array<materia.casting.CastingSection.CastingSectionBand>=[];
+		var index=levels.length-1;
+		while (index>0) {
+			var top=levels[index],bottom=levels[index-1];index--;
+			if (top-bottom<1e-7) continue;
+			var slice:CastingRegion=Intersection([region,materia.tooling.casting.MoldRegions.box({x:0,y:0,z:bottom,width:width,depth:depth,height:top-bottom})]);
+			var prism=prismaticSection(slice,{x:0,y:0,z:1},1e-6,id);
+			if (prism==null) throw "Non-prismatic machining band "+bottom+".."+top+" mm";
+			bands.push({topMm:top,bottomMm:bottom,contours:prism.contours});
+		}
+		return bands;
+	}
+
 	static function copy(value:CastingRegionMoments):CastingRegionMoments
 		return {volumeMm3:value.volumeMm3,firstMomentMm4:{x:value.firstMomentMm4.x,y:value.firstMomentMm4.y,z:value.firstMomentMm4.z}};
 

@@ -5,7 +5,8 @@ import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 enum abstract CoreSupportKind(String) to String {
 	var Bridge = "bridge";
-	var BedSocket = "bed-socket";
+	var RoutedSocket = "routed-socket";
+	var RegisteredFlange = "registered-flange";
 }
 
 enum abstract SupportHardwareKind(String) to String {
@@ -56,7 +57,11 @@ typedef CoreSupport = {
 	var embedDepth:Float;
 	var bondAreaMm2:Float;
 	var bridgeBondAreaMm2:Float;
+	/** Geometric upper limit for clamp bearing on a registered EPS flange. */
+	var clampBearingAreaMm2:Float;
 	var socketOperationId:Null<String>;
+	/** Exact wall-operation trace retained when an access former becomes EPS. */
+	var registrationProfiles:Array<materia.tooling.casting.CastingMoldPlan.MoldVolumeProfile>;
 	var foot:Null<CoreFoot>;
 	var panelIds:Array<String>;
 

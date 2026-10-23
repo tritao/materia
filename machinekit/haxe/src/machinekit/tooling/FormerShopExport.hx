@@ -70,7 +70,7 @@ class FormerShopExport {
 				var construction=FormerManufacturing.plan(former,plan.document.recipe,resin,MoldRegions.envelope(plan.document));
 				var item:FormerShopItem={id:former.volume.id,sourceIds:former.featureIds.copy(),construction:construction,
 					boards:[],reconstructionDifferenceMm3:null,minimumInteriorCoverMm:null};
-				var status:ToolingCheckStatus=Pending,message="Declared board construction and machining require shop/tool/workholding, sealing, pocket-jig and board/grip qualification.";
+				var status:ToolingCheckStatus=Pending,message="Exact board construction and accessible sections resolved; controller CAM has not yet been checked. Shop/tool/workholding, sealing, pocket-jig and board/grip qualification remain Pending.";
 				function board(id:String,stock:PanelStockSpec,region:CastingRegion,pose:materia.assembly.AssemblyRecord.AssemblyFrame,draft:Float):Void {
 					var job:FormerBoardJob={id:id,stock:stock,region:region,pose:pose,machining:null,sealingFaces:[],programs:[],reasons:[]};
 					try {

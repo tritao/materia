@@ -45,7 +45,7 @@ class LiftingSourceTests {
 			}
 			check(capacityCount==2*anchorCount,"each anchor retains both unresolved mix-strength checks");
 		}
-		var p=materia.tooling.casting.CastingMoldPlanner.plan(MillMoldSetup.document(frame),MillMoldSetup.options(frame));
+		var p=machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame),MillMoldSetup.options(frame));
 		var bed=p.panels.members.filter(member -> member.panel.id=="bed")[0];
 		var local=machinekit.tooling.ToolingPanel.fromPlan(bed.panel).geometry();
 		var world=machinekit.assembly.PosedParts.moved(local,bed.pose);local.close();

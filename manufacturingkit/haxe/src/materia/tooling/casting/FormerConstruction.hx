@@ -1,6 +1,7 @@
 package materia.tooling.casting;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.casting.CastingSection.CastingSectionBand;
 import materia.tooling.panel.PanelStockSpec;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 
@@ -66,13 +67,6 @@ typedef FormerConstructionPlan = {
 	var sealingRegions:Array<materia.casting.CastingRegion>;
 }
 
-/** Finished material in one constant-section band, in the board work frame. */
-typedef FormerMachiningBand = {
-	var topMm:Float;
-	var bottomMm:Float;
-	var contours:Array<materia.casting.CastingSection.CastingSectionContour>;
-}
-
 /** Native section extraction supplies these neutral records. CamKit owns
  * compensation and consumes exactly these same line/arc contours.
  */
@@ -83,7 +77,7 @@ typedef FormerMachiningPlan = {
 	var depthMm:Float;
 	var heightMm:Float;
 	var stock:PanelStockSpec;
-	var bands:Array<FormerMachiningBand>;
+	var bands:Array<CastingSectionBand>;
 	var draftDegrees:Float;
 	var cutter:FormerCutter;
 	var roughingCutter:FormerCutter;

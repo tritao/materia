@@ -97,12 +97,12 @@ class CastingMoldExport {
 			throw "Assembly recipe did not restore exactly";
 		text(dir + "/mold.assembly.json", saved);
 		scene(dir, "mold", assembled, p, review);
-		var coreList = [
-			for (c in p.cores)
-				c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.BedSocket
-					? c.id+": "+c.layers.length+" layers, bed socket "+c.support.socketOperationId
-					: c.id + ": " + c.layers.length + " layers, carrier " + MoldCores.carrierId(c) + ", shared " + MoldCores.bridgeId(c)
-		];
+		var coreList = [for (c in p.cores) switch c.support.kind {
+			case RoutedSocket: c.id+": "+c.layers.length+" layers, routed socket "+c.support.socketOperationId;
+			case RegisteredFlange: c.id+": "+c.layers.length+" layers, externally clamped registered flange at "+MoldCores.receiverId(c);
+			case Bridge: c.id+": "+c.layers.length+" layers, carrier "+MoldCores.carrierId(c)+", shared "+MoldCores.bridgeId(c);
+			default: throw "Unknown core support: "+c.id;
+		}];
 		text(dir
 			+ "/procedure.md",
 			"# Casting mold review — "

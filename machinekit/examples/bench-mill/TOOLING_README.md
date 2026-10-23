@@ -1,8 +1,8 @@
 # Base casting mold review
 
-**Not fabrication-ready; no coupon trial recorded.** Former CAM now uses single
-boards or removable panel boxes. Seven former assemblies retain explicit cutter-fit
-failures at sharp source corners; their geometry has not been changed.
+**Not fabrication-ready; no coupon trial recorded.** Deep face-open access
+pockets use sacrificial EPS. Shallow rigid tooling uses single-board parts;
+square datum and steel contacts are preserved by separate board pieces.
 
 This follows `manufacturingkit/TOOLING_PLAN.md` and generates the mold for
 the same complete frame instantiated by `MillFramePreview`: both XY and Z
@@ -35,8 +35,8 @@ The kit includes:
 - Two longitudinal support rails with blind wall-top locating sockets, round/slot
   positioning and separate M6 clamp bolts. The rails themselves need qualified
   external clamps to the walls; their attachment capacity is not established.
-- Connected detail/backing formers for shallow guide/drive recesses,
-  side-withdrawing foot-access openings and separate fill-side stem pieces.
+- Single-board detail/backing formers for shallow guide/drive recesses and
+  fill-side stems, plus four side-withdrawing EPS foot-access tools.
   Overlapping cuts are allocated deterministically into disjoint tooling solids;
   insert envelopes and datum fixtures are subtracted, preserving the intended
   intersection between foot-access and stem openings around the steel seats.
@@ -384,39 +384,49 @@ The anchor-revision baseline has zero trapped pockets (previously 74), with the 
 
 ## Former board construction and CAM
 
-The 14 former envelopes use 10 single-board blanks and four open panel boxes.
-Stock is the recipe's declared 18 or 25 mm board family. A thicker blank is faced
-to height; drafted solid edges use the declared tapered cutter. A drafted panel
-box remains Unsupported because leaning walls are not implemented. There are no
-glued-sheet blanks or 3D finishing route.
+The recipe selects sacrificial EPS for a body-open pocket whose smallest blank
+section exceeds its thickest declared board. This converts the four foot-access
+tools. Their registered neck/flange and clearance around independent insert
+datums remain exact; EPS is wire-cut in proved prismatic bands, with the declared
+covering and adhesive gaps. External flange clamp capacity remains Pending.
 
-The four foot-access bodies each use five rebated panels, plus separate neck and
-flange sheets. Their board material, declared dry interior and seam seal reproduce
-the functional former exactly. The neck/flange sheets register against the wall's
-external closure. Hollow-body joints use internal 4 × 30 mm pocket screws, a 15°
-jig, 20 mm end distance and at most 100 mm pitch; short joints use one centred
-screw when two will not fit. Heads and access stay in the dry cavity. Board/grip,
-jig, sealing, restraint and machine qualification remain pending.
+Shallow tools are cut from one declared 18 or 25 mm board, faced to height where
+needed. The former panel-box construction remains available for tall tools:
+internal pocket screws and dry-side access, no glue stack or drafted box route.
 
-The kit describes 38 board jobs. CAM accepts 27, with 11 sharp-corner rejections
-across bed backing, the bearing/drive seats and the four neck/flange pairs.
-These findings stay blocking. The 20 hollow-body boards also enter the existing
-pressure checks; their finished clipping and coupled corner loads retain an
-explicit Unsupported plate-model gap.
+The three remaining sharp inner loops met source steel or temporary datum
+supports. Rounding those contacts would change their fit. Instead the exact box
+algebra supplies separate rectangular board parts, with sealed contact joints.
+No source casting radius or mating position is changed. Bed backing uses 33
+single-board pieces; each bearing/drive seat uses four. Every machined edge and
+faced contact surface is listed for sealing.
 
-Use `former-board-stock.csv`, `former-pocket-screws.csv`, and
-`former-manufacturing.json` for stock, closure sites, sealing faces and program
-order. The four former assembly files show the removable pieces. Former programs
-retain the declared fixed G54 datum and spoilboard plane; headers state each
-blank's actual top Z. Only through bands include breakthrough.
+| Former feature | Applied source radius | Disposition |
+| --- | --- | --- |
+| `front-y-bearing-seat` | 0 mm | Preserve `driveYFloating` datum contact; four board pieces |
+| `rear-y-drive-seat` | 0 mm | Preserve `driveYFixed` datum contact; four board pieces |
+| `foot-access-LeftFront` | 0 mm | EPS; no routed rigid inside corner |
+| `foot-access-LeftRear` | 0 mm | EPS; no routed rigid inside corner |
+| `foot-access-RightFront` | 0 mm | EPS; no routed rigid inside corner |
+| `foot-access-RightRear` | 0 mm | EPS; no routed rigid inside corner |
+| Bed backing | Not a source feature | Preserve proud steel and datum contacts; separate board pieces |
+
+Use `eps-supports.json` for each core's receiver, registration profiles and
+restraint construction. Use `former-board-stock.csv` and `former-manufacturing.json` for stock, sealing
+faces and program order. Programs retain the fixed G54 datum and spoilboard;
+only through bands receive breakthrough. Machine, workholding, board/grip and
+chemical compatibility remain unqualified.
 
 The earlier totals changed from 889/402/123/74 to 626/568/119/0 (Pass/Pending/
 Unsupported/Fail) because fewer anchors and no separate washers removed repeated
 geometry checks, unqualified mix capacities became Pending, hardware gaps were
 resolved, and the 74 real washer-annulus traps were removed geometrically.
 
-The regenerated kit contains 375 artifacts and 67 review programs (40 panel,
-27 former), with 626 Pass, 561 Pending, 139 Unsupported and 7 Fail. The seven
-Fail records preserve the 11 uncuttable source corners; the 20 added Unsupported
-records expose the hollow-wall structural-model gaps. Trapped pockets remain
-zero. No casting geometry was changed.
+The preceding rigid-access baseline had 625 Pass, 556 Pending, 136 Unsupported
+and 7 Fail, with 370 artifacts and 67 review programs. Its seven former machining
+findings are the regression baseline for the corner/EPS revision. The corner/EPS kit has 560 artifacts and 88 programs (40 panel, 48 former),
+with **767 Pass / 615 Pending / 116 Unsupported / 0 Fail** and zero traps. All
+48 former machining checks pass. The increase includes 62 drawing checks, 48
+machining checks and 32 restraint checks for the separate parts; release
+qualification remains Pending. Removing the four hollow bodies removes their
+20 unsupported wall-model checks. Fabrication readiness remains false.

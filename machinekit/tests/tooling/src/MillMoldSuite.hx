@@ -5,7 +5,7 @@ import machinekit.tooling.CastingMoldCad;
 class MillMoldSuite {
 	public static function main():Void {
 		var frame = MillMoldSetup.frame();
-		var p = CastingMoldPlanner.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
+		var p = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var review=CastingMoldCad.review(p);
         MillMoldChecks.run(frame,p,review);
         var scene=machinekit.assembly.AssemblyPreview.scene(CastingMoldCad.assembly(p),"casting-presentation");

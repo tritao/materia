@@ -2,6 +2,7 @@ package camkit;
 
 import materia.tooling.casting.FormerConstruction;
 import materia.casting.CastingSection.CastingSectionContour;
+import materia.casting.CastingSection.CastingSectionBand;
 import materia.casting.CastingProfiles;
 import materia.casting.CastingProfileOffsets;
 import materia.tooling.panel.PanelJoints;
@@ -110,7 +111,7 @@ class CamToolingFormers {
 		return new Tool(number,0,2*outer,profile,flute,spec.stickOutMm*0.001,2*outer);
 	}
 
-	static function clear(job:CamJob,plan:FormerMachiningPlan,band:FormerMachiningBand,tool:Tool,
+	static function clear(job:CamJob,plan:FormerMachiningPlan,band:CastingSectionBand,tool:Tool,
 		settings:CamToolingPanels.PanelCamSettings,allowance:Float,width:Float,depth:Float,margin:Float,base:Float):Void {
 		var z=base+band.topMm*0.001;
 		var bottom=base+band.bottomMm*0.001-(band.bottomMm==0 ? settings.breakthroughAllowance : 0);

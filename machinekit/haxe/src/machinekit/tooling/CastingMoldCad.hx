@@ -300,7 +300,7 @@ class CastingMoldCad {
 				id: c.id,
 				material: EPSStock,
 				cuts: [],
-				regions: [MoldCores.foam(c)],
+				regions: [MoldCores.physical(c)],
 				profiles: [],
 				pieces: []
 			}), pose);
@@ -510,11 +510,12 @@ class CastingMoldCad {
 				});
 			}
 			var rowIds:Array<String> = [];
-			for (c in p.cores)
+			var bridgeCores=p.cores.filter(core -> core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge);
+			for (c in bridgeCores)
 				if (rowIds.indexOf(MoldCores.bridgeId(c)) < 0)
 					rowIds.push(MoldCores.bridgeId(c));
 			for (id in rowIds) {
-				var panelIds = [id].concat([for (c in p.cores) if (MoldCores.bridgeId(c) == id) MoldCores.carrierId(c)]),
+				var panelIds = [id].concat([for (c in bridgeCores) if (MoldCores.bridgeId(c) == id) MoldCores.carrierId(c)]),
 					shapes:Array<Part> = [];
 				var shape = Solids.building(shapes, owned -> {
 					for (m in p.supportPanels)
@@ -531,7 +532,7 @@ class CastingMoldCad {
 				permanent.push({id: materia.tooling.ToolingIds.derive("", id, "-fixture"), members: panelIds});
 			}
 			for (m in p.supportPanels)
-				if (rowIds.indexOf(m.panel.id) < 0 && p.cores.filter(c -> MoldCores.carrierId(c) == m.panel.id).length == 0) {
+				if (rowIds.indexOf(m.panel.id) < 0 && bridgeCores.filter(c -> MoldCores.carrierId(c) == m.panel.id).length == 0) {
 					var shape = panelWorld(m);
 					parts.push(shape);
 					members.push({id: m.panel.id, part: shape, direction: new Vector(0, 0, 1)});
@@ -555,9 +556,10 @@ class CastingMoldCad {
 				});
 			}
 			for (c in p.cores) {
-				var shape = machinekit.structural.CastingRegionCad.part(c.cavity);
+				var shape = machinekit.structural.CastingRegionCad.part(MoldCores.occupied(c));
 				parts.push(shape);
-				members.push({id: c.id, part: shape, direction: new Vector(0, 0, 1)});
+				var direction=MoldCores.withdrawal(c,p.panels.members.concat(p.supportPanels));
+				members.push({id: c.id, part: shape, direction: new Vector(direction.x,direction.y,direction.z)});
 			}
 			for (h in p.hardware)
 				if (h.kind == SupportHardwareKind.FixturePin || (h.kind == SupportHardwareKind.BoreMask && !threadedMask(p, h))) {
@@ -596,7 +598,7 @@ class CastingMoldCad {
 			var demolding = SweptRemoval.analyze(members, 1e-4);
 			members.pop();
 			for (id in rowIds) {
-				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in p.cores) if (MoldCores.bridgeId(c) == id) c.id]),
+				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in bridgeCores) if (MoldCores.bridgeId(c) == id) c.id]),
 					pieces:Array<Part> = [];
 				var n = members.length - 1;
 				while (n >= 0) {

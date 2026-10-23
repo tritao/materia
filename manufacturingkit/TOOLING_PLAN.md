@@ -27,9 +27,9 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 3: single-pocket box mold with selectable core supports and source-thread insert fixtures.
 - [x] Phase 4: mill-base allocation, exact reconstruction/coverage and separate assembly/demolding graphs.
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
-- [ ] Phase 6: exact fill, castability and process reporting implemented; planned cleanup and phase-8 integration remain.
-- [ ] Phase 7: records, requirements, exact feature geometry, former CAM and cleanup landed; drafted core comparison and source-corner corrections are parked.
-- [ ] Phase 8: exact stepped/flared envelope tooling landed; column/hobber fixture integration and complete setups remain.
+- [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
+- [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
+- [ ] Phase 8: exact envelope tooling landed; release-system slice, column/hobber fixture integration and complete setups remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1391,8 +1391,10 @@ Former shop decision (2026-10-22): dry-side pocket drilling uses a manual angled
 Former spacing decision (2026-10-22): a short rebate gets one centred pocket screw when two screws cannot retain the declared end distance and two-diameter separation; longer rebates use evenly spaced screws within the declared maximum pitch.
 Former assembly decision (2026-10-22): the portable assembly uses one deterministically selected parent joint per board; all rebate contacts and closure sites remain in the validated panel plan and shop records.
 Former tolerance decision (2026-10-22): on drafted faces, radial contour and reference-mesh deflection are limited to one twentieth of the declared tolerance multiplied by tan(draft), so shallow walls do not amplify discretisation beyond the vertical tolerance.
-Former source-dependent work parked (2026-10-22): cutter-fit rejects square internal corners in bed backing, the front bearing and rear drive seat formers, and the four foot-access neck/flange pairs. No source casting geometry or cutter-fit check was changed. These findings remain in the kit; selecting a geometry change waits for review while independent cleanup proceeds.
+Former machining findings (2026-10-22): the preceding kit rejected sharp inner corners in bed backing, the bearing/drive seat tools and four foot-access neck/flange pairs. The contact-preserving disposition below resolves them without changing source geometry or weakening cutter-fit checks.
 Former corner decision (user, 2026-10-23): the source declares a corner radius on every casting edge formed by a concave former corner, at least the declared profile cutter's radius plus the recipe margin, using the existing source radius intent. Before applying it, check against the interface records that no mating part or datum touches a new radius; a conflict is reported, not rounded. Frozen-CAD comparisons record the radii as an approved source correction, as with the insert blanks.
+
+Corner contact decision (2026-10-23): the remaining three sharp inner loops coincide with temporary datum blocks or proud source steel. Rounding would change those mating contacts, so no source radius is applied there. Their exact disjoint box pieces are separate single-board formers with sealed contact joints; the original rectangular cavity and contact planes remain unchanged. The four deep foot-access tools use EPS, preserving the access flange and the independent datum clearance. No casting geometry correction is needed for these seven findings.
 
 **Release system slice (after the corner and EPS slice, before the rest of phase 8).**
 Replace the `pending release and seam system` placeholder with a declared process:
@@ -1529,3 +1531,9 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   selector on the actual support frame, clearance-only panel bores and explicit
   screw/mask/end-plug records. Plain masks facing a panel get clearance access
   bores; resin-side receiver threads or counterbores are not introduced.
+
+- EPS support decision: a deep access pocket retains the exact registered neck,
+  flange and independent insert-datum clearance of the former template. The EPS
+  blank is wire-cut in exact section bands and held by external flange clamps;
+  clamp capacity stays Pending. Routed sockets remain one shared construction
+  for clear rectangular bed and side faces, with the actual receiving panel.

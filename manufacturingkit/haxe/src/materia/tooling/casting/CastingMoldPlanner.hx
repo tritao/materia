@@ -301,6 +301,7 @@ class CastingMoldPlanner {
 					&& MoldRegions.overlaps(MoldRegions.feature(d,a.featureId),MoldRegions.feature(d,b.featureId),1e-7,a.featureId))
 					throw "Overlapping reusable formers require distinct priorities: " + a.featureId + ", " + b.featureId;
 			}
+		var sideEPS=new Map<String,Bool>();
 		var bodies = new Map<String, MoldBox>(), low = e.z;
 		for (i in d.input.inserts) {
 			var dimensions = InsertBodies.box(i.body, i.id);
@@ -349,12 +350,14 @@ class CastingMoldPlanner {
 						continue;
 					}
 					var cb=featureBox(d,f);
-					if (Math.abs(cb.z + cb.height - b.z - b.height) > 1e-7
-						|| cb.x <= e.x
-						|| cb.x + cb.width >= e.x + e.width
-						|| cb.y <= e.y
-						|| cb.y + cb.depth >= e.y + e.depth)
-						throw "Shared bridge needs internal fill-open EPS pocket: " + f.id;
+					var fillOpen=Math.abs(cb.z+cb.height-b.z-b.height)<=1e-7
+						&& cb.x>e.x && cb.x+cb.width<e.x+e.width
+						&& cb.y>e.y && cb.y+cb.depth<e.y+e.depth;
+					if (!fillOpen) {
+						if (s.withdrawal==null) throw "Side EPS requires an explicit body-opening withdrawal: "+f.id;
+						sideEPS.set(f.id,true);
+						continue;
+					}
 					if (BoxAlgebra.volume(BoxAlgebra.subtract([cb], insertBoxes.concat(epsBoxes))) < CastingMoldPlanner.volume(cb) - 1e-5)
 						throw "Intersecting EPS/insert cavities need an explicit allocation";
 					var core=MoldCoreLayers.box(cb,f.id,r,CoreSupportKind.Bridge),id=core.id;
@@ -401,7 +404,7 @@ class CastingMoldPlanner {
 			};
 			var access = ordered.filter(f -> f.kind != CastingFeatureKind.InsertRecess
 				&& strategies.filter(s -> s.featureId == f.id
-					&& s.strategy == CoreStrategy.ReusableFormer
+					&& (s.strategy == CoreStrategy.ReusableFormer || sideEPS.exists(s.featureId))
 					&& s.withdrawal != null
 					&& Math.abs(s.withdrawal.x) > 0.9)
 					.length == 1 && MoldRegions.overlaps(MoldRegions.feature(d,f.id),MoldRegions.box(pad),1e-7,f.id));
@@ -545,7 +548,7 @@ class CastingMoldPlanner {
 		for (f in ordered)
 			if (f.kind != CastingFeatureKind.InsertRecess) {
 				var s = strategies.filter(s -> s.featureId == f.id)[0];
-				if (s.strategy != CoreStrategy.ReusableFormer) continue;
+				if (s.strategy != CoreStrategy.ReusableFormer && !sideEPS.exists(f.id)) continue;
 				var sourceRegion=MoldRegions.feature(d,f.id);
 				if (MoldRegions.boxes(sourceRegion)==null) {
 					if (s.withdrawal==null || !MoldFormerAccess.supported(d,f,s.withdrawal))
@@ -701,7 +704,84 @@ class CastingMoldPlanner {
 						"Feature has no supported physical tooling owner; choose an explicit alternative.", "tooling.feature.unsupported." + source.id, true);
 				}
 			}
+		var converted=new Map<String,String>();
+		for (former in result.formers) {
+			var owners=former.featureIds.filter(id -> sideEPS.exists(id));
+			if (owners.length==0) continue;
+			if (owners.length!=1) throw "Side EPS access former needs one source owner: "+former.volume.id;
+			var wall=result.openings.filter(open -> open.sealingIds.indexOf(former.volume.id)>=0);
+			if (wall.length!=1) throw "Side EPS needs one registered access panel: "+owners[0];
+			var id=materia.tooling.ToolingIds.derive("core-",former.volume.id);
+			var direction=former.withdrawal;
+			// The profile frame is a neutral datum. Whole-band extrusion proofs
+			// qualify its wire sections; it is not a sampled motion check.
+			var normal={x:-direction.x,y:-direction.y,z:-direction.z};
+			var axis=materia.casting.CastingBounds.axis(normal);
+			if (axis==null) throw "EPS access former needs an axial stock frame: "+owners[0];
+			var rotation=axis==0 ? (normal.x>0 ? [0.0,0,1,1,0,0,0,1,0] : [0.0,0,-1,-1,0,0,0,1,0])
+				: axis==1 ? (normal.y>0 ? [1.0,0,0,0,0,1,0,-1,0] : [1.0,0,0,0,0,-1,0,1,0])
+				: normal.z>0 ? [1.0,0,0,0,1,0,0,0,1] : [1.0,0,0,0,-1,0,0,0,-1];
+			var stockFrame=F.fromRotationMatrix(0,0,0,rotation);
+			var core=MoldCoreLayers.registeredFlange(MoldRegions.tooling(former.volume),owners[0],id,r,stockFrame,wall[0].panelId);
+			core.support.registrationProfiles=former.volume.profiles;
+			result.cores.push(core);
+			converted.set(former.volume.id,id);
+		}
+		for (feature in result.features) {
+			feature.memberIds=[for (id in feature.memberIds) converted.exists(id) ? converted.get(id) : id];
+			if (sideEPS.exists(feature.featureId)) feature.kind=EPSFeature;
+		}
+		for (open in result.openings)
+			open.sealingIds=[for (id in open.sealingIds) converted.exists(id) ? converted.get(id) : id];
+		result.formers=result.formers.filter(former -> !converted.exists(former.volume.id));
+		splitBoardContacts(result);
+		result.coreUnits=coreUnits(d.input,result.cores);
 		return finish(result,strategies);
+	}
+
+	/** Square source steel and datum contacts must remain square. A ring cut
+	 * around them is made from separate rectangular boards, rather than routing
+	 * an impossible inside corner or changing the mating source geometry.
+	 * BoxAlgebra supplies exact disjoint pieces; their joints require sealing.
+	 */
+	static function splitBoardContacts(plan:CastingMoldPlan):Void {
+		var replacements=new Map<String,Array<String>>(),formers:Array<MoldFormer>=[];
+		for (former in plan.formers) {
+			var volume=former.volume;
+			if (former.draftDegrees!=0 || volume.pieces.length<=1 || volume.regions.length>0
+				|| volume.profiles.length>0 || volume.cuts.length>0) {
+				formers.push(former);
+				continue;
+			}
+			var bounds=MoldCores.stockBounds(MoldRegions.tooling(volume),volume.id);
+			var direction=former.withdrawal;
+			var height=Math.abs(direction.x)*bounds.width+Math.abs(direction.y)*bounds.depth+Math.abs(direction.z)*bounds.height;
+			var thickest=0.0;
+			for (stock in plan.document.recipe.former.stocks) thickest=Math.max(thickest,stock.measuredThickness);
+			if (height>thickest+1e-7) {
+				// Tall formers retain their shared screwed panel-box construction.
+				formers.push(former);
+				continue;
+			}
+			var ids:Array<String>=[];
+			for (index in 0...volume.pieces.length) {
+				var id=materia.tooling.ToolingIds.derive("",volume.id,"-board-"+index);
+				ids.push(id);
+				formers.push({volume:{id:id,material:volume.material,pieces:[volume.pieces[index]],
+					regions:[],profiles:[],cuts:[]},featureIds:former.featureIds.copy(),
+					withdrawal:former.withdrawal,draftDegrees:former.draftDegrees});
+			}
+			replacements.set(volume.id,ids);
+		}
+		function expand(ids:Array<String>):Array<String> {
+			var result:Array<String>=[];
+			for (id in ids) result=result.concat(replacements.exists(id) ? replacements.get(id) : [id]);
+			result.sort(Reflect.compare);
+			return result;
+		}
+		for (feature in plan.features) feature.memberIds=expand(feature.memberIds);
+		for (opening in plan.openings) opening.sealingIds=expand(opening.sealingIds);
+		plan.formers=formers;
 	}
 
 	/** Complement of the actual source body, never its bounding-box stand-in.
@@ -938,19 +1018,25 @@ class CastingMoldPlanner {
 			for (id in m.panel.contactOpenings)
 				if (!seen.exists(m.panel.id + "/" + id))
 					throw "Unclassified mold opening";
+		var sealingProfiles:Array<MoldVolumeProfile>=[];
 		for (f in p.formers) {
 			MoldVolumeRecords.copy(f.volume);
-			for (profile in f.volume.profiles) {
-				var panels = p.panels.members.filter(m -> m.panel.id == profile.panelId);
-				if (panels.length != 1)
-					throw "Unknown former sealing panel";
-				var operations = panels[0].panel.operations.filter(o -> o.id == profile.operationId);
-				if (operations.length != 1
-					|| ToolingCodec.canonical(operations[0].contour) != ToolingCodec.canonical(profile.contour)
-					|| ToolingCodec.canonical(panels[0].pose) != ToolingCodec.canonical(profile.pose)
-					|| profile.depth != panels[0].panel.stock.measuredThickness)
-					throw "Former sealing profile differs from panel operation";
-			}
+			sealingProfiles=sealingProfiles.concat(f.volume.profiles);
+		}
+		for (core in p.cores) {
+			if (core.support.kind==CoreSupportKind.RegisteredFlange && core.support.registrationProfiles.length!=1)
+				throw "Registered EPS needs one exact wall sealing profile: "+core.id;
+			sealingProfiles=sealingProfiles.concat(core.support.registrationProfiles);
+		}
+		for (profile in sealingProfiles) {
+			var panels=p.panels.members.filter(m -> m.panel.id==profile.panelId);
+			if (panels.length!=1) throw "Unknown former sealing panel";
+			var operations=panels[0].panel.operations.filter(o -> o.id==profile.operationId);
+			if (operations.length!=1
+				|| ToolingCodec.canonical(operations[0].contour)!=ToolingCodec.canonical(profile.contour)
+				|| ToolingCodec.canonical(panels[0].pose)!=ToolingCodec.canonical(profile.pose)
+				|| profile.depth!=panels[0].panel.stock.measuredThickness)
+				throw "Former sealing profile differs from panel operation";
 		}
 		var exactResin=requiresRegions(p.document);
 		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document);
@@ -1183,7 +1269,7 @@ class CastingMoldPlanner {
 							throw "Bridge pad covers cavity fill opening: " + pad.panel.id;
 					}
 			}
-			if (support.kind != CoreSupportKind.Bridge && support.kind != CoreSupportKind.BedSocket)
+			if (support.kind != CoreSupportKind.Bridge && support.kind != CoreSupportKind.RoutedSocket)
 				throw "Invalid core support kind";
 			if (!Math.isFinite(support.adhesiveThickness)
 				|| support.adhesiveThickness <= 0
@@ -1191,7 +1277,7 @@ class CastingMoldPlanner {
 				|| support.bondAreaMm2 <= 0)
 				throw "Invalid core bond dimensions";
 			for (id in support.panelIds)
-				if (plan.supportPanels.filter(m -> m.panel.id == id).length != 1)
+				if (plan.supportPanels.concat(plan.panels.members).filter(m -> m.panel.id == id).length != 1)
 					throw "Missing support panel";
 			for (id in support.bondedPanelIds)
 				if (support.panelIds.indexOf(id) < 0)
@@ -1199,8 +1285,8 @@ class CastingMoldPlanner {
 			if (support.kind == CoreSupportKind.Bridge
 				&& (support.bondedPanelIds.length != 2 || support.panelIds.length != 4 || support.foot != null || support.socketOperationId != null))
 				throw "Incomplete bridge";
-			if (support.kind == CoreSupportKind.BedSocket
-				&& (support.bondedPanelIds.length != 0 || support.panelIds.length != 0 || support.foot == null || support.socketOperationId == null))
+			if (support.kind == CoreSupportKind.RoutedSocket
+				&& (support.bondedPanelIds.length != 0 || support.panelIds.length != 1 || support.panelIds[0]!="bed" || support.foot == null || support.socketOperationId == null))
 				throw "Incomplete bed socket";
 			var l = c.coveringThickness, cb = MoldCores.singleBox(c.cavity,c.id), bridge = support.kind == CoreSupportKind.Bridge;
 			if (!Math.isFinite(l)

@@ -33,6 +33,9 @@ interface CastingMoldKernel {
 	 */
 	public function prismaticSection(region:CastingRegion,direction:{x:Float,y:Float,z:Float},
 		toleranceMm3:Float,affectedId:String):Null<materia.casting.CastingSection.CastingPrismSection>;
+	/** Geometry bands only; machining access and wire-stock limits remain separate. */
+	public function prismaticBands(region:CastingRegion,width:Float,depth:Float,height:Float,affectedId:String)
+		:Array<materia.casting.CastingSection.CastingSectionBand>;
 	public function castingMass(document:ToolingDocument):CastingMassProperties;
 	/** True interior intersection with source resin, clipped at the declared fill plane. */
 	public function resinIntersection(document:ToolingDocument,region:CastingRegion):Float;

@@ -100,7 +100,7 @@ class MillMoldChecks {
 	}
 
 	public static function run(frame:BenchMillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
-		check(p.cores.length == 6 && p.fixtures.length == 16, "actual mill pocket and insert inventory");
+		check(p.cores.length == 10 && p.fixtures.length == 16, "actual mill pocket and insert inventory");
 		check(p.features.length == p.document.input.features.length && p.features.length == 35, "every full-frame feature classified");
 		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
 			check(report.validation.filter(v -> v.rule == "tooling.cad." + name && v.status == "pass").length == 1,
@@ -136,7 +136,7 @@ class MillMoldChecks {
 
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
-		for (c in p.cores) {
+		for (c in p.cores.filter(c -> c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)) {
 			check(c.layers.length == 2, "EPS layers fit 100 mm stock");
 			var first = MoldCores.singleBox(MoldCores.layerRegion(c.layers[0]),c.id);
 			var last = MoldCores.singleBox(MoldCores.layerRegion(c.layers[c.layers.length-1]),c.id);
@@ -149,10 +149,10 @@ class MillMoldChecks {
 			check(solid.valid() && solid.shape.subshapeCount(CadKit.ShapeKind.Solid) == 1, "each former is one physical connected solid");
 			solid.close();
 		}
-		check(p.formers.filter(f -> f.volume.profiles.length > 0).length == 4, "all access formers own exact router-relief sealing profiles");
+		check(p.cores.filter(c -> c.support.registrationProfiles.length==1).length==4, "all access EPS cores retain exact router-relief sealing profiles");
 		var mismatched = CastingMoldPlanner.plan(p.document,p.options);
-		var profiled = mismatched.formers.filter(f -> f.volume.profiles.length > 0)[0];
-		profiled.volume.profiles[0].depth += 1;
+		var profiled=mismatched.cores.filter(c -> c.support.registrationProfiles.length>0)[0];
+		profiled.support.registrationProfiles[0].depth+=1;
 		rejects(() -> CastingMoldPlanner.validate(mismatched), "former sealing profile must match panel operation");
 		check(p.changeRequests.filter(c -> c.kind == "release-alternative")
 			.length == materia.tooling.casting.CastingStrategies.resolve(p.document).filter(f -> f.strategy == "reusable-former")
@@ -258,19 +258,14 @@ class MillMoldChecks {
 		restored = CastingMoldPlanner.plan(p.document,p.options);
 		MoldFixtures.datum(restored.fixtures[0]).pieces[0].z += 30;
 		rejects(() -> CastingMoldCad.review(restored), "displaced insert datum fixture");
-		var f = p.formers.filter(f -> f.featureIds.length > 0 && StringTools.startsWith(f.featureIds[0], "foot-access-"))[0];
-		var former = ToolingVolume.geometryOf(f.volume),
-			castingPart = CastingMoldCad.source(p);
+		var core=p.cores.filter(c -> StringTools.startsWith(c.featureId,"foot-access-"))[0];
+		var direction=MoldCores.withdrawal(core,p.panels.members.concat(p.supportPanels));
+		var access=machinekit.structural.CastingRegionCad.part(core.cavity),castingPart=CastingMoldCad.source(p);
 		rejects(() -> SweptRemoval.analyze([
-			{id: f.volume.id, part: former, direction: new Vector(-f.withdrawal.x, 0, 0)},
-			{
-				id: "casting",
-				part: castingPart,
-				direction: new Vector(0, 0, 1)
-			}
-		]), "inward foot former trapped against actual casting");
-		former.close();
-		castingPart.close();
+			{id:core.id,part:access,direction:new Vector(-direction.x,-direction.y,-direction.z)},
+			{id:"casting",part:castingPart,direction:new Vector(0,0,1)}
+		]),"inward foot access tooling trapped against actual casting");
+		access.close();castingPart.close();
 		var review = report;
 		var memberIds = [for (m in CastingMoldCad.assembly(p).components()) m.id];
 		var playback = machinekit.tooling.MoldPlayback.frames(p, review, memberIds);

@@ -162,18 +162,11 @@ class FormerManufacturingTests {
 					var machining=board.machining;
 					if (machining==null) Sys.println("FORMER-SHOP "+board.id+" unsupported "+board.reasons.join("; "));
 					else {
-						var accepted=false;
-						try {
-							var settings=MillFabricationSetup.cam([materia.tooling.panel.PanelJoints.blank("board",40,30,recipe.panel,6,2)]);
-							var programs=camkit.CamToolingFormers.build(machining,settings);
-							accepted=true;
-							Sys.println("FORMER-SHOP "+board.id+" programs "+programs.length);
-						} catch (error:Dynamic) {
-							var reason=Std.string(error);
-							check(reason.indexOf(board.id)>=0 && reason.indexOf("Cutter cannot cut sharp internal corner")>=0,
-								"production CAM rejects only the diagnosed source corners: "+reason);
-							Sys.println("FORMER-SHOP "+board.id+" CAM rejected "+reason);
-						}
+						var settings=MillFabricationSetup.cam([materia.tooling.panel.PanelJoints.blank("board",40,30,recipe.panel,6,2)]);
+						var programs=camkit.CamToolingFormers.build(machining,settings);
+						var accepted=programs.length>0;
+						check(accepted,"Every production board passes cutter-fit without changing its source contact: "+board.id);
+						Sys.println("FORMER-SHOP "+board.id+" programs "+programs.length);
 						var solid=switch item.construction.build {case Solid(_,_,_):true;default:false;};
 						if (accepted && solid) {
 							var former=plan.formers.filter(former -> former.volume.id==item.id)[0];

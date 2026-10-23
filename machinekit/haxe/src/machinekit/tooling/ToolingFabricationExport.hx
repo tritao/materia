@@ -484,6 +484,11 @@ class ToolingFabricationExport {
 		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
 		data(dir, "planned-hardware.json", p.hardware);
 		data(dir, "core-units.json", p.coreUnits);
+		data(dir, "eps-supports.json", [for (core in p.cores) {
+			coreId:core.id,featureId:core.featureId,support:core.support,
+			withdrawal:MoldCores.withdrawal(core,p.panels.members.concat(p.supportPanels)),
+			removal:MoldCores.removal(core)
+		}]);
 		data(dir, "hardware-unsupported.json", unknown);
 		var lines = bill.lines();
 		lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));

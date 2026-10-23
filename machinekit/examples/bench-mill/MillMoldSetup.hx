@@ -12,9 +12,11 @@ class MillMoldSetup {
 	/** Mill overlap ownership is a recipe choice, independent of generic rules. */
 	static function featureRules():Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule> {
 		var rules = materia.tooling.casting.CastingStrategies.standardRules();
-		for (rule in rules)
+		for (rule in rules) {
+			rule.useEPSAboveBoardThickness=true;
 			rule.priority = rule.kind == materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening ? 30
 				: rule.kind == materia.casting.CastingFeature.CastingFeatureKind.Clearance ? 20 : 0;
+		}
 		return rules;
 	}
 

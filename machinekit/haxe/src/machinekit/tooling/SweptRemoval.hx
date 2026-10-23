@@ -159,7 +159,7 @@ class SweptRemoval {
 	public static function analyze(members:Array<RemovalMember>, contactVolumeToleranceMm3:Float = 1e-5):RemovalReport {
 		if (members == null
 			|| members.length == 0
-			|| members.length > 128
+			|| members.length > 256
 			|| !Math.isFinite(contactVolumeToleranceMm3)
 			|| contactVolumeToleranceMm3 < 0)
 			throw "Invalid removal analysis";

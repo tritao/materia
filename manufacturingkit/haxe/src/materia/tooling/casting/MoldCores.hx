@@ -9,7 +9,7 @@ import materia.tooling.casting.CoreSupport.CoreCutting;
 class MoldCores {
 	public static function carrierId(core:CastingMoldCore):String {
 		if (core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)
-			throw "Bed-socket core has no carrier: "+core.id;
+			throw "Non-bridge core has no carrier: "+core.id;
 		return materia.tooling.ToolingIds.derive("",core.id,"-carrier");
 	}
 
@@ -19,10 +19,36 @@ class MoldCores {
 		return other[0];
 	}
 
+	public static function receiverId(core:CastingMoldCore):String {
+		if ((core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.RoutedSocket
+			&& core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.RegisteredFlange)
+			|| core.support.panelIds.length!=1) throw "Routed core needs one receiving panel: "+core.id;
+		return core.support.panelIds[0];
+	}
+
 	public static function removal(core:CastingMoldCore):materia.tooling.casting.CastingMoldPlan.CoreRemoval
-		return core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.BedSocket
-			? materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughBed
+		return core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge
+			? receiverId(core)=="bed" ? materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughBed
+				: materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughPanel
 			: materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughFill;
+
+	public static function physical(core:CastingMoldCore):CastingRegion {
+		var foot=core.support.foot;
+		return foot==null ? foam(core) : CastingRegion.Union([foam(core),MoldRegions.box(foot.foam)]);
+	}
+
+	public static function occupied(core:CastingMoldCore):CastingRegion {
+		var foot=core.support.foot;
+		return foot==null ? core.cavity : CastingRegion.Union([core.cavity,MoldRegions.box(foot.foam)]);
+	}
+
+	public static function withdrawal(core:CastingMoldCore,panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>)
+			:{x:Float,y:Float,z:Float} {
+		if (core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge) return {x:0,y:0,z:1};
+		var matches=panels.filter(panel -> panel.panel.id==receiverId(core));
+		if (matches.length!=1) throw "Core socket references an unknown panel: "+core.id;
+		return materia.assembly.AssemblyFrames.transformVector(CoreSupports.socketFrame(matches[0]),0,0,-1);
+	}
 
 	/** The delivered single-pocket cutting sheet keeps its shop layout while the
 	 * allocation uses the common region/layer/support records in memory. */
@@ -34,8 +60,8 @@ class MoldCores {
 			foam:singleBox(core.foamEnvelope,core.id),materialSpec:recipe.core.materialSpec,
 			coveringThickness:core.coveringThickness,removal:removal(core),cutting:core.layers[0],
 			support:{kind:support.kind,adhesiveSpec:support.adhesiveSpec,adhesiveThickness:support.adhesiveThickness,
-				fitClearance:support.fitClearance,embedDepth:support.embedDepth,bondAreaMm2:support.bondAreaMm2,
-				socketOperationId:support.socketOperationId,foot:support.foot,panelIds:support.panelIds,
+				fitClearance:support.fitClearance,embedDepth:support.embedDepth,bondAreaMm2:support.bondAreaMm2,clampBearingAreaMm2:support.clampBearingAreaMm2,
+				socketOperationId:support.socketOperationId,registrationProfiles:support.registrationProfiles,foot:support.foot,panelIds:support.panelIds,
 				bondedPanelIds:support.bondedPanelIds,hardware:support.hardware,padClosure:support.padClosure},
 			restraintEvidence:evidence};
 	}

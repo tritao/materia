@@ -33,8 +33,8 @@ private typedef BridgeRegistration = {
 class CoreSupports {
 	public static function specification(kind:CoreSupportKind, r:ToolingRecipe):CoreSupport return {
 		kind:kind, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
-		fitClearance:r.jointClearance, embedDepth:0, bondAreaMm2:0, bridgeBondAreaMm2:0,
-		socketOperationId:null, foot:null, panelIds:[], bondedPanelIds:[], hardware:[],
+		fitClearance:r.jointClearance, embedDepth:0, bondAreaMm2:0, bridgeBondAreaMm2:0,clampBearingAreaMm2:0,
+		socketOperationId:null, registrationProfiles:[], foot:null, panelIds:[], bondedPanelIds:[], hardware:[],
 		padClosure:kind==Bridge ? materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps : null
 	};
 
@@ -120,10 +120,77 @@ class CoreSupports {
 	public static function kind(cb:MoldBox, b:MoldBox):CoreSupportKind {
 		var bottom = Math.abs(cb.z - b.z) < 1e-7,
 			top = Math.abs(cb.z + cb.height - b.z - b.height) < 1e-7;
-		if (bottom) return BedSocket;
+		if (bottom) return RoutedSocket;
 		if (!top)
 			throw "Bridge requires a cavity opening onto the fill face";
 		return Bridge;
+	}
+
+	/** The existing routed-foot construction in the receiving panel's frame.
+	 * +Z points into the cavity; the panel material is below Z0 in this frame.
+	 */
+	public static function socketFrame(panel:PanelPlacement):materia.assembly.AssemblyRecord.AssemblyFrame {
+		return switch panel.panel.contactFace {
+			case materia.tooling.ToolingEnums.ContactFace.PositiveZ:
+				F.compose(panel.pose,F.translation(0,0,panel.panel.stock.measuredThickness));
+			case materia.tooling.ToolingEnums.ContactFace.NegativeZ:
+				F.compose(panel.pose,F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]));
+			default:throw "Routed core socket needs a panel contact face: "+panel.panel.id;
+		};
+	}
+
+	static function movedBox(value:MoldBox,pose:materia.assembly.AssemblyRecord.AssemblyFrame):MoldBox
+		return CastingMoldPlanner.box(value.width,value.depth,value.height,
+			F.compose(pose,F.translation(value.x+value.width/2,value.y+value.depth/2,value.z)));
+
+	public static function routedSocket(cavity:MoldBox,featureId:String,r:ToolingRecipe,panel:PanelPlacement):{
+		core:CastingMoldCore,penetration:PenetrationPlan
+	} {
+		var frame=socketFrame(panel),local=movedBox(cavity,F.inverse(frame));
+		if (Math.abs(local.z)>1e-7) throw "EPS pocket does not open on receiver panel: "+featureId;
+		var bounds=materia.casting.CastingProfileGeometry.bounds(PanelContours.outside(panel.panel));
+		var positive=panel.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.PositiveZ;
+		var virtualPanel=PanelJoints.blank(panel.panel.id,bounds.width,bounds.height,r.panel,r.routerDiameter,r.minimumLigament);
+		var virtualBed:PanelPlacement={panel:virtualPanel,
+			pose:F.translation(bounds.x,positive ? bounds.y : -bounds.y-bounds.height,-r.panel.measuredThickness),
+			withdrawal:{x:0,y:0,z:-1}};
+		var core=MoldCoreLayers.box(local,featureId,r,RoutedSocket),records:Array<PenetrationPlan>=[];
+		build(core,local,r,virtualBed,[],records);
+		if (records.length!=1) throw "Routed socket needs one sealed receiver: "+featureId;
+		var transform=F.compose(F.inverse(panel.pose),F.compose(frame,virtualBed.pose));
+		var ux=F.transformVector(transform,1,0,0),uy=F.transformVector(transform,0,1,0);
+		var sign=ux.x*uy.y-ux.y*uy.x;
+		for (operation in virtualPanel.operations) if (operation.id==core.support.socketOperationId) {
+			var contour=[for (segment in operation.contour) {
+				var a=F.transformPoint(transform,segment.start.x,segment.start.y,0);
+				var b=F.transformPoint(transform,segment.end.x,segment.end.y,0),center=segment.center;
+				var c=center==null ? null : F.transformPoint(transform,center.x,center.y,0);
+				{kind:segment.kind,start:{x:a.x,y:a.y},end:{x:b.x,y:b.y},
+					center:c==null ? null : {x:c.x,y:c.y},sweep:sign*segment.sweep};
+			}];
+			if (sign<0) {
+				contour.reverse();
+				contour=[for (segment in contour) {kind:segment.kind,start:segment.end,end:segment.start,
+					center:segment.center,sweep:-segment.sweep}];
+			}
+			panel.panel.operations.push(PanelJoints.operation(operation.id,operation.kind,contour,operation.depth,
+				operation.toolDiameter,positive ? MachiningSide.PositiveZ : MachiningSide.NegativeZ,
+				operation.through,operation.reliefToolDiameter));
+			panel.panel.contactOpenings.push(operation.id);
+		}
+		panel.panel=PanelCodec.copy(panel.panel);
+		core.cavity=MoldRegions.moved(core.cavity,frame);
+		core.foamEnvelope=MoldRegions.moved(core.foamEnvelope,frame);
+		for (layer in core.layers) layer.stockToMold=F.compose(frame,layer.stockToMold);
+		var foot=core.support.foot;
+		if (foot==null) throw "Routed socket is missing its EPS foot: "+featureId;
+		foot.foam=movedBox(foot.foam,frame);
+		foot.cutting.stockToMold=F.compose(frame,foot.cutting.stockToMold);
+		core.support.panelIds=[panel.panel.id];
+		var record=records[0],seal=record.sealingFace;
+		if (seal==null) throw "Routed socket is missing its sealing face: "+featureId;
+		record.sealingFace=F.compose(frame,seal);
+		return {core:core,penetration:record};
 	}
 
 	public static function build(c:CastingMoldCore, b:MoldBox, r:ToolingRecipe, bed:PanelPlacement, panels:Array<PanelPlacement>,
@@ -131,7 +198,8 @@ class CoreSupports {
 		var foam=MoldCores.singleBox(c.foamEnvelope,c.id), cavity=MoldCores.singleBox(c.cavity,c.id);
 		var s = c.support, t = r.panel.measuredThickness, l = r.minimumLigament, tool = r.routerDiameter, g = r.adhesiveLineThickness, hw = r.hardware;
 		PanelJoints.validateClearance(r.jointClearance, r.panel.thicknessVariation, r.jointLiningAllowance, r.jointMachiningAllowance);
-		if (s.kind == BedSocket) {
+		if (s.kind == RoutedSocket) {
+			s.panelIds=[bed.panel.id];
 			if ((r.panel.measuredThickness / 3) > t - l || (r.panel.measuredThickness / 3) <= 2 * g)
 				throw "Core socket leaves insufficient bed stock or glue space";
 			var inset = tool + l, foot:MoldBox = {
@@ -247,7 +315,7 @@ class CoreSupports {
 		if (Math.abs(s.fitClearance-r.jointClearance)>1e-7
 			|| Math.abs(s.adhesiveThickness-r.adhesiveLineThickness)>1e-7)
 			throw "Core support differs from recipe";
-		if (s.kind != CoreSupportKind.BedSocket)
+		if (s.kind != CoreSupportKind.RoutedSocket)
 			return;
 		if (foot == null)
 			throw "Missing locating foot";
@@ -289,6 +357,7 @@ class CoreSupports {
 
 	public static function sharedBridges(b:MoldBox, r:ToolingRecipe, cores:Array<materia.tooling.casting.CastingMoldPlan.CastingMoldCore>,
 			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>):Void {
+		cores=cores.filter(core -> core.support.kind==Bridge);
 		if (cores.length == 0)
 			return;
 		var t = r.panel.measuredThickness,

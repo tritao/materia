@@ -10,6 +10,7 @@ class MillMoldPreview {
 		sys.FileSystem.createDirectory(root + "/build/tooling");
 		sys.FileSystem.createDirectory(dir);
 		var document = MillMoldSetup.document(frame);
+		CastingMoldPlanner.setGeometry(new machinekit.tooling.NativeCastingMoldKernel());
 		var sourceReview = CastingMoldPlanner.assess(document, MillMoldSetup.options(frame));
 		if (sourceReview.plan == null) {
 			var reportDir = root + "/build/tooling/base-source-assessment/" + sourceReview.sourceFingerprint;

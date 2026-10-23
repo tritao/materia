@@ -113,7 +113,7 @@ class BoxMoldTests {
 					check(report.assembly.assemblyOrder[0] == "bed", "bed installs before supported members");
 					check(report.assembly.removalOrder.length == (bed ? 7 : 9) && report.demolding.removalOrder.length == (bed ? 7 : 10),
 						"support geometry participates in graphs");
-					check(p.cores[0].support.kind == (bed ? CoreSupportKind.BedSocket : CoreSupportKind.Bridge), "support selected from opening");
+					check(p.cores[0].support.kind == (bed ? CoreSupportKind.RoutedSocket : CoreSupportKind.Bridge), "support selected from opening");
 					check(p.supportPanels.length == (bed ? 0 : 4), "support templates realized");
 					if (bed) {
 						var foot = p.cores[0].support.foot;
@@ -174,7 +174,7 @@ class BoxMoldTests {
 		rejects(() -> BoxMoldCad.review(p), "trapped opposite walls rejected");
 		var d = SinglePocketSetup.document();
 		var badBed = CastingMoldPlanner.planSinglePocket(d);
-		badBed.cores[0].support.kind = CoreSupportKind.BedSocket;
+		badBed.cores[0].support.kind = CoreSupportKind.RoutedSocket;
 		rejects(() -> CastingMoldPlanner.validate(badBed), "bed support cannot bridge a solid casting floor","Core support disagrees with opening");
 		d = SinglePocketSetup.document(18, false, true);
 		var badBridge = CastingMoldPlanner.planSinglePocket(d);

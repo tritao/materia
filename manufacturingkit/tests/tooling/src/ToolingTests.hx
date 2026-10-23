@@ -58,6 +58,61 @@ class ToolingTests {
 			"deep relief never contributes thread engagement");
 	}
 
+	static function boardLimitedStrategy():Void {
+		var document=fixture(),feature=document.input.features[0];
+		feature.kind=ServiceOpening;
+		for (rule in document.recipe.featureRules) rule.useEPSAboveBoardThickness=true;
+		document.setup.features=[];
+		var selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
+		check(selected.strategy==SacrificialEPS,"A deep body-open pocket uses EPS by recipe, without a feature-ID override");
+		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(10,80,61));
+		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
+		check(selected.strategy==ReusableFormer,"A source cut fitting a declared board stays rigid");
+		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,61));
+		document.recipe.former.stocks[0].measuredThickness=70;
+		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
+		check(selected.strategy==ReusableFormer,"Changing declared stock thickness changes the rule, not source geometry");
+		var raw:Array<Dynamic>=cast haxe.Json.parse(haxe.Json.stringify(document.recipe.featureRules));
+		Reflect.setField(raw[0],"useEPSAboveBoardThickness","yes");
+		rejects(() -> materia.tooling.casting.CastingStrategies.snapshotRules(raw),"Invalid casting strategy board limit");
+	}
+
+	static function routedSocketFaces():Void {
+		var rotations=[
+			[1.0,0,0,0,1,0,0,0,1], [1.0,0,0,0,-1,0,0,0,-1],
+			[1.0,0,0,0,0,-1,0,1,0], [1.0,0,0,0,0,1,0,-1,0],
+			[0.0,0,1,0,1,0,-1,0,0], [0.0,0,-1,0,1,0,1,0,0]
+		];
+		for (rotation in rotations) for (positive in [false,true]) {
+			var r=fixture().recipe;
+			r.minimumLigament=2;
+			var panel=materia.tooling.panel.PanelJoints.blank("socket-receiver",100,100,r.panel,r.routerDiameter,r.minimumLigament);
+			panel.contactFace=positive ? materia.tooling.ToolingEnums.ContactFace.PositiveZ
+				: materia.tooling.ToolingEnums.ContactFace.NegativeZ;
+			panel.labelSide=positive ? materia.tooling.ToolingEnums.MachiningSide.NegativeZ
+				: materia.tooling.ToolingEnums.MachiningSide.PositiveZ;
+			var receiver:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement={panel:panel,
+				pose:F.fromRotationMatrix(31,-27,92,rotation),withdrawal:{x:0,y:0,z:1}};
+			var frame=materia.tooling.casting.CoreSupports.socketFrame(receiver);
+			var cavity=materia.tooling.casting.CastingMoldPlanner.box(60,40,30,
+				F.compose(frame,F.translation(50,positive ? 50 : -50,0)));
+			var built=materia.tooling.casting.CoreSupports.routedSocket(cavity,"side-pocket",r,receiver);
+			var core=built.core,operation=receiver.panel.operations.filter(op -> op.id==core.support.socketOperationId)[0];
+			check(operation.side==(positive ? materia.tooling.ToolingEnums.MachiningSide.PositiveZ
+				: materia.tooling.ToolingEnums.MachiningSide.NegativeZ),"Socket opens on the actual receiving face");
+			check(built.penetration.panelId==panel.id && built.penetration.coreId==core.id,
+				"Every socket penetration names its core and receiver");
+			var actual=materia.tooling.casting.MoldCores.singleBox(core.cavity,core.id);
+			check(Math.abs(actual.x-cavity.x)+Math.abs(actual.y-cavity.y)+Math.abs(actual.z-cavity.z)
+				+Math.abs(actual.width-cavity.width)+Math.abs(actual.depth-cavity.depth)+Math.abs(actual.height-cavity.height)<1e-6,
+				"Routed support preserves the exact source cavity on every Cartesian face");
+			var foot:materia.tooling.casting.CoreSupport.CoreFoot=cast core.support.foot;
+			check(foot!=null && core.support.panelIds[0]==panel.id,"Routed EPS foot belongs to its actual panel");
+			var origin=F.transformPoint(F.inverse(frame),foot.cutting.stockToMold.x,foot.cutting.stockToMold.y,foot.cutting.stockToMold.z);
+			check(origin.z<0 && origin.z>-r.panel.measuredThickness,"Foot stock occupies only the receiving panel socket");
+		}
+	}
+
 	static function fixtureFaces():Void {
 		var document=fixture(),hole=document.input.inserts[0].holes[0];
 		hole.diameter=5;hole.tapDrill=5;hole.depth=12;hole.extent=Blind;hole.threadDepth=9;
@@ -445,7 +500,7 @@ class ToolingTests {
 			for (axis in materia.tooling.casting.CastingStrategies.WithdrawalAxes.values())
 				for (strategy in materia.tooling.casting.CastingSetup.CoreStrategies.values()) {
 					var round=materia.tooling.casting.CastingStrategies.snapshotRules([{kind:"lightening",opening:(opening:String),
-						strategy:(strategy:String),priority:0,preferredAxis:(axis:String)}])[0];
+						strategy:(strategy:String),priority:0,preferredAxis:(axis:String),useEPSAboveBoardThickness:false}])[0];
 					check(round.opening==opening && round.preferredAxis==axis && round.strategy==strategy,
 						"Every strategy, opening and withdrawal token survives its codec");
 				}
@@ -455,6 +510,8 @@ class ToolingTests {
 		vocabularyRoundTrips();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
+		routedSocketFaces();
+		boardLimitedStrategy();
 		fixtureFaces();
 		fixturePanelFaces();
 		if (Sys.getEnv("TOOLING_ONLY") == "castability") {

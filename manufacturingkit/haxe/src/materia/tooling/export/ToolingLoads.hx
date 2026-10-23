@@ -116,13 +116,24 @@ class ToolingLoads {
 		var occupied:Array<materia.casting.CastingRegion> = [];
 		var coreVolumes = new Map<String, Float>(),
 			coreForces = new Map<String, Float>();
+		var bounds=materia.tooling.casting.CastingMoldPlanner.shellBounds(p.document);
+		var fluid:materia.casting.CastingRegion=materia.tooling.casting.MoldRegions.envelope(p.document);
+		var fillHeight=Math.min(bounds.z+bounds.height,p.document.setup.fillHeightMm)-bounds.z;
+		fluid=fillHeight<=0 ? materia.casting.CastingRegion.Union([])
+			: materia.casting.CastingRegion.Intersection([fluid,materia.tooling.casting.MoldRegions.box({
+				x:bounds.x,y:bounds.y,z:bounds.z,width:bounds.width,depth:bounds.depth,height:fillHeight})]);
 		for (c in cores) {
-			var volume = materia.tooling.casting.MoldRegions.volume(materia.casting.CastingRegion.Difference(c.cavity,occupied.copy()),c.id);
-			var footprint=MoldCores.stockBounds(c.cavity,c.id);
+			var displaced=materia.casting.CastingRegion.Difference(
+				materia.casting.CastingRegion.Intersection([c.cavity,fluid]),occupied.copy());
+			var volume = materia.tooling.casting.MoldRegions.volume(displaced,c.id);
+			var footprint=volume>0 ? MoldCores.stockBounds(displaced,c.id) : null;
+			var projectedArea=footprint==null ? 0.0 : footprint.width*footprint.depth;
+			// Keep the original occupancy terms, not recursively nested remainders.
+			// Within the common fluid domain their union is exactly the same.
 			occupied.push(c.cavity);
 			coreVolumes.set(c.id, volume);
 			coreForces.set(c.id,
-				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * footprint.width * footprint.depth * 1e-6) * s.loadFactor);
+				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * projectedArea * 1e-6) * s.loadFactor);
 		}
 		for (m in walls.concat(p.supportPanels)) {
 			var b = CastingProfileGeometry.bounds(PanelContours.outside(m.panel));
@@ -151,7 +162,7 @@ class ToolingLoads {
 			};
 			if (!isWall) {
 				demand.kind = SupportUplift;
-				for (c in cores)
+				for (c in cores) if (c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)
 					if (MoldCores.bridgeId(c) == m.panel.id || MoldCores.carrierId(c) == m.panel.id)
 						demand.forceN += value(coreForces, c.id);
 				demand.pressurePa = demand.forceN / (b.width * b.height * 1e-6);
@@ -219,8 +230,9 @@ class ToolingLoads {
 				var v = matches[0];
 				for (n in [v.allowableN, v.bearingAreaMm2, v.allowableBearingPa])
 					positive(n);
-				if (v.bearingAreaMm2 > c.support.bondAreaMm2)
-					throw "Core restraint area exceeds planned bond area";
+				if (v.bearingAreaMm2 > (c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.RegisteredFlange
+					? c.support.clampBearingAreaMm2 : c.support.bondAreaMm2))
+					throw "Core restraint area exceeds planned contact area";
 				evidence = v.evidence;
 				status = design > v.allowableN
 					|| design / (v.bearingAreaMm2 * 1e-6) > v.allowableBearingPa ? Fail : compact && evidence.length > 0 ? Pass : Pending;

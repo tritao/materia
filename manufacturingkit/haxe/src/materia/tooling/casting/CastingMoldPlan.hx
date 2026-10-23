@@ -34,6 +34,7 @@ typedef PenetrationPlan = {
 enum abstract CoreRemoval(String) to String {
 	var BreakoutThroughFill = "breakout-through-fill";
 	var BreakoutThroughBed = "breakout-through-bed";
+	var BreakoutThroughPanel = "breakout-through-panel";
 }
 
 enum MoldConstruction {
@@ -97,6 +98,8 @@ typedef FeatureTooling = {
 typedef CastingMoldCore = {
 	var id:String;
 	var featureId:String;
+	/** Gross shaping envelope, including a declared external access neck/flange.
+	 * Loads and fill clip physical displacement to the source body and fill plane. */
 	var cavity:materia.casting.CastingRegion;
 	/** Lined foam envelope, including the declared inter-piece adhesive gaps. */
 	var foamEnvelope:materia.casting.CastingRegion;

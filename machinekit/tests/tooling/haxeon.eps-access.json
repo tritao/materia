@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-eps-access-tests"
+  },
+  "entry": "EpsAccessTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/eps-access",
+  "sources": [
+    "src/EpsAccessTests.hx",
+    "../../examples/box-mold/SinglePocketSetup.hx"
+  ]
+}

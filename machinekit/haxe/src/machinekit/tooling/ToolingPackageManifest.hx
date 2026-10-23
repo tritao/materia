@@ -95,7 +95,7 @@ class ToolingPackageManifest {
 		records.sort((a, b) -> Reflect.compare(a.path, b.path));
 		var manifest:ToolingManifest = {
 			format: "materia.tooling-manifest",
-			version: 14,
+			version: 15,
 			phase: 5,
 			lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			sourceFingerprint: f.sourceFingerprint,
@@ -349,7 +349,7 @@ class ToolingPackageManifest {
 		for (key in keys)
 			if (!Reflect.hasField(manifest, key))
 				throw "Missing tooling manifest field";
-		if (manifest.format != "materia.tooling-manifest" || manifest.version != 14)
+		if (manifest.format != "materia.tooling-manifest" || manifest.version != 15)
 			throw "Unsupported tooling manifest";
 		if (!Std.isOfType(manifest.files, Array))
 			throw "Invalid tooling manifest files";

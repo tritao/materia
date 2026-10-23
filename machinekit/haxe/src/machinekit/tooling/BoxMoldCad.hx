@@ -207,7 +207,7 @@ class BoxMoldCad {
 					} else if (record.kind == CoreSealed) {
 						var core = p.cores.filter(c -> c.id == record.coreId)[0],
 							foot = core.support.foot;
-						if (foot == null || core.support.kind != CoreSupportKind.BedSocket)
+						if (foot == null || core.support.kind != CoreSupportKind.RoutedSocket)
 							throw "Missing bed locating foot";
 						var bounds = cut.shape.bounds(),
 							lo = Vector.fromNative(bounds.get_min()),
@@ -302,7 +302,7 @@ class BoxMoldCad {
 					seals.push(seal);
 					tools.push(seal);
 					for (core in p.cores)
-						if (core.support.kind == CoreSupportKind.BedSocket) {
+						if (core.support.kind == CoreSupportKind.RoutedSocket) {
 							var cb = MoldCores.singleBox(core.cavity,core.id), coreSeal = placedBox({
 								x: cb.x,
 								y: cb.y,
@@ -416,7 +416,7 @@ class BoxMoldCad {
 				]);
 			}
 			parts.push(covered);
-			var direction = core.support.kind == CoreSupportKind.BedSocket ? -1.0 : 1.0;
+			var direction = core.support.kind == CoreSupportKind.RoutedSocket ? -1.0 : 1.0;
 			members.push({id: core.id, part: covered, direction: new Vector(0, 0, direction)});
 			members.push({id: "cured-casting", part: cured, direction: new Vector(0, 0, 1)});
 			var demoldingMotions=[for(member in members){id:member.id,x:member.direction.x,y:member.direction.y,z:member.direction.z}];

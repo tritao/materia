@@ -1,9 +1,11 @@
 # Mill-base core strategy comparison
 
-Status: the EPS baseline is measured from the regenerated records kit at
-`2641bb56c`. The requested drafted-melamine variant is parked: producing it
-requires library changes excluded by this comparison's scope. The production
-recipe remains unchanged; there is no qualified alternative to select yet.
+Status: closed by the user on 2026-10-23 in favour of EPS for face-open
+pockets deeper than a declared board, including the four foot-access pockets.
+Rigid formers remain for shallow features. The drafted-melamine route is not
+being built; the existing panel-box rule remains available for tall formers.
+The table below records the earlier comparison baseline, before that decision.
+The current kit and construction are described in TOOLING_README.md.
 
 Both variants must start from source fingerprint
 `d3652114c33eb87032d2df0bd51945ea472b2e9e4fdaf0c183bf76123bc63666`.
@@ -20,13 +22,13 @@ No source dimensions or openings were changed for this assessment.
 | Core uplift/restraint | 538.879 N total factored gross uplift; 67.360 or 134.720 N per foam piece; all 6 restraint qualifications Pending | Not evaluated |
 | Peak panel head pressure | 7.908 kPa | Not evaluated |
 | Air traps | 0 | Not evaluated |
-| Kit status | 625 Pass / 556 Pending / 136 Unsupported / 7 source-corner Fail | No kit or readiness claim |
+| Kit status | 625 Pass / 556 Pending / 136 Unsupported / 7 former-machining Fail | No kit or readiness claim |
 
 The sheet count covers the main panel blank layout, not the separate former-board
 stock. Uplift and pressure are design estimates from `load-estimates.json`, not
 physical restraint evidence. Router time cannot be qualified from program count.
 
-## Missing path, without adding another implementation
+## Why the drafted alternative was not selected
 
 1. `CastingFeaturePatterns.underside` declares width, depth and height adjustable,
    but not Draft. Its retained-web fragments must stay linked by `derivedFrom`.
@@ -38,7 +40,8 @@ physical restraint evidence. Router time cannot be qualified from program count.
    screwed hollow-box construction remains in force; no glued blank or second
    finishing path was introduced.
 
-These gaps prevent the requested comparison under the recipe/fixture-only rule.
+These gaps prevented a generated alternative under the recipe/fixture-only rule.
+The user subsequently closed that alternative in favour of EPS.
 No arbitrary draft angle, manual source mutation, substitute zero-draft comparison
 or new core type was introduced. The authored opening must retain its dimensions
 when a future accepted draft change tapers the feature inward.

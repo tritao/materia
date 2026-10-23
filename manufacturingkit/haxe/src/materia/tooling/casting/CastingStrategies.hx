@@ -35,6 +35,8 @@ typedef CastingStrategyRule = {
 	var strategy:CoreStrategy;
 	var priority:Int;
 	var preferredAxis:WithdrawalAxis;
+	/** Deep face-open pockets use EPS when no declared board can hold the source cut. */
+	var useEPSAboveBoardThickness:Bool;
 }
 
 /** Source intent and recipe rules choose defaults; setups name only explicit overrides. */
@@ -50,7 +52,8 @@ class CastingStrategies {
 					opening: opening,
 					strategy: kind == Lightening || opening == Enclosed ? SacrificialEPS : ReusableFormer,
 					priority: 0,
-					preferredAxis: kind == ServiceOpening ? X : Z
+					preferredAxis: kind == ServiceOpening ? X : Z,
+					useEPSAboveBoardThickness:false
 				});
 		}
 		return rules;
@@ -61,7 +64,9 @@ class CastingStrategies {
 			throw "Invalid casting strategy rules";
 		var rows:Array<Dynamic> = cast raw, result:Array<CastingStrategyRule> = [], ids = new Map<String, Bool>();
 		for (row in rows) {
-			CastingFeatureCodec.fields(row, ["kind", "opening", "strategy", "priority", "preferredAxis"]);
+			CastingFeatureCodec.fields(row, ["kind", "opening", "strategy", "priority", "preferredAxis", "useEPSAboveBoardThickness"]);
+			var limit:Dynamic=Reflect.field(row,"useEPSAboveBoardThickness");
+			if (!Std.isOfType(limit,Bool)) throw "Invalid casting strategy board limit";
 			var kind = R.string(row, "kind"), opening = R.string(row, "opening"), strategy = R.string(row, "strategy");
 			var axis = R.string(row, "preferredAxis"), priority = R.number(row, "priority");
 			if ((CastingFeatureKinds.tokens().indexOf(kind) < 0 || kind == (CastingFeatureKind.InsertRecess:String)))
@@ -77,7 +82,8 @@ class CastingStrategies {
 				throw "Duplicate casting strategy rule: " + id;
 			ids.set(id, true);
 			result.push({kind: cast kind, opening: cast opening, strategy: cast strategy,
-				priority: Std.int(priority), preferredAxis: cast axis});
+				priority: Std.int(priority), preferredAxis: cast axis,
+				useEPSAboveBoardThickness:cast limit});
 		}
 		result.sort((a, b) -> Reflect.compare((a.kind : String) + "/" + a.opening, (b.kind : String) + "/" + b.opening));
 		return result;
@@ -102,7 +108,23 @@ class CastingStrategies {
 			var rules = document.recipe.featureRules.filter(rule -> rule.kind == feature.kind && rule.opening == opening);
 			if (rules.length != 1)
 				throw "Missing or duplicate recipe strategy rule for feature: " + feature.id;
-			var rule = rules[0];
+			var rule = rules[0],strategy=rule.strategy;
+			if (strategy==ReusableFormer && opening==BodyOpening && rule.useEPSAboveBoardThickness) {
+				var dimensions=switch feature.geometry.solid {
+					case Cut(solid):switch solid {
+						case Box(width,depth,height):[width,depth,height];
+						case Cylinder(diameter,height):[diameter,diameter,height];
+					};
+					case Prism(profile,height):
+						var bounds=materia.casting.CastingProfileGeometry.bounds(profile);
+						[bounds.width,bounds.height,height];
+					case Insert(_):throw "Insert recess has no core strategy: "+feature.id;
+				};
+				var thickness=0.0;
+				for (stock in document.recipe.former.stocks) thickness=Math.max(thickness,stock.measuredThickness);
+				if (Math.min(dimensions[0],Math.min(dimensions[1],dimensions[2]))>thickness+1e-7)
+					strategy=SacrificialEPS;
+			}
 			var direction:Null<{x:Float, y:Float, z:Float}> = null;
 			if (rule.strategy == ReusableFormer) {
 				if (openings.length == 0)
@@ -121,7 +143,7 @@ class CastingStrategies {
 				}
 				direction = F.transformVector(document.setup.sourceToMold, normal.x, normal.y, normal.z);
 			}
-			result.push({featureId: feature.id, strategy: rule.strategy, priority: rule.priority, withdrawal: direction});
+			result.push({featureId: feature.id, strategy: strategy, priority: rule.priority, withdrawal: direction});
 		}
 		result.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
 		var units = new Map<String, CoreStrategy>();

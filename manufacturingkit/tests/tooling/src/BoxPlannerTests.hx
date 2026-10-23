@@ -206,14 +206,14 @@ class BoxPlannerTests {
 		check(bridge.cores[0].support.kind == CoreSupportKind.Bridge
 			&& bridge.supportPanels.length == 4, "suspended core receives carrier and pinned bridge");
 		var wrongBed = CastingMoldPlanner.planSinglePocket(d);
-		wrongBed.cores[0].support.kind = CoreSupportKind.BedSocket;
+		wrongBed.cores[0].support.kind = CoreSupportKind.RoutedSocket;
 		rejects(() -> CastingMoldPlanner.validate(wrongBed), "bed socket cannot alter a solid casting floor");
 		var bedDoc = ToolingCodec.copy(d);
 		bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].geometry.pose.z = 40;
         bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].openings=[materia.casting.CastingPatterns.face("body.z-max")];
 		bedDoc.setup.sourceFingerprint = ToolingCodec.inputFingerprint(bedDoc.input);
 		var bed = CastingMoldPlanner.planSinglePocket(bedDoc), core = bed.cores[0];
-		check(core.support.kind == CoreSupportKind.BedSocket && bed.supportPanels.length == 0, "bed opening selects routed socket");
+		check(core.support.kind == CoreSupportKind.RoutedSocket && bed.supportPanels.length == 0, "bed opening selects routed socket");
 		check(bed.openings.length == 10 && core.support.foot != null, "bed socket classified and separate foot defined");
 		var foot = core.support.foot;
 		if (foot == null)

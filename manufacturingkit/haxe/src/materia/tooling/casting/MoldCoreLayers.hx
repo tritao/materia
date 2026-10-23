@@ -77,6 +77,95 @@ class MoldCoreLayers {
 		return result;
 	}
 
+	/** An EPS access former retains the already-proved neck and flange geometry.
+	 * Erosion uses the profile metric times the withdrawal-axis interval. Across
+	 * a step, intersect every neighbouring eroded section within covering reach;
+	 * internal stock boundaries therefore receive glue, never spurious lining.
+	 */
+	public static function registeredFlange(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
+			frame:materia.assembly.AssemblyRecord.AssemblyFrame,panelId:String):CastingMoldCore {
+		var kernel=CastingMoldPlanner.geometry;
+		if (kernel==null) throw "Exact geometry kernel required for EPS access former: "+featureId;
+		var bounds=kernel.bounds(MoldRegions.moved(region,F.inverse(frame)),featureId);
+		frame=F.compose(frame,F.translation(bounds.x,bounds.y,bounds.z));
+		var work=MoldRegions.moved(region,F.inverse(frame));
+		var bands=kernel.prismaticBands(work,bounds.width,bounds.depth,bounds.height,featureId);
+		var cover=r.linerThickness,gap=r.adhesiveLineThickness;
+		var low=cover,high=bounds.height-cover;
+		if (high<=low) throw "Covering consumes EPS access former: "+featureId;
+		var levels=[low,high];
+		for (band in bands) for (value in [band.bottomMm-cover,band.bottomMm+cover,band.topMm-cover,band.topMm+cover])
+			if (value>low+EPS && value<high-EPS) levels.push(value);
+		levels.sort(Reflect.compare);
+		var unique:Array<Float>=[];
+		for (value in levels) if (unique.length==0 || value-unique[unique.length-1]>EPS) unique.push(value);
+		levels=unique;
+		var cells:Array<{bottom:Float,top:Float,region:CastingRegion}>=[];
+		for (index in 0...levels.length-1) {
+			var bottom=levels[index],top=levels[index+1],middle=(bottom+top)/2;
+			var active=bands.filter(band -> band.bottomMm<middle+cover+EPS && band.topMm>middle-cover-EPS);
+			var sections:Array<CastingRegion>=[];
+			for (band in active) {
+				var outers:Array<CastingRegion>=[];
+				for (outer in band.contours) if (outer.depth%2==0) {
+					var holes=band.contours.filter(hole -> hole.depth==outer.depth+1
+						&& G.inside(outer.contour,hole.contour[0].start.x,hole.contour[0].start.y));
+					var pose=F.translation(0,0,bottom);
+					outers.push(CastingRegion.Difference(prism(Offset.inward(outer.contour,cover),pose,top-bottom),
+						[for (hole in holes) prism(Offset.outward(hole.contour,cover),pose,top-bottom)]));
+				}
+				sections.push(CastingRegion.Union(outers));
+			}
+			if (sections.length==0) throw "Missing exact EPS erosion section: "+featureId;
+			var cell=CastingRegion.Intersection(sections);
+			if (MoldRegions.volume(cell,featureId)>EPS) cells.push({bottom:bottom,top:top,region:cell});
+		}
+		if (cells.length==0) throw "Covering consumes EPS access former: "+featureId;
+		var merged:Array<{bottom:Float,top:Float,region:CastingRegion}>=[];
+		for (cell in cells) {
+			var section=kernel.prismaticSection(cell.region,{x:0,y:0,z:1},EPS,featureId);
+			if (section==null) throw "EPS erosion interval is not prismatic: "+featureId;
+			var footprint=MoldRegions.section(section.contours,F.identity(),1);
+			if (merged.length>0 && Math.abs(merged[merged.length-1].top-cell.bottom)<EPS) {
+				var previous=merged[merged.length-1];
+				var other=kernel.prismaticSection(previous.region,{x:0,y:0,z:1},EPS,featureId);
+				if (other==null) throw "EPS stock interval is not prismatic: "+featureId;
+				var old=MoldRegions.section(other.contours,F.identity(),1);
+				var difference=MoldRegions.volume(CastingRegion.Difference(footprint,[old]),featureId)
+					+MoldRegions.volume(CastingRegion.Difference(old,[footprint]),featureId);
+				if (difference<=EPS) {
+					previous.top=cell.top;
+					previous.region=MoldRegions.section(other.contours,F.translation(0,0,previous.bottom),previous.top-previous.bottom);
+					continue;
+				}
+			}
+			merged.push(cell);
+		}
+		cells=merged;
+		var foam=CastingRegion.Union([for (cell in cells) cell.region]),layers:Array<CoreCutting>=[];
+		for (index in 0...cells.length) {
+			var cell=cells[index],bottom=cell.bottom,top=cell.top;
+			if (index>0 && Math.abs(cells[index-1].top-bottom)<EPS) bottom+=gap/2;
+			if (index+1<cells.length && Math.abs(cells[index+1].bottom-top)<EPS) top-=gap/2;
+			if (top<=bottom) throw "Adhesive consumes EPS stock band "+cell.bottom+".."+cell.top+" mm: "+featureId;
+			var trimmed=CastingRegion.Intersection([cell.region,MoldRegions.box({x:0,y:0,z:bottom,
+				width:bounds.width,depth:bounds.depth,height:top-bottom})]);
+			for (cutting in tiles(trimmed,id,r,true)) {
+				cutting.stockToMold=F.compose(frame,cutting.stockToMold);layers.push(cutting);
+			}
+		}
+		if (layers.length>32) throw "Too many EPS stock pieces: "+featureId;
+		if (MoldRegions.volume(CastingRegion.Difference(foam,[work]),featureId)>EPS)
+			throw "EPS lining escapes its access former: "+featureId;
+		var support=CoreSupports.specification(CoreSupport.CoreSupportKind.RegisteredFlange,r);
+		var root=kernel.prismaticSection(cells[0].region,{x:0,y:0,z:1},EPS,featureId);
+		if (root==null) throw "EPS flange has no certified bearing face: "+featureId;
+		support.clampBearingAreaMm2=MoldCores.area(root.contours);
+		support.panelIds=[panelId];support.padClosure=materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps;
+		return {id:id,featureId:featureId,cavity:region,foamEnvelope:MoldRegions.moved(foam,frame),layers:layers,
+			coveringThickness:cover,support:support};
+	}
+
 	static function core(cavity:CastingRegion,foam:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
 			allowProfileSplit:Bool):CastingMoldCore {
 		if (MoldRegions.volume(foam,featureId)<=EPS) throw "Covering consumes foam section";

@@ -21,3 +21,10 @@ typedef CastingPrismSection = {
 	var depth:Float;
 	var contours:Array<CastingSectionContour>;
 }
+
+/** Exact constant-profile interval; its complete extrusion is proved against the solid. */
+typedef CastingSectionBand = {
+	var topMm:Float;
+	var bottomMm:Float;
+	var contours:Array<CastingSectionContour>;
+}
