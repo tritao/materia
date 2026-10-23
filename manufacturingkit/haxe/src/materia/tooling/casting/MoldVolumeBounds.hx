@@ -2,7 +2,7 @@ package materia.tooling.casting;
 import materia.casting.BoxAlgebra;
 
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.casting.CastingProfileGeometry;
 import materia.assembly.AssemblyFrames as F;
 

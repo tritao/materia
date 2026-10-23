@@ -142,7 +142,7 @@ generates the coupon, exact drawings and assembled/exploded preview scenes.
 
 ### Single-pocket box mold
 
-`materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
+`materia.tooling.casting.CastingMoldPlanner.planSinglePocket(document)` builds the explicit
 orthogonal single-pocket template from a validated `ToolingDocument`: five
 panels, EPS/covering geometry, a ruled block cutting definition, an insert
 fixture and classified contact cuts. Resolved plans stay in memory; the strict
@@ -166,14 +166,14 @@ pending, including a broad-area core restraint, fixture accuracy and constraint
 qualification, anchorage, finishing stock, material/process evidence and handling.
 
 
-Core supports are reusable neutral records in `casting.CoreSupport` and generated
-by `CoreSupports`. Pass optional `CoreSupportOptions` to `BoxMoldPlanner.plan`;
-defaults use `Auto`, one-third measured stock for embed depth, recipe joint
-clearance and the declared recipe adhesive-line thickness. The options codec validates closed enum modes,
-finite dimensions and unknown fields; mold codec version 8 persists them and
-rejects earlier versions. Auto chooses a bed socket when the cavity opens onto the bed,
-otherwise a bridge when it opens onto the fill face. Explicit incompatible modes
-fail without changing the source casting.
+Core supports are reusable neutral records in `casting.CoreSupport`, shared by
+both mold constructions. `CastingMoldPlanner.planSinglePocket` chooses a bed
+socket when the cavity opens onto the bed, otherwise a bridge when it opens
+onto the fill face. It rejects a cavity with neither opening. Embed depth is
+one-third measured panel stock, fit clearance is the recipe joint clearance,
+and adhesive thickness comes from the recipe. There is no separate support-mode
+option or persisted intermediate plan. Validation checks the selected support
+against the actual source opening without changing the casting.
 
 A bed socket gets a classified `core-sealed` contact cut, inset laminated EPS
 foot and separate ruled cutting definition. A bridge gets four exact-operation

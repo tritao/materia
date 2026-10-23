@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.tooling.casting.CastingMoldPlanner;
 
 import haxe.Json;
@@ -67,8 +69,8 @@ class CastingMoldExport {
 		}
 		for (c in p.cores)
 			for (index in 0...c.layers.length) {
-				var cutting = c.layers[index],id = materia.tooling.casting.MoldCores.layerId(c,index);
-				data(dir + "/" + id + ".cutting.json",materia.tooling.casting.MoldCores.cuttingRecord(c,index));
+				var cutting = c.layers[index],id = MoldCores.layerId(c,index);
+				data(dir + "/" + id + ".cutting.json",MoldCores.cuttingRecord(c,index));
 				var part = ToolingVolume.fromCoreCutting(id,cutting).geometry();
 				step(dir + "/" + id + ".step", part);
 
@@ -81,9 +83,9 @@ class CastingMoldExport {
 			var part = ToolingVolume.geometryOf(f.volume);
 			step(dir + "/" + f.volume.id + ".step", part);
 		}
-		for (f in p.fixtures) {
-			var part = ToolingVolume.geometryOf(f.datum);
-			step(dir + "/" + f.datum.id + ".step", part);
+		for (volume in MoldFixtures.allVolumes(p)) {
+			var part=ToolingVolume.geometryOf(volume);
+			step(dir+"/"+volume.id+".step",part);
 		}
 		var casting = CastingMoldCad.reconstructed(p);
 		step(dir + "/reconstructed-casting.step", casting);
@@ -97,7 +99,9 @@ class CastingMoldExport {
 		scene(dir, "mold", assembled, p, review);
 		var coreList = [
 			for (c in p.cores)
-				c.id + ": " + c.layers.length + " layers, carrier " + c.carrierId + ", shared " + c.bridgeId
+				c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.BedSocket
+					? c.id+": "+c.layers.length+" layers, bed socket "+c.support.socketOperationId
+					: c.id + ": " + c.layers.length + " layers, carrier " + MoldCores.carrierId(c) + ", shared " + MoldCores.bridgeId(c)
 		];
 		text(dir
 			+ "/procedure.md",

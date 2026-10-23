@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
+import materia.tooling.casting.MoldCores;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import cadkit.modeling.Part;
@@ -13,9 +15,9 @@ import machinekit.standard.SocketHeadCapScrew;
 import machinekit.standard.FlatWasher;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingEnums.MachiningSide;
-import materia.tooling.casting.MoldPlan;
-import materia.tooling.casting.MoldPlan.MoldBox;
-import materia.tooling.casting.BoxMoldPlanner;
+import materia.tooling.casting.CastingMoldPlan;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.casting.CoreSupport.SupportHardwareKind;
 import machinekit.standard.HexNut;
@@ -39,6 +41,13 @@ typedef BoxMoldReview = {
 	}>;
 }
 
+private typedef BoxMoldAnalysis = {
+	var review:BoxMoldReview;
+	var sourceVolumeMm3:Float;
+	var reconstructedVolumeMm3:Float;
+	var assemblyMotions:Array<{id:String,x:Float,y:Float,z:Float}>;
+}
+
 /** CAD realization consumes the neutral plan. Loose screws/clamps are released first;
  * adhesive joints are released explicitly. Cores and supports participate in the
  * appropriate bed/fill withdrawal graph; EPS breakup remains a manual operation.
@@ -48,18 +57,18 @@ class BoxMoldCad {
 		return ToolingBlock.placedBox(b);
 	}
 
-	public static function reconstructed(p:MoldPlan):Part {
+	public static function reconstructed(p:CastingMoldPlan):Part {
 		var parts:Array<Part> = [placedBox(p.cavity)];
 		return Solids.building(parts, items -> {
 			for (c in p.cores)
-				items.push(placedBox(c.cavity));
+				items.push(placedBox(MoldCores.singleBox(c.cavity,c.id)));
 			for (f in p.fixtures)
-				items.push(placedBox(f.body));
+				items.push(placedBox(CastingMoldPlanner.insertBox(p.document,f.insertId)));
 			return Solids.cut(items[0], items.slice(1));
 		});
 	}
 
-	public static function source(p:MoldPlan):Part {
+	public static function source(p:CastingMoldPlan):Part {
 		var envelope:Array<Part> = [];
 		return Solids.building(envelope, items -> {
 			for (e in p.document.input.envelope) {
@@ -80,10 +89,10 @@ class BoxMoldCad {
 		});
 	}
 
-	static function insert(p:MoldPlan):CastInsert
+	static function insert(p:CastingMoldPlan):CastInsert
 		return ToolingInsertCad.component(p.document.input.inserts[0]);
 
-	public static function presentation(p:MoldPlan,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+	public static function presentation(p:CastingMoldPlan,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
 		var b=p.cavity,offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
 		for(m in p.panels.members)offsets.set(m.panel.id,switch m.panel.id {
 			case "bed": {x:0.0,y:0.0,z:-b.height*0.6};
@@ -102,8 +111,8 @@ class BoxMoldCad {
 		return ToolingExplode.presentation(definition,"box-mold",offsets);
 	}
 
-	public static function assembly(p:MoldPlan):MachineAssembly {
-		BoxMoldPlanner.validate(p);
+	public static function assembly(p:CastingMoldPlan):MachineAssembly {
+		CastingMoldPlanner.validate(p);
 		var b = p.cavity, a = PanelKit.assembly(p.panels, "coated particleboard");
 		for (index in 0...p.supportPanels.length) {
 			var m = p.supportPanels[index],
@@ -111,7 +120,7 @@ class BoxMoldCad {
 			a.addComponent(m.panel.id, ToolingPanel.fromPlan(m.panel), pose);
 		}
 		for (c in p.cores) {
-			var pose = F.compose(F.identity(), c.cutting.stockToMold);
+			var pose = F.compose(F.identity(), c.layers[0].stockToMold);
 			var foot = c.support.foot;
 			if (foot != null) {
 				var fp = F.compose(F.identity(), foot.cutting.stockToMold);
@@ -125,7 +134,7 @@ class BoxMoldCad {
 					ToolingHardwareCad.throughBolt(a, h.id, h.diameter, h.length, h.pose);
 				}
 			}
-			a.addComponent(c.id, ToolingVolume.fromCoreCutting(c.id, c.cutting), pose);
+			a.addComponent(c.id, ToolingVolume.fromCoreCutting(c.id, c.layers[0]), pose);
 		}
 		var i = p.document.input.inserts[0],
 			pose = F.compose(p.document.setup.sourceToMold, i.pose);
@@ -138,7 +147,7 @@ class BoxMoldCad {
 			var thread:materia.casting.InsertHole.InsertThread = cast hole.thread;
 			ToolingHardwareCad.fixtureScrew(a, fixing.hardwareId, hole, t + materia.tooling.casting.InsertFixturePlanner.minimumInsertion(hole),
 				F.fromRotationMatrix(fixing.entry.x, fixing.entry.y, b.z - t, [1, 0, 0, 0, -1, 0, 0, 0, -1]),fixing.entry);
-			var penetration = p.penetrations.filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
+			var penetration = MoldOpenings.records(p).filter(v -> v.sourceHoleId == hole.id && v.insertId == i.id)[0];
 			var plug = penetration.plug;
 			if (plug != null) {
 				if (plug.materialSpec != "steel")
@@ -170,7 +179,7 @@ class BoxMoldCad {
 		return a;
 	}
 
-	static function cutVolume(p:MoldPlan, panelId:String, opId:String):Part {
+	static function cutVolume(p:CastingMoldPlan, panelId:String, opId:String):Part {
 		var m = p.panels.members.filter(m -> m.panel.id == panelId)[0],
 			op = m.panel.operations.filter(o -> o.id == opId)[0],
 			t = m.panel.stock.measuredThickness;
@@ -182,11 +191,11 @@ class BoxMoldCad {
 		return world;
 	}
 
-	public static function penetrations(p:MoldPlan):Void {
-		BoxMoldPlanner.validate(p);
+	public static function penetrations(p:CastingMoldPlan):Void {
+		CastingMoldPlanner.validate(p);
 		var envelope = placedBox(p.cavity);
 		try {
-			for (record in p.penetrations) {
+			for (record in MoldOpenings.records(p)) {
 				var cut = cutVolume(p, record.panelId, record.operationId);
 				try {
 					if (record.kind == OutsideCasting) {
@@ -203,7 +212,7 @@ class BoxMoldCad {
 						var bounds = cut.shape.bounds(),
 							lo = Vector.fromNative(bounds.get_min()),
 							hi = Vector.fromNative(bounds.get_max()),
-							cb = core.cavity;
+							cb = MoldCores.singleBox(core.cavity,core.id);
 						if (record.panelId != "bed"
 							|| core.support.socketOperationId != record.operationId
 							|| lo.x < cb.x + record.sealMargin
@@ -214,7 +223,7 @@ class BoxMoldCad {
 							|| Math.abs(lo.z - p.cavity.z + core.support.embedDepth) > 1e-7)
 							throw "Core socket escapes sealing footprint";
 					} else {
-						BoxMoldPlanner.validateInsertSeal(p, record);
+						CastingMoldPlanner.validateInsertSeal(p, record);
 					}
 					cut.close();
 				} catch (e:Dynamic) {
@@ -231,7 +240,7 @@ class BoxMoldCad {
 
 	/** Cover every intended closed face with actual panels; the single fixing seal is
 	 * represented only by its explicitly checked insert footprint. Fill +Z remains open. */
-	static function coverage(p:MoldPlan, panels:Array<Part>):Void {
+	static function coverage(p:CastingMoldPlan, panels:Array<Part>):Void {
 		var b = p.cavity, s = 0.1;
 		var slabs:Array<MoldBox> = [
 			{
@@ -281,7 +290,7 @@ class BoxMoldCad {
 				seals:Array<Part> = [];
 			try {
 				if (k == 4) {
-					var insert = p.fixtures[0].body;
+					var insert = CastingMoldPlanner.insertBox(p.document,p.fixtures[0].insertId);
 					var seal = placedBox({
 						x: insert.x,
 						y: insert.y,
@@ -294,7 +303,7 @@ class BoxMoldCad {
 					tools.push(seal);
 					for (core in p.cores)
 						if (core.support.kind == CoreSupportKind.BedSocket) {
-							var cb = core.cavity, coreSeal = placedBox({
+							var cb = MoldCores.singleBox(core.cavity,core.id), coreSeal = placedBox({
 								x: cb.x,
 								y: cb.y,
 								z: b.z - s,
@@ -323,10 +332,11 @@ class BoxMoldCad {
 		}
 	}
 
-	public static function review(p:MoldPlan):BoxMoldReview {
+	static function analyze(p:CastingMoldPlan):BoxMoldAnalysis {
 		penetrations(p);
-		var original = source(p), rebuilt = reconstructed(p), difference = 0.0;
+		var original = source(p), rebuilt = reconstructed(p), difference = 0.0,sourceVolume=0.0,rebuiltVolume=0.0;
 		try {
+			sourceVolume=original.volume();rebuiltVolume=rebuilt.volume();
 			var missing = original.subtractAll([rebuilt]),
 				excess = rebuilt.subtractAll([original]);
 			difference = missing.volume() + excess.volume();
@@ -387,7 +397,7 @@ class BoxMoldCad {
 			var cured = Solids.union([casting, worldSteel]);
 			parts.push(cured);
 			var core = p.cores[0],
-				covered = placedBox(core.cavity),
+				covered = placedBox(MoldCores.singleBox(core.cavity,core.id)),
 				foot = core.support.foot;
 			if (foot != null) {
 				var fb = foot.foam;
@@ -440,16 +450,17 @@ class BoxMoldCad {
 				});
 			} else
 				members[members.length - 1].direction = new Vector(0, 0, 1);
-			var steelBody = placedBox(p.fixtures[0].body);
+			var steelBody = placedBox(CastingMoldPlanner.insertBox(p.document,p.fixtures[0].insertId));
 			parts.push(steelBody);
 			members.push({id: p.fixtures[0].insertId, part: steelBody, direction: new Vector(0, 0, 1)});
 			// For installation the bed approaches downward first, unlike its downward
 			// demolding withdrawal. Reverse the corresponding +Z clearance motion.
 			members[0].direction = new Vector(0, 0, 1);
 			var assemblyReport = SweptRemoval.analyze(members);
+			var assemblyMotions=[for (member in members) {id:member.id,x:member.direction.x,y:member.direction.y,z:member.direction.z}];
 			for (part in parts)
 				part.close();
-			return {
+			var result:BoxMoldReview = {
 				assembly: assemblyReport,
 				demolding: demolding,
 				demoldingMotions:demoldingMotions,
@@ -459,10 +470,29 @@ class BoxMoldCad {
 				rigidGroups: rigidGroups,
 				assemblyGroups: assemblyGroups
 			};
+			return {review:result,sourceVolumeMm3:sourceVolume,reconstructedVolumeMm3:rebuiltVolume,assemblyMotions:assemblyMotions};
 		} catch (e:Dynamic) {
 			for (part in parts)
 				part.close();
 			throw e;
 		}
 	}
+	public static function review(p:CastingMoldPlan):BoxMoldReview return analyze(p).review;
+
+	/** Expose the existing exact case review through the common review record.
+	 * The single-pocket shop report keeps its existing delivered layout. */
+	public static function commonReview(p:CastingMoldPlan):CastingMoldCad.CastingMoldReview {
+		var state=analyze(p),review=state.review,fingerprint=CastingMoldPlanner.fingerprint(p);
+		var checks=review.validation.concat([for (name in ["reconstruction","coverage","assembly-graph","demolding-graph"])
+			materia.tooling.export.ToolingLoads.check("tooling.cad."+name,[p.document.input.id],
+				materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,"Exact CAD "+name+" check passed.",[fingerprint])]);
+		return {fingerprint:fingerprint,handling:p.handling,
+			demoldingSteps:CastingMoldCad.steps(p,review.demolding.removalOrder),symmetricDifferenceMm3:review.symmetricDifferenceMm3,
+			sourceVolumeMm3:state.sourceVolumeMm3,reconstructedVolumeMm3:state.reconstructedVolumeMm3,
+			assembly:review.assembly,demolding:review.demolding,permanentGroups:review.rigidGroups,
+			assemblyGroups:review.assemblyGroups,validation:checks,
+			fabrication:materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks),
+			assemblyMotions:state.assemblyMotions,demoldingMotions:review.demoldingMotions};
+	}
+
 }

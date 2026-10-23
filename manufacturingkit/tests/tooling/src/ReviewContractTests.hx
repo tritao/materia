@@ -170,7 +170,6 @@ class ReviewContractTests {
 		var bridges = CastingMoldPlanner.plan(p.document,p.options);
 		var wider = CastingMoldPlanner.plan(p.document,p.options).cores[0];
 		wider.id = "wide-core";
-		wider.carrierId = "wide-carrier";
 		var cavity=materia.tooling.casting.MoldCores.singleBox(wider.cavity,wider.id);
 		var cy = cavity.y + cavity.depth / 2;
 		cavity.depth = 200;
@@ -180,7 +179,7 @@ class ReviewContractTests {
 		materia.tooling.casting.CoreSupports.sharedBridges(bridges.cavity, bridges.document.recipe, bridges.cores, [], []);
 		var foam = materia.tooling.casting.MoldCores.singleBox(
 			materia.tooling.casting.MoldCores.layerRegion(bridges.cores[0].layers[0]),bridges.cores[0].id);
-		check(Math.abs(bridges.cores[0].bridgeBondAreaMm2 - foam.width * foam.depth) < 1e-7,
+		check(Math.abs(bridges.cores[0].support.bridgeBondAreaMm2 - foam.width * foam.depth) < 1e-7,
 			"a wider row beam never credits bond area beyond the smaller foam pad");
 		var rigid=ToolingCodec.copy(p.document);
 		for (strategy in rigid.setup.features) if (strategy.strategy==materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {

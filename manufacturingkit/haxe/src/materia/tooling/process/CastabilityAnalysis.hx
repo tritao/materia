@@ -2,7 +2,6 @@ package materia.tooling.process;
 
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.BoxAlgebra;
-import materia.tooling.casting.BoxMoldPlanner;
 import materia.tooling.casting.CastingMoldPlanner;
 import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.assembly.AssemblyFrames as F;
@@ -15,7 +14,7 @@ import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.OrthogonalSections;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
 
 enum abstract CastabilityAction(String) to String {
@@ -406,7 +405,7 @@ class CastabilityAnalysis {
 						"This source-only distance/embedded-depth screen requires exact axis-aligned body and insert boxes.", []));
 				continue;
 			}
-			var box = BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, insertToMold);
+			var box = CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, insertToMold);
 			var edge = Math.min(Math.min(box.x - envelope.x, envelope.x + envelope.width - box.x - box.width),
 				Math.min(box.y - envelope.y, envelope.y + envelope.depth - box.y - box.depth));
 			var wet = BoxAlgebra.intersection(box, envelope);
@@ -422,7 +421,7 @@ class CastabilityAnalysis {
 						< Math.max(d.recipe.minimumLigament, hole.limits.minWall))
 						proposed = null;
 				if (proposed != null) {
-					var smaller = BoxMoldPlanner.box(proposed, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, insert.pose));
+					var smaller = CastingMoldPlanner.box(proposed, dimensions.depth, dimensions.height, F.compose(d.setup.sourceToMold, insert.pose));
 					var improved = Math.min(Math.min(smaller.x - envelope.x, envelope.x + envelope.width - smaller.x - smaller.width),
 						Math.min(smaller.y - envelope.y, envelope.y + envelope.depth - smaller.y - smaller.depth));
 					var requiredEdge:Float = cast limits.minimumInsertEdgeMm;
@@ -527,7 +526,7 @@ class CastabilityAnalysis {
 		var moments=materia.tooling.casting.CastHandling.moments(d,envelope);
 		var inverse=F.inverse(d.setup.sourceToMold),mold=moments.centerOfMassMoldMm;
 		var center=F.transformPoint(inverse,mold.x,mold.y,mold.z);
-		var source=BoxMoldPlanner.box(envelope.width,envelope.depth,envelope.height,
+		var source=CastingMoldPlanner.box(envelope.width,envelope.depth,envelope.height,
 			F.compose(inverse,F.translation(envelope.x+envelope.width/2,envelope.y+envelope.depth/2,envelope.z)));
 		var rx=Math.min(center.x-source.x,source.x+source.width-center.x)/2;
 		var ry=Math.min(center.y-source.y,source.y+source.depth-center.y)/2;

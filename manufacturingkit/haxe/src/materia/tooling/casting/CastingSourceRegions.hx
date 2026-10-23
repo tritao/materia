@@ -6,7 +6,7 @@ import materia.casting.CastingCavities;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingValidation;
 import materia.tooling.process.FillAnalysis;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 typedef CastingBoxRegions = {
 	var sourceId:String;
@@ -35,7 +35,7 @@ class CastingSourceRegions {
 			}
 
 		function placed(box:MoldBox):MoldBox {
-			return BoxMoldPlanner.box(box.width, box.depth, box.height,
+			return CastingMoldPlanner.box(box.width, box.depth, box.height,
 				F.compose(d.setup.sourceToMold, F.translation(box.x + box.width / 2, box.y + box.depth / 2, box.z)));
 		}
 		var envelope:CastingCavities.FinishedCastingCavity = {

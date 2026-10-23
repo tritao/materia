@@ -120,12 +120,12 @@ class RegionCorePlannerTests {
 			"inter-piece glue gaps remain distinct from EPS material");
 		check(R.volume(core.cavity,core.id)>R.volume(core.foamEnvelope,core.id),
 			"lining and the carrier glue line stay inside the finished cavity");
-		var carrier=plan.supportPanels.filter(row -> row.panel.id==core.carrierId)[0];
+		var carrier=plan.supportPanels.filter(row -> row.panel.id==materia.tooling.casting.MoldCores.carrierId(core))[0];
 		var carrierArea=Math.abs(materia.casting.CastingProfileGeometry.area(
 			materia.tooling.panel.PanelContours.outside(carrier.panel)));
-		var topArea=MoldCores.area(MoldCores.section(core.foamEnvelope,100-core.adhesiveThickness,core.id));
+		var topArea=MoldCores.area(MoldCores.section(core.foamEnvelope,100-core.support.adhesiveThickness,core.id));
 		check(Math.abs(carrierArea-topArea)<1e-6,"carrier follows the actual triangular contact footprint");
-		check(core.bridgeBondAreaMm2>0 && core.bridgeBondAreaMm2<=core.bondAreaMm2+1e-7,
+		check(core.support.bridgeBondAreaMm2>0 && core.support.bridgeBondAreaMm2<=core.support.bondAreaMm2+1e-7,
 			"beam bonding credits only exact foam contact");
 		var review=machinekit.tooling.CastingMoldCad.review(plan);
 		check(review.symmetricDifferenceMm3<1e-5,"non-box EPS reconstructs the source casting exactly");

@@ -2,7 +2,7 @@ import materia.tooling.process.JunctionThickness;
 import materia.tooling.process.OrthogonalSections;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.CastingProcessSpec.ProcessSpecs;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.casting.BoxAlgebra;
 import materia.tooling.ToolingCodec;
 

@@ -1,13 +1,7 @@
 package materia.tooling.casting;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import materia.tooling.casting.MoldPlan.MoldBox;
-
-enum abstract CoreSupportMode(String) to String {
-	var Auto = "auto";
-	var Bridge = "bridge";
-	var BedSocket = "bed-socket";
-}
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 enum abstract CoreSupportKind(String) to String {
 	var Bridge = "bridge";
@@ -21,13 +15,6 @@ enum abstract SupportHardwareKind(String) to String {
 	var FixturePin = "fixture-pin";
 	var BoreMask = "bore-mask";
 	var BorePlug = "bore-plug";
-}
-
-typedef CoreSupportOptions = {
-	var mode:CoreSupportMode;
-	var embedDepth:Float;
-	var fitClearance:Float;
-	var adhesiveThickness:Float;
 }
 
 typedef CoreCutting = {
@@ -68,6 +55,7 @@ typedef CoreSupport = {
 	var fitClearance:Float;
 	var embedDepth:Float;
 	var bondAreaMm2:Float;
+	var bridgeBondAreaMm2:Float;
 	var socketOperationId:Null<String>;
 	var foot:Null<CoreFoot>;
 	var panelIds:Array<String>;

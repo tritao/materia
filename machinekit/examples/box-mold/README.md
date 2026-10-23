@@ -32,9 +32,10 @@ remain a required process input; no clamp load qualification is implied. The
 
 Core support is selected from the actual cavity opening. A bed opening selects
 `bed-socket`; otherwise a fill-face opening selects `bridge`. A closed internal
-cavity is rejected. `BoxMoldPlanner.plan(document, options)` also accepts explicit
-`CoreSupportOptions` from `CoreSupports.defaults(recipe)`. Forcing a bed socket
-through a solid casting floor or a bridge through a solid top fails.
+cavity is rejected. `CastingMoldPlanner.planSinglePocket(document)` uses the
+shared core and fixture records. The recipe supplies fit and adhesive thickness;
+socket embed depth is one-third the measured panel stock. Validation rejects a
+support through a solid casting face.
 
 For a suspended core, four reusable panels form two registered wall-top pads,
 a broad carrier and a spanning bridge. Long walls have a half-stock-height

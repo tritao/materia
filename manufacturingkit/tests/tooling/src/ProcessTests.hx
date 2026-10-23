@@ -4,7 +4,7 @@ import materia.tooling.process.CastingProcessSpec.ProcessSpecs;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.CastingProcessAnalysis;
 import materia.tooling.ToolingCodec;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.casting.CastingMoldPlan;
 
 class ProcessTests {

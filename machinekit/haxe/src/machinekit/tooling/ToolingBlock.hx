@@ -9,16 +9,16 @@ import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 
 /** Rebuildable block in stock coordinates [0,w] x [0,d] x [0,h].
- * Visual material is explicit; supplier/process evidence remains in CorePlan.
+ * Visual material is explicit; supplier/process evidence remains in CastingMoldCore.
  */
 class ToolingBlock extends MachineComponent {
-	public static function fromBox(b:materia.tooling.casting.MoldPlan.MoldBox, material:String):ToolingBlock
+	public static function fromBox(b:materia.tooling.casting.CastingMoldPlan.MoldBox, material:String):ToolingBlock
 		return new ToolingBlock(new ComponentValues().setNumber("width", b.width)
 			.setNumber("depth", b.depth)
 			.setNumber("height", b.height)
 			.setToken("material", material));
 
-	public static function placedBox(b:materia.tooling.casting.MoldPlan.MoldBox):Part {
+	public static function placedBox(b:materia.tooling.casting.CastingMoldPlan.MoldBox):Part {
 		var local = fromBox(b, "unspecified").geometry();
 		try {
 			var world = local.translated(new cadkit.modeling.Vector(b.x, b.y, b.z));

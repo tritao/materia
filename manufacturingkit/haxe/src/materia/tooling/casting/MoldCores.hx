@@ -7,6 +7,39 @@ import materia.tooling.casting.CoreSupport.CoreCutting;
 
 /** Finished foam and gross cavity occupancy are distinct from cutting stock. */
 class MoldCores {
+	public static function carrierId(core:CastingMoldCore):String {
+		if (core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)
+			throw "Bed-socket core has no carrier: "+core.id;
+		return materia.tooling.ToolingIds.derive("",core.id,"-carrier");
+	}
+
+	public static function bridgeId(core:CastingMoldCore):String {
+		var carrier=carrierId(core), other=core.support.bondedPanelIds.filter(id -> id!=carrier);
+		if (other.length!=1) throw "Incomplete bonded core support: "+core.id;
+		return other[0];
+	}
+
+	public static function removal(core:CastingMoldCore):materia.tooling.casting.CastingMoldPlan.CoreRemoval
+		return core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.BedSocket
+			? materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughBed
+			: materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughFill;
+
+	/** The delivered single-pocket cutting sheet keeps its shop layout while the
+	 * allocation uses the common region/layer/support records in memory. */
+	public static function singlePocketRecord(core:CastingMoldCore,recipe:materia.tooling.ToolingRecipe):Dynamic {
+		if (core.layers.length!=1) throw "Single-pocket shop record requires one layer";
+		var support=core.support;
+		var evidence:Array<String>=[];
+		return {id:core.id,featureId:core.featureId,cavity:singleBox(core.cavity,core.id),
+			foam:singleBox(core.foamEnvelope,core.id),materialSpec:recipe.core.materialSpec,
+			coveringThickness:core.coveringThickness,removal:removal(core),cutting:core.layers[0],
+			support:{kind:support.kind,adhesiveSpec:support.adhesiveSpec,adhesiveThickness:support.adhesiveThickness,
+				fitClearance:support.fitClearance,embedDepth:support.embedDepth,bondAreaMm2:support.bondAreaMm2,
+				socketOperationId:support.socketOperationId,foot:support.foot,panelIds:support.panelIds,
+				bondedPanelIds:support.bondedPanelIds,hardware:support.hardware,padClosure:support.padClosure},
+			restraintEvidence:evidence};
+	}
+
 	public static function layerId(core:CastingMoldCore,index:Int):String {
 		if (index<0 || index>=core.layers.length) throw "Invalid core layer index: "+core.id;
 		return materia.tooling.ToolingIds.derive("",core.id,"-layer-"+index);
@@ -15,7 +48,7 @@ class MoldCores {
 	public static function cuttingRecord(core:CastingMoldCore,index:Int):Dynamic {
 		layerId(core,index);
 		return {featureId:core.featureId,coreId:core.id,cutting:core.layers[index],
-			adhesiveThickness:core.adhesiveThickness,coveringThickness:core.coveringThickness};
+			adhesiveThickness:core.support.adhesiveThickness,coveringThickness:core.coveringThickness};
 	}
 
 	public static function layerRegion(layer:CoreCutting):CastingRegion
@@ -48,12 +81,12 @@ class MoldCores {
 	public static function carrier(core:CastingMoldCore,r:materia.tooling.ToolingRecipe,z:Float)
 			:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement {
 		try {
-			var rows=section(core.foamEnvelope,z-core.adhesiveThickness,core.id);
+			var rows=section(core.foamEnvelope,z-core.support.adhesiveThickness,core.id);
 			var outers=rows.filter(row -> row.depth==0);
 			if (outers.length!=1 || rows.filter(row -> row.depth>1).length>0)
 				throw "Core carrier needs one connected top footprint";
 			var bounds=materia.casting.CastingProfileGeometry.bounds(outers[0].contour);
-			var panel=materia.tooling.panel.PanelJoints.blank(core.carrierId,bounds.width,bounds.height,
+			var panel=materia.tooling.panel.PanelJoints.blank(MoldCores.carrierId(core),bounds.width,bounds.height,
 				r.panel,r.routerDiameter,r.minimumLigament);
 			panel.operations[0].contour=materia.tooling.panel.PanelContours.placed(outers[0].contour,0,-bounds.x,-bounds.y);
 			for (index in 0...rows.length) if (rows[index].depth==1) {

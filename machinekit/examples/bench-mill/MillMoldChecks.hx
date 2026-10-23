@@ -1,3 +1,5 @@
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.casting.BoxAlgebra;
 import machinekit.tooling.CastingMoldCad;
 import machinekit.tooling.ToolingVolume;
@@ -136,11 +138,11 @@ class MillMoldChecks {
 		junctionGeometry(frame, p);
 		for (c in p.cores) {
 			check(c.layers.length == 2, "EPS layers fit 100 mm stock");
-			var first = materia.tooling.casting.MoldCores.singleBox(materia.tooling.casting.MoldCores.layerRegion(c.layers[0]),c.id);
-			var last = materia.tooling.casting.MoldCores.singleBox(materia.tooling.casting.MoldCores.layerRegion(c.layers[c.layers.length-1]),c.id);
-			var cavity = materia.tooling.casting.MoldCores.singleBox(c.cavity,c.id);
-			check(Math.abs(last.z + last.height + c.adhesiveThickness - cavity.z - cavity.height) < 1e-7, "glue line included in foam height");
-			check(Math.abs(last.z - first.z - first.height - c.adhesiveThickness) < 1e-7, "interlayer glue line included");
+			var first = MoldCores.singleBox(MoldCores.layerRegion(c.layers[0]),c.id);
+			var last = MoldCores.singleBox(MoldCores.layerRegion(c.layers[c.layers.length-1]),c.id);
+			var cavity = MoldCores.singleBox(c.cavity,c.id);
+			check(Math.abs(last.z + last.height + c.support.adhesiveThickness - cavity.z - cavity.height) < 1e-7, "glue line included in foam height");
+			check(Math.abs(last.z - first.z - first.height - c.support.adhesiveThickness) < 1e-7, "interlayer glue line included");
 		}
 		for (f in p.formers) {
 			var solid = ToolingVolume.geometryOf(f.volume);
@@ -174,26 +176,26 @@ class MillMoldChecks {
 		for (fixture in p.fixtures) for (fixing in fixture.fixings) {
 			var insert = p.document.input.inserts.filter(i -> i.id == fixture.insertId)[0];
 			var hole = insert.holes.filter(h -> h.id == fixing.sourceHoleId)[0];
-			var penetration = fixture.penetrations.filter(pen -> pen.sourceHoleId == hole.id)[0];
+			var penetration = materia.tooling.casting.CastingMoldPlan.MoldOpenings.records(p,fixture.insertId).filter(pen -> pen.sourceHoleId == hole.id)[0];
 			check(hole.thread != null && hole.extent == materia.casting.InsertHole.HoleExtent.Blind && penetration.plug == null
 				&& fixing.engagement + materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minTipGap <= hole.depth + 1e-7
 				&& materia.casting.InsertSpec.InsertBodyCodec.height(insert.body) - hole.depth >= hole.limits.minBack,
 				"source fixing preserves the blind C45 back wall and has no buried plug");
 		}
 		for (f in p.fixtures) {
-			var datum = ToolingVolume.geometryOf(f.datum);
+			var datum = ToolingVolume.geometryOf(MoldFixtures.datum(f));
 			check(datum.valid() && datum.solidCount() == 1, "bored datum support remains one valid connected solid");
 			datum.close();
-			check(f.lateralLocation.baselineMm >= p.document.recipe.hardware.fixturePinSpacing && f.datum.cuts.length >= 2,
+			check(MoldFixtures.lateral(f).baselineMm >= p.document.recipe.hardware.fixturePinSpacing && MoldFixtures.datum(f).cuts.length >= 2,
 				"fixture has pin/slot and clearance-only fixing cuts");
-			check(f.penetrations.length == 2 + f.fixings.length, "fixture bed cuts have explicit sealing face records");
+			check(materia.tooling.casting.CastingMoldPlan.MoldOpenings.records(p,f.insertId).length == 2 + f.fixings.length, "fixture bed cuts have explicit sealing face records");
 		}
 		for (f in p.fixtures) {
-			for (id in [f.lateralLocation.primaryId, f.lateralLocation.secondaryId]) {
-				check(report.demolding.removalOrder.indexOf(id) < report.demolding.removalOrder.indexOf(f.datum.id),
+			for (id in [MoldFixtures.lateral(f).primaryId, MoldFixtures.lateral(f).secondaryId]) {
+				check(report.demolding.removalOrder.indexOf(id) < report.demolding.removalOrder.indexOf(MoldFixtures.datum(f).id),
 					"through-bed pins withdraw before datum supports");
-				check(Math.abs(f.withdrawal.x) < 0.9
-					|| report.assembly.assemblyOrder.indexOf(f.datum.id) < report.assembly.assemblyOrder.indexOf(id),
+				check(Math.abs(MoldFixtures.withdrawal(f).x) < 0.9
+					|| report.assembly.assemblyOrder.indexOf(MoldFixtures.datum(f).id) < report.assembly.assemblyOrder.indexOf(id),
 					"datum supports seat before pins enter from below");
 			}
 		}
@@ -249,12 +251,12 @@ class MillMoldChecks {
 		restored.openings.pop();
 		rejects(() -> CastingMoldPlanner.validate(restored), "unclassified contact opening");
 		restored = CastingMoldPlanner.plan(p.document,p.options);
-		var smaller=materia.tooling.casting.MoldCores.singleBox(restored.cores[0].cavity,restored.cores[0].id);
+		var smaller=MoldCores.singleBox(restored.cores[0].cavity,restored.cores[0].id);
 		smaller.height -= 2;
 		restored.cores[0].cavity=materia.tooling.casting.MoldRegions.box(smaller);
 		rejects(() -> CastingMoldCad.review(restored), "missing pocket geometry");
 		restored = CastingMoldPlanner.plan(p.document,p.options);
-		restored.fixtures[0].datum.pieces[0].z += 30;
+		MoldFixtures.datum(restored.fixtures[0]).pieces[0].z += 30;
 		rejects(() -> CastingMoldCad.review(restored), "displaced insert datum fixture");
 		var f = p.formers.filter(f -> f.featureIds.length > 0 && StringTools.startsWith(f.featureIds[0], "foot-access-"))[0];
 		var former = ToolingVolume.geometryOf(f.volume),

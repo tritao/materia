@@ -5,7 +5,7 @@ import machinekit.tooling.CastingFillAnalysis;
 import machinekit.tooling.CastingFillGeometry;
 import machinekit.tooling.ToolingBlock;
 import materia.tooling.process.FillAnalysis;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 class FillGeometryNativeTests {
 	static var assertions=0;

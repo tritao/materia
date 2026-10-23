@@ -1,11 +1,13 @@
 package materia.tooling.process;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import materia.tooling.casting.CastingMoldPlan;
 import materia.casting.BoxAlgebra;
-import materia.tooling.casting.BoxMoldPlanner;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlanner;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.panel.PanelContours;
 import materia.casting.CastingProfileGeometry;
 import materia.casting.CastingProfile.CastingSegment;
@@ -48,7 +50,7 @@ class FillTooling {
 					if (xs[i + 1] - xs[i] > 1e-7
 						&& ys[j + 1] - ys[j] > 1e-7
 						&& CastingProfileGeometry.inside(contour, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2))
-						boxes.push(BoxMoldPlanner.box(xs[i + 1] - xs[i], ys[j + 1] - ys[j], depth,
+						boxes.push(CastingMoldPlanner.box(xs[i + 1] - xs[i], ys[j + 1] - ys[j], depth,
 							F.compose(pose, F.translation((xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2, 0))));
 			return boxes;
 		}
@@ -60,7 +62,7 @@ class FillTooling {
 			var outline = PanelContours.outside(member.panel),
 				thickness = member.panel.stock.measuredThickness;
 			var bounds = CastingProfileGeometry.bounds(outline);
-			var broad = BoxMoldPlanner.box(bounds.width, bounds.height, thickness,
+			var broad = CastingMoldPlanner.box(bounds.width, bounds.height, thickness,
 				F.compose(member.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)));
 			var old = blockers.length;
 			if (!add(broad))
@@ -80,7 +82,7 @@ class FillTooling {
 						material = BoxAlgebra.subtract(material, prism(op.contour, op.depth, pose));
 					else {
 						var cutBounds = CastingProfileGeometry.bounds(op.contour);
-						var cut = BoxMoldPlanner.box(cutBounds.width, cutBounds.height, op.depth,
+						var cut = CastingMoldPlanner.box(cutBounds.width, cutBounds.height, op.depth,
 							F.compose(pose, F.translation(cutBounds.x + cutBounds.width / 2, cutBounds.y + cutBounds.height / 2, 0)));
 						var before = blockers.length;
 						if (add(cut)) {
@@ -92,7 +94,7 @@ class FillTooling {
 			for (box in material)
 				add(box);
 		}
-		for (volume in [for (f in p.formers) f.volume].concat([for (f in p.fixtures) f.datum])) {
+		for (volume in [for (f in p.formers) f.volume].concat(MoldFixtures.allVolumes(p))) {
 			var material = volume.pieces.copy();
 			for (cut in volume.cuts) {
 				if (orthogonal(cut.operation.contour))
@@ -100,7 +102,7 @@ class FillTooling {
 				else {
 					var bounds = CastingProfileGeometry.bounds(cut.operation.contour);
 					var before = blockers.length;
-					if (add(BoxMoldPlanner.box(bounds.width, bounds.height, cut.operation.depth,
+					if (add(CastingMoldPlanner.box(bounds.width, bounds.height, cut.operation.depth,
 						F.compose(cut.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0))))) {
 						blockers.splice(before, 1);
 						unsupportedIds.push(volume.id);
@@ -116,7 +118,7 @@ class FillTooling {
 				if (exact!=null) for (box in exact) add(box);
 				else {
 					var bounds = CastingProfileGeometry.bounds(profile.contour);
-					if (add(BoxMoldPlanner.box(bounds.width, bounds.height, profile.depth,
+					if (add(CastingMoldPlanner.box(bounds.width, bounds.height, profile.depth,
 						F.compose(profile.pose, F.translation(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, 0)))))
 						unsupportedIds.push(volume.id);
 				}
@@ -126,13 +128,13 @@ class FillTooling {
 			var exact=materia.tooling.casting.MoldRegions.boxes(core.cavity);
 			if (exact!=null) for (box in exact) add(box);
 			else {
-				var bounds=materia.tooling.casting.MoldCores.stockBounds(core.cavity,core.id);
+				var bounds=MoldCores.stockBounds(core.cavity,core.id);
 				if (bounds.z+bounds.height>=fill) unsupportedIds.push(core.id);
 			}
 		}
 		for (insert in p.document.input.inserts) {
 			var dimensions = InsertBodies.box(insert.body, insert.id);
-			add(BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, insert.pose)));
+			add(CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, insert.pose)));
 		}
 		var unique:Array<String> = [];
 		for (id in unsupportedIds)

@@ -1,3 +1,4 @@
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.tooling.export.FabricationSpec;
 import materia.tooling.export.FabricationSpec.FabricationSpecs;
 import materia.tooling.export.ToolingFabrication;
@@ -149,14 +150,14 @@ class FabricationTests {
 		check(ToolingFabrication.plan(p, s).validation.filter(c -> c.rule == "fabrication.fastener.test-fasteners"
 			&& c.status == "fail").length == 1,
 			"fastener reaction exceeds capacity");
-		var rigid = [for (v in p.formers) v.volume].concat([for (v in p.fixtures) v.datum]);
+		var rigid = [for (v in p.formers) v.volume].concat(MoldFixtures.allVolumes(p));
 		check(rigid.length > 0, "fixture includes rigid tooling");
 		for (member in rigid) {
 			check(f.loads.estimates.filter(v -> v.id == member.id).length == 1, "every rigid former and datum has an uplift estimate");
 			check(f.loads.estimates.filter(v -> v.id == member.id + "-lateral-x").length == 1, "every rigid former and datum has a lateral estimate");
 		}
 		var wetPlan = materia.tooling.casting.CastingMoldPlanner.plan(p.document,p.options);
-		var wetMembers = [for (v in wetPlan.formers) v.volume].concat([for (v in wetPlan.fixtures) v.datum]);
+		var wetMembers = [for (v in wetPlan.formers) v.volume].concat(materia.tooling.casting.CastingMoldPlan.MoldFixtures.allVolumes(wetPlan));
 		var wetMember = wetMembers[0], envelope = wetPlan.envelope;
 		wetMember.profiles = [];
 		wetMember.cuts = [];

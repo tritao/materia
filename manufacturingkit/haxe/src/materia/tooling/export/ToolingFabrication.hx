@@ -1,5 +1,6 @@
 package materia.tooling.export;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.tooling.export.FabricationSpec.FabricationSpecs;
 
 import materia.tooling.casting.CastingMoldPlan;
@@ -173,8 +174,8 @@ class ToolingFabrication {
 		for (f in p.formers)
 			checks.push(ToolingLoads.check("fabrication.former-machining." + f.volume.id, [f.volume.id], Pending,
 				"Three-dimensional former blanking, setups and fixture access require a manufacturing route; panel CAM does not cover these solids.", []));
-		for (f in p.fixtures)
-			checks.push(ToolingLoads.check("fabrication.fixture-machining." + f.datum.id, [f.datum.id], Pending,
+		for (volume in MoldFixtures.allVolumes(p))
+			checks.push(ToolingLoads.check("fabrication.fixture-machining." + volume.id, [volume.id], Pending,
 				"Datum support machining and bore-mask release require qualified shop setups.", []));
 		var coupon = PanelCoupon.make(p.document.recipe.panel, s.couponClearancesMm, p.document.recipe.routerDiameter);
 		var hardware = p.document.recipe.hardware;
@@ -227,7 +228,7 @@ class ToolingFabrication {
 					memberIds: [for (v in requirements) v.partId]
 				},
 				{id: "formers", use: Reusable, memberIds: [for (v in p.formers) v.volume.id]},
-				{id: "datum-supports", use: Reusable, memberIds: [for (v in p.fixtures) v.datum.id]},
+				{id: "datum-supports", use: Reusable, memberIds: [for (volume in materia.tooling.casting.CastingMoldPlan.MoldFixtures.allVolumes(p)) volume.id]},
 				{id: "hardware", use: Reusable, memberIds: [for (v in p.hardware) v.id]},
 				{id: "eps-cores", use: PerCasting, memberIds: [for (v in p.cores) v.id]},
 				{

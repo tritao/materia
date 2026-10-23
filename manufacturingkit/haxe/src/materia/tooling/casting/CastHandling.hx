@@ -6,7 +6,7 @@ import materia.casting.BoxAlgebra;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 /** Exact box moments retain their algebraic path. Non-box source geometry
  * uses the application kernel, with results expressed in mm/kg. */

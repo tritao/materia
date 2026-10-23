@@ -126,7 +126,7 @@ class ToolingPresentation {
     materia.presentation.PresentationCodec.validate(definition,result);return result;
   }
 
-  public static function box(plan:materia.tooling.casting.MoldPlan,artifact:SceneArtifactData,
+  public static function box(plan:materia.tooling.casting.CastingMoldPlan,artifact:SceneArtifactData,
       review:BoxMoldCad.BoxMoldReview):AssemblyPresentation {
     return planned(artifact,BoxMoldCad.presentation(plan,artifact.assemblyDefinition),review.demolding,
       review.demoldingMotions,review.rigidGroups,"demould","Demould the box mould",[

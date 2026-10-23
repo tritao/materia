@@ -47,7 +47,7 @@ typedef InsertPlatePlan = {
 	var options:InsertPlateOptions;
 	var assembly:materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 	var sites:Array<InsertPlateSite>;
-	var penetrations:Array<MoldPlan.PenetrationPlan>;
+	var penetrations:Array<CastingMoldPlan.PenetrationPlan>;
 	var primary:{x:Float,y:Float};
 	var secondary:{x:Float,y:Float};
 	var clampPoints:Array<{x:Float,y:Float}>;
@@ -250,7 +250,7 @@ class InsertFixturePlanner {
 				validation.push(decision.check);
 			}
 		}
-		var penetrations:Array<MoldPlan.PenetrationPlan> = [];
+		var penetrations:Array<CastingMoldPlan.PenetrationPlan> = [];
 		for (panel in [pair.fixed,pair.moving]) for (operation in panel.operations) {
 			if (!operation.through || operation.kind == OutsideProfile) continue;
 			var matches = sites.filter(site -> panel.id == pair.moving.id && operation.id == site.id);

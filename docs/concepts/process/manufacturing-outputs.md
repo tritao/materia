@@ -102,7 +102,7 @@ CamKit turns them into programs.
 | Sheet-metal blanks | `cadkit.sheetmetal.SheetBlank.requirement` (flat pattern to `SheetPartRequirement`) |
 | Casting inputs and fingerprints | `materia.tooling`: `CastingToolingInput`, `CastingSetup`, `ToolingRecipe`, `ToolingDocument`, `ToolingCodec` |
 | Panels and joints | `materia.tooling.panel`: `PanelPlan`, `PanelOperation`, `PanelContours`, `PanelJoints`, `PanelCoupon` |
-| Mold planning | `materia.tooling.casting`: `BoxMoldPlanner`, `CastingMoldPlanner`, `CastingMoldPlan` |
+| Mold planning | `materia.tooling.casting`: `CastingMoldPlanner` (including single-pocket construction), `CastingMoldPlan` |
 | Fabrication review package | `materia.tooling.export`: `ToolingFabrication`, `FabricationPlan`, `ToolingManifest` |
 | Process analysis | `materia.tooling.process`: `CastingProcessAnalysis`, `CastabilityAnalysis`, `MoldOrientationStudy` |
 | Checks and the gate | `ToolingValidation`, `FabricationReadiness`, `ToolingReadiness.evaluate` |

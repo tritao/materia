@@ -1,5 +1,5 @@
 import cadkit.modeling.Part;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.OrthogonalSections;
 import materia.tooling.process.OrthogonalSections.SectionAxis;

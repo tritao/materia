@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import machinekit.tooling.InsertAnchorGeometry;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
@@ -401,14 +403,14 @@ class ToolingFabricationExport {
 					Std.string(b.width),
 					Std.string(b.depth),
 					Std.string(b.height),
-					Std.string(c.adhesiveThickness),
+					Std.string(c.support.adhesiveThickness),
 					Std.string(c.coveringThickness),
 					"per-casting"
 				]);
 			}
 		for (core in p.cores) for (index in 0...core.layers.length)
-			data(dir,materia.tooling.casting.MoldCores.layerId(core,index)+".cutting.json",
-				materia.tooling.casting.MoldCores.cuttingRecord(core,index));
+			data(dir,MoldCores.layerId(core,index)+".cutting.json",
+				MoldCores.cuttingRecord(core,index));
 		text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
 		var volumeRows = [
 			[
@@ -421,7 +423,7 @@ class ToolingFabricationExport {
 				"reusable"
 			]
 		];
-		for (volume in [for (v in p.formers) v.volume].concat([for (v in p.fixtures) v.datum]))
+		for (volume in [for (v in p.formers) v.volume].concat(MoldFixtures.allVolumes(p)))
 			for (index in 0...volume.pieces.length) {
 				var b = volume.pieces[index];
 				volumeRows.push([

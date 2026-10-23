@@ -4,8 +4,64 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingDocument;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
-import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.casting.CoreSupport.SupportHardware;
+
+typedef MoldBox = materia.casting.Box3;
+
+enum abstract PenetrationClass(String) to String {
+	var OutsideCasting = "outside-casting";
+	var InsertSealed = "insert-sealed";
+	var CoreSealed = "core-sealed";
+}
+
+typedef PenetrationPlan = {
+	var panelId:String;
+	var operationId:String;
+	var kind:PenetrationClass;
+	var insertId:Null<String>;
+	@:optional var sourceHoleId:String;
+	var coreId:Null<String>;
+	var sealMargin:Float;
+	var sealMaterial:String;
+	var sealingFace:Null<AssemblyFrame>;
+	var plug:Null<{
+		diameter:Float,
+		length:Float,
+		materialSpec:String
+	}>;
+}
+
+enum abstract CoreRemoval(String) to String {
+	var BreakoutThroughFill = "breakout-through-fill";
+	var BreakoutThroughBed = "breakout-through-bed";
+}
+
+typedef InsertDatums = {
+	var primarySupportPoints:Array<{
+		x:Float,
+		y:Float,
+		z:Float
+	}>;
+	var secondaryAxis:{x:Float, y:Float, z:Float};
+	var tertiaryAxis:{x:Float, y:Float, z:Float};
+}
+
+
+enum MoldConstruction {
+	SharedBridges;
+	SinglePocket;
+}
+
+/** Special sealing details belong to the same opening as its coverage record. */
+typedef OpeningProtection = {
+	var kind:PenetrationClass;
+	var insertId:Null<String>;
+	var sourceHoleId:Null<String>;
+	var coreId:Null<String>;
+	var sealMargin:Float;
+	var sealingFace:Null<AssemblyFrame>;
+	var plug:Null<{diameter:Float,length:Float,materialSpec:String}>;
+}
 
 enum abstract MoldPartMaterial(String) to String {
 	var EPSStock = "eps";
@@ -57,11 +113,7 @@ typedef CastingMoldCore = {
 	var foamEnvelope:materia.casting.CastingRegion;
 	var layers:Array<materia.tooling.casting.CoreSupport.CoreCutting>;
 	var coveringThickness:Float;
-	var adhesiveThickness:Float;
-	var carrierId:String;
-	var bridgeId:String;
-	var bondAreaMm2:Float;
-	var bridgeBondAreaMm2:Float;
+	var support:materia.tooling.casting.CoreSupport;
 }
 
 /** One source core intent, with all foam pieces created around retained supports. */
@@ -90,6 +142,7 @@ typedef MoldOpening = {
 	var kind:MoldOpeningKind;
 	var sealingIds:Array<String>;
 	var sealSpec:String;
+	var protection:Null<OpeningProtection>;
 }
 
 typedef PrecisionInterface = {
@@ -198,22 +251,27 @@ typedef InsertFixtureFixing = {
 	var threadSpec:String;
 }
 
+
+enum MoldFixtureSupport {
+	OnBed(panelId:String);
+	OnDatum(volume:MoldVolume,withdrawal:{x:Float,y:Float,z:Float},
+		lateralLocation:{primaryId:String,secondaryId:String,baselineMm:Float});
+}
+
 typedef MoldInsertFixture = {
 	var insertId:String;
 	var location:DatumFixtureLocation.DatumLocationPlan;
-	var datums:materia.tooling.casting.MoldPlan.InsertDatums;
-	var datum:MoldVolume;
+	var datums:InsertDatums;
+	var support:MoldFixtureSupport;
 	var mountingFace:AssemblyFrame;
-	var withdrawal:{x:Float, y:Float, z:Float};
 	var attachmentEvidence:Array<String>;
-	var lateralLocation:{primaryId:String, secondaryId:String, baselineMm:Float};
 	var fixings:Array<InsertFixtureFixing>;
-	var penetrations:Array<materia.tooling.casting.MoldPlan.PenetrationPlan>;
 	var boreMasks:Array<BoreMaskProtection>;
 	var assemblyClearance:{x:Float, y:Float, z:Float};
 }
 
 typedef CastingMoldPlan = {
+	var construction:MoldConstruction;
 	var id:String;
 	var document:ToolingDocument;
 	var sourceFingerprint:String;
@@ -233,6 +291,72 @@ typedef CastingMoldPlan = {
 	var changeRequests:Array<DesignChangeRequest>;
 	var validation:Array<materia.tooling.ToolingValidation>;
 	var fabrication:materia.tooling.ToolingValidation.FabricationReadiness;
+}
+
+/** Access explicit support variants; a bed fixture has no independent volume. */
+class MoldFixtures {
+	public static function volumes(fixture:MoldInsertFixture):Array<MoldVolume> return switch fixture.support {
+		case OnBed(_):[]; case OnDatum(volume,_,_):[volume];
+	};
+	public static function datum(fixture:MoldInsertFixture):MoldVolume return switch fixture.support {
+		case OnDatum(volume,_,_):volume; case OnBed(_):throw "Bed fixture has no separate datum volume: "+fixture.insertId;
+	};
+	public static function withdrawal(fixture:MoldInsertFixture):{x:Float,y:Float,z:Float} return switch fixture.support {
+		case OnDatum(_,direction,_):direction;
+		case OnBed(_):materia.assembly.AssemblyFrames.transformVector(fixture.mountingFace,0,0,1);
+	};
+	public static function lateral(fixture:MoldInsertFixture):{primaryId:String,secondaryId:String,baselineMm:Float}
+		return switch fixture.support {
+			case OnDatum(_,_,location):location;
+			case OnBed(_):throw "Bed fixture has no separate datum locating pins: "+fixture.insertId;
+		};
+	public static function bedId(fixture:MoldInsertFixture):String return switch fixture.support {
+		case OnBed(panelId):panelId; case OnDatum(_,_,_):throw "Fixture is supported by a datum: "+fixture.insertId;
+	};
+	public static function allVolumes(plan:CastingMoldPlan):Array<MoldVolume> {
+		var result:Array<MoldVolume>=[];
+		for (fixture in plan.fixtures) for (volume in volumes(fixture)) result.push(volume);
+		return result;
+	}
+}
+
+/** One canonical opening table. Physical penetration records are read-only
+ * compositions for sealing checks, not a second stored plan or encoding. */
+class MoldOpenings {
+	public static function fromRecord(record:PenetrationPlan):MoldOpening return {
+		panelId:record.panelId,operationId:record.operationId,
+		kind:record.kind==PenetrationClass.OutsideCasting ? MoldOpeningKind.ExteriorOpening : MoldOpeningKind.ToolingOpening,
+		sealingIds:record.insertId!=null ? [record.insertId] : record.coreId!=null ? [record.coreId] : [],
+		sealSpec:record.sealMaterial,
+		protection:record.kind==PenetrationClass.OutsideCasting ? null : {
+			kind:record.kind,insertId:record.insertId,sourceHoleId:record.sourceHoleId,coreId:record.coreId,
+			sealMargin:record.sealMargin,sealingFace:record.sealingFace,plug:record.plug}
+	};
+	public static function attach(plan:CastingMoldPlan,record:PenetrationPlan):Void {
+		var matches=plan.openings.filter(open -> open.panelId==record.panelId && open.operationId==record.operationId);
+		if (matches.length!=1 || matches[0].protection!=null) throw "Opening protection must have one unassigned operation";
+		matches[0].protection=fromRecord(record).protection;
+	}
+	public static function records(plan:CastingMoldPlan,?insertId:String):Array<PenetrationPlan> {
+		var result:Array<PenetrationPlan>=[];
+		for (open in plan.openings) {
+			var protection=open.protection;
+			if (protection==null) {
+				if (insertId==null && open.kind==MoldOpeningKind.ExteriorOpening)
+					result.push({panelId:open.panelId,operationId:open.operationId,kind:PenetrationClass.OutsideCasting,
+						insertId:null,coreId:null,sealMargin:0,sealMaterial:open.sealSpec,sealingFace:null,plug:null});
+			} else if (insertId==null || protection.insertId==insertId)
+				result.push({panelId:open.panelId,operationId:open.operationId,kind:protection.kind,
+					insertId:protection.insertId,sourceHoleId:protection.sourceHoleId,coreId:protection.coreId,
+					sealMargin:protection.sealMargin,sealMaterial:open.sealSpec,sealingFace:protection.sealingFace,plug:protection.plug});
+		}
+		return result;
+	}
+	public static function sourceProtection(plan:CastingMoldPlan,operationId:String):OpeningProtection {
+		var matches=plan.openings.filter(open -> open.operationId==operationId && open.protection!=null);
+		if (matches.length!=1) throw "Expected one protected source opening: "+operationId;
+		return cast matches[0].protection;
+	}
 }
 
 /** Strict authored process inputs. Missing physical evidence stays explicit, never inferred. */

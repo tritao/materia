@@ -1,3 +1,6 @@
+import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.casting.CastingInput;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.assembly.AssemblyFrames as F;
@@ -176,16 +179,16 @@ class CastingMoldTests {
 		var p=CastingMoldPlanner.plan(d,options(d));
 		var fixture=p.fixtures.filter(fixture -> fixture.insertId==extra.id)[0];
 		var bed=p.panels.members.filter(member -> member.panel.id=="bed")[0];
-		var socket=bed.panel.operations.filter(operation -> operation.id==fixture.datum.id)[0];
+		var socket=bed.panel.operations.filter(operation -> operation.id==MoldFixtures.datum(fixture).id)[0];
 		var top=bed.pose.z+bed.panel.stock.measuredThickness,below=0;
-		for (piece in fixture.datum.pieces) if (piece.z<top-1e-7) {
+		for (piece in MoldFixtures.datum(fixture).pieces) if (piece.z<top-1e-7) {
 			below++;
 			var contactTolerance=1e-6;
 			check(materia.casting.CastingProfileGeometry.containsRect(socket.contour,piece.x-bed.pose.x+contactTolerance,
 				piece.y-bed.pose.y+contactTolerance,piece.width-2*contactTolerance,piece.depth-2*contactTolerance),
 				"datum interior fits its bed socket; boundary contact is permitted");
 		}
-		check(below>0 && fixture.datum.pieces.filter(piece -> piece.z+piece.height>top+1e-7).length>0,
+		check(below>0 && MoldFixtures.datum(fixture).pieces.filter(piece -> piece.z+piece.height>top+1e-7).length>0,
 			"raised datum fixture actually straddles the bed surface");
 	}
 
@@ -278,7 +281,7 @@ class CastingMoldTests {
 		fixed.fixtures[0].location.report.rank=3;
 		var reordered=ToolingCodec.copy(sourceThreads).input.inserts[0];
 		reordered.holes.reverse();
-		var datum=fixed.fixtures[0],reversedCuts=materia.tooling.casting.MoldRegions.MoldVolumeRecords.copy(datum.datum);
+		var datum=fixed.fixtures[0],reversedCuts=materia.tooling.casting.MoldRegions.MoldVolumeRecords.copy(MoldFixtures.datum(datum));
 		reversedCuts.cuts.reverse();reversedCuts.pieces.reverse();
 		var permuted=materia.tooling.casting.DatumFixtureLocation.plan(reordered,sourceThreads.setup.sourceToMold,
 			{mountingFace:datum.mountingFace,datum:reversedCuts,fixings:datum.fixings});
@@ -292,7 +295,7 @@ class CastingMoldTests {
 				if (dx*dx+dy*dy<=9) clearContacts=false;
 			}
 		check(clearContacts,"support witnesses lie outside every source thread footprint");
-		var missingSupport=materia.tooling.casting.MoldRegions.MoldVolumeRecords.copy(datum.datum);
+		var missingSupport=materia.tooling.casting.MoldRegions.MoldVolumeRecords.copy(MoldFixtures.datum(datum));
 		missingSupport.pieces=[];
 		var unsupportedLocation=materia.tooling.casting.DatumFixtureLocation.plan(reordered,sourceThreads.setup.sourceToMold,
 			{mountingFace:datum.mountingFace,datum:missingSupport,fixings:datum.fixings});
@@ -319,13 +322,13 @@ class CastingMoldTests {
 		fixed.hardware = protectedHardware;
 		for (fixing in fixed.fixtures[0].fixings) {
 			var screw = fixed.hardware.filter(h -> h.id == fixing.hardwareId)[0];
-			var penetration = fixed.fixtures[0].penetrations.filter(pen -> pen.sourceHoleId == fixing.sourceHoleId)[0];
+			var penetration = MoldOpenings.records(fixed,fixed.fixtures[0].insertId).filter(pen -> pen.sourceHoleId == fixing.sourceHoleId)[0];
 			check(penetration.plug != null && fixing.engagement + 1 + penetration.plug.length <= threads[0].depth,
 				"through-thread fixing has a resin-side plug and a separate tip gap");
 			check(Math.abs(screw.length - (fixing.entry.z - screw.pose.z + 6)) < 1e-7,
 				"screw clamps the bed and datum with policy thread engagement");
 		}
-		var farEnd = fixed.fixtures[0].penetrations.filter(pen -> pen.sourceHoleId == fixed.fixtures[0].fixings[0].sourceHoleId)[0];
+		var farEnd = MoldOpenings.sourceProtection(fixed,fixed.fixtures[0].fixings[0].operationId);
 		var savedPlug = farEnd.plug;
 		farEnd.plug = null;
 		rejects(() -> CastingMoldPlanner.validate(fixed), "missing resin-side protection rejected");
@@ -344,7 +347,7 @@ class CastingMoldTests {
 		check(materia.tooling.casting.CastHandling.plan(d, handlingOptions, p.envelope).requiresFlip, "changing vertical requires handling/flip");
 		var bridgePlan = CastingMoldPlanner.plan(d,o);
 		var extraCore = CastingMoldPlanner.plan(d,o).cores[0];
-		var extraCavity=materia.tooling.casting.MoldCores.singleBox(extraCore.cavity,extraCore.id);
+		var extraCavity=MoldCores.singleBox(extraCore.cavity,extraCore.id);
 		extraCavity.y -= 20;
 		extraCavity.depth += 40;
 		extraCore.cavity=materia.tooling.casting.MoldRegions.box(extraCavity);
@@ -362,7 +365,7 @@ class CastingMoldTests {
 			for (f in p.document.input.features)
 				CastingMoldPlanner.featureBox(p.document, f)
 		]);
-		intersecting.fixtures[0].datum.pieces = [resinPieces[0]];
+		MoldFixtures.datum(intersecting.fixtures[0]).pieces = [resinPieces[0]];
 		rejects(() -> CastingMoldPlanner.validate(intersecting), "datum/resin intersection rejected before CAD");
 		var jigOptions=options(d);
 		jigOptions.replicationJigs=[{id:"synthetic-jig",datumSchemeId:"synthetic-datums",frameReference:"synthetic-frame",
@@ -395,16 +398,16 @@ class CastingMoldTests {
 		fragmented.setup.features.push({featureId: children[0].id, strategy: ReusableFormer, priority: 10, withdrawal: {x: 0, y: 0, z: 1}});
 		rejects(() -> ToolingCodec.copy(fragmented), "one authored core unit cannot mix incompatible tooling strategies");
 		var cuts = [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)],
-			negative = materia.tooling.casting.MoldCores.boxes(p.cores[0].cavity,p.cores[0].id);
+			negative = MoldCores.boxes(p.cores[0].cavity,p.cores[0].id);
 		for (f in p.formers)
 			for (b in f.volume.pieces)
 				negative.push(b);
 		for (f in p.fixtures)
-			for (b in f.datum.pieces)
+			for (b in MoldFixtures.datum(f).pieces)
 				negative.push(b);
 		for (i in d.input.inserts) {
 			var dimensions = InsertBodies.box(i.body, i.id);
-			negative.push(materia.tooling.casting.BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height,
+			negative.push(materia.tooling.casting.CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height,
 				materia.assembly.AssemblyFrames.compose(d.setup.sourceToMold, i.pose)));
 		}
 		var source = BoxAlgebra.subtract([p.envelope], cuts),
@@ -509,15 +512,15 @@ class CastingMoldTests {
 		rotated.setup.sourceToMold = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 100, [0, -1, 0, -1, 0, 0, 0, 0, -1]);
 		var rotatedPlan = CastingMoldPlanner.plan(rotated, options(rotated));
 		var rotatedNegative:Array<materia.casting.Box3> = [];
-		for (c in rotatedPlan.cores) rotatedNegative=rotatedNegative.concat(materia.tooling.casting.MoldCores.boxes(c.cavity,c.id));
+		for (c in rotatedPlan.cores) rotatedNegative=rotatedNegative.concat(MoldCores.boxes(c.cavity,c.id));
 		for (f in rotatedPlan.formers)
 			for (b in f.volume.pieces)
 				rotatedNegative.push(b);
 		for (f in rotatedPlan.fixtures)
-			for (b in f.datum.pieces)
+			for (b in MoldFixtures.datum(f).pieces)
 				rotatedNegative.push(b);
 		for (i in rotated.input.inserts)
-			rotatedNegative.push(materia.tooling.casting.BoxMoldPlanner.box(InsertBodies.box(i.body, i.id).width, InsertBodies.box(i.body, i.id).depth, InsertBodies.box(i.body, i.id).height,
+			rotatedNegative.push(materia.tooling.casting.CastingMoldPlanner.box(InsertBodies.box(i.body, i.id).width, InsertBodies.box(i.body, i.id).depth, InsertBodies.box(i.body, i.id).height,
 				materia.assembly.AssemblyFrames.compose(rotated.setup.sourceToMold, i.pose)));
 		var rotatedSource = BoxAlgebra.subtract([rotatedPlan.envelope], [for (f in rotated.input.features) CastingMoldPlanner.featureBox(rotated, f)]),
 			rotatedRebuilt = BoxAlgebra.subtract([rotatedPlan.cavity], rotatedNegative);

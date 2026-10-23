@@ -1,5 +1,7 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingCodec;
@@ -24,10 +26,11 @@ typedef ToolingSectionReviewResult = {
 class ToolingSectionReview {
 	public static function build(plan:CastingMoldPlan):ToolingSectionReviewResult {
 		var items=[for (former in plan.formers) {volume:former.volume,direction:former.withdrawal,ids:[former.volume.id].concat(former.featureIds)}];
-		for (fixture in plan.fixtures) items.push({volume:fixture.datum,direction:fixture.withdrawal,ids:[fixture.datum.id,fixture.insertId]});
+		for (fixture in plan.fixtures) for (volume in MoldFixtures.volumes(fixture))
+			items.push({volume:volume,direction:MoldFixtures.withdrawal(fixture),ids:[volume.id,fixture.insertId]});
 		var cuttingFiles=new Map<String,String>();
 		for (core in plan.cores) for (index in 0...core.layers.length) {
-			var id=materia.tooling.casting.MoldCores.layerId(core,index),cutting=core.layers[index];
+			var id=MoldCores.layerId(core,index),cutting=core.layers[index];
 			items.push({volume:ToolingVolume.fromCoreCutting(id,cutting).volume,
 				direction:cutting.wireDirection,ids:[id,core.id,core.featureId]});
 			cuttingFiles.set(id,id+".cutting.json");

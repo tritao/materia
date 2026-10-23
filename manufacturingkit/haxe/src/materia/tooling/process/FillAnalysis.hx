@@ -1,12 +1,13 @@
 package materia.tooling.process;
 
+import materia.tooling.casting.MoldCores;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.casting.BoxAlgebra;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 typedef FillBoundary = {var id:String; var box:MoldBox;}
 typedef FillCore = {var id:String; var geometry:materia.casting.CastingRegion;}
@@ -111,7 +112,7 @@ typedef FillAssessment = {var report:Null<FillReport>; var validation:Array<Tool
  */
 class FillAnalysis {
 	public static function coreBoxes(core:FillCore):Array<MoldBox>
-		return materia.tooling.casting.MoldCores.boxes(core.geometry,core.id);
+		return MoldCores.boxes(core.geometry,core.id);
 
 	public static function sourceSupport(input:materia.tooling.casting.CastingToolingInput):Array<ToolingValidation>
 		return materia.tooling.casting.CastingBoxSupport.check(input, "process.fill.geometry");

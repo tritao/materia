@@ -5,7 +5,7 @@ import machinekit.component.MachineComponent;
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.casting.InsertFixturePlanner.InsertPlatePlan;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
 import materia.tooling.panel.PanelJoints;
 import materia.casting.BoxAlgebra;

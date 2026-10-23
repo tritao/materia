@@ -15,7 +15,7 @@ import materia.tooling.casting.CastingMoldPlan.MoldVolume;
 import materia.tooling.casting.CastingMoldPlan.MoldPartMaterial;
 import materia.tooling.casting.CastingMoldPlan.MoldVolumeProfile;
 import materia.tooling.casting.CastingMoldPlan.MoldVolumeCut;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 
 /** Exact planning queries. Orthogonal expressions retain the shared box algebra;
  * other expressions require the application's exact kernel. Stock bounds never

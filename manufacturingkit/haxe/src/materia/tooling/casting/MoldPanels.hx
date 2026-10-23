@@ -10,8 +10,8 @@ import materia.tooling.panel.PanelJoints.PanelClosure;
 import materia.tooling.panel.PanelContours;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
-import materia.tooling.casting.MoldPlan.MoldBox;
-import materia.tooling.casting.MoldPlan.PenetrationPlan;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.PenetrationPlan;
 import materia.tooling.ToolingRecipe;
 
 enum abstract RaisedWalls(String) to String {

@@ -1,3 +1,4 @@
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
 import materia.casting.InsertSpec.InsertRole;
 import materia.assembly.AssemblyFrames as F;
 
@@ -50,7 +51,7 @@ class LiftingSourceTests {
 		var world=machinekit.assembly.PosedParts.moved(local,bed.pose);local.close();
 		try {
 			for (fixture in p.fixtures) if (fixture.insertId.indexOf("lift")==0) {
-				var datum=machinekit.tooling.ToolingVolume.geometryOf(fixture.datum);
+				var datum=machinekit.tooling.ToolingVolume.geometryOf(MoldFixtures.datum(fixture));
 				try {
 					var overlap=world.intersect(datum),volume=overlap.volume();overlap.close();
 					check(volume<1e-5,"native bed/datum pair has no interior overlap: "+fixture.insertId+" "+volume);

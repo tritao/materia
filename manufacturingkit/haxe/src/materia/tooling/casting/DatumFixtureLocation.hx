@@ -44,7 +44,7 @@ class DatumFixtureLocation {
 	 * excluding conservative bounds of every cut that reaches its contact plane. */
 	public static function onBed(source:CastingToolingInsert,sourceToMold:materia.assembly.AssemblyRecord.AssemblyFrame,
 			face:materia.assembly.AssemblyRecord.AssemblyFrame,bed:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement,
-			cavity:MoldPlan.MoldBox,fixings:Array<InsertFixtureFixing>):DatumLocationPlan {
+			cavity:CastingMoldPlan.MoldBox,fixings:Array<InsertFixtureFixing>):DatumLocationPlan {
 		var rotation=F.toRotationMatrix(bed.pose);
 		for (i in 0...9) if (Math.abs(rotation[i]-(i==0 || i==4 || i==8 ? 1 : 0))>EPS)
 			throw "Box fixture bed contact requires an XY panel: "+bed.panel.id;
@@ -53,7 +53,7 @@ class DatumFixtureLocation {
 			cavity.x-bed.pose.x,cavity.y-bed.pose.y,cavity.width,cavity.depth))
 			throw "Box fixture contact rectangle is outside its bed: "+bed.panel.id;
 		var thickness=bed.panel.stock.measuredThickness;
-		var pieces:Array<MoldPlan.MoldBox> = [{x:cavity.x,y:cavity.y,z:bed.pose.z,
+		var pieces:Array<CastingMoldPlan.MoldBox> = [{x:cavity.x,y:cavity.y,z:bed.pose.z,
 			width:cavity.width,depth:cavity.depth,height:thickness}];
 		var cuts:Array<MoldVolumeCut> = [];
 		for (operation in bed.panel.operations) if (operation.kind!=materia.tooling.panel.PanelPlan.PanelOperationKind.OutsideProfile) {
@@ -64,7 +64,7 @@ class DatumFixtureLocation {
 	}
 
 	static function contactPlan(source:CastingToolingInsert,sourceToMold:materia.assembly.AssemblyRecord.AssemblyFrame,
-			face:materia.assembly.AssemblyRecord.AssemblyFrame,datumId:String,pieces:Array<MoldPlan.MoldBox>,
+			face:materia.assembly.AssemblyRecord.AssemblyFrame,datumId:String,pieces:Array<CastingMoldPlan.MoldBox>,
 			cuts:Array<MoldVolumeCut>,hasProfiles:Bool,fixings:Array<InsertFixtureFixing>):DatumLocationPlan {
 		var pose=F.compose(sourceToMold,source.pose);
 		var dimensions=materia.casting.InsertSpec.InsertBodyCodec.box(source.body,source.id);

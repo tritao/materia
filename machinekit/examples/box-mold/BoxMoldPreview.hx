@@ -13,7 +13,7 @@ import machinekit.component.ComponentValues;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import materia.project.SceneArtifact;
-import materia.tooling.casting.BoxMoldPlanner;
+import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CoreSupports;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.panel.PanelCodec;
@@ -41,7 +41,7 @@ class BoxMoldPreview {
 			if (arg == "--bed-core")
 				bedCore = true;
 		}
-		var p = BoxMoldPlanner.plan(SinglePocketSetup.document(thickness, turn, bedCore)),
+		var p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document(thickness, turn, bedCore)),
 			report = BoxMoldCad.review(p),
 			cwd = Sys.getCwd();
 		var dir = sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/examples/box-mold/build/review" : cwd + "/build/review";
@@ -50,7 +50,7 @@ class BoxMoldPreview {
 		sys.FileSystem.createDirectory(dir);
 		sys.io.File.saveContent(dir + "/review.json", Json.stringify({
 			phase: 3,
-			fingerprint: BoxMoldPlanner.fingerprint(p),
+			fingerprint: CastingMoldPlanner.fingerprint(p),
 			geometry: report,
 			qualification: "REVIEW ONLY: physical restraint, datum accuracy, anchorage, compaction, loads and handling pending",
 			graphScope: "Assembly includes cores/inserts. Demolding begins after screw/clamp release and adhesive release; core support, EPS withdrawal/breakout and cured casting all participate. Straight translation sweeps only."
@@ -69,12 +69,17 @@ class BoxMoldPreview {
 			part.close();
 		}
 		for (c in p.cores) {
-			var b = c.cutting.block,
+			var b = c.layers[0].block,
 				component = ToolingBlock.fromBox(b, "EPS tooling");
 			var part = component.geometry();
 			part.shape.exportStep(dir + "/" + c.id + ".step");
 			part.close();
-			sys.io.File.saveContent(dir + "/" + c.id + ".cutting.json", Json.stringify(c, null, "\t") + "\n");
+			var record = materia.tooling.casting.MoldCores.singlePocketRecord(c,p.document.recipe);
+			var fields = Reflect.fields(record);
+			fields.sort(Reflect.compare);
+			var cutting:Dynamic = {};
+			for (field in fields) Reflect.setField(cutting, field, Reflect.field(record, field));
+			sys.io.File.saveContent(dir + "/" + c.id + ".cutting.json", Json.stringify(cutting, null, "\t") + "\n");
 			var lines = [
 				Curve(Outline, Segment.line(new Point2(0, 0), new Point2(b.width, 0))),
 				Curve(Outline, Segment.line(new Point2(b.width, 0), new Point2(b.width, b.height))),

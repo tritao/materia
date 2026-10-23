@@ -1,12 +1,13 @@
+import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
+import materia.tooling.casting.MoldCores;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.assembly.AssemblyFrames as F;
 import haxe.Json;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
-import materia.tooling.casting.BoxMoldPlanner;
+import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.casting.CoreSupports;
-import materia.tooling.casting.CoreSupport.CoreSupportMode;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 
 /** Planning/persistence remain buildable with ProjectKit alone, without native CAD. */
@@ -57,7 +58,7 @@ class BoxPlannerTests {
 			tertiary:{id:"tertiary",reference:materia.casting.FoundationDatumScheme.DatumReference.BodyFace("body.y-min"),
 				frame:F.fromRotationMatrix(0,-90,50,[1,0,0,0,0,-1,0,1,0])}};
 		withDatums.setup.sourceFingerprint=ToolingCodec.inputFingerprint(withDatums.input);
-		var datumPlan=BoxMoldPlanner.plan(withDatums);
+		var datumPlan=CastingMoldPlanner.planSinglePocket(withDatums);
 		check(datumPlan.validation.filter(v -> v.rule=="tooling.datum.contacts."+d.input.id
 			&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
 			"box planner preserves datum contact qualification gate");
@@ -69,7 +70,7 @@ class BoxPlannerTests {
 		pattern.input.inserts[0].holes.push(second);
 		TestInsertHoles.beforeCasting(pattern.input.inserts[0]);
 		pattern.setup.sourceFingerprint = ToolingCodec.inputFingerprint(pattern.input);
-		var patterned = BoxMoldPlanner.plan(pattern);
+		var patterned = CastingMoldPlanner.planSinglePocket(pattern);
 		check(patterned.fixtures[0].fixings.length == 2, "both source threads produce independent fixings");
 		var shallow = materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
 		shallow.depth = materia.casting.InsertHole.InsertHoleCodec.threadLimits(shallow).minEngagement
@@ -77,14 +78,14 @@ class BoxPlannerTests {
 		check(materia.tooling.casting.InsertFixturePlanner.select(shallow,
 			F.compose(pattern.setup.sourceToMold, pattern.input.inserts[0].pose), patterned.fixtures[0].mountingFace,
 			pattern.recipe.hardware) == null, "screw and far-end plug cannot consume the same depth");
-		check(patterned.penetrations.filter(p -> p.insertId == "seat" && p.sourceHoleId != null).length == 2,
+		check(MoldOpenings.records(patterned).filter(p -> p.insertId == "seat" && p.sourceHoleId != null).length == 2,
 			"each insert penetration traces to its source hole");
 		patterned.fixtures[0].fixings[0].engagement = 0.001;
-		rejects(() -> BoxMoldPlanner.validate(patterned), "engagement must match the numeric source policy");
+		rejects(() -> CastingMoldPlanner.validate(patterned), "engagement must match the numeric source policy");
 		var counterbored=ToolingCodec.copy(d);
 		counterbored.input.inserts[0].holes[0].counterbore={diameter:9,depth:2};
 		counterbored.setup.sourceFingerprint=ToolingCodec.inputFingerprint(counterbored.input);
-		var counterboredPlan=BoxMoldPlanner.plan(counterbored);
+		var counterboredPlan=CastingMoldPlanner.planSinglePocket(counterbored);
 		var selected=materia.tooling.casting.InsertFixturePlanner.select(counterbored.input.inserts[0].holes[0],
 			F.compose(counterbored.setup.sourceToMold,counterbored.input.inserts[0].pose),counterboredPlan.fixtures[0].mountingFace,counterbored.recipe.hardware);
 		check(selected!=null && selected.engagement==6 && selected.insertion==8,
@@ -95,7 +96,7 @@ class BoxPlannerTests {
 		noThread.input.inserts[0].holes[0].threadDepth = null;
 		noThread.input.inserts[0].holes[0].limits.threaded = null;
 		noThread.setup.sourceFingerprint = ToolingCodec.inputFingerprint(noThread.input);
-		var blocked = BoxMoldPlanner.plan(noThread);
+		var blocked = CastingMoldPlanner.planSinglePocket(noThread);
 		check(blocked.fixtures[0].fixings.length == 0 && blocked.changeRequests.filter(r -> r.kind == "insert-fixture-hole").length == 1
 			&& !blocked.fabrication.ready, "plain bore never becomes an invented thread");
 		var late=ToolingCodec.copy(d);
@@ -104,19 +105,19 @@ class BoxPlannerTests {
 			case Catalogue(_):throw "Fabricated fixture expected";
 		}
 		late.setup.sourceFingerprint=ToolingCodec.inputFingerprint(late.input);
-		var latePlan=BoxMoldPlanner.plan(late);
+		var latePlan=CastingMoldPlanner.planSinglePocket(late);
 		check(latePlan.fixtures[0].fixings.length==0 && latePlan.fixtures[0].boreMasks.length==0,
 			"post-cast thread supplies neither a pour-time fixing nor a fictitious bore mask");
 		check(latePlan.changeRequests.filter(r -> r.kind=="insert-fixture-hole").length==1,
 			"a fixture needs a usable pre-cast source hole when its only service thread is late");
-		var forgedSeal=BoxMoldPlanner.plan(d);
-		var sourcePenetration=forgedSeal.penetrations.filter(pen -> pen.sourceHoleId==d.input.inserts[0].holes[0].id)[0];
+		var forgedSeal=CastingMoldPlanner.planSinglePocket(d);
+		var sourcePenetration=MoldOpenings.records(forgedSeal).filter(pen -> pen.sourceHoleId==d.input.inserts[0].holes[0].id)[0];
 		switch forgedSeal.document.input.inserts[0].origin {
 			case Fabricated(manufacturing):manufacturing.holeRoutes[0].route=materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting;
 			case Catalogue(_):throw "Fabricated fixture expected";
 		}
 		var stageSealError="";
-		try BoxMoldPlanner.validateInsertSeal(forgedSeal,sourcePenetration) catch (error:Dynamic) stageSealError=Std.string(error);
+		try CastingMoldPlanner.validateInsertSeal(forgedSeal,sourcePenetration) catch (error:Dynamic) stageSealError=Std.string(error);
 		check(stageSealError.indexOf("Insert penetration has no unique source hole")>=0,
 			"a service-only thread cannot qualify a pre-cast insert-sealed penetration");
 		var undecided=ToolingCodec.copy(d);
@@ -125,19 +126,19 @@ class BoxPlannerTests {
 			case Catalogue(_):throw "Fabricated fixture expected";
 		}
 		undecided.setup.sourceFingerprint=ToolingCodec.inputFingerprint(undecided.input);
-		var undecidedPlan=BoxMoldPlanner.plan(undecided);
+		var undecidedPlan=CastingMoldPlanner.planSinglePocket(undecided);
 		check(undecidedPlan.fixtures[0].fixings.length==0 && undecidedPlan.fixtures[0].boreMasks.length==0
 			&& undecidedPlan.validation.filter(v -> v.rule=="tooling.fixture.hole-stage."+d.input.inserts[0].id
 				&& v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
 			"undecided manufacturing stage cannot become an existing fixture thread");
 		check(undecidedPlan.changeRequests.filter(r -> r.kind=="insert-fixture-hole").length==0,
 			"an undecided source hole route requests manufacturing planning rather than a casting change");
-		var p = BoxMoldPlanner.plan(d),initialFingerprint=BoxMoldPlanner.fingerprint(p);
-		var staleManufacturing=BoxMoldPlanner.plan(d);
+		var p = CastingMoldPlanner.planSinglePocket(d),initialFingerprint=CastingMoldPlanner.fingerprint(p);
+		var staleManufacturing=CastingMoldPlanner.planSinglePocket(d);
 		staleManufacturing.validation.filter(v -> v.rule=="fabrication.insert.inspection."+d.input.inserts[0].id)[0].status
 			=materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass;
 		var manufacturingError="";
-		try BoxMoldPlanner.validate(staleManufacturing) catch (error:Dynamic) manufacturingError=Std.string(error);
+		try CastingMoldPlanner.validate(staleManufacturing) catch (error:Dynamic) manufacturingError=Std.string(error);
 		check(manufacturingError.indexOf("Insert manufacturing validation differs from source")>=0,
 			"a planned inspection cannot be forged into physical inspection evidence");
 		var stockRule="tooling.precision.allowance."+d.input.inserts[0].id;
@@ -155,7 +156,7 @@ class BoxPlannerTests {
 		stocked.input.inserts[0].holes[0].depth=14;
 		stocked.input.inserts[0].holes[0].threadDepth=14;
 		stocked.setup.sourceFingerprint=ToolingCodec.inputFingerprint(stocked.input);
-		var reserved=BoxMoldPlanner.plan(stocked);
+		var reserved=CastingMoldPlanner.planSinglePocket(stocked);
 		check(reserved.validation.filter(v -> v.rule==stockRule && v.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1
 			&& reserved.changeRequests.filter(r -> r.id=="allowance-"+stocked.input.inserts[0].id).length==0,
 			"single-pocket mold uses the same source finishing-geometry decision");
@@ -163,26 +164,26 @@ class BoxPlannerTests {
 		check(p.validation.filter(check -> check.rule=="tooling.fixture.location."+p.fixtures[0].insertId
 			&& check.status=="pending" && check.message.indexOf("translation-x")>=0).length==1,
 			"box fixture names its unconstrained lateral direction");
-		var forged=BoxMoldPlanner.plan(d),locationError="";
+		var forged=CastingMoldPlanner.planSinglePocket(d),locationError="";
 		forged.fixtures[0].location.report.rank=6;
-		try BoxMoldPlanner.validate(forged) catch(error:Dynamic) locationError=Std.string(error);
+		try CastingMoldPlanner.validate(forged) catch(error:Dynamic) locationError=Std.string(error);
 		check(locationError.indexOf("Box fixture location differs from source geometry")>=0,
 			"a forged fully constrained box fixture is rejected");
-		check(p.panels.members.length == 5 && p.penetrations.length == 9, "all sockets/lands and fixing hole classified");
-		check(p.documentFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
-		var forgedSolid=BoxMoldPlanner.plan(d),solidError="";
-		forgedSolid.cores[0].cutting.solid=materia.tooling.casting.MoldRegions.box({x:0,y:0,z:0,width:1,depth:1,height:1});
-		try BoxMoldPlanner.validate(forgedSolid) catch (error:Dynamic) solidError=Std.string(error);
+		check(p.panels.members.length == 5 && p.openings.length == 9, "all sockets/lands and fixing hole classified");
+		check(p.sourceFingerprint == ToolingCodec.documentFingerprint(d), "mold provenance");
+		var forgedSolid=CastingMoldPlanner.planSinglePocket(d),solidError="";
+		forgedSolid.cores[0].layers[0].solid=materia.tooling.casting.MoldRegions.box({x:0,y:0,z:0,width:1,depth:1,height:1});
+		try CastingMoldPlanner.validate(forgedSolid) catch (error:Dynamic) solidError=Std.string(error);
 		check(solidError.indexOf("Invalid ruled core cutting definition")>=0,
 			"finished cutting solid cannot change behind its source foam geometry");
-		var missingSolid=BoxMoldPlanner.plan(d);
-		Reflect.setField(missingSolid.cores[0].cutting,"solid",null);
-		rejects(() -> BoxMoldPlanner.validate(missingSolid),"Invalid ruled core cutting definition");
-		p.cores[0].cutting.wireDirection = {x: 1, y: 1, z: 0};
-		rejects(() -> BoxMoldPlanner.validate(p), "unsupported wire direction rejected");
-		p = BoxMoldPlanner.plan(d);
-		p.penetrations.pop();
-		rejects(() -> BoxMoldPlanner.validate(p), "missing penetration classification");
+		var missingSolid=CastingMoldPlanner.planSinglePocket(d);
+		Reflect.setField(missingSolid.cores[0].layers[0],"solid",null);
+		rejects(() -> CastingMoldPlanner.validate(missingSolid),"Invalid ruled core cutting definition");
+		p.cores[0].layers[0].wireDirection = {x: 1, y: 1, z: 0};
+		rejects(() -> CastingMoldPlanner.validate(p), "unsupported wire direction rejected");
+		p = CastingMoldPlanner.planSinglePocket(d);
+		p.openings.pop();
+		rejects(() -> CastingMoldPlanner.validate(p), "missing penetration classification");
 		var panel:Dynamic = Json.parse(PanelCodec.encode(p.panels.members[0].panel));
 		Reflect.setField(panel, "version", 1);
 		rejects(() -> PanelCodec.decode(Json.stringify(panel)), "old panel encoding rejected");
@@ -190,47 +191,43 @@ class BoxPlannerTests {
 		Reflect.setField(Reflect.field(panel, "panel"), "contactOpenings", null);
 		rejects(() -> PanelCodec.decode(Json.stringify(panel)), "null opening list rejected");
 		d.recipe.panel.measuredThickness = 18.2;
-		check(BoxMoldPlanner.fingerprint(BoxMoldPlanner.plan(d)) != initialFingerprint, "stock changes invalidate package");
-		var bridge = BoxMoldPlanner.plan(d);
+		check(CastingMoldPlanner.fingerprint(CastingMoldPlanner.planSinglePocket(d)) != initialFingerprint, "stock changes invalidate package");
+		var bridge = CastingMoldPlanner.planSinglePocket(d);
 		check(bridge.cores[0].support.kind == CoreSupportKind.Bridge
 			&& bridge.supportPanels.length == 4, "suspended core receives carrier and pinned bridge");
-		var o = CoreSupports.defaults(d.recipe);
-		o.mode = CoreSupportMode.BedSocket;
-		rejects(() -> BoxMoldPlanner.plan(d, o), "bed socket cannot alter a solid casting floor");
+		var wrongBed = CastingMoldPlanner.planSinglePocket(d);
+		wrongBed.cores[0].support.kind = CoreSupportKind.BedSocket;
+		rejects(() -> CastingMoldPlanner.validate(wrongBed), "bed socket cannot alter a solid casting floor");
 		var bedDoc = ToolingCodec.copy(d);
 		bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].geometry.pose.z = 40;
         bedDoc.input.features.filter(f -> f.kind != "insert-recess")[0].openings=[materia.casting.CastingPatterns.face("body.z-max")];
 		bedDoc.setup.sourceFingerprint = ToolingCodec.inputFingerprint(bedDoc.input);
-		var bed = BoxMoldPlanner.plan(bedDoc), core = bed.cores[0];
+		var bed = CastingMoldPlanner.planSinglePocket(bedDoc), core = bed.cores[0];
 		check(core.support.kind == CoreSupportKind.BedSocket && bed.supportPanels.length == 0, "bed opening selects routed socket");
-		check(bed.penetrations.length == 10 && core.support.foot != null, "bed socket classified and separate foot defined");
+		check(bed.openings.length == 10 && core.support.foot != null, "bed socket classified and separate foot defined");
 		var foot = core.support.foot;
 		if (foot == null)
 			throw "Missing foot";
-		check(Math.abs(core.foam.z - bed.cavity.z) < 1e-7 && foot.foam.z < bed.cavity.z, "main core height preserved and foot buried");
-		o = CoreSupports.defaults(bedDoc.recipe);
-		o.mode = CoreSupportMode.Bridge;
-		rejects(() -> BoxMoldPlanner.plan(bedDoc, o), "bridge cannot pass a closed top");
-		o = CoreSupports.defaults(bedDoc.recipe);
-		o.fitClearance = 30;
-		rejects(() -> BoxMoldPlanner.plan(bedDoc, o), "socket clearance cannot escape core sealing land");
-		o = CoreSupports.defaults(bedDoc.recipe);
-		o.adhesiveThickness = 0;
-		rejects(() -> BoxMoldPlanner.plan(bedDoc, o), "zero adhesive thickness rejected");
-		rejects(() -> CoreSupports.options({
-			mode: "guess",
-			embedDepth: 6,
-			fitClearance: 0.2,
-			adhesiveThickness: 0.2
-		}), "unknown support mode rejected");
+		check(Math.abs(MoldCores.singleBox(core.foamEnvelope,core.id).z - bed.cavity.z) < 1e-7 && foot.foam.z < bed.cavity.z, "main core height preserved and foot buried");
+		var wrongBridge = CastingMoldPlanner.planSinglePocket(bedDoc);
+		wrongBridge.cores[0].support.kind = CoreSupportKind.Bridge;
+		rejects(() -> CastingMoldPlanner.validate(wrongBridge), "bridge cannot pass a closed top");
+		var escaped = CastingMoldPlanner.planSinglePocket(bedDoc);
+		var wide = ToolingCodec.copy(bedDoc).recipe;
+		wide.jointClearance = 30;
+		rejects(() -> CoreSupports.build(escaped.cores[0], escaped.cavity, wide, escaped.panels.members[0], [], []),
+			"socket clearance cannot escape core sealing land");
+		var noAdhesive = ToolingCodec.copy(bedDoc);
+		noAdhesive.recipe.adhesiveLineThickness = 0;
+		rejects(() -> CastingMoldPlanner.planSinglePocket(noAdhesive), "zero adhesive thickness rejected");
 		foot.cutting.wireDirection = {x: 1, y: 0, z: 0};
-		rejects(() -> BoxMoldPlanner.validate(bed), "foot cutting direction validated");
+		rejects(() -> CastingMoldPlanner.validate(bed), "foot cutting direction validated");
 		var constrained = ToolingCodec.copy(d);
 		constrained.recipe.jointClearance = 0.1;
 		rejects(() -> ToolingCodec.copy(constrained), "clearance must include stock variation and allowances");
-		var sealPlan = BoxMoldPlanner.plan(d);
-		sealPlan.penetrations.filter(x -> x.kind == "insert-sealed")[0].sealMargin = 100;
-		rejects(() -> BoxMoldPlanner.validate(sealPlan), "seal margin rejected before native CAD");
+		var sealPlan = CastingMoldPlanner.planSinglePocket(d);
+		MoldOpenings.sourceProtection(sealPlan,"insert-fixing-fixing").sealMargin = 100;
+		rejects(() -> CastingMoldPlanner.validate(sealPlan), "seal margin rejected before native CAD");
 		for (axis in [
 			materia.tooling.ToolingRecipe.CoreWireAxis.X,
 			materia.tooling.ToolingRecipe.CoreWireAxis.Y,
@@ -238,7 +235,7 @@ class BoxPlannerTests {
 		]) {
 			var direction = ToolingCodec.copy(d);
 			direction.recipe.coreWireAxis = axis;
-			var cut = BoxMoldPlanner.plan(direction).cores[0].cutting;
+			var cut = CastingMoldPlanner.planSinglePocket(direction).cores[0].layers[0];
 			check(cut.wireDirection.x * cut.wireDirection.x + cut.wireDirection.y * cut.wireDirection.y + cut.wireDirection.z * cut.wireDirection.z == 1,
 				"declared wire axis and faces");
 		}
@@ -265,11 +262,11 @@ class BoxPlannerTests {
 		check(derived.length <= 128, "derived source IDs always satisfy shared vocabulary");
 		var oversized = ToolingCodec.copy(d);
 		oversized.recipe.hardware.locatingPinDiameter = 4;
-		rejects(() -> BoxMoldPlanner.plan(oversized), "support obround must fit the selected router");
-		var padPlan = BoxMoldPlanner.plan(d);
+		rejects(() -> CastingMoldPlanner.planSinglePocket(oversized), "support obround must fit the selected router");
+		var padPlan = CastingMoldPlanner.planSinglePocket(d);
 		var pad = padPlan.supportPanels.filter(x -> StringTools.endsWith(x.panel.id, "-north-pad"))[0];
-		pad.pose.y = padPlan.cores[0].foam.y;
-		rejects(() -> BoxMoldPlanner.validate(padPlan), "carrier pad overlap rejected by neutral planner");
+		pad.pose.y = MoldCores.singleBox(padPlan.cores[0].foamEnvelope,padPlan.cores[0].id).y;
+		rejects(() -> CastingMoldPlanner.validate(padPlan), "carrier pad overlap rejected by neutral planner");
 		Sys.println('BoxPlannerTests: $assertions assertions passed');
 	}
 }

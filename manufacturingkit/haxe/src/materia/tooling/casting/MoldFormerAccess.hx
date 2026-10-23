@@ -76,7 +76,7 @@ class MoldFormerAccess {
 			pose:F.compose(wall.pose,F.translation(bounds.x+bounds.width/2,bounds.y+bounds.height/2,operation.depth))});
 		volume.regions.push(CastingRegion.Difference(flange,exclusions.copy()));
 		plan.openings.push({panelId:wall.panel.id,operationId:operation.id,kind:ToolingOpening,
-			sealingIds:[volume.id],sealSpec:r.hardware.sealMaterial});
+			sealingIds:[volume.id],protection:null,sealSpec:r.hardware.sealMaterial});
 		return [flange,MoldRegions.profile(volume.profiles[volume.profiles.length-1])];
 	}
 }

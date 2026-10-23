@@ -3,7 +3,7 @@ package materia.tooling.process;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingIds;
 import materia.casting.BoxAlgebra;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.process.FillAnalysis.FillBoundary;
 import materia.tooling.process.OrthogonalSections.SectionAxis;
 

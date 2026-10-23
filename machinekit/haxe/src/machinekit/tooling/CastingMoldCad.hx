@@ -1,5 +1,8 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.CastingMoldPlan.MoldOpenings;
+import materia.tooling.casting.MoldCores;
 import machinekit.tooling.InsertAnchorGeometry;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
@@ -16,7 +19,7 @@ import machinekit.standard.HexNut;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.casting.CoreSupport.SupportHardwareKind;
 import machinekit.tooling.SweptRemoval.RemovalMember;
 import machinekit.tooling.SweptRemoval.RemovalReport;
@@ -122,6 +125,7 @@ class CastingMoldCad {
 	}
 
 	public static function reconstructed(p:CastingMoldPlan):Part {
+		if (p.construction==SinglePocket) return BoxMoldCad.reconstructed(p);
 		var pieces:Array<Part> = [box(p.cavity)];
 		return Solids.building(pieces, parts -> {
 			for (c in p.cores)
@@ -132,7 +136,7 @@ class CastingMoldCad {
 			// They remain real clearance holes in the tooling, but are not pour
 			// space. The planner validates these full occupied volumes against resin.
 			for (f in p.fixtures)
-				for (piece in f.datum.pieces)
+				for (piece in MoldFixtures.datum(f).pieces)
 					parts.push(box(piece));
 			// Full envelopes include bores protected during pouring. Their actual
 			// masks are separate members in the assembly and demolding graphs.
@@ -177,7 +181,7 @@ class CastingMoldCad {
 	public static function looseHardware(p:CastingMoldPlan, h:materia.tooling.casting.CoreSupport.SupportHardware):Bool
 		return h.kind != SupportHardwareKind.FixturePin && (h.kind != SupportHardwareKind.BoreMask || threadedMask(p, h));
 
-	static function steps(p:CastingMoldPlan, order:Array<String>):Array<MoldDemoldingStep> {
+	public static function steps(p:CastingMoldPlan, order:Array<String>):Array<MoldDemoldingStep> {
 		var result:Array<MoldDemoldingStep> = [
 			{
 				id: "release-loose-tooling",
@@ -190,6 +194,18 @@ class CastingMoldCad {
 				status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
 			}
 		];
+		if (p.construction==SinglePocket) {
+			for (fixture in p.fixtures) {
+				for (fixing in fixture.fixings) result[0].memberIds.push(fixing.hardwareId);
+				for (mask in fixture.boreMasks) {
+					result[0].memberIds.push(mask.hardwareId);
+					if (mask.farEndId!=null) result[0].memberIds.push(mask.farEndId);
+				}
+				for (record in MoldOpenings.records(p,fixture.insertId)) if (record.plug!=null)
+					result[0].memberIds.push(materia.tooling.ToolingIds.derive("resin-plug-",record.sourceHoleId));
+			}
+			result[0].memberIds.sort(Reflect.compare);
+		}
 		var previous = "release-loose-tooling";
 		var entryMasks = [for (h in p.hardware) if (threadedMask(p, h)) h.id];
 		if (entryMasks.length > 0) {
@@ -244,7 +260,7 @@ class CastingMoldCad {
 	static function insertBox(p:CastingMoldPlan, id:String):MoldBox {
 		var i = p.document.input.inserts.filter(i -> i.id == id)[0];
 		var dimensions = InsertBodies.box(i.body, i.id);
-		return materia.tooling.casting.BoxMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, i.pose));
+		return materia.tooling.casting.CastingMoldPlanner.box(dimensions.width, dimensions.depth, dimensions.height, F.compose(p.document.setup.sourceToMold, i.pose));
 	}
 
 	static function panelWorld(m:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement):Part {
@@ -260,6 +276,7 @@ class CastingMoldCad {
 	}
 
 	public static function presentation(p:CastingMoldPlan,definition:materia.assembly.AssemblyDefinition):materia.presentation.AssemblyPresentation {
+		if (p.construction==SinglePocket) return BoxMoldCad.presentation(p,definition);
 		var b=p.cavity,offsets=new Map<String,materia.assembly.AssemblyDefinition.AssemblyVector>();
 		for(m in p.panels.members)offsets.set(m.panel.id,switch m.panel.id {
 			case "bed": {x:0.0,y:0.0,z:-b.height*0.7};
@@ -272,7 +289,7 @@ class CastingMoldCad {
 		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:b.height*(0.5+i*0.15)});
 		for(i in 0...p.cores.length)offsets.set(p.cores[i].id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
 		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
-		for(f in p.fixtures)offsets.set(f.datum.id,{x:f.withdrawal.x*b.width,y:0,z:f.withdrawal.z*b.height*1.4});
+		for(f in p.fixtures)offsets.set(MoldFixtures.datum(f).id,{x:MoldFixtures.withdrawal(f).x*b.width,y:0,z:MoldFixtures.withdrawal(f).z*b.height*1.4});
 		for(i in p.document.input.inserts)offsets.set(materia.tooling.ToolingIds.derive("insert-",i.id),{x:b.width*1.8,y:0,z:0});
 		for(hardware in anchorComponents(p))
 			offsets.set(hardware.id,offsets.get(materia.tooling.ToolingIds.derive("insert-",hardware.insertId)));
@@ -280,6 +297,7 @@ class CastingMoldCad {
 	}
 
 	public static function assembly(p:CastingMoldPlan):MachineAssembly {
+		if (p.construction==SinglePocket) return BoxMoldCad.assembly(p);
 		enableGeometry();
 		CastingMoldPlanner.validate(p);
 		var a = PanelKit.assembly(p.panels, "coated particleboard"), b = p.cavity;
@@ -293,7 +311,7 @@ class CastingMoldCad {
 				id: c.id,
 				material: EPSStock,
 				cuts: [],
-				regions: [materia.tooling.casting.MoldCores.foam(c)],
+				regions: [MoldCores.foam(c)],
 				profiles: [],
 				pieces: []
 			}), pose);
@@ -304,7 +322,7 @@ class CastingMoldCad {
 		}
 		for (f in p.fixtures) {
 			var pose = F.identity();
-			a.addComponent(f.datum.id, ToolingVolume.fromVolume(f.datum), pose);
+			a.addComponent(MoldFixtures.datum(f).id, ToolingVolume.fromVolume(MoldFixtures.datum(f)), pose);
 		}
 		for (i in p.document.input.inserts) {
 			var pose = F.compose(p.document.setup.sourceToMold, i.pose);
@@ -318,7 +336,7 @@ class CastingMoldCad {
 				a.addComponent(h.id, mask, F.compose(h.pose, ToolingPin.boreSeat(mask)));
 			}
 			else if (h.kind == SupportHardwareKind.BorePlug) {
-				var protections = [for (fixture in p.fixtures) for (pen in fixture.penetrations)
+				var protections = [for (fixture in p.fixtures) for (pen in MoldOpenings.records(p,fixture.insertId))
 					if (pen.sourceHoleId != null && materia.tooling.ToolingIds.derive("resin-plug-", fixture.insertId + "-" + pen.sourceHoleId) == h.id)
 					{insertId: fixture.insertId, holeId: pen.sourceHoleId}];
 				for (fixture in p.fixtures) for (mask in fixture.boreMasks)
@@ -439,6 +457,7 @@ class CastingMoldCad {
 	}
 
 	public static function review(p:CastingMoldPlan):CastingMoldReview {
+		if (p.construction==SinglePocket) return BoxMoldCad.commonReview(p);
 		enableGeometry();
 		CastingMoldPlanner.validate(p);
 		var references:Array<Part> = [], difference = 0.0, ov = 0.0, rv = 0.0;
@@ -503,10 +522,10 @@ class CastingMoldCad {
 			}
 			var rowIds:Array<String> = [];
 			for (c in p.cores)
-				if (rowIds.indexOf(c.bridgeId) < 0)
-					rowIds.push(c.bridgeId);
+				if (rowIds.indexOf(MoldCores.bridgeId(c)) < 0)
+					rowIds.push(MoldCores.bridgeId(c));
 			for (id in rowIds) {
-				var panelIds = [id].concat([for (c in p.cores) if (c.bridgeId == id) c.carrierId]),
+				var panelIds = [id].concat([for (c in p.cores) if (MoldCores.bridgeId(c) == id) MoldCores.carrierId(c)]),
 					shapes:Array<Part> = [];
 				var shape = Solids.building(shapes, owned -> {
 					for (m in p.supportPanels)
@@ -523,7 +542,7 @@ class CastingMoldCad {
 				permanent.push({id: materia.tooling.ToolingIds.derive("", id, "-fixture"), members: panelIds});
 			}
 			for (m in p.supportPanels)
-				if (rowIds.indexOf(m.panel.id) < 0 && p.cores.filter(c -> c.carrierId == m.panel.id).length == 0) {
+				if (rowIds.indexOf(m.panel.id) < 0 && p.cores.filter(c -> MoldCores.carrierId(c) == m.panel.id).length == 0) {
 					var shape = panelWorld(m);
 					parts.push(shape);
 					members.push({id: m.panel.id, part: shape, direction: new Vector(0, 0, 1)});
@@ -538,12 +557,12 @@ class CastingMoldCad {
 				});
 			}
 			for (f in p.fixtures) {
-				var shape = ToolingVolume.geometryOf(f.datum);
+				var shape = ToolingVolume.geometryOf(MoldFixtures.datum(f));
 				parts.push(shape);
 				members.push({
-					id: f.datum.id,
+					id: MoldFixtures.datum(f).id,
 					part: shape,
-					direction: new Vector(f.withdrawal.x, f.withdrawal.y, f.withdrawal.z)
+					direction: new Vector(MoldFixtures.withdrawal(f).x,MoldFixtures.withdrawal(f).y,MoldFixtures.withdrawal(f).z)
 				});
 			}
 			for (c in p.cores) {
@@ -588,7 +607,7 @@ class CastingMoldCad {
 			var demolding = SweptRemoval.analyze(members, 1e-4);
 			members.pop();
 			for (id in rowIds) {
-				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in p.cores) if (c.bridgeId == id) c.id]),
+				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in p.cores) if (MoldCores.bridgeId(c) == id) c.id]),
 					pieces:Array<Part> = [];
 				var n = members.length - 1;
 				while (n >= 0) {
@@ -622,7 +641,7 @@ class CastingMoldCad {
 			}
 			members[0].direction = new Vector(0, 0, 1);
 			for (member in members) {
-				var fixtures = p.fixtures.filter(f -> f.datum.id == member.id);
+				var fixtures = p.fixtures.filter(f -> MoldFixtures.datum(f).id == member.id);
 				if (fixtures.length == 1) {
 					var v = fixtures[0].assemblyClearance;
 					member.direction = new Vector(v.x, v.y, v.z);

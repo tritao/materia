@@ -9,12 +9,10 @@ import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelPlan;
 import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
 import materia.tooling.casting.CoreSupport;
-import materia.tooling.casting.CoreSupport.CoreSupportOptions;
-import materia.tooling.casting.CoreSupport.CoreSupportMode;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
-import materia.tooling.casting.MoldPlan.CorePlan;
-import materia.tooling.casting.MoldPlan.MoldBox;
-import materia.tooling.casting.MoldPlan.PenetrationPlan;
+import materia.tooling.casting.CastingMoldPlan.CastingMoldCore;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.PenetrationPlan;
 
 private typedef BridgeRegistration = {
 	var receiver:PanelPlan;
@@ -33,50 +31,12 @@ private typedef BridgeRegistration = {
 
 /** Two explicit support templates; neither establishes adhesive or structural qualification. */
 class CoreSupports {
-	public static function defaults(r:ToolingRecipe):CoreSupportOptions
-		return {
-			mode: Auto,
-			embedDepth: r.panel.measuredThickness / 3,
-			fitClearance: r.jointClearance,
-			adhesiveThickness: r.adhesiveLineThickness
-		};
-
-	public static function options(raw:Dynamic):CoreSupportOptions {
-		if (raw == null || Reflect.fields(raw).length != 4)
-			throw "Invalid core support options";
-		for (k in [
-			        "mode",      "embedDepth",
-			"fitClearance", "adhesiveThickness"
-		])
-			if (!Reflect.hasField(raw, k))
-				throw "Missing core support option " + k;
-		var token:Dynamic = Reflect.field(raw, "mode");
-		if (!Std.isOfType(token, String))
-			throw "Invalid core support mode";
-		var text:String = cast token;
-		var mode:CoreSupportMode = switch text {
-			case "auto":
-				Auto;
-			case "bridge":
-				Bridge;
-			case "bed-socket":
-				BedSocket;
-			default:
-				throw "Invalid core support mode";
-		};
-		function number(k:String, zero:Bool):Float {
-			var v:Dynamic = Reflect.field(raw, k);
-			if ((!Std.isOfType(v, Float) && !Std.isOfType(v, Int)) || !Math.isFinite(v) || (zero ? v < 0 : v <= 0))
-				throw "Invalid core support dimension " + k;
-			return v;
-		}
-		return {
-			mode: mode,
-			embedDepth: number("embedDepth", false),
-			fitClearance: number("fitClearance", true),
-			adhesiveThickness: number("adhesiveThickness", false)
-		};
-	}
+	public static function specification(kind:CoreSupportKind, r:ToolingRecipe):CoreSupport return {
+		kind:kind, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
+		fitClearance:r.jointClearance, embedDepth:0, bondAreaMm2:0, bridgeBondAreaMm2:0,
+		socketOperationId:null, foot:null, panelIds:[], bondedPanelIds:[], hardware:[],
+		padClosure:kind==Bridge ? materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps : null
+	};
 
 	public static function cutting(b:MoldBox, axis:materia.tooling.ToolingRecipe.CoreWireAxis):materia.tooling.casting.CoreSupport.CoreCutting {
 		var v = switch axis {
@@ -157,38 +117,35 @@ class CoreSupports {
 			throw "Invalid ruled core cutting definition";
 	}
 
-	public static function kind(o:CoreSupportOptions, cb:MoldBox, b:MoldBox):CoreSupportKind {
+	public static function kind(cb:MoldBox, b:MoldBox):CoreSupportKind {
 		var bottom = Math.abs(cb.z - b.z) < 1e-7,
 			top = Math.abs(cb.z + cb.height - b.z - b.height) < 1e-7;
-		if (o.mode == BedSocket || (o.mode == Auto && bottom)) {
-			if (!bottom)
-				throw "Bed socket requires a cavity opening onto the bed";
-			return BedSocket;
-		}
+		if (bottom) return BedSocket;
 		if (!top)
 			throw "Bridge requires a cavity opening onto the fill face";
 		return Bridge;
 	}
 
-	public static function build(c:CorePlan, b:MoldBox, r:ToolingRecipe, o:CoreSupportOptions, bed:PanelPlacement, panels:Array<PanelPlacement>,
+	public static function build(c:CastingMoldCore, b:MoldBox, r:ToolingRecipe, bed:PanelPlacement, panels:Array<PanelPlacement>,
 			penetrations:Array<PenetrationPlan>):Void {
-		var s = c.support, t = r.panel.measuredThickness, l = r.minimumLigament, tool = r.routerDiameter, g = o.adhesiveThickness, hw = r.hardware;
-		PanelJoints.validateClearance(o.fitClearance, r.panel.thicknessVariation, r.jointLiningAllowance, r.jointMachiningAllowance);
+		var foam=MoldCores.singleBox(c.foamEnvelope,c.id), cavity=MoldCores.singleBox(c.cavity,c.id);
+		var s = c.support, t = r.panel.measuredThickness, l = r.minimumLigament, tool = r.routerDiameter, g = r.adhesiveLineThickness, hw = r.hardware;
+		PanelJoints.validateClearance(r.jointClearance, r.panel.thicknessVariation, r.jointLiningAllowance, r.jointMachiningAllowance);
 		if (s.kind == BedSocket) {
-			if (o.embedDepth > t - l || o.embedDepth <= 2 * g)
+			if ((r.panel.measuredThickness / 3) > t - l || (r.panel.measuredThickness / 3) <= 2 * g)
 				throw "Core socket leaves insufficient bed stock or glue space";
 			var inset = tool + l, foot:MoldBox = {
-				x: c.foam.x + inset,
-				y: c.foam.y + inset,
-				z: b.z - o.embedDepth + g,
-				width: c.foam.width - 2 * inset,
-				depth: c.foam.depth - 2 * inset,
-				height: o.embedDepth - 2 * g
+				x: foam.x + inset,
+				y: foam.y + inset,
+				z: b.z - (r.panel.measuredThickness / 3) + g,
+				width: foam.width - 2 * inset,
+				depth: foam.depth - 2 * inset,
+				height: (r.panel.measuredThickness / 3) - 2 * g
 			};
 			if (foot.width <= tool || foot.depth <= tool)
 				throw "Core too small for locating foot";
 			s.foot = {foam: foot, cutting: cutting(foot, r.coreWireAxis)};
-			s.embedDepth = o.embedDepth;
+			s.embedDepth = (r.panel.measuredThickness / 3);
 			s.bondAreaMm2 = foot.width * foot.depth;
 			s.socketOperationId = materia.tooling.ToolingIds.derive("", c.id, "-socket");
 			var op = PanelJoints.operation(s.socketOperationId, Pocket,
@@ -197,11 +154,11 @@ class CoreSupports {
 					- bed.pose.x, foot.y
 					+ foot.depth / 2
 					- bed.pose.y, foot.width
-					+ o.fitClearance,
+					+ r.jointClearance,
 					foot.depth
-					+ o.fitClearance, tool / 2),
-				o.embedDepth, tool, MachiningSide.PositiveZ, false, tool);
-			var bounds = materia.casting.CastingProfileGeometry.bounds(op.contour), cb = c.cavity;
+					+ r.jointClearance, tool / 2),
+				(r.panel.measuredThickness / 3), tool, MachiningSide.PositiveZ, false, tool);
+			var bounds = materia.casting.CastingProfileGeometry.bounds(op.contour), cb = cavity;
 			if (bounds.x + bed.pose.x < cb.x + l
 				|| bounds.y + bed.pose.y < cb.y + l
 				|| bounds.x + bounds.width + bed.pose.x > cb.x + cb.width - l
@@ -229,14 +186,14 @@ class CoreSupports {
 			padDepth = hw.padDepth,
 			padWidth = b.width + 2 * t + 2 * edge,
 			px = b.x - t - edge;
-		var cx = c.foam.x + c.foam.width / 2,
-			bw = Math.max(c.foam.width, hw.minimumBridgeWidth),
+		var cx = foam.x + foam.width / 2,
+			bw = Math.max(foam.width, hw.minimumBridgeWidth),
 			bridgeX = cx - bw / 2;
 		var southY = b.y - padDepth - edge,
 			northY = b.y + b.depth,
 			bridgeY = southY,
 			bridgeDepth = b.depth + 2 * (padDepth + edge);
-		var carrier = PanelJoints.blank(materia.tooling.ToolingIds.derive("", c.id, "-carrier"), c.foam.width, c.foam.depth, r.panel, tool, l);
+		var carrier = PanelJoints.blank(materia.tooling.ToolingIds.derive("", c.id, "-carrier"), foam.width, foam.depth, r.panel, tool, l);
 		var bridge = PanelJoints.blank(materia.tooling.ToolingIds.derive("", c.id, "-bridge"), bw, bridgeDepth, r.panel, tool, l);
 		function placed(p:PanelPlan, x:Float, y:Float, z:Float):Void {
 			panels.push({
@@ -253,7 +210,7 @@ class CoreSupports {
 				slotY = north ? t / 2 : padDepth + edge - t / 2;
 			pad.labelY = north ? padDepth + edge - hw.labelOffset : hw.labelOffset;
 			pad.operations.push(PanelJoints.operation("wall-top-socket", Rebate,
-				PanelContours.relievedRectangle(padWidth / 2, slotY, b.width + 2 * t + o.fitClearance, t + o.fitClearance, tool / 2), t / 2, tool,
+				PanelContours.relievedRectangle(padWidth / 2, slotY, b.width + 2 * t + r.jointClearance, t + r.jointClearance, tool / 2), t / 2, tool,
 				MachiningSide.NegativeZ, false, tool));
 			var y = north ? b.y + b.depth + 2 * t : b.y - 2 * t,
 				pinx = cx - bw / 4,
@@ -271,24 +228,31 @@ class CoreSupports {
 				bridgePinId: north ? "secondary-slot" : "primary-pin",
 				receiverBoltId: "clamp-bolt",
 				bridgeBoltId: north ? "north-bolt" : "south-bolt"
-			}, r, o.fitClearance);
+			}, r, r.jointClearance);
 			var prefix = materia.tooling.ToolingIds.derive("", c.id, north ? "-north" : "-south");
 			supportHardware(s.hardware, materia.tooling.ToolingIds.derive("", prefix, "-pin"), materia.tooling.ToolingIds.derive("", prefix, "-bolt"),
 				{x: pinx, y: y}, {x: boltx, y: y}, b.z + b.height, r);
 			placed(pad, px, py, b.z + b.height);
 		}
-		placed(carrier, c.foam.x, c.foam.y, b.z + b.height);
+		placed(carrier, foam.x, foam.y, b.z + b.height);
 		placed(bridge, bridgeX, bridgeY, b.z + b.height + t);
 		s.bondedPanelIds = [carrier.id, bridge.id];
-		s.bondAreaMm2 = c.foam.width * c.foam.depth;
+		s.bondAreaMm2 = foam.width * foam.depth;
+		s.bridgeBondAreaMm2 = s.bondAreaMm2;
 	}
 
-	public static function validateFoot(c:CorePlan, r:ToolingRecipe, o:CoreSupportOptions, bed:MoldBox):Void {
+	public static function validateFoot(c:CastingMoldCore, r:ToolingRecipe, bed:MoldBox):Void {
+		var foam=MoldCores.singleBox(c.foamEnvelope,c.id);
 		var s = c.support, foot = s.foot;
+		if (Math.abs(s.fitClearance-r.jointClearance)>1e-7
+			|| Math.abs(s.adhesiveThickness-r.adhesiveLineThickness)>1e-7)
+			throw "Core support differs from recipe";
 		if (s.kind != CoreSupportKind.BedSocket)
 			return;
 		if (foot == null)
 			throw "Missing locating foot";
+		if (Math.abs(s.embedDepth-r.panel.measuredThickness/3)>1e-7)
+			throw "Locating foot does not match support";
 		var f = foot.foam, b = foot.cutting.block, p = foot.cutting.stockToMold, v = foot.cutting.wireDirection;
 		for (n in [
 			f.x, f.y, f.z, f.width, f.depth, f.height, b.x, b.y, b.z, b.width, b.depth, b.height, p.x, p.y, p.z, p.qx, p.qy, p.qz, p.qw
@@ -303,12 +267,12 @@ class CoreSupports {
 			|| f.width > r.core.width
 			|| f.depth > r.core.depth
 			|| f.height > r.core.height
-			|| Math.abs(f.x - c.foam.x - inset)
-			+ Math.abs(f.y - c.foam.y - inset)
-			+ Math.abs(f.width - c.foam.width + 2 * inset)
-			+ Math.abs(f.depth - c.foam.depth + 2 * inset)
-			+ Math.abs(f.z - bed.z + o.embedDepth - o.adhesiveThickness)
-			+ Math.abs(f.height - o.embedDepth + 2 * o.adhesiveThickness) > 1e-7)
+			|| Math.abs(f.x - foam.x - inset)
+			+ Math.abs(f.y - foam.y - inset)
+			+ Math.abs(f.width - foam.width + 2 * inset)
+			+ Math.abs(f.depth - foam.depth + 2 * inset)
+			+ Math.abs(f.z - bed.z + (r.panel.measuredThickness / 3) - r.adhesiveLineThickness)
+			+ Math.abs(f.height - (r.panel.measuredThickness / 3) + 2 * r.adhesiveLineThickness) > 1e-7)
 			throw "Locating foot does not match support";
 		if (b.x != 0
 			|| b.y != 0
@@ -410,14 +374,14 @@ class CoreSupports {
 			for (c in cores) {
 				var bounds=MoldCores.stockBounds(c.cavity,c.id);
 				if (Math.abs(bounds.y + bounds.depth / 2 - y) < 1e-7) {
-					c.bridgeId = id;
+					c.support.bondedPanelIds = [MoldCores.carrierId(c), id];
 					var foam=MoldCores.foam(c),f=MoldCores.stockBounds(c.foamEnvelope,c.id);
-					var contactZ=b.z+b.height-c.adhesiveThickness;
-					c.bondAreaMm2=MoldCores.area(MoldCores.section(foam,contactZ,c.id));
+					var contactZ=b.z+b.height-c.support.adhesiveThickness;
+					c.support.bondAreaMm2=MoldCores.area(MoldCores.section(foam,contactZ,c.id));
 					// Intersect the actual foam with the beam band, then measure its
 					// exact contact section; a curved pad never gets its blank's area.
 					var band=MoldRegions.box({x:f.x,y:by,z:f.z,width:f.width,depth:width,height:f.height});
-					c.bridgeBondAreaMm2=MoldCores.area(MoldCores.section(
+					c.support.bridgeBondAreaMm2=MoldCores.area(MoldCores.section(
 						materia.casting.CastingRegion.Intersection([foam,band]),contactZ,c.id));
 					panels.push(MoldCores.carrier(c,r,b.z+b.height));
 				}

@@ -28,7 +28,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 4: mill-base allocation, exact reconstruction/coverage and separate assembly/demolding graphs.
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and process reporting implemented; planned cleanup and phase-8 integration remain.
-- [ ] Phase 7: records, requirements, exact feature geometry and former CAM landed; cleanup and core comparison remain, with source-corner corrections parked.
+- [ ] Phase 7: records, requirements, exact feature geometry, former CAM and cleanup landed; core comparison remains, with source-corner corrections parked.
 - [ ] Phase 8: mill column and independent hobber plinth remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
@@ -1147,7 +1147,7 @@ lists each deleted module with the check or record that still covers it.
    on the declared compound: maximum section or layer thickness and maximum
    mass per lift, checked against the pour plan. The rule's values stay
    Pending until the compound is declared.
-9. One mold planner. `BoxMoldPlanner` becomes a case of `CastingMoldPlanner`
+9. [x] One mold planner. `BoxMoldPlanner` becomes a case of `CastingMoldPlanner`
    (a casting whose features are one box pocket), sharing its allocation,
    panels and records. Delete the separate planner, its codec and its options.
    Box-template kits stay identical.
@@ -1465,3 +1465,14 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   unresolved typed inputs and named physical evidence once, with existing blocked
   rule selectors and delivered artifacts. Instance IDs stay in the detailed report;
   readiness, source-change findings and the single integrity check are unchanged.
+
+- Common-planner decision (cleanup): the single-pocket construction shares
+  `CastingMoldPlanner`, core allocation, panels, fixture/opening records and
+  validation with the shared-bridge construction. Delete `BoxMoldPlanner`,
+  `MoldPlan` and support-mode options; choose support from the real opening and
+  declared recipe. Keep the existing north/south versus east/west shell layout
+  and delivered shop projections so kits do not change.
+- Retain `BoxMoldCad` as the single-pocket native construction case: its exact
+  individual-bridge and bed-foot reconstruction/removal checks are not proved
+  by the shared-rail builder. The common CAD API dispatches to those checks
+  once; this is not a second planner or a second verification pass.

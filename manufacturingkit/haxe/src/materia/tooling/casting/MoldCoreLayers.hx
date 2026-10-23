@@ -13,6 +13,25 @@ import materia.tooling.ToolingRecipe;
 class MoldCoreLayers {
 	static inline var EPS=1e-7;
 
+	public static function box(cavity:materia.casting.Box3,featureId:String,r:ToolingRecipe,
+			kind:CoreSupport.CoreSupportKind,singleBlock:Bool=false):CastingMoldCore {
+		var bridge=kind==CoreSupport.CoreSupportKind.Bridge,cover=r.linerThickness,g=r.adhesiveLineThickness;
+		var foam:materia.casting.Box3={x:cavity.x+cover,y:cavity.y+cover,z:cavity.z+(bridge ? cover : 0),
+			width:cavity.width-2*cover,depth:cavity.depth-2*cover,height:cavity.height-cover-(bridge ? g : 0)};
+		if (foam.width<=0 || foam.depth<=0 || foam.height<=0 || foam.width>r.core.width || foam.depth>r.core.depth
+			|| (singleBlock && foam.height>r.core.height)) throw "EPS block exceeds stock";
+		var count=Std.int(Math.ceil((foam.height+g)/(r.core.height+g)));
+		if (count<1 || count>(singleBlock ? 1 : 32)) throw "Too many EPS layers";
+		var layerHeight=(foam.height-g*(count-1))/count;
+		if (layerHeight<=0) throw "EPS adhesive consumes layer height";
+		var layers:Array<CoreCutting>=[];
+		for (index in 0...count) layers.push(CoreSupports.cutting({x:foam.x,y:foam.y,z:foam.z+index*(layerHeight+g),
+			width:foam.width,depth:foam.depth,height:layerHeight},r.coreWireAxis));
+		return {id:materia.tooling.ToolingIds.derive("core-",featureId),featureId:featureId,
+			cavity:MoldRegions.box(cavity),foamEnvelope:MoldRegions.box(foam),layers:layers,coveringThickness:cover,
+			support:CoreSupports.specification(kind,r)};
+	}
+
 	public static function supported(region:CastingRegion,id:String):Bool {
 		var kernel=CastingMoldPlanner.geometry;
 		if (kernel==null) return false;
@@ -64,8 +83,7 @@ class MoldCoreLayers {
 		if (MoldRegions.volume(CastingRegion.Difference(foam,[cavity]),featureId)>EPS)
 			throw "Lined foam escapes its source cavity";
 		return {id:id,featureId:featureId,cavity:cavity,foamEnvelope:foam,layers:tiles(foam,id,r,allowProfileSplit),
-			coveringThickness:r.linerThickness,adhesiveThickness:r.adhesiveLineThickness,
-			carrierId:materia.tooling.ToolingIds.derive("",id,"-carrier"),bridgeId:"pending",bondAreaMm2:0,bridgeBondAreaMm2:0};
+			coveringThickness:r.linerThickness,support:CoreSupports.specification(CoreSupport.CoreSupportKind.Bridge,r)};
 	}
 
 	/** Prisms allow trims on every stock plane. Drafted foam retains complete

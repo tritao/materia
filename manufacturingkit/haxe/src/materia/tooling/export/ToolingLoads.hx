@@ -1,5 +1,7 @@
 package materia.tooling.export;
 
+import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.MoldCores;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.casting.BoxAlgebra;
 import materia.tooling.ToolingValidation;
@@ -116,7 +118,7 @@ class ToolingLoads {
 			coreForces = new Map<String, Float>();
 		for (c in cores) {
 			var volume = materia.tooling.casting.MoldRegions.volume(materia.casting.CastingRegion.Difference(c.cavity,occupied.copy()),c.id);
-			var footprint=materia.tooling.casting.MoldCores.stockBounds(c.cavity,c.id);
+			var footprint=MoldCores.stockBounds(c.cavity,c.id);
 			occupied.push(c.cavity);
 			coreVolumes.set(c.id, volume);
 			coreForces.set(c.id,
@@ -150,7 +152,7 @@ class ToolingLoads {
 			if (!isWall) {
 				demand.kind = SupportUplift;
 				for (c in cores)
-					if (c.bridgeId == m.panel.id || c.carrierId == m.panel.id)
+					if (MoldCores.bridgeId(c) == m.panel.id || MoldCores.carrierId(c) == m.panel.id)
 						demand.forceN += value(coreForces, c.id);
 				demand.pressurePa = demand.forceN / (b.width * b.height * 1e-6);
 				r.validation.push(check("fabrication.support-loadpath." + m.panel.id, [m.panel.id], Pending,
@@ -217,7 +219,7 @@ class ToolingLoads {
 				var v = matches[0];
 				for (n in [v.allowableN, v.bearingAreaMm2, v.allowableBearingPa])
 					positive(n);
-				if (v.bearingAreaMm2 > c.bondAreaMm2)
+				if (v.bearingAreaMm2 > c.support.bondAreaMm2)
 					throw "Core restraint area exceeds planned bond area";
 				evidence = v.evidence;
 				status = design > v.allowableN
@@ -226,10 +228,10 @@ class ToolingLoads {
 			r.validation.push(check("fabrication.core-restraint." + c.id, [c.id], status,
 				"Gross displaced mix uplift, without EPS weight credit; attachment and dimensional bearing limits require evidence.", evidence));
 		}
-		var rigid = [for (former in p.formers) former.volume].concat([for (fixture in p.fixtures) fixture.datum]);
+		var rigid = [for (former in p.formers) former.volume].concat(MoldFixtures.allVolumes(p));
 		rigid.sort((a, b) -> Reflect.compare(a.id, b.id));
 		for (member in rigid) {
-			var clipped:Array<materia.tooling.casting.MoldPlan.MoldBox> = [];
+			var clipped:Array<materia.tooling.casting.CastingMoldPlan.MoldBox> = [];
 			for (box in materia.tooling.casting.MoldVolumeBounds.pieces(member)) {
 				var wet = BoxAlgebra.intersection(box, p.envelope);
 				if (wet != null) {
@@ -243,7 +245,7 @@ class ToolingLoads {
 			for (box in clipped)
 				zmin = Math.min(zmin, box.z);
 			function projection(axis:Int):Float {
-				var footprints:Array<materia.tooling.casting.MoldPlan.MoldBox> = [
+				var footprints:Array<materia.tooling.casting.CastingMoldPlan.MoldBox> = [
 					for (box in clipped)
 						{
 							x: axis == 0 ? box.y : box.x,

@@ -3,7 +3,7 @@ import materia.casting.CastingFeature.CastingGeometrySolid;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingDocument;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.MoldPlan.MoldBox;
+import materia.tooling.casting.CastingMoldPlan.MoldBox;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.CastabilityAnalysis;
 import materia.tooling.process.CastingProcessSpec.ProcessSpecs;
