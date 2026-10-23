@@ -145,9 +145,8 @@ generates the coupon, exact drawings and assembled/exploded preview scenes.
 `materia.tooling.casting.BoxMoldPlanner.plan(document)` builds the explicit
 orthogonal single-pocket template from a validated `ToolingDocument`: five
 panels, EPS/covering geometry, a ruled block cutting definition, an insert
-fixture and classified contact cuts. `BoxMoldCodec` version 4 stores the strict
-source document and resolved records and verifies regeneration on load. It
-rejects unknown versions and hand-edited generated records. Dimensions remain
+fixture and classified contact cuts. Resolved plans stay in memory; the strict
+authored source and delivered package are the persistence boundaries. Dimensions remain
 millimetres and profiles remain finished geometry, without cutter compensation.
 
 Panel codec version 3 requires `contactOpenings` in typed records and JSON.
@@ -205,9 +204,8 @@ grouted-joint inputs, `CompactionSpec`, per-insert `InsertAnchorage`, and handli
 requirements. Missing evidence remains pending. Nonempty anchorage geometry is
 rejected until a corresponding source-adapter revision can describe it; it is
 never silently added to the casting. Precision allowances never move source
-inserts. `CastingMoldCodec` version 3 stores and verifies complete regeneration;
-`MoldVolumeCodec` version 3 stores finite boxes and exact operation-derived sealing
-profiles for rebuildable CAD. A side former fills its router reliefs with the same
+inserts. In-memory mold volumes retain finite-box and exact operation-derived
+profile validation; the delivered package has one inventory integrity check. A side former fills its router reliefs with the same
 profile that cuts the panel window; those exterior sealing sections preserve
 source geometry and allow straight withdrawal.
 

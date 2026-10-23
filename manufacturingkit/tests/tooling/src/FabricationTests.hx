@@ -1,5 +1,5 @@
 import materia.tooling.export.FabricationSpec;
-import materia.tooling.export.FabricationSpecCodec;
+import materia.tooling.export.FabricationSpec.FabricationSpecs;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.casting.CastingMoldPlan;
@@ -103,26 +103,16 @@ class FabricationTests {
 			&& c.status == "pending").length == p.cores.length,
 			"missing restraint is per-core pending");
 		check(ToolingCodec.canonical(f) == ToolingCodec.canonical(ToolingFabrication.plan(p, s)), "fabrication generation is deterministic");
-		var encoded = FabricationSpecCodec.encode(s);
-		check(FabricationSpecCodec.encode(FabricationSpecCodec.decode(encoded)) == encoded, "fabrication spec versioned round-trip");
-		var strengths=FabricationSpecCodec.snapshot(s);
+		var strengths=FabricationSpecs.copy(s);
 		strengths.mixBearingStressMPa=80;strengths.mixTensileStrengthMPa=6;
-		var strengthEncoding=FabricationSpecCodec.encode(strengths),strengthCopy=FabricationSpecCodec.decode(strengthEncoding);
+		var strengthCopy=FabricationSpecs.copy(strengths);
 		check(strengthCopy.mixBearingStressMPa==80 && strengthCopy.mixTensileStrengthMPa==6
-			&& strengthEncoding!=encoded && s.mixBearingStressMPa==null && s.mixTensileStrengthMPa==null,
-			"resolved cured-mix strengths survive the strict format without changing unresolved source inputs");
+			&& s.mixBearingStressMPa==null && s.mixTensileStrengthMPa==null,
+			"resolved mix strengths do not mutate unresolved source inputs");
 		strengths.mixBearingStressMPa=0;
-		rejects(() -> FabricationSpecCodec.encode(strengths),"Mix anchor strength must be positive");
+		rejects(() -> FabricationSpecs.copy(strengths),"Mix anchor strength must be positive");
 		strengths.mixBearingStressMPa=80;strengths.mixTensileStrengthMPa=-1;
-		rejects(() -> FabricationSpecCodec.encode(strengths),"Mix anchor strength must be positive");
-		var raw:Dynamic = haxe.Json.parse(encoded);
-		raw.version = 3;
-		rejects(() -> FabricationSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported fabrication spec");
-		raw.version = 99;
-		rejects(() -> FabricationSpecCodec.decode(haxe.Json.stringify(raw)), "Unsupported fabrication spec");
-		raw = haxe.Json.parse(encoded);
-		Reflect.setField(raw.spec, "freeTextPending", new Array<String>());
-		rejects(() -> FabricationSpecCodec.decode(haxe.Json.stringify(raw)), "Unknown fabrication field");
+		rejects(() -> FabricationSpecs.copy(strengths),"Mix anchor strength must be positive");
 		s.solvent = StyreneBearing;
 		check(ToolingFabrication.plan(p, s).validation.filter(c -> c.rule == "fabrication.materials.compatibility"
 			&& c.status == "fail").length == 1,
@@ -165,7 +155,7 @@ class FabricationTests {
 			check(f.loads.estimates.filter(v -> v.id == member.id).length == 1, "every rigid former and datum has an uplift estimate");
 			check(f.loads.estimates.filter(v -> v.id == member.id + "-lateral-x").length == 1, "every rigid former and datum has a lateral estimate");
 		}
-		var wetPlan = materia.tooling.casting.CastingMoldCodec.decode(materia.tooling.casting.CastingMoldCodec.encode(p));
+		var wetPlan = materia.tooling.casting.CastingMoldPlanner.plan(p.document,p.options);
 		var wetMembers = [for (v in wetPlan.formers) v.volume].concat([for (v in wetPlan.fixtures) v.datum]);
 		var wetMember = wetMembers[0], envelope = wetPlan.envelope;
 		wetMember.profiles = [];

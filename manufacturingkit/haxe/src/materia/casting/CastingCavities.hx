@@ -59,7 +59,7 @@ class CastingCavities {
 		return {x: plane.x, y: plane.y, z: plane.z};
 	}
 	public static function derive(body:Array<CastingPrism>, features:Array<CastingFeature>):Array<FinishedCastingCavity> {
-		var records = CastingFeatureCodec.snapshot(features),
+		var records = CastingFeatureCodec.copy(features),
 			faces = boundary(body),
 			result:Array<FinishedCastingCavity> = [];
 		for (f in records) {

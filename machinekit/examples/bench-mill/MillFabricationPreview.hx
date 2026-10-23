@@ -1,5 +1,4 @@
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.ToolingValidation;
@@ -76,7 +75,6 @@ class MillFabricationPreview {
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pass,
 				"Exact source reconstruction, boundary coverage, assembly/demolding sweeps and portable assembly restoration passed.", [review.fingerprint]));
 		} else {
-			sys.io.File.saveContent(dir + "/mold-plan.json", CastingMoldCodec.encode(p));
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only export did not run CAD/sequence validation.", []));
 		}
@@ -229,143 +227,9 @@ class MillFabricationPreview {
 		MillMoldStudy.write(MillMoldStudy.study(frame, geometricReview, !recordsOnly, process), dir);
 		ToolingPackageManifest.write(dir, f, checks);
 		ToolingPackageManifest.verify(dir);
-		if (Sys.args().indexOf("--checks") >= 0) {
-			var path = dir + "/coupon-trial.csv",
-				saved = sys.io.File.getContent(path),
-				rejected = false;
-			sys.io.File.saveContent(path, saved + "tampered");
-			try
-				ToolingPackageManifest.verify(dir)
-			catch (e:Dynamic)
-				rejected = Std.string(e).indexOf("Tooling artifact hash differs") >= 0;
-			sys.io.File.saveContent(path, saved);
-			if (!rejected)
-				throw "Manifest failed to reject a modified coupon record";
-			ToolingPackageManifest.verify(dir);
-			var manifestPath = dir + "/manifest.json",
-				original = sys.io.File.getContent(manifestPath);
-			function rejectsManifest(change:Dynamic->Void, expected:String):Void {
-				var altered:Dynamic = haxe.Json.parse(original);
-				change(altered);
-				sys.io.File.saveContent(manifestPath, ToolingCodec.canonical(altered));
-				var error = "";
-				try
-					ToolingPackageManifest.verify(dir)
-				catch (e:Dynamic)
-					error = Std.string(e);
-				sys.io.File.saveContent(manifestPath, original);
-				if (error.indexOf(expected) < 0)
-					throw "Manifest tamper regression: " + error;
-			}
-			rejectsManifest(m -> m.fabrication.ready = true, "readiness differs");
-			rejectsManifest(m -> m.replacementGroups = new Array<Dynamic>(), "package fingerprint differs");
-			rejectsManifest(m -> {
-				var records:Array<Dynamic> = cast m.validation;
-				records[0].message = "altered validation";
-			}, "validation differs");
-			rejectsManifest(m -> {
-				var records:Array<Dynamic> = cast m.validation;
-				records[0].severity = "unknown";
-			}, "severity/status consistency");
-			rejectsManifest(m -> {
-				var records:Array<Dynamic> = cast m.validation;
-				records[0].status = "unknown";
-			}, "validation status");
-			rejectsManifest(m -> {
-				var records:Array<Dynamic> = cast m.validation;
-				records[0].status = "pass";
-				records[0].severity = "error";
-			}, "severity/status consistency");
-			rejectsManifest(m -> m.version = 7, "Unsupported tooling manifest");
-			rejectsManifest(m -> {
-				var files:Array<Dynamic> = cast m.files;
-				m.files = files.filter(file -> file.path != "insert-anchorage.json");
-			}, "Missing hashed source manufacturing artifact: insert-anchorage.json");
-			ToolingPackageManifest.verify(dir);
-			var unknown = new machinekit.tooling.ToolingBlock();
-			if (ToolingFabricationExport.classify(unknown).classification != UnsupportedHardware)
-				throw "Unknown hardware was silently ignored";
-			var hardwarePath = dir + "/hardware-validation.json",
-				originalHardware = sys.io.File.getContent(hardwarePath);
-			data(dir, "hardware-validation.json", [
-				ToolingLoads.check("fabrication.hardware.test-probe", ["test-probe"], ToolingCheckStatus.Unsupported, "Test unknown hardware", [])
-			]);
-			ToolingPackageManifest.write(dir, f, checks);
-			var probe:Dynamic = haxe.Json.parse(sys.io.File.getContent(manifestPath));
-			var probeValidation:Array<Dynamic> = cast probe.validation;
-			if (probeValidation.filter(v -> v.rule == "fabrication.hardware.test-probe").length != 1 || probe.fabrication.ready == true)
-				throw "Writer dropped unknown hardware because caller omitted returned checks";
-			ToolingPackageManifest.verify(dir);
-			sys.io.File.saveContent(hardwarePath, originalHardware);
-			ToolingPackageManifest.write(dir, f, checks);
-			ToolingPackageManifest.verify(dir);
-			var manufacturingPath=dir+"/insert-manufacturing.json";
-			var savedManufacturing=sys.io.File.getContent(manufacturingPath);
-			var alteredManufacturing:Dynamic=haxe.Json.parse(savedManufacturing);
-			alteredManufacturing.jobs=new Array<Dynamic>();
-			sys.io.File.saveContent(manufacturingPath,ToolingCodec.canonical(alteredManufacturing));
-			var manufacturingError="";
-			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) manufacturingError=Std.string(error);
-			sys.io.File.saveContent(manufacturingPath,savedManufacturing);
-			if (manufacturingError.indexOf("Insert manufacturing report differs from source")<0)
-				throw "Writer accepted a manufacturing report inconsistent with source: "+manufacturingError;
-			var replicationPath=dir+"/replication-jigs.json";
-			var savedReplication=sys.io.File.getContent(replicationPath);
-			var alteredReplication:Dynamic=haxe.Json.parse(savedReplication);
-			alteredReplication.sourceFingerprint="altered";
-			sys.io.File.saveContent(replicationPath,ToolingCodec.canonical(alteredReplication));
-			var replicationError="";
-			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) replicationError=Std.string(error);
-			sys.io.File.saveContent(replicationPath,savedReplication);
-			if (replicationError.indexOf("Replication report differs from source")<0)
-				throw "Writer accepted a replication report inconsistent with source: "+replicationError;
-			var cachedAnchorage=ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint,f.spec);
-			var expectedAnchorage=ToolingCodec.canonical(cachedAnchorage);
-			var cachedChecks:Array<ToolingValidation> =cast cachedAnchorage.validation;
-			var nativeChecks=cachedChecks.filter(check -> check.rule.indexOf(".cad.")>=0);
-			if (nativeChecks.length==0) throw "Production anchor cache test needs native evidence";
-			nativeChecks[0].message="Caller mutation";
-			nativeChecks[0].affectedIds.push("cache-probe");
-			if (ToolingCodec.canonical(ToolingFabricationExport.insertAnchorageReport(p,f.sourceFingerprint,f.spec))!=expectedAnchorage)
-				throw "Caller mutation poisoned cached anchor evidence";
-			var anchoragePath=dir+"/insert-anchorage.json";
-			var savedAnchorage=sys.io.File.getContent(anchoragePath);
-			var alteredAnchorage:Dynamic=haxe.Json.parse(savedAnchorage);
-			alteredAnchorage.validation=new Array<Dynamic>();
-			sys.io.File.saveContent(anchoragePath,ToolingCodec.canonical(alteredAnchorage));
-			var anchorageError="";
-			try ToolingPackageManifest.write(dir,f,checks) catch (error:Dynamic) anchorageError=Std.string(error);
-			sys.io.File.saveContent(anchoragePath,savedAnchorage);
-			if (anchorageError.indexOf("Insert anchorage source validation omitted or changed")<0)
-				throw "Writer accepted an anchorage report inconsistent with source: "+anchorageError;
-			var omittedChecks=checks.filter(check -> check.rule.indexOf("fabrication.insert.")!=0
-				&& !StringTools.startsWith(check.rule,"tooling.insert.anchorage."));
-			var omittedFabrication=f.validation;
-			f.validation=f.validation.filter(check -> check.rule.indexOf("fabrication.insert.")!=0
-				&& !StringTools.startsWith(check.rule,"tooling.insert.anchorage."));
-			ToolingPackageManifest.write(dir,f,omittedChecks);
-			f.validation=omittedFabrication;
-			var recovered:Dynamic=haxe.Json.parse(sys.io.File.getContent(manifestPath));
-			var recoveredChecks:Array<Dynamic> =cast recovered.validation;
-			var drawingCount=0,madeCount=0;
-			for (record in recoveredChecks) {
-				var rule:String=record.rule;
-				if (StringTools.startsWith(rule,"fabrication.insert.drawing.")) drawingCount++;
-			}
-			for (insert in p.document.input.inserts) switch insert.origin {
-				case Fabricated(_):madeCount++;
-				case Catalogue(_):
-			}
-			if (drawingCount!=madeCount)
-				throw "Writer dropped source manufacturing checks omitted by caller";
-			ToolingPackageManifest.verify(dir);
-			ToolingPackageManifest.write(dir,f,checks);
-			ToolingPackageManifest.verify(dir);
-			Sys.println("Fabrication manifest integrity/tamper checks passed");
-		}
-
+		Sys.println("Fabrication package integrity check passed");
 		removeGenerated(destination);
-		sys.FileSystem.rename(dir, destination);
+		sys.FileSystem.rename(dir,destination);
 		var formerProgramCount=0;
 		for (former in formerShop.formers) for (board in former.boards) formerProgramCount+=board.programs.length;
 		Sys.println("Fabrication review package: "

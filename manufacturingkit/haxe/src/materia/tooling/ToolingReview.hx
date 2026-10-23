@@ -7,7 +7,7 @@ import materia.tooling.casting.CastingSetup.CoreStrategy;
 /** Input-contract review only. Passing the codec never establishes fabrication readiness. */
 class ToolingReview {
 	public static function inspect(document:ToolingDocument):Array<ToolingDiagnostic> {
-		var d = ToolingCodec.snapshot(document);
+		var d = ToolingCodec.copy(document);
 		var result:Array<ToolingDiagnostic> = [
 			{ruleId: "tooling.input-contract", subjectId: d.input.id, severity: Info, status: Pass,
 				message: "Input, references and setup fingerprint are valid", evidence: []},

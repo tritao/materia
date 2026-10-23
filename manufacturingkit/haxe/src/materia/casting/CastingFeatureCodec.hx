@@ -7,17 +7,17 @@ import materia.assembly.AssemblyCodec;
 class CastingFeatureCodec {
 	public static inline var VERSION = 4;
 
-	public static function encode(features:Array<CastingFeature>):String {
-		var records:Array<Dynamic> = [];
-		for (feature in snapshot(features)) {
-			var record:Dynamic = {};
-			for (key in Reflect.fields(feature))
-				Reflect.setField(record, key, Reflect.field(feature, key));
-			Reflect.setField(record, "geometry", {solid: CastingFeature.CastingGeometrySolids.record(feature.geometry.solid), pose: feature.geometry.pose});
-			records.push(record);
-		}
-		return haxe.Json.stringify({version: VERSION, features: records});
-	}
+	public static function records(features:Array<CastingFeature>):Array<Dynamic> return [for (feature in features) {
+		id:feature.id,kind:feature.kind,
+		geometry:{solid:CastingFeature.CastingGeometrySolids.record(feature.geometry.solid),pose:feature.geometry.pose},
+		openings:feature.openings,draft:feature.draft,cornerRadius:feature.cornerRadius,
+		owner:feature.owner,adjustable:feature.adjustable,derivedFrom:feature.derivedFrom
+	}];
+
+	public static function copy(features:Array<CastingFeature>):Array<CastingFeature> return snapshot(records(features));
+
+	public static function encode(features:Array<CastingFeature>):String
+		return haxe.Json.stringify({version:VERSION,features:records(copy(features))});
 
 	public static function decode(text:String):Array<CastingFeature> {
 		var raw:Dynamic = haxe.Json.parse(text);

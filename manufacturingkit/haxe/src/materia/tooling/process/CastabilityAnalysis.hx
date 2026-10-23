@@ -104,7 +104,7 @@ class CastabilityAnalysis {
 
 	public static function analyze(document:ToolingDocument, raw:CastingProcessSpec, fill:Null<FillReport>, sections:Null<OrthogonalSectionReport>,
 			expectedSourceFingerprint:String, expectedProcessFingerprint:String, ?plannerChecks:Array<ToolingValidation>):CastabilityReport {
-		var d = ToolingCodec.snapshot(document),
+		var d = ToolingCodec.copy(document),
 			spec = ProcessSpecCodec.snapshot(raw);
 		if (spec.recipeFingerprint != ToolingCodec.recipeFingerprint(d.recipe))
 			throw "Stale castability recipe";

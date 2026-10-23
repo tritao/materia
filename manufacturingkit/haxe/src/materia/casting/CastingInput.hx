@@ -74,6 +74,8 @@ class CastingInputs {
 				CastingFeatureCodec.fields(raw,["kind","value"]);
 				var value=CastingRecordCodec.string(raw,"value");
 				if (StringTools.trim(value).length==0) throw "Empty known casting input";
+				for (index in 0...value.length)
+					if (value.charCodeAt(index)==0) throw "Invalid known casting input text";
 				CastingTextInput.Known(value);
 			case "unresolved":CastingTextInput.Unresolved(reason(raw));
 			default:throw "Unknown casting input state";

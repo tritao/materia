@@ -109,7 +109,11 @@ class ReplicationJigCodec {
 		result.sort((a,b) -> Reflect.compare(a.id,b.id));return result;
 	}
 
-	public static function records(jigs:Array<ReplicationJig>):Array<Dynamic> return [for (jig in snapshot(jigs)) {
+	public static function copy(jigs:Array<ReplicationJig>):Array<ReplicationJig> return snapshot(rawRecords(jigs));
+
+	public static function records(jigs:Array<ReplicationJig>):Array<Dynamic> return rawRecords(copy(jigs));
+
+	static function rawRecords(jigs:Array<ReplicationJig>):Array<Dynamic> return [for (jig in jigs) {
 		id:jig.id,datumSchemeId:jig.datumSchemeId,frameReference:jig.frameReference,pose:jig.pose,
 		masters:[for (m in jig.masters) {id:m.id,kind:(m.kind:String),body:CastingSolidCodec.record(m.body),pose:m.pose,
 			reference:m.reference,members:[for (member in m.members) Relationships.memberRecord(member)],finish:(m.finish:String),

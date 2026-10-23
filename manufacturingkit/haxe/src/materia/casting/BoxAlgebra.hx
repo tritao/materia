@@ -249,7 +249,7 @@ class BoxAlgebra {
 				result.push(fragment);
 			}
 		}
-		return CastingFeatureCodec.snapshot(result);
+		return CastingFeatureCodec.copy(result);
 	}
 
 	/** Exact minimum centroidal second moment about Y over X, in mm^4. */

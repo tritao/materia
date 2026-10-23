@@ -21,7 +21,7 @@ class MoldFormerAccess {
 	static inline var EPS=1e-7;
 
 	static function sectionFeature(d:ToolingDocument,feature:CastingFeature,direction:FormerWithdrawal):CastingFeature {
-		var copy=materia.casting.CastingFeatureCodec.snapshot([feature])[0];
+		var copy=materia.casting.CastingFeatureCodec.copy([feature])[0];
 		if (copy.draft.degrees==0)
 			copy.draft.axis=F.transformVector(F.inverse(d.setup.sourceToMold),direction.x,direction.y,direction.z);
 		return copy;

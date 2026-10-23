@@ -1,6 +1,7 @@
 import materia.tooling.casting.CastingMoldPlanner as P;
+
+import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.ToolingCodec;
 import materia.assembly.AssemblyFrames as F;
 
@@ -21,7 +22,7 @@ class RegionMoldPlannerTests {
 			document.setup.features=[{featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
 				priority:0,withdrawal:direction}];
 			document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
-			var authored=materia.tooling.casting.CastingMoldOptionsCodec.snapshot(options);
+			var authored=materia.tooling.casting.CastingMoldPlan.MoldOptions.copy(options);
 			authored.serviceOrientation=document.setup.sourceToMold;
 			var plan=machinekit.tooling.CastingMoldCad.plan(document,authored),former=plan.formers[0];
 			check(former.volume.profiles.length==1,"side former carries one panel-operation sealing profile");
@@ -86,11 +87,7 @@ class RegionMoldPlannerTests {
 				==ToolingCodec.canonical(machinekit.tooling.ToolingSectionReview.record(
 					machinekit.tooling.ToolingSectionReview.build(plan),plan.sourceFingerprint)),
 				"rebuilding a drawing report preserves its exact records and fingerprint");
-			var encoded=CastingMoldCodec.encode(plan);
-			check(CastingMoldCodec.encode(CastingMoldCodec.decode(encoded))==encoded,"native region plan regenerates through the strict codec");
 			P.setGeometry(null);
-			check(CastingMoldCodec.encode(machinekit.tooling.CastingMoldCad.decode(encoded))==encoded,
-				"a fresh native entry point restores exact regions without prior global kernel state");
 			var review=machinekit.tooling.CastingMoldCad.review(plan);
 			for (name in ["reconstruction","coverage","assembly-graph","demolding-graph"])
 				check(review.validation.filter(record -> record.rule=="tooling.cad."+name
@@ -99,14 +96,14 @@ class RegionMoldPlannerTests {
 			var processSpec=ProcessTests.spec();
 			processSpec.recipeFingerprint=ToolingCodec.recipeFingerprint(d.recipe);
 			var castability=materia.tooling.process.CastabilityAnalysis.analyze(d,processSpec,null,null,
-				CastingMoldCodec.fingerprint(plan),"draft-release-fixture",plan.validation);
+				CastingMoldPlanner.fingerprint(plan),"draft-release-fixture",plan.validation);
 			check(castability.validation.filter(row -> row.rule=="tooling.former.draft.pocket"
 				&& row.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 				"a real drafted former retains its passing source-release finding without orthogonal sections");
 			check(castability.proposals.filter(proposal -> proposal.action==materia.tooling.process.CastabilityAnalysis.CastabilityAction.SplitOrSacrificial
 				&& proposal.sourceIds.indexOf("pocket")>=0).length==0,
 				"a natively verified drafted former does not receive an obsolete unsupported-draft suggestion");
-			var rounded=ToolingCodec.snapshot(d);
+			var rounded=ToolingCodec.copy(d);
 			rounded.input.features[0].cornerRadius=8;
 			rounded.setup.sourceFingerprint=ToolingCodec.inputFingerprint(rounded.input);
 			var roundedReview=machinekit.tooling.CastingMoldCad.review(P.plan(rounded,options));
@@ -123,7 +120,7 @@ class RegionMoldPlannerTests {
 				[materia.casting.CastingPatterns.face("body.z-min")],100,160,31,-140,0,-1));
 			mixed.setup.features=d.setup.features.copy();
 			mixed.setup.sourceFingerprint=ToolingCodec.inputFingerprint(mixed.input);
-			var mixedOptions=materia.tooling.casting.CastingMoldOptionsCodec.snapshot(options);
+			var mixedOptions=materia.tooling.casting.CastingMoldPlan.MoldOptions.copy(options);
 			mixedOptions.precision=[for (insert in mixed.input.inserts) {insertId:insert.id,jigReference:null,
 				masterReference:null,masterFlatnessMm:null,releaseSpec:null,holeProtectionReference:null,evidence:[]}];
 			var mixedPlan=P.plan(mixed,mixedOptions);
@@ -136,19 +133,19 @@ class RegionMoldPlannerTests {
 				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass).length==1,
 				"mixed drafted formers and fixtures pass complete demolding sweeps");
 			sideFormers(options);
-			var oblique=ToolingCodec.snapshot(d);
+			var oblique=ToolingCodec.copy(d);
 			oblique.input.features[0].draft.axis={x:0.6,y:0,z:0.8};
 			oblique.setup.sourceFingerprint=ToolingCodec.inputFingerprint(oblique.input);
 			var declined=P.assess(oblique,options);
 			check(declined.plan==null && declined.validation.filter(record -> record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported
 				&& record.affectedIds.indexOf("pocket")>=0).length==1,
 				"an unrealized oblique draft remains Unsupported by feature ID with the native bridge enabled");
-			var flat=ToolingCodec.snapshot(d);
+			var flat=ToolingCodec.copy(d);
 			flat.input.features[0].draft.degrees=0;
 			flat.setup.sourceFingerprint=ToolingCodec.inputFingerprint(flat.input);
 			check(P.plan(flat,options).changeRequests.filter(request -> request.blockingChecks.indexOf("tooling.former.draft.pocket")>=0).length==1,
 				"removing source draft restores its release request");
-			var reversed=ToolingCodec.snapshot(d);
+			var reversed=ToolingCodec.copy(d);
 			reversed.setup.features[0].withdrawal={x:0,y:0,z:1};
 			check(P.plan(reversed,options).changeRequests.filter(request -> request.blockingChecks.indexOf("tooling.former.draft.pocket")>=0).length==1,
 				"a contradictory withdrawal cannot clear a source draft request");

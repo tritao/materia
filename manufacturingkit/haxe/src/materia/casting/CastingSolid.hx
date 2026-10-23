@@ -11,6 +11,8 @@ enum CastingSolid {
 
 /** One neutral encoding for solid primitives. The containing document owns versioning. */
 class CastingSolidCodec {
+	public static function copy(body:CastingSolid):CastingSolid return snapshot(record(body));
+
 	public static function encode(body:CastingSolid):String
 		return haxe.Json.stringify(record(body));
 
@@ -34,8 +36,6 @@ class CastingSolidCodec {
 	}
 
 	public static function snapshot(raw:Dynamic):CastingSolid {
-		if (Std.isOfType(raw, CastingSolid))
-			raw = record(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		var body = switch kind {
 			case "box":

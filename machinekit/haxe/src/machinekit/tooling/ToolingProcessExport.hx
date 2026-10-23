@@ -17,7 +17,7 @@ class ToolingProcessExport {
 			?interfaceContext:materia.casting.CastingInterfaceContext):Array<ToolingValidation> {
 		var report=existing==null ? CastingProcessAnalysis.analyze(p,spec,gravityMps2,fabrication,CastingFillAnalysis.fromPlan) : existing;
 		if (report.version!=materia.tooling.process.ProcessSpecCodec.VERSION
-			|| report.sourceFingerprint!=materia.tooling.casting.CastingMoldCodec.fingerprint(p)
+			|| report.sourceFingerprint!=materia.tooling.casting.CastingMoldPlanner.fingerprint(p)
 			|| report.processFingerprint!=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication)
 			|| report.castability==null
 			|| report.castability.version!=materia.tooling.process.CastabilityAnalysis.VERSION

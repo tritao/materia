@@ -137,7 +137,7 @@ class ReplicationJigTests {
 		source.interfaceContext=CastingInterfaceContexts.copy({foundationJoints:new Array<materia.casting.FoundationJointSources.FoundationJointOccurrence>(),jointSources:materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty(),bodyMember:"casting",inserts:[{id:"a",member:"left"},{id:"b",member:"right"}],
 			relationships:[{id:"rail-planes",relationship:relation}],sources:[Precision("left",a,F.identity()),Precision("right",b,F.identity())]});
 		var common=jig();common.masters[0].members=relation.members.copy();
-		var independent=Codec.snapshot([common])[0];independent.id="other-frame";
+		var independent=Codec.copy([common])[0];independent.id="other-frame";
 		var process:Array<materia.tooling.casting.CastingMoldPlan.PrecisionInterface> = [for (r in [a,b]) {
 			insertId:r.id,masterReference:null,jigReference:"common-frame",masterFlatnessMm:null,releaseSpec:null,holeProtectionReference:null,evidence:[]}];
 		check(ReplicationJigs.analyze(source,[common,independent],process).filter(c ->
@@ -158,16 +158,16 @@ class ReplicationJigTests {
 		check(ToolingCodec.canonical(Codec.records(Codec.snapshot(haxe.Json.parse(encoded))))==encoded,"strict jig records round trip");
 		j.masters[0].members.reverse();j.masters[0].jacks.reverse();
 		check(ToolingCodec.canonical(Codec.records([j]))==encoded,"member and jack order does not change jig encoding");
-		var copy=Codec.snapshot([j]);copy[0].masters[0].pose.z=999;
+		var copy=Codec.copy([j]);copy[0].masters[0].pose.z=999;
 		check(j.masters[0].pose.z==20,"jig poses are defensive copies");
-		rejects(() -> Codec.snapshot([j,j]),"Duplicate replication jig");
+		rejects(() -> Codec.copy([j,j]),"Duplicate replication jig");
 		var raw:Array<Dynamic> = cast haxe.Json.parse(encoded),masters:Array<Dynamic> = cast Reflect.field(raw[0],"masters");
 		Reflect.setField(masters[0],"kind","invented-master");
 		rejects(() -> Codec.snapshot(raw),"Unknown replication master kind");
 		j=jig();j.masters[0].finish=InterfaceFinish.SelfLevelled;
-		rejects(() -> Codec.snapshot([j]),"physical master finish");
+		rejects(() -> Codec.copy([j]),"physical master finish");
 		j=jig();j.masters[0].kind=ReplicationMasterKind.Rail;
-		rejects(() -> Codec.snapshot([j]),"kind conflicts with its finish");
+		rejects(() -> Codec.copy([j]),"kind conflicts with its finish");
 		j=jig();var checks=ReplicationJigs.analyze(source,[j],[]);
 		check(status(checks,".supports",ToolingCheckStatus.Pass),"three non-collinear jack contacts and lock references satisfy only layout prerequisites");
 		check(status(checks,".datum",ToolingCheckStatus.Pending),"missing source datum scheme stays pending");

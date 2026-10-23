@@ -39,7 +39,7 @@ class MillMoldStudy {
 		if (!geometry)
 			return MoldOrientationStudy.run(candidates(frame, process), MillFabricationSetup.spec(),null,machinekit.tooling.CastingFillAnalysis.fromPlan);
 		return MoldOrientationStudy.run(candidates(frame, process), MillFabricationSetup.spec(), p -> {
-			var hash = materia.tooling.casting.CastingMoldCodec.fingerprint(p);
+			var hash = materia.tooling.casting.CastingMoldPlanner.fingerprint(p);
 			var review = existing != null && existing.fingerprint == hash ? existing : CastingMoldCad.review(p);
 			return {
 				planFingerprint: review.fingerprint,

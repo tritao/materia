@@ -1,8 +1,9 @@
 package materia.tooling.export;
 
+import materia.tooling.export.FabricationSpec.FabricationSpecs;
+
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingValidation.ToolingReadiness;
@@ -134,7 +135,7 @@ class ToolingFabrication {
 
 	public static function plan(p:CastingMoldPlan, authored:FabricationSpec, ?cure:materia.tooling.process.CureAnalysis.CureReport):FabricationPlan {
 		CastingMoldPlanner.validate(p);
-		var s = FabricationSpecCodec.snapshot(authored),
+		var s = FabricationSpecs.copy(authored),
 			checks = p.validation.copy();
 		var eps = p.cores.length > 0;
 		checks.push(ToolingLoads.check("fabrication.materials.compatibility", [p.document.recipe.id],
@@ -143,7 +144,7 @@ class ToolingFabrication {
 			"Styrene-bearing resin is incompatible with EPS; the actual resin/EPS/adhesive/release combination requires compatibility evidence.",
 			s.compatibilityEvidence));
 		if (cure != null
-			&& (cure.sourceFingerprint != CastingMoldCodec.fingerprint(p)
+			&& (cure.sourceFingerprint != CastingMoldPlanner.fingerprint(p)
 				|| cure.resinReference != s.resinReference
 				|| cure.hasEPS != (p.cores.length > 0 || s.adhesiveContainsEPS != false)))
 			throw "Stale fabrication cure report";
@@ -182,7 +183,7 @@ class ToolingFabrication {
 		requirements.sort((a, b) -> Reflect.compare(a.id, b.id));
 		var placements = layout(requirements, p.document.recipe.panel.width, p.document.recipe.panel.height, s.blankKerfMm);
 		checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
-		var source = CastingMoldCodec.fingerprint(p);
+		var source = CastingMoldPlanner.fingerprint(p);
 		return {
 			format: "materia.tooling-fabrication",
 			version: 2,

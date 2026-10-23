@@ -20,7 +20,7 @@ class CastingSourceRegions {
 	static inline var RULE = "casting.source.box-geometry";
 
 	public static function derive(document:ToolingDocument):CastingBoxRegions {
-		var d = materia.tooling.ToolingCodec.snapshot(document);
+		var d = materia.tooling.ToolingCodec.copy(document);
 		var checks = CastingBoxSupport.check(d.input, RULE);
 		var result:CastingBoxRegions = {sourceId: d.input.id,
 			documentFingerprint: materia.tooling.ToolingCodec.documentFingerprint(d), regions: null, validation: checks};

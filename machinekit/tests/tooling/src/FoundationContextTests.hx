@@ -87,18 +87,18 @@ class FoundationContextTests {
 			"source metrology uncertainty reaches tooling and remains pending");
 		check(checks[0].affectedIds.indexOf("left")>=0 && checks[0].affectedIds.indexOf("right")>=0,
 			"relationship validation identifies the affected source inserts");
-		var altered=ToolingCodec.inputSnapshot(input);
+		var altered=ToolingCodec.copyInput(input);
 		var alteredContext=altered.interfaceContext;
 		if (alteredContext==null) throw "Expected a source context";
 		for (source in alteredContext.sources) switch source {
 			case Precision(member,_,pose): if (member=="base/left") pose.x+=1;
 			case Axis(_,_,_):
 		}
-		rejects(() -> ToolingCodec.inputSnapshot(altered),"Interface context differs from source requirement or pose");
+		rejects(() -> ToolingCodec.copyInput(altered),"Interface context differs from source requirement or pose");
 		var missing:Dynamic=haxe.Json.parse(encoded);
 		Reflect.deleteField(missing.input,"datumScheme");
 		rejects(() -> ToolingCodec.decodeInput(haxe.Json.stringify(missing)),"Missing input field: datumScheme");
-		var budgeted=ToolingCodec.inputSnapshot(input);budgeted.interfaceContext=null;
+		var budgeted=ToolingCodec.copyInput(input);budgeted.interfaceContext=null;
 		var budgetFingerprint=ToolingCodec.inputFingerprint(budgeted);
 		budgeted.inserts[0].interfaces[0].finishingProcessErrorMm=materia.casting.CastingInput.Known(0.002);
 		check(ToolingCodec.inputFingerprint(budgeted)!=budgetFingerprint,"source error allocations enter the fingerprint");

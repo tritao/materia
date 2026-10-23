@@ -64,8 +64,8 @@ class InsertAnchorTests {
 			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length==2,
 			"bearing area cannot be supplied by nominal flange diameter alone");
 		sourceRules.minimumBearingAreaMm2=20;
-		var badInput=materia.tooling.ToolingCodec.inputSnapshot(input);badInput.inserts[0].holes[0].depth+=0.1;
-		rejects(() -> materia.tooling.ToolingCodec.inputSnapshot(badInput),"Invalid insert seat: Anchor");
+		var badInput=materia.tooling.ToolingCodec.copyInput(input);badInput.inserts[0].holes[0].depth+=0.1;
+		rejects(() -> materia.tooling.ToolingCodec.copyInput(badInput),"Invalid insert seat: Anchor");
 		check(foundation.body.collisionHullQualification.status==machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Unsupported,
 			"anchor voids are not approximated by box collision hulls");
 		rejects(() -> foundation.body.minimumSectionIy(-20,20),"Unsupported non-box anchor material for inserts: seat");
@@ -86,7 +86,7 @@ class InsertAnchorTests {
 		var capability=sourceReview.validation.filter(record -> record.rule=="process.level1.geometry.seat");
 		check(capability.length==1 && capability[0].status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
 			"one source geometry capability finding covers anchor occupancy without duplicating bearing/capacity qualifications");
-		var sourceOnly=materia.tooling.ToolingCodec.snapshot(document);
+		var sourceOnly=materia.tooling.ToolingCodec.copy(document);
 		sourceOnly.recipe.designReview.minimumLiftingPoints=4;
 		var previous=materia.tooling.casting.CastingMoldPlanner.geometry;
 		materia.tooling.casting.CastingMoldPlanner.setGeometry(null);
@@ -160,7 +160,7 @@ class InsertAnchorTests {
 		check(core.layers.length>1 && materia.tooling.casting.MoldRegions.volume(materia.tooling.casting.MoldCores.foam(core),core.id)
 			< materia.tooling.casting.MoldRegions.volume(core.cavity,core.id),"uplift fixture really has lined and glued stock layers");
 		var layeredSettings:materia.tooling.process.FillAnalysis.FillSourceSettings={
-			sourceFingerprint:materia.tooling.casting.CastingMoldCodec.fingerprint(layered),processFingerprint:"layered-core",
+			sourceFingerprint:materia.tooling.casting.CastingMoldPlanner.fingerprint(layered),processFingerprint:"layered-core",
 			cores:[],densityKgM3:2400,gravityMps2:9.80665,pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,
 			extraLevels:[],fillObstructions:[],panels:[]};
 		var layeredFill=machinekit.tooling.CastingFillAnalysis.fromPlan(layered,layeredSettings).report;
@@ -253,7 +253,7 @@ class InsertAnchorTests {
 		check(haxe.Json.stringify(C.record(C.snapshot(haxe.Json.parse(encoded))))==encoded,"strict source anchor round trip");
 		var copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));
 		bolts(copy).reverse();
-		check(haxe.Json.stringify(C.record(C.snapshot(copy.anchorage)))==encoded,"anchor source order is canonical");
+		check(haxe.Json.stringify(C.record(C.copy(copy.anchorage)))==encoded,"anchor source order is canonical");
 		bolts(copy)[0].screw.headHeightMm+=1;
 		check(haxe.Json.stringify(C.record(spec.anchorage))==encoded,"source hardware facts are defensive copies");
 		rejects(() -> InsertAnchorHardware.parts(copy),"Anchor hardware differs from selected standard components");
@@ -315,7 +315,7 @@ class InsertAnchorTests {
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));copy.holes[0].frame.x=29;
 		rejects(() -> InsertSpecCodec.snapshot(InsertSpecCodec.record(copy)),"radial-wall rule");
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));bolts(copy)[0].locking=InsertAnchorLock.Shoulder;
-		check(switch C.snapshot(copy.anchorage) {case Bolted(_,a):a[0].locking==InsertAnchorLock.Shoulder;default:false;},
+		check(switch C.copy(copy.anchorage) {case Bolted(_,a):a[0].locking==InsertAnchorLock.Shoulder;default:false;},
 			"shoulder intent never invents a flange-to-insert clamp or a thread-runout stop");
 		rejects(() -> C.snapshot({kind:"bolted",rules:{demand:rules.demand,minimumEmbedmentMm:1,minimumBearingAreaMm2:1,minimumSpacingMm:1,minimumCoverMm:1},anchors:new Array<Dynamic>()}),"requires 1..256 anchors");
 		var old:Dynamic=InsertSpecCodec.record(spec);Reflect.deleteField(old,"anchorage");

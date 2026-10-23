@@ -38,7 +38,7 @@ class ProposalReplanTests {
 		result.setup.revision=revision;
 		result.setup.sourceFingerprint=ToolingCodec.inputFingerprint(result.input);
 		result.recipe.designReview.minimumLiftingPoints=4;
-		return ToolingCodec.snapshot(result);
+		return ToolingCodec.copy(result);
 	}
 
 	static function options(source:ToolingDocument):CastingMoldOptions {

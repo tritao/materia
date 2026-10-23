@@ -1,11 +1,12 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlanner;
+
 import materia.assembly.AssemblyFrames as F;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CoreSupport.SupportHardwareKind;
 import machinekit.tooling.CastingMoldCad.CastingMoldReview;
 import machinekit.tooling.CastingMoldCad.DemoldingStepKind;
@@ -42,7 +43,7 @@ typedef MoldPlaybackFrame = {
 /** Static snapshots of checked steps, never a new motion/adhesion/flip simulation. */
 class MoldPlayback {
 	public static function frames(p:CastingMoldPlan, review:CastingMoldReview, memberIds:Array<String>):Array<MoldPlaybackFrame> {
-		if (review.fingerprint != CastingMoldCodec.fingerprint(p))
+		if (review.fingerprint != CastingMoldPlanner.fingerprint(p))
 			throw "Stale playback review";
 		var ids = memberIds.copy();
 		ids.sort(Reflect.compare);
@@ -193,7 +194,7 @@ class MoldPlayback {
 	}
 
 	public static function write(p:CastingMoldPlan, review:CastingMoldReview, dir:String):Array<MoldPlaybackFrame> {
-		if (review.fingerprint != CastingMoldCodec.fingerprint(p))
+		if (review.fingerprint != CastingMoldPlanner.fingerprint(p))
 			throw "Stale playback review";
 		var assembly = CastingMoldCad.assembly(p),
 			members = assembly.components(),

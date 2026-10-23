@@ -160,8 +160,8 @@ class CastabilityTests {
 			== ToolingCodec.canonical(report), "partial reports and proposal IDs do not depend on feature order");
 		rejects(() -> CastabilityAnalysis.analyze(document, spec, fill, null, source, "stale"),
 			"Mismatched castability fill process");
-		var fragments = ToolingCodec.snapshot(document);
-		var sibling = materia.casting.CastingFeatureCodec.snapshot(fragments.input.features.filter(feature -> feature.id == "pocket"))[0];
+		var fragments = ToolingCodec.copy(document);
+		var sibling = materia.casting.CastingFeatureCodec.copy(fragments.input.features.filter(feature -> feature.id == "pocket"))[0];
 		sibling.id = "pocket-second";
 		fragments.input.features.push(sibling);
 		fragments.setup.sourceFingerprint = ToolingCodec.inputFingerprint(fragments.input);
@@ -173,7 +173,7 @@ class CastabilityTests {
 		fragments.input.features.reverse();
 		check(ToolingCodec.canonical(materia.tooling.process.CastingLevelOne.analyze(fragments)) == ToolingCodec.canonical(grouped),
 			"grouped geometry findings and messages are independent of fragment order");
-		var curvedBody = ToolingCodec.snapshot(document);
+		var curvedBody = ToolingCodec.copy(document);
 		curvedBody.input.envelope = materia.casting.CastingEnvelope.build(200, 180, 100, 10);
 		curvedBody.setup.sourceFingerprint = ToolingCodec.inputFingerprint(curvedBody.input);
 		var sourceChecks = materia.tooling.process.CastingLevelOne.analyze(curvedBody);
@@ -199,7 +199,7 @@ class CastabilityTests {
 		liftingLocations();
 		authoredProfileCorners();
 		nonBoxReports();
-		var d = ToolingCodec.snapshot(p.document),
+		var d = ToolingCodec.copy(p.document),
 			s = ProcessSpecCodec.snapshot(raw);
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(d.recipe);
 		s.sections = [];
@@ -322,7 +322,7 @@ class CastabilityTests {
 		check(unsupported.proposals.filter(v -> v.action == SplitOrSacrificial
 			&& v.sourceIds.indexOf(unsupportedFeature) >= 0).length == 1,
 			"unsupported strategy gets a tooling action with its source ID");
-		d = ToolingCodec.snapshot(p.document);
+		d = ToolingCodec.copy(p.document);
 		check(ToolingCodec.documentFingerprint(p.document) == unchanged, "screening and suggestions preserve the original source/setup");
 		for (proposal in unknown.proposals)
 			check(unknown.validation.filter(v -> v.rule == proposal.rule).length == 1, "proposal references real finding");

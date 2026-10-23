@@ -113,7 +113,9 @@ class InterfaceRequirements {
 		return result;
 	}
 
-	public static function records(requirements:Array<InterfaceRequirement>):Array<Dynamic> {
+	public static function records(requirements:Array<InterfaceRequirement>):Array<Dynamic> return rawRecords(copy(requirements));
+
+	static function rawRecords(requirements:Array<InterfaceRequirement>):Array<Dynamic> {
 		var result:Array<Dynamic> = [];
 		for (r in requirements) result.push({id: r.id, geometry: geometryRecord(r.geometry), route: (r.route:String),
 			allowanceMm: r.allowanceMm, finishingProcessErrorMm: CastingInput.CastingInputs.record(r.finishingProcessErrorMm), permittedFinishes: [for (f in r.permittedFinishes) (f:String)],
@@ -122,7 +124,7 @@ class InterfaceRequirements {
 	}
 
 	public static function copy(rows:Array<InterfaceRequirement>):Array<InterfaceRequirement>
-		return snapshot(records(rows));
+		return snapshot(rawRecords(rows));
 
 	/** Remaining combined fixture/casting/metrology budget; no geometric use. */
 	public static function fixtureBudgetMm(r:InterfaceRequirement):Null<Float>

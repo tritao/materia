@@ -24,7 +24,7 @@ class AnchorCapacityTests {
 			"nested and coincident cones cannot multiply their credited area");
 		near(Checks.projectedConeUnionArea([{x:1e8,y:-1e8,radius:1},{x:1e8+1,y:-1e8,radius:1}]),4*pi/3+Math.sqrt(3)/2,
 			"projection translation does not destroy small shared areas");
-		var insert=ToolingCodec.inputSnapshot(document.input).inserts[0];
+		var insert=ToolingCodec.copyInput(document.input).inserts[0];
 		insert.body=Primitive(Box(100,100,30));insert.interfaces=[];
 		insert.role=materia.casting.InsertSpec.InsertRole.LiftingMount;
 		insert.holes=[];

@@ -122,7 +122,7 @@ class InsertFixturePlanner {
 	 * This constructs no thread in tooling and makes no fixture-accuracy claim.
 	 */
 	public static function plate(document:materia.tooling.ToolingDocument, options:InsertPlateOptions):InsertPlatePlan {
-		var d = materia.tooling.ToolingCodec.snapshot(document);
+		var d = materia.tooling.ToolingCodec.copy(document);
 		options = copyOptions(options);
 		materia.tooling.ToolingIds.validate(options.id);
 		for (value in [options.edgeMargin, options.locatorEndInset, options.locatorSideInset])

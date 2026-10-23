@@ -110,7 +110,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 	}
 
 	public function castingMass(document:ToolingDocument):CastingMassProperties {
-		var d=ToolingCodec.snapshot(document),key=ToolingCodec.documentFingerprint(d);
+		var d=ToolingCodec.copy(document),key=ToolingCodec.documentFingerprint(d);
 		var cached=massCache.get(key);
 		if (cached!=null) return copyMass(cached);
 		var scope=new Scope();
@@ -147,7 +147,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 	}
 
 	public function resinIntersection(document:ToolingDocument,region:CastingRegion):Float {
-		var d=ToolingCodec.snapshot(document),scope=new Scope();
+		var d=ToolingCodec.copy(document),scope=new Scope();
 		try {
 			var local=scope.own(ToolingSourceCasting.fromInput(d.input).geometry());
 			var resin=scope.own(machinekit.assembly.PosedParts.moved(local,d.setup.sourceToMold));

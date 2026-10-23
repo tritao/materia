@@ -502,7 +502,7 @@ class ProcessTests {
 			.validation.filter(v -> v.rule == "process.cure.resin-identity" && v.status == "fail")
 			.length == 1,
 			"cure and solvent resin identity must agree");
-		var adhesiveDocument = ToolingCodec.snapshot(p.document);
+		var adhesiveDocument = ToolingCodec.copy(p.document);
 		for (strategy in adhesiveDocument.setup.features)
 			if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
 				strategy.strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
@@ -518,7 +518,7 @@ class ProcessTests {
 				&& ToolingCodec.canonical(r) == ToolingCodec.canonical(v)).length == 1,
 				"process report retains exact planner rule " + v.rule);
 		check(!integrated.fabrication.ready, "analysis cannot clear existing mold blockers");
-		var safeDocument = ToolingCodec.snapshot(p.document);
+		var safeDocument = ToolingCodec.copy(p.document);
 		safeDocument.recipe.core.maximumTemperatureC = 1000;
 		var safePlan = materia.tooling.casting.CastingMoldPlanner.plan(safeDocument, p.options);
 		var safeSpec = spec();

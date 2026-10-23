@@ -14,7 +14,6 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import materia.project.SceneArtifact;
 import materia.tooling.casting.BoxMoldPlanner;
-import materia.tooling.casting.BoxMoldCodec;
 import materia.tooling.casting.CoreSupports;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.panel.PanelCodec;
@@ -49,12 +48,9 @@ class BoxMoldPreview {
 		if (bedCore)
 			dir += "-bed";
 		sys.FileSystem.createDirectory(dir);
-		var encoded = BoxMoldCodec.encode(p);
-		BoxMoldCodec.decode(encoded);
-		sys.io.File.saveContent(dir + "/mold.json", encoded);
 		sys.io.File.saveContent(dir + "/review.json", Json.stringify({
 			phase: 3,
-			fingerprint: BoxMoldCodec.fingerprint(p),
+			fingerprint: BoxMoldPlanner.fingerprint(p),
 			geometry: report,
 			qualification: "REVIEW ONLY: physical restraint, datum accuracy, anchorage, compaction, loads and handling pending",
 			graphScope: "Assembly includes cores/inserts. Demolding begins after screw/clamp release and adhesive release; core support, EPS withdrawal/breakout and cured casting all participate. Straight translation sweeps only."

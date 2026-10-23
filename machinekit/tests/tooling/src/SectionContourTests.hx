@@ -59,7 +59,7 @@ class SectionContourTests {
 				&& Math.abs(directional.sections[2].plane.z-40)<1e-9,
 				"drawing end sections use actual geometry extrema rather than inflated stock bounds: "
 					+[for (view in directional.sections) view.plane.z].join(","));
-			var drafted=materia.tooling.casting.MoldVolumeCodec.snapshot(record);
+			var drafted=materia.tooling.casting.MoldRegions.MoldVolumeRecords.copy(record);
 			drafted.id="draft-former";
 			drafted.regions=[materia.casting.CastingRegion.Drafted("rounded-draft",draft.opening,draft.pose,draft.depth,2)];
 			check(machinekit.tooling.ToolingSectionDrawing.byDirection(drafted,{x:0,y:0,z:1}).sections.length==3,

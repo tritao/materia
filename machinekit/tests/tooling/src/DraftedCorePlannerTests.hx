@@ -47,9 +47,6 @@ class DraftedCorePlannerTests {
 		var drawings=machinekit.tooling.ToolingSectionReview.build(plan);
 		check(drawings.records.length==4 && drawings.validation.filter(row -> row.status!=Status.Pass).length==0,
 			"all drafted foam layers retain exact line/arc section drawings");
-		var encoded=materia.tooling.casting.CastingMoldCodec.encode(plan);
-		check(materia.tooling.casting.CastingMoldCodec.encode(machinekit.tooling.CastingMoldCad.decode(encoded))==encoded,
-			"drafted core geometry regenerates through the same strict source schema");
 		var review=machinekit.tooling.CastingMoldCad.review(plan);
 		near(review.symmetricDifferenceMm3,0,"drafted EPS reconstructs the actual source casting");
 		for (rule in ["coverage","assembly-graph","demolding-graph"])
@@ -82,7 +79,7 @@ class DraftedCorePlannerTests {
 		check(quantities!=null,"non-box orientation keeps its effort metrics");
 		if (quantities==null) throw "Missing drafted orientation effort";
 		near(quantities.mixMassKg,effort.mixMassKg,"orientation and direct effort share exact resin quantities");
-		var shortStock=ToolingCodec.snapshot(document);shortStock.recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Y;
+		var shortStock=ToolingCodec.copy(document);shortStock.recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Y;
 		var message="";
 		try machinekit.tooling.CastingMoldCad.plan(shortStock,options) catch (error:Dynamic) message=Std.string(error);
 		check(message.indexOf("EPS core pocket: Unsupported drafted EPS cross-profile tiling")>=0,

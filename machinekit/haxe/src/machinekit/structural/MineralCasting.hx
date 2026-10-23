@@ -118,7 +118,7 @@ class MineralCasting extends MachineComponent {
 		return interfaces == null ? [] : interfaces.precisionRequirements();
 	}
 
-	public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.snapshot(features);
+	public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.copy(features);
 
 	public function castingEnvelope():Array<CastingPrism> return [for (prism in envelope) {
 		id: prism.id,

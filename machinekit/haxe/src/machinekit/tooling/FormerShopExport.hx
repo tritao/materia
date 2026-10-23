@@ -60,7 +60,7 @@ class FormerShopExport {
 		if (materia.tooling.casting.CastingMoldPlanner.geometry==null)
 			materia.tooling.casting.CastingMoldPlanner.setGeometry(new NativeCastingMoldKernel());
 		var report:FormerShopReport={format:"materia.tooling.former-manufacturing",version:1,
-			sourceFingerprint:materia.tooling.casting.CastingMoldCodec.fingerprint(plan),sealSpec:plan.document.recipe.hardware.sealMaterial,
+			sourceFingerprint:materia.tooling.casting.CastingMoldPlanner.fingerprint(plan),sealSpec:plan.document.recipe.hardware.sealMaterial,
 			releaseSpec:plan.document.recipe.releaseSpec,formers:[],validation:[],pocketScrews:[]};
 		var scope=new Scope();
 		try {

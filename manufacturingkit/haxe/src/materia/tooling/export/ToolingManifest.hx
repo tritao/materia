@@ -17,6 +17,7 @@ typedef ToolingManifest = {
 	var packageFingerprint:String;
 	var files:Array<ToolingArtifact>;
 	var fabrication:FabricationReadiness;
-	var validation:Array<ToolingValidation>;
+	/** The single detailed report, covered by the artifact inventory. */
+	var validation:String;
 	var replacementGroups:Array<ReplacementGroup>;
 }

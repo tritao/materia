@@ -15,7 +15,6 @@ import machinekit.standard.HexNut;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.MoldPlan.MoldBox;
 import materia.tooling.casting.CoreSupport.SupportHardwareKind;
 import machinekit.tooling.SweptRemoval.RemovalMember;
@@ -75,12 +74,6 @@ class CastingMoldCad {
 
 	static function enableGeometry():Void {
 		if (CastingMoldPlanner.geometry==null) CastingMoldPlanner.setGeometry(new NativeCastingMoldKernel());
-	}
-
-	/** Restore non-box plans without relying on a preceding planning call. */
-	public static function decode(encoded:String):CastingMoldPlan {
-		enableGeometry();
-		return CastingMoldCodec.decode(encoded);
 	}
 
 	static function box(b:MoldBox):Part
@@ -664,11 +657,11 @@ class CastingMoldCad {
 						materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass, "Exact CAD "
 						+ name
 						+ " check passed.",
-						[materia.tooling.casting.CastingMoldCodec.fingerprint(p)])
+						[materia.tooling.casting.CastingMoldPlanner.fingerprint(p)])
 			]).concat(ReplicationContactCad.review(p.document.input,p.options.replicationJigs)).concat(FoundationJointCad.review(p.document.input))
 				.concat(InsertAnchorGeometry.review(p.document.input)).concat(InsertAnchorGeometry.reviewMold(p));
 			return {
-				fingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(p),
+				fingerprint: materia.tooling.casting.CastingMoldPlanner.fingerprint(p),
 				handling: p.handling,
 				demoldingSteps: steps(p, demolding.removalOrder),
 				symmetricDifferenceMm3: difference,

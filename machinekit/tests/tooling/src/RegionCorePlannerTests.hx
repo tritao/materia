@@ -16,13 +16,13 @@ class RegionCorePlannerTests {
 	}
 
 	static function variants(document:materia.tooling.ToolingDocument,options:CastingMoldOptions,original:CastingMoldPlan):Void {
-		var changed=ToolingCodec.snapshot(document);changed.recipe.core.height=20;
+		var changed=ToolingCodec.copy(document);changed.recipe.core.height=20;
 		var alternate=machinekit.tooling.CastingMoldCad.plan(changed,options);
 		check(alternate.cores[0].layers.length!=original.cores[0].layers.length,
 			"a stock-thickness change rebuilds the actual foam pieces");
 		check(ToolingCodec.canonical(alternate.cores[0].cavity)==ToolingCodec.canonical(original.cores[0].cavity),
 			"stock changes never modify the design cavity");
-		var mixed=ToolingCodec.snapshot(document);
+		var mixed=ToolingCodec.copy(document);
 		var service=materia.casting.CastingPatterns.box("side-service",
 			materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
 			[materia.casting.CastingPatterns.face("body.x-min"),materia.casting.CastingPatterns.feature("pocket")],
@@ -35,8 +35,8 @@ class RegionCorePlannerTests {
 			"an intersecting side former reserves the exact triangular EPS region");
 		var mixedReview=machinekit.tooling.CastingMoldCad.review(mixedPlan);
 		check(mixedReview.symmetricDifferenceMm3<1e-5,"mixed core/former ownership reconstructs the source union");
-		var pair=ToolingCodec.snapshot(document);
-		var round=materia.casting.CastingFeatureCodec.snapshot(pair.input.features)[0];
+		var pair=ToolingCodec.copy(document);
+		var round=materia.casting.CastingFeatureCodec.copy(pair.input.features)[0];
 		round.id="round-pocket";round.geometry.solid=Cut(materia.casting.CastingSolid.Cylinder(80,61));
 		round.geometry.pose=F.translation(75,10,-1);
 		pair.input.features.push(round);
@@ -62,7 +62,6 @@ class RegionCorePlannerTests {
 		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FabricationTests.spec());
 		var directory=Sys.getCwd()+"/build/tooling/nonbox-core-"+fabrication.fingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(directory);
-		sys.io.File.saveContent(directory+"/mold-plan.json",materia.tooling.casting.CastingMoldCodec.encode(plan));
 		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory);
 		checks=checks.concat(machinekit.tooling.ToolingProcessExport.write(plan,process.spec,9.80665,directory,
 			null,null,null,process));
@@ -86,25 +85,6 @@ class RegionCorePlannerTests {
 		check(markdown.indexOf("process.castability.release.")>=0 && markdown.indexOf("process.level1.lifting-points")>=0,
 			"human review includes available release and source findings rather than only an Unsupported note");
 		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
-		machinekit.tooling.ToolingPackageManifest.verify(directory);
-		var core=plan.cores[0],name=MoldCores.layerId(core,0)+".cutting.json";
-		var path=directory+"/"+name,original=sys.io.File.getContent(path);
-		var changed:Dynamic=haxe.Json.parse(original);
-		Reflect.deleteField(Reflect.field(changed,"cutting"),"solid");
-		try {
-			sys.io.File.saveContent(path,ToolingCodec.canonical(changed));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
-				"Core cutting artifact differs from source");
-		} catch (error:Dynamic) {sys.io.File.saveContent(path,original);throw error;}
-		sys.io.File.saveContent(path,original);
-		var manifestPath=directory+"/manifest.json",manifestText=sys.io.File.getContent(manifestPath);
-		var manifest:Dynamic=haxe.Json.parse(manifestText),files:Array<Dynamic> =cast Reflect.field(manifest,"files");
-		try {
-			Reflect.setField(manifest,"files",files.filter(file -> file.path!=name));
-			sys.io.File.saveContent(manifestPath,ToolingCodec.canonical(manifest));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Missing hashed tooling drawing");
-		} catch (error:Dynamic) {sys.io.File.saveContent(manifestPath,manifestText);throw error;}
-		sys.io.File.saveContent(manifestPath,manifestText);
 		machinekit.tooling.ToolingPackageManifest.verify(directory);
 		check(!fabrication.fabrication.ready,"geometric cutting evidence never grants physical fabrication readiness");
 	}
@@ -149,9 +129,6 @@ class RegionCorePlannerTests {
 		check(Math.abs(carrierArea-topArea)<1e-6,"carrier follows the actual triangular contact footprint");
 		check(core.bridgeBondAreaMm2>0 && core.bridgeBondAreaMm2<=core.bondAreaMm2+1e-7,
 			"beam bonding credits only exact foam contact");
-		var encoded=materia.tooling.casting.CastingMoldCodec.encode(plan);
-		check(materia.tooling.casting.CastingMoldCodec.encode(machinekit.tooling.CastingMoldCad.decode(encoded))==encoded,
-			"exact core cutting records regenerate through the strict mold codec");
 		var review=machinekit.tooling.CastingMoldCad.review(plan);
 		check(review.symmetricDifferenceMm3<1e-5,"non-box EPS reconstructs the source casting exactly");
 		for (rule in ["coverage","assembly-graph","demolding-graph"])

@@ -41,19 +41,18 @@ typedef InsertManufacturing = {
 	var holeRoutes:Array<{holeId:String,route:InsertHoleRoute}>;
 	var mountingRequirements:Array<InsertMountHoleRequirement>;
 	var inspections:Array<InsertInspection>;
-	var processReference:Null<String>;
+	var processReference:CastingInput.CastingTextInput;
 }
 
 class InsertManufacturingCodec {
 	/** A complete typed draft with no invented stock, hole route or inspection limit. */
 	public static function draft(material:InsertMaterialSpec):InsertManufacturing
 		return {material:InsertMaterial.InsertMaterials.snapshot(material),blank:Unselected,
-			holeRoutes:[],mountingRequirements:[],inspections:[],processReference:null};
+			holeRoutes:[],mountingRequirements:[],inspections:[],processReference:CastingInput.CastingTextInput.Unresolved("shop process, including workholding and surface preparation")};
 
 	public static function snapshot(raw:Dynamic):InsertManufacturing {
 		CastingFeatureCodec.fields(raw,["material","blank","holeRoutes","mountingRequirements","inspections","processReference"]);
 		var blankRaw:Dynamic=Reflect.field(raw,"blank");
-		if (Std.isOfType(blankRaw,InsertBlank)) blankRaw=blankRecord(cast blankRaw);
 		var blank:InsertBlank=switch CastingRecordCodec.string(blankRaw,"kind") {
 			case "unselected":
 				CastingFeatureCodec.fields(blankRaw,["kind"]);
@@ -81,7 +80,6 @@ class InsertManufacturingCodec {
 		routes.sort((a,b) -> Reflect.compare(a.holeId,b.holeId));
 		var inspections:Array<InsertInspection> = [],keys:Map<String,Bool> = [];
 		for (row in limited(raw,"inspections")) {
-			if (Std.isOfType(row,InsertInspection)) row=inspectionRecord(cast row);
 			var kind=CastingRecordCodec.string(row,"kind");
 			var inspection:InsertInspection=switch kind {
 				case "material-identity":
@@ -103,8 +101,8 @@ class InsertManufacturingCodec {
 			keys.set(key,true);inspections.push(inspection);
 		}
 		inspections.sort((a,b) -> Reflect.compare(inspectionKey(a),inspectionKey(b)));
-		var reference=CastingRecordCodec.optionalString(raw,"processReference");
-		if (reference!=null) validText(reference);
+		var reference=CastingInput.CastingInputs.text(Reflect.field(raw,"processReference"));
+		switch reference {case Known(value):validText(value);case Unresolved(_):}
 		return {material:InsertMaterial.InsertMaterials.snapshot(Reflect.field(raw,"material")),blank:blank,
 			holeRoutes:routes,mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.snapshot(Reflect.field(raw,"mountingRequirements")),
 			inspections:inspections,processReference:reference};
@@ -115,9 +113,9 @@ class InsertManufacturingCodec {
 		if (plan.inspections==null || plan.holeRoutes==null || plan.mountingRequirements==null) throw "Invalid insert manufacturing lists";
 		var copy=snapshot({material:plan.material,blank:blankRecord(plan.blank),holeRoutes:plan.holeRoutes,
 			mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.records(plan.mountingRequirements),
-			inspections:[for (inspection in plan.inspections) inspectionRecord(inspection)],processReference:plan.processReference});
+			inspections:[for (inspection in plan.inspections) inspectionRecord(inspection)],processReference:CastingInput.CastingInputs.textRecord(plan.processReference)});
 		return {material:copy.material,blank:blankRecord(copy.blank),holeRoutes:copy.holeRoutes,mountingRequirements:InsertMountHoleRequirement.InsertMountHoleRequirements.records(copy.mountingRequirements),
-			inspections:[for (inspection in copy.inspections) inspectionRecord(inspection)],processReference:copy.processReference};
+			inspections:[for (inspection in copy.inspections) inspectionRecord(inspection)],processReference:CastingInput.CastingInputs.textRecord(copy.processReference)};
 	}
 
 	public static function references(plan:InsertManufacturing,holes:Array<InsertHole>,interfaces:Array<InterfaceRequirement>):Void {

@@ -34,7 +34,7 @@ typedef CastingDesignReport = {
 /** Source-only screening. No mold planning, CAD imports, inferred capacities or source mutation. */
 class CastingLevelOne {
 	public static function analyze(document:ToolingDocument):CastingDesignReport {
-		var d = ToolingCodec.snapshot(document),
+		var d = ToolingCodec.copy(document),
 			limits = d.recipe.designReview;
 		var checks:Array<ToolingValidation> = [],
 			proposals:Array<CastabilityProposal> = [];
@@ -192,7 +192,7 @@ class CastingLevelOne {
 				}
 			}
 			if (proposed != null) {
-				var features = materia.casting.CastingFeatureCodec.snapshot(d.input.features);
+				var features = materia.casting.CastingFeatureCodec.copy(d.input.features);
 				var recesses = features.filter(feature -> feature.owner == insert.id);
 				if (recesses.length == 0 || recesses.filter(feature -> feature.adjustable.indexOf(materia.casting.CastingFeature.CastingDimension.Width) < 0).length > 0)
 					proposed = null;
@@ -319,7 +319,7 @@ class CastingLevelOne {
 			&& ToolingCodec.canonical(p) == ToolingCodec.canonical(proposal));
 		if (available.length != 1 || proposal.sourceParameterId == null || proposal.proposedValue == null)
 			throw "Unmapped or stale source proposal";
-		var d = ToolingCodec.snapshot(document);
+		var d = ToolingCodec.copy(document);
 		var inserts = d.input.inserts.filter(i -> proposal.sourceParameterId == "input.inserts." + i.id + ".body.solid.width");
 		var proposedValue:Float = cast proposal.proposedValue;
 		if (inserts.length != 1 || proposedValue <= 0)
@@ -335,6 +335,6 @@ class CastingLevelOne {
 		materia.casting.CastingCavities.derive(d.input.envelope, d.input.features);
 		d.setup.revision++;
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
-		return ToolingCodec.snapshot(d);
+		return ToolingCodec.copy(d);
 	}
 }

@@ -112,7 +112,7 @@ class InsertManufacturingPlan {
 			operations.push({id:materia.tooling.ToolingIds.derive("make-",insert.id,"-"+suffix),kind:kind,stage:stage,sourceIds:ids});
 		add("cut",CutStock,InsertOperationStage.BeforeCasting,[insert.id]);
 		add("blank",MachineBlank,InsertOperationStage.BeforeCasting,[insert.id]);
-		if (spec.processReference==null) missing.push("shop process, including workholding and surface preparation");
+		switch spec.processReference {case Unresolved(reason):missing.push(reason);case Known(_):}
 		var holes=insert.holes.copy();holes.sort((a,b) -> Reflect.compare(a.id,b.id));
 		for (hole in holes) {
 			var routes=spec.holeRoutes.filter(choice -> choice.holeId==hole.id);
@@ -212,10 +212,11 @@ class InsertManufacturingPlan {
 				case ChangeDesign(reason):
 					status=ToolingCheckStatus.Fail;message=reason+" for "+requirement.holeId+".";
 			}
-			if (requirement.clearanceReference==null) {
-				missing.push("clearanceReference");
+			switch requirement.clearanceReference {case Unresolved(reason):
+				missing.push(reason);
 				if (status==ToolingCheckStatus.Pass) status=ToolingCheckStatus.Pending;
 				message+=" Record the mating part's clearance source.";
+				case Known(_):
 			}
 			reports.push({holeId:requirement.holeId,componentPath:requirement.componentPath,
 				componentFingerprint:requirement.componentFingerprint,connectorId:requirement.connectorId,route:route,

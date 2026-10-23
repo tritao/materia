@@ -24,15 +24,16 @@ class CastingRegionTests {
 		var draft=CastingRegion.Drafted("former",materia.casting.CastingProfiles.rectangle(-20,-15,40,30),F.identity(),60,2);
 		check(switch C.snapshot(C.record(draft)) {case Drafted(id,_,_,depth,degrees):id=="former" && depth==60 && degrees==2;default:false;},
 			"drafted expression keeps source identity, opening, depth and angle");
+		rejects(() -> C.snapshot(a),"Invalid casting text: kind");
 		var raw:Dynamic=C.record(a);Reflect.setField(raw,"bounds",{});
 		rejects(() -> C.snapshot(raw),"Unexpected casting record fields");
 		rejects(() -> C.snapshot({kind:"bounds",box:{}}),"Unknown casting region kind");
 		rejects(() -> C.snapshot({kind:"union",regions:new Array<Dynamic>()}),"Invalid casting region operand count");
-		rejects(() -> C.snapshot(CastingRegion.Drafted("bad-former",materia.casting.CastingProfiles.roundedRectangle(-20,-15,40,30,1),F.identity(),60,2)),
+		rejects(() -> C.copy(CastingRegion.Drafted("bad-former",materia.casting.CastingProfiles.roundedRectangle(-20,-15,40,30,1),F.identity(),60,2)),
 			"Casting feature bad-former");
 		var children:Array<CastingRegion> =[],cycle=CastingRegion.Union(children);children.push(cycle);
-		rejects(() -> C.snapshot(cycle),"Casting region expression exceeds limit");
-		check(switch C.snapshot(CastingRegion.Difference(a,[])) {case Difference(_,cuts):cuts.length==0;default:false;},"difference may have no cuts without inventing a solid");
+		rejects(() -> C.copy(cycle),"Casting region expression exceeds limit");
+		check(switch C.copy(CastingRegion.Difference(a,[])) {case Difference(_,cuts):cuts.length==0;default:false;},"difference may have no cuts without inventing a solid");
 		Sys.println("CastingRegionTests: "+assertions+" assertions passed");
 	}
 }

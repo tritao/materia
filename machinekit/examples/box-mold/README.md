@@ -62,9 +62,9 @@ before the foot/core is withdrawn or broken out through the bed opening.
 A 0.1 mm covering allowance on submerged EPS faces is included in cavity size.
 Main blocks and separate locating feet have ruled +Y stock cutting definitions,
 STEP and SVG/DXF drawings, without kerf compensation. Adhesive references, bond
-areas, clearances, embed depth, pad closure and support members are persisted in
-the mold record. `BoxMoldCodec` version 2 includes support options and rejects
-version 1; changes invalidate the package fingerprint. Geometry is supplied, but
+areas, clearances, embed depth, pad closure and support members are retained in
+the in-memory mold plan. Authored inputs determine its fingerprint; the delivered
+package has one inventory integrity check. Geometry is supplied, but
 adhesive compatibility/strength, EPS bearing/compression, uplift resistance,
 bridge/pad strength and external clamp capacity remain unqualified.
 

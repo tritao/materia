@@ -106,7 +106,7 @@ class ToolingTests {
 			"shared plate thickness and placement derive from measured stock");
 		check(!materia.tooling.ToolingValidation.ToolingReadiness.evaluate(plan.validation).ready,
 			"nominal fixture geometry does not qualify seal and accuracy");
-		var counterbored=ToolingCodec.snapshot(d);
+		var counterbored=ToolingCodec.copy(d);
 		counterbored.input.inserts[0].holes[0].counterbore={diameter:12,depth:4};
 		counterbored.input.inserts[0].holes[0].threadDepth=14;
 		counterbored.setup.sourceFingerprint=ToolingCodec.inputFingerprint(counterbored.input);
@@ -167,10 +167,10 @@ class ToolingTests {
 		check(ToolingCodec.inputFingerprint(document.input) != fingerprint, "catalogue revision enters the source fingerprint");
 		product.revision = "fixture-v1";
 		product.holePolicyId = "other-policy";
-		rejects(() -> ToolingCodec.snapshot(document), "Catalogue insert hole policy differs from product declaration");
+		rejects(() -> ToolingCodec.copy(document), "Catalogue insert hole policy differs from product declaration");
 		product.holePolicyId = document.input.inserts[0].holes[0].limits.policyId;
 		document.input.inserts[0].origin = null;
-		rejects(() -> ToolingCodec.snapshot(document), "Missing insert origin");
+		rejects(() -> ToolingCodec.copy(document), "Missing insert origin");
 	}
 
 	static function fixture():ToolingDocument {
@@ -337,9 +337,9 @@ class ToolingTests {
 			[materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")], 20, 20, 100));
 		d.setup.features = [];
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
-		rejects(() -> ToolingCodec.snapshot(d), "Ambiguous former withdrawal");
+		rejects(() -> ToolingCodec.copy(d), "Ambiguous former withdrawal");
 		d.setup.features = [{featureId: "through-opening", strategy: ReusableFormer, priority: 5, withdrawal: {x: 0, y: 0, z: 1}}];
-		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.snapshot(d));
+		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(d));
 		var direction:{x:Float, y:Float, z:Float} = cast chosen[0].withdrawal;
 		check(chosen.length == 1 && direction.z == 1, "an explicit source feature override resolves withdrawal ambiguity");
 		check(materia.tooling.casting.CastingStrategies.standardRules().filter(rule -> rule.priority != 0).length == 0,
@@ -416,7 +416,7 @@ class ToolingTests {
 		rejects(() -> ToolingCodec.decode(Json.stringify(stored)), "Unknown insert field: width");
 		var stock = fixture();
 		stock.input.inserts[0].material = materia.casting.InsertMaterial.InsertMaterials.specification(C45Ground);
-		rejects(() -> ToolingCodec.inputSnapshot(stock.input),"Insert manufacturing grade differs from source stock");
+		rejects(() -> ToolingCodec.copyInput(stock.input),"Insert manufacturing grade differs from source stock");
 		switch stock.input.inserts[0].origin {
 			case Fabricated(manufacturing):manufacturing.material=stock.input.inserts[0].material;
 			case Catalogue(_):throw "Fabricated fixture expected";
@@ -448,12 +448,12 @@ class ToolingTests {
 		var before = ToolingCodec.recipeFingerprint(ordered.recipe);
 		var defaults = fixture();
 		defaults.setup.features = [];
-		var rules = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.snapshot(defaults));
+		var rules = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(defaults));
 		check(rules.length == 1 && rules[0].strategy == SacrificialEPS,
 			"recipe rules select lightening cores without feature-ID tables");
 		defaults.input.features.filter(feature -> feature.id == "pocket")[0].kind = ServiceOpening;
 		defaults.setup.sourceFingerprint = ToolingCodec.inputFingerprint(defaults.input);
-		rules = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.snapshot(defaults));
+		rules = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(defaults));
 		check(rules[0].strategy == ReusableFormer && rules[0].withdrawal != null && rules[0].withdrawal.z == 1,
 			"body opening and mold orientation derive a default former withdrawal");
 		ordered.recipe.panel.measuredThickness = 17.6;

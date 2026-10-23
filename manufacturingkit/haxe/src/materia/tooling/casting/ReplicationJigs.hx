@@ -17,7 +17,7 @@ import materia.casting.InterfaceRequirement;
 class ReplicationJigs {
 	public static function analyze(input:CastingToolingInput,authored:Array<ReplicationJig>,
 		process:Array<CastingMoldPlan.PrecisionInterface>):Array<ToolingValidation> {
-		var jigs=ReplicationJigCodec.snapshot(authored),result:Array<ToolingValidation> = [],context=input.interfaceContext;
+		var jigs=ReplicationJigCodec.copy(authored),result:Array<ToolingValidation> = [],context=input.interfaceContext;
 		var coverage:Map<String,Array<String>> = [],sources:Map<String,InterfaceContextSource> = [];
 		if (context!=null) for (source in context.sources) sources.set(CastingInterfaceContexts.sourceKey(source),source);
 		for (jig in jigs) {

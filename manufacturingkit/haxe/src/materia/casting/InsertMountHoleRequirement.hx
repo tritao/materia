@@ -16,7 +16,7 @@ typedef InsertMountHoleRequirement = {
 	var componentFingerprint:String;
 	var connectorId:String;
 	var connectorFrame:AssemblyFrame;
-	var clearanceReference:Null<String>;
+	var clearanceReference:CastingInput.CastingTextInput;
 	var permittedRoutes:Array<InsertHoleRoute>;
 	var budget:HoleClearanceBudget;
 }
@@ -26,7 +26,7 @@ class InsertMountHoleRequirements {
 		return [for (row in rows) {
 			holeId:row.holeId, componentPath:row.componentPath,
 			componentFingerprint:row.componentFingerprint, connectorId:row.connectorId,
-			connectorFrame:row.connectorFrame, clearanceReference:row.clearanceReference,
+			connectorFrame:row.connectorFrame, clearanceReference:CastingInput.CastingInputs.textRecord(row.clearanceReference),
 			permittedRoutes:row.permittedRoutes.copy(), budget:HoleClearanceBudgets.record(row.budget)
 		}];
 	}
@@ -53,12 +53,10 @@ class InsertMountHoleRequirements {
 			if (!~/^[a-f0-9]{64}$/.match(fingerprint)) throw "Invalid mounting component fingerprint: " + id;
 			var connector = CastingRecordCodec.string(row, "connectorId");
 			CastingFeatureCodec.identifier(connector);
-			var reference = CastingRecordCodec.optionalString(row, "clearanceReference");
-			if (reference != null) {
-				if (StringTools.trim(reference).length == 0 || reference.length > 2048)
-					throw "Invalid mounting clearance reference: " + id;
-				for (index in 0...reference.length)
-					if (reference.charCodeAt(index) == 0) throw "Invalid mounting clearance reference: " + id;
+			var reference=CastingInput.CastingInputs.text(Reflect.field(row,"clearanceReference"));
+			switch reference {
+				case Known(value):if (value.length>2048) throw "Invalid mounting clearance reference: "+id;
+				case Unresolved(_):
 			}
 			var routes:Array<InsertHoleRoute> = [];
 			for (value in CastingRecordCodec.array(row, "permittedRoutes")) {

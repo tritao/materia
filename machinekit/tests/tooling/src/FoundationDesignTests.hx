@@ -191,7 +191,7 @@ class FoundationDesignTests {
 		if (diagnostics.diagnostics.items.filter(item -> StringTools.startsWith(item.code, "casting.collision-hull.unsupported")).length != 1
 			|| diagnostics.unsupported == 0)
 			throw "Collision-hull Unsupported must reach the real foundation design diagnostics";
-		var boxDocument = materia.tooling.ToolingCodec.snapshot(document);
+		var boxDocument = materia.tooling.ToolingCodec.copy(document);
 		boxDocument.input.id = "box-control";
 		boxDocument.input.envelope = materia.casting.CastingEnvelope.build(100, 80, 120);
 		boxDocument.input.features = [];

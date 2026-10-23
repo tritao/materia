@@ -2,6 +2,7 @@ package materia.tooling.casting;
 
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.BoxAlgebra;
+import materia.tooling.casting.MoldRegions.MoldVolumeRecords;
 
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingDocument;
@@ -30,6 +31,11 @@ typedef CastingMoldAssessment = {
  * All casting dimensions come from the source document. It never adds design cuts.
  */
 class CastingMoldPlanner {
+	/** Identity follows authored inputs; exact CAD checks validate the resulting plan. */
+	public static function fingerprint(plan:CastingMoldPlan):String
+		return haxe.crypto.Sha256.encode(ToolingCodec.canonical({document:ToolingCodec.documentRecord(plan.document),
+			options:MoldOptions.record(plan.options)}));
+
 	/** Application-owned exact kernel. A pure box-only process leaves it unset. */
 	public static var geometry(default,null):Null<CastingMoldKernel>;
 
@@ -59,7 +65,7 @@ class CastingMoldPlanner {
 	}
 
 	public static function assess(document:ToolingDocument, authored:CastingMoldOptions):CastingMoldAssessment {
-		var d = ToolingCodec.snapshot(document), options = CastingMoldOptionsCodec.snapshot(authored);
+		var d = ToolingCodec.copy(document), options = MoldOptions.copy(authored);
 		var checks = sourceSupport(d.input);
 		// Hardware qualifications affect readiness, not whether the source cavity
 		// can be panelled. Exact hardware is realized and checked by the CAD bridge.
@@ -782,7 +788,7 @@ class CastingMoldPlanner {
 				members: p.supportPanels,
 				joints: []
 			});
-		CastingMoldOptionsCodec.snapshot(p.options);
+		MoldOptions.copy(p.options);
 		if (ToolingCodec.canonical(p.handling) != ToolingCodec.canonical(CastHandling.plan(p.document, p.options, p.envelope)))
 			throw "Stale source-derived handling plan";
 		DatumFixtures.validate(p);
@@ -874,7 +880,7 @@ class CastingMoldPlanner {
 				if (!seen.exists(m.panel.id + "/" + id))
 					throw "Unclassified mold opening";
 		for (f in p.formers) {
-			MoldVolumeCodec.snapshot(f.volume);
+			MoldVolumeRecords.copy(f.volume);
 			for (profile in f.volume.profiles) {
 				var panels = p.panels.members.filter(m -> m.panel.id == profile.panelId);
 				if (panels.length != 1)
@@ -890,7 +896,7 @@ class CastingMoldPlanner {
 		var exactResin=nonBoxFeatures(p.document);
 		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document, p.envelope);
 		for (fixture in p.fixtures) {
-			MoldVolumeCodec.snapshot(fixture.datum);
+			MoldVolumeRecords.copy(fixture.datum);
 			if (fixture.datum.profiles.length > 0 || fixture.datum.regions.length > 0)
 				throw "Neutral datum/resin validation does not support datum profiles or regions";
 			if (exactResin) {

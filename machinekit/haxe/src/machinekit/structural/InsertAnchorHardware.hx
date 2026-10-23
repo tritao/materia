@@ -102,7 +102,7 @@ class InsertAnchorHardware {
 			anchors.push({id:choice.id,holeId:choice.holeId,insertionMm:choice.insertionMm,
 				screw:screwRecord(screw),locking:choice.locking,lockingReference:choice.lockingReference});
 		}
-		var result=C.snapshot(Bolted(rules,anchors));C.references(result,spec.body,spec.holes,spec.origin,spec.interfaces);return result;
+		var result=C.copy(Bolted(rules,anchors));C.references(result,spec.body,spec.holes,spec.origin,spec.interfaces);return result;
 	}
 
 	public static function parts(spec:InsertSpec):Array<InsertAnchorComponent> {

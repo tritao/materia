@@ -57,68 +57,35 @@ class FoundationJointDesignTests {
 		var message="";try fn() catch (error:Dynamic) message=Std.string(error);
 		check(message.indexOf(expected)>=0,'Expected "$expected", got "$message"');
 	}
-	static function drawingIntegrity(directory:String,fabrication:materia.tooling.export.ToolingFabrication.FabricationPlan,
-			checks:Array<materia.tooling.ToolingValidation>):Void {
-		var manifestPath=directory+"/manifest.json",manifestText=sys.io.File.getContent(manifestPath);
-		var manifest:Dynamic=haxe.Json.parse(manifestText);
-		check(manifest.version==10,"the section-drawing manifest has one new strict version");
-		try {
-			manifest.version=9;sys.io.File.saveContent(manifestPath,haxe.Json.stringify(manifest));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Unsupported tooling manifest");
-		} catch (error:Dynamic) {sys.io.File.saveContent(manifestPath,manifestText);throw error;}
-		sys.io.File.saveContent(manifestPath,manifestText);
-		var reportPath=directory+"/tooling-section-drawings.json",reportText=sys.io.File.getContent(reportPath);
-		var report:Dynamic=haxe.Json.parse(reportText),records:Array<Dynamic> =cast report.drawings;
+	/** One hash-integrity regression covers every listed package artifact. */
+	static function packageIntegrity(directory:String):Void {
+		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
+		check(manifest.version==11,"the package has one strict boundary format");
+		var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/tooling-section-drawings.json"));
+		var records:Array<Dynamic>=cast report.drawings;
 		var rendered=records.filter(record -> record.validation.status=="pass");
-		check(rendered.length>0,"the package includes finished tooling section evidence");
-		var name=machinekit.tooling.ToolingSectionReview.filename(rendered[0].id)+".svg";
-		var svgPath=directory+"/"+name,svg=sys.io.File.getContent(svgPath);
+		check(rendered.length>0,"the package includes finished tooling sections");
+		var path=directory+"/"+machinekit.tooling.ToolingSectionReview.filename(rendered[0].id)+".svg";
+		var original=sys.io.File.getContent(path);
 		try {
-			sys.io.File.saveContent(svgPath,svg+"<!-- changed -->\n");
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
-				"Tooling drawing artifact differs from source");
-		} catch (error:Dynamic) {sys.io.File.saveContent(svgPath,svg);throw error;}
-		sys.io.File.saveContent(svgPath,svg);
-		try {
-			Reflect.setField(records[0],"sections",new Array<Dynamic>());
-			sys.io.File.saveContent(reportPath,materia.tooling.ToolingCodec.canonical(report));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
-				"Tooling section drawings differ from finished source geometry");
-		} catch (error:Dynamic) {sys.io.File.saveContent(reportPath,reportText);throw error;}
-		sys.io.File.saveContent(reportPath,reportText);
-		try {
-			manifest=haxe.Json.parse(manifestText);
-			var files:Array<Dynamic> =cast manifest.files;
-			Reflect.setField(manifest,"files",files.filter(file -> file.path!=name));
-			sys.io.File.saveContent(manifestPath,materia.tooling.ToolingCodec.canonical(manifest));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Missing hashed tooling drawing");
-		} catch (error:Dynamic) {sys.io.File.saveContent(manifestPath,manifestText);throw error;}
-		sys.io.File.saveContent(manifestPath,manifestText);
-		machinekit.tooling.ToolingPackageManifest.verify(directory);
+			sys.io.File.saveContent(path,original+"<!-- modified -->\n");
+			rejects(() -> machinekit.tooling.ToolingPackageManifest.verify(directory),"Tooling artifact hash differs");
+		} catch (error:Dynamic) {sys.io.File.saveContent(path,original);throw error;}
+		sys.io.File.saveContent(path,original);
 	}
 
 	static function exportJoint(plan:materia.tooling.casting.CastingMoldPlan):Void {
 		var fabrication=materia.tooling.export.ToolingFabrication.plan(plan,FoundationContextTests.fabricationSpec());
 		var directory=Sys.getCwd()+"/build/tooling/synthetic-foundation-joint-"+fabrication.fingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(directory);
-		sys.io.File.saveContent(directory+"/mold-plan.json",materia.tooling.casting.CastingMoldCodec.encode(plan));
-		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory),full=fabrication.validation;
-		fabrication.validation=full.filter(c -> !StringTools.startsWith(c.rule,"tooling.foundation-joint."));
+		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory);
 		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
-		fabrication.validation=full;machinekit.tooling.ToolingPackageManifest.verify(directory);
-		drawingIntegrity(directory,fabrication,checks);
+		machinekit.tooling.ToolingPackageManifest.verify(directory);
+		packageIntegrity(directory);
 		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
-		var rows:Array<Dynamic> = cast manifest.validation;
-		check(rows.filter(r -> StringTools.startsWith(Std.string(r.rule),"tooling.foundation-joint.")).length==18,
-			"manifest recomputes and retains every source joint check even if the caller drops them");
-		var path=directory+"/foundation-joints.json",original=sys.io.File.getContent(path);
-		try {
-			var omitted:Dynamic=haxe.Json.parse(original);Reflect.setField(omitted,"validation",new Array<Dynamic>());
-			sys.io.File.saveContent(path,materia.tooling.ToolingCodec.canonical(omitted));
-			rejects(() -> machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks),
-				"Foundation joint source or process validation omitted or changed");
-		} catch (error:Dynamic) {sys.io.File.saveContent(path,original);throw error;}
-		sys.io.File.saveContent(path,original);machinekit.tooling.ToolingPackageManifest.verify(directory);
+		var rows:Array<Dynamic>=cast haxe.Json.parse(sys.io.File.getContent(directory+"/"+manifest.validation));
+		check(rows.filter(row -> StringTools.startsWith(Std.string(row.rule),"tooling.foundation-joint.")).length==18,
+			"generation retains every source joint check in the detailed report");
 		var inventory=sys.io.File.getContent(directory+"/foundation-joint-hardware.csv");
 		check(inventory.indexOf("anchor")>=0 && inventory.indexOf("jack")>=0 && inventory.indexOf("iso4762-8.8")>=0,
 			"fabrication inventory retains the source joint's real standard fasteners");
@@ -217,7 +184,7 @@ class FoundationJointDesignTests {
 		var unknown:Array<materia.tooling.casting.CastingMoldPlan.FoundationJointProcess> = [{jointId:"missing",materialReference:null,cureEvidence:[]}];
 		rejects(() -> materia.tooling.casting.FoundationJointQualification.analyze(copy,unknown),"Unknown source foundation joint process");
 		facts.inserts.filter(i -> i.member=="lower/seat")[0].spec.holes[0].threadDepth=16;
-		rejects(() -> materia.tooling.ToolingCodec.inputSnapshot(copy),"Joint context differs from source insert");
+		rejects(() -> materia.tooling.ToolingCodec.copyInput(copy),"Joint context differs from source insert");
 		copy=materia.tooling.ToolingCodec.decodeInput(encoded);contextCopy=copy.interfaceContext;
 		if (contextCopy==null) throw "Expected source context";
 		contextCopy.jointSources.screws.filter(s -> s.member=="jack")[0].shankLength+=1;
@@ -227,7 +194,7 @@ class FoundationJointDesignTests {
 		copy=materia.tooling.ToolingCodec.decodeInput(encoded);contextCopy=copy.interfaceContext;
 		if (contextCopy==null) throw "Expected source context";
 		contextCopy.foundationJoints=[];contextCopy.jointSources=materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty();
-		check(materia.tooling.casting.FoundationJointQualification.missingSource(materia.tooling.ToolingCodec.inputSnapshot(copy))!=null,
+		check(materia.tooling.casting.FoundationJointQualification.missingSource(materia.tooling.ToolingCodec.copyInput(copy))!=null,
 			"removing the source declaration restores the mounting-interface request");
 		var document=SinglePocketSetup.document();document.input=input;document.setup.features=[];
 		document.setup.fillHeightMm=40;document.setup.sourceToMold=F.fromRotationMatrix(0,0,40,[1,0,0,0,-1,0,0,0,-1]);
@@ -251,7 +218,7 @@ class FoundationJointDesignTests {
 		check(plan.changeRequests.filter(c -> c.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.FoundationJointDefinition).length==1,
 			"removing the declaration restores the real source request in the mold planner");
 		var old:Dynamic=haxe.Json.parse(materia.tooling.ToolingCodec.canonical(options));Reflect.setField(old,"groutedJoints",new Array<Dynamic>());
-		rejects(() -> materia.tooling.casting.CastingMoldOptionsCodec.read(old),"Invalid mold process record");
+		rejects(() -> materia.tooling.casting.CastingMoldPlan.MoldOptions.read(old),"Invalid mold process record");
 	}
 	public static function main():Void run();
 

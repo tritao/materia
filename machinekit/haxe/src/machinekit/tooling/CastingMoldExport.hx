@@ -1,8 +1,9 @@
 package machinekit.tooling;
 
+import materia.tooling.casting.CastingMoldPlanner;
+
 import haxe.Json;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
 import materia.casting.CastingProfileGeometry;
@@ -37,15 +38,12 @@ class CastingMoldExport {
 		text(path, Json.stringify(value, null, "\t") + "\n");
 
 	public static function write(p:CastingMoldPlan, dir:String, review:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
-		if (review.fingerprint != CastingMoldCodec.fingerprint(p))
+		if (review.fingerprint != CastingMoldPlanner.fingerprint(p))
 			throw "Stale casting mold review";
 		sys.FileSystem.createDirectory(dir);
-		var encoded = CastingMoldCodec.encode(p);
-		CastingMoldCad.decode(encoded);
-		text(dir + "/mold-plan.json", encoded);
 		data(dir + "/review.json", {
 			phase: 4,
-			fingerprint: CastingMoldCodec.fingerprint(p),
+			fingerprint: CastingMoldPlanner.fingerprint(p),
 			geometry: review,
 			changeRequests: p.changeRequests,
 			limitations: "REVIEW ONLY. Datum fixtures require qualified attachments; steel bores, temporary masks and fixture pins are modeled in the swept graphs. Release accessible fasteners and adhesive as applicable; withdraw masks and fixture pins in the checked order. Compaction, anchorage, precision replication/grouting, loads and handling remain pending."
@@ -82,12 +80,10 @@ class CastingMoldExport {
 		for (f in p.formers) {
 			var part = ToolingVolume.geometryOf(f.volume);
 			step(dir + "/" + f.volume.id + ".step", part);
-			text(dir + "/" + f.volume.id + ".volume.json", materia.tooling.casting.MoldVolumeCodec.encode(f.volume));
 		}
 		for (f in p.fixtures) {
 			var part = ToolingVolume.geometryOf(f.datum);
 			step(dir + "/" + f.datum.id + ".step", part);
-			text(dir + "/" + f.datum.id + ".volume.json", materia.tooling.casting.MoldVolumeCodec.encode(f.datum));
 		}
 		var casting = CastingMoldCad.reconstructed(p);
 		step(dir + "/reconstructed-casting.step", casting);

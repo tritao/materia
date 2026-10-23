@@ -55,7 +55,9 @@ class MountHoleDerivation {
 				machiningErrorMm:allocation.machiningErrorMm,pitchAccumulationMm:allocation.pitchAccumulationMm,
 				requiredMarginMm:allocation.requiredMarginMm};
 			result.requirements.push({holeId:hole.id,componentPath:path,componentFingerprint:fingerprint,
-				connectorId:name,connectorFrame:connector,clearanceReference:reference,
+				connectorId:name,connectorFrame:connector,
+				clearanceReference:reference==null ? materia.casting.CastingInput.CastingTextInput.Unresolved("Bought-part bolt clearance source")
+					: materia.casting.CastingInput.CastingTextInput.Known(reference),
 				permittedRoutes:permitted.copy(),budget:budget});
 			switch HoleClearanceBudgets.choose(budget,permitted) {
 				case UsePreCast(_):result.routes.push({holeId:hole.id,route:InsertHoleRoute.BeforeCasting});

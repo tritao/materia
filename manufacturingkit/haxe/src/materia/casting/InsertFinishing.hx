@@ -61,7 +61,7 @@ class InsertFinishing {
 		}
 		if (invalid.length>0) return Invalid(invalid);
 		if (unsupported.length>0) return Unsupported(unsupported);
-		var result:InsertFinishedSteel={body:InsertSpec.InsertBodyCodec.snapshot(body),pose:F.identity(),removedSteel:[],replicatedLayers:[]};
+		var result:InsertFinishedSteel={body:InsertSpec.InsertBodyCodec.copy(body),pose:F.identity(),removedSteel:[],replicatedLayers:[]};
 		if (removedIds.length>0) {
 			if (raw==null) throw "Non-box removal passed the stock qualifier";
 			for (axis in 0...3) if (high[axis]-low[axis]<=EPS_MM)

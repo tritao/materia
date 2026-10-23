@@ -20,7 +20,7 @@ class InsertManufacturingTests {
 		var draft=Codec.draft(material),body=Primitive(Box(40,30,20));
 		var encoded=haxe.Json.stringify(Codec.record(draft));
 		check(haxe.Json.stringify(Codec.record(Codec.snapshot(haxe.Json.parse(encoded))))==encoded,"manufacturing choices round trip");
-		check(draft.holeRoutes.length==0 && draft.inspections.length==0 && draft.processReference==null,
+		check(draft.holeRoutes.length==0 && draft.inspections.length==0 && !materia.casting.CastingInput.CastingInputs.textIsKnown(draft.processReference),
 			"a draft invents neither a route nor an inspection limit or process evidence");
 		rejects(() -> materia.casting.InsertOrigin.InsertOriginCodec.snapshot({kind:"fabricated"},body,[]),"Unexpected casting record fields");
 		check(InsertBlankFit.assess(body,draft.blank)==InsertBlankFitResult.Unselected,"unselected stock remains explicit");
@@ -48,7 +48,7 @@ class InsertManufacturingTests {
 		draft.inspections=[MaterialIdentity,BlankDimensions(0.1),BondSurface];
 		var copy=Codec.snapshot(Codec.record(draft));copy.inspections.pop();
 		check(draft.inspections.length==3,"inspection choices are copied defensively");
-		draft.processReference="synthetic-shop-process";
+		draft.processReference=materia.casting.CastingInput.CastingTextInput.Known("synthetic-shop-process");
 		var holes=TestInsertHoles.through(5,20);
 		var insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert={id:"synthetic-seat",body:body,holes:holes,
 			anchorage:materia.casting.InsertAnchorage.Undeclared,origin:materia.casting.InsertOrigin.Fabricated(draft),interfaces:[],material:material,pose:F.identity(),

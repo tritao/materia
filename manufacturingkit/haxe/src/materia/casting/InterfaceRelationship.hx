@@ -212,7 +212,6 @@ class InterfaceRelationships {
 		return haxe.Json.stringify(memberRecord(member));
 
 	public static function readMember(raw:Dynamic):InterfaceMember {
-		if (Std.isOfType(raw, InterfaceMember)) raw = memberRecord(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		var result = switch kind {
 			case "component-interface":
@@ -238,7 +237,6 @@ class InterfaceRelationships {
 	};
 
 	static function readKind(raw:Dynamic):InterfaceRelationshipKind {
-		if (Std.isOfType(raw, InterfaceRelationshipKind)) raw = kindRecord(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		if (kind == "distance") {
 			CastingFeatureCodec.fields(raw, ["kind", "separationMm"]);
@@ -269,7 +267,6 @@ class InterfaceRelationships {
 	};
 
 	static function readTolerance(raw:Dynamic):RelationshipTolerance {
-		if (Std.isOfType(raw, RelationshipTolerance)) raw = toleranceRecord(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		var mm = CastingRecordCodec.number(raw, "maxDeviationMm");
 		if (mm <= 0) throw "Relationship tolerance must be positive";

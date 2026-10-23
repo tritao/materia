@@ -65,8 +65,9 @@ enum InsertAnchorage {
 }
 
 class InsertAnchorageCodec {
+	public static function copy(body:InsertAnchorage):InsertAnchorage return snapshot(record(body));
+
 	public static function snapshot(raw:Dynamic):InsertAnchorage {
-		if (Std.isOfType(raw,InsertAnchorage)) raw=record(cast raw);
 		return switch CastingRecordCodec.string(raw,"kind") {
 			case "undeclared":CastingFeatureCodec.fields(raw,["kind"]);Undeclared;
 			case "catalogue-retention":CastingFeatureCodec.fields(raw,["kind"]);CatalogueRetention;

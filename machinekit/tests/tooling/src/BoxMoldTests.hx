@@ -4,7 +4,6 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CoreSupport.CoreSupportMode;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.casting.CoreSupports;
-import materia.tooling.casting.BoxMoldCodec;
 import machinekit.assembly.PosedParts;
 import machinekit.tooling.BoxMoldCad;
 import machinekit.tooling.ToolingBlock;
@@ -88,8 +87,6 @@ class BoxMoldTests {
 					var d = SinglePocketSetup.document(t, rotated, bed),
 						p = BoxMoldPlanner.plan(d),
 						report = BoxMoldCad.review(p);
-					var encoded = BoxMoldCodec.encode(p);
-					check(BoxMoldCodec.encode(BoxMoldCodec.decode(encoded)) == encoded, "mold canonical recipe restoration");
 					var local = SinglePocketSetup.foundation(bed).body.geometry(),
 						original = PosedParts.moved(local, d.setup.sourceToMold);
 					local.close();

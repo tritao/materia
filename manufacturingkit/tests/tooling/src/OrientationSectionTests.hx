@@ -162,7 +162,7 @@ class OrientationSectionTests {
 			throw "Missing planned effort";
 		check(effort.panels == p.panels.members.length + p.supportPanels.length, "production panel effort excludes coupons");
 		check(effort.castingMassKg == p.handling.castingMassKg, "orientation mass uses real handling plan");
-		var invalid = ToolingCodec.snapshot(p.document);
+		var invalid = ToolingCodec.copy(p.document);
 		invalid.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
 		var failed:MoldOrientationCandidate = {
 			id: "failed",
@@ -172,7 +172,7 @@ class OrientationSectionTests {
 		};
 		var rejected = MoldOrientationStudy.run([failed, a], FabricationTests.spec());
 		check(rejected.rankedCandidates[0].id == "a", "complete plan ranks ahead of failed/unsupported candidate");
-		var brokenOptions = materia.tooling.casting.CastingMoldOptionsCodec.snapshot(p.options);
+		var brokenOptions = materia.tooling.casting.CastingMoldPlan.MoldOptions.copy(p.options);
 		brokenOptions.precision = [];
 		var broken:MoldOrientationCandidate = {
 			id: "planner-fails",
@@ -191,7 +191,7 @@ class OrientationSectionTests {
 			"reorientation cannot change the source revision");
 		var metrics = MoldOrientationStudy.metrics(p, FabricationTests.spec());
 		check(metrics.blankSheetUtilization > 0 && metrics.blankSheetUtilization <= 1, "bounding blank yield bounded");
-		var rigid = ToolingCodec.snapshot(p.document);
+		var rigid = ToolingCodec.copy(p.document);
 		rigid.setup.sourceToMold = materia.assembly.AssemblyFrames.identity();
 		rigid.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
 		rigid.setup.features[0].withdrawal = {x: 1, y: 0, z: 0};
@@ -199,7 +199,7 @@ class OrientationSectionTests {
 			materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]));
 		var withdrawal = turn.setup.features[0].withdrawal;
 		check(withdrawal != null && Math.abs(withdrawal.x) < 1e-8 && Math.abs(withdrawal.y - 1) < 1e-8, "source withdrawal direction rotates with the feature");
-		var revised = ToolingCodec.snapshot(p.document), e = p.envelope;
+		var revised = ToolingCodec.copy(p.document), e = p.envelope;
 		revised.input.revision++;
 		revised.input.features.push({id:"extra-pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(10,10,8)),pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.inverse(revised.setup.sourceToMold),
 				materia.assembly.AssemblyFrames.translation(e.x + 20, e.y + 20, e.z + e.height - 8))},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null});
@@ -239,7 +239,7 @@ class OrientationSectionTests {
 			"stale CAD evidence cannot mark a candidate checked");
 		var checked = MoldOrientationStudy.run([a], FabricationTests.spec(), plan -> {
 			return {
-				planFingerprint: materia.tooling.casting.CastingMoldCodec.fingerprint(plan),
+				planFingerprint: materia.tooling.casting.CastingMoldPlanner.fingerprint(plan),
 				assemblySteps: 1,
 				demoldingSteps: 1,
 				assemblyBlockingEdges: 0,

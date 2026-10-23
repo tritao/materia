@@ -26,20 +26,14 @@ class CastingRegionCodec {
 		var budget={nodes:0};
 		return read(raw,0,budget);
 	}
-	public static function record(region:CastingRegion):Dynamic {
-		var budget={nodes:0};
-		return write(read(region,0,budget));
-	}
-	static function typed(raw:Dynamic):Dynamic return switch (cast raw:CastingRegion) {
-		case Placed(geometry):{kind:"placed",geometry:geometry};
-		case Drafted(id,opening,pose,depth,degrees):{kind:"drafted",featureId:id,opening:opening,pose:pose,depth:depth,degrees:degrees};
-		case Union(regions):{kind:"union",regions:regions};
-		case Intersection(regions):{kind:"intersection",regions:regions};
-		case Difference(body,cuts):{kind:"difference",body:body,cuts:cuts};
-	};
+	public static function copy(region:CastingRegion):CastingRegion
+		return snapshot(write(region));
+
+	public static function record(region:CastingRegion):Dynamic
+		return write(copy(region));
+
 	static function read(raw:Dynamic,depth:Int,budget:{nodes:Int}):CastingRegion {
 		if (depth>MAX_DEPTH || ++budget.nodes>MAX_NODES) throw "Casting region expression exceeds limit";
-		if (Std.isOfType(raw,CastingRegion)) raw=typed(raw);
 		return switch CastingRecordCodec.string(raw,"kind") {
 			case "placed":
 				CastingFeatureCodec.fields(raw,["kind","geometry"]);
@@ -74,13 +68,17 @@ class CastingRegionCodec {
 		result.sort((a,b) -> Reflect.compare(key(write(a)),key(write(b))));
 		return result;
 	}
-	static function write(region:CastingRegion):Dynamic return switch region {
-		case Placed(geometry):{kind:"placed",geometry:{solid:CastingFeature.CastingGeometrySolids.record(geometry.solid),pose:geometry.pose}};
-		case Drafted(id,opening,pose,depth,degrees):{kind:"drafted",featureId:id,opening:opening,pose:pose,depth:depth,degrees:degrees};
-		case Union(regions):{kind:"union",regions:[for (region in regions) write(region)]};
-		case Intersection(regions):{kind:"intersection",regions:[for (region in regions) write(region)]};
-		case Difference(body,cuts):{kind:"difference",body:write(body),cuts:[for (region in cuts) write(region)]};
-	};
+	static function write(region:CastingRegion,depth:Int=0,?budget:{nodes:Int}):Dynamic {
+		if (budget==null) budget={nodes:0};
+		if (depth>MAX_DEPTH || ++budget.nodes>MAX_NODES) throw "Casting region expression exceeds limit";
+		return switch region {
+			case Placed(geometry):{kind:"placed",geometry:{solid:CastingFeature.CastingGeometrySolids.record(geometry.solid),pose:geometry.pose}};
+			case Drafted(id,opening,pose,height,degrees):{kind:"drafted",featureId:id,opening:opening,pose:pose,depth:height,degrees:degrees};
+			case Union(regions):{kind:"union",regions:[for (child in regions) write(child,depth+1,budget)]};
+			case Intersection(regions):{kind:"intersection",regions:[for (child in regions) write(child,depth+1,budget)]};
+			case Difference(body,cuts):{kind:"difference",body:write(body,depth+1,budget),cuts:[for (child in cuts) write(child,depth+1,budget)]};
+		};
+	}
 	/** Records contain only plain objects, arrays and scalar values at this point. */
 	static function key(raw:Dynamic):String {
 		if (Std.isOfType(raw,Array)) {

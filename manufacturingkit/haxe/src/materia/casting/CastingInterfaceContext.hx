@@ -116,7 +116,6 @@ class CastingInterfaceContexts {
 	};
 
 	static function readSource(raw:Dynamic):InterfaceContextSource {
-		if (Std.isOfType(raw,InterfaceContextSource)) raw=sourceRecord(cast raw);
 		return switch CastingRecordCodec.string(raw,"kind") {
 			case "precision":
 				CastingFeatureCodec.fields(raw,["kind","member","requirement","pose"]);

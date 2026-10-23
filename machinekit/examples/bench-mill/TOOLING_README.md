@@ -183,7 +183,7 @@ The package contains the full phase 4 CAD/drawings/assembly and these additions:
   support loads require a qualified model. Missing brace, fastener and core
   capacities are per-rule pending results. No EPS-weight credit is used.
 - `fabrication-validation.json` and Diagnostics vocabulary in
-  `fabrication-diagnostics.json`. Styrene/EPS and a cure peak at the declared
+  `fabrication-validation.json`. Styrene/EPS and a cure peak at the declared
   core limit fail outright; missing evidence, compaction or restraints stay
   pending. Source design requests and fixture/finishing qualification remain
   blockers. The new report does not overwrite the phase 4 review status.

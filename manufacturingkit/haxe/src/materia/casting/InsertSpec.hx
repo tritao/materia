@@ -44,7 +44,7 @@ class InsertSpecCodec {
 			body: InsertBodyCodec.record(spec.body),
 			anchorage: InsertAnchorage.InsertAnchorageCodec.record(spec.anchorage),
 			holes: InsertHole.InsertHoleCodec.snapshot(spec.holes),
-			origin: InsertOrigin.InsertOriginCodec.record(InsertOrigin.InsertOriginCodec.snapshot(spec.origin, spec.body, spec.holes)),
+			origin: InsertOrigin.InsertOriginCodec.record(spec.origin),
 			interfaces: InterfaceRequirement.InterfaceRequirements.records(spec.interfaces)
 		};
 	}
@@ -65,10 +65,11 @@ enum InsertBody {
 }
 
 class InsertBodyCodec {
+	public static function copy(body:InsertBody):InsertBody return snapshot(record(body));
+
 	public static function encode(body:InsertBody):String return haxe.Json.stringify(record(body));
 	public static function decode(text:String):InsertBody return snapshot(haxe.Json.parse(text));
 	public static function snapshot(raw:Dynamic):InsertBody {
-		if (Std.isOfType(raw, InsertBody)) raw = record(cast raw);
 		var result = switch CastingRecordCodec.string(raw, "kind") {
 			case "primitive":
 				CastingFeatureCodec.fields(raw, ["kind", "solid"]);

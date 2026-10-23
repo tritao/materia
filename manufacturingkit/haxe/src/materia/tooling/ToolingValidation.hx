@@ -29,20 +29,24 @@ class ToolingReadiness {
 			evidence: []
 		};
 
+	public static function validate(check:ToolingValidation):Void {
+		if (check.rule == null || check.rule.length == 0 || check.affectedIds == null || check.affectedIds.length == 0)
+			throw "Invalid tooling validation";
+		for (id in check.affectedIds)
+			ToolingIds.validate(id);
+		if (check.status != Pass && check.status != Fail && check.status != Pending && check.status != Unsupported)
+			throw "Invalid tooling validation status";
+		var expected = check.status == Pass ? Info : check.status == Pending ? Warning : Error;
+		if (check.severity != expected)
+			throw "Invalid tooling validation severity/status consistency";
+	}
+
 	public static function evaluate(checks:Array<ToolingValidation>):FabricationReadiness {
 		var blocked:Array<String> = [];
 		if (checks == null || checks.length == 0)
 			throw "Missing fabrication validation";
 		for (check in checks) {
-			if (check.rule == null || check.rule.length == 0 || check.affectedIds == null || check.affectedIds.length == 0)
-				throw "Invalid tooling validation";
-			for (id in check.affectedIds)
-				ToolingIds.validate(id);
-			if (check.status != Pass && check.status != Fail && check.status != Pending && check.status != Unsupported)
-				throw "Invalid tooling validation status";
-			var expected = check.status == Pass ? Info : check.status == Pending ? Warning : Error;
-			if (check.severity != expected)
-				throw "Invalid tooling validation severity/status consistency";
+			validate(check);
 			if (check.status != Pass && blocked.indexOf(check.rule) < 0)
 				blocked.push(check.rule);
 		}

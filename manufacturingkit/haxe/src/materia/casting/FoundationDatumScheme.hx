@@ -50,6 +50,8 @@ typedef UnresolvedFoundationDatum = {
 }
 
 class FoundationDatums {
+	public static function copy(scheme:FoundationDatumScheme):FoundationDatumScheme return snapshot(record(scheme));
+
 	public static function snapshot(raw:Dynamic):FoundationDatumScheme {
 		CastingFeatureCodec.fields(raw, ["id", "foundationId", "primary", "secondary", "tertiary"]);
 		var id = CastingRecordCodec.string(raw, "id");
@@ -68,7 +70,7 @@ class FoundationDatums {
 	}
 
 	public static function record(scheme:FoundationDatumScheme):Dynamic {
-		var s = snapshot(scheme);
+		var s = scheme;
 		return {id: s.id, foundationId: s.foundationId,
 			primary: datumRecord(s.primary), secondary: datumRecord(s.secondary), tertiary: datumRecord(s.tertiary)};
 	}
@@ -110,7 +112,7 @@ class FoundationDatums {
 
 	public static function validateReferences(scheme:FoundationDatumScheme, sources:FoundationDatumSources,
 			requirements:Array<InterfaceRequirement>):Array<UnresolvedFoundationDatum> {
-		var s = snapshot(scheme);
+		var s = copy(scheme);
 		var unresolved:Array<UnresolvedFoundationDatum> = [];
 		for (d in ordered(s)) {
 			var found = switch d.reference {
@@ -164,7 +166,6 @@ class FoundationDatums {
 		return {id: d.id, reference: referenceRecord(d.reference), frame: CastingRecordCodec.frame(d.frame)};
 
 	static function readReference(raw:Dynamic):DatumReference {
-		if (Std.isOfType(raw, DatumReference)) raw = referenceRecord(cast raw);
 		var result = switch CastingRecordCodec.string(raw, "kind") {
 			case "body-face":
 				CastingFeatureCodec.fields(raw, ["kind", "faceId"]);

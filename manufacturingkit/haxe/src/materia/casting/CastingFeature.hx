@@ -46,8 +46,9 @@ enum CastingGeometrySolid {
 }
 
 class CastingGeometrySolids {
+	public static function copy(body:CastingGeometrySolid):CastingGeometrySolid return snapshot(record(body));
+
 	public static function snapshot(raw:Dynamic):CastingGeometrySolid {
-		if (Std.isOfType(raw, CastingGeometrySolid)) raw = record(cast raw);
 		return switch CastingRecordCodec.string(raw, "kind") {
 			case "cut":
 				CastingFeatureCodec.fields(raw, ["kind", "solid"]);

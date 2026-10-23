@@ -8,7 +8,8 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentRecipeSupport as P;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan.MoldVolume;
-import materia.tooling.casting.MoldVolumeCodec;
+import materia.tooling.casting.MoldRegions.MoldVolumeRecords;
+import materia.tooling.ToolingCodec;
 
 /** Rebuildable exact finished tooling volume, in mold coordinates (mm). */
 class ToolingVolume extends MachineComponent {
@@ -18,7 +19,7 @@ class ToolingVolume extends MachineComponent {
 
 	static function parameters():Array<machinekit.component.ComponentParameter>
 		return [
-			P.text("volume", MoldVolumeCodec.encode({
+			P.text("volume", ToolingCodec.canonical(MoldVolumeRecords.record({
 				id: "former",
 				material: materia.tooling.casting.CastingMoldPlan.MoldPartMaterial.FormerStock,
 				cuts: [],
@@ -34,7 +35,7 @@ class ToolingVolume extends MachineComponent {
 						height: 20
 					}
 				]
-			}))
+			})))
 		];
 
 	public static function recipeType():ComponentType {
@@ -44,18 +45,18 @@ class ToolingVolume extends MachineComponent {
 	}
 
 	public static function fromVolume(v:MoldVolume):ToolingVolume
-		return new ToolingVolume(new ComponentValues().setToken("volume", MoldVolumeCodec.encode(v)));
+		return new ToolingVolume(new ComponentValues().setToken("volume", ToolingCodec.canonical(MoldVolumeRecords.record(v))));
 
 	/** Realize finished foam, never the rectangular cutting blank. Placement is
 	 * the record's stockToMold frame, supplied by the assembly caller.
 	 */
 	public static function fromCoreCutting(id:String,cutting:materia.tooling.casting.CoreSupport.CoreCutting):ToolingVolume
 		return fromVolume({id:id,material:EPSStock,pieces:[],profiles:[],cuts:[],
-			regions:[materia.casting.CastingRegion.CastingRegionCodec.snapshot(cutting.solid)]});
+			regions:[materia.casting.CastingRegion.CastingRegionCodec.copy(cutting.solid)]});
 
 	public function new(?input:ComponentValues) {
 		var v = P.resolve(parameters(), input),
-			record = MoldVolumeCodec.decode(v.token("volume"));
+			record = MoldVolumeRecords.snapshot(haxe.Json.parse(v.token("volume")));
 		var material = switch (record.material : String) {
 			case "eps": "EPS tooling";
 			case "steel": "steel";
@@ -64,7 +65,7 @@ class ToolingVolume extends MachineComponent {
 		super("MOLD-"
 			+ record.id
 			+ "-"
-			+ haxe.crypto.Sha256.encode(MoldVolumeCodec.encode(record)).substr(0, 12), "Tooling "
+			+ haxe.crypto.Sha256.encode(ToolingCodec.canonical(MoldVolumeRecords.record(record))).substr(0, 12), "Tooling "
 			+ record.id, material, false, v);
 		volume = record;
 		addConnector("mount", Mount, F.identity());

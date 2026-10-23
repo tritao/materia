@@ -32,8 +32,7 @@ class DraftGeometryTests {
 			check(lost.volume()+added.volume()<1e-7,"serialized finished-region expression reconstructs the source cavity exactly");
 			var volume:materia.tooling.casting.CastingMoldPlan.MoldVolume={id:"drafted-former",material:
 				materia.tooling.casting.CastingMoldPlan.MoldPartMaterial.FormerStock,pieces:[],profiles:[],cuts:[],regions:[expression]};
-			var encoded=materia.tooling.casting.MoldVolumeCodec.encode(volume);
-			var component=machinekit.tooling.ToolingVolume.fromVolume(materia.tooling.casting.MoldVolumeCodec.decode(encoded));
+			var component=machinekit.tooling.ToolingVolume.fromVolume(volume);
 			var rebuilt=scope.own(component.geometry());
 			var gap=scope.own(cavity.subtractAll([rebuilt])),excess=scope.own(rebuilt.subtractAll([cavity]));
 			check(gap.volume()+excess.volume()<1e-7,"portable tooling volume rebuilds its exact region without the source document");

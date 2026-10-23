@@ -3,8 +3,7 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingValidation;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
-import materia.tooling.casting.CastingMoldOptionsCodec;
+import materia.tooling.casting.CastingMoldPlan.MoldOptions;
 import materia.casting.BoxAlgebra;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
@@ -45,8 +44,8 @@ class ReviewContractTests {
 		};
 
 	public static function run(p:CastingMoldPlan):Void {
-		var o = CastingMoldOptionsCodec.snapshot(p.options);
-		var source=ToolingCodec.snapshot(p.document);
+		var o = MoldOptions.copy(p.options);
+		var source=ToolingCodec.copy(p.document);
 		source.input.inserts[0].finish=materia.casting.InsertSpec.InsertFinish.ReplicatedAfterCasting;
 		source.setup.sourceFingerprint=ToolingCodec.inputFingerprint(source.input);
 		o.precision[0].masterReference = null;
@@ -61,15 +60,15 @@ class ReviewContractTests {
 		var oldOptions:Dynamic=haxe.Json.parse(ToolingCodec.canonical(o));
 		var oldPrecision:Array<Dynamic> = cast Reflect.field(oldOptions,"precision");
 		Reflect.setField(oldPrecision[0],"allowance",null);
-		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		rejects(() -> MoldOptions.read(oldOptions),"Invalid mold process record");
 		Reflect.deleteField(oldPrecision[0],"allowance");
 		Reflect.setField(oldPrecision[0],"route","replicated");
-		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		rejects(() -> MoldOptions.read(oldOptions),"Invalid mold process record");
 		Reflect.deleteField(oldPrecision[0],"route");
 		Reflect.deleteField(oldPrecision[0],"jigReference");
-		rejects(() -> CastingMoldOptionsCodec.read(oldOptions),"Invalid mold process record");
+		rejects(() -> MoldOptions.read(oldOptions),"Invalid mold process record");
 		o.precision[0].jigReference="synthetic-jig";
-		check(CastingMoldOptionsCodec.snapshot(o).precision[0].jigReference=="synthetic-jig",
+		check(MoldOptions.copy(o).precision[0].jigReference=="synthetic-jig",
 			"jig reference is an explicit process choice");
 		o.precision[0].masterReference="synthetic-master";o.precision[0].releaseSpec="synthetic-release";
 		check(CastingMoldPlanner.plan(source,o).validation.filter(v ->
@@ -90,7 +89,7 @@ class ReviewContractTests {
 			"explicit source interfaces require replication independently of the aggregate finish label");
 		var raw = ToolingCodec.encode(p.document);
 		check(raw.indexOf('"label"') >= 0 && raw.indexOf('"sourceRole"') < 0, "source labels are separate from required typed roles");
-		var changed = ToolingCodec.snapshot(p.document);
+		var changed = ToolingCodec.copy(p.document);
 		changed.recipe.designReview.minimumInsertEdgeMm = 5;
 		var constrained = CastingLevelOne.analyze(changed).proposals.filter(v -> v.rule == "process.level1.insert-edge.seat");
 		check(constrained.length == 1 && constrained[0].proposedValue == null,
@@ -115,7 +114,7 @@ class ReviewContractTests {
 			&& v.status == "pass").length == 1,
 			"accepted width change clears the actual source edge rule");
 		rejects(() -> CastingLevelOne.apply(accepted, proposals[0]), "stale source proposal");
-		var limits = ToolingCodec.snapshot(changed);
+		var limits = ToolingCodec.copy(changed);
 		limits.recipe.designReview.minimumCornerRadiusMm = 2;
 		limits.recipe.designReview.minimumInsertCoverMm = 20;
 		limits.recipe.designReview.minimumFixingAccessMm = 20;
@@ -138,7 +137,7 @@ class ReviewContractTests {
 			{rule:"lifting-points",id:limits.input.id},
 			{rule:"removal-direction.pocket",id:"pocket"}
 		]) sourceFinding(levelOne,row.rule,row.id,"fail");
-		var passing=ToolingCodec.snapshot(accepted);
+		var passing=ToolingCodec.copy(accepted);
 		passing.recipe.designReview.minimumInsertCoverMm=9;
 		passing.recipe.designReview.minimumFixingAccessMm=10;
 		passing.recipe.designReview.removalClearanceMm=0;
@@ -151,7 +150,7 @@ class ReviewContractTests {
 			{rule:"fixing-access.seat",id:"seat"},
 			{rule:"removal-direction.pocket",id:"pocket"}
 		]) sourceFinding(positive,row.rule,row.id,"pass");
-		var rounded=ToolingCodec.snapshot(passing);
+		var rounded=ToolingCodec.copy(passing);
 		rounded.input.features.filter(feature -> feature.id=="pocket")[0].cornerRadius=3;
 		rounded.recipe.designReview.minimumCornerRadiusMm=2;
 		rounded.setup.sourceFingerprint=ToolingCodec.inputFingerprint(rounded.input);
@@ -175,12 +174,12 @@ class ReviewContractTests {
 		rejects(() -> ToolingReadiness.evaluate([invalid]), "severity/status consistency");
 		invalid.severity = materia.tooling.ToolingDiagnostic.ToolingSeverity.Info;
 		rejects(() -> ToolingReadiness.evaluate([invalid]), "severity/status consistency");
-		var lower = ToolingCodec.snapshot(p.document);
+		var lower = ToolingCodec.copy(p.document);
 		lower.setup.fillHeightMm = p.envelope.z + p.envelope.height / 2;
 		check(CastingMoldPlanner.resinAtFill(lower, p.envelope).filter(b -> b.z + b.height > lower.setup.fillHeightMm + 1e-7).length == 0,
 			"neutral datum/resin mask excludes material above fill height");
-		var bridges = CastingMoldCodec.decode(CastingMoldCodec.encode(p));
-		var wider = CastingMoldCodec.decode(CastingMoldCodec.encode(p)).cores[0];
+		var bridges = CastingMoldPlanner.plan(p.document,p.options);
+		var wider = CastingMoldPlanner.plan(p.document,p.options).cores[0];
 		wider.id = "wide-core";
 		wider.carrierId = "wide-carrier";
 		var cavity=materia.tooling.casting.MoldCores.singleBox(wider.cavity,wider.id);
@@ -222,7 +221,7 @@ class ReviewContractTests {
 			&& oneSided.converged
 			&& oneSided.lowerDiameterMm > 39.99,
 			"one cooled face doubles the effective slab thickness");
-		var rigid = ToolingCodec.snapshot(p.document);
+		var rigid = ToolingCodec.copy(p.document);
 		for (strategy in rigid.setup.features)
 			if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
 				strategy.strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;

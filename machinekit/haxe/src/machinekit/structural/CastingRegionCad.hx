@@ -12,7 +12,7 @@ import materia.casting.CastingRegion.CastingRegionCodec;
  */
 class CastingRegionCad {
 	public static function part(region:CastingRegion):Part {
-		var expression=CastingRegionCodec.snapshot(region),scope=new Scope();
+		var expression=CastingRegionCodec.copy(region),scope=new Scope();
 		try {
 			var result=build(scope,expression);
 			scope.release(result);

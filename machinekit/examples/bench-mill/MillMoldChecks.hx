@@ -8,7 +8,6 @@ import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.process.OrthogonalSections.SectionAxis;
 
 /** Real mill acceptance cases; source CAD is an independent reference to the planner. */
@@ -64,7 +63,7 @@ class MillMoldChecks {
 				{id: feature.id, box: CastingMoldPlanner.featureBox(p.document, feature)}
 		];
 		var resin = materia.casting.BoxAlgebra.subtract([p.envelope], [for (boundary in boundaries) boundary.box]);
-		var report = materia.tooling.process.JunctionThickness.analyze(p.document.input.id, CastingMoldCodec.fingerprint(p), resin, boundaries);
+		var report = materia.tooling.process.JunctionThickness.analyze(p.document.input.id, CastingMoldPlanner.fingerprint(p), resin, boundaries);
 		check(report.converged, "actual mill junction diameter reaches its declared numerical tolerance");
 		var owned:Array<cadkit.modeling.Part> = [];
 		try {
@@ -150,7 +149,7 @@ class MillMoldChecks {
 			solid.close();
 		}
 		check(p.formers.filter(f -> f.volume.profiles.length > 0).length == 4, "all access formers own exact router-relief sealing profiles");
-		var mismatched = CastingMoldCodec.decode(CastingMoldCodec.encode(p));
+		var mismatched = CastingMoldPlanner.plan(p.document,p.options);
 		var profiled = mismatched.formers.filter(f -> f.volume.profiles.length > 0)[0];
 		profiled.volume.profiles[0].depth += 1;
 		rejects(() -> CastingMoldPlanner.validate(mismatched), "former sealing profile must match panel operation");
@@ -205,9 +204,9 @@ class MillMoldChecks {
 		check(restoredAssembly.encode() == savedAssembly, "full hardware assembly round-trips within connector limits");
 		var unknown = "";
 		try {
-			var invalid = materia.tooling.ToolingCodec.inputSnapshot(p.document.input);
+			var invalid = materia.tooling.ToolingCodec.copyInput(p.document.input);
 			invalid.features[0].kind = cast "future-feature";
-			materia.tooling.ToolingCodec.inputSnapshot(invalid);
+			materia.tooling.ToolingCodec.copyInput(invalid);
 		} catch (e:Dynamic) {
 			unknown = Std.string(e);
 		}
@@ -218,7 +217,7 @@ class MillMoldChecks {
 		check(materia.tooling.ToolingCodec.canonical(CastingMoldPlanner.ownershipOrder(permuted, strategies))
 			== materia.tooling.ToolingCodec.canonical(CastingMoldPlanner.ownershipOrder(p.document.input.features, strategies)),
 			"raw feature permutation preserves the actual ownership ordering before codec sorting");
-		var unsupported = materia.tooling.ToolingCodec.snapshot(p.document);
+		var unsupported = materia.tooling.ToolingCodec.copy(p.document);
 		unsupported.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
 		var partial = CastingMoldPlanner.plan(unsupported, p.options),
 			assessment = CastingMoldCad.assess(partial);
@@ -240,24 +239,22 @@ class MillMoldChecks {
 			steel.close();
 		}
 		var changed = CastingMoldPlanner.plan(MillMoldSetup.document(frame, 17.8), MillMoldSetup.options(frame));
-		check(CastingMoldCodec.fingerprint(changed) != CastingMoldCodec.fingerprint(p), "measured stock invalidates package");
+		check(CastingMoldPlanner.fingerprint(changed) != CastingMoldPlanner.fingerprint(p), "measured stock invalidates package");
 		equivalent(frame, changed);
 		var bare = new MillFrame(frame.layout),
 			simple = CastingMoldPlanner.plan(MillMoldSetup.document(bare), MillMoldSetup.options(bare));
 		check(simple.features.length < p.features.length && p.features.filter(f -> f.featureId == "rear-y-drive-seat").length == 1,
 			"optional XY interfaces come from full source instance");
 		equivalent(bare, simple);
-		var encoded = CastingMoldCodec.encode(p),
-			restored = CastingMoldCodec.decode(encoded);
-		check(CastingMoldCodec.encode(restored) == encoded, "complete plan recipe regeneration");
+		var restored=CastingMoldPlanner.plan(p.document,p.options);
 		restored.openings.pop();
 		rejects(() -> CastingMoldPlanner.validate(restored), "unclassified contact opening");
-		restored = CastingMoldCodec.decode(encoded);
+		restored = CastingMoldPlanner.plan(p.document,p.options);
 		var smaller=materia.tooling.casting.MoldCores.singleBox(restored.cores[0].cavity,restored.cores[0].id);
 		smaller.height -= 2;
 		restored.cores[0].cavity=materia.tooling.casting.MoldRegions.box(smaller);
 		rejects(() -> CastingMoldCad.review(restored), "missing pocket geometry");
-		restored = CastingMoldCodec.decode(encoded);
+		restored = CastingMoldPlanner.plan(p.document,p.options);
 		restored.fixtures[0].datum.pieces[0].z += 30;
 		rejects(() -> CastingMoldCad.review(restored), "displaced insert datum fixture");
 		var f = p.formers.filter(f -> f.featureIds.length > 0 && StringTools.startsWith(f.featureIds[0], "foot-access-"))[0];

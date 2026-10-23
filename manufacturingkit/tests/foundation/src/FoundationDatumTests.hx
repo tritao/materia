@@ -27,7 +27,7 @@ class FoundationDatumTests {
 			"datum scheme round trip");
 		check(FoundationDatums.ordered(s)[0].id=="z-primary" && FoundationDatums.ordered(s)[2].id=="a-tertiary",
 			"datum precedence remains semantic rather than alphabetical");
-		var copy=FoundationDatums.snapshot(s);copy.primary.frame.x=20;
+		var copy=FoundationDatums.copy(s);copy.primary.frame.x=20;
 		check(s.primary.frame.x==0,"datum frame is a defensive copy");
 		var sources:FoundationDatumSources={bodyFaces:["body.z-min"],featureFaces:["register"=>["side-0"]],
 			insertInterfaces:["seat"=>["edge"]],insertHoles:["seat"=>["pin"]],unsupportedFeatures:[]};
@@ -43,9 +43,9 @@ class FoundationDatumTests {
 		s=scheme();requirement.datumReference="missing";
 		rejects(() -> FoundationDatums.validateReferences(s,sources,[requirement]),"undeclared foundation datum: seat-edge");
 		s.secondary.id=s.primary.id;
-		rejects(() -> FoundationDatums.snapshot(s),"Duplicate foundation datum");
+		rejects(() -> FoundationDatums.copy(s),"Duplicate foundation datum");
 		s=scheme();s.primary.frame.qw=0;
-		rejects(() -> FoundationDatums.snapshot(s),"unit rotation");
+		rejects(() -> FoundationDatums.copy(s),"unit rotation");
 		var bad:Dynamic=haxe.Json.parse(saved);Reflect.setField(bad,"oldDatum",true);
 		rejects(() -> FoundationDatums.snapshot(bad),"Unexpected casting record fields");
 		var envelope = materia.casting.CastingEnvelope.build(100,80,60);

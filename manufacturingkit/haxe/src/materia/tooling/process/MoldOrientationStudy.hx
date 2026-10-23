@@ -6,7 +6,6 @@ import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.casting.CastHandling;
 import materia.tooling.export.FabricationSpec;
 import materia.tooling.export.ToolingFabrication;
@@ -100,7 +99,7 @@ class MoldOrientationStudy {
 	/** Directions follow the source feature; setup coordinates and fill height are regenerated. */
 	public static function reorient(document:ToolingDocument, id:String, pose:materia.assembly.AssemblyRecord.AssemblyFrame):ToolingDocument {
 		materia.tooling.ToolingIds.validate(id);
-		var d = ToolingCodec.snapshot(document);
+		var d = ToolingCodec.copy(document);
 		var relative = materia.assembly.AssemblyFrames.compose(pose, materia.assembly.AssemblyFrames.inverse(d.setup.sourceToMold));
 		for (feature in d.setup.features)
 			if (feature.withdrawal != null) {
@@ -112,7 +111,7 @@ class MoldOrientationStudy {
 		var envelope = CastingMoldPlanner.envelope(d);
 		d.setup.sourceToMold.z -= envelope.z;
 		d.setup.fillHeightMm = envelope.height;
-		return ToolingCodec.snapshot(d);
+		return ToolingCodec.copy(d);
 	}
 
 	public static function metrics(p:CastingMoldPlan, fabrication:FabricationSpec):MoldEffortMetrics {
@@ -214,7 +213,7 @@ class MoldOrientationStudy {
 			if (seen.exists(candidate.id))
 				throw "Duplicate orientation candidate";
 			seen.set(candidate.id, true);
-			var d = ToolingCodec.snapshot(candidate.document),
+			var d = ToolingCodec.copy(candidate.document),
 				fingerprint = ToolingCodec.documentFingerprint(d);
 			var input = ToolingCodec.inputFingerprint(d.input);
 			if (source != null && source != input)
@@ -273,7 +272,7 @@ class MoldOrientationStudy {
 					"Mold planning failed: " + result.planningFailure, [fingerprint]));
 			else {
 				result.planningSucceeded = true;
-				result.planFingerprint = CastingMoldCodec.fingerprint(plan);
+				result.planFingerprint = CastingMoldPlanner.fingerprint(plan);
 				result.changeRequests = plan.changeRequests.copy();
 				if (shared == null) {
 					result.validation = result.validation.concat(plan.validation);

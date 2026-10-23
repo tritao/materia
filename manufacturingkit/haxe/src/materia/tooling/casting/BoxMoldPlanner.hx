@@ -27,6 +27,11 @@ import materia.tooling.casting.CoreSupport.CoreSupportKind;
  * The continuous inside lands own casting size; clearance is on the outside of sockets.
  */
 class BoxMoldPlanner {
+	/** Identity follows authored inputs; exact CAD checks validate the resulting plan. */
+	public static function fingerprint(plan:MoldPlan):String
+		return haxe.crypto.Sha256.encode(ToolingCodec.canonical({document:ToolingCodec.documentRecord(plan.document),
+			options:plan.supportOptions}));
+
 	public static function box(width:Float, depth:Float, height:Float, pose:AssemblyFrame):MoldBox {
 		var points = [];
 		for (x in [-width / 2, width / 2])
@@ -79,7 +84,7 @@ class BoxMoldPlanner {
 	}
 
 	public static function plan(input:ToolingDocument, ?supportOptions:CoreSupportOptions):MoldPlan {
-		var d = ToolingCodec.snapshot(input), r = d.recipe, e = d.input.envelope;
+		var d = ToolingCodec.copy(input), r = d.recipe, e = d.input.envelope;
 		for (insert in d.input.inserts) switch insert.anchorage {
 			case Bolted(_,_):throw "Unsupported non-box anchor occupancy: "+insert.id;
 			default:

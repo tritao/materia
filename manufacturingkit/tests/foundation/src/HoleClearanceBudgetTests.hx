@@ -72,7 +72,7 @@ class HoleClearanceBudgetTests {
 		var requirement:materia.casting.InsertMountHoleRequirement = {
 			holeId: "rail-mount-1", componentPath: "xyStage/railYLeft",
 			componentFingerprint: haxe.crypto.Sha256.encode("test rail recipe"), connectorId: "mount1",
-			connectorFrame: F.alongY(0, 200, 35, 0, 0, 1), clearanceReference: "test reference",
+			connectorFrame: F.alongY(0, 200, 35, 0, 0, 1), clearanceReference:materia.casting.CastingInput.CastingTextInput.Known("test reference"),
 			permittedRoutes: both, budget: budget()
 		};
 		var copied = InsertMountHoleRequirements.copy([requirement]);

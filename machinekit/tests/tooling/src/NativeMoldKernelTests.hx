@@ -80,7 +80,7 @@ class NativeMoldKernelTests {
 			near(kernel.resinIntersection(document,cavity),0,"source cavity contains no resin for datum collision checks");
 			var candidate=materia.tooling.casting.MoldRegions.box({x:45,y:0,z:40,width:5,depth:5,height:20});
 			near(kernel.resinIntersection(document,candidate),500,"native datum checks intersect actual resin");
-			var partial=materia.tooling.ToolingCodec.snapshot(document);
+			var partial=materia.tooling.ToolingCodec.copy(document);
 			partial.setup.fillHeightMm=50;
 			near(kernel.resinIntersection(partial,candidate),250,"datum/resin intersection stops at the declared fill height");
 			var triangle=CastingRegion.Placed({solid:Prism(materia.casting.CastingProfiles.polygon(

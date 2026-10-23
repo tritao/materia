@@ -2,8 +2,9 @@ package machinekit.tooling;
 
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.ToolingValidation;
+import materia.tooling.ToolingCodec;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
-import materia.tooling.casting.MoldVolumeCodec;
+import materia.tooling.casting.MoldRegions.MoldVolumeRecords;
 import machinekit.tooling.ToolingSectionDrawing.ToolingSectionSheet;
 
 typedef ToolingSectionRecord = {
@@ -54,7 +55,7 @@ class ToolingSectionReview {
 			if (cuttingFiles.exists(id)) evidence.push(cuttingFiles.get(id));
 			var check=materia.tooling.process.FillAnalysis.check(rule,ids,status,message,evidence);
 			result.validation.push(check);
-			result.records.push({id:id,geometryFingerprint:haxe.crypto.Sha256.encode(MoldVolumeCodec.encode(item.volume)),
+			result.records.push({id:id,geometryFingerprint:haxe.crypto.Sha256.encode(ToolingCodec.canonical(MoldVolumeRecords.record(item.volume))),
 				sections:sections,validation:check});
 		}
 		return result;

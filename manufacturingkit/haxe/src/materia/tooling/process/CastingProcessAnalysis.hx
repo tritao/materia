@@ -3,7 +3,6 @@ package materia.tooling.process;
 import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CastingMoldCodec;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.FillAnalysis;
 import materia.tooling.process.CureAnalysis;
@@ -47,11 +46,11 @@ class CastingProcessAnalysis {
 			?fabrication:materia.tooling.export.FabricationSpec,?exactFill:ExactFillBackend):CastingProcessReport {
 		CastingMoldPlanner.validate(p);
 		if (fabrication != null)
-			fabrication = materia.tooling.export.FabricationSpecCodec.snapshot(fabrication);
+			fabrication = materia.tooling.export.FabricationSpec.FabricationSpecs.copy(fabrication);
 		var spec = ProcessSpecCodec.snapshot(raw);
 		if (spec.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";
-		var sourceFingerprint = CastingMoldCodec.fingerprint(p);
+		var sourceFingerprint = CastingMoldPlanner.fingerprint(p);
 		var fingerprint=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication);
 		var projection = FillTooling.project(p);
 		var panels:Array<FillPanel> = [
@@ -168,8 +167,8 @@ class CastingProcessAnalysis {
 		?fabrication:materia.tooling.export.FabricationSpec):String {
 		if (!Math.isFinite(gravityMps2) || gravityMps2<=0) throw "Invalid process gravity";
 		var spec=ProcessSpecCodec.snapshot(raw);
-		if (fabrication!=null) fabrication=materia.tooling.export.FabricationSpecCodec.snapshot(fabrication);
-		var sourceFingerprint=CastingMoldCodec.fingerprint(p);
+		if (fabrication!=null) fabrication=materia.tooling.export.FabricationSpec.FabricationSpecs.copy(fabrication);
+		var sourceFingerprint=CastingMoldPlanner.fingerprint(p);
 		return haxe.crypto.Sha256.encode(ToolingCodec.canonical({
 			source: sourceFingerprint,
 			spec: spec,

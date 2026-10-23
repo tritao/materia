@@ -69,6 +69,8 @@ class EmbeddedAnchors {
 		}
 		result.sort((a,b) -> Reflect.compare(a.owner,b.owner));return result;
 	}
-	public static function records(rows:Array<EmbeddedInsertAnchors>):Array<Dynamic>
-		return [for (row in snapshot(rows)) {owner:row.owner,pose:row.pose,spec:InsertSpec.InsertSpecCodec.record(row.spec)}];
+	public static function records(rows:Array<EmbeddedInsertAnchors>):Array<Dynamic> {
+		var raw:Array<Dynamic> = [for (row in rows) {owner:row.owner,pose:row.pose,spec:InsertSpec.InsertSpecCodec.record(row.spec)}];
+		return [for (row in snapshot(raw)) {owner:row.owner,pose:row.pose,spec:InsertSpec.InsertSpecCodec.record(row.spec)}];
+	}
 }

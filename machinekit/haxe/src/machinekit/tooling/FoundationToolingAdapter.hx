@@ -20,7 +20,7 @@ class FoundationToolingAdapter {
 		if (ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(expected))
 			!=ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(foundation.body.embeddedAnchors())))
 			throw "Foundation embedded anchor occupancy differs from source inserts";
-		return ToolingCodec.inputSnapshot({
+		return ToolingCodec.copyInput({
 			id: id,
 			revision: revision,
 			lengthUnit: ToolingLengthUnit.Millimetres,

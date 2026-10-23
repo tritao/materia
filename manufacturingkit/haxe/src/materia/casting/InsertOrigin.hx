@@ -24,6 +24,9 @@ typedef CatalogueInsert = {
 }
 
 class InsertOriginCodec {
+	public static function copy(origin:InsertOrigin,body:InsertSpec.InsertBody,holes:Array<InsertHole>):InsertOrigin
+		return snapshot(record(origin),body,holes);
+
 	public static function geometryFingerprint(product:CatalogueInsert, body:InsertSpec.InsertBody, holes:Array<InsertHole>):String
 		return haxe.crypto.Sha256.encode(haxe.Json.stringify({
 			product:{manufacturer:product.manufacturer,reference:product.reference,revision:product.revision,
@@ -33,7 +36,6 @@ class InsertOriginCodec {
 
 	public static function snapshot(raw:Dynamic, body:InsertSpec.InsertBody, holes:Array<InsertHole>):InsertOrigin {
 		if (raw == null) throw "Missing insert origin";
-		if (Std.isOfType(raw, InsertOrigin)) raw = record(cast raw);
 		var kind = CastingRecordCodec.string(raw, "kind");
 		if (kind == "fabricated") {
 			CastingFeatureCodec.fields(raw, ["kind","manufacturing"]);
