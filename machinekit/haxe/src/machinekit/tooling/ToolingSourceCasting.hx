@@ -57,13 +57,13 @@ class ToolingSourceCasting extends MachineComponent {
 			return Solids.building([body], shapes -> {
 				for (cavity in CastingCavities.derive(source.envelope,source.features))
 					shapes.push(CastingCavityCad.part(cavity));
-				var embedded:Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors> = [];
+				var embedded:Array<materia.casting.InsertAnchorage.EmbeddedInsertAnchors> = [];
 				for (insert in source.inserts) switch insert.anchorage {
 					case Bolted(_,_):embedded.push({owner:insert.id,pose:insert.pose,
 						spec:{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces}});
 					default:
 				}
-				for (part in machinekit.structural.EmbeddedAnchorCad.parts(embedded)) shapes.push(part);
+				for (part in machinekit.tooling.InsertAnchorGeometry.embeddedParts(embedded)) shapes.push(part);
 				return Solids.cut(shapes[0],shapes.slice(1));
 			});
 		});

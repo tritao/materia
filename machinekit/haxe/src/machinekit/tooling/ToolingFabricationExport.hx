@@ -1,5 +1,6 @@
 package machinekit.tooling;
 
+import machinekit.tooling.InsertAnchorGeometry;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import materia.tooling.ToolingCodec;
@@ -150,11 +151,11 @@ class ToolingFabricationExport {
 		var nativeChecks=InsertAnchorGeometry.review(p.document.input,spec.mixBearingStressMPa,spec.mixTensileStrengthMPa)
 			.concat(InsertAnchorGeometry.reviewMold(p));
 		var checks:Array<materia.tooling.ToolingValidation> = [];
-		for (insert in p.document.input.inserts) checks=checks.concat(materia.tooling.casting.InsertAnchorageChecks.check(insert));
+		for (insert in p.document.input.inserts) checks=checks.concat(materia.casting.InsertAnchorage.InsertAnchorageChecks.check(insert));
 		for (record in nativeChecks) checks.push({rule:record.rule,affectedIds:record.affectedIds.copy(),
 			status:record.status,severity:record.severity,message:record.message,evidence:record.evidence.copy()});
 		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
-		return {format:"materia.tooling.insert-anchorage",version:3,sourceFingerprint:sourceFingerprint,
+		return {format:"materia.tooling.insert-anchorage",version:4,sourceFingerprint:sourceFingerprint,
 			materialInputs:{mixBearingStressMPa:spec.mixBearingStressMPa,mixTensileStrengthMPa:spec.mixTensileStrengthMPa},
 			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
 			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),insert.pose),

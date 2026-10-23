@@ -1,5 +1,6 @@
 package materia.tooling.casting;
 
+import materia.casting.InsertAnchorage.InsertAnchorageChecks;
 import materia.tooling.ToolingValidation;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
 import materia.casting.InsertOrigin.InsertGeometryBasis;

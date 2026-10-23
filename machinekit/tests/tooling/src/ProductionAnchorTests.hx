@@ -1,4 +1,4 @@
-import machinekit.structural.InsertAnchorPattern;
+import machinekit.tooling.InsertAnchorGeometry;
 import machinekit.structural.CastInsert;
 import machinekit.component.ComponentValues;
 
@@ -52,8 +52,8 @@ class ProductionAnchorTests {
 	public static function main():Void {
 		var rule = new machinekit.milling.MillCastingDetails().anchorRule;
 		var plate = new CastInsert(CastInsert.boxValues(50,60,20).setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
-		var first = InsertAnchorPattern.derive("plate",plate,rule,FootprintOnly,0);
-		var second = InsertAnchorPattern.derive("plate",plate,rule,FootprintOnly,0);
+		var first = InsertAnchorGeometry.derive("plate",plate,rule,FootprintOnly,0);
+		var second = InsertAnchorGeometry.derive("plate",plate,rule,FootprintOnly,0);
 		check(materia.tooling.ToolingCodec.canonical(first.insertSpec()) == materia.tooling.ToolingCodec.canonical(second.insertSpec()),
 			"footprint derivation is deterministic");
 		check(switch first.insertSpec().anchorage {case Bolted(_,anchors): anchors.length>=2
@@ -63,7 +63,7 @@ class ProductionAnchorTests {
 			machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(
 				machinekit.standard.FastenerThreads.coarse(12).mating()),30))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
-		var sized=InsertAnchorPattern.derive("loaded-plate",loaded,rule,FootprintOnly,0);
+		var sized=InsertAnchorGeometry.derive("loaded-plate",loaded,rule,FootprintOnly,0);
 		var selected=switch sized.insertSpec().anchorage {case Bolted(r,a):{rules:r,anchors:a};default:throw "Missing load-sized anchors";};
 		var admitted=0.0;
 		for (anchor in selected.anchors) admitted+=anchor.screw.assemblyPreloadN;
@@ -72,11 +72,11 @@ class ProductionAnchorTests {
 		check(selected.anchors.length==4 && selected.anchors.filter(anchor -> anchor.screw.thread.majorDiameter==8).length==4,
 			"demand and policy footprint choose four M8 anchors instead of the unloaded M5 pair");
 		var unloaded=new CastInsert(CastInsert.boxValues(50,60,30).setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
-		check(InsertAnchorPattern.minimumOuterLand("loaded-land",loaded,rule,0).x
-			> InsertAnchorPattern.minimumOuterLand("unloaded-land",unloaded,rule,0).x,
+		check(InsertAnchorGeometry.minimumOuterLand("loaded-land",loaded,rule,0).x
+			> InsertAnchorGeometry.minimumOuterLand("unloaded-land",unloaded,rule,0).x,
 			"source placement reserves resin cover for the demand-sized flange rather than the smallest bolt");
 		var error="";
-		try InsertAnchorPattern.derive("too-small",new CastInsert(CastInsert.boxValues(8,8,2).setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount)),rule,FootprintOnly,0)
+		try InsertAnchorGeometry.derive("too-small",new CastInsert(CastInsert.boxValues(8,8,2).setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount)),rule,FootprintOnly,0)
 		catch (e:Dynamic) error=Std.string(e);
 		check(error.indexOf("Insert too-small:")>=0,"unsatisfiable insert fails with its source ID");
 		var hatchThread=machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
@@ -84,7 +84,7 @@ class ProductionAnchorTests {
 			machinekit.structural.InsertHoles.tappedBlind(hatchThread,10))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
 		error="";
-		try InsertAnchorPattern.derive("small-hatch",smallHatch,rule,FootprintOnly,0)
+		try InsertAnchorGeometry.derive("small-hatch",smallHatch,rule,FootprintOnly,0)
 		catch (e:Dynamic) error=Std.string(e);
 		check(error.indexOf("Insert small-hatch:")>=0 && error.indexOf("thicker stock")>=0,
 			"the old hatch stock cannot silently receive an undersized thread or a one-anchor fallback");
@@ -92,14 +92,14 @@ class ProductionAnchorTests {
 			machinekit.structural.InsertHoles.tappedBlind(hatchThread,12))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
 		error="";
-		try InsertAnchorPattern.derive("thin-wall-hatch",hatch,rule,FootprintOnly,0)
+		try InsertAnchorGeometry.derive("thin-wall-hatch",hatch,rule,FootprintOnly,0)
 		catch (e:Dynamic) error=Std.string(e);
 		check(error.indexOf("Insert thin-wall-hatch:")>=0,
 			"nonintersecting taps still fail when the service-hole material wall is missing");
 		var largerHatch=new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(44,20,12),
 			machinekit.structural.InsertHoles.tappedBlind(hatchThread,12))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
-		var hatchPattern=InsertAnchorPattern.derive("hatch-control",largerHatch,rule,FootprintOnly,0);
+		var hatchPattern=InsertAnchorGeometry.derive("hatch-control",largerHatch,rule,FootprintOnly,0);
 		check(switch hatchPattern.insertSpec().anchorage {case Bolted(r,a):a.length==2
 			&& a.filter(anchor -> anchor.screw.thread.majorDiameter==5).length==2
 			&& materia.casting.InsertAnchorage.InsertAnchorageCodec.demandN(r)==6030;default:false;},
@@ -113,7 +113,7 @@ class ProductionAnchorTests {
 		var longSeat=new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(40,900,20),
 			machinekit.structural.InsertHoles.fromNeutral(longHoles))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GuideSeat));
-		var longPattern=InsertAnchorPattern.derive("long-seat",longSeat,rule,FootprintOnly,0).insertSpec();
+		var longPattern=InsertAnchorGeometry.derive("long-seat",longSeat,rule,FootprintOnly,0).insertSpec();
 		var anchorIds=switch longPattern.anchorage {case Bolted(_,a):[for (anchor in a) anchor.holeId];default:throw "Missing long-seat pattern";};
 		var stations=[for (hole in longPattern.holes) if (anchorIds.indexOf(hole.id)>=0) hole.frame.y];
 		stations.sort(Reflect.compare);
@@ -132,7 +132,7 @@ class ProductionAnchorTests {
 			error="";
 			var count=0;
 			try {
-				var selected=InsertAnchorPattern.derive("compact-lifting",compact,rule,FootprintOnly,1000).insertSpec();
+				var selected=InsertAnchorGeometry.derive("compact-lifting",compact,rule,FootprintOnly,1000).insertSpec();
 				count=switch selected.anchorage {case Bolted(_,anchors):anchors.length;default:0;};
 			} catch (e:Dynamic) error=Std.string(e);
 			check(width==70 ? error.indexOf("Insert compact-lifting:")>=0 : error=="" && count==4,

@@ -22,7 +22,7 @@ class CastHandling {
 		for (insert in d.input.inserts) {
 			var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
 				interfaces:insert.interfaces,anchorage:insert.anchorage};
-			volume-=materia.casting.EmbeddedAnchors.moments(spec,true).volume;
+			volume-=materia.casting.InsertAnchorage.EmbeddedAnchors.moments(spec,true).volume;
 		}
 		if (!Math.isFinite(volume) || volume<=0) throw "Casting requires positive resin volume: "+d.input.id;
 		return volume;
@@ -64,7 +64,7 @@ class CastHandling {
 			mz += kg * center.z;
 			var spec:materia.casting.InsertSpec={body:i.body,holes:i.holes,origin:i.origin,interfaces:i.interfaces,anchorage:i.anchorage};
 			for (exposedOnly in [true,false]) {
-				var hardware=materia.casting.EmbeddedAnchors.moments(spec,exposedOnly);
+				var hardware=materia.casting.InsertAnchorage.EmbeddedAnchors.moments(spec,exposedOnly);
 				var delta=hardware.volume*(exposedOnly ? -d.recipe.mixDensityKgM3 : d.recipe.steelDensityKgM3)*1e-9;
 				var point=F.transformPoint(F.compose(d.setup.sourceToMold,i.pose),hardware.center.x,hardware.center.y,hardware.center.z);
 				mass+=delta;mx+=delta*point.x;my+=delta*point.y;mz+=delta*point.z;

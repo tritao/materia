@@ -1,5 +1,6 @@
 package machinekit.tooling;
 
+import machinekit.tooling.InsertAnchorGeometry;
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 
 import cadkit.modeling.Part;
@@ -97,7 +98,7 @@ class CastingMoldCad {
 			if (owner!=null && owner!=insert.id) continue;
 			var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
 				interfaces:insert.interfaces,anchorage:insert.anchorage};
-			for (hardware in machinekit.structural.InsertAnchorHardware.parts(spec)) {
+			for (hardware in machinekit.tooling.InsertAnchorGeometry.components(spec)) {
 				var prefix="anchor-"+haxe.crypto.Sha256.encode(insert.id+"/"+hardware.anchorId).substr(0,20);
 				result.push({id:prefix+"-"+hardware.kind,insertId:insert.id,anchorId:hardware.anchorId,
 					part:hardware.part,pose:F.compose(p.document.setup.sourceToMold,F.compose(insert.pose,hardware.pose))});

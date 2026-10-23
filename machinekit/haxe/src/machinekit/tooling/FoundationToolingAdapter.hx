@@ -12,13 +12,13 @@ class FoundationToolingAdapter {
 	public static function snapshot(foundation:MineralFoundation, id:String, revision:Int,
 			?context:materia.casting.CastingInterfaceContext):CastingToolingInput {
 		foundation.body.finishedCavities();
-		var expected:Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors> = [];
+		var expected:Array<materia.casting.InsertAnchorage.EmbeddedInsertAnchors> = [];
 		for (row in foundation.insertLocations()) {
 			var spec=row.part.insertSpec();
 			switch spec.anchorage {case Bolted(_,_):expected.push({owner:row.id,pose:row.pose,spec:spec});default:}
 		}
-		if (ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(expected))
-			!=ToolingCodec.canonical(materia.casting.EmbeddedAnchors.records(foundation.body.embeddedAnchors())))
+		if (ToolingCodec.canonical(materia.casting.InsertAnchorage.EmbeddedAnchors.records(expected))
+			!=ToolingCodec.canonical(materia.casting.InsertAnchorage.EmbeddedAnchors.records(foundation.body.embeddedAnchors())))
 			throw "Foundation embedded anchor occupancy differs from source inserts";
 		return ToolingCodec.copyInput({
 			id: id,

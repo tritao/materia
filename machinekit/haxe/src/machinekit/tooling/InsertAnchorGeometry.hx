@@ -1,16 +1,43 @@
 package machinekit.tooling;
 
+import machinekit.standard.HexFlangeBolt;
+import machinekit.standard.PropertyClass;
+import machinekit.component.MachineComponent;
+import materia.casting.InsertAnchorage;
+import materia.casting.InsertSpec;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import machinekit.structural.CastInsert;
+import machinekit.structural.InsertHoles;
+import machinekit.structural.InsertBodies;
 import cadkit.modeling.Part;
 import machinekit.assembly.PosedParts;
-import machinekit.structural.InsertAnchorHardware;
 import machinekit.structural.CastingCavityCad;
-import machinekit.structural.InsertAnchorHardware.InsertAnchorComponentKind;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.InsertAnchorage.InsertAnchorageCodec as C;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.ToolingValidation;
 import materia.tooling.ToolingDiagnostic.ToolingCheckStatus;
 import materia.tooling.ToolingDiagnostic.ToolingSeverity;
+
+class InsertAnchorScreenDefect extends haxe.Exception {}
+
+enum InsertAnchorContext {
+	FootprintOnly;
+	Casting(body:Part,pose:materia.assembly.AssemblyRecord.AssemblyFrame);
+}
+
+
+enum abstract InsertAnchorComponentKind(String) to String {
+	var Bolt = "bolt";
+}
+
+typedef InsertAnchorComponent = {
+	var anchorId:String;
+	var kind:InsertAnchorComponentKind;
+	var part:MachineComponent;
+	var pose:AssemblyFrame;
+}
+
 
 /** Native checks of source hardware. Strength, locking evidence and tooling
  * interference remain separate; source shape bounds never substitute for solids. */
@@ -86,7 +113,7 @@ class InsertAnchorGeometry {
 					var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
 						anchorage:insert.anchorage,interfaces:insert.interfaces};
 					var exterior=own(PosedParts.moved(own(machinekit.structural.InsertBodies.part(insert.body)),insert.pose));
-					var hardware=InsertAnchorHardware.parts(spec);
+					var hardware=InsertAnchorGeometry.components(spec);
 					for (anchor in anchors) {
 						var metal:Array<Part> = [],bolt:Null<Part> = null;
 						var bearingPose=F.identity();
@@ -106,7 +133,7 @@ class InsertAnchorGeometry {
 						var placedBolt:Part=bolt;
 						var point=F.transformPoint(bearingPose,0,0,0);
 						var normal=F.transformVector(bearingPose,0,0,1);
-						var embedment=InsertAnchorHardware.axialEmbedment(point,normal,bulk);
+						var embedment=InsertAnchorGeometry.axialEmbedment(point,normal,bulk);
 						result.push(check(insert.id,anchor.id,"embedment",embedment+1e-7>=rules.minimumEmbedmentMm,
 							"Axial depth from flange bearing plane to the exposed casting boundary toward the loaded insert face "
 							+embedment+" mm; requires "+rules.minimumEmbedmentMm+" mm."));
@@ -120,8 +147,12 @@ class InsertAnchorGeometry {
 							+" mm2. Tooling interference and physical capacity are not qualified by this source-only check."));
 						capacityGeometry.push({anchorId:anchor.id,bearingAreaMm2:area,embedmentMm:embedment});
 					}
-					result=result.concat(materia.tooling.casting.InsertAnchorageChecks.materialChecks(insert,
-						capacityGeometry,bearingStrengthMPa,tensileStrengthMPa));
+					result=result.concat(materia.casting.InsertAnchorage.InsertAnchorageChecks.materialChecks(insert,
+						capacityGeometry,
+						bearingStrengthMPa==null ? materia.casting.CastingInput.Unresolved("Cured mix bearing strength")
+							: materia.casting.CastingInput.Known(bearingStrengthMPa),
+						tensileStrengthMPa==null ? materia.casting.CastingInput.Unresolved("Cured mix tensile strength")
+							: materia.casting.CastingInput.Known(tensileStrengthMPa)));
 			}
 		} catch (error:Dynamic) {for (shape in shapes) shape.close();for (part in parts) part.close();throw error;}
 		for (shape in shapes) shape.close();
@@ -146,4 +177,432 @@ class InsertAnchorGeometry {
 			status:passed ? ToolingCheckStatus.Pass : ToolingCheckStatus.Fail,
 			severity:passed ? ToolingSeverity.Info : ToolingSeverity.Error,message:message,evidence:[]};
 
+
+
+	/** Source authoring: add only the declared back-hole pattern. Existing bought-part
+	 * hole routes remain unchanged, including transfer drilling after casting. */
+	public static function backPattern(source:CastInsert,thread:cadkit.threads.ThreadSpec,
+		rules:InsertAnchorRules,points:Array<InsertBackAnchorChoice>):CastInsert {
+		var spec=source.insertSpec();
+		switch spec.anchorage {case Undeclared:default:throw "Source anchorage is already declared";}
+		var manufacturing=switch spec.origin {
+			case Fabricated(plan):plan;
+			case Catalogue(_):throw "A catalogue insert cannot acquire fabricated back holes";
+		};
+		var steel=switch materia.casting.InsertFinishing.assess(spec.body,spec.interfaces) {
+			case Resolved(result):result;
+			case Invalid(reason),Unsupported(reason):throw "Resolve source anchor stock before authoring back holes: "+reason;
+		};
+		var stock=materia.casting.InsertFinishing.box(steel);
+		if (stock==null) throw "Unsupported non-box source back-hole pattern";
+		var choice=InsertHoles.metricThread(thread),anchors:Array<InsertAnchorChoice> = [];
+		for (point in points) {
+			materia.casting.CastingFeatureCodec.identifier(point.id);
+			if (!Math.isFinite(point.xMm+point.yMm)) throw "Anchor coordinates must be finite: "+point.id;
+			if (spec.holes.filter(hole -> hole.id==point.id).length>0) throw "Duplicate source anchor hole: "+point.id;
+			var hole=InsertHoles.records(InsertHoles.tappedBlind(choice,stock.height,source.insertMaterial().grade))[0];
+			hole.id=point.id;hole.frame=F.translation(point.xMm,point.yMm,stock.z);
+			materia.casting.InsertStages.validateServiceHole(hole,stock);
+			spec.holes.push(hole);
+			manufacturing.holeRoutes.push({holeId:hole.id,route:materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting});
+			anchors.push({id:point.id,holeId:hole.id,lengthMm:point.lengthMm,insertionMm:point.insertionMm,
+				locking:point.locking});
+		}
+		var selected=choose(spec,rules,anchors),values=source.values().copy();
+		values.setToken("holes",InsertHoles.fromNeutral(spec.holes))
+			.setToken("origin",haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(spec.origin)))
+			.setToken("anchorage",haxe.Json.stringify(C.record(selected)));
+		return new CastInsert(values);
+	}
+
+	public static function demand(spec:InsertSpec,ruleId:String,factor:Float,liftingShareN:Float,anchorHoleIds:Array<String>):InsertAnchorDemand {
+		var occupied=C.occupiedHoleIds(spec.anchorage).concat(anchorHoleIds);
+		var loads:Array<{holeId:String,preloadN:Float}> = [];
+		for (hole in spec.holes) {
+			var thread=hole.thread;
+			if (thread!=null && occupied.indexOf(hole.id)<0)
+				loads.push({holeId:hole.id,preloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(InsertHoles.threadSpec(thread))});
+		}
+		loads.sort((a,b) -> Reflect.compare(a.holeId,b.holeId));
+		return {ruleId:ruleId,factor:factor,servicePreloads:loads,liftingShareN:liftingShareN,
+			servicePreloadReference:machinekit.design.ThreadedHolePolicy.ASSEMBLY_PRELOAD_REFERENCE};
+	}
+
+	public static function choose(spec:InsertSpec,rules:InsertAnchorRules,choices:Array<InsertAnchorChoice>):InsertAnchorage {
+		var anchors:Array<InsertBoltAnchor> = [];
+		for (choice in choices) {
+			var holes=spec.holes.filter(hole -> hole.id==choice.holeId);
+			if (holes.length!=1 || holes[0].thread==null) throw "Anchor choice requires a declared source tap: "+choice.id;
+			var thread=holes[0].thread;
+			if (thread==null) throw "Missing source anchor thread";
+			var screw=HexFlangeBolt.metric(thread.designation,choice.lengthMm,Steel88);
+			anchors.push({id:choice.id,holeId:choice.holeId,insertionMm:choice.insertionMm,
+				screw:screwRecord(screw),locking:choice.locking});
+		}
+		var result=C.copy(Bolted(rules,anchors));C.references(result,spec.body,spec.holes,spec.origin,spec.interfaces);return result;
+	}
+
+	public static function components(spec:InsertSpec):Array<InsertAnchorComponent> {
+		var source=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec)),result:Array<InsertAnchorComponent> = [];
+		checkHoleClearance(source);
+		var holes=materia.casting.InsertStages.holes(source,materia.casting.InsertStages.InsertStage.BeforeCasting);
+		switch source.anchorage {
+			case Undeclared,CatalogueRetention:
+			case Bolted(_,anchors):
+				for (anchor in anchors) {
+					var matches=holes.filter(hole -> hole.id==anchor.holeId);
+					if (matches.length!=1) throw "Missing physical pre-cast anchor hole: "+anchor.id;
+					var hole=matches[0],service=source.holes.filter(h -> h.id==anchor.holeId)[0],bearing=C.bearingFrame(service,anchor);
+					var screw=HexFlangeBolt.metric(anchor.screw.thread.designation,anchor.screw.lengthMm,Steel88);
+					if (!sameScrew(screwRecord(screw),anchor.screw))
+						throw "Anchor hardware differs from selected standard components: "+anchor.id;
+					var headInRaw=F.compose(F.inverse(hole.frame),bearing);
+					if (headInRaw.z>1e-8)
+						throw "Anchor flange intersects pre-cast steel: "+anchor.id;
+					var failures=materia.casting.ThreadedFastenerFit.checkIntervals(service,service.frame,
+						{shankLength:anchor.screw.lengthMm,threadedLength:anchor.screw.threadedLengthMm,bearingFrame:bearing},anchor.id)
+						.concat(materia.casting.ThreadedFastenerFit.checkIntervals(hole,hole.frame,
+							{shankLength:anchor.screw.lengthMm,threadedLength:anchor.screw.threadedLengthMm,bearingFrame:bearing},anchor.id))
+						.filter(finding -> !finding.passed);
+					if (failures.length>0) throw "Anchor source thread fit fails: "+anchor.id+": "+[for (f in failures) f.message].join("; ");
+					result.push({anchorId:anchor.id,kind:InsertAnchorComponentKind.Bolt,part:screw,pose:F.compose(bearing,F.inverse(screw.bearingFrame()))});
+				}
+		}
+		return result;
+	}
+
+	/** Both holes must retain their declared material wall. Screw diametral
+	 * clearance alone cannot protect the steel between intersecting bore spans. */
+	public static function requiredHoleLigament(a:materia.casting.InsertHole,b:materia.casting.InsertHole):Float
+		return InsertAnchorSelection.requiredHoleLigament(a,b);
+
+	/** Exact separation of the declared bore/major-thread design envelopes, in
+	 * insert coordinates. Counterbores and reliefs retain their own axial spans.
+	 * No mesh, endpoint-only distance or parallel-axis assumption is used. */
+	static function checkHoleClearance(spec:InsertSpec):Void {
+		var occupied=C.occupiedHoleIds(spec.anchorage);
+		if (occupied.length==0) return;
+		var shapes:Map<String,cadkit.modeling.Part> = [];
+		function envelope(hole:materia.casting.InsertHole):cadkit.modeling.Part {
+			var cached=shapes.get(hole.id);if (cached!=null) return cached;
+			var shape=machinekit.component.Solids.building([],owned -> {
+				function add(radius:Float,from:Float,to:Float):Void
+					owned.push(machinekit.design.DesignGeometry.envelope({id:hole.id,frame:hole.frame,
+						volume:CylinderVolume(radius,from,to)}));
+				add((hole.thread==null ? hole.diameter : hole.thread.majorDiameter)/2,0,hole.depth);
+				if (hole.counterbore!=null) add(hole.counterbore.diameter/2,0,hole.counterbore.depth);
+				if (hole.relief!=null) add(hole.relief.diameter/2,hole.relief.start,hole.depth);
+				return machinekit.component.Solids.union(owned);
+			});
+			shapes.set(hole.id,shape);return shape;
+		}
+		try {
+			for (id in occupied) {
+				var hole=spec.holes.filter(candidate -> candidate.id==id)[0];
+				for (other in spec.holes) if (other.id!=id) {
+					var minimum=requiredHoleLigament(hole,other);
+					var first=envelope(hole),second=envelope(other);
+					var firstBounds=first.shape.bounds(),secondBounds=second.shape.bounds();
+					var a=firstBounds.get_min(),b=firstBounds.get_max();
+					var c=secondBounds.get_min(),d=secondBounds.get_max();
+					var dx=Math.max(0,Math.max(a.get_x()-d.get_x(),c.get_x()-b.get_x()));
+					var dy=Math.max(0,Math.max(a.get_y()-d.get_y(),c.get_y()-b.get_y()));
+					var dz=Math.max(0,Math.max(a.get_z()-d.get_z(),c.get_z()-b.get_z()));
+					// Box distance is a lower bound: only definitely separated holes
+					// bypass the exact solid distance, including rotated bore spans.
+					if (Math.sqrt(dx*dx+dy*dy+dz*dz)>=minimum) continue;
+					var measured=first.distance(second);
+					if (measured+1e-7<minimum)
+						throw "Anchor "+id+": source hole "+other.id+" clearance "+measured+" mm; requires "+minimum+" mm";
+				}
+			}
+		} catch (error:Dynamic) {for (shape in shapes) shape.close();throw error;}
+		for (shape in shapes) shape.close();
+	}
+
+	static function sameScrew(a:InsertAnchorScrew,b:InsertAnchorScrew):Bool {
+		var x=a.thread,y=b.thread;
+		return a.partNumber==b.partNumber && a.lengthMm==b.lengthMm && a.threadedLengthMm==b.threadedLengthMm
+			&& a.headHeightMm==b.headHeightMm && a.headAcrossFlatsMm==b.headAcrossFlatsMm
+			&& a.flangeDiameterMm==b.flangeDiameterMm && a.flangeThicknessMm==b.flangeThicknessMm
+			&& a.bearingInnerDiameterMm==b.bearingInnerDiameterMm && a.bearingOuterDiameterMm==b.bearingOuterDiameterMm
+			&& a.assemblyPreloadN==b.assemblyPreloadN && a.preloadReference==b.preloadReference
+			&& x.designation==y.designation && x.majorDiameter==y.majorDiameter && x.pitch==y.pitch
+			&& x.starts==y.starts && x.internal==y.internal && x.toleranceClass==y.toleranceClass
+			&& x.hand==y.hand && x.profile==y.profile;
+	}
+
+	static function screwRecord(part:HexFlangeBolt):InsertAnchorScrew
+		return {partNumber:part.bom.partNumber,thread:InsertHoles.threadRecord(part.threadSpec()),lengthMm:part.shankLength(),
+			threadedLengthMm:part.threadedLength(),headHeightMm:part.spec.headHeight,headAcrossFlatsMm:part.spec.acrossFlats,
+			flangeDiameterMm:part.spec.flangeDiameter,flangeThicknessMm:part.spec.flangeThickness,
+			bearingInnerDiameterMm:part.spec.bearingInnerDiameter,bearingOuterDiameterMm:part.spec.bearingOuterDiameter,
+			assemblyPreloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(part.threadSpec()),
+			preloadReference:machinekit.design.ThreadedHolePolicy.ASSEMBLY_PRELOAD_REFERENCE};
+	/** Exact ray exit to the exposed composite-casting boundary. Steel/resin
+	 * interfaces do not substitute for that surface. Used by source sizing and
+	 * its independent tooling review; source geometry is borrowed. */
+	public static function axialEmbedment(point:materia.assembly.AssemblyDefinition.AssemblyVector,
+		direction:materia.assembly.AssemblyDefinition.AssemblyVector,bulk:cadkit.modeling.Part):Float {
+		var bounds=bulk.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
+		var dx=hi.get_x()-lo.get_x(),dy=hi.get_y()-lo.get_y(),dz=hi.get_z()-lo.get_z();
+		var length=2*Math.sqrt(dx*dx+dy*dy+dz*dz);
+		var ray=cadkit.modeling.Curve.line(new cadkit.modeling.Vector(point.x,point.y,point.z),
+			new cadkit.modeling.Vector(point.x+direction.x*length,point.y+direction.y*length,point.z+direction.z*length));
+		var depth=Math.POSITIVE_INFINITY;
+		var intersection:Null<cadkit.Shape> = null;
+		try {
+			intersection=bulk.shape.common(ray.shape);
+			for (vertex in intersection.vertices().all()) {
+				var p=vertex.position();
+				var distance=(p.get_x()-point.x)*direction.x+(p.get_y()-point.y)*direction.y+(p.get_z()-point.z)*direction.z;
+				vertex.close();
+				// The ray starts inside the qualified bulk. Its own start vertex
+				// is not a boundary event; the first other interval end is.
+				if (distance>1e-7) depth=Math.min(depth,distance);
+			}
+		} catch (error:Dynamic) {if (intersection!=null) intersection.close();ray.close();throw error;}
+		intersection.close();
+		ray.close();
+		if (!Math.isFinite(depth)) throw "Anchor axial embedment has no exposed casting boundary";
+		return depth;
+	}
+
+
+	/** Square land for a central clearance bore and corner anchors. Both bore
+	 * walls survive: the corner bore must lie wholly outside the central wall. */
+	public static function minimumClearancePadSide(diameter:Float,thickness:Float,
+		material:materia.casting.InsertMaterial):Float {
+		var central=machinekit.design.ThreadedHolePolicy.clearance(diameter);
+		for (size in availableSizes()) {
+			var hole:materia.casting.InsertHole;
+			try hole=holeForStock(size,thickness,material) catch (_:Dynamic) continue;
+			var nominal=HexFlangeBolt.catalog().get(size);
+			var edge=Math.max(hole.limits.minWall+nominal.diameter/2,nominal.flangeDiameter/2);
+			var separation=diameter/2+nominal.diameter/2+Math.max(central.minWall,hole.limits.minWall);
+			return Math.max(diameter+2*central.minWall,2*(edge+separation/Math.sqrt(2)));
+		}
+		throw "No standard blind anchor thread fits the clearance-pad thickness";
+	}
+
+	/** Absolute geometric floor around a central opening, using the smallest
+	 * standard flange bolt. The demand-admitted pattern can require more land. */
+	public static function minimumBandDepth(openingMm:Float,thicknessMm:Float,material:materia.casting.InsertMaterial,
+		rule:InsertAnchorPatternRule):Float {
+		InsertAnchorSelection.validateRule(rule);
+		if (!Math.isFinite(openingMm) || openingMm<0) throw "Invalid anchor-band opening";
+		for (size in availableSizes()) {
+			var hole:materia.casting.InsertHole;
+			try hole=holeForStock(size,thicknessMm,material) catch (_:Dynamic) continue;
+			var diameter=HexFlangeBolt.catalog().get(size).diameter;
+			var radius=HexFlangeBolt.catalog().get(size).flangeDiameter/2;
+			var edge=Math.max(hole.limits.minWall+diameter/2,radius);
+			return openingMm+2*(edge+radius+rule.coverDiameters*diameter);
+		}
+		throw "No standard blind anchor thread fits the source stock thickness";
+	}
+
+	/** Resin land for the demand-admitted back pattern. Use the same footprint
+	 * rule as the final native selection, rather than the smallest catalogue
+	 * thread. Final casting containment and cover remain mandatory. */
+	public static function minimumOuterLand(id:String,source:CastInsert,rule:InsertAnchorPatternRule,
+		liftingShareN:Float):{x:Float,y:Float} {
+		var sized=derive(id,source,rule,FootprintOnly,liftingShareN).insertSpec();
+		var raw=switch materia.casting.InsertFinishing.assess(sized.body,sized.interfaces) {
+			case Resolved(result):result;
+			case Invalid(reason),Unsupported(reason):throw reason;
+		};
+		var stock=materia.casting.InsertFinishing.box(raw);
+		if (stock==null) throw "Anchor outer land requires rectangular source steel: "+id;
+		var land={x:0.0,y:0.0};
+		switch sized.anchorage {
+			case Bolted(rules,anchors):for (anchor in anchors) {
+				var hole=sized.holes.filter(h -> h.id==anchor.holeId)[0];
+				var margin=anchor.screw.flangeDiameterMm/2+rules.minimumCoverMm;
+				land.x=Math.max(land.x,Math.max(stock.x-hole.frame.x+margin,
+					hole.frame.x+margin-stock.x-stock.width));
+				land.y=Math.max(land.y,Math.max(stock.y-hole.frame.y+margin,
+					hole.frame.y+margin-stock.y-stock.depth));
+			}
+			default:throw "Missing demand-sized anchor pattern: "+id;
+		}
+		return land;
+	}
+
+	static function availableSizes():Array<String> {
+		var catalog=HexFlangeBolt.catalog();
+		var sizes=catalog.designations();
+		sizes.sort((a,b) -> Reflect.compare(catalog.get(a).diameter,catalog.get(b).diameter));
+		return sizes;
+	}
+
+	static function holeForStock(size:String,thickness:Float,material:materia.casting.InsertMaterial):materia.casting.InsertHole {
+		var nominal=HexFlangeBolt.catalog().get(size);
+		var thread=machinekit.standard.FastenerThreads.coarse(nominal.diameter).mating();
+		return InsertHoles.records(InsertHoles.tappedBlind(InsertHoles.metricThread(thread),thickness,material))[0];
+	}
+
+
+	public static function derive(id:String, source:CastInsert, rule:InsertAnchorPatternRule,context:InsertAnchorContext,liftingShareN:Float):CastInsert {
+		try return build(source,rule,context,liftingShareN)
+		catch (error:Dynamic) {
+			if (Std.isOfType(error,InsertAnchorScreenDefect)) throw error;
+			throw "Insert " + id + ": anchor pattern: " + Std.string(error);
+		}
+	}
+
+	static function build(source:CastInsert,rule:InsertAnchorPatternRule,context:InsertAnchorContext,liftingShareN:Float):CastInsert {
+		InsertAnchorSelection.validateRule(rule);
+		if (!Math.isFinite(liftingShareN) || liftingShareN<0) throw "Invalid source lifting demand";
+		var spec=source.insertSpec();
+		switch spec.anchorage {case Undeclared:default:throw "Anchor pattern requires unanchored source steel";}
+		var steel=switch materia.casting.InsertFinishing.assess(spec.body,spec.interfaces) {
+			case Resolved(result):result;
+			case Invalid(reason),Unsupported(reason):throw reason;
+		};
+		var stock=materia.casting.InsertFinishing.box(steel);
+		if (stock==null) throw "Back-face anchor rule requires rectangular steel";
+		var choices:Array<InsertAnchorStockChoice>=[],failures:Array<String>=[];
+		for (size in availableSizes()) {
+			var nominal=HexFlangeBolt.catalog().get(size),hole:materia.casting.InsertHole;
+			try hole=holeForStock(size,stock.height,source.insertMaterial().grade)
+			catch (error:Dynamic) {failures.push(size+": "+Std.string(error));continue;}
+			var insertion=materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement;
+			var lengths=rule.screwLengthsMm.filter(length -> length>insertion
+				&& HexFlangeBolt.metric(size,length,Steel88).threadedLength()>=insertion);
+			lengths.sort(Reflect.compare);
+			if (lengths.length==0) {failures.push(size+": no declared screw length leaves the flange outside the insert");continue;}
+			if (hole.thread==null) throw "Missing resolved source anchor thread";
+			choices.push({size:size,diameter:nominal.diameter,flangeDiameter:nominal.flangeDiameter,
+				bearingInnerDiameter:nominal.bearingInnerDiameter,bearingOuterDiameter:nominal.bearingOuterDiameter,
+				hole:hole,lengths:lengths,assemblyPreloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(InsertHoles.threadSpec(hole.thread))});
+		}
+		var boundary=switch context {case FootprintOnly:[];case Casting(body,_):screenBoundary(body);};
+		var tested=new Map<String,Bool>(),screws=new Map<String,InsertAnchorScrew>();
+		var candidate=InsertAnchorSelection.select(spec,rule,demand(spec,rule.id,rule.demandFactor,liftingShareN,[]),choices,failures,item -> {
+			for (point in item.points) {
+				var selected={id:point.id,xMm:point.xMm,yMm:point.yMm,lengthMm:item.lengthMm,
+					insertionMm:point.insertionMm,locking:point.locking};
+				var key=item.size+":"+point.xMm+":"+point.yMm+":"+item.lengthMm;
+				if (!tested.exists(key)) {
+					var screwKey=item.size+":"+item.lengthMm;
+					if (!screws.exists(screwKey)) screws.set(screwKey,screwRecord(HexFlangeBolt.metric(item.size,item.lengthMm,Steel88)));
+					var accepted=switch context {
+						case FootprintOnly:true;
+						case Casting(_,pose):InsertAnchorScreen.accepts(selected,screws.get(screwKey),stock.z,pose,boundary,
+							item.rules.minimumCoverMm,item.rules.minimumEmbedmentMm);
+					};
+					tested.set(key,accepted);
+				}
+				if (tested.get(key)!=true) return false;
+			}
+			return true;
+		});
+		var selected=[for (point in candidate.points) {id:point.id,xMm:point.xMm,yMm:point.yMm,
+			lengthMm:candidate.lengthMm,insertionMm:point.insertionMm,locking:point.locking}];
+		var result=backPattern(source,InsertHoles.threadSpec(candidate.thread),candidate.rules,selected);
+		if (!contained(result,context,candidate.rules.minimumCoverMm,candidate.rules.minimumEmbedmentMm))
+			throw new InsertAnchorScreenDefect("Analytic anchor screen disagrees with native confirmation; candidate must not fall back");
+		components(result.insertSpec());return result;
+	}
+
+	/** Copy exact trimmed planar boundaries once per selector invocation. The
+	 * body already comes from the shared finished-cavity realization; no local
+	 * clipping, tessellation or bounding-box cavity substitution occurs here. */
+	static function screenBoundary(body:Part):Array<AnchorFace> {
+		var result:Array<AnchorFace>=[];
+		for (i in 0...body.shape.subshapeCount(CadKit.ShapeKind.Face)) {
+			var face=body.shape.subshape(CadKit.ShapeKind.Face,i);
+			try {
+				if (face.surfaceKind()!=CadKit.SurfaceKind.Plane)
+					throw "Anchor analytic screen requires a declared planar source boundary";
+				var n=face.faceNormal(),edges:Array<AnchorEdge>=[];
+				for (j in 0...face.subshapeCount(CadKit.ShapeKind.Edge)) {
+					var edge=face.subshape(CadKit.ShapeKind.Edge,j);
+					try {
+						if (edge.curveKind()!=CadKit.CurveKind.Line)
+							throw "Anchor analytic screen requires exact straight boundary edges";
+						var a=edge.positionAt(0),b=edge.positionAt(1);
+						edges.push({a:{x:a.get_x(),y:a.get_y(),z:a.get_z()},b:{x:b.get_x(),y:b.get_y(),z:b.get_z()}});
+					} catch (error:Dynamic) {edge.close();throw error;}
+					edge.close();
+				}
+				if (edges.length<3) throw "Anchor source face has no finite planar trim";
+				result.push({normal:{x:n.get_x(),y:n.get_y(),z:n.get_z()},edges:edges});
+			} catch (error:Dynamic) {face.close();throw error;}
+			face.close();
+		}
+		return result;
+	}
+
+	/** Chosen-pattern confirmation. Analytic admission never substitutes for
+	 * native occupancy, all-anchor embedment or finite-face cover. */
+	static function contained(source:CastInsert,context:InsertAnchorContext,cover:Float,minimumEmbedment:Float):Bool {
+		return switch context {
+			case FootprintOnly:true;
+			case Casting(body,pose):
+				var owned:Array<Part> = [],accepted=true;
+				function keep(part:Part):Part {owned.push(part);return part;}
+				try {
+					var spec=source.insertSpec();
+					var anchors=switch spec.anchorage {case Bolted(_,anchors):anchors;default:throw "Missing anchor candidate";};
+					for (anchor in anchors) {
+						var hole=spec.holes.filter(value -> value.id==anchor.holeId)[0];
+						var bearing=F.compose(pose,C.bearingFrame(hole,anchor));
+						if (axialEmbedment(F.transformPoint(bearing,0,0,0),F.transformVector(bearing,0,0,1),body)
+							+1e-7<minimumEmbedment) return false;
+					}
+					var exterior=keep(machinekit.assembly.PosedParts.moved(keep(InsertBodies.part(spec.body)),pose));
+					var hardware:Array<Part> = [];
+					for (component in InsertAnchorGeometry.components(spec)) {
+						var shape=keep(machinekit.assembly.PosedParts.moved(keep(component.part.geometry()),F.compose(pose,component.pose)));
+						shape.shape.setThreadedFaces([]);hardware.push(shape);
+					}
+					var exposed=keep(keep(Part.fuseAll(hardware)).subtract(exterior));
+					if (keep(exposed.subtract(body)).volume()>1e-6) {
+						accepted=false;
+					}
+					var bounds=exposed.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
+					if (accepted) for (index in 0...body.shape.subshapeCount(CadKit.ShapeKind.Face)) {
+						var face=body.shape.subshape(CadKit.ShapeKind.Face,index);
+						try {
+							var other=face.bounds(),a=other.get_min(),b=other.get_max();
+							var dx=Math.max(0,Math.max(lo.get_x()-b.get_x(),a.get_x()-hi.get_x()));
+							var dy=Math.max(0,Math.max(lo.get_y()-b.get_y(),a.get_y()-hi.get_y()));
+							var dz=Math.max(0,Math.max(lo.get_z()-b.get_z(),a.get_z()-hi.get_z()));
+							// Enclosing bounds supply a conservative distance lower bound;
+							// only near faces need the actual surface-distance solve.
+							if (dx*dx+dy*dy+dz*dz<cover*cover && exposed.shape.distance(face)+1e-7<cover) {
+								accepted=false;
+							}
+						}
+						catch (error:Dynamic) {face.close();throw error;}
+						face.close();if (!accepted) break;
+					}
+				} catch (error:Dynamic) {for (part in owned) part.close();throw error;}
+				for (part in owned) part.close();
+				accepted;
+		};
+	}
+
+
+	public static function embeddedParts(rows:Array<EmbeddedInsertAnchors>):Array<Part> {
+		var result:Array<Part> = [],cache=new PosedParts();
+		try {
+			for (row in rows) {
+				var components:Array<InsertAnchorGeometry.InsertAnchorComponent>;
+				try components=InsertAnchorGeometry.components(row.spec)
+				catch (error:Dynamic) throw "Insert "+row.owner+": "+Std.string(error);
+				for (hardware in components) {
+					var occupancy=cache.posed(hardware.part,F.compose(row.pose,hardware.pose));
+					result.push(occupancy);
+					// This owned copy represents excluded resin volume, not an external
+					// screw machining interface on the resulting casting. Keep the exact
+					// B-rep; semantic threads remain on the real component in the BOM.
+					occupancy.shape.setThreadedFaces([]);
+			}
+			}
+		} catch (error:Dynamic) {for (part in result) part.close();cache.close();throw error;}
+		cache.close();return result;
+	}
 }

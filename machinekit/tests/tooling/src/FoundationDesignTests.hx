@@ -117,7 +117,7 @@ class FoundationDesignTests {
 					var local=Part.box(box.width,box.depth,box.height);parts.push(local);
 					var placed=PosedParts.moved(local,row.pose);parts.push(placed);cuts.push(placed);
 				}
-				for (hardware in machinekit.structural.InsertAnchorHardware.parts(row.part.insertSpec())) {
+				for (hardware in machinekit.tooling.InsertAnchorGeometry.components(row.part.insertSpec())) {
 					var local=hardware.part.geometry();parts.push(local);local.shape.setThreadedFaces([]);
 					var placed=PosedParts.moved(local,F.compose(row.pose,hardware.pose));parts.push(placed);cuts.push(placed);
 				}

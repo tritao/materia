@@ -124,7 +124,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 				var parts=[local];
 				var spec:materia.casting.InsertSpec={body:insert.body,holes:insert.holes,origin:insert.origin,
 					interfaces:insert.interfaces,anchorage:insert.anchorage};
-				for (hardware in machinekit.structural.InsertAnchorHardware.parts(spec)) {
+				for (hardware in machinekit.tooling.InsertAnchorGeometry.components(spec)) {
 					var raw=scope.own(hardware.part.geometry());
 					raw.shape.setThreadedFaces([]);
 					parts.push(scope.own(machinekit.assembly.PosedParts.moved(raw,hardware.pose)));

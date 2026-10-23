@@ -9,7 +9,7 @@ class MillCastingDetails {
 	 * Demand is class-8.8 service preload plus a two-load-path lifting share,
 	 * multiplied by the named 1.5 design reserve. Mix strengths remain inputs.
 	 * Geometric minima do not establish compound-specific anchor capacity. */
-	public var anchorRule:machinekit.structural.InsertAnchorPattern.InsertAnchorPatternRule = {
+	public var anchorRule:materia.casting.InsertAnchorage.InsertAnchorPatternRule = {
 		id: "mill-bolted-anchor-demand-v1", demandFactor: 1.5, maximumCount: 64,
 		liftingLoadPaths: 2, gravityMps2: 9.80665,
 		minimumCount: 2, maximumPitchInShortWidths: 4,
@@ -74,7 +74,7 @@ class MillCastingDetails {
 
 	/** A centred clearance bore retains the full policy wall on both sides. */
 	public function minimumClearancePadSide(diameterMm:Float,thicknessMm:Float):Float {
-		var minimum=machinekit.structural.InsertAnchorPattern.minimumClearancePadSide(diameterMm,thicknessMm,C45Bright);
+		var minimum=machinekit.tooling.InsertAnchorGeometry.minimumClearancePadSide(diameterMm,thicknessMm,C45Bright);
 		// Source blanks are specified in whole millimetres, outward from the
 		// exact geometric floor; tangent bores are not rounded inward.
 		return Math.ceil(minimum);
@@ -83,7 +83,7 @@ class MillCastingDetails {
 	/** Absolute joint-pad floor from access, policy edge wall, flange and cover.
 	 * The final demand-sized pattern must still pass native containment. */
 	public function minimumColumnPadDepth(thicknessMm:Float):Float
-		return machinekit.structural.InsertAnchorPattern.minimumBandDepth(columnBoltAccessDepth,thicknessMm,C45Bright,anchorRule);
+		return machinekit.tooling.InsertAnchorGeometry.minimumBandDepth(columnBoltAccessDepth,thicknessMm,C45Bright,anchorRule);
 
 	public function new() {
 		levelingFoot = Foot(70, 20, machinekit.standard.FastenerThreads.metric(16, 2),

@@ -4,7 +4,7 @@ import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
 import machinekit.structural.MineralFoundation;
 import machinekit.structural.MineralFoundation.CastInsertPlacement;
-import machinekit.structural.InsertAnchorPattern;
+import machinekit.tooling.InsertAnchorGeometry;
 import machinekit.structural.InsertHoles;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingPatterns;
@@ -77,9 +77,10 @@ class MillLiftingPattern {
 							var steel=new machinekit.assembly.MachineAssembly();steel.addComponent(id,candidate.part,F.identity());
 							var checked=machinekit.design.AssemblyDesignChecks.check(steel);
 							if (checked.hasErrors()) throw checked.items.map(item -> item.message).join("; ");
-							InsertAnchorPattern.derive(id,candidate.part,details.anchorRule,Casting(resin,candidate.pose),share);
+							InsertAnchorGeometry.derive(id,candidate.part,details.anchorRule,Casting(resin,candidate.pose),share);
 							chosen=candidate;break;
 						} catch (error:Dynamic) {
+							if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
 							failures.push(footprint.width+"x"+footprint.depth+" @ "+seed.x+","+seed.y+": "+Std.string(error));
 						}
 					}

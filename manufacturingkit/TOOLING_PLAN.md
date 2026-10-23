@@ -1111,7 +1111,7 @@ is trimmed first. Items 8–14 are deletions and merges with no new capability:
 kits stay identical except where an item says otherwise, and the slice report
 lists each deleted module with the check or record that still covers it.
 
-1. Unresolved inputs are a typed value (known, or unresolved with a reason), not
+1. [x] Unresolved inputs are a typed value (known, or unresolved with a reason), not
    `Null<Float>` found by reflecting over field-name strings
    (`HoleClearanceBudget` and the other nullable inputs in `materia.casting`).
    Missing-input lists come from the type, not from field names.
@@ -1132,7 +1132,7 @@ lists each deleted module with the check or record that still covers it.
    check per package. Remove layers that re-verify what another layer already
    proves. List each removal with the check that still covers it. Delete
    unneeded layers rather than disabling them behind flags.
-7. Make anchor selection fast. `InsertAnchorPattern` now takes about 92 s per
+7. [x] Make anchor selection fast. `InsertAnchorPattern` now takes about 92 s per
    mill build because it runs native OCCT cover and containment checks on
    every enumerated candidate. Inserts, holes, anchors and the cavity faces
    they meet are boxes, cylinders and discs. Screen candidates with exact
@@ -1174,7 +1174,7 @@ lists each deleted module with the check or record that still covers it.
     geometry. In the bench-mill directory, merge build configs that only differ
     by entry point into one project with named entries where haxeon supports
     it, and delete configs no suite or document uses.
-14. Consolidate anchors and insert stages. Anchor demand, pattern selection,
+14. [x] Consolidate anchors and insert stages. Anchor demand, pattern selection,
     hardware and checks are spread over about eight files in three packages
     (`InsertAnchorage`, `EmbeddedAnchors`, `InsertAnchorPattern`,
     `InsertAnchorHardware`, `InsertAnchorGeometry`, `InsertAnchorageChecks`,
@@ -1392,7 +1392,7 @@ Former registration decision (2026-10-22): neck and flange sheets register again
 - Input states use concrete numeric/text enums for the assembly wire profile,
   encoded as `{kind:"known",value}` or `{kind:"unresolved",reason}`. Numeric
   budgets, metrology, shop-process and bought-part clearance references use them;
-  the conditional anchor locking reference remains with anchor consolidation.
+  anchor retaining references and mix-strength inputs use the same explicit states.
 - Typed model copies explicitly write raw records before parsing. Raw snapshots
   accept one representation, with existing canonical ordering and geometry limits.
 - The package manifest references the single `fabrication-validation.json` report.
@@ -1423,3 +1423,17 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   independent format versions. Compound/pour shop records use the package format.
   Exact panel and core-cutting readers remain because delivered panel/fixture and
   cutting records use them for CAD restoration and manufacturing geometry checks.
+
+- Anchor cleanup decision: `InsertAnchorage` owns neutral demand records,
+  candidate ordering, screening and checks. `InsertAnchorGeometry` owns catalogue
+  resolution, exact boundary extraction and native confirmation. The former
+  pattern/hardware/embedded/check modules are deleted; these two modules retain
+  their checks. The screen copies actual trimmed planar edges from the shared
+  cavity realization, including openings; it never approximates them by a mesh.
+  A rejected native confirmation is an error, never another candidate or plate.
+- Retain the insert manufacturing model, shop-operation planner, finishing,
+  blank-fit and stage helpers: drawings and operation sheets consume them;
+  fixtures require before-casting holes and the assembly requires service holes.
+  These are two physical stages, separate from before/after-casting shop operations.
+- Anchor locking is a shoulder stop or a retaining process with a typed reference.
+  No retaining product or cured-mix strength is chosen. Evidence remains Pending.

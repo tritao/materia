@@ -208,7 +208,7 @@ class MillFrame extends MachineAssembly {
 						InsertHoles.fromNeutral(holes)).setToken("role",InsertRole.HatchMount)
 						.setToken("label","rear motor hatch anchor"));
 					var land:Float;
-					try land=machinekit.structural.InsertAnchorPattern.minimumOuterLand("hatch-layout",part,details.anchorRule,0).x
+					try land=machinekit.tooling.InsertAnchorGeometry.minimumOuterLand("hatch-layout",part,details.anchorRule,0).x
 					catch (error:Dynamic) {lastFailure=Std.string(error);offset+=1;continue;}
 					var needed=Math.max(details.hatchAnchorSideOffset,a.yBayWidth/2+details.hatchAnchorWidth/2+land);
 					if (needed<=offset+1e-8) {settled=true;break;}
@@ -367,7 +367,7 @@ class MillFrame extends MachineAssembly {
 		return result;
 	}
 
-	static function anchorInserts(rows:Array<CastInsertPlacement>,rule:machinekit.structural.InsertAnchorPattern.InsertAnchorPatternRule,
+	static function anchorInserts(rows:Array<CastInsertPlacement>,rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule,
 		castingValues:ComponentValues):Array<CastInsertPlacement> {
 		var body=new machinekit.structural.MineralCasting(castingValues).geometry();
 		try {
@@ -384,13 +384,13 @@ class MillFrame extends MachineAssembly {
 			// patterns and their exact containment are unchanged across this loop.
 			var fixed:Map<String,CastInsert> = [];
 			for (row in rows) if (row.part.parameterToken("role")!=InsertRole.LiftingMount)
-				fixed.set(row.id,machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose),0));
+				fixed.set(row.id,machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),0));
 			// Hardware changes the casting mass. Resolve that known design coupling
 			// without borrowing workshop strength values or dropping hardware mass.
 			for (pass in 0...8) {
 				var result:Array<CastInsertPlacement> = [for (row in rows) {id:row.id,pose:row.pose,openings:row.openings,
 					part:fixed.exists(row.id) ? fixed.get(row.id)
-						: machinekit.structural.InsertAnchorPattern.derive(row.id,row.part,rule,Casting(body,row.pose),liftingShare)}];
+						: machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),liftingShare)}];
 				var resolved=share(result);
 				if (Math.abs(resolved-liftingShare)<1e-6) {body.close();return result;}
 				liftingShare=resolved;

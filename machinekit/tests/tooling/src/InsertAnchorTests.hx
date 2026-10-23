@@ -5,7 +5,7 @@ import materia.casting.InsertAnchorage;
 import materia.casting.InsertAnchorage.InsertAnchorageCodec as C;
 import machinekit.structural.CastInsert;
 import machinekit.structural.InsertHoles;
-import machinekit.structural.InsertAnchorHardware;
+import machinekit.tooling.InsertAnchorGeometry;
 
 /** Synthetic anchor choices exercise rules, not a production fastening pattern. */
 class InsertAnchorTests {
@@ -30,12 +30,12 @@ class InsertAnchorTests {
 		var values=CastInsert.precastHoles(CastInsert.boxValues(60,50,20),InsertHoles.fromNeutral(holes))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount);
 		var base=new CastInsert(values),spec=base.insertSpec();
-		var anchorage=InsertAnchorHardware.choose(spec,
-			{demand:InsertAnchorHardware.demand(spec,"fixture-demand-v1",1.5,0,["back-left","back-right"]),
+		var anchorage=InsertAnchorGeometry.choose(spec,
+			{demand:InsertAnchorGeometry.demand(spec,"fixture-demand-v1",1.5,0,["back-left","back-right"]),
 				minimumEmbedmentMm:10,minimumBearingAreaMm2:20,minimumSpacingMm:5,minimumCoverMm:8},
 			[for (hole in holes) if (hole.id!="mounting") {id:hole.id,holeId:hole.id,lengthMm:25,
 				insertionMm:materia.casting.InsertHole.InsertHoleCodec.threadLimits(hole).minEngagement+0.5,
-				locking:InsertAnchorLock.RetainingCompound,lockingReference:null}]);
+				locking:InsertAnchorLock.RetainingCompound(materia.casting.CastingInput.CastingTextInput.Unresolved("Anchor retaining compound and cure/torque evidence"))}]);
 		values.setToken("anchorage",haxe.Json.stringify(C.record(anchorage)));return new CastInsert(values);
 	}
 	static function foundationGeometry(source:CastInsert):Void {
@@ -196,7 +196,7 @@ class InsertAnchorTests {
 			check(a.volume()+b.volume()<1e-6,"detached source resin matches foundation CAD by symmetric difference with real anchor voids");
 			var cache=new machinekit.assembly.PosedParts();
 			try {
-				for (hardware in InsertAnchorHardware.parts(spec)) {
+				for (hardware in InsertAnchorGeometry.components(spec)) {
 					var part=cache.posed(hardware.part,F.compose(F.translation(0,0,60),hardware.pose));owned.push(part);
 					part.shape.setThreadedFaces([]);
 					var common=new cadkit.modeling.Part(actual.shape.common(part.shape));owned.push(common);
@@ -215,35 +215,66 @@ class InsertAnchorTests {
 		switch origin {case Fabricated(plan):plan.holeRoutes=[{holeId:"fixing",route:materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting}];default:throw "Expected fabricated source";}
 		values.setToken("origin",haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
 		source=new CastInsert(values);
-		var rules:materia.casting.InsertAnchorage.InsertAnchorRules={demand:InsertAnchorHardware.demand(source.insertSpec(),"source-pattern-demand-v1",1.5,0,[]),
+		var rules:materia.casting.InsertAnchorage.InsertAnchorRules={demand:InsertAnchorGeometry.demand(source.insertSpec(),"source-pattern-demand-v1",1.5,0,[]),
 			minimumEmbedmentMm:10,minimumBearingAreaMm2:20,minimumSpacingMm:5,minimumCoverMm:8};
-		var points:Array<machinekit.structural.InsertAnchorHardware.InsertBackAnchorChoice> = [for (x in [-15.0,15.0]) {
+		var points:Array<materia.casting.InsertAnchorage.InsertBackAnchorChoice> = [for (x in [-15.0,15.0]) {
 			id:x<0 ? "back-left" : "back-right",xMm:x,yMm:0,lengthMm:25,insertionMm:8.3,
-			locking:InsertAnchorLock.RetainingCompound,lockingReference:null}];
-		var anchored=InsertAnchorHardware.backPattern(source,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points);
+			locking:InsertAnchorLock.RetainingCompound(materia.casting.CastingInput.CastingTextInput.Unresolved("Anchor retaining compound and cure/torque evidence"))}];
+		var anchored=InsertAnchorGeometry.backPattern(source,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points);
 		check(source.insertSpec().holes.length==1 && anchored.insertSpec().holes.length==3,"source back pattern owns its new holes without mutating the input insert");
 		var plan=switch anchored.insertSpec().origin {case Fabricated(plan):plan;default:throw "Expected source plan";};
 		check(plan.holeRoutes.filter(route -> route.holeId=="fixing" && route.route==materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting).length==1,
 			"adding anchors never changes a bought-part mounting-hole route");
 		check(plan.holeRoutes.filter(route -> route.route==materia.casting.InsertManufacturing.InsertHoleRoute.BeforeCasting).length==2,
 			"only the new source anchor holes are declared pre-cast");
-		check(InsertAnchorHardware.parts(anchored.insertSpec()).length==2,"source pattern selects actual ISO 4162 flange bolts");
-		rejects(() -> InsertAnchorHardware.backPattern(anchored,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points),"already declared");
+		check(InsertAnchorGeometry.components(anchored.insertSpec()).length==2,"source pattern selects actual ISO 4162 flange bolts");
+		rejects(() -> InsertAnchorGeometry.backPattern(anchored,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points),"already declared");
 		points[0].id="fixing";
-		rejects(() -> InsertAnchorHardware.backPattern(source,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points),"Duplicate source anchor hole");
+		rejects(() -> InsertAnchorGeometry.backPattern(source,machinekit.standard.FastenerThreads.coarse(6).mating(),rules,points),"Duplicate source anchor hole");
 	}
 
+	static function analyticDistances():Void {
+		var targets:Array<{points:Array<materia.casting.InsertAnchorage.AnchorPoint>,normal:materia.casting.InsertAnchorage.AnchorPoint}> = [
+			{points:[{x:-5.0,y:-5.0,z:3.0},{x:5.0,y:-5.0,z:3.0},{x:5.0,y:5.0,z:3.0},{x:-5.0,y:5.0,z:3.0}],normal:{x:0.0,y:0.0,z:1.0}},
+			{points:[{x:2.0,y:2.0,z:0.5},{x:3.0,y:2.0,z:0.5},{x:3.0,y:3.0,z:0.5},{x:2.0,y:3.0,z:0.5}],normal:{x:0.0,y:0.0,z:1.0}},
+			{points:[{x:3.0,y:-0.2,z:0.3},{x:3.0,y:0.2,z:0.3},{x:3.0,y:0.2,z:0.7},{x:3.0,y:-0.2,z:0.7}],normal:{x:1.0,y:0.0,z:0.0}},
+			{points:[{x:-5.0,y:-5.0,z:10.0},{x:10.0,y:-5.0,z:-5.0},{x:10.0,y:5.0,z:-5.0},{x:-5.0,y:5.0,z:10.0}],normal:{x:Math.sqrt(0.5),y:0.0,z:Math.sqrt(0.5)}}
+		];
+		for (target in targets) {
+			var vectors=[for (p in target.points) new cadkit.modeling.Vector(p.x,p.y,p.z)],
+				wire=cadkit.modeling.Curve.polyline(vectors,true),sketch:cadkit.modeling.Sketch=null,
+				cylinder:cadkit.modeling.Part=null,hex:cadkit.modeling.Part=null;
+			try {
+				var normal=new cadkit.modeling.Vector(target.normal.x,target.normal.y,target.normal.z);
+				var plane=new cadkit.modeling.Plane(vectors[0],vectors[1].subtract(vectors[0]),normal);
+				sketch=cadkit.modeling.Sketch.face(wire,[],plane);
+				cylinder=cadkit.modeling.Part.cylinderSpan(1,0,1);
+				hex=cadkit.modeling.Part.prism(cadkit.modeling.Polygon.regular(6,4),0,1);
+				var face:materia.casting.InsertAnchorage.AnchorFace={normal:target.normal,
+					edges:[for (i in 0...target.points.length) {a:target.points[i],b:target.points[(i+1)%target.points.length]}]};
+				var actual=cylinder.shape.distance(sketch.shape),screen=InsertAnchorScreen.cylinderFace(
+					{x:0.0,y:0.0,z:0.0},{x:0.0,y:0.0,z:1.0},1,1,face);
+				check(Math.abs(actual-screen)<1e-7,"finite cylinder/face analytic distance agrees with native: "+actual+" vs "+screen);
+				actual=hex.shape.distance(sketch.shape);screen=InsertAnchorScreen.hexFace(F.identity(),4,0,1,face);
+				check(Math.abs(actual-screen)<1e-7,"finite hex/face analytic distance agrees with native: "+actual+" vs "+screen);
+			} catch (error:Dynamic) {
+				if (hex!=null) hex.close();if (cylinder!=null) cylinder.close();if (sketch!=null) sketch.close();wire.close();throw error;
+			}
+			hex.close();cylinder.close();sketch.close();wire.close();
+		}
+	}
 	public static function main():Void run();
 
 	public static function run():Void {
+		analyticDistances();
 		sourcePattern();
 		var source=fixture(),spec=source.insertSpec();
 		var thinLigament=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));
 		thinLigament.holes.filter(hole -> hole.id=="mounting")[0].frame.x=5;
-		rejects(() -> InsertAnchorHardware.parts(thinLigament),"source hole mounting clearance");
+		rejects(() -> InsertAnchorGeometry.components(thinLigament),"source hole mounting clearance");
 		var colliding=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));
 		colliding.holes.filter(hole -> hole.id=="mounting")[0].frame.x=14;
-		rejects(() -> InsertAnchorHardware.parts(colliding),"source hole mounting clearance");
+		rejects(() -> InsertAnchorGeometry.components(colliding),"source hole mounting clearance");
 		var collisionValues=source.values().copy().setToken("holes",InsertHoles.fromNeutral(colliding.holes));
 		rejects(() -> new machinekit.structural.MineralFoundation(new machinekit.component.ComponentValues()
 			.setNumber("width",120).setNumber("depth",100).setNumber("height",80),
@@ -256,10 +287,10 @@ class InsertAnchorTests {
 		check(haxe.Json.stringify(C.record(C.copy(copy.anchorage)))==encoded,"anchor source order is canonical");
 		bolts(copy)[0].screw.headHeightMm+=1;
 		check(haxe.Json.stringify(C.record(spec.anchorage))==encoded,"source hardware facts are defensive copies");
-		rejects(() -> InsertAnchorHardware.parts(copy),"Anchor hardware differs from selected standard components");
+		rejects(() -> InsertAnchorGeometry.components(copy),"Anchor hardware differs from selected standard components");
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));bolts(copy)[0].screw.flangeThicknessMm+=0.1;
-		rejects(() -> InsertAnchorHardware.parts(copy),"Anchor hardware differs from selected standard components");
-		var parts=InsertAnchorHardware.parts(spec);
+		rejects(() -> InsertAnchorGeometry.components(copy),"Anchor hardware differs from selected standard components");
+		var parts=InsertAnchorGeometry.components(spec);
 		var screwGeometry=parts[0].part.geometry();
 		try check(screwGeometry.shape.threadedFaces().length==1,"real anchor component retains its external thread metadata")
 		catch (error:Dynamic) {screwGeometry.close();throw error;}
@@ -275,7 +306,7 @@ class InsertAnchorTests {
 			check(Math.abs(screw.pose.z-(anchor.insertionMm-anchor.screw.lengthMm))<1e-8,"the continuous flange starts on the declared bearing plane");
 		}
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));bolts(copy)[0].insertionMm=1;
-		rejects(() -> InsertAnchorHardware.parts(copy),"Anchor source thread fit fails");
+		rejects(() -> InsertAnchorGeometry.components(copy),"Anchor source thread fit fails");
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));
 		copy.interfaces=[{id:"back-stock",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(
 			F.fromRotationMatrix(0,0,1,[1,0,0,0,-1,0,0,0,-1])),route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
@@ -285,15 +316,15 @@ class InsertAnchorTests {
 			hole.depth-=1;if (hole.threadDepth!=null) hole.threadDepth=hole.threadDepth-1;
 			if (hole.id!="mounting") hole.frame.z=1;
 		}
-		var stocked=InsertAnchorHardware.parts(copy),first=stocked[0],anchor=bolts(copy)[0];
+		var stocked=InsertAnchorGeometry.components(copy),first=stocked[0],anchor=bolts(copy)[0];
 		var stockedTip=F.transformPoint(first.pose,0,0,-anchor.screw.lengthMm);
 		check(Math.abs(stockedTip.z-1-anchor.insertionMm)<1e-8,"disposable back stock never counts toward permanent source thread engagement");
 		var rules=switch copy.anchorage {case Bolted(r,_):r;default:throw "Expected bolt rules";};
 		// A small counterbore clears the incomplete upper thread, but cannot
 		// contain the much wider flange. Interval fit must not certify its head.
 		for (hole in copy.holes) if (hole.id!="mounting") hole.counterbore={diameter:8,depth:3};
-		copy.anchorage=InsertAnchorHardware.choose(copy,rules,[for (a in bolts(copy)) {id:a.id,holeId:a.holeId,lengthMm:12,
-			insertionMm:11.5,locking:InsertAnchorLock.RetainingCompound,lockingReference:null}]);
+		copy.anchorage=InsertAnchorGeometry.choose(copy,rules,[for (a in bolts(copy)) {id:a.id,holeId:a.holeId,lengthMm:12,
+			insertionMm:11.5,locking:InsertAnchorLock.RetainingCompound(materia.casting.CastingInput.CastingTextInput.Unresolved("Anchor retaining compound and cure/torque evidence"))}]);
 		var occupied=bolts(copy)[0],serviceHole=copy.holes.filter(h -> h.id==occupied.holeId)[0];
 		var rawHole=materia.casting.InsertStages.holes(copy,materia.casting.InsertStages.InsertStage.BeforeCasting)
 			.filter(h -> h.id==occupied.holeId)[0];
@@ -303,7 +334,7 @@ class InsertAnchorTests {
 			.concat(materia.casting.ThreadedFastenerFit.checkIntervals(rawHole,rawHole.frame,
 				{shankLength:occupied.screw.lengthMm,threadedLength:occupied.screw.threadedLengthMm,bearingFrame:bearing},occupied.id));
 		check(fit.filter(f -> !f.passed).length==0,"raw-stock collision control passes every source and pre-cast thread-fit rule");
-		rejects(() -> InsertAnchorHardware.parts(copy),"Anchor flange intersects pre-cast steel");
+		rejects(() -> InsertAnchorGeometry.components(copy),"Anchor flange intersects pre-cast steel");
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));bolts(copy)[0].holeId="missing";
 		rejects(() -> InsertSpecCodec.snapshot(InsertSpecCodec.record(copy)),"Unknown anchor source hole");
 		copy=InsertSpecCodec.snapshot(InsertSpecCodec.record(spec));copy.holes[0].extent=materia.casting.InsertHole.HoleExtent.Through;
@@ -331,15 +362,15 @@ class InsertAnchorTests {
 		check(manufacturing.operations.filter(op -> op.kind==materia.tooling.casting.InsertManufacturingPlan.InsertOperationKind.FitAnchors
 			&& op.stage==materia.tooling.casting.InsertManufacturingPlan.InsertOperationStage.BeforeCasting).length==2,
 			"each source anchor appears in the pre-cast operation sheet");
-		var checks=materia.tooling.casting.InsertAnchorageChecks.check(input);
+		var checks=materia.casting.InsertAnchorage.InsertAnchorageChecks.check(input);
 		check(checks.filter(c -> c.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length==0,"valid nominal anchor limits pass their implemented checks");
 		check(checks.filter(c -> c.rule.indexOf(".capacity")>=0 && c.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,"capacity requires physical evidence");
 		check(!materia.tooling.ToolingValidation.ToolingReadiness.evaluate(checks).ready,"nominal thread fit cannot qualify casting occupancy or capacity");
 		var locked=bolts(spec)[0];locked.locking=InsertAnchorLock.Shoulder;
-		check(materia.tooling.casting.InsertAnchorageChecks.check(input).filter(c -> c.rule.indexOf(".locking")>=0
+		check(materia.casting.InsertAnchorage.InsertAnchorageChecks.check(input).filter(c -> c.rule.indexOf(".locking")>=0
 			&& c.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==1,
 			"an undeclared physical shoulder stays Unsupported even with nominal standard hardware");
-		locked.locking=InsertAnchorLock.RetainingCompound;
+		locked.locking=InsertAnchorLock.RetainingCompound(materia.casting.CastingInput.CastingTextInput.Unresolved("Anchor retaining compound and cure/torque evidence"));
 		foundationGeometry(source);
 		Sys.println('InsertAnchorTests: $assertions assertions passed');
 	}

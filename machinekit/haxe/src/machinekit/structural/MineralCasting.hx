@@ -1,5 +1,6 @@
 package machinekit.structural;
 
+import machinekit.tooling.InsertAnchorGeometry;
 import cadkit.modeling.Part;
 import machinekit.component.*;
 import machinekit.component.ComponentRecipeSupport as P;
@@ -37,8 +38,8 @@ class MineralCasting extends MachineComponent {
 	public function new(?overrides:ComponentValues) {
 		var v = P.resolve(parameters(), overrides), cuts = CastingPatterns.decode(v.token("features"));
 		v.setToken("features", CastingPatterns.encode(cuts));
-		v.setToken("embeddedAnchors",haxe.Json.stringify(materia.casting.EmbeddedAnchors.records(
-			materia.casting.EmbeddedAnchors.snapshot(haxe.Json.parse(v.token("embeddedAnchors"))))));
+		v.setToken("embeddedAnchors",haxe.Json.stringify(materia.casting.InsertAnchorage.EmbeddedAnchors.records(
+			materia.casting.InsertAnchorage.EmbeddedAnchors.snapshot(haxe.Json.parse(v.token("embeddedAnchors"))))));
 		var datumRaw:Dynamic = haxe.Json.parse(v.token("datumScheme"));
 		if (datumRaw != null) datumRaw = materia.casting.FoundationDatumScheme.FoundationDatums.record(
 			materia.casting.FoundationDatumScheme.FoundationDatums.snapshot(datumRaw));
@@ -96,7 +97,7 @@ class MineralCasting extends MachineComponent {
 			return Solids.building([body], owned -> {
 				for (cavity in finishedCavities())
 					owned.push(Solids.named(CastingCavityCad.part(cavity), cavity.featureId));
-				for (part in EmbeddedAnchorCad.parts(embeddedAnchors())) owned.push(part);
+				for (part in InsertAnchorGeometry.embeddedParts(embeddedAnchors())) owned.push(part);
 				return Solids.cut(owned[0], owned.slice(1));
 			});
 		} catch (error:Dynamic) {
@@ -105,8 +106,8 @@ class MineralCasting extends MachineComponent {
 		}
 	}
 
-	public function embeddedAnchors():Array<materia.casting.EmbeddedAnchors.EmbeddedInsertAnchors>
-		return materia.casting.EmbeddedAnchors.snapshot(haxe.Json.parse(parameterToken("embeddedAnchors")));
+	public function embeddedAnchors():Array<materia.casting.InsertAnchorage.EmbeddedInsertAnchors>
+		return materia.casting.InsertAnchorage.EmbeddedAnchors.snapshot(haxe.Json.parse(parameterToken("embeddedAnchors")));
 
 	public function foundationDatumScheme():Null<materia.casting.FoundationDatumScheme> {
 		var raw:Dynamic = haxe.Json.parse(parameterToken("datumScheme"));

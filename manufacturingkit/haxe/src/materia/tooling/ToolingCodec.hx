@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 19;
+	public static inline var VERSION = 20;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -786,6 +786,8 @@ class ToolingCodec {
 			return canonical(materia.casting.InsertSpec.InsertBodyCodec.record(cast value));
 		if (Std.isOfType(value, materia.casting.CastingFeature.CastingGeometrySolid))
 			return canonical(materia.casting.CastingFeature.CastingGeometrySolids.record(cast value));
+		if (Std.isOfType(value,materia.casting.InsertAnchorage.InsertAnchorLock))
+			return canonical(materia.casting.InsertAnchorage.InsertAnchorageCodec.lockingRecord(cast value));
 		if (Std.isOfType(value,materia.casting.InsertAnchorage))
 			return canonical(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(cast value));
 		if (Std.isOfType(value, materia.casting.InsertOrigin))
