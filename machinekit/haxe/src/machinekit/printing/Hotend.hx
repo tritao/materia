@@ -90,6 +90,27 @@ class Hotend extends MachineComponent {
 		var sink = Solids.named(Part.cylinderSpan(spec.heatsinkDiameter / 2, spec.blockHeight, spec.blockHeight + spec.heatsinkLength), "heatsink");
 		if (detail == Envelope) return Solids.union([block, sink]);
 		var breakNeck = Solids.named(Part.cylinderSpan(3.5, spec.blockHeight - 0.5, spec.blockHeight + 3), "neck");
-		return Solids.union([block, breakNeck, sink]);
+		// The heatsink's fins: a core with a fin every 2.5 mm below a solid mounting collar at its top.
+		sink.close();
+		var r = spec.heatsinkDiameter / 2, base = spec.blockHeight + 3, top = spec.blockHeight + spec.heatsinkLength, collar = top - 8;
+		var profile:Array<{r:Float, z:Float}> = [{r: 0.0, z: base}, {r: 0.4 * r, z: base}];
+		var z = base;
+		while (z + 2.5 <= collar) {
+			profile.push({r: 0.4 * r, z: z + 1.5});
+			profile.push({r: r, z: z + 1.5});
+			profile.push({r: r, z: z + 2.5});
+			profile.push({r: 0.4 * r, z: z + 2.5});
+			z += 2.5;
+		}
+		if (z < collar) profile.push({r: 0.4 * r, z: collar});
+		profile = profile.concat([{r: r, z: collar}, {r: r, z: top}, {r: 0.0, z: top}]);
+		return Solids.union([block, breakNeck, Solids.named(Part.revolve(profile), "heatsink")]);
+	}
+
+	/** The turned heatsink without its fins, as before they were drawn. */
+	override public function massGeometry():Null<Part> {
+		var block = Solids.named(Part.box(spec.blockWidth, spec.blockDepth, spec.blockHeight), "block");
+		var sink = Solids.named(Part.cylinderSpan(spec.heatsinkDiameter / 2, spec.blockHeight, spec.blockHeight + spec.heatsinkLength), "heatsink");
+		return Solids.union([block, Solids.named(Part.cylinderSpan(3.5, spec.blockHeight - 0.5, spec.blockHeight + 3), "neck"), sink]);
 	}
 }

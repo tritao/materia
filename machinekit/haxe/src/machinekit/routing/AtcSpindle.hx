@@ -64,9 +64,26 @@ class AtcSpindle extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /**
+   * The spindle: a nose collar, the main body with two coolant-jacket grooves, and the rear cap, revolved about its
+   * axis, with the ISO30 taper in the nose. Envelope detail is the body cylinder, which also sets the mass.
+   */
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.cut(Solids.named(Part.cylinder(n("diameter") / 2,
-      n("length")), "spindle-body"), [Solids.named(Part.revolve([{
+    var d = n("diameter"), r = d / 2, l = n("length");
+    if (detail == Envelope) return envelope();
+    var body = Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: 0.72 * r, z: 0.0}, {r: 0.72 * r, z: 0.05 * l}, {r: 0.9 * r, z: 0.07 * l},
+      {r: r, z: 0.09 * l}, {r: r, z: 0.8 * l}, {r: 0.92 * r, z: 0.82 * l}, {r: 0.92 * r, z: 0.95 * l}, {r: 0.6 * r, z: l}, {r: 0.0, z: l}]), "spindle-body");
+    var tools = [taper()];
+    for (z in [0.35 * l, 0.6 * l]) tools.push(Solids.named(Part.revolve([{r: r - 1.5, z: z}, {r: r + 1, z: z}, {r: r + 1, z: z + 3}, {r: r - 1.5, z: z + 3}]), "coolant-groove"));
+    return Solids.cut(body, tools);
+  }
+
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part return Solids.cut(Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "spindle-body"), [taper()]);
+
+  function taper():Part {
+    return Solids.named(Part.revolve([{
       r: 0,
       z: -1
     }, {
@@ -82,7 +99,7 @@ class AtcSpindle extends AssumedCatalogComponent {
       r: 0,
       z: n("taperLength")
     }
-    ]), "iso30-taper")]);
+    ]), "iso30-taper");
   }
   /** Reference cylinder body, assembled as a separate BOM component in SR3. */
   public function releaseCylinder():machinekit

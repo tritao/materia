@@ -32,9 +32,15 @@ class ToolLengthSetter extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** A base, a body and the sprung plunger on top. Envelope detail is its cylinder, which also sets the mass. */
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.cylinder(n("diameter") / 2, n("height")), "setter");
+    var r = n("diameter") / 2, h = n("height");
+    if (detail == Envelope) return massGeometry();
+    return Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: 0.5 * h}, {r: 0.85 * r, z: 0.55 * h}, {r: 0.75 * r, z: 0.55 * h},
+      {r: 0.75 * r, z: 0.9 * h}, {r: 0.45 * r, z: 0.9 * h}, {r: 0.45 * r, z: h}, {r: 0.0, z: h}]), "setter");
   }
+
+  override public function massGeometry():Null<Part> return Solids.named(Part.cylinder(n("diameter") / 2, n("height")), "setter");
   public function triggerFrame():materia.assembly.AssemblyRecord.AssemblyFrame return Solids.axial(
     0,
     0,

@@ -46,7 +46,17 @@ class ToolHolder extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /** The turned holder with the two drive slots across its flange. Envelope detail is the turned body, which also sets the mass. */
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return body();
+    var slot = 16.1, depth = Math.min(8.0, 0.2 * n("flangeDiameter"));
+    return Solids.cut(body(), [for (side in [-1.0, 1.0]) Solids.named(Part.box(slot, depth + 1, n("flangeThickness") + 0.09, cadkit.modeling.Align.Center,
+      side < 0 ? cadkit.modeling.Align.Max : cadkit.modeling.Align.Min, cadkit.modeling.Align.Min).translated(new Vector(0, side * (n("flangeDiameter") / 2 - depth), -n("flangeThickness") - 0.1)), "drive-slot")]);
+  }
+
+  override public function massGeometry():Null<Part> return body();
+
+  function body():Part {
     return Solids.named(Part.revolve([{r: n("colletBore") / 2, z: -n("gaugeLength")}, {
       r: n("noseDiameter") / 2,
       z: -n("gaugeLength")

@@ -38,7 +38,20 @@ class VacuumZoneValve extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
-  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
+  /** A flanged valve body: end flanges and a waisted body with its bolt circle, on the flow bore. Envelope detail is the cylinder, which also sets the mass. */
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return envelope();
+    var r = n("diameter") / 2, l = n("length"), flange = Math.min(0.18 * l, 12);
+    var body = Solids.named(Part.revolve([{r: n("bore") / 2, z: 0.0}, {r: r, z: 0.0}, {r: r, z: flange}, {r: 0.72 * r, z: flange}, {r: 0.72 * r, z: l - flange},
+      {r: r, z: l - flange}, {r: r, z: l}, {r: n("bore") / 2, z: l}]), "valve-body");
+    var bolts = (r + n("bore") / 2) / 2 + (r - n("bore") / 2) * 0.2;
+    return Solids.cut(body, [for (i in 0...4) Solids.named(Part.cylinderSpan(Math.min(3.0, (r - n("bore") / 2) * 0.15), -0.1, l + 0.1,
+      bolts * Math.cos(Math.PI / 4 + i * Math.PI / 2), bolts * Math.sin(Math.PI / 4 + i * Math.PI / 2)), "bolt")]);
+  }
+
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part return Solids.cut(
     Solids.named(
       Part.cylinder(
         n("diameter") / 2,

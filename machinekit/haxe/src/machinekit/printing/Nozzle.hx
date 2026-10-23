@@ -57,8 +57,22 @@ class Nozzle extends MachineComponent {
 	override public function values():ComponentValues
 		return new ComponentValues().setToken("designation", designation).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
+	/** The tip cone and its wrench hex. Envelope detail turns the hex's corners; the mass is the turned body across its flats. */
 	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return envelope();
 		var tip = spec.tipDiameter / 2, top = spec.hexSize / 2;
+		return Solids.union([
+			Solids.named(Part.revolve([{r: 0, z: 0}, {r: tip, z: 0}, {r: top * 0.9, z: spec.coneHeight}, {r: 0, z: spec.coneHeight}]), "cone"),
+			Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.hexSize), spec.coneHeight - 0.01, spec.coneHeight + spec.hexHeight), "hex")
+		]);
+	}
+
+	override public function massGeometry():Null<Part> return body(spec.hexSize / 2);
+
+	function envelope():Part return body(spec.hexSize / Math.sqrt(3));
+
+	function body(top:Float):Part {
+		var tip = spec.tipDiameter / 2;
 		return Solids.named(Part.revolve([{r: 0, z: 0}, {r: tip, z: 0}, {r: top, z: spec.coneHeight},
 			{r: top, z: spec.coneHeight + spec.hexHeight}, {r: 0, z: spec.coneHeight + spec.hexHeight}]), "body");
 	}

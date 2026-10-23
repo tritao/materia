@@ -61,11 +61,24 @@ class Fan extends MachineComponent {
 		return new ComponentValues().setToken("designation", designation).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		if (!spec.blower || detail == Envelope)
-			return Solids.named(Part.box(spec.width, spec.depth, spec.height), "housing");
+		if (detail == Envelope) return envelope();
+		if (!spec.blower) {
+			// The square frame around the rotor, its hub, and the four corner screw holes.
+			var pitch = 0.8 * spec.width, frame = Solids.cut(envelope(), [Solids.named(Part.cylinderSpan(0.47 * spec.width, -0.1, spec.height + 0.1), "rotor-bore")]
+				.concat([for (i in 0...4) Solids.named(Part.cylinderSpan(1.6, -0.1, spec.height + 0.1, (i % 2 == 0 ? -1 : 1) * pitch / 2,
+					(i < 2 ? -1 : 1) * pitch / 2), "screw-hole")]));
+			var hub = Solids.named(Part.cylinderSpan(0.2 * spec.width, 0.1 * spec.height, 0.9 * spec.height), "hub");
+			var struts = [for (i in 0...4) Solids.named(Part.cylinderAlong(0.08 * spec.height, new Vector(0, 0, 0.3 * spec.height),
+				new Vector(Math.cos(i * Math.PI / 2), Math.sin(i * Math.PI / 2), 0), 0.49 * spec.width), "strut")];
+			return Solids.union([frame, hub].concat(struts));
+		}
 		// The volute is a cylinder with a duct leaving it towards +X.
 		var wheel = Solids.named(Part.cylinderSpan(spec.width / 2 - 1, 0, spec.height), "volute");
 		var duct = Solids.named(Part.box(spec.width / 2, spec.depth * 0.4, spec.height).translated(new Vector(spec.width / 4, 0, 0)), "duct");
 		return Solids.union([wheel, duct]);
 	}
+
+	override public function massGeometry():Null<Part> return spec.blower ? null : envelope();
+
+	function envelope():Part return Solids.named(Part.box(spec.width, spec.depth, spec.height), "housing");
 }

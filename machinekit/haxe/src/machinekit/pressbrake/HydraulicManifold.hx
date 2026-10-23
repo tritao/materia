@@ -23,8 +23,11 @@ class HydraulicManifold extends MachineComponent {
 		}
 	}
 	override public function hasGeometry():Bool return true;
+	/** The distribution bar with its outlets drilled. Envelope detail is the bar, which also sets the mass. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(24, 24, 16 + 12 * outlets), "hydraulic-manifold");
+		return detail == Envelope ? massGeometry() : machinekit.pneumatic.PneumaticBodies.manifold(24, 24, 16 + 12 * outlets, outlets);
+
+	override public function massGeometry():Null<Part> return Solids.named(Part.box(24, 24, 16 + 12 * outlets), "hydraulic-manifold");
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.hydraulic-manifold", [
 			new machinekit.component.ComponentParameter("outlets", Count, Integer(2), null, 1, 64)

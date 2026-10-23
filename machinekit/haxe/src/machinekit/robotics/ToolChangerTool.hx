@@ -57,6 +57,17 @@ class ToolChangerTool extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinderSpan(diameter / 2, 0, thickness);
+	/** The body with the recess its master's coupling boss locks into, and an air port on its rim for each channel. Envelope detail is the cylinder, which also sets the mass. */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope || thickness < 6) return Part.cylinderSpan(diameter / 2, 0, thickness);
+		var r = diameter / 2;
+		var shape = Solids.cut(Solids.named(Part.cylinderSpan(r, 0, thickness), "body"),
+			[Solids.named(Part.cylinderSpan(0.6 * r + 0.2, -0.1, Math.min(3.0, thickness - 1)), "coupling-recess")]);
+		return Solids.cut(shape, [for (i in 0...airChannels) {
+			var angle = 2 * Math.PI * i / airChannels, dir = new cadkit.modeling.Vector(Math.cos(angle), Math.sin(angle), 0);
+			Solids.named(Part.cylinderAlong(1.5, new cadkit.modeling.Vector(dir.x * (r - 6), dir.y * (r - 6), 0.4 * thickness), dir, 6.1), "air-port");
+		}]);
+	}
+
+	override public function massGeometry():Null<Part> return Part.cylinderSpan(diameter / 2, 0, thickness);
 }

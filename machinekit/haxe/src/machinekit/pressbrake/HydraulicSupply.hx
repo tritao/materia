@@ -28,8 +28,15 @@ class HydraulicSupply extends MachineComponent implements PressureSource {
 	}
 	override public function pressureSource():Null<PressureSource> return this;
 	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(100, 100, 200), "hydraulic-service");
+	/** A power pack: the oil tank, the pump bell on it and the motor above. Envelope detail is the box, which also sets the mass. */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return massGeometry();
+		return Solids.union([Solids.named(Part.box(100, 100, 110), "tank"), Solids.named(Part.cylinderSpan(12, 109.99, 112, 30, 30), "filler-cap"),
+			Solids.named(Part.revolve([{r: 0.0, z: 109.99}, {r: 28.0, z: 109.99}, {r: 28.0, z: 128.0}, {r: 46.0, z: 128.0}, {r: 46.0, z: 192.0},
+				{r: 40.0, z: 200.0}, {r: 0.0, z: 200.0}]), "motor")]);
+	}
+
+	override public function massGeometry():Null<Part> return Solids.named(Part.box(100, 100, 200), "hydraulic-service");
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.hydraulic-supply", [
 			new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(0), "Pa", 0)

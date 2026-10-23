@@ -41,7 +41,20 @@ class DustShoe extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /**
+   * The shoe's ring with its hose neck, and the brush skirt below it as a thin ring of bristles. Envelope detail is
+   * the solid ring the brush sweeps, which also sets the mass.
+   */
   override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope) return envelope();
+    var outer = n("diameter") / 2, inner = n("spindleClearance") / 2, skirt = Math.min(6.0, 0.5 * (outer - inner));
+    return Solids.cut(envelope(), [Solids.named(Part.revolve([{r: inner - 0.1, z: -n("brushLength") - 0.1}, {r: outer - skirt, z: -n("brushLength") - 0.1},
+      {r: outer - skirt, z: 0.0}, {r: inner - 0.1, z: 0.0}]), "brush-gap")]);
+  }
+
+  override public function massGeometry():Null<Part> return envelope();
+
+  function envelope():Part {
     return Solids.building([], parts -> {parts.push(Solids.cut(
       Solids.named(
         Part.cylinderSpan(

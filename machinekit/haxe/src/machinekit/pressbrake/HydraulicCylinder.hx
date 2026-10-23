@@ -59,9 +59,20 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
 	}
 	public function movingRod():HydraulicCylinderRod return new HydraulicCylinderRod(rod, stroke + capLength + stemLength);
 	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part
+	/** The barrel between its two end caps, bored for the piston and the rod bearing. Envelope detail keeps a plain barrel, which also sets the mass. */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return body(false);
+		return body(true);
+	}
+
+	override public function massGeometry():Null<Part> return body(false);
+
+	function body(caps:Bool):Part
 		return Solids.building([], parts -> {
-			parts.push(Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, bodyLength), "barrel"));
+			var r = outerDiameter / 2;
+			parts.push(Solids.named(caps ? Part.revolve([{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: capLength}, {r: r - wall / 2, z: capLength},
+				{r: r - wall / 2, z: bodyLength - capLength}, {r: r, z: bodyLength - capLength}, {r: r, z: bodyLength}, {r: 0.0, z: bodyLength}])
+				: Part.cylinderSpan(r, 0, bodyLength), "barrel"));
 			parts.push(Solids.named(Part.cylinderSpan(bore / 2, capLength, bodyLength - capLength), "piston-bore"));
 			parts.push(Solids.named(Part.cylinderSpan(rod / 2, bodyLength - capLength, bodyLength + 1), "rod-bearing"));
 			return Solids.cut(parts[0], [parts[1], parts[2]]);

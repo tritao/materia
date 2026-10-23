@@ -36,9 +36,26 @@ class VacuumBlower extends AssumedCatalogComponent {
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
+  /**
+   * A side-channel blower: the impeller housing with its inlet and outlet ports in the front face, the finned motor
+   * behind it and the fan cowl. Envelope detail is its cylinder, which also sets the mass.
+   */
   override public function geometry(detail:ComponentDetail = Preview):Part {
-    return Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "blower-envelope");
+    var r = n("diameter") / 2, l = n("length"), port = Math.min(n("portDiameter"), 0.4 * r) / 2;
+    if (detail == Envelope) return massGeometry();
+    var profile = [{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: 0.3 * l}, {r: 0.62 * r, z: 0.3 * l}];
+    // Cooling fins along the motor.
+    var fins = 8, pitch = 0.6 * l / fins;
+    for (i in 0...fins) {
+      var z = 0.32 * l + i * pitch;
+      profile = profile.concat([{r: 0.62 * r, z: z}, {r: 0.72 * r, z: z}, {r: 0.72 * r, z: z + pitch * 0.4}, {r: 0.62 * r, z: z + pitch * 0.4}]);
+    }
+    profile = profile.concat([{r: 0.62 * r, z: 0.94 * l}, {r: 0.66 * r, z: 0.94 * l}, {r: 0.66 * r, z: l}, {r: 0.0, z: l}]);
+    var body = Solids.named(Part.revolve(profile), "blower");
+    return Solids.cut(body, [for (x in [-0.5 * r, 0.5 * r]) Solids.named(Part.cylinderSpan(port, -0.1, 0.12 * l, x, 0), "port")]);
   }
+
+  override public function massGeometry():Null<Part> return Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "blower-envelope");
   override public function io():MachineIo return {inputs:["ready", "overload"], outputs:["run"], analogOutputs:[]};
 
 }

@@ -190,6 +190,7 @@ class ComponentClassification {
 		// standard
 		file(registry, "machinekit.standard.socket-head-cap-screw", "Fasteners", ComponentKind.Generic);
 		file(registry, "machinekit.standard.hex-bolt", "Fasteners", ComponentKind.Generic);
+		file(registry, "machinekit.standard.hex-flange-bolt", "Fasteners", ComponentKind.Generic);
 		file(registry, "machinekit.standard.hex-nut", "Fasteners", ComponentKind.Generic);
 		file(registry, "machinekit.standard.fine-pitch-nut", "Fasteners", ComponentKind.Generic);
 		file(registry, "machinekit.standard.flat-washer", "Fasteners", ComponentKind.Generic);

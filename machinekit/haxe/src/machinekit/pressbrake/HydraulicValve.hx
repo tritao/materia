@@ -29,8 +29,11 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
 	public function controlSpec():ValveControlSpec return ClosedCentre;
 	override public function valveSpec():Null<ValveSpec> return this;
 	override public function hasGeometry():Bool return true;
+	/** A double-solenoid spool valve on its block. Envelope detail is the block, which also sets the mass. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(120, 60, 60), "hydraulic-valve-block");
+		return detail == Envelope ? massGeometry() : machinekit.pneumatic.PneumaticBodies.valve(120, 60, 60, 70, 2, [-22, 0, 22]);
+
+	override public function massGeometry():Null<Part> return Solids.named(Part.box(120, 60, 60), "hydraulic-valve-block");
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.hydraulic-valve", [], _ -> new HydraulicValve());
 		return recipe;

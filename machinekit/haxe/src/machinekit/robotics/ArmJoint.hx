@@ -87,6 +87,16 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinderSpan(diameter / 2, 0, length);
+	/**
+	 * The stator flange, the housing, and the output disc turning on its bearing above a narrow running gap.
+	 * Envelope detail is the housing's cylinder, which also sets the mass.
+	 */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope || length < 20) return Part.cylinderSpan(diameter / 2, 0, length);
+		var r = diameter / 2;
+		return Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: 6.0}, {r: 0.94 * r, z: 7.0}, {r: 0.94 * r, z: length - 8},
+			{r: 0.6 * r, z: length - 8}, {r: 0.6 * r, z: length - 7}, {r: 0.85 * r, z: length - 7}, {r: 0.85 * r, z: length}, {r: 0.0, z: length}]), "housing");
+	}
+
+	override public function massGeometry():Null<Part> return geometry(Envelope);
 }

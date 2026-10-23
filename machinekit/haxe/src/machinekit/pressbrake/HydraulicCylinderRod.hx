@@ -24,8 +24,11 @@ class HydraulicCylinderRod extends MachineComponent {
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 	}
 	override public function hasGeometry():Bool return true;
+	/** The rod with its threaded tip and wrench neck. Envelope detail is the bar, which also sets the mass. */
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "rod");
+		return detail == Envelope ? massGeometry() : machinekit.pneumatic.PneumaticBodies.rod(diameter, length);
+
+	override public function massGeometry():Null<Part> return Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "rod");
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.hydraulic-cylinder-rod", [
 			ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 190)

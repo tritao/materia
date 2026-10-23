@@ -52,7 +52,31 @@ class Er20Holder extends MachineComponent {
 		addConnector("tool", Axis, Solids.axial(0, 0, 0));
 	}
 	override public function hasGeometry():Bool return true;
-	override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
+	/** The collet nut with its four wrench notches, and the holder body above it. Envelope detail is the cylinder, which also sets the mass. */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return envelope();
+		var r = DIAMETER / 2, bore = BORE_DIAMETER / 2, nut = 10.0;
+		var body = Solids.named(Part.revolve([{r: bore, z: 0.0}, {r: r - 1, z: 0.0}, {r: r, z: 1.0}, {r: r, z: nut}, {r: 0.85 * r, z: nut + 1},
+			{r: 0.85 * r, z: LENGTH}, {r: bore, z: LENGTH}]), "collet-nut");
+		return Solids.building([], owned -> {
+			owned.push(body);
+			var notches:Array<Part> = [];
+			for (i in 0...4) {
+				var angle = Math.PI * i / 2, depth = r - 2.5;
+				var raw = Part.box(6, 3.5, nut + 0.2, cadkit.modeling.Align.Center, cadkit.modeling.Align.Min, cadkit.modeling.Align.Min);
+				var notch = raw.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(new cadkit.modeling.Vector(-Math.sin(angle) * depth,
+					Math.cos(angle) * depth, -0.1), new cadkit.modeling.Vector(Math.cos(angle), Math.sin(angle), 0), cadkit.modeling.Vector.Z())));
+				raw.close();
+				owned.push(notch);
+				notches.push(Solids.named(notch, "wrench-notch"));
+			}
+			return Solids.cut(body, notches);
+		});
+	}
+
+	override public function massGeometry():Null<Part> return envelope();
+
+	function envelope():Part return Solids.cut(
 		Solids.named(Part.cylinderSpan(DIAMETER / 2, 0, LENGTH), "collet-nut"),
 		[Solids.named(Part.cylinderSpan(BORE_DIAMETER / 2, -0.1, LENGTH + 0.1), "tool-bore")]);
 	static var holderRecipe:Null<ComponentType>;
