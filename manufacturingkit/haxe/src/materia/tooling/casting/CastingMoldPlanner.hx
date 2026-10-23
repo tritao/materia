@@ -74,6 +74,14 @@ class CastingMoldPlanner {
 			F.compose(d.setup.sourceToMold, F.compose(e.pose, F.translation((xs[0] + xs[3]) / 2, (ys[0] + ys[3]) / 2, 0))));
 	}
 
+	/** Shell stock bounds only. Material queries use MoldRegions.envelope. */
+	public static function shellBounds(document:ToolingDocument):MoldBox {
+		var region=MoldRegions.envelope(document),pieces=MoldRegions.boxes(region);
+		if (pieces!=null && pieces.length==1 && document.input.envelope.length==1
+			&& document.input.envelope[0].profile.length==4) return envelope(document);
+		return MoldRegions.exactBounds(region,document.input.id);
+	}
+
 	public static function insertBox(document:ToolingDocument,id:String):MoldBox {
 		var matches=document.input.inserts.filter(insert -> insert.id==id);
 		if (matches.length!=1) throw "Expected one source insert: "+id;
@@ -99,8 +107,8 @@ class CastingMoldPlanner {
 		if (regionTooling) {
 			checks=checks.filter(check -> unsupported.indexOf(check)<0);
 			checks.push(materia.tooling.process.FillAnalysis.check("tooling.feature.box-geometry",
-				[for (feature in d.input.features) feature.id],Pass,
-				"Rectangular panel shell with exact source-region tooling and registered CAD geometry.",[]));
+				[d.input.id].concat([for (feature in d.input.features) feature.id]),Pass,
+				"Panel shell with exact source envelope/cavity tooling and registered CAD geometry.",[]));
 			unsupported=[];
 		}
 		if (unsupported.length > 0) {
@@ -132,13 +140,7 @@ class CastingMoldPlanner {
 	static function canPlanRegions(d:ToolingDocument):Bool {
 		if (geometry==null) return false;
 		var strategies=CastingStrategies.resolve(d);
-		try envelope(d) catch (error:Dynamic) {
-			var message=Std.string(error);
-			if (message=="Multi-core box template needs one rectangular envelope"
-				|| message=="Nonrectangular envelope unsupported by box template"
-				|| message.indexOf("axis-aligned")>=0) return false;
-			throw error;
-		}
+		shellBounds(d);
 		for (insert in d.input.inserts) switch insert.body {
 			case Primitive(materia.casting.CastingSolid.Box(_,_,_)):
 			default:return false;
@@ -159,9 +161,11 @@ class CastingMoldPlanner {
 		return true;
 	}
 
-	static function nonBoxFeatures(d:ToolingDocument):Bool
-		return materia.casting.CastingCavities.derive(d.input.envelope,d.input.features)
+	static function requiresRegions(d:ToolingDocument):Bool {
+		var body=MoldRegions.boxes(MoldRegions.envelope(d));
+		return body==null || body.length!=1 || materia.casting.CastingCavities.derive(d.input.envelope,d.input.features)
 			.filter(cavity -> !materia.casting.CastingCavities.supportsBoxes(cavity)).length>0;
+	}
 
 	/** Interior allocation uses authoritative cavities; panel sealing profiles
 	 * extend outward from the source boundary and have no source interior.
@@ -230,7 +234,9 @@ class CastingMoldPlanner {
 		for (former in result.formers)
 			if (former.featureIds.length == 0 && former.draftDegrees == 0)
 				request(result, "draft-" + former.volume.id, ReleaseAlternative, [former.volume.id],
-					"Bed-backing zero-draft rigid former needs a source/setup or supported sacrificial-tooling change; draft on a different feature does not qualify this part.",
+					(StringTools.startsWith(former.volume.id,"envelope-former-")
+						? "Envelope-shaping zero-draft rigid former needs release qualification or a supported source/setup alternative."
+						: "Bed-backing zero-draft rigid former needs a source/setup or supported sacrificial-tooling change; draft on a different feature does not qualify this part."),
 					"tooling.former.draft." + former.volume.id);
 		var handlingQualified=CastHandling.qualified(d,o,result.handling);
 		if (result.handling.requiresFlip && !CastHandling.sourceDeclared(d) && !handlingQualified)
@@ -282,8 +288,8 @@ class CastingMoldPlanner {
 	}
 
 	static function build(d:ToolingDocument, o:CastingMoldOptions, geometryChecks:Array<materia.tooling.ToolingValidation>):CastingMoldPlan {
-		var e = envelope(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
-		var exactRegions=nonBoxFeatures(d);
+		var e = shellBounds(d), r = d.recipe, t = r.panel.measuredThickness, l = r.minimumLigament;
+		var exactRegions=requiresRegions(d);
 		if (o.precision.length != d.input.inserts.length)
 			throw "Every insert needs a precision process record";
 		var strategies = CastingStrategies.resolve(d);
@@ -499,27 +505,34 @@ class CastingMoldPlanner {
 		var occupied = insertBoxes.concat(epsBoxes).concat(fixtures),
 			previous:Array<MoldBox> = [];
 		var occupiedRegions=[for (box in insertBoxes.concat(fixtures)) MoldRegions.box(box)].concat(epsRegions);
-		var backing = BoxAlgebra.subtract([b], [e].concat(occupied));
-		for (group in BoxAlgebra.groups(backing)) {
-			var id = "bed-backing-" + result.formers.length;
-			result.formers.push({
-				volume: {
-					id: id,
-					material: FormerStock,
-					cuts: [],
-					regions: [],
-					profiles: [],
-					pieces: group
-				},
-				draftDegrees: 0,
-				featureIds: [],
-				withdrawal: {
-					x: 0,
-					y: 0,
-					z: -1
-				}
-			});
+		if (requiresRegions(d)) {
+			var outside=materia.casting.CastingRegion.Difference(MoldRegions.box(b),
+				[MoldRegions.envelope(d)].concat(occupiedRegions));
+			addEnvelopeFormers(result,outside);
+		} else {
+			var backing = BoxAlgebra.subtract([b], [e].concat(occupied));
+			for (group in BoxAlgebra.groups(backing)) {
+				var id = "bed-backing-" + result.formers.length;
+				result.formers.push({
+					volume: {
+						id: id,
+						material: FormerStock,
+						cuts: [],
+						regions: [],
+						profiles: [],
+						pieces: group
+					},
+					draftDegrees: 0,
+					featureIds: [],
+					withdrawal: {
+						x: 0,
+						y: 0,
+						z: -1
+					}
+				});
+			}
 		}
+
 		var previousRegions:Array<materia.casting.CastingRegion> =[];
 		var claims:Array<{id:String,priority:Int,region:materia.casting.CastingRegion}> =[];
 		function claim(id:String,priority:Int,region:materia.casting.CastingRegion):Void {
@@ -691,6 +704,54 @@ class CastingMoldPlanner {
 		return finish(result,strategies);
 	}
 
+	/** Complement of the actual source body, never its bounding-box stand-in.
+	 * Separate section islands become separate removable physical fillers.
+	 */
+	static function addEnvelopeFormers(plan:CastingMoldPlan,outside:materia.casting.CastingRegion):Void {
+		if (MoldRegions.volume(outside,plan.document.input.id)<=1e-7) return;
+		var boxes=MoldRegions.boxes(outside);
+		var regions:Array<materia.casting.CastingRegion>=[];
+		if (boxes!=null) {
+			for (group in BoxAlgebra.groups(boxes))
+				regions.push(materia.casting.CastingRegion.Union([for (piece in group) MoldRegions.box(piece)]));
+		} else {
+			if (geometry==null) throw "Exact envelope tooling kernel required: "+plan.document.input.id;
+			var section:Null<materia.casting.CastingSection.CastingPrismSection>=null;
+			for (axis in [{x:1.0,y:0.0,z:0.0},{x:0.0,y:1.0,z:0.0},{x:0.0,y:0.0,z:1.0}]) {
+				section=geometry.prismaticSection(outside,axis,1e-5,plan.document.input.id);
+				if (section!=null) break;
+			}
+			if (section==null) throw "Envelope complement needs supported planar prism tooling: "+plan.document.input.id;
+			for (outer in section.contours) if (outer.depth%2==0) {
+				var contours=[outer];
+				for (hole in section.contours) if (hole.depth==outer.depth+1
+					&& CastingProfileGeometry.inside(outer.contour,hole.contour[0].start.x,hole.contour[0].start.y))
+					contours.push(hole);
+				regions.push(MoldRegions.section(contours,section.pose,section.depth));
+			}
+		}
+		regions.sort((a,b) -> Reflect.compare(ToolingCodec.canonical(a),ToolingCodec.canonical(b)));
+		for (index in 0...regions.length) {
+			var region=regions[index],bounds=MoldRegions.exactBounds(region,plan.document.input.id);
+			var shell=plan.cavity,body=plan.envelope;
+			var direction={x:0.0,y:0.0,z:0.0};
+			if (bounds.z+bounds.height<=body.z+1e-7) direction.z=-1;
+			else if (Math.abs(bounds.x-shell.x)+Math.abs(bounds.width-shell.width)
+				+Math.abs(bounds.y-shell.y)+Math.abs(bounds.depth-shell.depth)<1e-7
+				&& Math.abs(bounds.z+bounds.height-shell.z-shell.height)<1e-7) direction.z=1;
+			else if (Math.abs(bounds.x-shell.x)<1e-7) direction.x=-1;
+			else if (Math.abs(bounds.x+bounds.width-shell.x-shell.width)<1e-7) direction.x=1;
+			else if (Math.abs(bounds.y-shell.y)<1e-7) direction.y=-1;
+			else if (Math.abs(bounds.y+bounds.depth-shell.y-shell.depth)<1e-7) direction.y=1;
+			else throw "Envelope filler has no exterior withdrawal: "+plan.document.input.id;
+			var id=materia.tooling.ToolingIds.derive("envelope-former-",plan.document.input.id,"-"+index);
+			var pieces=MoldRegions.boxes(region);
+			plan.formers.push({volume:{id:id,material:FormerStock,pieces:pieces==null ? [] : pieces,
+				regions:pieces==null ? [region] : [],profiles:[],cuts:[]},
+				featureIds:[],draftDegrees:0,withdrawal:direction});
+		}
+	}
+
 	/** Ownership ordering accepts raw caller order, before codec canonicalisation. */
 	public static function ownershipOrder(features:Array<materia.casting.CastingFeature>,
 			strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>):Array<materia.casting.CastingFeature> {
@@ -749,9 +810,15 @@ class CastingMoldPlanner {
 	}
 
 	public static function resinAtFill(document:ToolingDocument, envelope:MoldBox):Array<MoldBox> {
-		var wetted = BoxAlgebra.copy(envelope);
-		wetted.height = Math.min(wetted.height, document.setup.fillHeightMm - wetted.z);
-		return BoxAlgebra.subtract(wetted.height > 0 ? [wetted] : [], [for (feature in document.input.features) featureBox(document, feature)]);
+		var body=MoldRegions.boxes(MoldRegions.envelope(document));
+		if (body==null) throw "Box resin query does not support source envelope: "+document.input.id;
+		var wetted:Array<MoldBox>=[];
+		for (piece in body) {
+			var clipped=BoxAlgebra.copy(piece);
+			clipped.height=Math.min(clipped.height,document.setup.fillHeightMm-clipped.z);
+			if (clipped.height>0) wetted.push(clipped);
+		}
+		return BoxAlgebra.subtract(wetted,[for (feature in document.input.features) featureBox(document,feature)]);
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
@@ -885,7 +952,7 @@ class CastingMoldPlanner {
 					throw "Former sealing profile differs from panel operation";
 			}
 		}
-		var exactResin=nonBoxFeatures(p.document);
+		var exactResin=requiresRegions(p.document);
 		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document, p.envelope);
 		for (fixture in p.fixtures) {
 			MoldVolumeRecords.copy(MoldFixtures.datum(fixture));

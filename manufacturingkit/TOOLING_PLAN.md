@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and process reporting implemented; planned cleanup and phase-8 integration remain.
 - [ ] Phase 7: records, requirements, exact feature geometry, former CAM and cleanup landed; drafted core comparison and source-corner corrections are parked.
-- [ ] Phase 8: mill column and independent hobber plinth remain.
+- [ ] Phase 8: exact stepped/flared envelope tooling landed; column/hobber fixture integration and complete setups remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1482,3 +1482,10 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   individual-bridge and bed-foot reconstruction/removal checks are not proved
   by the shared-rail builder. The common CAD API dispatches to those checks
   once; this is not a second planner or a second verification pass.
+
+- Phase-8 shell decision: keep a reusable rectangular panel shell around stock
+  bounds and derive its removable shaping fillers from the exact source-envelope
+  complement. Bounds never replace casting material in resin, mass or fill.
+  Separate prism-section islands are physical fillers; exterior side fillers
+  withdraw outward, bottom backing downward and a fill-open collar upward.
+  Native complete sweeps confirm each declared direction without sampled poses.

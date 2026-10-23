@@ -140,6 +140,16 @@ The [generic joinery example](../machinekit/examples/panel-tooling/README.md)
 generates the coupon, exact drawings and assembled/exploded preview scenes.
 
 
+### Source envelope and shell
+
+The shared planner sizes its rectangular panel shell from source-envelope bounds.
+Stepped box bodies and supported planar-prism complements of flared or chamfered
+bodies use exact removable shaping fillers. Material, mass, fill and native
+reconstruction retain the actual source envelope; stock bounds never replace it.
+Every filler has exact section drawings and a checked complete removal sweep.
+The single-pocket construction below retains its rectangular-envelope restriction.
+Column fixture/setup integration remains phase-8 work.
+
 ### Single-pocket box mold
 
 `materia.tooling.casting.CastingMoldPlanner.planSinglePocket(document)` builds the explicit

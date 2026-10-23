@@ -44,7 +44,9 @@ class CastHandling {
 			if (exact.massKg<=0) throw "Casting handling requires positive mass";
 			return exact;
 		}
-		var resin = BoxAlgebra.subtract([envelope], [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)]);
+		var body=MoldRegions.boxes(MoldRegions.envelope(d));
+		if (body==null) throw "Exact box handling requires a box source envelope: "+d.input.id;
+		var resin = BoxAlgebra.subtract(body, [for (f in d.input.features) CastingMoldPlanner.featureBox(d, f)]);
 		var mass = 0.0, mx = 0.0, my = 0.0, mz = 0.0;
 		for (b in resin) {
 			var kg = b.width * b.depth * b.height * d.recipe.mixDensityKgM3 * 1e-9;
