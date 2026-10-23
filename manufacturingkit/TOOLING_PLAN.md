@@ -28,7 +28,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 4: mill-base allocation, exact reconstruction/coverage and separate assembly/demolding graphs.
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and process reporting implemented; planned cleanup and phase-8 integration remain.
-- [ ] Phase 7: records, requirements, exact feature geometry, former CAM and cleanup landed; core comparison remains, with source-corner corrections parked.
+- [ ] Phase 7: records, requirements, exact feature geometry, former CAM and cleanup landed; drafted core comparison and source-corner corrections are parked.
 - [ ] Phase 8: mill column and independent hobber plinth remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
@@ -1104,6 +1104,10 @@ head pressure, and the source changes the draft needs. Report both kits
 side by side. This adds no new core type and no library code beyond the recipe
 rule and fixtures. The user picks the production recipe from the results.
 
+Comparison status: [the EPS baseline and missing drafted route](../machinekit/examples/bench-mill/CORE_STRATEGY_COMPARISON.md)
+are recorded. The variant is parked under the recipe/fixture-only rule; the EPS
+default is unchanged. Continue phase 8 independently.
+
 **Cleanup slice (after step 3, before the core comparison and phase 8).**
 These are defects or excess weight in work already landed, so the scope freeze
 allows them. Phase 8 carries this machinery to the column and the hobber, so it
@@ -1265,6 +1269,8 @@ running automated checks. Keep generated full-size geometry under ignored build
 directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
+
+- The drafted-core comparison needs source Draft adjustability and its mapped proposal/application, plus leaning hollow-former walls; these library changes are excluded from the comparison, so the variant is parked.
 
 - Extreme integral JSON round-trips (observed 1e14 becoming 276447232) need a separate toolchain investigation; do not add another JSON parser to tooling.
 
