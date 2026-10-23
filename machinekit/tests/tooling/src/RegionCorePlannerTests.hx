@@ -82,7 +82,7 @@ class RegionCorePlannerTests {
 		var markdown=sys.io.File.getContent(directory+"/castability-review.md");
 		check(markdown.indexOf("process.castability.release.")>=0 && markdown.indexOf("process.level1.lifting-points")>=0,
 			"human review includes available release and source findings rather than only an Unsupported note");
-		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
+		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks,plan,process.spec);
 		machinekit.tooling.ToolingPackageManifest.verify(directory);
 		check(!fabrication.fabrication.ready,"geometric cutting evidence never grants physical fabrication readiness");
 	}

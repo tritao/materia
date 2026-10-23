@@ -225,7 +225,7 @@ class MillFabricationPreview {
 			+"\n## Former boards\n\nUse former-board-stock.csv for each single-board or hollow-box part, former-pocket-screws.csv for dry-side jig drilling and closure, and former-manufacturing.json for sealing faces and each board's program order. The per-former assembly files show the removable board construction. Neck and flange sheets register against the wall and use its external closure; hollow-body joints use internal pocket screws.\n"
 			+"\nFormer programs retain the declared fixed G54 work datum and spoilboard plane; each header states its actual stock-top Z. Thicker blanks therefore use a different top Z, not a different assumed datum. Machine and seal all listed contact surfaces; pocket-screw heads and access stay inside the dry cavity. Board/grip, jig, workholding and machine qualification remain pending.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p, process, f.spec.gravityMps2, dir, geometricReview, f.spec, frame.base,processReport,MillMoldSetup.input(frame).interfaceContext));
-		ToolingPackageManifest.write(dir, f, checks);
+		ToolingPackageManifest.write(dir, f, checks, p, process);
 		ToolingPackageManifest.verify(dir);
 		Sys.println("Fabrication package integrity check passed");
 		removeGenerated(destination);

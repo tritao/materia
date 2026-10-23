@@ -60,7 +60,7 @@ class FoundationJointDesignTests {
 	/** One hash-integrity regression covers every listed package artifact. */
 	static function packageIntegrity(directory:String):Void {
 		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
-		check(manifest.version==13,"the package has one strict boundary format");
+		check(manifest.version==14,"the package has one strict boundary format");
 		var report:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/tooling-section-drawings.json"));
 		var records:Array<Dynamic>=cast report.drawings;
 		var rendered=records.filter(record -> record.validation.status=="pass");
@@ -79,13 +79,58 @@ class FoundationJointDesignTests {
 		var directory=Sys.getCwd()+"/build/tooling/synthetic-foundation-joint-"+fabrication.fingerprint.substr(0,12);
 		machinekit.tooling.ToolingFiles.directory(directory);
 		var checks=machinekit.tooling.ToolingFabricationExport.write(plan,fabrication,directory);
-		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks);
+		var validationBefore = materia.tooling.ToolingCodec.canonical(checks.concat(fabrication.validation));
+		machinekit.tooling.ToolingPackageManifest.write(directory,fabrication,checks,plan);
 		machinekit.tooling.ToolingPackageManifest.verify(directory);
 		packageIntegrity(directory);
+		var missing = machinekit.tooling.ToolingPackageManifest.missingInputs(plan,fabrication,checks.concat(fabrication.validation));
+		var reasons = [for (input in missing) input.reason];
+		check(reasons.length > 0,
+			"the package reports available missing inputs");
+		var seen:Map<String,Bool> = [];
+		for (input in missing) {
+			check(!seen.exists(input.reason) && input.checks.length>0,
+				"each missing input appears once with the checks it blocks");
+			seen.set(input.reason,true);
+		}
+		var status = sys.io.File.getContent(directory+"/START-HERE.md");
+		check(status.indexOf("Missing inputs and evidence") < status.indexOf("Recorded kit status"),
+			"the kit leads with missing inputs before instance findings");
+		check(materia.tooling.ToolingCodec.canonical(checks.concat(fabrication.validation))==validationBefore,
+			"the input summary preserves every detailed validation record");
+
 		var manifest:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"/manifest.json"));
 		var rows:Array<Dynamic>=cast haxe.Json.parse(sys.io.File.getContent(directory+"/"+manifest.validation));
 		check(rows.filter(row -> StringTools.startsWith(Std.string(row.rule),"tooling.foundation-joint.")).length==18,
 			"generation retains every source joint check in the detailed report");
+		var synthetic = [
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.insert.anchorage.a.capacity.bearing",["a"],"Missing bearing"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.insert.anchorage.b.capacity.bearing",["b"],"Missing bearing"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.insert.anchorage.a.capacity.cone",["a"],"Missing tensile"),
+			materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.fixture.source-hole.a",["a"],"Source thread absent")
+		];
+		var savedBearing = fabrication.spec.mixBearingStressMPa;
+		var savedTensile = fabrication.spec.mixTensileStrengthMPa;
+		fabrication.spec.mixBearingStressMPa = null;
+		fabrication.spec.mixTensileStrengthMPa = null;
+		var grouped = machinekit.tooling.ToolingPackageManifest.missingInputs(plan,fabrication,synthetic);
+		check(grouped.length==2 && grouped[0].reason=="Cured mix bearing strength" && grouped[0].checks.length==2
+			&& grouped[1].checks.length==1,"shared strengths group instances without mixing bearing and cone dependencies");
+		synthetic.reverse();
+		check(materia.tooling.ToolingCodec.canonical(grouped)==materia.tooling.ToolingCodec.canonical(
+			machinekit.tooling.ToolingPackageManifest.missingInputs(plan,fabrication,synthetic)),
+			"the missing-input list is independent of instance order");
+		fabrication.spec.mixBearingStressMPa = 100;
+		check(machinekit.tooling.ToolingPackageManifest.missingInputs(plan,fabrication,synthetic).length==1,
+			"a supplied strength clears only its missing input, without clearing other dependencies");
+		var sourceText = machinekit.tooling.ToolingPackageManifest.statusText(synthetic,grouped,[]);
+		check(sourceText.indexOf("tooling.insert.anchorage.*.capacity.bearing")>=0
+			&& sourceText.indexOf("2 checks")>=0,
+			"the opening list summarizes repeated instances while preserving their rule selector");
+		check(sourceText.indexOf("tooling.fixture.source-hole.a")>sourceText.indexOf("Recorded kit status"),
+			"missing source threads remain source actions rather than workshop inputs");
+		fabrication.spec.mixBearingStressMPa = savedBearing;
+		fabrication.spec.mixTensileStrengthMPa = savedTensile;
 		var inventory=sys.io.File.getContent(directory+"/foundation-joint-hardware.csv");
 		check(inventory.indexOf("anchor")>=0 && inventory.indexOf("jack")>=0 && inventory.indexOf("iso4762-8.8")>=0,
 			"fabrication inventory retains the source joint's real standard fasteners");

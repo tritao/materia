@@ -182,15 +182,18 @@ The package contains the full phase 4 CAD/drawings/assembly and these additions:
   use the declared simply-supported plate model; tabs/cutouts/rebates and local
   support loads require a qualified model. Missing brace, fastener and core
   capacities are per-rule pending results. No EPS-weight credit is used.
-- `fabrication-validation.json` and Diagnostics vocabulary in
-  `fabrication-validation.json`. Styrene/EPS and a cure peak at the declared
-  core limit fail outright; missing evidence, compaction or restraints stay
-  pending. Source design requests and fixture/finishing qualification remain
-  blockers. The new report does not overwrite the phase 4 review status.
-- A versioned `manifest.json` containing source/fabrication/package fingerprints,
-  every generated file's byte count and SHA-256, validation and separate readiness.
-  Only STEP header timestamps are normalized for reproducibility. Verification
-  catches modified artifacts; `--checks` includes a tamper/restore regression.
+- `fabrication-validation.json` uses the shared Diagnostics vocabulary and keeps
+  every instance finding. Styrene/EPS incompatibility and exceeded declared
+  compound limits fail; missing evidence, compaction or restraints stay Pending.
+  Source design requests and fixture/finishing qualification remain blockers.
+- The versioned `manifest.json` inventories each artifact's byte count and
+  SHA-256, the detailed validation report and readiness. Only STEP header
+  timestamps are normalized. One integrity check covers the delivered files;
+  its shared hash path has a tamper/restore regression in the test suite.
+- `README.md` and `START-HERE.md` lead with each missing input or physical
+  evidence once, listing the existing checks and artifact releases it blocks.
+  Source actions remain separate. The summary changes no detailed check or
+  readiness result.
 
 CAM uses the same finished contours as CAD and drawings. CamKit retains the exact
 boundary for cutter compensation, then samples its centreline to the declared
@@ -251,25 +254,26 @@ command or automatic setup switch.
 ## Castability feedback
 
 `castability-analysis.json` and `castability-review.md` contain source-owned
-findings and suggested actions. The same screening results are included in each
-orientation candidate. The report retains existing fill topology/ceiling and
+findings and suggested actions for the recorded setup. The report retains
+existing fill topology/ceiling and
 planner draft checks, adds aggregate-based passage and section-size screens,
 and keeps EPS breakout trials explicitly pending. Nothing changes the casting.
 
-The strict process input is now version 3 (versions 1 and 2 are rejected). Its required
-`castability` object declares `maximumAggregateSizeMm`,
-`minimumPassageAggregateRatio`, `maximumSectionThicknessMm` and `evidence`.
-The mill leaves these limits null until the actual mix/process is selected.
-Supply them in the existing `--process-spec` input, preserving the recipe
-fingerprint. Declared limits are screening assumptions, not physical qualification.
+Process inputs are the plain shop records described above. Their `castability`
+object declares `maximumAggregateSizeMm`, `minimumPassageAggregateRatio` and
+`evidence`; the `compound` object owns the supplier's section or layer limit and
+maximum mass per lift. No intermediate process version or thermal model is
+required. The mill leaves production limits unresolved until the actual compound
+and process are selected. Declared limits screen the design; physical
+qualification remains separate.
 
 Suggestions identify source IDs and the blocking rule. Where supported they give
 measured/target dimensions, an axis and a representative region, or a candidate
 vent point, all in mold coordinates (mm). A design reviewer must map a proposed
 face separation to actual source parameters and replan a new source revision.
 Vents need a continuous route and sealing plan; no penetration is added by the
-report. Junction inscribed diameter now has explicit numerical bounds; junction heat flow, cure, structural,
-release and handling evidence remain independent requirements.
+report. Junction inscribed diameter has explicit numerical bounds. Compound,
+structural, release and handling qualification remain independent requirements.
 
 
 ## Geometric section bounds

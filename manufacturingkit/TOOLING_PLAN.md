@@ -1163,7 +1163,7 @@ lists each deleted module with the check or record that still covers it.
     as a shop document; then they are part of the package format. Exact
     reconstruction compares the native CAD with the in-memory plan and the
     frozen CAD fixtures. Do this together with item 6.
-12. Report Pending by missing input. Each unresolved input appears once, with
+12. [x] Report Pending by missing input. Each unresolved input appears once, with
     the checks and artifacts it blocks. The per-instance records stay in the
     detailed report, and readiness is unchanged. The kit status (README and
     START-HERE) leads with this list.
@@ -1460,3 +1460,8 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   an unconfigured motor fixture, separately from the named preset's explicit
   assumed flange. Supplier CAD checks read the existing pinned shared libraries
   through supported environment overrides; no geometry is substituted.
+
+- Missing-input presentation decision (cleanup): README and START-HERE group
+  unresolved typed inputs and named physical evidence once, with existing blocked
+  rule selectors and delivered artifacts. Instance IDs stay in the detailed report;
+  readiness, source-change findings and the single integrity check are unchanged.
