@@ -50,6 +50,7 @@ class MaterialLibrary {
     toolingEPS(),
     toolingBoard(),
     mineralCast(),
+    assumedReplication(),
     material("carbide", "Cemented carbide", [0.70, 0.71, 0.72], 1.0, 0.35, 14500, "carbide"),
     material("cast-iron", "Cast iron", [0.58, 0.59, 0.60], 1.0, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.80, 0.60, 0.38], 1.0, 0.38, 8800, "bronze"),
@@ -99,6 +100,15 @@ class MaterialLibrary {
   static function toolingBoard():MaterialDef {
     var result=material("tooling-coated-board","Coated particleboard (nominal)",[0.85,0.83,0.73],0,0.65,650,"coated particleboard");
     result.physical.propertiesAssumed=true;return result;
+  }
+
+  /** Sensitivity input only, not a selected product or qualified creep limit. */
+  static function assumedReplication():MaterialDef {
+    var result=material("replication-compound-assumed","Replication compound (assumed)",[0.45,0.47,0.39],0.0,0.9,1800,
+      "replication compound (assumed)");
+    result.physical.youngsModulusPa=4e9;
+    result.physical.propertiesAssumed=true;
+    return result;
   }
 
   /** Assumed epoxy-granite bulk inputs, for checks that explicitly consume them.

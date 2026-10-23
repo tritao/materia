@@ -1856,3 +1856,17 @@ mount geometry and the supported-router rerun remain pending. Frozen CAD and
 release gates remain unchanged. Builds stopped at the 8 GB root-space floor;
 retained archives were hash-verified and relocated to DEV (DATA1 is full), with
 current references updated and a [relocation inventory](mounting/evidence-relocation.json).
+
+
+RM2 physical fixture checkpoint (2026-10-23): 65 shared, 110 tube-access/capture
+and 53 assembled-mount assertions pass. Shared geometry includes a removable
+nut cassette with real retaining screws/extraction threads, an integral outward
+receiver/adjustment foot, locked weldable pad stock, real bolts/washers/nuts,
+service key openings and an explicitly assumed replication layer. The local
+Y section preserves its rail/pinion datums. [Evidence](mounting/geometry-validation.json)
+is compact on root. No DATA1 writes. These are local 500 mm rack/400 mm rail
+fixtures, not complete bed masses or full-router clearance acceptance. X host
+geometry, section cuts/joints, end caps and machine withdrawal/wrench corridors,
+supplier envelopes, geometry-derived compliance and new weld fatigue remain
+open. Frozen CAD and SR-D3/SR6-C gates are unchanged. Root crossed below 8 GB;
+implementation/builds paused and reproducible build output was removed.

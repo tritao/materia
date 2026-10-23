@@ -1,0 +1,194 @@
+{
+  "status": "Local physical geometry passes; whole-machine and geometry-derived compliance qualification remain open",
+  "sourceBaseCommit": "6bf32c2b1dca88a2b43a7b1c7ff74c3f17ce4c83",
+  "archive": "build/sheet-router-evidence/mount-geometry-20261023.tar.gz",
+  "archiveSha256": "ae23d7954fbf1b2f5b89e83ef9b4cbb1f544a5d756d9981acba0f8430cf4e7f7",
+  "bytes": 136241,
+  "checks": {
+    "sharedAssertions": 65,
+    "accessAssertions": 110,
+    "assembledMountAssertions": 53
+  },
+  "massKg": {
+    "rackAndRailPrototype": 11.585042391355483,
+    "railCassettePrototypeIncludingRail": 2.3280530816257308,
+    "rackAndRailPrototypeParts": {
+      "adjuster1": 0.0011293657165149713,
+      "adjuster2": 0.0011293657165149713,
+      "adjuster3": 0.0011293657165149713,
+      "adjuster4": 0.0011293657165149713,
+      "anchor-bolt1": 0.008738190917526867,
+      "anchor-bolt2": 0.008738190917526867,
+      "anchor-bolt3": 0.008738190917526867,
+      "anchor-nut1": 0.0023809573891722608,
+      "anchor-nut2": 0.0023809573891722608,
+      "anchor-nut3": 0.0023809573891722608,
+      "anchor-washer1": 0.0010164484800613018,
+      "anchor-washer2": 0.0010164484800613018,
+      "anchor-washer3": 0.0010164484800613018,
+      "pad": 4.721094900487524,
+      "rack": 1.3,
+      "rack-bolt1": 0.008738190917526867,
+      "rack-bolt2": 0.008738190917526867,
+      "rack-bolt3": 0.008738190917526867,
+      "rack-bolt4": 0.008738190917526867,
+      "rack-spacer1": 0.0010164484800613018,
+      "rack-spacer2": 0.0010164484800613018,
+      "rack-spacer3": 0.0010164484800613018,
+      "rack-spacer4": 0.0010164484800613018,
+      "rail": 1.284,
+      "receiver": 3.6587326532437796,
+      "replication": 0.5412720268074868
+    }
+  },
+  "limits": [
+    "Local 500 mm rack / 400 mm rail; 540 mm rack carrier and 440 mm cassette fixtures",
+    "No whole-router section joints, end-caps or loading/service corridor qualification",
+    "Nominal guide-block sweep; actual supplier envelope still to check",
+    "Product thickness/creep and preload/bearing qualification unresolved",
+    "Geometry-derived compliance and new pad weld reaction/fatigue qualification pending",
+    "No whole-router static/modal/motion/fatigue pass; frozen CAD unchanged"
+  ],
+  "verifiedFiles": [
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountSteel.hx",
+      "bytes": 5257,
+      "sha256": "95cf882da9eb5d189e88fb3323d61343e2ea3c2e72dbe7613740fb8af7351ff5"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountComponents.hx",
+      "bytes": 821,
+      "sha256": "28d855338af70d4af8e69f20ce312e4b40a5eea6df164cdfbf227dfc286987cc"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountNutCassette.hx",
+      "bytes": 6787,
+      "sha256": "ecb4b6c0a7e44748269fa4acda4a86305b37f54ac22e1272c9dcf213492e0e9e"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/LinearMountReplication.hx",
+      "bytes": 2350,
+      "sha256": "85636700d8974f8d80ba8557a19c559360afc02cf745112140a1779ccb2a1877"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/InsertMountPattern.hx",
+      "bytes": 2539,
+      "sha256": "bb6cd4d06b643be600c9f51c4488eb04f0b3a4b485e6bf510fff9d9e97a836f3"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/MountHoleDerivation.hx",
+      "bytes": 4308,
+      "sha256": "606d0c1da6dfcdaae5d07bd89ad9d536eb29f53bcd0a58aab0cc2b21525c036c"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/structural/MountThroughBolts.hx",
+      "bytes": 2863,
+      "sha256": "00f481d7a8834f6be022e00a3c34db5e049347ab83e6bf2ec9b8a7cd223ae7fa"
+    },
+    {
+      "path": "projectkit/src/materia/project/MaterialLibrary.hx",
+      "bytes": 12596,
+      "sha256": "000852f2c6fcda33a7310ff283d38f6828b7b8fefa87a9cd6a4d6bcee872179b"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountTests.hx",
+      "bytes": 11757,
+      "sha256": "97b5a9f14915a491fc7d9b1b9e16d1b81da88591e7454679a8f0c4166a3d7265"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountAccessTests.hx",
+      "bytes": 9016,
+      "sha256": "bd32ce861c1d521c5474577cf63faa32ac4f55db6fe1392124888828fef083c8"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountAssemblyTests.hx",
+      "bytes": 11061,
+      "sha256": "e88b07ac4262a6982dfd46476e58e5d61d01842372eca593d8156c2de96bf15c"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.json",
+      "bytes": 275,
+      "sha256": "55fbad9133b718735e76e5527c62a98ce993e7094af1ff82ae993b61783692cd"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.access.json",
+      "bytes": 259,
+      "sha256": "3b8ec5d4aece05c0ce59b5dc28ccbba4a4cd0f7571e8a2775c811fb19a9a3a6d"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.assembly.json",
+      "bytes": 322,
+      "sha256": "7c7acf74ef50eb399051b276bc33c52ac8a179a40181136ff89c0489fc9734bd"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/resumed-core.log",
+      "bytes": 6874,
+      "sha256": "3c9bf0ac812f772affba15dabd18e4ca2d55262a4d5775ad1f0a3fa10693e75b"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access-final.log",
+      "bytes": 8783,
+      "sha256": "c5dd0fc19cb1e89e34579cad646822aa60baf26f90ead254388f1b99f7d25334"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly.log",
+      "bytes": 8808,
+      "sha256": "fb3999d16225fb13049c1a473c50e3ff18be2863149adfdb297663b0ca428159"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/access.json",
+      "bytes": 3880,
+      "sha256": "30051fd02493ec06860a8b029d0db61d83da4b5a037949b7222d0338478c37af"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/cassette.step",
+      "bytes": 226392,
+      "sha256": "6358d3b6d11f3cb1158d2d5eb9c9121586d17568248fe60b90f60b70f7836c50"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/cover.step",
+      "bytes": 58632,
+      "sha256": "f671d4202bc8cc4f52b5c7b2c3ff686933b49163d0621f4b71eae9417ec2f24a"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/host.step",
+      "bytes": 56203,
+      "sha256": "3f07f8208bbe57d8e09e768070c40ec2b70000b9af4d3a4287c028e4f743348d"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/mass.json",
+      "bytes": 29718,
+      "sha256": "b6662f454a7e6044faab8f765b0067b2e5e3aacd189f54b8fd9ebad6e59fbc55"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/assembly.json",
+      "bytes": 62469,
+      "sha256": "0e0194918bf6ceed1dc8bbc32ed06968c4528247ea2fcf89ac3560c654a180b8"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/geometry.json",
+      "bytes": 1050,
+      "sha256": "98af43b20a1c57c60aff9655322645985be1efc5f3139251ccb7f3bc73616904"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/mass.json",
+      "bytes": 31029,
+      "sha256": "6327e5c905af4542e991f418fba9d90b193ffc2cb97112606b2a4b305d5a16b2"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/pad.step",
+      "bytes": 84823,
+      "sha256": "c6654d06d741cafe1fda1a4620e5ebafb7958a7b17d2c8fb2e6b0e570092777f"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/receiver.step",
+      "bytes": 88689,
+      "sha256": "881dd78b36bbbc21715793ea409107c5b543c3971bfbf873af3a14e5d655832b"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/replication.step",
+      "bytes": 84823,
+      "sha256": "214589d29de64c86a8817e42f642aa1780073d95158b8a4920ffab5d6cdee785"
+    }
+  ]
+}

@@ -152,3 +152,51 @@ of truth, while mount ownership includes extra carriers/cleats/washers/nuts once
 Full geometry-derived terms, rotations, joint preload/slip and consumption by the
 router solver remain unqualified. No new router stiffness, mode or motion result
 is claimed by this change.
+
+
+## Physical fixture update — 2026-10-23
+
+The current local fixtures pass **65 shared, 110 access and 53 assembled-mount
+assertions**. [Geometry evidence](geometry-validation.json) is compact on root;
+DATA1 received no writes. These are local candidate results, not frozen adoption.
+
+The rail's through-bolt route now has a physical removable C45 nut cassette,
+24 × 10 mm with a separate 2 mm drilled retaining cover. ISO 4032 nuts cannot
+rotate in its hex pockets. Real washers/nuts bear directly on the tube wall;
+the cover carries no assembly preload. The cage has 0.5 mm sliding clearance
+and M3 extraction threads at both ends. M3 cover screws retain the existing C45
+engagement/back-wall rules. A 750 mm local withdrawal sweep clears an open
+100 × 100 × 6 tube, using its 88 × 88 end mouth, without side-wall windows at
+every rail bolt. Actual machine end caps, section joining/pulling sequence and
+the complete withdrawal corridor remain to check. Hex-key access through the
+rail counterbores and nut/washer/cage interference checks pass in native CAD.
+
+The rack fixture now uses the shared `LinearMountSteel` member with an integral
+outward foot: **22 mm receiver height × 20 mm thickness**, **44.9 mm foot width
+× 9.5845057 mm foot thickness**, 540 mm fixture length for a sourced 500 mm rack.
+The foot doubles as the adjustment bar: M4×12 flat-point screws reach the actual
+rack back. Their 2 mm keys pass 3.5 mm access bores in the real pad/replication.
+The rack remains stood off on actual 1.6 mm M6 washers. M6×25 anchor screws use
+real counterbores, washers and outboard nuts; 2.61549 mm projects beyond the nut.
+The outboard foot clears the nominal guide-block sweep and the pinion envelope.
+This avoids placing an inward flange underneath the guide block. It does not
+replace the complete supplier-envelope and wrench-envelope sweep.
+
+One **140 × 8 mm welded mild-steel pad plus 4 mm assumed replication** carries
+both the Y rail and rack support datum in the fixture. C45 receivers remain
+bolted parts; weldable mild-steel pads reject C45 tapped-hole policies. Existing
+rail/pinion datums are retained in this local Y section (carrier 12, rack back
+24.584506 and pinion centre 58 mm above the tube top). An X mounting section
+still needs its own host geometry/clearance check; do not transfer the Y pad
+height to X or move the frozen motor/beam to make it fit.
+
+The physical study layer has explicit **assumed** density 1800 kg/m³ and modulus
+4 GPa, inherited from the sensitivity study, not a selected production compound.
+Recipe/assembly reload and FEM mass/inertia export pass for the assembled mount.
+The 540 mm rack/rail prototype totals **11.585042 kg**, including 1.3 kg rack,
+1.284 kg rail, 4.721095 kg pad, 0.541272 kg layer, 3.658733 kg receiver and real
+hardware. The separate 440 mm cassette fixture totals 2.328053 kg including its
+1.284 kg rail. These unequal-length fixtures must not be multiplied into a full
+bed or moving-mass claim. Section cuts/joints, complete host service access,
+geometry-derived compliance and new pad-weld reactions/fatigue remain open.
+Frozen CAD and all release gates are unchanged.

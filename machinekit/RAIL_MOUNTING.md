@@ -201,6 +201,16 @@ limits, actual through-bolt/nut rail backing and full native/FE acceptance remai
 open. Today's generic tape scale has no mounting bores and is rejected by the
 adapter rather than receiving invented holes.
 
+2026-10-23 local geometry checkpoint: 65 shared, 110 access and 53 assembled
+assertions pass. The shared steel recipe now supports an integral adjustment
+foot and distinct locked C45/weldable mild-steel stock; the latter rejects C45
+threads. A rebuildable removable nut cassette supplies capture, retaining cover
+and extraction threads without per-bolt tube-side windows. `LinearMountReplication`
+provides explicitly assumed physical layer geometry/mass (not a production grade).
+See [geometry evidence](examples/sheet-router/mounting/geometry-validation.json).
+Full cast/welded factory acceptance, host end-cap/service corridors, joined
+sections, supplier envelopes and geometry-derived compliance remain open.
+
 The host supplies a mounting datum:
 a replicated plane plus a steel side bar with push screws for assembly adjustment,
 then locking under RM-D1. A fixed precision lip is not the primary reference.
