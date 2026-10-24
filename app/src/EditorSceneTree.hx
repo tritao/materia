@@ -7,7 +7,6 @@ import haxeon.ui.widgets.collections.TreeRootMetadata;
 import haxeon.ui.icons.IconName;
 import app.editor.SceneVisibility;
 import app.editor.SceneTreeRow;
-import materia.assembly.AssemblyBodies;
 import app.editor.AssemblyHierarchy;
 import app.editor.LegacyAssemblyVisibility;
 import materia.assembly.AssemblyDefinition;
@@ -136,7 +135,6 @@ class EditorSceneTree implements TreeViewModel {
   }
   static inline var PROJECT:String = "project:";
   final scene:EditorScene;
-  final generatedLabels:Map<String, String>;
   /** Assemblies contain other assemblies and part occurrences. */
   final children:Map<String, Array<String>> = [];
   /** Occurrence to its authored owning assembly. */
@@ -144,7 +142,6 @@ class EditorSceneTree implements TreeViewModel {
   final parentOf:Map<String, String> = [];
   final groups:Map<String,app.editor.AssemblyHierarchy.AssemblyTreeGroup> = [];
   var hierarchy:Null<AssemblyHierarchy>;
-  final authoredMembers:Map<String,Bool> = [];
   /** Body root to the kind of moving joint that carries it. */
   final jointOf:Map<String, String> = [];
   final childCache:Map<String, Array<String>> = [];
@@ -167,17 +164,10 @@ class EditorSceneTree implements TreeViewModel {
     for(id in members)if(scene.isVisible(id))shown++;
     return {label:group.label,path:group.path,count:members.length,shown:shown};
   }
-  /** What the row for a scene object says: a readable name for generated parts, or the person's rename. */
+  /** Object names are resolved when project overrides are materialized, never in the tree. */
   function displayLabel(key:String):String {
     var item = scene.object(key);
-    if (item == null) return key;
-    var generated = generatedLabels.get(key);
-    if (generated != null && generated == item.label && StringTools.startsWith(key, PROJECT)) {
-      var id=key.substr(PROJECT.length);
-      if (authoredMembers.exists(key)) id=id.substr(id.lastIndexOf("/")+1);
-      return AssemblyBodies.displayName(id);
-    }
-    return item.label;
+    return item == null ? key : item.label;
   }
   function matches(key:String):Bool {
     if (filter == "" || key == selectionKey()) return true;
@@ -190,7 +180,7 @@ class EditorSceneTree implements TreeViewModel {
     }
     var item = scene.object(key);
     if (item != null) {
-      if (item.label.toLowerCase().indexOf(filter) >= 0 || displayLabel(key).toLowerCase().indexOf(filter) >= 0 ||
+      if (displayLabel(key).toLowerCase().indexOf(filter) >= 0 ||
           item.kind.toLowerCase().indexOf(filter) >= 0) return true;
       if (group != null) for (child in group) if (matches(child)) return true;
       for (index in 0...scene.cadFeatureCount(key))
@@ -224,11 +214,10 @@ class EditorSceneTree implements TreeViewModel {
     childCache.set(parentKey, result);
     return result;
   }
-  /** Generated labels distinguish authored renames from generated part designations. */
-  public function new(scene:EditorScene, ?definition:AssemblyDefinition, ?generatedLabels:Map<String, String>) {
+  /** Hierarchy membership is independent of object names. */
+  public function new(scene:EditorScene, ?definition:AssemblyDefinition) {
     this.scene=scene;
     scene.selectionObjects=selectedObjects;
-    this.generatedLabels=generatedLabels==null?new Map():generatedLabels;
     if(definition==null)return;
     var authored=new AssemblyHierarchy(definition,[for(item in scene.items())item.id]);
     hierarchy=authored;
@@ -237,7 +226,7 @@ class EditorSceneTree implements TreeViewModel {
     for(key=>parent in authored.parents)if(parent!="scene")parentOf.set(key,parent);
     for(occurrence in authored.definition.occurrences) {
       var id=PROJECT+occurrence.id;
-      if(parentOf.exists(id)){partsOf.set(id,parentOf.get(id));authoredMembers.set(id,true);}
+      if(parentOf.exists(id)){partsOf.set(id,parentOf.get(id));}
     }
     for(joint in authored.definition.joints)if(joint.role=="tree" && joint.type!="fixed")
       jointOf.set(PROJECT+joint.child,Std.string(joint.type));
@@ -303,9 +292,8 @@ class EditorSceneTree implements TreeViewModel {
     if(item!=null) {
       var joint = jointOf.get(key);
       var shown = displayLabel(key);
-      // The generated designation stays one hover away when the row shows a readable name.
       return iconLabeledItem(key, shown + (joint == null ? "" : " · " + joint) +
-        (scene.isVisible(key) ? "" : " (hidden)"), IconName.Cube, shown == item.label ? null : item.label);
+        (scene.isVisible(key) ? "" : " (hidden)"), IconName.Cube, item.id);
     }
     var marker=key.indexOf(":feature:");
     if(marker>=0){

@@ -290,7 +290,7 @@ class ProjectSourceTests {
 
   /** The arm's hierarchy shows its rigid bodies, not its 20-deep joint tree. */
   static function checkArmHierarchy(session:ProjectDocumentSession):Void {
-    var tree = new EditorSceneTree(session.scene, session.projectAssemblyDefinition, session.generatedLabels());
+    var tree = new EditorSceneTree(session.scene, session.projectAssemblyDefinition);
     var top = [for (index in 0...tree.childCount("scene")) tree.childKeyAt("scene", index)];
     check(top.join(",") == "project:pedestal,project:table,project:padPick,project:padPlace,project:workpiece",
       "the hierarchy starts at the arm's base body and the cell's fixed bodies (" + top.join(",") + ")");

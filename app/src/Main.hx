@@ -813,7 +813,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (simulationStop != null) closeAfterSimulationStop = finishClose;
       else finishClose();
     };
-    treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
+    treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition);
     treeModel.canChangeVisibility = function() return !documents.blocked();
     treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
     if (hostContext != null) {
@@ -959,7 +959,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new MenuItem("visibility", "Show / hide (Space)", function() treeModel.toggleVisibility(treeModel.selectionKey()), !documents.blocked()),
         new MenuItem("isolate", "Isolate selected", function() treeModel.isolateSelected(), !documents.blocked()),
         new MenuItem("show-all", "Show all", function() treeModel.showAll(), !documents.blocked()),
-        new MenuItem("rename", "Rename (F2)", function() startRename(scene.selectedId), canEditObjects() && scene.object(scene.selectedId)!=null),
+        new MenuItem("rename", "Rename (F2)", function() startRename(treeModel.selectionKey()),
+          canEditObjects() && scene.object(treeModel.selectionKey())!=null),
+        new MenuItem("reset-name", "Reset name", function() {
+          session.resetName(treeModel.selectionKey());
+          hierarchyMenuVisible = false;
+          invalidateView();
+        }, canEditObjects() && scene.object(treeModel.selectionKey())!=null && session.generatedName(treeModel.selectionKey())!=null),
         new MenuItem("duplicate", "Duplicate", function() commands.execute("scene.duplicate"),
           commands.get("scene.duplicate").isEnabled(ui.commandContext)),
         new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
@@ -2421,7 +2427,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         if (!workspace.isOpen("machine-control")) workspace.open("machine-control", "inspector");
         workspace.activate("machine-control");
       }
-      treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
+      treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition);
       treeModel.canChangeVisibility = function() return !documents.blocked();
       treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
       treeModel.setFilter(hierarchySearch);

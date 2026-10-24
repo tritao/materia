@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "object-name-tests"
+  },
+  "entry": "tests.ObjectNameTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/object-name-tests"
+}

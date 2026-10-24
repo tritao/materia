@@ -168,11 +168,19 @@ class ProjectDocumentSession {
     bim.cad.clearHistory();
   }
 
-  /** The label the project gave each generated object, so callers can tell which ones were renamed. */
-  public function generatedLabels():Map<String, String> {
-    var result = new Map<String, String>();
-    if (projectBaseline != null) for (record in projectBaseline) result.set(record.id, record.label);
-    return result;
+  /** Source name before applying the document's explicit label override. */
+  public function generatedName(id:String):Null<String> {
+    if (projectBaseline != null)
+      for (record in projectBaseline) if (record.id == id) return record.label;
+    return null;
+  }
+
+  public function resetName(id:String):Bool {
+    var name = generatedName(id);
+    if (name == null || scene.object(id) == null) return false;
+    // Saving omits this override; rebuilding can then supply a new source name.
+    scene.setName(id, name);
+    return true;
   }
 
   public function newDocument():Void {

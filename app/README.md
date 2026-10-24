@@ -248,7 +248,12 @@ and filtered deviations in µm. Opening details does not rerun stock removal or 
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame
   it. F2 or the object context menu opens Rename; the context menu also offers
-  Duplicate, Delete, and Frame. Edits support undo/redo and mark the document as unsaved.
+  Duplicate, Delete, and Frame. Generated objects also offer **Reset name**.
+  The tree, Rename dialog, inspector and search use the same object name. A project
+  supplies the generated name; a saved name override follows the stable object ID
+  across rebuilds. Reset name removes that override and restores the current source
+  name. Internal IDs appear in tree tooltips and never change when an object is renamed.
+  Edits support undo/redo and mark the document as unsaved.
 - Create and duplicate select the new object; duplicates retain appearance and
   visibility with a small XY offset. Delete selects a neighbour or the Scene root.
   Undo restores the previous objects, order, and selection; redo retains object IDs.
