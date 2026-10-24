@@ -1,0 +1,10 @@
+{
+ "version":1,
+ "package":{"name":"casting-mold-surface-tests"},
+ "entry":"CastingMoldSurfaceTests",
+ "sourceRoots":["src","../../examples/box-mold"],
+ "sources":["src/CastingMoldSurfaceTests.hx","../../examples/box-mold/SinglePocketSetup.hx"],
+ "dependencies":{"machinekit":{"path":"../.."}},
+ "target":"host",
+ "outputDir":"build/casting-surface"
+}

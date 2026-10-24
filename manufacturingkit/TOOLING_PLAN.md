@@ -1570,3 +1570,5 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   in tooling views; the Finished casting view shows it with the source inserts
   and cast-in anchors. The reference adds no simulation mass or collision and
   is not a physical tooling assembly operation.
+
+- Finished casting surfaces (2026-10-24): refine reconstructed resin before review, STEP and mesh export so tangent access reliefs leave no artificial coplanar face patches; preserve exact solid geometry.

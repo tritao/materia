@@ -123,7 +123,22 @@ class CastingMoldCad {
 		return result;
 	}
 
+	/** Merge coplanar patches left by access tooling touching the casting boundary.
+	 * Finalize before STEP, mesh and review derive their surface identities.
+	 */
 	public static function reconstructed(p:CastingMoldPlan):Part {
+		var raw = unrefinedReconstruction(p);
+		try {
+			var finished = raw.refined();
+			raw.close();
+			return finished;
+		} catch (error:Dynamic) {
+			raw.close();
+			throw error;
+		}
+	}
+
+	static function unrefinedReconstruction(p:CastingMoldPlan):Part {
 		if (p.construction==SinglePocket) return BoxMoldCad.reconstructed(p);
 		var pieces:Array<Part> = [box(p.cavity)];
 		return Solids.building(pieces, parts -> {
