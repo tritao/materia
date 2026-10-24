@@ -87,6 +87,31 @@ class EpsAccessTests {
 		var core=MoldCoreLayers.registeredFlange(MoldRegions.tooling(volume),feature.id,"core-bed-access",
 			plan.document.recipe,F.identity(),"bed");
 		check(core.layers.length>0 && core.support.clampBearingAreaMm2>0,"Bed EPS retains the shared ruled cutting and restraint route");
+		core.support.registrationProfiles=volume.profiles;
+		plan.cores=[core];
+		var fits=machinekit.tooling.CastingMoldCad.corePanelFit(plan);
+		check(fits.length==1 && fits[0].status=="pass"
+			&& fits[0].affectedIds.indexOf(core.id)>=0 && fits[0].affectedIds.indexOf("bed")>=0,
+			"Exact relieved neck and outside flange clear the actual machined bed");
+		var layer=core.layers[0],original=layer.solid;
+		var intrusion=MoldRegions.moved(box(14,14,8,2,2,2),bed.pose);
+		layer.solid=Union([original,MoldRegions.moved(intrusion,F.inverse(layer.stockToMold))]);
+		var fitError="";
+		try machinekit.tooling.CastingMoldCad.corePanelFit(plan)
+		catch (error:Dynamic) fitError=Std.string(error);
+		check(fitError.indexOf("EPS access intersects receiver: "+core.id+"/bed")>=0,
+			"Oversized finished foam fails even when its nominal sealed envelope still fits");
+		layer.solid=original;
+		var cavityBefore=core.cavity;
+		core.cavity=Union([cavityBefore,intrusion]);
+		fitError="";
+		try machinekit.tooling.CastingMoldCad.corePanelFit(plan)
+		catch (error:Dynamic) fitError=Std.string(error);
+		check(fitError.indexOf("EPS access intersects receiver: "+core.id+"/bed")>=0,
+			"An oversized sealing neck fails even when the actual foam still fits");
+		core.cavity=cavityBefore;
+		check(machinekit.tooling.CastingMoldCad.corePanelFit(plan).length==1,
+			"Restoring only the offending geometry restores the exact fit proof");
 		var wrong=materia.tooling.casting.CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
 		var wrongFeature=wrong.document.input.features.filter(feature -> feature.id=="pocket")[0],message="";
 		try materia.tooling.casting.MoldFormerAccess.registeredBedAccess(wrong,wrongFeature,volume,[])

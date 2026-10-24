@@ -72,11 +72,13 @@ class MillFabricationPreview {
 		var f = ToolingFabrication.plan(p, fabricationSpec, processReport);
 		if (process.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";
-		var checks:Array<ToolingValidation> = [];
+		var checks:Array<ToolingValidation> = recordsOnly ? CastingMoldCad.corePanelFit(p) : [];
 		var geometricReview:Null<machinekit.tooling.CastingMoldCad.CastingMoldReview> = null;
 		if (!recordsOnly) {
 			var review = CastingMoldCad.review(p);
 			geometricReview = review;
+			checks = checks.concat(review.validation.filter(record ->
+				StringTools.startsWith(record.rule, "tooling.cad.core-panel-fit.")));
 			if (review.fingerprint != f.sourceFingerprint)
 				throw "Stale geometric review";
 			if (Sys.args().indexOf("--checks") >= 0 && extraChecks!=null)

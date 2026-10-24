@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "casting-mold-view-tests"},
+  "entry": "CastingMoldViewTests",
+  "sourceRoots": ["src", "../../haxe/src"],
+  "sources": ["src/CastingMoldViewTests.hx", "../../haxe/src/machinekit/tooling/CastingMoldView.hx"],
+  "dependencies": {"projectkit": {"path": "../../../projectkit"}},
+  "target": "host",
+  "outputDir": "build/casting-view"
+}

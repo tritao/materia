@@ -439,10 +439,48 @@ class CastingMoldCad {
 		}
 	}
 
+	/** Check the delivered foam, including its neck and external flange, against
+	 * the actual machined receiver. Bounds and contour endpoints cannot prove a
+	 * fit: a router-relief arc can extend beyond every stored endpoint.
+	 */
+	public static function corePanelFit(p:CastingMoldPlan):Array<materia.tooling.ToolingValidation> {
+		var checks:Array<materia.tooling.ToolingValidation> = [];
+		for (core in p.cores) {
+			if (core.support.kind != materia.tooling.casting.CoreSupport.CoreSupportKind.RegisteredFlange)
+				continue;
+			var panelId = MoldCores.receiverId(core);
+			var receivers = p.panels.members.filter(member -> member.panel.id == panelId);
+			if (receivers.length != 1)
+				throw "Unknown EPS access receiver: " + core.id + "/" + panelId;
+			var scope = new cadkit.modeling.Scope();
+			try {
+				var panel = scope.own(panelWorld(receivers[0]));
+				var foam = scope.own(machinekit.structural.CastingRegionCad.part(MoldCores.physical(core)));
+				var sealed = scope.own(machinekit.structural.CastingRegionCad.part(MoldCores.occupied(core)));
+				for (solid in [foam, sealed]) {
+					var overlap = scope.own(solid.intersect(panel));
+					if (overlap.volume() > 1e-4)
+						throw "EPS access intersects receiver: " + core.id + "/" + panelId;
+				}
+				checks.push(materia.tooling.export.ToolingLoads.check(
+					"tooling.cad.core-panel-fit." + core.id, [core.id, core.featureId, panelId],
+					materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,
+					"Finished EPS and its sealed neck clear the machined receiver; the external flange remains outside.",
+					[CastingMoldPlanner.fingerprint(p)]));
+				scope.close();
+			} catch (error:Dynamic) {
+				scope.close();
+				throw error;
+			}
+		}
+		return checks;
+	}
+
 	public static function review(p:CastingMoldPlan):CastingMoldReview {
 		if (p.construction==SinglePocket) return BoxMoldCad.commonReview(p);
 		enableGeometry();
 		CastingMoldPlanner.validate(p);
+		var coreFits = corePanelFit(p);
 		var references:Array<Part> = [], difference = 0.0, ov = 0.0, rv = 0.0;
 		try {
 			var original = source(p);
@@ -658,7 +696,7 @@ class CastingMoldCad {
 			for (part in parts)
 				if (!part.shape.isClosed())
 					part.close();
-			var validation = p.validation.concat([
+			var validation = p.validation.concat(coreFits).concat([
 				for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
 					materia.tooling.export.ToolingLoads.check("tooling.cad."
 						+ name, [p.document.input.id],

@@ -1556,3 +1556,17 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   blank is wire-cut in exact section bands and held by external flange clamps;
   clamp capacity stays Pending. Routed sockets remain one shared construction
   for clear rectangular bed and side faces, with the actual receiving panel.
+
+- EPS receiver-fit review (2026-10-24): the shared access contour already drives
+  the registration profile and panel operation. Keep the source and cutouts
+  unchanged. Exact delivered STEP checks refuted the apparent column collision:
+  relieved arcs extend beyond their endpoints, and external flanges intentionally
+  protrude. Native mold review explicitly checks finished foam and the sealed
+  neck against the machined receiver, naming the core, feature and panel. Regress
+  oversized foam separately from an oversized sealing envelope.
+
+- Finished casting view (2026-10-24): include the exact reconstructed resin body
+  as a rendering reference before generating presentation fingerprints. Hide it
+  in tooling views; the Finished casting view shows it with the source inserts
+  and cast-in anchors. The reference adds no simulation mass or collision and
+  is not a physical tooling assembly operation.

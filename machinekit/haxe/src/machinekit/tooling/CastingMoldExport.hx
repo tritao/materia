@@ -88,7 +88,12 @@ class CastingMoldExport {
 			step(dir+"/"+volume.id+".step",part);
 		}
 		var casting = CastingMoldCad.reconstructed(p);
-		step(dir + "/reconstructed-casting.step", casting);
+		try casting.shape.exportStep(dir + "/reconstructed-casting.step") catch (error:Dynamic) {
+			casting.close();
+			throw error;
+		}
+		var castingMesh = AssemblyPreview.part(CastingMoldView.REFERENCE_ID, "Finished casting", casting,
+			materia.project.MaterialLibrary.fromSpec("mineral cast"));
 		var assembled = CastingMoldCad.assembly(p),
 			saved = assembled.encode();
 		var restored = MachineAssembly.decode(saved);
@@ -96,7 +101,7 @@ class CastingMoldExport {
 		if (restored.encode() != saved)
 			throw "Assembly recipe did not restore exactly";
 		text(dir + "/mold.assembly.json", saved);
-		scene(dir, "mold", assembled, p, review);
+		scene(dir, "mold", assembled, p, review, castingMesh);
 		var coreList = [for (c in p.cores) switch c.support.kind {
 			case RoutedSocket: c.id+": "+c.layers.length+" layers, routed socket "+c.support.socketOperationId;
 			case RegisteredFlange: c.id+": "+c.layers.length+" layers, externally clamped registered flange at "+MoldCores.receiverId(c);
@@ -129,9 +134,15 @@ class CastingMoldExport {
 			"7. Lift/flip only with qualified points/equipment. Replicate the designated rail/bearing seats against qualified masters; grout the column joint using its approved gap, jacking and cure-before-torque process. These allowances and processes are pending, and source geometry was not altered.\n");
 	}
 
-	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan, review:CastingMoldCad.CastingMoldReview):Void {
+	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan,
+			review:CastingMoldCad.CastingMoldReview, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):Void {
 		var sceneData=AssemblyPreview.scene(a,id);
+		CastingMoldView.geometry(sceneData, castingMesh);
 		sceneData.presentation=ToolingPresentation.casting(plan,sceneData,review);
+		var embedded = [for (insert in plan.document.input.inserts)
+			plan.construction == SinglePocket ? insert.id : materia.tooling.ToolingIds.derive("insert-", insert.id)];
+		for (anchor in CastingMoldCad.anchorComponents(plan)) embedded.push(anchor.id);
+		CastingMoldView.presentation(sceneData, embedded);
 		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(sceneData));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {
