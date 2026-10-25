@@ -17,6 +17,8 @@ import materia.casting.CastingProfile.CastingSegment;
 
 /** Strict exact local-part recipe, separate from occurrence placement and qualification. */
 class PanelCodec {
+	public static inline final LABEL_WIDTH_MM=30.0;
+	public static inline final LABEL_HEIGHT_MM=8.0;
 	public static function encode(panel:PanelPlan):String {
 		var text = ToolingCodec.canonical({format: "materia.tooling-panel", version: 3, panel: snapshot(panel)}) + "\n";
 		if (haxe.io.Bytes.ofString(text).length > 262144)
@@ -242,12 +244,12 @@ class PanelCodec {
 			}
 		if (p.contactFace != ContactFace.None && (p.contactFace : String) == (p.labelSide : String))
 			throw "Label zone on contact face";
-		if (!CastingProfileGeometry.containsRect(outline, p.labelX - 15, p.labelY - 4, 30, 8))
+		if (!CastingProfileGeometry.containsRect(outline, p.labelX - LABEL_WIDTH_MM/2, p.labelY - LABEL_HEIGHT_MM/2, LABEL_WIDTH_MM, LABEL_HEIGHT_MM))
 			throw "Label zone outside panel";
 		for (op in p.operations)
 			if (op.kind != OutsideProfile) {
 				var q = CastingProfileGeometry.bounds(op.contour);
-				if (q.x < p.labelX + 15 && q.x + q.width > p.labelX - 15 && q.y < p.labelY + 4 && q.y + q.height > p.labelY - 4)
+				if (q.x < p.labelX + LABEL_WIDTH_MM/2 && q.x + q.width > p.labelX - LABEL_WIDTH_MM/2 && q.y < p.labelY + LABEL_HEIGHT_MM/2 && q.y + q.height > p.labelY - LABEL_HEIGHT_MM/2)
 					throw "Label zone intersects cut";
 			}
 		return p;

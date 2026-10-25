@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: exact column reconstruction, source-thread carriers, EPS access and assembly/demolding graphs pass; column fabrication construction gaps and hobber integration remain.
+- [ ] Phase 8: shared shop recipe and plinth integration implemented; exact reconstruction and continuous removal graphs pass; flared column formers and assembly relationship integration remain.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1222,6 +1222,57 @@ Each factory returns fresh records. The mill retains its source-recess ownership
 priorities; the column's wire axis and service withdrawal axis differ because it
 lies front-on-bed. Keep those geometric overrides in the setup with their reasons.
 
+Hobber strut detail decision (2026-10-25): use three non-collinear upper and
+three lower square compound struts per retained EPS region. Keep the drive-side
+struts clear of the drive channel. Derive bearing area and centroid from the
+actual strut/core face intersection, and resolve upper reactions from force and
+overturning moments; a centroid outside the support triangle is rejected.
+Compound and foam bearing strengths remain workshop inputs.
+The front band's second strut pair is at X320 rather than X340 to clear the
+existing tray socket at X365/Y−365; socket and service-hole positions are unchanged.
+Use three dry head-sized board pads bonded to each shared beam, one per upper
+strut. Separate pads leave the adjacent open channel and its carrier clear. The struts and EPS are preassembled before pouring and remain in the
+casting; the bonded beam/pad fixtures come off after cure. Liquid fill excludes the
+precast compound, and all strut bonding faces stay free of release coatings.
+
+Hobber fixture detail decision (2026-10-25): pour mounting-faces-down and
+transform strut contacts with gravity. Reserve datum stock before EPS, and span
+any dry backing gap with the existing locating foot, including its glue lines.
+Post width follows source fixing clearance, pin spacing, travel and ligaments.
+Prefer a straight bed post when the source voids and steel clearances certify it;
+a side-facing source opening alone does not require an external side datum.
+Sockets use the existing coupon's 0.5 mm sealing land rather than the mill
+plate's 3 mm land; sealing qualification stays Pending. A narrow rectangular
+stem gets a dry carrier widened in one direction to fit the existing label zone.
+Bridge rows follow the actual top contact; overlapping bands share one beam,
+with separate pads and exact bonding areas. Check fixtures in one batch against
+one owned, fill-clipped casting, preserving every result and threshold with no
+qualification-result cache. Straight bed posts keep their top within the post
+section, enlarged around source face bores to retain real steel contact. Connected
+sacrificial EPS units assemble from their declared stock layers around fixtures;
+only carrier-facing layers and locating-foot contacts prebond outside the mold.
+The complete EPS stays with the casting during the checked lift, followed by an
+explicit Pending manual breakup through its declared opening. Release bed/carrier
+bonds before rigid withdrawal; no intact pull through an undercut is claimed.
+
+EPS playback decision (2026-10-25): bond release is a manual snapshot,
+not removal of the foam. Retained EPS follows the checked casting lift and flip;
+open EPS disappears only at its Pending breakup step. Precast compound is shown
+once after cure, as part of the casting. Package checks consume the fresh native
+review; no report-restoration or native-check cache is added.
+
+Hobber column setup decision (2026-10-25): reuse the plinth setup and export
+entry with the casting selected explicitly. Put source +Y rail faces toward the
+bed, with source Z along mold Y; workshop choices remain shared.
+
+Socket motion detail decision (2026-10-25): keep standalone swept solids
+strict about supported surfaces. For a catalogue tail with unsupported faces,
+supported boundary-face extrusions form an inner bound and the translated
+bounding box forms an outer bound. Use exact intersections to certify a blocking
+relation only when either bound proves the existing contact-volume predicate;
+otherwise report Unsupported with both member IDs. No sampled poses or
+bounding-box material approximation enters a claimed relation.
+
 **Mold scene integration (first item after phase 8; user decision 2026-10-25).**
 1. The mold export writes an occurrence tree grouped by role, taken from the
    mold plan rather than from names:
@@ -1485,6 +1536,24 @@ Hobber source decision (user, 2026-10-25):
 2. The front band (28.5 L) and the drive-side pocket (23.2 L) stay enclosed EPS cores, left in the casting. Each is held by source-declared cast-in struts of the production compound, precast before the pour, below and above the core. The upper struts bear on a bridge across the open pour face, and the bridge is clamped to the mold. The struts become casting material, so no passage or hole remains.
 3. The struts are source features: a declared material, sections and positions, with uplift and bearing checked against the core's buoyancy. Strength stays Pending on the compound like the other material checks. Strut-to-casting bond and the strut precast step go into the shop record.
 4. Frozen-CAD comparisons record the filled strip and the struts as an approved source correction.
+
+Hobber column source hold (2026-10-25): its two back lightening networks
+remain enclosed after the existing head recess and retained spine are included.
+Each is 3.864 L. They have neither a body opening nor source-declared cast-in supports. The plinth
+strut approval does not authorise changing the column. Keep the column source
+unchanged and reject an invented support/access route; its mold delivery waits
+for the source support decision. Continue the three required kits independently.
+
+Phase 8 source fixture hold: the plinth has no usable source fixture
+thread at `driveSeat`, `enclosureSeat00`, `enclosureSeat02`, `enclosureSeat20`,
+`enclosureSeat22`, `liftLeft`, `liftRight`, `railLeft`, `railRight` or `tablePlate`.
+Keep their source-thread design requests; adding holes changes source geometry
+and is parked for approval. Continue the independent tooling work.
+
+Hobber lifting source hold: the plinth declares two lifting inserts, below the
+shared recipe requirement of four. Keep `process.level1.lifting-points` Fail
+and its source proposal visible; adding or moving lifting inserts needs source
+approval. Do not weaken the shared shop rule to clear the delivery report.
 
 
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.

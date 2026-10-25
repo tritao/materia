@@ -285,7 +285,10 @@ class ToolingFabrication {
 		for (placement in layout)
 			sheets = Std.int(Math.max(sheets, placement.sheet));
 		for (c in p.cores)
-			for (layer in c.layers) eps += layer.block.width*layer.block.depth*layer.block.height;
+			for (job in materia.tooling.casting.MoldCores.cuttingJobs(c)) {
+				var blank=job.cutting.block;
+				eps+=blank.width*blank.depth*blank.height;
+			}
 		var mixVolume=CastHandling.resinVolume(p.document);
 		return {
 			panels: panels.length,

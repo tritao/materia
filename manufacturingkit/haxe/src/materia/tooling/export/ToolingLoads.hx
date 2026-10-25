@@ -135,6 +135,13 @@ class ToolingLoads {
 			coreForces.set(c.id,
 				(p.document.recipe.mixDensityKgM3 * s.gravityMps2 * volume * 1e-9 + extra * projectedArea * 1e-6) * s.loadFactor);
 		}
+		var precastReactions=new Map<String,Array<{strutId:String,forceN:Float,stressMPa:Float}>>();
+		for(core in cores)if(core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts){
+			var moments=materia.tooling.casting.MoldRegions.moments(core.cavity,core.id),first=moments.firstMomentMm4;
+			var centroid={x:first.x/moments.volumeMm3,y:first.y/moments.volumeMm3,z:first.z/moments.volumeMm3};
+			precastReactions.set(core.id,materia.tooling.casting.PrecastCoreSupports.reactions(
+				core.support.precastContacts,centroid,value(coreForces,core.id)));
+		}
 		for (m in walls.concat(p.supportPanels)) {
 			var b = CastingProfileGeometry.bounds(PanelContours.outside(m.panel));
 			var zmin = 1e30, zmax = -1e30;
@@ -165,6 +172,16 @@ class ToolingLoads {
 				for (c in cores) if (c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)
 					if (MoldCores.bridgeId(c) == m.panel.id || MoldCores.carrierId(c) == m.panel.id)
 						demand.forceN += value(coreForces, c.id);
+				for(c in cores)if(c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts
+					&& c.support.panelIds.indexOf(m.panel.id)>=0){
+					var index=MoldCores.spreaderIds(c).indexOf(m.panel.id);
+					if(index<0)demand.forceN+=value(coreForces,c.id); // Beam/rail upper bound.
+					else {
+						var reactions=precastReactions.get(c.id);
+						if(reactions==null)throw "Missing precast bearing reactions: "+c.id;
+						demand.forceN+=reactions[index].forceN;
+					}
+				}
 				demand.pressurePa = demand.forceN / (b.width * b.height * 1e-6);
 				r.validation.push(check("fabrication.support-loadpath." + m.panel.id, [m.panel.id], Pending,
 					"Core forces reach the carrier/bridge as local loads. Rail reactions, adhesive distribution and connections need a qualified load-path model.",
@@ -224,6 +241,27 @@ class ToolingLoads {
 			var matches = s.coreRestraints.filter(v -> v.coreId == c.id);
 			if (matches.length > 1)
 				throw "Duplicate core restraint";
+			if(c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts){
+				if(matches.length>0)throw "Source compound struts cannot be replaced by an adhesive restraint: "+c.id;
+				var reactions=precastReactions.get(c.id);
+				if(reactions==null)throw "Missing precast bearing reactions: "+c.id;
+				var status:ToolingCheckStatus=Pass,peakPa=0.0;
+				for(reaction in reactions){
+					var stressPa=reaction.stressMPa*1e6;
+					peakPa=Math.max(peakPa,stressPa);
+					r.estimates.push({id:reaction.strutId,kind:SupportUplift,pressurePa:0,forceN:reaction.forceN,
+						displacedVolumeMm3:0,deflectionMm:null,stressPa:stressPa});
+				}
+				var mix=s.mixBearingStressMPa,foam=p.document.recipe.core.compressionStrengthPa;
+				if(mix==null || foam==null)status=Pending;
+				if(mix!=null && peakPa>mix*1e6 || foam!=null && peakPa>foam)status=Fail;
+				if(status==Pass && (!compact || p.document.recipe.core.evidence.length==0))status=Pending;
+				r.validation.push(check("fabrication.core-restraint."+c.id,[c.id].concat([for(contact in c.support.precastContacts)contact.strutId]),status,
+					"Source upper-strut reactions balance gross uplift and both overturning moments. Peak bearing demand="
+					+peakPa+" Pa; compound/EPS bearing strengths and stock evidence are required. Bridge load paths remain independently Pending.",
+					p.document.recipe.core.evidence));
+				continue;
+			}
 			var status:ToolingCheckStatus = Pending,
 				evidence:Array<String> = [];
 			if (matches.length == 1) {

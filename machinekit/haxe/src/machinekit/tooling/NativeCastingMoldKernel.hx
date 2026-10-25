@@ -179,7 +179,8 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 		return result;
 	}
 
-	public function resinIntersection(document:ToolingDocument,region:CastingRegion):Float {
+	public function resinIntersections(document:ToolingDocument,regions:Array<CastingRegion>):Array<Float> {
+		if(regions.length==0)return [];
 		var d=ToolingCodec.copy(document),scope=new Scope();
 		try {
 			var local=scope.own(ToolingSourceCasting.fromInput(d.input).geometry());
@@ -187,21 +188,23 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 			var bounds=resin.shape.bounds();
 			var low=cadkit.modeling.Vector.fromNative(bounds.get_min()),high=cadkit.modeling.Vector.fromNative(bounds.get_max());
 			var height=Math.min(high.z,d.setup.fillHeightMm)-low.z;
-			var volume=0.0;
-			if (height>0) {
+			var volumes:Array<Float>=[];
+			if(height>0){
 				var blank=scope.own(Part.box(high.x-low.x,high.y-low.y,height));
 				var clip=scope.own(blank.translated(new cadkit.modeling.Vector(
 					(low.x+high.x)/2,(low.y+high.y)/2,low.z)));
 				var filled=scope.own(resin.intersect(clip));
-				var candidate=scope.own(machinekit.structural.CastingRegionCad.part(region));
-				volume=measure(scope.own(filled.intersect(candidate))).volumeMm3;
-			}
-			scope.close();
-			return volume;
-		} catch (error:Dynamic) {
-			scope.close();
-			throw error;
-		}
+				for(region in regions){
+					var query=new Scope();
+					try {
+						var candidate=query.own(machinekit.structural.CastingRegionCad.part(region));
+						volumes.push(measure(query.own(filled.intersect(candidate))).volumeMm3);
+						query.close();
+					}catch(error:Dynamic){query.close();throw error;}
+				}
+			}else for(region in regions)volumes.push(0);
+			scope.close();return volumes;
+		}catch(error:Dynamic){scope.close();throw error;}
 	}
 
 	static function copyMass(value:CastingMassProperties):CastingMassProperties

@@ -11,6 +11,7 @@ enum abstract ReleaseSubstrate(String) to String {
 	var EPSCovering = "eps-covering";
 	var ToolingMetal = "tooling-metal";
 	var BondingSteel = "bonding-steel";
+	var BondingCompound = "bonding-compound";
 }
 
 /** A native geometry query supplies the contact area, never a hand-entered list.
@@ -70,16 +71,19 @@ typedef ReleasePlan = {
 }
 
 class ReleasePlans {
+	public static function isBonding(substrate:ReleaseSubstrate):Bool
+		return substrate==BondingSteel || substrate==BondingCompound;
+
 	public static function build(sourceId:String,system:ReleaseSystem,coveringThicknessMm:Float,
 			faces:Array<ReleaseFace>):ReleasePlan {
 		var sorted=faces.copy();sorted.sort((a,b) -> Reflect.compare(a.id,b.id));
-		var coated=[for (face in sorted) if (face.wettedAreaMm2>0 && face.substrate!=BondingSteel) face.id];
-		var protected=[for (face in sorted) if (face.substrate==BondingSteel) face.id];
+		var coated=[for (face in sorted) if (face.wettedAreaMm2>0 && !isBonding(face.substrate)) face.id];
+		var protected=[for (face in sorted) if (isBonding(face.substrate)) face.id];
 		var parts:Array<String>=[],steel:Array<String>=[],steps:Array<ReleaseStep>=[];
 		for (face in sorted) {
 			ToolingIds.validate(face.id);ToolingIds.validate(face.partId);
 			if (parts.indexOf(face.partId)<0) parts.push(face.partId);
-			if (face.substrate==BondingSteel && steel.indexOf(face.partId)<0) steel.push(face.partId);
+			if (isBonding(face.substrate) && steel.indexOf(face.partId)<0) steel.push(face.partId);
 		}
 		parts.sort(Reflect.compare);steel.sort(Reflect.compare);
 		function add(partId:String,kind:ReleaseAction,ids:Array<String>,coat:Int,seconds:Null<CastingInput>):Void {
@@ -94,7 +98,7 @@ class ReleasePlans {
 		}
 		for (partId in parts) {
 			var owned=sorted.filter(face -> face.partId==partId);
-			if (owned[0].substrate==BondingSteel) continue;
+			if (isBonding(owned[0].substrate)) continue;
 			var seal=[for (face in owned) if (face.needsSealing) face.id];
 			var wet=[for (face in owned) if (coated.indexOf(face.id)>=0) face.id];
 			var eps=[for (face in owned) if (face.substrate==EPSCovering && face.wettedAreaMm2>0) face.id];
@@ -136,7 +140,7 @@ class ReleasePlans {
 				|| !Math.isFinite(face.wettedAreaMm2) || face.wettedAreaMm2<0 || face.wettedAreaMm2>face.areaMm2+1e-6)
 				bad.push(face.id);
 			all.push(face.id);
-			if (face.substrate==BondingSteel) expectedProtected.push(face.id);
+			if (isBonding(face.substrate)) expectedProtected.push(face.id);
 			else if (face.wettedAreaMm2>0) expectedCoated.push(face.id);
 			if (face.substrate==EPSCovering && face.wettedAreaMm2>0) eps.push(face.id);
 		}
@@ -170,11 +174,11 @@ class ReleasePlans {
 		var bonding=agrees(plan.mustNotCoatFaceIds,expectedProtected) && badCoating.length==0
 			&& plan.coatedFaceIds.filter(id -> expectedProtected.indexOf(id)>=0).length==0;
 		var steel:Array<String>=[];
-		for (face in plan.faces) if (face.substrate==BondingSteel && steel.indexOf(face.partId)<0) steel.push(face.partId);
+		for (face in plan.faces) if (isBonding(face.substrate) && steel.indexOf(face.partId)<0) steel.push(face.partId);
 		var firstCoat=plan.steps.length;
 		for (index in 0...plan.steps.length) if (plan.steps[index].action==ApplyAgent) {firstCoat=index;break;}
 		var assembly=agrees(plan.prepareBeforePartIds,steel);
-		for (face in plan.faces) if (face.substrate==BondingSteel && face.adjacentCoatedFaceIds.length>0) {
+		for (face in plan.faces) if (isBonding(face.substrate) && face.adjacentCoatedFaceIds.length>0) {
 			var masked=false;
 			for (index in 0...firstCoat) if (plan.steps[index].action==MaskBondingFaces
 				&& plan.steps[index].faceIds.indexOf(face.id)>=0) masked=true;

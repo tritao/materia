@@ -75,7 +75,7 @@ class ToolingReleaseExport {
 					var seal=substrate==Board && (stock==null || exposed(face,cast stock));
 					// Keep dry exposed board faces for sealing and all source steel
 					// for clean handling; only real wet patches receive release.
-					if (wetArea<=0 && !seal && substrate!=BondingSteel && substrate!=EPSCovering) continue;
+					if (wetArea<=0 && !seal && !ReleasePlans.isBonding(substrate) && substrate!=EPSCovering) continue;
 					var record:ReleaseFace={id:materia.tooling.ToolingIds.derive("",id,"-release-face-"+index),
 						partId:id,sourceIds:sourceIds.copy(),faceIndex:index,areaMm2:area,wettedAreaMm2:wetArea,
 						bounds:bounds(face),substrate:substrate,needsSealing:seal,adjacentCoatedFaceIds:[]};
@@ -84,8 +84,8 @@ class ToolingReleaseExport {
 				}
 			}
 			for (entry in parts) add(entry.id,entry.sourceIds,entry.part,entry.substrate,entry.stock);
-			for (steel in contacts) if (steel.face.substrate==BondingSteel) {
-				for (tool in contacts) if (tool.face.substrate!=BondingSteel && mayTouch(steel.bounds,tool.bounds)
+			for (steel in contacts) if (ReleasePlans.isBonding(steel.face.substrate)) {
+				for (tool in contacts) if (!ReleasePlans.isBonding(tool.face.substrate) && mayTouch(steel.bounds,tool.bounds)
 					&& steel.part.shape.distance(tool.part.shape)<=CONTACT_MM) steel.face.adjacentCoatedFaceIds.push(tool.face.id);
 				steel.face.adjacentCoatedFaceIds.sort(Reflect.compare);
 			}
@@ -97,7 +97,7 @@ class ToolingReleaseExport {
 	public static function build(plan:CastingMoldPlan,shop:FormerShopExport.FormerShopReport):ReleasePlan {
 		var scope=new Scope(),parts:Array<ReleaseGeometryPart>=[],seen=new Map<String,Bool>();
 		try {
-			var source=scope.own(CastingMoldCad.source(plan));
+			var source=scope.own(CastingMoldCad.pouredSource(plan));
 			var box=bounds(source),height=Math.min(box.height,plan.document.setup.fillHeightMm-box.z);
 			if (height<=0) throw "Release surfaces need resin below the declared fill plane";
 			var fill=scope.own(ToolingBlock.placedBox({x:box.x,y:box.y,z:box.z,
@@ -131,6 +131,8 @@ class ToolingReleaseExport {
 				add(volume.id,[fixture.insertId],ToolingVolume.geometryOf(volume),ToolingMetal,null);
 			for (insert in plan.document.input.inserts) add(materia.tooling.ToolingIds.derive("insert-",insert.id),
 				[insert.id],CastingMoldCad.steel(plan,insert.id),BondingSteel,null);
+			for(strut in plan.document.input.precastStruts)
+				add(strut.id,[strut.coreFeatureId],machinekit.structural.CastingRegionCad.part(CastingMoldCad.strutRegion(plan,strut)),BondingCompound,null);
 			for (hardware in CastingMoldCad.anchorComponents(plan)) {
 				var local=scope.own(hardware.part.geometry());
 				add(hardware.id,[hardware.insertId,hardware.anchorId],machinekit.assembly.PosedParts.moved(local,hardware.pose),BondingSteel,null);

@@ -22,6 +22,7 @@ class ToolingSourceCasting extends MachineComponent {
 				new ComponentValues().setToken("source",ToolingCodec.encodeInput({
 					id:"recipe-unit-sample",revision:1,lengthUnit:materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 					datumScheme:null,interfaces:[],interfaceContext:null,
+					precastStruts:[],
 					envelope:[{id:"body",height:1,pose:F.identity(),profile:[{x:-0.5,y:-0.5},{x:0.5,y:-0.5},{x:0.5,y:0.5},{x:-0.5,y:0.5}]}],
 					features:[],inserts:[]
 				})));

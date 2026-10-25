@@ -321,6 +321,7 @@ class ToolingTests {
 			revision: 1,
 			lengthUnit: ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
+			precastStruts:[],
 			envelope: [
 				{
 					id: "body",
@@ -480,7 +481,7 @@ class ToolingTests {
 			[materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")], 20, 20, 100));
 		d.setup.features = [];
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
-		rejects(() -> ToolingCodec.copy(d), "Ambiguous former withdrawal");
+		rejects(() -> ToolingCodec.copy(d), "Ambiguous feature withdrawal");
 		d.setup.features = [{featureId: "through-opening", strategy: ReusableFormer, priority: 5, withdrawal: {x: 0, y: 0, z: 1}}];
 		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(d));
 		var direction:{x:Float, y:Float, z:Float} = cast chosen[0].withdrawal;
@@ -542,6 +543,28 @@ class ToolingTests {
 		rejects(() -> ToolingCodec.snapshot(raw),"Unknown recipe field: releaseSpec");
 	}
 
+	static function precastPourContract():Void {
+		var source=fixture();
+		source.input.precastStruts=[{id:"precast-top",coreFeatureId:"pocket",material:CastingCompound,contact:Upper,
+			box:{x:0,y:0,z:60,width:10,depth:10,height:40}}];
+		source.setup.sourceFingerprint=ToolingCodec.inputFingerprint(source.input);
+		var copied=ToolingCodec.decode(ToolingCodec.encode(source));
+		check(copied.input.precastStruts.length==1,"Precast source struts survive the strict source document");
+		var finalGeometry=materia.tooling.casting.CastingSourceRegions.derive(copied).regions;
+		var pour=materia.tooling.casting.CastingSourceRegions.poured(copied).regions;
+		check(finalGeometry!=null && pour!=null,"Axis-aligned precast fill uses exact shared box algebra");
+		if(finalGeometry==null || pour==null)throw "Expected exact precast fill regions";
+		check(Math.abs(materia.casting.BoxAlgebra.volume(finalGeometry.resin)-materia.casting.BoxAlgebra.volume(pour.resin)-4000)<1e-7,
+			"Poured quantity excludes already cured compound, while final casting retains it");
+		check(pour.boundaries.filter(boundary->boundary.id=="precast-top").length==1,
+			"The precast strut is a named fill boundary");
+		var boundary=pour.boundaries.filter(boundary->boundary.id=="precast-top")[0].box;
+		check(Math.abs(boundary.z)<1e-7 && Math.abs(boundary.height-40)<1e-7,
+			"Precast fill occupancy follows sourceToMold, including an inverted casting");
+		copied.input.precastStruts[0].coreFeatureId="missing-core";
+		rejects(()->ToolingCodec.copyInput(copied.input),"Precast strut references an unknown source core: precast-top");
+	}
+
 	static function fixtureReceiverContract():Void {
 		var source=fixture(),before=ToolingCodec.recipeFingerprint(source.recipe);
 		for (choice in [materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
@@ -583,6 +606,7 @@ class ToolingTests {
 		insertEnvelopeRecords();
 		vocabularyRoundTrips();
 		releaseContract();
+		precastPourContract();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
 		routedSocketFaces();

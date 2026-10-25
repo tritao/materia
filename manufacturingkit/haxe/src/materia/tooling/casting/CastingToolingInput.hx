@@ -42,5 +42,6 @@ typedef CastingToolingInput = {
 	var interfaces:Array<materia.casting.InterfaceRequirement>;
 	var envelope:Array<CastingPrism>;
 	var features:Array<CastingFeature>;
+	var precastStruts:Array<materia.casting.PrecastStrut>;
 	var inserts:Array<CastingToolingInsert>;
 }

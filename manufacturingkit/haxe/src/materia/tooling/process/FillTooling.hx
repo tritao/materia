@@ -131,6 +131,12 @@ class FillTooling {
 				if (bounds.z+bounds.height>=fill) unsupportedIds.push(core.id);
 			}
 		}
+		for(strut in p.document.input.precastStruts){
+			var boxes=materia.tooling.casting.MoldRegions.boxes(materia.tooling.casting.MoldRegions.moved(
+				materia.tooling.casting.MoldRegions.box(strut.box),p.document.setup.sourceToMold));
+			if(boxes==null)unsupportedIds.push(strut.id);
+			else for(box in boxes)add(box);
+		}
 		for (insert in p.document.input.inserts) {
 			var boxes=materia.tooling.casting.MoldRegions.boxes(
 				materia.tooling.casting.MoldRegions.insert(p.document,insert.id));

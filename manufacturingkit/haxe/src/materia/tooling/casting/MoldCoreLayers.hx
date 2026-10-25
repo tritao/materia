@@ -84,6 +84,29 @@ class MoldCoreLayers {
 	 */
 	public static function registeredFlange(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
 			frame:materia.assembly.AssemblyRecord.AssemblyFrame,panelId:String):CastingMoldCore {
+		return layered(region,featureId,id,r,frame,CoreSupport.CoreSupportKind.RegisteredFlange,[panelId]);
+	}
+
+	/** Enclosed EPS uses the same exact section erosion and stock/glue allocation
+	 * as an access core. Its source struts replace the removable flange fixture.
+	 */
+	public static function retained(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe):CastingMoldCore {
+		return layered(region,featureId,id,r,F.identity(),CoreSupport.CoreSupportKind.PrecastStruts,[]);
+	}
+
+	/** A connected source-void unit shares one declared bed or fill access. */
+	public static function network(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
+			kind:CoreSupport.CoreSupportKind):CastingMoldCore {
+		if(kind!=CoreSupport.CoreSupportKind.Bridge && kind!=CoreSupport.CoreSupportKind.RoutedSocket)
+			throw "EPS network needs a bed or fill receiver: "+featureId;
+		var core=layered(region,featureId,id,r,F.identity(),kind,[]);
+		core.support.assemblyByLayer=true;
+		core.support.breakoutAfterLift=true;
+		return core;
+	}
+
+	static function layered(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
+			frame:materia.assembly.AssemblyRecord.AssemblyFrame,kind:CoreSupport.CoreSupportKind,panelIds:Array<String>):CastingMoldCore {
 		var kernel=CastingMoldPlanner.geometry;
 		if (kernel==null) throw "Exact geometry kernel required for EPS access former: "+featureId;
 		var bounds=kernel.bounds(MoldRegions.moved(region,F.inverse(frame)),featureId);
@@ -91,7 +114,8 @@ class MoldCoreLayers {
 		var work=MoldRegions.moved(region,F.inverse(frame));
 		var bands=kernel.prismaticBands(work,bounds.width,bounds.depth,bounds.height,featureId);
 		var cover=r.linerThickness,gap=r.adhesiveLineThickness;
-		var low=cover,high=bounds.height-cover;
+		var low=kind==CoreSupport.CoreSupportKind.RoutedSocket ? 0.0 : cover;
+		var high=bounds.height-(kind==CoreSupport.CoreSupportKind.Bridge ? gap : cover);
 		if (high<=low) throw "Covering consumes EPS access former: "+featureId;
 		var levels=[low,high];
 		for (band in bands) for (value in [band.bottomMm-cover,band.bottomMm+cover,band.topMm-cover,band.topMm+cover])
@@ -157,11 +181,13 @@ class MoldCoreLayers {
 		if (layers.length>32) throw "Too many EPS stock pieces: "+featureId;
 		if (MoldRegions.volume(CastingRegion.Difference(foam,[work]),featureId)>EPS)
 			throw "EPS lining escapes its access former: "+featureId;
-		var support=CoreSupports.specification(CoreSupport.CoreSupportKind.RegisteredFlange,r);
-		var root=kernel.prismaticSection(cells[0].region,{x:0,y:0,z:1},EPS,featureId);
-		if (root==null) throw "EPS flange has no certified bearing face: "+featureId;
-		support.clampBearingAreaMm2=MoldCores.area(root.contours);
-		support.panelIds=[panelId];support.padClosure=materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps;
+		var support=CoreSupports.specification(kind,r);
+		if (kind==CoreSupport.CoreSupportKind.RegisteredFlange) {
+			var root=kernel.prismaticSection(cells[0].region,{x:0,y:0,z:1},EPS,featureId);
+			if (root==null) throw "EPS flange has no certified bearing face: "+featureId;
+			support.clampBearingAreaMm2=MoldCores.area(root.contours);
+			support.panelIds=panelIds.copy();support.padClosure=materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps;
+		}
 		return {id:id,featureId:featureId,cavity:region,foamEnvelope:MoldRegions.moved(foam,frame),layers:layers,
 			coveringThickness:cover,support:support};
 	}

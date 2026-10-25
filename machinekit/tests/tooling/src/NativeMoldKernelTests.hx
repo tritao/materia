@@ -77,12 +77,18 @@ class NativeMoldKernelTests {
 			var cavity=materia.tooling.casting.MoldRegions.feature(document,"drafted-pocket");
 			near(materia.tooling.casting.MoldRegions.volume(cavity,"drafted-pocket"),removedVolume,
 				"planner region uses the same derived source cavity in mold coordinates");
-			near(kernel.resinIntersection(document,cavity),0,"source cavity contains no resin for datum collision checks");
+			near(kernel.resinIntersections(document,[cavity])[0],0,"source cavity contains no resin for datum collision checks");
 			var candidate=materia.tooling.casting.MoldRegions.box({x:45,y:0,z:40,width:5,depth:5,height:20});
-			near(kernel.resinIntersection(document,candidate),500,"native datum checks intersect actual resin");
+			near(kernel.resinIntersections(document,[candidate])[0],500,"native datum checks intersect actual resin");
+			var batch=kernel.resinIntersections(document,[candidate,cavity,candidate]);
+			check(batch.length==3,"one resin batch returns every fixture result");
+			near(batch[0],500,"batch keeps the first fixture result");
+			near(batch[1],0,"batch keeps the empty fixture result in order");
+			near(batch[2],500,"batch keeps repeated fixture queries");
+			check(kernel.resinIntersections(document,[]).length==0,"empty fixture batch has no native work");
 			var partial=materia.tooling.ToolingCodec.copy(document);
 			partial.setup.fillHeightMm=50;
-			near(kernel.resinIntersection(partial,candidate),250,"datum/resin intersection stops at the declared fill height");
+			near(kernel.resinIntersections(partial,[candidate])[0],250,"datum/resin intersection stops at the declared fill height");
 			var triangle=CastingRegion.Placed({solid:Prism(materia.casting.CastingProfiles.polygon(
 				[{x:0,y:0},{x:20,y:0},{x:0,y:20}]),40),pose:F.identity()});
 			near(materia.tooling.casting.MoldRegions.volume(triangle,"triangle"),8000,"non-box planning volume uses exact geometry");

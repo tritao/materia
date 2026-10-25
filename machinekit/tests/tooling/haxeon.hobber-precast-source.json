@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "package": {
+    "name": "hobber-precast-source-tests"
+  },
+  "entry": "HobberPrecastSourceTests",
+  "sourceRoots": [
+    "../../examples/casting-shop",
+    "../../examples/flexspline-hobber",
+    "src",
+    "../../examples/bench-mill",
+    "../../examples/cnc-router",
+    "../../examples/box-mold"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/hobber-precast-source"
+}

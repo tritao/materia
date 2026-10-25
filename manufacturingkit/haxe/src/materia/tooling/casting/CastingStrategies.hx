@@ -126,7 +126,7 @@ class CastingStrategies {
 					strategy=SacrificialEPS;
 			}
 			var direction:Null<{x:Float, y:Float, z:Float}> = null;
-			if (rule.strategy == ReusableFormer) {
+			if (rule.strategy == ReusableFormer || strategy == SacrificialEPS && opening == BodyOpening) {
 				if (openings.length == 0)
 					throw "Reusable former rule requires a body opening: " + feature.id;
 				var normals = [for (o in openings) {id: o.target, normal: CastingCavities.bodyFaceNormal(document.input.envelope, o.target)}];
@@ -139,7 +139,7 @@ class CastingStrategies {
 				for (candidate in candidates) {
 					var v = candidate.normal;
 					if (Math.abs(v.x - normal.x) + Math.abs(v.y - normal.y) + Math.abs(v.z - normal.z) > 1e-9)
-						throw "Ambiguous former withdrawal; declare an explicit setup override: " + feature.id;
+						throw "Ambiguous feature withdrawal; declare an explicit setup override: " + feature.id;
 				}
 				direction = F.transformVector(document.setup.sourceToMold, normal.x, normal.y, normal.z);
 			}

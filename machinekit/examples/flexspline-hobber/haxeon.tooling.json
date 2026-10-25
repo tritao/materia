@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-hobber-tooling"},
+  "entry": "HobberMoldPreview",
+  "sourceRoots": [".", "../casting-shop"],
+  "dependencies": {
+    "machinekit": {"path": "../.."},
+    "cadkit": {"path": "../../../cadkit"},
+    "camkit": {"path": "../../../camkit"},
+    "manufacturingkit": {"path": "../../../manufacturingkit"},
+    "cnckit": {"path": "../../../cnckit"},
+    "toolpathkit": {"path": "../../../toolpathkit"}
+  },
+  "target": "host",
+  "outputDir": "build/tooling-host"
+}

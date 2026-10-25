@@ -39,19 +39,56 @@ class FoundationLayout {
 	public static inline final FOOT_REGISTER_CLEARANCE = 1.0;
 	public static inline final FOOT_PLATE_THICKNESS = 15.0;
 	public static inline final FOOT_PLATE_WIDTH = 110.0;
+	public static inline final PLINTH_CORE_FLOOR = 85.0;
+	public static inline final PLINTH_CORE_WEB = 35.0;
+	public static inline final DRIVE_SUPPORT_FRONT = 140.0;
+	public static inline final DRIVE_CAP_UNDERSIDE = 660.0;
+	public static inline final DRIVE_RIB_HALF_WIDTH = 15.0;
+	public static inline final PRECAST_STRUT_SECTION = 50.0;
 
 	static function faces(names:Array<String>):Array<CastingOpening>
 		return [for (name in names) C.face(name)];
 
 	/** Casting-local bounds for the cap, twin webs and bearing cross-ribs. */
 	public static function driveSupports():Array<Array<Float>> {
-		var layout = HobberXLayout.front(), start = 140 - layout.bedCentre, end = layout.bedRear - layout.bedCentre;
-		var supports = [[start, -150.0, 660.0, end, 150.0, 720.0]];
+		var layout = HobberXLayout.front(), start = DRIVE_SUPPORT_FRONT - layout.bedCentre, end = layout.bedRear - layout.bedCentre;
+		var supports = [[start, -150.0, DRIVE_CAP_UNDERSIDE, end, 150.0, 720.0]];
 		for (side in [-1, 1])
 			supports.push([start, side * 112.5 - 17.5, 0.0, end, side * 112.5 + 17.5, 720.0]);
 		for (station in [layout.floatingCentre, layout.screwStart])
-			supports.push([station - layout.bedCentre - 15, -275.0, 0.0, station - layout.bedCentre + 15, 275.0, 720.0]);
+			supports.push([station - layout.bedCentre - DRIVE_RIB_HALF_WIDTH, -275.0, 0.0,
+				station - layout.bedCentre + DRIVE_RIB_HALF_WIDTH, 275.0, 720.0]);
+		// Approved source correction: the 5 mm strip beside the drive web is solid.
+		var stripEnd = layout.floatingCentre - layout.bedCentre - DRIVE_RIB_HALF_WIDTH;
+		if (stripEnd <= PLINTH_CORE_WEB / 2) throw "Hobber drive web has no declared side strip";
+		supports.push([PLINTH_CORE_WEB / 2,-95.0,PLINTH_CORE_FLOOR,stripEnd,95.0,DRIVE_CAP_UNDERSIDE]);
 		return supports;
+	}
+
+	/** Three non-collinear contacts on each side of an enclosed core. The upper
+	 * struts reach the open pour face and bear against a clamped tooling bridge.
+	 * Fifty-mm square sections are source geometry, not a material capacity claim.
+	 */
+	public static function precastStruts(kind:String):Array<materia.casting.PrecastStrut> {
+		dimensions(kind);
+		if (kind != "bed") return [];
+		var result:Array<materia.casting.PrecastStrut> = [], half = PRECAST_STRUT_SECTION / 2;
+		for (core in [
+			// The second pair clears the retained tray socket at X365/Y-365.
+			{id:"front-band",top:PLINTH_HEIGHT-25,sites:[{x:80.0,y:-350.0},{x:320.0,y:-350.0},{x:210.0,y:-300.0}]},
+			// Keep the upper struts outside the source X-drive channel's +/-55 mm band.
+			{id:"drive-pocket",top:DRIVE_CAP_UNDERSIDE,sites:[{x:100.0,y:-80.0},{x:220.0,y:-80.0},{x:160.0,y:80.0}]}
+		]) for (index in 0...core.sites.length) {
+			var site = core.sites[index];
+			for (upper in [false,true]) result.push({
+				id:"precast-"+core.id+"-"+(upper?"upper":"lower")+"-"+index,
+				coreFeatureId:"core-1-0",material:materia.casting.PrecastStrut.StrutMaterial.CastingCompound,
+				contact:upper?materia.casting.PrecastStrut.StrutContact.Upper:materia.casting.PrecastStrut.StrutContact.Lower,
+				box:{x:site.x-half,y:site.y-half,z:upper?core.top:0,width:PRECAST_STRUT_SECTION,
+					depth:PRECAST_STRUT_SECTION,height:upper?PLINTH_HEIGHT-core.top:PLINTH_CORE_FLOOR}
+			});
+		}
+		return materia.casting.PrecastStrut.PrecastStruts.copy(result);
 	}
 
 	static function boxInsert(id:String, role:InsertRole, label:String, w:Float, d:Float, h:Float,
@@ -123,7 +160,7 @@ class FoundationLayout {
 
 	public static function bodyValues(kind:String):ComponentValues {
 		var d = dimensions(kind);
-		var cores = kind == "bed" ? C.grid(d[0], d[1], d[2], 25, 85, 25, 35, 2, 1)
+		var cores = kind == "bed" ? C.grid(d[0], d[1], d[2], 25, PLINTH_CORE_FLOOR, 25, PLINTH_CORE_WEB, 2, 1)
 			: C.grid(d[0], d[1], d[2], 20, 20, 20, 20);
 		if (kind == "bed") {
 			var layout = HobberXLayout.front(), centre = layout.bedCentre;
@@ -180,8 +217,15 @@ class FoundationLayout {
 				240, 100, d[2], 0, 60, 0));
 			cores = Patterns.retain(cores, [BoxAlgebra.fromLimits([-60.0, -100, 0, 60, HobberZLayout.SPINE_FRONT_COLUMN_Y, 500])]);
 		}
+		var struts = precastStruts(kind);
+		for (feature in cores) if (feature.kind != Lightening) for (strut in struts)
+			if (BoxAlgebra.volume(BoxAlgebra.subtract([strut.box],[materia.casting.CastingBounds.feature(feature)]))
+				< BoxAlgebra.volume([strut.box])-1e-7)
+				throw "Precast strut "+strut.id+" intersects source opening "+feature.id;
+		var lightening = Patterns.retain(cores.filter(feature -> feature.kind == Lightening),[for (strut in struts) strut.box]);
+		cores = cores.filter(feature -> feature.kind != Lightening).concat(lightening);
 		return new ComponentValues().setNumber("width", d[0]).setNumber("depth", d[1]).setNumber("height", d[2])
-			.setToken("features", C.encode(cores));
+			.setToken("features", C.encode(cores)).setToken("precastStruts",materia.casting.PrecastStrut.PrecastStruts.encode(struts));
 	}
 
 	public static function placements(kind:String):Array<CastInsertPlacement>

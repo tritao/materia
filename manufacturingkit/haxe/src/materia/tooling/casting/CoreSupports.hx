@@ -32,7 +32,7 @@ private typedef BridgeRegistration = {
 /** Two explicit support templates; neither establishes adhesive or structural qualification. */
 class CoreSupports {
 	public static function specification(kind:CoreSupportKind, r:ToolingRecipe):CoreSupport return {
-		kind:kind, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
+		kind:kind, precastContacts:[], assemblyByLayer:false, breakoutAfterLift:false, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
 		fitClearance:r.jointClearance, embedDepth:0, bondAreaMm2:0, bridgeBondAreaMm2:0,clampBearingAreaMm2:0,
 		socketOperationId:null, registrationProfiles:[], foot:null, panelIds:[], bondedPanelIds:[], hardware:[],
 		padClosure:kind==Bridge ? materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps : null
@@ -193,58 +193,74 @@ class CoreSupports {
 		return {core:core,penetration:record};
 	}
 
+	/** The receiver is sized from a certified contact rectangle, independently of
+	 * the rest of a branched EPS core. Neither rectangle is a material surrogate.
+	 */
+	public static function socketFoot(c:CastingMoldCore,foam:{x:Float,y:Float,width:Float,depth:Float},
+			cavityContact:{x:Float,y:Float,width:Float,depth:Float},baseZ:Float,contactZ:Float,r:ToolingRecipe,
+			bed:PanelPlacement,penetrations:Array<PenetrationPlan>):Void {
+		var s=c.support,t=r.panel.measuredThickness,l=r.minimumLigament,tool=r.routerDiameter,
+			g=r.adhesiveLineThickness,hw=r.hardware;
+		if(s.kind!=RoutedSocket)throw "Locating foot requires a routed-socket support: "+c.id;
+		if(contactZ<baseZ-1e-7)throw "EPS contact lies below its socket receiver: "+c.id;
+		PanelJoints.validateClearance(r.jointClearance,r.panel.thicknessVariation,r.jointLiningAllowance,r.jointMachiningAllowance);
+		s.panelIds=[bed.panel.id];
+		if ((r.panel.measuredThickness / 3) > t - l || (r.panel.measuredThickness / 3) <= 2 * g)
+			throw "Core socket leaves insufficient bed stock or glue space";
+		var inset = tool + l, foot:MoldBox = {
+			x: foam.x + inset,
+			y: foam.y + inset,
+			z: baseZ - (r.panel.measuredThickness / 3) + g,
+			width: foam.width - 2 * inset,
+			depth: foam.depth - 2 * inset,
+			height: contactZ-baseZ+(r.panel.measuredThickness / 3) - 2 * g
+		};
+		if (foot.width <= tool || foot.depth <= tool)
+			throw "Core too small for locating foot";
+		s.foot = {foam: foot, cutting: cutting(foot, r.coreWireAxis)};
+		s.embedDepth = (r.panel.measuredThickness / 3);
+		s.bondAreaMm2 = foot.width * foot.depth;
+		s.socketOperationId = materia.tooling.ToolingIds.derive("", c.id, "-socket");
+		var op = PanelJoints.operation(s.socketOperationId, Pocket,
+			PanelContours.relievedRectangle(foot.x
+				+ foot.width / 2
+				- bed.pose.x, foot.y
+				+ foot.depth / 2
+				- bed.pose.y, foot.width
+				+ r.jointClearance,
+				foot.depth
+				+ r.jointClearance, tool / 2),
+			(r.panel.measuredThickness / 3), tool, MachiningSide.PositiveZ, false, tool);
+		var bounds = materia.casting.CastingProfileGeometry.bounds(op.contour), cb = cavityContact;
+		if (bounds.x + bed.pose.x < cb.x + l
+			|| bounds.y + bed.pose.y < cb.y + l
+			|| bounds.x + bounds.width + bed.pose.x > cb.x + cb.width - l
+			|| bounds.y + bounds.height + bed.pose.y > cb.y + cb.depth - l)
+			throw "Core socket escapes sealing footprint";
+		bed.panel.operations.push(op);
+		bed.panel.contactOpenings.push(op.id);
+		penetrations.push({
+			panelId: bed.panel.id,
+			operationId: op.id,
+			kind: CoreSealed,
+			insertId: null,
+			coreId: c.id,
+			sealMargin: l,
+			sealMaterial: hw.sealMaterial,
+			sealingFace: F.translation(cb.x + cb.width / 2, cb.y + cb.depth / 2, baseZ),
+			plug: null
+		});
+
+	}
+
 	public static function build(c:CastingMoldCore, b:MoldBox, r:ToolingRecipe, bed:PanelPlacement, panels:Array<PanelPlacement>,
 			penetrations:Array<PenetrationPlan>):Void {
 		var foam=MoldCores.singleBox(c.foamEnvelope,c.id), cavity=MoldCores.singleBox(c.cavity,c.id);
 		var s = c.support, t = r.panel.measuredThickness, l = r.minimumLigament, tool = r.routerDiameter, g = r.adhesiveLineThickness, hw = r.hardware;
 		PanelJoints.validateClearance(r.jointClearance, r.panel.thicknessVariation, r.jointLiningAllowance, r.jointMachiningAllowance);
 		if (s.kind == RoutedSocket) {
-			s.panelIds=[bed.panel.id];
-			if ((r.panel.measuredThickness / 3) > t - l || (r.panel.measuredThickness / 3) <= 2 * g)
-				throw "Core socket leaves insufficient bed stock or glue space";
-			var inset = tool + l, foot:MoldBox = {
-				x: foam.x + inset,
-				y: foam.y + inset,
-				z: b.z - (r.panel.measuredThickness / 3) + g,
-				width: foam.width - 2 * inset,
-				depth: foam.depth - 2 * inset,
-				height: (r.panel.measuredThickness / 3) - 2 * g
-			};
-			if (foot.width <= tool || foot.depth <= tool)
-				throw "Core too small for locating foot";
-			s.foot = {foam: foot, cutting: cutting(foot, r.coreWireAxis)};
-			s.embedDepth = (r.panel.measuredThickness / 3);
-			s.bondAreaMm2 = foot.width * foot.depth;
-			s.socketOperationId = materia.tooling.ToolingIds.derive("", c.id, "-socket");
-			var op = PanelJoints.operation(s.socketOperationId, Pocket,
-				PanelContours.relievedRectangle(foot.x
-					+ foot.width / 2
-					- bed.pose.x, foot.y
-					+ foot.depth / 2
-					- bed.pose.y, foot.width
-					+ r.jointClearance,
-					foot.depth
-					+ r.jointClearance, tool / 2),
-				(r.panel.measuredThickness / 3), tool, MachiningSide.PositiveZ, false, tool);
-			var bounds = materia.casting.CastingProfileGeometry.bounds(op.contour), cb = cavity;
-			if (bounds.x + bed.pose.x < cb.x + l
-				|| bounds.y + bed.pose.y < cb.y + l
-				|| bounds.x + bounds.width + bed.pose.x > cb.x + cb.width - l
-				|| bounds.y + bounds.height + bed.pose.y > cb.y + cb.depth - l)
-				throw "Core socket escapes sealing footprint";
-			bed.panel.operations.push(op);
-			bed.panel.contactOpenings.push(op.id);
-			penetrations.push({
-				panelId: bed.panel.id,
-				operationId: op.id,
-				kind: CoreSealed,
-				insertId: null,
-				coreId: c.id,
-				sealMargin: l,
-				sealMaterial: hw.sealMaterial,
-				sealingFace: F.translation(cb.x + cb.width / 2, cb.y + cb.depth / 2, b.z),
-				plug: null
-			});
+			socketFoot(c,{x:foam.x,y:foam.y,width:foam.width,depth:foam.depth},
+				{x:cavity.x,y:cavity.y,width:cavity.width,depth:cavity.depth},b.z,b.z,r,bed,penetrations);
 			return;
 		}
 		// The carrier is bonded to the foam; the bridge is bonded to the carrier.
@@ -379,7 +395,7 @@ class CoreSupports {
 		panel.labelY=width/2;
 		var placed:PanelPlacement={panel:panel,pose:F.translation(left,y,face.z),withdrawal:{x:0,y:0,z:1}};
 		var bridgeIds:Array<String>=[];
-		for (core in p.cores) if (core.support.kind==Bridge)
+		for (core in p.cores) if (core.support.kind==Bridge || core.support.kind==PrecastStruts)
 			for (member in core.support.bondedPanelIds) if (bridgeIds.indexOf(member)<0) bridgeIds.push(member);
 		for (other in p.supportPanels) if (bridgeIds.indexOf(other.panel.id)>=0) {
 			var relative=F.compose(F.inverse(placed.pose),other.pose),normal=F.transformVector(relative,0,0,1);
@@ -423,8 +439,22 @@ class CoreSupports {
 
 	public static function sharedBridges(b:MoldBox, r:ToolingRecipe, cores:Array<materia.tooling.casting.CastingMoldPlan.CastingMoldCore>,
 			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>,
-			raised:MoldPanels.RaisedWalls=MoldPanels.RaisedWalls.EastWest):Void {
-		cores=cores.filter(core -> core.support.kind==Bridge);
+			raised:MoldPanels.RaisedWalls=MoldPanels.RaisedWalls.EastWest,
+			?precastHeads:Map<String,Array<MoldBox>>):Void {
+		cores=cores.filter(core -> core.support.kind==Bridge || core.support.kind==PrecastStruts);
+		function seatBounds(core:CastingMoldCore):MoldBox {
+			if(core.support.kind==Bridge){
+				var rows=MoldCores.section(core.foamEnvelope,b.z+b.height-core.support.adhesiveThickness,core.id);
+				var outers=rows.filter(row->row.depth==0);
+				if(outers.length!=1)throw "Bridge needs one connected EPS contact: "+core.id;
+				var footprint=materia.casting.CastingProfileGeometry.bounds(outers[0].contour),cover=core.coveringThickness;
+				return {x:footprint.x-cover,y:footprint.y-cover,z:b.z+b.height,
+					width:footprint.width+2*cover,depth:footprint.height+2*cover,height:r.panel.measuredThickness};
+			}
+			var head=precastHeads==null ? null : precastHeads.get(core.id);
+			if(head==null)throw "Missing precast bridge footprint: "+core.id;
+			return MoldRegions.exactBounds(materia.casting.CastingRegion.Union([for(pad in head)MoldRegions.box(pad)]),core.id);
+		}
 		if (cores.length == 0)
 			return;
 		if (raised==MoldPanels.RaisedWalls.NorthSouth) {
@@ -441,7 +471,12 @@ class CoreSupports {
 				coveringThickness:core.coveringThickness,support:core.support
 			}];
 			var localPanels:Array<PanelPlacement>=[],localHardware:Array<SupportHardware>=[];
-			sharedBridges(localBox,r,localCores,localPanels,localHardware);
+			var localHeads=new Map<String,Array<MoldBox>>();
+			if(precastHeads!=null)for(id in precastHeads.keys()){
+				var head=precastHeads.get(id);
+				if(head!=null)localHeads.set(id,[for(pad in head)movedBox(pad,inverse)]);
+			}
+			sharedBridges(localBox,r,localCores,localPanels,localHardware,MoldPanels.RaisedWalls.EastWest,localHeads);
 			for (panel in localPanels) {
 				for (operation in panel.panel.operations) if (operation.id=="wall-top-socket") {
 					// North/south walls include both corner laps, unlike the
@@ -466,14 +501,27 @@ class CoreSupports {
 			l = r.minimumLigament,
 			edge = 2 * l + r.routerDiameter,
 			pad = r.hardware.padDepth;
-		var rows:Array<Float> = [];
-		for (c in cores) {
-			var bounds=MoldCores.stockBounds(c.cavity,c.id);
-			var y = bounds.y + bounds.depth / 2;
-			if (rows.filter(v -> Math.abs(v - y) < 1e-7).length == 0)
-				rows.push(y);
+		// Overlapping beam bands are one physical row. A branched core is
+		// supported at its actual pour-face contact, not its full-height bounds.
+		var rows:Array<{bottom:Float,top:Float,memberIds:Array<String>}> = [];
+		for (core in cores) {
+			var bounds=seatBounds(core),y=bounds.y+bounds.depth/2;
+			var width=Math.max(r.hardware.minimumBridgeWidth,
+				core.support.kind==PrecastStruts ? bounds.depth : bounds.depth/2);
+			if(!Math.isFinite(width) || width<r.hardware.minimumBridgeWidth)
+				throw "Core row cannot provide the minimum bridge width: "+core.id;
+			rows.push({bottom:y-width/2,top:y+width/2,memberIds:[core.id]});
 		}
-		rows.sort(Reflect.compare);
+		rows.sort((a,b)->a.bottom!=b.bottom ? Reflect.compare(a.bottom,b.bottom) : Reflect.compare(a.top,b.top));
+		var merged:Array<{bottom:Float,top:Float,memberIds:Array<String>}>=[];
+		for(row in rows){
+			if(merged.length>0 && row.bottom<=merged[merged.length-1].top+1e-7){
+				var previous=merged[merged.length-1];
+				previous.top=Math.max(previous.top,row.top);
+				previous.memberIds=previous.memberIds.concat(row.memberIds);
+			}else merged.push(row);
+		}
+		rows=merged;
 		function place(panel:materia.tooling.panel.PanelPlan, x:Float, y:Float, z:Float):Void
 			panels.push({
 				panel: PanelCodec.copy(panel),
@@ -503,14 +551,8 @@ class CoreSupports {
 			});
 		}
 		for (index in 0...rows.length) {
-			var y = rows[index], width = 0.0;
-			for (core in cores) {
-				var bounds=MoldCores.stockBounds(core.cavity,core.id);
-				if (Math.abs(bounds.y + bounds.depth / 2 - y) < 1e-7)
-					width = Math.max(width,bounds.depth / 2);
-			}
-			if (width < r.hardware.minimumBridgeWidth)
-				throw "Core row cannot provide the minimum bridge width";
+			var row=rows[index],y=(row.bottom+row.top)/2,width=row.top-row.bottom;
+			if(width<r.hardware.minimumBridgeWidth-1e-7)throw "Core row is below the minimum bridge width";
 			var id = "core-bridge-" + index,
 				beam = PanelJoints.blank(id, b.width + 2 * (pad + edge), width, r.panel, r.routerDiameter, l),
 				bx = b.x - pad - edge,
@@ -543,8 +585,23 @@ class CoreSupports {
 			}
 			place(beam, bx, by, b.z + b.height + t);
 			for (c in cores) {
-				var bounds=MoldCores.stockBounds(c.cavity,c.id);
-				if (Math.abs(bounds.y + bounds.depth / 2 - y) < 1e-7) {
+				if (row.memberIds.indexOf(c.id)>=0) {
+					if(c.support.kind==PrecastStruts){
+						var heads=precastHeads==null ? null : precastHeads.get(c.id);
+						if(heads==null)throw "Missing precast bearing pads: "+c.id;
+						var padIds=MoldCores.spreaderIds(c);
+						if(heads.length!=padIds.length)throw "Precast bearing pads disagree with source contacts: "+c.id;
+						for(index in 0...heads.length){
+							var head=heads[index];
+							var spreader=PanelJoints.blank(padIds[index],head.width,head.depth,r.panel,r.routerDiameter,l);
+							spreader.contactFace=materia.tooling.ToolingEnums.ContactFace.NegativeZ;
+							place(spreader,head.x,head.y,b.z+b.height);
+						}
+						c.support.bondedPanelIds=padIds.concat([id]);
+						c.support.panelIds=c.support.bondedPanelIds.concat(["bridge-left-rail","bridge-right-rail"]);
+						c.support.padClosure=materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps;
+						continue;
+					}
 					c.support.bondedPanelIds = [MoldCores.carrierId(c), id];
 					var foam=MoldCores.foam(c),f=MoldCores.stockBounds(c.foamEnvelope,c.id);
 					var contactZ=b.z+b.height-c.support.adhesiveThickness;

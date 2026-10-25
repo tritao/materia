@@ -24,7 +24,8 @@ typedef RemovalReport = {
 }
 
 /** Exact straight-translation sweeps. Inputs remain borrowed; every temporary is closed.
- * Planar/cylindrical faces and axial or transverse conical withdrawals are supported. Other surfaces fail explicitly.
+ * Standalone swept solids require supported boundary surfaces. Relation checks
+ * may also certify the same predicate from rigorous inner/outer bounds.
  */
 class SweptRemoval {
 	static function prism(face:Shape, delta:Vector, pieces:Array<Part>):Void {
@@ -98,7 +99,8 @@ class SweptRemoval {
 		}
 	}
 
-	public static function sweep(part:Part, delta:Vector):Part {
+	static function boundarySweep(part:Part, delta:Vector, strict:Bool):{part:Part, complete:Bool} {
+		var complete = true;
 		if (delta.length() < 1e-8)
 			throw "Removal displacement must be nonzero";
 		var pieces:Array<Part> = [];
@@ -118,11 +120,13 @@ class SweptRemoval {
 							prism(face,delta,pieces);
 						else if (Math.abs(axis.dot(delta.normalized()))<=1e-10)
 							radialSweep(face,delta,pieces);
-						else throw "Unsupported removal boundary surface";
+						else if (strict) throw "Unsupported removal boundary surface";
+						else complete = false;
 					} else if (face.surfaceKind() == CadKit.SurfaceKind.Cylinder) {
 						radialSweep(face,delta,pieces);
-					} else
+					} else if (strict)
 						throw "Unsupported removal boundary surface";
+					else complete = false;
 					face.close();
 				} catch (e:Dynamic) {
 					face.close();
@@ -135,13 +139,17 @@ class SweptRemoval {
 				result.close();
 				throw "Invalid union of boundary sweeps";
 			}
-			return result;
+			return {part: result, complete: complete};
 		} catch (e:Dynamic) {
 			for (p in pieces)
 				if (!p.shape.isClosed())
 					p.close();
 			throw e;
 		}
+	}
+
+	public static function sweep(part:Part, delta:Vector):Part {
+		return boundarySweep(part, delta, true).part;
 	}
 
 	public static function intersectionVolume(a:Part, b:Part):Float {
@@ -182,7 +190,7 @@ class SweptRemoval {
 		var travel = high.subtract(low).length() + 1,
 			blocking:Array<PanelBlockingRelation> = [];
 		// Exact broad phase: disjoint bounds cannot contain a positive-volume intersection.
-		// The accepted pairs still use the complete boundary-face sweep and booleans.
+		// Accepted pairs use boundary-face sweeps and exact boolean intersections.
 		function meets(a:Part, b:Part):Bool {
 			var x = a.shape.bounds(),
 				y = b.shape.bounds(),
@@ -203,19 +211,49 @@ class SweptRemoval {
 					throw 'Initial overlap ${members[i].id}/${members[j].id}';
 			}
 		for (a in members) {
-			var swept:Part;
-			try swept=sweep(a.part,a.direction.scale(travel)) catch (error:Dynamic)
+			var delta = a.direction.scale(travel);
+			var bounds = a.part.shape.bounds();
+			var lo = Vector.fromNative(bounds.get_min());
+			var hi = Vector.fromNative(bounds.get_max());
+			var outerLo = new Vector(Math.min(lo.x, lo.x + delta.x), Math.min(lo.y, lo.y + delta.y), Math.min(lo.z, lo.z + delta.z));
+			var outerHi = new Vector(Math.max(hi.x, hi.x + delta.x), Math.max(hi.y, hi.y + delta.y), Math.max(hi.z, hi.z + delta.z));
+			var candidates = members.filter(b -> {
+				if (b.id == a.id) return false;
+				var bb = b.part.shape.bounds();
+				var bl = Vector.fromNative(bb.get_min()), bh = Vector.fromNative(bb.get_max());
+				var upperVolume = Math.max(0, Math.min(outerHi.x, bh.x) - Math.max(outerLo.x, bl.x))
+					* Math.max(0, Math.min(outerHi.y, bh.y) - Math.max(outerLo.y, bl.y))
+					* Math.max(0, Math.min(outerHi.z, bh.z) - Math.max(outerLo.z, bl.z));
+				return upperVolume > contactVolumeToleranceMm3;
+			});
+			if (candidates.length == 0) continue;
+			var swept:{part:Part, complete:Bool};
+			try swept = boundarySweep(a.part, delta, false) catch (error:Dynamic)
 				throw 'Removal sweep ${a.id}: '+Std.string(error);
+			var outer:Null<Part> = null;
 			try {
-				for (b in members)
-					if (b.id != a.id && meets(swept, b.part)) {
-						var volume = intersectionVolume(swept, b.part);
-						if (volume > contactVolumeToleranceMm3)
-							blocking.push({movingId: a.id, blockerId: b.id});
-					}
-				swept.close();
+				if (!swept.complete) {
+					var size = outerHi.subtract(outerLo);
+					var box = Part.box(size.x, size.y, size.z);
+					try outer = box.translated(new Vector((outerLo.x + outerHi.x) / 2, (outerLo.y + outerHi.y) / 2, outerLo.z))
+					catch (e:Dynamic) { box.close(); throw e; }
+					box.close();
+				}
+				for (b in candidates) {
+					// The partial sweep is a subset; the enclosing box is a superset.
+					// Either bound can prove the predicate. An unresolved pair stays unsupported.
+					if (outer != null && intersectionVolume(outer, b.part) <= contactVolumeToleranceMm3) continue;
+					var volume = intersectionVolume(swept.part, b.part);
+					if (volume > contactVolumeToleranceMm3)
+						blocking.push({movingId: a.id, blockerId: b.id});
+					else if (!swept.complete)
+						throw 'Unsupported removal relation ${a.id}/${b.id}: unsupported boundary surface prevents certification';
+				}
+				swept.part.close();
+				if (outer != null) outer.close();
 			} catch (e:Dynamic) {
-				swept.close();
+				swept.part.close();
+				if (outer != null) outer.close();
 				throw e;
 			}
 		}

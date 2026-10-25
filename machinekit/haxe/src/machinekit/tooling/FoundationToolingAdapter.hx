@@ -29,6 +29,7 @@ class FoundationToolingAdapter {
 			interfaces: foundation.body.precisionRequirements(),
 			envelope: foundation.body.castingEnvelope(),
 			features: foundation.body.castingFeatures(),
+			precastStruts: foundation.body.precastStruts(),
 			inserts: [for (row in foundation.insertLocations()) insert(row)]
 		});
 	}

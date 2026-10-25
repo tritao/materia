@@ -28,6 +28,8 @@ enum abstract MoldPlaybackAction(String) to String {
 	var ReleaseLooseHardware = "release-hardware";
 	var WithdrawMember = "withdraw";
 	var ReorientCasting = "flip-to-service";
+	var ReleaseCoreBonds = "release-eps-bonds";
+	var BreakoutCore = "breakout-eps";
 }
 
 typedef MoldPlaybackFrame = {
@@ -120,6 +122,8 @@ class MoldPlayback {
 			visible.remove(materia.tooling.ToolingIds.derive("insert-", i.id));
 		for (hardware in CastingMoldCad.anchorComponents(p))
 			visible.remove(hardware.id);
+		// Precast compound is already part of the finished source solid.
+		for(strut in p.document.input.precastStruts)visible.remove(strut.id);
 		visible.set("cured-casting", true);
 		for (step in review.demoldingSteps) {
 			var active:Array<String> = [];
@@ -135,7 +139,7 @@ class MoldPlayback {
 					throw "Missing cured-casting playback motion";
 				var v = motion[0], travel = review.demolding.travelMm;
 				pose = F.translation(v.x * travel, v.y * travel, v.z * travel);
-			} else
+			} else if(step.kind!=DemoldingStepKind.ReleaseEPSBonds)
 				for (id in active) {
 					if (!visible.exists(id))
 						throw "Demolding playback withdraws a missing member: " + id;
@@ -145,6 +149,8 @@ class MoldPlayback {
 				case DemoldingStepKind.ReleaseHardware: MoldPlaybackAction.ReleaseLooseHardware;
 				case DemoldingStepKind.Withdraw: MoldPlaybackAction.WithdrawMember;
 				case DemoldingStepKind.FlipToService: MoldPlaybackAction.ReorientCasting;
+				case DemoldingStepKind.ReleaseEPSBonds: MoldPlaybackAction.ReleaseCoreBonds;
+				case DemoldingStepKind.BreakoutEPS: MoldPlaybackAction.BreakoutCore;
 				default: throw "Unsupported demolding playback step";
 			};
 			snapshot(MoldPlaybackPhase.Demolding, step.id, action, active, step.status);
@@ -169,7 +175,8 @@ class MoldPlayback {
 	/** Static presentation scenes have no collision proxies or dynamics. Exact validation
 	 * lives in the fingerprint-bound CAD review, not approximate viewer boxes.
 	 */
-	public static function scene(parts:Array<SceneArtifactPart>, id:String):materia.project.SceneArtifact.SceneArtifactData {
+	public static function scene(parts:Array<SceneArtifactPart>, id:String,
+			frame:MoldPlaybackFrame,liftedEPS:Array<String>):materia.project.SceneArtifact.SceneArtifactData {
 		return {
 			lengthUnit: "mm",
 			metresPerUnit: 0.001,
@@ -184,7 +191,8 @@ class MoldPlayback {
 						{
 							id: part.id,
 							definition: part.id,
-							initialPose: F.identity(),
+							initialPose: frame.phase==Demolding && liftedEPS.indexOf(part.id)>=0
+								? F.compose(F.identity(),frame.castingPose) : F.identity(),
 							grounded: true
 						}
 				],
@@ -212,6 +220,9 @@ class MoldPlayback {
 			local.close();
 			cache.set(m.id, AssemblyPreview.part(m.id, m.component.designation, world, m.component.materialId));
 		}
+		var liftedEPS=[for(core in p.cores)if(core.support.breakoutAfterLift
+			|| core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
+			for(id in materia.tooling.casting.MoldCores.assemblyMembers(core))id];
 		var castCache = new Map<String, SceneArtifactPart>(),
 			folder = dir + "/sequence";
 		ToolingFiles.directory(folder);
@@ -246,7 +257,7 @@ class MoldPlayback {
 				parts.push(part);
 			}
 			var filename = (frame.phase : String) + "-" + StringTools.lpad(Std.string(++index), "0", 3) + ".mtrg";
-			sys.io.File.saveBytes(folder + "/" + filename, SceneArtifact.encode(scene(parts, "playback-" + index)));
+			sys.io.File.saveBytes(folder + "/" + filename, SceneArtifact.encode(scene(parts, "playback-" + index,frame,liftedEPS)));
 			records.push({file: "sequence/" + filename, frame: frame});
 			instructions.push("- [" + filename + "](" + filename + "): " + frame.stepId + " (" + frame.status + ")");
 		}

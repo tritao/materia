@@ -1,6 +1,7 @@
 package machinekit.tooling;
 
 import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
+import materia.tooling.casting.CastingMoldPlan.CastingMoldCore;
 import materia.tooling.casting.MoldCores;
 import machinekit.tooling.InsertAnchorGeometry;
 
@@ -37,6 +38,7 @@ class ToolingFabricationExport {
 	public static function classify(component:machinekit.component.MachineComponent):HardwareDimensions {
 		if (Std.isOfType(component, ToolingPanel)
 			|| Std.isOfType(component, ToolingVolume)
+			|| Std.isOfType(component, ToolingBlock)
 			|| Std.isOfType(component, machinekit.structural.CastInsert))
 			return {classification: NonHardware, lengthMm: null, diameterMm: null};
 		if (Std.isOfType(component, machinekit.standard.SocketHeadCapScrew)) {
@@ -250,6 +252,21 @@ class ToolingFabricationExport {
 		return cadChecks;
 	}
 
+	/** A retained core has no removal vector; breakup is also not an intact pull. */
+	public static function coreSupportRecords(cores:Array<CastingMoldCore>,
+			panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>):Array<Dynamic> {
+		var records:Array<Dynamic>=[];
+		for(core in cores){
+			var removal=MoldCores.removal(core);
+			if(core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts
+				&& !core.support.breakoutAfterLift)
+				records.push({coreId:core.id,featureId:core.featureId,support:core.support,
+					removal:removal,withdrawal:MoldCores.withdrawal(core,panels)});
+			else records.push({coreId:core.id,featureId:core.featureId,support:core.support,removal:removal});
+		}
+		return records;
+	}
+
 	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String,
 			?formerReport:FormerShopExport.FormerShopReport):Array<materia.tooling.ToolingValidation> {
 		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
@@ -395,13 +412,14 @@ class ToolingFabricationExport {
 				"consumption"
 			]
 		];
-		for (c in p.cores)
-			for (index in 0...c.layers.length) {
-				var b = c.layers[index].block;
+		for (c in p.cores) {
+			var jobs=MoldCores.cuttingJobs(c);
+			for (index in 0...jobs.length) {
+				var b = jobs[index].cutting.block;
 				coreRows.push([
 					c.id,
 					c.featureId,
-					Std.string(index + 1),
+					index<c.layers.length ? Std.string(index+1) : "foot",
 					Std.string(b.width),
 					Std.string(b.depth),
 					Std.string(b.height),
@@ -410,9 +428,9 @@ class ToolingFabricationExport {
 					"per-casting"
 				]);
 			}
-		for (core in p.cores) for (index in 0...core.layers.length)
-			data(dir,MoldCores.layerId(core,index)+".cutting.json",
-				MoldCores.cuttingRecord(core,index));
+		}
+		for (core in p.cores) for (job in MoldCores.cuttingJobs(core))
+			data(dir,job.id+".cutting.json",MoldCores.cuttingJobRecord(core,job.cutting));
 		text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
 		var volumeRows = [
 			[
@@ -486,11 +504,7 @@ class ToolingFabricationExport {
 		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
 		data(dir, "planned-hardware.json", p.hardware);
 		data(dir, "core-units.json", p.coreUnits);
-		data(dir, "eps-supports.json", [for (core in p.cores) {
-			coreId:core.id,featureId:core.featureId,support:core.support,
-			withdrawal:MoldCores.withdrawal(core,p.panels.members.concat(p.supportPanels)),
-			removal:MoldCores.removal(core)
-		}]);
+		data(dir,"eps-supports.json",coreSupportRecords(p.cores,p.panels.members.concat(p.supportPanels)));
 		data(dir, "hardware-unsupported.json", unknown);
 		var lines = bill.lines();
 		lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));

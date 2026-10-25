@@ -273,6 +273,11 @@ class BoxPlannerTests {
 		if (foot == null)
 			throw "Missing foot";
 		check(Math.abs(MoldCores.singleBox(core.foamEnvelope,core.id).z - bed.cavity.z) < 1e-7 && foot.foam.z < bed.cavity.z, "main core height preserved and foot buried");
+		var effort=materia.tooling.export.ToolingFabrication.effort(bed,FabricationTests.spec());
+		var mainBlank=core.layers[0].block,footBlank=foot.cutting.block;
+		check(Math.abs(effort.sacrificialEPSVolumeMm3
+			-mainBlank.width*mainBlank.depth*mainBlank.height-footBlank.width*footBlank.depth*footBlank.height)<1e-7,
+			"EPS stock effort includes the separately cut locating foot");
 		var wrongBridge = CastingMoldPlanner.planSinglePocket(bedDoc);
 		wrongBridge.cores[0].support.kind = CoreSupportKind.Bridge;
 		rejects(() -> CastingMoldPlanner.validate(wrongBridge), "bridge cannot pass a closed top");

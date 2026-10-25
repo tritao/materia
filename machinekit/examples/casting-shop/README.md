@@ -13,3 +13,9 @@ front-on-bed orientation, and its side-open service passages withdraw along mold
 The mill resolves service and clearance recess ownership before lightening voids.
 Those choices remain in the mill setup with their reasons. The shared recipe does
 not acquire a mill feature-ID table.
+
+`CastingShopExport` is the shared kit pipeline used by the mill and hobber entry
+points. Each caller supplies its source foundation, mold setup and output root.
+The hobber plinth pours with mounting faces toward the bed. Source lower compound
+struts become upper supports in the mold frame; the wire direction follows their
+vertical axes.

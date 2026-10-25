@@ -7,6 +7,7 @@ enum abstract CoreSupportKind(String) to String {
 	var Bridge = "bridge";
 	var RoutedSocket = "routed-socket";
 	var RegisteredFlange = "registered-flange";
+	var PrecastStruts = "precast-struts";
 }
 
 enum abstract SupportHardwareKind(String) to String {
@@ -49,8 +50,21 @@ typedef SupportHardware = {
 	var length:Float;
 }
 
+/** Exact resin-side contact in mold coordinates; Upper/Lower follow mold Z. */
+typedef PrecastCoreContact = {
+	var strutId:String;
+	var contact:materia.casting.PrecastStrut.StrutContact;
+	var areaMm2:Float;
+	var centroid:{x:Float,y:Float,z:Float};
+}
+
 typedef CoreSupport = {
 	var kind:CoreSupportKind;
+	var precastContacts:Array<PrecastCoreContact>;
+	/** Install the existing wire-cut stock pieces around fixtures, then bond. */
+	var assemblyByLayer:Bool;
+	/** Keep the bonded EPS with the casting during lift; break out afterwards. */
+	var breakoutAfterLift:Bool;
 	var adhesiveSpec:String;
 	var adhesiveThickness:Float;
 	var fitClearance:Float;

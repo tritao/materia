@@ -41,6 +41,17 @@ class ReleasePlanTests {
 		check(plan.steps.filter(step -> step.action==Seal && step.faceIds.indexOf("board-dry")>=0).length==2,
 			"Dry exposed board faces in the sealing record are sealed too");
 		check(plan.prepareBeforePartIds.join("|")=="anchor|insert","All preparation precedes fitting steel or anchored assemblies");
+		var compound=face("strut-bond","strut",BondingCompound,100,false);
+		compound.adjacentCoatedFaceIds=["board-wet"];
+		var retained=ReleasePlans.build("casting",plan.system,0.1,plan.faces.concat([compound]));
+		check(retained.mustNotCoatFaceIds.indexOf(compound.id)>=0 && retained.coatedFaceIds.indexOf(compound.id)<0,
+			"Precast compound bonding faces are never coated");
+		check(first(retained,"strut",MaskBondingFaces)<first(retained,"board",ApplyAgent),
+			"Precast bonding contacts are masked before adjacent release coating");
+		check(status(retained,"bonding")==Pass && status(retained,"assembly")==Pass,
+			"Compound struts follow the existing bonding and assembly checks");
+		retained.steps.filter(step->step.action==ApplyAgent)[0].faceIds.push(compound.id);
+		check(status(retained,"bonding")==Fail,"An actual coat on precast bonding compound fails");
 		plan=fixture();plan.system.epsSafety=EPSReleaseSafety.Unsafe;
 		var unsafe=ReleasePlans.validate(plan).filter(row -> row.rule=="fabrication.release.eps-safety")[0];
 		check(unsafe.status==Fail && unsafe.affectedIds.join("|")=="eps-wet","Unsafe agent fails against the exact EPS-contact face IDs");

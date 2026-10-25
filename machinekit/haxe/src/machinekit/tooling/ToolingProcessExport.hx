@@ -92,9 +92,15 @@ class ToolingProcessExport {
 				resources.push(local);
 				var actual = machinekit.assembly.PosedParts.moved(local, p.document.setup.sourceToMold);
 				resources.push(actual);
+				var struts:Array<cadkit.modeling.Part>=[];
+				for(strut in p.document.input.precastStruts){
+					var part=machinekit.structural.CastingRegionCad.part(CastingMoldCad.strutRegion(p,strut));
+					resources.push(part);struts.push(part);
+				}
+				if(struts.length>0){actual=actual.subtractAll(struts);resources.push(actual);}
 				if (Math.abs(fill.geometricResinVolumeMm3 - actual.volume()) > Math.max(1e-5, actual.volume() * 1e-9))
 					throw "Fill geometric resin volume differs from actual foundation CAD volume";
-				var region = CastingMoldCad.source(p);
+				var region = CastingMoldCad.pouredSource(p);
 				resources.push(region);
 				var missing = actual.subtractAll([region]);
 				resources.push(missing);
@@ -112,7 +118,7 @@ class ToolingProcessExport {
 				part.close();
 			sys.io.File.saveContent(dir + "/fill-foundation-cad-check.json", ToolingCodec.canonical({
 				sourceFingerprint: sourceFingerprint,
-				reference: "foundation.body.geometry() transformed to mold coordinates",
+				reference: "foundation.body.geometry() transformed to mold coordinates, excluding declared precast compound struts",
 				symmetricDifferenceMm3: difference
 			}) + "\n");
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pass,

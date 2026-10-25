@@ -66,6 +66,27 @@ class FoundationDesignTests {
 		});
 	}
 
+	/** Approved hobber correction, independent of the source feature builder.
+	 * Preserve the historical STEP and add only the specified 5 mm strip and
+	 * the twelve 50 mm square precast-compound strut envelopes.
+	 */
+	static function hobberPrecastAdditions():Array<materia.casting.Box3> {
+		var boxes:Array<materia.casting.Box3>=[{x:17.5,y:-95,z:85,width:5,depth:190,height:575}];
+		for(site in [{x:80.0,y:-350.0,top:775.0},{x:320.0,y:-350.0,top:775.0},{x:210.0,y:-300.0,top:775.0},
+			{x:100.0,y:-80.0,top:660.0},{x:220.0,y:-80.0,top:660.0},{x:160.0,y:80.0,top:660.0}]) {
+			boxes.push({x:site.x-25,y:site.y-25,z:0,width:50,depth:50,height:85});
+			boxes.push({x:site.x-25,y:site.y-25,z:site.top,width:50,depth:50,height:800-site.top});
+		}
+		return boxes;
+	}
+
+	static function hobberPrecastDesignChange(previous:Part):Part {
+		return Solids.building([new Part(previous.shape.cloneShape())],parts->{
+			for(box in hobberPrecastAdditions())parts.push(machinekit.tooling.ToolingBlock.placedBox(box));
+			return Solids.union(parts);
+		});
+	}
+
 	/** Approved production-anchor correction against the independent pre-anchor STEP.
 	 * Restore the historical 40 x 60 mm joint and 40 x 40 mm foot-seat voids,
 	 * cut the policy-sized pads, then
@@ -156,6 +177,7 @@ class FoundationDesignTests {
 		var input:materia.tooling.casting.CastingToolingInput = {
 			id: "foot-fixture", revision: 1, lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
+			precastStruts:[],
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
 		var frame = MillMoldSetup.frame();
@@ -457,11 +479,13 @@ class FoundationDesignTests {
 			var previous = new Part(cadkit.Shape.importStepText(text)),
 				actual = row.part.body.geometry();
 			if (row.id == "hobber-bed") {
-				var corrected = socketDesignChange(previous,row.part);
+				var sockets = socketDesignChange(previous,row.part);
+				var corrected = hobberPrecastDesignChange(sockets);
+				sockets.close();
 				try {
-					same(corrected,actual,"hobber-bed explicit socket design correction");
+					same(corrected,actual,"hobber-bed approved socket, solid strip and precast-strut corrections");
 					var added = actual.subtract(previous), removed = previous.subtract(actual);
-					try Sys.println("hobber-bed socket correction: added="+added.volume()+" removed="+removed.volume()+" mm3")
+					try Sys.println("hobber-bed approved source corrections: added="+added.volume()+" removed="+removed.volume()+" mm3")
 					catch (error:Dynamic) {added.close(); removed.close(); throw error;}
 					added.close(); removed.close();
 				} catch (error:Dynamic) {corrected.close(); previous.close(); actual.close(); throw error;}
@@ -497,7 +521,8 @@ class FoundationDesignTests {
 				if (Math.abs(historicalIy-frozenIy) > frozenIy*1e-10) throw "Shared algebra changes historical frozen section Iy: " + row.id;
 				var boxFeatures = row.part.body.castingFeatures().filter(feature -> materia.casting.CastingFeature.CastingGeometrySolids.isBox(feature.geometry.solid));
 				var cells = materia.casting.BoxAlgebra.material(row.part.body.castingEnvelope(),boxFeatures);
-				if (kind == "bed") previousCells = materia.casting.BoxAlgebra.coalesce(previousCells.concat(socketSeats(row.part)));
+				if (kind == "bed") previousCells = materia.casting.BoxAlgebra.coalesce(materia.casting.BoxAlgebra.subtract(
+					previousCells.concat(socketSeats(row.part)).concat(hobberPrecastAdditions()),[]));
 				var difference = materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(cells, previousCells))
 					+ materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(previousCells, cells));
 				assertions++;

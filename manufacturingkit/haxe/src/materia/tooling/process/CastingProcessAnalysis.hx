@@ -70,12 +70,13 @@ class CastingProcessAnalysis {
       pourRateMm3PerSecond:spec.pourRateMm3PerSecond, maximumAirEscapeWidthMm:spec.maximumAirEscapeWidthMm,
       extraLevels:[], fillObstructions:projection.blockers, panels:panels};
     var geometry = materia.tooling.casting.CastingSourceRegions.derive(p.document);
+    var pourGeometry = materia.tooling.casting.CastingSourceRegions.poured(p.document);
     var fillAssessment:FillAssessment;
-    if (geometry.regions == null) fillAssessment = exactFill == null ? {
-      report:null, validation:materia.tooling.casting.CastingSourceRegions.checks(geometry, "process.fill.geometry")
+    if (pourGeometry.regions == null) fillAssessment = exactFill == null ? {
+      report:null, validation:materia.tooling.casting.CastingSourceRegions.checks(pourGeometry, "process.fill.geometry")
     }
     :exactFill(p, fillSettings);
-    else fillAssessment = FillAnalysis.assessRegions(geometry, p.document.setup.fillHeightMm, fillSettings);
+    else fillAssessment = FillAnalysis.assessRegions(pourGeometry, p.document.setup.fillHeightMm, fillSettings);
     if (projection.unsupportedIds.length > 0) fillAssessment.validation.push(FillAnalysis.check(
       "process.fill.tooling-projection",
       projection.unsupportedIds,

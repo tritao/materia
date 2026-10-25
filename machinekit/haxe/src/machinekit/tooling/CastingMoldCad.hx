@@ -27,6 +27,8 @@ enum abstract DemoldingStepKind(String) to String {
 	var ReleaseHardware = "release-hardware";
 	var Withdraw = "withdraw";
 	var FlipToService = "flip-to-service";
+	var BreakoutEPS = "breakout-eps";
+	var ReleaseEPSBonds = "release-eps-bonds";
 }
 
 typedef MoldDemoldingStep = {var id:String; var kind:DemoldingStepKind; var memberIds:Array<String>; var dependsOn:Array<String>; var status:materia.tooling.ToolingDiagnostic.ToolingCheckStatus;}
@@ -91,6 +93,18 @@ class CastingMoldCad {
 		} catch (error:Dynamic) {local.close();throw error;}
 	}
 
+	/** Precast compound occupies real fill space, but is already cured. */
+	public static function strutRegion(p:CastingMoldPlan,strut:materia.casting.PrecastStrut):materia.casting.CastingRegion
+		return materia.tooling.casting.MoldRegions.moved(materia.tooling.casting.MoldRegions.box(strut.box),p.document.setup.sourceToMold);
+
+	public static function pouredSource(p:CastingMoldPlan):Part {
+		var source=source(p),pieces:Array<Part>=[source];
+		return Solids.building(pieces,owned->{
+			for(strut in p.document.input.precastStruts)owned.push(machinekit.structural.CastingRegionCad.part(strutRegion(p,strut)));
+			return owned.length==1 ? source : Solids.cut(source,owned.slice(1));
+		});
+	}
+
 	public static function anchorComponents(p:CastingMoldPlan,?owner:String):Array<{
 		id:String,insertId:String,anchorId:String,part:machinekit.component.MachineComponent,
 		pose:materia.assembly.AssemblyRecord.AssemblyFrame
@@ -143,7 +157,7 @@ class CastingMoldCad {
 		var pieces:Array<Part> = [box(p.cavity)];
 		return Solids.building(pieces, parts -> {
 			for (c in p.cores)
-				parts.push(machinekit.structural.CastingRegionCad.part(c.cavity));
+				parts.push(machinekit.structural.CastingRegionCad.part(MoldCores.occupied(c)));
 			for (f in p.formers)
 				parts.push(ToolingVolume.geometryOf(f.volume));
 			// Fixture receivers are enclosed by the bed and sealed insert faces.
@@ -222,6 +236,17 @@ class CastingMoldCad {
 				dependsOn: [previous], status: materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending});
 			previous = "release-far-end-thread-plugs";
 		}
+		var bonds:Array<String>=[];
+		for(core in p.cores)if(core.support.breakoutAfterLift){
+			var id=core.support.foot!=null ? materia.tooling.ToolingIds.derive("",core.id,"-foot")
+				: core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge ? MoldCores.carrierId(core) : null;
+			if(id!=null && bonds.indexOf(id)<0)bonds.push(id);
+		}
+		if(bonds.length>0){
+			result.push({id:"release-eps-bonds",kind:ReleaseEPSBonds,memberIds:bonds,dependsOn:[previous],
+				status:materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending});
+			previous="release-eps-bonds";
+		}
 		for (id in order) {
 			var stepId = materia.tooling.ToolingIds.derive("withdraw-", id);
 			result.push({
@@ -242,6 +267,13 @@ class CastingMoldCad {
 				status: materia.tooling.casting.CastHandling.qualified(p.document, p.options,
 					p.handling) ? materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass : materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending
 			});
+		var dependency=result[result.length-1].id;
+		for(core in p.cores)if(core.support.breakoutAfterLift){
+			var id=materia.tooling.ToolingIds.derive("breakout-",core.id);
+			result.push({id:id,kind:BreakoutEPS,memberIds:MoldCores.assemblyMembers(core),
+				dependsOn:[dependency],status:materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending});
+			dependency=id;
+		}
 		return result;
 	}
 
@@ -284,7 +316,8 @@ class CastingMoldCad {
 			case _: {x:0.0,y:0.0,z:0.0};
 		});
 		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:b.height*(0.5+i*0.15)});
-		for(i in 0...p.cores.length)offsets.set(p.cores[i].id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
+		for(i in 0...p.cores.length)if(p.cores[i].support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
+			for(id in MoldCores.assemblyMembers(p.cores[i]))offsets.set(id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
 		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
 		for(f in p.fixtures) for(volume in MoldFixtures.volumes(f))
 			offsets.set(volume.id,{x:MoldFixtures.withdrawal(f).x*b.width,y:0,z:MoldFixtures.withdrawal(f).z*b.height*1.4});
@@ -305,6 +338,16 @@ class CastingMoldCad {
 		}
 		for (i in 0...p.cores.length) {
 			var c = p.cores[i], pose = F.identity();
+			if(c.support.assemblyByLayer){
+				for(index in 0...c.layers.length)a.addComponent(MoldCores.assemblyLayerId(c,index),
+					ToolingVolume.fromCoreCutting(MoldCores.layerId(c,index),c.layers[index]),c.layers[index].stockToMold);
+				var foot=c.support.foot;
+				if(foot!=null){
+					var id=materia.tooling.ToolingIds.derive("",c.id,"-foot");
+					a.addComponent(id,ToolingVolume.fromCoreCutting(id,foot.cutting),foot.cutting.stockToMold);
+				}
+				continue;
+			}
 			a.addComponent(c.id, ToolingVolume.fromVolume({
 				id: c.id,
 				material: EPSStock,
@@ -313,6 +356,11 @@ class CastingMoldCad {
 				profiles: [],
 				pieces: []
 			}), pose);
+		}
+		for(strut in p.document.input.precastStruts){
+			var b=strut.box;
+			a.addComponent(strut.id,ToolingBlock.fromBox(b,"mineral cast"),
+				F.compose(p.document.setup.sourceToMold,F.translation(b.x,b.y,b.z)));
 		}
 		for (f in p.formers) {
 			var pose = F.identity();
@@ -375,7 +423,7 @@ class CastingMoldCad {
 		return a;
 	}
 
-	static function coverage(p:CastingMoldPlan, tooling:Array<Part>):Void {
+	static function coverage(p:CastingMoldPlan, tooling:Array<Part>, casting:Part):Void {
 		var b = p.cavity, s = 0.1, faces:Array<MoldBox> = [
 			{
 				x: b.x - s,
@@ -432,8 +480,6 @@ class CastingMoldCad {
 				// Check actual resin contact on the closed outer face. A former's
 				// shoulder can seal on the face without filling a positive-depth
 				// slab behind it. Voids are not resin contact surfaces.
-				var casting = source(p);
-				owned.push(casting);
 				var translated = casting.translated(directions[index]);
 				owned.push(translated);
 				var contact = slab.intersect(translated);
@@ -500,6 +546,14 @@ class CastingMoldCad {
 		try {
 			var original = source(p);
 			references.push(original);
+			for(strut in p.document.input.precastStruts){
+				var declared=machinekit.structural.CastingRegionCad.part(strutRegion(p,strut));
+				references.push(declared);
+				var outside=declared.subtract(original);
+				references.push(outside);
+				if(outside.volume()>1e-4)
+					throw "Precast compound strut leaves final casting material: "+strut.id;
+			}
 			var rebuilt = reconstructed(p);
 			references.push(rebuilt);
 			var missing = original.subtractAll([rebuilt]);
@@ -557,13 +611,15 @@ class CastingMoldCad {
 				});
 			}
 			var rowIds:Array<String> = [];
-			var bridgeCores=p.cores.filter(core -> core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge);
+			var bridgeCores=p.cores.filter(core -> core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge
+				|| core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts);
 			for (c in bridgeCores)
 				if (rowIds.indexOf(MoldCores.bridgeId(c)) < 0)
 					rowIds.push(MoldCores.bridgeId(c));
 			for (id in rowIds) {
-				var panelIds = [id].concat([for (c in bridgeCores) if (MoldCores.bridgeId(c) == id) MoldCores.carrierId(c)]),
-					shapes:Array<Part> = [];
+				var panelIds=[id],shapes:Array<Part>=[];
+				for(core in bridgeCores)if(MoldCores.bridgeId(core)==id)
+					for(member in core.support.bondedPanelIds)if(panelIds.indexOf(member)<0)panelIds.push(member);
 				var shape = Solids.building(shapes, owned -> {
 					for (m in p.supportPanels)
 						if (panelIds.indexOf(m.panel.id) >= 0)
@@ -579,7 +635,7 @@ class CastingMoldCad {
 				permanent.push({id: materia.tooling.ToolingIds.derive("", id, "-fixture"), members: panelIds});
 			}
 			for (m in p.supportPanels)
-				if (rowIds.indexOf(m.panel.id) < 0 && bridgeCores.filter(c -> MoldCores.carrierId(c) == m.panel.id).length == 0) {
+				if (rowIds.indexOf(m.panel.id) < 0 && bridgeCores.filter(c -> c.support.bondedPanelIds.indexOf(m.panel.id)>=0).length == 0) {
 					var shape = panelWorld(m);
 					parts.push(shape);
 					members.push({id: m.panel.id, part: shape, direction: new Vector(0, 0, 1)});
@@ -602,11 +658,14 @@ class CastingMoldCad {
 					direction: new Vector(MoldFixtures.withdrawal(f).x,MoldFixtures.withdrawal(f).y,MoldFixtures.withdrawal(f).z)
 				});
 			}
-			for (c in p.cores) {
-				var shape = machinekit.structural.CastingRegionCad.part(MoldCores.occupied(c));
-				parts.push(shape);
-				var direction=MoldCores.withdrawal(c,p.panels.members.concat(p.supportPanels));
-				members.push({id: c.id, part: shape, direction: new Vector(direction.x,direction.y,direction.z)});
+			var coreShapes=new Map<String,Part>();
+			for(c in p.cores){
+				var shape=machinekit.structural.CastingRegionCad.part(MoldCores.occupied(c));
+				parts.push(shape);coreShapes.set(c.id,shape);
+				if(c.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts && !c.support.breakoutAfterLift){
+					var direction=MoldCores.withdrawal(c,p.panels.members.concat(p.supportPanels));
+					members.push({id:c.id,part:shape,direction:new Vector(direction.x,direction.y,direction.z)});
+				}
 			}
 			for (h in p.hardware)
 				if (h.kind == SupportHardwareKind.FixturePin || (h.kind == SupportHardwareKind.BoreMask && !threadedMask(p, h))) {
@@ -625,8 +684,20 @@ class CastingMoldCad {
 					}
 					members.push({id: h.id, part: shape, direction: direction});
 				}
-			coverage(p, parts);
-			var castingPieces = [source(p)];
+			var castingSource=source(p);
+			parts.push(castingSource);
+			coverage(p,parts.slice(0,parts.length-1),castingSource);
+			var retained=p.cores.filter(core->core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts);
+			var liftedEPS=p.cores.filter(core->core.support.breakoutAfterLift || retained.indexOf(core)>=0);
+			var castingPieces=[castingSource];
+			for(core in liftedEPS){
+				var shape=coreShapes.get(core.id);
+				if(shape==null)throw "Missing lifted EPS solid: "+core.id;
+				castingPieces.push(new Part(shape.shape.cloneShape()));
+			}
+			if(liftedEPS.length>0)permanent.push({id:"cured-casting",members:
+				[for(core in liftedEPS)for(id in MoldCores.assemblyMembers(core))id]
+				.concat([for(strut in p.document.input.precastStruts)strut.id])});
 			for (i in p.document.input.inserts)
 				castingPieces.push(steel(p, i.id));
 			var cured = Solids.union(castingPieces);
@@ -644,8 +715,36 @@ class CastingMoldCad {
 			];
 			var demolding = SweptRemoval.analyze(members, 1e-4);
 			members.pop();
+			// These are actual wire-cut stock pieces before bonding. Check their
+			// individual installation, including placing inserts between EPS bands.
+			for(core in p.cores)if(core.support.breakoutAfterLift){
+				if(core.support.assemblyByLayer){
+					for(index in 0...core.layers.length){
+						var shape=machinekit.structural.CastingRegionCad.part(MoldCores.layerRegion(core.layers[index]));
+						parts.push(shape);members.push({id:MoldCores.assemblyLayerId(core,index),part:shape,direction:new Vector(0,0,1)});
+					}
+					var foot=core.support.foot;
+					if(foot!=null){
+						var id=materia.tooling.ToolingIds.derive("",core.id,"-foot");
+						var shape=machinekit.structural.CastingRegionCad.part(MoldCores.layerRegion(foot.cutting));
+						parts.push(shape);members.push({id:id,part:shape,direction:new Vector(0,0,1)});
+						var ids=MoldCores.baseAssemblyMembers(core).concat([id]),selected=members.filter(member->ids.indexOf(member.id)>=0);
+						var bonded=Solids.union([for(member in selected)new Part(member.part.shape.cloneShape())]);
+						for(member in selected)members.remove(member);
+						var loaded=materia.tooling.ToolingIds.derive("",core.id,"-base-loaded");
+						parts.push(bonded);members.push({id:loaded,part:bonded,direction:new Vector(0,0,1)});
+						groups.push({id:loaded,members:ids});
+					}
+				}else{
+					var shape=coreShapes.get(core.id);
+					if(shape==null)throw "Missing EPS assembly solid: "+core.id;
+					members.push({id:core.id,part:shape,direction:new Vector(0,0,1)});
+				}
+			}
 			for (id in rowIds) {
-				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in bridgeCores) if (MoldCores.bridgeId(c) == id) c.id]),
+				var ids = [materia.tooling.ToolingIds.derive("", id, "-fixture")].concat([for (c in bridgeCores)
+					if (c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge && MoldCores.bridgeId(c)==id)
+						for(member in MoldCores.bridgeAssemblyMembers(c))member]),
 					pieces:Array<Part> = [];
 				var n = members.length - 1;
 				while (n >= 0) {
@@ -663,6 +762,54 @@ class CastingMoldCad {
 					direction: new Vector(0, 0, 1)
 				});
 				groups.push({id: materia.tooling.ToolingIds.derive("", id, "-loaded"), members: ids});
+			}
+			// A pressure board stays dry and comes off after cure. Before the pour,
+			// install each connected bridge/core/strut unit as a supported assembly.
+			function pressurePanels(core:CastingMoldCore):Array<String>
+				return core.support.panelIds.filter(id->id!="bridge-left-rail" && id!="bridge-right-rail");
+			var retainedRows:Array<Array<CastingMoldCore>>=[];
+			for(core in retained){
+				var row=[core],index=retainedRows.length-1;
+				while(index>=0){
+					var joins=retainedRows[index].filter(other->pressurePanels(other)
+						.filter(id->pressurePanels(core).indexOf(id)>=0).length>0).length>0;
+					if(joins){row=row.concat(retainedRows[index]);retainedRows.splice(index,1);}
+					index--;
+				}
+				retainedRows.push(row);
+			}
+			function contains(groupId:String,leaf:String,path:Array<String>):Bool {
+				if(groupId==leaf)return true;
+				if(path.indexOf(groupId)>=0)throw "Cyclic retained-core assembly group: "+groupId;
+				for(group in groups.concat(permanent))if(group.id==groupId)
+					for(id in group.members)if(contains(id,leaf,path.concat([groupId])))return true;
+				return false;
+			}
+			for(row in retainedRows){
+				row.sort((a,b)->Reflect.compare(a.id,b.id));
+				var assemblyIds:Array<String>=[],selected:Array<RemovalMember>=[];
+				for(core in row)for(panel in pressurePanels(core)){
+					var matches=members.filter(member->contains(member.id,panel,[]));
+					if(matches.length!=1)throw "Missing retained core bridge member: "+panel;
+					if(selected.indexOf(matches[0])<0)selected.push(matches[0]);
+				}
+				var shape=Solids.building([],owned->{
+					for(core in row){
+						owned.push(machinekit.structural.CastingRegionCad.part(MoldCores.occupied(core)));
+						assemblyIds.push(core.id);
+						for(contact in core.support.precastContacts){
+							var strut=p.document.input.precastStruts.filter(strut->strut.id==contact.strutId)[0];
+							owned.push(machinekit.structural.CastingRegionCad.part(strutRegion(p,strut)));
+							assemblyIds.push(strut.id);
+						}
+					}
+					for(member in selected){owned.push(new Part(member.part.shape.cloneShape()));assemblyIds.push(member.id);}
+					return Solids.union(owned);
+				});
+				for(member in selected)members.remove(member);
+				var id=materia.tooling.ToolingIds.derive("",row[0].id,"-loaded");
+				parts.push(shape);members.push({id:id,part:shape,direction:new Vector(0,0,1)});
+				groups.push({id:id,members:assemblyIds});
 			}
 			for (i in p.document.input.inserts) {
 				var shape = steel(p, i.id);

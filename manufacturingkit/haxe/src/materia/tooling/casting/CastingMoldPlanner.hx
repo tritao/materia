@@ -172,6 +172,53 @@ class CastingMoldPlanner {
 			.filter(cavity -> !materia.casting.CastingCavities.supportsBoxes(cavity)).length>0;
 	}
 
+	/** Reserve orthogonal material with the shared exact algebra first. Bounds
+	 * only discard provably separated remaining tools; intersecting curved
+	 * inserts and profiles still go through the exact kernel.
+	 */
+	static function reservedDifference(source:materia.casting.CastingRegion,
+			cuts:Array<materia.casting.CastingRegion>):materia.casting.CastingRegion {
+		var boxes=MoldRegions.boxes(source),boxCuts:Array<MoldBox>=[],other:Array<materia.casting.CastingRegion>=[];
+		for(cut in cuts){
+			var pieces=MoldRegions.boxes(cut);
+			if(pieces==null)other.push(cut);else boxCuts=boxCuts.concat(pieces);
+		}
+		var material=source;
+		if(boxes!=null){
+			var retained=BoxAlgebra.coalesce(BoxAlgebra.subtract(boxes,boxCuts));
+			if(retained.length==0)return materia.casting.CastingRegion.Difference(source,[source]);
+			material=materia.casting.CastingRegion.Union([for(box in retained)MoldRegions.box(box)]);
+		}else if(boxCuts.length>0)material=materia.casting.CastingRegion.Difference(source,[for(box in boxCuts)MoldRegions.box(box)]);
+		var bounds=materia.casting.CastingRegionBounds.box(material);
+		if(bounds==null)return material;
+		other=other.filter(cut->{
+			var limit=materia.casting.CastingRegionBounds.box(cut);
+			return limit!=null && BoxAlgebra.intersection(bounds,limit)!=null;
+		});
+		return other.length==0 ? material : materia.casting.CastingRegion.Difference(material,other);
+	}
+
+	/** Upper bounds on obstacles can certify a straight bed post. Curved cuts
+	 * are not credited as clearance; curved steel bounds can only deny a route.
+	 * Final datum/resin and swept checks still use the actual geometry.
+	 */
+	static function bedPostObstacles(d:ToolingDocument):Null<Array<MoldBox>> {
+		var body=MoldRegions.boxes(MoldRegions.envelope(d));
+		if(body==null)return null;
+		var voids:Array<MoldBox>=[];
+		for(feature in d.input.features)if(feature.kind!=CastingFeatureKind.InsertRecess){
+			var boxes=MoldRegions.boxes(MoldRegions.feature(d,feature.id));
+			if(boxes!=null)voids=voids.concat(boxes);
+		}
+		var obstacles=BoxAlgebra.subtract(body,voids);
+		for(insert in d.input.inserts){
+			var bounds=materia.casting.CastingRegionBounds.box(MoldRegions.insert(d,insert.id));
+			if(bounds==null)return null;
+			obstacles.push(bounds);
+		}
+		return obstacles;
+	}
+
 	/** Interior allocation uses authoritative cavities; panel sealing profiles
 	 * extend outward from the source boundary and have no source interior.
 	 */
@@ -332,73 +379,10 @@ class CastingMoldPlanner {
 		var result=seed(d,o,e,b,geometryChecks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts))
 				.concat(ReplicationJigs.analyze(d.input,o.replicationJigs,o.precision))
 				.concat(FoundationJointQualification.analyze(d.input,o.foundationJointProcesses)),raisedWalls),panels=result.panels,bed=panels.members[0];
-		var epsBoxes:Array<MoldBox> = [], insertBoxes:Array<MoldBox> = [];
-		var epsRegions:Array<materia.casting.CastingRegion> = [];
-		var insertRegions=[for (insert in d.input.inserts) MoldRegions.insert(d,insert.id)];
-		for (region in insertRegions) {
-			var boxes=MoldRegions.boxes(region);
-			if (boxes!=null) insertBoxes=insertBoxes.concat(boxes);
-		}
-		for (f in d.input.features)
-			if (f.kind != CastingFeatureKind.InsertRecess) {
-				var s = strategies.filter(s -> s.featureId == f.id)[0];
-				if (s.strategy == CoreStrategy.SacrificialEPS) {
-					var cavity=MoldRegions.feature(d,f.id),boxes=MoldRegions.boxes(cavity);
-					var fillWithdrawal=s.withdrawal!=null && s.withdrawal.z>1-1e-8;
-					if (boxes==null || boxes.length!=1) {
-						var bounds=MoldCores.stockBounds(cavity,f.id);
-						var internal=bounds.x>e.x && bounds.x+bounds.width<e.x+e.width
-							&& bounds.y>e.y && bounds.y+bounds.depth<e.y+e.depth;
-						if (Math.abs(bounds.z+bounds.height-b.z-b.height)>1e-7 || !internal && !fillWithdrawal) {
-							if (s.withdrawal==null)
-								throw "Side EPS requires an explicit body-opening withdrawal: "+f.id;
-							// Exact access allocation below is shared with rigid formers;
-							// it retains the full cavity, neck and registration profile.
-							sideEPS.set(f.id,true);
-							continue;
-						}
-						for (reserved in insertRegions.concat(epsRegions))
-							if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
-								throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
-						var cores=MoldCoreLayers.build(cavity,f.id,r);
-						for (core in cores) result.cores.push(core);
-						result.features.push({featureId:f.id,kind:EPSFeature,memberIds:[for (core in cores) core.id]});
-						epsRegions.push(cavity);
-						continue;
-					}
-					var cb=featureBox(d,f);
-					var fillOpen=Math.abs(cb.z+cb.height-b.z-b.height)<=1e-7
-						&& (fillWithdrawal || cb.x>e.x && cb.x+cb.width<e.x+e.width
-						&& cb.y>e.y && cb.y+cb.depth<e.y+e.depth);
-					if (!fillOpen) {
-						if (s.withdrawal==null) throw "Side EPS requires an explicit body-opening withdrawal: "+f.id;
-						sideEPS.set(f.id,true);
-						continue;
-					}
-					if (exactRegions) for (reserved in insertRegions.concat(epsRegions))
-						if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
-							throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
-					if (BoxAlgebra.volume(BoxAlgebra.subtract([cb], insertBoxes.concat(epsBoxes))) < CastingMoldPlanner.volume(cb) - 1e-5)
-						throw "Intersecting EPS/insert cavities need an explicit allocation";
-					var core=MoldCoreLayers.box(cb,f.id,r,CoreSupportKind.Bridge),id=core.id;
-					result.cores.push(core);
-					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
-					epsBoxes.push(cb);
-					epsRegions.push(cavity);
-				} else if (s.strategy == CoreStrategy.Unsupported) {
-					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
-					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
-						"No supported tooling route is declared for this feature. Select an available exact source-region former or supported ruled EPS, or revise the source.",
-						"tooling.feature.unsupported." + f.id, true);
-				}
-			}
-		result.coreUnits = coreUnits(d.input, result.cores);
-		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware,raisedWalls);
-		// Priority is explicit: inserts, EPS and datum supports are reserved first;
-		// rigid formers then resolve by descending authored priority and sorted IDs.
 		var ordered = ownershipOrder(d.input.features, strategies);
+		var postObstacles=bedPostObstacles(d);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
-		for (i in d.input.inserts) {
+		function addFixture(i:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Void {
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
 				face = F.compose(pose, F.translation(0, 0, InsertBodies.height(i.body))),
 				normal = F.transformVector(face, 0, 0, 1),
@@ -420,9 +404,14 @@ class CastingMoldPlanner {
 					featureId:d.input.features.filter(f -> f.kind==CastingFeatureKind.InsertRecess && f.owner==i.id)[0].id,
 					kind:InsertFeature,memberIds:[materia.tooling.ToolingIds.derive("insert-",i.id)]
 				});
-				continue;
+				return;
 			}
 			var dt = r.hardware.datumThickness, pw = r.hardware.datumPostWidth;
+			for(hole in InsertFixturePlanner.availableHoles(i))if(InsertFixturePlanner.facing(F.compose(pose,hole.frame),face)){
+				var diameter=hole.thread==null ? hole.diameter : hole.thread.majorDiameter;
+				if(hole.counterbore!=null)diameter=Math.max(diameter,hole.counterbore.diameter);
+				pw=Math.max(pw,diameter+2*r.minimumLigament);
+			}
 			var pocketId:Null<String> = null;
 			var pad:MoldBox = {
 				x: body.x,
@@ -436,12 +425,23 @@ class CastingMoldPlanner {
 				y: 0.0,
 				z: -1.0
 			};
-			var access = ordered.filter(f -> f.kind != CastingFeatureKind.InsertRecess
+			var baseZ=Math.min(pad.z,b.z-dt),postHeight=pad.z-baseZ;
+			var bedPad=BoxAlgebra.copy(pad);
+			if(pad.z>=b.z-1e-7 && postHeight>1e-7){
+				bedPad.width=Math.min(body.width,pw);bedPad.depth=Math.min(body.depth,pw);
+				bedPad.x=face.x-bedPad.width/2;bedPad.y=face.y-bedPad.depth/2;
+			}
+			var bedPieces=[bedPad];
+			if(postHeight>1e-7)bedPieces.push({x:face.x-pw/2,y:face.y-pw/2,z:baseZ,width:pw,depth:pw,height:postHeight});
+			var bedClear=postObstacles!=null && bedPieces.filter(piece->
+				postObstacles.filter(obstacle->BoxAlgebra.intersection(piece,obstacle)!=null).length>0).length==0;
+			var access = bedClear ? [] : ordered.filter(f -> f.kind != CastingFeatureKind.InsertRecess
 				&& strategies.filter(s -> s.featureId == f.id
-					&& (s.strategy == CoreStrategy.ReusableFormer || sideEPS.exists(s.featureId))
+					&& (s.strategy == CoreStrategy.ReusableFormer || s.strategy == CoreStrategy.SacrificialEPS)
 					&& s.withdrawal != null
 					&& Math.abs(s.withdrawal.x) > 0.9)
 					.length == 1 && MoldRegions.overlaps(MoldRegions.feature(d,f.id),MoldRegions.box(pad),1e-7,f.id));
+			if(bedClear)pad=bedPad;
 			if (access.length > 0) {
 				var dir = strategies.filter(s -> s.featureId == access[0].id)[0].withdrawal;
 				if (dir == null)
@@ -535,6 +535,106 @@ class CastingMoldPlanner {
 			result.validation.push(materia.tooling.ToolingValidation.ToolingReadiness.pending("tooling.fixture.attachment." + i.id, [i.id],
 				"Bed pins register the nominal support only. Qualify insert XY location/clamping, datum accuracy and release. Screws use declared source threads only."));
 		}
+		// Bed and wall fixtures establish material ownership before EPS stock is
+		// cut. Upward cross-carriers still wait for the shared bridge layout.
+		var earlyFixtures=new Map<String,Bool>();
+		for (insert in d.input.inserts) {
+			var face=F.compose(F.compose(d.setup.sourceToMold,insert.pose),F.translation(0,0,InsertBodies.height(insert.body)));
+			var normal=F.transformVector(face,0,0,1);
+			if (normal.z < -1+1e-8 || DatumFixtures.panelOnFace(result.panels.members,face)!=null) {
+				addFixture(insert);
+				earlyFixtures.set(insert.id,true);
+			}
+		}
+		var fixtureReservations=[for (volume in MoldFixtures.allVolumes(result)) for (piece in volume.pieces) piece];
+		var epsBoxes:Array<MoldBox> = [], insertBoxes:Array<MoldBox> = [];
+		var epsRegions:Array<materia.casting.CastingRegion> = [];
+		var allocatedEPSFeatures = new Map<String,Bool>();
+		var insertRegions=[for (insert in d.input.inserts) MoldRegions.insert(d,insert.id)];
+		for (region in insertRegions) {
+			var boxes=MoldRegions.boxes(region);
+			if (boxes!=null) insertBoxes=insertBoxes.concat(boxes);
+		}
+		for (allocation in PrecastCoreSupports.allocations(d)) {
+			for (id in allocation.featureIds) {
+				var choices=strategies.filter(strategy -> strategy.featureId==id);
+				if (choices.length!=1 || choices[0].strategy!=CoreStrategy.SacrificialEPS)
+					throw "Precast source struts require an EPS strategy: "+id;
+				allocatedEPSFeatures.set(id,true);
+			}
+			var core=MoldCoreLayers.retained(allocation.region,allocation.featureIds[0],allocation.id,r);
+			core.support.precastContacts=allocation.contacts;
+			result.cores.push(core);
+			for (id in allocation.featureIds) result.features.push({featureId:id,kind:EPSFeature,memberIds:[core.id]});
+			epsRegions.push(core.cavity);
+			var boxes=MoldRegions.boxes(core.cavity);
+			if (boxes!=null) epsBoxes=epsBoxes.concat(boxes);
+		}
+		for(network in EPSAccessNetworks.plan(d,strategies,[for(id in allocatedEPSFeatures.keys())id],fixtureReservations)){
+			var core=EPSAccessNetworks.add(result,network);
+			for(id in network.featureIds)allocatedEPSFeatures.set(id,true);
+			epsRegions.push(MoldCores.occupied(core));
+			var boxes=MoldRegions.boxes(MoldCores.occupied(core));
+			if(boxes!=null)epsBoxes=epsBoxes.concat(boxes);
+		}
+		for (f in d.input.features)
+			if (f.kind != CastingFeatureKind.InsertRecess && !allocatedEPSFeatures.exists(f.id)) {
+				var s = strategies.filter(s -> s.featureId == f.id)[0];
+				if (s.strategy == CoreStrategy.SacrificialEPS) {
+					var cavity=MoldRegions.feature(d,f.id),boxes=MoldRegions.boxes(cavity);
+					var fillWithdrawal=s.withdrawal!=null && s.withdrawal.z>1-1e-8;
+					if (boxes==null || boxes.length!=1) {
+						var bounds=MoldCores.stockBounds(cavity,f.id);
+						var internal=bounds.x>e.x && bounds.x+bounds.width<e.x+e.width
+							&& bounds.y>e.y && bounds.y+bounds.depth<e.y+e.depth;
+						if (Math.abs(bounds.z+bounds.height-b.z-b.height)>1e-7 || !internal && !fillWithdrawal) {
+							if (s.withdrawal==null)
+								throw "EPS core has no declared access or cast-in supports: "+f.id;
+							// Exact access allocation below is shared with rigid formers;
+							// it retains the full cavity, neck and registration profile.
+							sideEPS.set(f.id,true);
+							continue;
+						}
+						for (reserved in insertRegions.concat(epsRegions))
+							if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
+								throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
+						var cores=MoldCoreLayers.build(cavity,f.id,r);
+						for (core in cores) result.cores.push(core);
+						result.features.push({featureId:f.id,kind:EPSFeature,memberIds:[for (core in cores) core.id]});
+						epsRegions.push(cavity);
+						continue;
+					}
+					var cb=featureBox(d,f);
+					var fillOpen=Math.abs(cb.z+cb.height-b.z-b.height)<=1e-7
+						&& (fillWithdrawal || cb.x>e.x && cb.x+cb.width<e.x+e.width
+						&& cb.y>e.y && cb.y+cb.depth<e.y+e.depth);
+					if (!fillOpen) {
+						if (s.withdrawal==null) throw "EPS core has no declared access or cast-in supports: "+f.id;
+						sideEPS.set(f.id,true);
+						continue;
+					}
+					if (exactRegions) for (reserved in insertRegions.concat(epsRegions))
+						if (MoldRegions.overlaps(cavity,reserved,1e-7,f.id))
+							throw "Intersecting EPS/insert cavities need an explicit allocation: "+f.id;
+					if (BoxAlgebra.volume(BoxAlgebra.subtract([cb], insertBoxes.concat(epsBoxes))) < CastingMoldPlanner.volume(cb) - 1e-5)
+						throw "Intersecting EPS/insert cavities need an explicit allocation";
+					var core=MoldCoreLayers.box(cb,f.id,r,CoreSupportKind.Bridge),id=core.id;
+					result.cores.push(core);
+					result.features.push({featureId: f.id, kind: EPSFeature, memberIds: [id]});
+					epsBoxes.push(cb);
+					epsRegions.push(cavity);
+				} else if (s.strategy == CoreStrategy.Unsupported) {
+					result.features.push({featureId: f.id, kind: UnsupportedFeature, memberIds: []});
+					request(result, "unsupported-" + f.id, ReleaseAlternative, [f.id],
+						"No supported tooling route is declared for this feature. Select an available exact source-region former or supported ruled EPS, or revise the source.",
+						"tooling.feature.unsupported." + f.id, true);
+				}
+			}
+		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware,raisedWalls,PrecastCoreSupports.pressureFootprints(d,result.cores));
+		// Priority is explicit: inserts, EPS and datum supports are reserved first;
+		// rigid formers then resolve by descending authored priority and sorted IDs.
+		for (i in d.input.inserts) if (!earlyFixtures.exists(i.id)) addFixture(i);
+
 		var fixtures:Array<MoldBox> = [];
 		for (volume in MoldFixtures.allVolumes(result))
 			for (p in volume.pieces)
@@ -586,8 +686,7 @@ class CastingMoldPlanner {
 					var pull=s.withdrawal;
 					if (pull==null || !MoldFormerAccess.supported(d,f,pull))
 						throw "Non-box former needs a supported withdrawal: "+f.id;
-					var allocated=materia.casting.CastingRegion.Difference(sourceRegion,
-						occupiedRegions.concat(previousRegions));
+					var allocated=reservedDifference(sourceRegion,occupiedRegions.concat(previousRegions));
 					var ids:Array<String> =[],blank=sourceRegion;
 					if (MoldRegions.volume(allocated,f.id)>1e-7) {
 						var id=materia.tooling.ToolingIds.derive("former-",f.id,"-0");
@@ -668,7 +767,7 @@ class CastingMoldPlanner {
 				if (profiles.length > 0 && groups.length != 1)
 					throw "Access former needs an explicit split for its sealing profile: " + f.id;
 				for (index in 0...groups.length) {
-					var remaining=exactRegions ? materia.casting.CastingRegion.Difference(
+					var remaining=exactRegions ? reservedDifference(
 						materia.casting.CastingRegion.Union([for (piece in groups[index]) MoldRegions.box(piece)]),occupiedRegions.concat(previousRegions)) : null;
 					if (remaining!=null && MoldRegions.volume(remaining,f.id)<=1e-7) continue;
 					var id = materia.tooling.ToolingIds.derive("former-", f.id, "-" + index);
@@ -776,13 +875,13 @@ class CastingMoldPlanner {
 		if (requiresRegions(d)) {
 			// Allocate source access necks before envelope fillers, so an exact
 			// bed/side access is never occupied twice by backing and a core.
-			var reserved=occupiedRegions.concat([for (core in result.cores) core.cavity])
+			var reserved=occupiedRegions.concat([for (core in result.cores) MoldCores.occupied(core)])
 				.concat([for (former in result.formers) formerRegion(former)]);
-			addEnvelopeFormers(result,materia.casting.CastingRegion.Difference(MoldRegions.box(b),
+			addEnvelopeFormers(result,reservedDifference(MoldRegions.box(b),
 				[MoldRegions.envelope(d)].concat(reserved)));
 		}
 		splitBoardContacts(result);
-		result.coreUnits=coreUnits(d.input,result.cores);
+		result.coreUnits=coreUnits(d.input,result.cores,result.features);
 		return finish(result,strategies);
 	}
 
@@ -902,20 +1001,27 @@ class CastingMoldPlanner {
 		return ordered;
 	}
 
-	public static function coreUnits(input:CastingToolingInput, cores:Array<CastingMoldCore>):Array<CastingCoreUnit> {
+	public static function coreUnits(input:CastingToolingInput, cores:Array<CastingMoldCore>,
+			?allocations:Array<FeatureTooling>):Array<CastingCoreUnit> {
 		var groups = new Map<String, CastingCoreUnit>();
 		for (core in cores) {
-			var sources = input.features.filter(feature -> feature.id == core.featureId);
-			if (sources.length != 1)
+			var sourceIds=[core.featureId];
+			if (allocations!=null) for (allocation in allocations)
+				if (allocation.kind==EPSFeature && allocation.memberIds.indexOf(core.id)>=0 && sourceIds.indexOf(allocation.featureId)<0)
+					sourceIds.push(allocation.featureId);
+			var sources = input.features.filter(feature -> sourceIds.indexOf(feature.id)>=0);
+			if (sources.length != sourceIds.length)
 				throw "Core has no unique source feature: " + core.id;
-			var source = sources[0], parent = source.derivedFrom == null ? source.id : source.derivedFrom;
+			for (source in sources) {
+			var parent = source.derivedFrom == null ? source.id : source.derivedFrom;
 			var group = groups.get(parent);
 			if (group == null) {
 				group = {id: materia.tooling.ToolingIds.derive("core-unit-", parent), parentFeatureId: parent, featureIds: [], coreIds: []};
 				groups.set(parent, group);
 			}
-			group.featureIds.push(source.id);
-			group.coreIds.push(core.id);
+			if (group.featureIds.indexOf(source.id)<0) group.featureIds.push(source.id);
+			if (group.coreIds.indexOf(core.id)<0) group.coreIds.push(core.id);
+			}
 		}
 		var result = [for (group in groups) group];
 		for (group in result) {
@@ -958,7 +1064,7 @@ class CastingMoldPlanner {
 	}
 
 	public static function validate(p:CastingMoldPlan):Void {
-		if (ToolingCodec.canonical(p.coreUnits)!=ToolingCodec.canonical(coreUnits(p.document.input,p.cores)))
+		if (ToolingCodec.canonical(p.coreUnits)!=ToolingCodec.canonical(coreUnits(p.document.input,p.cores,p.features)))
 			throw "Core units disagree with source feature lineage";
 		switch p.construction {
 			case SinglePocket:validateSinglePocket(p);return;
@@ -996,10 +1102,17 @@ class CastingMoldPlanner {
 		}
 		for (m in p.panels.members.concat(p.supportPanels))
 			member(m.panel.id);
+		for(strut in p.document.input.precastStruts){
+			member(strut.id);
+			var owners=p.cores.filter(core->core.support.kind==CoreSupportKind.PrecastStruts
+				&& core.support.precastContacts.filter(contact->contact.strutId==strut.id).length==1);
+			if(owners.length!=1)throw "Precast source strut needs one retained EPS owner: "+strut.id;
+		}
 		for (c in p.cores) {
 			member(c.id);
 			if (c.layers.length == 0 || c.layers.length > 32)
 				throw "Invalid EPS layers";
+			for(id in MoldCores.assemblyMembers(c))if(id!=c.id)member(id);
 		}
 		for (f in p.formers)
 			member(f.volume.id);
@@ -1094,22 +1207,26 @@ class CastingMoldPlanner {
 				|| profile.depth!=panels[0].panel.stock.measuredThickness)
 				throw "Former sealing profile differs from panel operation";
 		}
-		var exactResin=requiresRegions(p.document);
-		var resin = p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document);
-		for (volume in MoldFixtures.allVolumes(p)) {
+		var exactResin=requiresRegions(p.document),volumes=MoldFixtures.allVolumes(p);
+		var resin=p.fixtures.length==0 || exactResin ? [] : resinAtFill(p.document);
+		for(volume in volumes){
 			MoldVolumeRecords.copy(volume);
-			if (volume.profiles.length > 0 || volume.regions.length > 0)
+			if(volume.profiles.length>0 || volume.regions.length>0)
 				throw "Neutral datum/resin validation does not support datum profiles or regions";
-			if (exactResin) {
-				if (geometry==null) throw "Exact tooling geometry kernel required: "+volume.id;
-				var region=materia.casting.CastingRegion.Union([for (piece in volume.pieces) MoldRegions.box(piece)]);
-				if (geometry.resinIntersection(p.document,region)>1e-7)
+			for(piece in volume.pieces)for(resinPiece in resin)
+				if(BoxAlgebra.intersection(piece,resinPiece)!=null)
 					throw "Datum fixture intersects resin: "+volume.id;
+		}
+		if(exactResin && volumes.length>0){
+			if(geometry==null)throw "Exact tooling geometry kernel required: "+p.document.input.id;
+			var regions=[for(volume in volumes)materia.casting.CastingRegion.Union([for(piece in volume.pieces)MoldRegions.box(piece)])];
+			var intersections=geometry.resinIntersections(p.document,regions);
+			if(intersections.length!=volumes.length)throw "Incomplete datum/resin intersection batch";
+			for(index in 0...volumes.length){
+				var value=intersections[index];
+				if(!Math.isFinite(value) || value<0)throw "Invalid datum/resin intersection: "+volumes[index].id;
+				if(value>1e-7)throw "Datum fixture intersects resin: "+volumes[index].id;
 			}
-			for (piece in volume.pieces)
-				for (resinPiece in resin)
-					if (BoxAlgebra.intersection(piece, resinPiece) != null)
-						throw "Datum fixture intersects resin: " + volume.id;
 		}
 	}
 	/** Single-pocket construction: the individual bridge or routed bed socket. */

@@ -87,7 +87,7 @@ class ToolingPresentation {
       var parts=[direction.id];
       for(group in groups)if(group.id==direction.id)parts=group.members.copy();
       // The cured body is a check solid, not an occurrence in the tooling-only export.
-      if(direction.id=="cured-casting")parts=[];
+      if(direction.id=="cured-casting" && groups.filter(group->group.id==direction.id).length==0)parts=[];
       resolved.set(direction.id,parts);
       for(part in parts) {
         if(deltas.exists(part))throw "Tooling movement belongs to multiple checked groups: "+part;
@@ -150,6 +150,10 @@ class ToolingPresentation {
       steps.push({id:plannedStep.id,title:plannedStep.id,
         instruction:plannedStep.kind==CastingMoldCad.DemoldingStepKind.FlipToService?
           "Flip the cured casting using the qualified handling plan. This is a manual handling operation.":
+          plannedStep.kind==CastingMoldCad.DemoldingStepKind.BreakoutEPS?
+          "Break up and remove the sacrificial EPS through its declared opening after lifting the casting. This manual process requires qualification; no intact withdrawal is claimed.":
+          plannedStep.kind==CastingMoldCad.DemoldingStepKind.ReleaseEPSBonds?
+          "Release the declared EPS-to-bed or carrier bonds before rigid tooling withdrawal. Qualify this manual release process before pouring.":
           "Release the highlighted loose hardware and threaded protection before withdrawing tooling. This is a manual operation.",
         highlight:highlights,action:Note});
     }

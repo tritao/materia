@@ -19,6 +19,19 @@ typedef CastingBoxRegions = {
 class CastingSourceRegions {
 	static inline var RULE = "casting.source.box-geometry";
 
+	/** The finished casting includes the cured struts; a pour excludes them. */
+	public static function poured(document:ToolingDocument):CastingBoxRegions {
+		var result=derive(document),regions=result.regions;
+		if(regions==null)return result;
+		for(strut in document.input.precastStruts){
+			var boxes=MoldRegions.boxes(MoldRegions.moved(MoldRegions.box(strut.box),document.setup.sourceToMold));
+			if(boxes==null)throw "Non-axial precast strut in box fill: "+strut.id;
+			for(box in boxes)regions.boundaries.push({id:strut.id,box:box});
+			regions.resin=BoxAlgebra.subtract(regions.resin,boxes);
+		}
+		return result;
+	}
+
 	public static function derive(document:ToolingDocument):CastingBoxRegions {
 		var d = materia.tooling.ToolingCodec.copy(document);
 		var checks = CastingBoxSupport.check(d.input, RULE);

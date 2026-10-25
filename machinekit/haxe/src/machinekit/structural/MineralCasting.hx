@@ -23,6 +23,7 @@ class MineralCasting extends MachineComponent {
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
 		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0), P.length("cornerChamfer", 0),
 		P.text("features", CastingPatterns.encode([])),
+		P.text("precastStruts", materia.casting.PrecastStrut.PrecastStruts.encode([])),
 		P.text("embeddedAnchors", "[]"),
 		P.text("datumScheme", "null"),
 		P.text("interfaces", "[]")
@@ -38,6 +39,11 @@ class MineralCasting extends MachineComponent {
 	public function new(?overrides:ComponentValues) {
 		var v = P.resolve(parameters(), overrides), cuts = CastingPatterns.decode(v.token("features"));
 		v.setToken("features", CastingPatterns.encode(cuts));
+		var struts = materia.casting.PrecastStrut.PrecastStruts.decode(v.token("precastStruts"));
+		for (strut in struts)
+			if (cuts.filter(feature -> feature.id == strut.coreFeatureId || feature.derivedFrom == strut.coreFeatureId).length == 0)
+				throw "Precast strut references an unknown source core: " + strut.id;
+		v.setToken("precastStruts", materia.casting.PrecastStrut.PrecastStruts.encode(struts));
 		v.setToken("embeddedAnchors",haxe.Json.stringify(materia.casting.InsertAnchorage.EmbeddedAnchors.records(
 			materia.casting.InsertAnchorage.EmbeddedAnchors.snapshot(haxe.Json.parse(v.token("embeddedAnchors"))))));
 		var datumRaw:Dynamic = haxe.Json.parse(v.token("datumScheme"));
@@ -120,6 +126,8 @@ class MineralCasting extends MachineComponent {
 	}
 
 	public function castingFeatures():Array<CastingFeature> return materia.casting.CastingFeatureCodec.copy(features);
+	public function precastStruts():Array<materia.casting.PrecastStrut>
+		return materia.casting.PrecastStrut.PrecastStruts.decode(parameterToken("precastStruts"));
 
 	public function castingEnvelope():Array<CastingPrism> return [for (prism in envelope) {
 		id: prism.id,

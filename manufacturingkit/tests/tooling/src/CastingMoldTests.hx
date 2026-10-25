@@ -351,7 +351,10 @@ class CastingMoldTests {
 		var extraCavity=MoldCores.singleBox(extraCore.cavity,extraCore.id);
 		extraCavity.y -= 20;
 		extraCavity.depth += 40;
-		extraCore.cavity=materia.tooling.casting.MoldRegions.box(extraCavity);
+		// The larger source cavity must also produce larger physical foam and
+		// cutting layers; a bounds-only mutation is not a valid later core.
+		extraCore=materia.tooling.casting.MoldCoreLayers.box(extraCavity,"later-bridge-core",d.recipe,
+			materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge);
 		bridgePlan.cores.push(extraCore);
 		var bridgePanels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement> = [];
 		materia.tooling.casting.CoreSupports.sharedBridges(bridgePlan.cavity, bridgePlan.document.recipe, bridgePlan.cores, bridgePanels, []);

@@ -174,7 +174,9 @@ class ReviewContractTests {
 		var cy = cavity.y + cavity.depth / 2;
 		cavity.depth = 200;
 		cavity.y = cy - 100;
-		wider.cavity=materia.tooling.casting.MoldRegions.box(cavity);
+		// Rebuild physical foam too: a larger cavity alone supplies no wider bond pad.
+		wider=materia.tooling.casting.MoldCoreLayers.box(cavity,"wide-core",p.document.recipe,
+			materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge);
 		bridges.cores.push(wider);
 		materia.tooling.casting.CoreSupports.sharedBridges(bridges.cavity, bridges.document.recipe, bridges.cores, [], []);
 		var foam = materia.tooling.casting.MoldCores.singleBox(
