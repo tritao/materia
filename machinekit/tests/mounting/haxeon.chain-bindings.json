@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "cable-chain-binding-tests"
+  },
+  "entry": "CableChainBindingTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/sheet-router"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/shared-mount-build"
+}

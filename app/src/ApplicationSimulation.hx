@@ -92,6 +92,7 @@ class ApplicationSimulation {
   var zoneMonitors:Array<SimulatedRobotZoneAdapter> = [];
   var print:Null<PrintProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
+  var cableChainVisuals:Array<CableChainVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
   var digitalProgram:Null<MachineDigitalProgramPlayer> = null;
   var pressBrake:Null<PressBrakeControllerPlayer> = null;
@@ -212,6 +213,7 @@ class ApplicationSimulation {
     var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
+    var candidateChains:Array<CableChainVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateDigital:Null<MachineDigitalProgramPlayer> = null;
     var candidatePress:Null<PressBrakeControllerPlayer> = null;
@@ -340,6 +342,10 @@ class ApplicationSimulation {
             var jointIds = [for (joint in built.model.joints) joint.id];
             var ownedBelts = [for (belt in machine.belts) if (jointIds.indexOf(belt.driverJoint) >= 0) belt];
             if (ownedBelts.length > 0) candidateBelts.push(new BeltVisuals(session, built, candidate, ownedBelts));
+            if(machine.cableChains!=null) {
+              var ownedChains=[for(chain in machine.cableChains)if(jointIds.indexOf(chain.axisJoint)>=0)chain];
+              if(ownedChains.length>0)candidateChains.push(new CableChainVisuals(session,built,candidate,ownedChains));
+            }
             if (machine.program != null && machine.program.axes.length > 0 &&
                 jointIds.indexOf(machine.program.axes[0]) >= 0) {
               if (ownsJob || ownsPress) throw "A controller cannot share CNC or press execution with an axis program";
@@ -658,7 +664,9 @@ class ApplicationSimulation {
       if (hobbing != null) hobbing.dispose();
       if (print != null) print.dispose();
       for (visual in beltVisuals) visual.reset();
+      for (visual in cableChainVisuals) visual.reset();
       beltVisuals = candidateBelts;
+      cableChainVisuals = candidateChains;
       if (machineProgram != null) machineProgram.beforeReset();
       machineProgram = candidateProgram;
       if (digitalProgram != null) digitalProgram.beforeReset();
@@ -765,6 +773,7 @@ class ApplicationSimulation {
     zoneMonitors = prepared.zoneMonitors;
     print = prepared.print;
     beltVisuals = prepared.beltVisuals;
+    cableChainVisuals = prepared.cableChainVisuals;
     machineProgram = prepared.machineProgram;
     digitalProgram = prepared.digitalProgram;
     pressBrake = prepared.pressBrake;
@@ -895,6 +904,7 @@ class ApplicationSimulation {
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();
     for (visual in beltVisuals) visual.reset();
+    for (visual in cableChainVisuals) visual.reset();
     presentMembers();
     presentationEpoch++; return true;
   }
@@ -987,6 +997,9 @@ class ApplicationSimulation {
     var count = 0;
     for (visual in beltVisuals) count += visual.updates;
     return count;
+  }
+  public function cableChainDisplayUpdates():Int {
+    var count=0;for(visual in cableChainVisuals)count+=visual.updates;return count;
   }
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
@@ -1185,6 +1198,7 @@ class ApplicationSimulation {
     var physics = frame == null || robotsInSession == null ? null : robotsInSession.presentFrame(frame);
     try {
       for (visual in beltVisuals) visual.present(physics);
+      for (visual in cableChainVisuals) visual.present(physics);
     } catch (error:Dynamic) {
       if (physics != null) physics.dispose();
       if (frame != null) frame.dispose();
@@ -1323,7 +1337,9 @@ class ApplicationSimulation {
     if (print != null) print.dispose(releases);
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();
+    for (visual in cableChainVisuals) visual.reset();
     beltVisuals = [];
+    cableChainVisuals = [];
     if (machineProgram != null) machineProgram.beforeReset();
     machineProgram = null;
     if (digitalProgram != null) digitalProgram.beforeReset();

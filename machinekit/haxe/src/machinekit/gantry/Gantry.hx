@@ -280,7 +280,10 @@ class Gantry extends AxisBuilder {
             var pose=AxisBuilder.orient(origin[0],origin[1],origin[2],direction,[0.0,0,1]);
             var member="cableChain"+axis.toUpperCase(),values=spec.cableChain.values().setNumber("travel",travel);
             var chain=new machinekit.motion.CableChain(values);
-            attach(member,new GantryCableChain(chain),pose,fixed);
+            var routed=new GantryCableChain(chain,fixed,carrier,axis);
+            addMemberConnector(fixed,routed.endConnector,AssemblyFrames.compose(AssemblyFrames.inverse(zeroPose(fixed)),pose));
+            addMemberConnector(carrier,routed.endConnector,AssemblyFrames.compose(AssemblyFrames.inverse(start),AssemblyFrames.compose(pose,chain.movingFrame(0))));
+            attach(member,routed,pose,fixed);
             cableChainBindings.push({axis:axis,member:member,carrier:carrier,pose:pose,chain:chain});
         }
     }

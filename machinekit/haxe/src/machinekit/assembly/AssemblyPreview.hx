@@ -136,7 +136,16 @@ class AssemblyPreview {
 				wraps: [for (i in 0...path.wraps.length) {occurrence: path.wraps[i].instanceId,
 					connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
 		}
-		return {belts: belts};
+		var chains:Array<materia.project.SceneArtifact.SceneArtifactCableChainVisual>=[];
+        for(entry in assembly.components())if(Std.isOfType(entry.component,machinekit.gantry.GantryCableChain)) {
+            var routed:machinekit.gantry.GantryCableChain=cast entry.component,chain=routed.chain;
+            var slash=entry.id.lastIndexOf("/"),prefix=slash<0?"":entry.id.substr(0,slash+1);
+            chains.push({occurrence:entry.id,fixed:{occurrence:prefix+routed.fixedHost,connector:routed.endConnector},
+                moving:{occurrence:prefix+routed.movingHost,connector:routed.endConnector},axisJoint:prefix+routed.axis,
+                bendRadius:chain.n("bendRadius"),innerWidth:chain.n("innerWidth"),innerHeight:chain.n("innerHeight"),
+                wall:chain.n("wall"),travel:chain.n("travel")});
+        }
+        return {belts: belts,cableChains:chains};
 	}
 
 	/** Preserve include scopes and component metadata from the flattened export. */

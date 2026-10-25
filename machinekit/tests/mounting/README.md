@@ -61,3 +61,20 @@ shrinking, and is registered/classified for saved assemblies. Native checks
 verify assembly reload plus computed mass/inertia exported exactly once by the
 existing `AssemblyFemExport`. This verifies mass export, **not** a complete joint
 compliance law or full mounting-factory acceptance.
+
+## Cable-chain display checks (2026-10-25)
+
+`haxeon.chain.json` compares `PackedCableChainMesh` with native
+`CableChain.geometryAt` at seven travel positions: bounds, hollow volume within
+1.5% chordal-bend discretization, closed/outward winding, finite transformed
+coordinates and reusable vertex/normal storage. It also checks the routed-chain
+recipe reload (23,407 assertions).
+
+`haxeon.chain-bindings.json` checks both router beds at nine X/Y poses each,
+including scene-motion wire reload and the moving X-chain datum carried by Y.
+The display cap corners stay at the fixed/moving bracket connectors (540
+assertions, 0.001 mm float32 comparison tolerance). It does not claim whole-router
+save/reload: unrelated code-only components still prevent that. The app passes a
+compiler-only build; no interactive editor visual check was performed. Compact
+[source/log evidence](../../examples/sheet-router/mounting/cable-chain-validation.json)
+is retained without executable or native build outputs.

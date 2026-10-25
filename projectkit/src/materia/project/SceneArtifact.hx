@@ -144,6 +144,7 @@ typedef SceneArtifactProjectMotion = {
   @:id(7) @:optional var hobbing:SceneArtifactHobbing;
   /** Feedback-driven access guard, executed before the machine program. */
   @:id(8) @:optional var enclosureGuard:SceneArtifactEnclosureGuard;
+  @:id(9) @:optional var cableChains:Array<SceneArtifactCableChainVisual>;
 }
 
 /** Runtime guard policy; door travel and linear speeds are SI, angles radians. */
@@ -227,6 +228,23 @@ typedef SceneArtifactProjectMotion = {
   /** Explicit simulation unloading criterion, not a chamber-pressure measurement. */
   @:id(11) var releaseTravelMm:Float;
   @:id(12) var releaseClosingForceN:Float;
+}
+
+/** Chain dimensions are in assembly units; ends name actual member connectors. */
+@:wire typedef SceneArtifactCableChainVisual = {
+  @:id(1) var occurrence:String;
+  @:id(2) var fixed:SceneArtifactChainEnd;
+  @:id(3) var moving:SceneArtifactChainEnd;
+  @:id(4) var bendRadius:Float;
+  @:id(5) var innerWidth:Float;
+  @:id(6) var innerHeight:Float;
+  @:id(7) var wall:Float;
+  @:id(8) var travel:Float;
+  @:id(9) var axisJoint:String;
+}
+@:wire typedef SceneArtifactChainEnd = {
+  @:id(1) var occurrence:String;
+  @:id(2) var connector:String;
 }
 
 @:wire typedef SceneArtifactBeltVisual = {
@@ -1219,6 +1237,27 @@ class SceneArtifact {
         for (component in definition.definitions) if (component.id == occurrence.definition)
           for (connector in component.connectors) if (connector.name == wrap.connector) found = true;
         if (!found) throw "Moving belt wrap connector is missing";
+      }
+    }
+    var chains=motion.cableChains;
+    if(chains!=null) {
+      if(chains.length>128)throw "Too many moving cable chains";
+      var seen:Map<String,Bool>=[];
+      for(chain in chains) {
+        if(occurrences.indexOf(chain.occurrence)<0||seen.exists(chain.occurrence)||joints.indexOf(chain.axisJoint)<0)
+          throw "Cable chain needs a distinct occurrence and known joint";
+        seen.set(chain.occurrence,true);
+        for(v in [chain.bendRadius,chain.innerWidth,chain.innerHeight,chain.wall,chain.travel])
+          if(!finite(v)||v<=0)throw "Cable chain dimensions must be finite and positive";
+        if(chain.bendRadius<=chain.innerHeight/2+chain.wall)throw "Cable chain bend is too tight";
+        for(end in [chain.fixed,chain.moving]) {
+          var found=false;
+          if(end==null)throw "Cable chain end is missing";
+          for(o in definition.occurrences)if(o.id==end.occurrence)
+            for(c in definition.definitions)if(c.id==o.definition)
+              for(k in c.connectors)if(k.name==end.connector)found=true;
+          if(!found)throw "Cable chain end connector is missing";
+        }
       }
     }
     var contacts = motion.contacts;

@@ -11,6 +11,7 @@ class MotionComponents {
 		registry.register(RotaryEncoderRing.recipeType());
 		registry.register(PlanetaryReducer.recipeType());
 		registry.register(CableChain.recipeType());
+        registry.register(machinekit.gantry.GantryCableChain.recipeType());
 		registry.register(BrakeServo.recipeType());
 
 		registry.register(LinearBearing.recipeType());

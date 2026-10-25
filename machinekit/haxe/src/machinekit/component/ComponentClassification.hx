@@ -119,6 +119,7 @@ class ComponentClassification {
 		file(registry, "machinekit.motion.caster-wheel", "Wheels", ComponentKind.Generic);
 		file(registry, "machinekit.motion.drive-wheel", "Wheels", ComponentKind.Generic);
 		file(registry, "machinekit.motion.cable-chain", "Cable management", ComponentKind.Generic);
+        file(registry, "machinekit.motion.routed-cable-chain", "Cable management", ComponentKind.Generic);
 		// pneumatic
 		file(registry, "machinekit.pneumatic.air-supply", "Air supply and valves", ComponentKind.Generic);
 		file(registry, "machinekit.pneumatic.solenoid-valve", "Air supply and valves", ComponentKind.Generic);

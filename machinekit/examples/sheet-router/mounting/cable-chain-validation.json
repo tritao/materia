@@ -1,0 +1,115 @@
+{
+  "status": "Native chain mesh and end-binding checks pass; app compiler-only build passes",
+  "baseCommit": "3454cbf609fdecee64c44150a8196869679bd417",
+  "archive": "build/sheet-router-evidence/cable-chain-20261025.tar.gz",
+  "archiveSha256": "bd65f2f3187bfe39fc64854129f12538eb5d7a1d7df37456592d18d8e4c9564f",
+  "bytes": 97434,
+  "checks": {
+    "meshAssertions": 23407,
+    "bindingAssertions": 540,
+    "appCompileExitCode": 0,
+    "nativePositions": [
+      0,
+      1,
+      700,
+      1400,
+      2100,
+      2799,
+      2800
+    ],
+    "bedsMm": [
+      2600,
+      3150
+    ],
+    "xyPosesPerBed": 9
+  },
+  "appModuleSha256": "0e6ba202f9bbcdbbeaae9d853df8644feaca5268c29a7a10aad006f1ea5b8eb6",
+  "verifiedFiles": [
+    {
+      "path": "app/src/CableChainVisuals.hx",
+      "bytes": 5492,
+      "sha256": "ee3af736b0a498f4d5d03c3533c10e7e756d663582901b6bd26038a7d210deb1"
+    },
+    {
+      "path": "app/src/ApplicationSimulation.hx",
+      "bytes": 71462,
+      "sha256": "dcfd919a831307b1e67668c7d0bc559b6fd092a4160db852795da655468fe6d2"
+    },
+    {
+      "path": "projectkit/src/materia/project/SceneArtifact.hx",
+      "bytes": 204255,
+      "sha256": "9bb16beecc48aae8ba204c560844b6ca874ca0258fa43919a23378dbbcf4c1f5"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/assembly/AssemblyPreview.hx",
+      "bytes": 15276,
+      "sha256": "015c9c5dba20d9db382bb9067352ee7781ee35321ba7b24806b5dd88a60e6219"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/gantry/Gantry.hx",
+      "bytes": 53803,
+      "sha256": "b610e5e58928894f7c7cfb9a740a7c0389e6813707e91036967c081734629870"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/gantry/GantryCableChain.hx",
+      "bytes": 2214,
+      "sha256": "c2942fc8e56f49012d794f26726bb3ea2843714ebdb51f510cff618a123964eb"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/motion/PackedCableChainMesh.hx",
+      "bytes": 3608,
+      "sha256": "2afe2a18d9b19f34047992df7311f6ee65d93422017d36ee42bd3815363bd6d5"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/motion/MotionComponents.hx",
+      "bytes": 2337,
+      "sha256": "bb81c7eec6c5eb7a861bc7871ff52d302ecebae2353edeced43e0ea701b63158"
+    },
+    {
+      "path": "machinekit/haxe/src/machinekit/component/ComponentClassification.hx",
+      "bytes": 20805,
+      "sha256": "83bf592f991e28786dc7ce5e22a52a3404abc0b9948a77038e01966ba4f62159"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/PackedCableChainMeshTests.hx",
+      "bytes": 3134,
+      "sha256": "102fc81f6122d471080b61070504af23cb93e9c8cbd39c854cbf5fdf946c548b"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/CableChainBindingTests.hx",
+      "bytes": 3211,
+      "sha256": "07d2217d438f72276232a40dddf2a7dff5c04412d911682e6a3984bd3c61781c"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.chain.json",
+      "bytes": 315,
+      "sha256": "85cd417ab4e94989d7fa59e740666abad6a4656ac6dba6e60e3ee653a9a4a159"
+    },
+    {
+      "path": "machinekit/tests/mounting/haxeon.chain-bindings.json",
+      "bytes": 348,
+      "sha256": "37e70129ecf6951e1f45793e24f60800d62fe5512406903ac2869ee84ef12daa"
+    },
+    {
+      "path": "build/sheet-router-work/cable-chain-mesh.log",
+      "bytes": 6886,
+      "sha256": "e164fa55e62e062ccaf995f3a7441125859d68130e2b66607c4571ed94894250"
+    },
+    {
+      "path": "build/sheet-router-work/cable-chain-bindings.log",
+      "bytes": 6678,
+      "sha256": "60457cb4ca9a62d7ee4bef5d2838875117031a8308f348f17669cac2775bb912"
+    },
+    {
+      "path": "build/sheet-router-work/cable-chain-app-compile.log",
+      "bytes": 8390,
+      "sha256": "f02715430815f838df1181ca491bc3cf066c06a42781f667aaae498a78cc4093"
+    }
+  ],
+  "limitations": [
+    "No interactive editor visual check",
+    "Whole-router save/reload remains blocked by unrelated code-only members; chain recipe and scene-motion wire data tested separately",
+    "No frozen structure geometry edits or structural solves",
+    "Current root remains below 8 GB structural solve floor; no DATA1 writes"
+  ]
+}

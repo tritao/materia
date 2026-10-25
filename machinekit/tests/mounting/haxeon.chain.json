@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "packed-cable-chain-tests"
+  },
+  "entry": "PackedCableChainMeshTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/shared-mount-build"
+}

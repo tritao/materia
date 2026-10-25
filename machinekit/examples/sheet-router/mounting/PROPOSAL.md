@@ -239,3 +239,16 @@ must be checked with actual hardware, wrench paths, hole edge distances and new
 load paths before approval. Do not turn either result into a clearance pass for
 a fully detailed production mount. Proposed end anchoring and motor-mount drive
 stiffness remain study candidates; dynamic/static/fatigue acceptance is pending.
+
+## Cable-chain display closure — 2026-10-25
+
+`GantryCableChain` now exports persisted fixed/moving host bindings and explicit
+assembly connectors. Scene artifacts declare both endpoints and source chain
+parameters. The app replaces each static occurrence mesh with the live hollow
+runs/bend mesh using both endpoint poses; X follows its moving Y carrier.
+`PackedCableChainMesh` performs no CAD work during animation and reuses vertex
+and normal buffers. Runtime geometry is cleared/rebuilt through the same
+presentation lifecycle as belts. No physical structure dimensions changed.
+Native/source mesh comparisons pass 23,407 assertions, binding/wire checks pass
+540 on both beds, and the app compiler-only build passes. No interactive editor
+visual check was performed. See [compact evidence](cable-chain-validation.json).
