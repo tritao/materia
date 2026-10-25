@@ -1432,6 +1432,12 @@ Hobber source hold (2026-10-23): exact connectivity of all non-insert cavities, 
 
 Keep the EPS disposition and source geometry unchanged pending the source-support decision. The recommended direction is source-declared cast-in supports retaining the cavity shapes; new access passages are an alternative source change. Both need an approved source correction and corresponding frozen-CAD control. Do not invent support penetrations, omit the retained cores from a claimed assembly check, or report a successful withdrawal through solid material. Phase 8 remains open.
 
+Hobber source decision (user, 2026-10-25):
+1. The 5 mm web-side strip (0.55 L) is a box-split sliver, not a design void. The source fills it solid.
+2. The front band (28.5 L) and the drive-side pocket (23.2 L) stay enclosed EPS cores, left in the casting. Each is held by source-declared cast-in struts of the production compound, precast before the pour, below and above the core. The upper struts bear on a bridge across the open pour face, and the bridge is clamped to the mold. The struts become casting material, so no passage or hole remains.
+3. The struts are source features: a declared material, sections and positions, with uplift and bearing checked against the core's buoyancy. Strength stays Pending on the compound like the other material checks. Strut-to-casting bond and the strut precast step go into the shop record.
+4. Frozen-CAD comparisons record the filled strip and the struts as an approved source correction.
+
 
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
