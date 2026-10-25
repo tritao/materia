@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-cable-harness-check"},
+  "entry": "CableHarnessCheck",
+  "sourceRoots": ["."],
+  "dependencies": {"machinekit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "../../../build/suppliers/lcsccable/cad-check"
+}

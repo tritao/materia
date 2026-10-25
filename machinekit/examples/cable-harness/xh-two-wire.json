@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "id": "lcsc-xh-two-wire-reference",
+  "units": "mm",
+  "description": "Two XHP-2 housings, four SXH-001T-P0.6 contacts; nominal straight reference harness, not production qualified",
+  "supplier_length_mm": null,
+  "supplier_length_note": "Supplier wire-only length basis is known; correspondence to cut/installed lengths requires drawing approval",
+  "ends": [
+    {
+      "id": "A",
+      "housing_id": "C144401",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "exit_direction": [
+        0,
+        1,
+        0
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "unpopulated_cavities": []
+    },
+    {
+      "id": "B",
+      "housing_id": "C144401",
+      "origin": [
+        0,
+        200,
+        0
+      ],
+      "exit_direction": [
+        0,
+        -1,
+        0
+      ],
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "unpopulated_cavities": []
+    }
+  ],
+  "wire_types": [
+    {
+      "id": "ul1007-awg24-nominal",
+      "manufacturer_mpn": null,
+      "supplier_style": {
+        "productMpn": "UL1007",
+        "displayMpn": "UL1007",
+        "slotNum": null,
+        "voltage": "300"
+      },
+      "awg": 24,
+      "outer_diameter_mm": {
+        "value": 1.4,
+        "status": "design_assumption",
+        "evidence": "Reference design OD; not inferred from AWG or UL style"
+      },
+      "minimum_bend_radius_mm": null,
+      "voltage_v": null,
+      "temperature_range_c": null,
+      "strand_construction": null,
+      "length_tolerance_mm": null
+    }
+  ],
+  "wires": [
+    {
+      "id": "W1",
+      "wire_type_id": "ul1007-awg24-nominal",
+      "color": "red",
+      "cut_length_mm": 210,
+      "route": [
+        [
+          -1.25,
+          0,
+          0
+        ],
+        [
+          -1.25,
+          200,
+          0
+        ]
+      ],
+      "from": {
+        "end_id": "A",
+        "cavity": 1,
+        "contact_id": "C140573",
+        "termination_allowance_mm": {
+          "value": 5,
+          "status": "design_assumption",
+          "evidence": "Nominal embedded length for reference routing; needs approved crimp drawing"
+        },
+        "strip_length_mm": null,
+        "tinning_length_mm": null
+      },
+      "to": {
+        "end_id": "B",
+        "cavity": 1,
+        "contact_id": "C140573",
+        "termination_allowance_mm": {
+          "value": 5,
+          "status": "design_assumption",
+          "evidence": "Nominal embedded length for reference routing; needs approved crimp drawing"
+        },
+        "strip_length_mm": null,
+        "tinning_length_mm": null
+      }
+    },
+    {
+      "id": "W2",
+      "wire_type_id": "ul1007-awg24-nominal",
+      "color": "black",
+      "cut_length_mm": 210,
+      "route": [
+        [
+          1.25,
+          0,
+          0
+        ],
+        [
+          1.25,
+          200,
+          0
+        ]
+      ],
+      "from": {
+        "end_id": "A",
+        "cavity": 2,
+        "contact_id": "C140573",
+        "termination_allowance_mm": {
+          "value": 5,
+          "status": "design_assumption",
+          "evidence": "Nominal embedded length for reference routing; needs approved crimp drawing"
+        },
+        "strip_length_mm": null,
+        "tinning_length_mm": null
+      },
+      "to": {
+        "end_id": "B",
+        "cavity": 2,
+        "contact_id": "C140573",
+        "termination_allowance_mm": {
+          "value": 5,
+          "status": "design_assumption",
+          "evidence": "Nominal embedded length for reference routing; needs approved crimp drawing"
+        },
+        "strip_length_mm": null,
+        "tinning_length_mm": null
+      }
+    }
+  ]
+}

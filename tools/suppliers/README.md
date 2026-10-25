@@ -583,3 +583,18 @@ MATERIA_ROOT="$PWD" ./haxeon/scripts/haxeon run --project machinekit/examples/su
 
 It writes `build/suppliers/hzmotion/cad/import-audit.json`. This verifies nominal
 assembly interfaces, not manufacturing tolerances or supplier load ratings.
+
+## LCSC Cable
+
+`python3 tools/suppliers/lcsccable.py` captures LCSC Cable's public selector lists
+and frontend configuration data into `build/suppliers/lcsccable/`. It supports
+`--refresh` and `--offline`, preserves raw response evidence, and emits a
+per-style/part completeness matrix. The initial snapshot has 90 wire-style
+entries, 25 gauge options, 467 housings and 52 contacts; selectors are not a
+compatibility matrix. Repeated style names and reported voltages are preserved.
+
+The [cable harness example](../../machinekit/examples/cable-harness/README.md)
+provides the commands, recipe schema, reviewed JST XH evidence, compatibility
+validator, BOM, connection schedule, nominal CAD and STEP checks. Its explicit
+unknowns prevent catalogue descriptions or assumed wire diameters from becoming
+production-qualified specifications.
