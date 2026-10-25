@@ -78,7 +78,7 @@ working days, with no free-shipping threshold
 | 1,201–2,000 kg | €145 |
 | 2,001–3,000 kg | €190 |
 
-Planned orders, all in 25 kg bags (no single grade reaches a tonne, so big bags don't pay):
+Planned orders, sand in 25 kg bags and filler in 20 kg bags (no single grade reaches a tonne, so big bags don't pay):
 
 | Grade | Order 1: coupon tests + mill base and column | Order 2: hobber plinth and column |
 | --- | --- | --- |
@@ -87,11 +87,13 @@ Planned orders, all in 25 kg bags (no single grade reaches a tonne, so big bags 
 | 1–2 mm | 3 | 7 |
 | 0.3–0.6 mm | 3 | 6 |
 | 0–1 mm | 3 | 5 |
-| **Total** | 18 bags, 450 kg, €80 shipping | 40 bags, 1,000 kg, €80 shipping |
+| Calcium carbonate 63 µm (20 kg bags) | 2 | 6 |
+| **Total** | 20 bags, 490 kg, €85 shipping | 46 bags, 1,120 kg, €80 shipping |
 
-- Keep order 1 at 450 kg or under; at 451 kg the rate rises to €85.
-- Order 2 waits for the coupon results and the hobber roof thickening. Up to 8 more bags still
-  ship at €80.
+- Order 1 ships at €85 because the filler takes it past 450 kg. Drop one sand test bag to get
+  back to €80.
+- Order 2 waits for the coupon results and the hobber roof thickening. About 3 more sand bags
+  still ship at €80; beyond 1,200 kg the rate rises to €145.
 - The 3–5 mm grade is left out: a gap between 3 and 4 mm costs little packing.
 
 ### Alternatives and top-ups
@@ -123,13 +125,21 @@ inserts. Switch only after a coupon comparison against the all-quartz mix.
 
 ## Filler (below 0.1 mm, about 145 kg in total)
 
-- **Micronised calcium carbonate (recommended).** Cheap, and much safer to handle than silica flour.
-  Sur Química sells 98.5 %+ purity in 25 and 50 kg bags and 1 t big bags
-  ([datasheet](https://www.gruposur.com/download/hojas_tecnicas/ht-557-53020-000.pdf)). Geokom
-  MICARB is another option ([datasheet](https://geokom.com/storage/files/afTaa64eWrFbHUE6wu6e1CCL7MNOPE1ijTK1hba9.pdf)).
-- **Silica flour** is slightly stiffer but is respirable crystalline silica. Use it only with a P3
-  respirator and wet cleanup.
-- The fines in the Vetonek 0–1 mm sand may reduce the filler needed; the coupon tests decide.
+| Option | Data | Price | Use |
+| --- | --- | --- | --- |
+| Vetonek calcium carbonate (agricultural lime), 63 µm grade | Crushed limestone; claims 40 % calcium (pure CaCO₃ content). The "63 µm" grade probably means everything passes a 63 µm sieve. Moisture and purity otherwise not stated. | €8.33 per 20 kg (about €0.42/kg); 1 t big bag also sold | **Primary filler.** It fits below the 0–1 mm sand and ships in the same Vetonek orders. The 800 µm grade overlaps the sands; don't use it. |
+| Nazza carbonato de cálcio, ref. 42990 | Marble powder, CaCO₃ > 98.8 %, mean particle about 5 µm, surface area 2.7 m²/g, bulk density 0.75 kg/L | €26.63 per 25 kg incl. VAT; free shipping above €95. Sold to professional buyers only (asks for an IAE registration). | **Optional extra, 2–4 % of the aggregate**, to test for packing. Too fine to be the whole filler share: its surface area would dominate resin demand. |
+
+Links: [Vetonek](https://vetonek.com/pt/products/carbonato-calcio-cal-agricola),
+[Nazza](https://www.nazza.pt/produtos-quimicos/209-carbonato-calcio.html)
+([datasheet](https://www.nazza.es/img/cms/FT-Carbonato%20de%20calcio-Nazza.pdf)).
+Other industrial carbonates: Sur Química, 98.5 %+ purity in 25 and 50 kg bags and 1 t big bags
+([datasheet](https://www.gruposur.com/download/hojas_tecnicas/ht-557-53020-000.pdf)), and Geokom
+MICARB ([datasheet](https://geokom.com/storage/files/afTaa64eWrFbHUE6wu6e1CCL7MNOPE1ijTK1hba9.pdf)).
+
+Silica flour is slightly stiffer but is respirable crystalline silica; use it only with a P3
+respirator and wet cleanup. The fines in the Vetonek 0–1 mm sand may reduce the filler needed;
+the coupon tests decide.
 
 ## Epoxy
 
@@ -162,7 +172,10 @@ Check each grade:
    the bond.
 3. **Grading.** Sieve against the stated band, and measure the share below 0.1 mm in the 0–1 mm sand.
 
-Coupon tests compare all quartz with quartz sand plus basalt coarse. For each mix, measure:
+The moisture check matters most for the agricultural lime, which is often not dried.
+
+Coupon tests compare all quartz with quartz sand plus basalt coarse, each with and without the 2–4 %
+Nazza 5 µm addition. For each mix, measure:
 - dry packed density of the blend, tuning the split toward maximum packing;
 - the lowest resin content that still flows under vibration;
 - the exotherm of a block about 150 mm thick;
