@@ -13,11 +13,16 @@ unresolved there until the coupon tests below give measured values.
   resin but doubles every minimum section. Finer grain needs 3–4 points more resin, which means
   more shrinkage, exotherm and expansion, and lower stiffness.
 - **Minimum wall or rib** 5 × 8 = 40 mm. **Minimum passage or insert-to-mold gap**
-  3 × 8 = 24 mm (`minimumPassageAggregateRatio` = 3).
+  3 × 8 = 24 mm (`minimumPassageAggregateRatio` = 3). Rampf's datasheet for its own mineral
+  casting grades gives the same pairing: 8 mm maximum particle with a 40 mm minimum castable wall
+  (EPUMENT 140/8B), 5 mm with 25 mm, and 3 mm with 15 mm.
 - **Resin** 9–12 % by mass, low viscosity, slow hardener. Packing decides most of the result:
   less resin beats a better rock.
-- **Quartz aggregate throughout.** The casting then expands at about 12–14 ppm/K, close to the
-  steel inserts. Crushed basalt is the later bulk alternative for the coarse fractions (see below).
+- **Quartz aggregate first**, because it is the only aggregate sold washed, dried and graded in
+  bags. Commercial mineral casting expands at about 17–20 ppm/K (Rampf: 17 for the 8 mm grade,
+  19.5 for 5 mm, 20 for 3 mm), well above steel's 11–12. The mismatch with the steel inserts
+  falls with lower resin content and lower-expansion rock. Crushed basalt is the later bulk
+  alternative for the coarse fractions (see below).
 
 ## Mix and quantities
 
@@ -113,8 +118,9 @@ Planned orders, sand in 25 kg bags and filler in 20 kg bags (no single grade rea
 ### Later: crushed basalt for the coarse fractions
 
 Basalt from quarries around Lisbon, bought by the tonne, is stiffer, denser and cheaper per kg than
-bagged quartz. It must be washed and dried to under 0.1 % moisture, and expands less than the steel
-inserts. Switch only after a coupon comparison against the all-quartz mix.
+bagged quartz. The rock expands at about 5–8 ppm/K against about 11–12 for quartz, so it brings the
+casting's expansion closer to the steel inserts. It must be washed and dried to under 0.1 %
+moisture. Switch only after a coupon comparison against the all-quartz mix.
 
 ### Avoid
 
@@ -150,11 +156,29 @@ Low viscosity (ideally under about 600 mPa·s), slow hardener, solvent-free, in 
 | Sikafloor‑161 (Sika Portugal) | Low-viscosity two-part epoxy, a binder for quartz mortars, sold at builders' merchants. Confirm it is solvent-free and check its pot life. | [datasheet](https://prt.sika.com/dam/dms/pt01/m/sikafloor_-161.pdf) |
 | Resoltech 1050 with 1053S hardener | Infusion grade, 205 mPa·s mixed; via Castro Composites, which ships to Portugal | [Castro Composites](https://www.castrocompositesshop.com/en/resins/1088-epoxy-resin-resoltech-1050-8431252093182.html) |
 | Nazza | General epoxies from 0.7 to 25 kg; ask which are low viscosity | [Nazza](https://www.nazza.pt/32-resinas-epoxi) |
+| Breddermann E45GB (Germany) | Low-viscosity casting system with 45 min working time, advertised for mineral casting and machine beds; no datasheet found, and shipping to Portugal unconfirmed | search "Breddermann E45GB" |
+| SKresin 3530 (Harzspezialisten, Germany) | Very thin resin developed for filled systems, advertised for polymer concrete and machine-bed casting; ask for the datasheet and Portugal shipping | [Harzspezialisten](https://www.harzspezialisten.de/Polymerbeton) |
 
 Not suitable: Acorus Aquastone EPX (12–14 Pa·s, too thick).
 
 ## Ready-made products
 
+- **Rampf EPUSELF.** Rampf's do-it-yourself mineral casting: pre-metered containers of graded
+  minerals, resin and hardener, mixed in the supplied bucket with a slow stirrer and usually cast
+  without compaction. The brochure says 30 kg containers; other listings say 25 kg. It is sold in
+  three EPUMENT grades:
+
+  | Grade | Max particle | Min wall | Modulus | Compressive | Flexural | Expansion | Damping (log. decrement) |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 140/8B | 8 mm | 40 mm | > 35 GPa | > 130 MPa | > 30 MPa | ~17 ppm/K | 0.03 |
+  | 140/5 | 5 mm | 25 mm | 35–40 GPa | 140–160 MPa | 35–45 MPa | ~19.5 ppm/K | 0.035 |
+  | 130/3 | 3 mm | 15 mm | > 25 GPa | > 130 MPa | > 35 MPa | ~20 ppm/K | 0.038 |
+
+  Density is about 2.3 for all three. No price or Portugal shipping is published, so ask Rampf for
+  a quote. The 140/8B grade matches our design target exactly, so it is both a datasheet-backed
+  option for the mill castings (about 9 containers) and the reference mix for the coupon tests.
+  [Brochure](https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf),
+  [product page](https://rampf-group.com/en/products-solutions/details/epuself-1408).
 - **Rampf EPUMENT.** The industrial benchmark: density 2.3–2.4, modulus 30–45 GPa. It is sold as a
   German system and casting service, not by the bag.
   [Product](https://www.rampf-group.com/en-us/products-solutions/details/mineral-casting-epument/),
@@ -162,6 +186,22 @@ Not suitable: Acorus Aquastone EPX (12–14 Pa·s, too thick).
 - **Sikadur‑42.** A three-part epoxy grout for machine base plates. Use it for the base–column joint
   grout gap and under feet, not for the castings.
   [Datasheet](https://sgp.sika.com/content/dam/dms/sg01/6/sikadur-42-mp-normal.pdf).
+
+## Interface compounds (not casting binders)
+
+These go on the casting after it cures, for precision interfaces, joints and bushes. They are not
+casting binders.
+
+| Product | Use | Data | Link |
+| --- | --- | --- | --- |
+| Diamant DWH 310 FL (#0795) | Replicating rail seats against a release-coated master (the 4 mm seat allowance), load-bearing gap levelling, casting bushes and centring elements | Steel-filled epoxy, 12–14 Pa·s mixed, 87:13 by weight, 50 min pot life and 18 h to demould at 20 °C, shrinkage < 0.1 %, 165 MPa compressive, 8.7 GPa modulus, −20 to +80 °C. 250 g, 500 g or 1 kg, from €45.03. Surfaces need roughening to Rt about 0.5 mm. | [shop](https://diamant-polymer.de/en/shop/dwh/310-fl/), [datasheet](https://diamant-polymer.de/en/wp-content/uploads/sites/2/DIAMANT_TD_DWH-310-FL_0795_EN_V1-1.pdf) |
+| Diamant EP-Flow | Self-levelling support grout; candidate for the base–column joint and under feet, beside Sikadur‑42 | 57 MPa compressive, 8.5 GPa modulus, 9:1 by mass, 60 min pot life, layers up to 100 mm; no minimum layer published (see the sheet-router DIY route) | [product](https://diamant-polymer.de/en/product-overview/ep-flow/) |
+| Moglice and other slideway compounds | Rail-seat replication | Compared in [METROLOGY_SOURCING.md](../../METROLOGY_SOURCING.md) | |
+
+Diamant's site says it now ships to "selected EU countries", but its shipping page says Germany
+only. Its German rates are €14 up to 5 kg, €17 for 6–15 kg, €20 for 16–29 kg and €40 from 30 kg.
+Ask Diamant about delivery to Portugal.
+[Shipping](https://diamant-polymer.de/en/shipping-methods/).
 
 ## Checks on arrival and coupon tests
 
@@ -175,7 +215,7 @@ Check each grade:
 The moisture check matters most for the agricultural lime, which is often not dried.
 
 Coupon tests compare all quartz with quartz sand plus basalt coarse, each with and without the 2–4 %
-Nazza 5 µm addition. For each mix, measure:
+Nazza 5 µm addition. If EPUSELF 140/8B is bought, cast it alongside as the datasheet reference. For each mix, measure:
 - dry packed density of the blend, tuning the split toward maximum packing;
 - the lowest resin content that still flows under vibration;
 - the exotherm of a block about 150 mm thick;
