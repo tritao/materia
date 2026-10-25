@@ -1,7 +1,8 @@
 # Compound sourcing (Portugal)
 
 Purchase options for the epoxy-granite compound of the mill and hobber castings, delivered to
-Portugal, with the mix design, mixing equipment, batch plan and coupon tests that go with them. Prices and availability are web snapshots found on 2026-10-25 and will change. Grain
+Portugal, with the mix design, mixing equipment, batch plan, post-cure enclosure, coupon tests and a
+consolidated shopping list. Prices and availability are web snapshots found on 2026-10-25 and will change. Grain
 sizes, purity and dryness are seller claims; no technical sheet has been received yet. None of
 this is in `CastingShopRecipe` yet: the compound, its aggregate size and its limits stay
 unresolved there until the coupon tests below give measured values.
@@ -454,6 +455,151 @@ Roughly in order of payoff:
 
 Items 1–4 together can probably move the mix from about 25 GPa to over 30 GPa, into EPUSELF
 territory.
+
+## Post-cure
+
+### Cycle
+
+1. Cure in the mold at a steady 20–25 °C until the casting has gelled and can be demoulded.
+   SR 8100 EVO with SD 8822 is slow, so expect days for the plinth.
+2. Demould, then post-cure the casting on its own. Sicomin allows the cycle to continue after
+   demoulding, which keeps the EPS, glues and release coatings out of the heat. Stand the casting
+   level on its planned foot positions, because warm resin is softer and a badly supported casting
+   can creep into a twist.
+3. Ramp at about 5 °C per hour to 40 °C and hold for at least 24 h. Optional further steps follow
+   the resin datasheet: for SR 8100 EVO, 4 h each at 40, 60 and 80 °C. The 80 °C step needs a PIR or
+   rock-wool enclosure; the XPS box below stays at or below 60 °C.
+4. Cool at about 5 °C per hour inside the closed box, back to near room temperature, before any
+   precision work.
+5. Log time and temperature on the casting surface and on a witness coupon cured beside it. The log
+   goes in the pour's shop record.
+
+### Enclosure
+
+A knock-down box of XPS boards on a frame of drywall steel profiles, from Leroy Merlin. Steel
+profiles are unaffected by the heat; PVC pipe loses stiffness from about 50–60 °C, and Leroy Merlin's
+plumbing fittings lack three-way corner joints. A single fabric layer (a grow tent such as the
+Secret Jardin HS240W, €249.90) or a tarp needs 2–3 kW to hold 40 °C, against 400–600 W for the box.
+
+- **Inside size** 1.8 m long × 1.2 m wide × 1.25 m high. The standard 1,250 × 600 × 40 mm boards
+  fit almost without cutting. The hobber plinth (about 0.93 × 0.8 × 0.8 m on its supports) fits,
+  with about 0.7 m left at one end for the heater; the mill castings and coupons fit easily.
+- **Boards:** each long wall is three boards standing vertically, each end wall two; the roof and
+  floor are three each, laid across the 1.2 m width with about 5 cm trimmed. 16 boards, about
+  11.8 m².
+- **Frame, in 70 mm galvanised profiles:**
+  - base and top: a rectangle of U-track ("canal") each; each 3 m length cuts into 1.8 + 1.2 m, so
+    4 lengths make both;
+  - uprights: ten C-studs ("montante") 1.25 m long, at the corners and every 0.6 m, from 5 studs;
+  - roof: two 1.2 m cross-members, from one more stud.
+- **Assembly:** screw the profiles together with self-drilling screws. Fix the boards outside the
+  frame with a few 55 mm screws and large washers, then tape every joint with aluminium tape.
+- **Door:** one end wall's two boards held by tape only, as a removable panel.
+- **Floor:** cut holes in the floor boards so the casting's supports stand on the concrete, not on
+  the foam.
+- **Holes:** small cut-outs for the heater lead and the probe leads.
+
+Polystyrene limits: XPS is rated to about 75 °C continuous, so the box stays at or below 60 °C. Keep
+the heater at least 30 cm from every board, with a rock wool or cement board shield between it and
+the nearest wall. Don't blow heater air onto the walls. Check in store that the boards are really XPS:
+one Danosa listing has "EPS" in its spec table. EPS also works at 40 °C but is softer.
+
+Heat check: 11.8 m² of 40 mm XPS (λ 0.035) loses about 260 W at a 25 °C difference. With joints and
+the floor, holding 40 °C takes about 400–600 W. Warming 1 t of casting by 25 °C takes about 6 kWh,
+about 8–12 h with a 1–2 kW heater at the gentle ramp. A 24 h hold uses about 15–20 kWh, roughly
+€3–5 of electricity.
+
+### Heating and control
+
+- **Heater: Leroy Merlin Equation Essential, 2,000 W oil-filled radiator**
+  ([product](https://www.leroymerlin.pt/produtos/aquecedor-oleo-equation-essential-2000w-96886431.html)).
+  Its page could not be read, so check these in store:
+  - **mechanical rotary controls** that resume heating when power returns. An external thermostat
+    switches the heater by cutting its power, so an electronic model that comes back in standby
+    cannot be used;
+  - a **power selector with lower settings** (typically 800/1,200/2,000 W). Run it on a lower setting
+    to leave margin on the 10 A thermostat relay;
+  - its own thermostat set to maximum, so the external controller governs; a tip-over and overheat
+    cut-out.
+- **Controller: Inkbird ITC-308 WiFi** (amazon.es, about €56–58)
+  ([listing](https://www.amazon.es/Inkbird-Termostato-Temperatura-Calentador-Invernadero/dp/B08VMNYL3X)).
+  - On/off control with separate heating and cooling outlets, 10 A, 100–240 V, with a 2 m NTC probe.
+  - The WiFi version adds the Inkbird Pro app for alarms and history during an unattended 24 h hold.
+  - Tape its probe to the casting surface, not in the air stream.
+- **Independent high-limit cut-out: a standard Inkbird ITC-308** (amazon.es, about €39)
+  ([listing](https://www.amazon.es/Inkbird-Calefaccion-Refrigeraci%C3%B3n-Temperatura-Frigor%C3%ADfico/dp/B016EYB03G)).
+  Plug the controller into this unit's heating outlet, with its set point at 60–65 °C and its probe
+  in the box air near the top. A stuck relay in the controller then cannot overheat the casting.
+- **Logger:** an Inkbird WiFi thermometer-hygrometer, or thermocouples on the casting and in a
+  coupon ([amazon.es](https://www.amazon.es/Inkbird-Term%C3%B3metro-Temperatura-Almacenamiento-Invernadero/dp/B0C7QP52TZ)).
+- **Circulation fan:** a small clip fan, placed low where the air is coolest, so the top and bottom
+  stay within a few degrees. Consumer fans are usually rated to about 40 °C ambient, so check before
+  the 60 °C step.
+- **Safety:** an RCD-protected socket, any extension reel fully unwound, a smoke detector beside the
+  box, nothing flammable against the heater, and no gas or paraffin heaters (combustion moisture,
+  carbon monoxide and open flame near solvent fumes).
+
+## Shopping list
+
+Prices are 2026-10-25 snapshots incl. VAT unless noted; "not checked" means a typical-shop estimate.
+
+### Compound and coupon tests
+
+| Item | Source | Qty | Cost |
+| --- | --- | --- | --- |
+| Silica sand, 5 grades | Vetonek order 1 (tests and mill) | 18 × 25 kg | €135–157 + shipping |
+| Calcium carbonate 63 µm | Vetonek order 1 | 2 × 20 kg | €17 (order 1 ships at €85) |
+| Silica sand and carbonate | Vetonek order 2 (hobber, after coupons) | 40 + 6 bags | €350–400 + €80 shipping |
+| SR 8100 EVO with SD 8822 and SD 8824 | Sicomin or a distributor | smallest kits, then about 163 kg in total | quote needed |
+| Resoltech 1050, 1056S and 1055S | Castro Composites | 1.35 kg kit each | about €51 each excl. VAT |
+| Polymer casting system 3550 | Harzspezialisten | ~6.5 kg | ~€38 |
+| Sikafloor‑161 | Sika distributor | smallest kit | quote needed |
+| GPTMS silane | TCI (500 g €82; 100 g €25) or an industrial supplier such as an Evonik Dynasylan GLYMO distributor for technical grade | 100 g for coupons; about 0.8–1.6 kg for all castings | €25, then about €165–330 at TCI prices |
+| Nazza carbonate 5 µm (optional) | Nazza, business buyers | 1 × 25 kg | €26.63 |
+| EPUSELF 140/8B (optional reference) | Rampf | 1 container | quote needed |
+
+Silane: [TCI](https://www.tcichemicals.com/ES/en/p/G0210),
+[Sigma-Aldrich](https://www.sigmaaldrich.com/FR/en/product/aldrich/440167) (1 L €381).
+
+### Mixing, compaction and testing
+
+| Item | Source | Notes | Cost |
+| --- | --- | --- | --- |
+| Mixing drill, ≥ 1,400 W, low gear | e.g. Skil 1613AA (1,400 W, two speeds, M14) ([product](https://www.skileurope.com/pt/ferramentas-eletricas/misturadoras/1613aa)) | plus a 140–160 mm double-spiral paddle | ~€100–250 (not checked) |
+| Second drill mixer (plinth) or LIS MH 80 trough mixer | Magmag | trough mixer only if more large pours follow | €100–250, or €1,250 |
+| Mortar tubs, 60–90 L | builders' merchant | 3–4, one per batch in rotation | ~€10–20 each (not checked) |
+| Platform scale, 150 kg, 100 g resolution | e.g. Orbegozo PB 2222 ([PcComponentes](https://www.pccomponentes.pt/balanca-digital-orbegozo-pb-2222-ate-150-kg-aco-inoxidavel-ecra-lcd)) | aggregate kits; 100 g is 0.4 % of a 27 kg kit | €11.99 |
+| Bench scale, 5 kg, 1 g | kitchen scale | resin, hardener and silane | ~€15 (not checked) |
+| External form vibrators, 230 V single phase | e.g. Wacker Neuson AR 26/3/230 ([product](https://www.wackerneuson.com/cemea/products/concrete-technology/external-vibrators/loosening-separating-transporting/ar26/model-variations/tab)); ask Portuguese distributors or rental | clamp to the molds; 3,000 rpm typical | quote needed |
+| Small vibrating table | e.g. a 150 W lab table, or a table built on a vibrator motor | coupons | quote needed |
+| Test sieves (0.1, 0.3, 0.6, 1, 2, 4, 8 mm) | lab or garden-supply sieves | grading check on arrival | ~€15–40 each (not checked) |
+| Kitchen oven and a tray | — | moisture test at 105 °C | — |
+| Calibrated container, about 10 L | bucket marked with a measured water volume | packing test | — |
+| Acetone, rags, release agent for the mixer | builders' merchant | cleaning straight after the last batch | ~€20 (not checked) |
+| Nitrile gloves, goggles, P3 masks | builders' merchant | P3 when handling filler | ~€30 (not checked) |
+
+### Post-cure enclosure
+
+| Item | Source | Qty | Cost |
+| --- | --- | --- | --- |
+| XPS 40 mm, 1,250 × 600, pack of 10 (Danopren, 7.5 m²) | Leroy Merlin ([pack](https://www.leroymerlin.pt/produtos/pack-10-plc-xps-danopren-para-cobertura-40mm-7-5m2-82609335.html), [Danosa](https://www.leroymerlin.pt/produtos/placa-de-isolamento-em-poliestireno-extrudado-xps-40-mm-pack-7-5m2-danosa-82601251.html)) | 2 packs (20 boards, 4 spare) | €79 |
+| C-stud 70 mm × 3 m, ref. 15953154 | Leroy Merlin ([product](https://www.leroymerlin.pt/produtos/perfil-montante-70-3-mm-15953154.html)) | 6 | €24 |
+| U-track 70 mm × 3 m | Leroy Merlin, to confirm in store ([Pladur track datasheet](https://corporate.pladur.com/siteassets/pdf/fdp-pt-canais-48-70.pdf?v=4ae0b7)) | 4 | ~€12–16 |
+| Self-drilling metal-to-metal screws, about 4.2 × 13 mm | Leroy Merlin | 1 pack | ~€5–10 (not checked) |
+| 55 mm screws and large washers | Leroy Merlin | 1 pack each | ~€10 (not checked) |
+| Aluminium tape, 50 mm × 50 m, rated to 120 °C | Leroy Merlin (Autogyre at €13.90 on the French site; PT stock unconfirmed) | 1 roll | ~€14 |
+| Rock wool slab or cement board | Leroy Merlin | 1, heater shield | ~€10–15 (not checked) |
+| Tin snips | Leroy Merlin | 1, if needed | ~€15 (not checked) |
+| Equation Essential 2,000 W oil-filled radiator | Leroy Merlin | 1 | check price and controls in store |
+| Inkbird ITC-308 WiFi | amazon.es | 1, controller | ~€56–58 |
+| Inkbird ITC-308 | amazon.es | 1, high-limit cut-out | ~€39 |
+| Inkbird WiFi thermometer | amazon.es | 1, logger | ~€20–30 (not checked) |
+| Clip fan | any | 1 | ~€15–20 (not checked) |
+| Smoke detector | Leroy Merlin | 1 | ~€10–20 (not checked) |
+
+Collect the 3 m profiles in store: Leroy Merlin charges €24.99 to deliver long items, against €3.90 for
+small ones. The enclosure comes to about €170–185 for the box and about €200–250 for heating and
+control, and is reusable for every casting.
 
 ## Checks on arrival and coupon tests
 
