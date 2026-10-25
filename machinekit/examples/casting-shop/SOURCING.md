@@ -235,7 +235,32 @@ Requirements:
 
 ### Ranking
 
-1. **Best performance: Resoltech 1050** (Castro Composites, Spain).
+1. **Best performance: Sicomin SR 8100 EVO** (France), with SD 8822 or SD 8824. It has the most
+   complete datasheet of the candidates
+   ([datasheet V0.9, 2025-09-15](https://sicomin.com/datasheets/sr8100evo_sd882x.pdf),
+   [product](https://sicomin.com/en/epoxy-products/epoxy/infusion-rtm/sr-8100/)).
+
+   | | SD 8822 (slow) | SD 8824 (intermediate) |
+   | --- | --- | --- |
+   | Mix ratio by weight | 100:31 | 100:22 |
+   | Mixed viscosity at 20 °C / 30 °C | 340 / 150 mPa·s | 210 / 115 mPa·s |
+   | Gel time, 1 mm film, 20 °C / 30 °C | 20 h 20 / 11 h 30 | 9 h 10 / 4 h 30 |
+   | Tg2 | 97 °C | 88 °C |
+   | Cast resin tensile modulus (24 h 40 °C / 8 h 80 °C post-cure) | 3.6 / 3.2 GPa | 3.3 / 3.0 GPa |
+   | Cast resin flexural strength | 112–120 MPa | 109–112 MPa |
+   | Compressive yield | 100–107 MPa | 90–100 MPa |
+
+   - Use SD 8822 for the hobber plinth: very low viscosity, a very long working time and slow
+     heat release in the 1 t pour. Use SD 8824 for the smaller castings, which then cure and
+     demould sooner. The bulk gel time of a filled mass is shorter than the film figure, but still
+     hours.
+   - Slow, high-Tg systems need post-curing. Sicomin recommends room-temperature cure, then
+     40–80 °C, for example steps of 4 h at 40, 60 and 80 °C. At least 24 h at 40 °C in an
+     insulated tent is the practical minimum for a casting.
+   - Contains no CMR or SVHC substances, which matters for hand mixing.
+   - Pack sizes, price and an Iberian distributor are not published. Ask Sicomin (+33 4 42 42 30 20,
+     info@sicomin.com); Aviatec in Germany and France resells Sicomin products.
+2. **Alternative: Resoltech 1050** (Castro Composites, Spain).
    - All six hardeners mix at 100:35 by weight and can be blended. Gel times per 70 mL at 23 °C:
      1059S 10 min, 1058S 26 min, 1056S 58 min, 1055S 2 h 38 min, 1054S 5 h, 1053S 14 h. Blending
      1056S with 1055S gives about 60–90 minutes, which suits the plinth.
@@ -247,14 +272,14 @@ Requirements:
    - [Castro Composites](https://www.castrocompositesshop.com/en/resins/1088-epoxy-resin-resoltech-1050-8431252093182.html),
      [catalogue excerpt](https://pdf.nauticexpo.com/pdf/resoltech/resoltech-1050/26759-92324.html),
      [datasheet excerpt](https://pdf.directindustry.es/pdf/resoltech/resoltech-1050/55297-425647.html).
-2. **Best value, if its datasheet holds up: Harzspezialisten polymer casting system 3550**
+3. **Best value, if its datasheet holds up: Harzspezialisten polymer casting system 3550**
    (Germany).
    - Made for polymer concrete casting, "medium" working time.
    - From €37.95 for about 6.5 kg, about €5.84/kg; all 163 kg would be roughly €950.
    - No published viscosity, Tg or mix ratio, and Portugal shipping is unknown. It becomes the pick
      only if its viscosity is under about 1,000 mPa·s and its working time is at least 45 minutes.
    - [Product](https://www.harzspezialisten.de/polymerverguss-epoxidharz-set).
-3. **Budget and local: Sikafloor‑161** (Sika Portugal).
+4. **Budget and local: Sikafloor‑161** (Sika Portugal).
    - 100 % solids, low viscosity, a binder for quartz mortars, 79:21 by weight, 300–400 rpm mixing.
      Dry heat resistance +80 °C for up to 7 days, +100 °C for 12 h.
    - Pot life about 50 min at 10 °C, 25 min at 20 °C and 15 min at 30 °C. That works for the mill
@@ -285,8 +310,9 @@ Not recommended:
   ([Baustoffshop](https://www.baustoffshop.de/p-t-epoxidharz-euroharz-ep-2-2k-12-kg-geb-8-4-kg.html)).
 - **Acorus Aquastone EPX:** 12–14 Pa·s, too thick ([Acorus](https://acorus.pt/produtos/resina-epoxi)).
 
-Expected choice: Resoltech for the hobber plinth. For the smaller castings, 3550 if its data is
-good, otherwise Sikafloor‑161. The coupon tests decide.
+Expected choice: Sicomin SR 8100 EVO with SD 8822 for the hobber plinth, or Resoltech if Sicomin is
+unavailable or much dearer. For the smaller castings, SR 8100 EVO with SD 8824, or 3550 if its data
+is good and the budget matters. The coupon tests decide.
 
 ## Ready-made products
 
@@ -443,11 +469,13 @@ The moisture check matters most for the agricultural lime, which is often not dr
 Coupon tests compare:
 - **aggregate:** all quartz against quartz sand with basalt coarse, each with and without the 2–4 %
   Nazza 5 µm addition;
-- **binder:** Resoltech 1050 with 1056S/1055S, Harzspezialisten 3550 and Sikafloor‑161 on the same
+- **binder:** Sicomin SR 8100 EVO with SD 8822 and SD 8824, Resoltech 1050 with 1056S/1055S,
+  Harzspezialisten 3550 and Sikafloor‑161 on the same
   aggregate blend, with and without silane;
 - **reference:** EPUSELF 140/8B, cast alongside if bought.
 
-Coupon purchases, beside Vetonek order 1: the Resoltech 1.35 kg kit with each hardener (about €51
+Coupon purchases, beside Vetonek order 1: the smallest Sicomin SR 8100 EVO kit with each hardener,
+the Resoltech 1.35 kg kit with each hardener (about €51
 each), the 3550 set of about 6.5 kg (about €38), the smallest Sikafloor‑161 kit, a small pack of
 GPTMS or APTES silane, and EPUSELF 140/8B if Rampf quotes it.
 
