@@ -1,0 +1,563 @@
+{
+  "status": "Native profile/member check; detailed mount release remains open",
+  "sourceScreenSha256": "5f4ae55305b9c24ce6daedc221acde5b490b44b42c1e3b1516443d9d50a88007",
+  "rows": [
+    {
+      "bedMm": 2600,
+      "candidate": "foot",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 66.79225294540515,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "foot",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 3642.112162507942,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 54,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 12000,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLefthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323627643,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323626579,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323629514,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 60,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 6000,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLefthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618138214,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618132893,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.2547661814757,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "foot",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYRightPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 3183.1682817621386,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRighthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323642403,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323634196,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323598183,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRighthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618212014,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.2547661817098,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 2600,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476617990915,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "foot",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 66.79225294540515,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "foot",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 3642.112162507942,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 54,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 12000,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLefthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323627819,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323627655,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323629514,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "CLEAR: native solid separates from continuous profile",
+      "existingMember": "chainYFixedBracket",
+      "governingPoseMm": null,
+      "maximumIntersectionMm3": 0,
+      "minimumGapMm": 60,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYLeftPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 6000,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLefthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618139095,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618138276,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYLeftpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.2547661814757,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Left"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "foot",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "pinionYRightPreload",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 3183.1682817621386,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRighthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323642197,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323634023,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "pad",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 534.5095323598183,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRighthomeMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618210985,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightnegativeLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476618170114,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    },
+    {
+      "bedMm": 3150,
+      "candidate": "replication",
+      "disposition": "BLOCKED: continuous profile intersects native member; redesign proposal required",
+      "existingMember": "switchYRightpositiveLimitMount",
+      "governingPoseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "maximumIntersectionMm3": 267.25476617990915,
+      "minimumGapMm": 0,
+      "poses": 18,
+      "side": "Right"
+    }
+  ],
+  "limitations": [
+    "Continuous candidate profiles omit detailed drilling and joints",
+    "Frozen router geometry unchanged",
+    "Service wrench and cassette withdrawal paths remain unqualified",
+    "No structural solve or dynamic acceptance"
+  ],
+  "sourceHashes": {
+    "machinekit/tests/mounting/src/RouterMountClearanceTests.hx": "321af7fb23a1ecfc26ddc60ba45c4a166c47a1c23e406629c717dc86f86b0abf",
+    "machinekit/tests/mounting/haxeon.clearance.json": "aeccdc897bc2fc8b42fbb781e049facf35c1d558c8c718c3e6b21020da998e45",
+    "machinekit/examples/sheet-router/SheetRouter.hx": "919ecb4fd616a98e7df7e8bf7309aabbde647dbfc0e9a76601702f94bd5340d9"
+  }
+}

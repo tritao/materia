@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "router-mount-clearance"
+  },
+  "entry": "RouterMountClearanceTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/sheet-router"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/sheet-router-work/shared-mount-build"
+}

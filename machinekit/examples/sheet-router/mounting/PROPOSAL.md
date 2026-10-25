@@ -214,3 +214,28 @@ same 19 overlap candidates per bed awaiting native checks. See
 [verified compact evidence](datum-validation.json) and
 [screen](../fem/rack-results/mount-clearance-plan.json). The earlier native archive
 remains historical evidence; no old results are relabelled as corrected CAD.
+
+## Native whole-Y candidate checks — 2026-10-25
+
+[Results](../fem/rack-results/mount-native-clearance.json) cover all 19 flagged
+pairs at 18 poses on each bed (684 native intersections). Candidate continuous
+profiles omit future detailed drilling/joints; the opposing preload, chain and
+switch bracket solids come from the current router. No frozen part was edited.
+
+| Pair, on each bed | Disposition |
+|---|---|
+| Left chain fixed bracket vs foot, pad, replication | Clear; bounding-box false alarms |
+| Left preload vs foot | Blocked: 3642 mm³ maximum intersection |
+| Left preload vs pad / replication | Blocked: 12000 / 6000 mm³ |
+| Right preload vs foot | Blocked: 3183 mm³ |
+| Each of six Y switch mounts vs pad / replication | Blocked: 534.5 / 267.3 mm³ per mount |
+
+All 16 blocked pairs per bed are recorded individually in the results, including
+pose and intersection volume. The chain bracket needs no change for these three
+pairs. Preload intersections require a revised drive/motor-mount arrangement;
+a continuous seat cannot simply be adopted. Switch brackets require a proposed
+pad relief or relocation preserving switch actuation and access. These fixes
+must be checked with actual hardware, wrench paths, hole edge distances and new
+load paths before approval. Do not turn either result into a clearance pass for
+a fully detailed production mount. Proposed end anchoring and motor-mount drive
+stiffness remain study candidates; dynamic/static/fatigue acceptance is pending.
