@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": {"name": "linked-artifact-tests"},
+  "entry": "LinkedArtifactTests",
+  "sourceRoots": ["."],
+  "sources": ["LinkedArtifactTests.hx"],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build/linked-artifacts"
+}

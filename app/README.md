@@ -155,6 +155,14 @@ mission or playback status for a plain machine. Open the source `.project.json`;
 a prebuilt `.mtrg` contains only the selected geometry and cannot regenerate another
 configuration. Source selection is locked while simulation is running or paused.
 
+A variant may also link to an already generated scene using an entrypoint such as
+`{"kind":"artifact","path":"build/tooling/base/mold.mtrg"}`. Paths resolve relative
+to the project; external machining programs resolve relative to the linked artifact.
+These entries do not execute project code or accept editable recipe documents. They
+read the current artifact on every load, and report a missing file rather than silently
+building or substituting another model. Regenerate the artifact with its source tooling
+command when the design changes.
+
 ```json
 "defaultVariant": "small",
 "variants": [

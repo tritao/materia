@@ -45,6 +45,11 @@ class MateriaProjectRunner {
     var entryId = ProjectVariants.entrypoint(root, variantId);
     var entry = Reflect.field(entries, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
+    if (fieldText(entry, "kind") == "artifact") {
+      linkedArtifact(manifestPath, entry);
+      return {kind: "prebuilt-artifact", projectPath: manifestPath, entrypoint: entryId,
+        module: "", reconcilesSavedRecipe: false};
+    }
     if (fieldText(entry, "kind") != "cad-preview")
       throw "Unsupported Materia viewport entrypoint kind";
     var reconcilesSavedRecipe = Reflect.field(entry, "reconcilesSavedRecipe") == true;
@@ -129,7 +134,23 @@ class MateriaProjectRunner {
 
   static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
-    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(projectPath));
+    var root:Dynamic = Json.parse(File.getContent(projectPath));
+    var entry = Reflect.field(field(root, "entrypoints"), ProjectVariants.entrypoint(root, variantId));
+    var source = fieldText(entry, "kind") == "artifact" ? linkedArtifact(FileSystem.fullPath(projectPath), entry) : projectPath;
+    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(source));
+  }
+
+  /** Generated artifacts remain external to the source project and retain their own resources. */
+  static function linkedArtifact(manifestPath:String, entry:Dynamic):String {
+    if (Reflect.field(entry, "documentInput") == true || Reflect.field(entry, "reconcilesSavedRecipe") == true)
+      throw "Artifact entrypoints cannot accept editable source documents";
+    var path = resolveProjectPath(directory(manifestPath), fieldText(entry, "path"));
+    if (!ProjectSourceLoader.isPrebuilt(path)) throw "Artifact entrypoint requires an .mtrg file";
+    if (!FileSystem.exists(path) || FileSystem.isDirectory(path))
+      throw "Generated project artifact is missing; regenerate it first: " + path;
+    var metadata = FileSystem.metadata(path);
+    if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Project artifact exceeds the 150 MB limit";
+    return path;
   }
 
   /** Produces geometry bytes; external program paths remain relative to the source project. */
@@ -153,6 +174,13 @@ class MateriaProjectRunner {
       entry:Dynamic = Reflect.field(entrypoints, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     var kind = fieldText(entry, "kind");
+    if (kind == "artifact") {
+      if (recipeDocument != null) throw "Artifact entrypoints cannot accept an editable document";
+      if (control != null) { control.throwIfCancelled(); control.phase("Reading the linked artifact"); }
+      var bytes = File.getBytes(linkedArtifact(manifestPath, entry));
+      SceneArtifact.decodeView(bytes);
+      return bytes;
+    }
     if (kind != "cad-preview") throw 'Unsupported Materia viewport entrypoint kind: $kind';
 
     var installation = installationRoot();
