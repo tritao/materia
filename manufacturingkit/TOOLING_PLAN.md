@@ -1205,6 +1205,17 @@ the pedestal uses shared records/joints/planner with configuration only. Changin
 stock thickness, casting size, opening direction and core strategy requires no
 mill-specific conditionals in the libraries. Existing frame geometry is unchanged.
 
+**Shop recipe (part of the phase 8 hobber integration; user decision 2026-10-25).**
+Workshop choices are declared once and shared by every casting setup: mill base,
+mill column, hobber plinth and column, and later machines. They include board
+stocks, cutters, CAM settings, the compound datasheet, the release system,
+compaction and fabrication settings. Machine setups name only their casting
+features, inserts and machine rules, and override a shop value only where the
+casting really differs, with the reason recorded. Move the values now in
+`MillMoldSetup`, `MillColumnMoldSetup` and `MillFabricationSetup` into it before
+the hobber setup is written; the hobber setup consumes it from the start.
+Mill kits stay identical.
+
 **Mold scene integration (first item after phase 8; user decision 2026-10-25).**
 1. The mold export writes an occurrence tree grouped by role, taken from the
    mold plan rather than from names:
@@ -1225,6 +1236,16 @@ mill-specific conditionals in the libraries. Existing frame geometry is unchange
 Acceptance: every mold occurrence sits in exactly one role group, every tooling
 occurrence names at least one source ID or is listed as shared hardware, and
 the cross-links round-trip for the base and the column.
+
+**Mill mold setup sharing (with the mold scene integration).**
+1. The mold setup takes the selected configuration's frame. Delete
+   `MillMoldSetup.frame()`; `MillProject` passes the frame it builds the
+   assembly from, so the mold and the machine come from one construction.
+2. One mill mold setup and one preview take the casting (base or column) as a
+   parameter. Delete `MillColumnMoldSetup` and `MillColumnMoldPreview`.
+3. A neutral planner-level check generates the Compact VMC base mold plan with
+   no code changes and no full kit. Add no Compact VMC mold variant until that
+   configuration is a build target.
 
 ### 9. Physical calibration and release
 
