@@ -56,6 +56,7 @@ class PresentationCodec {
     }
     for (view in value.views) {
       text(view.id); text(view.label); source(view.source);
+      if (view.displayTransform != null) materia.assembly.AssemblyCodec.validateFrame(view.displayTransform);
       if (views.exists(view.id)) throw 'Duplicate presentation view "${view.id}"';
       views.set(view.id, true);
       finite(view.explode);

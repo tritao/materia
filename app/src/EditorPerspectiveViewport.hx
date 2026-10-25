@@ -239,7 +239,7 @@ class EditorPerspectiveViewport implements View {
     updatePresentationCamera();
     var controller=presentation,frame=presentationResult;
     if(controller==null||frame==null)throw "No assembly presentation to save";
-    var selected=controller.record.views.filter(v->v.id==controller.cursor.view)[0];
+    var selected=controller.record.views.filter(v->v.id==frame.view)[0];
     var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);var anchor=flat.occurrences[0].id;
     var item=scene.object("project:"+anchor);if(item==null)item=scene.object(anchor);if(item==null)throw "Missing view anchor";
     var pose=presentationPoseById.get(item.id);var center=pose==null?[item.x,item.y,item.z]:pose.position;
@@ -248,7 +248,8 @@ class EditorPerspectiveViewport implements View {
       camera:Anchored({occurrence:anchor,subtree:false},{x:(camera.targetX-center[0])/presentationScale,
         y:(camera.targetY-center[1])/presentationScale,z:(camera.targetZ-center[2])/presentationScale},
         camera.distance/factor/presentationScale,camera.yaw,camera.pitch),
-      visibility:selected.visibility,sections:frame.sections};
+      visibility:selected.visibility,sections:sourceSections(frame.sections)};
+    if (selected.displayTransform != null) value.displayTransform = selected.displayTransform;
     return haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(value));
   }
   public function presentationFrame():Null<PresentationFrame> {
@@ -664,15 +665,31 @@ class EditorPerspectiveViewport implements View {
     var normal=camera.viewDirection();
     camera.frame(x,y,z,Math.max(0.08,bounds[3]-bounds[0]),Math.max(0.08,bounds[4]-bounds[1]),Math.max(0.08,bounds[5]-bounds[2]),aspect());
     if(onSectionEdit==null)throw "Section authoring requires a project document";
-    onSectionEdit([{occurrence:null,point:{x:x/presentationScale,y:y/presentationScale,z:z/presentationScale},
-      normal:{x:-normal[0],y:-normal[1],z:-normal[2]}}]);
+    onSectionEdit(sourceSections([{occurrence:null,point:{x:x/presentationScale,y:y/presentationScale,z:z/presentationScale},
+      normal:{x:-normal[0],y:-normal[1],z:-normal[2]}}]));
     host.requestFrame();
+  }
+  /** Store authored planes in assembly coordinates, not the view's display frame. */
+  function sourceSections(planes:Array<SectionPlane>):Array<SectionPlane> {
+    var controller=presentation;
+    if(controller==null)return planes;
+    var frame=presentationFrame();
+    if(frame==null)return planes;
+    var view=controller.record.views.filter(candidate->candidate.id==frame.view)[0];
+    var display=view.displayTransform;
+    if(display==null)return planes;
+    var inverse=AssemblyFrames.inverse(display);
+    return [for(plane in planes) {
+      occurrence:null,
+      point:AssemblyFrames.transformPoint(inverse,plane.point.x,plane.point.y,plane.point.z),
+      normal:AssemblyFrames.transformVector(inverse,plane.normal.x,plane.normal.y,plane.normal.z)
+    }];
   }
   public function clearSection():Void {if(onSectionEdit!=null)onSectionEdit([]);}
   public function flipSection():Void {
     var frame=presentationFrame();if(frame==null||onSectionEdit==null)return;
-    onSectionEdit([for(plane in frame.sections){occurrence:null,point:plane.point,
-      normal:{x:-plane.normal.x,y:-plane.normal.y,z:-plane.normal.z}}]);
+    onSectionEdit(sourceSections([for(plane in frame.sections){occurrence:null,point:plane.point,
+      normal:{x:-plane.normal.x,y:-plane.normal.y,z:-plane.normal.z}}]));
   }
   function sectionView(view:SceneView):SceneView {
     applyPresentation(view);

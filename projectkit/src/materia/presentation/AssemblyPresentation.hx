@@ -39,6 +39,10 @@ import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
   @:id(5) var sections:Array<SectionPlane>;
   @:id(6) var explode:Float;
   @:id(7) @:optional var source:PresentationSource;
+  /** Rigid display-world from assembly-world transform; absent means identity.
+   * Engineering poses, mass, collision and motion evidence are unchanged.
+   */
+  @:id(8) @:optional var displayTransform:materia.assembly.AssemblyRecord.AssemblyFrame;
 }
 @:wire typedef ExplodeOffset = {
   @:id(1) var select:PartSelector;

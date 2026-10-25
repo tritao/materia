@@ -142,7 +142,10 @@ class CastingMoldExport {
 		var embedded = [for (insert in plan.document.input.inserts)
 			plan.construction == SinglePocket ? insert.id : materia.tooling.ToolingIds.derive("insert-", insert.id)];
 		for (anchor in CastingMoldCad.anchorComponents(plan)) embedded.push(anchor.id);
-		CastingMoldView.presentation(sceneData, embedded);
+		var liftingIds = [for (insert in plan.document.input.inserts)
+			if (insert.role == materia.casting.InsertSpec.InsertRole.LiftingMount)
+				plan.construction == SinglePocket ? insert.id : materia.tooling.ToolingIds.derive("insert-", insert.id)];
+		CastingMoldView.presentation(sceneData, embedded, review.handling.moldToService, liftingIds);
 		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(sceneData));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {

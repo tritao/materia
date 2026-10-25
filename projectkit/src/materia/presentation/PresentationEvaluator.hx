@@ -165,6 +165,17 @@ class PresentationEvaluator {
         plane.normal.x, plane.normal.y, plane.normal.z);
       result.sections.push({occurrence:null, point:point, normal:normal});
     }
+    var display = view.displayTransform;
+    if (display != null) {
+      for (id in result.poses.keys()) {
+        var pose = result.poses.get(id);
+        if (pose != null) result.poses.set(id, AssemblyFrames.compose(display, pose));
+      }
+      for (plane in result.sections) {
+        plane.point = AssemblyFrames.transformPoint(display, plane.point.x, plane.point.y, plane.point.z);
+        plane.normal = AssemblyFrames.transformVector(display, plane.normal.x, plane.normal.y, plane.normal.z);
+      }
+    }
     return result;
   }
 }

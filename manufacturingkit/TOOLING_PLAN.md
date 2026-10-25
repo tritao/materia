@@ -1572,3 +1572,5 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   is not a physical tooling assembly operation.
 
 - Finished casting surfaces (2026-10-24): refine reconstructed resin before review, STEP and mesh export so tangent access reliefs leave no artificial coplanar face patches; preserve exact solid geometry.
+
+- Finished casting presentation (2026-10-25): installed and as-poured views use the declared handling transform as a rigid display-only frame. Lifting-point identification derives from source LiftingMount inserts, with transparent resin and capacity explicitly Pending; no rated hardware or handling qualification is implied.
