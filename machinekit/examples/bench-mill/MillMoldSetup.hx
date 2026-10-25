@@ -11,9 +11,8 @@ import materia.assembly.AssemblyFrames as F;
 class MillMoldSetup {
 	/** Mill overlap ownership is a recipe choice, independent of generic rules. */
 	static function featureRules():Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule> {
-		var rules = materia.tooling.casting.CastingStrategies.standardRules();
+		var rules = CastingShopRecipe.featureRules();
 		for (rule in rules) {
-			rule.useEPSAboveBoardThickness=true;
 			rule.priority = rule.kind == materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening ? 30
 				: rule.kind == materia.casting.CastingFeature.CastingFeatureKind.Clearance ? 20 : 0;
 		}
@@ -34,17 +33,11 @@ class MillMoldSetup {
 		return FoundationToolingAdapter.snapshot(frame.base,"bench-mill-base",1,context);
 	}
 
-	public static function document(frame:BenchMillFrame, thickness:Float = 18):ToolingDocument {
-		var input = input(frame),
-			height = frame.layout.railPlane,
-			stock = PanelJoints.stock(thickness);
-		stock.materialSpec = "coated particleboard";
-		var formerStocks=[stock];
-		if (stock.measuredThickness<25) {
-			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
-			thicker.nominalThickness=25;thicker.measuredThickness=25;
-			formerStocks.push(thicker);
-		}
+	public static function document(frame:BenchMillFrame, thickness:Float = CastingShopRecipe.BOARD_THICKNESS_MM):ToolingDocument {
+		var input = input(frame), height = frame.layout.railPlane;
+		var recipe = CastingShopRecipe.tooling("mill-base-panel-eps-review", thickness);
+		// Mill service/clearance ownership resolves intersecting source recesses before lightening.
+		recipe.featureRules = featureRules();
 		return {
 			input: input,
 			setup: {
@@ -60,72 +53,7 @@ class MillMoldSetup {
 					withdrawal: {x: 0, y: 0, z: -1}, priority: 10
 				}]
 			},
-			recipe: {
-				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
-					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
-					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
-				]},
-				featureRules: featureRules(),
-				id: "mill-base-panel-eps-review",
-				revision: 1,
-				panel: stock,
-				core: {
-					materialSpec: "EPS supplier grade pending",
-					width: 1000,
-					depth: 500,
-					height: 100,
-					densityKgM3: null,
-					compressionStrengthPa: null,
-					compressionStrainFraction: null,
-					maximumTemperatureC: null,
-					evidence: []
-				},
-				jointLiningAllowance: 0.0,
-				jointMachiningAllowance: 0.05,
-				coreWireAxis: materia.tooling.ToolingRecipe.CoreWireAxis.Y,
-				adhesiveLineThickness: 0.2,
-				mixDensityKgM3: 2400,
-				steelDensityKgM3: 7850,
-				handlingLoadFactor: 1.5,
-				hardware: {
-					plugDepth: 5,
-					plugMaterial: "steel",
-					sealMargin: 3,
-					sealMaterial: "pending compatible sealing compound",
-					minimumBridgeWidth: 40,
-					locatingPinDiameter: 6,
-					supportScrewDiameter: 6,
-					supportClearanceDiameter: 7,
-					secondaryPinTravel: 2,
-					padDepth: 54,
-					labelOffset: 8,
-					datumThickness: 8,
-					datumPostWidth: 20,
-					formerFlangeThickness: 12,
-					formerFlangeMargin: 10,
-					fixturePinDiameter: 3,
-					fixturePinEmbed: 3,
-					fixtureReceiver:materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
-					fixturePinSpacing: 8,
-					fixtureSlotToolDiameter: 3
-				},
-				jointClearance: 0.2,
-				linerThickness: 0.1,
-				routerDiameter: 6,
-				minimumLigament: 2,
-				resinSpec: "pending binder",
-				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
-				adhesiveSpec: "pending EPS compatible adhesive",
-				processEvidence: [],
-				designReview: {
-					minimumCornerRadiusMm: null,
-					minimumInsertCoverMm: null,
-					minimumInsertEdgeMm: null,
-					minimumFixingAccessMm: null,
-					minimumLiftingPoints: 4,
-					removalClearanceMm: null
-				}
-			}
+			recipe: recipe
 		};
 	}
 
@@ -146,14 +74,7 @@ class MillMoldSetup {
 						evidence: []
 					}
 			],
-			compaction: {
-				method: Undeclared,
-				bedInterfaceReference: null,
-				frequencyHz: null,
-				amplitudeMm: null,
-				durationSeconds: null,
-				evidence: []
-			},
+			compaction: CastingShopRecipe.compaction(),
 
 			serviceOrientation: materia.assembly.AssemblyFrames.identity(),
 			overlapRule: ReservedThenPriority,

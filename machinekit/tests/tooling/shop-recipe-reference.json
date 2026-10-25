@@ -1,0 +1,712 @@
+{
+  "baseRecipe": {
+    "adhesiveLineThickness": 0.2,
+    "adhesiveSpec": "pending EPS compatible adhesive",
+    "core": {
+      "compressionStrainFraction": null,
+      "compressionStrengthPa": null,
+      "densityKgM3": null,
+      "depth": 500,
+      "evidence": [],
+      "height": 100,
+      "materialSpec": "EPS supplier grade pending",
+      "maximumTemperatureC": null,
+      "width": 1000
+    },
+    "coreWireAxis": "y",
+    "designReview": {
+      "minimumCornerRadiusMm": null,
+      "minimumFixingAccessMm": null,
+      "minimumInsertCoverMm": null,
+      "minimumInsertEdgeMm": null,
+      "minimumLiftingPoints": 4,
+      "removalClearanceMm": null
+    },
+    "featureRules": [
+      {
+        "kind": "clearance",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 20,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "clearance",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 20,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "interface-recess",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "interface-recess",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "lightening",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "lightening",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "service-opening",
+        "opening": "body-opening",
+        "preferredAxis": "x",
+        "priority": 30,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "service-opening",
+        "opening": "enclosed",
+        "preferredAxis": "x",
+        "priority": 30,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      }
+    ],
+    "former": {
+      "cutters": [
+        {
+          "fluteLengthMm": 30,
+          "id": "former-straight-6",
+          "stickOutMm": 35,
+          "taperDegrees": 0,
+          "tipDiameterMm": 6
+        },
+        {
+          "fluteLengthMm": 30,
+          "id": "former-taper-3deg-6",
+          "stickOutMm": 35,
+          "taperDegrees": 3,
+          "tipDiameterMm": 6
+        }
+      ],
+      "finishingStockMm": 0.5,
+      "pocketScrew": {
+        "diameterMm": 4,
+        "edgeDistanceMm": 20,
+        "jigAngleDegrees": 15,
+        "lengthMm": 30,
+        "maximumPitchMm": 100
+      },
+      "stocks": [
+        {
+          "allowedRotations": [
+            0,
+            90
+          ],
+          "coatedFace": "both",
+          "directionConstraint": "free",
+          "height": 1220,
+          "materialSpec": "coated particleboard",
+          "measuredThickness": 18,
+          "nominalThickness": 18,
+          "thicknessVariation": 0.1,
+          "width": 2440
+        },
+        {
+          "allowedRotations": [
+            0,
+            90
+          ],
+          "coatedFace": "both",
+          "directionConstraint": "free",
+          "height": 1220,
+          "materialSpec": "coated particleboard",
+          "measuredThickness": 25,
+          "nominalThickness": 25,
+          "thicknessVariation": 0.1,
+          "width": 2440
+        }
+      ],
+      "toleranceMm": 0.1
+    },
+    "handlingLoadFactor": 1.5,
+    "hardware": {
+      "datumPostWidth": 20,
+      "datumThickness": 8,
+      "fixturePinDiameter": 3,
+      "fixturePinEmbed": 3,
+      "fixturePinSpacing": 8,
+      "fixtureReceiver": "independent-datums",
+      "fixtureSlotToolDiameter": 3,
+      "formerFlangeMargin": 10,
+      "formerFlangeThickness": 12,
+      "labelOffset": 8,
+      "locatingPinDiameter": 6,
+      "minimumBridgeWidth": 40,
+      "padDepth": 54,
+      "plugDepth": 5,
+      "plugMaterial": "steel",
+      "sealMargin": 3,
+      "sealMaterial": "pending compatible sealing compound",
+      "secondaryPinTravel": 2,
+      "supportClearanceDiameter": 7,
+      "supportScrewDiameter": 6
+    },
+    "id": "mill-base-panel-eps-review",
+    "jointClearance": 0.2,
+    "jointLiningAllowance": 0,
+    "jointMachiningAllowance": 0.05,
+    "linerThickness": 0.1,
+    "minimumLigament": 2,
+    "mixDensityKgM3": 2400,
+    "panel": {
+      "allowedRotations": [
+        0,
+        90
+      ],
+      "coatedFace": "both",
+      "directionConstraint": "free",
+      "height": 1220,
+      "materialSpec": "coated particleboard",
+      "measuredThickness": 18,
+      "nominalThickness": 18,
+      "thicknessVariation": 0.1,
+      "width": 2440
+    },
+    "processEvidence": [],
+    "releaseSystem": {
+      "agent": {
+        "buffSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "coats": 5,
+        "cureSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "recoatSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        }
+      },
+      "epsCovering": {
+        "kind": "tape",
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select the declared EPS covering product"
+        }
+      },
+      "epsSafety": {
+        "kind": "unresolved",
+        "reason": "Release-agent EPS safety is not yet declared"
+      },
+      "pva": {
+        "coats": 1,
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select PVA release film and supply its product drying data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select PVA release film and supply its product drying data"
+        }
+      },
+      "sealer": {
+        "coats": 2,
+        "cureSeconds": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        },
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        }
+      }
+    },
+    "resinSpec": "pending binder",
+    "revision": 1,
+    "routerDiameter": 6,
+    "steelDensityKgM3": 7850
+  },
+  "columnRecipe": {
+    "adhesiveLineThickness": 0.2,
+    "adhesiveSpec": "pending EPS compatible adhesive",
+    "core": {
+      "compressionStrainFraction": null,
+      "compressionStrengthPa": null,
+      "densityKgM3": null,
+      "depth": 500,
+      "evidence": [],
+      "height": 100,
+      "materialSpec": "EPS supplier grade pending",
+      "maximumTemperatureC": null,
+      "width": 1000
+    },
+    "coreWireAxis": "z",
+    "designReview": {
+      "minimumCornerRadiusMm": null,
+      "minimumFixingAccessMm": null,
+      "minimumInsertCoverMm": null,
+      "minimumInsertEdgeMm": null,
+      "minimumLiftingPoints": 4,
+      "removalClearanceMm": null
+    },
+    "featureRules": [
+      {
+        "kind": "clearance",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 20,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "clearance",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 20,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "interface-recess",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "interface-recess",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "lightening",
+        "opening": "body-opening",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "lightening",
+        "opening": "enclosed",
+        "preferredAxis": "z",
+        "priority": 0,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "service-opening",
+        "opening": "body-opening",
+        "preferredAxis": "y",
+        "priority": 30,
+        "strategy": "reusable-former",
+        "useEPSAboveBoardThickness": true
+      },
+      {
+        "kind": "service-opening",
+        "opening": "enclosed",
+        "preferredAxis": "y",
+        "priority": 30,
+        "strategy": "sacrificial-eps",
+        "useEPSAboveBoardThickness": true
+      }
+    ],
+    "former": {
+      "cutters": [
+        {
+          "fluteLengthMm": 30,
+          "id": "former-straight-6",
+          "stickOutMm": 35,
+          "taperDegrees": 0,
+          "tipDiameterMm": 6
+        },
+        {
+          "fluteLengthMm": 30,
+          "id": "former-taper-3deg-6",
+          "stickOutMm": 35,
+          "taperDegrees": 3,
+          "tipDiameterMm": 6
+        }
+      ],
+      "finishingStockMm": 0.5,
+      "pocketScrew": {
+        "diameterMm": 4,
+        "edgeDistanceMm": 20,
+        "jigAngleDegrees": 15,
+        "lengthMm": 30,
+        "maximumPitchMm": 100
+      },
+      "stocks": [
+        {
+          "allowedRotations": [
+            0,
+            90
+          ],
+          "coatedFace": "both",
+          "directionConstraint": "free",
+          "height": 1220,
+          "materialSpec": "coated particleboard",
+          "measuredThickness": 18,
+          "nominalThickness": 18,
+          "thicknessVariation": 0.1,
+          "width": 2440
+        },
+        {
+          "allowedRotations": [
+            0,
+            90
+          ],
+          "coatedFace": "both",
+          "directionConstraint": "free",
+          "height": 1220,
+          "materialSpec": "coated particleboard",
+          "measuredThickness": 25,
+          "nominalThickness": 25,
+          "thicknessVariation": 0.1,
+          "width": 2440
+        }
+      ],
+      "toleranceMm": 0.1
+    },
+    "handlingLoadFactor": 1.5,
+    "hardware": {
+      "datumPostWidth": 20,
+      "datumThickness": 8,
+      "fixturePinDiameter": 3,
+      "fixturePinEmbed": 3,
+      "fixturePinSpacing": 8,
+      "fixtureReceiver": "independent-datums",
+      "fixtureSlotToolDiameter": 3,
+      "formerFlangeMargin": 10,
+      "formerFlangeThickness": 12,
+      "labelOffset": 8,
+      "locatingPinDiameter": 6,
+      "minimumBridgeWidth": 40,
+      "padDepth": 54,
+      "plugDepth": 5,
+      "plugMaterial": "steel",
+      "sealMargin": 3,
+      "sealMaterial": "pending compatible sealing compound",
+      "secondaryPinTravel": 2,
+      "supportClearanceDiameter": 7,
+      "supportScrewDiameter": 6
+    },
+    "id": "mill-column-panel-eps-review",
+    "jointClearance": 0.2,
+    "jointLiningAllowance": 0,
+    "jointMachiningAllowance": 0.05,
+    "linerThickness": 0.1,
+    "minimumLigament": 2,
+    "mixDensityKgM3": 2400,
+    "panel": {
+      "allowedRotations": [
+        0,
+        90
+      ],
+      "coatedFace": "both",
+      "directionConstraint": "free",
+      "height": 1220,
+      "materialSpec": "coated particleboard",
+      "measuredThickness": 18,
+      "nominalThickness": 18,
+      "thicknessVariation": 0.1,
+      "width": 2440
+    },
+    "processEvidence": [],
+    "releaseSystem": {
+      "agent": {
+        "buffSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "coats": 5,
+        "cureSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "recoatSeconds": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select a mold-release wax and supply its product timing data"
+        }
+      },
+      "epsCovering": {
+        "kind": "tape",
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select the declared EPS covering product"
+        }
+      },
+      "epsSafety": {
+        "kind": "unresolved",
+        "reason": "Release-agent EPS safety is not yet declared"
+      },
+      "pva": {
+        "coats": 1,
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select PVA release film and supply its product drying data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select PVA release film and supply its product drying data"
+        }
+      },
+      "sealer": {
+        "coats": 2,
+        "cureSeconds": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        },
+        "drySeconds": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        },
+        "reference": {
+          "kind": "unresolved",
+          "reason": "Select an exposed-board sealer and supply its product timing data"
+        }
+      }
+    },
+    "resinSpec": "pending binder",
+    "revision": 1,
+    "routerDiameter": 6,
+    "steelDensityKgM3": 7850
+  },
+  "fabrication": {
+    "adhesiveContainsEPS": null,
+    "blankKerfMm": 3.2,
+    "blankMarginMm": 12,
+    "braces": [],
+    "compactionEvidence": [],
+    "compactionPressurePa": null,
+    "compatibilityEvidence": [],
+    "coreRestraints": [],
+    "couponClearancesMm": [
+      0.1,
+      0.2,
+      0.3
+    ],
+    "fasteners": [],
+    "gravityMps2": 9.80665,
+    "loadFactor": 1.5,
+    "mixBearingStressMPa": null,
+    "mixTensileStrengthMPa": null,
+    "plates": [],
+    "resinReference": "pending binder",
+    "revision": 1,
+    "rigidRestraints": [],
+    "sheetMaterialId": "tooling-coated-board",
+    "solvent": "unknown"
+  },
+  "process": {
+    "castability": {
+      "evidence": [],
+      "maximumAggregateSizeMm": null,
+      "minimumPassageAggregateRatio": null
+    },
+    "compound": {
+      "maximumMassPerLiftKg": {
+        "kind": "unresolved",
+        "reason": "Compound maximum mass per lift"
+      },
+      "reference": {
+        "kind": "unresolved",
+        "reason": "Production compound and datasheet"
+      },
+      "thickness": {
+        "kind": "unresolved",
+        "reason": "Compound section or layer thickness limit"
+      }
+    },
+    "id": "mill-base-process-review",
+    "maximumAirEscapeWidthMm": null,
+    "mixComposition": null,
+    "mixer": null,
+    "pourRateMm3PerSecond": null,
+    "recipeFingerprint": "0587dc68b17caf67d51179bafecc440a6e51d3c235e66aa6631c5cb1d8c24bf4",
+    "revision": 1
+  },
+  "cam": {
+    "approachClearance": 0.0005,
+    "arcTolerance": 2e-05,
+    "blankMargin": 0.012,
+    "blendTolerance": 2e-05,
+    "breakthroughAllowance": 0.001,
+    "chordTolerance": 2e-05,
+    "cutDirection": "climb",
+    "diameterMatchTolerance": 5e-05,
+    "drillPeckDepth": 0.003,
+    "drillPeckRatio": 3,
+    "feed": 0.01,
+    "fixtures": [],
+    "lengthUnit": "m",
+    "nominalDiameters": [
+      {
+        "diameter": 0.003,
+        "number": 1
+      },
+      {
+        "diameter": 0.0032,
+        "number": 2
+      },
+      {
+        "diameter": 0.006,
+        "number": 3
+      },
+      {
+        "diameter": 0.006200000000000001,
+        "number": 4
+      },
+      {
+        "diameter": 0.007,
+        "number": 5
+      },
+      {
+        "diameter": 0.0135,
+        "number": 6
+      }
+    ],
+    "onionSkinDepth": 0.0005,
+    "plungeFeed": 0.002,
+    "safeZ": 0.012,
+    "singleToolPrograms": true,
+    "speedUnit": "m/s",
+    "spindleRpm": 12000,
+    "spindleSpinUpSeconds": 2,
+    "spoilboardPlane": -0.018,
+    "stepDown": 0.003,
+    "stepOverFraction": 0.4,
+    "studyOnly": true,
+    "toolMeasurementReference": null,
+    "tools": [
+      {
+        "diameter": 0.003,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.003,
+        "number": 1,
+        "stickOut": 0.03
+      },
+      {
+        "diameter": 0.0032,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.0032,
+        "number": 2,
+        "stickOut": 0.03
+      },
+      {
+        "diameter": 0.006,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.006,
+        "number": 3,
+        "stickOut": 0.03
+      },
+      {
+        "diameter": 0.006200000000000001,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.006200000000000001,
+        "number": 4,
+        "stickOut": 0.03
+      },
+      {
+        "diameter": 0.007,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.007,
+        "number": 5,
+        "stickOut": 0.03
+      },
+      {
+        "diameter": 0.0135,
+        "fluteLength": 0.025,
+        "length": 0,
+        "nominalDiameter": 0.0135,
+        "number": 6,
+        "stickOut": 0.03
+      }
+    ],
+    "travel": {
+      "lower": {
+        "x": -0.1,
+        "y": -0.1,
+        "z": -0.1
+      },
+      "upper": {
+        "x": 3,
+        "y": 3,
+        "z": 0.3
+      }
+    },
+    "travelSpace": "machine",
+    "vacuumHold": null,
+    "workOrigin": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "workOriginReference": null,
+    "workholdingReference": null
+  },
+  "compaction": {
+    "amplitudeMm": null,
+    "bedInterfaceReference": null,
+    "durationSeconds": null,
+    "evidence": [],
+    "frequencyHz": null,
+    "method": "undeclared"
+  },
+  "panelToolDiametersMm": [
+    3.0,
+    3.2,
+    6.0,
+    6.2,
+    7.0,
+    13.5
+  ]
+}

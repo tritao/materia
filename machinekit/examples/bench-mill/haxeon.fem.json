@@ -19,6 +19,7 @@
     "MillLiftingPattern.hx"
   ],
   "sourceRoots": [
+    "../casting-shop",
     ".",
     "../cnc-router"
   ],

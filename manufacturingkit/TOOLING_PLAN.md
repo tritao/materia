@@ -1216,6 +1216,12 @@ casting really differs, with the reason recorded. Move the values now in
 the hobber setup is written; the hobber setup consumes it from the start.
 Mill kits stay identical.
 
+Shop declaration decision (2026-10-25): keep the shared choices in
+`machinekit/examples/casting-shop/CastingShopRecipe.hx`, outside the libraries.
+Each factory returns fresh records. The mill retains its source-recess ownership
+priorities; the column's wire axis and service withdrawal axis differ because it
+lies front-on-bed. Keep those geometric overrides in the setup with their reasons.
+
 **Mold scene integration (first item after phase 8; user decision 2026-10-25).**
 1. The mold export writes an occurrence tree grouped by role, taken from the
    mold plan rather than from names:

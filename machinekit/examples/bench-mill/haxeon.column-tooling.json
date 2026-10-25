@@ -24,6 +24,7 @@
     "MillMoldChecks.hx"
   ],
   "sourceRoots": [
+    "../casting-shop",
     ".",
     "../cnc-router"
   ],

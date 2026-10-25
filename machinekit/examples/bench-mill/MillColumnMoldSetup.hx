@@ -13,7 +13,7 @@ class MillColumnMoldSetup {
 		return FoundationToolingAdapter.snapshot(frame.column,"bench-mill-column",1,context);
 	}
 
-	public static function document(frame:BenchMillFrame,thickness:Float=18):ToolingDocument {
+	public static function document(frame:BenchMillFrame,thickness:Float=CastingShopRecipe.BOARD_THICKNESS_MM):ToolingDocument {
 		var document=MillMoldSetup.document(frame,thickness),source=input(frame);
 		var depth=frame.layout.columnDepth;
 		document.input=source;
@@ -21,7 +21,9 @@ class MillColumnMoldSetup {
 			fillHeightMm:depth,freeboardMm:0,
 			sourceToMold:F.fromRotationMatrix(0,0,depth/2,[1,0,0,0,0,-1,0,1,0]),features:[]};
 		document.recipe.id="mill-column-panel-eps-review";
+		// Front-on-bed column orientation puts the wire through mold Z rather than base mold Y.
 		document.recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Z;
+		// Side-open column service passages withdraw along mold Y.
 		for (rule in document.recipe.featureRules)
 			if (rule.kind==materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening)
 				rule.preferredAxis=materia.tooling.casting.CastingStrategies.WithdrawalAxis.Y;

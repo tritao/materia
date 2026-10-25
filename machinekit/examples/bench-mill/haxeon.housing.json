@@ -9,6 +9,7 @@
     "ReferenceHousingChecks.hx"
   ],
   "sourceRoots": [
+    "../casting-shop",
     "."
   ],
   "dependencies": {

@@ -26,6 +26,7 @@
     "../../examples/bench-mill/MillLiftingPattern.hx"
   ],
   "sourceRoots": [
+    "../../examples/casting-shop",
     "src",
     "../../examples/bench-mill",
     "../../examples/cnc-router"
