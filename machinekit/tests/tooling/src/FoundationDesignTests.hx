@@ -24,6 +24,34 @@ class FoundationDesignTests {
 		Sys.println(id + " symmetric difference: " + difference);
 	}
 
+	/** Source pockets meet at declared openings; they never share interior.
+	 * Bounds only discard separated pairs. Profiles use the exact CAD cavity. */
+	static function disjointPockets(source:MineralCasting, id:String):Void {
+		var cavities = source.finishedCavities(), envelope = source.castingEnvelope();
+		var entries = [for (feature in source.castingFeatures()) if (feature.kind != InsertRecess) {
+			id:feature.id,
+			bounds:materia.casting.CastingRegionBounds.box(CastingCavities.cutRegion(envelope,feature)),
+			cavity:cavities.filter(cavity -> cavity.featureId == feature.id)[0]
+		}];
+		for (index in 0...entries.length) for (other in index + 1...entries.length) {
+			var a = entries[index], b = entries[other];
+			if (a.bounds != null && b.bounds != null
+				&& materia.casting.BoxAlgebra.intersection(a.bounds,b.bounds) == null) continue;
+			var common = Solids.building([machinekit.structural.CastingCavityCad.part(a.cavity)], parts -> {
+				parts.push(machinekit.structural.CastingCavityCad.part(b.cavity));
+				parts.push(parts[0].intersect(parts[1]));
+				parts[0].close();
+				parts[1].close();
+				return parts[2];
+			});
+			var volume:Float;
+			try volume = common.volume() catch (error:Dynamic) {common.close();throw error;}
+			common.close();
+			if (volume > 1e-7) throw "Source pockets overlap: " + id + ": " + a.id + ", " + b.id;
+		}
+		assertions++;
+	}
+
 	/** The accepted socket cut-over is an explicit design correction to the frozen box seats.
 	 * Keep the pre-socket STEP as an independent control: restore its twelve 20 mm
 	 * seat voids, then remove only the declared source socket cavities.
@@ -446,9 +474,8 @@ class FoundationDesignTests {
 		}
 		var mold = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		assertions++;
-		if (mold.coreUnits.length != 6 || mold.coreUnits.filter(unit -> unit.coreIds.length == 3 && unit.featureIds.length == 3).length != 2
-			|| mold.coreUnits.filter(unit -> unit.coreIds.length == 1 && unit.featureIds.length == 1).length != 4)
-			throw "Retained mill rail beams preserve their two fragmented core units beside four single foot-access units";
+		if (mold.coreUnits.length != 10 || mold.coreUnits.filter(unit -> unit.coreIds.length == 1 && unit.featureIds.length == 1).length != 10)
+			throw "Six directly authored underside pockets and four foot-access pockets need ten individual core units";
 		var reference:Dynamic = haxe.Json.parse(sys.io.File.getContent(root + "/reference.json"));
 		if (Sys.args().indexOf("--audit-openings") >= 0)
 			for (source in [frame.base.body, frame.column.body])
@@ -465,6 +492,11 @@ class FoundationDesignTests {
 		var frozenRows:Array<Dynamic> = cast baseline.currentBeforeMigration;
 		var currentRows:Array<Dynamic> = [];
 		for (row in foundations) {
+			disjointPockets(row.part.body,row.id);
+			assertions++;
+			if (row.part.body.castingFeatures().filter(feature -> feature.derivedFrom != null
+				|| feature.id.indexOf("-fragment-") >= 0).length != 0)
+				throw "Foundation pockets must be directly authored at named design stations: " + row.id;
 			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + ".step.gz"]);
 			var text = process.readStdout(), status = process.exitCode();
 			process.close();
@@ -544,9 +576,6 @@ class FoundationDesignTests {
 				if (Math.abs(iy - expected) > expected * 1e-10)
 					throw "Shared algebra changes frozen hobber minimum section Iy: " + row.id + ": " + iy + " vs " + expected;
 				var features = row.part.body.castingFeatures();
-				assertions++;
-				if (features.filter(feature -> feature.derivedFrom != null).length == 0)
-					throw "Hobber retained supports must preserve authored parent IDs";
 				if (kind == "bed") {
 					assertions++;
 					if (features.filter(feature -> feature.kind == InterfaceRecess && feature.owner != null

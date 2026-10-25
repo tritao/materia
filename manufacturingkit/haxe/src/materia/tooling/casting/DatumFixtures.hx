@@ -66,7 +66,7 @@ class DatumFixtures {
 		var r = p.document.recipe,
 			h = r.hardware,
 			dt = h.datumThickness,
-			pw = h.datumPostWidth;
+			pw = InsertFixturePlanner.requiredPostWidth(p.document.input, r);
 		var cx = face.x, cy = face.y, floor = p.cavity.z - dt;
 		if (Math.abs(withdrawal.x) > 0.9) {
 			cx = withdrawal.x > 0 ? p.cavity.x + p.cavity.width + 2 * r.panel.measuredThickness : p.cavity.x - 2 * r.panel.measuredThickness;

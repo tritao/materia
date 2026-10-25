@@ -58,6 +58,24 @@ typedef InsertPlatePlan = {
 
 /** All mold constructions use the same source-thread access and axial depth budget. */
 class InsertFixturePlanner {
+	/** The declared stock width is a minimum. Source-thread clearance and the
+	 * existing primary/secondary pin ligaments determine the usable datum post. */
+	public static function requiredPostWidth(input:CastingToolingInput, recipe:materia.tooling.ToolingRecipe):Float {
+		var h = recipe.hardware, pin = h.fixturePinDiameter + recipe.jointClearance;
+		var width = h.datumPostWidth;
+		for (insert in input.inserts) {
+			var face = F.compose(insert.pose, F.translation(0, 0, materia.casting.InsertSpec.InsertBodyCodec.height(insert.body)));
+			for (hole in availableHoles(insert)) {
+				var fixing = select(hole, insert.pose, face, h);
+				if (fixing == null) continue;
+				var spacing = Math.max(h.fixturePinSpacing,
+					fixing.clearanceDiameter + pin + h.secondaryPinTravel + 2 * recipe.minimumLigament);
+				width = Math.max(width, spacing + pin + h.secondaryPinTravel + 2 * recipe.minimumLigament);
+			}
+		}
+		return width;
+	}
+
 	public static function holes(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<InsertHole>
 		return materia.casting.InsertStages.holes({body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},
 			materia.casting.InsertStages.InsertStage.BeforeCasting);

@@ -9,7 +9,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
   "Deferred scope" with a one-line reason, unless it is a defect in work already
   planned. Reviews fix defects; they do not add features.
 - **Code complete** means phases 6–8 produce complete, reproducible and honestly
-  validated mold kits for the mill base, the mill column and the hobber plinth.
+  validated mold kits for the mill base, mill column, hobber plinth and hobber column.
   Readiness remaining Pending on inputs that software cannot supply does not
   block code completion. Those inputs are accuracy budgets (RM0), production
   compound and layer, the base–column joint gap and jacking, workshop equipment
@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: shared shop recipe and plinth integration implemented; exact reconstruction and continuous removal graphs pass; flared column formers and assembly relationship integration remain.
+- [ ] Phase 8: shared shop recipe, source authoring cleanup and initial plinth integration landed; approved geometry corrections, four final kits and shared mold scene integration remain. No flared former work.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1537,23 +1537,21 @@ Hobber source decision (user, 2026-10-25):
 3. The struts are source features: a declared material, sections and positions, with uplift and bearing checked against the core's buoyancy. Strength stays Pending on the compound like the other material checks. Strut-to-casting bond and the strut precast step go into the shop record.
 4. Frozen-CAD comparisons record the filled strip and the struts as an approved source correction.
 
-Hobber column source hold (2026-10-25): its two back lightening networks
-remain enclosed after the existing head recess and retained spine are included.
-Each is 3.864 L. They have neither a body opening nor source-declared cast-in supports. The plinth
-strut approval does not authorise changing the column. Keep the column source
-unchanged and reject an invented support/access route; its mold delivery waits
-for the source support decision. Continue the three required kits independently.
-
-Phase 8 source fixture hold: the plinth has no usable source fixture
-thread at `driveSeat`, `enclosureSeat00`, `enclosureSeat02`, `enclosureSeat20`,
-`enclosureSeat22`, `liftLeft`, `liftRight`, `railLeft`, `railRight` or `tablePlate`.
-Keep their source-thread design requests; adding holes changes source geometry
-and is parked for approval. Continue the independent tooling work.
-
-Hobber lifting source hold: the plinth declares two lifting inserts, below the
-shared recipe requirement of four. Keep `process.level1.lifting-points` Fail
-and its source proposal visible; adding or moving lifting inserts needs source
-approval. Do not weaken the shared shop rule to clear the delivery report.
+**Hobber source decision 2 (user, 2026-10-25).**
+1. Fill the two 3.864 L column back lightening networks solid. Keep the closed
+   section; add no struts, retained EPS or opening. Precast struts stay plinth-only.
+2. Declare source fixing holes on the plinth's `driveSeat`,
+   `enclosureSeat00/02/20/22`, `liftLeft`, `liftRight`, `railLeft`, `railRight`
+   and `tablePlate`. Reuse a mounting thread facing the mold bed where one
+   exists; otherwise add a dedicated source fixture thread through `InsertHoles`
+   and the existing hole policy, retaining its wall, clearance and engagement
+   rules. Tooling does not infer these declarations. Plug unused threads.
+3. Keep the two existing plinth lifting inserts and add two at the mass/CoM
+   castability proposal positions. Size them by demand with the shared mill
+   anchor rule. Keep the shared four-point rule unchanged; clear its Fail by
+   correcting the source. Capacity and physical lifting evidence remain Pending.
+Record all three as approved frozen-CAD corrections, requiring zero symmetric
+difference against the corrected source.
 
 
 **Source simplification decision (user, 2026-10-25).** A review of the mill and
@@ -1563,6 +1561,18 @@ and hobber kits are finalised. It replaces the flared column formers, and it
 supersedes items 2 and 3 of the first hobber source decision (precast struts and
 retained cores). Record every geometry change below as an approved frozen-CAD
 correction, with zero symmetric difference against the corrected source.
+
+Authoring implementation decision (2026-10-25): run structural sizing before
+realizing the final source foundations; the source consumes resolved insert
+footprints, holes and placements. Named pocket spans refer to the machine's rib,
+rail-beam, boss and wall stations; connections are declared in the source rather
+than inferred while constructing it. The authoring slice preserves the frozen
+casting volumes; the approved geometry corrections below land separately.
+The column motor bay is a rear span and two cheeks beside the Z channel;
+their directly authored boxes remove the former rectangular overlap while
+preserving the same union of cavities and the existing 2.5D tooling path. The
+hobber head recess keeps its spine as three named spans. Service routes already contained in a chamber are not duplicated
+as additional cuts; their wall connections remain explicit.
 
 Authoring, both machines:
 1. Declare pockets directly. Each lightening pocket is a named feature with

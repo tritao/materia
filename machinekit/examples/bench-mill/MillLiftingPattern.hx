@@ -10,24 +10,10 @@ import materia.casting.CastingPatterns;
 /** Four source connections enclose the foundation's nominal centre of mass.
  * The attachment footprint is a design declaration, never a capacity approval. */
 class MillLiftingPattern {
-	/** Native nominal mass in the pour state: transferred holes and finishing
-	 * removal do not yet exist. Embedded anchor hardware remains real components. */
-	public static function asCastMass(foundation:MineralFoundation):machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties {
-		var raw=new machinekit.assembly.MachineAssembly(),poses=foundation.solvedPoses();
-		for (member in foundation.components()) {
-			var part=member.component;
-			if (Std.isOfType(part,CastInsert)) {
-				var steel:CastInsert=cast part;
-				part=new CastInsert(steel.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
-			}
-			raw.addComponent(member.id,part,poses.get(member.id));
-		}
-		return raw.massProperties();
-	}
 
 	public static function placements(body:ComponentValues,existing:Array<CastInsertPlacement>,
 		details:MillCastingDetails):Array<CastInsertPlacement> {
-		var foundation=new MineralFoundation(body,existing),mass=asCastMass(foundation);
+		var foundation=new MineralFoundation(body,existing),mass=machinekit.structural.FoundationSizing.asCastMass(foundation);
 		if (mass.mass<=0 || !Math.isFinite(mass.mass) || mass.unaccounted.length>0)
 			throw "Lifting layout needs the source foundation mass and centre of mass";
 		var footprints=[{width:details.liftingPlateWidthMm,depth:details.liftingPlateDepthMm}]

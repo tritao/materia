@@ -27,12 +27,6 @@ class MillColumnMoldSetup {
 		for (rule in document.recipe.featureRules)
 			if (rule.kind==materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening)
 				rule.preferredAxis=materia.tooling.casting.CastingStrategies.WithdrawalAxis.Y;
-		for (choice in [
-			{featureId:"selected-y-shaft-passage",priority:40,sign:-1.0}
-		]) if (source.features.filter(feature -> feature.id==choice.featureId).length==1)
-			document.setup.features.push({featureId:choice.featureId,
-				strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
-				priority:choice.priority,withdrawal:{x:0,y:0,z:choice.sign}});
 		return document;
 	}
 

@@ -406,7 +406,7 @@ class CastingMoldPlanner {
 				});
 				return;
 			}
-			var dt = r.hardware.datumThickness, pw = r.hardware.datumPostWidth;
+			var dt = r.hardware.datumThickness, pw = InsertFixturePlanner.requiredPostWidth(d.input, r);
 			for(hole in InsertFixturePlanner.availableHoles(i))if(InsertFixturePlanner.facing(F.compose(pose,hole.frame),face)){
 				var diameter=hole.thread==null ? hole.diameter : hole.thread.majorDiameter;
 				if(hole.counterbore!=null)diameter=Math.max(diameter,hole.counterbore.diameter);

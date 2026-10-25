@@ -219,7 +219,9 @@ class MillMoldChecks {
 			== materia.tooling.ToolingCodec.canonical(CastingMoldPlanner.ownershipOrder(p.document.input.features, strategies)),
 			"raw feature permutation preserves the actual ownership ordering before codec sorting");
 		var unsupported = materia.tooling.ToolingCodec.copy(p.document);
-		unsupported.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
+		var unsupportedChoice = materia.tooling.casting.CastingStrategies.resolve(unsupported)[0];
+		unsupportedChoice.strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
+		unsupported.setup.features = [unsupportedChoice];
 		var partial = CastingMoldPlanner.plan(unsupported, p.options),
 			assessment = CastingMoldCad.assess(partial);
 		check(assessment.geometry == null && assessment.diagnostics.hasErrors() && !partial.fabrication.ready,

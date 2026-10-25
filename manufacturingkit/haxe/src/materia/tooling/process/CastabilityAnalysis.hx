@@ -528,15 +528,10 @@ class CastabilityAnalysis {
 		var center=F.transformPoint(inverse,mold.x,mold.y,mold.z);
 		var source=CastingMoldPlanner.box(envelope.width,envelope.depth,envelope.height,
 			F.compose(inverse,F.translation(envelope.x+envelope.width/2,envelope.y+envelope.depth/2,envelope.z)));
-		var rx=Math.min(center.x-source.x,source.x+source.width-center.x)/2;
-		var ry=Math.min(center.y-source.y,source.y+source.depth-center.y)/2;
-		if (rx<=0 || ry<=0) return [];
 		var result:Array<CastabilityProposal> = [];
-		for (index in 0...count) {
-			var angle=2*Math.PI*(index+0.5)/count;
-			var x=center.x+(count==1 ? 0 : rx*Math.cos(angle));
-			var y=center.y+(count==1 ? 0 : ry*Math.sin(angle));
-			var point=F.transformPoint(d.setup.sourceToMold,x,y,source.z+source.height);
+		for (location in materia.casting.InsertAnchorage.InsertAnchorSelection.liftingPositions(source,center,count)) {
+			var x=location.x,y=location.y;
+			var point=F.transformPoint(d.setup.sourceToMold,x,y,location.z);
 			var proposal:CastabilityProposal={id:"proposal",rule:"process.level1.lifting-points",sourceIds:[d.input.id],
 				action:DeclareLiftingPoint,owner:DesignReview,measuredMm:null,targetMm:null,axis:null,region:null,point:point,
 				instruction:"Review a source lifting connection at source XYZ="+x+","+y+","+(source.z+source.height)

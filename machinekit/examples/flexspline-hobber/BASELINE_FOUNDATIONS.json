@@ -9769,7 +9769,7 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "e592d6031481af1d397a876d76b5b8d3963c643c2b53292184dfba36dae6d561",
+      "sourceFingerprint": "ea04bc2e4c8d78b49b8d36c4094dd0fe4fd97dffabf42b3b56728ee320205902",
       "sourceCodecVersion": 24,
       "volumeMm3": 69282648.80908884,
       "massKg": 166.27835714181322,
@@ -9780,10 +9780,10 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "c652d5b32235dab98ec24e951b34708df365fbcc100c1ce14e2d66f1e840d26e",
+      "sourceFingerprint": "292ec10a8cf928be8b78424203d25f1de381d5b026a37a7d6d3fc79899ccd27b",
       "sourceCodecVersion": 24,
-      "volumeMm3": 41315101.88527599,
-      "massKg": 99.15624452466238,
+      "volumeMm3": 41315101.88527619,
+      "massKg": 99.15624452466287,
       "boxStatus": "unsupported",
       "boxReason": "Non-box anchor occupancy for inserts: footLeftFront, footLeftRear, footRightFront, footRightRear, hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railZLeft, railZRight",
       "unsupportedFeatures": [],
@@ -9791,10 +9791,10 @@
     },
     {
       "id": "hobber-bed",
-      "sourceFingerprint": "1321aa1294768c499e9a430bbc17d0e813f23b7032475ef674a21a0f18178332",
+      "sourceFingerprint": "8e380afbf80b7a24a54c0c2712d208d7360c6e27a586bec61dc14c229fadef05",
       "sourceCodecVersion": 24,
-      "volumeMm3": 350967609.82848966,
-      "massKg": 842.3222635883752,
+      "volumeMm3": 350967609.82848835,
+      "massKg": 842.322263588372,
       "boxStatus": "unsupported",
       "boxReason": "Unsupported collision geometry for features: insert-trayClampSeat0, insert-trayClampSeat1, insert-trayClampSeat10, insert-trayClampSeat11, insert-trayClampSeat2, insert-trayClampSeat3, insert-trayClampSeat4, insert-trayClampSeat5, insert-trayClampSeat6, insert-trayClampSeat7, insert-trayClampSeat8, insert-trayClampSeat9",
       "unsupportedFeatures": [
@@ -9815,10 +9815,10 @@
     },
     {
       "id": "hobber-column",
-      "sourceFingerprint": "32278a4ac0da90f2bb5c2609aad552ac7652f8cb9c4c820a83e7099e9a671e30",
+      "sourceFingerprint": "6bd40e35532ae3125a88fe0630b872534646e2837d9f979caa0e949421919726",
       "sourceCodecVersion": 24,
-      "volumeMm3": 18059500.00000001,
-      "massKg": 43.34280000000003,
+      "volumeMm3": 18059500.00000002,
+      "massKg": 43.34280000000005,
       "boxStatus": "pass",
       "boxReason": "Exact disjoint-box material hulls",
       "unsupportedFeatures": [],

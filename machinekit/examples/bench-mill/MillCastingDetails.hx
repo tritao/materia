@@ -7,13 +7,8 @@ class MillCastingDetails {
 	 * Demand is class-8.8 service preload plus a two-load-path lifting share,
 	 * multiplied by the named 1.5 design reserve. Mix strengths remain inputs.
 	 * Geometric minima do not establish compound-specific anchor capacity. */
-	public var anchorRule:materia.casting.InsertAnchorage.InsertAnchorPatternRule = {
-		id: "mill-bolted-anchor-demand-v1", demandFactor: 1.5, maximumCount: 64,
-		liftingLoadPaths: 2, gravityMps2: 9.80665,
-		minimumCount: 2, maximumPitchInShortWidths: 4,
-		embedmentDiameters: 2, coverDiameters: 1, spacingDiameters: 0.5,
-		screwLengthsMm: [10,12,16,20,25,30,35,40,45,50,60,70,80]
-	};
+	public var anchorRule:materia.casting.InsertAnchorage.InsertAnchorPatternRule =
+		materia.casting.InsertAnchorage.InsertAnchorSelection.sourceDemandRule("mill-bolted-anchor-demand-v1");
 	public var shoulderClearance:Float = 12;
 	public var shoulderDepth:Float = 20;
 	public var undersidePocketSetback:Float = 160;

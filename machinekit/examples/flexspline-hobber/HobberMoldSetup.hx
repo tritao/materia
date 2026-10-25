@@ -24,18 +24,6 @@ class HobberMoldSetup {
   // The catalogue sockets have a small circular sealing land, qualified in
   // the existing hobber socket fixture coupon rather than a mill plate land.
   recipe.hardware.sealMargin=0.5;
-  // Size datum posts for the selected source clearance hole plus the same
-  // pin pair and edge ligaments used by DatumFixtures; no insert-specific sizes.
-  var h=recipe.hardware,pin=h.fixturePinDiameter+recipe.jointClearance;
-  for(insert in input.inserts){
-   var face=F.compose(insert.pose,F.translation(0,0,materia.casting.InsertSpec.InsertBodyCodec.height(insert.body)));
-   for(hole in materia.tooling.casting.InsertFixturePlanner.availableHoles(insert)){
-    var fixing=materia.tooling.casting.InsertFixturePlanner.select(hole,insert.pose,face,h);
-    if(fixing==null)continue;
-    var spacing=Math.max(h.fixturePinSpacing,fixing.clearanceDiameter+pin+h.secondaryPinTravel+2*recipe.minimumLigament);
-    h.datumPostWidth=Math.max(h.datumPostWidth,spacing+pin+h.secondaryPinTravel+2*recipe.minimumLigament);
-   }
-  }
   var document:ToolingDocument={input:input,recipe:recipe,setup:{
    id:"plinth-mounting-faces-down",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
    fillHeightMm:foundation.body.parameterNumber("height"),freeboardMm:0,
@@ -54,13 +42,6 @@ class HobberMoldSetup {
      rule.preferredAxis=materia.tooling.casting.CastingStrategies.WithdrawalAxis.Y;
    return document;
   }
-  // The removable rear bridge's specific register owns its overlap with the
-  // general tray ledge. Keep that casting-specific decision out of the shop.
-  var bridge=materia.tooling.casting.CastingStrategies.resolve(document)
-   .filter(strategy->strategy.featureId=="tray-rear-bridge-seat");
-  if(bridge.length!=1)throw "Hobber plinth is missing its rear bridge register";
-  bridge[0].priority=10;
-  document.setup.features=[bridge[0]];
   return document;
  }
 

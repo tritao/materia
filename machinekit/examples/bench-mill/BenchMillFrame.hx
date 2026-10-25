@@ -25,7 +25,8 @@ class BenchMillFrame extends MillFrame {
 	public static function create(layout:MillFrameLayout,?zAxis:MillZAxisLayout,?xyAxis:MillXYStageLayout,
 		?casting:MillCastingDetails):BenchMillFrame {
 		var chosen=casting==null ? new MillCastingDetails() : casting;
-		var source=new MillCastingSource(layout,chosen,zAxis,xyAxis);
+		var sizing=new MillCastingSizing(layout,chosen,zAxis,xyAxis);
+		var source=new MillCastingSource(layout,chosen,sizing,zAxis,xyAxis);
 		return new BenchMillFrame(layout,source,chosen,zAxis,xyAxis);
 	}
 
@@ -36,48 +37,106 @@ class BenchMillFrame extends MillFrame {
 	}
 }
 
-/** Mill structural layout: ribbed base, separate column and finished steel interfaces.
- * Casting construction and persistence remain in the shared structural components.
- */
+/** Realizes the declared footprints, holes and pockets returned by sizing. */
 private class MillCastingSource extends MachineAssembly {
-	public final layout:MillFrameLayout;
 	public final base:MineralFoundation;
 	public final column:MineralFoundation;
-	public final zAxis:Null<MillZAxisLayout>;
-	public final xyAxis:Null<MillXYStageLayout>;
+
+	public function new(l:MillFrameLayout, details:MillCastingDetails, sizing:MillCastingSizing,
+		?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout) {
+		super();
+		var baseInserts=sizing.baseInserts, columnInserts=sizing.columnInserts;
+		var stripCentre=sizing.stripCentre, flared=sizing.flared;
+		base = new MineralFoundation(sizing.baseValues, baseInserts);
+		include("base", base, F.translation(0, l.baseCentreY, 0));
+		if (l.footPockets)
+			for (sx in [-1, 1])
+				for (sy in [-1, 1]) {
+					var id = corner(sx, sy);
+					addComponent('levelingFoot$id', machinekit.structural.LevelingFoot.of(details.levelingFoot));
+					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
+				}
+
+		column = new MineralFoundation(sizing.columnValues, columnInserts, "footLeftFront");
+		for (side in ["Left", "Right"]) {
+			var id = 'railZ$side', top = Solids.axial(0, 0, l.insertThickness);
+			column.addMemberConnector(id, "railSeat", F.compose(F.translation(0, l.zRailStart + l.zRailLength / 2 - stripCentre, 0), top));
+			if (zAxis != null)
+				for (end in ["Lower", "Upper"]) {
+					var centre = end == "Lower" ? details.zBearingAnchorOffset : l.zRailStart + l.zRailLength + details.zBearingAnchorOffset;
+					var region = F.translation(0, centre - stripCentre, 0);
+					column.addMemberConnector(id, 'bearing$end', region);
+					column.addMemberConnector(id, 'bearing${end}Face', F.compose(region, top));
+				}
+		}
+		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
+		// Mating frames coincide; the physical finished faces oppose each other.
+		var first = columnInserts.filter(row -> row.id == "footLeftFront")[0];
+		addMemberConnector("column/footLeftFront", "baseSeat", F.compose(F.inverse(first.pose), Solids.axial(first.pose.x, first.pose.y, 0)));
+		addMate("column-on-base", "fixed", "base/columnLeftFront", "top", "column/footLeftFront", "baseSeat");
+		if (flared)
+			for (sx in [-1, 1])
+				for (sy in [-1, 1]) {
+					var id = corner(sx, sy),
+						anchor = columnInserts.filter(row -> row.id == 'foot$id')[0];
+					var bolt = 'columnBolt$id';
+					addComponent(bolt, machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread.thread.designation,
+						details.columnBoltLengthIncrement * Math.ceil((l.insertThickness
+							+ machinekit.design.ThreadedHolePolicy.resolve(details.columnAnchorThread.thread, C45Bright).minEngagement)
+							/ details.columnBoltLengthIncrement),
+						machinekit.standard.PropertyClass.Steel88));
+					addMemberConnector('column/foot$id', "boltSeat",
+						F.compose(F.inverse(anchor.pose), F.translation(anchor.pose.x, anchor.pose.y, l.insertThickness)));
+					addMemberConnector(bolt, "seat", F.identity());
+					addMate('column-clamp-$id', "fixed", 'column/foot$id', "boltSeat", bolt, "seat");
+				}
+		exposeConnector("mount", "base/casting", "mount");
+		for (id in ["railYLeft", "railYRight"])
+			exposeConnector(id, 'base/$id', "top");
+		for (id in ["railZLeft", "railZRight"])
+			exposeConnector(id, 'column/$id', "railSeat");
+		for (sx in [-1, 1])
+			for (sy in [-1, 1])
+				exposeConnector('foot${corner(sx, sy)}', 'base/foot${corner(sx, sy)}', "top");
+	}
+
+	static function corner(x:Int,y:Int):String
+		return (x<0 ? "Left" : "Right")+(y<0 ? "Front" : "Rear");
+}
+
+/** One structural sizing pass, before constructing the source foundations.
+ * Searches resolve design dimensions here; workshop evidence is never assumed. */
+private class MillCastingSizing {
+	public final baseValues:ComponentValues;
+	public final baseInserts:Array<CastInsertPlacement>;
+	public final columnValues:ComponentValues;
+	public final columnInserts:Array<CastInsertPlacement>;
+	public final stripCentre:Float;
+	public final flared:Bool;
 
 	public function new(layout:MillFrameLayout, details:MillCastingDetails, ?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout) {
-		super();
 		if (layout == null)
 			throw "Mill frame needs a layout";
-		this.layout = layout;
 		if (zAxis != null && zAxis.frame != layout)
 			throw "Frame and Z datums must share one layout";
-		this.zAxis = zAxis;
 		if (xyAxis != null && xyAxis.frame != layout)
 			throw "Frame and XY datums must share one layout";
-		this.xyAxis = xyAxis;
 		var l = layout;
 		var baseVoids:Array<CastingFeature> = [], baseInserts:Array<CastInsertPlacement> = [];
 		var pocketFront = l.front + (l.footPockets ? details.undersidePocketSetback : l.wall),
 			pocketRear = l.columnFront - l.wall;
 		var pocketLength = (pocketRear - pocketFront - l.wall) / 2;
-		var underside:Array<CastingFeature> = [];
-		for (row in 0...2)
-			underside.push(CastingFeaturePatterns.underside('underside-row-$row', l.baseWidth - 2 * l.wall,
-				pocketLength, l.baseHeight - l.roof, 0,
-				pocketFront + pocketLength / 2 + row * (pocketLength + l.wall) - l.baseCentreY));
-		// Source intent reserves full-height rail beams. The common algebra creates
-		// stable fragments and preserves their shared authored core parent.
-		var railBeams:Array<materia.casting.Box3> = [for (side in [-1, 1]) {
-			x: side * l.yRailSpacing / 2 - l.seatWidth / 2,
-			y: -l.baseDepth / 2,
-			z: 0,
-			width: l.seatWidth,
-			depth: l.baseDepth,
-			height: l.baseHeight
-		}];
-		baseVoids = CastingFeaturePatterns.retain(underside, railBeams);
+		// Six authored pockets leave the two full-height rail beams in place.
+		// Their walls are explicit source stations, not subtraction fragments.
+		var pockets=[
+			{name:"left",low:-l.baseWidth/2+l.wall,high:-(l.yRailSpacing+l.seatWidth)/2},
+			{name:"centre",low:-(l.yRailSpacing-l.seatWidth)/2,high:(l.yRailSpacing-l.seatWidth)/2},
+			{name:"right",low:(l.yRailSpacing+l.seatWidth)/2,high:l.baseWidth/2-l.wall}
+		];
+		for (row in 0...2)for(pocket in pockets)
+			baseVoids.push(CastingFeaturePatterns.underside('underside-row-$row-${pocket.name}',pocket.high-pocket.low,
+				pocketLength,l.baseHeight-l.roof,(pocket.low+pocket.high)/2,
+				pocketFront+pocketLength/2+row*(pocketLength+l.wall)-l.baseCentreY));
 		if (xyAxis != null)
 			for (side in [-1, 1]) {
 				var shoulderOuter = (l.yRailSpacing + l.seatWidth) / 2 + details.shoulderClearance;
@@ -131,6 +190,7 @@ private class MillCastingSource extends MachineAssembly {
 
 		// Four independent steel pairs provide a broad column mounting interface.
 		var flared = l.columnFootWidth > l.columnWidth;
+		this.flared=flared;
 		var footWidth = flared ? Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter,details.columnAnchorThickness)) : l.wall,
 			footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
 		for (sx in [-1, 1])
@@ -175,16 +235,9 @@ private class MillCastingSource extends MachineAssembly {
 		if (xyAxis!=null) baseInserts=mountRails(baseInserts,MillRailPlacement.y(xyAxis.guided()),
 			F.translation(0,l.baseCentreY,0),"xyStage",details);
 		baseInserts=baseInserts.concat(MillLiftingPattern.placements(body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids),baseInserts,details));
-		baseInserts = anchorInserts(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
-		base = new MineralFoundation(body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids), baseInserts);
-		include("base", base, F.translation(0, l.baseCentreY, 0));
-		if (l.footPockets)
-			for (sx in [-1, 1])
-				for (sy in [-1, 1]) {
-					var id = corner(sx, sy);
-					addComponent('levelingFoot$id', machinekit.structural.LevelingFoot.of(details.levelingFoot));
-					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
-				}
+		baseInserts = machinekit.structural.FoundationSizing.anchors(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
+		this.baseValues=body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids);
+		this.baseInserts=baseInserts;
 
 		var columnVoids:Array<CastingFeature> = [],
 			columnInserts:Array<CastInsertPlacement> = [];
@@ -211,14 +264,36 @@ private class MillCastingSource extends MachineAssembly {
 					- l.railPlane
 					- details.selectedShaftClearance / 2));
 			}
-			columnVoids.push(CastingFeaturePatterns.box("rear-y-motor-bay", ServiceOpening,
+			var rearBay = CastingFeaturePatterns.box("rear-y-motor-bay", ServiceOpening,
 				[CastingPatterns.face(flared ? "foot.y-max" : "body.y-max"), CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")],
 				a.yBayWidth, a.yServiceRear
 				+ details.rearBayDesignClearance
 				- bayFront, a.yBayTop
 				- l.railPlane, 0,
 				(bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2
-				- l.columnCentreY, 0));
+				- l.columnCentreY, 0);
+			if (zAxis != null && zAxis.channelBack > bayFront) {
+				// Directly author the rear span and two cheeks beside the channel.
+				// Their disjoint union is the original motor bay minus the channel.
+				var half = a.yBayWidth / 2, notch = zAxis.channelWidth / 2;
+				var front = bayFront - l.columnCentreY;
+				var back = a.yServiceRear + details.rearBayDesignClearance - l.columnCentreY;
+				var notchBack = zAxis.channelBack - l.columnCentreY;
+				if (notch >= half || notchBack >= back)
+					throw "Z channel must leave the declared rear motor bay connected";
+				rearBay = CastingFeaturePatterns.box("rear-y-motor-bay", ServiceOpening,
+					[CastingPatterns.face(flared ? "foot.y-max" : "body.y-max"),
+					 CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")],
+					a.yBayWidth, back - notchBack, a.yBayTop - l.railPlane,
+					0, (notchBack + back) / 2, 0);
+				for (side in [-1, 1])
+					columnVoids.push(CastingFeaturePatterns.box("rear-y-motor-cheek-" + (side < 0 ? "left" : "right"),
+						ServiceOpening, [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min"),
+							CastingPatterns.feature("rear-y-motor-bay"), CastingPatterns.feature("z-drive-channel")],
+						half - notch, notchBack - front, a.yBayTop - l.railPlane,
+						side * (half + notch) / 2, (front + notchBack) / 2, 0));
+			}
+			columnVoids.push(rearBay);
 			var hatchWall=details.hatchAnchorThread.thread.majorDiameter/2
 				+machinekit.design.ThreadedHolePolicy.resolve(details.hatchAnchorThread.thread,C45Bright).minWall;
 			var maximumHatchOffset=details.hatchAnchorSideOffset+details.hatchAnchorWidth/2-hatchWall;
@@ -253,7 +328,6 @@ private class MillCastingSource extends MachineAssembly {
 			}
 		}
 		var chamberHeight = (l.columnHeight - 2 * l.roof - l.wall) / 2;
-		var rearChambers:Array<CastingFeature> = [];
 		// Rear-open chambers leave a thick front web, side walls, sole, top and
 		// cross rib. This avoids prescribing inaccessible sealed internal cores.
 		for (row in 0...2) {
@@ -263,18 +337,12 @@ private class MillCastingSource extends MachineAssembly {
 				start = Math.max(start, xyAxis.yBayTop - l.railPlane + l.roof);
 			if (top <= start || frontWeb >= l.columnDepth)
 				throw "Column backing consumes rear chamber: rear-chamber-" + row;
-			var chamberOpenings = [CastingPatterns.face("body.y-min"), CastingPatterns.face("body.y-max")];
+			var chamberOpenings = [CastingPatterns.face("body.y-max")];
 			if (flared && start < MillFrameLayout.COLUMN_FOOT_HEIGHT)
-				chamberOpenings = chamberOpenings.concat([CastingPatterns.face("foot.y-min"), CastingPatterns.face("foot.y-max")]);
-			rearChambers.push(CastingFeaturePatterns.box('rear-chamber-$row', Lightening, chamberOpenings,
-				l.columnWidth - 2 * l.wall, l.columnDepth, top - start, 0, 0, start));
+				chamberOpenings = chamberOpenings.concat([CastingPatterns.face("foot.y-max")]);
+			columnVoids.push(CastingFeaturePatterns.box('rear-chamber-$row', Lightening, chamberOpenings,
+				l.columnWidth-2*l.wall,l.columnDepth-frontWeb,top-start,0,frontWeb/2,start));
 		}
-		var backing:Array<materia.casting.Box3> = [{
-			x: -l.columnWidth / 2, y: -l.columnDepth / 2, z: 0,
-			width: l.columnWidth, depth: frontWeb, height: l.columnHeight
-		}];
-		for (feature in CastingFeaturePatterns.retain(rearChambers, backing))
-			columnVoids.push(feature);
 
 		// One physical strip per side carries the guide and both bearing-plate anchors.
 		var stripStart = zAxis == null ? l.zRailStart : 0.0;
@@ -327,48 +395,10 @@ private class MillCastingSource extends MachineAssembly {
 		if (zAxis!=null) columnInserts=mountRails(columnInserts,MillRailPlacement.z(zAxis),
 			F.translation(0,l.columnCentreY,l.railPlane),"zAxis",details);
 		columnInserts=columnInserts.concat(MillLiftingPattern.placements(columnValues,columnInserts,details));
-		columnInserts = anchorInserts(columnInserts, details.anchorRule, columnValues);
-		column = new MineralFoundation(columnValues, columnInserts, "footLeftFront");
-		for (side in ["Left", "Right"]) {
-			var id = 'railZ$side', top = Solids.axial(0, 0, l.insertThickness);
-			column.addMemberConnector(id, "railSeat", F.compose(F.translation(0, l.zRailStart + l.zRailLength / 2 - stripCentre, 0), top));
-			if (zAxis != null)
-				for (end in ["Lower", "Upper"]) {
-					var centre = end == "Lower" ? details.zBearingAnchorOffset : l.zRailStart + l.zRailLength + details.zBearingAnchorOffset;
-					var region = F.translation(0, centre - stripCentre, 0);
-					column.addMemberConnector(id, 'bearing$end', region);
-					column.addMemberConnector(id, 'bearing${end}Face', F.compose(region, top));
-				}
-		}
-		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
-		// Mating frames coincide; the physical finished faces oppose each other.
-		var first = columnInserts.filter(row -> row.id == "footLeftFront")[0];
-		addMemberConnector("column/footLeftFront", "baseSeat", F.compose(F.inverse(first.pose), Solids.axial(first.pose.x, first.pose.y, 0)));
-		addMate("column-on-base", "fixed", "base/columnLeftFront", "top", "column/footLeftFront", "baseSeat");
-		if (flared)
-			for (sx in [-1, 1])
-				for (sy in [-1, 1]) {
-					var id = corner(sx, sy),
-						anchor = columnInserts.filter(row -> row.id == 'foot$id')[0];
-					var bolt = 'columnBolt$id';
-					addComponent(bolt, machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread.thread.designation,
-						details.columnBoltLengthIncrement * Math.ceil((l.insertThickness
-							+ machinekit.design.ThreadedHolePolicy.resolve(details.columnAnchorThread.thread, C45Bright).minEngagement)
-							/ details.columnBoltLengthIncrement),
-						machinekit.standard.PropertyClass.Steel88));
-					addMemberConnector('column/foot$id', "boltSeat",
-						F.compose(F.inverse(anchor.pose), F.translation(anchor.pose.x, anchor.pose.y, l.insertThickness)));
-					addMemberConnector(bolt, "seat", F.identity());
-					addMate('column-clamp-$id', "fixed", 'column/foot$id', "boltSeat", bolt, "seat");
-				}
-		exposeConnector("mount", "base/casting", "mount");
-		for (id in ["railYLeft", "railYRight"])
-			exposeConnector(id, 'base/$id', "top");
-		for (id in ["railZLeft", "railZRight"])
-			exposeConnector(id, 'column/$id', "railSeat");
-		for (sx in [-1, 1])
-			for (sy in [-1, 1])
-				exposeConnector('foot${corner(sx, sy)}', 'base/foot${corner(sx, sy)}', "top");
+		columnInserts = machinekit.structural.FoundationSizing.anchors(columnInserts, details.anchorRule, columnValues);
+		this.columnValues=columnValues;
+		this.columnInserts=columnInserts;
+		this.stripCentre=stripCentre;
 	}
 
 	static function corner(x:Int, y:Int):String
@@ -392,37 +422,6 @@ private class MillCastingSource extends MachineAssembly {
 		return result;
 	}
 
-	static function anchorInserts(rows:Array<CastInsertPlacement>,rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule,
-		castingValues:ComponentValues):Array<CastInsertPlacement> {
-		var body=new machinekit.structural.MineralCasting(castingValues).geometry();
-		try {
-			var lifting=rows.filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount);
-			function share(placed:Array<CastInsertPlacement>):Float {
-				if (lifting.length==0) return 0;
-				var mass=MillLiftingPattern.asCastMass(new MineralFoundation(castingValues,placed));
-				if (mass.unaccounted.length>0 || !Math.isFinite(mass.mass) || mass.mass<=0)
-					throw "Anchor lifting demand requires the actual source casting mass";
-				return mass.mass*rule.gravityMps2/Math.min(rule.liftingLoadPaths,lifting.length);
-			}
-			var liftingShare=share(rows);
-			// Only lifting demand depends on the resolved casting mass. Other
-			// patterns and their exact containment are unchanged across this loop.
-			var fixed:Map<String,CastInsert> = [];
-			for (row in rows) if (row.part.parameterToken("role")!=InsertRole.LiftingMount)
-				fixed.set(row.id,machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),0));
-			// Hardware changes the casting mass. Resolve that known design coupling
-			// without borrowing workshop strength values or dropping hardware mass.
-			for (pass in 0...8) {
-				var result:Array<CastInsertPlacement> = [for (row in rows) {id:row.id,pose:row.pose,openings:row.openings,
-					part:fixed.exists(row.id) ? fixed.get(row.id)
-						: machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),liftingShare)}];
-				var resolved=share(result);
-				if (Math.abs(resolved-liftingShare)<1e-6) {body.close();return result;}
-				liftingShare=resolved;
-			}
-			throw "Anchor/lifting mass sizing did not converge for "+[for (row in lifting) row.id].join(", ");
-		} catch (error:Dynamic) {body.close();throw error;}
-	}
 
 	static function down(x:Float, y:Float, z:Float):materia.assembly.AssemblyRecord.AssemblyFrame
 		return F.fromRotationMatrix(x, y, z, [1, 0, 0, 0, -1, 0, 0, 0, -1]);

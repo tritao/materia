@@ -512,6 +512,33 @@ typedef InsertAnchorCandidate = {
 }
 
 class InsertAnchorSelection {
+	/** Named source rule shared by the mill and hobber. This is a demand-side
+	 * design choice; compound capacity still requires the declared material data.
+	 * Return fresh records so one source cannot mutate another's recipe.
+	 */
+	public static function sourceDemandRule(id:String):InsertAnchorPatternRule return {
+		id:id,demandFactor:1.5,maximumCount:64,liftingLoadPaths:2,gravityMps2:9.80665,
+		minimumCount:2,maximumPitchInShortWidths:4,embedmentDiameters:2,
+		coverDiameters:1,spacingDiameters:0.5,
+		screwLengthsMm:[10,12,16,20,25,30,35,40,45,50,60,70,80]
+	};
+
+	/** The same CoM-based source locations used by the castability proposals.
+	 * They propose attachment positions, not rigging or compound capacity.
+	 */
+	public static function liftingPositions(body:Box3,center:materia.assembly.AssemblyDefinition.AssemblyVector,
+			count:Int):Array<materia.assembly.AssemblyDefinition.AssemblyVector> {
+		if(count<1)throw "Lifting pattern needs a positive count";
+		var rx=Math.min(center.x-body.x,body.x+body.width-center.x)/2;
+		var ry=Math.min(center.y-body.y,body.y+body.depth-center.y)/2;
+		if(rx<=0 || ry<=0)return [];
+		return [for(index in 0...count){
+			var angle=2*Math.PI*(index+0.5)/count;
+			{x:center.x+(count==1 ? 0 : rx*Math.cos(angle)),
+			 y:center.y+(count==1 ? 0 : ry*Math.sin(angle)),z:body.z+body.height};
+		}];
+	}
+
 	public static function validateRule(rule:InsertAnchorPatternRule):Void {
 		if (rule==null || rule.minimumCount<2 || rule.maximumCount<rule.minimumCount || rule.maximumCount>256
 			|| rule.id==null || StringTools.trim(rule.id).length==0 || rule.demandFactor<1

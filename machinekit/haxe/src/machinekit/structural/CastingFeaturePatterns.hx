@@ -2,8 +2,6 @@ package machinekit.structural;
 
 import materia.casting.CastingFeature;
 import materia.casting.CastingPatterns;
-import materia.casting.BoxAlgebra;
-import materia.casting.Box3;
 
 /** Shared source patterns; constants and ownership belong to the caller. */
 class CastingFeaturePatterns {
@@ -27,13 +25,23 @@ class CastingFeaturePatterns {
 		var centre = alongX ? x : y,
 			low = Math.min(centre - accessWidth / 2, edge),
 			high = Math.max(centre + accessWidth / 2, edge);
+		// The bore enters the dry access pocket at its floor. If it continues
+		// above the register, that is a separate, directly authored upper bore.
+		var lowerTop = Math.min(stemTop, floor);
+		var upperFloor = roof;
 		var out = [
 			box(ids.access, ServiceOpening, accessOpenings, alongX ? high - low : accessDepth, alongX ? accessDepth : high - low,
-				roof
-				- floor
-				- (plate == null ? 0 : plate.thickness), alongX ? (low + high) / 2 : x, alongX ? y : (low + high) / 2, floor),
-			box(ids.stem, Clearance, stemOpenings, stemSize, stemSize, stemTop, x, y, 0)
+				roof - floor - (plate == null ? 0 : plate.thickness),
+				alongX ? (low + high) / 2 : x, alongX ? y : (low + high) / 2, floor),
+			box(ids.stem, Clearance, stemOpenings.filter(opening -> opening.kind == BodyFace),
+				stemSize, stemSize, lowerTop, x, y, 0)
 		];
+		if (stemTop > upperFloor) {
+			var upperOpenings = stemOpenings.filter(opening -> opening.kind == Feature);
+			upperOpenings.push(CastingPatterns.feature(plate == null ? ids.access : ids.register));
+			out.push(box(ids.stem + "-upper", Clearance, upperOpenings, stemSize, stemSize,
+				stemTop - upperFloor, x, y, upperFloor));
+		}
 		if (plate != null) {
 			if (ids.register == null)
 				throw "Foot plate requires an explicit register feature ID";
@@ -45,6 +53,4 @@ class CastingFeaturePatterns {
 		return out;
 	}
 
-	public static function retain(features:Array<CastingFeature>, supports:Array<Box3>):Array<CastingFeature>
-		return BoxAlgebra.retain(features, supports);
 }
