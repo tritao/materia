@@ -1895,3 +1895,17 @@ Fifteen focused preparation tests pass. Root is about 5.3 GB free: no structural
 solve or modal replay until it exceeds 8 GB; no DATA1 writes. Full supported-rack
 mass/compliance, executed-history rerun, 100-million-reversal weld fatigue,
 options (a–c), geometry approval and SR6-C remain release gates.
+
+User decision (2026-10-25): hold the complete mount-required `driveRack` migration,
+with no optional/unmounted interim path. Land the shared API and every caller in
+one change with the real router rack mount, after the rerun selects the Y drive
+and motor mount and the native conflicts are designed out. Frozen CAD remains
+unchanged beforehand. [RM2](../../RAIL_MOUNTING.md) records the caller inventory:
+Gantry, LinearTrack, AxisBuilderChecks, AssemblyIntegrityTests, SheetRouterChecks
+and the internal placement call. The [native study](fem/rack-results/mount-native-clearance.json)
+records 16 blocking preload/switch pairs per bed; the three chain-bracket pairs
+clear. The prototype datum correction passes 54 native assertions with zero
+lateral rail error on both beds. Catalogue mount connectors and the widened
+RM2 plan are already present; unsupported-rack API enforcement remains pending.
+J7 publication reserve/cycle time is excluded from frame acceptance. The Y drive
+and motor mount remain first in the braking-following study ranking.

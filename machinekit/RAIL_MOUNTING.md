@@ -248,6 +248,27 @@ allowance and mount mass/compliance; FE export includes them exactly once.
 The catalogue rack recipe owns holes; its joint gauge and motor-plate adjustment
 remain RM4 relationships, not dimensions baked into a rack seat.
 
+**Router migration boundary, user decision 2026-10-25:** hold the entire
+mount-required `AxisBuilder.driveRack` / `rackPlacement` migration. No optional
+mount, legacy/unmounted overload or split contract is introduced. Land it in one
+change with the router's real mount, after the corrected structural/motion rerun
+selects the Y drive and motor mount and native preload/switch conflicts are
+designed out. Frozen router geometry stays unchanged before that rerun. Inputs:
+the corrected axial-centre fixture and the [native clearance results](examples/sheet-router/fem/rack-results/mount-native-clearance.json),
+with 16 blocking profile/member pairs per bed; the three chain-bracket envelope
+flags per bed clear natively. Untracked RackSeat/RackMountPattern drafts remain
+study input only. The catalogue rack recipe with sourced mount connectors and
+this widened rail/rack/scale plan are already on main; the API migration is pending.
+
+Caller inventory to migrate together (repository search, excluding generated
+build copies): `Gantry.buildDrive` (all rack-driven gantries, including CNC-router
+examples), `LinearTrack.buildDrive` (placement and drive), `AxisBuilderChecks.run`,
+`AssemblyIntegrityTests` (drive and reversed placement), `SheetRouterChecks.mesh`,
+and the internal `driveRack` → `rackPlacement` call. Re-run the repository search
+at implementation time. The required host datum and mesh frame must determine
+orientation and reject disagreement, without a bounding-box supported-side
+heuristic. A declared datum alone must not disguise a missing physical load path.
+
 ### RM3 — Bench mill adoption
 
 `MillFrame` uses RM2 for the Y rails and the column's Z rails; the saddle carries the X rails the same
