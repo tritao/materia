@@ -297,6 +297,8 @@ Other candidates:
 | --- | --- | --- |
 | SKresin 3530 (Harzspezialisten) | Very thin, developed for filled systems; about 30 min pot life with Epohard 35, about €20/kg | [Harzspezialisten](https://www.harzspezialisten.de/polymerverguss-epoxidharz) |
 | Breddermann E45GB (Germany) | Low-viscosity casting system, 45 min working time, advertised for mineral casting; no datasheet or product link found | search "Breddermann E45GB" |
+| Aditya Birla CeTePox AM XP 340 | Specialist system for large machine beds, from the manufacturer's mineral-casting portfolio; datasheet, packs and Portugal supply not yet checked | Aditya Birla Advanced Materials, mineral-casting portfolio |
+| Aditya Birla CeTePox AM 3641 | Low-exotherm mineral-casting binder, a possible fit for the 1 t hobber plinth; datasheet, packs and Portugal supply not yet checked | Aditya Birla Advanced Materials, mineral-casting portfolio |
 
 Not recommended:
 - **Nazza art, table and floor resins.** No viscosity, Tg, modulus or creep data.
