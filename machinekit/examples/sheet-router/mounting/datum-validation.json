@@ -1,0 +1,73 @@
+{
+  "status": "Corrected axial-centre prototype; 54 native assertions pass; full-machine clearance pending",
+  "archive": "build/sheet-router-evidence/mount-datum-20261025.tar.gz",
+  "archiveSha256": "c9b2b92d9981cdf7a186641519958e442f53db30895d440ae405bb72960a6d3b",
+  "bytes": 119524,
+  "verifiedFiles": [
+    {
+      "path": "build/sheet-router-work/shared-mount/access/access.json",
+      "bytes": 3880,
+      "sha256": "30051fd02493ec06860a8b029d0db61d83da4b5a037949b7222d0338478c37af"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/cassette.step",
+      "bytes": 226392,
+      "sha256": "6358d3b6d11f3cb1158d2d5eb9c9121586d17568248fe60b90f60b70f7836c50"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/cover.step",
+      "bytes": 58632,
+      "sha256": "f671d4202bc8cc4f52b5c7b2c3ff686933b49163d0621f4b71eae9417ec2f24a"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/host.step",
+      "bytes": 56203,
+      "sha256": "3f07f8208bbe57d8e09e768070c40ec2b70000b9af4d3a4287c028e4f743348d"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/access/mass.json",
+      "bytes": 29718,
+      "sha256": "b6662f454a7e6044faab8f765b0067b2e5e3aacd189f54b8fd9ebad6e59fbc55"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/replication.step",
+      "bytes": 84823,
+      "sha256": "246d5826ded4eec5e556e7f46a8e40a36205b6e3fcec7f3bc1c2fc669de10dd4"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/geometry.json",
+      "bytes": 1141,
+      "sha256": "55c826d0a2e90362c3cfcb254f0dbadf43dafb7a94282f68771982d3cc2e09ab"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/mass.json",
+      "bytes": 31074,
+      "sha256": "e8b9c9a9b8b332def619ef9687c011c0924dc8234f8b5e14f91319172759a493"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/assembly.json",
+      "bytes": 62495,
+      "sha256": "4a300a82e5dfc4589345b2138913a7ef8c50b6e0e8740045b5f3fdf89406e9d3"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/pad.step",
+      "bytes": 84823,
+      "sha256": "e3e220a38d5a88b25b55f30b13534bdc6355c1d6e102d1d78d1c92b16fcb5f0f"
+    },
+    {
+      "path": "build/sheet-router-work/shared-mount/assembly/receiver.step",
+      "bytes": 88689,
+      "sha256": "a984c592493ba6a0c6eede03b0df4ef6e1d3e5c58e6b4c04e095d2c8c48ddf51"
+    },
+    {
+      "path": "machinekit/tests/mounting/src/LinearMountAssemblyTests.hx",
+      "bytes": 11729,
+      "sha256": "cec46ac1ebe0584c414392db3347b3f78bfef67bbe621f737266252c9cbbe9ee"
+    },
+    {
+      "path": "build/sheet-router-work/mount-datum-export.log",
+      "bytes": 8652,
+      "sha256": "d7564eee25daf1e386be8de779658c575e767e3297bcb8b0a8fb764bfcfeed4f"
+    }
+  ]
+}

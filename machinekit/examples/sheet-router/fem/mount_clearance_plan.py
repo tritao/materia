@@ -55,7 +55,7 @@ def screen(packet,native,pinion_width):
     local_pinion_z=(rb['minZ']+rb['maxZ'])/2
     if abs((sp['maxZ']-sp['minZ'])-1.6)>1e-6:raise ValueError('Changed source stand-off')
     moving={a['axis']:{p['id'] for p in a['movingMembers']} for a in packet['axes']}
-    bed=packet['workY'];placements=[];flags={};compared=0
+    bed=packet['workY'];placements=[];flags={};compared=0;candidate_boxes={}
     for side in ('Left','Right'):
         pinion=parts['pinionY'+side];pose=pinion['poseMm'];normal=rotate(pose,[0,0,1])
         if abs(abs(normal[0])-1)>1e-6 or max(abs(normal[1:]))>1e-6:
@@ -87,6 +87,7 @@ def screen(packet,native,pinion_width):
         pad_x=sorted([x-sign*50,x+sign*90])
         candidates['pad']=box([pad_x[0],longitudinal[0],top],[pad_x[1],longitudinal[1],top+8])
         candidates['replication']=box([pad_x[0],longitudinal[0],top+8],[pad_x[1],longitudinal[1],top+12])
+        candidate_boxes[side]=candidates
         skip={'rackYLeft','rackYRight','railPadYLeft','railPadYRight','chainX','chainY'}
         for px,py,pz in itertools.product((0,800,1600),(0,bed/2,bed),(0,200)):
             for name,candidate in candidates.items():
@@ -105,7 +106,7 @@ def screen(packet,native,pinion_width):
                     flags[key]['overlapPoses']+=1
                     flags[key]['maxOverlapBoxMm']=[max(a,b) for a,b in zip(flags[key]['maxOverlapBoxMm'],overlap)]
     return dict(bedMm=bed,poses=18,pairChecks=compared,placements=placements,
-        nativeChecksRequired=list(flags.values()),envelopePass=not flags,
+        nativeChecksRequired=list(flags.values()),candidateBoxes=candidate_boxes,envelopePass=not flags,
         scope='Conservative boxes and translation membership; not a native collision or full-clearance pass')
 
 

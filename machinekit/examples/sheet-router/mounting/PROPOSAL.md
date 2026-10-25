@@ -200,3 +200,17 @@ hardware. The separate 440 mm cassette fixture totals 2.328053 kg including its
 bed or moving-mass claim. Section cuts/joints, complete host service access,
 geometry-derived compliance and new pad-weld reactions/fatigue remain open.
 Frozen CAD and all release gates are unchanged.
+
+## Axial-centre prototype correction — 2026-10-25
+
+The pinion face start is now derived from the rack face and the actual pinion
+width; its axial centre locates the rail and shared pad. Rail local-width datum
+is −28.9 mm (previously −38.9), pad datum −8.9 mm (previously −18.9), and pad
+anchor/access holes follow the corrected reference. Frozen router datums are
+unchanged. The corrected fixture passes 54 native assertions, including rack,
+pinion, guide sweep, fastener contacts and pad key access. The whole-Y envelope
+screen now reports zero lateral rail error on both sides of both beds, with the
+same 19 overlap candidates per bed awaiting native checks. See
+[verified compact evidence](datum-validation.json) and
+[screen](../fem/rack-results/mount-clearance-plan.json). The earlier native archive
+remains historical evidence; no old results are relabelled as corrected CAD.

@@ -4,7 +4,7 @@
     "rack-joint/inputs/packets/y2600/manifest.json": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec",
     "rack-joint/inputs/packets/y3150/manifest.json": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
   },
-  "fixtureArchiveSha256": "ae23d7954fbf1b2f5b89e83ef9b4cbb1f544a5d756d9981acba0f8430cf4e7f7",
+  "fixtureArchiveSha256": "c9b2b92d9981cdf7a186641519958e442f53db30895d440ae405bb72960a6d3b",
   "beds": [
     {
       "bedMm": 2600,
@@ -47,8 +47,8 @@
             ]
           ],
           "requiredRailLocalWidthCoordinateMm": -28.899999999999977,
-          "prototypeRailLocalWidthCoordinateMm": -38.9,
-          "prototypeRailLateralErrorMm": 10.0
+          "prototypeRailLocalWidthCoordinateMm": -28.9,
+          "prototypeRailLateralErrorMm": 0.0
         },
         {
           "side": "Right",
@@ -86,8 +86,8 @@
             ]
           ],
           "requiredRailLocalWidthCoordinateMm": -28.90000000000009,
-          "prototypeRailLocalWidthCoordinateMm": -38.9,
-          "prototypeRailLateralErrorMm": -10.0
+          "prototypeRailLocalWidthCoordinateMm": -28.9,
+          "prototypeRailLateralErrorMm": 0.0
         }
       ],
       "nativeChecksRequired": [
@@ -396,6 +396,76 @@
           ]
         }
       ],
+      "candidateBoxes": {
+        "Left": {
+          "upright": {
+            "minX": -474.15,
+            "minY": -245.00000010000008,
+            "minZ": 821.5845057908103,
+            "maxX": -454.15,
+            "maxY": 3145.0000001000003,
+            "maxZ": 843.5845057908103
+          },
+          "foot": {
+            "minX": -499.04999999999995,
+            "minY": -245.00000010000008,
+            "minZ": 812.0000000999999,
+            "maxX": -454.15,
+            "maxY": 3145.0000001000003,
+            "maxZ": 821.5845057908103
+          },
+          "pad": {
+            "minX": -515.25,
+            "minY": -245.00000010000008,
+            "minZ": 800.0,
+            "maxX": -375.25,
+            "maxY": 3145.0000001000003,
+            "maxZ": 808.0
+          },
+          "replication": {
+            "minX": -515.25,
+            "minY": -245.00000010000008,
+            "minZ": 808.0,
+            "maxX": -375.25,
+            "maxY": 3145.0000001000003,
+            "maxZ": 812.0
+          }
+        },
+        "Right": {
+          "upright": {
+            "minX": 2054.15,
+            "minY": -245.00000010000008,
+            "minZ": 821.5845057908103,
+            "maxX": 2074.15,
+            "maxY": 3145.0000001000003,
+            "maxZ": 843.5845057908103
+          },
+          "foot": {
+            "minX": 2054.15,
+            "minY": -245.00000010000008,
+            "minZ": 812.0000000999999,
+            "maxX": 2099.05,
+            "maxY": 3145.0000001000003,
+            "maxZ": 821.5845057908103
+          },
+          "pad": {
+            "minX": 1975.25,
+            "minY": -245.00000010000008,
+            "minZ": 800.0,
+            "maxX": 2115.25,
+            "maxY": 3145.0000001000003,
+            "maxZ": 808.0
+          },
+          "replication": {
+            "minX": 1975.25,
+            "minY": -245.00000010000008,
+            "minZ": 808.0,
+            "maxX": 2115.25,
+            "maxY": 3145.0000001000003,
+            "maxZ": 812.0
+          }
+        }
+      },
       "envelopePass": false,
       "scope": "Conservative boxes and translation membership; not a native collision or full-clearance pass"
     },
@@ -440,8 +510,8 @@
             ]
           ],
           "requiredRailLocalWidthCoordinateMm": -28.89999999999997,
-          "prototypeRailLocalWidthCoordinateMm": -38.9,
-          "prototypeRailLateralErrorMm": 10.0
+          "prototypeRailLocalWidthCoordinateMm": -28.9,
+          "prototypeRailLateralErrorMm": 0.0
         },
         {
           "side": "Right",
@@ -479,8 +549,8 @@
             ]
           ],
           "requiredRailLocalWidthCoordinateMm": -28.900000000000084,
-          "prototypeRailLocalWidthCoordinateMm": -38.9,
-          "prototypeRailLateralErrorMm": -10.0
+          "prototypeRailLocalWidthCoordinateMm": -28.9,
+          "prototypeRailLateralErrorMm": 0.0
         }
       ],
       "nativeChecksRequired": [
@@ -789,6 +859,76 @@
           ]
         }
       ],
+      "candidateBoxes": {
+        "Left": {
+          "upright": {
+            "minX": -474.15,
+            "minY": -245.00000010000142,
+            "minZ": 821.5845057908103,
+            "maxX": -454.15,
+            "maxY": 3695.0000000999994,
+            "maxZ": 843.5845057908103
+          },
+          "foot": {
+            "minX": -499.04999999999995,
+            "minY": -245.00000010000142,
+            "minZ": 812.0000000999999,
+            "maxX": -454.15,
+            "maxY": 3695.0000000999994,
+            "maxZ": 821.5845057908103
+          },
+          "pad": {
+            "minX": -515.25,
+            "minY": -245.00000010000142,
+            "minZ": 800.0,
+            "maxX": -375.25,
+            "maxY": 3695.0000000999994,
+            "maxZ": 808.0
+          },
+          "replication": {
+            "minX": -515.25,
+            "minY": -245.00000010000142,
+            "minZ": 808.0,
+            "maxX": -375.25,
+            "maxY": 3695.0000000999994,
+            "maxZ": 812.0
+          }
+        },
+        "Right": {
+          "upright": {
+            "minX": 2054.15,
+            "minY": -245.0000001000005,
+            "minZ": 821.5845057908103,
+            "maxX": 2074.15,
+            "maxY": 3695.0000001000003,
+            "maxZ": 843.5845057908103
+          },
+          "foot": {
+            "minX": 2054.15,
+            "minY": -245.0000001000005,
+            "minZ": 812.0000000999999,
+            "maxX": 2099.05,
+            "maxY": 3695.0000001000003,
+            "maxZ": 821.5845057908103
+          },
+          "pad": {
+            "minX": 1975.25,
+            "minY": -245.0000001000005,
+            "minZ": 800.0,
+            "maxX": 2115.25,
+            "maxY": 3695.0000001000003,
+            "maxZ": 808.0
+          },
+          "replication": {
+            "minX": 1975.25,
+            "minY": -245.0000001000005,
+            "minZ": 808.0,
+            "maxX": 2115.25,
+            "maxY": 3695.0000001000003,
+            "maxZ": 812.0
+          }
+        }
+      },
       "envelopePass": false,
       "scope": "Conservative boxes and translation membership; not a native collision or full-clearance pass"
     }

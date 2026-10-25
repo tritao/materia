@@ -42,17 +42,26 @@ class LinearMountAssemblyTests {
   assembly.addComponent("receiver",member);assembly.addComponent("rack",rack,rackPose);
   // One 140 mm replicated datum covers the rail and outward rack support.
   var rail=machinekit.motion.LinearRail.metric("HGH25CA",400,machinekit.motion.LinearRail.NOMINAL);
-  var railPose=machinekit.assembly.AxisBuilder.orient(-centre+12+rail.spec.railHeight,-200,-38.9,[1.0,0,0],[0.0,1,0]);
+  // The source pinion pose is its axial face start, not its centre.
+  var pinion=new machinekit.transmission.HelicalPinion(new ComponentValues().setToken("hand","left"));
+  var pinionWidth=pinion.n("faceWidth");
+  var pinionFaceStart=thickness+washer.thickness+(rack.spec.faceWidthMm-pinionWidth)/2;
+  var pinionAxialCentre=pinionFaceStart+pinionWidth/2;
+  var railWidthCoordinate=pinionAxialCentre-60;
+  var padWidthCoordinate=railWidthCoordinate+20;
+  var anchorPadX=pinionAxialCentre-padWidthCoordinate;
+  check(Math.abs(railWidthCoordinate+28.9)<1e-9,"rail datum is anchored to the pinion axial centre");
+  var railPose=machinekit.assembly.AxisBuilder.orient(-centre+12+rail.spec.railHeight,-200,railWidthCoordinate,[1.0,0,0],[0.0,1,0]);
   var padHoles:Array<materia.casting.InsertHole>=[],layerHoles:Array<materia.casting.InsertHole>=[];
   function clearance(id:String,x:Float,y:Float,d:Float):Void {
    for(pair in [{depth:8.0,rows:padHoles},{depth:4.0,rows:layerHoles}]) {
     var h=InsertHoles.records(InsertHoles.through(d,pair.depth))[0];h.id=id;h.frame.x=x;h.frame.y=y;pair.rows.push(h);
    }
   }
-  for(i in 0...anchors.length)clearance('anchor${i+1}',50,-anchors[i],7);
-  for(i in 0...stations.length)clearance('push-access${i+1}',50,-stations[i],3.5);
+  for(i in 0...anchors.length)clearance('anchor${i+1}',anchorPadX,-anchors[i],7);
+  for(i in 0...stations.length)clearance('push-access${i+1}',anchorPadX,-stations[i],3.5);
   for(c in rail.mountingConnectors()) {var p=F.compose(railPose,c.frame);clearance('rail-'+c.name,-20,-p.y,7);}
-  var padPose=F.fromRotationMatrix(-centre,0,-18.9,[0,0,1,0,-1,0,1,0,0]);
+  var padPose=F.fromRotationMatrix(-centre,0,padWidthCoordinate,[0,0,1,0,-1,0,1,0,0]);
   var layerPose=F.compose(padPose,F.translation(0,0,8));
   var pad=new LinearMountSteel(new ComponentValues().setNumber("width",140).setNumber("length",length).setNumber("thickness",8)
    .setToken("stock","weldable-mild-steel").setToken("role","host-pad").setToken("holes",InsertHoles.fromNeutral(padHoles)));
@@ -107,15 +116,14 @@ class LinearMountAssemblyTests {
     var keyBody=own(machinekit.assembly.PosedParts.moved(key,keyPose));
     clear(keyBody,padBody,"adjuster key passes the real outboard pad opening");clear(keyBody,layerBody,"adjuster key passes the replicated datum opening");
    }
-   var pinion=new machinekit.transmission.HelicalPinion(new ComponentValues().setToken("hand","left"));
    var pinionRaw=own(pinion.geometry(Envelope));
    for(i in 0...9) {
-    var gear=own(machinekit.assembly.PosedParts.moved(pinionRaw,F.translation(rack.spec.pitchHeightMm-rack.spec.holeHeightMm+radius,-225+i*56.25,21.1)));
+    var gear=own(machinekit.assembly.PosedParts.moved(pinionRaw,F.translation(rack.spec.pitchHeightMm-rack.spec.holeHeightMm+radius,-225+i*56.25,pinionFaceStart)));
     check(gear.distance(receiverBody)>=1.0,"pinion envelope clears complete receiver/foot");
    }
    var block=machinekit.motion.LinearRailBlock.metric("HGH25CA",machinekit.motion.LinearRailBlock.NOMINAL);
    for(i in 0...9) {
-    var pose=machinekit.assembly.AxisBuilder.orient(-centre+12+rail.spec.railHeight,-200+i*50,-38.9,[1.0,0,0],[0.0,1,0]);
+    var pose=machinekit.assembly.AxisBuilder.orient(-centre+12+rail.spec.railHeight,-200+i*50,railWidthCoordinate,[1.0,0,0],[0.0,1,0]);
     var body=placed(block,pose);check(body.distance(receiverBody)>1,"guide block sweep clears outboard foot");
    }
    var reload=machinekit.assembly.MachineAssembly.decode(assembly.encode());
@@ -129,7 +137,7 @@ class LinearMountAssemblyTests {
     sys.io.File.saveContent(output+"/assembly.json",assembly.encode());sys.io.File.saveContent(output+"/mass.json",haxe.Json.stringify(fem,null,"  "));
     sys.io.File.saveContent(output+"/geometry.json",haxe.Json.stringify({reviewOnly:true,sourceRack:rack.spec.designation,lengthMm:length,
      footMm:foot,receiverHeightMm:height,receiverThicknessMm:thickness,flangeWidthMm:44.9,anchors:selected,
-     datumMm:{carrier:12,rackBack:back,pinionCentre:58},
+     datumMm:{carrier:12,rackBack:back,pinionCentre:58,pinionAxialCentre:pinionAxialCentre,railWidth:railWidthCoordinate,padWidth:padWidthCoordinate},
      limitations:["Local 500 mm rack/400 mm rail fixture; not a complete router clearance sweep","Assumed replication product/creep unresolved",
       "Welded pad/tube load and fatigue qualification pending","Nominal guide block used; supplier sweep still required","No new SR-D3 pass"]},null,"  "));
    }
