@@ -381,7 +381,15 @@ for epoxy screeds and polymer concrete. Options at Magmag
 | LIS MH 100/110 | 100 L | 1,500 W | €1,399 | More capacity than needed |
 | LIS MH 120/140 | 120 L | 1,500 W | €1,632 | More capacity than needed |
 
-Ask the seller (suporte@magmag.pt, +351 236 621 161) for:
+Alternatives at ferramentas.pt. Their pages could not be read beyond the titles, so capacity, speed,
+discharge and price are still to check:
+
+| Model | Known | Fit |
+| --- | --- | --- |
+| Great Tool MH140, horizontal mixer | 230 V, 1,500 W | Same type as the LIS MH range, an alternative for the hobber plinth. [Product](https://ferramentas.pt/misturadora-horizontal-230v-1500w-great-tool-mh140.html) |
+| Great Tool GTCOME50120, "automatic" mortar mixer | title only | Probably a stand-mounted paddle mixer, like the LIS 55 L: an alternative to the drill mixer for the smaller castings. [Product](https://ferramentas.pt/misturadora-de-argamassa-automatica-great-tool-gtcome50120.html) |
+
+Ask the seller (suporte@magmag.pt, +351 236 621 161, or ferramentas.pt for the Great Tool models) for:
 - shaft speed (about 30–60 rpm is normal for trough mixers);
 - the usable batch with a stiff mortar (usually 50–60 % of the trough), and whether the motor
   copes at that load;
@@ -566,7 +574,7 @@ Silane: [TCI](https://www.tcichemicals.com/ES/en/p/G0210),
 | Item | Source | Notes | Cost |
 | --- | --- | --- | --- |
 | Mixing drill, ≥ 1,400 W, low gear | e.g. Skil 1613AA (1,400 W, two speeds, M14) ([product](https://www.skileurope.com/pt/ferramentas-eletricas/misturadoras/1613aa)) | plus a 140–160 mm double-spiral paddle | ~€100–250 (not checked) |
-| Second drill mixer (plinth) or LIS MH 80 trough mixer | Magmag | trough mixer only if more large pours follow | €100–250, or €1,250 |
+| Second drill mixer (plinth) or a trough mixer | Magmag (LIS MH 80) or ferramentas.pt (Great Tool MH140; GTCOME50120 as a stand mixer) | trough mixer only if more large pours follow | €100–250, or €1,250 for the LIS; Great Tool prices to check |
 | Mortar tubs, 60–90 L | builders' merchant | 3–4, one per batch in rotation | ~€10–20 each (not checked) |
 | Platform scale, 150 kg, 100 g resolution | e.g. Orbegozo PB 2222 ([PcComponentes](https://www.pccomponentes.pt/balanca-digital-orbegozo-pb-2222-ate-150-kg-aco-inoxidavel-ecra-lcd)) | aggregate kits; 100 g is 0.4 % of a 27 kg kit | €11.99 |
 | Bench scale, 5 kg, 1 g | kitchen scale | resin, hardener and silane | ~€15 (not checked) |
