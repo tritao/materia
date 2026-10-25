@@ -4,7 +4,8 @@
 panel-CAM records to casting examples. Add this directory as a Haxeon source root;
 it is example configuration, not a library default or a separate package.
 
-Production compound, equipment and coupon evidence remain unresolved. Consumers
+Production compound, equipment and coupon evidence remain unresolved; candidate
+compound suppliers, quantities and coupon tests are in [SOURCING.md](SOURCING.md). Consumers
 keep their existing readiness checks. Machine setups own geometry, orientations,
 feature allocation priorities and source interface requirements.
 
