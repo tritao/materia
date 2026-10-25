@@ -1205,6 +1205,27 @@ the pedestal uses shared records/joints/planner with configuration only. Changin
 stock thickness, casting size, opening direction and core strategy requires no
 mill-specific conditionals in the libraries. Existing frame geometry is unchanged.
 
+**Mold scene integration (first item after phase 8; user decision 2026-10-25).**
+1. The mold export writes an occurrence tree grouped by role, taken from the
+   mold plan rather than from names:
+   - Casting (reference);
+   - Mold shell (bed, then walls by side);
+   - Formers, named by the source feature they form;
+   - EPS cores, by core unit, with layers, carriers and bridges;
+   - Inserts, each with its fixture, screws and bore masks beneath it;
+   - Hardware.
+2. Each tooling occurrence carries the source feature or insert IDs it serves.
+   Selecting a tooling node highlights its features on the casting, and
+   selecting a casting feature lists the tooling that forms it.
+3. In the machine scene, each casting occurrence offers *Open mold*. It switches
+   to that casting's mold variant for the same configuration, selects the
+   casting there, and offers a way back.
+4. Mold geometry stays out of machine assembly scenes.
+
+Acceptance: every mold occurrence sits in exactly one role group, every tooling
+occurrence names at least one source ID or is listed as shared hardware, and
+the cross-links round-trip for the base and the column.
+
 ### 9. Physical calibration and release
 
 Fabricate a joint coupon and a representative small mold with EPS core, steel
