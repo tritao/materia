@@ -21,6 +21,14 @@ class CastingCavityCad {
 	static inline var CONTACT_AREA = 1e-8;
 	static inline var CONTACT_VOLUME = 1e-8;
 
+	/** Exact physical drilling tool, shared by source and installed views. */
+	public static function receiver(hole:materia.casting.InsertHole):Part {
+		return Scope.run(scope -> {
+			var local=scope.own(Part.cylinder(hole.diameter/2,hole.depth));
+			return scope.own(PosedParts.moved(local,hole.frame));
+		});
+	}
+
 	public static function prism(prism:CastingPrism):Part {
 		return Scope.run(scope -> {
 			var local = scope.own(Part.prism([for (point in prism.profile) new Vector(point.x, point.y)], 0, prism.height));

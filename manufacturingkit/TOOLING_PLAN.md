@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: shared shop recipe, source authoring cleanup and initial plinth integration landed; approved geometry corrections, four final kits and shared mold scene integration remain. No flared former work.
+- [ ] Phase 8: authoring cleanup and approved mill source simplification complete, with verified base/column kits; hobber source corrections, four-kit final verification and shared mold scene integration remain. No flared former work.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1655,6 +1655,53 @@ Functional fixes:
    bolted rear plate, using the existing FEM export. Record the result; the
    source changes only on that evidence.
 
+Mill compression-foot detail decision (2026-10-25): use a removable
+60 × 60 × 15 mm floating roof plate with an 18 mm clearance bore, an M16 support nut
+below it and a separate locknut. The access floor and stem are 18 mm; the
+plate top is 118 mm above the sole. The nominal pad sits 50 mm below the sole.
+A collar-free foot and the two nuts use the existing levelling-foot family.
+The rod locates the plate; its tip stops 2 mm below the ceiling, so no
+upper stem pocket or plate register is cast. The plate fits the access pocket
+at every rotation around the rod. The support pushes upward into the plate
+underside, and the plate bears on the casting ceiling; geometry checks reject the former reversed load path.
+Supplier geometry, plate bending and physical load qualification remain Pending.
+
+Mill source detail decisions (2026-10-25): keep the finished base interfaces on
+one top plane; declare 4 mm raw finishing stock separately from the unresolved
+process-error allocation. Use a 150 mm stepped column foot with a 3.2 mm internal
+radius, a 3 mm joint gap, four existing M12 clamps and three ISO 4026 flat-point
+M8 jacks (25 mm). The sole pads share M12 clearance, M6 fixture and M8 jack holes;
+source access pockets and retained roofs follow the tool and policy clearances.
+The complete source assembly checks its joint datums and cure-before-torque.
+The fully threaded jacks need no counterbores; ordinary source-thread plugs
+protect both ends during the pour. Only headed class 8.8 screws may clamp the
+joint. Jack strength and bearing qualification remain physical work.
+Use one M6 anchor family and one centred-M12 36 × 100 × 30 mm lifting blank on
+both mill castings, with the front base blanks quarter-turned to fit the land.
+Hatch steel is post-cure bonded D12 × 12 mm C45 stock in D12.2 × 12 mm receivers;
+compound and bond evidence remain Pending. Proud raw steel is rebated into the
+bed. Cured closures fill the actual clearance and cutter relief of both steel
+and datum receivers; source screw/pin access stays dry and open. Exact coverage
+and the bed-with-closure removal group verify those physical seals.
+Maximum aggregate size remains an unresolved compound-datasheet input; the
+named in-house minimum passage ratio is three aggregate diameters.
+Board-limited recipe rules measure the finished cavity along the selected
+opening/withdrawal normal, not an unrelated thin dimension or an overshooting
+intent cut. The two deep motor-bay cheeks therefore use the existing EPS route.
+The hobber's small catalogue sockets use the bed as their common coplanar
+source-thread receiver; raised mounting faces keep separate datum supports.
+This casting-specific receiver override avoids undersized routed datum sockets.
+
+The isolated-column FEM comparison uses the existing posed-body export and
+C3D10 deck path: open 2.787 × 10^9 N·mm/rad, ideal eight-patch bolted rear plate
+6.376 × 10^9 N·mm/rad (2.29×). Global mesh refinement changes stiffness by 0.65%
+and 0.20%; torque and strain-energy balances pass. The recorded comparison is
+in `machinekit/examples/bench-mill/fem/column-torsion-comparison.json`.
+Keep the open production source: assumed compound properties and ideal bolt
+patches are conditional evidence, not qualified bolt slip or machine accuracy.
+
+
+
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.
@@ -1796,3 +1843,18 @@ Former registration decision (2026-10-22): neck and flange sheets register again
 - Finished casting surfaces (2026-10-24): refine reconstructed resin before review, STEP and mesh export so tangent access reliefs leave no artificial coplanar face patches; preserve exact solid geometry.
 
 - Finished casting presentation (2026-10-25): installed and as-poured views use the declared handling transform as a rigid display-only frame. Lifting-point identification derives from source LiftingMount inserts, with transparent resin and capacity explicitly Pending; no rated hardware or handling qualification is implied.
+
+Mill step detail decision (2026-10-25): retain the 150 mm foot height and form the step with two declared side clearances, with a 3.2 mm internal radius from the shared 6 mm profile cutter plus 0.2 mm margin. Yaw the column pour frame a quarter turn so its tall EPS clearances fit the existing stock. Anchor screening uses an exact insert-local intersection containing every candidate and cover test; the selected pattern still receives whole-body native confirmation.
+
+Mill hatch detail decision (2026-10-25): keep the four service-hole centres and use made C45 cylindrical inserts, 12 mm diameter by 12 mm, with policy-sized blind M4 threads. Drill 12.2 mm flat-bottom receivers 12 mm deep after casting cure, embed the steel by 10 mm and retain the existing 2 mm proud service face. The in-house receiver ligament floor is 0.25 diameter and the back-wall floor is 0.5 diameter, checked against exact casting material; these are geometric floors, not compound or bond capacity. The adhesive and coupon remain one Pending input. Receiver machining is absent from pour geometry and mass, and present in service CAD and shop records.
+
+Mill anchor detail decision (2026-10-25): the shared shop declares ISO 4162 coarse anchor diameters 5, 6, 8, 10, 12, 14 and 16 mm. Select the smallest diameter that admits every insert in a casting, retaining each insert's demand-sized count and the exact native confirmation; do not mix diameters to rescue a failing footprint.
+
+Mill lifting detail decision (2026-10-25): use one centred-thread blank per lifting role from the declared maximum 40 × 100 × 30 mm stock; quarter-turn that same blank where it fits the front land better. Resolve its edge land in the sizing pass. Joint-pad widths follow the same demand and steel-hole selector before the source is constructed. The approved centring correction replaces the previous fixed off-centre lifting drilling; exact cover and neighbour checks remain mandatory.
+
+Mill interface detail decision (2026-10-25): the finished Y seat plane is the casting top; guide and bearing inserts carry 4 mm of explicit grinding stock, separate from the unresolved finishing-process error share. The column has a distinct 3 mm joint plane above the base, and source column stations use it. The lower hatch fixing retains its 10 mm sole datum; the upper fixing follows the existing bay-top datum. The source datum schemes use the authored top, side and front envelope faces; physical datum accuracy remains unqualified.
+
+Mill bed detail decision (2026-10-25): keep the bed at the source casting boundary and route rebates for proud raw steel. Model the compatible cured closure as the exact routed clearance/relief volume minus the steel envelope; it remains attached to the bed in assembly and removal. Do not fill those corner gaps with a geometric tolerance. Dry-fit/protect the raw mounting faces, cure and inspect the closure before the pour, and keep all steel/anchor bonding faces uncoated. The existing material/coupon qualification remains Pending. Fixing length uses the remaining board below each rebate floor.
+
+Mill joint detail decision (2026-10-25): retain the four M12 clamp centres and use three fully threaded ISO 4026 flat-point M8 × 25 jacks in a 3 mm grout gap. The fully threaded source holes need ordinary bore protection and no counterbore. Jack bearing and strength remain unqualified. Jack/fixture spacing and access depth follow the hole policy and a 2.5 mm driver clearance; the two anchor lands are sized from demand. All four sole pads have the same jack and dedicated fixture drilling; three jacks are installed, with unused holes protected during the pour. Cure precedes final clamp torque. The lifting selector admits 36 × 100 × 30 mm blanks: the centred M12 thread retains the policy's 12 mm radial wall, the demand-sized M6 pattern fits, and exact neighbour/cover checks pass. Front base lifts quarter-turn that same part. The rear chamber floor also retains the declared roof web above the bolt-access ceiling.
+Mill passage detail decision (2026-10-25): use the shared in-house minimum passage/aggregate ratio of 3. Maximum aggregate size remains a required compound-datasheet input; no grading value or material qualification is assumed.

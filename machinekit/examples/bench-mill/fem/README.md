@@ -477,3 +477,32 @@ Later work includes the distributing-coupling assembly model and uncertainty/con
 checks. The modal inertia/export and nine-pose numerical gates now pass;
 the revised static travel budget passes. Geometry candidates stay deferred
 until that budget and modal review justify them.
+
+
+### Isolated column torsion comparison
+
+`MillFemExport --column-torsion` exports the current exact service casting through
+`AssemblyFemExport` to `build/fem/column-torsion/column.json`. Run
+`column_torsion.py <column.json> --ccx <ccx> --output <absolute-output-directory>`
+with the existing FEM environment and CalculiX library path. The default 24 and
+18 mm quadratic tetrahedral meshes must agree within 5%; the solve also checks
+positive Jacobians, the support torque and strain energy against the applied
+unit moment. Straight-sided quadratic elements resolve curved boundaries with
+at least 24 circle points; each meshed material volume must agree with the
+imported BREP within 1%. It uses the same deck helpers, element ordering and
+solver path as the frame fixtures.
+
+Both cases clamp the sole and load a rigid top diaphragm. The candidate is a
+6 mm steel rear plate above the 150 mm step, connected at eight ideal rigid bolt
+patches; its face is not bonded to the casting. Cast-in steel and anchors are
+omitted from stiffness in both cases while their exact source voids remain.
+This isolates a conditional section comparison. Assumed compound properties,
+ideal bolt stiffness and omitted joint slip prevent a machine-accuracy claim or
+a production plate decision. The base–column joint is outside this model.
+
+The recorded source-simplification comparison is in
+[column-torsion-comparison.json](column-torsion-comparison.json): 2.787 GN·mm/rad
+open and 6.376 GN·mm/rad with the ideal bolted plate (2.29×). Refinement changes
+are 0.65% and 0.20%; material-volume error is below 0.005%. Torque and strain
+energy balance pass. The production source stays open; this result does not
+qualify compound properties or bolt-interface slip.

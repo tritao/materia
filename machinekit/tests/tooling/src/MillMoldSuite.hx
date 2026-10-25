@@ -5,6 +5,7 @@ import machinekit.tooling.CastingMoldCad;
 class MillMoldSuite {
 	public static function main():Void {
 		var frame = MillMoldSetup.frame();
+		if(Sys.args().indexOf("--column-plan")>=0) {MillMoldChecks.columnPlan(frame);return;}
 		var p = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var review=CastingMoldCad.review(p);
         MillMoldChecks.run(frame,p,review);
@@ -14,6 +15,7 @@ class MillMoldSuite {
         if(steps.length!=review.demoldingSteps.length)throw "Casting presentation omitted planned steps";
         for(index in 0...steps.length)if(steps[index].id!=review.demoldingSteps[index].id)throw "Casting presentation reordered planned steps";
         materia.project.SceneArtifact.encode(scene);
+        if(Sys.args().indexOf("--small")<0 && Sys.args().indexOf("--assembly-only")<0) MillMoldChecks.columnPlan(frame);
         Sys.println("Casting presentation: planner step order and artifact validation passed");
 	}
 }

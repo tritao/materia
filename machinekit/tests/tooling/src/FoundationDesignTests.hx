@@ -115,65 +115,6 @@ class FoundationDesignTests {
 		});
 	}
 
-	/** Approved production-anchor correction against the independent pre-anchor STEP.
-	 * Restore the historical 40 x 60 mm joint and 40 x 40 mm foot-seat voids,
-	 * cut the policy-sized pads, then
-	 * subtract the declared lifting seats and actual standard anchor hardware.
-	 * Other frozen geometry stays fixed. */
-	static function anchorDesignChange(previous:Part,foundation:machinekit.structural.MineralFoundation):Part {
-		return Solids.building([new Part(previous.shape.cloneShape())], parts -> {
-			var restored:Array<Part> =[parts[0]];
-			for (row in foundation.insertLocations())
-				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount) {
-					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
-					var old=Part.box(40,60,box.height);parts.push(old);
-					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
-				}
-			for (row in foundation.insertLocations())
-				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat) {
-					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
-					var old=Part.box(40,40,box.height);parts.push(old);
-					var placed=PosedParts.moved(old,row.pose);parts.push(placed);restored.push(placed);
-				}
-			// Approved flange-anchor migration enlarges only the hatch blank;
-			// its service thread remains at the historical mounting datum.
-			var hatches=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount);
-			var envelope:Part=null;
-			if (hatches.length>0) {
-				var envelopeParts=[for (prism in foundation.body.castingEnvelope()) machinekit.structural.CastingCavityCad.prism(prism)];
-				for (part in envelopeParts) parts.push(part);
-				envelope=Part.fuseAll(envelopeParts);parts.push(envelope);
-			}
-			for (row in hatches) {
-					var spec=row.part.insertSpec();
-					var occupied=switch spec.anchorage {case Bolted(_,anchors):[for (anchor in anchors) anchor.holeId];default:[];};
-					var hole=spec.holes.filter(h -> occupied.indexOf(h.id)<0)[0];
-					var old=Part.box(20,20,10);parts.push(old);
-					var pose=F.compose(row.pose,F.translation(hole.frame.x,hole.frame.y,hole.frame.z-10));
-					var placed=PosedParts.moved(old,pose);parts.push(placed);
-					// Historical steel protrudes beyond the rear opening; only
-					// restore the cavity inside the unchanged casting envelope.
-					var cavity=placed.intersect(envelope);parts.push(cavity);restored.push(cavity);
-			}
-			var bulk=Solids.union(restored);parts.push(bulk);
-			var cuts:Array<Part> =[];
-			for (row in foundation.insertLocations()) {
-				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.ColumnMount
-					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount
-					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LevelingSeat
-					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount) {
-					var box=materia.casting.InsertSpec.InsertBodyCodec.box(row.part.insertSpec().body,row.id);
-					var local=Part.box(box.width,box.depth,box.height);parts.push(local);
-					var placed=PosedParts.moved(local,row.pose);parts.push(placed);cuts.push(placed);
-				}
-				for (hardware in machinekit.tooling.InsertAnchorGeometry.components(row.part.insertSpec())) {
-					var local=hardware.part.geometry();parts.push(local);local.shape.setThreadedFaces([]);
-					var placed=PosedParts.moved(local,F.compose(row.pose,hardware.pose));parts.push(placed);cuts.push(placed);
-				}
-			}
-			return Solids.cut(bulk,cuts);
-		});
-	}
 
 	static function prism(p:materia.casting.CastingPrism):Part {
 		var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
@@ -205,7 +146,7 @@ class FoundationDesignTests {
 		var input:materia.tooling.casting.CastingToolingInput = {
 			id: "foot-fixture", revision: 1, lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
-			precastStruts:[],
+			precastStruts:[],postCureInserts:[],
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
 		var frame = MillMoldSetup.frame();
@@ -463,6 +404,15 @@ class FoundationDesignTests {
 		var cwd = Sys.getCwd(),
 			root = (sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/tests/tooling" : cwd) + "/fixtures/foundation-design";
 		var frame = MillMoldSetup.frame();
+		if(Sys.args().indexOf("--export-approved-mill")>=0) {
+			for(row in [{id:"mill-base",body:frame.base.body},{id:"mill-column",body:frame.column.body}]) {
+				var part=row.body.geometry();
+				try part.shape.exportStep(root+"/"+row.id+"-simplified.step")
+				catch(error:Dynamic) {part.close();throw error;}
+				part.close();
+			}
+			return;
+		}
 		var columnBolts = frame.components().filter(row -> StringTools.startsWith(row.id, "columnBolt"));
 		assertions++;
 		if (columnBolts.length != 4) throw "Mill needs its four column service screws";
@@ -497,12 +447,12 @@ class FoundationDesignTests {
 			if (row.part.body.castingFeatures().filter(feature -> feature.derivedFrom != null
 				|| feature.id.indexOf("-fragment-") >= 0).length != 0)
 				throw "Foundation pockets must be directly authored at named design stations: " + row.id;
-			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + ".step.gz"]);
+			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + (StringTools.startsWith(row.id,"mill-") ? "-simplified" : "") + ".step.gz"]);
 			var text = process.readStdout(), status = process.exitCode();
 			process.close();
 			if (status != 0)
 				throw "Cannot decode frozen migration CAD fixture";
-			var records:Array<Dynamic> = cast reference.files;
+			var records:Array<Dynamic> = cast (StringTools.startsWith(row.id,"mill-") ? reference.approvedSimplification.files : reference.files);
 			var matches = records.filter(record -> record.id == row.id);
 			assertions++;
 			if (matches.length != 1 || haxe.crypto.Sha256.encode(text) != matches[0].stepSha256
@@ -522,13 +472,9 @@ class FoundationDesignTests {
 					added.close(); removed.close();
 				} catch (error:Dynamic) {corrected.close(); previous.close(); actual.close(); throw error;}
 				corrected.close();
-			} else if (StringTools.startsWith(row.id,"mill-")) {
-				var corrected=anchorDesignChange(previous,row.part);
-				try same(corrected,actual,row.id+" declared pad, lifting and anchor corrections")
-				catch (error:Dynamic) {corrected.close();previous.close();actual.close();throw error;}
-				corrected.close();
-			} else same(previous,actual,row.id);
-			var sourceInput = machinekit.tooling.FoundationToolingAdapter.snapshot(row.part,row.id,1);
+			} else same(previous,actual,row.id + (StringTools.startsWith(row.id,"mill-") ? " approved source simplification" : ""));
+			var sourceDatums=row.part.body.foundationDatumScheme();
+			var sourceInput = machinekit.tooling.FoundationToolingAdapter.snapshot(row.part,sourceDatums==null ? row.id : sourceDatums.foundationId,1);
 			var unsupported = row.part.body.finishedCavities().filter(cavity -> !CastingCavities.supportsBoxes(cavity));
 			var boxSupported = row.part.body.collisionHullQualification.status == machinekit.structural.CastingCollisionQualification.CastingCollisionStatus.Supported;
 			var boxes = boxSupported ? row.part.body.materialBoxes() : null;

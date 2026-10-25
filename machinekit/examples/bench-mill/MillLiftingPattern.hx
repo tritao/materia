@@ -12,12 +12,15 @@ import materia.casting.CastingPatterns;
 class MillLiftingPattern {
 
 	public static function placements(body:ComponentValues,existing:Array<CastInsertPlacement>,
-		details:MillCastingDetails):Array<CastInsertPlacement> {
-		var foundation=new MineralFoundation(body,existing),mass=machinekit.structural.FoundationSizing.asCastMass(foundation);
+		details:MillCastingDetails,topFace:{width:Float,depth:Float},rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule):Array<CastInsertPlacement> {
+		var foundation=new MineralFoundation(body.copy().setToken("postCureBonds","[]"),existing),mass=machinekit.structural.FoundationSizing.asCastMass(foundation);
 		if (mass.mass<=0 || !Math.isFinite(mass.mass) || mass.unaccounted.length>0)
 			throw "Lifting layout needs the source foundation mass and centre of mass";
-		var footprints=[{width:details.liftingPlateWidthMm,depth:details.liftingPlateDepthMm}]
-			.concat(details.liftingAlternativeFootprintsMm);
+		var servicePolicy=machinekit.design.ThreadedHolePolicy.resolve(details.liftingThread.thread,C45Bright);
+		var minimumWidth=Math.ceil(details.liftingThread.thread.majorDiameter+2*servicePolicy.minWall);
+		var footprints=[for (width in Std.int(minimumWidth)...Std.int(Math.floor(details.liftingPlateWidthMm))+1)
+			{width:(width:Float),depth:details.liftingPlateDepthMm}];
+		if (footprints.length==0) throw "Lifting stock cannot retain the policy thread wall";
 		for (footprint in footprints)
 			if (!Math.isFinite(footprint.width+footprint.depth) || footprint.width<=0 || footprint.depth<=0)
 				throw "Invalid source lifting plate footprint";
@@ -25,14 +28,24 @@ class MillLiftingPattern {
 			var area=Reflect.compare(a.width*a.depth,b.width*b.depth);
 			return area!=0 ? area : Reflect.compare(a.width,b.width);
 		});
-		var share=mass.mass*details.anchorRule.gravityMps2/Math.min(details.anchorRule.liftingLoadPaths,4);
-		var service=InsertHoles.records(InsertHoles.tappedBlind(details.liftingThread,details.liftingPlateThicknessMm,C45Bright))[0];
-		var wall=details.liftingThread.thread.majorDiameter/2+service.limits.minWall;
-		var maximum={x:details.liftingServiceInsetX-wall,y:details.liftingServiceInsetY-wall};
-		if (maximum.x<0 || maximum.y<0) throw "Fixed lifting service position cannot retain its policy steel wall";
-		var seeds:Array<{x:Float,y:Float}> = [];
-		for (x in [0.0,maximum.x/2,maximum.x]) for (y in [0.0,maximum.y/2,maximum.y]) seeds.push({x:x,y:y});
-		seeds.sort((a,b) -> Reflect.compare(a.x+a.y,b.x+b.y));
+		var share=mass.mass*rule.gravityMps2/Math.min(rule.liftingLoadPaths,4);
+		if (details.liftingLandStepMm<=0 || details.liftingMaximumLandMm<details.liftingLandStepMm)
+			throw "Invalid lifting land search rule";
+		var seeds:Array<{x:Float,y:Float,turn:Int}> = [];
+		var count=Std.int(Math.floor(details.liftingMaximumLandMm/details.liftingLandStepMm));
+		for (ix in 1...count+1) for (iy in 1...count+1) for (turn in [0,1])
+			seeds.push({x:ix*details.liftingLandStepMm,y:iy*details.liftingLandStepMm,turn:turn});
+		seeds.sort((a,b) -> {
+			var sum=Reflect.compare(a.x+a.y,b.x+b.y);
+			if (sum!=0) return sum;
+			var x=Reflect.compare(a.x,b.x);
+			return x!=0 ? x : Reflect.compare(a.turn,b.turn);
+		});
+		// The centred service drilling is identical at every site. Reject a
+		// thread/blank that cannot carry demand before searching placements.
+		var trial=placement("lifting-blank",body,details,details.liftingPlateWidthMm,
+			details.liftingPlateDepthMm,1,1,share,seeds[0],topFace);
+		InsertAnchorGeometry.derive(trial.id,trial.part,rule,FootprintOnly,share);
 		var resin=foundation.body.geometry(),result:Array<CastInsertPlacement> = [];
 		try {
 			for (sx in [-1,1]) for (sy in [-1,1]) {
@@ -41,10 +54,10 @@ class MillLiftingPattern {
 				for (footprint in footprints) {
 					for (seed in seeds) {
 						try {
-							var candidate=placement(id,body,details,footprint.width,footprint.depth,sx,sy,share,seed);
+							var candidate=placement(id,body,details,footprint.width,footprint.depth,sx,sy,share,seed,topFace);
 							// Use the source contract to reject a new side breakout as
 							// well as volume outside the resin. Only the top is open.
-							new MineralFoundation(body,existing.concat([candidate])).body.finishedCavities();
+							new MineralFoundation(body.copy().setToken("postCureBonds","[]"),existing.concat([candidate])).body.finishedCavities();
 							var blank=machinekit.structural.InsertBodies.part(candidate.part.insertSpec().body);
 							var placed:cadkit.modeling.Part=null,outside:cadkit.modeling.Part=null;
 							var missing=0.0;
@@ -61,7 +74,7 @@ class MillLiftingPattern {
 							var steel=new machinekit.assembly.MachineAssembly();steel.addComponent(id,candidate.part,F.identity());
 							var checked=machinekit.design.AssemblyDesignChecks.check(steel);
 							if (checked.hasErrors()) throw checked.items.map(item -> item.message).join("; ");
-							InsertAnchorGeometry.derive(id,candidate.part,details.anchorRule,Casting(resin,candidate.pose),share);
+							InsertAnchorGeometry.derive(id,candidate.part,rule,Casting(resin,candidate.pose),share);
 							chosen=candidate;break;
 						} catch (error:Dynamic) {
 							if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
@@ -81,13 +94,13 @@ class MillLiftingPattern {
 	}
 
 	static function placement(id:String,body:ComponentValues,details:MillCastingDetails,width:Float,depth:Float,
-		sx:Int,sy:Int,share:Float,seed:{x:Float,y:Float}):CastInsertPlacement {
+		sx:Int,sy:Int,share:Float,seed:{x:Float,y:Float,turn:Int},topFace:{width:Float,depth:Float}):CastInsertPlacement {
 		var height=details.liftingPlateThicknessMm;
 		if (!Math.isFinite(height) || height<=0) throw "Invalid source lifting plate thickness";
 		var land=seed;
 		var holes=InsertHoles.records(InsertHoles.tappedBlind(details.liftingThread,height,C45Bright));
-		holes[0].frame.x=sx*(width/2+land.x-details.liftingServiceInsetX);
-		holes[0].frame.y=sy*(depth/2+land.y-details.liftingServiceInsetY);
+		holes[0].frame.x=0;
+		holes[0].frame.y=0;
 		var wall=details.liftingThread.thread.majorDiameter/2+holes[0].limits.minWall;
 		if (Math.abs(holes[0].frame.x)+wall>width/2+1e-7
 			|| Math.abs(holes[0].frame.y)+wall>depth/2+1e-7)
@@ -95,10 +108,11 @@ class MillLiftingPattern {
 		var part=new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(width,depth,height),
 			InsertHoles.fromNeutral(holes))
 			.setToken("role",materia.casting.InsertSpec.InsertRole.LiftingMount)
-			.setToken("label","foundation lifting connection"));
-		var x=body.number("width")/2-width/2-land.x,y=body.number("depth")/2-depth/2-land.y;
+			.setToken("label","foundation lifting connection").setToken("finish",materia.casting.InsertSpec.InsertFinish.AsSupplied));
+		var footprintWidth=seed.turn==0 ? width : depth,footprintDepth=seed.turn==0 ? depth : width;
+		var x=topFace.width/2-footprintWidth/2-land.x,y=topFace.depth/2-footprintDepth/2-land.y;
 		var z=body.number("height")-height;
 		if (x<=0 || y<=0 || z<0) throw "Source lifting blank exceeds the foundation envelope";
-		return {id:id,part:part,pose:F.translation(sx*x,sy*y,z),openings:[CastingPatterns.face("body.z-max")]};
+		return {id:id,part:part,pose:seed.turn==0 ? F.translation(sx*x,sy*y,z) : F.fromRotationMatrix(sx*x,sy*y,z,[0,-1,0,1,0,0,0,0,1]),openings:[CastingPatterns.face("body.z-max")]};
 	}
 }

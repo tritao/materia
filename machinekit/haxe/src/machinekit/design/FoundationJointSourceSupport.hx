@@ -39,14 +39,20 @@ class FoundationJointSourceSupport {
 		function screw(member:String):Void {
 			if (seen.exists(member)) return;
 			var part=members.get(member);
-			if (!Std.isOfType(part,SocketHeadCapScrew)) throw "Foundation joint screw is not an actual fastener: "+member;
-			var fastener:SocketHeadCapScrew=cast part;
-			if (fastener.componentType()==null) throw "Unsupported custom foundation joint screw: "+member;
-			if (fastener.propertyClass!=machinekit.standard.PropertyClass.Steel88)
-				throw "Foundation joint source policy requires ISO 4762 class 8.8: "+member;
-			seen.set(member,true);result.screws.push({member:member,kind:FoundationJointScrewKind.Iso4762Steel88,partNumber:fastener.bom.partNumber,
-				thread:machinekit.structural.InsertHoles.threadRecord(fastener.threadSpec()),shankLength:fastener.shankLength(),
-				threadedLength:fastener.threadedLength(),bearingFrame:F.compose(pose(member),fastener.bearingFrame())});
+			if (Std.isOfType(part,SocketHeadCapScrew)) {
+				var fastener:SocketHeadCapScrew=cast part;
+				if (fastener.componentType()==null || fastener.propertyClass!=machinekit.standard.PropertyClass.Steel88)
+					throw "Foundation joint source policy requires standard ISO 4762 class 8.8: "+member;
+				result.screws.push({member:member,kind:FoundationJointScrewKind.Iso4762Steel88,partNumber:fastener.bom.partNumber,
+					thread:machinekit.structural.InsertHoles.threadRecord(fastener.threadSpec()),shankLength:fastener.shankLength(),
+					threadedLength:fastener.threadedLength(),bearingFrame:F.compose(pose(member),fastener.bearingFrame())});
+			} else if (Std.isOfType(part,machinekit.standard.SocketSetScrew)) {
+				var fastener:machinekit.standard.SocketSetScrew=cast part;
+				result.screws.push({member:member,kind:FoundationJointScrewKind.Iso4026NominalSteel,partNumber:fastener.bom.partNumber,
+					thread:machinekit.structural.InsertHoles.threadRecord(fastener.thread),shankLength:fastener.length,
+					threadedLength:fastener.length,bearingFrame:F.compose(pose(member),machinekit.standard.SocketSetScrew.boreSeat())});
+			} else throw "Foundation joint screw is not an actual fastener: "+member;
+			seen.set(member,true);
 		}
 		for (instance in instances) {body(instance.joint.lowerBody);body(instance.joint.upperBody);}
 		for (instance in instances) {

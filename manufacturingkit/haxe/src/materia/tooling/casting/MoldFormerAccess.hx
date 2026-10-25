@@ -44,11 +44,11 @@ class MoldFormerAccess {
 	}
 
 	public static function add(plan:CastingMoldPlan,feature:CastingFeature,direction:FormerWithdrawal,
-			volume:MoldVolume,exclusions:Array<CastingRegion>):Array<CastingRegion> {
+			volume:MoldVolume,exclusions:Array<CastingRegion>,registeredEPS:Bool=false):Array<CastingRegion> {
 		// Rigid bed-facing tools leave after the bed is removed. Registered
 		// EPS uses registeredBedAccess explicitly, before its material conversion.
 		if (Math.abs(direction.z)>1-EPS) return [];
-		try return build(plan,feature,direction,volume,exclusions) catch (error:Dynamic)
+		try return build(plan,feature,direction,volume,exclusions,registeredEPS) catch (error:Dynamic)
 			throw "Former access "+feature.id+": "+Std.string(error);
 	}
 
@@ -92,7 +92,7 @@ class MoldFormerAccess {
 	}
 
 	static function build(plan:CastingMoldPlan,feature:CastingFeature,direction:FormerWithdrawal,
-			volume:MoldVolume,exclusions:Array<CastingRegion>):Array<CastingRegion> {
+			volume:MoldVolume,exclusions:Array<CastingRegion>,registeredEPS:Bool):Array<CastingRegion> {
 		var d=plan.document,r=d.recipe;
 		if (!supported(d,feature,direction)) throw "Unsupported source opening or withdrawal";
 		var section=CastingDraftSections.derive(d.input.envelope,sectionFeature(d,feature,direction));
@@ -104,8 +104,18 @@ class MoldFormerAccess {
 		if (Math.abs(local.z)>EPS || normal.z<1-EPS || Math.abs(u.z)>EPS)
 			throw "Source withdrawal section is not on its panel contact plane";
 		var contour=PanelContours.placed(section.opening,Math.atan2(u.y,u.x),local.x,local.y);
+		if (registeredEPS) {
+			// A dry registration neck occupies the wall thickness outside the
+			// source envelope. Its relief belongs to the matched EPS neck and
+			// panel opening, never the finished casting cavity.
+			var sourceBounds=CastingProfileGeometry.bounds(contour),margin=r.minimumLigament;
+			contour=PanelContours.relievedRectangle(sourceBounds.x+sourceBounds.width/2,
+				sourceBounds.y+sourceBounds.height/2,sourceBounds.width+2*margin,
+				sourceBounds.height+2*margin,r.routerDiameter/2);
+		}
 		var operation=PanelJoints.operation(materia.tooling.ToolingIds.derive("access-",feature.id),InsideProfile,
-			contour,r.panel.measuredThickness,r.routerDiameter,MachiningSide.PositiveZ,true);
+			contour,r.panel.measuredThickness,r.routerDiameter,MachiningSide.PositiveZ,true,
+			registeredEPS ? r.routerDiameter : null);
 		wall.panel.operations.push(operation);
 		wall.panel.contactOpenings.push(operation.id);
 		wall.panel=PanelCodec.copy(wall.panel);

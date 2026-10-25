@@ -27,14 +27,13 @@ typedef MillFrameOptions = {
 	?roof:Float;
 	?seatWidth:Float;
 	?insertThickness:Float;
-	?seatRise:Float;
+	?columnJointGapMm:Float;
 }
 
 /** Mill-specific layout, independent of a particular example and of enclosure size.
  * Dimensions are a design concept, not material/process or stiffness qualification.
  */
 class MillFrameLayout {
-	public static inline var COLUMN_FOOT_SHOULDER:Float = 90;
 	public static inline var COLUMN_FOOT_HEIGHT:Float = 150;
 	public static inline var COLUMN_ACCESS_TOP:Float = 80;
 	public final yTravel:MillYTravel;
@@ -57,7 +56,8 @@ class MillFrameLayout {
 	public final roof:Float;
 	public final seatWidth:Float;
 	public final insertThickness:Float;
-	public final seatRise:Float;
+	public final columnJointGapMm:Float;
+	public final columnMountPlane:Float;
 	public final front:Float;
 	public final rear:Float;
 	public final baseDepth:Float;
@@ -77,16 +77,16 @@ class MillFrameLayout {
 		columnWidth = options.columnWidth ?? 320; columnDepth = options.columnDepth ?? 260;
 		columnFootWidth = options.columnFootWidth ?? columnWidth;
 		wall = options.wall ?? 40; roof = options.roof ?? 60; seatWidth = options.seatWidth ?? 40;
-		insertThickness = options.insertThickness ?? 20; seatRise = options.seatRise ?? 4;
+		insertThickness = options.insertThickness ?? 20; columnJointGapMm = options.columnJointGapMm ?? 0;
 		if (!Math.isFinite(columnFootWidth) || columnFootWidth < columnWidth || columnFootWidth > baseWidth-2*wall ||
 			(columnFootWidth>columnWidth && columnFootWidth<columnWidth+3*wall)) throw "Column foot must retain material around its steel clamping stations";
 		for (value in [frontExtension, yRailSpacing, yRailStart, yRailLength, columnFront, columnHeight, zRailSpacing,
 			zRailStart, zRailLength, baseWidth, baseHeight, columnWidth, columnDepth, wall, roof,
-			seatWidth, insertThickness, seatRise]) if (!Math.isFinite(value)) throw "Mill frame dimensions must be finite";
+			seatWidth, insertThickness, columnJointGapMm]) if (!Math.isFinite(value)) throw "Mill frame dimensions must be finite";
 		for (value in [yRailSpacing, yRailLength, columnHeight, zRailSpacing, zRailLength,
 			baseWidth, baseHeight, columnWidth, columnDepth, wall, roof, seatWidth, insertThickness])
 			if (value <= 0) throw "Mill frame dimensions must be positive";
-		if (frontExtension < 0 || (footPockets && (baseHeight < 180 || wall < 40 || insertThickness >= 40)) || seatRise < 0 || seatRise >= insertThickness || insertThickness >= roof ||
+		if (frontExtension < 0 || (footPockets && (baseHeight < 180 || wall < 40 || insertThickness >= 40)) || columnJointGapMm < 0 || columnJointGapMm >= insertThickness || insertThickness >= roof ||
 			roof >= baseHeight || 3 * wall >= columnWidth || 2 * roof + wall >= columnHeight ||
 			columnDepth <= 3 * roof || columnWidth > baseWidth - 2 * wall ||
 			yRailSpacing <= seatWidth || yRailSpacing + seatWidth + 2 * wall >= baseWidth ||
@@ -94,10 +94,11 @@ class MillFrameLayout {
 			yRailStart + yRailLength > columnFront || columnFront - yRailStart <= 3 * wall)
 			throw "Mill frame interfaces leave no continuous walls, webs or insert support";
 		front = yRailStart - wall - frontExtension;
-		// The column's finished steel face lies seatRise ahead of its casting.
-		rear = columnFront + seatRise + columnDepth + wall;
+		// Finished rail seats share the casting top/face; stock belongs to the source inserts.
+		rear = columnFront + columnDepth + wall;
 		baseDepth = rear - front; baseCentreY = (front + rear) / 2;
-		columnCentreY = columnFront + seatRise + columnDepth / 2;
-		railPlane = baseHeight + seatRise;
+		columnCentreY = columnFront + columnDepth / 2;
+		railPlane = baseHeight;
+		columnMountPlane = railPlane + columnJointGapMm;
 	}
 }

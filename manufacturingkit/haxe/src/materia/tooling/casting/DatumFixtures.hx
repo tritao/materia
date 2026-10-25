@@ -25,22 +25,41 @@ class DatumFixtures {
 	public static function panelOnFace(panels:Array<PanelPlacement>,face:materia.assembly.AssemblyRecord.AssemblyFrame)
 			:Null<PanelPlacement> {
 		var matches:Array<PanelPlacement>=[];
-		for (panel in panels) {
-			var surface:Null<Float>=switch panel.panel.contactFace {
-				case materia.tooling.ToolingEnums.ContactFace.PositiveZ:panel.panel.stock.measuredThickness;
-				case materia.tooling.ToolingEnums.ContactFace.NegativeZ:0.0;
-				case materia.tooling.ToolingEnums.ContactFace.None:null;
-				default:throw "Unknown fixture panel contact face: "+panel.panel.id;
-			};
-			if (surface==null) continue;
-			var local=F.compose(F.inverse(panel.pose),face),normal=F.transformVector(local,0,0,1);
-			var expected=panel.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.PositiveZ ? -1.0 : 1.0;
-			if (Math.abs(local.z-surface)<1e-7 && normal.z*expected>1-1e-8
-				&& materia.casting.CastingProfileGeometry.inside(PanelContours.outside(panel.panel),local.x,local.y))
-				matches.push(panel);
-		}
+		for (panel in panels)
+			if (contactSurface(panel,face)!=null) matches.push(panel);
 		if (matches.length>1) throw "Insert mounting plane matches multiple receiver panels";
 		return matches.length==0 ? null : matches[0];
+	}
+
+	/** Shared finished contact plane, including a routed receiver floor. */
+	public static function contactSurface(panel:PanelPlacement,face:materia.assembly.AssemblyRecord.AssemblyFrame):Null<Float> {
+		var t=panel.panel.stock.measuredThickness;
+		var surface:Null<Float>=switch panel.panel.contactFace {
+			case materia.tooling.ToolingEnums.ContactFace.PositiveZ:t;
+			case materia.tooling.ToolingEnums.ContactFace.NegativeZ:0.0;
+			case materia.tooling.ToolingEnums.ContactFace.None:null;
+			default:throw "Unknown fixture panel contact face";
+		};
+		if (surface==null) return null;
+		var local=F.compose(F.inverse(panel.pose),face),normal=F.transformVector(local,0,0,1);
+		var expected=panel.panel.contactFace==materia.tooling.ToolingEnums.ContactFace.PositiveZ ? -1.0 : 1.0;
+		if (normal.z*expected<1-1e-8 || !materia.casting.CastingProfileGeometry.inside(PanelContours.outside(panel.panel),local.x,local.y)) return null;
+		if (Math.abs(local.z-surface)<1e-7) return surface;
+		for (operation in panel.panel.operations) if (!operation.through
+			&& (operation.kind==Pocket || operation.kind==Rebate)) {
+			var floor=operation.side==MachiningSide.PositiveZ ? t-operation.depth : operation.depth;
+			if (Math.abs(local.z-floor)<1e-7
+				&& materia.casting.CastingProfileGeometry.inside(operation.contour,local.x,local.y)) return floor;
+		}
+		return null;
+	}
+
+	static function panelGrip(panel:PanelPlacement,entry:materia.assembly.AssemblyRecord.AssemblyFrame):Float {
+		var local=F.compose(F.inverse(panel.pose),entry),axis=F.transformVector(local,0,0,1);
+		if (Math.abs(axis.z)<1-1e-7) throw "Panel fixing is not normal to its receiver";
+		var t=panel.panel.stock.measuredThickness,grip=axis.z>0 ? local.z : t-local.z;
+		if (grip<=0 || grip>t+1e-7) throw "Panel fixing has no positive receiver stack";
+		return grip;
 	}
 
 	/** Nominal access preference only; the native swept-removal graph verifies it.
@@ -248,6 +267,7 @@ class DatumFixtures {
 		}
 		var location=DatumFixtureLocation.plan(i,p.document.setup.sourceToMold,{mountingFace:face,datum:datum,fixings:fixings});
 		p.validation.push(DatumFixtureLocation.validation(i.id,location));
+		if (pocketId!=null) MoldBedReceivers.datum(p,i.id,bed,datum,pocketId);
 		p.fixtures.push({
 			insertId: i.id,
 			location:location,
@@ -297,6 +317,12 @@ class DatumFixtures {
 			var point=F.transformPoint(inverse,entry.x,entry.y,entry.z);
 			var operation=PanelJoints.operation(id,Drill,PanelContours.circle(point.x,point.y,diameter/2),
 				thickness,diameter,MachiningSide.PositiveZ,true);
+			var bounds=materia.casting.CastingProfileGeometry.bounds(operation.contour);
+			var parents=panel.panel.operations.filter(parent -> !parent.through && parent.side==operation.side
+				&& (parent.kind==Pocket || parent.kind==Rebate) && Math.abs(thickness-parent.depth-point.z)<1e-7
+				&& materia.casting.CastingProfileGeometry.containsRect(parent.contour,bounds.x,bounds.y,bounds.width,bounds.height));
+			if (parents.length>1) throw "Ambiguous fixing access rebate: "+insert.id;
+			if (parents.length==1) operation.accessVia=parents[0].id;
 			panel.panel.operations.push(operation);
 			panel.panel.contactOpenings.push(id);
 			p.openings.push({panelId:panel.panel.id,operationId:id,kind:ToolingOpening,
@@ -311,10 +337,11 @@ class DatumFixtures {
 			if (selected!=null) {
 				var id=fixingId(p,insert.id,hole.id),thread:materia.casting.InsertHole.InsertThread=cast hole.thread;
 				access(id,hole,entry,selected.clearanceDiameter,selected.plug);
-				var head=F.compose(F.compose(entry,F.translation(0,0,-thickness)),
+				var grip=panelGrip(panel,entry);
+				var head=F.compose(F.compose(entry,F.translation(0,0,-grip)),
 					F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]));
 				p.hardware.push({id:id,kind:FixtureScrew,diameter:thread.majorDiameter,
-					length:thickness+selected.insertion,pose:head});
+					length:grip+selected.insertion,pose:head});
 				fixings.push({sourceHoleId:hole.id,hardwareId:id,panelId:panel.panel.id,operationId:id,
 					entry:entry,engagement:selected.engagement,threadSpec:thread.designation});
 				var cap:Null<{diameter:Float,length:Float,materialSpec:String}>=selected.plug;
@@ -428,10 +455,11 @@ class DatumFixtures {
 					|| ToolingCodec.canonical(fixing.entry)!=ToolingCodec.canonical(entry))
 					throw "Fixture fixing differs from source hole";
 				var hardware=p.hardware.filter(item -> item.id==fixing.hardwareId);
-				var head=F.compose(F.compose(entry,F.translation(0,0,-panel.panel.stock.measuredThickness)),
+				var grip=panelGrip(panel,entry);
+				var head=F.compose(F.compose(entry,F.translation(0,0,-grip)),
 					F.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]));
 				if (hardware.length!=1 || hardware[0].kind!=FixtureScrew || hardware[0].diameter!=thread.majorDiameter
-					|| hardware[0].length!=panel.panel.stock.measuredThickness+selected.insertion
+					|| hardware[0].length!=grip+selected.insertion
 					|| ToolingCodec.canonical(hardware[0].pose)!=ToolingCodec.canonical(head))
 					throw "Panel fixing hardware differs from source engagement and stack";
 				var cap:Null<{diameter:Float,length:Float,materialSpec:String}>=selected.plug;

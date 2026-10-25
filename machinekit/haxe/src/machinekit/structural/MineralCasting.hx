@@ -23,6 +23,8 @@ class MineralCasting extends MachineComponent {
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
 		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0), P.length("cornerChamfer", 0),
 		P.text("features", CastingPatterns.encode([])),
+		P.choice("buildStage", materia.casting.InsertStages.tokens(), materia.casting.InsertStages.InsertStage.Service),
+		P.text("postCureBonds", "[]"),
 		P.text("precastStruts", materia.casting.PrecastStrut.PrecastStruts.encode([])),
 		P.text("embeddedAnchors", "[]"),
 		P.text("datumScheme", "null"),
@@ -39,6 +41,8 @@ class MineralCasting extends MachineComponent {
 	public function new(?overrides:ComponentValues) {
 		var v = P.resolve(parameters(), overrides), cuts = CastingPatterns.decode(v.token("features"));
 		v.setToken("features", CastingPatterns.encode(cuts));
+		v.setToken("postCureBonds", haxe.Json.stringify(materia.casting.PostCureBond.PostCureBonds.records(
+			materia.casting.PostCureBond.PostCureBonds.snapshot(haxe.Json.parse(v.token("postCureBonds"))))));
 		var struts = materia.casting.PrecastStrut.PrecastStruts.decode(v.token("precastStruts"));
 		for (strut in struts)
 			if (cuts.filter(feature -> feature.id == strut.coreFeatureId || feature.derivedFrom == strut.coreFeatureId).length == 0)
@@ -69,12 +73,14 @@ class MineralCasting extends MachineComponent {
 		envelope = CastingEnvelope.build(v.number("width"), v.number("depth"), v.number("height"), v.number("cornerChamfer"),
 			v.number("footWidth"), v.number("footHeight"), v.number("footShoulder"));
 		var cavities = finishedCavities(), unsupported = cavities.filter(cavity -> !CastingCavities.supportsBoxes(cavity));
-		if (parameterNumber("cornerChamfer") == 0 && parameterNumber("footWidth") == 0 && unsupported.length == 0 && embeddedAnchors().length==0) {
+		if ((postCureBonds().length == 0 || parameterToken("buildStage")==materia.casting.InsertStages.InsertStage.BeforeCasting) && parameterNumber("cornerChamfer") == 0 && parameterNumber("footWidth") == 0 && unsupported.length == 0 && embeddedAnchors().length==0) {
 			var material = materialBoxes();
 			addFacet(CollisionHullFacet.fromBoxes([for (box in BoxAlgebra.compact(material)) BoxAlgebra.limits(box)]));
 			collisionHullQualification = new CastingCollisionQualification(CastingCollisionStatus.Supported, "Exact disjoint-box material hulls");
 		} else {
-			collisionHullQualification = new CastingCollisionQualification(CastingCollisionStatus.Unsupported, embeddedAnchors().length>0
+			collisionHullQualification = new CastingCollisionQualification(CastingCollisionStatus.Unsupported, postCureBonds().length>0
+				? "Post-cure receiver bores require non-box collision decomposition: "+[for (bond in postCureBonds()) bond.insertId].join(", ")
+				: embeddedAnchors().length>0
 				? "Non-box anchor occupancy for inserts: "+[for (row in embeddedAnchors()) row.owner].join(", ")
 				: unsupported.length == 0
 				? "Flared or chamfered envelopes require non-box collision decomposition"
@@ -104,6 +110,8 @@ class MineralCasting extends MachineComponent {
 				for (cavity in finishedCavities())
 					owned.push(Solids.named(CastingCavityCad.part(cavity), cavity.featureId));
 				for (part in InsertAnchorGeometry.embeddedParts(embeddedAnchors())) owned.push(part);
+				if (parameterToken("buildStage") == materia.casting.InsertStages.InsertStage.Service)
+					for (bond in postCureBonds()) owned.push(CastingCavityCad.receiver(bond.receiver));
 				return Solids.cut(owned[0], owned.slice(1));
 			});
 		} catch (error:Dynamic) {
@@ -111,6 +119,12 @@ class MineralCasting extends MachineComponent {
 			throw error;
 		}
 	}
+
+	public function asCastGeometry():Part
+		return new MineralCasting(values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting)).geometry();
+
+	public function postCureBonds():Array<materia.casting.PostCureBond>
+		return materia.casting.PostCureBond.PostCureBonds.snapshot(haxe.Json.parse(parameterToken("postCureBonds")));
 
 	public function embeddedAnchors():Array<materia.casting.InsertAnchorage.EmbeddedInsertAnchors>
 		return materia.casting.InsertAnchorage.EmbeddedAnchors.snapshot(haxe.Json.parse(parameterToken("embeddedAnchors")));
@@ -140,6 +154,8 @@ class MineralCasting extends MachineComponent {
 		return CastingCavities.derive(castingEnvelope(), features);
 
 	public function materialBoxes():Array<materia.casting.Box3> {
+		if (postCureBonds().length>0 && parameterToken("buildStage")==materia.casting.InsertStages.InsertStage.Service)
+			throw "Unsupported non-box post-cure receivers: "+[for (bond in postCureBonds()) bond.insertId].join(", ");
 		var embedded=embeddedAnchors();
 		if (embedded.length>0) throw "Unsupported non-box anchor material for inserts: "+[for (row in embedded) row.owner].join(", ");
 		return BoxAlgebra.material(castingEnvelope(),features);
@@ -147,5 +163,6 @@ class MineralCasting extends MachineComponent {
 
 	public function minimumSectionIy(x0:Float, x1:Float):Float return BoxAlgebra.minimumIy(materialBoxes(), x0, x1);
 
-	public function castingByWeight():{material:String, kg:Float} return {material: materialSpec(), kg: massProperties().mass};
+	public function castingByWeight():{material:String, kg:Float} return {material: materialSpec(), kg: new MineralCasting(values().copy()
+			.setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting)).massProperties().mass};
 }

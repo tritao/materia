@@ -15,6 +15,12 @@ typedef CastInsertPlacement = {
 	final openings:Array<CastingOpening>;
 }
 
+typedef PostCureInsertPlacement = {
+	final id:String;
+	final part:CastInsert;
+	final pose:AssemblyFrame;
+}
+
 /** A casting and its separately itemised steel inserts, with matching recesses.
  * Layouts belong to the machine using this assembly, not to the component core.
  */
@@ -22,8 +28,12 @@ class MineralFoundation extends MachineAssembly {
 	public final body:MineralCasting;
 
 	final inserts:Array<CastInsertPlacement>;
+	final bonded:Array<PostCureInsertPlacement> = [];
+	// Components declared by this source as permanent during the pour. Parts
+	// added later (such as removable levelling plates) belong to service assembly.
+	final pouredMembers:Array<String> = ["casting"];
 
-	public function new(bodyValues:ComponentValues, placements:Array<CastInsertPlacement>, ?rootInsert:String) {
+	public function new(bodyValues:ComponentValues, placements:Array<CastInsertPlacement>, ?rootInsert:String, ?postCure:Array<PostCureInsertPlacement>) {
 		super();
 		if (placements == null)
 			throw "Foundation needs an insert list";
@@ -73,6 +83,7 @@ class MineralFoundation extends MachineAssembly {
 		addComponent("casting", body);
 		for (row in inserts) {
 			addComponent(row.id, row.part, row.pose);
+			pouredMembers.push(row.id);
 			if (row.id == rootInsert) {
 				addMemberConnector(row.id, "castingSeat", F.compose(F.inverse(row.pose), body.connector("mount").frame));
 				addMate("casting-insert", "fixed", row.id, "castingSeat", "casting", "mount");
@@ -87,17 +98,74 @@ class MineralFoundation extends MachineAssembly {
 				var id="anchor-"+haxe.crypto.Sha256.encode(row.id+"/"+hardware.anchorId).substr(0,20)+"-"+hardware.kind;
 				if (ids.exists(id)) throw "Duplicate foundation anchor member: "+id;ids.set(id,true);
 				addComponent(id,hardware.part,F.compose(row.pose,hardware.pose));
+				pouredMembers.push(id);
 				addMemberConnector(row.id,id+"Seat",hardware.pose);
 				addMemberConnector(id,"castAnchorSeat",F.identity());
 				addMate(id+"-cast-in","fixed",row.id,id+"Seat",id,"castAnchorSeat");
 			}
 			exposeConnector(row.id, row.id, "top");
 		}
+		var bonds=body.postCureBonds();
+		var service=postCure==null ? [] : postCure;
+		if (bonds.length!=service.length) throw "Post-cure receivers and insert placements must agree";
+		for (row in service) {
+			if (row==null || row.part==null || ids.exists(row.id)) throw "Duplicate or invalid post-cure insert";
+			ids.set(row.id,true);
+			var matches=bonds.filter(bond -> bond.insertId==row.id);
+			if (matches.length!=1) throw "Missing post-cure receiver: "+row.id;
+			validateBond(row,matches[0]);
+			bonded.push({id:row.id,part:row.part,pose:F.compose(F.identity(),row.pose)});
+			addComponent(row.id,row.part,row.pose);
+			addMemberConnector("casting",row.id+"Bond",row.pose);
+			addMate(row.id+"-bonded-after-cure","fixed","casting",row.id+"Bond",row.id,"mount");
+			exposeConnector(row.id,row.id,"top");
+		}
 		if (rootInsert != null)
 			exposeConnector("mount", rootInsert, "mount");
 		else
 			exposeConnector("mount", "casting", "mount");
 	}
+
+	function validateBond(row:PostCureInsertPlacement,bond:materia.casting.PostCureBond):Void {
+		var spec=row.part.insertSpec();
+		var diameter:Float, height:Float;
+		switch spec.body {
+			case Primitive(Cylinder(d,h)):diameter=d;height=h;
+			default:throw "Bonded receiver requires a cylindrical insert: "+row.id;
+		}
+		var hole=bond.receiver;
+		var top=F.transformPoint(F.compose(F.inverse(hole.frame),row.pose),0,0,height);
+		var bottom=F.transformPoint(F.compose(F.inverse(hole.frame),row.pose),0,0,0);
+		if (Math.abs(top.x)+Math.abs(top.y)+Math.abs(bottom.x)+Math.abs(bottom.y)>1e-7
+			|| top.z>0 || bottom.z<=0 || bottom.z>=hole.depth || diameter>=hole.diameter)
+			throw "Bonded insert does not fit its declared receiver: "+row.id;
+		var scope=new cadkit.modeling.Scope();
+		try {
+			var raw=new MineralCasting(body.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
+			var casting=scope.own(raw.geometry());
+			var tool=scope.own(CastingCavityCad.receiver(hole));
+			var common=scope.own(casting.intersect(tool));
+			if (Math.abs(common.volume()-tool.volume())>1e-6)
+				throw "Post-cure receiver breaks into a cavity or outside the casting: "+row.id;
+			// The declared back-wall rule is physical source geometry, not evidence.
+			var back=materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+			back.depth+=hole.limits.minBack;
+			var backTool=scope.own(CastingCavityCad.receiver(back));
+			var backCommon=scope.own(casting.intersect(backTool));
+			if (Math.abs(backCommon.volume()-backTool.volume())>1e-6)
+				throw "Post-cure receiver lacks its declared back wall: "+row.id;
+			var wall=materia.casting.InsertHole.InsertHoleCodec.snapshot([hole])[0];
+			wall.diameter+=2*hole.limits.minWall;
+			var wallTool=scope.own(CastingCavityCad.receiver(wall));
+			var wallCommon=scope.own(casting.intersect(wallTool));
+			if (Math.abs(wallCommon.volume()-wallTool.volume())>1e-6)
+				throw "Post-cure receiver lacks its declared radial wall: "+row.id;
+			scope.close();
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
+	public function postCureLocations():Array<PostCureInsertPlacement>
+		return [for (row in bonded) {id:row.id,part:row.part,pose:F.compose(F.identity(),row.pose)}];
 
 	function validateDatums():Void {
 		var scheme=body.foundationDatumScheme(),interfaces=body.precisionRequirements();
@@ -138,6 +206,8 @@ class MineralFoundation extends MachineAssembly {
 			}
 		}
 	}
+
+	public function castingMemberIds():Array<String> return pouredMembers.copy();
 
 	public function insertLocations():Array<CastInsertPlacement>
 		return [

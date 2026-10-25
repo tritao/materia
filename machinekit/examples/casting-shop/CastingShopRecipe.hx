@@ -13,6 +13,13 @@ import materia.tooling.panel.PanelPlan;
  */
 class CastingShopRecipe {
  public static inline var BOARD_THICKNESS_MM = 18;
+ /** In-house placeability screen; compound grading and compaction still need qualification. */
+ public static inline var MINIMUM_PASSAGE_AGGREGATE_RATIO = 3;
+ public static inline var FORMER_PROFILE_DIAMETER_MM = 6;
+ public static inline var FORMER_CORNER_MARGIN_MM = 0.2;
+ public static function formerCornerRadiusMm():Float
+  return FORMER_PROFILE_DIAMETER_MM / 2 + FORMER_CORNER_MARGIN_MM;
+ public static function anchorDiametersMm():Array<Float> return [5,6,8,10,12,14,16];
  public static function featureRules():Array<materia.tooling.casting.CastingStrategies.CastingStrategyRule> {
   var rules = materia.tooling.casting.CastingStrategies.standardRules();
   for (rule in rules) rule.useEPSAboveBoardThickness = true;
@@ -29,8 +36,8 @@ class CastingShopRecipe {
 		}
 		return {
 				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
-					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
-					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
+					{id:"former-straight-6",tipDiameterMm:FORMER_PROFILE_DIAMETER_MM,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
+					{id:"former-taper-3deg-6",tipDiameterMm:FORMER_PROFILE_DIAMETER_MM,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
 				]},
 				featureRules: featureRules(),
 				id: id,
@@ -130,7 +137,7 @@ class CastingShopRecipe {
 	public static function process(recipe:materia.tooling.ToolingRecipe, id:String):materia.tooling.process.CastingProcessSpec return {
 		id:id,revision:1,recipeFingerprint:materia.tooling.ToolingCodec.recipeFingerprint(recipe),
 		pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,mixComposition:null,mixer:null,
-		castability:{maximumAggregateSizeMm:null,minimumPassageAggregateRatio:null,evidence:[]},
+		castability:{maximumAggregateSizeMm:null,minimumPassageAggregateRatio:MINIMUM_PASSAGE_AGGREGATE_RATIO,evidence:[]},
 		compound:{reference:materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
 			thickness:materia.tooling.process.CastingProcessSpec.CompoundThicknessLimit.Unresolved("Compound section or layer thickness limit"),
 			maximumMassPerLiftKg:materia.casting.CastingInput.Unresolved("Compound maximum mass per lift")}

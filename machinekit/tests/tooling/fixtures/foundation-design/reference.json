@@ -39,5 +39,30 @@
       "hobber-bed",
       "hobber-column"
     ]
+  },
+  "approvedSimplification": {
+    "decision": "Source simplification decision (user, 2026-10-25)",
+    "corrections": [
+      "Single finished base top plane and explicit 4 mm raw steel finishing stock",
+      "Stepped column foot with declared 150 mm step and 3.2 mm internal cutter radius",
+      "Compression levelling feet with removable post-cure roof plates",
+      "Source M6 anchor family and centred M12 lifting plates; 36 x 100 x 30 mm common blank",
+      "3 mm base-column gap, four M12 clamps and three fully threaded ISO 4026 M8 jacks; source access and retained roof",
+      "Post-cure bonded D12 x 12 mm hatch inserts in D12.2 x 12 mm receivers"
+    ],
+    "files": [
+      {
+        "id": "mill-base",
+        "stepSha256": "68879dbeb36eb51bcaa23c9124b82d1492994aac008e36ad1b006b36820882b3",
+        "stepBytes": 2903960,
+        "compressedBytes": 437359
+      },
+      {
+        "id": "mill-column",
+        "stepSha256": "140046c416427d9489a49fd438246ee3a0a6f17c417fd5600e2dbf0819f9c0e8",
+        "stepBytes": 2699894,
+        "compressedBytes": 410892
+      }
+    ]
   }
 }

@@ -71,7 +71,7 @@ class MillCapacityLayout {
 		toolChangeHeight = options.toolChangeHeight ?? 0;
 		for (v in [headHeight,fixtureHeight,noseMin]) if (!Math.isFinite(v) || v <= 0) throw "Capacity head, fixture and nose must be finite and positive";
 		if (!Math.isFinite(toolChangeHeight) || toolChangeHeight < 0) throw "Tool-change height must be finite and not negative";
-		var guide=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA"), baseHeight=280.0, railPlane=baseHeight+4;
+		var guide=machinekit.motion.LinearRailSystem.catalog().get("HGH25CA"), baseHeight=280.0, railPlane=baseHeight;
 		tableWidth=xTravel+300; tableDepth=yTravel+100;
 		xRailSpacing=tableDepth-140;
 		xRailLength=up(xTravel+2*(xBlockSpan+guide.blockLength/2+guide.railEndMargin+overtravel));

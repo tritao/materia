@@ -33,7 +33,7 @@ class MillFramePreview {
 		return new MillFrameLayout({yRailSpacing: 220, yRailStart: railStart, yRailLength: railEnd - railStart,
 			columnFront: column.y - reference.column.depth / 2, columnHeight: reference.column.height + rise + 40 + spindleStackRise(reference),
 			zRailSpacing: Math.max(180, reference.column.railSpacing),
-			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, frontExtension: yTravel.frontExtension, footPockets: true, yTravel: yTravel});
+			zRailStart: z.z - reference.base.height + 100, zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)}, {baseWidth: 520, columnFootWidth: 440, columnJointGapMm: MillCastingDetails.COLUMN_JOINT_GAP_MM, frontExtension: yTravel.frontExtension, footPockets: true, yTravel: yTravel});
 	}
 
 	public static function spindleStackRise(reference:BenchMill):Float {
@@ -134,7 +134,7 @@ class MillFramePreview {
 			travel: [{axis:"x",travel:2*xy.xHalfTravel},{axis:"y",travel:2*xy.yHalfTravel},{axis:"z",travel:-z.lower}],
 			base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
 			column: {width: l.columnWidth, depth: l.columnDepth, height: l.columnHeight, railFaceY: l.columnFront,
-				footShoulderMm: MillFrameLayout.COLUMN_FOOT_SHOULDER,footHeightMm: MillFrameLayout.COLUMN_FOOT_HEIGHT,clampAccess:"vertical side face"},
+				footProfile:"stepped",footHeightMm: MillFrameLayout.COLUMN_FOOT_HEIGHT,clampAccess:"vertical side face"},
 			xyFullStrokeStructuralClearance: clearancesVerified?"passed conservative Cartesian-product CAD swept-volume audit":"not rerun by the physical-reference writer",
 			zFullStrokeStructuralClearance: clearancesVerified?"passed conservative CAD swept-volume audit":"not rerun by the physical-reference writer",
 			xy: {tableTop: xy.tableTop, saddleHeight: MillXYStageLayout.SADDLE_HEIGHT, tableRibDepth: MillXYStageLayout.RISER_HEIGHT, xOvertravel: xy.xOvertravel, yOvertravel: xy.yOvertravel, yScrewZ: xy.yScrewZ, yMotorFace: xy.yMotorFace, yBayRoof: l.roof, yBayLocation: "lower column", yServiceRear: xy.yServiceRear},

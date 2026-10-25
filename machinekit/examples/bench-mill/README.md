@@ -61,13 +61,12 @@ Leadshine spindle payloads and explicit load/duty assumptions.
 size the axis assemblies. Castings and separately itemized steel interfaces use
 shared `MineralFoundation` recipes; other machine families keep their own layouts.
 
-The reference base is 520 × 909 × 220 mm. The Y motor sits in a rear service bay beneath the column, with a continuous
+The reference base is 520 × 805 × 220 mm. The Y motor sits in a rear service bay beneath the column, with a continuous
 60 mm casting roof and side supports. The column is 320 × 260 × 833 mm. Guide/bearing inserts stand 4 mm proud
-of the casting, with 16 mm embedded thickness. Core openings, walls, dimensions
+of the casting as explicit raw finishing stock, with 20 mm embedded thickness. Core openings, walls, dimensions
 and materials remain design assumptions requiring process and structural review.
-That geometry assumes the seats are machined after casting. The chosen
-process now uses replication instead; see below. The geometry has not been
-updated yet.
+The source retains nominal service interfaces separately from the raw finishing
+stock and unresolved finishing-process accuracy allocations.
 
 ### Precision interfaces: DIY replication route (decided 2026-10-19)
 
@@ -118,8 +117,11 @@ and [../../METROLOGY_SOURCING.md](../../METROLOGY_SOURCING.md) (instruments and
 compounds). Open code-review findings are in [REVIEW.md](REVIEW.md).
 
 Four side-open foot pockets expose adjustment nuts. M16 foot envelopes pass
-through 18 mm steel seat bores and separate stem openings in the casting. Front
-foot stations sit beneath a full-height bridge; underside cores start behind it.
+through 18 mm clearance bores in removable 60 × 60 × 15 mm roof plates. A support
+nut below each plate pushes it into the casting ceiling; a separate nut locks
+the adjustment. The plates install after cure, with no cast-in foot anchors or
+upper stem pockets. Front foot stations sit beneath a full-height bridge;
+underside cores start behind it.
 Foot supplier ratings, lateral restraint, anchoring, floor suitability and insert
 anchorage are unresolved. The shown pads/nuts are geometric concepts.
 

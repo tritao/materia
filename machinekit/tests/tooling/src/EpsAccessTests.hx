@@ -119,6 +119,86 @@ class EpsAccessTests {
 		check(message.indexOf("would change source casting geometry")>=0,"Bed access cannot invent an opening through source resin");
 	}
 
+	static function sideRegistration():Void {
+		var document=SinglePocketSetup.document();
+		document.input.inserts=[];document.input.features=[];
+		document.setup.sourceToMold=F.identity();
+		var bounds=MoldRegions.exactBounds(MoldRegions.envelope(document),"side-registration");
+		var feature:materia.casting.CastingFeature={id:"side-pocket",kind:ServiceOpening,
+			geometry:{solid:Cut(materia.casting.CastingSolid.Box(30,40,30)),
+				pose:F.translation(0,bounds.y+bounds.depth-20,30)},
+			openings:[materia.casting.CastingPatterns.face("body.y-max")],
+			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[],derivedFrom:null};
+		document.input.features=[feature];
+		document.setup.features=[{featureId:feature.id,strategy:SacrificialEPS,priority:10,withdrawal:{x:0,y:1,z:0}}];
+		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
+		var plan=machinekit.tooling.CastingMoldCad.plan(document,options());
+		check(plan.cores.length==1 && plan.cores[0].support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.RegisteredFlange,
+			"Sharp side-open EPS uses its matched dry registration neck");
+		var core=plan.cores[0],profiles=core.support.registrationProfiles;
+		check(profiles.length==1 && profiles[0].panelId=="north","Side registration names its actual receiver");
+		var wall=plan.panels.members.filter(member -> member.panel.id=="north")[0];
+		var operation=wall.panel.operations.filter(operation -> operation.id==profiles[0].operationId)[0];
+		check(operation.reliefToolDiameter==document.recipe.routerDiameter,
+			"The declared relief cutter is shared by the receiver and the EPS neck");
+		check(materia.tooling.ToolingCodec.canonical(operation.contour)==materia.tooling.ToolingCodec.canonical(profiles[0].contour),
+			"Side EPS, drawings and CAM use the same exact operation contour");
+		check(plan.document.input.features[0].cornerRadius==0,"Dry relief does not round the source cavity");
+		var source=machinekit.tooling.CastingMoldCad.source(plan),rebuilt=machinekit.tooling.CastingMoldCad.reconstructed(plan);
+		var missing=source.subtract(rebuilt),extra=rebuilt.subtract(source);
+		check(missing.volume()+extra.volume()<1e-5,"Relieved side registration preserves exact source resin");
+		missing.close();extra.close();source.close();rebuilt.close();
+		for (fit in machinekit.tooling.CastingMoldCad.corePanelFit(plan))
+			check(fit.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,"Side EPS fits the real machined receiver");
+	}
+
+	static function rebatedSteel():Void {
+		var document=SinglePocketSetup.document(),insert=document.input.inserts[0];
+		insert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,35,19));
+		insert.interfaces=[{id:"finished-seat",geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,15)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:4,
+			finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("Finishing error allocation"),
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],positionToleranceMm:0.01,
+			datumReference:"primary",relationshipIds:[]}];
+		var recess=document.input.features.filter(feature -> feature.owner==insert.id)[0];
+		recess.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Insert(insert.body);
+		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
+		var process=options();
+		process.precision=[{insertId:insert.id,jigReference:null,masterReference:null,masterFlatnessMm:null,
+			releaseSpec:null,holeProtectionReference:null,evidence:[]}];
+		var plan=machinekit.tooling.CastingMoldCad.plan(document,process);
+		check(Math.abs(plan.cavity.z-plan.envelope.z)<1e-8,"Proud steel does not lower the mold bed");
+		check(plan.formers.filter(former -> StringTools.startsWith(former.volume.id,"bed-backing-")).length==0,
+			"The rebated bed needs no sliver backing formers");
+		check(plan.seals.length==1,"Routed clearance and corner relief have an explicit cured closure");
+		var closure=machinekit.tooling.ToolingVolume.fromVolume(plan.seals[0].volume,plan.seals[0].materialSpec);
+		check(closure.materialSpec()=="unspecified" && closure.parameterToken("stockMaterial")==plan.seals[0].materialSpec,
+			"Unresolved seal chemistry remains a shop reference, with no fabricated physical material claim");
+		var bed=plan.panels.members[0],pockets=bed.panel.operations.filter(operation -> operation.id=="steel-rebate-"+insert.id);
+		check(pockets.length==1 && pockets[0].depth==4 && !pockets[0].through,"Bed rebate matches the raw proud finishing stock");
+		var fixture=plan.fixtures.filter(fixture -> fixture.insertId==insert.id)[0];
+		check(materia.tooling.casting.CastingMoldPlan.MoldFixtures.panelId(fixture)=="bed" && fixture.fixings.length==1,
+			"The insert fixes through its rebated bed into its own declared source thread");
+		var hardware=plan.hardware.filter(hardware -> hardware.id==fixture.fixings[0].hardwareId)[0];
+		var hole=materia.tooling.casting.InsertFixturePlanner.availableHoles(insert)[0];
+		var selected=materia.tooling.casting.InsertFixturePlanner.select(hole,F.compose(document.setup.sourceToMold,insert.pose),
+			fixture.mountingFace,document.recipe.hardware);
+		check(selected!=null && Math.abs(hardware.length-(14+selected.insertion))<1e-8,
+			"Fixing length uses the remaining 14 mm board stack, not the full 18 mm blank");
+		var drill=bed.panel.operations.filter(operation -> operation.id==fixture.fixings[0].operationId)[0];
+		check(drill.accessVia==pockets[0].id,"CAM cuts the receiver before its dependent clearance bore");
+		var review=machinekit.tooling.CastingMoldCad.review(plan);
+		check(review.symmetricDifferenceMm3<1e-5,"Steel rebate and closure preserve exact source resin");
+		check(review.permanentGroups.filter(group -> group.members.indexOf("bed")>=0
+			&& group.members.indexOf(plan.seals[0].volume.id)>=0).length==1,"Cured closure moves with its bed in the exact removal graphs");
+		var profile=plan.seals[0].volume.profiles[0],pocket=MoldRegions.profile(profile);
+		// Leave only a positive-volume bottom shard: the traced operation is
+		// unchanged, but the actual closure no longer reaches the wet boundary.
+		profile.subtract=[Difference(pocket,[box(100.05,-0.05,-4,0.1,0.1,1)])];
+		var failure="";try machinekit.tooling.CastingMoldCad.review(plan) catch(error:Dynamic) failure=Std.string(error);
+		check(failure.indexOf("Uncovered mold boundary")>=0,"Removing the real closure exposes the leak to the existing exact coverage check");
+	}
+
 	static function overlapOwnership():Void {
 		var document=SinglePocketSetup.document();
 		document.input.inserts=[];
@@ -220,6 +300,8 @@ class EpsAccessTests {
 		transverseBore();
 		fixture(false);fixture(true);
 		bedAccess();
+		sideRegistration();
+		rebatedSteel();
 		overlapOwnership();
 		rotatedBridge();
 		sideMaskAssembly();

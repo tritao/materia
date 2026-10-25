@@ -160,6 +160,7 @@ class CastingMoldCad {
 				parts.push(machinekit.structural.CastingRegionCad.part(MoldCores.occupied(c)));
 			for (f in p.formers)
 				parts.push(ToolingVolume.geometryOf(f.volume));
+			for (seal in p.seals) parts.push(ToolingVolume.geometryOf(seal.volume));
 			// Fixture receivers are enclosed by the bed and sealed insert faces.
 			// They remain real clearance holes in the tooling, but are not pour
 			// space. The planner validates these full occupied volumes against resin.
@@ -318,6 +319,7 @@ class CastingMoldCad {
 		for(i in 0...p.supportPanels.length)offsets.set(p.supportPanels[i].panel.id,{x:0,y:0,z:b.height*(0.5+i*0.15)});
 		for(i in 0...p.cores.length)if(p.cores[i].support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
 			for(id in MoldCores.assemblyMembers(p.cores[i]))offsets.set(id,{x:0,y:0,z:b.height*(0.8+i*0.12)});
+		for(seal in p.seals) offsets.set(seal.volume.id,offsets.get(seal.panelId));
 		for(f in p.formers)offsets.set(f.volume.id,{x:f.withdrawal.x*b.width*0.7,y:f.withdrawal.y*b.depth*0.4,z:f.withdrawal.z*b.height*0.7});
 		for(f in p.fixtures) for(volume in MoldFixtures.volumes(f))
 			offsets.set(volume.id,{x:MoldFixtures.withdrawal(f).x*b.width,y:0,z:MoldFixtures.withdrawal(f).z*b.height*1.4});
@@ -365,6 +367,9 @@ class CastingMoldCad {
 		for (f in p.formers) {
 			var pose = F.identity();
 			a.addComponent(f.volume.id, ToolingVolume.fromVolume(f.volume), pose);
+		}
+		for (seal in p.seals) {
+			a.addComponent(seal.volume.id,ToolingVolume.fromVolume(seal.volume,seal.materialSpec),F.identity());
 		}
 		for (volume in MoldFixtures.allVolumes(p)) {
 			var pose = F.identity();
@@ -487,8 +492,9 @@ class CastingMoldCad {
 				var uncovered = contact.subtractAll(tooling);
 				owned.push(uncovered);
 				var volume = uncovered.volume();
-				if (volume > 1e-3)
-					throw "Uncovered mold boundary " + index + ": " + volume + " mm3";
+				if (volume > 1e-3) {
+					throw "Uncovered mold boundary " + index + ": " + volume + " mm3 at " + haxe.Json.stringify(machinekit.assembly.PosedParts.boxOf(uncovered));
+				}
 				for (part in owned)
 					part.close();
 			} catch (e:Dynamic) {
@@ -609,6 +615,17 @@ class CastingMoldCad {
 					part: shape,
 					direction: new Vector(m.withdrawal.x, m.withdrawal.y, m.withdrawal.z)
 				});
+			}
+			for (panel in p.panels.members) {
+				var seals=p.seals.filter(seal -> seal.panelId==panel.panel.id);
+				if (seals.length==0) continue;
+				var member=members.filter(member -> member.id==panel.panel.id)[0];
+				var shapes=[new Part(member.part.shape.cloneShape())];
+				for (seal in seals) shapes.push(ToolingVolume.geometryOf(seal.volume));
+				var shape=Solids.building(shapes,owned -> Solids.union(owned));
+				parts.push(shape);member.part=shape;
+				member.id=materia.tooling.ToolingIds.derive("",panel.panel.id,"-sealed");
+				permanent.push({id:member.id,members:[panel.panel.id].concat([for (seal in seals) seal.volume.id])});
 			}
 			var rowIds:Array<String> = [];
 			var bridgeCores=p.cores.filter(core -> core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge

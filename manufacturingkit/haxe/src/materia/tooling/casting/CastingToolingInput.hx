@@ -43,5 +43,6 @@ typedef CastingToolingInput = {
 	var envelope:Array<CastingPrism>;
 	var features:Array<CastingFeature>;
 	var precastStruts:Array<materia.casting.PrecastStrut>;
+	var postCureInserts:Array<{insert:CastingToolingInsert,bond:materia.casting.PostCureBond}>;
 	var inserts:Array<CastingToolingInsert>;
 }

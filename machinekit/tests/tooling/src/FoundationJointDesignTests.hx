@@ -30,7 +30,7 @@ class FoundationJointDesignTests {
 			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records([requirement]))));
 	}
 	static function fixture(definition:FoundationJoint,upperZ:Float=42):MachineAssembly return model(definition,upperZ).assembly;
-	static function model(definition:FoundationJoint,upperZ:Float=42,jackX:Float=70):{assembly:MachineAssembly,lower:MineralFoundation} {
+	static function model(definition:FoundationJoint,upperZ:Float=42,jackX:Float=70,flatJack:Bool=false,flatAnchor:Bool=false):{assembly:MachineAssembly,lower:MineralFoundation} {
 		var thread=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
 		var lower=new MineralFoundation(new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",40),
 			[{id:"seat",part:seat(40,InsertHoles.tappedBlind(thread,20)),pose:F.translation(0,0,20),
@@ -44,9 +44,15 @@ class FoundationJointDesignTests {
 			.setToken("role",materia.casting.InsertSpec.InsertRole.ColumnMount));
 		var result=new MachineAssembly();result.include("lower",lower);result.include("upper",upper,F.translation(0,0,upperZ));
 		result.addComponent("block",block,F.translation(jackX,0,20));
-		result.addComponent("jack",machinekit.standard.SocketHeadCapScrew.metric("M6",30,machinekit.standard.PropertyClass.Steel88),
+		var jack:machinekit.component.MachineComponent=flatJack
+			? machinekit.standard.SocketSetScrew.forThread(machinekit.standard.FastenerThreads.coarse(6),30)
+			: machinekit.standard.SocketHeadCapScrew.metric("M6",30,machinekit.standard.PropertyClass.Steel88);
+		result.addComponent("jack",jack,
 			F.compose(F.translation(jackX,0,12),F.turnY(Math.PI)));
-		result.addComponent("anchor",machinekit.standard.SocketHeadCapScrew.metric("M4",30,machinekit.standard.PropertyClass.Steel88),F.translation(0,0,62));
+		var anchor:machinekit.component.MachineComponent=flatAnchor
+			? machinekit.standard.SocketSetScrew.forThread(machinekit.standard.FastenerThreads.coarse(4),30)
+			: machinekit.standard.SocketHeadCapScrew.metric("M4",30,machinekit.standard.PropertyClass.Steel88);
+		result.addComponent("anchor",anchor,F.translation(0,0,62));
 		result.addDesignRequirement(FoundationConnection("joint-instance",definition));return {assembly:result,lower:lower};
 	}
 	static function hasCode(result:machinekit.assembly.Diagnostics,code:String):Bool
@@ -265,9 +271,26 @@ class FoundationJointDesignTests {
 		var old:Dynamic=haxe.Json.parse(materia.tooling.ToolingCodec.canonical(options));Reflect.setField(old,"groutedJoints",new Array<Dynamic>());
 		rejects(() -> materia.tooling.casting.CastingMoldPlan.MoldOptions.read(old),"Invalid mold process record");
 	}
+	static function headlessJack():Void {
+		var row=model(joint(),42,70,true);
+		check(!AssemblyDesignChecks.check(row.assembly).hasErrors(),"fully threaded flat-point jacks retain the checked source load path");
+		var context=machinekit.tooling.FoundationAssemblyContext.snapshot(row.assembly,"lower/casting",[{id:"seat",member:"lower/seat"}]);
+		var input=machinekit.tooling.FoundationToolingAdapter.snapshot(row.lower,"headless-jack",1,context);
+		var copied=materia.tooling.ToolingCodec.copyInput(input),sources=copied.interfaceContext;
+		if (sources==null) throw "Missing headless-jack context";
+		check(sources.jointSources.screws.filter(screw -> screw.member=="jack"
+			&& screw.kind==materia.casting.FoundationJointSources.FoundationJointScrewKind.Iso4026NominalSteel
+			&& screw.threadedLength==screw.shankLength).length==1,"portable source records retain actual fully threaded ISO 4026 hardware");
+		check(machinekit.tooling.FoundationJointCad.review(copied).filter(check -> check.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length==0,
+			"native contact reconstructs the recorded flat-point standard component");
+		var wrong=model(joint(),42,70,false,true).assembly;
+		check(invalid(AssemblyDesignChecks.check(wrong),"headed class 8.8"),"a headless jack cannot become a clamping anchor");
+	}
+
 	public static function main():Void run();
 
 	public static function run():Void {
+		headlessJack();
 		var source=fixture(joint()),saved=source.encode(),copy=MachineAssembly.decode(saved);
 		check(copy.encode()==saved,"foundation joint source declaration survives typed assembly encoding");
 		var declarations=copy.designRequirements();

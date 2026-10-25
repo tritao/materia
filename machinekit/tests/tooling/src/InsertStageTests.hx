@@ -21,7 +21,53 @@ class InsertStageTests {
 	}
 	public static function main():Void run();
 
+	static function postCure():Void {
+		var insert=new CastInsert(CastInsert.precastHoles(CastInsert.manufacturedValues(materia.casting.InsertMaterial.C45Bright)
+			.setToken("body",InsertBodyCodec.encode(Primitive(Cylinder(12,12)))),
+			InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating()),12))
+			.setToken("role",materia.casting.InsertSpec.InsertRole.HatchMount));
+		var steelAssembly=new machinekit.assembly.MachineAssembly();steelAssembly.addComponent("hatch",insert);
+		check(!machinekit.design.AssemblyDesignChecks.check(steelAssembly).hasErrors(),"bonded steel retains the full threaded-hole policy wall");
+		var receiver=InsertHoles.records(InsertHoles.through(12.2,12))[0];
+		receiver.id="hatch-receiver";receiver.extent=materia.casting.InsertHole.HoleExtent.Blind;
+		receiver.frame=F.fromRotationMatrix(0,0,50,[1,0,0,0,-1,0,0,0,-1]);
+		receiver.limits={policyId:"receiver-test",threaded:null,minWall:2.5,minBack:5,minClearance:2.5,overrides:[]};
+		var bonds:Array<materia.casting.PostCureBond>=[{insertId:"hatch",receiver:receiver,
+			adhesive:materia.casting.CastingInput.CastingTextInput.Unresolved("Adhesive coupon")}];
+		function values():ComponentValues return new ComponentValues().setNumber("width",40).setNumber("depth",40)
+			.setNumber("height",50).setToken("postCureBonds",haxe.Json.stringify(materia.casting.PostCureBond.PostCureBonds.records(bonds)));
+		var foundation=new machinekit.structural.MineralFoundation(values(),[],null,[{id:"hatch",part:insert,pose:F.translation(0,0,40)}]);
+		check(foundation.castingMemberIds().length==1,"bonded steel is not a pour member");
+		var raw=foundation.body.asCastGeometry(),service=foundation.body.geometry();
+		near(raw.volume(),80000,"receiver does not exist in the as-cast part");
+		near(raw.volume()-service.volume(),Math.PI*6.1*6.1*12,"receiver exists only after drilling");
+		raw.close();service.close();
+		var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"bonded-source",1);
+		check(input.inserts.length==0 && input.postCureInserts.length==1,"adapter distinguishes post-cure and cast-in steel");
+		var encoded=materia.tooling.ToolingCodec.encodeInput(input),decoded=materia.tooling.ToolingCodec.decodeInput(encoded);
+		check(decoded.postCureInserts[0].bond.receiver.id=="hatch-receiver","delivered source retains receiver provenance");
+		var oldFormat:Dynamic=haxe.Json.parse(encoded);oldFormat.version=24;
+		rejects(() -> materia.tooling.ToolingCodec.decodeInput(haxe.Json.stringify(oldFormat)),"Unsupported tooling source format or version");
+		var fingerprint=materia.tooling.ToolingCodec.inputFingerprint(input);
+		decoded.postCureInserts[0].bond.receiver.depth+=1;
+		check(materia.tooling.ToolingCodec.inputFingerprint(decoded)!=fingerprint,"receiver machining dimensions enter the fingerprint");
+		var checks=materia.tooling.casting.InsertQualifications.postCure(input);
+		check(checks.filter(check -> check.rule=="tooling.insert.post-cure-bond" && check.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
+			"adhesive input blocks all bonded installations once");
+		var saved=machinekit.assembly.MachineAssembly.decode(foundation.encode());
+		var casting:machinekit.structural.MineralCasting=cast saved.components().filter(row -> row.id=="casting")[0].component;
+		check(casting.postCureBonds()[0].receiver.depth==12,"portable assembly retains the post-cure source holes");
+		rejects(() -> new machinekit.structural.MineralFoundation(values(),[]),"receivers and insert placements must agree");
+		receiver.frame.x=15;
+		rejects(() -> new machinekit.structural.MineralFoundation(values(),[],null,[{id:"hatch",part:insert,pose:F.translation(15,0,40)}]),
+			"breaks into a cavity or outside the casting");
+		receiver.frame.x=13;
+		rejects(() -> new machinekit.structural.MineralFoundation(values(),[],null,[{id:"hatch",part:insert,pose:F.translation(13,0,40)}]),
+			"declared radial wall");
+	}
+
 	public static function run():Void {
+		postCure();
 		var pattern=InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()),20);
 		var holes=InsertHoles.records(pattern),first=holes[0];
 		first.id="pre";first.frame.x=-12;

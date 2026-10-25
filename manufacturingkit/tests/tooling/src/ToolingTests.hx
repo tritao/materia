@@ -67,7 +67,15 @@ class ToolingTests {
 		check(selected.strategy==SacrificialEPS,"A deep body-open pocket uses EPS by recipe, without a feature-ID override");
 		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(10,80,61));
 		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
-		check(selected.strategy==ReusableFormer,"A source cut fitting a declared board stays rigid");
+		check(selected.strategy==SacrificialEPS,"A thin dimension without an opening cannot turn a deep pocket into a board former");
+		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,11));
+		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
+		check(selected.strategy==ReusableFormer,"A shallow opening fits the declared board");
+		feature.geometry.pose.z=-100;
+		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,110));
+		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
+		check(selected.strategy==ReusableFormer,"Stock selection uses the finished 10 mm cavity, not the 110 mm intent cut");
+		feature.geometry.pose.z=-1;
 		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,61));
 		document.recipe.former.stocks[0].measuredThickness=70;
 		selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
@@ -75,6 +83,26 @@ class ToolingTests {
 		var raw:Array<Dynamic>=cast haxe.Json.parse(haxe.Json.stringify(document.recipe.featureRules));
 		Reflect.setField(raw[0],"useEPSAboveBoardThickness","yes");
 		rejects(() -> materia.tooling.casting.CastingStrategies.snapshotRules(raw),"Invalid casting strategy board limit");
+	}
+
+	static function epsFillPortal():Void {
+		var document = fixture();
+		var feature = materia.casting.CastingPatterns.box("multiple-portals", Lightening,
+			[for (face in ["body.y-min", "body.y-max", "body.z-min", "body.z-max"])
+				materia.casting.CastingPatterns.face(face)], 100, 180, 100);
+		document.input.features = [feature];
+		document.input.inserts = [];
+		document.setup.features = [];
+		for (rule in document.recipe.featureRules) rule.preferredAxis = X;
+		document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
+		var selected = materia.tooling.casting.CastingStrategies.resolve(document);
+		check(selected[0].withdrawal != null && selected[0].withdrawal.z == 1,
+			"EPS with a fill-face opening uses that declared portal despite other open sides");
+		feature.openings.reverse();
+		check(ToolingCodec.canonical(selected) == ToolingCodec.canonical(materia.tooling.casting.CastingStrategies.resolve(document)),
+			"EPS fill access does not depend on opening order");
+		feature.kind = Clearance;
+		rejects(() -> materia.tooling.casting.CastingStrategies.resolve(document), "Ambiguous feature withdrawal");
 	}
 
 	static function routedSocketFaces():Void {
@@ -321,7 +349,7 @@ class ToolingTests {
 			revision: 1,
 			lengthUnit: ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
-			precastStruts:[],
+			precastStruts:[],postCureInserts:[],
 			envelope: [
 				{
 					id: "body",
@@ -611,6 +639,7 @@ class ToolingTests {
 		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
 		routedSocketFaces();
 		boardLimitedStrategy();
+		epsFillPortal();
 		fixtureFaces();
 		fixturePanelFaces();
 		if (Sys.getEnv("TOOLING_ONLY") == "castability") {

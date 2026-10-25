@@ -170,17 +170,22 @@ class CastingMoldTests {
 	static function straddlingDatum():Void {
 		var d=ToolingTests.fixture();d.recipe.minimumLigament=2;
 		var extra=ToolingCodec.copy(d).input.inserts[0];
-		extra.id="raised-seat";extra.pose=F.translation(-70,0,86);
+		extra.id="raised-seat";extra.pose=F.translation(-70,0,79);
+		d.input.features.push(materia.casting.CastingPatterns.box("raised-seat-access",InterfaceRecess,
+			[materia.casting.CastingPatterns.face("body.z-max")],50,45,1,-70,0,99));
 		d.input.inserts.push(extra);
 		d.input.features.push({id:"insert-raised-seat",kind:InsertRecess,owner:extra.id,
 			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(extra.body),pose:extra.pose},
-			openings:[materia.casting.CastingPatterns.face("body.z-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
+			openings:[materia.casting.CastingPatterns.feature("raised-seat-access")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
 			cornerRadius:0,adjustable:[],derivedFrom:null});
 		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
 		var p=CastingMoldPlanner.plan(d,options(d));
 		var fixture=p.fixtures.filter(fixture -> fixture.insertId==extra.id)[0];
 		var bed=p.panels.members.filter(member -> member.panel.id=="bed")[0];
 		var socket=bed.panel.operations.filter(operation -> operation.id==MoldFixtures.datum(fixture).id)[0];
+		var seals=p.seals.filter(seal -> seal.insertId==extra.id);
+		check(seals.length==1 && seals[0].volume.profiles[0].operationId==socket.id,
+			"straddling datum's exact receiver clearance and corner relief have a traced cured closure");
 		var top=bed.pose.z+bed.panel.stock.measuredThickness,below=0;
 		for (piece in MoldFixtures.datum(fixture).pieces) if (piece.z<top-1e-7) {
 			below++;
@@ -194,6 +199,8 @@ class CastingMoldTests {
 	}
 
 	public static function run(d:ToolingDocument):Void {
+		var contractDocument=ToolingCodec.copy(d);
+		contractDocument.recipe.minimumLigament=2;
 		straddlingDatum();
 		liftingSourceDeclaration();
 		mountingRouteRequest();
@@ -201,6 +208,18 @@ class CastingMoldTests {
 		replicationReservation(d);
 		d = ToolingCodec.copy(d);
 		d.recipe.minimumLigament = 2;
+		// An intentional recessed seat exercises a real datum support. Proud raw
+		// steel now rests directly in a bed rebate, with no backing slivers.
+		d=ToolingCodec.copy(d);
+		var recessed=d.input.inserts[0];recessed.pose.z=76;
+		var recessedFeature=d.input.features.filter(feature -> feature.owner==recessed.id)[0];
+		recessedFeature.geometry.pose=recessed.pose;
+		recessedFeature.openings=[materia.casting.CastingPatterns.face("body.x-max"),
+			materia.casting.CastingPatterns.feature("seat-access")];
+		d.input.features.push(materia.casting.CastingPatterns.box("seat-access",InterfaceRecess,
+			[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],
+			40,30,4,80,0,96));
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
 		var late=ToolingCodec.copy(d);
 		switch late.input.inserts[0].origin {
 			case Fabricated(manufacturing):manufacturing.holeRoutes[0].route=materia.casting.InsertManufacturing.InsertHoleRoute.TransferAfterCasting;
@@ -250,7 +269,10 @@ class CastingMoldTests {
 		check(fixed.fixtures[0].fixings.length == 2, "datum selects both accessible source steel threads");
 		var offsetThread=ToolingCodec.copy(sourceThreads),offsetInsert=offsetThread.input.inserts[0];
 		offsetInsert.body=materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(71,45,20));
-		offsetInsert.pose=F.translation(65,0,90);
+		offsetInsert.pose=F.translation(65,0,76);
+		var offsetAccess=offsetThread.input.features.filter(feature -> feature.id=="seat-access")[0];
+		offsetAccess.geometry={solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(
+			materia.casting.CastingSolid.Box(71,45,4)),pose:F.translation(65,0,96)};
 		var offsetHole=materia.casting.InsertHole.InsertHoleCodec.snapshot(threads)[0];
 		offsetHole.frame.x=17.5;offsetHole.frame.y=0;
 		offsetInsert.holes=[offsetHole];TestInsertHoles.beforeCasting(offsetInsert);
@@ -678,8 +700,8 @@ class CastingMoldTests {
 		var invalidRule = CastingMoldPlanner.plan(d,o);
 		invalidRule.changeRequests[0].blockingChecks = ["missing-rule"];
 		rejects(() -> CastingMoldPlanner.validate(invalidRule), "change requests cannot name nonexistent validation rules");
-		ReviewContractTests.run(CastingMoldPlanner.plan(d,o));
-		ProcessTests.run(CastingMoldPlanner.plan(d,o));
+		ReviewContractTests.run(CastingMoldPlanner.plan(contractDocument,options(contractDocument)));
+		ProcessTests.run(CastingMoldPlanner.plan(contractDocument,options(contractDocument)));
 		Sys.println('CastingMoldTests: $assertions assertions passed');
 	}
 

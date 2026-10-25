@@ -160,8 +160,11 @@ class CastabilityAnalysis {
 			var minimumOwners = sources(minimumSpan.lowerSourceIds.concat(minimumSpan.upperSourceIds));
 			var minimumRule = "process.castability.minimum-passage";
 			if (limits.maximumAggregateSizeMm == null || limits.minimumPassageAggregateRatio == null) {
+				var missing:Array<String>=[];
+				if (limits.maximumAggregateSizeMm==null) missing.push("maximum aggregate size");
+				if (limits.minimumPassageAggregateRatio==null) missing.push("minimum passage/aggregate ratio");
 				checks.push(FillAnalysis.check(minimumRule, minimumOwners, Pending,
-					"Declare maximum aggregate size and minimum passage/aggregate ratio; narrowest opposing-face span is " + minimum + " mm.", limits.evidence));
+					"Declare "+missing.join(" and ")+"; narrowest opposing-face span is " + minimum + " mm.", limits.evidence));
 				proposals.push(proposal(minimumRule, minimumOwners, DeclareLimit, ProcessReview,
 					"Supply the mix grading and recipe passage ratio, then rerun the section screen.", minimum, null, minimumSpan.axis, minimumSpan.strips[0]));
 			} else {

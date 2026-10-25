@@ -112,10 +112,10 @@ class MillZAxisLayout {
 		bracketWidth = nut.flangeDiameter + 2 * MillZCarriage.SHELF_MARGIN;
 		channelWidth = Math.max(bracketWidth, fixed.spec.width) + 2 * clearance;
 		channelBack = screwY + bracketWidth / 2 + clearance;
-		upperBottom = frame.railPlane + frame.zRailStart + frame.zRailLength;
+		upperBottom = frame.columnMountPlane + frame.zRailStart + frame.zRailLength;
 		lowerHeight = frame.zRailStart;
-		floatingZ = frame.railPlane + lowerHeight / 2;
-		motorFace = frame.railPlane + frame.columnHeight + 40;
+		floatingZ = frame.columnMountPlane + lowerHeight / 2;
+		motorFace = frame.columnMountPlane + frame.columnHeight + 40;
 		fixedZ = motorFace - drive.bearingDrop;
 		upperHeight = 40;
 		var shoulder=fixed.spec.shoulderZ;if(shoulder==null)throw "HZMotion Z mount needs a screw shoulder datum";
@@ -125,7 +125,7 @@ class MillZAxisLayout {
 		if (crossDriveZ != null && (!Math.isFinite(crossDriveZ) || floatingZ-drive.floatingEnd <= crossDriveZ+12+clearance))
 			throw "Z screw end enters the crossing Y shaft clearance";
 		var couplingLength=coupling.length;
-		var railLow = frame.railPlane + frame.zRailStart + block.spec.railEndMargin;
+		var railLow = frame.columnMountPlane + frame.zRailStart + block.spec.railEndMargin;
 		var railHigh = upperBottom - block.spec.railEndMargin;
 		var reach = blockSpan + block.spec.blockLength / 2;
 		overtravel = Math.min(Math.min(headCentre + lower - reach - railLow, railHigh - headCentre - reach), options.overtravelLimit ?? Math.POSITIVE_INFINITY);
@@ -139,7 +139,7 @@ class MillZAxisLayout {
 			upperHeight < 20 ||
 			couplingLength / 2 < motor.rating.shaftDiameter * 0.75 || overtravel <= 0 ||
 			headCentre + carriageHeight / 2 + clearance >= upperBottom ||
-			headCentre + lower - carriageHeight / 2 <= frame.railPlane + lowerHeight + clearance ||
+			headCentre + lower - carriageHeight / 2 <= frame.columnMountPlane + lowerHeight + clearance ||
 			headBack - spindleY <= spindle.diameter() / 2 + 20 ||
 			channelBack + frame.wall >= frame.columnCentreY + frame.columnDepth / 2)
 			throw "Z layout cannot fit its carriage, central drive and supported end mounts";

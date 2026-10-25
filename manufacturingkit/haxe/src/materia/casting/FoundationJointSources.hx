@@ -19,6 +19,7 @@ typedef FoundationJointBody = {
 typedef FoundationJointInsert = {var member:String; var pose:AssemblyFrame; var spec:InsertSpec;}
 enum abstract FoundationJointScrewKind(String) to String {
 	var Iso4762Steel88 = "iso4762-8.8";
+	var Iso4026NominalSteel = "iso4026-nominal-steel";
 }
 typedef FoundationJointScrew = {
 	var member:String;
@@ -62,11 +63,15 @@ class FoundationJointSourceCodec {
 		}
 		for (row in bounded(raw,"screws")) {
 			Fields.fields(row,["member","kind","partNumber","thread","shankLength","threadedLength","bearingFrame"]);
-			if (C.string(row,"kind")!="iso4762-8.8") throw "Unsupported foundation joint screw kind";
+			var kind:FoundationJointScrewKind=switch C.string(row,"kind") {
+				case "iso4762-8.8":FoundationJointScrewKind.Iso4762Steel88;
+				case "iso4026-nominal-steel":FoundationJointScrewKind.Iso4026NominalSteel;
+				default:throw "Unsupported foundation joint screw kind";
+			};
 			var partNumber=C.string(row,"partNumber");
 			if (StringTools.trim(partNumber).length==0 || partNumber.length>2048 || materia.assembly.AssemblyCodec.containsNul(partNumber))
 				throw "Invalid foundation joint screw part number";
-			var screw:FoundationJointScrew={member:member(row,seen),kind:FoundationJointScrewKind.Iso4762Steel88,partNumber:partNumber,
+			var screw:FoundationJointScrew={member:member(row,seen),kind:kind,partNumber:partNumber,
 				thread:InsertThreadCodec.snapshot(Reflect.field(row,"thread")),shankLength:C.number(row,"shankLength"),
 				threadedLength:C.number(row,"threadedLength"),bearingFrame:C.frame(Reflect.field(row,"bearingFrame"))};
 			if (screw.thread.internal || screw.shankLength<=0 || screw.threadedLength<=0 || screw.threadedLength>screw.shankLength)

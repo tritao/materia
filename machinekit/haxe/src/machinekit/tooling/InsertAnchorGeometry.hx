@@ -392,6 +392,7 @@ class InsertAnchorGeometry {
 		InsertAnchorSelection.validateRule(rule);
 		if (!Math.isFinite(openingMm) || openingMm<0) throw "Invalid anchor-band opening";
 		for (size in availableSizes()) {
+			if (rule.allowedNominalDiametersMm.indexOf(HexFlangeBolt.catalog().get(size).diameter)<0) continue;
 			var hole:materia.casting.InsertHole;
 			try hole=holeForStock(size,thicknessMm,material) catch (_:Dynamic) continue;
 			var diameter=HexFlangeBolt.catalog().get(size).diameter;
@@ -400,6 +401,23 @@ class InsertAnchorGeometry {
 			return openingMm+2*(edge+radius+rule.coverDiameters*diameter);
 		}
 		throw "No standard blind anchor thread fits the source stock thickness";
+	}
+
+	/** Two lands beside an access pocket each carry a row of anchors. This
+	 * demand-side floor precedes the unchanged full footprint/cover selector. */
+	public static function minimumAnchorBandWidth(source:CastInsert,rule:InsertAnchorPatternRule):Float {
+		if (rule.allowedNominalDiametersMm.length!=1) throw "Band width needs one selected anchor thread";
+		var diameter=rule.allowedNominalDiametersMm[0];
+		var thread=machinekit.standard.FastenerThreads.coarse(diameter).mating();
+		var nominal=HexFlangeBolt.catalog().get(thread.designation);
+		var policy=machinekit.design.ThreadedHolePolicy.resolve(thread,source.insertMaterial().grade);
+		var demand=demand(source.insertSpec(),rule.id,rule.demandFactor,0,[]),load=0.0;
+		for (service in demand.servicePreloads) load+=service.preloadN;
+		var count=Math.max(rule.minimumCount,Math.ceil(load*demand.factor/
+			machinekit.design.ThreadedHolePolicy.assemblyPreloadN(thread)));
+		if (count>rule.maximumCount) throw "Anchor demand exceeds the declared count limit";
+		var columns=Math.ceil(count/2),edge=Math.max(policy.minWall+diameter/2,nominal.flangeDiameter/2);
+		return 2*edge+(columns-1)*(nominal.flangeDiameter+rule.spacingDiameters*diameter);
 	}
 
 	/** Resin land for the demand-admitted back pattern. Use the same footprint
@@ -464,6 +482,7 @@ class InsertAnchorGeometry {
 		if (stock==null) throw "Back-face anchor rule requires rectangular steel";
 		var choices:Array<InsertAnchorStockChoice>=[],failures:Array<String>=[];
 		for (size in availableSizes()) {
+			if (rule.allowedNominalDiametersMm.indexOf(HexFlangeBolt.catalog().get(size).diameter)<0) continue;
 			var nominal=HexFlangeBolt.catalog().get(size),hole:materia.casting.InsertHole;
 			try hole=holeForStock(size,stock.height,source.insertMaterial().grade)
 			catch (error:Dynamic) {failures.push(size+": "+Std.string(error));continue;}
@@ -477,7 +496,7 @@ class InsertAnchorGeometry {
 				bearingInnerDiameter:nominal.bearingInnerDiameter,bearingOuterDiameter:nominal.bearingOuterDiameter,
 				hole:hole,lengths:lengths,assemblyPreloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(InsertHoles.threadSpec(hole.thread))});
 		}
-		var boundary=switch context {case FootprintOnly:[];case Casting(body,_):screenBoundary(body);};
+		var boundary=switch context {case FootprintOnly:[];case Casting(body,pose):anchorBoundary(body,pose,stock,choices,rule);};
 		var tested=new Map<String,Bool>(),screws=new Map<String,InsertAnchorScrew>();
 		var candidate=InsertAnchorSelection.select(spec,rule,demand(spec,rule.id,rule.demandFactor,liftingShareN,[]),choices,failures,item -> {
 			for (point in item.points) {
@@ -504,6 +523,41 @@ class InsertAnchorGeometry {
 		if (!contained(result,context,candidate.rules.minimumCoverMm,candidate.rules.minimumEmbedmentMm))
 			throw new InsertAnchorScreenDefect("Analytic anchor screen disagrees with native confirmation; candidate must not fall back");
 		components(result.insertSpec());return result;
+	}
+
+	/** Exact query window, not a replacement casting envelope. Every possible
+	 * anchor, its required cover and its embedment test segment lie inside it.
+	 * Artificial window faces therefore cannot change an admission predicate.
+	 * Cropping once avoids unrelated curved faces elsewhere in the casting;
+	 * the chosen pattern is still confirmed against the complete original body.
+	 */
+	static function anchorBoundary(body:Part,pose:AssemblyFrame,stock:materia.casting.Box3,
+			choices:Array<InsertAnchorStockChoice>,rule:InsertAnchorPatternRule):Array<AnchorFace> {
+		if (choices.length==0) return [];
+		var radius=0.0,cover=0.0,embedment=0.0,length=0.0,head=0.0;
+		for (choice in choices) {
+			radius=Math.max(radius,choice.flangeDiameter/2);
+			cover=Math.max(cover,rule.coverDiameters*choice.diameter);
+			embedment=Math.max(embedment,rule.embedmentDiameters*choice.diameter);
+			head=Math.max(head,HexFlangeBolt.catalog().get(choice.size).headHeight);
+			for (value in choice.lengths) length=Math.max(length,value);
+		}
+		var margin=radius+cover;
+		var low=stock.z-length-head-margin;
+		var high=stock.z+stock.height+embedment+margin;
+		var scope=new cadkit.modeling.Scope();
+		try {
+			var local=scope.own(Part.box(stock.width+2*margin,stock.depth+2*margin,high-low));
+			var window=scope.own(PosedParts.moved(local,F.compose(pose,
+				F.translation(stock.x+stock.width/2,stock.y+stock.depth/2,low))));
+			var region=scope.own(body.intersect(window));
+			var result=screenBoundary(region);
+			scope.close();
+			return result;
+		} catch (error:Dynamic) {
+			scope.close();
+			throw error;
+		}
 	}
 
 	/** Copy exact trimmed planar boundaries once per selector invocation. The

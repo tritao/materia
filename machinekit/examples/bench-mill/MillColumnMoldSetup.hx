@@ -19,7 +19,7 @@ class MillColumnMoldSetup {
 		document.input=source;
 		document.setup={id:"column-front-on-bed",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(source),
 			fillHeightMm:depth,freeboardMm:0,
-			sourceToMold:F.fromRotationMatrix(0,0,depth/2,[1,0,0,0,0,-1,0,1,0]),features:[]};
+			sourceToMold:F.fromRotationMatrix(0,0,depth/2,[0,0,1,1,0,0,0,1,0]),features:[]};
 		document.recipe.id="mill-column-panel-eps-review";
 		// Front-on-bed column orientation puts the wire through mold Z rather than base mold Y.
 		document.recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Z;

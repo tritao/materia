@@ -125,7 +125,7 @@ class CastingMoldPlanner {
 				reason: check.message + ". Select supported source geometry or implement profile-capable tooling before fabrication.",
 				blockingChecks: [check.rule]
 			}];
-			checks=checks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts))
+			checks=checks.concat(InterfaceQualification.source(d.input).concat(InsertQualifications.postCure(d.input))).concat(InsertQualifications.manufacturing(d.input.inserts))
 				.concat(ReplicationJigs.analyze(d.input,options.replicationJigs,options.precision))
 				.concat(FoundationJointQualification.analyze(d.input,options.foundationJointProcesses));
 			return {sourceFingerprint: ToolingCodec.documentFingerprint(d), plan: null, validation: checks,
@@ -255,6 +255,7 @@ class CastingMoldPlanner {
 			cores: [],
 			coreUnits: [],
 			formers: [],
+			seals: [],
 			fixtures: [],
 			features: [],
 			openings: openings,
@@ -326,7 +327,7 @@ class CastingMoldPlanner {
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("closure-loads", [d.input.id],
 				"Wall/pad clamps, braces and uplift capacity require qualification"),
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("materials-process", [d.recipe.id],
-				"Adhesive, covering, release and cure compatibility require qualification"),
+				"Adhesive, covering, receiver-closure compound, release and cure compatibility require qualification"),
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("precision-interfaces", [d.input.id],
 				"Replication and grout interfaces require evidence"),
 			materia.tooling.ToolingValidation.ToolingReadiness.pending("anchorage-compaction", [d.input.id], "Anchorage and compaction loads require evidence")
@@ -364,7 +365,7 @@ class CastingMoldPlanner {
 			if (normal.z>1-1e-8 && face.z>=e.z+e.height+l-1e-7 && face.z<e.z+e.height+t/2)
 				raisedWalls=RaisedWalls.NorthSouth;
 			bodies.set(i.id, b);
-			low = Math.min(low, b.z);
+			// The bed follows the source envelope, not proud finishing stock.
 			if (o.precision.filter(p -> p.insertId == i.id).length != 1)
 				throw "Missing or duplicate insert process record";
 		}
@@ -376,9 +377,10 @@ class CastingMoldPlanner {
 			depth: e.depth,
 			height: e.z + e.height - low
 		};
-		var result=seed(d,o,e,b,geometryChecks.concat(InterfaceQualification.source(d.input)).concat(InsertQualifications.manufacturing(d.input.inserts))
+		var result=seed(d,o,e,b,geometryChecks.concat(InterfaceQualification.source(d.input).concat(InsertQualifications.postCure(d.input))).concat(InsertQualifications.manufacturing(d.input.inserts))
 				.concat(ReplicationJigs.analyze(d.input,o.replicationJigs,o.precision))
 				.concat(FoundationJointQualification.analyze(d.input,o.foundationJointProcesses)),raisedWalls),panels=result.panels,bed=panels.members[0];
+		MoldBedReceivers.add(result);
 		var ordered = ownershipOrder(d.input.features, strategies);
 		var postObstacles=bedPostObstacles(d);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
@@ -392,7 +394,7 @@ class CastingMoldPlanner {
 			// A source mounting face already seated on a panel fixes through that
 			// panel, as in the single-pocket case. Separate datums bridge a gap.
 			var direct=r.hardware.fixtureReceiver==materia.tooling.ToolingRecipe.FixtureReceiver.PanelWhenCoplanar;
-			var receiver=direct || normal.z>-1+1e-8
+			var receiver=direct || face.z<e.z-1e-7 || normal.z>-1+1e-8
 				? DatumFixtures.panelOnFace(result.panels.members.concat(result.supportPanels),face) : null;
 			if (receiver!=null || normal.z > -1 + 1e-8) {
 				if (receiver==null && normal.z>1-1e-8)
@@ -694,7 +696,7 @@ class CastingMoldPlanner {
 						var exclusions=occupiedRegions.concat(previousRegions);
 						var extension=sideEPS.exists(f.id) && pull.z< -1+1e-7
 							? MoldFormerAccess.registeredBedAccess(result,f,volume,exclusions)
-							: MoldFormerAccess.add(result,f,pull,volume,exclusions);
+							: MoldFormerAccess.add(result,f,pull,volume,exclusions,sideEPS.exists(f.id));
 						blank=materia.casting.CastingRegion.Union([sourceRegion].concat(extension));
 						claim(f.id,s.priority,blank);
 						result.formers.push({volume:volume,featureIds:[f.id],withdrawal:pull,draftDegrees:f.draft.degrees});
@@ -1074,7 +1076,7 @@ class CastingMoldPlanner {
 		FoundationJointQualification.validate(p.document.input,p.options.foundationJointProcesses,p.validation);
 		ReplicationJigs.validate(p.document.input,p.options.replicationJigs,p.options.precision,p.validation);
 		InterfaceQualification.validate(p.document.input,p.validation);
-		InsertQualifications.validateManufacturing(p.document.input.inserts,p.validation);
+		InsertQualifications.validateManufacturing(p.document.input.inserts.concat([for (row in p.document.input.postCureInserts) row.insert]),p.validation);
 		InsertQualifications.validateAnchorage(p.document.input.inserts,p.validation);
 		if (ToolingCodec.canonical(p.fabrication) != ToolingCodec.canonical(materia.tooling.ToolingValidation.ToolingReadiness.evaluate(p.validation)))
 			throw "Stale fabrication readiness";
@@ -1156,6 +1158,14 @@ class CastingMoldPlanner {
 				&& p.validation.filter(v -> v.status == "unsupported" && v.affectedIds.indexOf(feature.featureId) >= 0).length == 0)
 				throw "Unsupported feature needs blocking validation";
 		var ids = new Map<String, Bool>();
+		for (seal in p.seals) {
+			member(seal.volume.id);
+			if (p.panels.members.filter(panel -> panel.panel.id==seal.panelId).length!=1
+				|| p.document.input.inserts.filter(insert -> insert.id==seal.insertId).length!=1
+				|| seal.volume.material!=SealantStock || seal.materialSpec!=p.document.recipe.hardware.sealMaterial)
+				throw "Seal disagrees with its receiver, insert or recipe: "+seal.volume.id;
+			MoldVolumeRecords.copy(seal.volume);
+		}
 		for (f in p.features) {
 			for (id in f.memberIds)
 				if (!members.exists(id))
@@ -1187,7 +1197,7 @@ class CastingMoldPlanner {
 			for (id in m.panel.contactOpenings)
 				if (!seen.exists(m.panel.id + "/" + id))
 					throw "Unclassified mold opening";
-		var sealingProfiles:Array<MoldVolumeProfile>=[];
+		var sealingProfiles:Array<MoldVolumeProfile>=[for (seal in p.seals) for (profile in seal.volume.profiles) profile];
 		for (f in p.formers) {
 			MoldVolumeRecords.copy(f.volume);
 			sealingProfiles=sealingProfiles.concat(f.volume.profiles);
@@ -1203,8 +1213,10 @@ class CastingMoldPlanner {
 			var operations=panels[0].panel.operations.filter(o -> o.id==profile.operationId);
 			if (operations.length!=1
 				|| ToolingCodec.canonical(operations[0].contour)!=ToolingCodec.canonical(profile.contour)
-				|| ToolingCodec.canonical(panels[0].pose)!=ToolingCodec.canonical(profile.pose)
-				|| profile.depth!=panels[0].panel.stock.measuredThickness)
+				|| ToolingCodec.canonical(F.compose(panels[0].pose,F.translation(0,0,
+					operations[0].side==materia.tooling.ToolingEnums.MachiningSide.PositiveZ
+						? panels[0].panel.stock.measuredThickness-operations[0].depth : 0)))!=ToolingCodec.canonical(profile.pose)
+				|| profile.depth!=operations[0].depth)
 				throw "Former sealing profile differs from panel operation";
 		}
 		var exactResin=requiresRegions(p.document),volumes=MoldFixtures.allVolumes(p);
@@ -1352,7 +1364,7 @@ class CastingMoldPlanner {
 					"Compaction, closure loads and handling require qualification")
 			];
 		result.validation=result.validation.concat(fixtureChecks);
-		result.validation = result.validation.concat(InterfaceQualification.source(d.input))
+		result.validation = result.validation.concat(InterfaceQualification.source(d.input).concat(InsertQualifications.postCure(d.input)))
 			.concat(FoundationJointQualification.source(d.input));
 		if (F.transformVector(d.setup.sourceToMold, 0, 0, 1).z < 0)
 			result.changeRequests.push({
@@ -1381,7 +1393,7 @@ class CastingMoldPlanner {
 	static function validateSinglePocket(plan:CastingMoldPlan):Void {
 		InterfaceQualification.validate(plan.document.input,plan.validation);
 		FoundationJointQualification.validate(plan.document.input,[],plan.validation);
-		InsertQualifications.validateManufacturing(plan.document.input.inserts,plan.validation);
+		InsertQualifications.validateManufacturing(plan.document.input.inserts.concat([for (row in plan.document.input.postCureInserts) row.insert]),plan.validation);
 		InsertQualifications.validateAnchorage(plan.document.input.inserts,plan.validation);
 		for (source in plan.document.input.inserts) {
 			var stock=InterfaceQualification.finishingStock(plan.document.input,source);

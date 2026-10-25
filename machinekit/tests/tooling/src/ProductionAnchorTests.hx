@@ -146,7 +146,7 @@ class ProductionAnchorTests {
 		var frame = MillMoldSetup.frame();
 		Sys.println("ANCHOR-SOURCE-WALL-TIME "+(Sys.time()-sourceStart)+" seconds (complete frame construction)");
 		var foundations=[frame.base,frame.column];
-		var depth=Math.max(frame.layout.roof,frame.casting.minimumColumnPadDepth(frame.layout.insertThickness));
+		var depth=Math.max(frame.layout.roof,frame.casting.minimumColumnPadDepth(frame.layout.insertThickness,frame.casting.anchorRule));
 		check(depth>frame.casting.columnBoltAccessDepth,"source pad retains resin lands beside its declared access opening");
 		for (foundation in foundations) {
 			var steel=machinekit.design.AssemblyDesignChecks.check(foundation);
@@ -171,10 +171,8 @@ class ProductionAnchorTests {
 				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount
 					|| row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount) neighbours(foundation,row);
 				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount) {
-					var service=materia.assembly.AssemblyFrames.transformPoint(row.pose,sourceHoles[0].frame.x,sourceHoles[0].frame.y,sourceHoles[0].frame.z);
-					check(Math.abs(Math.abs(service.x)-(foundation.body.parameterNumber("width")/2-22))<1e-8
-						&& Math.abs(Math.abs(service.y)-(foundation.body.parameterNumber("depth")/2-27))<1e-8,
-						"enlarging the source lifting plate retains its existing service-hole position: "+row.id);
+					check(Math.abs(sourceHoles[0].frame.x)+Math.abs(sourceHoles[0].frame.y)<1e-8,
+						"approved lifting correction centres the service thread in one shared blank: "+row.id);
 				}
 				if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.HatchMount) {
 					var service=materia.assembly.AssemblyFrames.transformPoint(row.pose,sourceHoles[0].frame.x,sourceHoles[0].frame.y,sourceHoles[0].frame.z);
@@ -189,7 +187,9 @@ class ProductionAnchorTests {
 					"every production insert has its derived anchors: "+row.id);
 			}
 			Sys.println("Production anchor count: "+count);
-			var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"production-anchor-test",1);
+			var datums:materia.casting.FoundationDatumScheme=cast foundation.body.foundationDatumScheme();
+			check(datums!=null,"production foundations declare their source datum scheme");
+			var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,datums.foundationId,1);
 			for (finding in machinekit.tooling.InsertAnchorGeometry.review(input)) {
 				Sys.println(finding.rule+" "+finding.status+" "+finding.message);
 				check(finding.rule.indexOf(".capacity.")>=0

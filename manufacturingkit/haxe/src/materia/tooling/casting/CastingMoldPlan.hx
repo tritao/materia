@@ -58,6 +58,7 @@ enum abstract MoldPartMaterial(String) to String {
 	var EPSStock = "eps";
 	var SteelStock = "steel";
 	var FormerStock = "former";
+	var SealantStock = "sealant";
 }
 
 typedef MoldVolumeProfile = {
@@ -262,6 +263,14 @@ typedef MoldInsertFixture = {
 	var assemblyClearance:{x:Float, y:Float, z:Float};
 }
 
+/** Cured closure material remains attached to its receiver panel. */
+typedef MoldSeal = {
+	var volume:MoldVolume;
+	var panelId:String;
+	var insertId:String;
+	var materialSpec:String;
+}
+
 typedef CastingMoldPlan = {
 	var construction:MoldConstruction;
 	var id:String;
@@ -276,6 +285,7 @@ typedef CastingMoldPlan = {
 	var cores:Array<CastingMoldCore>;
 	var coreUnits:Array<CastingCoreUnit>;
 	var formers:Array<MoldFormer>;
+	var seals:Array<MoldSeal>;
 	var fixtures:Array<MoldInsertFixture>;
 	var features:Array<FeatureTooling>;
 	var openings:Array<MoldOpening>;

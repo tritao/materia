@@ -98,7 +98,7 @@ class MillXYStageLayout {
 		yScrewZ = saddleBottom;
 		yMountPlane = yScrewZ - 40;
 		yBayTop = yScrewZ + yMotor.spec.connectorHeight + clearance;
-		yHatchLowerZ = frame.railPlane + 10; yHatchUpperZ = yBayTop + 10;
+		yHatchLowerZ = frame.columnMountPlane + 10; yHatchUpperZ = yBayTop + 10;
 		xMotorZ = saddleBottom + SADDLE_HEIGHT / 2;
 		xScrewZ = xRailPlane + 40;
 		yServiceRear = frame.columnCentreY + frame.columnDepth / 2;

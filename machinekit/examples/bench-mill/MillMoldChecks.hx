@@ -99,9 +99,42 @@ class MillMoldChecks {
 				part.close();
 	}
 
+	/** Real column source on the shared planner, without a kit export. */
+	public static function columnPlan(frame:BenchMillFrame):Void {
+		var count=0;
+		function verify(ok:Bool,message:String):Void {count++;if(!ok)throw message;}
+		var plan=CastingMoldCad.plan(MillColumnMoldSetup.document(frame),MillColumnMoldSetup.options(frame));
+		for(id in ["column-step-clearance-left","column-step-clearance-right","rear-y-motor-cheek-left","rear-y-motor-cheek-right"]) {
+			var records=plan.features.filter(feature -> feature.featureId==id);
+			verify(records.length==1 && records[0].kind==FeatureToolingKind.EPSFeature,
+				"Deep face-open cavity uses declared sacrificial EPS: "+id);
+			verify(plan.formers.filter(former -> former.featureIds.indexOf(id)>=0).length==0,
+				"Deep cavity needs no unbuildable rigid former: "+id);
+			verify(plan.cores.filter(core -> records[0].memberIds.indexOf(core.id)>=0).length>0,
+				"Deep cavity has physical EPS stock: "+id);
+		}
+		verify(plan.formers.length==0,"Every deep column cavity has the declared sacrificial construction route");
+		verify(plan.validation.filter(record -> record.rule=="tooling.feature.box-geometry"
+			&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported).length==0,
+			"Column curved step cavities have exact supported tooling");
+		var source=CastingMoldCad.source(plan),reconstructed=CastingMoldCad.reconstructed(plan);
+		var missing:cadkit.modeling.Part=null,extra:cadkit.modeling.Part=null;
+		try {
+			missing=source.subtract(reconstructed);extra=reconstructed.subtract(source);
+			verify(missing.volume()+extra.volume()<1e-5,"Stepped column mold reconstructs the exact source resin");
+		} catch(error:Dynamic) {
+			if(extra!=null)extra.close();if(missing!=null)missing.close();
+			reconstructed.close();source.close();throw error;
+		}
+		extra.close();missing.close();reconstructed.close();source.close();
+		for(record in CastingMoldCad.corePanelFit(plan))
+			verify(record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pass,record.message);
+		Sys.println('Column mold plan: $count assertions passed');
+	}
+
 	public static function run(frame:BenchMillFrame, p:CastingMoldPlan, report:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
-		check(p.cores.length == 10 && p.fixtures.length == 16, "actual mill pocket and insert inventory");
-		check(p.features.length == p.document.input.features.length && p.features.length == 35, "every full-frame feature classified");
+		check(p.cores.length == 10 && p.fixtures.length == 12, "actual mill pocket and insert inventory");
+		check(p.features.length == p.document.input.features.length && p.features.length == 31, "every full-frame feature classified");
 		for (name in ["reconstruction", "coverage", "assembly-graph", "demolding-graph"])
 			check(report.validation.filter(v -> v.rule == "tooling.cad." + name && v.status == "pass").length == 1,
 				"CAD review owns its " + name + " evidence");
@@ -117,32 +150,48 @@ class MillMoldChecks {
 			"source-level design metrics map into foundation integrity");
 		check(report.symmetricDifferenceMm3 < 1e-3 && !report.fabrication.ready, "review geometry passes without fabricating readiness");
 		var rowGroups=report.assemblyGroups.filter(group -> group.members.filter(id -> p.cores.filter(core -> core.id==id).length==1).length>0);
-		check(rowGroups.length == 2 && report.permanentGroups.length == 2, "two shared row fixtures");
+		check(rowGroups.length == 2 && report.permanentGroups.length == 3, "two shared row fixtures and the bed-attached closures");
 		var anchored=p.document.input.inserts.filter(insert -> switch insert.anchorage {case Bolted(_,_):true;default:false;});
 		check(report.assemblyGroups.length==rowGroups.length+anchored.length,
 			"each anchored insert has its own rigid insertion group alongside the core rows");
-		check(report.assembly.assemblyOrder[0] == "bed", "bed installed first");
+		var first=report.assembly.assemblyOrder[0];
+		check(first=="bed" || report.permanentGroups.filter(group -> group.id==first && group.members.indexOf("bed")>=0).length==1,
+			"the bed, with its cured closures, installs first");
 		check(p.changeRequests.filter(c -> c.kind == "lifting-points").length == 0,
 			"source lifting connections clear their design request");
 		check(p.validation.filter(check -> check.rule=="tooling.handling.flip" && check.status=="pending").length==1,
 			"rigging and flip evidence remain pending independently");
 		check(p.options.precision.length==p.document.input.inserts.length && p.options.foundationJointProcesses.length==0,
-			"process choices cover source inserts without inventing the undeclared source joint");
-		var jointRequests=p.changeRequests.filter(request -> request.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.FoundationJointDefinition);
-		check(jointRequests.length==1 && jointRequests[0].sourceIds.length==4
-			&& jointRequests[0].blockingChecks.length==1 && p.validation.filter(record -> record.rule==jointRequests[0].blockingChecks[0]
-				&& record.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Pending).length==1,
-			"the mill's four column anchors retain a source joint request while production gap and jacking remain undeclared");
+			"process choices cover the source while the joint compound and cure evidence stay unresolved");
+		check(p.changeRequests.filter(request -> request.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.FoundationJointDefinition).length==0,
+			"the declared source joint clears its definition request");
+		var withoutJoint=materia.tooling.ToolingCodec.copyInput(p.document.input);
+		if (withoutJoint.interfaceContext==null) throw "Mill source joint requires assembly context";
+		withoutJoint.interfaceContext.foundationJoints=[];
+		withoutJoint.interfaceContext.jointSources={bodies:[],inserts:[],screws:[]};
+		var missingJoint=materia.tooling.casting.FoundationJointQualification.missingSource(withoutJoint);
+		check(missingJoint!=null && missingJoint.affectedIds.length==4,"removing the source joint restores the four mounting-interface requests");
+		check(p.formers.filter(former -> StringTools.startsWith(former.volume.id,"bed-backing-")).length==0,
+			"rebated steel receivers remove the backing sliver formers");
+		check(p.changeRequests.filter(request -> request.kind==materia.tooling.casting.CastingMoldPlan.DesignChangeKind.InterfaceAllowance).length==0,
+			"explicit finishing stock clears the source allowance requests");
 
 		equivalent(frame, p);
 		junctionGeometry(frame, p);
 		for (c in p.cores.filter(c -> c.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge)) {
-			check(c.layers.length == 2, "EPS layers fit 100 mm stock");
+			check(c.layers.length>0,"every bridge core has wire-cut stock");
+			for (layer in c.layers) check(layer.block.width<=p.document.recipe.core.width
+				&& layer.block.depth<=p.document.recipe.core.depth && layer.block.height<=p.document.recipe.core.height,
+				"EPS layers fit the declared stock dimensions");
 			var first = MoldCores.singleBox(MoldCores.layerRegion(c.layers[0]),c.id);
 			var last = MoldCores.singleBox(MoldCores.layerRegion(c.layers[c.layers.length-1]),c.id);
 			var cavity = MoldCores.singleBox(c.cavity,c.id);
 			check(Math.abs(last.z + last.height + c.support.adhesiveThickness - cavity.z - cavity.height) < 1e-7, "glue line included in foam height");
-			check(Math.abs(last.z - first.z - first.height - c.support.adhesiveThickness) < 1e-7, "interlayer glue line included");
+			for (index in 1...c.layers.length) {
+				var before=MoldCores.singleBox(MoldCores.layerRegion(c.layers[index-1]),c.id);
+				var after=MoldCores.singleBox(MoldCores.layerRegion(c.layers[index]),c.id);
+				check(Math.abs(after.z-before.z-before.height-c.support.adhesiveThickness)<1e-7,"interlayer glue line included");
+			}
 		}
 		for (f in p.formers) {
 			var solid = ToolingVolume.geometryOf(f.volume);
@@ -160,7 +209,8 @@ class MillMoldChecks {
 				+ p.formers.filter(f -> f.featureIds.length == 0)
 					.length,
 			"every zero-draft rigid feature has a release decision");
-		check(p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.attachment.")).length == 16,
+		check(p.validation.filter(v -> StringTools.startsWith(v.rule, "tooling.fixture.attachment.")).length
+			==p.fixtures.filter(fixture -> MoldFixtures.volumes(fixture).length>0).length,
 			"fixture attachments are tooling pending records");
 		check(p.changeRequests.filter(c -> c.kind == "fixture-attachment").length == 0, "tool-only fixture attachments are not casting changes");
 		check(report.handling.castingMassKg > 0 && report.demoldingSteps[report.demoldingSteps.length - 1].kind == "flip-to-service",
@@ -182,15 +232,18 @@ class MillMoldChecks {
 				&& materia.casting.InsertSpec.InsertBodyCodec.height(insert.body) - hole.depth >= hole.limits.minBack,
 				"source fixing preserves the blind C45 back wall and has no buried plug");
 		}
-		for (f in p.fixtures) {
-			var datum = ToolingVolume.geometryOf(MoldFixtures.datum(f));
+		for (f in p.fixtures.filter(fixture -> MoldFixtures.volumes(fixture).length>0)) {
+			var volume=MoldFixtures.datum(f);
+			check(p.seals.filter(seal -> seal.volume.id=="receiver-seal-"+volume.id
+				&& seal.insertId==f.insertId).length==1,"datum receiver relief has its actual cured closure");
+			var datum = ToolingVolume.geometryOf(volume);
 			check(datum.valid() && datum.solidCount() == 1, "bored datum support remains one valid connected solid");
 			datum.close();
 			check(MoldFixtures.lateral(f).baselineMm >= p.document.recipe.hardware.fixturePinSpacing && MoldFixtures.datum(f).cuts.length >= 2,
 				"fixture has pin/slot and clearance-only fixing cuts");
 			check(materia.tooling.casting.CastingMoldPlan.MoldOpenings.records(p,f.insertId).length == 2 + f.fixings.length, "fixture bed cuts have explicit sealing face records");
 		}
-		for (f in p.fixtures) {
+		for (f in p.fixtures.filter(fixture -> MoldFixtures.volumes(fixture).length>0)) {
 			for (id in [MoldFixtures.lateral(f).primaryId, MoldFixtures.lateral(f).secondaryId]) {
 				check(report.demolding.removalOrder.indexOf(id) < report.demolding.removalOrder.indexOf(MoldFixtures.datum(f).id),
 					"through-bed pins withdraw before datum supports");

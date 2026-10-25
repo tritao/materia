@@ -6,6 +6,13 @@ class LiftingSourceTests {
 	static var assertions=0;
 	static function check(ok:Bool,message:String):Void {assertions++;if (!ok) throw message;}
 	public static function main():Void {
+		var witness=new machinekit.structural.MineralFoundation(
+			new machinekit.component.ComponentValues().setNumber("width",100).setNumber("depth",100).setNumber("height",50),[]);
+		var poured=machinekit.structural.FoundationSizing.asCastMass(witness);
+		witness.addComponent("removable-foot-plate",machinekit.structural.LevelingFoot.of(Plate(60,60,15,18)));
+		var after=machinekit.structural.FoundationSizing.asCastMass(witness);
+		check(Math.abs(after.mass-poured.mass)<1e-9,"post-cure removable hardware does not inflate pour lifting demand");
+		check(witness.massProperties().mass>poured.mass,"the installed assembly still includes its removable hardware mass");
 		var frame=MillMoldSetup.frame();
 		for (foundation in [frame.base,frame.column]) {
 			var rows=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==InsertRole.LiftingMount);
@@ -30,7 +37,9 @@ class LiftingSourceTests {
 			}
 			var diagnostics=machinekit.design.AssemblyDesignChecks.check(foundation);
 			check(!diagnostics.hasErrors(),"source foundation interfaces: "+diagnostics.items.map(item -> item.message).join("; "));
-			var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"lifting-source",1);
+			var datums:materia.casting.FoundationDatumScheme=cast foundation.body.foundationDatumScheme();
+			check(datums!=null,"production foundations declare their source datum scheme");
+			var input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,datums.foundationId,1);
 			var anchorCount=0,capacityCount=0;
 			for (insert in input.inserts) switch insert.anchorage {
 				case Bolted(_,anchors):anchorCount+=anchors.length;

@@ -35,11 +35,10 @@ The kit includes:
 - Two longitudinal support rails with blind wall-top locating sockets, round/slot
   positioning and separate M6 clamp bolts. The rails themselves need qualified
   external clamps to the walls; their attachment capacity is not established.
-- Single-board detail/backing formers for shallow guide/drive recesses and
+- Single-board detail formers for shallow guide/drive recesses and
   fill-side stems, plus four side-withdrawing EPS foot-access tools.
-  Overlapping cuts are allocated deterministically into disjoint tooling solids;
-  insert envelopes and datum fixtures are subtracted, preserving the intended
-  intersection between foot-access and stem openings around the steel seats.
+  Source pockets are authored disjointly at the rib and wall stations. Insert
+  envelopes and datum fixtures are subtracted from their tooling allocations.
 - Nominal steel datum supports at the actual insert heights. Bed-facing
   supports seat in blind board sockets; elevated foot supports have external
   columns and withdraw sideways. Each has round/slot locating receivers and a
@@ -55,15 +54,15 @@ The kit includes:
   source feature. Unknown kinds or override IDs fail. Zero-draft rigid features
   need a release alternative; unsupported strategies block readiness.
   Draft is never added implicitly by the mold setup.
-- Retained beams and backing split authored features through the shared box
-  algebra. Stable fragments retain their parent through `derivedFrom`;
-  `core-units.json` groups the foam pieces by their authored core intent.
+- Named source pockets leave the required rail beams and webs directly. The
+  shared algebra allocates tooling; it does not invent source fragments.
 
 
 The insert stock specification is C45 EN 1.0503 bright or ground bar, with a
 580 MPa minimum tensile strength; service and fixture screws are class 8.8.
-Buried M12 base anchors and M4 column hatch anchors have blind, flat-bottom
-machined bores followed by bottoming taps. Usable thread excludes two pitches of
+Buried M12 base anchors have blind, flat-bottom machined bores followed by
+bottoming taps. The four M4 hatch threads are post-cure bonded D12 × 12 mm
+C45 inserts in D12.2 × 12 mm drilled receivers; adhesive qualification is Pending. Usable thread excludes two pitches of
 runout. The base anchors use named 30 mm stock and derived 40 mm service screws.
 Their mounting plane is unchanged; the casting refreeze records 96,000 mm³ of
 additional steel recess. Insert manufacturing and physical qualification remain
@@ -82,18 +81,18 @@ The sloped-foot fixture exercises the actual fill, section and planner entry
 points against its independent CAD cut. Unsupported command-line assessments
 are written under `build/tooling/base-source-assessment/<source fingerprint>/`.
 
-The inverted setup puts rail faces toward the bed, underside cavities toward the
-fill face and the nominal rail mounting plane at mold Z=0. The casting envelope
-starts 4 mm above that datum in this source instance. Backing formers fill that
-space without changing the casting or moving its steel inserts. Precision rail
-and screw-bearing seats follow the reviewed **replicated** route; their actual
-allowances, masters, flatness evidence and hole protection are pending. Source
-finish mismatches and missing machining/replication stock produce change requests.
-Precision masters, dams and hole plugs require resolved source allowances and
-process choices. The fabrication package reports these missing tooling routes;
-no unused geometry fields imply that they have been implemented. The column joint has a separate pending grout-gap, jacking, sleeve and
-cure-before-torque record. Requests flag any source-interface changes needed;
-this generator does not invent replication or grout clearance in the machine.
+The inverted setup puts the casting top at mold Z=0. Precision inserts carry
+4 mm of explicit raw finishing stock beyond that plane; routed bed rebates
+receive that stock. Cured closures fill their clearance and corner relief, and
+the equivalent gaps around datum receivers. They move with the bed in both
+removal graphs. The kit names the compound reference and orders dry fitting,
+closure curing, inspection and release; compatibility remains Pending.
+
+Precision seats retain their source finishing route and nominal service datum.
+The 4 mm stock is separate from the unresolved RM0 finishing-process error
+allocation. The base–column source joint has a 3 mm gap, four M12 clamps, three
+M8 jacks and cure-before-torque. Joint compound and cure/torque evidence remain
+Pending; a source-definition request returns if the joint is removed.
 
 The study shares the measured sheet-thickness parameter between the contact
 panels and nominal plywood support displays. Separate stock lots and material
@@ -149,17 +148,17 @@ review and load/access checks below; phase 9 supplies physical evidence.
 ```
 
 `MillColumnMoldSetup` copies the actual `frame.column`, lays its front on the bed
-and fills toward its rear. The shared planner constructs exact flared-envelope
-fillers, source-thread datum carriers and bed/side EPS access. The preview checks
+and fills toward its rear. The stepped foot uses ordinary EPS access cores;
+there are no flared-envelope fillers. The shared planner constructs source-thread
+datum carriers and registered bed/side EPS access. The preview checks
 source reconstruction and both continuous swept blocking graphs. Side-facing
 bore masks follow their source-hole axes during assembly. The fabrication entry
 uses the same writer as the base, including comparison with the actual column CAD.
 
-**Not fabrication-ready.** Two flared-envelope fillers currently report
-Unsupported board construction: the rectangular hollow-box interior breaks
-through their diagonal faces. Their finished volumes and withdrawal checks are
-preserved; no rectangular approximation or absent manufacturing check clears
-this finding. Source holes without a usable fixing thread retain their requests.
+**Not fabrication-ready.** Compound, equipment, tolerance allocations and physical
+qualification remain unresolved. The hatch inserts are installed after cure and
+do not appear as cast-in fixture steel. Source holes without a usable fixing
+thread retain their requests.
 Add `--records-only` to omit CAD/sequence verification explicitly; that
 package keeps its geometric review Pending.
 
@@ -356,53 +355,65 @@ single validation report retains every detailed source/process finding.
 
 The source uses ISO 4162 Type F full-head flange bolts, class 8.8, without separate washers or socket recesses. One recipe rule sizes each pattern from service-screw assembly preload and the lifting share. Mix bearing and tensile strengths, locking evidence and physical qualification remain pending.
 
-Lifting blanks are selected against the existing casting cavities, full thread-envelope steel walls and anchor cover. The base and rear column use 71 × 45 × 30 mm; the front column uses 40 × 100 × 30 mm where its rail recesses limit width. The 70 mm compact blank fails the demand/wall regression; 71 mm passes. Hatch blanks are 44 × 20 × 12 mm. Every service-hole position is unchanged. Clearance-bore pads retain the full central-bore wall beside the back taps: 57 mm square at base feet and 48 mm wide at the column joint.
+Lifting blanks are selected against the casting cavities, full thread-envelope
+steel walls and anchor cover. All mill lifting roles now use the same centred-M12
+36 × 100 × 30 mm blank, quarter-turned on the front base lands. Each casting uses
+one M6 anchor family; counts still follow demand per insert. Column-joint pads
+follow the same footprint selector. Feet are removable compression assemblies;
+hatch steel is bonded after cure and has no cast-in anchor pattern.
 
-Cover below is the minimum exposed-anchor cover to the casting boundaries for that insert, in millimetres. It is a geometry check, not an anchorage-capacity qualification.
+Cover below is the minimum exposed-anchor cover to the casting boundaries for
+that insert, in millimetres. It is a geometry check, not a capacity qualification.
 
 ### Base
 
 | Insert | Raw steel, mm | Anchors | Minimum cover, mm |
 |---|---:|---:|---:|
-| `railYLeft` | 40 × 410 × 20 | 4 × M8 | 15.582 |
-| `railYRight` | 40 × 410 × 20 | 4 × M8 | 15.582 |
-| `driveYFixed` | 100 × 25 × 20 | 2 × M5 | 20.000 |
-| `driveYFloating` | 100 × 20 × 20 | 2 × M5 | 19.948 |
-| `columnLeftFront` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
-| `footLeftFront` | 57 × 57 × 20 | 2 × M5 | 9.751 |
-| `columnLeftRear` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
-| `footLeftRear` | 57 × 57 × 20 | 2 × M5 | 9.751 |
-| `columnRightFront` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
-| `footRightFront` | 57 × 57 × 20 | 2 × M5 | 9.751 |
-| `columnRightRear` | 48 × 82.4 × 30 | 4 × M8 | 26.000 |
-| `footRightRear` | 57 × 57 × 20 | 2 × M5 | 9.751 |
-| `liftLeftFront` | 71 × 45 × 30 | 4 × M8 | 8.000 |
-| `liftLeftRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
-| `liftRightFront` | 71 × 45 × 30 | 4 × M8 | 8.000 |
-| `liftRightRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `columnLeftFront` | 52 × 111.6 × 30 | 7 × M6 | 30.000 |
+| `columnLeftRear` | 52 × 111.6 × 30 | 7 × M6 | 30.000 |
+| `columnRightFront` | 52 × 111.6 × 30 | 7 × M6 | 30.000 |
+| `columnRightRear` | 52 × 111.6 × 30 | 7 × M6 | 30.000 |
+| `driveYFixed` | 100 × 25 × 24 | 2 × M6 | 20.000 |
+| `driveYFloating` | 100 × 20 × 24 | 2 × M6 | 20.000 |
+| `liftLeftFront` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftLeftRear` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftRightFront` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftRightRear` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `railYLeft` | 40 × 410 × 24 | 5 × M6 | 14.808 |
+| `railYRight` | 40 × 410 × 24 | 5 × M6 | 14.808 |
 
 ### Column
 
 | Insert | Raw steel, mm | Anchors | Minimum cover, mm |
 |---|---:|---:|---:|
-| `hatchRearLeftLower` | 44 × 20 × 12 | 2 × M5 | 6.800 |
-| `hatchRearLeftUpper` | 44 × 20 × 12 | 2 × M5 | 10.000 |
-| `hatchRearRightLower` | 44 × 20 × 12 | 2 × M5 | 6.800 |
-| `hatchRearRightUpper` | 44 × 20 × 12 | 2 × M5 | 10.000 |
-| `railZLeft` | 40 × 833 × 20 | 8 × M6 | 6.000 |
-| `railZRight` | 40 × 833 × 20 | 8 × M6 | 6.000 |
-| `footLeftFront` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
-| `footLeftRear` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
-| `footRightFront` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
-| `footRightRear` | 48 × 82.4 × 20 | 2 × M5 | 5.000 |
-| `liftLeftFront` | 40 × 100 × 30 | 7 × M6 | 9.600 |
-| `liftLeftRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
-| `liftRightFront` | 40 × 100 × 30 | 7 × M6 | 9.600 |
-| `liftRightRear` | 71 × 45 × 30 | 4 × M8 | 8.000 |
+| `footLeftFront` | 52 × 111.6 × 20 | 6 × M6 | 6.000 |
+| `footLeftRear` | 52 × 111.6 × 20 | 6 × M6 | 6.000 |
+| `footRightFront` | 52 × 111.6 × 20 | 6 × M6 | 6.000 |
+| `footRightRear` | 52 × 111.6 × 20 | 6 × M6 | 6.000 |
+| `liftLeftFront` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftLeftRear` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftRightFront` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `liftRightRear` | 36 × 100 × 30 | 8 × M6 | 7.200 |
+| `railZLeft` | 40 × 833 × 24 | 8 × M6 | 6.000 |
+| `railZRight` | 40 × 833 × 24 | 8 × M6 | 6.000 |
 
-The base has 52 anchors and the column 54. The focused native run measured 92.1 seconds across the selector calls for both foundations, including unsuccessful calls; complete frame construction took 105.4 seconds. These are observed wall times on the shared development machine. Temporary selector timing instrumentation was removed.
+The base has 74 anchors and the column 72, all M6. The former mixed-thread
+52/54-anchor source is historical; the current common-family rule retains
+per-insert preload/lifting demand and checks steel walls, exact casting cover
+and tooling clearance. Capacity still awaits measured compound strengths.
 
-The anchor-revision baseline has zero trapped pockets (previously 74), with the fill check unchanged. Its 265 artifacts include 40 panel review programs; validation was 626 Pass, 568 Pending, 119 Unsupported and 0 Fail. Fabrication readiness remains false: the recorded material strengths, workshop inputs and physical evidence are still unresolved.
+The approved source-simplification kits have zero trapped pockets, with the
+fill check unchanged. The base is **1086 Pass / 530 Pending / 131 Unsupported /
+0 Fail** (previously 775/627/116/0); the column is **1032/454/126/0**
+(previously 705/458/145/0). The base has 19 single-board former pieces, ten EPS
+cores and twelve insert fixtures; the column has no former pieces, twelve EPS
+cores and ten insert fixtures. The two deep motor-bay cheeks follow the same
+board-depth EPS rule as the stepped-foot clearances. The base's 33 backing
+pieces disappear into properly sealed bed rebates. Post-cure hatch steel and
+removable compression feet are service parts, so they need no pour fixtures.
+The common M6 patterns and actual receiver seals also change the detailed
+check inventory; workshop inputs, material capacities and coupons remain
+explicitly unqualified.
 
 
 ## Release and sealing
@@ -426,8 +437,8 @@ alone do not qualify the system. Readiness remains false.
 
 ## Former board construction and CAM
 
-The recipe selects sacrificial EPS for a body-open pocket whose smallest blank
-section exceeds its thickest declared board. This converts the four foot-access
+The recipe selects sacrificial EPS for a body-open pocket whose finished depth through its selected opening
+exceeds the thickest declared board. This converts the four foot-access
 tools. Their registered neck/flange and clearance around independent insert
 datums remain exact; EPS is wire-cut in proved prismatic bands, with the declared
 covering and adhesive gaps. External flange clamp capacity remains Pending.
@@ -439,8 +450,8 @@ internal pocket screws and dry-side access, no glue stack or drafted box route.
 The three remaining sharp inner loops met source steel or temporary datum
 supports. Rounding those contacts would change their fit. Instead the exact box
 algebra supplies separate rectangular board parts, with sealed contact joints.
-No source casting radius or mating position is changed. Bed backing uses 33
-single-board pieces; each bearing/drive seat uses four. Every machined edge and
+No source casting radius or mating position is changed. The proud steel now sits in sealed bed rebates, so the 33 bed-backing
+pieces are gone; each bearing/drive seat still uses separate board pieces. Every machined edge and
 faced contact surface is listed for sealing.
 
 | Former feature | Applied source radius | Disposition |

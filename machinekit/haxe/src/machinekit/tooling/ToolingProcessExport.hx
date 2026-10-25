@@ -88,7 +88,7 @@ class ToolingProcessExport {
 			var resources:Array<cadkit.modeling.Part> = [];
 			var difference = 0.0;
 			try {
-				var local = foundation.body.geometry();
+				var local = foundation.body.asCastGeometry();
 				resources.push(local);
 				var actual = machinekit.assembly.PosedParts.moved(local, p.document.setup.sourceToMold);
 				resources.push(actual);
@@ -118,11 +118,11 @@ class ToolingProcessExport {
 				part.close();
 			sys.io.File.saveContent(dir + "/fill-foundation-cad-check.json", ToolingCodec.canonical({
 				sourceFingerprint: sourceFingerprint,
-				reference: "foundation.body.geometry() transformed to mold coordinates, excluding declared precast compound struts",
+				reference: "foundation.body.asCastGeometry() transformed to mold coordinates, excluding declared precast compound struts",
 				symmetricDifferenceMm3: difference
 			}) + "\n");
 			checks.push(FillAnalysis.check("process.fill.cad-volume-agreement", [p.document.input.id], ToolingCheckStatus.Pass,
-				"Symmetric difference against actual foundation.body.geometry() passed; see fill-foundation-cad-check.json.",
+				"Symmetric difference against actual foundation.body.asCastGeometry() passed; see fill-foundation-cad-check.json.",
 				[sourceFingerprint, "fill-foundation-cad-check.json"]));
 		}
 		return checks;

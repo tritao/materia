@@ -21,7 +21,7 @@ class MillFrameChecks {
 		// Envelope regression: shorten the front without moving the spindle or column.
 		near(layout.yRailStart, -270, "compact front rail datum");
 		near(layout.yRailLength, 410, "rails sized from stroke and support envelopes");
-		near(layout.baseDepth, 809, "base follows compact rail start");
+		near(layout.baseDepth, 805, "base follows compact rail start");
 		near(xy.yHalfTravel * 2, layout.yTravel.stroke, "shared Y stroke");
 		check(xy.yOvertravel >= layout.yTravel.overtravel, "reserved Y overtravel survives shortening");
 		for (stroke in [120.0, 160]) {
@@ -52,9 +52,33 @@ class MillFrameChecks {
 		check(largerFrame.baseDepth > layout.baseDepth, "larger working envelope grows the structure");
 		var frame = BenchMillFrame.create(layout, z, xy);
 		frame.validate();
+		var sourceDesign=machinekit.design.AssemblyDesignChecks.check(frame);
+		check(!sourceDesign.hasErrors(),"Source joint and threaded steel design: "+sourceDesign.items.map(item -> item.code+": "+item.message).join("; "));
 		var poses = frame.solvedPoses();
 		for (foundation in [frame.base, frame.column]) {
 			check(!FoundationIntegrity.check(foundation).hasErrors(), "nominal insert planes");
+			var lifting=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount);
+			check(lifting.length==4,"four declared source lifting connections");
+			for (row in lifting) Sys.println("LIFT-SOURCE "+(foundation==frame.base ? "base/" : "column/")+row.id
+				+" XYZ="+row.pose.x+","+row.pose.y+","+row.pose.z);
+			var designs=[for (row in lifting) materia.tooling.ToolingCodec.canonical(
+				materia.casting.InsertSpec.InsertSpecCodec.record(row.part.insertSpec()))];
+			check(designs.filter(design -> design!=designs[0]).length==0,"one lifting part per casting, without mirrored drilling patterns");
+			var diameters:Array<Float>=[];
+			for (row in foundation.insertLocations()) {
+				for (hole in row.part.insertSpec().holes) if (row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount
+					&& hole.id=="fixing") {
+					near(hole.frame.x,0,"lifting service thread is centred in its blank X");
+					near(hole.frame.y,0,"lifting service thread is centred in its blank Y");
+				}
+				switch row.part.insertSpec().anchorage {
+					case Bolted(_,anchors):for (anchor in anchors) diameters.push(anchor.screw.thread.majorDiameter);
+					default:
+				}
+			}
+			check(diameters.length>0 && diameters.filter(diameter -> diameter!=diameters[0]).length==0,
+				"one shop-declared anchor diameter per casting");
+
 			var body = foundation.body.geometry();
 			check(body.valid() && body.solidCount() == 1, "casting remains one connected valid solid");
 			var locations = foundation.solvedPoses();
@@ -81,9 +105,10 @@ class MillFrameChecks {
 				var lower=F.compose(poses.get('base/column$id'),lowerSteel.connector("top").frame);
 				var upper=F.compose(poses.get('column/foot$id'),upperSteel.connector("top").frame);
 				near(lower.x, upper.x, "column steel pair X"); near(lower.y, upper.y, "column steel pair Y");
-				near(lower.z, upper.z, "column steel pair Z");
-				var foot = F.transformPoint(poses.get('base/foot$id'), 0, 0, layout.insertThickness);
-				near(foot.z, layout.footPockets ? frame.casting.footAccessFloor : 0, "foot steel plane");
+				near(upper.z-lower.z, layout.columnJointGapMm, "column steel pair declared grout gap");
+				var plate = frame.base.components().filter(member -> member.id == 'foot$id')[0].component;
+				var foot = F.compose(poses.get('base/foot$id'), plate.connector("top").frame);
+				near(foot.z, layout.footPockets ? frame.casting.footRoof : 0, "foot steel plane");
 			}
 		}
   var insertState=new cadkit.modeling.AssemblyState(frame.definition());
@@ -96,7 +121,7 @@ class MillFrameChecks {
    for(end in ["Lower","Upper"]){
     var seat=insertState.worldConnector('column/$id','bearing${end}Face');
     near(seat.y,layout.columnFront,"Bearing mounting face preserved");
-    near(seat.z,layout.railPlane+(end=="Lower"?10:layout.zRailStart+layout.zRailLength+10),"Bearing anchor height preserved");
+    near(seat.z,layout.columnMountPlane+(end=="Lower"?10:layout.zRailStart+layout.zRailLength+10),"Bearing anchor height preserved");
    }
   }
 		check(frame.components().filter(m -> StringTools.startsWith(m.id, "levelingFoot")).length == 4, "four leveling feet installed");
@@ -105,11 +130,30 @@ class MillFrameChecks {
 			var steelLocal = frame.base.components().filter(m -> m.id == 'foot$id')[0].component.geometry();
 			var footLocal = frame.components().filter(m -> m.id == 'levelingFoot$id')[0].component.geometry();
 			var steel = PosedParts.moved(steelLocal, poses.get('base/foot$id')), foot = PosedParts.moved(footLocal, poses.get('levelingFoot$id'));
-			near(steel.distance(foot), 0, "adjusting nut bears on steel seat");
+			var nutLocal = frame.components().filter(member -> member.id == 'footSupportNut$id')[0].component.geometry();
+			var nutPose = poses.get('footSupportNut$id');
+			var nut = PosedParts.moved(nutLocal, nutPose);
+			near(steel.distance(nut), 0, "support nut bears on the plate underside");
+			var pressed = PosedParts.moved(nutLocal, F.compose(F.translation(0, 0, 1e-3), nutPose));
+			var bearing = steel.intersect(pressed);
+			check(bearing.volume() > 1e-6, "upward foot reaction meets the steel plate");
+			bearing.close(); pressed.close();
+			var lowered = PosedParts.moved(nutLocal, F.compose(F.translation(0, 0, -1e-3), nutPose));
+			bearing = steel.intersect(lowered);
+			near(bearing.volume(), 0, "support separates when the foot reaction reverses");
+			bearing.close(); lowered.close();
 			var common = steel.intersect(foot); near(common.volume(), 0, "stem clears bored steel seat"); common.close();
 			var casting = frame.base.body.geometry(), body = PosedParts.moved(casting, poses.get("base/casting"));
 			common = body.intersect(foot); near(common.volume(), 0, "foot clears access pocket and stem opening"); common.close();
-			body.close(); casting.close(); steel.close(); foot.close(); steelLocal.close(); footLocal.close();
+			near(body.distance(steel), 0, "bearing plate contacts the casting ceiling");
+			var plateUp = PosedParts.moved(steelLocal, F.compose(F.translation(0, 0, 1e-3), poses.get('base/foot$id')));
+			var ceilingContact = body.intersect(plateUp);
+			check(ceilingContact.volume() > 1e-6, "upward plate reaction meets the casting ceiling");
+			ceilingContact.close(); plateUp.close();
+			check(frame.casting.footPlateSide * Math.sqrt(2) < frame.casting.footAccessDepth,
+				"floating bearing plate stays in the pocket at every rotation around the rod");
+			common = body.intersect(nut); near(common.volume(), 0, "support nut clears the dry access pocket"); common.close();
+			body.close(); casting.close(); steel.close(); foot.close(); nut.close(); nutLocal.close(); steelLocal.close(); footLocal.close();
 		}
 		check(layout.columnFootWidth > layout.columnWidth,"column has a wider separate foot");
 		for (side in ["Left","Right"]) for (end in ["Front","Rear"]) {
@@ -117,15 +161,15 @@ class MillFrameChecks {
 			var bolt:AssemblyFrame = poses.get('columnBolt$id');
 			var blank = frame.column.body.geometry(), casting = PosedParts.moved(blank,poses.get("column/casting")); blank.close();
 			var side=bolt.x<0?-1:1;
-			var bit=cadkit.modeling.Part.cylinderSpan(6,bolt.z+6,layout.railPlane+68,bolt.x,bolt.y);
-			var handle=cadkit.modeling.Part.cylinderAlong(6,new cadkit.modeling.Vector(bolt.x,bolt.y,layout.railPlane+68),
+			var bit=cadkit.modeling.Part.cylinderSpan(6,bolt.z+6,layout.columnMountPlane+68,bolt.x,bolt.y);
+			var handle=cadkit.modeling.Part.cylinderAlong(6,new cadkit.modeling.Vector(bolt.x,bolt.y,layout.columnMountPlane+68),
 				new cadkit.modeling.Vector(side,0,0),layout.columnFootWidth/2-Math.abs(bolt.x)+60);
 			for (access in [bit,handle]) {
 				var common=casting.intersect(access); near(common.volume(),0,"column bolt has side-entry L-key access"); common.close(); access.close();
 			}
-			var blocked=cadkit.modeling.Part.cylinderSpan(6,bolt.z+12,layout.railPlane+180,bolt.x,bolt.y);
+			var blocked=cadkit.modeling.Part.cylinderSpan(6,bolt.z+12,layout.columnMountPlane+180,bolt.x,bolt.y);
 			var common=casting.intersect(blocked); check(common.volume()>1,"column taper stays closed above the bolt"); common.close(); blocked.close(); casting.close();
-			near(bolt.z,layout.railPlane+layout.insertThickness,"clamp head bears on steel sole");
+			near(bolt.z,layout.columnMountPlane+layout.insertThickness,"clamp head bears on steel sole");
 			var screw:machinekit.standard.SocketHeadCapScrew=cast frame.components().filter(m -> m.id=='columnBolt$id')[0].component;
 			var tip:Float=bolt.z-screw.shankLength();
 			var anchor:AssemblyFrame=poses.get('base/column$id');
@@ -159,15 +203,15 @@ class MillFrameChecks {
 		variant.validate();
 		var variantPoses:Map<String, AssemblyFrame> = variant.solvedPoses();
 		var variantColumn:AssemblyFrame = variantPoses.get("column/casting");
-		near(variantColumn.z, 264, "changed base height moves the column interface");
-		near(variantColumn.y - 150 - 4, layout.columnFront, "deeper column preserves the guide datum");
+		near(variantColumn.z, 260, "changed base height moves the column interface");
+		near(variantColumn.y - 150, layout.columnFront, "deeper column preserves the guide datum");
 		for (foundation in [variant.base, variant.column]) {
 			var shape = foundation.body.geometry();
 			check(shape.valid() && shape.solidCount() == 1, "resized frame stays connected");
 			shape.close();
 		}
 		rejects(() -> new MillFrameLayout(interfaces, {baseWidth: 100}), "reject unsupported guide/column layout");
-		rejects(() -> new MillFrameLayout(interfaces, {seatRise: 20}), "reject unembedded inserts");
+		rejects(() -> new MillFrameLayout(interfaces, {columnJointGapMm: 20}), "reject excessive column joint gap");
 		rejects(() -> new MillFrameLayout(interfaces, {wall: Math.NaN}), "reject nonfinite geometry");
 		rejects(() -> new MillFrameLayout(interfaces, {roof: 220}), "reject absent underside cavities");
 		rejects(() -> new MillFrameLayout(interfaces, {columnDepth: 120}), "reject overlapping column sole pads");

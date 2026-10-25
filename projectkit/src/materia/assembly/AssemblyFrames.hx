@@ -9,6 +9,20 @@ class AssemblyFrames {
 	public static function identity():AssemblyFrame
 		return {x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1};
 
+	/** Right-handed section frame with local Z along a declared unit normal. */
+	public static function sectionFrame(direction:{x:Float,y:Float,z:Float},sourceId:String):AssemblyFrame {
+		if (direction==null) throw "Missing section direction: "+sourceId;
+		var n=direction,length=Math.sqrt(n.x*n.x+n.y*n.y+n.z*n.z);
+		if (!Math.isFinite(length) || Math.abs(length-1)>1e-7) throw "Invalid section direction: "+sourceId;
+		var x=Math.abs(n.z)<0.9 ? {x:-n.y,y:n.x,z:0.0} : {x:n.z,y:0.0,z:-n.x};
+		var scale=Math.sqrt(x.x*x.x+x.y*x.y+x.z*x.z);
+		x={x:x.x/scale,y:x.y/scale,z:x.z/scale};
+		var y={x:n.y*x.z-n.z*x.y,y:n.z*x.x-n.x*x.z,z:n.x*x.y-n.y*x.x};
+		var yScale=Math.sqrt(y.x*y.x+y.y*y.y+y.z*y.z);
+		y={x:y.x/yScale,y:y.y/yScale,z:y.z/yScale};
+		return fromRotationMatrix(0,0,0,[x.x,y.x,n.x,x.y,y.y,n.y,x.z,y.z,n.z]);
+	}
+
 	public static function translation(x:Float, y:Float, z:Float):AssemblyFrame
 		return {x: x, y: y, z: z, qx: 0, qy: 0, qz: 0, qw: 1};
 

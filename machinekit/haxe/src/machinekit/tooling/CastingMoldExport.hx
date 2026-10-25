@@ -101,6 +101,7 @@ class CastingMoldExport {
 				text(dir + "/" + id + ".svg", Svg.write(drawing));
 				text(dir + "/" + id + ".dxf", Dxf.write(drawing));
 			}
+		for (seal in p.seals) step(dir+"/"+seal.volume.id+".step",ToolingVolume.geometryOf(seal.volume));
 		for (f in p.formers) {
 			var part = ToolingVolume.geometryOf(f.volume);
 			step(dir + "/" + f.volume.id + ".step", part);

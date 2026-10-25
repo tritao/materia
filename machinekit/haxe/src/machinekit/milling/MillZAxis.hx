@@ -26,9 +26,9 @@ class MillZAxis extends AxisBuilder {
 		var lower = new MillZBearingPlate(new ComponentValues().setNumber("bearingPitch",2*l.drive.floatingBoltX).setNumber("bearingHole",5).setNumber("bearingTapDepth",15).setNumber("width", width)
 			.setNumber("height", l.lowerHeight).setNumber("thickness", l.mountThickness)
 			.setBoolean("guideRelief",l.crossDriveZ!=null).setNumber("guideSpacing",f.yRailSpacing).setNumber("guideWidth",l.block.spec.railWidth)
-			.setNumber("crossShaftZ", l.crossDriveZ == null ? 0 : l.crossDriveZ - f.railPlane)
+			.setNumber("crossShaftZ", l.crossDriveZ == null ? 0 : l.crossDriveZ - f.columnMountPlane)
 			.setNumber("bearingZ", l.lowerHeight / 2).setNumber("anchorZ", 10).setNumber("anchorSpacing", f.zRailSpacing));
-		attach("floatingMount", lower, F.translation(0, f.columnFront - l.mountThickness / 2, f.railPlane), "fixedMount");
+		attach("floatingMount", lower, F.translation(0, f.columnFront - l.mountThickness / 2, f.columnMountPlane), "fixedMount");
 		attach("motorMount", l.fixed, down(0,f.columnFront,l.motorFace),"fixedMount");
 		// Its foot sits where the drawing's foot frame would; the ring holds the bearing on the journal.
 		var floatingPose = F.compose(down(0,f.columnFront,l.floatingZ+l.drive.floatingBoltZ), l.floating.supportInFootFrame());

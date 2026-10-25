@@ -127,6 +127,7 @@ class ToolingReleaseExport {
 					add(board.id,former.featureIds,machinekit.structural.CastingRegionCad.part(board.region),Board,
 						{stock:board.stock,pose:board.pose});
 			}
+			for (seal in plan.seals) add(seal.volume.id,[seal.insertId],ToolingVolume.geometryOf(seal.volume),SealedCompound,null);
 			for (fixture in plan.fixtures) for (volume in MoldFixtures.volumes(fixture))
 				add(volume.id,[fixture.insertId],ToolingVolume.geometryOf(volume),ToolingMetal,null);
 			for (insert in plan.document.input.inserts) add(materia.tooling.ToolingIds.derive("insert-",insert.id),

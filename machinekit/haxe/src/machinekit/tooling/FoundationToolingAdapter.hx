@@ -30,11 +30,13 @@ class FoundationToolingAdapter {
 			envelope: foundation.body.castingEnvelope(),
 			features: foundation.body.castingFeatures(),
 			precastStruts: foundation.body.precastStruts(),
-			inserts: [for (row in foundation.insertLocations()) insert(row)]
+			postCureInserts:[for (row in foundation.postCureLocations()) {insert:insert(row),
+				bond:foundation.body.postCureBonds().filter(bond -> bond.insertId==row.id)[0]}],
+			inserts: [for (row in foundation.insertLocations()) insert({id:row.id,part:row.part,pose:row.pose})]
 		});
 	}
 
-	static function insert(row:CastInsertPlacement):CastingToolingInsert {
+	static function insert(row:machinekit.structural.MineralFoundation.PostCureInsertPlacement):CastingToolingInsert {
 		if (row.part.buildStage()!=materia.casting.InsertStages.InsertStage.Service)
 			throw "Foundation design requires a service-stage insert: "+row.id;
 		var source = row.part.insertSpec();

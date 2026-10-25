@@ -19,6 +19,7 @@ class ToolingVolume extends MachineComponent {
 
 	static function parameters():Array<machinekit.component.ComponentParameter>
 		return [
+			P.text("stockMaterial", "coated particleboard"),
 			P.text("volume", ToolingCodec.canonical(MoldVolumeRecords.record({
 				id: "former",
 				material: materia.tooling.casting.CastingMoldPlan.MoldPartMaterial.FormerStock,
@@ -44,8 +45,15 @@ class ToolingVolume extends MachineComponent {
 		return recipe;
 	}
 
-	public static function fromVolume(v:MoldVolume):ToolingVolume
-		return new ToolingVolume(new ComponentValues().setToken("volume", ToolingCodec.canonical(MoldVolumeRecords.record(v))));
+	public static function fromVolume(v:MoldVolume,?materialSpec:String):ToolingVolume {
+		var material=materialSpec==null ? switch v.material {
+			case EPSStock:"EPS tooling";case SteelStock:"steel";case FormerStock:"coated particleboard";
+			case SealantStock:throw "Closure material must come from the recipe";
+			default:throw "Unknown tooling volume material";
+		} : materialSpec;
+		return new ToolingVolume(new ComponentValues().setToken("volume",ToolingCodec.canonical(MoldVolumeRecords.record(v)))
+			.setToken("stockMaterial",material));
+	}
 
 	/** Realize finished foam, never the rectangular cutting blank. Placement is
 	 * the record's stockToMold frame, supplied by the assembly caller.
@@ -57,16 +65,16 @@ class ToolingVolume extends MachineComponent {
 	public function new(?input:ComponentValues) {
 		var v = P.resolve(parameters(), input),
 			record = MoldVolumeRecords.snapshot(haxe.Json.parse(v.token("volume")));
-		var material = switch (record.material : String) {
-			case "eps": "EPS tooling";
-			case "steel": "steel";
-			default: "coated particleboard";
-		};
+		var material = v.token("stockMaterial");
 		super("MOLD-"
 			+ record.id
 			+ "-"
-			+ haxe.crypto.Sha256.encode(ToolingCodec.canonical(MoldVolumeRecords.record(record))).substr(0, 12), "Tooling "
-			+ record.id, material, false, v);
+			+ haxe.crypto.Sha256.encode(ToolingCodec.canonical({volume:MoldVolumeRecords.record(record),materialSpec:material})).substr(0, 12), "Tooling "
+			+ record.id, record.material==SealantStock ? "unspecified" : material, false, v);
+		// Seal chemistry is a recipe/shop input, not a material-library key.
+		// Keep its full reference in stockMaterial and the identity above. The
+		// generic scene material supplies no seal strength or compatibility.
+
 		volume = record;
 		addConnector("mount", Mount, F.identity());
 	}

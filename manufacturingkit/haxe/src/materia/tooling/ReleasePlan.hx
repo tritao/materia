@@ -10,6 +10,7 @@ enum abstract ReleaseSubstrate(String) to String {
 	var Board = "board";
 	var EPSCovering = "eps-covering";
 	var ToolingMetal = "tooling-metal";
+	var SealedCompound = "sealed-compound";
 	var BondingSteel = "bonding-steel";
 	var BondingCompound = "bonding-compound";
 }

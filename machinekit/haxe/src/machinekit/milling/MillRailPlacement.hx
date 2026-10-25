@@ -42,7 +42,7 @@ class MillRailPlacement {
 				insertId: 'railZ$name',
 				rail: l.rail,
 				pose: F.compose(F.translation(side * f.zRailSpacing / 2,
-					f.columnFront - l.block.spec.railHeight, f.railPlane + f.zRailStart), rotation)
+					f.columnFront - l.block.spec.railHeight, f.columnMountPlane + f.zRailStart), rotation)
 			};
 		}];
 	}

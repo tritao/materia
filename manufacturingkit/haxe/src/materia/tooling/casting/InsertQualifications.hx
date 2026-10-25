@@ -34,6 +34,14 @@ class InsertQualifications {
 			throw "Insert anchorage validation differs from source";
 	}
 
+	public static function postCure(input:CastingToolingInput):Array<ToolingValidation> {
+		var result=manufacturing([for (row in input.postCureInserts) row.insert]);
+		var missing=[for (row in input.postCureInserts) if (!materia.casting.CastingInput.CastingInputs.textIsKnown(row.bond.adhesive)) row.insert.id];
+		if (missing.length>0) result.push(ToolingReadiness.pending("tooling.insert.post-cure-bond",missing,
+			"Bonded inserts require the steel-to-compound adhesive and its coupon result. Drill the declared receivers after cure, clean, bond and cure before fitting the hatch."));
+		return result;
+	}
+
 	public static function manufacturing(inserts:Array<CastingToolingInsert>):Array<ToolingValidation> {
 		var result:Array<ToolingValidation> = [];
 		for (insert in inserts) switch insert.origin {

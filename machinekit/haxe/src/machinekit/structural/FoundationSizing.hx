@@ -11,9 +11,13 @@ class FoundationSizing {
 	 * removal do not yet exist. Embedded anchor hardware remains real components. */
 	public static function asCastMass(foundation:MineralFoundation):machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties {
 		var raw=new machinekit.assembly.MachineAssembly(),poses=foundation.solvedPoses();
+		var members=foundation.castingMemberIds();
 		for (member in foundation.components()) {
+			if (members.indexOf(member.id)<0) continue;
 			var part=member.component;
-			if (Std.isOfType(part,CastInsert)) {
+			if (Std.isOfType(part,MineralCasting)) {
+				part=new MineralCasting(part.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
+			} else if (Std.isOfType(part,CastInsert)) {
 				var steel:CastInsert=cast part;
 				part=new CastInsert(steel.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
 			}
@@ -22,14 +26,57 @@ class FoundationSizing {
 		return raw.massProperties();
 	}
 
+	public static function singleThreadRule(rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule,
+		size:Float):materia.casting.InsertAnchorage.InsertAnchorPatternRule return {
+		id:rule.id,demandFactor:rule.demandFactor,maximumCount:rule.maximumCount,
+		liftingLoadPaths:rule.liftingLoadPaths,gravityMps2:rule.gravityMps2,minimumCount:rule.minimumCount,
+		maximumPitchInShortWidths:rule.maximumPitchInShortWidths,embedmentDiameters:rule.embedmentDiameters,
+		coverDiameters:rule.coverDiameters,spacingDiameters:rule.spacingDiameters,
+		screwLengthsMm:rule.screwLengthsMm.copy(),allowedNominalDiametersMm:[size]
+	};
+
+	/** Minimum declared stock width admitted by the same demand/steel selector.
+	 * The final placement still needs casting cover and whole-body confirmation. */
+	public static function anchorPadWidth(id:String,prototype:CastInsert,minimum:Float,depth:Float,height:Float,
+		maximum:Float,increment:Float,rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule):Float {
+		if (increment<=0 || maximum<minimum) throw "No source pad width remains inside the casting: "+id;
+		var count=Std.int(Math.floor((maximum-minimum)/increment));
+		var last="";
+		for (index in 0...count+1) {
+			var width=minimum+index*increment;
+			var part=new CastInsert(prototype.values().copy().setToken("body",
+				materia.casting.InsertSpec.InsertBodyCodec.encode(Primitive(Box(width,depth,height)))));
+			try {
+				machinekit.tooling.InsertAnchorGeometry.derive(id,part,rule,FootprintOnly,0);
+				return width;
+			} catch (error:Dynamic) {
+				if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
+				last=Std.string(error);
+			}
+		}
+		throw "No demand-sized source pad fits "+id+": "+last;
+	}
+
 	public static function anchors(rows:Array<CastInsertPlacement>,rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule,
-		castingValues:ComponentValues):Array<CastInsertPlacement> {
+		castingValues:ComponentValues,commonSize:Bool=false):Array<CastInsertPlacement> {
+		if (commonSize) {
+			var sizes=rule.allowedNominalDiametersMm.copy(),failures:Array<String>=[];
+			sizes.sort(Reflect.compare);
+			for (size in sizes) {
+				var single=singleThreadRule(rule,size);
+				try return anchors(rows,single,castingValues) catch (error:Dynamic) {
+					if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
+					failures.push(Std.string(size)+" mm: "+Std.string(error));
+				}
+			}
+			throw "No shared declared anchor thread fits the casting: "+failures.join("; ");
+		}
 		var body=new machinekit.structural.MineralCasting(castingValues).geometry();
 		try {
 			var lifting=rows.filter(row -> row.part.parameterToken("role")==materia.casting.InsertSpec.InsertRole.LiftingMount);
 			function share(placed:Array<CastInsertPlacement>):Float {
 				if (lifting.length==0) return 0;
-				var mass=asCastMass(new MineralFoundation(castingValues,placed));
+				var mass=asCastMass(new MineralFoundation(castingValues.copy().setToken("postCureBonds","[]"),placed));
 				if (mass.unaccounted.length>0 || !Math.isFinite(mass.mass) || mass.mass<=0)
 					throw "Anchor lifting demand requires the actual source casting mass";
 				return mass.mass*rule.gravityMps2/Math.min(rule.liftingLoadPaths,lifting.length);

@@ -60,17 +60,9 @@ class DatumFixtureLocation {
 			face:materia.assembly.AssemblyRecord.AssemblyFrame,panel:materia.tooling.panel.PanelAssemblyPlan.PanelPlacement,
 			fixings:Array<InsertFixtureFixing>):DatumLocationPlan {
 		var thickness=panel.panel.stock.measuredThickness;
-		var surface=switch panel.panel.contactFace {
-			case materia.tooling.ToolingEnums.ContactFace.PositiveZ:thickness;
-			case materia.tooling.ToolingEnums.ContactFace.NegativeZ:0.0;
-			case materia.tooling.ToolingEnums.ContactFace.None:throw "Fixture receiver needs a declared panel contact face: "+panel.panel.id;
-			default:throw "Unknown fixture panel contact face: "+panel.panel.id;
-		};
+		var surface=DatumFixtures.contactSurface(panel,face);
+		if (surface==null) throw "Insert face is not on its panel contact plane: "+source.id;
 		var basis=contactBasis(source,sourceToMold,face),inverse=F.inverse(panel.pose);
-		var localFace=F.compose(inverse,face),normal=F.transformVector(localFace,0,0,1);
-		var expected=surface==0 ? 1.0 : -1.0;
-		if (Math.abs(localFace.z-surface)>EPS || normal.z*expected<1-EPS)
-			throw "Insert face is not on its panel contact plane: "+source.id;
 		var outline=materia.tooling.panel.PanelContours.outside(panel.panel);
 		var footprint=footprintBounds(basis.footprint);
 		if (footprint!=null) {

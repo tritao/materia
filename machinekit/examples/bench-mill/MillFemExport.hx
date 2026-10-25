@@ -184,7 +184,30 @@ class MillFemExport {
 		return result;
 	}
 
+	/** Isolated-column comparison shares the posed-body FEM exporter and solver path.
+	 * The foundation joint is deliberately outside this clamped-sole study. */
+	static function columnTorsionPacket():Void {
+		var frame = build().frame, layout = frame.layout;
+		var folder = root()+"/"+DIRECTORY+"/build/fem/column-torsion";
+		ensure(folder);
+		var model = new AssemblyModel("mm");
+		frame.column.addTo(model,"");
+		var state = new AssemblyState(model.definition("column-torsion"));
+		state.forwardKinematics();
+		var exported = machinekit.structural.fem.AssemblyFemExport.bodies(frame.column,state,folder,id -> id == "casting");
+		var part = exported.parts.filter(part -> part.id == "casting")[0];
+		var packet = {source:part, sourceRevision:StringTools.trim(command(root(),["rev-parse","HEAD"])),
+			plate:{widthMm:layout.columnWidth,thicknessMm:6.0,lowerZMm:150.0,upperZMm:layout.columnHeight,
+				rearYMm:layout.columnDepth/2,boltEdgeMm:20.0,boltRows:4,patchRadiusMm:8.0},
+			boundary:"sole clamped; rigid top diaphragm under unit Mz; rear plate connected at eight ideal rigid bolt patches",
+			limitations:["assumed elastic properties from frame-study.json", "ideal bolt-patch upper bound; no slip or preload qualification",
+				"cast-in steel and anchors omitted from stiffness in both cases; their exact source voids remain", "source remains open pending physical joint evidence"]};
+		File.saveContent(folder+"/column.json",haxe.Json.stringify(packet,null,"  ")+"\n");
+		Sys.println("Column torsion packet: "+folder+"/column.json");
+	}
+
 	public static function main():Void {
+		if(Sys.args().indexOf("--column-torsion")>=0) {columnTorsionPacket();return;}
 		var mill = build(), zLayout:MillZAxisLayout = mill.frame.zAxis;
 		var name = "center", x = 0.0, y = 0.0, z = zLayout.lower / 2;
         var verifyRepeat=false, poseMatrix=false;

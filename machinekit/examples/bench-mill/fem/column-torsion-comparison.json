@@ -1,0 +1,191 @@
+{
+  "status": "conditional comparison; physical qualification Pending",
+  "sourceSha256": "010015c0057d43770e9a8db38f6f98bd94797e60a300b802bf5f87784125b750",
+  "materials": {
+    "mineral-cast": {
+      "youngsPa": 35000000000,
+      "poissonRatio": 0.25,
+      "densityKgPerM3": 2400,
+      "assumed": true,
+      "source": "MaterialLibrary modulus/density; Poisson ratio is an explicit study assumption",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        }
+      ]
+    },
+    "machined-steel": {
+      "youngsPa": 210000000000,
+      "poissonRatio": 0.3,
+      "densityKgPerM3": 7850,
+      "assumed": true,
+      "source": "Study isotropic machined-steel assumption: E=210 GPa, nu=0.30; density=7850 kg/m3 retained from MaterialLibrary. No material certificate supplied.",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        },
+        {
+          "property": "youngsPa",
+          "source": "Explicit study steel modulus; no library value"
+        }
+      ]
+    }
+  },
+  "plate": {
+    "boltEdgeMm": 20,
+    "boltRows": 4,
+    "lowerZMm": 150,
+    "patchRadiusMm": 8,
+    "rearYMm": 130,
+    "thicknessMm": 6,
+    "upperZMm": 833,
+    "widthMm": 320
+  },
+  "boundary": "sole clamped; rigid top diaphragm under unit Mz; rear plate connected at eight ideal rigid bolt patches",
+  "limitations": [
+    "assumed elastic properties from frame-study.json",
+    "ideal bolt-patch upper bound; no slip or preload qualification",
+    "cast-in steel and anchors omitted from stiffness in both cases; their exact source voids remain",
+    "source remains open pending physical joint evidence"
+  ],
+  "results": {
+    "open": [
+      {
+        "meshSizeMm": 24,
+        "stiffnessNmmPerRad": 2805384318.013878,
+        "rotationRadPerNmm": 3.564574e-10,
+        "reactionNmm": -1.0,
+        "strainEnergyNmm": 1.782287e-10,
+        "minimumJacobian": 0.018290542165287773,
+        "elements": 63359,
+        "materialVolumeRelativeErrors": {
+          "CASTING": 4.3960515042851256e-05
+        },
+        "boltPatchNodes": [],
+        "deckSha256": "ca7c133fbacccd377c28c853ed933be8b215e9c3638623ce2b2d529a56af4972",
+        "resultSha256": "139e9cba1880550337f746b1ea42e7605bba364129970ccd2c90916f17aed197"
+      },
+      {
+        "meshSizeMm": 18,
+        "stiffnessNmmPerRad": 2787229582.985859,
+        "rotationRadPerNmm": 3.587792e-10,
+        "reactionNmm": -1.0,
+        "strainEnergyNmm": 1.793896e-10,
+        "minimumJacobian": 0.06351226406523233,
+        "elements": 87371,
+        "materialVolumeRelativeErrors": {
+          "CASTING": 4.988780737669174e-05
+        },
+        "boltPatchNodes": [],
+        "deckSha256": "8c00fbd4f8434ffe4aaa2ee1a97e3f7d8ab61d5517443e6485b57d6e536611ec",
+        "resultSha256": "f1ddca785407afda2c7cf0203843eb8585acb75cccff687bf53c9c548860b4b3"
+      }
+    ],
+    "ideal-bolted-rear-plate": [
+      {
+        "meshSizeMm": 24,
+        "stiffnessNmmPerRad": 6388359897.198512,
+        "rotationRadPerNmm": 1.565347e-10,
+        "reactionNmm": -1.0,
+        "strainEnergyNmm": 7.826737e-11,
+        "minimumJacobian": 0.021650360784362388,
+        "elements": 66612,
+        "materialVolumeRelativeErrors": {
+          "CASTING": 4.3960515042851256e-05,
+          "PLATE": 0.0
+        },
+        "boltPatchNodes": [
+          [
+            11,
+            8
+          ],
+          [
+            14,
+            14
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            6,
+            33
+          ],
+          [
+            14,
+            6
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            6,
+            5
+          ]
+        ],
+        "deckSha256": "90bb2e2f5f0319dca24532aaef92e160819641cd3984ce8b2a99898be5fc0c4e",
+        "resultSha256": "56838e6aaa5f377f23a981e4df48fb4217a33d052ca7dc513ff92a861be2a46d"
+      },
+      {
+        "meshSizeMm": 18,
+        "stiffnessNmmPerRad": 6375558658.327436,
+        "rotationRadPerNmm": 1.56849e-10,
+        "reactionNmm": -1.0,
+        "strainEnergyNmm": 7.842453e-11,
+        "minimumJacobian": 0.06351226406523233,
+        "elements": 92620,
+        "materialVolumeRelativeErrors": {
+          "CASTING": 4.988780737669174e-05,
+          "PLATE": 0.0
+        },
+        "boltPatchNodes": [
+          [
+            14,
+            9
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            13,
+            5
+          ],
+          [
+            10,
+            9
+          ],
+          [
+            15,
+            13
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            13,
+            9
+          ],
+          [
+            13,
+            9
+          ]
+        ],
+        "deckSha256": "3c2d588a297d71128beb933d034bfeec213f57a8ca9a13c6ca3daff9a63def88",
+        "resultSha256": "858a38c8a171bcc704e5cd1e0a74538faf09c9cd90cb546fe5bcf89562af40fe"
+      }
+    ]
+  },
+  "plateToOpenStiffnessRatio": 2.287417834987791,
+  "productionSource": "open; ideal bolt patches are not physical evidence",
+  "sourceRevision": "fa7c1eefd5060c4b37ed3ba6bc0662dfbae42e51",
+  "geometryDiscretization": "Straight-sided C3D10; >=24 circle points; material-volume errors below 1%; identical 8 mm bolt patches locally resolved in both meshes and both cases."
+}

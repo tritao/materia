@@ -24,6 +24,9 @@ class HobberMoldSetup {
   // The catalogue sockets have a small circular sealing land, qualified in
   // the existing hobber socket fixture coupon rather than a mill plate land.
   recipe.hardware.sealMargin=0.5;
+  // The small catalogue sockets use the bed as their shared source-thread
+  // carrier. Raised faces still receive the normal separate datum supports.
+  recipe.hardware.fixtureReceiver=materia.tooling.ToolingRecipe.FixtureReceiver.PanelWhenCoplanar;
   var document:ToolingDocument={input:input,recipe:recipe,setup:{
    id:"plinth-mounting-faces-down",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
    fillHeightMm:foundation.body.parameterNumber("height"),freeboardMm:0,

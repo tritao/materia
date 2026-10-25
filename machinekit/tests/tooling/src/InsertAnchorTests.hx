@@ -263,9 +263,61 @@ class InsertAnchorTests {
 			hex.close();cylinder.close();sketch.close();wire.close();
 		}
 	}
+	static function remoteCurvedBoundary():Void {
+		var source=new CastInsert(CastInsert.boxValues(60,50,20)
+			.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
+		var rule=InsertAnchorSelection.sourceDemandRule("remote-boundary-regression");
+		var owned:Array<cadkit.modeling.Part>=[];
+		function keep(part:cadkit.modeling.Part):cadkit.modeling.Part {owned.push(part);return part;}
+		try {
+			var body=keep(cadkit.modeling.Part.box(400,400,400));
+			var cylinder=keep(cadkit.modeling.Part.cylinderSpan(10,0,400));
+			var cut=keep(machinekit.assembly.PosedParts.moved(cylinder,F.translation(150,150,0)));
+			var drilled=keep(body.subtract(cut));
+			check(drilled.volume()<body.volume()-100000,"control casting contains a real remote cylindrical opening");
+			var pose=F.translation(0,0,380);
+			var plain=InsertAnchorGeometry.derive("plain-window",source,rule,Casting(body,pose),0);
+			var curved=InsertAnchorGeometry.derive("curved-window",source,rule,Casting(drilled,pose),0);
+			check(materia.tooling.ToolingCodec.canonical(C.record(plain.insertSpec().anchorage))
+				==materia.tooling.ToolingCodec.canonical(C.record(curved.insertSpec().anchorage)),
+				"a remote curved boundary leaves the exact selected anchor pattern unchanged");
+		} catch (error:Dynamic) {for(part in owned)part.close();throw error;}
+		for(part in owned)part.close();
+	}
+
+	static function commonCastingThread():Void {
+		var rule=materia.casting.InsertAnchorage.InsertAnchorSelection.sourceDemandRule("shared-thread-test");
+		rule.allowedNominalDiametersMm=[5,6];
+		var rows:Array<machinekit.structural.MineralFoundation.CastInsertPlacement>=[];
+		for (diameter in [4,12]) {
+			var part=new machinekit.structural.CastInsert(machinekit.structural.CastInsert.precastHoles(
+				machinekit.structural.CastInsert.boxValues(100,80,30),
+				machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(
+					machinekit.standard.FastenerThreads.coarse(diameter).mating()),30))
+				.setToken("role",materia.casting.InsertSpec.InsertRole.GenericMount));
+			rows.push({id:"seat-"+diameter,part:part,pose:materia.assembly.AssemblyFrames.translation(diameter==4 ? -100 : 100,0,70),
+				openings:[materia.casting.CastingPatterns.face("body.z-max")]});
+		}
+		var values=new machinekit.component.ComponentValues().setNumber("width",400).setNumber("depth",300).setNumber("height",100);
+		var selected=machinekit.structural.FoundationSizing.anchors(rows,rule,values,true),sizes:Array<Float>=[];
+		for (row in selected) switch row.part.insertSpec().anchorage {
+			case Bolted(_,anchors):for (anchor in anchors) sizes.push(anchor.screw.thread.majorDiameter);
+			default:throw "Missing common anchor pattern";
+		}
+		check(sizes.length>2 && sizes.filter(size -> size!=sizes[0]).length==0,
+			"A whole casting uses one smallest passing declared anchor diameter across different demands");
+		check(rule.allowedNominalDiametersMm.indexOf(sizes[0])>=0,"Common anchors use the shop's declared sizes");
+		rule.allowedNominalDiametersMm=[];
+		var message="";try materia.casting.InsertAnchorage.InsertAnchorSelection.validateRule(rule)
+		catch (error:Dynamic) message=Std.string(error);
+		check(message.indexOf("Invalid anchor pattern rule")>=0,"An empty allowed thread list is rejected");
+	}
+
 	public static function main():Void run();
 
 	public static function run():Void {
+		commonCastingThread();
+		remoteCurvedBoundary();
 		analyticDistances();
 		sourcePattern();
 		var source=fixture(),spec=source.insertSpec();

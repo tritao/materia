@@ -46,18 +46,35 @@ private class MillCastingSource extends MachineAssembly {
 		?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout) {
 		super();
 		var baseInserts=sizing.baseInserts, columnInserts=sizing.columnInserts;
-		var stripCentre=sizing.stripCentre, flared=sizing.flared;
+		var stripCentre=sizing.stripCentre;
 		base = new MineralFoundation(sizing.baseValues, baseInserts);
+		if (l.footPockets)
+			for (sx in [-1, 1]) for (sy in [-1, 1]) {
+				var id = corner(sx, sy);
+				base.addComponent('foot$id', machinekit.structural.LevelingFoot.of(
+					Plate(details.footPlateSide, details.footPlateSide, details.footPlateThickness,
+						details.levelingClearanceDiameter)),
+					F.translation(sx * (l.baseWidth / 2 - l.wall),
+						(sy < 0 ? l.front + details.footEndSetback : l.rear - details.footEndSetback) - l.baseCentreY,
+						details.footRoof - details.footPlateThickness));
+			}
 		include("base", base, F.translation(0, l.baseCentreY, 0));
 		if (l.footPockets)
 			for (sx in [-1, 1])
 				for (sy in [-1, 1]) {
 					var id = corner(sx, sy);
 					addComponent('levelingFoot$id', machinekit.structural.LevelingFoot.of(details.levelingFoot));
-					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "top", 'levelingFoot$id', "mount");
+					addMate('leveling-foot-$id', "fixed", 'base/foot$id', "mount", 'levelingFoot$id', "mount");
+					var thread = details.levelingThread;
+					addComponent('footSupportNut$id', machinekit.structural.LevelingFoot.of(
+						Nut(Hexagon(details.footNutAcrossFlats), details.footSupportNutHeight, thread)));
+					addMate('foot-support-$id', "fixed", 'base/foot$id', "mount", 'footSupportNut$id', "top");
+					addComponent('footLockNut$id', machinekit.structural.LevelingFoot.of(
+						Nut(Hexagon(details.footNutAcrossFlats), details.footLockNutHeight, thread)));
+					addMate('foot-lock-$id', "fixed", 'footSupportNut$id', "mount", 'footLockNut$id', "top");
 				}
 
-		column = new MineralFoundation(sizing.columnValues, columnInserts, "footLeftFront");
+		column = new MineralFoundation(sizing.columnValues, columnInserts, "footLeftFront", sizing.columnPostCure);
 		for (side in ["Left", "Right"]) {
 			var id = 'railZ$side', top = Solids.axial(0, 0, l.insertThickness);
 			column.addMemberConnector(id, "railSeat", F.compose(F.translation(0, l.zRailStart + l.zRailLength / 2 - stripCentre, 0), top));
@@ -69,19 +86,18 @@ private class MillCastingSource extends MachineAssembly {
 					column.addMemberConnector(id, 'bearing${end}Face', F.compose(region, top));
 				}
 		}
-		include("column", column, F.translation(0, l.columnCentreY, l.railPlane));
+		include("column", column, F.translation(0, l.columnCentreY, l.columnMountPlane));
 		// Mating frames coincide; the physical finished faces oppose each other.
 		var first = columnInserts.filter(row -> row.id == "footLeftFront")[0];
-		addMemberConnector("column/footLeftFront", "baseSeat", F.compose(F.inverse(first.pose), Solids.axial(first.pose.x, first.pose.y, 0)));
+		addMemberConnector("column/footLeftFront", "baseSeat", F.compose(F.inverse(first.pose), Solids.axial(first.pose.x, first.pose.y, -l.columnJointGapMm)));
 		addMate("column-on-base", "fixed", "base/columnLeftFront", "top", "column/footLeftFront", "baseSeat");
-		if (flared)
 			for (sx in [-1, 1])
 				for (sy in [-1, 1]) {
 					var id = corner(sx, sy),
 						anchor = columnInserts.filter(row -> row.id == 'foot$id')[0];
 					var bolt = 'columnBolt$id';
 					addComponent(bolt, machinekit.standard.SocketHeadCapScrew.metric(details.columnAnchorThread.thread.designation,
-						details.columnBoltLengthIncrement * Math.ceil((l.insertThickness
+						details.columnBoltLengthIncrement * Math.ceil((l.insertThickness+l.columnJointGapMm
 							+ machinekit.design.ThreadedHolePolicy.resolve(details.columnAnchorThread.thread, C45Bright).minEngagement)
 							/ details.columnBoltLengthIncrement),
 						machinekit.standard.PropertyClass.Steel88));
@@ -90,6 +106,29 @@ private class MillCastingSource extends MachineAssembly {
 					addMemberConnector(bolt, "seat", F.identity());
 					addMate('column-clamp-$id', "fixed", 'column/foot$id', "boltSeat", bolt, "seat");
 				}
+		if (l.columnJointGapMm>0) {
+			var joint:materia.casting.FoundationJoint={id:"base-column",lowerBody:"base/casting",upperBody:"column/casting",
+				route:Grouted,gapMm:l.columnJointGapMm,gapToleranceMm:0.1,seats:[],jacks:[],anchors:[],cureBeforeTorque:true};
+			for (sx in [-1,1]) for (sy in [-1,1]) {
+				var id=corner(sx,sy),lower="base/column"+id,upper="column/foot"+id;
+				joint.seats.push({id:id,lower:{member:lower,feature:"joint-seat"},upper:{member:upper,feature:"joint-seat"}});
+				joint.anchors.push({id:id,screw:"columnBolt"+id,target:{member:lower,feature:"fixing"},
+					through:[{member:upper,feature:"fixing"}]});
+				if (sx>0 && sy>0) continue;
+				var row=columnInserts.filter(row -> row.id=="foot"+id)[0];
+				var hole=row.part.insertSpec().holes.filter(hole -> hole.id=="jack")[0];
+				var point=F.transformPoint(row.pose,hole.frame.x,hole.frame.y,hole.frame.z);
+				var length=details.columnBoltLengthIncrement*Math.ceil((l.insertThickness+l.columnJointGapMm)/details.columnBoltLengthIncrement);
+				var screw="columnJack"+id;
+				addComponent(screw,machinekit.standard.SocketSetScrew.forThread(details.jointJackThread.thread.mating(),length),F.translation(point.x,l.columnCentreY+point.y,l.railPlane+length));
+				addMemberConnector(upper,"jackSeat",F.compose(F.inverse(row.pose),
+					F.translation(point.x,point.y,length-l.columnJointGapMm)));
+				addMemberConnector(screw,"nominalSeat",F.identity());
+				addMate("column-jack-"+id,"fixed",upper,"jackSeat",screw,"nominalSeat");
+				joint.jacks.push({id:id,screw:screw,receiver:{member:upper,feature:"jack"},bearing:{member:lower,feature:"joint-seat"}});
+			}
+			addDesignRequirement(machinekit.design.DesignRequirement.FoundationConnection("base-column-joint",joint));
+		}
 		exposeConnector("mount", "base/casting", "mount");
 		for (id in ["railYLeft", "railYRight"])
 			exposeConnector(id, 'base/$id', "top");
@@ -112,9 +151,25 @@ private class MillCastingSizing {
 	public final columnValues:ComponentValues;
 	public final columnInserts:Array<CastInsertPlacement>;
 	public final stripCentre:Float;
-	public final flared:Bool;
+	public final columnPostCure:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement>;
 
-	public function new(layout:MillFrameLayout, details:MillCastingDetails, ?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout) {
+	public function new(layout:MillFrameLayout, details:MillCastingDetails, ?zAxis:MillZAxisLayout, ?xyAxis:MillXYStageLayout, ?sharedDiameter:Float) {
+		if (sharedDiameter==null) {
+			var sizes=details.anchorRule.allowedNominalDiametersMm.copy(),failures:Array<String>=[];
+			sizes.sort(Reflect.compare);
+			for (size in sizes) try {
+				var resolved=new MillCastingSizing(layout,details,zAxis,xyAxis,size);
+				baseValues=resolved.baseValues;baseInserts=resolved.baseInserts;
+				columnValues=resolved.columnValues;columnInserts=resolved.columnInserts;
+				columnPostCure=resolved.columnPostCure;stripCentre=resolved.stripCentre;
+				return;
+			} catch (error:Dynamic) {
+				if (Std.isOfType(error,machinekit.tooling.InsertAnchorGeometry.InsertAnchorScreenDefect)) throw error;
+				failures.push(Std.string(size)+" mm: "+Std.string(error));
+			}
+			throw "No declared common mill anchor thread fits the source: "+failures.join("; ");
+		}
+		var anchorRule=machinekit.structural.FoundationSizing.singleThreadRule(details.anchorRule,sharedDiameter);
 		if (layout == null)
 			throw "Mill frame needs a layout";
 		if (zAxis != null && zAxis.frame != layout)
@@ -162,13 +217,13 @@ private class MillCastingSizing {
 		}
 		for (side in [-1, 1])
 			baseInserts.push(insert(side < 0 ? "railYLeft" : "railYRight", l.seatWidth, l.yRailLength, l.insertThickness, GuideSeat, "Y guide seat", [CastingPatterns.face("body.z-max")],
-				F.translation(side * l.yRailSpacing / 2, l.yRailStart + l.yRailLength / 2 - l.baseCentreY, l.railPlane - l.insertThickness)));
+				F.translation(side * l.yRailSpacing / 2, l.yRailStart + l.yRailLength / 2 - l.baseCentreY, l.railPlane - l.insertThickness),details.precisionFinishingStockMm));
 		if (xyAxis != null)
 			for (end in ["Fixed", "Floating"]) {
 				var fixed = end == "Fixed",
 					y = fixed ? xyAxis.yFixedY : xyAxis.yFloatingY;
 				baseInserts.push(insert('driveY$end', details.driveBearingSeatWidth, fixed ? xyAxis.yFixedDepth : xyAxis.yFloatingDepth, l.insertThickness, BearingSeat,
-					"Y drive bearing seat", [CastingPatterns.feature(fixed ? "rear-y-drive-seat" : "front-y-bearing-seat")], F.translation(0, y - l.baseCentreY, xyAxis.yMountPlane - l.insertThickness)));
+					"Y drive bearing seat", [CastingPatterns.feature(fixed ? "rear-y-drive-seat" : "front-y-bearing-seat")], F.translation(0, y - l.baseCentreY, xyAxis.yMountPlane - l.insertThickness),details.precisionFinishingStockMm));
 			}
 		if (xyAxis != null) {
 			var a = xyAxis;
@@ -189,43 +244,42 @@ private class MillCastingSizing {
 		}
 
 		// Four independent steel pairs provide a broad column mounting interface.
-		var flared = l.columnFootWidth > l.columnWidth;
-		this.flared=flared;
-		var footWidth = flared ? Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter,details.columnAnchorThickness)) : l.wall,
-			footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness));
+		var clampX = l.columnWidth / 2 - l.wall;
+		if (l.columnFootWidth > l.columnWidth) clampX = (l.columnWidth + l.columnFootWidth) / 4;
+		var footWidth = Math.max(l.wall,details.minimumClearancePadSide(details.columnAnchorThread.clearanceDiameter,details.columnAnchorThickness)),
+			footDepth = Math.max(l.roof, details.minimumColumnPadDepth(l.insertThickness,anchorRule));
+		var padPrototype=new CastInsert(CastInsert.precastHoles(
+			CastInsert.boxValues(footWidth,footDepth,details.columnAnchorThickness),
+			InsertHoles.tappedBlind(details.columnAnchorThread,details.columnAnchorThickness))
+			.setToken("role",InsertRole.ColumnMount).setToken("label","column mounting anchor"));
+		footWidth=Math.max(footWidth,Math.ceil(machinekit.tooling.InsertAnchorGeometry.minimumAnchorBandWidth(
+			solePad(footWidth,footDepth,l.insertThickness,details),anchorRule)));
+		var maximumPadWidth=l.columnFootWidth-2*clampX;
+		footWidth=machinekit.structural.FoundationSizing.anchorPadWidth("column-joint-pad",padPrototype,
+			footWidth,footDepth,details.columnAnchorThickness,maximumPadWidth,details.columnBoltLengthIncrement,anchorRule);
 		for (sx in [-1, 1])
 			for (sy in [-1, 1]) {
 				var id = corner(sx, sy),
-					x = sx * (flared ? (l.columnWidth + l.columnFootWidth) / 4 : l.columnWidth / 2 - l.wall),
+					x = sx * clampX,
 					y = l.columnCentreY + sy * (l.columnDepth / 2 - l.roof);
 				baseInserts.push({
 					id: 'column$id',
 					openings: [CastingPatterns.face("body.z-max")],
-					part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(footWidth, footDepth, details.columnAnchorThickness),
-						flared ? InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness) : InsertHoles.fromNeutral([]))
+					part: jointSeat(new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(footWidth, footDepth, details.columnAnchorThickness),
+						InsertHoles.tappedBlind(details.columnAnchorThread, details.columnAnchorThickness))
 						.setToken("role", InsertRole.ColumnMount)
-						.setToken("label", "column mounting anchor")),
+						.setToken("label", "column mounting anchor")), details.columnAnchorThickness),
 					pose: F.translation(x, y - l.baseCentreY, l.railPlane - details.columnAnchorThickness)
 				});
 				if (l.footPockets) {
 					var fx = sx * (l.baseWidth / 2 - l.wall),
 						fy = (sy < 0 ? l.front + details.footEndSetback : l.rear - details.footEndSetback) - l.baseCentreY;
 					var foot = CastingFeaturePatterns.foot({access: 'foot-access-$id', stem: 'foot-stem-$id', register: null},
-						fx, fy, sx * l.baseWidth / 2, true, 2 * (l.wall + details.footInnerClearance), details.footAccessDepth,
-						details.footAccessFloor, details.footAccessFloor + details.footAccessHeight, details.footStemSize, details.footStemTop,
-						[CastingPatterns.face(sx < 0 ? "body.x-min" : "body.x-max")], [CastingPatterns.face("body.z-min")]);
-					for (feature in foot)
-						baseVoids.push(feature);
-					baseInserts.push({
-						id: 'foot$id',
-						openings: [CastingPatterns.feature('foot-access-$id'), CastingPatterns.feature('foot-stem-$id')],
-						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter,l.insertThickness)),
-							Math.max(l.wall,details.minimumClearancePadSide(details.levelingClearanceDiameter,l.insertThickness)),l.insertThickness),
-							InsertHoles.through(details.levelingClearanceDiameter, l.insertThickness))
-							.setToken("role", InsertRole.LevelingSeat)
-							.setToken("label", "leveling screw seat")),
-						pose: F.translation(fx, fy, details.footAccessFloor - l.insertThickness)
-					});
+						fx, fy, sx * l.baseWidth / 2, true, 2 * l.wall, details.footAccessDepth,
+						details.footAccessFloor, details.footRoof, details.footStemSize, details.footStemTop,
+						[CastingPatterns.face(sx < 0 ? "body.x-min" : "body.x-max")],
+						[CastingPatterns.face("body.z-min")]);
+					for (feature in foot) baseVoids.push(feature);
 				} else
 					baseInserts.push(insert('foot$id', l.wall, l.wall, l.insertThickness, LevelingSeat, "foundation foot seat",
 						[CastingPatterns.face("body.z-min"),CastingPatterns.face(sx<0 ? "body.x-min" : "body.x-max"),
@@ -234,9 +288,9 @@ private class MillCastingSizing {
 			}
 		if (xyAxis!=null) baseInserts=mountRails(baseInserts,MillRailPlacement.y(xyAxis.guided()),
 			F.translation(0,l.baseCentreY,0),"xyStage",details);
-		baseInserts=baseInserts.concat(MillLiftingPattern.placements(body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids),baseInserts,details));
-		baseInserts = machinekit.structural.FoundationSizing.anchors(baseInserts, details.anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids));
-		this.baseValues=body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids);
+		baseInserts=baseInserts.concat(MillLiftingPattern.placements(body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids,"bench-mill-base"),baseInserts,details,{width:l.baseWidth,depth:l.baseDepth},anchorRule));
+		baseInserts = machinekit.structural.FoundationSizing.anchors(baseInserts, anchorRule, body(l.baseWidth, l.baseDepth, l.baseHeight, baseVoids,"bench-mill-base"));
+		this.baseValues=body(l.baseWidth,l.baseDepth,l.baseHeight,baseVoids,"bench-mill-base");
 		this.baseInserts=baseInserts;
 
 		var columnVoids:Array<CastingFeature> = [],
@@ -245,7 +299,7 @@ private class MillCastingSizing {
 		if (zAxis != null) {
 			var channelFront = l.columnCentreY - l.columnDepth / 2;
 			columnVoids.push(CastingFeaturePatterns.box("z-drive-channel", ServiceOpening,
-				[CastingPatterns.face("body.y-min"), CastingPatterns.face("body.z-max"), CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")].concat(flared ? [CastingPatterns.face("foot.y-min")] : []),
+				[CastingPatterns.face("body.y-min"), CastingPatterns.face("body.z-max"), CastingPatterns.face("body.z-min")],
 				zAxis.channelWidth, zAxis.channelBack
 				- channelFront, l.columnHeight, 0,
 				(channelFront + zAxis.channelBack) / 2
@@ -257,19 +311,19 @@ private class MillCastingSizing {
 				// The shorter selected motor moves the bracket rearward. Keep a real
 				// shaft passage through the web separating the Z channel and rear bay.
 				var tunnelFront = l.columnFront, tunnelBack = bayFront;
-				columnVoids.push(CastingFeaturePatterns.box("selected-y-shaft-passage",ServiceOpening, [CastingPatterns.face(flared ? "foot.y-min" : "body.y-min")], details.selectedShaftClearance, tunnelBack
+				columnVoids.push(CastingFeaturePatterns.box("selected-y-shaft-passage",ServiceOpening, [CastingPatterns.face("body.y-min")], details.selectedShaftClearance, tunnelBack
 					- tunnelFront, details.selectedShaftClearance, 0,
 					(tunnelFront + tunnelBack) / 2
 					- l.columnCentreY, a.yScrewZ
-					- l.railPlane
+					- l.columnMountPlane
 					- details.selectedShaftClearance / 2));
 			}
 			var rearBay = CastingFeaturePatterns.box("rear-y-motor-bay", ServiceOpening,
-				[CastingPatterns.face(flared ? "foot.y-max" : "body.y-max"), CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")],
+				[CastingPatterns.face("body.y-max"), CastingPatterns.face("body.z-min")],
 				a.yBayWidth, a.yServiceRear
 				+ details.rearBayDesignClearance
 				- bayFront, a.yBayTop
-				- l.railPlane, 0,
+				- l.columnMountPlane, 0,
 				(bayFront + a.yServiceRear + details.rearBayDesignClearance) / 2
 				- l.columnCentreY, 0);
 			if (zAxis != null && zAxis.channelBack > bayFront) {
@@ -282,50 +336,19 @@ private class MillCastingSizing {
 				if (notch >= half || notchBack >= back)
 					throw "Z channel must leave the declared rear motor bay connected";
 				rearBay = CastingFeaturePatterns.box("rear-y-motor-bay", ServiceOpening,
-					[CastingPatterns.face(flared ? "foot.y-max" : "body.y-max"),
-					 CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")],
-					a.yBayWidth, back - notchBack, a.yBayTop - l.railPlane,
+					[CastingPatterns.face("body.y-max"),
+					 CastingPatterns.face("body.z-min")],
+					a.yBayWidth, back - notchBack, a.yBayTop - l.columnMountPlane,
 					0, (notchBack + back) / 2, 0);
 				for (side in [-1, 1])
 					columnVoids.push(CastingFeaturePatterns.box("rear-y-motor-cheek-" + (side < 0 ? "left" : "right"),
-						ServiceOpening, [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min"),
+						ServiceOpening, [CastingPatterns.face("body.z-min"),
 							CastingPatterns.feature("rear-y-motor-bay"), CastingPatterns.feature("z-drive-channel")],
-						half - notch, notchBack - front, a.yBayTop - l.railPlane,
+						half - notch, notchBack - front, a.yBayTop - l.columnMountPlane,
 						side * (half + notch) / 2, (front + notchBack) / 2, 0));
 			}
 			columnVoids.push(rearBay);
-			var hatchWall=details.hatchAnchorThread.thread.majorDiameter/2
-				+machinekit.design.ThreadedHolePolicy.resolve(details.hatchAnchorThread.thread,C45Bright).minWall;
-			var maximumHatchOffset=details.hatchAnchorSideOffset+details.hatchAnchorWidth/2-hatchWall;
-			for (sx in [-1, 1]) {
-				var offset=Math.max(details.hatchAnchorSideOffset,a.yBayWidth/2+details.hatchAnchorWidth/2);
-				var part:CastInsert=null,settled=false,lastFailure="";
-				while (offset<=maximumHatchOffset+1e-8) {
-					var holes=InsertHoles.records(InsertHoles.tappedBlind(details.hatchAnchorThread,details.hatchAnchorThickness));
-					holes[0].frame.x=sx*(details.hatchAnchorSideOffset-offset);
-					part=new CastInsert(CastInsert.precastHoles(
-						CastInsert.boxValues(details.hatchAnchorWidth,details.hatchAnchorDepth,details.hatchAnchorThickness),
-						InsertHoles.fromNeutral(holes)).setToken("role",InsertRole.HatchMount)
-						.setToken("label","rear motor hatch anchor"));
-					var land:Float;
-					try land=machinekit.tooling.InsertAnchorGeometry.minimumOuterLand("hatch-layout",part,details.anchorRule,0).x
-					catch (error:Dynamic) {lastFailure=Std.string(error);offset+=1;continue;}
-					var needed=Math.max(details.hatchAnchorSideOffset,a.yBayWidth/2+details.hatchAnchorWidth/2+land);
-					if (needed<=offset+1e-8) {settled=true;break;}
-					offset=needed;
-				}
-				if (!settled) throw "No hatch footprint placement retains its fixed service hole and policy wall: "+lastFailure;
-				for (z in [a.yHatchLowerZ, a.yHatchUpperZ])
-					columnInserts.push({
-						id: 'hatchRear${sx < 0 ? "Left" : "Right"}${z == a.yHatchLowerZ ? "Lower" : "Upper"}',
-						openings: [CastingPatterns.face(flared ? "foot.y-max" : "body.y-max")]
-							.concat(z == a.yHatchLowerZ ? [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")] : []),
-						part: new CastInsert(part.values()),
-						pose: F.fromRotationMatrix(sx*offset,
-							a.yServiceRear+details.hatchAnchorServiceFaceOffset-details.hatchAnchorThickness-l.columnCentreY,
-							z-l.railPlane,[1,0,0,0,0,1,0,-1,0])
-					});
-			}
+
 		}
 		var chamberHeight = (l.columnHeight - 2 * l.roof - l.wall) / 2;
 		// Rear-open chambers leave a thick front web, side walls, sole, top and
@@ -333,13 +356,13 @@ private class MillCastingSizing {
 		for (row in 0...2) {
 			var start = l.roof + row * (chamberHeight + l.wall),
 				top = start + chamberHeight;
-			if (row == 0 && xyAxis != null)
-				start = Math.max(start, xyAxis.yBayTop - l.railPlane + l.roof);
+			if (row==0) {
+				start=Math.max(start,MillFrameLayout.COLUMN_ACCESS_TOP+l.roof);
+				if (xyAxis!=null) start=Math.max(start,xyAxis.yBayTop-l.columnMountPlane+l.roof);
+			}
 			if (top <= start || frontWeb >= l.columnDepth)
 				throw "Column backing consumes rear chamber: rear-chamber-" + row;
 			var chamberOpenings = [CastingPatterns.face("body.y-max")];
-			if (flared && start < MillFrameLayout.COLUMN_FOOT_HEIGHT)
-				chamberOpenings = chamberOpenings.concat([CastingPatterns.face("foot.y-max")]);
 			columnVoids.push(CastingFeaturePatterns.box('rear-chamber-$row', Lightening, chamberOpenings,
 				l.columnWidth-2*l.wall,l.columnDepth-frontWeb,top-start,0,frontWeb/2,start));
 		}
@@ -353,49 +376,73 @@ private class MillCastingSizing {
 				zAxis == null ? "Z guide seat" : "continuous Z guide and bearing mounting strip",
 				[CastingPatterns.face("body.y-min")]
 					.concat(stripEnd >= l.columnHeight ? [CastingPatterns.face("body.z-max")] : [])
-					.concat(flared && stripStart < MillFrameLayout.COLUMN_FOOT_HEIGHT ? [CastingPatterns.face("foot.y-min")] : [])
-					.concat(stripStart == 0 ? [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")] : []),
-				F.fromRotationMatrix(side * l.zRailSpacing / 2, -l.columnDepth / 2 + l.insertThickness - l.seatRise, stripCentre,
-					[1, 0, 0, 0, 0, -1, 0, 1, 0])));
-		for (sx in [-1, 1])
-			for (sy in [-1, 1])
-				columnInserts.push(insert('foot${corner(sx, sy)}', footWidth, footDepth, l.insertThickness, ColumnMount, "column sole pad", [CastingPatterns.face(flared ? "foot.z-min" : "body.z-min")],
-					down(sx * (flared ? (l.columnWidth + l.columnFootWidth) / 4 : l.columnWidth / 2 - l.wall), sy * (l.columnDepth / 2 - l.roof),
-						l.insertThickness)));
-		if (flared)
-			for (row in columnInserts)
-				if (StringTools.startsWith(row.id, "foot")) {
-					var side = row.pose.x < 0 ? -1 : 1,
-						inner = Math.abs(row.pose.x) - details.columnBoltAccessHalfWidth,
-						outer = l.columnFootWidth / 2;
-					columnVoids.push(CastingFeaturePatterns.box('bolt-access-${row.id}', ServiceOpening,
-						[CastingPatterns.face(side < 0 ? "foot.x-min" : "foot.x-max")],
-						outer - inner, details.columnBoltAccessDepth, MillFrameLayout.COLUMN_ACCESS_TOP - l.insertThickness,
-						side * (inner + outer) / 2, row.pose.y, l.insertThickness));
-				}
-		if (flared) {
-			columnInserts = [
-				for (row in columnInserts)
-					StringTools.startsWith(row.id, "foot") ? {
-						id: row.id,
-						openings: row.openings,
-						pose: row.pose,
-						part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(footWidth, footDepth, l.insertThickness),
-							InsertHoles.through(details.columnAnchorThread.clearanceDiameter, l.insertThickness))
-							.setToken("role", InsertRole.ColumnMount)
-							.setToken("label", "column sole clamping pad"))
-					} : row
-			];
+					.concat(stripStart == 0 ? [CastingPatterns.face("body.z-min")] : []),
+				F.fromRotationMatrix(side * l.zRailSpacing / 2, -l.columnDepth / 2 + l.insertThickness , stripCentre,
+					[1, 0, 0, 0, 0, -1, 0, 1, 0]),details.precisionFinishingStockMm));
+		for (sx in [-1,1]) for (sy in [-1,1]) {
+			var id="foot"+corner(sx,sy);
+			var part=solePad(footWidth,footDepth,l.insertThickness,details);
+			var pose=down(sx*clampX,sy*(l.columnDepth/2-l.roof),l.insertThickness);
+			if (sy>0) pose=F.compose(pose,F.fromRotationMatrix(0,0,0,[-1,0,0,0,-1,0,0,0,1]));
+			columnInserts.push({id:id,part:part,pose:pose,openings:[CastingPatterns.face("body.z-min")]});
+			var inner=clampX-details.columnBoltAccessHalfWidth,outer=l.columnFootWidth/2;
+			columnVoids.push(CastingFeaturePatterns.box("bolt-access-"+id,ServiceOpening,
+				[CastingPatterns.face(sx<0 ? "body.x-min" : "body.x-max")],outer-inner,details.columnBoltAccessDepth,
+				MillFrameLayout.COLUMN_ACCESS_TOP-l.insertThickness,sx*(inner+outer)/2,pose.y,l.insertThickness));
 		}
-		var columnValues = body(l.columnWidth, l.columnDepth, l.columnHeight, columnVoids);
-		if (flared)
-			columnValues.setNumber("footWidth", l.columnFootWidth)
-				.setNumber("footHeight", MillFrameLayout.COLUMN_FOOT_HEIGHT)
-				.setNumber("footShoulder", MillFrameLayout.COLUMN_FOOT_SHOULDER);
+
+		// A wide source blank and two explicit side clearances form the step.
+		// Extending the rounded cuts across their declared open faces leaves
+		// only the two re-entrant radii on the finished casting.
+		if (l.columnFootWidth > l.columnWidth) for (side in [-1, 1]) {
+			var radius = details.columnFootCornerRadiusMm;
+			var width = (l.columnFootWidth - l.columnWidth) / 2 + radius;
+			var height = l.columnHeight - MillFrameLayout.COLUMN_FOOT_HEIGHT + radius;
+			var feature = CastingFeaturePatterns.box("column-step-clearance-" + (side < 0 ? "left" : "right"),
+				Clearance, [CastingPatterns.face(side < 0 ? "body.x-min" : "body.x-max"),
+					CastingPatterns.face("body.y-min"), CastingPatterns.face("body.y-max"), CastingPatterns.face("body.z-max")],
+				width, height, l.columnDepth);
+			feature.geometry.pose = F.fromRotationMatrix(
+				side * (l.columnWidth + l.columnFootWidth + 2 * radius) / 4, l.columnDepth / 2,
+				(MillFrameLayout.COLUMN_FOOT_HEIGHT + l.columnHeight + radius) / 2,
+				[1, 0, 0, 0, 0, -1, 0, 1, 0]);
+			feature.cornerRadius = radius;
+			columnVoids.push(feature);
+		}
+		var columnValues = body(l.columnFootWidth, l.columnDepth, l.columnHeight, columnVoids,"bench-mill-column");
+		var postCure:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement>=[];
+		var bonds:Array<materia.casting.PostCureBond>=[];
+		if (xyAxis!=null) for (side in [-1,1]) for (upper in [false,true]) {
+			var z=(upper ? xyAxis.yHatchUpperZ : xyAxis.yHatchLowerZ)-l.columnMountPlane;
+			var id="hatchRear"+(side<0 ? "Left" : "Right")+(upper ? "Upper" : "Lower");
+			var face=xyAxis.yServiceRear+details.hatchAnchorServiceFaceOffset-l.columnCentreY;
+			var part=new CastInsert(CastInsert.precastHoles(CastInsert.manufacturedValues(C45Bright)
+				.setToken("body",materia.casting.InsertSpec.InsertBodyCodec.encode(
+					Primitive(Cylinder(details.hatchInsertDiameter,details.hatchAnchorThickness)))),
+				InsertHoles.tappedBlind(details.hatchAnchorThread,details.hatchAnchorThickness))
+				.setToken("role",InsertRole.HatchMount).setToken("label","post-cure bonded hatch insert")
+				.setToken("finish",materia.casting.InsertSpec.InsertFinish.AsSupplied));
+			var pose=F.fromRotationMatrix(side*details.hatchAnchorSideOffset,
+				face-details.hatchAnchorThickness,z,[1,0,0,0,0,1,0,-1,0]);
+			postCure.push({id:id,part:part,pose:pose});
+			var receiver=InsertHoles.records(InsertHoles.through(details.hatchReceiverDiameter,details.hatchReceiverDepth))[0];
+			receiver.id=id+"-receiver";
+			receiver.extent=materia.casting.InsertHole.HoleExtent.Blind;
+			receiver.limits={policyId:"mill-hatch-bonded-receiver-v1",threaded:null,
+				minWall:details.hatchReceiverDiameter*details.hatchReceiverWallDiameters,
+				minBack:details.hatchReceiverDiameter*details.hatchReceiverBackDiameters,
+				minClearance:details.hatchReceiverDiameter*details.hatchReceiverWallDiameters,overrides:[]};
+			receiver.frame=F.fromRotationMatrix(side*details.hatchAnchorSideOffset,l.columnDepth/2,z,
+				[1,0,0,0,0,-1,0,1,0]);
+			bonds.push({insertId:id,receiver:receiver,
+				adhesive:materia.casting.CastingInput.CastingTextInput.Unresolved("Post-cure steel-to-compound bonding adhesive and coupon")});
+		}
+		columnValues.setToken("postCureBonds",haxe.Json.stringify(materia.casting.PostCureBond.PostCureBonds.records(bonds)));
+		this.columnPostCure=postCure;
 		if (zAxis!=null) columnInserts=mountRails(columnInserts,MillRailPlacement.z(zAxis),
-			F.translation(0,l.columnCentreY,l.railPlane),"zAxis",details);
-		columnInserts=columnInserts.concat(MillLiftingPattern.placements(columnValues,columnInserts,details));
-		columnInserts = machinekit.structural.FoundationSizing.anchors(columnInserts, details.anchorRule, columnValues);
+			F.translation(0,l.columnCentreY,l.columnMountPlane),"zAxis",details);
+		columnInserts=columnInserts.concat(MillLiftingPattern.placements(columnValues,columnInserts,details,{width:l.columnWidth,depth:l.columnDepth},anchorRule));
+		columnInserts = machinekit.structural.FoundationSizing.anchors(columnInserts, anchorRule, columnValues);
 		this.columnValues=columnValues;
 		this.columnInserts=columnInserts;
 		this.stripCentre=stripCentre;
@@ -426,20 +473,54 @@ private class MillCastingSizing {
 	static function down(x:Float, y:Float, z:Float):materia.assembly.AssemblyRecord.AssemblyFrame
 		return F.fromRotationMatrix(x, y, z, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
 
-	static function insert(id:String, width:Float, depth:Float, thickness:Float, role:materia.casting.InsertSpec.InsertRole, label:String, openings:Array<CastingOpening>,
-			pose:materia.assembly.AssemblyRecord.AssemblyFrame):CastInsertPlacement
-		return {
-			id: id,
-			part: new CastInsert(CastInsert.boxValues(width, depth, thickness)
-				.setToken("role", role)
-				.setToken("label", label)),
-			pose: pose,
-			openings: openings
-		};
+	static function solePad(width:Float,depth:Float,thickness:Float,details:MillCastingDetails):CastInsert {
+		var holes=InsertHoles.records(InsertHoles.through(details.columnAnchorThread.clearanceDiameter,thickness));
+		var fixture=InsertHoles.records(InsertHoles.tappedBlind(details.jointFixtureThread,thickness))[0];
+		fixture.id="fixture";fixture.frame.y=-details.jointHolePitchMm;holes.push(fixture);
+		var jack=InsertHoles.records(InsertHoles.tappedThrough(details.jointJackThread,thickness))[0];
+		jack.id="jack";jack.frame=F.translation(0,details.jointHolePitchMm,0);
+		holes.push(jack);
+		return jointSeat(new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(width,depth,thickness),
+			InsertHoles.fromNeutral(holes)).setToken("role",InsertRole.ColumnMount).setToken("label","column sole clamping pad")),thickness);
+	}
 
-	static function body(width:Float, depth:Float, height:Float, voids:Array<CastingFeature>):ComponentValues
-		return new ComponentValues().setNumber("width", width)
-			.setNumber("depth", depth)
-			.setNumber("height", height)
-			.setToken("features", CastingPatterns.encode(voids));
+	static function jointSeat(part:CastInsert,height:Float):CastInsert {
+		var requirement:materia.casting.InterfaceRequirement={id:"joint-seat",
+			geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,height)),
+			route:materia.casting.InterfaceRequirement.InterfaceRoute.AsSupplied,allowanceMm:0,
+			finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("RM0 joint seat and metrology allocation"),
+			permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.AsSupplied],
+			positionToleranceMm:part.parameterNumber("positionTolerance"),datumReference:"primary",relationshipIds:[]};
+		return new CastInsert(part.values().copy().setToken("finish",materia.casting.InsertSpec.InsertFinish.AsSupplied)
+			.setToken("interfaces",haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records([requirement]))));
+	}
+
+	static function insert(id:String, width:Float, depth:Float, thickness:Float, role:materia.casting.InsertSpec.InsertRole, label:String, openings:Array<CastingOpening>,
+		pose:materia.assembly.AssemblyRecord.AssemblyFrame,finishingStock:Float=0):CastInsertPlacement {
+		var part=new CastInsert(CastInsert.boxValues(width,depth,thickness+finishingStock)
+			.setToken("role",role).setToken("label",label));
+		if (finishingStock>0) {
+			var requirement:materia.casting.InterfaceRequirement={id:"finished-seat",
+				geometry:materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0,0,thickness)),
+				route:materia.casting.InterfaceRequirement.InterfaceRoute.Ground,allowanceMm:finishingStock,
+				finishingProcessErrorMm:materia.casting.CastingInput.Unresolved("RM0 finishing-process error allocation"),
+				permittedFinishes:[materia.casting.InterfaceRequirement.InterfaceFinish.Ground],
+				positionToleranceMm:part.parameterNumber("positionTolerance"),datumReference:"primary",relationshipIds:[]};
+			part=new CastInsert(part.values().copy().setToken("interfaces",haxe.Json.stringify(
+				materia.casting.InterfaceRequirement.InterfaceRequirements.records([requirement]))));
+		}
+		return {id:id,part:part,pose:pose,openings:openings};
+	}
+
+	static function body(width:Float, depth:Float, height:Float, voids:Array<CastingFeature>,foundationId:String):ComponentValues {
+		var scheme:materia.casting.FoundationDatumScheme={id:foundationId+"-datums",foundationId:foundationId,
+			primary:{id:"primary",reference:BodyFace("body.z-max"),frame:F.translation(0,0,height)},
+			secondary:{id:"secondary",reference:BodyFace("body.x-min"),
+				frame:F.fromRotationMatrix(-width/2,0,0,[0,0,-1,1,0,0,0,-1,0])},
+			tertiary:{id:"tertiary",reference:BodyFace("body.y-min"),
+				frame:F.fromRotationMatrix(0,-depth/2,0,[1,0,0,0,0,-1,0,1,0])}};
+		return new ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("height", height)
+			.setToken("features", CastingPatterns.encode(voids)).setToken("datumScheme",haxe.Json.stringify(
+				materia.casting.FoundationDatumScheme.FoundationDatums.record(scheme)));
+	}
 }

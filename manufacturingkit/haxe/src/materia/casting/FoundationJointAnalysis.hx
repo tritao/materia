@@ -27,7 +27,9 @@ class FoundationJointAnalysis {
 				used.set(jack.screw,true);used.set(jack.receiver.member,true);used.set(jack.bearing.member,true);
 			}
 			for (anchor in j.anchors) {
-				screw(source,anchor.screw);hole(source,anchor.target);used.set(anchor.screw,true);used.set(anchor.target.member,true);
+				if (screw(source,anchor.screw).kind!=FoundationJointScrewKind.Iso4762Steel88)
+					throw "Foundation joint clamping anchor requires a headed class 8.8 screw: "+anchor.id;
+				hole(source,anchor.target);used.set(anchor.screw,true);used.set(anchor.target.member,true);
 				var lower=belongs(source,j.lowerBody,anchor.target),upper=belongs(source,j.upperBody,anchor.target);
 				if (!lower && !upper) throw "Foundation joint anchor target does not belong to either casting: "+anchor.id;
 				var linked=false,other=lower ? j.upperBody : j.lowerBody;

@@ -233,6 +233,7 @@ typedef InsertAnchorPatternRule = {
 	var coverDiameters:Float;
 	var spacingDiameters:Float;
 	var screwLengthsMm:Array<Float>;
+	var allowedNominalDiametersMm:Array<Float>;
 }
 
 
@@ -520,7 +521,8 @@ class InsertAnchorSelection {
 		id:id,demandFactor:1.5,maximumCount:64,liftingLoadPaths:2,gravityMps2:9.80665,
 		minimumCount:2,maximumPitchInShortWidths:4,embedmentDiameters:2,
 		coverDiameters:1,spacingDiameters:0.5,
-		screwLengthsMm:[10,12,16,20,25,30,35,40,45,50,60,70,80]
+		screwLengthsMm:[10,12,16,20,25,30,35,40,45,50,60,70,80],
+		allowedNominalDiametersMm:[5,6,8,10,12,14,16]
 	};
 
 	/** The same CoM-based source locations used by the castability proposals.
@@ -546,8 +548,14 @@ class InsertAnchorSelection {
 			|| rule.maximumPitchInShortWidths<=0
 			|| rule.embedmentDiameters<=0 || rule.coverDiameters<=0 || rule.spacingDiameters<=0
 			|| !Math.isFinite(rule.maximumPitchInShortWidths+rule.embedmentDiameters+rule.coverDiameters+rule.spacingDiameters)
-			|| rule.screwLengthsMm==null || rule.screwLengthsMm.length==0)
+			|| rule.screwLengthsMm==null || rule.screwLengthsMm.length==0
+			|| rule.allowedNominalDiametersMm==null || rule.allowedNominalDiametersMm.length==0)
 			throw "Invalid anchor pattern rule";
+		var sizes:Array<Float>=[];
+		for (diameter in rule.allowedNominalDiametersMm) {
+			if (!Math.isFinite(diameter) || diameter<=0 || sizes.indexOf(diameter)>=0) throw "Invalid allowed anchor thread diameter";
+			sizes.push(diameter);
+		}
 		for (length in rule.screwLengthsMm)
 			if (!Math.isFinite(length) || length<=0) throw "Invalid declared standard anchor screw length";
 	}

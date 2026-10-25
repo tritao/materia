@@ -47,16 +47,26 @@ class FoundationJointCad {
 		var result:Array<ToolingValidation> = [],context=input.interfaceContext;
 		if (context==null) return result;
 		var source=context.jointSources;
-		var screws:Map<String,machinekit.standard.SocketHeadCapScrew> = [],poses:Map<String,AssemblyFrame> = [];
+		var screws:Map<String,machinekit.component.MachineComponent> = [],poses:Map<String,AssemblyFrame> = [];
 		for (row in source.inserts) poses.set(row.member,row.pose);
 		for (row in source.screws) {
-			var screw=machinekit.standard.SocketHeadCapScrew.metric(row.thread.designation,row.shankLength,machinekit.standard.PropertyClass.Steel88);
-			if (screw.bom.partNumber!=row.partNumber || Math.abs(screw.threadedLength()-row.threadedLength)>1e-8
-				|| materia.tooling.ToolingCodec.canonical(machinekit.structural.InsertHoles.threadRecord(screw.threadSpec()))
+			var screw:machinekit.component.MachineComponent,bearing:AssemblyFrame;
+			var thread:cadkit.threads.ThreadSpec,threadedLength:Float;
+			switch row.kind {
+				case Iso4762Steel88:
+					var selected=machinekit.standard.SocketHeadCapScrew.metric(row.thread.designation,row.shankLength,machinekit.standard.PropertyClass.Steel88);
+					screw=selected;bearing=selected.bearingFrame();thread=selected.threadSpec();threadedLength=selected.threadedLength();
+				case Iso4026NominalSteel:
+					var selected=machinekit.standard.SocketSetScrew.forThread(machinekit.structural.InsertHoles.threadSpec(row.thread),row.shankLength);
+					screw=selected;bearing=machinekit.standard.SocketSetScrew.boreSeat();thread=selected.thread;threadedLength=selected.length;
+				default:throw "Unsupported source joint screw: "+row.member;
+			}
+			if (screw.bom.partNumber!=row.partNumber || Math.abs(threadedLength-row.threadedLength)>1e-8
+				|| materia.tooling.ToolingCodec.canonical(machinekit.structural.InsertHoles.threadRecord(thread))
 					!=materia.tooling.ToolingCodec.canonical(row.thread))
 				throw "Joint hardware differs from source standard component: "+row.member;
 			screws.set(row.member,screw);
-			poses.set(row.member,F.compose(row.bearingFrame,F.inverse(screw.bearingFrame())));
+			poses.set(row.member,F.compose(row.bearingFrame,F.inverse(bearing)));
 		}
 		for (instance in context.foundationJoints) {
 			var prefix="tooling.foundation-joint.cad."+haxe.crypto.Sha256.encode(instance.id);

@@ -89,6 +89,30 @@ class CastingStrategies {
 		return result;
 	}
 
+	/** Stock height follows an actual declared opening, not the thinnest box
+	 * dimension. All clipping stays in CastingCavities. Unavailable non-box
+	 * queries retain the strategy for the existing Unsupported geometry gate. */
+	static function withdrawalDepth(document:ToolingDocument,feature:CastingFeature,
+		normal:{x:Float,y:Float,z:Float}):Null<Float> {
+		var cavity=CastingCavities.derive(document.input.envelope,document.input.features).filter(cavity -> cavity.featureId==feature.id)[0];
+		return switch cavity.geometry {
+			case Prisms(pieces):
+				var low=Math.POSITIVE_INFINITY,high=Math.NEGATIVE_INFINITY;
+				for (piece in pieces) for (point in piece.profile) for (z in [0.0,piece.height]) {
+					var p=F.transformPoint(piece.pose,point.x,point.y,z),projection=p.x*normal.x+p.y*normal.y+p.z*normal.z;
+					low=Math.min(low,projection);high=Math.max(high,projection);
+				}
+				high-low;
+			case SolidIntersection(_,_,_):
+				if (CastingMoldPlanner.geometry==null) null;
+				else {
+					var local=MoldRegions.moved(CastingCavities.region(cavity),F.inverse(F.sectionFrame(normal,feature.id)));
+					MoldRegions.exactBounds(local,feature.id).height;
+				}
+			case UnsupportedGeometry(_):null;
+		};
+	}
+
 	public static function resolve(document:ToolingDocument):Array<CastingFeatureStrategy> {
 		var result:Array<CastingFeatureStrategy> = [];
 		for (feature in document.input.features) {
@@ -109,22 +133,6 @@ class CastingStrategies {
 			if (rules.length != 1)
 				throw "Missing or duplicate recipe strategy rule for feature: " + feature.id;
 			var rule = rules[0],strategy=rule.strategy;
-			if (strategy==ReusableFormer && opening==BodyOpening && rule.useEPSAboveBoardThickness) {
-				var dimensions=switch feature.geometry.solid {
-					case Cut(solid):switch solid {
-						case Box(width,depth,height):[width,depth,height];
-						case Cylinder(diameter,height):[diameter,diameter,height];
-					};
-					case Prism(profile,height):
-						var bounds=materia.casting.CastingProfileGeometry.bounds(profile);
-						[bounds.width,bounds.height,height];
-					case Insert(_):throw "Insert recess has no core strategy: "+feature.id;
-				};
-				var thickness=0.0;
-				for (stock in document.recipe.former.stocks) thickness=Math.max(thickness,stock.measuredThickness);
-				if (Math.min(dimensions[0],Math.min(dimensions[1],dimensions[2]))>thickness+1e-7)
-					strategy=SacrificialEPS;
-			}
 			var direction:Null<{x:Float, y:Float, z:Float}> = null;
 			if (rule.strategy == ReusableFormer || strategy == SacrificialEPS && opening == BodyOpening) {
 				if (openings.length == 0)
@@ -134,7 +142,24 @@ class CastingStrategies {
 					return rule.preferredAxis == X ? v.x : rule.preferredAxis == Y ? v.y : v.z;
 				var best = 0.0;
 				for (candidate in normals) best = Math.max(best, Math.abs(coordinate(candidate.normal)));
-				var candidates = normals.filter(candidate -> Math.abs(Math.abs(coordinate(candidate.normal)) - best) <= 1e-9);
+				if (strategy==ReusableFormer && rule.useEPSAboveBoardThickness) {
+					var thickness=0.0;
+					for (stock in document.recipe.former.stocks) thickness=Math.max(thickness,stock.measuredThickness);
+					var allDeep=true;
+					for (candidate in normals) if (Math.abs(Math.abs(coordinate(candidate.normal))-best)<=1e-9) {
+						var depth=withdrawalDepth(document,feature,candidate.normal);
+						if (depth==null || depth<=thickness+1e-7) allDeep=false;
+					}
+					if (allDeep) strategy=SacrificialEPS;
+				}
+				// Sacrificial stock can share the open pour face; it is broken
+				// out after lifting rather than claiming a rigid side withdrawal.
+				var fillPortals = strategy == SacrificialEPS ? normals.filter(candidate -> {
+					var v = candidate.normal;
+					return F.transformVector(document.setup.sourceToMold, v.x, v.y, v.z).z > 1 - 1e-9;
+				}) : [];
+				var candidates = fillPortals.length > 0 ? fillPortals
+					: normals.filter(candidate -> Math.abs(Math.abs(coordinate(candidate.normal)) - best) <= 1e-9);
 				var normal = candidates[0].normal;
 				for (candidate in candidates) {
 					var v = candidate.normal;

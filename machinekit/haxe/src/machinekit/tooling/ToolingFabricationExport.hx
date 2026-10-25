@@ -102,7 +102,7 @@ class ToolingFabricationExport {
 		};
 		var inspectionRows:Array<Array<String>> = [["insert_id","inspection_kind","source_id","stage","limit_declared","tolerance_mm","execution_status"]];
 		var bomRows:Array<Array<String>> = [["insert_id","part_number","procurement_kind","process","material_grade","quantity"]];
-		for (insert in p.document.input.inserts) switch insert.origin {
+		for (insert in p.document.input.inserts.concat([for (row in p.document.input.postCureInserts) row.insert])) switch insert.origin {
 			case Catalogue(_):
 			case Fabricated(_):
 				var job=materia.tooling.casting.InsertManufacturingPlan.build(insert);
@@ -143,6 +143,21 @@ class ToolingFabricationExport {
 		}
 		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:5,
 			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:[for (job in jobs) materia.tooling.casting.InsertManufacturingPlan.record(job)]});
+		data(dir,"bed-rebate-seals.json",{sourceFingerprint:f.sourceFingerprint,
+			seals:[for (seal in p.seals) {id:seal.volume.id,panelId:seal.panelId,insertId:seal.insertId,
+				materialSpec:seal.materialSpec,geometry:materia.tooling.casting.MoldRegions.MoldVolumeRecords.record(seal.volume),
+				sequence:["Route the receiver rebate and source fixing clearances.",
+					"Dry-fit the protected insert or datum; protect screw and pin access, then fill the modeled external clearance and cutter-relief region with the compatible closure compound.",
+					"Cure the closure attached to the bed, remove and inspect the receiver fit, then apply the declared release system.",
+					"Keep all insert and anchor bonding faces clean. Compatibility and reuse require the declared coupon."]} ]});
+		data(dir,"post-cure-bonded-inserts.json",{sourceFingerprint:f.sourceFingerprint,
+			installations:[for (row in p.document.input.postCureInserts) {
+				insertId:row.insert.id,pose:row.insert.pose,
+				receiver:row.bond.receiver,adhesive:materia.casting.CastingInput.CastingInputs.textRecord(row.bond.adhesive),
+				sequence:["After casting cure, drill the declared flat-bottom blind receiver in the casting datum frame.",
+					"Clean and prepare both bonding surfaces; keep the service thread clean.",
+					"Bond the steel insert at the declared service position; cure the adhesive before loading the hatch."]
+			}]});
 		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
 		text(dir,"insert-hole-budgets.csv",ToolingFabrication.csv(budgetRows));
 		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));

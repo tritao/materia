@@ -289,6 +289,7 @@ class MoldVolumeRecords {
 			case "eps": EPSStock;
 			case "steel": SteelStock;
 			case "former": FormerStock;
+			case "sealant": SealantStock;
 			default: throw "Invalid mold volume material";
 		};
 		var pieces = boxes(array(r, "pieces", 2048)),

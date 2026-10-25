@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 24;
+	public static inline var VERSION = 25;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -98,11 +98,15 @@ class ToolingCodec {
 			precastStruts:materia.casting.PrecastStrut.PrecastStruts.records(input.precastStruts),
 			interfaces:materia.casting.InterfaceRequirement.InterfaceRequirements.records(input.interfaces),
 			interfaceContext:input.interfaceContext==null ? null : materia.casting.CastingInterfaceContext.CastingInterfaceContexts.record(input.interfaceContext),
-			inserts:[for (i in input.inserts) {
-				var spec=materia.casting.InsertSpec.InsertSpecCodec.record({body:i.body,holes:i.holes,origin:i.origin,anchorage:i.anchorage,interfaces:i.interfaces});
-				{id:i.id,body:spec.body,holes:spec.holes,origin:spec.origin,anchorage:spec.anchorage,interfaces:spec.interfaces,
-					pose:i.pose,role:i.role,label:i.label,positionTolerance:i.positionTolerance,material:i.material,finish:i.finish};
-			}]}));
+			postCureInserts:[for (row in input.postCureInserts) {insert:insertRecord(row.insert),
+				bond:materia.casting.PostCureBond.PostCureBonds.records([row.bond])[0]}],
+			inserts:[for (i in input.inserts) insertRecord(i)]}));
+	}
+
+	static function insertRecord(i:CastingToolingInsert):Dynamic {
+		var spec=materia.casting.InsertSpec.InsertSpecCodec.record({body:i.body,holes:i.holes,origin:i.origin,anchorage:i.anchorage,interfaces:i.interfaces});
+		return {id:i.id,body:spec.body,holes:spec.holes,origin:spec.origin,anchorage:spec.anchorage,interfaces:spec.interfaces,
+			pose:i.pose,role:i.role,label:i.label,positionTolerance:i.positionTolerance,material:i.material,finish:i.finish};
 	}
 
 	public static function documentRecord(document:ToolingDocument):Dynamic
@@ -111,7 +115,7 @@ class ToolingCodec {
 	public static function inputSnapshot(raw:Dynamic):CastingToolingInput return readInput(raw);
 
 	static function readInput(raw:Dynamic):CastingToolingInput {
-		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "precastStruts", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
+		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "precastStruts", "postCureInserts", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
 		if (string(raw, "lengthUnit") != "mm")
 			throw "Tooling input requires explicit mm units";
 		var envelope:Array<CastingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
@@ -123,6 +127,15 @@ class ToolingCodec {
 			if (features.filter(feature -> feature.id == strut.coreFeatureId || feature.derivedFrom == strut.coreFeatureId).length == 0)
 				throw "Precast strut references an unknown source core: " + strut.id;
 		var inserts:Array<CastingToolingInsert> = [for (i in array(raw, "inserts")) readInsert(i)];
+		var postCure=[for (row in array(raw,"postCureInserts")) {
+			object(row,["insert","bond"],"post-cure insert");
+			var insert=readInsert(Reflect.field(row,"insert"));
+			var bond=materia.casting.PostCureBond.PostCureBonds.snapshot([Reflect.field(row,"bond")])[0];
+			if (bond.insertId!=insert.id || inserts.filter(other -> other.id==insert.id).length>0)
+				throw "Post-cure insert identity conflicts with the source: "+insert.id;
+			{insert:insert,bond:bond};
+		}];
+		unique(postCure,row -> row.insert.id,"post-cure inserts");
 		unique(envelope, p -> p.id, "envelope");
 		unique(features, f -> f.id, "features");
 		unique(inserts, i -> i.id, "inserts");
@@ -169,6 +182,7 @@ class ToolingCodec {
 			envelope: envelope,
 			features: features,
 			precastStruts: struts,
+			postCureInserts: postCure,
 			inserts: inserts
 		};
 	}
