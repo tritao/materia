@@ -1556,6 +1556,95 @@ and its source proposal visible; adding or moving lifting inserts needs source
 approval. Do not weaken the shared shop rule to clear the delivery report.
 
 
+**Source simplification decision (user, 2026-10-25).** A review of the mill and
+hobber sources found that most tooling cost comes from how the castings are
+authored, not from what the machines need. This decision runs before the column
+and hobber kits are finalised. It replaces the flared column formers, and it
+supersedes items 2 and 3 of the first hobber source decision (precast struts and
+retained cores). Record every geometry change below as an approved frozen-CAD
+correction, with zero symmetric difference against the corrected source.
+
+Authoring, both machines:
+1. Declare pockets directly. Each lightening pocket is a named feature with
+   explicit rib and wall positions, a corner radius under the corner-radius
+   decision, draft, and declared openings. Lightening by subtracting retained
+   boxes from a grid (`CastingFeaturePatterns.retain`, the hobber's closed-cell
+   grid minus supports) leaves the source vocabulary, together with hashed
+   fragment IDs. Box algebra stays a tooling allocation tool. An undeclared
+   enclosed network is a source error.
+2. Move sizing out of source construction. These move into one structural sizing
+   step that runs before the source is built and returns declared footprints and
+   sizes for the source to consume:
+   - the anchor geometry searches;
+   - the hatch placement loop;
+   - the lifting footprint search;
+   - the mass/anchor fixed point.
+   Source code contains no try/catch searches.
+3. Hobber inserts use the mill's typed details vocabulary: anchor rule, thread
+   choices, plate sizing, and precast or tapped holes. This applies together with
+   hobber source decision 2.
+4. Delete leftovers:
+   - `UPPER_OFFSET` and the old-bed coordinates;
+   - unnamed literals, which become named layout values;
+   - service cuts without declared openings;
+   - per-feature mold setup overrides keyed by ID, including the dead
+     `selected-y-shaft-passage` override and the kind-priority remap needed
+     because source features overlap. Source features do not overlap, and
+     withdrawal comes from source draft and openings.
+
+   The hobber setup's `datumPostWidth` rule moves to the shared fixture planner.
+
+Mill geometry:
+1. One top plane. The 4 mm seat rise is the declared replication or finishing
+   allowance on the precision seats, matching the README. The mold bed sits at
+   the casting top and is rebated for the proud steel, which removes the
+   `bed-backing` sliver formers (33 of the base's 48 boards today).
+2. The column foot is stepped instead of the 45° flare, keeping side bolt
+   access. The step's re-entrant corner takes a radius under the corner rule.
+   The `flared` flag and its branches are deleted. The flared-former work does
+   not land unless another source needs it.
+3. The four access-hatch M4 threads become post-cast bonded inserts, declared as
+   post-cure source holes. The cast-in hatch plates and their placement search are
+   deleted.
+4. Shoulder depth and foot stems are 18 mm, so every base former uses one 18 mm
+   board stock. Each lift role is one part: a single lift-plate footprint with a
+   centred service hole, instead of mirrored plates.
+5. The shop recipe declares the allowed anchor threads. Each casting uses one size
+   by default, the smallest that covers its largest demand.
+6. Fix the 1 mm foot-access overhang caused by the symmetric clearance.
+
+Hobber geometry:
+1. Fill both outer bands of the plinth solid: the front band (28.5 L) and its
+   y+ counterpart. Merge outer wall, band and rail beam into one side wall
+   (about +131 kg).
+2. Fill the 35 mm full-height slots between the drive webs and the rail beams,
+   together with the 5 mm sliver.
+3. Open the drive-side pocket (23.2 L) to the sole, which is the pour face, so
+   that it becomes an ordinary face-open core.
+4. Re-author the plinth with positive ribs from the `HobberXLayout` stations
+   under authoring item 1.
+5. Redeclare the cable route with real face openings at both ends.
+6. Precast struts, the pour-face bridge and the retained-EPS disposition are
+   deleted once no source uses them.
+7. The column is solid apart from its declared head recess; hobber source
+   decision 2 fills the back networks.
+
+Functional fixes:
+1. The mill levelling foot carries the machine in compression through the single
+   levelling-foot family (REVIEW.md B1), with the load path checked.
+2. The base–column joint is declared as a foundation joint, with jacking screws,
+   grout or replication gap, anchor pattern and cure-before-torque. Pick the
+   recommended values and record them.
+3. Minimum walls: the shop recipe declares the maximum aggregate size from the
+   compound datasheet, and a recipe minimum-wall rule gates source walls. The
+   wall checks stay Pending until the datasheet value is entered; do not invent
+   it. Walls that fail are thickened in the source.
+4. The mill base's solid aft region goes through the datasheet section rule, with
+   no source change unless that rule fails.
+5. Compare the mill column's torsional stiffness, current open section against a
+   bolted rear plate, using the existing FEM export. Record the result; the
+   source changes only on that evidence.
+
 Former CAM datum decision (2026-10-22): all former stock heights use the declared machine spoilboard plane and fixed work datum, including thicker boards. Only through bands receive breakthrough; tapered finishing offsets its contact height by that breakthrough. Program headers state the spoilboard and stock-top Z.
 Former load decision (2026-10-22): hollow-former boards enter the existing peak-pressure and plate-support checks as wetted walls; finished clipping and coupled corner loads retain the existing Unsupported plate-model gap per board, without credit from nominal rectangular blanks. Gross former restraint checks remain unchanged.
 Former registration decision (2026-10-22): neck and flange sheets register against the mold wall and use its external closure; the hollow body uses internal pocket screws. Capture, grip and the complete restraint remain pending shop qualification.
