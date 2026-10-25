@@ -1880,3 +1880,18 @@ multipliers. Nominal-only drive screens remain provisional. Keep >100% raised-
 feed next-window replan coverage separate from the promised ≤100% grid. Do not
 reuse the rejected thin-shelf mass/compliance for the new mount. The complete
 joint packet and new rerun remain pending; no frozen CAD change is approved.
+
+Executed-motion/mount checkpoint (2026-10-25): the J6 handoff now supplies 186
+hash-validated executed histories (90 pose, 64 phase, 32 full-feed resume),
+replacing the offline control evidence for the forthcoming corrected rerun.
+Publication-reserve cycle times are excluded; above-100% raised-feed replans
+remain separate. See [preparation and limits](fem/RERUN_PREPARATION.md).
+Light geometry-derived screens expose a 10 mm pinion axial-reference error in
+the local prototype and unresolved preload/chain/switch envelope overlaps.
+Native full-machine clearance, X host, section joints and service corridors are
+still open. Proposed receiver end anchoring and motor-mount stiffness lead the
+provisional drive ranking; no frozen geometry edit or dynamic pass is claimed.
+Fifteen focused preparation tests pass. Root is about 5.3 GB free: no structural
+solve or modal replay until it exceeds 8 GB; no DATA1 writes. Full supported-rack
+mass/compliance, executed-history rerun, 100-million-reversal weld fatigue,
+options (a–c), geometry approval and SR6-C remain release gates.

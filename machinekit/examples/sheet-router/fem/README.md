@@ -1,5 +1,13 @@
 # SR5 structural screen
 
+## Executed-history preparation (2026-10-25)
+
+[Preparation](RERUN_PREPARATION.md) records the 186-history J6 preflight,
+whole-Y candidate envelope checks, local geometry-derived mount compliance and
+provisional drive ranking. No corrected structural/modal result is available:
+mount geometry remains unqualified and root is below the 8 GB solve floor.
+Producer cycle times and frozen-structure errors are not reused.
+
 ## Current rack/motion gate (2026-10-22)
 
 The [joint study](RACK_JOINT_STUDY.md) supersedes the earlier release interpretation.

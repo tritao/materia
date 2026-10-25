@@ -1,0 +1,606 @@
+{
+  "status": "Provisional algebraic ranking only; corrected structural/error/fatigue results pending",
+  "sourceMembersSha256": {
+    "rack-joint/inputs/packets/y2600/manifest.json": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec",
+    "rack-joint/inputs/packets/y3150/manifest.json": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
+  },
+  "mountScreenSha256": "c3ee03dfde73c8a4020d76bb91d0e3e820f817b2d2161b29bd12548d4ca51d90",
+  "rows": [
+    {
+      "bedMm": 2600,
+      "seatVariant": "native-three-anchor-fixture",
+      "contactModel": "washer-annulus",
+      "seatPerPinionNPerM": 8558959.421819093,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.0,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 2755065419.483789,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 6009121.435656597,
+          "dualYDriveAndSeatsNPerM": 12018242.871313194,
+          "changeAgainstFrozenNoSeatPercent": -29.57333672388518,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 5650740.1378269885,
+          "dualYDriveAndSeatsNPerM": 11301480.275653977,
+          "changeAgainstFrozenNoSeatPercent": -33.77355122395128,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 5392683.533013272,
+          "dualYDriveAndSeatsNPerM": 10785367.066026544,
+          "changeAgainstFrozenNoSeatPercent": -36.797964327928966,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 5102282.310178948,
+          "dualYDriveAndSeatsNPerM": 10204564.620357895,
+          "changeAgainstFrozenNoSeatPercent": -40.201455063557646,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 4474634.432437553,
+          "dualYDriveAndSeatsNPerM": 8949268.864875106,
+          "changeAgainstFrozenNoSeatPercent": -47.55746312812613,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 4272842.647669851,
+          "dualYDriveAndSeatsNPerM": 8545685.295339702,
+          "changeAgainstFrozenNoSeatPercent": -49.922454787870876,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "seatVariant": "native-three-anchor-fixture",
+      "contactModel": "tributary-foot",
+      "seatPerPinionNPerM": 8970678.347688794,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.0,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 174663011.5426532,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 6209200.307375486,
+          "dualYDriveAndSeatsNPerM": 12418400.614750972,
+          "changeAgainstFrozenNoSeatPercent": -27.22842033667432,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 5827314.80437806,
+          "dualYDriveAndSeatsNPerM": 11654629.60875612,
+          "changeAgainstFrozenNoSeatPercent": -31.704103182762577,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 5553269.756082833,
+          "dualYDriveAndSeatsNPerM": 11106539.512165666,
+          "changeAgainstFrozenNoSeatPercent": -34.91590020591023,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 5245808.615514395,
+          "dualYDriveAndSeatsNPerM": 10491617.23102879,
+          "changeAgainstFrozenNoSeatPercent": -38.51933249616442,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 4584640.703869516,
+          "dualYDriveAndSeatsNPerM": 9169281.407739032,
+          "changeAgainstFrozenNoSeatPercent": -46.26819401959577,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 4373039.688954021,
+          "dualYDriveAndSeatsNPerM": 8746079.377908042,
+          "changeAgainstFrozenNoSeatPercent": -48.748149464981,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "seatVariant": "proposed-end-anchors",
+      "contactModel": "washer-annulus",
+      "seatPerPinionNPerM": 20485727.79334002,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.02427119357352086,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 14623062.488945156,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 10163477.7251498,
+          "dualYDriveAndSeatsNPerM": 20326955.4502996,
+          "changeAgainstFrozenNoSeatPercent": 19.11555310168356,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 9178875.44355796,
+          "dualYDriveAndSeatsNPerM": 18357750.88711592,
+          "changeAgainstFrozenNoSeatPercent": 7.576053677507599,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 8516852.117785677,
+          "dualYDriveAndSeatsNPerM": 17033704.235571355,
+          "changeAgainstFrozenNoSeatPercent": -0.18283326533945488,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 7814419.23339902,
+          "dualYDriveAndSeatsNPerM": 15628838.46679804,
+          "changeAgainstFrozenNoSeatPercent": -8.41531862155589,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 6432531.796861337,
+          "dualYDriveAndSeatsNPerM": 12865063.593722673,
+          "changeAgainstFrozenNoSeatPercent": -24.61098419773323,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 6023585.709375144,
+          "dualYDriveAndSeatsNPerM": 12047171.418750288,
+          "changeAgainstFrozenNoSeatPercent": -29.403816013475648,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "seatVariant": "proposed-end-anchors",
+      "contactModel": "tributary-foot",
+      "seatPerPinionNPerM": 20923045.378825083,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.02427119357352086,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 14408098.529616725,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 10269973.483113699,
+          "dualYDriveAndSeatsNPerM": 20539946.966227397,
+          "changeAgainstFrozenNoSeatPercent": 20.363679132546288,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 9265648.71164329,
+          "dualYDriveAndSeatsNPerM": 18531297.42328658,
+          "changeAgainstFrozenNoSeatPercent": 8.593032914530752,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 8591508.887911016,
+          "dualYDriveAndSeatsNPerM": 17183017.775822032,
+          "changeAgainstFrozenNoSeatPercent": 0.6921410994155996,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 7877223.700175015,
+          "dualYDriveAndSeatsNPerM": 15754447.40035003,
+          "changeAgainstFrozenNoSeatPercent": -7.679252778781709,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 6475027.419858704,
+          "dualYDriveAndSeatsNPerM": 12950054.839717409,
+          "changeAgainstFrozenNoSeatPercent": -24.112937193093632,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 6060834.15390113,
+          "dualYDriveAndSeatsNPerM": 12121668.30780226,
+          "changeAgainstFrozenNoSeatPercent": -28.96726573099595,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "seatVariant": "native-three-anchor-fixture",
+      "contactModel": "washer-annulus",
+      "seatPerPinionNPerM": 8558959.421819093,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.0,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 2755065419.483789,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 6009121.435656597,
+          "dualYDriveAndSeatsNPerM": 12018242.871313194,
+          "changeAgainstFrozenNoSeatPercent": -29.57333672388518,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 5650740.1378269885,
+          "dualYDriveAndSeatsNPerM": 11301480.275653977,
+          "changeAgainstFrozenNoSeatPercent": -33.77355122395128,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 5392683.533013272,
+          "dualYDriveAndSeatsNPerM": 10785367.066026544,
+          "changeAgainstFrozenNoSeatPercent": -36.797964327928966,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 5102282.310178948,
+          "dualYDriveAndSeatsNPerM": 10204564.620357895,
+          "changeAgainstFrozenNoSeatPercent": -40.201455063557646,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 4474634.432437553,
+          "dualYDriveAndSeatsNPerM": 8949268.864875106,
+          "changeAgainstFrozenNoSeatPercent": -47.55746312812613,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 4272842.647669851,
+          "dualYDriveAndSeatsNPerM": 8545685.295339702,
+          "changeAgainstFrozenNoSeatPercent": -49.922454787870876,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "seatVariant": "native-three-anchor-fixture",
+      "contactModel": "tributary-foot",
+      "seatPerPinionNPerM": 8970678.347688794,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.0,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 174663011.5426532,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 6209200.307375486,
+          "dualYDriveAndSeatsNPerM": 12418400.614750972,
+          "changeAgainstFrozenNoSeatPercent": -27.22842033667432,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 5827314.80437806,
+          "dualYDriveAndSeatsNPerM": 11654629.60875612,
+          "changeAgainstFrozenNoSeatPercent": -31.704103182762577,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 5553269.756082833,
+          "dualYDriveAndSeatsNPerM": 11106539.512165666,
+          "changeAgainstFrozenNoSeatPercent": -34.91590020591023,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 5245808.615514395,
+          "dualYDriveAndSeatsNPerM": 10491617.23102879,
+          "changeAgainstFrozenNoSeatPercent": -38.51933249616442,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 4584640.703869516,
+          "dualYDriveAndSeatsNPerM": 9169281.407739032,
+          "changeAgainstFrozenNoSeatPercent": -46.26819401959577,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 4373039.688954021,
+          "dualYDriveAndSeatsNPerM": 8746079.377908042,
+          "changeAgainstFrozenNoSeatPercent": -48.748149464981,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "seatVariant": "proposed-end-anchors",
+      "contactModel": "washer-annulus",
+      "seatPerPinionNPerM": 20485727.79334002,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.02427119357352086,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 14623062.488945156,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 10163477.7251498,
+          "dualYDriveAndSeatsNPerM": 20326955.4502996,
+          "changeAgainstFrozenNoSeatPercent": 19.11555310168356,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 9178875.44355796,
+          "dualYDriveAndSeatsNPerM": 18357750.88711592,
+          "changeAgainstFrozenNoSeatPercent": 7.576053677507599,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 8516852.117785677,
+          "dualYDriveAndSeatsNPerM": 17033704.235571355,
+          "changeAgainstFrozenNoSeatPercent": -0.18283326533945488,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 7814419.23339902,
+          "dualYDriveAndSeatsNPerM": 15628838.46679804,
+          "changeAgainstFrozenNoSeatPercent": -8.41531862155589,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 6432531.796861337,
+          "dualYDriveAndSeatsNPerM": 12865063.593722673,
+          "changeAgainstFrozenNoSeatPercent": -24.61098419773323,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 6023585.709375144,
+          "dualYDriveAndSeatsNPerM": 12047171.418750288,
+          "changeAgainstFrozenNoSeatPercent": -29.403816013475648,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "seatVariant": "proposed-end-anchors",
+      "contactModel": "tributary-foot",
+      "seatPerPinionNPerM": 20923045.378825083,
+      "additionalEndAnchorHardwarePerLocalFixtureKg": 0.02427119357352086,
+      "frozenDrivePerPinionNPerM": 8532452.278900722,
+      "frozenDriveFlexibilityShares": {
+        "beltMPerN": 0.0,
+        "hingeMPerN": 0.6492430035324056,
+        "meshMPerN": 0.17064904557801444,
+        "reducerMPerN": 0.1801079508895799
+      },
+      "driveRequiredToRestoreFrozenStiffnessNPerM": 14408098.529616725,
+      "restoringFrozenStiffnessPossibleWithFiniteDrive": true,
+      "options": [
+        {
+          "option": "mount4-gearbox2",
+          "driveOnlyPerPinionNPerM": 20170625.274107296,
+          "withSeatPerPinionNPerM": 10269973.483113699,
+          "dualYDriveAndSeatsNPerM": 20539946.966227397,
+          "changeAgainstFrozenNoSeatPercent": 20.363679132546288,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount4",
+          "driveOnlyPerPinionNPerM": 16630264.371438961,
+          "withSeatPerPinionNPerM": 9265648.71164329,
+          "dualYDriveAndSeatsNPerM": 18531297.42328658,
+          "changeAgainstFrozenNoSeatPercent": 8.593032914530752,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2-gearbox2",
+          "driveOnlyPerPinionNPerM": 14577301.901250474,
+          "withSeatPerPinionNPerM": 8591508.887911016,
+          "dualYDriveAndSeatsNPerM": 17183017.775822032,
+          "changeAgainstFrozenNoSeatPercent": 0.6921410994155996,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "mount2",
+          "driveOnlyPerPinionNPerM": 12633585.90955175,
+          "withSeatPerPinionNPerM": 7877223.700175015,
+          "dualYDriveAndSeatsNPerM": 15754447.40035003,
+          "changeAgainstFrozenNoSeatPercent": -7.679252778781709,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "gearbox2",
+          "driveOnlyPerPinionNPerM": 9376877.362667156,
+          "withSeatPerPinionNPerM": 6475027.419858704,
+          "dualYDriveAndSeatsNPerM": 12950054.839717409,
+          "changeAgainstFrozenNoSeatPercent": -24.112937193093632,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        },
+        {
+          "option": "unchanged",
+          "driveOnlyPerPinionNPerM": 8532452.278900722,
+          "withSeatPerPinionNPerM": 6060834.15390113,
+          "dualYDriveAndSeatsNPerM": 12121668.30780226,
+          "changeAgainstFrozenNoSeatPercent": -28.96726573099595,
+          "replacementMassKg": null,
+          "geometryReleased": false
+        }
+      ]
+    }
+  ],
+  "module2": {
+    "status": "Excluded from current integral-foot geometry; redesign required",
+    "assumptions": "m2, 15 teeth preserves pitch circumference; permissible feed force is not a stiffness rating",
+    "receiverFootThicknessIfOtherDatumsPreservedMm": 5.084505690810467,
+    "footCounterboreDepthMm": 6,
+    "reason": "Published m2 pitch height 22 vs 17.5 mm lowers this foot to 5.0845 mm, thinner than its 6 mm counterbore",
+    "additionalYRackFixedMassKg": {
+      "2600": 10.049999999999997,
+      "3150": 11.699999999999996
+    },
+    "pinionMassChangeKg": null,
+    "applicationRatingQualified": false
+  },
+  "limitations": [
+    "Multipliers are optimistic stiffness-only bounds; no supplier replacement or moving mass selected",
+    "The native local geometry still needs placement correction, preload/bracket clearance and weld/contact qualification",
+    "No frequency, braking error or cycle-time inference from this algebra",
+    "Current exports have publication-reserve timing inflation; cycle comparisons suppressed",
+    "No structural solve or frozen CAD edit"
+  ]
+}

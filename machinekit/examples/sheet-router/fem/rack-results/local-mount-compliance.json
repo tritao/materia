@@ -1,0 +1,717 @@
+{
+  "status": "Provisional local geometry/compliance screen; no structural solve",
+  "archiveSha256": "ae23d7954fbf1b2f5b89e83ef9b4cbb1f544a5d756d9981acba0f8430cf4e7f7",
+  "nativeFixtureMassKg": 11.585042391355483,
+  "mountPartsExcludingExistingRailAndRackKg": 9.001042391355481,
+  "screens": [
+    {
+      "variant": "native-three-anchor-fixture",
+      "contactModel": "washer-annulus",
+      "anchorStationsMm": [
+        -125,
+        0,
+        125
+      ],
+      "additionalHardwareMassKg": 0.0,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "native-prototype",
+      "frameCentreLocalWidthMm": -38.9,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 20.0,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 8400597.212534774,
+        "flexibilityMatrixMPerN": [
+          [
+            1.4849685464307605e-07,
+            0.0,
+            1.7521508322728088e-08
+          ],
+          [
+            0.0,
+            7.951728854808111e-08,
+            0.0
+          ],
+          [
+            1.7521508322728088e-08,
+            0.0,
+            9.99715063412456e-08
+          ]
+        ],
+        "loadDirection": [
+          -0.386184412811875,
+          1.0,
+          -0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.466354931290222e-08,
+          "frame-bolts": 6.069854013286443e-08,
+          "integral-receiver-foot": 1.864004346690665e-08,
+          "welded-pad": 3.0734528347746325e-09,
+          "replication-normal-only": 9.21432985202987e-09,
+          "push-screw": 2.749240153385945e-09
+        },
+        "frameReactionWeightSquared": 5.000000004800016,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "compression-push-bedding"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "native-three-anchor-fixture",
+      "contactModel": "tributary-foot",
+      "anchorStationsMm": [
+        -125,
+        0,
+        125
+      ],
+      "additionalHardwareMassKg": 0.0,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "native-prototype",
+      "frameCentreLocalWidthMm": -38.9,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 20.0,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 8796868.724286119,
+        "flexibilityMatrixMPerN": [
+          [
+            1.1254137412004239e-07,
+            0.0,
+            1.7521508322728088e-08
+          ],
+          [
+            0.0,
+            7.951728854808111e-08,
+            0.0
+          ],
+          [
+            1.7521508322728088e-08,
+            0.0,
+            9.99715063412456e-08
+          ]
+        ],
+        "loadDirection": [
+          0.386184412811875,
+          1.0,
+          0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.8172084717143607e-08,
+          "frame-bolts": 6.379123187247487e-08,
+          "integral-receiver-foot": 1.864004346690665e-08,
+          "welded-pad": 3.0734528347746325e-09,
+          "replication-normal-only": 0.0,
+          "push-screw": 0.0
+        },
+        "frameReactionWeightSquared": 5.000000004800016,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "uplift-bolts"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "proposed-end-anchors",
+      "contactModel": "washer-annulus",
+      "anchorStationsMm": [
+        -230.00000010000022,
+        -125,
+        0,
+        125,
+        230.00000010000034
+      ],
+      "additionalHardwareMassKg": 0.02427119357352086,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "native-prototype",
+      "frameCentreLocalWidthMm": -38.9,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 20.0,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 20170761.36877442,
+        "flexibilityMatrixMPerN": [
+          [
+            4.074572038262034e-08,
+            0.0,
+            7.176809791765023e-11
+          ],
+          [
+            0.0,
+            4.03309613219382e-08,
+            0.0
+          ],
+          [
+            7.176809791765023e-11,
+            0.0,
+            2.5036287541831424e-08
+          ]
+        ],
+        "loadDirection": [
+          -0.386184412811875,
+          1.0,
+          -0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.466354931290222e-08,
+          "frame-bolts": 1.764524452353877e-08,
+          "integral-receiver-foot": 7.763988181817603e-10,
+          "welded-pad": 1.0636449965683447e-09,
+          "replication-normal-only": 2.678632846913861e-09,
+          "push-screw": 2.749240153385945e-09
+        },
+        "frameReactionWeightSquared": 1.4535147387279976,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "compression-push-bedding"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "proposed-end-anchors",
+      "contactModel": "tributary-foot",
+      "anchorStationsMm": [
+        -230.00000010000022,
+        -125,
+        0,
+        125,
+        230.00000010000034
+      ],
+      "additionalHardwareMassKg": 0.02427119357352086,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "native-prototype",
+      "frameCentreLocalWidthMm": -38.9,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 20.0,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 20594595.7764328,
+        "flexibilityMatrixMPerN": [
+          [
+            3.390453805152844e-08,
+            0.0,
+            7.176809791765023e-11
+          ],
+          [
+            0.0,
+            4.03309613219382e-08,
+            0.0
+          ],
+          [
+            7.176809791765023e-11,
+            0.0,
+            2.5036287541831424e-08
+          ]
+        ],
+        "loadDirection": [
+          0.386184412811875,
+          1.0,
+          0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.8172084717143607e-08,
+          "frame-bolts": 1.85442991278489e-08,
+          "integral-receiver-foot": 7.763988181817603e-10,
+          "welded-pad": 1.0636449965683447e-09,
+          "replication-normal-only": 0.0,
+          "push-screw": 0.0
+        },
+        "frameReactionWeightSquared": 1.4535147387279976,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "uplift-bolts"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "native-three-anchor-fixture",
+      "contactModel": "washer-annulus",
+      "anchorStationsMm": [
+        -125,
+        0,
+        125
+      ],
+      "additionalHardwareMassKg": 0.0,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "corrected-placement-proposal",
+      "frameCentreLocalWidthMm": -28.900000000000034,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 10.000000000000036,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 8558959.421819093,
+        "flexibilityMatrixMPerN": [
+          [
+            1.3808018796640937e-07,
+            0.0,
+            1.7521508322728088e-08
+          ],
+          [
+            0.0,
+            7.88982409284392e-08,
+            0.0
+          ],
+          [
+            1.7521508322728088e-08,
+            0.0,
+            9.973341110292179e-08
+          ]
+        ],
+        "loadDirection": [
+          -0.386184412811875,
+          1.0,
+          -0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.466354931290222e-08,
+          "frame-bolts": 6.069854013286443e-08,
+          "integral-receiver-foot": 1.864004346690665e-08,
+          "welded-pad": 8.709299850568475e-10,
+          "replication-normal-only": 9.21432985202987e-09,
+          "push-screw": 2.749240153385945e-09
+        },
+        "frameReactionWeightSquared": 5.000000004800016,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "compression-push-bedding"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "native-three-anchor-fixture",
+      "contactModel": "tributary-foot",
+      "anchorStationsMm": [
+        -125,
+        0,
+        125
+      ],
+      "additionalHardwareMassKg": 0.0,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "corrected-placement-proposal",
+      "frameCentreLocalWidthMm": -28.900000000000034,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 10.000000000000036,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 8970678.347688794,
+        "flexibilityMatrixMPerN": [
+          [
+            1.0212470744337571e-07,
+            0.0,
+            1.7521508322728088e-08
+          ],
+          [
+            0.0,
+            7.88982409284392e-08,
+            0.0
+          ],
+          [
+            1.7521508322728088e-08,
+            0.0,
+            9.973341110292179e-08
+          ]
+        ],
+        "loadDirection": [
+          0.386184412811875,
+          1.0,
+          0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.8172084717143607e-08,
+          "frame-bolts": 6.379123187247487e-08,
+          "integral-receiver-foot": 1.864004346690665e-08,
+          "welded-pad": 8.709299850568475e-10,
+          "replication-normal-only": 0.0,
+          "push-screw": 0.0
+        },
+        "frameReactionWeightSquared": 5.000000004800016,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "uplift-bolts"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "proposed-end-anchors",
+      "contactModel": "washer-annulus",
+      "anchorStationsMm": [
+        -230.00000010000022,
+        -125,
+        0,
+        125,
+        230.00000010000034
+      ],
+      "additionalHardwareMassKg": 0.02427119357352086,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "corrected-placement-proposal",
+      "frameCentreLocalWidthMm": -28.900000000000034,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 10.000000000000036,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 20485727.79334002,
+        "flexibilityMatrixMPerN": [
+          [
+            3.714077311738302e-08,
+            0.0,
+            7.176809791765023e-11
+          ],
+          [
+            0.0,
+            4.011672445588981e-08,
+            0.0
+          ],
+          [
+            7.176809791765023e-11,
+            0.0,
+            2.4953888747197432e-08
+          ]
+        ],
+        "loadDirection": [
+          -0.386184412811875,
+          1.0,
+          -0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.466354931290222e-08,
+          "frame-bolts": 1.764524452353877e-08,
+          "integral-receiver-foot": 7.763988181817603e-10,
+          "welded-pad": 3.0140703982366023e-10,
+          "replication-normal-only": 2.678632846913861e-09,
+          "push-screw": 2.749240153385945e-09
+        },
+        "frameReactionWeightSquared": 1.4535147387279976,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "compression-push-bedding"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    },
+    {
+      "variant": "proposed-end-anchors",
+      "contactModel": "tributary-foot",
+      "anchorStationsMm": [
+        -230.00000010000022,
+        -125,
+        0,
+        125,
+        230.00000010000034
+      ],
+      "additionalHardwareMassKg": 0.02427119357352086,
+      "netAreaMm2": 710.7527656817167,
+      "frameDatum": "corrected-placement-proposal",
+      "frameCentreLocalWidthMm": -28.900000000000034,
+      "sectionCentroidXZMm": [
+        -8.0711321846721,
+        15.448842832773547
+      ],
+      "sectionInertiaCoordinateMm4": [
+        [
+          64627.564152625855,
+          -30997.790087336794
+        ],
+        [
+          -30997.790087336794,
+          99733.15176273964
+        ]
+      ],
+      "geometry": {
+        "rackBoltGripMm": 13.600000000000001,
+        "anchorBoltGripMm": 15.584505690810467,
+        "padOverhangLeverMm": 10.000000000000036,
+        "sourceBoltStationsMm": [
+          187.5,
+          62.5,
+          -62.5,
+          -187.5
+        ],
+        "footThicknessMm": 9.584505690810467,
+        "compoundThicknessMm": 4
+      },
+      "worst": {
+        "stationMm": 250.00000010000034,
+        "equivalentTangentialStiffnessNPerM": 20923045.378825083,
+        "flexibilityMatrixMPerN": [
+          [
+            3.029959078629111e-08,
+            0.0,
+            7.176809791765023e-11
+          ],
+          [
+            0.0,
+            4.011672445588981e-08,
+            0.0
+          ],
+          [
+            7.176809791765023e-11,
+            0.0,
+            2.4953888747197432e-08
+          ]
+        ],
+        "loadDirection": [
+          0.386184412811875,
+          1.0,
+          0.3546701698188172
+        ],
+        "projectedTermMPerN": {
+          "rack-bolts": 2.8172084717143607e-08,
+          "frame-bolts": 1.85442991278489e-08,
+          "integral-receiver-foot": 7.763988181817603e-10,
+          "welded-pad": 3.0140703982366023e-10,
+          "replication-normal-only": 0.0,
+          "push-screw": 0.0
+        },
+        "frameReactionWeightSquared": 1.4535147387279976,
+        "rackReactionWeightSquared": 2.500000003200011,
+        "normalPath": "uplift-bolts"
+      },
+      "stationCount": 101,
+      "assumptions": [
+        "E steel 210 GPa, Poisson 0.3; replication E 4 GPa; properties unmeasured",
+        "Linear bolt root-area stiffness; contact, fit, preload loss and thread-bearing compliance unresolved",
+        "Union of maximum drilled slices used as a weak prismatic section surrogate",
+        "Simply supported interior spans; rotationally fixed end-overhang assumption, not qualified restraint",
+        "Replicated footprint assumption is sensitivity only; no bonded-shear/friction credit",
+        "No weld flexibility, rotational boundary qualification or rack-section joint model; not final seat stiffness"
+      ],
+      "scope": "Local geometry-derived sensitivity. Do not use as a complete corrected-model release input."
+    }
+  ],
+  "limits": [
+    "No per-metre/full-bed mass extrapolation: fixture lengths differ",
+    "No corrected static/modal/dynamic or fatigue acceptance",
+    "Added end anchors are a study proposal, not a native-checked CAD change"
+  ]
+}

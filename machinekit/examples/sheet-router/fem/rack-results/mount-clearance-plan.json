@@ -1,0 +1,803 @@
+{
+  "status": "Y candidate placement/envelope screen only; native checks outstanding",
+  "sourceMembersSha256": {
+    "rack-joint/inputs/packets/y2600/manifest.json": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec",
+    "rack-joint/inputs/packets/y3150/manifest.json": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de"
+  },
+  "fixtureArchiveSha256": "ae23d7954fbf1b2f5b89e83ef9b4cbb1f544a5d756d9981acba0f8430cf4e7f7",
+  "beds": [
+    {
+      "bedMm": 2600,
+      "poses": 18,
+      "pairChecks": 28224,
+      "placements": [
+        {
+          "side": "Left",
+          "pinionPoseOriginMm": [
+            -495.25,
+            1300,
+            857.9999999999999
+          ],
+          "pinionAxialCentreMm": [
+            -485.25,
+            1300.0,
+            857.9999999999999
+          ],
+          "declaredPinionWidthMm": 20.0,
+          "receiverOriginMm": [
+            -454.15,
+            0.0,
+            832.5845057908103
+          ],
+          "receiverBasis": [
+            [
+              0.0,
+              0.0,
+              -1.0
+            ],
+            [
+              0.0,
+              1.0,
+              -0.0
+            ],
+            [
+              1.0,
+              0.0,
+              -0.0
+            ]
+          ],
+          "requiredRailLocalWidthCoordinateMm": -28.899999999999977,
+          "prototypeRailLocalWidthCoordinateMm": -38.9,
+          "prototypeRailLateralErrorMm": 10.0
+        },
+        {
+          "side": "Right",
+          "pinionPoseOriginMm": [
+            2095.25,
+            1300,
+            857.9999999999999
+          ],
+          "pinionAxialCentreMm": [
+            2085.25,
+            1300.0,
+            857.9999999999999
+          ],
+          "declaredPinionWidthMm": 20.0,
+          "receiverOriginMm": [
+            2054.15,
+            0.0,
+            832.5845057908103
+          ],
+          "receiverBasis": [
+            [
+              0.0,
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              -1.0,
+              -0.0
+            ],
+            [
+              1.0,
+              0.0,
+              -0.0
+            ]
+          ],
+          "requiredRailLocalWidthCoordinateMm": -28.90000000000009,
+          "prototypeRailLocalWidthCoordinateMm": -38.9,
+          "prototypeRailLateralErrorMm": -10.0
+        }
+      ],
+      "nativeChecksRequired": [
+        {
+          "side": "Left",
+          "candidate": "foot",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            23.79999999999984,
+            40.0,
+            9.584505690810488
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "foot",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            3.7999999999999545,
+            100.0,
+            9.584505690810488
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            39.999999999999886,
+            40.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            15.0,
+            100.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLefthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLeftnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLeftpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            39.999999999999886,
+            40.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            15.0,
+            100.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLefthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLeftnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLeftpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "foot",
+          "existingMember": "pinionYRightPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            3.800000000000182,
+            100.0,
+            3.5845057908104536
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRighthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRightnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRightpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRighthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRightnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRightpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        }
+      ],
+      "envelopePass": false,
+      "scope": "Conservative boxes and translation membership; not a native collision or full-clearance pass"
+    },
+    {
+      "bedMm": 3150,
+      "poses": 18,
+      "pairChecks": 28224,
+      "placements": [
+        {
+          "side": "Left",
+          "pinionPoseOriginMm": [
+            -495.25,
+            1575,
+            857.9999999999999
+          ],
+          "pinionAxialCentreMm": [
+            -485.25,
+            1575.0,
+            857.9999999999999
+          ],
+          "declaredPinionWidthMm": 20.0,
+          "receiverOriginMm": [
+            -454.15,
+            9.094947017729282e-13,
+            832.5845057908103
+          ],
+          "receiverBasis": [
+            [
+              0.0,
+              0.0,
+              -0.9999999999999998
+            ],
+            [
+              0.0,
+              0.9999999999999998,
+              -0.0
+            ],
+            [
+              1.0,
+              0.0,
+              -2.220446049250313e-16
+            ]
+          ],
+          "requiredRailLocalWidthCoordinateMm": -28.89999999999997,
+          "prototypeRailLocalWidthCoordinateMm": -38.9,
+          "prototypeRailLateralErrorMm": 10.0
+        },
+        {
+          "side": "Right",
+          "pinionPoseOriginMm": [
+            2095.25,
+            1575,
+            857.9999999999999
+          ],
+          "pinionAxialCentreMm": [
+            2085.25,
+            1575.0,
+            857.9999999999999
+          ],
+          "declaredPinionWidthMm": 20.0,
+          "receiverOriginMm": [
+            2054.15,
+            9.094947017729282e-13,
+            832.5845057908103
+          ],
+          "receiverBasis": [
+            [
+              0.0,
+              0.0,
+              0.9999999999999998
+            ],
+            [
+              0.0,
+              -0.9999999999999998,
+              -0.0
+            ],
+            [
+              1.0,
+              0.0,
+              -2.220446049250313e-16
+            ]
+          ],
+          "requiredRailLocalWidthCoordinateMm": -28.900000000000084,
+          "prototypeRailLocalWidthCoordinateMm": -38.9,
+          "prototypeRailLateralErrorMm": -10.0
+        }
+      ],
+      "nativeChecksRequired": [
+        {
+          "side": "Left",
+          "candidate": "foot",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            23.79999999999984,
+            40.0,
+            9.584505690810488
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "foot",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            3.7999999999999545,
+            100.0,
+            9.584505690810488
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            39.999999999999886,
+            40.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            15.0,
+            100.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLefthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLeftnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "pad",
+          "existingMember": "switchYLeftpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "chainYFixedBracket",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            39.999999999999886,
+            40.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "pinionYLeftPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            15.0,
+            100.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLefthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLeftnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Left",
+          "candidate": "replication",
+          "existingMember": "switchYLeftpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.000000000000057,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "foot",
+          "existingMember": "pinionYRightPreload",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            3.800000000000182,
+            100.0,
+            3.5845057908104536
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRighthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRightnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "pad",
+          "existingMember": "switchYRightpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            8.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRighthomeMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRightnegativeLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        },
+        {
+          "side": "Right",
+          "candidate": "replication",
+          "existingMember": "switchYRightpositiveLimitMount",
+          "overlapPoses": 18,
+          "firstPoseMm": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "maxOverlapBoxMm": [
+            6.0,
+            12.0,
+            4.0
+          ]
+        }
+      ],
+      "envelopePass": false,
+      "scope": "Conservative boxes and translation membership; not a native collision or full-clearance pass"
+    }
+  ],
+  "limitations": [
+    "Axial pinion centre derived from its actual pose and explicit shaft width; no supportedSide heuristic",
+    "Prototype lateral reference discrepancy must be fixed before full-machine CAD qualification",
+    "Overlapping boxes request native checks and do not prove material interference",
+    "X mounting host, rack section joints, nut/end-cassette withdrawal and all articulated chains remain open",
+    "No structural solve or frozen CAD edit"
+  ]
+}

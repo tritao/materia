@@ -1,0 +1,4858 @@
+{
+  "schema": 1,
+  "status": "Executed-history inputs validated; corrected-model replay pending",
+  "producerRoot": "/home/joao/dev/materia-worktrees/jerk-timing/build/om-r1",
+  "readerSource": "/home/joao/dev/materia-worktrees/jerk-timing/machinekit/examples/sheet-router/fem",
+  "readerSha256": "a4cd3fc479418a6f56deb450a3098b7c5d2b71272602b2d5eab165cb058b4dc0",
+  "indexSha256": {
+    "j6-executed-pose-grid": "0fceaaaa6b03484569b886eac8d9020cdd1c15fc298db03180a23f2980db3a88",
+    "j6-executed-phase-grid": "04ab3aa29a52b28b6b37d9fdad1a462ad4df67b8d4c1d81754f136e674a1f02f",
+    "j6-full-feed-resume": "b11e706d118a1496fe6e506b18ef2e82e1e514005a0d14718a91e8ab982d2c11"
+  },
+  "histories": [
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p0/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "246d7e128dc36802b965a28c9facd6e7cf1613a52243b597ad88a865de4428ad",
+        "2600-arc-hold-resume.json": "1b68bc48937b2df13e9716987933fe301994e7d50b2d8edfd0b1fd6ed661a930",
+        "2600-arc-hold-resume.manifest.json": "aea426673d9c76dfe6df13408f32c4642d89b55b301a6dcf6ca3bb27abaf2d0a"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p0/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "a4dcf110a2edafd351a35690adc6c8d0fc156ceb7c0f3cbd1507f1ae0999428c",
+        "2600-arc-hold-stop.json": "c4b2c1d3edfd09cf7c5b2406ab6bd49aa78c20243c4f90ae367024a9dd3e6b4e",
+        "2600-arc-hold-stop.manifest.json": "d875e30fbb3438896697c75697bc510087e6de8af38169808783491ed8661fc9"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p0/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "c370ff3b7581638355562eabda522f303e943a42c5028e38885fbe6d44978903",
+        "2600-arc-override-hold-resume.json": "5b08fd4f67f82e05e6dea1a7b06b992c0a241b0f4865f9de491b232c45a67b54",
+        "2600-arc-override-hold-resume.manifest.json": "666d8be8e841ed7898dbb1da92309bc65e797699e4fc09ce5d1549fb7fde1fe2"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p0/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "df56b85c219a3561c2c81d952570aae05ecfbf4bf4e4ce3abdf01e7488824e11",
+        "2600-arc-override-hold-stop.json": "6eaa9269346f5ef1df493abf53a43cbe018b439de0f7d94e5d8af18ec5760710",
+        "2600-arc-override-hold-stop.manifest.json": "818ef45ba004c591e50cb39be03a4d1b7216636d08c1037f3d2e55c9d09964e5"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p0/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "91ca9fed2c143b60bf1738466c32a3f59510069c9f5caf36a06ea6d90509b956",
+        "2600-nominal.json": "1abd65899435bbc13b4e28549fd62f38a6dfe8bff49ff98be8626198dd5d8668",
+        "2600-nominal.manifest.json": "0637b91c057be3083b60d234ed7ed007bb48759151f0134a7c5c420036fbca97"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p1/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "2d6e286378bad3119a4e1feb2f5b82ac2e7c7e9d1dc17003b115f40fbc54f590",
+        "2600-arc-hold-resume.json": "cb33e68feef75245f0429720ef0089cdf77100d285ef6ad3c3119074a451e24b",
+        "2600-arc-hold-resume.manifest.json": "d3c45ed4fa30829f8dcfb53f34c64be4ea398670d8998cb19845fc3cf32230bc"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p1/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "bbf89e4a95494ab4105d770cf415db9f266aebb1fd1087f4c4f87f0b607a1839",
+        "2600-arc-hold-stop.json": "7471f2cb15715d47a44e6e861ee51eb98cc09b909560d82a49e2a580a83c2246",
+        "2600-arc-hold-stop.manifest.json": "46e7cd41e33d617d33030e28e659b2f8542fea42a9b0423bb6352ce3ed97a073"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p1/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "8c164a37ae591af54f4270352dd2905e6a78de2139eba307d4eed90468bc7d61",
+        "2600-arc-override-hold-resume.json": "22e4ff46f6b6d6375ed3d4edb48af4088d1a92bfeaba7d566a613328f46b166a",
+        "2600-arc-override-hold-resume.manifest.json": "7ea583b655a0239ccf679020e54efdda19473fcbcab390718100cb906afc7a4c"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p1/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "bb532241726180700e2b266da6710ec6081f54affffb44c5dadba83351325bf7",
+        "2600-arc-override-hold-stop.json": "957b38cbb0f3eba90a0d04eb330f9212ff1d64ff5f05287e4a8d5d6006b0c807",
+        "2600-arc-override-hold-stop.manifest.json": "f016ed63e42b651d4b5c59195f545cd6f886a6dc3070119593740155008a50c4"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p1/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "7da22059333dee9ab3eeb8f2e77e9aba063352bda42aedb7a678b011fd154c7d",
+        "2600-nominal.json": "95b75dfc9101b89543b426f615fff51fe6372e674839ff09d805d6c2e71042eb",
+        "2600-nominal.manifest.json": "004cc11319f585732e8a96c613426a7174c02b496929ed778d0926de40f63c68"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p2/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "44dcca406e0e80e7640097b6b685933a9196b50d103f6b6fb875b0ab85c0e832",
+        "2600-arc-hold-resume.json": "03d7375c29a6fab00a2281b9bfefe7ded6a6978a69beacdabcef46b263a73dba",
+        "2600-arc-hold-resume.manifest.json": "72f5371e51a0b5932aaa7d6f6ad4d162be177feda2e491f6f01f4f3bd6ca680a"
+      },
+      "samples": 58194,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p2/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "f859b6e10cbc43052e0cfe00f7b4ec85c8a4189ccae554924536ead6859edc8e",
+        "2600-arc-hold-stop.json": "0e526f9e232ccf1b25534f4e09a17f5c2f097bb7435406c8f5e3587937b4d159",
+        "2600-arc-hold-stop.manifest.json": "d1627a108a8e4479883d8ff51e58bb569c9043c951d611dd610722385f31d583"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p2/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "7fc820eb3e024d309e6f2b7af7acedd29264093be11625a85f19c34fb412a3ca",
+        "2600-arc-override-hold-resume.json": "9deab1e0e102921c38cb9804240ddd832114663ba14c84ca9e3664d5d5b7976d",
+        "2600-arc-override-hold-resume.manifest.json": "a4c3289e3a98e40cee9a3b141d601a005c7af37f4da0c021aefd30adf9473384"
+      },
+      "samples": 58222,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p2/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "656bd42e566b849a16fc0e2a923ba0982c6e49219dbb58272d51fdd72adcdd9f",
+        "2600-arc-override-hold-stop.json": "200fd7d383a49b71ff0e2ec4293e1f4062369b0b3b5cb057efd01a1468f443fe",
+        "2600-arc-override-hold-stop.manifest.json": "4268220c2b8f0fb7895cb12e7d085bc4df99d0189637b2cf7859990127b700d3"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p2/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "5e0205250e3042970353d080784fb12e6da8c5aaa33f4b7589867267a966d569",
+        "2600-nominal.json": "d2019fd4c2764acee6ff500ecfb2ef6a6c2721444ed34b4da9888d5393b2dacb",
+        "2600-nominal.manifest.json": "a4a7515f0c65a3c217398ef34d14142c2ad5c6cc86fccbff55c5dfba8f832345"
+      },
+      "samples": 46422,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "1882c5ae7cca81dc01b9315a8c05cfa8908bdc247b4f6039bbaf5bd71972ec1e",
+        "2600-arc-hold-resume.json": "fd37a15c8e25a502e792fc89745e044b74908e2cd31a8188c7e41aada89a1419",
+        "2600-arc-hold-resume.manifest.json": "2e7d1bac1f7979e73401d053048bd1812022924a9de890e43a9cde71f38ab37b"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "07887416d349096d5bf864daf74b7ed1e44ffd2ca49abcb5f887569500636412",
+        "2600-arc-hold-stop.json": "b19534e82988e6985d99097af253649fa875bbd2d52b90ec111760b64af7a482",
+        "2600-arc-hold-stop.manifest.json": "77ec5ac1f29a93846cdebdea02ea161ccb5cfe2827553ffc1debcef5a5a95b1b"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "b6134e1af384b296d10c0a028785c0e1d8bec10bf8b74f86c95a1af6120deb59",
+        "2600-arc-override-hold-resume.json": "bc18e9d0eec804673ee3fd354a15ee44129a1d5a8861f2321f806a0ba76ffa10",
+        "2600-arc-override-hold-resume.manifest.json": "7015bc6f7834f515b6a8bcb0c95da9d6403507057d5d4b5ea20e87a659b2ebe0"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "f02bf1ce2c104fc87360008576dd9597de1e475cab9fe15ff14d00d43e78c36a",
+        "2600-arc-override-hold-stop.json": "95ad22b1b64ef7b0d273f17393b5756c62a1e5dd188ee849194e50cbfc1d1e98",
+        "2600-arc-override-hold-stop.manifest.json": "ff33fb93ffd45a3747da86762c9405fd1f443ae556fc20f278ea72d91800e40d"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p3/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "d64dcce2d150e652ea9d3c9723bbdaf42a8984e2707189dcd77a588030268bd8",
+        "2600-nominal.json": "0510a0b6f9e323109cc4cd69f71969877f08db636892745bb09ccf5e1b7fc980",
+        "2600-nominal.manifest.json": "1fb2c7237d3b4223360231e308316a7344129016bd3e9f1f870b6e9674aa7d30"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "a7152a8a4906a18bb2e4f7b34bf52b0b2f0db2e3aa0f070c63b2e223769e129c",
+        "2600-arc-hold-resume.json": "77fc72667a8891ea7938b146458f9b4fe1aaf6f40e254d3067e9f83a81d28013",
+        "2600-arc-hold-resume.manifest.json": "c9f4fbfa308eaac4121c7490dd57130e0546bef0af6b30bf4780e4e40ca8cd35"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "5b56f1cdd4e8780f5e681831a85cc89f2f8e5cdebd55dba0870c0967d67c9bfb",
+        "2600-arc-hold-stop.json": "2f8b40411f27417f92a8acbcd4d2d72bbc1bc88eda0ea721f1fa1282cd796fba",
+        "2600-arc-hold-stop.manifest.json": "8f21204e7c731455fc02cfc1d90aa815521e4de9ae0debc703cf7f648a2517a8"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "09d4a1ea82adeb045ecae959e84629444da229040464af2453c27b1ee2a043d3",
+        "2600-arc-override-hold-resume.json": "345033165477e8320184123416329fa8200772ea603b2ec31a47fa29a8d94e27",
+        "2600-arc-override-hold-resume.manifest.json": "d48a280287cc0d48b234ccb2b68187849c2dda41474357277a3274b86072b516"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "af78334c37a55100affbf15cff4eb6cf8b5b3f8414e6cb3aff6154a9ca6d3d13",
+        "2600-arc-override-hold-stop.json": "dda24d96c0e97649d56c7ba9b9493d7f7908a2af316d1b197336f140563ed96f",
+        "2600-arc-override-hold-stop.manifest.json": "9d26be19ef6ddc398a1b988a99671a1e21d8a30e043d81e0d936c7d8cae133d7"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p4/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "fbf2251bd1feab0ecb8f16d35e18e8a07e0b4e47e2100e09ba8854b855e964c6",
+        "2600-nominal.json": "a4a8fff4a784374cfbde0e11cac322910b0aa3c7c62f7d3280b897e051a273a9",
+        "2600-nominal.manifest.json": "c5b15eede64771db8e9cef6d54545bc23878621cbd5d2fa691e7c71a4ed3c5be"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p5/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "c7d8ef39f98a19044c303f4417bfddcd58ceac7ae3b1c9c31b7fce6135faff99",
+        "2600-arc-hold-resume.json": "d097086b677c44310cacbab4d3202858c29d81f843eb8bae8a919c2ab59a7a9f",
+        "2600-arc-hold-resume.manifest.json": "baca7c10082b31ed13023787a83fb0b041ab9e9663ebad359f8c7844ce19f915"
+      },
+      "samples": 58194,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p5/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "a1558ce95c0b12bb527108ba2e3f074417ae6e19dba001fa80fc4a1e59f85294",
+        "2600-arc-hold-stop.json": "f3dcbaa664a6482e777dfd2c2f7c9dbeb98dd22412d938a66b06ce2ceff9b7ed",
+        "2600-arc-hold-stop.manifest.json": "c44fe84d1380027da7b241a688e07e240620264b0cff827d87ca59531611f883"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p5/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "e36a3fc3ade615773794bb127eb94ca07f8655f555b7e0aa7743e5712eeda6ed",
+        "2600-arc-override-hold-resume.json": "1b4bdc4b13b00768bc203008c77bef6899d829ac2d0633167753c7e1a108a73f",
+        "2600-arc-override-hold-resume.manifest.json": "f982743bec302d2f23c7ce2d808c02550a889145d53b4aba1fab608cca82c06c"
+      },
+      "samples": 58222,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p5/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "54929cdded336357444ff1d1d9aeea65f9d77fd5df88816a3ba769b320b64322",
+        "2600-arc-override-hold-stop.json": "c085737421f780c93820328589cffcfb75afe98165c7dc80954bae81ebca9f52",
+        "2600-arc-override-hold-stop.manifest.json": "8c1e7d6c073c941b39d3a60c2944c1610e2e49179deeafc286350456cfa5ce2f"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p5/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "daef85fbad9ba75f766301f35ac20a35528887649922a88c18e13f91e7f6166d",
+        "2600-nominal.json": "cb9548025c2a21cdc1751c226979b99ddbbeb5019fddede68b0b18246d4d694b",
+        "2600-nominal.manifest.json": "780d97a8a1f8df5cc4a957486704351dd3e88dd2891c6f6df78fe08a64564ebb"
+      },
+      "samples": 46422,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p6/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "973e73fae5218e5334c8f0787625ccf94852ae767c6579b6581e4b1400ec1cb5",
+        "2600-arc-hold-resume.json": "2e34a2e63a0d4fd1e22597650515a9f39dd248946b729e8f4b2b0239d7b2ce33",
+        "2600-arc-hold-resume.manifest.json": "2b6fd1746451d6579c186cee075dcfd5bdec0c8d0278c351d5898951b8ea73c7"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p6/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "a9b6e1bbded8398cc2fd60364de1c532cf0fb54726289d6a4b2c5d9e7e348d79",
+        "2600-arc-hold-stop.json": "f1d99addfacb8ea9d4107a608e7ab4647f13b754ca740e1e18d0ad0282e9cb0c",
+        "2600-arc-hold-stop.manifest.json": "b2b52608760fae9e227d876f300552977b7b94780f28496e9ced0857d34f5e01"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p6/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "53eac1540be540f7afa7a2ab99610c9803dc77c8420dce16a6bb65c5bd333181",
+        "2600-arc-override-hold-resume.json": "07eba1c3739776d2bb00053fc06e6ec83b093b57fc89c364ff325b8b48c148d2",
+        "2600-arc-override-hold-resume.manifest.json": "2906bb328fce421652e7ec3997977528c126d3576bbb33514b71e518cbe0040f"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p6/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "09ce31f87b2a65e8efb94f8c595705d27cd320f293ae3bdbaace278e984b46d1",
+        "2600-arc-override-hold-stop.json": "0fc70342d1ce6168746209385ffb311b486e934f653998d0b98a8caabc82d2a8",
+        "2600-arc-override-hold-stop.manifest.json": "0fba865ebb405da6bb98488b8d8a1bfa2e30bf17d58e70cddf96ced8a6e2a787"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p6/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "fec935b25cc0ee18374ae5a5713931adc3cf31c0a7ccac6a7db449bc8887ec2e",
+        "2600-nominal.json": "f5dfcc39c72c62662dc0e491415e4bec0d3aa251a139641ced8cf26e92756e06",
+        "2600-nominal.manifest.json": "11d7c1ee564c053a545760dd40593f7c44b7f345822e6a336bd7b7afdac9f46b"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p7/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "6cb86f6c4addf054d3b85c911e07c4e653bf10d158478cce1c98c7f21ed36d82",
+        "2600-arc-hold-resume.json": "625ec5d1b548787fb2962b6ba49456edb2b191b142eb552a836e56918539ab8b",
+        "2600-arc-hold-resume.manifest.json": "ba740e3e1e9d90d089b49f2d52638c217fc5e13acdbe0f350bda2eac6764aba8"
+      },
+      "samples": 58230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p7/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "7c99a55e2c459935c7b0b7e1d8e675be49a095c317b51894c571d161da9e9a2e",
+        "2600-arc-hold-stop.json": "b2776fa32c190e19cce754bb79d0be1ef7991acb764e18e900c845cc9539dc16",
+        "2600-arc-hold-stop.manifest.json": "52aee74f4d0ed44615258e91e2e8903e4ce8e052727ba4ec6b64596cf4124342"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p7/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "0de0e89e28b92f5e12b2b78794c6b0e5aaabad86fbf9dd3235cb1f133cbb8b31",
+        "2600-arc-override-hold-resume.json": "3d249111882804e7f87d766edf63033f7890d7f680f9154791b5a87af323f0ab",
+        "2600-arc-override-hold-resume.manifest.json": "6986bcd11210ae1448638e2fb0320492095eeb3cd58e265bd2163e191ad5b3af"
+      },
+      "samples": 58258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p7/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "f270d4ce2ca4173257f09986e381b4709ea411216ebc36c980e83fd55ee33c0a",
+        "2600-arc-override-hold-stop.json": "d654762ddd49d93a286b01db7b7bdf632b5ca35e63b596d44e15f2574ef21c66",
+        "2600-arc-override-hold-stop.manifest.json": "7ac50688408d6d66df9a4caa4348ce39feaa341d081c8655ccf32ebeaaa14644"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p7/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "4571a913435aafbb60e400c8ec1d096e4d521936d19096d83d7add84550d608d",
+        "2600-nominal.json": "3ee141b22d7c03bf3ecc1edd89160783bdae7c94b99d0b247b8f65ff75561817",
+        "2600-nominal.manifest.json": "be199c869c13d31f0d9c588e779466253d22eacb5d6300863f2d2889e68dcaa1"
+      },
+      "samples": 46450,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p8/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "173935d492489814c690862b8e9c235adbd8c4946156e8cd2aa79540b6cb2387",
+        "2600-arc-hold-resume.json": "c70970a95b7ae5935c35896d0449c8de87e35b918cb08d9d6f2d658a99a1482b",
+        "2600-arc-hold-resume.manifest.json": "444d8d9ee4b4d1c43af8d48698e114feff159398933afa7abad1f29a8e784a46"
+      },
+      "samples": 58194,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p8/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "46aab699f048d4defb6385e6691a6a6162b601ea7352cf3ea6adfd35e157b956",
+        "2600-arc-hold-stop.json": "6f587fbf2c4d6dca667ffdc8031bcb01fb985bee535a101532390be0571ac03d",
+        "2600-arc-hold-stop.manifest.json": "8444f8f563570d0dcd397e0348d52ead81a32f1a11d097e9cab8b4780734ba72"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p8/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "2afdbdd5d11ee2473fdee03418828eda182f4b9589fbc2c7d6b3bfcfada57444",
+        "2600-arc-override-hold-resume.json": "b45d6ba9518a828e8d5b14c297aab0367f093be1f97f248c75e1d37fe40e006d",
+        "2600-arc-override-hold-resume.manifest.json": "b62b710bca786ca1d3026c24659536e9b50ce92526224694562d7a6f8960fc69"
+      },
+      "samples": 58222,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p8/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "8ec9404c8d21bb81a44891583dfedc31be350edb0aa4f00238eeb47f7a5169f9",
+        "2600-arc-override-hold-stop.json": "786ae00f3610f2b214448abb3be6cd62529c915d603775dfe9584d078bab1559",
+        "2600-arc-override-hold-stop.manifest.json": "8f21736efbedada44f0614356ae08abf69d503f9db8c097c92fe90c4c290c670"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y2600/p8/exports/2600-nominal",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 2600.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-nominal.csv": "f6ec93bf268201debc2efea08fee59cc1190d21f55c35e38493716df8f0d40fe",
+        "2600-nominal.json": "35ecf76a0b58abd96003f9544c94b16f05e743a4ad5ff31f8ac26e3200920cb8",
+        "2600-nominal.manifest.json": "302154b7fdfbc9ba8ce0ae4124a9fd9a8cf233131b96139944e162620b143dc7"
+      },
+      "samples": 46422,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p0/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "96840b9b192f71e5a0bf1c885d23281308871cfa467432499b3ce1560b53948d",
+        "3150-arc-hold-resume.json": "e9575314ecee88059a7174cb8452ada1956ef29eca58be74557b3942beed8e54",
+        "3150-arc-hold-resume.manifest.json": "e068b77864d615bc794a3dbdc434ca21c4759ab7cb335121bc03e41441ecc336"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p0/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "d98cb0246f4d35c0a37f73b141cefb8ffeae480ce2fd263674cceb7093d7de68",
+        "3150-arc-hold-stop.json": "aec9bb97ef1f29da3ea1c08a9de90a3ca99a50dc562c72587504dbbcdcc7e288",
+        "3150-arc-hold-stop.manifest.json": "0dd6139a4829811d3f7e2b312c4cf47d81a925406702c20b7a2a1973c229c68c"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p0/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "1770f9457a28dc06fc5610f54038c641ee581a72c86563b56f70a8d959677220",
+        "3150-arc-override-hold-resume.json": "aacd71c3ba3bd383ee5dc1da199e4a25f7d70e569accafe644784ffd6088e11c",
+        "3150-arc-override-hold-resume.manifest.json": "aec8628f6bd46d38911257cc89dcae049c28b72107f008d8f4238cf8b366fef8"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p0/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "a62ec3e91454c2cadcc248e7d8c63de6c51c9c30d4cb54d1afccdaa6fe989430",
+        "3150-arc-override-hold-stop.json": "945ebdd7322e418590f7ec535dceda4bcf40f9b3559ee0e2309a654003e87fef",
+        "3150-arc-override-hold-stop.manifest.json": "de80471b03d8410c896df248b51159bdf78042cc9cc16154695f535b5d9e382f"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p0/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "2f1432ff6c55bc39f922a21df9ac279ee033c373e0eb1e4ad6898bfd6dccadbb",
+        "3150-nominal.json": "2b4ed3974c5ff7fa02cf2c4fd0d50912e90b54618d9687921e9606bfdb7d5b9f",
+        "3150-nominal.manifest.json": "d1c43bb1134f9791152843263139d3dc2c3b379bf79bac3aebcd011d2f186041"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p1/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "d54e71b58a5c24dbd4768c9670d165a5cf11c70b51b14c2d7fb8b9c232d586b9",
+        "3150-arc-hold-resume.json": "38b4602ed2bfd72e20a26dcf09986c3f40dc993b455f61eb74eec7ad5cbcb766",
+        "3150-arc-hold-resume.manifest.json": "2a4cac66f003e8067886f3eb1701d395a98c7a7afe642e9b241b443e32732f18"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p1/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "e280465402d4fb22f6051ef6983914d0114a476ffaef08323635c01e834966b8",
+        "3150-arc-hold-stop.json": "1bf7b6756853a3863e840da0b927f4d42283907b2389ad10626025a3175ea9a5",
+        "3150-arc-hold-stop.manifest.json": "516b711afd4dd9cc5912a98884fff03647f3819ca81b2ec57a29d0c62d55dea2"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p1/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "8a03dc068e47769ca016ddf372a638d6cfe0b1d3085679327bf81457e22786f3",
+        "3150-arc-override-hold-resume.json": "31b0246752841addb6f8d8b716d26e672fa0611a8bec71c0b9b1fe078c00b25f",
+        "3150-arc-override-hold-resume.manifest.json": "ace827ecf2e88d7d935349ae7106ae327eb5428a30e33bbc7dc85d5c0156aeeb"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p1/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "8c148af7220717fbd42a7e286ddfb25268d2e9ef508d96638a1a4f195a13d665",
+        "3150-arc-override-hold-stop.json": "0f9b98d58cd452f3f976c9945334ebfaebb24434d10e5300c7ad8513177bca1e",
+        "3150-arc-override-hold-stop.manifest.json": "96185bd72f25080e1df1d5e17d2a6bd61f24812fd7fcfe18c303b01e7d7ff795"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p1/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "4297525c23d61f1af64756f0a8f8fa75fa29fa98ff49d7e339490e7099bee0c5",
+        "3150-nominal.json": "200bc7a405802870a0014948cd106ba9a5e5be7114b04c60399bf0124df6fcbf",
+        "3150-nominal.manifest.json": "571d201fe528a66eb89c10170b03ad433b650a6ba5637a3f290f371ed51287b5"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p2/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "f8ca9ce38dd7c5d07c60eeae594cb7a58a17a7213068715268c87e9b7249951b",
+        "3150-arc-hold-resume.json": "f3cab1be32e100acf3127b65eddd5bd6c28f911f6659add7dc38a1d1cfe04dd3",
+        "3150-arc-hold-resume.manifest.json": "94cdffab23a78059a216d1c18fa054f1257eecda6d5d5490b16c692e84044fce"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p2/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "32574889351a5afa4f9da10448dfd1ca592958b68bc2b4ae204e104d9d62d5de",
+        "3150-arc-hold-stop.json": "6347f4c2dbe262c7690b8c2a8b5beedcb154d4e00aaa6758d0eeba869da0a5ce",
+        "3150-arc-hold-stop.manifest.json": "c17ad525afb3e5fe89cdd48a159ec244e41ea0747fe2b82ee736fe6573239ee7"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p2/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "0b27f019055be6a365d5f62ba2df831bd9d13c270997346bdb624c5586f950e2",
+        "3150-arc-override-hold-resume.json": "b07d4a3410571357eb8a140748df2dc2886e8fef435549e9505072ddf73bf240",
+        "3150-arc-override-hold-resume.manifest.json": "d8b7370c78767f6adb771a943d9bfc628f8037c0ac1f90ed95817fba4048a422"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p2/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "2454ccd39117eb7aaab668c9279b0012043f713e7ab12c552282bd90a2e9baa2",
+        "3150-arc-override-hold-stop.json": "a0700ac47227a4bf52ca45915593920334391aa3b8c948ebe0a4421240b10709",
+        "3150-arc-override-hold-stop.manifest.json": "ca512b39e0d5fd42118d1a2bd7017179ae7eda46ffefe48fcadd5d8df1d8f5bf"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p2/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "3e6d07b0ca2d14cdef672f25a8fc11e2c578cc9def3407243802c9abb6b7d041",
+        "3150-nominal.json": "31273e4c57426cd16ca766e3a084f132441f51cf00614f6a83a255c751da7f0c",
+        "3150-nominal.manifest.json": "ff008b70f4c67725be820f5e06a326cc5bacd4e1a7e740340fffe850ec8a630e"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p3/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "9226761a76e4a75f60f5c7c96c698a325b61e77b672b18e2b49b0afbc3def8ee",
+        "3150-arc-hold-resume.json": "db193acd40610469e213af4f410e16283f7c3d768b69ab6a19af59a13d7436c6",
+        "3150-arc-hold-resume.manifest.json": "412e53a524124e0222a1b49590c2ed6cf6ebd3a45f0ceec0013c25726afd0b6a"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p3/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "c05676abb03d3d596b0761bf0b121d06c21bf766d5f3a847752a6eedd8df26be",
+        "3150-arc-hold-stop.json": "77a246989bfc1f5a663336054cb4aa8438aa3a86f277448122e7a79fe279a70f",
+        "3150-arc-hold-stop.manifest.json": "b9d3325af5e7be8cfd19fcb7406cb60382a1b31a88fc1e5b7b7b4104c6fb8b75"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p3/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "44f01ea9c1c9de19260e22d2ecba5ac8ee98013f13e402dadd1af88001beddbc",
+        "3150-arc-override-hold-resume.json": "ac6d5ccc711a2967d5d56e08dde10261b63613c67029375299e9148a1665d704",
+        "3150-arc-override-hold-resume.manifest.json": "2fbc031d079a98c1538d5a8e7feb9b20d485bcfa52b16c6650dce9f429c294c9"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p3/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "a774ce67a9543dea615c01ce4944acaa190c55601f7c131e9b194d12c74edb48",
+        "3150-arc-override-hold-stop.json": "7ff3ee5d5b72a21675651085cec8ca304dab745ec54559baa69ff936aedbd48d",
+        "3150-arc-override-hold-stop.manifest.json": "fb36da291c8ee05fb3f1f9f02298a8747cab8a46c46b05711460b0a0412a4c3e"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p3/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "11cb1cfb828b166448c47450272c5cc37ea3a5006ac67382c3ec52102ed4958e",
+        "3150-nominal.json": "48d2213bb706dbba203b7a42f9a97b9db0dbc332091c67628e55338e5cc50d80",
+        "3150-nominal.manifest.json": "6840add4b964b493849a7f7d68a5f4cad55f6c62f73d42d815b5b590177686e4"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "1e2cba9bebca5a28f92d7501b7e77fd67ccb3120797759992190d22a6b15641d",
+        "3150-arc-hold-resume.json": "88f73003af395a27965f7b735b52039742f68a614f3334b5047b2bee7304a24e",
+        "3150-arc-hold-resume.manifest.json": "78a8797becd20383e6346a2caaba8f1513d96076beb0c800dbe6992d4d47cfb7"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "f7c47a93663fc6bc6a0f8ec7cc6aa0a1fdc2c7bc92529c19e58b7baefac3fb57",
+        "3150-arc-hold-stop.json": "08bf2c4ea4269473635a3c3a6aa39a071aa5f45e940a5edf20195bf7874bddc3",
+        "3150-arc-hold-stop.manifest.json": "0f940403314a39e8b496dd65f006fda2955f2973a1a5a1cacf189dfa9ee493fa"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "12c7eb09f2df58c7c3ec1203605c3f8f337ca3b69edad2f10d22abc115bc4196",
+        "3150-arc-override-hold-resume.json": "f4d92abe7d219de35b7245d6767ac2752f33889a15e46bef5be0e4fb69a87972",
+        "3150-arc-override-hold-resume.manifest.json": "30a411a643493dbed3e081d312a15ac338cd6cfaef24427832b6deb2eaeaef7f"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "5d469b38715def99c50ca4ffedff61ce84932ddb68a834ed5772d87ed2d5dfef",
+        "3150-arc-override-hold-stop.json": "65d99f642d4c2e1e5c61bbd383bce50d40f4f3d750dbc3b3c4f2350942143520",
+        "3150-arc-override-hold-stop.manifest.json": "08e0f8e3e2ca636a73269f73519b6254e45a9224395e715d812ac28b997150b4"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p4/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "1de1c842f0d9b0134ee2588e54e18966d0860dcceeae2e3237e93a3796664087",
+        "3150-nominal.json": "7d1b64d70307992d8b96718f556d09f4150ee4b9670707ad7e9a27280e17864e",
+        "3150-nominal.manifest.json": "b816bb3aa2968c3ed0177ce50ffd534c94aa589a126ed13a79a8741cf4ba7db5"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "645183b755896e66d510c32dd524f70703eec0ee983fde75867c47acc454321a",
+        "3150-arc-hold-resume.json": "361533efa0c13ae6e49adf37b20ed71f87f201fa0c4bed27aa3db4797d0244fa",
+        "3150-arc-hold-resume.manifest.json": "675cc991c86560fdab37f32e82b9749718da163721446ff674ca279e66d83fd1"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "a6f401c1e1459a5eff19e6af2d8eb45a1a6c1bb29fd869c166a6bd8c19abca26",
+        "3150-arc-hold-stop.json": "461288d784a881534d2f69974d2e09e81f69102c6f0ef3655ddbe1f5e6d9718b",
+        "3150-arc-hold-stop.manifest.json": "e3f168192b0b1eb7e6130791252139196fcd423b5603dc5461b0f3437eaedeb2"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "9a7ed5d95b1c68ae2ee27f61ce432917ff31a1ad4baccf35ceef01ab42e53a2f",
+        "3150-arc-override-hold-resume.json": "5a97b284439bec8d85e0125f492c4bebd0a8c73f5b8951f934740172f90c4da3",
+        "3150-arc-override-hold-resume.manifest.json": "a11c5ee55235511cc507bffe8c3275ff107722a638c4737290efcd2021023f6a"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "3caa131ff640ce6c5d1255e2abcc416e05bbceca8d31005f62fd6f5bf33709ef",
+        "3150-arc-override-hold-stop.json": "924685fd75bced97315c4b16cb91164f39a5e210c0f03db926d7b854dbfb3e1f",
+        "3150-arc-override-hold-stop.manifest.json": "ecd6b136743fade3e866c9960d1ab806d8f798d3a0f9724461b936778f7b5f9e"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p5/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "86cc959bb1951eefddf1e2a9e31a8d25851bdbb930b0e42b2b6068d687d0bfa3",
+        "3150-nominal.json": "ee0d712b5c66e130f6c775a6d93c93198018a2128e6044514999e3951f8cbd39",
+        "3150-nominal.manifest.json": "e53b4b1ca53386eccc08ac6746c91d2ab81367d4e37985bed6260253c1aaa485"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p6/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "ad4ed410e17c6575789fb75293fd868704d5dfb2115d887023be2b23ade2c1bf",
+        "3150-arc-hold-resume.json": "cfc21a2e3d291761bd8b80e9a66a4ac2b08e094ddba211223c86ca98617efec6",
+        "3150-arc-hold-resume.manifest.json": "96fca40060a9adc905d52a8f606ca376ed128fafd9721e3cb0a70a344d8390b9"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p6/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "a0e2c40343f70179f2429c29a7d89caabf7f424e54a9110b564239a9ad45e765",
+        "3150-arc-hold-stop.json": "850039122c313a372cf3292287b59816569b4bb0de8df62012e4aac41d797cd3",
+        "3150-arc-hold-stop.manifest.json": "7e9d7b5b1837babcb373c2b0d5297b9ae12ec20b316b3067f3c4fa2a754b65d4"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p6/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "04a714d4ba3c2bab43cdec5c6c59397e3d484c3bcf0ebe96f62480e179944249",
+        "3150-arc-override-hold-resume.json": "0798b8e976f749e5842be06f539d5344fad01bac6640c3684e1fb2318216335a",
+        "3150-arc-override-hold-resume.manifest.json": "eae0496c7826c42b2545a7beae4bcaee7002395b9c15bcc1e199d7617ed67f00"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p6/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "0e18763b7f8ebb9ec8cd160b1d8dd0f3a5d4395515f6be19a64e81730e6bf59d",
+        "3150-arc-override-hold-stop.json": "9dd67636108680b60aeecbed7dbc77802f696990a113205bf38aaaa493ca3cec",
+        "3150-arc-override-hold-stop.manifest.json": "5ef37173944e100ffb7c5ebf0ae41c008cf1653f6488619d2884c42d4d890eff"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p6/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "92c3393253b1b498ea967adb954990627a321b71ed1777613c1ac84bd04cb7cf",
+        "3150-nominal.json": "792b6af47a873d94b91a06820e0689d1c753dcf132bf42f971c55781cb2aca1e",
+        "3150-nominal.manifest.json": "395d2fcb3338093bcc5542ccabab14210979edcf6e5f17d0ed2edd4e11f5a0e2"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p7/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "4b991a3ae6fb29676000f3e917f49c70ce21c94e23ec2b3e306e52198da11fcb",
+        "3150-arc-hold-resume.json": "9060599ab30e0d88403f8783b12bb5184e65484d9dc6cd63294fe32985c7669a",
+        "3150-arc-hold-resume.manifest.json": "7683cb89710e33e5813231868bffdaa2d7c4c9e934c22ab378b8219698e5ec02"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p7/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "d759b7b7406421c282b851a3938e6e49f23f772d1e20f325595ec2200055e345",
+        "3150-arc-hold-stop.json": "a2458bbe2fc0d5cd94a6715311781d204b984ac76ec7e07a6fc5f36e8e168826",
+        "3150-arc-hold-stop.manifest.json": "bbdff97de5a2054fd1b9bbf12e12cce6f0807bc0d4d7792bf0926189d170d0ad"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p7/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "54392927e430f034c13394a69921a05f6af6f06207e828ae7c1b8ab0b2507f8c",
+        "3150-arc-override-hold-resume.json": "9520fd6b547fbb31ce4be0b1f3fdd111a22322d347de82772d06141be6222f2f",
+        "3150-arc-override-hold-resume.manifest.json": "809c4760e64c95900a9a8d10fb57287f0575f71733a6ae5bd922055235e93177"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p7/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "9d2f249871c472c038b589ad39a773d7209711b7eebe548f0744da3685e30423",
+        "3150-arc-override-hold-stop.json": "e6d0dd2447c88bd25093bb20f321726e9bd9a4243d3740b172503d8962acfa34",
+        "3150-arc-override-hold-stop.manifest.json": "01d86c7dfc33baf219647971c619ed78b2f26fcb384bfb8776507121f4819b31"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p7/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "e3d6a929246d18231800fafe1ef9350056d418b97f3390aaef9fd56bbb242f44",
+        "3150-nominal.json": "ad8bf921e7f9c1a1177f1b3c8fbef64953244e741c6a5ebe13426258e7d341fd",
+        "3150-nominal.manifest.json": "34cf8b1a67a48a479ea75c4d542fcd9eed59ba64fcbc408fdd41e7bc6a83c6ae"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p8/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "c4be648d0daa026d19e031ae354fdaac8300bd200eea22dc949c44f6007b38c2",
+        "3150-arc-hold-resume.json": "eba67640e32489ce252596f1ec1b00938383cfd0ee46e633cf8bd15a4cede7b5",
+        "3150-arc-hold-resume.manifest.json": "b9118505b371402d597238794ef6f20c137bda3d4ad36691f0a05cb343206f33"
+      },
+      "samples": 52570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p8/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "f051295e3c9ebd9532753080a9f40fa03466b11e9ee9f11e7b0b7f8f91bf0d35",
+        "3150-arc-hold-stop.json": "3343718f7186edd652f7f0569c7115f4add43aac35fde59fb82c09811019893c",
+        "3150-arc-hold-stop.manifest.json": "a771e26d4ce65a052b41acad3cf1531c38ff25b3f2920eee89187e5034b0369a"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p8/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "a896e06284061f507373b8156755017975e970eee36aed2f03df9f92b9184677",
+        "3150-arc-override-hold-resume.json": "5ba07e9b4014b041bf7063ddb1c308e331b37bb3f6f0df10cfc44d9622ba936a",
+        "3150-arc-override-hold-resume.manifest.json": "3523bcff012cb23c3032696e51c09ca2555ccbc0f6525045c7c0c8738923e2bb"
+      },
+      "samples": 52598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p8/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "ea636b21f7e595d047a8477b842367edb5da6b781f81e284b427002478af6820",
+        "3150-arc-override-hold-stop.json": "0fdb730080865934a14b82edd29a6ef5f1d96ec6ee147a4ea3d6a4834c543da2",
+        "3150-arc-override-hold-stop.manifest.json": "bbdb724ab800a7ece19582b88daaea2125abc113f9de2952a0f1dba4415e251e"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-pose-grid",
+      "prefix": "y3150/p8/exports/3150-nominal",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-nominal.csv": "d7fb2a4e607f627cc621f525420d5fa205c9135eb986de9da28175fb051230dd",
+        "3150-nominal.json": "f2895f1e5fbac84ab7456b92d5cab403f10f1543b13aede910741f115ff8c7cf",
+        "3150-nominal.manifest.json": "d3aef893ac4730f62dcfc8dcaaf5b49a335a435c9db85d86d644b38f909135d1"
+      },
+      "samples": 41134,
+      "scenario": "nominal",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "03097beff8cbb1accb1d49041e44016468a349abf4ed8df8a19c59c8a8056bcc",
+        "2600-arc-hold-resume.json": "881b119dbf2aff9095d6e2b07d613a1734f0a9696bc5882f146d06a2c4b773c0",
+        "2600-arc-hold-resume.manifest.json": "59995ea712d9a1748d701dab9d5c2fb8af1eef32c3b09c01b0c0db279f92a600"
+      },
+      "samples": 56898,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "d21b596a4b6d366cb21a4f693d0e0e4421d6396dff66d33e066604e81673f7fe",
+        "2600-arc-hold-stop.json": "54f81d48d5df91804c237506a8922aae4a156f47b7812f8bf9fe3f8b2d9efcc2",
+        "2600-arc-hold-stop.manifest.json": "07990bab795d1db68cc9e4fdd7e4b86a2fc7872d35a7ce0dab0b7429dc33976d"
+      },
+      "samples": 24858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "47532a8cdc089be6b33841e2e54f29203aea0eb4c6b8926ee6f2d3d3cc11c68d",
+        "2600-arc-override-hold-resume.json": "9e6bbe2c512fbdcb4d1ff7f976906d8c100984db59d5cf53284040dccc7d072a",
+        "2600-arc-override-hold-resume.manifest.json": "2bec830be13ff6d4790343188925cb2eca464e91b7fb615be417c4dee206d6fc"
+      },
+      "samples": 56926,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "aa0448265d5d3b9bf94fa61e6c35896fa4b146d483a5422a13ee1850927c3ea0",
+        "2600-arc-override-hold-stop.json": "f0138c7c5988b51580b002fdc6a3b204859059f1758226c19fb230329424a42b",
+        "2600-arc-override-hold-stop.manifest.json": "43a3a2bd1a8e3566992f5cc94c97064da0e5cf43a9b6bfb3313d1c6d75e74478"
+      },
+      "samples": 24942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "ab81ffa75f3ebc677d9d61b358ca0d00265e5312abc57a50630130927536585b",
+        "2600-arc-hold-resume.json": "f66a693bc5111563dc4e4fe07fd4afa48aa2f862fac2faedfc7dc6a355737912",
+        "2600-arc-hold-resume.manifest.json": "15b18f464c0d5677676ac3beb6adad06962c33cbbd041f9247bd528063fac15e"
+      },
+      "samples": 56898,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "a92f70e66544d390c981ef4486ef6f27bc70c5f4d2be5781589abfb0838ad199",
+        "2600-arc-hold-stop.json": "2b1de4a4d4effcf18ebaffd48d2f61e1568b02ff27a2a1f3a29ad21965af63b9",
+        "2600-arc-hold-stop.manifest.json": "272c6f96587ec99a32eaa7275b9a36c2be9235a50df9083103bd926e5d633cb0"
+      },
+      "samples": 24858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "bdbcbc6882b1cb449df0cdfec04961e6aa93239315c17672e09ecc87064ea026",
+        "2600-arc-override-hold-resume.json": "6742d20f71ac3d35e1dc24378cffa0039bfb39fae5de4828b1fd2f78e94df036",
+        "2600-arc-override-hold-resume.manifest.json": "6ecafe3566c125f1bbae05c83dd090febedb71f5890c4fd35b18390bc38fb051"
+      },
+      "samples": 56926,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "bf4b8cd1a83344dfb3c7783e3ff12cf60c9ab018c9f7adbb8dbef37893ae90ad",
+        "2600-arc-override-hold-stop.json": "a5b191ceb023128ef9a01ce61d2a2e2f90a3f45606858077962ccb9b64ceefd4",
+        "2600-arc-override-hold-stop.manifest.json": "83ea5828d9fdfd899955df8fa1785549e140f9c08a5f28561c083f8d3e73c1b5"
+      },
+      "samples": 24942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "56f0165b9ee9b75b668e7a9fd94da06521cb623656c5d7b0df61d8c1ce55528a",
+        "3150-arc-hold-resume.json": "69e5c276ebcc02012171fa028dceef2b5d65e0a2604f23f5ffb5d5dfe1b569fd",
+        "3150-arc-hold-resume.manifest.json": "17d669c2cb3b350d6863215e5d828ea1156656c214e67e462aafac8059004a8c"
+      },
+      "samples": 51238,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "8ae1ea41d8da5101eca4cdc19aba0c359b5469193533f05d99f291c3cc1d98ba",
+        "3150-arc-hold-stop.json": "afb9f00da0dbe46ffee6b80b485cef5f499f194e6a821b32812154b9b37d46d1",
+        "3150-arc-hold-stop.manifest.json": "7f627c43663b39c7e4a274d2d41c2012844a91c31c2fdc4643fa68001d65f85a"
+      },
+      "samples": 20574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "853d333db82a0c18bfece7651fd003fdf613dcf41ea0dc7d1e657e403ffaaf11",
+        "3150-arc-override-hold-resume.json": "b855eee780d56c910915058138f501aad02e222d55001d4b63e64553f62349d3",
+        "3150-arc-override-hold-resume.manifest.json": "c3982510e11511685216232e50d38e26921f0e3108214cf4e118e0f493c8b3c6"
+      },
+      "samples": 51266,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "0c62d28f0ea14b73e88270e621ed3c88dc06e96e5ae3d909e99cac670f54e7b5",
+        "3150-arc-override-hold-stop.json": "30e4de527b7e3b4c3a2efcfb2d6328f72fa35a886f2c630db4cc8a4c22ca8906",
+        "3150-arc-override-hold-stop.manifest.json": "a16cc7b5ea5b899b3e5fe2f78365e6e344672a8e9b426cc0396f83cfcabf3bd9"
+      },
+      "samples": 20658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "0c65e9c0b77402d3e44e0605c2d1ee95ffcfbc2e8c641205251dc8125cf17a07",
+        "3150-arc-hold-resume.json": "01219be90e1b0690d2b111d964a289b10d91cf22d3cff9226387ef3a205d439b",
+        "3150-arc-hold-resume.manifest.json": "da64957a8e9564ce6e700ebb91e9a57d564a6217afb17c13c249d001aacd35b3"
+      },
+      "samples": 51238,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "4bf2680fa53b537dd25890a50ad53700a2c733343360bbcfee19a1e9be42fda5",
+        "3150-arc-hold-stop.json": "38eeaf9e8ce582e58e171810735b6e93da59c58c6317a4acff6ad250def3afcb",
+        "3150-arc-hold-stop.manifest.json": "f46a7cd81a1742089d120c953078aadf68361dcbcab815f3a08fe03cbf45ae3d"
+      },
+      "samples": 20574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "5994e606649939605cba683a93c00968931226939bfc4d93150d792ea734bbf3",
+        "3150-arc-override-hold-resume.json": "693f570131ef82c2e097a145de33a3c6924f7844a8f0fc456989f39ab4414d16",
+        "3150-arc-override-hold-resume.manifest.json": "0cfd395f87b9eaa9881c61eba462dc5ebd6d553423055edfa4c339310b89be08"
+      },
+      "samples": 51266,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase1000/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "1f9f6891364d35e0f94232abac6d504b1e2b4c06dfb4be9110d0df6ff4060eca",
+        "3150-arc-override-hold-stop.json": "a31046bede9d63a7af61f356417271eae1c778f55ad4b42496ee26050c706b85",
+        "3150-arc-override-hold-stop.manifest.json": "fbdbfb029637c6667ed3f5fedf073ccea4e39c7ced3ebc583b60b8f49f15cff2"
+      },
+      "samples": 20658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "7d11cf90db135a2e767c1bcbcb3021c726d756429450de92b0b66ddfd600cd6c",
+        "2600-arc-hold-resume.json": "76130910967f754546b18a14acec9545e907fc75894d97ce7569cd95e7351648",
+        "2600-arc-hold-resume.manifest.json": "523a917d94ee11dbc48c4e32c7215409be5fb807bb75bc51b7101c171dafeb7d"
+      },
+      "samples": 57898,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "b8b9a51e6925ade15d03730a9f6885152cd2569fba7e88e4ab3cab956241ed8b",
+        "2600-arc-hold-stop.json": "951758b4a57d624ec70cb17f525bf0203725602a2823ba89a1ba513a18e9f088",
+        "2600-arc-hold-stop.manifest.json": "42d3dbc596f2e84d086fce4c0eaa618949a69a4382cfc42709c864a92898e075"
+      },
+      "samples": 21858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "1a8028fd87dd011f69c2c427bb05583c75fc28bd2997d926485cc722fd81f716",
+        "2600-arc-override-hold-resume.json": "cee17d0fd10751b396d71384badaf991c4e4ee18660cf50d94bb0d5f60f8ade0",
+        "2600-arc-override-hold-resume.manifest.json": "b04f8494bf2a46178a33d4da5d986d0218b43278ac9792ecdcd1528944376a96"
+      },
+      "samples": 57926,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "5fd44edcba3f5b4b0cedf9b6c68d32d6d06de7ca849d0a565c33695870012763",
+        "2600-arc-override-hold-stop.json": "3de34975e6548562cf3b7e938d65b499b0c97fc81953b23585634b9fefda6f2e",
+        "2600-arc-override-hold-stop.manifest.json": "5c34d5bc43721978bd37c90921f00ef03d254313db8c2d8d2d11472520849247"
+      },
+      "samples": 21942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "091c687f6d1e45a809c3e6bee58beae7beddbe81bb6aecbe185a4ab519bcc516",
+        "2600-arc-hold-resume.json": "a12fbdd2d22d7048cfe6a08fadbc3cca90c64ff97824e2b888a440c52acce9f9",
+        "2600-arc-hold-resume.manifest.json": "7f5e8a53d68dc04a336c907de60202bc23c26e986a89fab44c2837ea304e7f86"
+      },
+      "samples": 57898,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "35c0a117b7cbb5003be06c6e5cf74516aa133c891d2d7f4fcbdd258e22017758",
+        "2600-arc-hold-stop.json": "095ea1fc675ac58d7e9759ad5957fb6c0de570cad3edba58a8548da4f05eb5d3",
+        "2600-arc-hold-stop.manifest.json": "e1775d80f0c706f23d1fecae41088a31299b80230ea3f757f2b04bdac856927d"
+      },
+      "samples": 21858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "c67d7c57c2e6d7f93b2bd5abb3e604764ba0b23f9e17eb0c3964203f60bd63d8",
+        "2600-arc-override-hold-resume.json": "d9f3e372fdf5fe82725d6ada5c1c6466c6503e1ea7333782889303430a938515",
+        "2600-arc-override-hold-resume.manifest.json": "cf34f5559c35fd15c313f064dca9d4a2ee35df1fa6b05576ab76ba13f9c0b8f7"
+      },
+      "samples": 57926,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "cf106d15dac7a0534fda191e7362662be48672e0d00597aed1b4eea53df6b79b",
+        "2600-arc-override-hold-stop.json": "6fa5204436bfa62a0b66cfa7266522681f2b3d918dcd98c165b3da2bf88969a4",
+        "2600-arc-override-hold-stop.manifest.json": "d6eae1dd1c93d485fc09e8c553e7dddb5611c888cd8ef496f67a3e88f660974d"
+      },
+      "samples": 21942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "5bff55dc96853918bb3258d457275615ff0679abf776c5cabe3be47f48e24273",
+        "3150-arc-hold-resume.json": "2e46240b1f36a4520e862fed2e664929681d7375fd58da355580a88fa8681dac",
+        "3150-arc-hold-resume.manifest.json": "98816a10e9940759c57fa94654ca3615e7f35c76c2cd36171d47033e91b4087b"
+      },
+      "samples": 52238,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "c7870e7006636b8a30c2547bbbd13bf5faf02f782bd647a3f3af7482866141e2",
+        "3150-arc-hold-stop.json": "4ff19027d80d321d7cd775579fe50553cf653ffe256b589c65b24c240cf18b32",
+        "3150-arc-hold-stop.manifest.json": "15ffc3e5908ca24718d02c6148f1f0f8d36dbf18711960df35771698f6b20159"
+      },
+      "samples": 17574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "8932997834c8515de3295bca346e5e96004992f31d6654e5469d2aacdc8771b8",
+        "3150-arc-override-hold-resume.json": "516b48d4e16e310b850e990bbdecdda99199eee0832ddd6f3a025bd5a95e2729",
+        "3150-arc-override-hold-resume.manifest.json": "932c7df7de15225f60fa8542d3a8d5c90c83cea4127748bea9bc8df12c3ae254"
+      },
+      "samples": 52266,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "38bdb41632842cfc9ab8b76a2a1e7f8261ad7bdcb18a4f97aa674b12ac5ec981",
+        "3150-arc-override-hold-stop.json": "3f02245fa36953378b06239a3893f5936e3686de9df109596ca53db327b0cec3",
+        "3150-arc-override-hold-stop.manifest.json": "532a1b090346ba3d8bde20c310eeaa6136bb0e5361975c5653d22145608fb4b7"
+      },
+      "samples": 17658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "93e2ee04175d4963af4ffbe328eaf2ac5feaef988783dcdebbc91ff581d1e2ff",
+        "3150-arc-hold-resume.json": "ef3e687ade3c4f17f7156cb2c439b9b6c8b6d2ae2f3f88883be1353c84b1001f",
+        "3150-arc-hold-resume.manifest.json": "6da5c6a3b94959546d47e545860aaeae381c1a9079ad642ebc233e7b4b0f639a"
+      },
+      "samples": 52238,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "5571b71307e56e6e4f15e9086eab661d7baffaac892479c9c5d70ce4ad3209ab",
+        "3150-arc-hold-stop.json": "3dbcf88b2fe9a79fca090e782f0c22222728ea43b62d90ffdbebf346c6334817",
+        "3150-arc-hold-stop.manifest.json": "4059312b63cbc1b020f5f1bf1dd5e05a546a3267edae37212f3cbc06a0b3c29a"
+      },
+      "samples": 17574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "6a79c30650fae114caf43fd02ef9f09c10b14a9a621aa47204819a969f3990af",
+        "3150-arc-override-hold-resume.json": "9a13a25fbd9e1635589be0923bd3417afbef55973e48412f508424933714c6c7",
+        "3150-arc-override-hold-resume.manifest.json": "be712b170cdb7c7a35d48ffb4514cb12aed45c96561ae07827821472f0996b4c"
+      },
+      "samples": 52266,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase250/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "999b365e5f50a2c55ba6cf73b70eabe28ad17899f692c8ea815ec8c7c6187374",
+        "3150-arc-override-hold-stop.json": "02ffd2626fb677a0f0c150ddaef661a9358c54ca16ce5d2f3fda2fdd2da8c22c",
+        "3150-arc-override-hold-stop.manifest.json": "23ca9b1bbe90e0ec38cd1ae4523f6ee6d9613904886cdf47df6363403731acbd"
+      },
+      "samples": 17658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "974f4ee77ac6e248a802acde1694b4c4c9c70addee1809fc04ab3c37a068ba7b",
+        "2600-arc-hold-resume.json": "379e986f3a109570aef7f776b69b5a4b15e386297929260d3de6807b0a1d3930",
+        "2600-arc-hold-resume.manifest.json": "e592c2a6d029ee16b0f98987204d6e9d1e38cf57c4c4f0165ca2cfe83b45ab4b"
+      },
+      "samples": 57566,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "2d91036979acfae9227234498def0f370a8c04ca0d918f40e9031e5d7ae4737a",
+        "2600-arc-hold-stop.json": "c0e337e58d1d684df77db8c20a52e631c4989b670171f38fd9027107e2c2e65f",
+        "2600-arc-hold-stop.manifest.json": "8fe6d91fa0a958486d254df4efb9247445ad7b91bbc9057c110c8b40ee31deb6"
+      },
+      "samples": 22858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "0066d0607a6915bb63fc18d8e286d92c6491a9addd8f4bbf16c02b1435242747",
+        "2600-arc-override-hold-resume.json": "31967aa5382274451e6023a137db3b91c54862fc8eb189d730468246702c8c69",
+        "2600-arc-override-hold-resume.manifest.json": "981d78e3206df992603d9df7388998110452c6e34c8dd1cf8b2c1e07b789f173"
+      },
+      "samples": 57594,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "d7a026d5124f5ee4823070e104a5ddb5ede842bedd85a78030c7597fd5be5dea",
+        "2600-arc-override-hold-stop.json": "768d814fa0d070e93991482b97710712d325a56ec35883cc56bbf8f6ffb914f2",
+        "2600-arc-override-hold-stop.manifest.json": "656b0ba0d9ec15e2318a6775e7d0ca384d5f5ea50790036d44ab26dede7f2881"
+      },
+      "samples": 22942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "225908921c81d5a5e4388a65e48df024ec1654f39ac9262572ef51035856c8ec",
+        "2600-arc-hold-resume.json": "62ebc58bb48f022fd72595f2037fc95ebf8c26561a35f546c0fb7a6a1759477b",
+        "2600-arc-hold-resume.manifest.json": "d6957931648979af5d8ed73e8f65b1cbce007ccfc27fe26821be3be8466a776a"
+      },
+      "samples": 57566,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "e3f9bea45f57112a1a725cfee9d2b64c9070b3c2ca8f4b29af433b3fbe23b456",
+        "2600-arc-hold-stop.json": "eb75f3e16f4a4fe85ea762fd8ced636932f9ee2afdaef7dfc7e33f024a446d45",
+        "2600-arc-hold-stop.manifest.json": "14f68078eb319e1fad8fb2141dd746824052963805502732bc0b0cee34f521f1"
+      },
+      "samples": 22858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "159bb91d832845877745c467a1e7a9f84de95ebe04f25eec6a49971dd53ded20",
+        "2600-arc-override-hold-resume.json": "40f1105e24fd93313640c018bbacfcb4549b8820c74aae585daa3481208aed4b",
+        "2600-arc-override-hold-resume.manifest.json": "738986b383937d6de1005c00f800917397cf1de87158feb41ab6651ffc31e367"
+      },
+      "samples": 57594,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "5410e63fe4a6a22675c38f256a94aafba0b830c59af9a4e0fdcfd2fdf984b55b",
+        "2600-arc-override-hold-stop.json": "a890953585e76c98c16032237c6f840efd1a0d5cf27a1a4a1d9c2cb82c2d8213",
+        "2600-arc-override-hold-stop.manifest.json": "6fb20bf71247e23a9f0dec1624c0ba9b34f9db74e929587aac6dd2740893f54f"
+      },
+      "samples": 22942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "a94abbb5f3cd015b88bc47fa70450761c84bc45577bb84117d36f561ad8dd950",
+        "3150-arc-hold-resume.json": "ea5867e9cd29960fd9207c201b08bf8f9e04f8048f5147fa77f633a0b85a5519",
+        "3150-arc-hold-resume.manifest.json": "217d81ed1f624b01bc2d82605570c01381de50ad3838caea3304e645870ed726"
+      },
+      "samples": 51906,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "5fd455c8e539018575b41dbd503c6172b11509c75f2f64a4a4608d886f7804b4",
+        "3150-arc-hold-stop.json": "69e4c27c18bdf003e77ea4334a0fea247740e295968246babd95949f9b95b3fd",
+        "3150-arc-hold-stop.manifest.json": "815c779066147cfd4f36f504c918f31755ba76ca829b067ac76042dbe1fc5d73"
+      },
+      "samples": 18574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "82e8e12388873cd66c9a564757522ddecd057e146103c121fef32b7043b42cc3",
+        "3150-arc-override-hold-resume.json": "e6867959888a8a235423fd193935103da59e50a8dd2213d7e6eedfb70b474c80",
+        "3150-arc-override-hold-resume.manifest.json": "55f2d92fd1cdb5bc0c0a42f552b29bdf1f65fcf13377dabf436201fc3f93b374"
+      },
+      "samples": 51934,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "a7021bc2791a5065af481dd3511d32278335b6abfca436ecbc5feaf20f160a59",
+        "3150-arc-override-hold-stop.json": "48dc80dc62c27f950178e6e576c9cfa3fbcee28a31f2d0a1d0a64672faf315bb",
+        "3150-arc-override-hold-stop.manifest.json": "495e5bbfd46873a15f26ff6da0303ec0d539c28fec971d334f94726a941073a4"
+      },
+      "samples": 18658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "a59db5d2ef5059adc0ce5a57600e2fc6201444a07248dbfe866073fa6c146099",
+        "3150-arc-hold-resume.json": "3f3f1675928e0427427769b24e578181f44be26dc0e01083d8ba49ad1390da28",
+        "3150-arc-hold-resume.manifest.json": "4b0f67c1e04820ec93092f8fb3797405254e72ad0b9a55dff81e13a8f9749cee"
+      },
+      "samples": 51906,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "e74ad666fc73cd466471d467b8a6be041add716ded2d0f8bf4cdb63d67d64695",
+        "3150-arc-hold-stop.json": "73e128a04df1e72bbe0ab839750bb29f2d5845ab961cd39053257e185af590aa",
+        "3150-arc-hold-stop.manifest.json": "c2f179f5d8f5d908335cc5446b53fd0cf5f9763b71d70002800f4e0a73e60989"
+      },
+      "samples": 18574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "ec312cf2ed487476255e7e8e4e3ea59736fa001d234b4eb4e824a1994d5c22ef",
+        "3150-arc-override-hold-resume.json": "eb45422797c33e8fb2fbebeda88f1522a3aa3b09cfb34e858546cf9e3397361f",
+        "3150-arc-override-hold-resume.manifest.json": "ed701d54204bf549428bd4d425b437203c750775c5d2d7f66b35416f632f4975"
+      },
+      "samples": 51934,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "1076afc270a242dccfb58a098d97a45804ec6ce572e4677c2ad850fa1593f26b",
+        "3150-arc-override-hold-stop.json": "1ee3d34ca05cd8e12bcab3255ba59169ac461a63f8b9edf9e349ab89c4aff4c2",
+        "3150-arc-override-hold-stop.manifest.json": "ebfa80ea7981e722c42d39d7ea0301f6042c5c6b717b992a31fb26b3df864bd1"
+      },
+      "samples": 18658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "ed98155610997a5882d0c416bb36e7a44e4feb5b24da0bb9dd821f694674bfa3",
+        "2600-arc-hold-resume.json": "3eafd133d8dda19b0a1a5dea813847725bcf75a156eeab7e0c944fee3c8e7d4e",
+        "2600-arc-hold-resume.manifest.json": "d252df1b7730b69dce821db2915f24ab1e10325450a2bff0ed5a08373538efbb"
+      },
+      "samples": 57230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "2d68e6b6cfb3d49be0c5e36e5aa86ecf4eeecc880b0f3c29f777ed9e4b5b4d51",
+        "2600-arc-hold-stop.json": "7868c49c653c7a4a529e4131b9735abd06266dc0d4ea72d4b71b182c6bba9f33",
+        "2600-arc-hold-stop.manifest.json": "6954e270bfd2d12dbed1fc350204bd1620550814e59273e30d40f96ae7df6051"
+      },
+      "samples": 23858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "86ecf69ba4d4813f3f685f486879bd4d01e5f88817cfa5d3aeaa483e27812f16",
+        "2600-arc-override-hold-resume.json": "c92a36ea226a23f3226855c32c48911bdc00cd2b86ef4a22b24ac2eeab67683a",
+        "2600-arc-override-hold-resume.manifest.json": "8444ef9ac4328dc503590d6d341e2d2281b6ee2ff561b918cd8947fde5724947"
+      },
+      "samples": 57258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "d9e34196090c3298eb7773a7ec8250feb2ea21e16d9c98e898d877731eb5af24",
+        "2600-arc-override-hold-stop.json": "1f8e2f198b0b9f75f33b9fa4ebd917e09b99fc6a800a5672cabb08fc9efb27e1",
+        "2600-arc-override-hold-stop.manifest.json": "87597ea0d62458a367c4698b3f6908e6e2a749cfda458f9f3aadcdee92abf7ed"
+      },
+      "samples": 23942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "9bed0531eaa9593a978088f2978f260f53d3d52602fb339a47d1ea16ff20f9b1",
+        "2600-arc-hold-resume.json": "73e2b03e3a3231e4279936e64443932a080d5d48aaa032240cd5a255d952fe30",
+        "2600-arc-hold-resume.manifest.json": "81fb280c1c85abf04b095c497c713ec96337ec7b93f7e909dbca176ef34cfcf1"
+      },
+      "samples": 57230,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "26d184229986eccaa84cb9af0c68b633fe3336be44d7ac2286e0a55111f34642",
+        "2600-arc-hold-stop.json": "826e6fea86da9e485e48fc8767b612be6f9c322e8bd82ac491a30813963ffd62",
+        "2600-arc-hold-stop.manifest.json": "3dfa9c8364109e35489bc5e304c282660dc6ff4f0bc220deb1cdede57e7e4bd4"
+      },
+      "samples": 23858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "f5f963ef60cd1074dcc08033632762c3fb330e1bb8ea8c2edd439feae752ef91",
+        "2600-arc-override-hold-resume.json": "783cd96ad76e23254f792f2d963cafa98bc7654ebd268c7475ec09772c162add",
+        "2600-arc-override-hold-resume.manifest.json": "109ae40a46d3e5d7b7f3fcf385a6779b6c353b5036208cd88a68df86f6ed9243"
+      },
+      "samples": 57258,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "4492fe77fce2d2222b1b75562c43ddc29cd63839986779b1d95a55408c7787f4",
+        "2600-arc-override-hold-stop.json": "2093f52d600f7e18b272b76a788e23a9ae857a4dcb70be9c4bd55b4b5af6446a",
+        "2600-arc-override-hold-stop.manifest.json": "bc83af27aee33bc4cdf294695252cbaa89d379f5b620f48c20ff262da5f3b7d9"
+      },
+      "samples": 23942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "d23bb3f6fc16bd948bfa74cae375cca2a50c86eb5f7e6f27cb607c999f4f876a",
+        "3150-arc-hold-resume.json": "35eaf09af3e499cd40bcbfa8d7ad37fca6a47f6fcea687e5ad3b60c2a7229dcd",
+        "3150-arc-hold-resume.manifest.json": "667711d1a5f16036701aa9b94f9a59c4c5fc25a26baa0b6d68d6018dbf627797"
+      },
+      "samples": 51570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "7a37ee58cb7717b1ea51877acaba84744c31341db73ed16753366ed56af348af",
+        "3150-arc-hold-stop.json": "9ba07b180a606bbb40e8a7350209aa517b2f74b195495138c54c7af566544798",
+        "3150-arc-hold-stop.manifest.json": "52133aa5b35de9a2a9e3d08e6b385ba14a5598825c23cd6afd6a9966c4d5fbde"
+      },
+      "samples": 19574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "60117c2e2cd4153e9e44126a6f3a6b69daec58cd5139786ecff7bf395b6bdd2a",
+        "3150-arc-override-hold-resume.json": "18445b72bf429ac5b7071e2404c03f7a8641512b7aac9eb569b817ddb1327fe7",
+        "3150-arc-override-hold-resume.manifest.json": "c60dc47af8996907b1eef7d7295f53d4e7202c1925c5be237f9960aee7ba6eed"
+      },
+      "samples": 51598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "92d7a6dbe509cfb2dc716f15eee717260a5dccea809039b40726021170f996cd",
+        "3150-arc-override-hold-stop.json": "ced38e27d1071df0e60efad8d44c36eb14643e459c4b499d7e1eb143d8eeb1d5",
+        "3150-arc-override-hold-stop.manifest.json": "fb71eea9068f61639d89c15e2ad5f5f76d7ec8d9305cd23ccc65a9e38526d5da"
+      },
+      "samples": 19658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "1c53dc82f97b2957da80b3321d9ebbfc85136b1b066c915472689fccf2a2bb8a",
+        "3150-arc-hold-resume.json": "fc0fd537d9b2fe2b4c4265addb95314e9497fbc38cdf9e9449a07de8c4df9a9c",
+        "3150-arc-hold-resume.manifest.json": "19b34dd797fe53430f51f323030f8397b5d27b1d729c0ba0c338323360428ad3"
+      },
+      "samples": 51570,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "8c07ce657eb3c29525e773cbda4bc4819edce76f38cf60a54bd3084741f1a3e4",
+        "3150-arc-hold-stop.json": "a48860ccb258df0b5b2e7fbc375644a83fd43f0bcd832c5f5eb7c221363d3830",
+        "3150-arc-hold-stop.manifest.json": "b88d5310a71f92b5d6ff1a64803c7450e6132eefb65afb3054c139b15686885d"
+      },
+      "samples": 19574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "9cbc556799075c25050e09e02d9b92e1ee82ea5aab646783f8242f10e2d21e62",
+        "3150-arc-override-hold-resume.json": "6fdf3962bea75307421540bc896b65ee0c9c81ac4d3826f19da11dcfbfd9e6d6",
+        "3150-arc-override-hold-resume.manifest.json": "a138aacc0a60150aa2da3c585a30d919a54990fa98b9f1e786dc4462d258528b"
+      },
+      "samples": 51598,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-executed-phase-grid",
+      "prefix": "phase750/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "7335d44f631bf412420f34c18afb5020e0677e1180e9a5c849e0736175993f93",
+        "3150-arc-override-hold-stop.json": "3c5cb24d901b42d5628bf210239e6ca24a8063b040790e6863c3c3b83c9e35b3",
+        "3150-arc-override-hold-stop.manifest.json": "c815435a5f2bc66a31c84a8900de429299005a9c6e3b3819ee597b61217aad7d"
+      },
+      "samples": 19658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 0.75
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "3ea4de66f1417b9ebdba590aeabbcf41538ed6e2d891c2c6897be3566d483bea",
+        "2600-arc-hold-resume.json": "77335c53c82871c050c335d70b6b6316d938e0c3a9f2893573eb6fa2371b6c26",
+        "2600-arc-hold-resume.manifest.json": "39326a8af5be8d0e285d396a15dfb729217ef86ee4bb6e4a0cf0d4192e3942d5"
+      },
+      "samples": 48890,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "07887416d349096d5bf864daf74b7ed1e44ffd2ca49abcb5f887569500636412",
+        "2600-arc-hold-stop.json": "3bd1c1a59052be0b17c7ebd903433e56e5965043e4b9a67b6b57b8322d70ba82",
+        "2600-arc-hold-stop.manifest.json": "37d890f9bb485c29ecea6fe2fe3e7cd8d0f11d7bf35a181d8d5df35c722483f2"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "2e31f85345f6474fcf850cf697c209436f98fb87789efc9189847686d4ece89d",
+        "2600-arc-override-hold-resume.json": "1155a89b862dd9124d96556b4ee54b5e1c74df5bafddc29ae37db25e40f1b8de",
+        "2600-arc-override-hold-resume.manifest.json": "0184c94a140943f58719954f5bb37f7508f25718651dacf581a9affa04edb9ca"
+      },
+      "samples": 48930,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "f02bf1ce2c104fc87360008576dd9597de1e475cab9fe15ff14d00d43e78c36a",
+        "2600-arc-override-hold-stop.json": "44a821c3832353f672f8d317a68fc7e6765124911f30605dc9f15467269560d9",
+        "2600-arc-override-hold-stop.manifest.json": "66bfa5362d5112886603897775a7c688095da394c61728e8a518dc3428b39a04"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "94ead14017a54c2462b175b2f2fc09b2c85b83e4f3be009f5375817816a16772",
+        "2600-arc-hold-resume.json": "2b2e4e955778cf8988c2e2d9f1a3ff4a00bbf47c667e8dd4135b51d63e52d18b",
+        "2600-arc-hold-resume.manifest.json": "3ea47e48121c075af07bfc68c0248025de0c78fd5e80069fb21f047d9c036f38"
+      },
+      "samples": 48890,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "5b56f1cdd4e8780f5e681831a85cc89f2f8e5cdebd55dba0870c0967d67c9bfb",
+        "2600-arc-hold-stop.json": "2572dd47f36730da3cd8102d9272d4ce5a6938eabd0337b77723c236a15a362f",
+        "2600-arc-hold-stop.manifest.json": "d6138b9ef93a273a2bd944495c167e4d1042f1181d0a8e78555d9ee57117d768"
+      },
+      "samples": 20858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "afc12f3672b8018162831e076260552b93e8366b3306d7eb210c0f44a9f9411f",
+        "2600-arc-override-hold-resume.json": "858a7a94aac2550a2d117a9a720727fd1d9582467d8ce34639af9070cbd3a332",
+        "2600-arc-override-hold-resume.manifest.json": "d154802dd5bb45007b898aa97459bfae1a026739dd5aa0adc02191289558ca5f"
+      },
+      "samples": 48930,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "af78334c37a55100affbf15cff4eb6cf8b5b3f8414e6cb3aff6154a9ca6d3d13",
+        "2600-arc-override-hold-stop.json": "7b58085436196bad58356a3a91598c4ede1a7bfd65af5a00c63a8fec0a155bc9",
+        "2600-arc-override-hold-stop.manifest.json": "b4b0019005663e40ba4cc8a120812e450da94a7d4418b0083054d1f187f27ca5"
+      },
+      "samples": 20942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "92545f0084647f192bd20017cc59f8287390ae626783bdae3d6ae3d7627adf38",
+        "3150-arc-hold-resume.json": "844362222e7e64ff4a4e5fe35230f1158df5b5b81ce4c98182f59d26545573de",
+        "3150-arc-hold-resume.manifest.json": "6238007f50e5896c45ad83795c724b844e98c1ecd4c35fadf3e4897b6634a0a2"
+      },
+      "samples": 43574,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "f7c47a93663fc6bc6a0f8ec7cc6aa0a1fdc2c7bc92529c19e58b7baefac3fb57",
+        "3150-arc-hold-stop.json": "7d63e03f0331e49d817569a240b08364f24c77b45173c60bd2a7f96eaf8d7b53",
+        "3150-arc-hold-stop.manifest.json": "c194edb991c918ae01bcc97e5589624e4e25efd9cb5744f5cbec35c23ac6a4cb"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "6657e0ce1250a7f90af2c873807810f14c872dbef522fdeac4c67396f520e7d2",
+        "3150-arc-override-hold-resume.json": "74668ea31fbb9bdee9ba70fcfd8cbdb51a21fc6fc6cab9000a1c61fe93a9bc6e",
+        "3150-arc-override-hold-resume.manifest.json": "c2c603cd2ef121e2246bcafefc3339610479264395b81cdb3c68f7f8e9204f1e"
+      },
+      "samples": 43614,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "5d469b38715def99c50ca4ffedff61ce84932ddb68a834ed5772d87ed2d5dfef",
+        "3150-arc-override-hold-stop.json": "d0c82d0b15656be681c3aee31fff662cd495430f60ff588377ea3023f5c0bfee",
+        "3150-arc-override-hold-stop.manifest.json": "2b33480f1fc86435df7e1688c1b38d021d78d07ed6ae6737a479dee99cfaeee4"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "b24f899e5328d6775277490daba60e2d0d04212ed25b46ca3850cefb0369d6e8",
+        "3150-arc-hold-resume.json": "4c1a710cfd47edea5b96dea5a431fa7a643468572e1936bcd26a19047fd42f26",
+        "3150-arc-hold-resume.manifest.json": "5f2af74e65f2bb7e7a02363c160adcf24df3eae33ec0609088aa61d39b25138b"
+      },
+      "samples": 43574,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "a6f401c1e1459a5eff19e6af2d8eb45a1a6c1bb29fd869c166a6bd8c19abca26",
+        "3150-arc-hold-stop.json": "19a2ca841fdff44bb2f72a5eda9e44f50c138b744dfa37ac15a097d1c00572b7",
+        "3150-arc-hold-stop.manifest.json": "adfd3412d770b51142994d2be33a11db2c448311c0c5cefda3a910a28cbba4e2"
+      },
+      "samples": 16574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "d82e1e760c5c9c906e0d852fe88460a3a37b7ebfe25d4f2e6716b5d231cf4cf4",
+        "3150-arc-override-hold-resume.json": "fabcdc82a04d63a547dfcaa5493b7dd783830a8549199c427f3573060228a618",
+        "3150-arc-override-hold-resume.manifest.json": "9bc725395c403a7fc096812d9807441bd641907c625170bf06146c9718c23daa"
+      },
+      "samples": 43614,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase0/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "3caa131ff640ce6c5d1255e2abcc416e05bbceca8d31005f62fd6f5bf33709ef",
+        "3150-arc-override-hold-stop.json": "af1143f06cc820533493d441185c92e01f47265d602e9573a504a00acf62df02",
+        "3150-arc-override-hold-stop.manifest.json": "7103b3a982ea7993a5830aafab4622b0ced52454671c99f08228e3e2c5739785"
+      },
+      "samples": 16658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "26dcd3528a22979764115607ccd81ed6d8ff94edd902a01102f4d8aeae67f025",
+        "2600-arc-hold-resume.json": "98b66f81fa103869110a9714f0b34de4583cd4e79110311c849b59583c0005f1",
+        "2600-arc-hold-resume.manifest.json": "a9768ee58de2982c7ccfa66fd7b39a06988f79117ccb1b26cdd9b6d907d1126e"
+      },
+      "samples": 48890,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "2d91036979acfae9227234498def0f370a8c04ca0d918f40e9031e5d7ae4737a",
+        "2600-arc-hold-stop.json": "48a2c8074fa680426d53a403c89027191a11641af2f44817bd1cf148d35eaf29",
+        "2600-arc-hold-stop.manifest.json": "27fe78da658926a1a5bb26386924fb985a7932af3a460e4a2f2ebae1ff0967bb"
+      },
+      "samples": 22858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "9c679851736ea51f60d4785102259efe8b8a2955ac9bf7de8072a13c15abcce3",
+        "2600-arc-override-hold-resume.json": "45f37435d53c5b4db20335550c12a8da9cfda831cadda8c4e9e1a62356979775",
+        "2600-arc-override-hold-resume.manifest.json": "31f4123fe99f205e444cbe7a11f584a5a70393e5d5844aef27fb8a533bb0f48e"
+      },
+      "samples": 48930,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p3/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "d7a026d5124f5ee4823070e104a5ddb5ede842bedd85a78030c7597fd5be5dea",
+        "2600-arc-override-hold-stop.json": "fc5f7356c2bfd0295a593c4c9ed5a0fc9e91d13730460999e75ce60086269e31",
+        "2600-arc-override-hold-stop.manifest.json": "79bcf7acd8946252b7b68d70633d2452a32f0b085e198ea3641733457f05824d"
+      },
+      "samples": 22942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-resume.csv": "31d74c404569bba0fbf8a80f49e27b771c335dbe2824bcd48fd285d5bfa0b78f",
+        "2600-arc-hold-resume.json": "8d0b5406c606a2b76862dec2dbd251a4fdb7d11cba601bb2e4694294e062b8b0",
+        "2600-arc-hold-resume.manifest.json": "96eb648a4fb4b4a56ecf935b0f8cf1a215d8d2b827905b6397eb33f1c836714c"
+      },
+      "samples": 48890,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-hold-stop.csv": "e3f9bea45f57112a1a725cfee9d2b64c9070b3c2ca8f4b29af433b3fbe23b456",
+        "2600-arc-hold-stop.json": "72240801196f22d21fd8301955b7562a5401a58136ab252e680ccd6b84ec3e01",
+        "2600-arc-hold-stop.manifest.json": "8456ee7982b7a5d263291bdac30e2b6a9347f4ba66203317f894361704ea5cce"
+      },
+      "samples": 22858,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-override-hold-resume",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-resume.csv": "bdb3dec537e5fbe3d0177d44631c71b2b76a1b881eb1e00552bbb8adc9946e5b",
+        "2600-arc-override-hold-resume.json": "fa48e9cb2e78c013fe03fc025ee8afc9c3721703a1601c4db8f3f2291ff20f22",
+        "2600-arc-override-hold-resume.manifest.json": "cd42a01097fa578229e04a603385cbfa0778f06422b3636146ab88a6a78c1e5e"
+      },
+      "samples": 48930,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y2600/p4/exports/2600-arc-override-hold-stop",
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1300.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "2600-arc-override-hold-stop.csv": "5410e63fe4a6a22675c38f256a94aafba0b830c59af9a4e0fdcfd2fdf984b55b",
+        "2600-arc-override-hold-stop.json": "0e2f660e354d7e326d5a64b302f8309608e50caca7e1a97a45b2b5b48bddddd0",
+        "2600-arc-override-hold-stop.manifest.json": "e286d1aebdd4c2ff87d24b6cf6450b343931086030d9045eb471c60b1b15eb18"
+      },
+      "samples": 22942,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        377.4213365252766,
+        57.81392233467636
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3741.51618731306
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "5b6ab28dae507aaec7c62feba318030ad0edacb097d4fe4d187536048bd004f3",
+        "3150-arc-hold-resume.json": "c92dfed43e28527da2a434cb9d823f627268754cfc57015393e996c997878b75",
+        "3150-arc-hold-resume.manifest.json": "56ee10b463246794922afd9c7bb4c71a4c391b362700421d6f6ddc1d50ae2a8f"
+      },
+      "samples": 43574,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "5fd455c8e539018575b41dbd503c6172b11509c75f2f64a4a4608d886f7804b4",
+        "3150-arc-hold-stop.json": "ba834020a2b341627c38fbb3c0d27b879653a3db39076eca4399c496ef2ef5fb",
+        "3150-arc-hold-stop.manifest.json": "a5fa9b762d9c353ef6769ab0c9ba199883a7819b73acc0d6e1e49e2ef896b6a8"
+      },
+      "samples": 18574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "6b5c90942e3e7f0d3f064fad266bc8d0a6004f0d370df5b208b3c2be151d175c",
+        "3150-arc-override-hold-resume.json": "19d8c0259a8ddc5bdc57bc375b22bde20df383c2fb2a7033f8dbdd08a9aa4313",
+        "3150-arc-override-hold-resume.manifest.json": "963fb9405f0558591bcc537202371d0aa76deeb3c9e7daf4bdb9b2c1a51bf4d4"
+      },
+      "samples": 43614,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p4/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 1575.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "a7021bc2791a5065af481dd3511d32278335b6abfca436ecbc5feaf20f160a59",
+        "3150-arc-override-hold-stop.json": "47c7681a8b6940c1f1d8bc778829cf22b0150cabd5ab91fb90f5f4143bd68eb8",
+        "3150-arc-override-hold-stop.manifest.json": "5c7d06ceef9cd9d9f2b792c11854359198360cf9bb1e78e73087ffedd86b127b"
+      },
+      "samples": 18658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-resume.csv": "2d171601fafeea22048eced66b58ca4e4df1a9f3a3c3f08b4790c8a601d0dcc7",
+        "3150-arc-hold-resume.json": "007782382c023f611e865a8c14d2387b95a6cda0efe9089b85af663a81d6522c",
+        "3150-arc-hold-resume.manifest.json": "9263aa07b35d0acad19ae75662d93f8a5cf077c299f17179fbfc057201bb23cd"
+      },
+      "samples": 43574,
+      "scenario": "arc-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-hold-stop.csv": "e74ad666fc73cd466471d467b8a6be041add716ded2d0f8bf4cdb63d67d64695",
+        "3150-arc-hold-stop.json": "b914f3d50132d8012dc4fced87ee8a24a5b01cb1aef8ebcafc03fea3d5b78b2f",
+        "3150-arc-hold-stop.manifest.json": "9c5124d86b7b27d1e6b8bf17654ca72532158532f8ec346f1aec062bf0f7bca4"
+      },
+      "samples": 18574,
+      "scenario": "arc-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-override-hold-resume",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-resume.csv": "546cf02d4d4fb316e553e2e39ee27684e6a424513cdcd42f34a902c596a7e1c4",
+        "3150-arc-override-hold-resume.json": "ee6cd68c49704fd529c2a9e093ba93299a864ce861445a01220dcf8c8ddc31a5",
+        "3150-arc-override-hold-resume.manifest.json": "d6825fdd02b0c90a7aaefbad14e4ab2b457317b0787c244672abbcd82247aee7"
+      },
+      "samples": 43614,
+      "scenario": "arc-override-hold-resume",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    },
+    {
+      "dataset": "j6-full-feed-resume",
+      "prefix": "phase500/y3150/p5/exports/3150-arc-override-hold-stop",
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800.0,
+        "y": 3150.0,
+        "z": 200.0
+      },
+      "sha256": {
+        "3150-arc-override-hold-stop.csv": "1076afc270a242dccfb58a098d97a45804ec6ce572e4677c2ad850fa1593f26b",
+        "3150-arc-override-hold-stop.json": "305a654688b95baab38584248376fffeca47eb2023359ed0a9f2651a545a2d5d",
+        "3150-arc-override-hold-stop.manifest.json": "8c7f89cad7a333825d781d50eb4068872b91ac20e0e6b683bf2496b7dfcf03f9"
+      },
+      "samples": 18658,
+      "scenario": "arc-override-hold-stop",
+      "contourJerkXY": [
+        134.7123598618431,
+        14.708999946365063
+      ],
+      "assumedDriveJerkXY": [
+        6230.492165,
+        3739.589126
+      ],
+      "heldRestartFeedOverride": 1.0
+    }
+  ],
+  "historyCount": 186,
+  "cycleTimeReporting": "Suppressed: publication-reserve correction/re-export pending",
+  "requires": [
+    "corrected full-length mounting mass and geometry-derived compliance",
+    "both meshes/all poses and qualified weld reactions",
+    "revalidate index/output hashes after any re-export"
+  ],
+  "scope": "Generic Cartesian executor histories, assumed drives; no selected router hardware or corrected structure pass"
+}
