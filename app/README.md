@@ -155,14 +155,6 @@ mission or playback status for a plain machine. Open the source `.project.json`;
 a prebuilt `.mtrg` contains only the selected geometry and cannot regenerate another
 configuration. Source selection is locked while simulation is running or paused.
 
-A variant may also link to an already generated scene using an entrypoint such as
-`{"kind":"artifact","path":"build/tooling/base/mold.mtrg"}`. Paths resolve relative
-to the project; external machining programs resolve relative to the linked artifact.
-These entries do not execute project code or accept editable recipe documents. They
-read the current artifact on every load, and report a missing file rather than silently
-building or substituting another model. Regenerate the artifact with its source tooling
-command when the design changes.
-
 ```json
 "defaultVariant": "small",
 "variants": [
@@ -327,8 +319,10 @@ and filtered deviations in µm. Opening details does not rerun stock removal or 
 Project loading runs the build and fingerprint tools as cached HashLink executables.
 The generator uses Haxeon's reusable compiler session, and its compiled code is reused
 across opens and editable recipe changes. Deterministic entrypoints opt into geometry
-caching with `"cache": {"inputs": [...]}`; list every external file that affects their
-output. The Gantry picker, yaw picker, and welder enable this cache. Source contents,
+caching with `"cache": {}`. Haxeon's analyzed module graph supplies the transitive
+source inputs using the same request as compilation; source lists are unnecessary.
+External non-source resources may additionally be declared in `cache.inputs`.
+The Gantry picker, yaw picker, and welder enable this cache. Source contents,
 manifests, compiler options, declared inputs, and tool/native library metadata invalidate
 cached artifacts. Recipe edits always execute the generator with the new document.
 Caches live below `${XDG_CACHE_HOME:-$HOME/.cache}/materia`, in `project-tools` and

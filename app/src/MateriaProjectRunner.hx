@@ -45,11 +45,6 @@ class MateriaProjectRunner {
     var entryId = ProjectVariants.entrypoint(root, variantId);
     var entry = Reflect.field(entries, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
-    if (fieldText(entry, "kind") == "artifact") {
-      linkedArtifact(manifestPath, entry);
-      return {kind: "prebuilt-artifact", projectPath: manifestPath, entrypoint: entryId,
-        module: "", reconcilesSavedRecipe: false};
-    }
     if (fieldText(entry, "kind") != "cad-preview")
       throw "Unsupported Materia viewport entrypoint kind";
     var reconcilesSavedRecipe = Reflect.field(entry, "reconcilesSavedRecipe") == true;
@@ -134,23 +129,7 @@ class MateriaProjectRunner {
 
   static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
-    var root:Dynamic = Json.parse(File.getContent(projectPath));
-    var entry = Reflect.field(field(root, "entrypoints"), ProjectVariants.entrypoint(root, variantId));
-    var source = fieldText(entry, "kind") == "artifact" ? linkedArtifact(FileSystem.fullPath(projectPath), entry) : projectPath;
-    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(source));
-  }
-
-  /** Generated artifacts remain external to the source project and retain their own resources. */
-  static function linkedArtifact(manifestPath:String, entry:Dynamic):String {
-    if (Reflect.field(entry, "documentInput") == true || Reflect.field(entry, "reconcilesSavedRecipe") == true)
-      throw "Artifact entrypoints cannot accept editable source documents";
-    var path = resolveProjectPath(directory(manifestPath), fieldText(entry, "path"));
-    if (!ProjectSourceLoader.isPrebuilt(path)) throw "Artifact entrypoint requires an .mtrg file";
-    if (!FileSystem.exists(path) || FileSystem.isDirectory(path))
-      throw "Generated project artifact is missing; regenerate it first: " + path;
-    var metadata = FileSystem.metadata(path);
-    if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Project artifact exceeds the 150 MB limit";
-    return path;
+    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(projectPath));
   }
 
   /** Produces geometry bytes; external program paths remain relative to the source project. */
@@ -174,13 +153,6 @@ class MateriaProjectRunner {
       entry:Dynamic = Reflect.field(entrypoints, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     var kind = fieldText(entry, "kind");
-    if (kind == "artifact") {
-      if (recipeDocument != null) throw "Artifact entrypoints cannot accept an editable document";
-      if (control != null) { control.throwIfCancelled(); control.phase("Reading the linked artifact"); }
-      var bytes = File.getBytes(linkedArtifact(manifestPath, entry));
-      SceneArtifact.decodeView(bytes);
-      return bytes;
-    }
     if (kind != "cad-preview") throw 'Unsupported Materia viewport entrypoint kind: $kind';
 
     var installation = installationRoot();
@@ -313,18 +285,18 @@ class MateriaProjectRunner {
   static function buildCachePrefix(entry:Dynamic, projectRoot:String, manifestPath:String,
       haxeonManifest:String, module:String, functionName:String, haxe:String,
       home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
-    var declaration = Reflect.hasField(entry, "cache") ? field(entry, "cache") : null;
-    var emptyInputs:Array<String> = [];
-    var rawInputs:Dynamic = declaration == null ? emptyInputs : field(declaration, "inputs");
-    if (!Std.isOfType(rawInputs, Array)) throw "Project cache inputs must be an array of file paths";
     var inputs:Array<String> = [manifestPath];
-    var declaredInputs:Array<Dynamic> = rawInputs;
-    for (input in declaredInputs) {
-      if (!Std.isOfType(input, String))
-        throw "Project cache input must be a file path";
-      var path:String = input;
-      if (StringTools.trim(path).length == 0) throw "Project cache input must be a file path";
-      inputs.push(resolveProjectPath(projectRoot, path));
+    // Explicit non-source resources may supplement the compiler-derived module set.
+    var declaration = Reflect.field(entry, "cache");
+    var raw:Dynamic = declaration == null ? null : Reflect.field(declaration, "inputs");
+    if (raw != null) {
+      if (!Std.isOfType(raw, Array)) throw "Project cache inputs must be an array of file paths";
+      var resources:Array<Dynamic> = raw;
+      for (resource in resources) {
+        if (!Std.isOfType(resource, String) || StringTools.trim(resource).length == 0)
+          throw "Project cache input must be a file path";
+        inputs.push(resolveProjectPath(projectRoot, resource));
+      }
     }
     var cacheRoot = Sys.getEnv("XDG_CACHE_HOME");
     if (cacheRoot == null || cacheRoot.length == 0) {
@@ -334,7 +306,8 @@ class MateriaProjectRunner {
     }
     var cacheDirectory = ProjectPath.join([cacheRoot, "materia", "generated-artifacts"]);
     if (!ensureCacheDirectory(cacheDirectory)) return null;
-    var arguments = [haxeonManifest, module, functionName, tools, home].concat(inputs);
+    var arguments = [haxeonManifest, module, functionName, tools, home,
+      Reflect.field(entry, "documentInput") == true ? "true" : "false"].concat(inputs);
     var fingerprint = StringTools.trim(runProjectTool("MateriaProjectFingerprint", arguments,
       haxe, home, tools, "Could not fingerprint Materia project entrypoint", control));
     if (!Sha256Digest.isHex(fingerprint)) throw "Project fingerprint has an invalid result";

@@ -11,8 +11,7 @@ import sys.io.File;
 
 /** Build a project entrypoint as a separate HashLink artifact generator. */
 class MateriaProjectModuleBuild {
-	static function main():Void {
-		var args = Sys.args();
+	public static function request(args:Array<String>):{arguments:Array<String>, home:String, wrapperRoot:String, reusable:Bool, manifestPath:String} {
 		if (args.length != 6)
 			throw "usage: MateriaProjectModuleBuild <haxeon.json> <module> <function> <output-prefix> <haxeon-root> <document-input>";
 		var manifestPath = Path.normalize(FileSystem.fullPath(args[0]));
@@ -73,6 +72,13 @@ class MateriaProjectModuleBuild {
 		var wrapperPath = Path.join([wrapperRoot, "MateriaGeneratedEntrypoint.hx"]);
 		if (!FileSystem.exists(wrapperPath) || File.getContent(wrapperPath) != wrapper) File.saveContent(wrapperPath, wrapper);
 		arguments.push(wrapperPath);
+		return {arguments:arguments, home:home, wrapperRoot:wrapperRoot, reusable:reusable, manifestPath:manifestPath};
+	}
+
+	static function main():Void {
+		var prepared = request(Sys.args());
+		var arguments = prepared.arguments, home = prepared.home, wrapperRoot = prepared.wrapperRoot,
+			manifestPath = prepared.manifestPath, reusable = prepared.reusable;
 		var oneShot = function() {
 			CompilerDriver.compile(CompilerArguments.parse(arguments));
 			return 0;

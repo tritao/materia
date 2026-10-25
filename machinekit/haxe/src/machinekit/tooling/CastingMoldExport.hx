@@ -134,19 +134,39 @@ class CastingMoldExport {
 			"7. Lift/flip only with qualified points/equipment. Replicate the designated rail/bearing seats against qualified masters; grout the column joint using its approved gap, jacking and cure-before-torque process. These allowances and processes are pending, and source geometry was not altered.\n");
 	}
 
-	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan,
-			review:CastingMoldCad.CastingMoldReview, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):Void {
+	/** Viewport-only generation shares the exported scene, without writing a kit. */
+	public static function artifact(plan:CastingMoldPlan):haxe.io.Bytes {
+		var casting = CastingMoldCad.reconstructed(plan);
+		var mesh = AssemblyPreview.part(CastingMoldView.REFERENCE_ID, "Finished casting", casting,
+			materia.project.MaterialLibrary.fromSpec("mineral cast"));
+		return SceneArtifact.encode(sceneData("mold", CastingMoldCad.assembly(plan), plan, null, mesh));
+	}
+
+	static function sceneData(id:String, a:MachineAssembly, plan:CastingMoldPlan,
+			review:Null<CastingMoldCad.CastingMoldReview>, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):materia.project.SceneArtifact.SceneArtifactData {
 		var sceneData=AssemblyPreview.scene(a,id);
 		CastingMoldView.geometry(sceneData, castingMesh);
-		sceneData.presentation=ToolingPresentation.casting(plan,sceneData,review);
+		if (review == null) {
+			if (sceneData.assemblyDefinition == null) throw "Mold scene requires an assembly";
+			sceneData.presentation = CastingMoldCad.presentation(plan,sceneData.assemblyDefinition);
+			sceneData.recipeDiagnostics = ["Viewport preview; full geometric review and fabrication verification have not been run."];
+		} else sceneData.presentation=ToolingPresentation.casting(plan,sceneData,review);
 		var embedded = [for (insert in plan.document.input.inserts)
 			plan.construction == SinglePocket ? insert.id : materia.tooling.ToolingIds.derive("insert-", insert.id)];
 		for (anchor in CastingMoldCad.anchorComponents(plan)) embedded.push(anchor.id);
 		var liftingIds = [for (insert in plan.document.input.inserts)
 			if (insert.role == materia.casting.InsertSpec.InsertRole.LiftingMount)
 				plan.construction == SinglePocket ? insert.id : materia.tooling.ToolingIds.derive("insert-", insert.id)];
-		CastingMoldView.presentation(sceneData, embedded, review.handling.moldToService, liftingIds);
-		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(sceneData));
+		var moldToService = materia.assembly.AssemblyFrames.compose(plan.options.serviceOrientation,
+			materia.assembly.AssemblyFrames.inverse(plan.document.setup.sourceToMold));
+		CastingMoldView.presentation(sceneData, embedded, moldToService, liftingIds);
+		return sceneData;
+	}
+
+	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan,
+			review:CastingMoldCad.CastingMoldReview, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):Void {
+		var record = sceneData(id, a, plan, review, castingMesh);
+		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(record));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {
 			var mesh = AssemblyPreview.part(row.id, row.id, row.component.geometry(), row.component.materialId),

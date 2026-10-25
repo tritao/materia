@@ -10,6 +10,9 @@ import materia.project.SceneArtifact;
  * Study-specific checks remain executable separately; old projects are view aliases.
  */
 class MillProject {
+ public static function baseMold():Bytes return MillMoldPreview.scene();
+ public static function columnMold():Bytes return MillMoldPreview.scene(true);
+
  public static function smallAssembly():MachineAssembly {
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());

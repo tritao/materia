@@ -11,8 +11,8 @@ class MateriaProjectFingerprint {
 	static var generatedSources:String;
 	static function main():Void {
 		var args = Sys.args();
-		if (args.length < 5)
-			throw "usage: MateriaProjectFingerprint <manifest> <module> <function> <tools-dir> <haxeon-root> [input-file ...]";
+		if (args.length < 6)
+			throw "usage: MateriaProjectFingerprint <manifest> <module> <function> <tools-dir> <haxeon-root> <document-input> [input-file ...]";
 		var manifest = FileSystem.fullPath(args[0]);
 		var project = new PackageResolver(new PathSourceAcquirer()).resolve(manifest, null, false, Target.parse("host"));
 		var home = FileSystem.fullPath(args[4]);
@@ -23,9 +23,6 @@ class MateriaProjectFingerprint {
 		add(paths, manifest);
 		for (item in project.packages.packages) {
 			add(paths, Path.join([item.root, PackageResolver.MANIFEST_NAME]));
-			for (root in item.sourceRoots) addHaxeSources(paths, root);
-			for (path in item.sources)
-				if (!StringTools.startsWith(Path.normalize(FileSystem.fullPath(path)), generatedSources + "/")) add(paths, path);
 			for (path in item.ffiInterfaces) add(paths, path);
 			for (path in item.ffiProjections) add(paths, path);
 			for (imported in item.ffiImports) {
@@ -33,20 +30,36 @@ class MateriaProjectFingerprint {
 				add(paths, imported.header);
 			}
 		}
-		for (root in [Path.join([home, "src"]), Path.join([home, "stdlib"])])
-			addHaxeSources(paths, root);
+		var request = MateriaProjectModuleBuild.request([manifest,args[1],args[2],
+			Path.join([cache,"materia","fingerprint-analysis"]),home,args[5]]);
+		var parsed = compiler.tools.CompilerArguments.parse(request.arguments);
+		var compiler = new compiler.tools.CompilerSession().prepare(parsed, _ -> {});
+		var analysis = compiler.analyze(parsed.entry);
+		var moduleSources:Array<{name:String,path:String,text:String}> = [];
+		for (name in analysis.moduleNames) {
+			var state = compiler.modules.get(name);
+			if (state == null) throw "Missing analyzed module: " + name;
+			// Include the deterministic wrapper: it encodes the function and document-input contract.
+			moduleSources.push({name:name,path:state.source.path,text:state.source.text});
+		}
+		// Compiler implementation changes still invalidate generated code.
+		addHaxeSources(paths, Path.join([home, "src"]));
 		for (name in ["MateriaProjectModuleBuild.hx", "MateriaProjectFingerprint.hx"])
 			add(paths, Path.join([args[3], name]));
-		for (index in 5...args.length) add(paths, args[index]);
+		for (index in 6...args.length) add(paths, args[index]);
 		var ordered = [for (path in paths.keys()) path];
 		ordered.sort(Reflect.compare);
 		var fields = new StringBuf();
-		field(fields, "materia-generated-artifact-v2");
+		field(fields, "materia-generated-artifact-v3");
 		// These options affect generated code even when source bytes are unchanged.
 		for (name in ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"])
 			field(fields, name + ":" + (Sys.getEnv(name) == "0" ? "off" : "on"));
 		field(fields, args[1]);
 		field(fields, args[2]);
+		moduleSources.sort((a,b) -> Reflect.compare(a.name,b.name));
+		for (source in moduleSources) {
+			field(fields,source.name);field(fields,source.path);field(fields,source.text);
+		}
 		for (path in ordered) {
 			field(fields, path);
 			field(fields, ContentDigest.make(File.getBytes(path)).toHex());

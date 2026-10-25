@@ -2,6 +2,15 @@ import haxe.Json;
 import materia.tooling.casting.CastingMoldPlanner;
 
 class MillMoldPreview {
+	/** Both source-project mold variants use the same setup and native planner as exports. */
+	public static function scene(column:Bool = false):haxe.io.Bytes {
+		var frame = MillMoldSetup.frame();
+		var document = column ? MillColumnMoldSetup.document(frame) : MillMoldSetup.document(frame);
+		var options = column ? MillColumnMoldSetup.options(frame) : MillMoldSetup.options(frame);
+		var plan = machinekit.tooling.CastingMoldCad.plan(document, options);
+		return machinekit.tooling.CastingMoldExport.artifact(plan);
+	}
+
 	public static function main():Void {
 		var frame = MillMoldSetup.frame(), input = MillMoldSetup.input(frame);
 		var cwd = Sys.getCwd(),
