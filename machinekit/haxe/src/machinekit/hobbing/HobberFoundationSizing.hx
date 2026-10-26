@@ -214,7 +214,7 @@ class HobberFoundationSizing {
 			var envelope=materia.casting.CastingEnvelope.build(dimensions[0],dimensions[1],dimensions[2]);
 			var feature:materia.casting.CastingFeature={id:"lifting-candidate",kind:InsertRecess,
 				geometry:ownGeometry,openings:candidate.openings,draft:{degrees:0,axis:{x:0,y:0,z:1}},
-				cornerRadius:0,owner:candidate.id,adjustable:[],derivedFrom:null};
+				cornerRadius:0,owner:candidate.id,adjustable:[]};
 			var cavity=materia.casting.CastingCavities.derive(envelope,[feature])[0];
 			var embedded=own(machinekit.structural.CastingCavityCad.part(cavity));
 			var missing=own(embedded.subtract(resin));

@@ -19,8 +19,7 @@ class RegionMoldPlannerTests {
 			feature.draft={degrees:2,axis:{x:1,y:0,z:0}};
 			document.input.features=[feature];
 			var direction=F.transformVector(document.setup.sourceToMold,1,0,0);
-			document.setup.features=[{featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
-				priority:0,withdrawal:direction}];
+			ToolingTestRules.set(document,feature.id,materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,0,direction);
 			document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
 			var authored=materia.tooling.casting.CastingMoldPlan.MoldOptions.copy(options);
 			authored.serviceOrientation=document.setup.sourceToMold;
@@ -91,8 +90,7 @@ class RegionMoldPlannerTests {
 		var feature=d.input.features[0];
 		feature.kind=materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening;
 		feature.draft={degrees:2,axis:{x:0,y:0,z:1}};
-		d.setup.features=[{featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
-			priority:0,withdrawal:{x:0,y:0,z:-1}}];
+		ToolingTestRules.set(d,feature.id,materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,0,{x:0,y:0,z:-1});
 		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
 		var options:CastingMoldOptions={replicationJigs:[],foundationJointProcesses:[],precision:[],
 			compaction:{method:CompactionMethod.Undeclared,bedInterfaceReference:null,frequencyHz:null,amplitudeMm:null,
@@ -146,7 +144,7 @@ class RegionMoldPlannerTests {
 			mixed.input.features.push(materia.casting.CastingPatterns.box("fill-core",
 				materia.casting.CastingFeature.CastingFeatureKind.Lightening,
 				[materia.casting.CastingPatterns.face("body.z-min")],100,160,31,-140,0,-1));
-			mixed.setup.features=d.setup.features.copy();
+			mixed.recipe.featureRules=materia.tooling.casting.CastingStrategies.snapshotRules(haxe.Json.parse(ToolingCodec.canonical(d.recipe.featureRules)));
 			mixed.setup.sourceFingerprint=ToolingCodec.inputFingerprint(mixed.input);
 			var mixedOptions=materia.tooling.casting.CastingMoldPlan.MoldOptions.copy(options);
 			mixedOptions.precision=[for (insert in mixed.input.inserts) {insertId:insert.id,jigReference:null,
@@ -173,10 +171,6 @@ class RegionMoldPlannerTests {
 			flat.setup.sourceFingerprint=ToolingCodec.inputFingerprint(flat.input);
 			check(P.plan(flat,options).changeRequests.filter(request -> request.blockingChecks.indexOf("tooling.former.draft.pocket")>=0).length==1,
 				"removing source draft restores its release request");
-			var reversed=ToolingCodec.copy(d);
-			reversed.setup.features[0].withdrawal={x:0,y:0,z:1};
-			check(P.plan(reversed,options).changeRequests.filter(request -> request.blockingChecks.indexOf("tooling.former.draft.pocket")>=0).length==1,
-				"a contradictory withdrawal cannot clear a source draft request");
 		} catch (error:Dynamic) {
 			P.setGeometry(previous);
 			throw error;

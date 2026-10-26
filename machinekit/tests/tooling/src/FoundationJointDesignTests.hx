@@ -247,7 +247,7 @@ class FoundationJointDesignTests {
 		contextCopy.foundationJoints=[];contextCopy.jointSources=materia.casting.FoundationJointSources.FoundationJointSourceCodec.empty();
 		check(materia.tooling.casting.FoundationJointQualification.missingSource(materia.tooling.ToolingCodec.copyInput(copy))!=null,
 			"removing the source declaration restores the mounting-interface request");
-		var document=SinglePocketSetup.document();document.input=input;document.setup.features=[];
+		var document=SinglePocketSetup.document();document.input=input;
 		document.setup.fillHeightMm=40;document.setup.sourceToMold=F.fromRotationMatrix(0,0,40,[1,0,0,0,-1,0,0,0,-1]);
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(input);
 		var options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions={replicationJigs:[],foundationJointProcesses:[],

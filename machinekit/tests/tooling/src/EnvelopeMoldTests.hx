@@ -23,23 +23,22 @@ class EnvelopeMoldTests {
 		serviceOrientation:F.identity(),overlapRule:ReservedThenPriority,liftingEvidence:[]
 	};
 
-	static function fixture(flared:Bool):Void {
+	static function fixture():Void {
 		var values=new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",120);
-		if (flared) values.setNumber("footWidth",160).setNumber("footHeight",40).setNumber("footShoulder",15);
-		else values.setNumber("cornerChamfer",12);
+		values.setNumber("cornerChamfer",12);
 		var foundation=new MineralFoundation(values,[]);
 		var document=SinglePocketSetup.document();
-		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,flared ? "flared-shell" : "chamfered-shell",1);
+		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"chamfered-shell",1);
 		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
 		document.setup.sourceToMold=F.identity();
-		document.setup.features=[];
+
 		document.setup.fillHeightMm=120;
 		var boxes=materia.tooling.casting.CastingSourceRegions.derive(document);
 		check(boxes.regions==null && boxes.validation.filter(row -> row.status=="unsupported"
 			&& row.affectedIds.indexOf(document.input.id)>=0).length==1,
 			"Box-only consumers retain an explicit source-envelope Unsupported result");
 		var plan=CastingMoldCad.plan(document,options());
-		check(plan.formers.length==(flared ? 2 : 4),"Each envelope complement island is an independent former");
+		check(plan.formers.length==4,"Each envelope complement island is an independent former");
 		check(plan.document.input.envelope.length==document.input.envelope.length,"Shell planning preserves source envelope pieces");
 		check(plan.validation.filter(row -> row.rule=="tooling.feature.box-geometry" && row.status=="pass").length==1,
 			"Native regions qualify envelope tooling without claiming box-only source support");
@@ -72,73 +71,8 @@ class EnvelopeMoldTests {
 		check(message.indexOf("Casting reconstruction differs by")>=0,"Missing envelope filler fails exact reconstruction: "+message);
 	}
 
-	static function stepped():Void {
-		var document=SinglePocketSetup.document();
-		document.input.id="stepped-shell";
-		document.input.inserts=[];
-		document.input.features=[];
-		function rectangle(width:Float,depth:Float):Array<{x:Float,y:Float}>
-			return [{x:-width/2,y:-depth/2},{x:width/2,y:-depth/2},
-				{x:width/2,y:depth/2},{x:-width/2,y:depth/2}];
-		document.input.envelope=[
-			{id:"lower",profile:rectangle(200,160),height:20,pose:F.identity()},
-			{id:"upper",profile:rectangle(100,80),height:80,pose:F.translation(0,0,20)}
-		];
-		document.setup.features=[];
-		document.setup.sourceToMold=F.identity();
-		document.setup.fillHeightMm=100;
-		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
-		var plan=CastingMoldCad.plan(document,options());
-		var volume=200*160*20+100*80*80;
-		check(Math.abs(plan.handling.castingMassKg-volume*document.recipe.mixDensityKgM3*1e-9)<1e-7,
-			"Disjoint-box handling retains the exact stepped body rather than its stock bounds");
-		var resin=CastingMoldPlanner.resinAtFill(document);
-		check(Math.abs(materia.casting.BoxAlgebra.volume(resin)-volume)<1e-7,
-			"Box resin analysis uses every exact body piece");
-		check(plan.formers.length==1 && plan.formers[0].withdrawal.z==1,
-			"Connected stepped-envelope collar withdraws through the fill side");
-		var drawings=machinekit.tooling.ToolingSectionReview.build(plan);
-		check(drawings.records.length==plan.formers.length
-			&& drawings.validation.filter(row -> row.status!="pass").length==0,
-			"Every exact envelope filler has line/arc section drawing evidence");
-		var review=CastingMoldCad.review(plan);
-		check(review.symmetricDifferenceMm3<1e-5,"Stepped shell reconstructs its exact source union");
-		check(review.demolding.removalOrder.indexOf(plan.formers[0].volume.id)>=0,
-			"Collar has a real swept removal path");
-	}
-
-	static function bandedFillers():Void {
-		var values=new ComponentValues().setNumber("width",100).setNumber("depth",80).setNumber("height",120)
-			.setNumber("footWidth",160).setNumber("footHeight",40).setNumber("footShoulder",15);
-		var foundation=new MineralFoundation(values,[]),document=SinglePocketSetup.document();
-		document.input=machinekit.tooling.FoundationToolingAdapter.snapshot(foundation,"banded-shell",1);
-		document.setup.sourceFingerprint=ToolingCodec.inputFingerprint(document.input);
-		document.setup.sourceToMold=F.fromRotationMatrix(0,0,40,[1,0,0,0,0,-1,0,1,0]);
-		document.setup.features=[];document.setup.fillHeightMm=80;
-		var plan=CastingMoldCad.plan(document,options());
-		var outside=materia.casting.CastingRegion.Union([for (former in plan.formers)
-			materia.tooling.casting.MoldRegions.tooling(former.volume)]);
-		var interrupted=materia.casting.CastingRegion.Difference(outside,[materia.tooling.casting.MoldRegions.box(
-			{x:-80,y:-90,z:20,width:20,depth:20,height:10})]);
-		for (axis in [{x:1.0,y:0.0,z:0.0},{x:0.0,y:1.0,z:0.0},{x:0.0,y:0.0,z:1.0}])
-			check(CastingMoldPlanner.geometry.prismaticSection(interrupted,axis,1e-5,"banded-shell")==null,
-				"Interrupted complement genuinely needs more than one global prism");
-		plan.formers=[];
-		CastingMoldPlanner.addEnvelopeFormers(plan,interrupted);
-		check(plan.formers.length>2,"Exact band islands become independent physical fillers");
-		var target=machinekit.structural.CastingRegionCad.part(interrupted);
-		var rebuilt=machinekit.structural.CastingRegionCad.part(materia.casting.CastingRegion.Union(
-			[for (former in plan.formers) materia.tooling.casting.MoldRegions.tooling(former.volume)]));
-		var missing=target.subtractAll([rebuilt]),excess=rebuilt.subtractAll([target]);
-		check(missing.volume()+excess.volume()<1e-5,"Banded complement reconstruction has zero symmetric difference");
-		missing.close();excess.close();target.close();rebuilt.close();
-	}
-
 	static function main():Void {
-		fixture(true);
-		fixture(false);
-		stepped();
-		bandedFillers();
+		fixture();
 		Sys.println('EnvelopeMoldTests: $assertions assertions passed');
 	}
 }

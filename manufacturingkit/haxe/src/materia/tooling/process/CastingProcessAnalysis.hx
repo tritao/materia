@@ -102,7 +102,7 @@ class CastingProcessAnalysis {
       var ids = compound.affectedIds.copy();
       for (finding in sectionAssessment.validation) if (finding.status == Unsupported) for (id in finding.affectedIds) {
         var features = p.document.input.features.filter(feature -> feature.id == id);
-        var owner = features.length == 1 && features[0].derivedFrom != null ? features[0].derivedFrom : id;
+        var owner = id;
         if (ids.indexOf(owner) < 0) ids.push(owner);
       }
       ids.sort(Reflect.compare);

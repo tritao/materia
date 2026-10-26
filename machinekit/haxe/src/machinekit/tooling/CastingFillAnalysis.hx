@@ -89,7 +89,7 @@ class CastingFillAnalysis {
 			var boundaries:Array<NativeFillPart> = [],blockers:Array<NativeFillPart> = [],cores:Array<NativeFillPart> = [];
 			for (cavity in materia.casting.CastingCavities.derive(plan.document.input.envelope,plan.document.input.features)) {
 				var local=own(resources,machinekit.structural.CastingCavityCad.part(cavity));
-				boundaries.push({id:cavity.parentId,part:own(resources,machinekit.assembly.PosedParts.moved(local,plan.document.setup.sourceToMold))});
+				boundaries.push({id:cavity.featureId,part:own(resources,machinekit.assembly.PosedParts.moved(local,plan.document.setup.sourceToMold))});
 			}
 			var owners=new Map<String,Array<String>>();
 			for (anchor in CastingMoldCad.anchorComponents(plan)) owners.set(anchor.id,[anchor.insertId,anchor.anchorId]);

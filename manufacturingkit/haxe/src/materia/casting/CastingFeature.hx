@@ -108,5 +108,4 @@ typedef CastingFeature = {
 	var cornerRadius:Float;
 	var owner:Null<String>;
 	var adjustable:Array<CastingDimension>;
-	var derivedFrom:Null<String>;
 }

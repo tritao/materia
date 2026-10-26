@@ -270,7 +270,7 @@ class CastingMoldPlanner {
 	}
 
 	static function finish(result:CastingMoldPlan,
-			strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>):CastingMoldPlan {
+			strategies:Array<materia.tooling.casting.CastingStrategies.ResolvedFeatureStrategy>):CastingMoldPlan {
 		var d=result.document,o=result.options;
 		for (strategy in strategies) if (strategy.strategy==CoreStrategy.ReusableFormer) {
 			var feature=d.input.features.filter(feature -> feature.id==strategy.featureId)[0];
@@ -948,16 +948,8 @@ class CastingMoldPlanner {
 				section=geometry.prismaticSection(outside,axis,1e-5,plan.document.input.id);
 				if (section!=null) break;
 			}
-			var sections:Array<materia.casting.CastingSection.CastingPrismSection>=[];
-			if (section!=null) sections.push(section);
-			else {
-				var bounds=MoldRegions.exactBounds(outside,plan.document.input.id);
-				var origin=F.translation(bounds.x,bounds.y,bounds.z);
-				var bands=geometry.prismaticBands(MoldRegions.moved(outside,F.inverse(origin)),
-					bounds.width,bounds.depth,bounds.height,plan.document.input.id);
-				for (band in bands) sections.push({contours:band.contours,depth:band.topMm-band.bottomMm,
-					pose:F.compose(origin,F.translation(0,0,band.bottomMm))});
-			}
+			if (section==null) throw "Envelope filler is not a straight prism: "+plan.document.input.id;
+			var sections=[section];
 			for (slice in sections) for (outer in slice.contours) if (outer.depth%2==0) {
 				var contours=[outer];
 				for (hole in slice.contours) if (hole.depth==outer.depth+1
@@ -990,7 +982,7 @@ class CastingMoldPlanner {
 
 	/** Ownership ordering accepts raw caller order, before codec canonicalisation. */
 	public static function ownershipOrder(features:Array<materia.casting.CastingFeature>,
-			strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>):Array<materia.casting.CastingFeature> {
+			strategies:Array<materia.tooling.casting.CastingStrategies.ResolvedFeatureStrategy>):Array<materia.casting.CastingFeature> {
 		var ordered = features.copy();
 		ordered.sort((a, b) -> {
 			var aa = strategies.filter(v -> v.featureId == a.id),
@@ -1014,19 +1006,17 @@ class CastingMoldPlanner {
 			if (sources.length != sourceIds.length)
 				throw "Core has no unique source feature: " + core.id;
 			for (source in sources) {
-			var parent = source.derivedFrom == null ? source.id : source.derivedFrom;
-			var group = groups.get(parent);
-			if (group == null) {
-				group = {id: materia.tooling.ToolingIds.derive("core-unit-", parent), parentFeatureId: parent, featureIds: [], coreIds: []};
-				groups.set(parent, group);
-			}
-			if (group.featureIds.indexOf(source.id)<0) group.featureIds.push(source.id);
-			if (group.coreIds.indexOf(core.id)<0) group.coreIds.push(core.id);
+				var parent = source.id;
+				var group = groups.get(parent);
+				if (group == null) {
+					group = {id: materia.tooling.ToolingIds.derive("core-unit-", parent), featureId: parent, coreIds: []};
+					groups.set(parent, group);
+				}
+				if (group.coreIds.indexOf(core.id)<0) group.coreIds.push(core.id);
 			}
 		}
 		var result = [for (group in groups) group];
 		for (group in result) {
-			group.featureIds.sort(Reflect.compare);
 			group.coreIds.sort(Reflect.compare);
 		}
 		result.sort((a, b) -> Reflect.compare(a.id, b.id));

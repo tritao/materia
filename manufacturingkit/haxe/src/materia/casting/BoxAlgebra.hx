@@ -191,7 +191,7 @@ class BoxAlgebra {
 		var region:Array<Box3> = [];
 		for (prism in body) {
 			var residue:CastingCavities.FinishedCastingCavity = {
-				featureId: prism.id, parentId: prism.id,
+				featureId: prism.id,
 				geometry: CastingCavities.FinishedCavityGeometry.Prisms([prism])
 			};
 			if (!CastingCavities.supportsBoxes(residue)) {
@@ -203,53 +203,6 @@ class BoxAlgebra {
 			for (box in CastingCavities.boxes(residue)) region.push(box);
 		}
 		return coalesce(subtract(region, cuts));
-	}
-
-	/** Stable fragment IDs depend on exact geometry, never traversal/array order. */
-	public static function retain(features:Array<CastingFeature>, supports:Array<Box3>):Array<CastingFeature> {
-		var result:Array<CastingFeature> = [];
-		for (f in features) {
-			if (f.draft.degrees != 0 || f.cornerRadius != 0)
-				throw "Unsupported non-box retained-support subtraction: " + f.id;
-			var cells = coalesce(subtract([CastingBounds.feature(f)], supports));
-			if (cells.length == 1 && compare(cells[0], CastingBounds.feature(f)) == 0) {
-				result.push(f);
-				continue;
-			}
-			for (b in cells) {
-				var fragment:CastingFeature = {
-					id: f.id,
-					kind: f.kind,
-					geometry: f.geometry,
-					openings: [for (o in f.openings) {kind: o.kind, target: o.target}],
-					draft: {degrees: f.draft.degrees, axis: {x: f.draft.axis.x, y: f.draft.axis.y, z: f.draft.axis.z}},
-					cornerRadius: f.cornerRadius,
-					owner: f.owner,
-					adjustable: f.adjustable.copy(),
-					derivedFrom: f.derivedFrom
-				};
-				fragment.derivedFrom = f.derivedFrom == null ? f.id : f.derivedFrom;
-				fragment.id = fragment.derivedFrom + "-fragment-" + haxe.crypto.Sha256.encode(haxe.Json.stringify(limits(b))).substr(0, 20);
-				fragment.geometry = {
-					solid: Cut(CastingSolid.Box(b.width, b.depth, b.height)),
-					pose: materia.assembly.AssemblyFrames.translation(b.x + b.width / 2, b.y + b.depth / 2, b.z)
-				};
-				// A retained support may close a formerly open face. Keep only openings that survive.
-				var before = CastingBounds.feature(f),
-					old = limits(before),
-					now = limits(b);
-				fragment.openings = fragment.openings.filter(o -> {
-					if (o.kind != BodyFace)
-						return true;
-					var names = ["x-min", "y-min", "z-min", "x-max", "y-max", "z-max"];
-					var suffix = o.target.substr(o.target.lastIndexOf(".") + 1),
-						index = names.indexOf(suffix);
-					return index < 0 || old[index] == now[index];
-				});
-				result.push(fragment);
-			}
-		}
-		return CastingFeatureCodec.copy(result);
 	}
 
 	/** Exact minimum centroidal second moment about Y over X, in mm^4. */

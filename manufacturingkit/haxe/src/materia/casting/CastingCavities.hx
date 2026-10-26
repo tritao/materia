@@ -14,7 +14,6 @@ enum FinishedCavityGeometry {
 
 typedef FinishedCastingCavity = {
 	var featureId:String;
-	var parentId:String;
 	var geometry:FinishedCavityGeometry;
 }
 typedef CastingFace3 = {var id:String; var points:Array<{x:Float, y:Float, z:Float}>;}
@@ -75,7 +74,7 @@ class CastingCavities {
 						id: prism.id, profile: [for (point in prism.profile) {x: point.x, y: point.y}],
 						height: prism.height, pose: CastingRecordCodec.frame(prism.pose)
 					}];
-					result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom,
+					result.push({featureId: f.id,
 						geometry: SolidIntersection(envelope, f, records)});
 					continue;
 			}
@@ -134,7 +133,7 @@ class CastingCavities {
 			for (id in reached)
 				if (f.openings.filter(o -> o.kind == BodyFace && o.target == id).length == 0)
 					throw "Undeclared casting breakout: " + f.id + " " + id;
-			result.push({featureId: f.id, parentId: f.derivedFrom == null ? f.id : f.derivedFrom, geometry: Prisms(pieces)});
+			result.push({featureId: f.id, geometry: Prisms(pieces)});
 		}
 		return result;
 	}

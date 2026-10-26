@@ -21,7 +21,7 @@ class MineralCasting extends MachineComponent {
 
 	public static function parameters():Array<ComponentParameter> return [
 		P.length("width", 650), P.length("depth", 550), P.length("height", 120),
-		P.length("footWidth", 0), P.length("footHeight", 0), P.length("footShoulder", 0), P.length("cornerChamfer", 0),
+		P.length("cornerChamfer", 0),
 		P.text("features", CastingPatterns.encode([])),
 		P.choice("buildStage", materia.casting.InsertStages.tokens(), materia.casting.InsertStages.InsertStage.Service),
 		P.text("postCureBonds", "[]"),
@@ -56,18 +56,11 @@ class MineralCasting extends MachineComponent {
 			throw "Casting requires mineral cast";
 		if (v.number("cornerChamfer") < 0 || 2 * v.number("cornerChamfer") >= Math.min(v.number("width"), v.number("depth")))
 			throw "Casting chamfer consumes body";
-		if (v.number("footWidth") == 0 && (v.number("footHeight") != 0 || v.number("footShoulder") != 0))
-			throw "Incomplete casting foot";
-		if (v.number("footWidth") != 0 && (v.number("footWidth") <= v.number("width")
-			|| v.number("footShoulder") <= 0 || v.number("footHeight") <= v.number("footShoulder")
-			|| v.number("footHeight") >= v.number("height")))
-			throw "Invalid flared casting foot";
 		super("MINERAL-CASTING", "Mineral casting (purchase by casting mass, kg)", "mineral cast", false, v);
 		features = cuts;
-		envelope = CastingEnvelope.build(v.number("width"), v.number("depth"), v.number("height"), v.number("cornerChamfer"),
-			v.number("footWidth"), v.number("footHeight"), v.number("footShoulder"));
+		envelope = CastingEnvelope.build(v.number("width"), v.number("depth"), v.number("height"), v.number("cornerChamfer"));
 		var cavities = finishedCavities(), unsupported = cavities.filter(cavity -> !CastingCavities.supportsBoxes(cavity));
-		if ((postCureBonds().length == 0 || parameterToken("buildStage")==materia.casting.InsertStages.InsertStage.BeforeCasting) && parameterNumber("cornerChamfer") == 0 && parameterNumber("footWidth") == 0 && unsupported.length == 0 && embeddedAnchors().length==0) {
+		if ((postCureBonds().length == 0 || parameterToken("buildStage")==materia.casting.InsertStages.InsertStage.BeforeCasting) && parameterNumber("cornerChamfer") == 0 && unsupported.length == 0 && embeddedAnchors().length==0) {
 			var material = materialBoxes();
 			addFacet(CollisionHullFacet.fromBoxes([for (box in BoxAlgebra.compact(material)) BoxAlgebra.limits(box)]));
 			collisionHullQualification = new CastingCollisionQualification(CastingCollisionStatus.Supported, "Exact disjoint-box material hulls");
@@ -77,7 +70,7 @@ class MineralCasting extends MachineComponent {
 				: embeddedAnchors().length>0
 				? "Non-box anchor occupancy for inserts: "+[for (row in embeddedAnchors()) row.owner].join(", ")
 				: unsupported.length == 0
-				? "Flared or chamfered envelopes require non-box collision decomposition"
+				? "Chamfered envelopes require non-box collision decomposition"
 				: "Unsupported collision geometry for features: " + [for (cavity in unsupported) cavity.featureId].join(", "));
 		}
 		addFacet(collisionHullQualification);

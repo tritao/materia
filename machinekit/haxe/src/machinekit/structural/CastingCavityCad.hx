@@ -72,7 +72,7 @@ class CastingCavityCad {
 				declared.set(opening.target, true);
 				continue;
 			}
-			var candidates = features.filter(other -> other.id == opening.target || other.derivedFrom == opening.target);
+			var candidates = features.filter(other -> other.id == opening.target);
 			var meets = false;
 			for (other in candidates) {
 				var otherCut = scope.own(cut(other,body));

@@ -45,8 +45,8 @@ class MoldSceneTests {
     }
     for(former in plan.formers)for(id in former.featureIds)
      check(SceneSourceMaps.tooling(map,id).indexOf(former.volume.id)>=0,"Former names its source intent");
-    for(unit in plan.coreUnits)for(id in unit.featureIds)
-     check(SceneSourceMaps.tooling(map,id).length>0,"Every EPS source feature has forming tooling");
+    for(unit in plan.coreUnits)
+     check(SceneSourceMaps.tooling(map,unit.featureId).length>0,"Every EPS source feature has forming tooling");
     var again=SceneArtifact.decode(SceneArtifact.encode(data));
     var againProject:materia.project.SceneArtifact.SceneArtifactProject=cast again.project;
     check(haxe.Json.stringify(againProject.sources)==haxe.Json.stringify(map),"Source map survives a second round trip");

@@ -17,10 +17,9 @@ class HobberSourceTests {
  public static function bodyIntent():Void {
   for(kind in ["bed","column"]) {
    var values=FoundationLayout.bodyValues(kind),cuts=CastingPatterns.decode(values.token("features"));
-   var envelope=materia.casting.CastingEnvelope.build(values.number("width"),values.number("depth"),values.number("height"),0,0,0,0);
+   var envelope=materia.casting.CastingEnvelope.build(values.number("width"),values.number("depth"),values.number("height"));
    var cavities=CastingCavities.derive(envelope,cuts);
    check(cavities.length==cuts.length,"Every declared source cut derives exactly: "+kind);
-   check(cuts.filter(feature->feature.derivedFrom!=null).length==0,"Source pockets are directly authored: "+kind);
    var byFeature=new Map<String,Array<materia.casting.Box3>>(),voids:Array<materia.casting.Box3>=[];
    for(cavity in cavities) {
     check(CastingCavities.supportsBoxes(cavity),"Hobber design cuts retain exact box topology: "+cavity.featureId);

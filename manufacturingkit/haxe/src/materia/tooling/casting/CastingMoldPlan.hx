@@ -109,11 +109,10 @@ typedef CastingMoldCore = {
 	var support:materia.tooling.casting.CoreSupport;
 }
 
-/** One source core intent, with all foam pieces created around retained supports. */
+/** One exact source core intent and its physical foam membership. */
 typedef CastingCoreUnit = {
 	var id:String;
-	var parentFeatureId:String;
-	var featureIds:Array<String>;
+	var featureId:String;
 	var coreIds:Array<String>;
 }
 

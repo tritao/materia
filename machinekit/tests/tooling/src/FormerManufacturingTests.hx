@@ -109,8 +109,8 @@ class FormerManufacturingTests {
 		document.input.inserts=[];
 		document.input.features=document.input.features.filter(feature -> feature.kind!=materia.casting.CastingFeature.CastingFeatureKind.InsertRecess);
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
-		document.setup.features[0].strategy=ReusableFormer;
-		document.setup.features[0].withdrawal={x:0,y:0,z:1};
+		for(rule in document.recipe.featureRules)
+			if(rule.kind==materia.casting.CastingFeature.CastingFeatureKind.Lightening)rule.strategy=ReusableFormer;
 		var options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions={foundationJointProcesses:[],replicationJigs:[],precision:[],
 			compaction:{method:materia.tooling.casting.CastingMoldPlan.CompactionMethod.Undeclared,bedInterfaceReference:null,frequencyHz:null,amplitudeMm:null,durationSeconds:null,evidence:[]},
 			serviceOrientation:document.setup.sourceToMold,overlapRule:materia.tooling.casting.CastingMoldPlan.OverlapRule.ReservedThenPriority,liftingEvidence:[]};

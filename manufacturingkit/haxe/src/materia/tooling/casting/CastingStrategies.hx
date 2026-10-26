@@ -39,7 +39,23 @@ typedef CastingStrategyRule = {
 	var useEPSAboveBoardThickness:Bool;
 }
 
-/** Source intent and recipe rules choose defaults; setups name only explicit overrides. */
+/** Directions are expressed in mold coordinates, never source coordinates. */
+typedef ResolvedFeatureStrategy = {
+	var featureId:String;
+	var strategy:CoreStrategy;
+
+	/** Higher priority owns overlap first; IDs resolve equal priorities. */
+	var priority:Int;
+
+	/** Required for reusable formers. EPS may use null for breakup removal. */
+	var withdrawal:Null<{
+		var x:Float;
+		var y:Float;
+		var z:Float;
+	}>;
+}
+
+/** Source intent and recipe rules choose tooling; source axes select withdrawal. */
 class CastingStrategies {
 	public static function standardRules():Array<CastingStrategyRule> {
 		var rules:Array<CastingStrategyRule> = [];
@@ -113,20 +129,11 @@ class CastingStrategies {
 		};
 	}
 
-	public static function resolve(document:ToolingDocument):Array<CastingFeatureStrategy> {
-		var result:Array<CastingFeatureStrategy> = [];
+	public static function resolve(document:ToolingDocument):Array<ResolvedFeatureStrategy> {
+		var result:Array<ResolvedFeatureStrategy> = [];
 		for (feature in document.input.features) {
 			if (feature.kind == InsertRecess)
 				continue;
-			var overrides = document.setup.features.filter(s -> s.featureId == feature.id);
-			if (overrides.length == 0 && feature.derivedFrom != null)
-				overrides = document.setup.features.filter(s -> s.featureId == feature.derivedFrom);
-			if (overrides.length == 1) {
-				var selected = overrides[0], direction = selected.withdrawal;
-				result.push({featureId: feature.id, strategy: selected.strategy, priority: selected.priority,
-					withdrawal: direction == null ? null : {x: direction.x, y: direction.y, z: direction.z}});
-				continue;
-			}
 			var openings = feature.openings.filter(o -> o.kind == BodyFace);
 			var opening:StrategyOpening = openings.length == 0 ? Enclosed : BodyOpening;
 			var rules = document.recipe.featureRules.filter(rule -> rule.kind == feature.kind && rule.opening == opening);
@@ -173,21 +180,13 @@ class CastingStrategies {
 				for (candidate in candidates) {
 					var v = candidate.normal;
 					if (Math.abs(v.x - normal.x) + Math.abs(v.y - normal.y) + Math.abs(v.z - normal.z) > 1e-9)
-						throw "Ambiguous feature withdrawal; declare an explicit setup override: " + feature.id;
+						throw "Ambiguous feature withdrawal; declare the source withdrawal axis: " + feature.id;
 				}
 				direction = F.transformVector(document.setup.sourceToMold, normal.x, normal.y, normal.z);
 			}
 			result.push({featureId: feature.id, strategy: strategy, priority: rule.priority, withdrawal: direction});
 		}
 		result.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
-		var units = new Map<String, CoreStrategy>();
-		for (resolved in result) {
-			var feature = document.input.features.filter(source -> source.id == resolved.featureId)[0];
-			var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
-			if (units.exists(parent) && units.get(parent) != resolved.strategy)
-				throw "Core unit strategies differ: " + parent;
-			units.set(parent, resolved.strategy);
-		}
 		return result;
 	}
 }

@@ -5,13 +5,13 @@ import materia.assembly.AssemblyCodec;
 
 /** Strict source schema; no old box-list encoding is accepted. */
 class CastingFeatureCodec {
-	public static inline var VERSION = 4;
+	public static inline var VERSION = 5;
 
 	public static function records(features:Array<CastingFeature>):Array<Dynamic> return [for (feature in features) {
 		id:feature.id,kind:feature.kind,
 		geometry:{solid:CastingFeature.CastingGeometrySolids.record(feature.geometry.solid),pose:feature.geometry.pose},
 		openings:feature.openings,draft:feature.draft,cornerRadius:feature.cornerRadius,
-		owner:feature.owner,adjustable:feature.adjustable,derivedFrom:feature.derivedFrom
+		owner:feature.owner,adjustable:feature.adjustable
 	}];
 
 	public static function copy(features:Array<CastingFeature>):Array<CastingFeature> return snapshot(records(features));
@@ -43,8 +43,7 @@ class CastingFeatureCodec {
 				"draft",
 				"cornerRadius",
 				"owner",
-				"adjustable",
-				"derivedFrom"
+				"adjustable"
 			]);
 			var g:Dynamic = Reflect.field(row, "geometry"),
 				d:Dynamic = Reflect.field(row, "draft"),
@@ -76,8 +75,7 @@ class CastingFeatureCodec {
 						"x"), y: CastingRecordCodec.number(axis, "y"), z: CastingRecordCodec.number(axis, "z")}},
 				cornerRadius: CastingRecordCodec.number(row, "cornerRadius"),
 				owner: CastingRecordCodec.optionalString(row, "owner"),
-				adjustable: adjustable,
-				derivedFrom: CastingRecordCodec.optionalString(row, "derivedFrom")
+				adjustable: adjustable
 			});
 		}
 		var ids = new Map<String, Bool>();
@@ -90,8 +88,7 @@ class CastingFeatureCodec {
 				"draft",
 				"cornerRadius",
 				"owner",
-				"adjustable",
-				"derivedFrom"
+				"adjustable"
 			]);
 			identifier(f.id);
 			if (ids.exists(f.id))
@@ -133,8 +130,6 @@ class CastingFeatureCodec {
 				throw "Invalid casting feature corner radius: " + f.id;
 			if (f.owner != null)
 				identifier(f.owner);
-			if (f.derivedFrom != null)
-				identifier(f.derivedFrom);
 			if (f.openings == null || f.adjustable == null)
 				throw "Missing casting feature declarations: " + f.id;
 			var openings = new Map<String, Bool>();
@@ -157,15 +152,15 @@ class CastingFeatureCodec {
 		}
 		for (f in copy)
 			for (o in f.openings)
-				if (o.kind == Feature && (openingTargets(copy, o.target).length == 0 || o.target == f.id || o.target == f.derivedFrom))
+				if (o.kind == Feature && (openingTargets(copy, o.target).length == 0 || o.target == f.id))
 					throw "Unknown feature opening: " + f.id;
 		copy.sort((a, b) -> Reflect.compare(a.id, b.id));
 		return copy;
 	}
 
-	/** Openings may name an authored parent after retained supports fragment its cut. */
+	/** Openings name an exact source feature ID. */
 	public static function openingTargets(features:Array<CastingFeature>, id:String):Array<CastingFeature>
-		return features.filter(feature -> feature.id == id || feature.derivedFrom == id);
+		return features.filter(feature -> feature.id == id);
 
 	public static function fields(raw:Dynamic, names:Array<String>):Void {
 		if (raw == null || Std.isOfType(raw, Array) || Std.isOfType(raw, String))

@@ -109,8 +109,7 @@ class ReviewContractTests {
 		limits.recipe.designReview.minimumFixingAccessMm = 20;
 		limits.recipe.designReview.minimumLiftingPoints = 1;
 		limits.recipe.designReview.removalClearanceMm = 0;
-		limits.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
-		limits.setup.features[0].withdrawal = {x: 0, y: 0, z: -1};
+		ToolingTestRules.first(limits,materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,{x: 0, y: 0, z: -1});
 		var levelOne = CastabilityAnalysis.sourceReview(limits);
 		function sourceFinding(report:materia.tooling.process.CastabilityAnalysis.CastingDesignReport,
 				rule:String,id:String,status:String):Void {
@@ -123,15 +122,14 @@ class ReviewContractTests {
 			{rule:"insert-cover.seat",id:"seat"},
 			{rule:"insert-edge.seat",id:"seat"},
 			{rule:"fixing-access.seat",id:"seat"},
-			{rule:"lifting-points",id:limits.input.id},
-			{rule:"removal-direction.pocket",id:"pocket"}
+			{rule:"lifting-points",id:limits.input.id}
 		]) sourceFinding(levelOne,row.rule,row.id,"fail");
+		sourceFinding(levelOne,"removal-direction.pocket","pocket","pass");
 		var passing=ToolingCodec.copy(accepted);
 		passing.recipe.designReview.minimumInsertCoverMm=9;
 		passing.recipe.designReview.minimumFixingAccessMm=10;
 		passing.recipe.designReview.removalClearanceMm=0;
-		passing.setup.features[0].strategy=materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;
-		passing.setup.features[0].withdrawal={x:0,y:0,z:1};
+		ToolingTestRules.first(passing,materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,{x:0,y:0,z:1});
 		var positive=CastabilityAnalysis.sourceReview(passing);
 		for (row in [
 			{rule:"insert-cover.seat",id:"seat"},
@@ -184,8 +182,8 @@ class ReviewContractTests {
 		check(Math.abs(bridges.cores[0].support.bridgeBondAreaMm2 - foam.width * foam.depth) < 1e-7,
 			"a wider row beam never credits bond area beyond the smaller foam pad");
 		var rigid=ToolingCodec.copy(p.document);
-		for (strategy in rigid.setup.features) if (strategy.strategy==materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
-			strategy.strategy=materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer;strategy.withdrawal={x:0,y:0,z:1};
+		for (strategy in materia.tooling.casting.CastingStrategies.resolve(rigid)) if (strategy.strategy==materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS) {
+			ToolingTestRules.set(rigid,strategy.featureId,materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,0,{x:0,y:0,z:1});
 		}
 		var noCore=CastingMoldPlanner.plan(rigid,p.options);
 		s=FabricationTests.spec();s.solvent=StyreneBearing;s.compatibilityEvidence=["test resin"];

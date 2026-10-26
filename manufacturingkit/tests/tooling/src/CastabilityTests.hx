@@ -111,7 +111,6 @@ class CastabilityTests {
 		var baseline = materia.tooling.process.CastabilityAnalysis.sourceReview(document);
 		var feature = document.input.features.filter(feature -> feature.id == "pocket")[0];
 		feature.cornerRadius = 4;
-		feature.derivedFrom = "authored-pocket";
 		document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
 		var before = ToolingCodec.canonical(document);
 		var spec = ProcessTests.spec();
@@ -122,15 +121,15 @@ class CastabilityTests {
 		var source = ToolingCodec.documentFingerprint(document), process = "partial-process";
 		var fill = FillAnalysis.analyze(document.input.id, source, process,
 			[box(0, 0, 2, 2, 10), box(2, 0, 2, 2, 2), box(4, 0, 4, 2, 6)],
-			[{id: "authored-pocket", box: box(4, 6, 4, 2, 4)}], [], 10, 2400, 10, null, 100);
+			[{id: "pocket", box: box(4, 6, 4, 2, 4)}], [], 10, 2400, 10, null, 100);
 		var report = CastabilityAnalysis.analyze(document, spec, fill, null, source, process);
 		check(report.minimumOpposingFaceSpanMm == null && report.maximumInscribedThicknessMm == null
 			&& report.maximumDiameterLowerMm == null && report.maximumDiameterUpperMm == null, "missing section geometry supplies no invented scalar measurements");
 		for (rule in ["process.castability.minimum-passage"]) {
 			check(status(report, rule) == "unsupported", "a declared limit does not qualify missing geometry: " + rule);
 			var row = report.validation.filter(row -> row.rule == rule)[0];
-			check(row.affectedIds.length == 1 && row.affectedIds[0] == "authored-pocket",
-				"unsupported measurements name the authored feature rather than a fragment or body bound");
+			check(row.affectedIds.length == 1 && row.affectedIds[0] == "pocket",
+				"unsupported measurements name the source feature rather than a body bound");
 		}
 		check(status(report, "process.level1.lifting-points") == "fail",
 			"a non-box cavity cannot hide missing typed lifting connections");
@@ -144,7 +143,7 @@ class CastabilityTests {
 		var vent = report.proposals.filter(proposal -> proposal.action == RouteVent);
 		check(vent.length == 1 && vent[0].point != null, "partial fill keeps its vent position");
 		var ventPoint:{x:Float,y:Float,z:Float} = cast vent[0].point;
-		check(vent[0].sourceIds[0] == "authored-pocket" && ventPoint.z == 6,
+		check(vent[0].sourceIds[0] == "pocket" && ventPoint.z == 6,
 			"exact fill evidence retains its owned vent proposal without orthogonal sections");
 		check(report.validation.filter(row -> row.rule == vent[0].rule && row.status == "fail").length == 1,
 			"retaining a vent suggestion never clears the actual trapped-air failure");
@@ -154,24 +153,11 @@ class CastabilityTests {
 			"an unavailable fill report keeps source checks without inventing pockets or vent locations");
 		check(ToolingCodec.canonical(document) == before, "partial geometry screening leaves authored source facts unchanged");
 		document.input.features.reverse();
-		document.setup.features.reverse();
+		document.recipe.featureRules.reverse();
 		check(ToolingCodec.canonical(CastabilityAnalysis.analyze(document, spec, fill, null, source, process))
 			== ToolingCodec.canonical(report), "partial reports and proposal IDs do not depend on feature order");
 		rejects(() -> CastabilityAnalysis.analyze(document, spec, fill, null, source, "stale"),
 			"Mismatched castability fill process");
-		var fragments = ToolingCodec.copy(document);
-		var sibling = materia.casting.CastingFeatureCodec.copy(fragments.input.features.filter(feature -> feature.id == "pocket"))[0];
-		sibling.id = "pocket-second";
-		fragments.input.features.push(sibling);
-		fragments.setup.sourceFingerprint = ToolingCodec.inputFingerprint(fragments.input);
-		var grouped = materia.tooling.process.CastabilityAnalysis.sourceReview(fragments);
-		var geometryRows = grouped.validation.filter(row -> row.rule == "process.level1.geometry.authored-pocket");
-		check(geometryRows.length == 1 && geometryRows[0].message.indexOf("pocket-second") >= 0
-			&& geometryRows[0].message.indexOf("pocket") >= 0,
-			"non-box fragments retain their reasons in one finding for the authored parent");
-		fragments.input.features.reverse();
-		check(ToolingCodec.canonical(materia.tooling.process.CastabilityAnalysis.sourceReview(fragments)) == ToolingCodec.canonical(grouped),
-			"grouped geometry findings and messages are independent of fragment order");
 		var curvedBody = ToolingCodec.copy(document);
 		curvedBody.input.envelope = materia.casting.CastingEnvelope.build(200, 180, 100, 10);
 		curvedBody.setup.sourceFingerprint = ToolingCodec.inputFingerprint(curvedBody.input);
@@ -208,6 +194,7 @@ class CastabilityTests {
 		var source = ToolingCodec.documentFingerprint(d),
 			owner = d.input.features[0].id;
 		function analyze(region:Array<MoldBox>, ?boundaries:Array<FillBoundary>):CastabilityReport {
+			s.recipeFingerprint=ToolingCodec.recipeFingerprint(d.recipe);
 			if (boundaries == null)
 				boundaries = [];
 			var fillHeight = 0.0;
@@ -299,7 +286,7 @@ class CastabilityTests {
 		check(status(unknown, "process.castability.minimum-passage") == "pending", "unknown aggregate never passes");
 		check(compoundStatus()=="pending","unknown datasheet section limit never passes");
 		check(status(unknown, "process.fill.air-escape-width") == "pending", "unknown ceiling rule remains pending");
-		for (strategy in d.setup.features) {
+		for (strategy in materia.tooling.casting.CastingStrategies.resolve(d)) {
 			if (strategy.strategy == materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS)
 				check(unknown.proposals.filter(v -> v.action == QualifyBreakout
 					&& v.sourceIds.indexOf(strategy.featureId) >= 0).length == 1,
@@ -312,18 +299,19 @@ class CastabilityTests {
 			}
 		}
 		var unchanged = ToolingCodec.documentFingerprint(p.document);
-		d.setup.features.reverse();
+		d.recipe.featureRules.reverse();
 		d.input.features.reverse();
 		check(ToolingCodec.canonical(analyze([box(0, 0, 100, 60, 20)])) == ToolingCodec.canonical(unknown),
 			"source/setup member order does not change screening or proposal IDs");
-		var unsupportedFeature = d.setup.features[0].featureId;
-		d.setup.features[0].strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
+		var unsupportedFeature = materia.tooling.casting.CastingStrategies.resolve(d)[0].featureId;
+		ToolingTestRules.first(d,materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported,null);
 		var unsupported = analyze([box(0, 0, 100, 60, 20)]);
 		check(status(unsupported, "process.castability.release." + unsupportedFeature) == "unsupported", "unsupported strategy remains an explicit blocker");
 		check(unsupported.proposals.filter(v -> v.action == SplitOrSacrificial
 			&& v.sourceIds.indexOf(unsupportedFeature) >= 0).length == 1,
 			"unsupported strategy gets a tooling action with its source ID");
 		d = ToolingCodec.copy(p.document);
+		s.recipeFingerprint=ToolingCodec.recipeFingerprint(d.recipe);
 		check(ToolingCodec.documentFingerprint(p.document) == unchanged, "screening and suggestions preserve the original source/setup");
 		for (proposal in unknown.proposals)
 			check(unknown.validation.filter(v -> v.rule == proposal.rule).length == 1, "proposal references real finding");
@@ -339,7 +327,7 @@ class CastabilityTests {
 		Reflect.deleteField(rawSpec.castability,"minimumPassageAggregateRatio");
 		rejects(() -> ProcessSpecs.fromRecord(rawSpec),"Unexpected casting record fields");
 		s.recipeFingerprint = haxe.crypto.Sha256.encode("stale");
-		rejects(() -> analyze([box(0, 0, 100, 60, 20)]), "Stale castability recipe");
+		rejects(() -> CastabilityAnalysis.analyze(d,s,fill,sections,source,"process",p.validation), "Stale castability recipe");
 		Sys.println('CastabilityTests: $assertions assertions passed');
 	}
 }

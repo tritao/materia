@@ -145,7 +145,7 @@ class CastabilityAnalysis {
 			for (check in geometry.validation) if (check.status == Unsupported)
 				for (id in check.affectedIds) {
 					var features = d.input.features.filter(feature -> feature.id == id);
-					ids.push(features.length == 1 && features[0].derivedFrom != null ? features[0].derivedFrom : id);
+					ids.push(id);
 				}
 			ids = sources(ids);
 			if (ids.length == 0) ids = [root];
@@ -215,13 +215,9 @@ class CastabilityAnalysis {
 		}
 		var strategies = materia.tooling.casting.CastingStrategies.resolve(d);
 		strategies.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
-		var reportedParents = new Map<String, Bool>();
 		for (strategy in strategies) {
 			var source = d.input.features.filter(feature -> feature.id == strategy.featureId)[0];
-			var parent = source.derivedFrom == null ? source.id : source.derivedFrom;
-			if (reportedParents.exists(parent))
-				continue;
-			reportedParents.set(parent, true);
+			var parent = source.id;
 			var rule = "process.castability.release." + parent;
 			if (strategy.strategy == SacrificialEPS) {
 				checks.push(FillAnalysis.check(rule, [parent], Pending,
@@ -231,21 +227,10 @@ class CastabilityAnalysis {
 					"Trial breakout through the declared opening after fixture release; record access, remaining foam and damage against this source revision."));
 			} else if (strategy.strategy == ReusableFormer) {
 				var draftRule = "tooling.former.draft." + strategy.featureId;
-				var siblings = d.input.features.filter(feature -> (feature.derivedFrom == null ? feature.id : feature.derivedFrom) == parent);
-				var draftRules = [for (feature in siblings) "tooling.former.draft." + feature.id];
-				var actual = plannerChecks == null ? [] : plannerChecks.filter(v -> draftRules.indexOf(v.rule) >= 0);
+				var actual = plannerChecks == null ? [] : plannerChecks.filter(v -> v.rule == draftRule);
 				if (actual.length > 0) {
-					for (check in actual)
-						checks.push(check);
-					if (siblings.length == 1)
-						rule = draftRule;
-					else {
-						var status = actual.filter(v -> v.status == Unsupported).length > 0 ? Unsupported
-							: actual.filter(v -> v.status == Fail).length > 0 ? Fail
-							: actual.length < siblings.length || actual.filter(v -> v.status == Pending).length > 0 ? Pending : Pass;
-						checks.push(FillAnalysis.check(rule, [parent], status,
-							"Release qualification covers every fragment of the authored core unit.", []));
-					}
+					for (check in actual) checks.push(check);
+					rule = draftRule;
 				} else
 					checks.push(FillAnalysis.check(rule, [parent], Pending,
 						"Run the real planner and exact swept removal checks for rigid-former extraction; adhesion needs physical evidence.", []));
@@ -317,36 +302,34 @@ class CastabilityAnalysis {
 				proposals.push(proposal);
 			}
 		}
-		var radiusByParent = new Map<String, Float>();
+		var radiusByFeature = new Map<String, Float>();
 		for (feature in d.input.features)
 			if (feature.kind != InsertRecess) {
-				var parent = feature.derivedFrom == null ? feature.id : feature.derivedFrom;
+				var parent = feature.id;
 				var radius = materia.casting.CastingProfileGeometry.minimumInternalRadius(
 					materia.casting.CastingFeatureContours.contour(feature));
-				var previous = radiusByParent.get(parent);
-				radiusByParent.set(parent, previous == null ? radius : Math.min(previous, radius));
+				radiusByFeature.set(parent, radius);
 			}
-		for (radius in radiusByParent)
+		for (radius in radiusByFeature)
 			metrics.minimumCornerRadiusMm = metrics.minimumCornerRadiusMm == null ? radius : Math.min(metrics.minimumCornerRadiusMm, radius);
-		var parents = [for (parent in radiusByParent.keys()) parent];
+		var parents = [for (parent in radiusByFeature.keys()) parent];
 		parents.sort(Reflect.compare);
 		for (parent in parents)
-			finding("process.level1.corner-radius." + parent, parent, radiusByParent.get(parent), limits.minimumCornerRadiusMm,
+			finding("process.level1.corner-radius." + parent, parent, radiusByFeature.get(parent), limits.minimumCornerRadiusMm,
 				"Authored source wall-profile radius needs the recipe minimum; any change requires design acceptance and replanning.", null,
 				limits.minimumCornerRadiusMm);
 		var liftCount = materia.tooling.casting.CastHandling.liftingIds(d).length;
 		finding("process.level1.lifting-points", d.input.id, liftCount, limits.minimumLiftingPoints == null ? null : 1.0 * limits.minimumLiftingPoints,
 			"Typed lifting-point count versus recipe requirement; load capacity, CoM and a qualified cradle remain separate evidence.", null, null);
 		// Geometry capability is separate from anchor bearing/capacity evidence.
-		// Multiple non-box fragments still produce one owned source finding.
+		// Findings retain exact source IDs.
 		var support = materia.tooling.casting.CastingBoxSupport.check(d.input, "process.level1.geometry");
 		var unsupported = support.filter(check -> check.status == Unsupported);
 		var geometryOwners = new Map<String, Array<String>>(), geometryMessages = new Map<String, Array<String>>();
 		for (check in unsupported) {
 			var parents:Array<String> = [];
 			for (id in check.affectedIds) {
-				var sources = d.input.features.filter(feature -> feature.id == id);
-				var parent = sources.length == 0 || sources[0].derivedFrom == null ? id : sources[0].derivedFrom;
+				var parent = id;
 				if (parents.indexOf(parent) < 0) parents.push(parent);
 			}
 			parents.sort(Reflect.compare);

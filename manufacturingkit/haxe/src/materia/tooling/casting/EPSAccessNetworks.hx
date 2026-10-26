@@ -9,7 +9,7 @@ import materia.casting.CastingSection.CastingSectionContour;
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.ToolingDocument;
 import materia.tooling.ToolingCodec;
-import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
+import materia.tooling.casting.CastingStrategies.ResolvedFeatureStrategy;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 
 typedef EPSAccessNetwork = {
@@ -101,7 +101,7 @@ class EPSAccessNetworks {
   return candidates[0];
  }
 
- public static function plan(d:ToolingDocument,strategies:Array<CastingFeatureStrategy>,
+ public static function plan(d:ToolingDocument,strategies:Array<ResolvedFeatureStrategy>,
   excluded:Array<String>,?reserved:Array<Box3>):Array<EPSAccessNetwork> {
   var ids=[for(strategy in strategies)if(strategy.strategy==SacrificialEPS
    && excluded.indexOf(strategy.featureId)<0)strategy.featureId];

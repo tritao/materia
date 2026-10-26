@@ -275,7 +275,9 @@ class MillMoldChecks {
 		var unsupported = materia.tooling.ToolingCodec.copy(p.document);
 		var unsupportedChoice = materia.tooling.casting.CastingStrategies.resolve(unsupported)[0];
 		unsupportedChoice.strategy = materia.tooling.casting.CastingSetup.CoreStrategy.Unsupported;
-		unsupported.setup.features = [unsupportedChoice];
+		var unsupportedKind=unsupported.input.features.filter(feature->feature.id==unsupportedChoice.featureId)[0].kind;
+		for(rule in unsupported.recipe.featureRules)
+			if(rule.kind==unsupportedKind)rule.strategy=unsupportedChoice.strategy;
 		var partial = CastingMoldPlanner.plan(unsupported, p.options),
 			assessment = CastingMoldCad.assess(partial);
 		check(assessment.geometry == null && assessment.diagnostics.hasErrors() && !partial.fabrication.ready,

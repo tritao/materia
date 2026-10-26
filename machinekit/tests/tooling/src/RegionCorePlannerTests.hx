@@ -28,7 +28,7 @@ class RegionCorePlannerTests {
 			[materia.casting.CastingPatterns.face("body.x-min"),materia.casting.CastingPatterns.feature("pocket")],
 			100,20,30,-71,0,20);
 		mixed.input.features.push(service);
-		mixed.setup.features.push({featureId:service.id,strategy:ReusableFormer,priority:10,withdrawal:{x:-1,y:0,z:0}});
+		ToolingTestRules.set(mixed,service.id,ReusableFormer,10,{x:-1,y:0,z:0});
 		mixed.setup.sourceFingerprint=ToolingCodec.inputFingerprint(mixed.input);
 		var mixedPlan=machinekit.tooling.CastingMoldCad.plan(mixed,options);
 		check(mixedPlan.cores.length==1 && mixedPlan.formers.length==1,

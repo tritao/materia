@@ -72,16 +72,6 @@ class FoundationToolingTests {
 		rejectsCavity(() -> {var p = source().geometry(); p.close();}, "Unreached declared feature opening: round-port passage");
 		companions = [];
 
-		feature.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(16, 30));
-		feature.geometry.pose = F.translation(65, 0, 25);
-		feature.openings = [CastingPatterns.face("foot.side-2")];
-		values.setNumber("height", 120).setNumber("footWidth", 160).setNumber("footHeight", 60).setNumber("footShoulder", 20);
-		var foot = source();
-		var cavity = machinekit.structural.CastingCavityCad.part(foot.finishedCavities()[0]);
-		// The plane x + 0.75z = 95 bisects this cylinder under (x,z)->(130-x,80-z).
-		try near(cavity.volume(), Math.PI * 8 * 8 * 15, "sloped-foot cylinder agrees with analytic half-volume")
-		catch (error:Dynamic) {cavity.close(); throw error;}
-		cavity.close();
 	}
 
 	static function roundFoundation():Void {
@@ -156,7 +146,7 @@ class FoundationToolingTests {
 		var document = SinglePocketSetup.document();
 		document.input = input;
 		document.setup.sourceToMold = sourceToMold;
-		document.setup.features = [];
+
 		document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(input);
 		// Explicit nominal mouth land study: this is not physical seal evidence.
 		document.recipe.hardware.sealMargin = 0.5;
@@ -319,15 +309,6 @@ class FoundationToolingTests {
 				fillHeightMm: 100,
 				freeboardMm: 0,
 				sourceToMold: F.identity(),
-				features: [
-					for (f in input.features)
-						if (f.kind != "insert-recess") {
-							featureId: f.id,
-							strategy: SacrificialEPS,
-							priority: 0,
-							withdrawal: null
-						}
-				]
 			},
 			recipe: {
 				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
@@ -504,12 +485,6 @@ class FoundationToolingTests {
 		chamfered.setNumber("cornerChamfer", 12);
 		var chamferedInput = equivalent(new MineralFoundation(declareFixtureOpenings(chamfered, ["underside" => ["body.z-min"], "side-opening" => ["body.x-min"]]), placements), "chamfered-foundation");
 		check(chamferedInput.envelope[0].profile.length == 8, "chamfer represented by actual profile");
-		var flared = values.copy();
-		flared.setNumber("footWidth", 320).setNumber("footHeight", 100).setNumber("footShoulder", 50);
-		var flaredPlacements:Array<CastInsertPlacement> = [placements[0], {id: placements[1].id, part: placements[1].part, pose: placements[1].pose, openings: [CastingPatterns.face("foot.y-min")]}];
-		var flaredInput = equivalent(new MineralFoundation(declareFixtureOpenings(flared, ["underside" => ["foot.z-min"], "side-opening" => ["body.x-min", "foot.side-4"]]), flaredPlacements), "flared-foundation");
-		check(flaredInput.envelope.length == 2 && flaredInput.envelope[1].id == "foot", "flared foot is an additive oriented prism");
-		equivalent(new MineralFoundation(declareFixtureOpenings(flared.setNumber("cornerChamfer", 12), ["underside" => ["foot.z-min"], "side-opening" => ["body.x-min", "foot.side-4"]]), flaredPlacements), "flared-chamfered-foundation");
 
 		// Existing independent machine family exercises the same adapter unchanged.
 		var hobber = FoundationToolingAdapter.snapshot(new machinekit.hobbing.MineralCastBed(), "typed-hobber", 1);

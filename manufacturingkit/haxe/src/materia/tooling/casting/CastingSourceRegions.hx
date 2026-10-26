@@ -39,7 +39,7 @@ class CastingSourceRegions {
 				F.compose(d.setup.sourceToMold, F.translation(box.x + box.width / 2, box.y + box.depth / 2, box.z)));
 		}
 		var envelope:CastingCavities.FinishedCastingCavity = {
-			featureId: d.input.id, parentId: d.input.id,
+			featureId: d.input.id,
 			geometry: CastingCavities.FinishedCavityGeometry.Prisms(d.input.envelope)
 		};
 		var body:Array<MoldBox> = [];

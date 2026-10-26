@@ -9769,8 +9769,8 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "1a73fe35f001c987f2ec597ae7605d14e5e26226332d57eed2d55e5ce644a79b",
-      "sourceCodecVersion": 26,
+      "sourceFingerprint": "6674e6c21bbdace4f49f77e821f6fa49035409cc2f3ff874b636cb495675a812",
+      "sourceCodecVersion": 27,
       "volumeMm3": 68796700.8557764,
       "massKg": 165.1120820538634,
       "boxStatus": "unsupported",
@@ -9780,8 +9780,8 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "488bf81f94d0259bb3354cb460fc55ca43ac071373977f4a8ec84a8c96ee6e54",
-      "sourceCodecVersion": 26,
+      "sourceFingerprint": "0a89ca6800c36e949902d732872a9dcaa4aa98c9edd4a9dfdf0821c3e67cb531",
+      "sourceCodecVersion": 27,
       "volumeMm3": 42272723.07897126,
       "massKg": 101.45453538953103,
       "boxStatus": "unsupported",
@@ -9794,8 +9794,8 @@
     },
     {
       "id": "hobber-bed",
-      "sourceFingerprint": "670821457025b31c18e310ca3c83a7b0a165fc301424f743c9998b9f6bac20e4",
-      "sourceCodecVersion": 26,
+      "sourceFingerprint": "7f528cf30a35e4148b6ed4e3a3fc9f97292c81f1cdae1449dd1997e592923319",
+      "sourceCodecVersion": 27,
       "volumeMm3": 471682156.0256817,
       "massKg": 1132.0371744616361,
       "boxStatus": "unsupported",
@@ -9818,8 +9818,8 @@
     },
     {
       "id": "hobber-column",
-      "sourceFingerprint": "86f1a4a9b509edd96f52ee4c7ff61ee3c2cba36f6dd7db2be8fe5fdd3eb08e0b",
-      "sourceCodecVersion": 26,
+      "sourceFingerprint": "d200dc072fd259f64e1a7c500cb394a1b694c37361e7759c8871c9c22be953b5",
+      "sourceCodecVersion": 27,
       "volumeMm3": 29267979.66861247,
       "massKg": 70.24315120466993,
       "boxStatus": "unsupported",

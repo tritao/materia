@@ -62,7 +62,7 @@ class ToolingTests {
 		var document=fixture(),feature=document.input.features[0];
 		feature.kind=ServiceOpening;
 		for (rule in document.recipe.featureRules) rule.useEPSAboveBoardThickness=true;
-		document.setup.features=[];
+
 		var selected=materia.tooling.casting.CastingStrategies.resolve(document)[0];
 		check(selected.strategy==SacrificialEPS,"A deep body-open pocket uses EPS by recipe, without a feature-ID override");
 		feature.geometry.solid=materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(10,80,61));
@@ -92,7 +92,7 @@ class ToolingTests {
 				materia.casting.CastingPatterns.face(face)], 100, 180, 100);
 		document.input.features = [feature];
 		document.input.inserts = [];
-		document.setup.features = [];
+
 		for (rule in document.recipe.featureRules) rule.preferredAxis = X;
 		document.setup.sourceFingerprint = ToolingCodec.inputFingerprint(document.input);
 		var selected = materia.tooling.casting.CastingStrategies.resolve(document);
@@ -377,8 +377,8 @@ class ToolingTests {
 				}
 			],
 			features: [
-				{id:"pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,61)),pose:F.translation(0, 0, -1)},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null},
-				{id:"insert-seat",kind:InsertRecess,owner:"seat",geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,20))),pose:F.translation(80, 0, 90)},openings:[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height],derivedFrom:null}
+				{id:"pocket",kind:materia.casting.CastingFeature.CastingFeatureKind.Lightening,owner:null,geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(100,80,61)),pose:F.translation(0, 0, -1)},openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]},
+				{id:"insert-seat",kind:InsertRecess,owner:"seat",geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40,30,20))),pose:F.translation(80, 0, 90)},openings:[materia.casting.CastingPatterns.face("body.z-max"),materia.casting.CastingPatterns.face("body.x-max")],draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]}
 			],
 			inserts: [
 				{
@@ -490,15 +490,7 @@ class ToolingTests {
 				sourceFingerprint: ToolingCodec.inputFingerprint(input),
 				fillHeightMm: 100,
 				freeboardMm: 0,
-				sourceToMold: F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [
-					{
-						featureId: "pocket",
-						strategy: SacrificialEPS,
-						priority: 0,
-						withdrawal: null
-					}
-				]
+				sourceToMold: F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1])
 			}
 		};
 	}
@@ -508,7 +500,7 @@ class ToolingTests {
 		d.input.features = d.input.features.filter(f -> f.kind == materia.casting.CastingFeature.CastingFeatureKind.InsertRecess);
 		d.input.features.push(materia.casting.CastingPatterns.box("through-opening", ServiceOpening,
 			[materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")], 20, 20, 100));
-		d.setup.features = [];
+
 		var through=d.input.features.filter(feature -> feature.id=="through-opening")[0];
 		through.draft.axis={x:1,y:0,z:0};
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
@@ -520,10 +512,6 @@ class ToolingTests {
 		var actual=nominated[0].withdrawal;
 		check(actual!=null && Math.abs(actual.x-expected.x)+Math.abs(actual.y-expected.y)+Math.abs(actual.z-expected.z)<1e-8,
 			"source axis chooses the intended end and follows the source-to-mold orientation without an ID-keyed override");
-		d.setup.features = [{featureId: "through-opening", strategy: ReusableFormer, priority: 5, withdrawal: {x: 0, y: 0, z: 1}}];
-		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(d));
-		var direction:{x:Float, y:Float, z:Float} = cast chosen[0].withdrawal;
-		check(chosen.length == 1 && direction.z == 1, "an explicit source feature override resolves withdrawal ambiguity");
 		check(materia.tooling.casting.CastingStrategies.standardRules().filter(rule -> rule.priority != 0).length == 0,
 			"generic strategy rules contain no machine-specific ownership priorities");
 	}
@@ -713,7 +701,7 @@ class ToolingTests {
 		check(ToolingCodec.documentFingerprint(ordered) == fingerprint, "named collection order does not change fingerprint");
 		var before = ToolingCodec.recipeFingerprint(ordered.recipe);
 		var defaults = fixture();
-		defaults.setup.features = [];
+
 		var rules = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(defaults));
 		check(rules.length == 1 && rules[0].strategy == SacrificialEPS,
 			"recipe rules select lightening cores without feature-ID tables");
@@ -811,24 +799,10 @@ class ToolingTests {
 			r.document.input.envelope = [for (_ in 0...513) items(r.document.input.envelope)[0]];
 		}, "Too many tooling records");
 		corrupt(r -> {
-			r.document.setup.features = new Array<Dynamic>();
 			r.document.recipe.featureRules = new Array<Dynamic>();
 		}, "Missing or duplicate recipe strategy rule");
-		corrupt(r -> {
-			items(r.document.setup.features)[0].featureId = "insert-seat";
-		}, "insert-recess strategy");
-		corrupt(r -> {
-			items(r.document.setup.features).push(items(r.document.setup.features)[0]);
-		}, "duplicate or insert-recess strategy");
-		corrupt(r -> {
-			items(r.document.setup.features)[0].strategy = "reusable-former";
-		}, "needs a withdrawal");
-		corrupt(r -> {
-			items(r.document.setup.features)[0].withdrawal = {x: 0, y: 0, z: 2};
-		}, "unit length");
-		corrupt(r -> {
-			items(r.document.setup.features)[0].strategy = "guess";
-		}, "Unsupported core strategy token");
+		corrupt(r -> {Reflect.setField(r.document.setup,"features",new Array<Dynamic>());}, "Unknown setup field: features");
+		corrupt(r -> {items(r.document.recipe.featureRules)[0].strategy="guess";}, "Invalid casting rule strategy");
 		corrupt(r -> {
 			r.document.recipe.panel.thicknessVariation = 18;
 		}, "variation consumes");
@@ -880,13 +854,12 @@ class ToolingTests {
 			check(pendingRules.indexOf("tooling.insert.anchorage." + insert.id + ".source") >= 0,
 				"undeclared source anchorage remains pending: " + insert.id);
 		var unsupported = fixture();
-		unsupported.setup.features[0].strategy = Unsupported;
+		ToolingTestRules.first(unsupported,Unsupported,null);
 		check(ToolingReview.inspect(unsupported).filter(d -> d.status == "unsupported").length == 1,
 			"explicit unsupported strategy survives serialization and review");
 		var reusable = fixture();
-		reusable.setup.features[0].strategy = ReusableFormer;
-		reusable.setup.features[0].withdrawal = {x: 0, y: 0, z: 1};
-		var restoredDirection = ToolingCodec.decode(ToolingCodec.encode(reusable)).setup.features[0].withdrawal;
+		ToolingTestRules.first(reusable,ReusableFormer,{x: 0, y: 0, z: 1});
+		var restoredDirection = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.decode(ToolingCodec.encode(reusable)))[0].withdrawal;
 		check(restoredDirection != null && restoredDirection.z == 1, "explicit reusable former direction");
 		reusable.recipe.core.compressionStrengthPa = 100000;
 		reusable.recipe.core.compressionStrainFraction = 0.1;

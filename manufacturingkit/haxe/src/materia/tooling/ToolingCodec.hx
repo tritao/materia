@@ -19,7 +19,6 @@ import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import materia.casting.CastingFeature.CastingFeatureKind;
 import materia.tooling.casting.CastingSetup;
 import materia.tooling.casting.CastingSetup.CoreStrategy;
-import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
 
 /** Strict, detached and deterministic records. No native geometry or inventory effects.
  * Named collections are sorted by ID; profile vertices retain their geometric order.
@@ -27,7 +26,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 26;
+	public static inline var VERSION = 27;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -325,69 +324,18 @@ class ToolingCodec {
 			"sourceFingerprint",
 			"sourceToMold",
 			"fillHeightMm",
-			"freeboardMm",
-			"features"
+			"freeboardMm"
 		], "setup");
 		var fingerprint = string(raw, "sourceFingerprint");
 		if (fingerprint != inputFingerprint(input))
 			throw "Stale tooling setup: source fingerprint does not match";
-		var byId = new Map<String, CastingFeature>();
-		for (f in input.features)
-			if (f.kind != InsertRecess) {
-				byId.set(f.id, f);
-				if (f.derivedFrom != null)
-					byId.set(f.derivedFrom, f);
-			}
-		var used = new Map<String, Bool>();
-		var features:Array<CastingFeatureStrategy> = [];
-		for (f in array(raw, "features")) {
-			object(f, ["featureId", "strategy", "withdrawal", "priority"], "feature strategy");
-			var id = string(f, "featureId");
-			if (!byId.exists(id) || used.exists(id))
-				throw 'Unknown, duplicate or insert-recess strategy $id';
-			used.set(id, true);
-			var strategy:CoreStrategy = switch string(f, "strategy") {
-				case "sacrificial-eps":
-					SacrificialEPS;
-				case "reusable-former":
-					ReusableFormer;
-				case "unsupported":
-					Unsupported;
-				default:
-					throw "Unsupported core strategy token";
-			};
-			var direction:Null<{
-				var x:Float;
-				var y:Float;
-				var z:Float;
-			}> = null;
-			if (Reflect.field(f, "withdrawal") != null) {
-				var v = Reflect.field(f, "withdrawal");
-				object(v, ["x", "y", "z"], "withdrawal");
-				direction = {x: number(v, "x"), y: number(v, "y"), z: number(v, "z")};
-				var norm = direction.x * direction.x + direction.y * direction.y + direction.z * direction.z;
-				if (Math.abs(norm - 1) > 1e-8)
-					throw "Withdrawal direction must be unit length";
-			}
-			if (strategy == ReusableFormer && direction == null)
-				throw "Reusable former needs a withdrawal direction";
-			var priority = integer(f, "priority");
-			features.push({
-				featureId: id,
-				strategy: strategy,
-				withdrawal: direction,
-				priority: priority
-			});
-		}
-		features.sort((a, b) -> Reflect.compare(a.featureId, b.featureId));
 		return {
 			id: string(raw, "id"),
 			revision: revision(raw),
 			sourceFingerprint: fingerprint,
 			fillHeightMm: number(raw, "fillHeightMm"),
 			freeboardMm: nonnegative(raw, "freeboardMm"),
-			sourceToMold: frame(raw, "sourceToMold"),
-			features: features
+			sourceToMold: frame(raw, "sourceToMold")
 		};
 	}
 

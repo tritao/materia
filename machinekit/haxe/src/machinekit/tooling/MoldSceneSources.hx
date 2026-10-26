@@ -59,8 +59,8 @@ class MoldSceneSources {
    var units=plan.coreUnits.filter(unit->unit.coreIds.indexOf(core.id)>=0);
    var sources:Array<String>=[],parents:Array<String>=[];
    for(unit in units) {
-    if(parents.indexOf(unit.parentFeatureId)<0)parents.push(unit.parentFeatureId);
-    for(id in unit.featureIds)if(sources.indexOf(id)<0)sources.push(id);
+    if(parents.indexOf(unit.featureId)<0)parents.push(unit.featureId);
+    if(sources.indexOf(unit.featureId)<0)sources.push(unit.featureId);
    }
    if(sources.length==0)sources.push(core.featureId);
    if(parents.length==0)parents.push(core.featureId);

@@ -56,7 +56,7 @@ class NativeMoldKernelTests {
 		var feature=P.box("drafted-pocket",Lightening,[P.face("body.z-max")],40,30,61,0,0,20);
 		feature.draft.degrees=2;
 		document.input.features=[feature];
-		document.setup.features=[];
+
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 		document.setup.sourceToMold=F.fromRotationMatrix(5,-7,100,[1,0,0,0,-1,0,0,0,-1]);
 		var offset=60*Math.tan(2*Math.PI/180);

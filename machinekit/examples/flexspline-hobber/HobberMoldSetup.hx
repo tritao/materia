@@ -30,7 +30,7 @@ class HobberMoldSetup {
    id:"plinth-mounting-faces-down",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
    fillHeightMm:foundation.body.parameterNumber("height"),freeboardMm:0,
    sourceToMold:F.fromRotationMatrix(0,0,foundation.body.parameterNumber("height"),
-    [1,0,0,0,-1,0,0,0,-1]),features:[]
+    [1,0,0,0,-1,0,0,0,-1])
   }};
   if(casting==Column){
    var depth=foundation.body.parameterNumber("depth");

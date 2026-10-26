@@ -209,7 +209,7 @@ class ToolingPackageManifest {
 		add("Resin, EPS, adhesive and release-system compatibility evidence", ["fabrication.materials.compatibility", "materials-process"], ["material", "fabrication-validation.json"]);
 		add("Insert inspection results and drawing release", ["fabrication.insert.inspection.", "fabrication.insert.final-inspection.", "fabrication.insert.drawing."], insertFiles);
 		add("Datum accuracy, fixing, hole protection and post-cure removal evidence", ["tooling.fixture.attachment.", "insert-fixtures"], insertFiles);
-		for (unit in plan.coreUnits) add("EPS breakup and extraction trial", ["process.castability.release." + unit.parentFeatureId], ["core-", "castability-", "fabrication-validation.json"]);
+		for (unit in plan.coreUnits) add("EPS breakup and extraction trial", ["process.castability.release." + unit.featureId], ["core-", "castability-", "fabrication-validation.json"]);
 		add("Handling equipment, measured mass/CoM and flip procedure", ["tooling.handling.flip"], ["handling", "fabrication-validation.json"]);
 		add("Native reconstruction and sequence review", ["fabrication.geometry-and-sequence"], ["fabrication-validation.json"]);
 		var result = [for (group in groups) group];

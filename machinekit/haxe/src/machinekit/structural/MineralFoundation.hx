@@ -58,8 +58,7 @@ class MineralFoundation extends MachineAssembly {
 				draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
 				cornerRadius: 0,
 				owner: row.id,
-				adjustable: [],
-				derivedFrom: null
+				adjustable: []
 			};
 			// Validate references with the complete feature set, including caller features.
 			var copy = recess;

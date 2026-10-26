@@ -23,7 +23,6 @@ typedef InsertLocation = {
 class FoundationLayout {
 	public static inline final TABLE_FACE = 228.0;
 	public static inline final TABLE_SEAT = TABLE_FACE - 210.0;
-	public static inline final TABLE_WELL_FLOOR = TABLE_SEAT - 10.0;
 	public static inline final PLINTH_HEIGHT = 800.0;
 	public static inline final TABLE_SEAT_HEIGHT = 608.0;
 	public static inline final TABLE_WELL_FLOOR_HEIGHT = 598.0;
@@ -58,7 +57,6 @@ class FoundationLayout {
 	public static inline final CABLE_DUCT_HEIGHT = 40.0;
 	public static inline final CABLE_DUCT_CENTRE_Y = 300.0;
 	public static inline final CABLE_DUCT_FLOOR = 500.0;
-	public static inline final DRIVE_SUPPORT_FRONT = 140.0;
 	public static inline final DRIVE_CAP_UNDERSIDE = 660.0;
 	public static inline final DRIVE_RIB_HALF_WIDTH = 15.0;
 	public static inline final FIXTURE_THREAD_MM = 6.0;

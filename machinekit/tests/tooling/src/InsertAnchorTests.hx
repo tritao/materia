@@ -73,7 +73,7 @@ class InsertAnchorTests {
 			&& c.affectedIds.indexOf("seat")>=0).length==1,"fill box consumers report the anchor owner explicitly");
 		var document=SinglePocketSetup.document();document.input=input;
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(input);
-		document.setup.fillHeightMm=80;document.setup.features=[];
+		document.setup.fillHeightMm=80;
 		document.setup.sourceToMold=F.fromRotationMatrix(0,0,80,[1,0,0,0,-1,0,0,0,-1]);
 		var options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions={replicationJigs:[],foundationJointProcesses:[],
 			precision:[{insertId:"seat",masterReference:null,jigReference:null,masterFlatnessMm:null,releaseSpec:null,holeProtectionReference:null,evidence:[]}],

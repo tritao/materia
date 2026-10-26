@@ -32,7 +32,7 @@ class MillMoldSetup {
 			var depth = frame.layout.columnDepth;
 			document.input = source;
 			document.setup = {id:"column-front-on-bed",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(source),
-				fillHeightMm:depth,freeboardMm:0,sourceToMold:F.fromRotationMatrix(0,0,depth/2,[0,0,1,1,0,0,0,1,0]),features:[]};
+				fillHeightMm:depth,freeboardMm:0,sourceToMold:F.fromRotationMatrix(0,0,depth/2,[0,0,1,1,0,0,0,1,0])};
 			document.recipe.id = "mill-column-panel-eps-review";
 			document.recipe.coreWireAxis = materia.tooling.ToolingRecipe.CoreWireAxis.Z;
 			for (rule in document.recipe.featureRules)
@@ -50,8 +50,7 @@ class MillMoldSetup {
 				sourceFingerprint: ToolingCodec.inputFingerprint(input),
 				fillHeightMm: height,
 				freeboardMm: 0,
-				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: []
+				sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1])
 			},
 			recipe: recipe
 		};

@@ -130,9 +130,9 @@ class EpsAccessTests {
 			geometry:{solid:Cut(materia.casting.CastingSolid.Box(30,40,30)),
 				pose:F.translation(0,bounds.y+bounds.depth-20,30)},
 			openings:[materia.casting.CastingPatterns.face("body.y-max")],
-			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[],derivedFrom:null};
+			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[]};
 		document.input.features=[feature];
-		document.setup.features=[{featureId:feature.id,strategy:SacrificialEPS,priority:10,withdrawal:{x:0,y:1,z:0}}];
+		ToolingTestRules.set(document,feature.id,SacrificialEPS,10,{x:0,y:1,z:0});
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 		var plan=machinekit.tooling.CastingMoldCad.plan(document,options());
 		check(plan.cores.length==1 && plan.cores[0].support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.RegisteredFlange,
@@ -214,13 +214,12 @@ class EpsAccessTests {
 			{id:"fill-tool",z:40.0,y:0.0,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
 				priority:20,sign:1.0,face:"body.z-max"}];
 		for (item in definitions) document.input.features.push({id:item.id,
-			kind:materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
+			kind:item.id=="bed-void" ? materia.casting.CastingFeature.CastingFeatureKind.Lightening : materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
 			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40,40,60)),
 				pose:F.translation(item.id=="bed-void" ? -10 : 10,item.y,item.z)},
 			openings:[materia.casting.CastingPatterns.face(item.face)],draft:{degrees:0,axis:{x:0,y:0,z:1}},
-			cornerRadius:0,owner:null,adjustable:[],derivedFrom:null});
-		document.setup.features=[for (item in definitions) {featureId:item.id,strategy:item.strategy,
-			priority:item.priority,withdrawal:{x:0.0,y:0.0,z:item.sign}}];
+			cornerRadius:0,owner:null,adjustable:[]});
+		for(item in definitions)ToolingTestRules.set(document,item.id,item.strategy,item.priority,{x:0.0,y:0.0,z:item.sign});
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 
 		var plan=machinekit.tooling.CastingMoldCad.plan(document,options());
@@ -326,10 +325,9 @@ class EpsAccessTests {
 		document.input.features=[recess,{id:"fixing-access",kind:materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
 			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(25,40,70)),
 				pose:F.translation(right-size.height-12.5+proud,0,30)},openings:[materia.casting.CastingPatterns.face("body.z-max")],
-			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[],derivedFrom:null}];
+			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,owner:null,adjustable:[]}];
 		document.setup.sourceToMold=F.identity();
-		document.setup.features=[{featureId:"fixing-access",strategy:materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
-			priority:10,withdrawal:{x:0,y:0,z:1}}];
+		ToolingTestRules.set(document,"fixing-access",materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,10,{x:0,y:0,z:1});
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 		return document;
 	}
@@ -485,12 +483,9 @@ class EpsAccessTests {
 				pose:F.translation(index==0?-20:40,0,index==0?0:10)},
 			openings:index==0 ? [materia.casting.CastingPatterns.face("body.z-min"),materia.casting.CastingPatterns.feature("drive-channel")]
 				: [materia.casting.CastingPatterns.feature("shaft")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
-			cornerRadius:0,owner:null,adjustable:[],derivedFrom:null
+			cornerRadius:0,owner:null,adjustable:[]
 		}];
-		document.setup.features=[for(feature in document.input.features) {
-			featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS,
-			priority:0,withdrawal:{x:0.0,y:0.0,z:-1.0}
-		}];
+		for(feature in document.input.features)ToolingTestRules.set(document,feature.id,SacrificialEPS,0,{x:0.0,y:0.0,z:-1.0});
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
 		var before=materia.tooling.ToolingCodec.encodeInput(document.input);
 		var plan=machinekit.tooling.CastingMoldCad.plan(document,options());
@@ -504,10 +499,10 @@ class EpsAccessTests {
 		document.input.features.push({id:"round-neighbour",kind:materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
 			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(20,50)),pose:F.translation(90,0,0)},
 			openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
-			cornerRadius:0,owner:null,adjustable:[],derivedFrom:null});
-		document.setup.features.push({featureId:"round-neighbour",strategy:SacrificialEPS,priority:0,withdrawal:{x:0.0,y:0.0,z:-1.0}});
+			cornerRadius:0,owner:null,adjustable:[]});
+		ToolingTestRules.set(document,"round-neighbour",SacrificialEPS,0,{x:0.0,y:0.0,z:-1.0});
 		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
-		var networks=materia.tooling.casting.EPSAccessNetworks.plan(document,document.setup.features,[]);
+		var networks=materia.tooling.casting.EPSAccessNetworks.plan(document,materia.tooling.casting.CastingStrategies.resolve(document),[]);
 		check(networks.length==1 && networks[0].featureIds.length==2 && networks[0].featureIds.indexOf("round-neighbour")<0,
 			"Unrelated non-box cuts retain their native route without disabling exact box networks");
 	}

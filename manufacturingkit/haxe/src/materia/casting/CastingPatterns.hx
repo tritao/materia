@@ -18,7 +18,6 @@ class CastingPatterns {
 			draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
 			cornerRadius: 0,
 			owner: owner,
-			derivedFrom: null,
 			adjustable: adjustable == null ? [] : adjustable
 		};
 

@@ -180,7 +180,7 @@ compatibility path for the old encoding.
 | `PanelStockSpec` | Material reference, nominal and measured thickness, variation, coated face, stock dimensions, permitted rotations/direction |
 | `CoreStockSpec` | EPS grade reference, available block sizes, density, declared compression/temperature limits, layer adhesive, evidence references |
 | `CastingToolingInput` | Source ID/revision/hash, supported envelope, typed `materia.casting` features, inserts with holes and interface requirements, datum scheme, foundation joints (phase 7) |
-| `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, feature overrides, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
+| `CastingSetup` | Source-to-mold transform, gravity/fill direction, open face, parting choices, support and finishing datums, compaction, fill height, pour rate and pour points, initial/ambient temperature |
 | `CompactionSpec` | Method (vibration table, external vibrators, internal poker, none), mold-bed interface, declared frequency/amplitude/duration or pending, evidence |
 | `InsertAnchorage` | Insert reference, anchorage kind (bolted anchors, welded studs, undercut, bonded keys), anchor holes and hardware, resolved preload/lifting demand and recipe factor, embedment, flange bearing and projected-cone areas, spacing and cover, material capacity or pending, evidence |
 | `InsertManufacturing` | Insert reference, steel grade and blank stock, placed-part connector lineage and per-hole clearance budgets/routes, pre-cast operations (cut, square, drill and tap, anchors, deburr, surface preparation), post-cast operations with their stock, inspection points before casting, thread protection, procurement `Make(process)` |
@@ -291,13 +291,9 @@ pose stored in a JSON text parameter.
 | `draft`, `cornerRadius` | Wall draft along a declared withdrawal axis and internal corner radius; zero is explicit |
 | `owner` | The interface or insert the feature serves, or null |
 | `adjustable` | Dimensions the design allows proposals to change (lightening cores yes, interface recesses no) |
-| `derivedFrom` | The design feature this one was split from when retained webs, backing or bosses are subtracted from it, or null |
 
-- Retained material (support webs, backing under precision seats, foot bosses) is
-  subtracted from a design feature by the shared box algebra. Each resulting
-  fragment keeps a stable ID and `derivedFrom`, so tooling can group the
-  fragments of one bay into one core unit and castability can report against the
-  design feature that the designer edits.
+- Pockets are authored directly at named design stations. Openings and tooling
+  attribution use exact source feature IDs; no retained-fragment aliases remain.
 
 - A feature stores design intent: its cut and the body faces or features it
   opens through. The finished cavity (cut ∩ body) is derived by one function in
@@ -318,8 +314,8 @@ pose stored in a JSON text parameter.
   `kind = InsertRecess` and the insert as `owner`; recess links derive from that.
 - Default mold strategies follow from kind and openings through recipe rules
   (for example, a lightening pocket open to the fill face becomes an EPS core and
-  an interface recess a rigid former). A setup overrides a strategy by naming the
-  feature ID. Unknown kinds fail. The mill's ID-keyed strategy table is deleted.
+  an interface recess a rigid former). Source withdrawal axes resolve opposed
+  openings. Unknown kinds fail; no ID-keyed strategy override is stored.
 - Castability proposals change only `adjustable` dimensions; other features get
   change requests.
 
@@ -499,7 +495,7 @@ builder in `machinekit.structural`.
   step 1 converts the mill and the hobber together: one feature type and one box
   algebra hold on main, not after a later rebase. `FoundationLayout` builds typed
   features through the shared builder with declared kinds, openings, owners,
-  adjustable dimensions and `derivedFrom` fragments; its `legacy` flags and
+  adjustable dimensions; its `legacy` flags and
   branches go. `CastingFeatures`, `CastingCells`, `CastingFootPocket`,
   `LegacyFoundationRecipes` (with `decodeLegacyBaseline` and the HB5 recipe
   tests) are deleted, and baseline reports are regenerated rather than read in
@@ -1047,7 +1043,7 @@ Implement `materia.casting` and the source model described under foundation
 design model, in three steps:
 
 1. **Records.** Typed features with openings, finished extents, owners,
-   adjustable dimensions and `derivedFrom`; shared vocabulary and the one box
+   adjustable dimensions; shared vocabulary and the one box
    algebra in `materia.casting`; insert holes through `DesignInterfaces`; typed
    finish; named mill layout parameters, the shared feature builder and one
    levelling-foot family; the adapter reduced to a copy; the hobber foundations
@@ -1064,11 +1060,11 @@ design model, in three steps:
 Acceptance: after step 1 the mill base and column rebuild with zero symmetric
 difference against their previous CAD, and so do the hobber bed and column;
 fill, collision hulls and section stiffness give identical results through the
-shared box algebra, and fragments group by `derivedFrom`. A body the box hull
+shared box algebra, and core units reference exact source features. A body the box hull
 cannot represent reports its collision hull Unsupported rather than omitting it.
 `CastingFeatures`, `CastingCells`, `CastingFootPocket`, `LegacyFoundationRecipes`
 and the hobber `MineralFoundation`/`FoundationIntegrity` no longer exist. `MillMoldSetup` has no
-feature-ID strategy table, and an override names its feature explicitly. No code
+feature-ID strategy table or stored override field. No code
 outside the shared finished-cavity function clips design cuts; an unreached
 declared opening, or an undeclared breakout, is rejected. A column cut crossing
 the sloped foot yields an exact prism finished cavity that box-only consumers
@@ -1458,7 +1454,7 @@ validation pending. Neither entry manufactures the coupon or releases the mold.
   sizes and per-insert cover are recorded in the mill TOOLING_README.
 - Generic strategy rules have no mill-specific ownership priority. Equal withdrawal
   normals need no face-ID tie-break; tied distinct directions require an explicit
-  source-feature override. Derived fragments retain their authored parent.
+  source withdrawal axis. Core units reference their exact authored feature.
 - Missing source fixture threads require a casting design request. Obstructed
   access to an existing source thread remains tooling validation work; tooling
   never invents a thread or threaded board receiver.
@@ -1852,9 +1848,9 @@ Former registration decision (2026-10-22): neck and flange sheets register again
   Native complete sweeps confirm each declared direction without sampled poses.
 
 - Column recipe decision: put the front on the bed, use mold-Z foam wire, and
-  prefer source-Y service withdrawals. The rear motor bay owns its junction
-  before the selected shaft passage and then the Z channel; these explicit
-  feature overrides resolve shared negative space without changing the casting.
+  prefer source-Y service withdrawals. The former per-feature junction ordering
+  was superseded by the source simplification: pockets are disjoint and recipe
+  rules plus source openings/axes choose strategies.
 
 - Panel-fixture record decision: use the source mounting frame and certified
   contact witnesses for datum geometry. Remove the unused nominal quarter-point
@@ -1905,3 +1901,11 @@ Mill bed detail decision (2026-10-25): keep the bed at the source casting bounda
 
 Mill joint detail decision (2026-10-25): retain the four M12 clamp centres and use three fully threaded ISO 4026 flat-point M8 × 25 jacks in a 3 mm grout gap. The fully threaded source holes need ordinary bore protection and no counterbore. Jack bearing and strength remain unqualified. Jack/fixture spacing and access depth follow the hole policy and a 2.5 mm driver clearance; the two anchor lands are sized from demand. All four sole pads have the same jack and dedicated fixture drilling; three jacks are installed, with unused holes protected during the pour. Cure precedes final clamp torque. The lifting selector admits 36 × 100 × 30 mm blanks: the centred M12 thread retains the policy's 12 mm radial wall, the demand-sized M6 pattern fits, and exact neighbour/cover checks pass. Front base lifts quarter-turn that same part. The rear chamber floor also retains the declared roof web above the bolt-access ceiling.
 Mill passage detail decision (2026-10-25): use the shared in-house minimum passage/aggregate ratio of 3. Maximum aggregate size remains a required compound-datasheet input; no grading value or material qualification is assumed.
+
+## Source-simplification leftover sweep (2026-10-26)
+
+Removed: retained-box feature authoring (`BoxAlgebra.retain`), the unused flared-foot parameters and envelope builder, their fixtures/tests, the envelope filler's foot-only multi-band fallback, and unused hobber `TABLE_WELL_FLOOR`/`DRIVE_SUPPORT_FRONT` stations. Production callers were checked before deletion.
+
+Kept: chamfers and exact prismatic envelope fillers (`MillPedestal` declares a 30 mm chamfer), and ordinary EPS supports/bridges and former flanges (production mill/hobber tooling). Production strut, pour-face-bridge and retained-EPS paths were already deleted. The redundant box-example override and the stored ID-keyed setup override field/resolver are deleted. Recipe rules and source withdrawal axes are the only strategy inputs; resolved per-feature associations stay in memory. Tooling format 27 rejects old records; all four kits are regenerated. Source geometry stays unchanged.
+
+The unused fragment ancestry field and parent-opening aliases are deleted. Casting feature format 5 rejects old records; core units carry one exact feature ID while shared physical core membership is retained.

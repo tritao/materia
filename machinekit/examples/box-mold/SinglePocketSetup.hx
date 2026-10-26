@@ -44,15 +44,7 @@ class SinglePocketSetup {
 				sourceFingerprint: ToolingCodec.inputFingerprint(input),
 				fillHeightMm: 100,
 				freeboardMm: 0,
-				sourceToMold: F.fromRotationMatrix(0, 0, 100, quarterTurn ? [0, -1, 0, -1, 0, 0, 0, 0, -1] : [1, 0, 0, 0, -1, 0, 0, 0, -1]),
-				features: [
-					{
-						featureId: "pocket",
-						strategy: SacrificialEPS,
-						priority: 0,
-						withdrawal: null
-					}
-				]
+				sourceToMold: F.fromRotationMatrix(0, 0, 100, quarterTurn ? [0, -1, 0, -1, 0, 0, 0, 0, -1] : [1, 0, 0, 0, -1, 0, 0, 0, -1])
 			},
 			recipe: {
 				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[

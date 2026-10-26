@@ -34,7 +34,7 @@ class ProposalReplanTests {
 	static function document(source:MineralFoundation,revision:Int):ToolingDocument {
 		var result=SinglePocketSetup.document();
 		result.input=FoundationToolingAdapter.snapshot(source,"proposal-lifting-fixture",revision);
-		result.setup.features=[];
+
 		result.setup.revision=revision;
 		result.setup.sourceFingerprint=ToolingCodec.inputFingerprint(result.input);
 		result.recipe.designReview.minimumLiftingPoints=4;

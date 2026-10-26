@@ -33,7 +33,7 @@ class HobberSocketFixtureSetup {
 		return {
 			input:input,
 			setup:{id:"mouths-on-carrier",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(input),
-				fillHeightMm:106,freeboardMm:0,sourceToMold:F.fromRotationMatrix(250,170,106,[1,0,0,0,-1,0,0,0,-1]),features:[]},
+				fillHeightMm:106,freeboardMm:0,sourceToMold:F.fromRotationMatrix(250,170,106,[1,0,0,0,-1,0,0,0,-1])},
 			recipe:{
 				id:"socket-coupon-study",revision:1,former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
 					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
