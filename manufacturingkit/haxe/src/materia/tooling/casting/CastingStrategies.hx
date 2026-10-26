@@ -160,6 +160,15 @@ class CastingStrategies {
 				}) : [];
 				var candidates = fillPortals.length > 0 ? fillPortals
 					: normals.filter(candidate -> Math.abs(Math.abs(coordinate(candidate.normal)) - best) <= 1e-9);
+				// A source-authored axis selects the intended end of a through
+				// passage; IDs never choose between opposed openings.
+				if (candidates.length>1) {
+					var axis=feature.draft.axis;
+					var nominated=candidates.filter(candidate -> {
+						var n=candidate.normal;return n.x*axis.x+n.y*axis.y+n.z*axis.z>1-1e-9;
+					});
+					if (nominated.length==1) candidates=nominated;
+				}
 				var normal = candidates[0].normal;
 				for (candidate in candidates) {
 					var v = candidate.normal;

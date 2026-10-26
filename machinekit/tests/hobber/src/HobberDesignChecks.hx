@@ -81,12 +81,14 @@ class HobberDesignChecks {
       for(item in foundations){
         var foundation=item.foundation;
         var localPoses=foundation.solvedPoses(),body=cache.posed(foundation.body,localPoses.get("casting"));
+        var composite:cadkit.modeling.Part;
+        try composite=foundation.asCastCompositeGeometry() catch(error:Dynamic){body.close();throw error;}
         try {
           if(item.kind=="bed"){
             var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
             var raw=cadkit.modeling.Part.box(drive.part.boxDimensions(drive.id).width,drive.part.boxDimensions(drive.id).depth,50);
             var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-50)));raw.close();
-            var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
+            var missing=slab.subtract(composite),volume=missing.volume();missing.close();slab.close();
             count++;if(volume>0.001)throw 'X drive insert lacks 50 mm full-footprint casting backing: $volume mm3';
             for(probe in HobberDriveSupportChecks.ribProbes(body)){count++;if(probe.missingMm3>0.001)throw 'Missing casting load path ${probe.label}: ${probe.missingMm3} mm3';}
           }
@@ -94,17 +96,17 @@ class HobberDesignChecks {
             var drive=foundation.insertLocations().filter(p->p.id=="driveSeat")[0];
             var raw=cadkit.modeling.Part.box(drive.part.boxDimensions(drive.id).width,drive.part.boxDimensions(drive.id).depth,125);
             var slab=PosedParts.moved(raw,F.compose(drive.pose,F.translation(0,0,-125)));raw.close();
-            var missing=slab.subtract(body),volume=missing.volume();missing.close();slab.close();
+            var missing=slab.subtract(composite),volume=missing.volume();missing.close();slab.close();
             count++;if(volume>0.001)throw 'Central Z drive seat lacks 125 mm full casting backing: $volume mm3';
           }
           for(row in foundation.insertLocations())if(row.id=="railLeft"||row.id=="railRight"){
             var backing=item.kind=="bed"?row.pose.z:10.0;
             var raw=cadkit.modeling.Part.box(row.part.boxDimensions(row.id).width,row.part.boxDimensions(row.id).depth,backing);
             var slab=PosedParts.moved(raw,F.compose(localPoses.get(row.id),F.translation(0,0,-backing)));raw.close();
-            var unsupported=slab.subtract(body),missing=unsupported.volume();unsupported.close();slab.close();
+            var unsupported=slab.subtract(composite),missing=unsupported.volume();unsupported.close();slab.close();
             count++;if(missing>0.001)throw 'rail insert ${item.kind}/${row.id} lacks full casting backing: $missing mm3';
           }
-        }catch(e:Dynamic){body.close();throw e;}body.close();
+        }catch(e:Dynamic){composite.close();body.close();throw e;}composite.close();body.close();
       }
       // Tray drops in from above with bed guides and table fitted, before the moving column/head.
       var tray=members.filter(m->m.id=="chipTray")[0].component;

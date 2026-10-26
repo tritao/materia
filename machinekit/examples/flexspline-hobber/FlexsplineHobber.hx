@@ -40,7 +40,7 @@ class FlexsplineHobber extends MachineAssembly {
     if(this.spec.internal)throw "external hobbing machine requires external gear";
     var profile=new ToothProfile(this.spec);hob=Hob.fromDesign(new HobDesign(ConjugateRack.of(profile),1,32,gashes),this.spec,40,16,false,detailedHob);
     bed=new MineralCastBed();column=new MineralCastColumn();
-    includeAt("bed",bed,F.translation(HobberXLayout.front().bedCentre,0,-590));
+    includeAt("bed",bed,FoundationLayout.worldPose("bed"));
     var footCentres=FoundationLayout.feet();
     for(i in 0...footCentres.length){
       var p=footCentres[i],x=p.x+HobberXLayout.front().bedCentre,y=p.y;
@@ -84,21 +84,21 @@ class FlexsplineHobber extends MachineAssembly {
     var centre=0.0;
     if(cutDistance<minX||cutDistance>100||this.spec.faceWidth>20)throw "gear/fixture exceeds hobber capacity";
     travel=[{id:"X",lower:minX,upper:HobberXLayout.RETRACT,initial:cutDistance},{id:"Y",lower:-10,upper:10,initial:0},{id:"Z",lower:-10,upper:190,initial:0}];
-    for(side in [-1,1]){
-      var name=side<0?"Left":"Right",insert=side<0?"bed/railLeft":"bed/railRight";
-      fixAt("railX"+name,LinearRail.metric("HGH25CA",HobberXLayout.front().railLength,LinearRail.MEASURED),AxisBuilder.orient(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),insert,F.alongY(HobberXLayout.front().railStart,side*FoundationLayout.BED_RAIL_CENTRE,220,0,0,1));
-      precisionMounts.push({name:"railX"+name+"-mount",parent:insert});
+    for(placed in HobberRailPlacement.placements("bed",FoundationLayout.placements("bed"))) {
+      var insert="bed/"+placed.insertId;
+      fixAt(placed.memberId,placed.rail,placed.pose,insert,placed.contact);
+      precisionMounts.push({name:placed.memberId+"-mount",parent:insert});
     }
     addComponent("Xbridge",new HobberSaddle("GE-X-carriage"));zero.set("Xbridge",F.translation(centre,0,0));
     moving("X",Prismatic,"railXLeft","Xbridge",F.translation(0,0,242),[1.0,0,0],cutDistance,minX,HobberXLayout.RETRACT);
     for(side in [-1,1])for(row in [HobberXLayout.BLOCK_FRONT,HobberXLayout.BLOCK_REAR])fixAt("blockX"+(side<0?"Left":"Right")+(row==HobberXLayout.BLOCK_FRONT?"":"Front"),LinearRailBlock.metric("HGH25CA",LinearRailBlock.SUPPLIER),
       AxisBuilder.orient(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,242,[0.0,0,1],[1.0,0,0]),"Xbridge",F.alongY(centre+row,side*FoundationLayout.BED_RAIL_CENTRE,260,0,0,1));
-    includeAt("column",column,F.fromRotationMatrix(centre+286,0,290,[0.0,-1,0,1,0,0,0,0,1]));
+    includeAt("column",column,FoundationLayout.worldPose("column"));
     fixExisting("column-mount","Xbridge","column/basePlate",F.alongY(centre+326,0,280,0,0,1));
-    for(side in [-1,1]){
-      var name=side<0?"Left":"Right",insert=side<0?"column/railLeft":"column/railRight";
-      fixAt("railZ"+name,LinearRail.metric("HGH15CA",480),AxisBuilder.orient(centre+161,side*145,295,[-1.0,0,0],[0.0,0,1]),insert,F.alongY(centre+176,side*145,295,-1,0,0));
-      precisionMounts.push({name:"railZ"+name+"-mount",parent:insert});
+    for(placed in HobberRailPlacement.placements("column",FoundationLayout.placements("column"))) {
+      var insert="column/"+placed.insertId;
+      fixAt(placed.memberId,placed.rail,placed.pose,insert,placed.contact);
+      precisionMounts.push({name:placed.memberId+"-mount",parent:insert});
     }
     addComponent("Zplate",new HobberSaddle("GE-Z-saddle"));zero.set("Zplate",F.translation(centre,0,363));
     moving("Z",Prismatic,"railZLeft","Zplate",F.translation(centre+161,0,363),[0.0,0,1],0,-10,190);

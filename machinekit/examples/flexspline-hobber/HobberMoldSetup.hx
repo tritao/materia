@@ -19,7 +19,6 @@ class HobberMoldSetup {
   var recipe=CastingShopRecipe.tooling(sourceId+"-panel-eps-review");
   // Pour mounting faces toward the bed: the existing source threads are
   // reached through dry datum posts, rather than submerged cross-carriers.
-  // Source lower struts become the upper supports in this orientation.
   recipe.coreWireAxis=materia.tooling.ToolingRecipe.CoreWireAxis.Z;
   // The catalogue sockets have a small circular sealing land, qualified in
   // the existing hobber socket fixture coupon rather than a mill plate land.

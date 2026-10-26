@@ -207,6 +207,29 @@ class MineralFoundation extends MachineAssembly {
 		}
 	}
 
+	/** Physical load-path occupancy in foundation coordinates, before finishing.
+	 * Keep resin-only geometry separate for mix quantities, fill and section models.
+	 * Permanent steel and anchors occupy material; temporary tooling does not.
+	 */
+	public function asCastCompositeGeometry():cadkit.modeling.Part {
+		var poses=solvedPoses(),members=components(),ids=pouredMembers.copy();
+		return machinekit.component.Solids.building([],owned->{
+			for(member in members)if(ids.indexOf(member.id)>=0) {
+				var part=member.component;
+				if(Std.isOfType(part,MineralCasting))
+					part=new MineralCasting(part.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
+				else if(Std.isOfType(part,CastInsert))
+					part=new CastInsert(part.values().copy().setToken("buildStage",materia.casting.InsertStages.InsertStage.BeforeCasting));
+				var local=part.geometry();
+				var placed:cadkit.modeling.Part;
+				try placed=machinekit.assembly.PosedParts.moved(local,poses.get(member.id))
+				catch(error:Dynamic){local.close();throw error;}
+				local.close();owned.push(placed);placed.shape.setThreadedFaces([]);
+			}
+			return machinekit.component.Solids.union(owned);
+		});
+	}
+
 	public function castingMemberIds():Array<String> return pouredMembers.copy();
 
 	public function insertLocations():Array<CastInsertPlacement>

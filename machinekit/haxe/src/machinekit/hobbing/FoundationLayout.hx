@@ -4,7 +4,6 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.CastingFeature;
 import materia.casting.CastingPatterns as C;
-import materia.casting.BoxAlgebra;
 import materia.casting.InsertSpec;
 import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
@@ -40,6 +39,7 @@ class FoundationLayout {
 	public static inline final RAIL_SEAT_HEIGHT = 790.0;
 	public static inline final DRIVE_SEAT_HEIGHT = 710.0;
 	public static inline final LIFT_SEAT_HEIGHT = 770.0;
+	public static inline final LIFT_CENTRE_Y = 310.0;
 	public static inline final BED_RAIL_CENTRE = 220.0;
 	public static inline final BED_RAIL_SEAT_WIDTH = 50.0;
 	public static inline final BED_RAIL_BEAM_WIDTH = 110.0;
@@ -54,45 +54,40 @@ class FoundationLayout {
 	public static inline final FOOT_PLATE_WIDTH = 110.0;
 	public static inline final PLINTH_CORE_FLOOR = 85.0;
 	public static inline final PLINTH_CORE_WEB = 35.0;
+	public static inline final CABLE_DUCT_WIDTH = 30.0;
+	public static inline final CABLE_DUCT_HEIGHT = 40.0;
+	public static inline final CABLE_DUCT_CENTRE_Y = 300.0;
+	public static inline final CABLE_DUCT_FLOOR = 500.0;
 	public static inline final DRIVE_SUPPORT_FRONT = 140.0;
 	public static inline final DRIVE_CAP_UNDERSIDE = 660.0;
 	public static inline final DRIVE_RIB_HALF_WIDTH = 15.0;
-	public static inline final PRECAST_STRUT_SECTION = 50.0;
+	public static inline final FIXTURE_THREAD_MM = 6.0;
+	public static inline final TABLE_INSERT_WIDTH = 280.0;
+	public static inline final TABLE_INSERT_BORE = 40.0;
+	public static inline final TABLE_INSERT_THICKNESS = 20.0;
 
 	static function faces(names:Array<String>):Array<CastingOpening>
 		return [for (name in names) C.face(name)];
 
-	/** Three non-collinear contacts on each side of an enclosed core. The upper
-	 * struts reach the open pour face and bear against a clamped tooling bridge.
-	 * Fifty-mm square sections are source geometry, not a material capacity claim.
-	 */
-	public static function precastStruts(kind:String):Array<materia.casting.PrecastStrut> {
-		dimensions(kind);
-		if (kind != "bed") return [];
-		var result:Array<materia.casting.PrecastStrut> = [], half = PRECAST_STRUT_SECTION / 2;
-		for (core in [
-			// The second pair clears the retained tray socket at X365/Y-365.
-			{id:"front-band",featureId:"pocket-centreSocketRight-leftWall-floor",top:PLINTH_HEIGHT-25,sites:[{x:80.0,y:-350.0},{x:320.0,y:-350.0},{x:210.0,y:-300.0}]},
-			// Keep the upper struts outside the source X-drive channel's +/-55 mm band.
-			{id:"drive-pocket",featureId:"pocket-driveRibRear-leftWebInside-floor",top:DRIVE_CAP_UNDERSIDE,sites:[{x:100.0,y:-80.0},{x:220.0,y:-80.0},{x:160.0,y:80.0}]}
-		]) for (index in 0...core.sites.length) {
-			var site = core.sites[index];
-			for (upper in [false,true]) result.push({
-				id:"precast-"+core.id+"-"+(upper?"upper":"lower")+"-"+index,
-				coreFeatureId:core.featureId,material:materia.casting.PrecastStrut.StrutMaterial.CastingCompound,
-				contact:upper?materia.casting.PrecastStrut.StrutContact.Upper:materia.casting.PrecastStrut.StrutContact.Lower,
-				box:{x:site.x-half,y:site.y-half,z:upper?core.top:0,width:PRECAST_STRUT_SECTION,
-					depth:PRECAST_STRUT_SECTION,height:upper?PLINTH_HEIGHT-core.top:PLINTH_CORE_FLOOR}
-			});
-		}
-		return materia.casting.PrecastStrut.PrecastStruts.copy(result);
-	}
 
 	static function boxInsert(id:String, role:InsertRole, label:String, w:Float, d:Float, h:Float,
 			pose:AssemblyFrame, openings:Array<String>, holes:String):InsertLocation {
-		return {id:id,part:new CastInsert(CastInsert.boxValues(w,d,h).setToken("role",role)
-			.setToken("label",label).setToken("finish",GroundAfterCasting).setToken("holes",holes)),
+		return {id:id,part:new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(w,d,h).setToken("role",role)
+			.setToken("label",label).setToken("finish",GroundAfterCasting),holes)),
 			pose:pose,openings:faces(openings)};
+	}
+
+
+	/** Source-declared M6 fixture drilling, using the same C45/8.8 hole policy
+	 * as service threads. Offset only when a source service bore owns the centre.
+	 * Tooling consumes these records; it does not create the steel thread. */
+	public static function fixtureHoles(thickness:Float,?existing:String,offsetX:Float=0):String {
+		var choice=InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(FIXTURE_THREAD_MM).mating());
+		var holes=existing==null ? [] : InsertHoles.records(existing);
+		var fixture=InsertHoles.records(InsertHoles.tappedBlind(choice,thickness))[0];
+		fixture.id="fixture";
+		fixture.frame.x=offsetX;holes.push(fixture);
+		return InsertHoles.fromNeutral(holes);
 	}
 
 	public static function enclosureSeats():Array<InsertLocation> {
@@ -100,7 +95,7 @@ class FoundationLayout {
 		for (x in [-1,1]) for (y in [-1,1])
 			out.push(boxInsert('enclosureSeat${x+1}${y+1}',EnclosureMount,"enclosure frame dry-side mounting pad",80,80,20,
 				F.fromRotationMatrix(x*(HobberXLayout.front().bedLength/2-100),y*380,720,[1.0,0,0,0,0,y,0,-y,0]),
-				[y < 0 ? "body.y-min" : "body.y-max"],InsertHoles.fromNeutral([])));
+				[y < 0 ? "body.y-min" : "body.y-max"],fixtureHoles(20)));
 		return out;
 	}
 
@@ -155,6 +150,14 @@ class FoundationLayout {
 		return [for (i in 0...3) {x: (i < 2 ? -1 : 1) * (HobberXLayout.front().bedLength / 2 - 120),
 			y: i == 0 ? -330.0 : i == 1 ? 330.0 : 0.0}];
 
+	/** Assembly construction frame shared with bought-part mounting sources. */
+	public static function worldPose(kind:String):AssemblyFrame return switch kind {
+		case "bed":F.translation(HobberXLayout.front().bedCentre,0,TABLE_SEAT-TABLE_SEAT_HEIGHT);
+		case "column":F.fromRotationMatrix(HobberZLayout.SEAT_FACE_X+HobberZLayout.SPINE_FRONT_COLUMN_Y,
+			0,HobberZLayout.FOUNDATION_ORIGIN_Z,[0.0,-1,0,1,0,0,0,0,1]);
+		default:throw "Unknown hobber foundation frame: "+kind;
+	};
+
 	public static function dimensions(kind:String):Array<Float>
 		return switch kind {
 			case "bed": [HobberXLayout.front().bedLength, 800, PLINTH_HEIGHT];
@@ -162,37 +165,15 @@ class FoundationLayout {
 			default: throw "Unknown hobber foundation kind";
 		};
 
-	static inline final COLUMN_WALL = 20.0;
-	static inline final COLUMN_RIB = 20.0;
 	static inline final COLUMN_SPINE_HALF_WIDTH = 60.0;
 	static inline final COLUMN_HEAD_WIDTH = 240.0;
 	static inline final COLUMN_HEAD_DEPTH = 100.0;
 	static inline final COLUMN_HEAD_CENTRE_Y = 60.0;
 
-	/** Four authored chambers. The front pair ends at the head recess, so
-	 * neither the spine nor the recess is recovered by subtracting supports. */
-	static function columnPockets(width:Float, depth:Float, height:Float):Array<CastingFeature> {
-		var out:Array<CastingFeature> = [];
-		for (side in [-1, 1]) {
-			var outer = width / 2 - COLUMN_WALL;
-			var rearInner = COLUMN_SPINE_HALF_WIDTH, frontInner = COLUMN_HEAD_WIDTH / 2;
-			var rearLow = -depth / 2 + COLUMN_WALL, rearHigh = -COLUMN_RIB / 2;
-			var frontLow = COLUMN_RIB / 2, frontHigh = depth / 2 - COLUMN_WALL;
-			var suffix = side < 0 ? "left" : "right";
-			out.push(Patterns.box("rear-chamber-" + suffix, Lightening, [], outer - rearInner,
-				rearHigh - rearLow, height - 2 * COLUMN_WALL, side * (outer + rearInner) / 2,
-				(rearLow + rearHigh) / 2, COLUMN_WALL));
-			out.push(Patterns.box("head-side-chamber-" + suffix, Lightening, [C.feature("head-recess-" + suffix)],
-				outer - frontInner, frontHigh - frontLow, height - 2 * COLUMN_WALL,
-				side * (outer + frontInner) / 2, (frontLow + frontHigh) / 2, COLUMN_WALL));
-		}
-		return out;
-	}
 
 	public static function bodyValues(kind:String):ComponentValues {
 		var d = dimensions(kind);
-		var cores = kind == "bed" ? HobberCastingPockets.plinth(d[0], d[1], d[2])
-			: columnPockets(d[0], d[1], d[2]);
+		var cores:Array<CastingFeature> = kind == "bed" ? HobberCastingPockets.plinth(d[0], d[1], d[2]) : [];
 		if (kind == "bed") {
 			var layout = HobberXLayout.front(), centre = layout.bedCentre;
 			var footCentres = feet();
@@ -203,9 +184,7 @@ class FoundationLayout {
 				cores = cores.concat(Patterns.foot({access: 'foot$i-access', stem: 'foot$i-stem', register: 'foot$i-plate-register'},
 					p.x, p.y, edge, alongX, FOOT_ACCESS_WIDTH, FOOT_ACCESS_WIDTH, FOOT_FLOOR, FOOT_ROOF,
 					FOOT_STEM_CLEARANCE, FOOT_SUPPORT_TOP, faces([opening]),
-					faces(["body.z-min"]).concat([C.feature(i == 2 ? "pocket-motorRibRear-leftWebInside-footRoof"
-						: i == 0 ? "pocket-frontSocketStart-leftEnclosureInside-footRoof"
-						: "pocket-frontSocketStart-rightEnclosureInside-footRoof")]), {
+					faces(["body.z-min"]).concat(i==2 ? [C.feature("pocket-motorRibRear-leftWebInside-footRoof")] : []), {
 						owner: "footSeat" + i, openings: [C.feature('foot$i-access')],
 						width: FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
 						depth: FOOT_PLATE_WIDTH + FOOT_REGISTER_CLEARANCE,
@@ -237,11 +216,12 @@ class FoundationLayout {
 					faces(["body.x-max", "body.z-max"]).concat([C.feature("X-drive-channel")]),
 					25, (TRAY_REAR_BRIDGE_WIDTH - DRIVE_CHANNEL_WIDTH) / 2, 10, d[0] / 2 - 12.5,
 					side * (TRAY_REAR_BRIDGE_WIDTH + DRIVE_CHANNEL_WIDTH) / 4, d[2] - 10, "tray-rear-bridge"));
-			// Side chambers already provide the rest of this cable path.
-			cores.push(Patterns.box("cable-route", ServiceOpening, [
-				C.feature("pocket-centreSocketLeft-rightRailOutside-floor"),
-				C.feature("pocket-centreWebRight-rightRailOutside-floor")],
-				PLINTH_CORE_WEB, 30, 40, 0, 300, 500));
+			// Preserve the reviewed cable centreline. The filled outer band now
+			// needs a real longitudinal duct opening at both body end faces.
+			var cable=Patterns.box("cable-route", ServiceOpening, faces(["body.x-min","body.x-max"]),
+				d[0], CABLE_DUCT_WIDTH, CABLE_DUCT_HEIGHT, 0, CABLE_DUCT_CENTRE_Y, CABLE_DUCT_FLOOR);
+			cable.draft.axis={x:1,y:0,z:0};
+			cores.push(cable);
 		} else {
 			// The spine continues into the head opening. Three direct spans
 			// describe its U-shaped recess without cutting it and retaining a boss.
@@ -255,13 +235,8 @@ class FoundationLayout {
 				2 * COLUMN_SPINE_HALF_WIDTH, headRear - HobberZLayout.SPINE_FRONT_COLUMN_Y, d[2],
 				0, (headRear + HobberZLayout.SPINE_FRONT_COLUMN_Y) / 2, 0));
 		}
-		var struts = precastStruts(kind);
-		for (feature in cores) if (feature.kind != Lightening) for (strut in struts)
-			if (BoxAlgebra.volume(BoxAlgebra.subtract([strut.box],[materia.casting.CastingBounds.feature(feature)]))
-				< BoxAlgebra.volume([strut.box])-1e-7)
-				throw "Precast strut "+strut.id+" intersects source opening "+feature.id;
 		return new ComponentValues().setNumber("width", d[0]).setNumber("depth", d[1]).setNumber("height", d[2])
-			.setToken("features", C.encode(cores)).setToken("precastStruts",materia.casting.PrecastStrut.PrecastStruts.encode(struts));
+			.setToken("features", C.encode(cores));
 	}
 
 	public static function placements(kind:String):Array<CastInsertPlacement>
@@ -277,21 +252,26 @@ class FoundationLayout {
 		if (kind == "bed") {
 			var layout = HobberXLayout.front(), centre = layout.bedCentre;
 			out = enclosureSeats().concat(trayClampSeats());
-			add("tablePlate",TableMount,"table seat",280,280,20,-centre,0,TABLE_SEAT_HEIGHT-20,[],InsertHoles.through(40,20));
+			add("tablePlate",TableMount,"table seat",TABLE_INSERT_WIDTH,TABLE_INSERT_WIDTH,TABLE_INSERT_THICKNESS,
+				-centre,0,TABLE_SEAT_HEIGHT-TABLE_INSERT_THICKNESS,[],fixtureHoles(TABLE_INSERT_THICKNESS,
+					InsertHoles.through(TABLE_INSERT_BORE,TABLE_INSERT_THICKNESS),(TABLE_INSERT_WIDTH+TABLE_INSERT_BORE)/4));
 			for (side in [-1,1]) out.push(boxInsert(side < 0 ? "railLeft" : "railRight",GuideSeat,"preloaded column guide seat",
 				BED_RAIL_SEAT_WIDTH,layout.railLength,20,
 				F.fromRotationMatrix(layout.railStart+layout.railLength/2-centre,side*BED_RAIL_CENTRE,RAIL_SEAT_HEIGHT,
 					[0.0,1,0,-1,0,0,0,0,1]),["body.z-max"],none));
 			out.push(boxInsert("driveSeat",DriveMount,"central X screw channel seat",100,layout.motorFace-layout.deckStart,20,
-				F.fromRotationMatrix((layout.motorFace+layout.deckStart)/2-centre,0,DRIVE_SEAT_HEIGHT,[0.0,1,0,-1,0,0,0,0,1]),[],none));
+				F.fromRotationMatrix((layout.motorFace+layout.deckStart)/2-centre,0,DRIVE_SEAT_HEIGHT,[0.0,1,0,-1,0,0,0,0,1]),[],fixtureHoles(20)));
 			for (side in [-1,1]) add(side < 0 ? "liftLeft" : "liftRight",LiftingMount,"lifting point",30,30,30,
-				-150-centre,side*310,LIFT_SEAT_HEIGHT,["body.z-max"],none);
+				-150-centre,side*LIFT_CENTRE_Y,LIFT_SEAT_HEIGHT,["body.z-max"],none);
 		} else {
-			add("basePlate",ColumnMount,"column carriage sole",380,100,20,0,-40,-10,["body.z-min"],none);
+			// Author the sole from its actual underside service face. This changes
+			// no steel envelope or drilling position; rear anchors then face resin.
+			out.push(boxInsert("basePlate",ColumnMount,"column carriage sole",380,100,20,
+				F.fromRotationMatrix(0,-40,10,[1.0,0,0,0,-1,0,0,0,-1]),["body.z-min"],fixtureHoles(20)));
 			for (side in [-1,1]) out.push(boxInsert(side < 0 ? "railLeft" : "railRight",GuideSeat,"Z rail seat",35,480,20,
 				F.fromRotationMatrix(side*145,90,245,[1.0,0,0,0,0,1,0,-1,0]),["body.y-max"],none));
 			out.push(boxInsert("driveSeat",DriveMount,"central Z drive back seat",100,460,20,
-				F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0]),[],none));
+				F.fromRotationMatrix(0,HobberZLayout.SEAT_COLUMN_Y,250,[-1.0,0,0,0,0,1,0,1,0]),[],fixtureHoles(20)));
 			for (side in [-1,1]) add(side < 0 ? "liftLeft" : "liftRight",LiftingMount,"lifting point",25,25,20,
 				side*160,-40,490,["body.z-max"],none);
 		}

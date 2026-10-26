@@ -106,7 +106,21 @@ class EPSAccessNetworks {
   var ids=[for(strategy in strategies)if(strategy.strategy==SacrificialEPS
    && excluded.indexOf(strategy.featureId)<0)strategy.featureId];
   var selected=d.input.features.filter(feature->ids.indexOf(feature.id)>=0);
-  var seeds=selected.filter(feature->feature.openings.filter(opening->opening.kind==BodyFace).length==0);
+  var seeds=selected.filter(feature->{
+   var openings=feature.openings.filter(opening->opening.kind==BodyFace);
+   if(openings.length==0)return true;
+   // A datum crossing a bed-facing void needs the existing shaped network
+   // and locating foot. A full-width through-bed access would remove its
+   // receiver and the surrounding ligament.
+   if(reserved==null || reserved.length==0)return false;
+   var bedFacing=openings.filter(opening->{
+    var normal=materia.casting.CastingCavities.bodyFaceNormal(d.input.envelope,opening.target);
+    return F.transformVector(d.setup.sourceToMold,normal.x,normal.y,normal.z).z< -1+EPS;
+   });
+   if(bedFacing.length==0)return false;
+   var boxes=MoldRegions.boxes(MoldRegions.feature(d,feature.id));
+   return boxes!=null && boxes.filter(box->reserved.filter(piece->BoxAlgebra.intersection(box,piece)!=null).length>0).length>0;
+  });
   if(seeds.length==0)return [];
   var byFeature=new Map<String,Array<Box3>>(),voids:Array<Box3>=[];
   for(feature in selected){

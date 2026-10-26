@@ -102,6 +102,7 @@ class ToolingTests {
 		check(ToolingCodec.canonical(selected) == ToolingCodec.canonical(materia.tooling.casting.CastingStrategies.resolve(document)),
 			"EPS fill access does not depend on opening order");
 		feature.kind = Clearance;
+		feature.draft.axis={x:1,y:0,z:0};
 		rejects(() -> materia.tooling.casting.CastingStrategies.resolve(document), "Ambiguous feature withdrawal");
 	}
 
@@ -349,7 +350,7 @@ class ToolingTests {
 			revision: 1,
 			lengthUnit: ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
-			precastStruts:[],postCureInserts:[],
+			postCureInserts:[],
 			envelope: [
 				{
 					id: "body",
@@ -508,8 +509,17 @@ class ToolingTests {
 		d.input.features.push(materia.casting.CastingPatterns.box("through-opening", ServiceOpening,
 			[materia.casting.CastingPatterns.face("body.z-min"), materia.casting.CastingPatterns.face("body.z-max")], 20, 20, 100));
 		d.setup.features = [];
+		var through=d.input.features.filter(feature -> feature.id=="through-opening")[0];
+		through.draft.axis={x:1,y:0,z:0};
 		d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
 		rejects(() -> ToolingCodec.copy(d), "Ambiguous feature withdrawal");
+		through.draft.axis={x:0,y:0,z:-1};
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var nominated=materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(d));
+		var expected=materia.assembly.AssemblyFrames.transformVector(d.setup.sourceToMold,0,0,-1);
+		var actual=nominated[0].withdrawal;
+		check(actual!=null && Math.abs(actual.x-expected.x)+Math.abs(actual.y-expected.y)+Math.abs(actual.z-expected.z)<1e-8,
+			"source axis chooses the intended end and follows the source-to-mold orientation without an ID-keyed override");
 		d.setup.features = [{featureId: "through-opening", strategy: ReusableFormer, priority: 5, withdrawal: {x: 0, y: 0, z: 1}}];
 		var chosen = materia.tooling.casting.CastingStrategies.resolve(ToolingCodec.copy(d));
 		var direction:{x:Float, y:Float, z:Float} = cast chosen[0].withdrawal;
@@ -555,6 +565,28 @@ class ToolingTests {
 				}
 	}
 
+	static function fixtureEnds():Void {
+		var d=fixture(),insert=d.input.inserts[0],hole=insert.holes[0];
+		hole.frame=F.identity();hole.extent=Blind;hole.depth=12;hole.threadDepth=10;
+		hole.diameter=5;hole.tapDrill=5;hole.clearanceDiameter=6.6;
+		hole.thread={designation:"M6",majorDiameter:6,pitch:1,starts:1,hand:Right,internal:true,toleranceClass:"6H",profile:Metric};
+		hole.limits.policyId="fixture-end-test";hole.limits.threaded={minEngagement:7.8,minTipGap:1};
+		TestInsertHoles.beforeCasting(insert);
+		var face=materia.tooling.casting.InsertFixturePlanner.mountingFace(insert,F.identity(),d.recipe.hardware);
+		var normal=F.transformVector(face,0,0,1);
+		check(Math.abs(face.z-insert.pose.z)<1e-8 && normal.z< -1+1e-8,
+			"A source underside thread selects the actual negative end, without moving the steel or hole");
+		check(materia.tooling.casting.InsertFixturePlanner.physicalEnd(insert,F.identity(),face),
+			"The selected fixture plane is a physical source end");
+		var moved=F.compose(F.translation(0,0,1),face);
+		check(!materia.tooling.casting.InsertFixturePlanner.physicalEnd(insert,F.identity(),moved),
+			"An interior plane cannot be credited as a source contact face");
+		var socket=materia.casting.InsertSpec.InsertBody.CrimpedSocket(materia.casting.CastingSolid.Cylinder(8,20),
+			{length:25,width:11,thickness:2.2,wave:1.4,blend:0.5});
+		var ends=materia.casting.InsertSpec.InsertBodyCodec.planarEndFrames(socket);
+		check(ends.length==1 && ends[0].z==45,"A crimped retention tail does not invent a planar back receiver");
+	}
+
 	static function releaseContract():Void {
 		var source=fixture(),restored=ToolingCodec.decode(ToolingCodec.encode(source));
 		check(restored.recipe.releaseSystem.sealer.coats==2 && restored.recipe.releaseSystem.agent.coats==5,
@@ -569,28 +601,6 @@ class ToolingTests {
 		Reflect.deleteField(raw.recipe,"releaseSystem");
 		Reflect.setField(raw.recipe,"releaseSpec","legacy placeholder");
 		rejects(() -> ToolingCodec.snapshot(raw),"Unknown recipe field: releaseSpec");
-	}
-
-	static function precastPourContract():Void {
-		var source=fixture();
-		source.input.precastStruts=[{id:"precast-top",coreFeatureId:"pocket",material:CastingCompound,contact:Upper,
-			box:{x:0,y:0,z:60,width:10,depth:10,height:40}}];
-		source.setup.sourceFingerprint=ToolingCodec.inputFingerprint(source.input);
-		var copied=ToolingCodec.decode(ToolingCodec.encode(source));
-		check(copied.input.precastStruts.length==1,"Precast source struts survive the strict source document");
-		var finalGeometry=materia.tooling.casting.CastingSourceRegions.derive(copied).regions;
-		var pour=materia.tooling.casting.CastingSourceRegions.poured(copied).regions;
-		check(finalGeometry!=null && pour!=null,"Axis-aligned precast fill uses exact shared box algebra");
-		if(finalGeometry==null || pour==null)throw "Expected exact precast fill regions";
-		check(Math.abs(materia.casting.BoxAlgebra.volume(finalGeometry.resin)-materia.casting.BoxAlgebra.volume(pour.resin)-4000)<1e-7,
-			"Poured quantity excludes already cured compound, while final casting retains it");
-		check(pour.boundaries.filter(boundary->boundary.id=="precast-top").length==1,
-			"The precast strut is a named fill boundary");
-		var boundary=pour.boundaries.filter(boundary->boundary.id=="precast-top")[0].box;
-		check(Math.abs(boundary.z)<1e-7 && Math.abs(boundary.height-40)<1e-7,
-			"Precast fill occupancy follows sourceToMold, including an inverted casting");
-		copied.input.precastStruts[0].coreFeatureId="missing-core";
-		rejects(()->ToolingCodec.copyInput(copied.input),"Precast strut references an unknown source core: precast-top");
 	}
 
 	static function fixtureReceiverContract():Void {
@@ -634,7 +644,6 @@ class ToolingTests {
 		insertEnvelopeRecords();
 		vocabularyRoundTrips();
 		releaseContract();
-		precastPourContract();
 		if (Sys.getEnv("TOOLING_ONLY") == "anchors") {AnchorCapacityTests.run(fixture());return;}
 		if (Sys.getEnv("TOOLING_ONLY") == "fixture-faces") {fixtureFaces();fixturePanelFaces();Sys.println('FixtureFaceTests: $assertions assertions passed');return;}
 		routedSocketFaces();
@@ -650,6 +659,7 @@ class ToolingTests {
 			return;
 		}
 		withdrawalTie();
+		fixtureEnds();
 		relievedFixing();
 		sharedFixturePlate();
 		unresolvedStockFixing();

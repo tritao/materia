@@ -84,16 +84,13 @@ class CastingFillAnalysis {
 		materia.tooling.casting.CastingMoldPlanner.validate(plan);
 		var resources:Array<Model> = [];
 		try {
-			var source=own(resources,CastingMoldCad.pouredSource(plan));
+			var source=own(resources,CastingMoldCad.source(plan));
 			var bounds=source.shape.bounds(),lo=bounds.get_min(),hi=bounds.get_max();
 			var boundaries:Array<NativeFillPart> = [],blockers:Array<NativeFillPart> = [],cores:Array<NativeFillPart> = [];
 			for (cavity in materia.casting.CastingCavities.derive(plan.document.input.envelope,plan.document.input.features)) {
 				var local=own(resources,machinekit.structural.CastingCavityCad.part(cavity));
 				boundaries.push({id:cavity.parentId,part:own(resources,machinekit.assembly.PosedParts.moved(local,plan.document.setup.sourceToMold))});
 			}
-			for(strut in plan.document.input.precastStruts)
-				boundaries.push({id:strut.id,sourceIds:[strut.coreFeatureId],
-					part:own(resources,machinekit.structural.CastingRegionCad.part(CastingMoldCad.strutRegion(plan,strut)))});
 			var owners=new Map<String,Array<String>>();
 			for (anchor in CastingMoldCad.anchorComponents(plan)) owners.set(anchor.id,[anchor.insertId,anchor.anchorId]);
 			var assembly=CastingMoldCad.assembly(plan),poses=assembly.solvedPoses();

@@ -267,7 +267,7 @@ class DatumFixtures {
 		}
 		var location=DatumFixtureLocation.plan(i,p.document.setup.sourceToMold,{mountingFace:face,datum:datum,fixings:fixings});
 		p.validation.push(DatumFixtureLocation.validation(i.id,location));
-		if (pocketId!=null) MoldBedReceivers.datum(p,i.id,bed,datum,pocketId);
+		if (pocketId!=null) MoldPanelReceivers.datum(p,i.id,bed,datum,pocketId);
 		p.fixtures.push({
 			insertId: i.id,
 			location:location,
@@ -318,11 +318,15 @@ class DatumFixtures {
 			var operation=PanelJoints.operation(id,Drill,PanelContours.circle(point.x,point.y,diameter/2),
 				thickness,diameter,MachiningSide.PositiveZ,true);
 			var bounds=materia.casting.CastingProfileGeometry.bounds(operation.contour);
-			var parents=panel.panel.operations.filter(parent -> !parent.through && parent.side==operation.side
-				&& (parent.kind==Pocket || parent.kind==Rebate) && Math.abs(thickness-parent.depth-point.z)<1e-7
+			var parents=panel.panel.operations.filter(parent -> !parent.through
+				&& (parent.kind==Pocket || parent.kind==Rebate)
+				&& Math.abs((parent.side==MachiningSide.PositiveZ ? thickness-parent.depth : parent.depth)-point.z)<1e-7
 				&& materia.casting.CastingProfileGeometry.containsRect(parent.contour,bounds.x,bounds.y,bounds.width,bounds.height));
 			if (parents.length>1) throw "Ambiguous fixing access rebate: "+insert.id;
-			if (parents.length==1) operation.accessVia=parents[0].id;
+			if (parents.length==1) {
+				operation.side=parents[0].side;operation.setupId=parents[0].setupId;
+				operation.accessVia=parents[0].id;
+			}
 			panel.panel.operations.push(operation);
 			panel.panel.contactOpenings.push(id);
 			p.openings.push({panelId:panel.panel.id,operationId:id,kind:ToolingOpening,
@@ -434,9 +438,9 @@ class DatumFixtures {
 	public static function validatePanel(p:CastingMoldPlan,fixture:MoldInsertFixture):Void {
 		var source=sourceInsert(p,fixture.insertId),panel=receiver(p,MoldFixtures.panelId(fixture));
 		var stock=F.compose(p.document.setup.sourceToMold,source.pose);
-		var face=F.compose(stock,F.translation(0,0,materia.casting.InsertSpec.InsertBodyCodec.height(source.body)));
-		if (ToolingCodec.canonical(fixture.mountingFace)!=ToolingCodec.canonical(face))
-			throw "Panel fixture face differs from source mouth: "+source.id;
+		var face=fixture.mountingFace;
+		if(!InsertFixturePlanner.physicalEnd(source,p.document.setup.sourceToMold,face))
+			throw "Panel fixture face differs from source planar ends: "+source.id;
 		var holes=InsertFixturePlanner.availableHoles(source);
 		if (fixture.fixings.length+fixture.boreMasks.length!=holes.length)
 			throw "Every pre-cast source hole needs a fixing screw or bore mask";
@@ -539,6 +543,8 @@ class DatumFixtures {
 					throw "Fixture sealing footprint does not cover bed penetration";
 			}
 			var source = p.document.input.inserts.filter(i -> i.id == f.insertId)[0];
+			if(!InsertFixturePlanner.physicalEnd(source,p.document.setup.sourceToMold,f.mountingFace))
+				throw "Datum fixture face differs from source planar ends: "+source.id;
 			var precastHoles=InsertFixturePlanner.availableHoles(source);
 			var location=DatumFixtureLocation.plan(source,p.document.setup.sourceToMold,
 				{mountingFace:f.mountingFace,datum:MoldFixtures.datum(f),fixings:f.fixings});

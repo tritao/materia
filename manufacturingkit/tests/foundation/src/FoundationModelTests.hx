@@ -34,7 +34,6 @@ class FoundationModelTests {
 		return materia.casting.CastingPolygons.area(p.profile) * p.height;
 
 	public static function main():Void {
-		PrecastStrutTests.run();
 		CastingInputTests.run();
 		CastingProfileTests.run();
 		CastingDraftSectionTests.run();

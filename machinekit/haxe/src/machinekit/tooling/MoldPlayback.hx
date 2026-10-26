@@ -122,8 +122,6 @@ class MoldPlayback {
 			visible.remove(materia.tooling.ToolingIds.derive("insert-", i.id));
 		for (hardware in CastingMoldCad.anchorComponents(p))
 			visible.remove(hardware.id);
-		// Precast compound is already part of the finished source solid.
-		for(strut in p.document.input.precastStruts)visible.remove(strut.id);
 		visible.set("cured-casting", true);
 		for (step in review.demoldingSteps) {
 			var active:Array<String> = [];
@@ -220,8 +218,7 @@ class MoldPlayback {
 			local.close();
 			cache.set(m.id, AssemblyPreview.part(m.id, m.component.designation, world, m.component.materialId));
 		}
-		var liftedEPS=[for(core in p.cores)if(core.support.breakoutAfterLift
-			|| core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
+		var liftedEPS=[for(core in p.cores)if(core.support.breakoutAfterLift)
 			for(id in materia.tooling.casting.MoldCores.assemblyMembers(core))id];
 		var castCache = new Map<String, SceneArtifactPart>(),
 			folder = dir + "/sequence";

@@ -97,7 +97,7 @@ class ToolingReleaseExport {
 	public static function build(plan:CastingMoldPlan,shop:FormerShopExport.FormerShopReport):ReleasePlan {
 		var scope=new Scope(),parts:Array<ReleaseGeometryPart>=[],seen=new Map<String,Bool>();
 		try {
-			var source=scope.own(CastingMoldCad.pouredSource(plan));
+			var source=scope.own(CastingMoldCad.source(plan));
 			var box=bounds(source),height=Math.min(box.height,plan.document.setup.fillHeightMm-box.z);
 			if (height<=0) throw "Release surfaces need resin below the declared fill plane";
 			var fill=scope.own(ToolingBlock.placedBox({x:box.x,y:box.y,z:box.z,
@@ -132,8 +132,6 @@ class ToolingReleaseExport {
 				add(volume.id,[fixture.insertId],ToolingVolume.geometryOf(volume),ToolingMetal,null);
 			for (insert in plan.document.input.inserts) add(materia.tooling.ToolingIds.derive("insert-",insert.id),
 				[insert.id],CastingMoldCad.steel(plan,insert.id),BondingSteel,null);
-			for(strut in plan.document.input.precastStruts)
-				add(strut.id,[strut.coreFeatureId],machinekit.structural.CastingRegionCad.part(CastingMoldCad.strutRegion(plan,strut)),BondingCompound,null);
 			for (hardware in CastingMoldCad.anchorComponents(plan)) {
 				var local=scope.own(hardware.part.geometry());
 				add(hardware.id,[hardware.insertId,hardware.anchorId],machinekit.assembly.PosedParts.moved(local,hardware.pose),BondingSteel,null);

@@ -27,7 +27,7 @@ import materia.tooling.casting.CastingSetup.CastingFeatureStrategy;
  */
 class ToolingCodec {
 	public static inline var FORMAT = "materia.casting-tooling";
-	public static inline var VERSION = 25;
+	public static inline var VERSION = 26;
 	public static inline var MAX_RECORDS = 512;
 	public static inline var MAX_TEXT_BYTES = 2097152;
 
@@ -95,7 +95,6 @@ class ToolingCodec {
 	public static function inputRecord(input:CastingToolingInput):Dynamic {
 		return Json.parse(canonical({id:input.id,revision:input.revision,lengthUnit:input.lengthUnit,
 			envelope:input.envelope,features:input.features,datumScheme:input.datumScheme,
-			precastStruts:materia.casting.PrecastStrut.PrecastStruts.records(input.precastStruts),
 			interfaces:materia.casting.InterfaceRequirement.InterfaceRequirements.records(input.interfaces),
 			interfaceContext:input.interfaceContext==null ? null : materia.casting.CastingInterfaceContext.CastingInterfaceContexts.record(input.interfaceContext),
 			postCureInserts:[for (row in input.postCureInserts) {insert:insertRecord(row.insert),
@@ -115,17 +114,13 @@ class ToolingCodec {
 	public static function inputSnapshot(raw:Dynamic):CastingToolingInput return readInput(raw);
 
 	static function readInput(raw:Dynamic):CastingToolingInput {
-		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "precastStruts", "postCureInserts", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
+		object(raw, ["id", "revision", "lengthUnit", "envelope", "features", "postCureInserts", "inserts", "datumScheme", "interfaces", "interfaceContext"], "input");
 		if (string(raw, "lengthUnit") != "mm")
 			throw "Tooling input requires explicit mm units";
 		var envelope:Array<CastingPrism> = [for (p in array(raw, "envelope")) readPrism(p)];
 		if (envelope.length == 0)
 			throw "Tooling input needs an envelope";
 		var features = materia.casting.CastingFeatureCodec.snapshot(array(raw,"features"));
-		var struts = materia.casting.PrecastStrut.PrecastStruts.snapshot(array(raw,"precastStruts"));
-		for (strut in struts)
-			if (features.filter(feature -> feature.id == strut.coreFeatureId || feature.derivedFrom == strut.coreFeatureId).length == 0)
-				throw "Precast strut references an unknown source core: " + strut.id;
 		var inserts:Array<CastingToolingInsert> = [for (i in array(raw, "inserts")) readInsert(i)];
 		var postCure=[for (row in array(raw,"postCureInserts")) {
 			object(row,["insert","bond"],"post-cure insert");
@@ -181,7 +176,6 @@ class ToolingCodec {
 			interfaces: interfaces,
 			envelope: envelope,
 			features: features,
-			precastStruts: struts,
 			postCureInserts: postCure,
 			inserts: inserts
 		};

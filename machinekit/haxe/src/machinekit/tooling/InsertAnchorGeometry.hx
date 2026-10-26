@@ -551,7 +551,7 @@ class InsertAnchorGeometry {
 			var window=scope.own(PosedParts.moved(local,F.compose(pose,
 				F.translation(stock.x+stock.width/2,stock.y+stock.depth/2,low))));
 			var region=scope.own(body.intersect(window));
-			var result=screenBoundary(region);
+			var result=planarBoundary(region);
 			scope.close();
 			return result;
 		} catch (error:Dynamic) {
@@ -563,7 +563,7 @@ class InsertAnchorGeometry {
 	/** Copy exact trimmed planar boundaries once per selector invocation. The
 	 * body already comes from the shared finished-cavity realization; no local
 	 * clipping, tessellation or bounding-box cavity substitution occurs here. */
-	static function screenBoundary(body:Part):Array<AnchorFace> {
+	public static function planarBoundary(body:Part):Array<AnchorFace> {
 		var result:Array<AnchorFace>=[];
 		for (i in 0...body.shape.subshapeCount(CadKit.ShapeKind.Face)) {
 			var face=body.shape.subshape(CadKit.ShapeKind.Face,i);

@@ -19,6 +19,7 @@ class HobberFootChecks {
     check(restored.components().length==members.length,"separate foot hardware persists");
     var body=machine.bed.body.geometry(),plate=LevelingFoot.of(Plate(Pocket.FOOT_PLATE_WIDTH,Pocket.FOOT_PLATE_WIDTH,Pocket.FOOT_PLATE_THICKNESS,26)),cache=new PosedParts();
     var plateShape=plate.geometry(),began=Sys.time();
+    var poses=machine.solvedPoses(),toCasting=F.inverse(poses.get("bed/casting"));
     function volumeInBody(shape:Part):Float {var common=shape.intersect(body);var v=common.volume();common.close();return v;}
     function box(w:Float,d:Float,h:Float,x:Float,y:Float,z:Float):Part {var raw=Part.box(w,d,h),p=raw.translated(new Vector(x,y,z));raw.close();return p;}
     try {
@@ -26,8 +27,12 @@ class HobberFootChecks {
         var support=box(110,110,70,p.x,p.y,Pocket.FOOT_ROOF),hole=box(Pocket.FOOT_STEM_CLEARANCE,Pocket.FOOT_STEM_CLEARANCE,72,p.x,p.y,Pocket.FOOT_ROOF-1);
         var roof=support.subtract(hole);support.close();hole.close();
         var expected=roof.volume();check(Math.abs(volumeInBody(roof)-expected)<1e-5,"continuous 70 mm roof around stem "+i);roof.close();
-        var passage=box(28,28,Pocket.FOOT_SUPPORT_TOP+1,p.x,p.y,0);
+        var passage=box(Pocket.FOOT_STEM_CLEARANCE,Pocket.FOOT_STEM_CLEARANCE,Pocket.FOOT_SUPPORT_TOP,p.x,p.y,0);
         check(volumeInBody(passage)<0.001,"stem has casting clearance "+i);passage.close();
+        var foot=members.filter(member->member.id=="foot"+i)[0];
+        var installedFoot=cache.posed(foot.component,F.compose(toCasting,poses.get(foot.id)));
+        var overlap=volumeInBody(installedFoot);installedFoot.close();
+        check(overlap<0.001,"actual installed foot clears the finished blind stem passage "+i);
         // An 80 mm-wide, 12 mm-thick wrench corridor reaches both nuts.
         for(z in [Pocket.FOOT_ROOF-Pocket.FOOT_PLATE_THICKNESS-9.5,Pocket.FOOT_ROOF-Pocket.FOOT_PLATE_THICKNESS-28.5]){
           var alongX=i==2,edge=alongX?machine.bed.body.parameterNumber("width")/2+40:(p.y<0?-440.0:440.0);

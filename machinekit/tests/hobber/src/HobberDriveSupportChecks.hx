@@ -21,7 +21,7 @@ class HobberDriveSupportChecks {
     return [for(p in probes){var solid=box(p.bounds),gap=solid.subtract(body),v=gap.volume();gap.close();solid.close();{label:p.label,missingMm3:v};}];
   }
   static function section(path:String,cells:Array<Array<Float>>,workX:Float):Void {
-    var x=workX-HobberXLayout.front().bedCentre,parts=['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1050" viewBox="0 0 1000 1050"><rect width="1000" height="1050" fill="white"/><g font-family="sans-serif" fill="#222"><text x="50" y="35" font-size="21">Bed transverse section: work X = '+workX+' mm</text><text x="50" y="62" font-size="15">Dark: exact box intermediate BEFORE round socket cuts. Dimensions in mm.</text>'];
+    var x=workX-HobberXLayout.front().bedCentre,parts=['<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1050" viewBox="0 0 1000 1050"><rect width="1000" height="1050" fill="white"/><g font-family="sans-serif" fill="#222"><text x="50" y="35" font-size="21">Bed transverse section: work X = '+workX+' mm</text><text x="50" y="62" font-size="15">Dark: exact box intermediate BEFORE round socket and anchor cuts. Dimensions in mm.</text>'];
     for(b in cells)if(x>b[0]&&x<b[3])parts.push('<rect x="'+(500+b[1])+'" y="'+(920-b[5])+'" width="'+(b[4]-b[1])+'" height="'+(b[5]-b[2])+'" fill="#515862"/>');
     for(z in [0,85,660,710,720,800]){parts.push('<path d="M 80 '+(920-z)+' H 920" stroke="#aab1ba" stroke-dasharray="3 5"/><text x="20" y="'+(925-z)+'" font-size="14">'+z+'</text>');}
     parts.push('<g fill="#087eab" stroke="#087eab" stroke-width="1.5"><path d="M350 300 H650 M350 294 V306 M650 294 V306 M925 200 V260 M919 200 H931 M919 260 H931"/><text x="410" y="325" stroke="none" font-size="16">300 mm cap width</text><text x="934" y="236" stroke="none" font-size="16">60</text></g>');
@@ -30,16 +30,18 @@ class HobberDriveSupportChecks {
   }
   public static function run():Void {
     var machine=new FlexsplineHobber(),source=machine.bed.body,body=source.geometry();
+    var composite=machine.bed.asCastCompositeGeometry();
     var cavities=source.finishedCavities(),boxIds=[for(cavity in cavities)if(CastingCavities.supportsBoxes(cavity))cavity.featureId];
     var boxFeatures=source.castingFeatures().filter(feature->boxIds.indexOf(feature.id)>=0);
     // This exact intermediate validates the shared BOX algebra. It is never published
     // as the final casting's collision hull or stiffness result.
-    var values=source.values().setToken("features",materia.casting.CastingPatterns.encode(boxFeatures));
+    var values=source.values().copy().setToken("features",materia.casting.CastingPatterns.encode(boxFeatures))
+      .setToken("embeddedAnchors","[]");
     var intermediateSource=new machinekit.structural.MineralCasting(values),intermediate=intermediateSource.geometry();
     var cells=intermediateSource.materialBoxes(),nonbox=cavities.filter(cavity->!CastingCavities.supportsBoxes(cavity));
     var row=machine.bed.insertLocations().filter(p->p.id=="driveSeat")[0],size=row.part.boxDimensions(row.id);
     var raw=Part.box(size.width,size.depth,50),backing=PosedParts.moved(raw,F.compose(row.pose,F.translation(0,0,-50)));raw.close();
-    var missing=backing.subtract(body),missingVolume=missing.volume(),required=backing.volume();missing.close();backing.close();
+    var missing=backing.subtract(composite),missingVolume=missing.volume(),required=backing.volume();missing.close();backing.close();
     var n=0,measureOnly=Sys.args().indexOf("measure-only")>=0,probes:Array<Dynamic> = [];
     try {
       n++;if(!measureOnly&&missingVolume>0.001)throw 'X drive seat lacks 50 mm full-footprint casting backing: $missingVolume mm3';
@@ -62,6 +64,7 @@ class HobberDriveSupportChecks {
       }
       var reconstructed=machinekit.component.Solids.building([new Part(intermediate.shape.cloneShape())],parts->{
         for(cavity in nonbox)parts.push(machinekit.structural.CastingCavityCad.part(cavity));
+        for(anchor in machinekit.tooling.InsertAnchorGeometry.embeddedParts(source.embeddedAnchors()))parts.push(anchor);
         return machinekit.component.Solids.cut(parts[0],parts.slice(1));
       });
       try {
@@ -76,22 +79,23 @@ class HobberDriveSupportChecks {
       var unsupported="";
       try source.minimumSectionIy(-HobberXLayout.front().footSpan/2,HobberXLayout.front().footSpan/2)
       catch(error:Dynamic)unsupported=Std.string(error);
-      n++;if(unsupported.indexOf("Unsupported non-box finished cavity: insert-trayClampSeat")<0)
-        throw "Final box-only section screen must name its unsupported source feature";
+      n++;if(unsupported.indexOf("Unsupported non-box anchor material for inserts: ")!=0
+        || source.embeddedAnchors().filter(anchor->unsupported.indexOf(anchor.owner)<0).length>0)
+        throw "Final box-only section screen must name its unsupported anchor owners: "+unsupported;
       var output=Sys.getEnv("HOBBER_DRIVE_SUPPORT_EVIDENCE");
       if(output!=null){
         section(output+"-box-intermediate-motor-flange.svg",[for(b in cells)BoxAlgebra.limits(b)],HobberXLayout.front().motorFace-10);
         section(output+"-box-intermediate-under-motor.svg",[for(b in cells)BoxAlgebra.limits(b)],(HobberXLayout.front().motorFace+HobberXLayout.front().motorRear)/2);
       }
       var result={assertions:n,boxIntermediate:{before:cells.length,after:compact.length,volumeMm3:intermediate.volume()},
-        finalBoxHull:{status:"unsupported",features:[for(cavity in nonbox)cavity.featureId]},
+        finalBoxHull:{status:"unsupported",features:[for(cavity in nonbox)cavity.featureId],anchorOwners:[for(anchor in source.embeddedAnchors())anchor.owner]},
         finalSection:{status:"unsupported",message:unsupported},exactFinalReconstruction:true,
         driveSeatRequiredBackingMm3:required,driveSeatMissingBackingMm3:missingVolume,backingDepthMm:50,probes:probes,
         solidCount:body.solidCount(),castingMassKg:machine.bed.castingByWeight().kg,
-        scope:"Exact native support continuity and box-intermediate regression; final round-cavity box hull/stiffness unsupported. Not structural qualification."};
+        scope:"Exact native support continuity and box-intermediate regression; final round-cavity and anchor occupancy box hull/stiffness unsupported. Not structural qualification."};
       if(output!=null)sys.io.File.saveContent(output+".json",haxe.Json.stringify(result));
       Sys.println("HOBBER_DRIVE_SUPPORT "+haxe.Json.stringify(result));
-    }catch(error:Dynamic){intermediate.close();body.close();throw error;}
-    intermediate.close();body.close();
+    }catch(error:Dynamic){intermediate.close();composite.close();body.close();throw error;}
+    intermediate.close();composite.close();body.close();
   }
 }

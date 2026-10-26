@@ -39,28 +39,6 @@ class CastingMoldExport {
 	static function data(path:String, value:Dynamic):Void
 		text(path, Json.stringify(value, null, "\t") + "\n");
 
-	public static function writePrecastShop(p:CastingMoldPlan,dir:String):Void {
-		if(p.document.input.precastStruts.length>0){
-			var volume=materia.casting.BoxAlgebra.volume([for(strut in p.document.input.precastStruts)strut.box]);
-			data(dir+"/precast-compound-struts.json",{
-				struts:materia.casting.PrecastStrut.PrecastStruts.records(p.document.input.precastStruts),
-				compound:p.document.recipe.resinSpec,
-				volumeMm3:volume,
-				massKg:volume*p.document.recipe.mixDensityKgM3*1e-9,
-				contacts:[for(core in p.cores)if(core.support.kind==PrecastStruts)
-					{coreId:core.id,contacts:core.support.precastContacts,bridgePanelIds:core.support.panelIds}],
-				operations:[
-					"Precast the declared struts from the production compound; cure and inspect before mold assembly.",
-					"Prepare and bond lower struts, EPS and upper struts in their declared source positions before installing the retained unit.",
-					"Keep compound bonding faces uncoated; mask them during the release-system preparation.",
-					"Bond the three dry bearing pads to the shared beam using the recipe adhesive; cure and inspect the fixture before coating or assembly.",
-					"Seat each upper strut head against its own pad; clamp the beam to the supported rails before pouring.",
-					"Leave the enclosed EPS and compound struts inside the cured casting. Remove only the dry beam/pad fixture."
-				]
-			});
-		}
-	}
-
 	public static function write(p:CastingMoldPlan, dir:String, review:machinekit.tooling.CastingMoldCad.CastingMoldReview):Void {
 		if (review.fingerprint != CastingMoldPlanner.fingerprint(p))
 			throw "Stale casting mold review";
@@ -129,14 +107,11 @@ class CastingMoldExport {
 			case RoutedSocket: c.id+": "+c.layers.length+" layers, routed socket "+c.support.socketOperationId;
 			case RegisteredFlange: c.id+": "+c.layers.length+" layers, externally clamped registered flange at "+MoldCores.receiverId(c);
 			case Bridge: c.id+": "+c.layers.length+" layers, carrier "+MoldCores.carrierId(c)+", shared "+MoldCores.bridgeId(c);
-			case PrecastStruts: c.id+": "+c.layers.length+" layers, left in casting; source compound struts "
-				+[for(contact in c.support.precastContacts)contact.strutId].join(", ")+"; dry bridge/spreader "+c.support.panelIds.join(", ");
-			default: throw "Unknown core support: "+c.id;
+				default:throw "Unknown EPS support kind: "+c.id;
 		}];
 		for(core in p.cores)if(core.support.assemblyByLayer)coreList.push(core.id
 			+": install the supplied stock layers around fixtures in the checked order, then bond and finish their covering; keep with the casting for lift and break out through "
 			+MoldCores.removal(core)+" afterwards. Release bed/carrier adhesive before tooling withdrawal; qualify these manual processes.");
-		writePrecastShop(p,dir);
 		text(dir
 			+ "/procedure.md",
 			"# Casting mold review — "

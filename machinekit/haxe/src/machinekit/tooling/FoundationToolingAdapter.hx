@@ -29,7 +29,6 @@ class FoundationToolingAdapter {
 			interfaces: foundation.body.precisionRequirements(),
 			envelope: foundation.body.castingEnvelope(),
 			features: foundation.body.castingFeatures(),
-			precastStruts: foundation.body.precastStruts(),
 			postCureInserts:[for (row in foundation.postCureLocations()) {insert:insert(row),
 				bond:foundation.body.postCureBonds().filter(bond -> bond.insertId==row.id)[0]}],
 			inserts: [for (row in foundation.insertLocations()) insert({id:row.id,part:row.part,pose:row.pose})]

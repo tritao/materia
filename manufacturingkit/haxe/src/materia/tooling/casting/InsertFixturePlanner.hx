@@ -64,16 +64,45 @@ class InsertFixturePlanner {
 		var h = recipe.hardware, pin = h.fixturePinDiameter + recipe.jointClearance;
 		var width = h.datumPostWidth;
 		for (insert in input.inserts) {
-			var face = F.compose(insert.pose, F.translation(0, 0, materia.casting.InsertSpec.InsertBodyCodec.height(insert.body)));
-			for (hole in availableHoles(insert)) {
-				var fixing = select(hole, insert.pose, face, h);
-				if (fixing == null) continue;
-				var spacing = Math.max(h.fixturePinSpacing,
-					fixing.clearanceDiameter + pin + h.secondaryPinTravel + 2 * recipe.minimumLigament);
-				width = Math.max(width, spacing + pin + h.secondaryPinTravel + 2 * recipe.minimumLigament);
+			for(end in materia.casting.InsertSpec.InsertBodyCodec.planarEndFrames(insert.body)) {
+				var face=F.compose(insert.pose,end);
+				for (hole in availableHoles(insert)) {
+					var fixing=select(hole,insert.pose,face,h);
+					if(fixing==null)continue;
+					var spacing=Math.max(h.fixturePinSpacing,
+						fixing.clearanceDiameter+pin+h.secondaryPinTravel+2*recipe.minimumLigament);
+					width=Math.max(width,spacing+pin+h.secondaryPinTravel+2*recipe.minimumLigament);
+				}
 			}
 		}
 		return width;
+	}
+
+	/** Reuse only source threads. Prefer an actual panel receiver, then a
+	 * bed-facing end; equal choices keep the authored positive-end convention.
+	 * An unresolved hole route may nominate a face but never becomes a fixing. */
+	public static function mountingFace(insert:CastingToolingInput.CastingToolingInsert,sourceToMold:AssemblyFrame,
+			hardware:ToolingHardware,?panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>):AssemblyFrame {
+		var stock=F.compose(sourceToMold,insert.pose),ends=materia.casting.InsertSpec.InsertBodyCodec.planarEndFrames(insert.body);
+		var selected=F.compose(stock,ends[0]),best=Math.NEGATIVE_INFINITY;
+		var available=availableHoles(insert);
+		for(end in ends) {
+			var face=F.compose(stock,end);
+			var usable=available.filter(hole->select(hole,stock,face,hardware)!=null).length>0;
+			if(!usable && !unresolvedFixing(insert,stock,face,hardware))continue;
+			var normal=F.transformVector(face,0,0,1);
+			var direct=panels!=null && DatumFixtures.panelOnFace(panels,face)!=null;
+			var score=(direct ? 4 : 0)-normal.z;
+			if(score>best+1e-8){selected=face;best=score;}
+		}
+		return selected;
+	}
+
+	public static function physicalEnd(insert:CastingToolingInput.CastingToolingInsert,sourceToMold:AssemblyFrame,
+			face:AssemblyFrame):Bool {
+		var stock=F.compose(sourceToMold,insert.pose);
+		return materia.casting.InsertSpec.InsertBodyCodec.planarEndFrames(insert.body).filter(end->
+			materia.tooling.ToolingCodec.canonical(F.compose(stock,end))==materia.tooling.ToolingCodec.canonical(face)).length==1;
 	}
 
 	public static function holes(insert:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Array<InsertHole>

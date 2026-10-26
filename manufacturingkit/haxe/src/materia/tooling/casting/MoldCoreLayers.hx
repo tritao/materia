@@ -87,13 +87,6 @@ class MoldCoreLayers {
 		return layered(region,featureId,id,r,frame,CoreSupport.CoreSupportKind.RegisteredFlange,[panelId]);
 	}
 
-	/** Enclosed EPS uses the same exact section erosion and stock/glue allocation
-	 * as an access core. Its source struts replace the removable flange fixture.
-	 */
-	public static function retained(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe):CastingMoldCore {
-		return layered(region,featureId,id,r,F.identity(),CoreSupport.CoreSupportKind.PrecastStruts,[]);
-	}
-
 	/** A connected source-void unit shares one declared bed or fill access. */
 	public static function network(region:CastingRegion,featureId:String,id:String,r:ToolingRecipe,
 			kind:CoreSupport.CoreSupportKind):CastingMoldCore {

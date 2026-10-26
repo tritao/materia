@@ -64,5 +64,32 @@
         "compressedBytes": 410892
       }
     ]
+  },
+  "approvedHobberSimplification": {
+    "decision": "Hobber source decision 2 and Source simplification decision (user, 2026-10-25); lifting-land corrections (user, 2026-10-25/26)",
+    "corrections": [
+      "Fill plinth outer bands, drive-web slots and the sliver; directly author remaining pockets and open the drive chamber to the sole",
+      "Fill column back networks; preserve the declared head recess",
+      "Redeclare the cable duct through both real body end faces",
+      "Connector-derived rail holes and policy-resolved source fixture threads; preserve existing mounting locations",
+      "Demand-sized ISO 4162 anchors; preserve catalogue socket retention",
+      "Keep original lifting service centres; add plinth points at CoM-proposed X and symmetric Y=310 mm outer bands",
+      "Add column pair at X=160/-160 mm, Y=46 mm with demand-selected 65 x 58 x 30 mm blanks: keep 6 mm cover to the original lifting plates and rail-anchor heads; the earlier Y=54 mm square overlapped those heads",
+      "Reframe the column sole from its underside without changing its steel envelope or fixture-hole location, so rear anchors enter resin"
+    ],
+    "files": [
+      {
+        "id": "hobber-bed",
+        "stepSha256": "8d08d419e8055966ad17c2bc55db2056b161c74a3e620a1e3e4727780a9db0fd",
+        "stepBytes": 7583177,
+        "compressedBytes": 1099295
+      },
+      {
+        "id": "hobber-column",
+        "stepSha256": "5517f6606d8c1ce251074a462bde8a82d0eeae990b6944046573025a960e3e48",
+        "stepBytes": 1733663,
+        "compressedBytes": 262497
+      }
+    ]
   }
 }

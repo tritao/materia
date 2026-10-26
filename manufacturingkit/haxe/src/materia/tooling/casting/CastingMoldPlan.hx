@@ -32,7 +32,6 @@ typedef PenetrationPlan = {
 }
 
 enum abstract CoreRemoval(String) to String {
-	var LeaveInCasting = "leave-in-casting";
 	var BreakoutThroughFill = "breakout-through-fill";
 	var BreakoutThroughBed = "breakout-through-bed";
 	var BreakoutThroughPanel = "breakout-through-panel";

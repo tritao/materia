@@ -9769,8 +9769,8 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "573d0be96be946ddde51b2e2e05c12ef30cfbef1c742338a780b56dda9194d8f",
-      "sourceCodecVersion": 25,
+      "sourceFingerprint": "35383393d1b465f35b337364fe8df5db15b2b0b744d798dbea1707e4b1099845",
+      "sourceCodecVersion": 26,
       "volumeMm3": 68874053.65577689,
       "massKg": 165.29772877386455,
       "boxStatus": "unsupported",
@@ -9780,8 +9780,8 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "b7ecb9332ef7b8fe69cb8a4b1e546e280301e344a8c827998839dd516409df7a",
-      "sourceCodecVersion": 25,
+      "sourceFingerprint": "909a49081e0e32fde055c29efe0fb9ffb35d5cd63e57ff1eb2db2f18a8a23ec8",
+      "sourceCodecVersion": 26,
       "volumeMm3": 42102473.07897135,
       "massKg": 101.04593538953124,
       "boxStatus": "unsupported",
@@ -9794,12 +9794,12 @@
     },
     {
       "id": "hobber-bed",
-      "sourceFingerprint": "e7900ab659f1d2196d0ad339bca96eb4416d139f76663bdd6fafe06ecf32e9d9",
-      "sourceCodecVersion": 25,
-      "volumeMm3": 350967609.82848835,
-      "massKg": 842.322263588372,
+      "sourceFingerprint": "670821457025b31c18e310ca3c83a7b0a165fc301424f743c9998b9f6bac20e4",
+      "sourceCodecVersion": 26,
+      "volumeMm3": 471682156.0256817,
+      "massKg": 1132.0371744616361,
       "boxStatus": "unsupported",
-      "boxReason": "Unsupported collision geometry for features: insert-trayClampSeat0, insert-trayClampSeat1, insert-trayClampSeat10, insert-trayClampSeat11, insert-trayClampSeat2, insert-trayClampSeat3, insert-trayClampSeat4, insert-trayClampSeat5, insert-trayClampSeat6, insert-trayClampSeat7, insert-trayClampSeat8, insert-trayClampSeat9",
+      "boxReason": "Non-box anchor occupancy for inserts: driveSeat, enclosureSeat00, enclosureSeat02, enclosureSeat20, enclosureSeat22, liftAdditional1, liftAdditional2, liftLeft, liftRight, railLeft, railRight, tablePlate",
       "unsupportedFeatures": [
         "insert-trayClampSeat0",
         "insert-trayClampSeat1",
@@ -9818,14 +9818,14 @@
     },
     {
       "id": "hobber-column",
-      "sourceFingerprint": "8fe663e805857d4c5b5184a3a3352f285c429dbef3f34732083f01e675d4f282",
-      "sourceCodecVersion": 25,
-      "volumeMm3": 18059500.00000002,
-      "massKg": 43.34280000000005,
-      "boxStatus": "pass",
-      "boxReason": "Exact disjoint-box material hulls",
+      "sourceFingerprint": "86f1a4a9b509edd96f52ee4c7ff61ee3c2cba36f6dd7db2be8fe5fdd3eb08e0b",
+      "sourceCodecVersion": 26,
+      "volumeMm3": 29267979.66861247,
+      "massKg": 70.24315120466993,
+      "boxStatus": "unsupported",
+      "boxReason": "Non-box anchor occupancy for inserts: basePlate, driveSeat, liftAdditional1, liftAdditional2, liftLeft, liftRight, railLeft, railRight",
       "unsupportedFeatures": [],
-      "minimumIyMm4": 515253226.29969406
+      "minimumIyMm4": null
     }
   ],
   "currentDesignBasis": "Exact native volumes; box-only sections are Unsupported for non-box socket recesses and embedded anchor hardware, never approximated."

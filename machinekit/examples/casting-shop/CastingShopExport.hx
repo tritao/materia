@@ -51,7 +51,8 @@ class CastingShopExport {
 	public static function write(document:materia.tooling.ToolingDocument,
 			options:materia.tooling.casting.CastingMoldPlan.CastingMoldOptions,
 			foundation:machinekit.structural.MineralFoundation,stem:String,processId:String,root:String,
-			?extraChecks:materia.tooling.casting.CastingMoldPlan->machinekit.tooling.CastingMoldCad.CastingMoldReview->Void):Void {
+			?extraChecks:materia.tooling.casting.CastingMoldPlan->machinekit.tooling.CastingMoldCad.CastingMoldReview->Void,
+			?sourceReview:materia.tooling.casting.CastingMoldPlan->Array<ToolingValidation>):Void {
 		var recordsOnly = Sys.args().indexOf("--records-only") >= 0;
 		var name = stem+"-fabrication"+(recordsOnly ? "-records" : "");
 		var destination = root + "/build/tooling/" + name,
@@ -81,7 +82,6 @@ class CastingShopExport {
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pass,
 				"Exact source reconstruction, boundary coverage, assembly/demolding sweeps and portable assembly restoration passed.", [review.fingerprint]));
 		} else {
-			CastingMoldExport.writePrecastShop(p,dir);
 			checks.push(ToolingLoads.check("fabrication.geometry-and-sequence", [p.document.input.id], ToolingCheckStatus.Pending,
 				"Records-only export did not run CAD/sequence validation.", []));
 		}
@@ -241,6 +241,7 @@ class CastingShopExport {
 			+"\nFormer programs retain the declared fixed G54 work datum and spoilboard plane; each header states its actual stock-top Z. Thicker blanks therefore use a different top Z, not a different assumed datum. Machine and seal all listed contact surfaces; pocket-screw heads and access stay inside the dry cavity. Board/grip, jig, workholding and machine qualification remain pending.\n");
 		checks = checks.concat(machinekit.tooling.ToolingProcessExport.write(p,process,f.spec.gravityMps2,dir,
 			geometricReview,f.spec,foundation,processReport,p.document.input.interfaceContext));
+		if(sourceReview!=null)checks=checks.concat(sourceReview(p));
 		ToolingPackageManifest.write(dir, f, checks, p, process);
 		ToolingPackageManifest.verify(dir);
 		Sys.println("Fabrication package integrity check passed");

@@ -85,8 +85,15 @@ class FoundationSizing {
 			// Only lifting demand depends on the resolved casting mass. Other
 			// patterns and their exact containment are unchanged across this loop.
 			var fixed:Map<String,CastInsert> = [];
-			for (row in rows) if (row.part.parameterToken("role")!=InsertRole.LiftingMount)
-				fixed.set(row.id,machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),0));
+			for (row in rows) if (row.part.parameterToken("role")!=InsertRole.LiftingMount) {
+				var part=switch row.part.insertSpec().origin {
+					// Published retention stays unchanged, while its real mass and
+					// displacement remain in the complete lifting-demand assembly.
+					case Catalogue(_):row.part;
+					case Fabricated(_):machinekit.tooling.InsertAnchorGeometry.derive(row.id,row.part,rule,Casting(body,row.pose),0);
+				};
+				fixed.set(row.id,part);
+			}
 			// Hardware changes the casting mass. Resolve that known design coupling
 			// without borrowing workshop strength values or dropping hardware mass.
 			for (pass in 0...8) {

@@ -126,6 +126,18 @@ class InsertBodyCodec {
 			case CrimpedSocket(mouth, tail): CastingSolid.CastingSolidCodec.height(mouth) + tail.length;
 		};
 	}
+	/** Exact planar end frames, positive end first. A crimped tail is not a
+	 * second planar receiver. Frames describe the source body without changing
+	 * its geometry or the authored hole coordinates. */
+	public static function planarEndFrames(body:InsertBody):Array<materia.assembly.AssemblyRecord.AssemblyFrame> {
+		var frames=[materia.assembly.AssemblyFrames.translation(0,0,height(body))];
+		switch body {
+			case Primitive(_):frames.push(materia.assembly.AssemblyFrames.fromRotationMatrix(0,0,0,[1,0,0,0,-1,0,0,0,-1]));
+			case CrimpedSocket(_,_):
+		}
+		return frames;
+	}
+
 	/** Mouth span only; this is not a bounding-box approximation of the insert. */
 	public static function mouth(body:InsertBody):CastingSolid return switch body {
 		case Primitive(solid): solid;

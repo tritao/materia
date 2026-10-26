@@ -13,15 +13,8 @@ class MoldCores {
 		return materia.tooling.ToolingIds.derive("",core.id,"-carrier");
 	}
 
-	public static function spreaderIds(core:CastingMoldCore):Array<String> {
-		if(core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
-			throw "Only precast struts use dry bearing pads: "+core.id;
-		return [for(contact in core.support.precastContacts)if(contact.contact==materia.casting.PrecastStrut.StrutContact.Upper)
-			materia.tooling.ToolingIds.derive("precast-pad-",contact.strutId)];
-	}
-
 	public static function bridgeId(core:CastingMoldCore):String {
-		var pads=core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts ? spreaderIds(core) : [carrierId(core)];
+		var pads=[carrierId(core)];
 		var other=core.support.bondedPanelIds.filter(id -> pads.indexOf(id)<0);
 		if (other.length!=1) throw "Incomplete bonded core support: "+core.id;
 		return other[0];
@@ -35,9 +28,7 @@ class MoldCores {
 	}
 
 	public static function removal(core:CastingMoldCore):materia.tooling.casting.CastingMoldPlan.CoreRemoval
-		return core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts
-			? materia.tooling.casting.CastingMoldPlan.CoreRemoval.LeaveInCasting
-			: core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge
+		return core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge
 			? receiverId(core)=="bed" ? materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughBed
 				: materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughPanel
 			: materia.tooling.casting.CastingMoldPlan.CoreRemoval.BreakoutThroughFill;
@@ -60,8 +51,6 @@ class MoldCores {
 
 	public static function withdrawal(core:CastingMoldCore,panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>)
 			:{x:Float,y:Float,z:Float} {
-		if (core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts)
-			throw "Retained EPS has no withdrawal path: "+core.id;
 		if (core.support.kind==materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge) return {x:0,y:0,z:1};
 		var matches=panels.filter(panel -> panel.panel.id==receiverId(core));
 		if (matches.length!=1) throw "Core socket references an unknown panel: "+core.id;

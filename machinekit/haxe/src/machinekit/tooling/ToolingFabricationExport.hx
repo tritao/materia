@@ -267,14 +267,13 @@ class ToolingFabricationExport {
 		return cadChecks;
 	}
 
-	/** A retained core has no removal vector; breakup is also not an intact pull. */
+	/** Manual breakup does not claim an intact removal vector. */
 	public static function coreSupportRecords(cores:Array<CastingMoldCore>,
 			panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>):Array<Dynamic> {
 		var records:Array<Dynamic>=[];
 		for(core in cores){
 			var removal=MoldCores.removal(core);
-			if(core.support.kind!=materia.tooling.casting.CoreSupport.CoreSupportKind.PrecastStruts
-				&& !core.support.breakoutAfterLift)
+			if(!core.support.breakoutAfterLift)
 				records.push({coreId:core.id,featureId:core.featureId,support:core.support,
 					removal:removal,withdrawal:MoldCores.withdrawal(core,panels)});
 			else records.push({coreId:core.id,featureId:core.featureId,support:core.support,removal:removal});

@@ -187,6 +187,23 @@ class InsertAnchorTests {
 			var metal=machinekit.tooling.CastingMoldCad.steel(mold,"seat");owned.push(metal);
 			var nominalMass=(resin.volume()*mold.document.recipe.mixDensityKgM3+metal.volume()*mold.document.recipe.steelDensityKgM3)*1e-9;
 			check(Math.abs(nominalMass-mold.handling.castingMassKg)<1e-6,"source anchor moments agree with exact nominal metal/resin mass");
+			var composite=foundation.asCastCompositeGeometry();owned.push(composite);
+			var backing=machinekit.tooling.ToolingBlock.placedBox({x:-30.0,y:-25.0,z:30.0,width:60.0,depth:50.0,height:30.0});
+			owned.push(backing);
+			var nominalResin=foundation.body.asCastGeometry();owned.push(nominalResin);
+			var resinGap=backing.subtract(nominalResin),compositeGap=backing.subtract(composite);
+			owned.push(resinGap);owned.push(compositeGap);
+			check(resinGap.volume()>100 && compositeGap.volume()<1e-6,
+				"Permanent steel anchors fill their real backing occupancy; they are not air voids or extra resin");
+			var cut=materia.casting.CastingPatterns.box("test-void",materia.casting.CastingFeature.CastingFeatureKind.Lightening,
+				[materia.casting.CastingPatterns.face("body.z-min")],20,20,20,45,0,0);
+			var hollow=new machinekit.structural.MineralFoundation(new machinekit.component.ComponentValues()
+				.setNumber("width",120).setNumber("depth",100).setNumber("height",80)
+				.setToken("features",materia.casting.CastingPatterns.encode([cut])),foundation.insertLocations());
+			var hollowComposite=hollow.asCastCompositeGeometry();owned.push(hollowComposite);
+			var probe=machinekit.tooling.ToolingBlock.placedBox({x:40.0,y:-5.0,z:0.0,width:10.0,depth:10.0,height:10.0});
+			owned.push(probe);var realGap=probe.subtract(hollowComposite);owned.push(realGap);
+			check(Math.abs(realGap.volume()-1000)<1e-6,"Composite backing checks still expose genuine source cavities");
 			var actual=foundation.body.geometry();owned.push(actual);
 			var baseline=new machinekit.structural.MineralCasting(foundation.body.values().copy().setToken("embeddedAnchors","[]")).geometry();
 			owned.push(baseline);

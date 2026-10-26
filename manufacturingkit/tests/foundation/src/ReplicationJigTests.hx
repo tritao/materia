@@ -30,7 +30,7 @@ class ReplicationJigTests {
 			sources:[Precision("casting",a,F.identity()),Precision("casting",b,F.identity())]};
 		return {id:"jig-fixture",revision:1,lengthUnit:materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			datumScheme:null,interfaceContext:CastingInterfaceContexts.copy(context),interfaces:[a,b],
-			precastStruts:[],postCureInserts:[],
+			postCureInserts:[],
 			envelope:materia.casting.CastingEnvelope.build(100,80,40),features:[],inserts:[]};
 	}
 	static function jig():ReplicationJig return {

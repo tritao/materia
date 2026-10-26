@@ -52,69 +52,15 @@ class FoundationDesignTests {
 		assertions++;
 	}
 
-	/** The accepted socket cut-over is an explicit design correction to the frozen box seats.
-	 * Keep the pre-socket STEP as an independent control: restore its twelve 20 mm
-	 * seat voids, then remove only the declared source socket cavities.
-	 */
-	static function socketSeats(foundation:machinekit.structural.MineralFoundation):Array<materia.casting.Box3> {
-		var sockets = foundation.insertLocations().filter(row -> switch row.part.insertSpec().origin {
-			case Catalogue(product): product.reference == machinekit.structural.FixingSockets.PFEIFER_REFERENCE;
+	/** Catalogue sockets remain single source inserts, without duplicate box seats. */
+	static function socketCount(foundation:machinekit.structural.MineralFoundation):Void {
+		var sockets=foundation.insertLocations().filter(row->switch row.part.insertSpec().origin {
+			case Catalogue(product):product.reference==machinekit.structural.FixingSockets.PFEIFER_REFERENCE;
 			default:false;
 		});
 		assertions++;
-		if (sockets.length != 12) throw "Hobber tray must use twelve catalogue sockets, with no duplicate box seats";
-		return [for (row in sockets) {
-			var hole = row.part.insertSpec().holes[0], mouth = F.compose(row.pose,hole.frame);
-			{x:mouth.x-10,y:mouth.y-10,z:mouth.z-20,width:20.0,depth:20.0,height:20.0};
-		}];
+		if(sockets.length!=12)throw "Hobber tray needs twelve catalogue sockets without duplicate box seats";
 	}
-
-	static function socketDesignChange(previous:Part,foundation:machinekit.structural.MineralFoundation):Part {
-		var oldSeats = socketSeats(foundation);
-		var restored = Solids.building([new Part(previous.shape.cloneShape())], parts -> {
-			for (box in oldSeats) {
-				var local = Part.box(box.width,box.depth,box.height);
-				try parts.push(PosedParts.moved(local,F.translation(box.x+box.width/2,box.y+box.depth/2,box.z)))
-				catch (error:Dynamic) {local.close(); throw error;}
-				local.close();
-			}
-			return Solids.union(parts);
-		});
-		var source = foundation.body;
-		var ids = source.castingFeatures().filter(feature -> !materia.casting.CastingFeature.CastingGeometrySolids.isBox(feature.geometry.solid));
-		assertions++;
-		if (ids.length != oldSeats.length || ids.filter(feature -> feature.kind != InsertRecess).length != 0)
-			throw "Socket correction must change only source-owned insert recesses";
-		var names = [for (feature in ids) feature.id];
-		return Solids.building([restored], parts -> {
-			for (cavity in source.finishedCavities())
-				if (names.indexOf(cavity.featureId) >= 0)
-					parts.push(machinekit.structural.CastingCavityCad.part(cavity));
-			return Solids.cut(parts[0],parts.slice(1));
-		});
-	}
-
-	/** Approved hobber correction, independent of the source feature builder.
-	 * Preserve the historical STEP and add only the specified 5 mm strip and
-	 * the twelve 50 mm square precast-compound strut envelopes.
-	 */
-	static function hobberPrecastAdditions():Array<materia.casting.Box3> {
-		var boxes:Array<materia.casting.Box3>=[{x:17.5,y:-95,z:85,width:5,depth:190,height:575}];
-		for(site in [{x:80.0,y:-350.0,top:775.0},{x:320.0,y:-350.0,top:775.0},{x:210.0,y:-300.0,top:775.0},
-			{x:100.0,y:-80.0,top:660.0},{x:220.0,y:-80.0,top:660.0},{x:160.0,y:80.0,top:660.0}]) {
-			boxes.push({x:site.x-25,y:site.y-25,z:0,width:50,depth:50,height:85});
-			boxes.push({x:site.x-25,y:site.y-25,z:site.top,width:50,depth:50,height:800-site.top});
-		}
-		return boxes;
-	}
-
-	static function hobberPrecastDesignChange(previous:Part):Part {
-		return Solids.building([new Part(previous.shape.cloneShape())],parts->{
-			for(box in hobberPrecastAdditions())parts.push(machinekit.tooling.ToolingBlock.placedBox(box));
-			return Solids.union(parts);
-		});
-	}
-
 
 	static function prism(p:materia.casting.CastingPrism):Part {
 		var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
@@ -146,7 +92,7 @@ class FoundationDesignTests {
 		var input:materia.tooling.casting.CastingToolingInput = {
 			id: "foot-fixture", revision: 1, lengthUnit: materia.tooling.ToolingEnums.ToolingLengthUnit.Millimetres,
 			datumScheme:null, interfaces:[], interfaceContext:null,
-			precastStruts:[],postCureInserts:[],
+			postCureInserts:[],
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
 		var frame = MillMoldSetup.frame();
@@ -413,6 +359,19 @@ class FoundationDesignTests {
 			}
 			return;
 		}
+		if(Sys.args().indexOf("--export-approved-hobber")>=0) {
+			var sources:Array<{id:String,part:machinekit.structural.MineralFoundation}>=[
+				{id:"hobber-bed",part:new machinekit.hobbing.MineralCastBed()},
+				{id:"hobber-column",part:new machinekit.hobbing.MineralCastColumn()}
+			];
+			for(row in sources) {
+				var part=row.part.body.geometry();
+				try part.shape.exportStep(root+"/"+row.id+"-simplified.step")
+				catch(error:Dynamic) {part.close();throw error;}
+				part.close();
+			}
+			return;
+		}
 		var columnBolts = frame.components().filter(row -> StringTools.startsWith(row.id, "columnBolt"));
 		assertions++;
 		if (columnBolts.length != 4) throw "Mill needs its four column service screws";
@@ -447,12 +406,12 @@ class FoundationDesignTests {
 			if (row.part.body.castingFeatures().filter(feature -> feature.derivedFrom != null
 				|| feature.id.indexOf("-fragment-") >= 0).length != 0)
 				throw "Foundation pockets must be directly authored at named design stations: " + row.id;
-			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + (StringTools.startsWith(row.id,"mill-") ? "-simplified" : "") + ".step.gz"]);
+			var process = sys.io.Process.run("gzip", ["-dc", root + "/" + row.id + "-simplified.step.gz"]);
 			var text = process.readStdout(), status = process.exitCode();
 			process.close();
 			if (status != 0)
 				throw "Cannot decode frozen migration CAD fixture";
-			var records:Array<Dynamic> = cast (StringTools.startsWith(row.id,"mill-") ? reference.approvedSimplification.files : reference.files);
+			var records:Array<Dynamic> = cast (StringTools.startsWith(row.id,"mill-") ? reference.approvedSimplification.files : reference.approvedHobberSimplification.files);
 			var matches = records.filter(record -> record.id == row.id);
 			assertions++;
 			if (matches.length != 1 || haxe.crypto.Sha256.encode(text) != matches[0].stepSha256
@@ -460,19 +419,7 @@ class FoundationDesignTests {
 				throw "Frozen migration CAD fixture fingerprint mismatch: " + row.id;
 			var previous = new Part(cadkit.Shape.importStepText(text)),
 				actual = row.part.body.geometry();
-			if (row.id == "hobber-bed") {
-				var sockets = socketDesignChange(previous,row.part);
-				var corrected = hobberPrecastDesignChange(sockets);
-				sockets.close();
-				try {
-					same(corrected,actual,"hobber-bed approved socket, solid strip and precast-strut corrections");
-					var added = actual.subtract(previous), removed = previous.subtract(actual);
-					try Sys.println("hobber-bed approved source corrections: added="+added.volume()+" removed="+removed.volume()+" mm3")
-					catch (error:Dynamic) {added.close(); removed.close(); throw error;}
-					added.close(); removed.close();
-				} catch (error:Dynamic) {corrected.close(); previous.close(); actual.close(); throw error;}
-				corrected.close();
-			} else same(previous,actual,row.id + (StringTools.startsWith(row.id,"mill-") ? " approved source simplification" : ""));
+			same(previous,actual,row.id+" approved source simplification");
 			var sourceDatums=row.part.body.foundationDatumScheme();
 			var sourceInput = machinekit.tooling.FoundationToolingAdapter.snapshot(row.part,sourceDatums==null ? row.id : sourceDatums.foundationId,1);
 			var unsupported = row.part.body.finishedCavities().filter(cavity -> !CastingCavities.supportsBoxes(cavity));
@@ -499,28 +446,30 @@ class FoundationDesignTests {
 				if (Math.abs(historicalIy-frozenIy) > frozenIy*1e-10) throw "Shared algebra changes historical frozen section Iy: " + row.id;
 				var boxFeatures = row.part.body.castingFeatures().filter(feature -> materia.casting.CastingFeature.CastingGeometrySolids.isBox(feature.geometry.solid));
 				var cells = materia.casting.BoxAlgebra.material(row.part.body.castingEnvelope(),boxFeatures);
-				if (kind == "bed") previousCells = materia.casting.BoxAlgebra.coalesce(materia.casting.BoxAlgebra.subtract(
-					previousCells.concat(socketSeats(row.part)).concat(hobberPrecastAdditions()),[]));
-				var difference = materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(cells, previousCells))
-					+ materia.casting.BoxAlgebra.volume(materia.casting.BoxAlgebra.subtract(previousCells, cells));
-				assertions++;
-				if (difference > 1e-6)
-					throw "Shared algebra changes frozen hobber material: " + row.id;
-				assertions++;
-				if (Math.abs(materia.casting.BoxAlgebra.volume(cells) - materia.casting.BoxAlgebra.volume(previousCells)) > 1e-6)
-					throw "Shared algebra changes frozen hobber volume: " + row.id;
-				var expected = materia.casting.BoxAlgebra.minimumIy(previousCells,-half,half);
-				var iy = materia.casting.BoxAlgebra.minimumIy(cells,-half,half);
+				// The historic cells still prove the shared section algebra above.
+				// Approved geometry intentionally differs from them. Prove current
+				// box material against native booleans; the full source is separately
+				// compared with its approved frozen STEP, including non-box hardware.
+				var boxValues=row.part.body.values().copy()
+					.setToken("features",CastingPatterns.encode(boxFeatures)).setToken("embeddedAnchors","[]");
+				var nativeBoxes=new MineralCasting(boxValues).geometry();
+				var neutralBoxes:Part;
+				try neutralBoxes=Solids.building([],owned->{
+					for(cell in cells)owned.push(machinekit.tooling.ToolingBlock.placedBox(cell));
+					return Solids.union(owned);
+				}) catch(error:Dynamic) {nativeBoxes.close();throw error;}
+				try same(nativeBoxes,neutralBoxes,row.id+" shared box material versus native booleans")
+				catch(error:Dynamic) {nativeBoxes.close();neutralBoxes.close();throw error;}
+				nativeBoxes.close();neutralBoxes.close();
+				if(kind=="bed")socketCount(row.part);
 				if (kind == "bed") {
 					var message = "";
 					try row.part.body.minimumSectionIy(-half,half) catch (error:Dynamic) message = Std.string(error);
 					assertions++;
-					if (message.indexOf("Unsupported non-box finished cavity: insert-trayClampSeat") < 0)
-						throw "Final casting box-only stiffness must name its unsupported socket feature";
+					if (message.indexOf("Unsupported non-box anchor material for inserts: ") != 0
+						|| row.part.body.embeddedAnchors().filter(anchor -> message.indexOf(anchor.owner)<0).length>0)
+						throw "Final casting box-only stiffness must name its unsupported anchor owners: "+message;
 				}
-				assertions++;
-				if (Math.abs(iy - expected) > expected * 1e-10)
-					throw "Shared algebra changes frozen hobber minimum section Iy: " + row.id + ": " + iy + " vs " + expected;
 				var features = row.part.body.castingFeatures();
 				if (kind == "bed") {
 					assertions++;

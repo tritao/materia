@@ -3,6 +3,7 @@ package machinekit.hobbing;
  * Fixed bearing/motor above the nut; the loaded screw segment works in tension.
  */
 class HobberZLayout {
+  public static inline final FOUNDATION_ORIGIN_Z=290.0;
   public static inline final AXIS_X=180.0;
   public static inline final NUT_OFFSET_Z=55.0;
   public static inline final SHAFT_TOP=730.0;

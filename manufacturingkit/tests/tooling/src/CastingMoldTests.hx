@@ -198,10 +198,59 @@ class CastingMoldTests {
 			"raised datum fixture actually straddles the bed surface");
 	}
 
+	static function offCentreFixingPost():Void {
+		var d=ToolingTests.fixture();d.recipe.minimumLigament=2;
+		var insert=d.input.inserts[0];
+		insert.body=Primitive(Box(100,80,20));
+		insert.pose=F.fromRotationMatrix(0,0,60,[1,0,0,0,-1,0,0,0,-1]);
+		var bore=TestInsertHoles.through(20,20)[0];bore.id="service-bore";
+		var fixing=TestInsertHoles.through(5,20)[0];fixing.id="fixture";fixing.frame.x=35;
+		fixing.extent=Blind;fixing.depth=12;fixing.threadDepth=10;fixing.tapDrill=5;fixing.clearanceDiameter=6.6;
+		fixing.thread={designation:"M6",majorDiameter:6,pitch:1,starts:1,hand:Right,
+			internal:true,toleranceClass:"6H",profile:Metric};
+		fixing.limits.threaded={minEngagement:7.8,minTipGap:1};
+		insert.holes=[bore,fixing];TestInsertHoles.beforeCasting(insert);
+		d.input.features=[{id:"insert-seat",kind:InsertRecess,owner:insert.id,
+			geometry:{solid:Insert(insert.body),pose:insert.pose},openings:[],
+			draft:{degrees:0,axis:{x:0,y:0,z:1}},cornerRadius:0,adjustable:[],derivedFrom:null},
+			materia.casting.CastingPatterns.box("bed-access",InterfaceRecess,
+				[materia.casting.CastingPatterns.face("body.z-min")],100,80,40)];
+		d.setup.sourceToMold=F.identity();d.setup.features=[];
+		d.setup.sourceFingerprint=ToolingCodec.inputFingerprint(d.input);
+		var p=CastingMoldPlanner.plan(d,options(d)),fixture=p.fixtures[0];
+		check(fixture.fixings.length==1 && fixture.fixings[0].sourceHoleId==fixing.id,
+			"An offset source thread gets a supported fixing chase instead of an unused mask");
+		check(fixture.boreMasks.length==1 && fixture.boreMasks[0].sourceHoleId==bore.id,
+			"The central unthreaded bore retains its own separate mask");
+		check(p.validation.filter(check->check.rule=="tooling.fixture.clearance."+insert.id).length==0,
+			"Post geometry clears the actual off-centre source fixing");
+	}
+
+	static function bedVoidAroundDatum():Void {
+		var d=ToolingTests.fixture();d.input.inserts=[];
+		d.setup.sourceToMold=F.identity();
+		d.input.features=[materia.casting.CastingPatterns.box("bed-void",ServiceOpening,
+			[materia.casting.CastingPatterns.face("body.z-min")],100,100,60,0,0,0)];
+		var post={x:-10.0,y:-10.0,z:0.0,width:20.0,depth:20.0,height:60.0};
+		var strategies:Array<materia.tooling.casting.CastingSetup.CastingFeatureStrategy>=[{
+			featureId:"bed-void",strategy:SacrificialEPS,priority:0,withdrawal:{x:0,y:0,z:-1}}];
+		var networks=materia.tooling.casting.EPSAccessNetworks.plan(d,strategies,[],[post]);
+		check(networks.length==1 && networks[0].kind==materia.tooling.casting.CoreSupport.CoreSupportKind.RoutedSocket,
+			"A bed-open cavity around a datum uses the existing locating-foot EPS network");
+		check(Math.abs(materia.tooling.casting.MoldRegions.volume(networks[0].cavity,"bed-void")-576000)<1e-6,
+			"The datum is reserved from the EPS without changing the source cavity");
+		check(materia.tooling.casting.MoldRegions.volume(Intersection([networks[0].cavity,
+			materia.tooling.casting.MoldRegions.box(post)]),"bed-void")<1e-6,
+			"The routed-foot EPS network never occupies its datum support");
+		d.setup.sourceToMold=F.fromRotationMatrix(0,0,100,[1.0,0,0,0,-1,0,0,0,-1]);
+		check(materia.tooling.casting.EPSAccessNetworks.plan(d,strategies,[],[post]).length==0,
+			"An ordinary fill-open EPS cavity keeps its existing support route");
+	}
+
 	public static function run(d:ToolingDocument):Void {
 		var contractDocument=ToolingCodec.copy(d);
 		contractDocument.recipe.minimumLigament=2;
-		straddlingDatum();
+		straddlingDatum();offCentreFixingPost();bedVoidAroundDatum();
 		liftingSourceDeclaration();
 		mountingRouteRequest();
 		unrealizedGeometry();

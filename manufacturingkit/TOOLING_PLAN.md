@@ -27,9 +27,9 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 3: single-pocket box mold with selectable core supports and source-thread insert fixtures.
 - [x] Phase 4: mill-base allocation, exact reconstruction/coverage and separate assembly/demolding graphs.
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
-- [ ] Phase 6: exact fill, castability and compound-datasheet reporting landed; phase-8 setup integration remains.
+- [x] Phase 6: exact fill, castability and compound-datasheet reporting integrated into all four verified kits; workshop inputs remain Pending.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: authoring cleanup and approved mill source simplification complete, with verified base/column kits; hobber source corrections, four-kit final verification and shared mold scene integration remain. No flared former work.
+- [ ] Phase 8: approved mill and hobber source corrections and four-kit final verification complete, with zero Fail; shared mold scene integration remains. No flared former work.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1194,7 +1194,7 @@ lists each deleted module with the check or record that still covers it.
 
 ### 8. Column and independent structure
 
-Add the column setup, stepped/flared envelope support, intersecting channels and
+Add the column setup, stepped envelope support, intersecting channels and
 side-removal details on the phase 7 model. Add an independent structure using
 the shared planner with different dimensions, insert layout and opening direction.
 The independent structure is the hobber's monolithic plinth (930 × 800 × 800 mm)
@@ -1222,21 +1222,13 @@ Each factory returns fresh records. The mill retains its source-recess ownership
 priorities; the column's wire axis and service withdrawal axis differ because it
 lies front-on-bed. Keep those geometric overrides in the setup with their reasons.
 
-Hobber strut detail decision (2026-10-25): use three non-collinear upper and
-three lower square compound struts per retained EPS region. Keep the drive-side
-struts clear of the drive channel. Derive bearing area and centroid from the
-actual strut/core face intersection, and resolve upper reactions from force and
-overturning moments; a centroid outside the support triangle is rejected.
-Compound and foam bearing strengths remain workshop inputs.
-The front band's second strut pair is at X320 rather than X340 to clear the
-existing tray socket at X365/Y−365; socket and service-hole positions are unchanged.
-Use three dry head-sized board pads bonded to each shared beam, one per upper
-strut. Separate pads leave the adjacent open channel and its carrier clear. The struts and EPS are preassembled before pouring and remain in the
-casting; the bonded beam/pad fixtures come off after cure. Liquid fill excludes the
-precast compound, and all strut bonding faces stay free of release coatings.
+Hobber strut detail decision (2026-10-25), superseded by the approved source
+simplification below: no source retains EPS or uses precast struts, strut pads
+or pour-face support bridges. Their implementation and shop paths are deleted.
+Ordinary removable EPS, locating feet and shared core-support beams remain.
 
-Hobber fixture detail decision (2026-10-25): pour mounting-faces-down and
-transform strut contacts with gravity. Reserve datum stock before EPS, and span
+Hobber fixture detail decision (2026-10-25): pour mounting-faces-down.
+Reserve datum stock before EPS, and span
 any dry backing gap with the existing locating foot, including its glue lines.
 Post width follows source fixing clearance, pin spacing, travel and ligaments.
 Prefer a straight bed post when the source voids and steel clearances certify it;
@@ -1256,9 +1248,8 @@ explicit Pending manual breakup through its declared opening. Release bed/carrie
 bonds before rigid withdrawal; no intact pull through an undercut is claimed.
 
 EPS playback decision (2026-10-25): bond release is a manual snapshot,
-not removal of the foam. Retained EPS follows the checked casting lift and flip;
-open EPS disappears only at its Pending breakup step. Precast compound is shown
-once after cure, as part of the casting. Package checks consume the fresh native
+not removal of the foam. Open EPS follows the checked casting lift and flip,
+then disappears only at its Pending breakup step. Package checks consume the fresh native
 review; no report-restoration or native-check cache is added.
 
 Hobber column setup decision (2026-10-25): reuse the plinth setup and export
@@ -1552,6 +1543,56 @@ Hobber source decision (user, 2026-10-25):
    correcting the source. Capacity and physical lifting evidence remain Pending.
 Record all three as approved frozen-CAD corrections, requiring zero symmetric
 difference against the corrected source.
+
+Implementation decisions (hobber integration, 2026-10-25; verified against corrected frozen CAD):
+- Mounting holes derive from the placed bought-part mount connectors. The separate
+  M6 source fixture thread uses the inter-station midpoint nearest the seat centre
+  (negative local Y breaks an equal-distance tie); all source hole-policy checks remain.
+- Lifting blanks retain the existing service centres and exposed faces. Size their
+  widths from the C45 thread wall and demand, using the shared 100 mm deep, 30 mm
+  thick stock family; check both in-plane orientations. Additional points use the
+  existing mass/CoM proposal rule and the unchanged four-point shop requirement.
+- Declare the column sole fixture thread on its underside. Existing receiver and
+  closure geometry applies to either physical insert end and any contacting shell
+  panel; no steel is moved merely to obtain a bed-facing fixture.
+- Keep catalogue sockets in the complete lifting-mass assembly, while preserving
+  their catalogue retention instead of applying fabricated-plate anchor sizing.
+- Source correction (user, 2026-10-25): the two new plinth lifting points retain
+  the four-point CoM proposal X and move symmetrically onto the filled outer
+  bands near Y=±310 mm. The original proposed Y≈±141 mm intersects source
+  pockets; the existing lifting points and every service hole remain unchanged.
+  Keep cover, anchor and lift-polygon checks; point ratings/load sharing and
+  sling-angle limits stay Pending without declared equipment and rigging.
+- Source correction (user, 2026-10-26): preserve the two column lifting
+  service centres at X=±160, Y=−40 mm and add a symmetric pair on the clear top
+  side lands at X=±160, Y=+46 mm, with demand-selected 65×58×30 mm blanks.
+  Starting from the 60 mm square, derive the available X land from the body
+  and source cavities; search rectangular footprints by area at each Y, nearest
+  the initial Y=+60 mm proposal first. Keep 6 mm cover to the original lifting
+  plates and the rail-anchor heads. The earlier Y=54 mm square overlapped the
+  top rail-anchor heads; include their exact flange/hex geometry in the screen
+  and native confirmation, not only neighbouring steel blanks. The head recess,
+  rail seats, drive seat and service holes stay in place. Record the chosen pair in the approved frozen-CAD correction.
+- The column sole is authored from its actual underside service face. Flipping
+  its local frame preserves its steel envelope and source fixture drilling;
+  rear anchors now enter the casting rather than pointing outside it.
+- A proud side receiver releases outward after cure and the bed releases its
+  slot first. Bolt source-thread-fixed steel to its receiver panel before installing
+  the loaded panel vertically; after cure, unclamp and remove the panel separately.
+  Unclamped loose steel enters its receiver laterally from the cavity. Separate
+  exact assembly and demolding graphs check these real motions.
+- Expand each datum post and its receiver to support its declared off-centre
+  source fixing hole. Keep plain through-hole masks removable after cure, but
+  install them from the accessible far end before casting when a bed datum
+  blocks entry. Place panel labels in remaining dry rectangles clear of all cuts.
+- Face-open EPS intersected by a reserved bed datum uses the existing shaped
+  network and locating foot. Do not route a full-width through opening across
+  the datum socket. This preserves source cavities and the bed ligament.
+- Check geometric seat backing against the physical as-cast composite, including
+  permanent source steel and anchors. Keep resin-only geometry for mix quantities,
+  fill, rib material and section screens; real source voids remain voids.
+
+
 
 
 **Source simplification decision (user, 2026-10-25).** A review of the mill and

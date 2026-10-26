@@ -359,7 +359,7 @@ class CastingMoldPlanner {
 		for (i in d.input.inserts) {
 			var pose=F.compose(d.setup.sourceToMold,i.pose);
 			var b=insertStockBounds(d,i.id);
-			var face=F.compose(pose,F.translation(0,0,InsertBodies.height(i.body))),normal=F.transformVector(face,0,0,1);
+			var face=InsertFixturePlanner.mountingFace(i,d.setup.sourceToMold,r.hardware),normal=F.transformVector(face,0,0,1);
 			// Dry cross-carriers span X. Keep their supporting side walls at
 			// the fill rim when source steel sits below the raised-wall lap.
 			if (normal.z>1-1e-8 && face.z>=e.z+e.height+l-1e-7 && face.z<e.z+e.height+t/2)
@@ -380,13 +380,13 @@ class CastingMoldPlanner {
 		var result=seed(d,o,e,b,geometryChecks.concat(InterfaceQualification.source(d.input).concat(InsertQualifications.postCure(d.input))).concat(InsertQualifications.manufacturing(d.input.inserts))
 				.concat(ReplicationJigs.analyze(d.input,o.replicationJigs,o.precision))
 				.concat(FoundationJointQualification.analyze(d.input,o.foundationJointProcesses)),raisedWalls),panels=result.panels,bed=panels.members[0];
-		MoldBedReceivers.add(result);
+		MoldPanelReceivers.add(result);
 		var ordered = ownershipOrder(d.input.features, strategies);
 		var postObstacles=bedPostObstacles(d);
 		// Datum fixtures occupy negative space only; neutral validation checks their resin clearance.
 		function addFixture(i:materia.tooling.casting.CastingToolingInput.CastingToolingInsert):Void {
 			var pose = F.compose(d.setup.sourceToMold, i.pose),
-				face = F.compose(pose, F.translation(0, 0, InsertBodies.height(i.body))),
+				face=InsertFixturePlanner.mountingFace(i,d.setup.sourceToMold,r.hardware,result.panels.members.concat(result.supportPanels)),
 				normal = F.transformVector(face, 0, 0, 1),
 				body = bodies.get(i.id);
 			if (body == null)
@@ -428,13 +428,27 @@ class CastingMoldPlanner {
 				z: -1.0
 			};
 			var baseZ=Math.min(pad.z,b.z-dt),postHeight=pad.z-baseZ;
+			// Keep the datum's locating centre and mask support, and include
+			// every selected source fixing's clearance chase in its post.
+			// An off-centre source thread must not silently become an unused mask.
+			var post:MoldBox={x:face.x-pw/2,y:face.y-pw/2,z:baseZ,width:pw,depth:pw,height:postHeight};
+			for(hole in InsertFixturePlanner.availableHoles(i)) {
+				var fixing=InsertFixturePlanner.select(hole,pose,face,r.hardware);
+				if(fixing==null)continue;
+				var margin=fixing.clearanceDiameter/2+r.minimumLigament;
+				var x=Math.min(post.x,fixing.entry.x-margin),y=Math.min(post.y,fixing.entry.y-margin);
+				post.width=Math.max(post.x+post.width,fixing.entry.x+margin)-x;
+				post.depth=Math.max(post.y+post.depth,fixing.entry.y+margin)-y;
+				post.x=x;post.y=y;
+			}
 			var bedPad=BoxAlgebra.copy(pad);
 			if(pad.z>=b.z-1e-7 && postHeight>1e-7){
-				bedPad.width=Math.min(body.width,pw);bedPad.depth=Math.min(body.depth,pw);
-				bedPad.x=face.x-bedPad.width/2;bedPad.y=face.y-bedPad.depth/2;
+				bedPad.width=Math.min(body.width,post.width);bedPad.depth=Math.min(body.depth,post.depth);
+				bedPad.x=Math.max(body.x,Math.min(post.x,body.x+body.width-bedPad.width));
+				bedPad.y=Math.max(body.y,Math.min(post.y,body.y+body.depth-bedPad.depth));
 			}
 			var bedPieces=[bedPad];
-			if(postHeight>1e-7)bedPieces.push({x:face.x-pw/2,y:face.y-pw/2,z:baseZ,width:pw,depth:pw,height:postHeight});
+			if(postHeight>1e-7)bedPieces.push(BoxAlgebra.copy(post));
 			var bedClear=postObstacles!=null && bedPieces.filter(piece->
 				postObstacles.filter(obstacle->BoxAlgebra.intersection(piece,obstacle)!=null).length>0).length==0;
 			var access = bedClear ? [] : ordered.filter(f -> f.kind != CastingFeatureKind.InsertRecess
@@ -483,10 +497,10 @@ class CastingMoldPlanner {
 				pieces=[pad];
 				var baseZ=Math.min(pad.z,b.z-dt),height=pad.z-baseZ;
 				if (height>1e-8) pieces.push({
-					x:padEntersBed ? pad.x : face.x-pw/2,
-					y:padEntersBed ? pad.y : face.y-pw/2,
-					z:baseZ,width:padEntersBed ? pad.width : pw,
-					depth:padEntersBed ? pad.depth : pw,height:height
+					x:padEntersBed ? pad.x : post.x,
+					y:padEntersBed ? pad.y : post.y,
+					z:baseZ,width:padEntersBed ? pad.width : post.width,
+					depth:padEntersBed ? pad.depth : post.depth,height:height
 				});
 				// A pad less than one datum thickness above the bed crosses its
 				// surface. Its full section, including locator support, needs a socket.
@@ -498,11 +512,11 @@ class CastingMoldPlanner {
 					depth: pad.depth,
 					height: dt
 				} : {
-					x: face.x - pw / 2,
-					y: face.y - pw / 2,
+					x: post.x,
+					y: post.y,
 					z: b.z - dt,
-					width: pw,
-					depth: pw,
+					width: post.width,
+					depth: post.depth,
 					height: dt
 					};
 				var op = PanelJoints.operation(materia.tooling.ToolingIds.derive("datum-", i.id), Pocket,
@@ -541,7 +555,7 @@ class CastingMoldPlanner {
 		// cut. Upward cross-carriers still wait for the shared bridge layout.
 		var earlyFixtures=new Map<String,Bool>();
 		for (insert in d.input.inserts) {
-			var face=F.compose(F.compose(d.setup.sourceToMold,insert.pose),F.translation(0,0,InsertBodies.height(insert.body)));
+			var face=InsertFixturePlanner.mountingFace(insert,d.setup.sourceToMold,r.hardware,result.panels.members);
 			var normal=F.transformVector(face,0,0,1);
 			if (normal.z < -1+1e-8 || DatumFixtures.panelOnFace(result.panels.members,face)!=null) {
 				addFixture(insert);
@@ -556,21 +570,6 @@ class CastingMoldPlanner {
 		for (region in insertRegions) {
 			var boxes=MoldRegions.boxes(region);
 			if (boxes!=null) insertBoxes=insertBoxes.concat(boxes);
-		}
-		for (allocation in PrecastCoreSupports.allocations(d)) {
-			for (id in allocation.featureIds) {
-				var choices=strategies.filter(strategy -> strategy.featureId==id);
-				if (choices.length!=1 || choices[0].strategy!=CoreStrategy.SacrificialEPS)
-					throw "Precast source struts require an EPS strategy: "+id;
-				allocatedEPSFeatures.set(id,true);
-			}
-			var core=MoldCoreLayers.retained(allocation.region,allocation.featureIds[0],allocation.id,r);
-			core.support.precastContacts=allocation.contacts;
-			result.cores.push(core);
-			for (id in allocation.featureIds) result.features.push({featureId:id,kind:EPSFeature,memberIds:[core.id]});
-			epsRegions.push(core.cavity);
-			var boxes=MoldRegions.boxes(core.cavity);
-			if (boxes!=null) epsBoxes=epsBoxes.concat(boxes);
 		}
 		for(network in EPSAccessNetworks.plan(d,strategies,[for(id in allocatedEPSFeatures.keys())id],fixtureReservations)){
 			var core=EPSAccessNetworks.add(result,network);
@@ -632,7 +631,7 @@ class CastingMoldPlanner {
 						"tooling.feature.unsupported." + f.id, true);
 				}
 			}
-		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware,raisedWalls,PrecastCoreSupports.pressureFootprints(d,result.cores));
+		CoreSupports.sharedBridges(result.cavity, r, result.cores, result.supportPanels, result.hardware,raisedWalls);
 		// Priority is explicit: inserts, EPS and datum supports are reserved first;
 		// rigid formers then resolve by descending authored priority and sorted IDs.
 		for (i in d.input.inserts) if (!earlyFixtures.exists(i.id)) addFixture(i);
@@ -1104,12 +1103,6 @@ class CastingMoldPlanner {
 		}
 		for (m in p.panels.members.concat(p.supportPanels))
 			member(m.panel.id);
-		for(strut in p.document.input.precastStruts){
-			member(strut.id);
-			var owners=p.cores.filter(core->core.support.kind==CoreSupportKind.PrecastStruts
-				&& core.support.precastContacts.filter(contact->contact.strutId==strut.id).length==1);
-			if(owners.length!=1)throw "Precast source strut needs one retained EPS owner: "+strut.id;
-		}
 		for (c in p.cores) {
 			member(c.id);
 			if (c.layers.length == 0 || c.layers.length > 32)

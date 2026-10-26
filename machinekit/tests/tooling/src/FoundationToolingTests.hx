@@ -285,25 +285,10 @@ class FoundationToolingTests {
 		exterior.close();
 	}
 
-	static function rebuild(input:CastingToolingInput):Part {
-		var envelope:Array<Part> = [];
-		for (p in input.envelope) {
-			var local = Part.prism([for (v in p.profile) new Vector(v.x, v.y)], 0, p.height);
-			try
-				envelope.push(PosedParts.moved(local, p.pose))
-			catch (e:Dynamic) {
-				local.close();
-				throw e;
-			}
-			local.close();
-		}
-		var body = Solids.union(envelope);
-		return Solids.building([body], parts -> {
-			for (cavity in materia.casting.CastingCavities.derive(input.envelope, input.features))
-				parts.push(machinekit.structural.CastingCavityCad.part(cavity));
-			return Solids.cut(parts[0], parts.slice(1));
-		});
-	}
+	static function rebuild(input:CastingToolingInput):Part
+		// Exercise the production neutral reader, including embedded anchor
+		// displacement; cavity-only reconstruction omits part of the source.
+		return machinekit.tooling.ToolingSourceCasting.fromInput(input).geometry();
 
 	static function equivalent(foundation:MineralFoundation, label:String):CastingToolingInput {
 		var input = FoundationToolingAdapter.snapshot(foundation, label, 1);
@@ -412,7 +397,7 @@ class FoundationToolingTests {
 			}
 		};
 		input = ToolingCodec.decode(ToolingCodec.encode(document)).input;
-		var original = foundation.body.geometry(),
+		var original = foundation.body.asCastGeometry(),
 			reconstructed = rebuild(input);
 		try {
 			check(reconstructed.valid(), '$label rebuilt shape is valid');

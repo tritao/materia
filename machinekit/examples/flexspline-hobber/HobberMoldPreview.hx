@@ -21,6 +21,6 @@ class HobberMoldPreview {
   var document=HobberMoldSetup.document(foundation,casting),cwd=Sys.getCwd();
   var root=sys.FileSystem.exists(cwd+"/machinekit") ? cwd+"/machinekit/examples/flexspline-hobber" : cwd;
   CastingShopExport.write(document,HobberMoldSetup.options(document.input),foundation,
-   casting,"hobber-"+casting+"-process-review",root,HobberMoldChecks.run);
+   casting,"hobber-"+casting+"-process-review",root,HobberMoldChecks.run,HobberMoldChecks.liftingReview);
  }
 }

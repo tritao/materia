@@ -32,7 +32,7 @@ private typedef BridgeRegistration = {
 /** Two explicit support templates; neither establishes adhesive or structural qualification. */
 class CoreSupports {
 	public static function specification(kind:CoreSupportKind, r:ToolingRecipe):CoreSupport return {
-		kind:kind, precastContacts:[], assemblyByLayer:false, breakoutAfterLift:false, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
+		kind:kind, assemblyByLayer:false, breakoutAfterLift:false, adhesiveSpec:r.adhesiveSpec, adhesiveThickness:r.adhesiveLineThickness,
 		fitClearance:r.jointClearance, embedDepth:0, bondAreaMm2:0, bridgeBondAreaMm2:0,clampBearingAreaMm2:0,
 		socketOperationId:null, registrationProfiles:[], foot:null, panelIds:[], bondedPanelIds:[], hardware:[],
 		padClosure:kind==Bridge ? materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps : null
@@ -395,7 +395,7 @@ class CoreSupports {
 		panel.labelY=width/2;
 		var placed:PanelPlacement={panel:panel,pose:F.translation(left,y,face.z),withdrawal:{x:0,y:0,z:1}};
 		var bridgeIds:Array<String>=[];
-		for (core in p.cores) if (core.support.kind==Bridge || core.support.kind==PrecastStruts)
+		for (core in p.cores) if (core.support.kind==Bridge)
 			for (member in core.support.bondedPanelIds) if (bridgeIds.indexOf(member)<0) bridgeIds.push(member);
 		for (other in p.supportPanels) if (bridgeIds.indexOf(other.panel.id)>=0) {
 			var relative=F.compose(F.inverse(placed.pose),other.pose),normal=F.transformVector(relative,0,0,1);
@@ -439,21 +439,15 @@ class CoreSupports {
 
 	public static function sharedBridges(b:MoldBox, r:ToolingRecipe, cores:Array<materia.tooling.casting.CastingMoldPlan.CastingMoldCore>,
 			panels:Array<PanelPlacement>, hardware:Array<materia.tooling.casting.CoreSupport.SupportHardware>,
-			raised:MoldPanels.RaisedWalls=MoldPanels.RaisedWalls.EastWest,
-			?precastHeads:Map<String,Array<MoldBox>>):Void {
-		cores=cores.filter(core -> core.support.kind==Bridge || core.support.kind==PrecastStruts);
+			raised:MoldPanels.RaisedWalls=MoldPanels.RaisedWalls.EastWest):Void {
+		cores=cores.filter(core -> core.support.kind==Bridge);
 		function seatBounds(core:CastingMoldCore):MoldBox {
-			if(core.support.kind==Bridge){
-				var rows=MoldCores.section(core.foamEnvelope,b.z+b.height-core.support.adhesiveThickness,core.id);
-				var outers=rows.filter(row->row.depth==0);
-				if(outers.length!=1)throw "Bridge needs one connected EPS contact: "+core.id;
-				var footprint=materia.casting.CastingProfileGeometry.bounds(outers[0].contour),cover=core.coveringThickness;
-				return {x:footprint.x-cover,y:footprint.y-cover,z:b.z+b.height,
-					width:footprint.width+2*cover,depth:footprint.height+2*cover,height:r.panel.measuredThickness};
-			}
-			var head=precastHeads==null ? null : precastHeads.get(core.id);
-			if(head==null)throw "Missing precast bridge footprint: "+core.id;
-			return MoldRegions.exactBounds(materia.casting.CastingRegion.Union([for(pad in head)MoldRegions.box(pad)]),core.id);
+			var rows=MoldCores.section(core.foamEnvelope,b.z+b.height-core.support.adhesiveThickness,core.id);
+			var outers=rows.filter(row->row.depth==0);
+			if(outers.length!=1)throw "Bridge needs one connected EPS contact: "+core.id;
+			var footprint=materia.casting.CastingProfileGeometry.bounds(outers[0].contour),cover=core.coveringThickness;
+			return {x:footprint.x-cover,y:footprint.y-cover,z:b.z+b.height,
+				width:footprint.width+2*cover,depth:footprint.height+2*cover,height:r.panel.measuredThickness};
 		}
 		if (cores.length == 0)
 			return;
@@ -471,12 +465,7 @@ class CoreSupports {
 				coveringThickness:core.coveringThickness,support:core.support
 			}];
 			var localPanels:Array<PanelPlacement>=[],localHardware:Array<SupportHardware>=[];
-			var localHeads=new Map<String,Array<MoldBox>>();
-			if(precastHeads!=null)for(id in precastHeads.keys()){
-				var head=precastHeads.get(id);
-				if(head!=null)localHeads.set(id,[for(pad in head)movedBox(pad,inverse)]);
-			}
-			sharedBridges(localBox,r,localCores,localPanels,localHardware,MoldPanels.RaisedWalls.EastWest,localHeads);
+			sharedBridges(localBox,r,localCores,localPanels,localHardware,MoldPanels.RaisedWalls.EastWest);
 			for (panel in localPanels) {
 				for (operation in panel.panel.operations) if (operation.id=="wall-top-socket") {
 					// North/south walls include both corner laps, unlike the
@@ -507,7 +496,7 @@ class CoreSupports {
 		for (core in cores) {
 			var bounds=seatBounds(core),y=bounds.y+bounds.depth/2;
 			var width=Math.max(r.hardware.minimumBridgeWidth,
-				core.support.kind==PrecastStruts ? bounds.depth : bounds.depth/2);
+				bounds.depth/2);
 			if(!Math.isFinite(width) || width<r.hardware.minimumBridgeWidth)
 				throw "Core row cannot provide the minimum bridge width: "+core.id;
 			rows.push({bottom:y-width/2,top:y+width/2,memberIds:[core.id]});
@@ -586,22 +575,6 @@ class CoreSupports {
 			place(beam, bx, by, b.z + b.height + t);
 			for (c in cores) {
 				if (row.memberIds.indexOf(c.id)>=0) {
-					if(c.support.kind==PrecastStruts){
-						var heads=precastHeads==null ? null : precastHeads.get(c.id);
-						if(heads==null)throw "Missing precast bearing pads: "+c.id;
-						var padIds=MoldCores.spreaderIds(c);
-						if(heads.length!=padIds.length)throw "Precast bearing pads disagree with source contacts: "+c.id;
-						for(index in 0...heads.length){
-							var head=heads[index];
-							var spreader=PanelJoints.blank(padIds[index],head.width,head.depth,r.panel,r.routerDiameter,l);
-							spreader.contactFace=materia.tooling.ToolingEnums.ContactFace.NegativeZ;
-							place(spreader,head.x,head.y,b.z+b.height);
-						}
-						c.support.bondedPanelIds=padIds.concat([id]);
-						c.support.panelIds=c.support.bondedPanelIds.concat(["bridge-left-rail","bridge-right-rail"]);
-						c.support.padClosure=materia.tooling.panel.PanelJoints.PanelClosure.ExternalClamps;
-						continue;
-					}
 					c.support.bondedPanelIds = [MoldCores.carrierId(c), id];
 					var foam=MoldCores.foam(c),f=MoldCores.stockBounds(c.foamEnvelope,c.id);
 					var contactZ=b.z+b.height-c.support.adhesiveThickness;
