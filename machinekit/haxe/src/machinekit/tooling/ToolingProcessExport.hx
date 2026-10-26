@@ -15,7 +15,7 @@ class ToolingProcessExport {
 			?foundation:machinekit.structural.MineralFoundation,
 			?existing:materia.tooling.process.CastingProcessAnalysis.CastingProcessReport,
 			?interfaceContext:materia.casting.CastingInterfaceContext):Array<ToolingValidation> {
-		var report=existing==null ? CastingProcessAnalysis.analyze(p,spec,gravityMps2,fabrication,CastingFillAnalysis.fromPlan) : existing;
+		var report=existing==null ? CastingProcessAnalysis.analyze(p,spec,gravityMps2,fabrication,CastingFillAnalysis.fromPlan,CastingWallReview.fromPlan) : existing;
 		if (report.sourceFingerprint!=materia.tooling.casting.CastingMoldPlanner.fingerprint(p)
 			|| report.processFingerprint!=CastingProcessAnalysis.fingerprint(p,spec,gravityMps2,fabrication)
 			|| report.castability.sourceFingerprint!=report.sourceFingerprint
@@ -29,6 +29,7 @@ class ToolingProcessExport {
 			sys.io.File.saveContent(dir+"/fill-foundation-cad-check.json","null\n");
 		}
 		writeCastability(report.castability,report.sections,report.fill,dir);
+		if(report.aggregate!=null)writeAggregate(p,report.aggregate,dir);
 		sys.io.File.saveContent(dir+"/fill-analysis.json",ToolingCodec.canonical(report.fill)+"\n");
 		sys.io.File.saveContent(dir+"/casting-process-spec.json",ToolingCodec.canonical(report.spec)+"\n");
 		sys.io.File.saveContent(dir+"/compound-datasheet-check.json",ToolingCodec.canonical(report.compound)+"\n");
@@ -36,6 +37,56 @@ class ToolingProcessExport {
 		sys.io.File.saveContent(dir+"/section-geometry.json",ToolingCodec.canonical(report.sections)+"\n");
 		writePour(report,dir);
 		return checks;
+	}
+
+	public static function writeAggregate(p:CastingMoldPlan,report:materia.tooling.process.AggregateGate.AggregateReport,dir:String):{
+		groups:Array<Array<String>>,witnesses:Array<Array<String>>
+	} {
+		sys.io.File.saveContent(dir+"/aggregate-wall-review.json",ToolingCodec.canonical(report)+"\n");
+		var groups:Array<Array<String>>=[["casting","rule_class","feature_a","feature_b","min_measured_mm","required_mm","witness_count","status",
+			"source_min_x_mm","source_min_y_mm","source_min_z_mm","source_max_x_mm","source_max_y_mm","source_max_z_mm","criterion"]];
+		var witnesses:Array<Array<String>>=[["casting","gap_id","rule_class","feature_a","feature_b","source_ids","measured_mm","required_mm","status",
+			"source_min_x_mm","source_min_y_mm","source_min_z_mm","source_max_x_mm","source_max_y_mm","source_max_z_mm",
+			"witness_start_x_mm","witness_start_y_mm","witness_start_z_mm","witness_end_x_mm","witness_end_y_mm","witness_end_z_mm","method"]];
+		var inverse=materia.assembly.AssemblyFrames.inverse(p.document.setup.sourceToMold);
+		function location(b:materia.casting.Box3):Array<String> {
+			var region=materia.tooling.casting.CastingMoldPlanner.box(b.width,b.depth,b.height,
+				materia.assembly.AssemblyFrames.compose(inverse,materia.assembly.AssemblyFrames.translation(b.x+b.width/2,b.y+b.depth/2,b.z)));
+			return [for(value in [region.x,region.y,region.z,region.x+region.width,region.y+region.depth,region.z+region.height])Std.string(value)];
+		}
+		for(group in report.groups) {
+			var row=[p.document.input.id,(group.kind:String),group.featurePair[0],group.featurePair[1],Std.string(group.minimumMeasuredMm),
+				group.requiredMm==null ? "" : Std.string(group.requiredMm),Std.string(group.witnessCount),(group.status:String)];
+			row=row.concat(location(group.region));row.push(group.criterion);groups.push(row);
+		}
+		for(gap in report.gaps) {
+			var required=materia.tooling.process.AggregateGate.required(gap.kind,report.limits);
+			var group=report.groups.filter(group->group.kind==gap.kind && ToolingCodec.canonical(group.featurePair)==ToolingCodec.canonical(gap.featurePair))[0];
+			var status=gap.kind==materia.tooling.process.AggregateGate.AggregateGapKind.WithinAssembly ? group.status
+				: required==null ? ToolingCheckStatus.Pending : gap.measuredMm<required-1e-7 ? ToolingCheckStatus.Fail : ToolingCheckStatus.Pass;
+			var row=[p.document.input.id,gap.id,(gap.kind:String),gap.featurePair[0],gap.featurePair[1],gap.sourceIds.join(" | "),
+				Std.string(gap.measuredMm),required==null ? "" : Std.string(required),(status:String)];
+			row=row.concat(location(gap.region));
+			var witness=gap.witness;
+			if(witness==null)for(_ in 0...6)row.push("");
+			else for(point in [witness.first,witness.second]) {
+				var source=materia.assembly.AssemblyFrames.transformPoint(inverse,point.x,point.y,point.z);
+				for(value in [source.x,source.y,source.z])row.push(Std.string(value));
+			}
+			row.push(gap.method);witnesses.push(row);
+		}
+		sys.io.File.saveContent(dir+"/aggregate-groups.csv",materia.tooling.export.ToolingFabrication.csv(groups));
+		sys.io.File.saveContent(dir+"/aggregate-witnesses.csv",materia.tooling.export.ToolingFabrication.csv(witnesses));
+		var text=["# Aggregate wall, flow and steel clearance review","",
+			"Geometry unchanged. Coordinates and bounding boxes in the CSVs are foundation-local millimetres; JSON geometry is in mold coordinates.",
+			"One row per source feature pair and rule class: [aggregate-groups.csv](aggregate-groups.csv).",
+			"All measured witnesses, including open within-assembly gaps: [aggregate-witnesses.csv](aggregate-witnesses.csv).",
+			"An open gap within one insert assembly has no passage-spacing floor; its bulk access uses the existing exact filling topology.",
+			"Where a structural wall also carries flow between forming tooling, both rules apply; the 24 mm process rule does not weaken the 40 mm wall rule.",""];
+		for(check in report.validation)text.push("- "+check.rule+" ("+check.status+"): "+check.message);
+		text.push("\nNo source geometry change is authorised by this report.");
+		sys.io.File.saveContent(dir+"/aggregate-wall-review.md",text.join("\n")+"\n");
+		return {groups:groups,witnesses:witnesses};
 	}
 
 	static function writeCastability(castability:materia.tooling.process.CastabilityAnalysis.CastabilityReport,

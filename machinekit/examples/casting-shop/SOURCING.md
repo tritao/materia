@@ -3,20 +3,27 @@
 Purchase options for the epoxy-granite compound of the mill and hobber castings, delivered to
 Portugal, with the mix design, mixing equipment, batch plan, post-cure enclosure, coupon tests and a
 consolidated shopping list. Prices and availability are web snapshots found on 2026-10-25 and will change. Grain
-sizes, purity and dryness are seller claims; no technical sheet has been received yet. None of
-this is in `CastingShopRecipe` yet: the compound, its aggregate size and its limits stay
-unresolved there until the coupon tests below give measured values.
+sizes, purity and dryness are seller claims; no technical sheet has been received yet. The 8 mm aggregate top size and the 5× wall / 3× passage design gates are declared in
+`CastingShopRecipe`. Compound strength, modulus and maximum section/lift limits remain
+unqualified; supplier limits and the coupon tests below are still required.
 
 ## Design target
 
-- **Maximum aggregate size 8 mm** (graded 0–8 mm). This is the coarsest size that the insert
-  ligaments, ribs and insert-to-mold gaps of about 1 t machines admit. Coarser grain saves little
+- **Maximum aggregate size 8 mm** (graded 0–8 mm). This is the mix-design target; the wall and passage gates must
+  confirm it against every casting before production. Coarser grain saves little
   resin but doubles every minimum section. Finer grain needs 3–4 points more resin, which means
   more shrinkage, exotherm and expansion, and lower stiffness.
 - **Minimum wall or rib** 5 × 8 = 40 mm. **Minimum passage or insert-to-mold gap**
   3 × 8 = 24 mm (`minimumPassageAggregateRatio` = 3). Rampf's datasheet for its own mineral
   casting grades gives the same pairing: 8 mm maximum particle with a 40 mm minimum castable wall
   (EPUMENT 140/8B), 5 mm with 25 mm, and 3 mm with 15 mm.
+- **Steel cover:** at least dg + 5 = **13 mm** to mold, EPS or free faces.
+  **Separate insert assemblies:** clear spacing at least max(dg + 5, 4/3 dg) =
+  **13 mm**. These adopt the aggregate terms from EN 1992-1-1 8.2 and ACI 318;
+  they do not claim full reinforced-concrete code qualification.
+- **Within one insert assembly:** its own anchors, flanges and threads are not
+  24 mm flow passages. Open gaps fill with matrix fines. Recesses must open to
+  bulk resin; narrow enclosed/dead-end pockets remain defects.
 - **Resin** 9–12 % by mass, low viscosity, slow hardener. Packing decides most of the result:
   less resin beats a better rock.
 - **Quartz aggregate first**, because it is the only aggregate sold washed, dried and graded in

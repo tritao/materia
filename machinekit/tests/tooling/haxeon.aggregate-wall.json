@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-aggregate-wall-tests"
+  },
+  "entry": "AggregateWallTests",
+  "sourceRoots": [
+    "src",
+    "../../examples/box-mold",
+    "../../../manufacturingkit/tests/tooling/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build/aggregate-wall",
+  "sources": [
+    "../../examples/box-mold/SinglePocketSetup.hx",
+    "src/AggregateWallTests.hx"
+  ]
+}

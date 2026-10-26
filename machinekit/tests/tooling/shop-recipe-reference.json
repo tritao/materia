@@ -543,9 +543,17 @@
   },
   "process": {
     "castability": {
-      "evidence": [],
-      "maximumAggregateSizeMm": null,
-      "minimumPassageAggregateRatio": 3
+      "maximumAggregateSizeMm": 8,
+      "minimumPassageAggregateRatio": 3,
+      "minimumWallAggregateRatio": 5,
+      "evidence": [
+        "EN 1992-1-1 8.2: adopted aggregate-related dg+5 mm term for steel cover and spacing (not full RC code qualification)",
+        "ACI 318: adopted clear-spacing term 4/3 dg",
+        "machinekit/examples/casting-shop/SOURCING.md#design-target (Vetonek 4–8 mm top grade)",
+        "https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf pp.6–7, EPUMENT 140/8B (8 mm / 40 mm)"
+      ],
+      "steelSpacingAggregateRatio": 1.3333333333333333,
+      "steelAggregateMarginMm": 5
     },
     "compound": {
       "maximumMassPerLiftKg": {

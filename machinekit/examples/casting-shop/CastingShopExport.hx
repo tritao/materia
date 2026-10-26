@@ -62,7 +62,7 @@ class CastingShopExport {
 		var p = machinekit.tooling.CastingMoldCad.plan(document,options);
 		var process = processSpec(p.document.recipe,processId);
 		var fabricationSpec = CastingShopRecipe.fabrication();
-		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan);
+		var processReport = materia.tooling.process.CastingProcessAnalysis.analyze(p, process, fabricationSpec.gravityMps2, fabricationSpec,machinekit.tooling.CastingFillAnalysis.fromPlan,machinekit.tooling.CastingWallReview.fromPlan);
 		var f = ToolingFabrication.plan(p, fabricationSpec, processReport);
 		if (process.recipeFingerprint != ToolingCodec.recipeFingerprint(p.document.recipe))
 			throw "Stale process recipe fingerprint";

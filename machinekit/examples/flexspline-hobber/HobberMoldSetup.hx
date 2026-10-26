@@ -13,7 +13,7 @@ enum abstract HobberMoldCasting(String) {
 
 /** Hobber geometry and orientation only; workshop choices are shared. */
 class HobberMoldSetup {
- public static function document(foundation:MineralFoundation,casting:HobberMoldCasting=Plinth):ToolingDocument {
+ public static function document(foundation:MineralFoundation,casting:HobberMoldCasting=HobberMoldCasting.Plinth):ToolingDocument {
   var sourceId="hobber-"+casting;
   var input=FoundationToolingAdapter.snapshot(foundation,sourceId,1);
   var recipe=CastingShopRecipe.tooling(sourceId+"-panel-eps-review");
@@ -32,7 +32,7 @@ class HobberMoldSetup {
    sourceToMold:F.fromRotationMatrix(0,0,foundation.body.parameterNumber("height"),
     [1,0,0,0,-1,0,0,0,-1])
   }};
-  if(casting==Column){
+  if(casting==HobberMoldCasting.Column){
    var depth=foundation.body.parameterNumber("depth");
    document.setup.id="column-rail-faces-down";
    document.setup.fillHeightMm=depth;

@@ -89,6 +89,13 @@ class Shape {
 		return CadKit.shapeDistanceChecked(native.borrow(), other.native.borrow());
 	}
 
+	/** Exact closest-point pairs for positive separation. The first query returns
+	 * their count; zero means the shapes touch or overlap. */
+	public function distanceWitness(other:Shape, index:Int = 0):CadKit.DistanceWitness {
+		if (index < 0) throw "Distance witness index out of range";
+		return CadKit.shapeDistanceWitnessChecked(native.borrow(), other.native.borrow(), index);
+	}
+
 	public function volume(?relativeTolerance:Float):Float {
 		if (relativeTolerance != null) return CadKit.shapeVolumeWithToleranceChecked(native.borrow(), relativeTolerance);
 		return CadKit.shapeVolumeChecked(native.borrow());

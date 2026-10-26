@@ -11,12 +11,12 @@ class MillMoldPreview {
 
 	public static function main():Void {
 		var frame = MillProject.smallFrame();
-		var casting:MillMoldSetup.MillMoldCasting = Sys.args().indexOf("--column") >= 0 ? Column : Base;
-		var input = MillMoldSetup.input(frame,casting), stem = casting == Column ? "column" : "base";
+		var casting:MillMoldSetup.MillMoldCasting = Sys.args().indexOf("--column") >= 0 ? MillMoldSetup.MillMoldCasting.Column : MillMoldSetup.MillMoldCasting.Base;
+		var input = MillMoldSetup.input(frame,casting), stem = casting == MillMoldSetup.MillMoldCasting.Column ? "column" : "base";
 		var document = MillMoldSetup.document(frame,CastingShopRecipe.BOARD_THICKNESS_MM,casting);
 		var options = MillMoldSetup.options(frame,casting);
 		if (Sys.args().indexOf("--fabrication") >= 0) {
-			MillFabricationPreview.write(document,options,casting == Column ? frame.column : frame.base,
+			MillFabricationPreview.write(document,options,casting == MillMoldSetup.MillMoldCasting.Column ? frame.column : frame.base,
 				stem,"mill-"+stem+"-process-review");
 			return;
 		}
@@ -48,7 +48,7 @@ class MillMoldPreview {
 		}
 		sys.io.File.saveContent(dir + "/source-input.json", materia.tooling.ToolingCodec.canonical(input) + "\n");
 		sys.io.File.saveContent(dir + "/review.json", Json.stringify(review, null, "\t") + "\n");
-		if (casting == Base && Sys.args().indexOf("--checks") >= 0)
+		if (casting == MillMoldSetup.MillMoldCasting.Base && Sys.args().indexOf("--checks") >= 0)
 			MillMoldChecks.run(frame, plan, review);
 		machinekit.tooling.CastingMoldExport.write(plan, dir, review);
 		Sys.println(stem+" mold plan: "

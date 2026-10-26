@@ -15,8 +15,8 @@ enum abstract MillMoldCasting(String) {
 /** Tooling uses the complete frame instantiated by the mechanical preview. */
 class MillMoldSetup {
 
-	public static function input(frame:BenchMillFrame, casting:MillMoldCasting = Base):CastingToolingInput {
-		if (casting == Column) {
+	public static function input(frame:BenchMillFrame, casting:MillMoldCasting = MillMoldCasting.Base):CastingToolingInput {
+		if (casting == MillMoldCasting.Column) {
 			var context = machinekit.tooling.FoundationAssemblyContext.snapshot(frame,"column/casting",
 				[for (insert in frame.column.insertLocations()) {id:insert.id,member:"column/"+insert.id}]);
 			return FoundationToolingAdapter.snapshot(frame.column,"bench-mill-column",1,context);
@@ -26,9 +26,9 @@ class MillMoldSetup {
 		return FoundationToolingAdapter.snapshot(frame.base,"bench-mill-base",1,context);
 	}
 
-	public static function document(frame:BenchMillFrame, thickness:Float = CastingShopRecipe.BOARD_THICKNESS_MM, casting:MillMoldCasting = Base):ToolingDocument {
-		if (casting == Column) {
-			var document = document(frame,thickness,Base), source = input(frame,Column);
+	public static function document(frame:BenchMillFrame, thickness:Float = CastingShopRecipe.BOARD_THICKNESS_MM, casting:MillMoldCasting = MillMoldCasting.Base):ToolingDocument {
+		if (casting == MillMoldCasting.Column) {
+			var document = document(frame,thickness,MillMoldCasting.Base), source = input(frame,MillMoldCasting.Column);
 			var depth = frame.layout.columnDepth;
 			document.input = source;
 			document.setup = {id:"column-front-on-bed",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(source),
@@ -56,7 +56,7 @@ class MillMoldSetup {
 		};
 	}
 
-	public static function options(frame:BenchMillFrame, casting:MillMoldCasting = Base):CastingMoldOptions {
+	public static function options(frame:BenchMillFrame, casting:MillMoldCasting = MillMoldCasting.Base):CastingMoldOptions {
 		var input = input(frame,casting);
 		return {
 			replicationJigs: [],

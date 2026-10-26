@@ -117,12 +117,12 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_chamfer_edges(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_chamfer_edges_operation(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_chamfer_operation(shape: cad_shape, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
-	extern fn cad_shape_refine_operation(shape: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_clone(shape: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_copy_element_aliases_bytes(shape: cad_shape, kind: cad_shape_kind, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_shape_copy_element_names_bytes(shape: cad_shape, kind: cad_shape_kind, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_shape_destroy(shape: cad_shape) -> void;
 	extern fn cad_shape_distance(first: cad_shape, second: cad_shape, out_distance: ptr<f64> @out) -> cad_result;
+	extern fn cad_shape_distance_witness(first: cad_shape, second: cad_shape, solution_index: u32, out_witness: ptr<cad_distance_witness> @out) -> cad_result;
 	extern fn cad_shape_extrude(profile: cad_shape, delta: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_extrude_operation(profile: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_fillet(shape: cad_shape, radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -137,6 +137,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_physical_properties(shape: cad_shape, out_properties: ptr<cad_physical_properties> @out) -> cad_result;
 	extern fn cad_shape_place(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_place_operation(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_refine_operation(shape: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve_operation(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate(shape: cad_shape, axis: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -176,6 +177,12 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	struct cad_bounds @layout(48, 8) {
 		min: cad_vec3 @offset(0);
 		max: cad_vec3 @offset(24);
+	}
+	struct cad_distance_witness @layout(64, 8) {
+		distance: f64 @offset(0);
+		first: cad_vec3 @offset(8);
+		second: cad_vec3 @offset(32);
+		count: u32 @offset(56);
 	}
 	struct cad_inertia_tensor @layout(48, 8) {
 		xx: f64 @offset(0);

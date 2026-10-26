@@ -18,6 +18,9 @@ var maximumMassPerLiftKg:CastingInput;
 
 typedef CastabilityLimits = {var maximumAggregateSizeMm: Null<Float>;
 var minimumPassageAggregateRatio:Null<Float>;
+var minimumWallAggregateRatio:Float;
+var steelAggregateMarginMm:Float;
+var steelSpacingAggregateRatio:Float;
 var evidence:Array<String>;
 }
 
@@ -37,6 +40,10 @@ var compound:CompoundDatasheet;
 class ProcessSpecs {
   static function positive(value:Float):Float {
     if (!Math.isFinite(value) || value <= 0) throw "Invalid casting process number";
+    return value;
+  }
+  static function wallRatio(value:Float):Float {
+    if(value==null || !Math.isFinite(value) || value<1 || value>1e6)throw "Invalid minimum wall/aggregate ratio";
     return value;
   }
   static function optional(value:Null<Float>, minimum:Float, maximum:Float):Null < Float> {
@@ -104,6 +111,11 @@ class ProcessSpecs {
         1,
         1e6
       ),
+      minimumWallAggregateRatio : wallRatio(limits.minimumWallAggregateRatio),
+
+      steelAggregateMarginMm : positive(limits.steelAggregateMarginMm),
+      steelSpacingAggregateRatio : wallRatio(limits.steelSpacingAggregateRatio),
+
       evidence : evidence
     }, compound : {
       reference : reference,
@@ -139,6 +151,11 @@ class ProcessSpecs {
       [
         "maximumAggregateSizeMm",
         "minimumPassageAggregateRatio",
+        "minimumWallAggregateRatio",
+
+        "steelAggregateMarginMm",
+        "steelSpacingAggregateRatio",
+
         "evidence"
       ]
     );
@@ -195,6 +212,11 @@ class ProcessSpecs {
         limits,
         "maximumAggregateSizeMm"
       ),
+      minimumWallAggregateRatio : materia.casting.CastingRecordCodec.number(Reflect.field(raw,"castability"),"minimumWallAggregateRatio"),
+
+      steelAggregateMarginMm : materia.casting.CastingRecordCodec.number(limits,"steelAggregateMarginMm"),
+      steelSpacingAggregateRatio : materia.casting.CastingRecordCodec.number(limits,"steelSpacingAggregateRatio"),
+
       minimumPassageAggregateRatio : inputNumber(
         limits,
         "minimumPassageAggregateRatio"

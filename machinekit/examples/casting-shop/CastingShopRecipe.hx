@@ -13,8 +13,16 @@ import materia.tooling.panel.PanelPlan;
  */
 class CastingShopRecipe {
  public static inline var BOARD_THICKNESS_MM = 18;
- /** In-house placeability screen; compound grading and compaction still need qualification. */
+ /** Mix-design top size from SOURCING.md (Vetonek 4–8 mm). Actual grading still needs qualification. */
+ public static inline var MAXIMUM_AGGREGATE_MM = 8;
+ /** SOURCING.md design target; RAMPF EPUSELF brochure, EPUMENT 140/8B: 8 mm / 40 mm. */
+ public static inline var MINIMUM_WALL_AGGREGATE_RATIO = 5;
+ /** In-house minimum clear passage/aggregate ratio. */
  public static inline var MINIMUM_PASSAGE_AGGREGATE_RATIO = 3;
+ /** EN 1992-1-1 8.2 aggregate term dg+5; recipe adopts this term, not the full RC spacing rule. */
+ public static inline var STEEL_AGGREGATE_MARGIN_MM = 5;
+ /** ACI 318 aggregate-related clear-spacing term, 4.0/3.0 dg. */
+ public static inline var STEEL_SPACING_AGGREGATE_RATIO = 4.0/3.0;
  public static inline var FORMER_PROFILE_DIAMETER_MM = 6;
  public static inline var FORMER_CORNER_MARGIN_MM = 0.2;
  public static function formerCornerRadiusMm():Float
@@ -137,7 +145,14 @@ class CastingShopRecipe {
 	public static function process(recipe:materia.tooling.ToolingRecipe, id:String):materia.tooling.process.CastingProcessSpec return {
 		id:id,revision:1,recipeFingerprint:materia.tooling.ToolingCodec.recipeFingerprint(recipe),
 		pourRateMm3PerSecond:null,maximumAirEscapeWidthMm:null,mixComposition:null,mixer:null,
-		castability:{maximumAggregateSizeMm:null,minimumPassageAggregateRatio:MINIMUM_PASSAGE_AGGREGATE_RATIO,evidence:[]},
+		castability:{maximumAggregateSizeMm:MAXIMUM_AGGREGATE_MM,minimumPassageAggregateRatio:MINIMUM_PASSAGE_AGGREGATE_RATIO, minimumWallAggregateRatio:MINIMUM_WALL_AGGREGATE_RATIO,
+   steelAggregateMarginMm:STEEL_AGGREGATE_MARGIN_MM,
+   steelSpacingAggregateRatio:STEEL_SPACING_AGGREGATE_RATIO,evidence:[
+   "EN 1992-1-1 8.2: adopted aggregate-related dg+5 mm term for steel cover and spacing (not full RC code qualification)",
+   "ACI 318: adopted clear-spacing term 4/3 dg",
+   "machinekit/examples/casting-shop/SOURCING.md#design-target (Vetonek 4–8 mm top grade)",
+   "https://www.rampf-group.com/fileadmin/Downloads/RMA/Epuself-RAMPF-EN.pdf pp.6–7, EPUMENT 140/8B (8 mm / 40 mm)"
+  ]},
 		compound:{reference:materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
 			thickness:materia.tooling.process.CastingProcessSpec.CompoundThicknessLimit.Unresolved("Compound section or layer thickness limit"),
 			maximumMassPerLiftKg:materia.casting.CastingInput.Unresolved("Compound maximum mass per lift")}

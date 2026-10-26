@@ -121,8 +121,15 @@ class CastabilityAnalysis {
 		return record;
 		}
 
+	public static function aggregateProposals(report:AggregateGate.AggregateReport):Array<CastabilityProposal>
+		return [for(finding in report.failures)proposal(
+			AggregateGate.rule(finding.gap.kind),
+			finding.gap.sourceIds,WidenPassage,DesignReview,
+			"Source decision required: increase this material gap or select a finer qualified mix. Geometry is unchanged.",
+			finding.gap.measuredMm,finding.requiredMm,finding.gap.axis,finding.gap.region)];
+
 	public static function analyze(document:ToolingDocument, raw:CastingProcessSpec, fill:Null<FillReport>, sections:Null<OrthogonalSectionReport>,
-			expectedSourceFingerprint:String, expectedProcessFingerprint:String, ?plannerChecks:Array<ToolingValidation>):CastabilityReport {
+			expectedSourceFingerprint:String, expectedProcessFingerprint:String, ?plannerChecks:Array<ToolingValidation>,?aggregate:AggregateGate.AggregateReport):CastabilityReport {
 		var d = ToolingCodec.copy(document),
 			spec = ProcessSpecs.copy(raw);
 		if (spec.recipeFingerprint != ToolingCodec.recipeFingerprint(d.recipe))
@@ -149,40 +156,13 @@ class CastabilityAnalysis {
 				}
 			ids = sources(ids);
 			if (ids.length == 0) ids = [root];
-			for (rule in ["process.castability.minimum-passage"])
+			for (rule in aggregate==null ? [for(kind in AggregateGate.kinds())AggregateGate.rule(kind)] : [])
 				checks.push(FillAnalysis.check(rule, ids, Unsupported,
 					"No exact section interval is available for this geometry; no box or scalar substitute is credited.", []));
 		} else {
 			var spans = sections.spans.copy();
 			spans.sort((a, b) -> a.thicknessMm != b.thicknessMm ? Reflect.compare(a.thicknessMm, b.thicknessMm) : Reflect.compare(a.id, b.id));
 			minimum = spans[0].thicknessMm;
-			var minimumSpan = spans[0];
-			var minimumOwners = sources(minimumSpan.lowerSourceIds.concat(minimumSpan.upperSourceIds));
-			var minimumRule = "process.castability.minimum-passage";
-			if (limits.maximumAggregateSizeMm == null || limits.minimumPassageAggregateRatio == null) {
-				var missing:Array<String>=[];
-				if (limits.maximumAggregateSizeMm==null) missing.push("maximum aggregate size");
-				if (limits.minimumPassageAggregateRatio==null) missing.push("minimum passage/aggregate ratio");
-				checks.push(FillAnalysis.check(minimumRule, minimumOwners, Pending,
-					"Declare "+missing.join(" and ")+"; narrowest opposing-face span is " + minimum + " mm.", limits.evidence));
-				proposals.push(proposal(minimumRule, minimumOwners, DeclareLimit, ProcessReview,
-					"Supply the mix grading and recipe passage ratio, then rerun the section screen.", minimum, null, minimumSpan.axis, minimumSpan.strips[0]));
-			} else {
-				var required = limits.maximumAggregateSizeMm * limits.minimumPassageAggregateRatio;
-				var narrow = spans.filter(s -> s.thicknessMm < required - 1e-7);
-				var ids = sources([for (s in narrow) for (id in s.lowerSourceIds.concat(s.upperSourceIds)) id]);
-				checks.push(FillAnalysis.check(minimumRule, ids.length == 0 ? [root] : ids, narrow.length == 0 ? Pass : Fail,
-					"Opposing-face passage screen: minimum "
-					+ minimum
-					+ " mm; declared aggregate-based minimum "
-					+ required
-					+ " mm. This is a geometry screen, not a prediction of paste flow or compaction.",
-					limits.evidence));
-				for (s in narrow)
-					proposals.push(proposal(minimumRule, s.lowerSourceIds.concat(s.upperSourceIds), WidenPassage, DesignReview,
-						"Increase separation of these source faces to at least the target, or select a finer qualified aggregate mix. Recheck stiffness and tooling.",
-						s.thicknessMm, required, s.axis, s.strips[0]));
-			}
 			maximum = sections.maximumInscribedThicknessMm;
 			switch spec.compound.thickness {
 				case Section(limit):
@@ -197,6 +177,12 @@ class CastabilityAnalysis {
 							null,limit,null,null,bound.witness));
 				case Layer(_),Unresolved(_):
 			}
+		}
+		if(aggregate==null && sections!=null)
+			aggregate=AggregateGate.withFill(root,AggregateGate.fromSections(d,expectedSourceFingerprint,limits,sections),fill);
+		if(aggregate!=null) {
+			checks=checks.concat(aggregate.validation);
+			proposals=proposals.concat(aggregateProposals(aggregate));
 		}
 		if (fill != null) {
 			// Keep the exact fill rule/status/ownership: suggestions do not clear it.

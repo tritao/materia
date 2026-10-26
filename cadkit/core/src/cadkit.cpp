@@ -3134,6 +3134,46 @@ extern "C" CADKIT_API cad_result cad_shape_distance(
     }
 }
 
+extern "C" CADKIT_API cad_result cad_shape_distance_witness(
+    cad_shape first, cad_shape second, uint32_t solution_index,
+    cad_distance_witness* out_witness) {
+    clear_error();
+    if (out_witness == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_witness must not be null");
+    }
+    *out_witness = {};
+    TopoDS_Shape a, b;
+    const auto first_result = copy_shape(first, a);
+    if (first_result != CAD_OK) return first_result;
+    const auto second_result = copy_shape(second, b);
+    if (second_result != CAD_OK) return second_result;
+    try {
+        BRepExtrema_DistShapeShape query(a, b);
+        if (!query.IsDone() || query.NbSolution() == 0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT could not locate a distance witness");
+        }
+        const double value = query.Value();
+        if (!std::isfinite(value) || value < 0.0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT distance is not finite");
+        }
+        out_witness->distance = value;
+        if (value == 0.0) {
+            if (solution_index != 0) return fail(CAD_ERROR_INVALID_ARGUMENT, "Distance witness index out of range");
+            return CAD_OK;
+        }
+        const auto count = static_cast<uint32_t>(query.NbSolution());
+        if (solution_index >= count) return fail(CAD_ERROR_INVALID_ARGUMENT, "Distance witness index out of range");
+        const auto p = query.PointOnShape1(static_cast<int>(solution_index) + 1);
+        const auto q = query.PointOnShape2(static_cast<int>(solution_index) + 1);
+        out_witness->first = {p.X(), p.Y(), p.Z()};
+        out_witness->second = {q.X(), q.Y(), q.Z()};
+        out_witness->count = count;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_face_surface_kind(
     cad_shape face,
     cad_surface_kind* out_kind) {

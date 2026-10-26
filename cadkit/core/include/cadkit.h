@@ -64,6 +64,15 @@ typedef struct cad_bounds {
     cad_vec3 max;
 } cad_bounds;
 
+/* A positive-separation closest-point solution. count is zero for contact or
+   overlap; otherwise solution_index selects one of count equally close pairs. */
+typedef struct cad_distance_witness {
+    double distance;
+    cad_vec3 first;
+    cad_vec3 second;
+    uint32_t count;
+} cad_distance_witness;
+
 typedef struct cad_mass_properties {
     double volume;
     double surface_area;
@@ -543,6 +552,12 @@ CADKIT_API cad_result cad_shape_distance(
     cad_shape first,
     cad_shape second,
     double* out_distance CADKIT_HXI_OUT);
+
+CADKIT_API cad_result cad_shape_distance_witness(
+    cad_shape first,
+    cad_shape second,
+    uint32_t solution_index,
+    cad_distance_witness* out_witness CADKIT_HXI_OUT);
 
 CADKIT_API cad_result cad_face_surface_kind(
     cad_shape face,

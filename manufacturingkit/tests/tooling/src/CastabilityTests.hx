@@ -186,13 +186,12 @@ class CastabilityTests {
 		s.recipeFingerprint = ToolingCodec.recipeFingerprint(d.recipe);
 		s.castability = {
 			maximumAggregateSizeMm: 4,
-			minimumPassageAggregateRatio: 3,
-			evidence: ["fixture-assumption-not-qualified"]
+			minimumPassageAggregateRatio: 3, minimumWallAggregateRatio:5, steelAggregateMarginMm:5, steelSpacingAggregateRatio:4.0/3.0, evidence: ["fixture-assumption-not-qualified"]
 		};
 		s.compound.thickness=CompoundThicknessLimit.Section(30);
 		s.maximumAirEscapeWidthMm = 100;
 		var source = ToolingCodec.documentFingerprint(d),
-			owner = d.input.features[0].id;
+			owner = d.input.features.filter(feature->feature.kind!=materia.casting.CastingFeature.CastingFeatureKind.InsertRecess)[0].id;
 		function analyze(region:Array<MoldBox>, ?boundaries:Array<FillBoundary>):CastabilityReport {
 			s.recipeFingerprint=ToolingCodec.recipeFingerprint(d.recipe);
 			if (boundaries == null)
@@ -204,17 +203,17 @@ class CastabilityTests {
 			var sections = OrthogonalSections.analyze(d.input.id, source, region, boundaries);
 			return CastabilityAnalysis.analyze(d, s, fill, sections, source, "process", p.validation);
 		}
-		var slender = analyze([box(0, 0, 100, 60, 20)]);
+		var slender = analyze([box(0, 0, 100, 60, 20)],[{id:owner,box:box(0,20,100,60,10)}]);
 		check(status(slender, "process.castability.minimum-passage") == "pass", "sufficient passage passes");
 		check(slender.maximumInscribedThicknessMm == 20, "rectangular thickness uses shortest dimension");
 		var thin = analyze([box(0, 0, 100, 60, 8)], [{id: owner, box: box(0, 8, 100, 60, 10)}]);
 		check(status(thin, "process.castability.minimum-passage") == "fail", "aggregate-based narrow passage fails");
-		var widen = thin.proposals.filter(v -> v.action == WidenPassage);
+		var widen = thin.proposals.filter(v -> v.action == WidenPassage && v.rule=="process.castability.minimum-passage");
 		check(widen.length == 1 && widen[0].sourceIds.indexOf(owner) >= 0, "narrow passage reports source feature");
 		check(widen[0].measuredMm == 8 && widen[0].targetMm == 12 && widen[0].axis == Z, "proposal carries exact dimension and target");
 		var proposalRegion:MoldBox = cast widen[0].region;
 		check(proposalRegion.height == 8 && widen[0].owner == DesignReview, "source proposal has mold-space location and owner");
-		var atLimit = analyze([box(0, 0, 100, 60, 12)]);
+		var atLimit = analyze([box(0, 0, 100, 60, 12)],[{id:owner,box:box(0,12,100,60,10)}]);
 		check(status(atLimit, "process.castability.minimum-passage") == "pass", "equality at aggregate limit passes");
 		var thick = analyze([box(0, 0, 100, 60, 40)]);
 		check(thick.maximumDiameterLowerMm!=null && (cast thick.maximumDiameterLowerMm:Float)>30,"thick block exposes the datasheet section exceedance");

@@ -41,8 +41,7 @@ class ProcessTests {
     revision: 1, recipeFingerprint: haxe.crypto.Sha256.encode("test-recipe"),
     pourRateMm3PerSecond: null, maximumAirEscapeWidthMm: null, mixComposition: null, mixer: null, castability: {
     maximumAggregateSizeMm: null,
-    minimumPassageAggregateRatio: null,
-    evidence:[]
+    minimumPassageAggregateRatio: null, minimumWallAggregateRatio:5, steelAggregateMarginMm:5, steelSpacingAggregateRatio:4.0/3.0, evidence:[]
   }, compound: {
     reference: materia.casting.CastingInput.CastingTextInput.Unresolved("Production compound and datasheet"),
     thickness: CompoundThicknessLimit.Unresolved("Compound section/layer thickness"),

@@ -1726,8 +1726,9 @@ compound and bond evidence remain Pending. Proud raw steel is rebated into the
 bed. Cured closures fill the actual clearance and cutter relief of both steel
 and datum receivers; source screw/pin access stays dry and open. Exact coverage
 and the bed-with-closure removal group verify those physical seals.
-Maximum aggregate size remains an unresolved compound-datasheet input; the
-named in-house minimum passage ratio is three aggregate diameters.
+The mix design declares 8 mm maximum aggregate from the shop SOURCING.md;
+the named in-house minimum flow-passage ratio is three aggregate diameters.
+Actual grading and compound properties remain unqualified pending evidence.
 Board-limited recipe rules measure the finished cavity along the selected
 opening/withdrawal normal, not an unrelated thin dimension or an overshooting
 intent cut. The two deep motor-bay cheeks therefore use the existing EPS route.
@@ -1900,7 +1901,7 @@ Mill interface detail decision (2026-10-25): the finished Y seat plane is the ca
 Mill bed detail decision (2026-10-25): keep the bed at the source casting boundary and route rebates for proud raw steel. Model the compatible cured closure as the exact routed clearance/relief volume minus the steel envelope; it remains attached to the bed in assembly and removal. Do not fill those corner gaps with a geometric tolerance. Dry-fit/protect the raw mounting faces, cure and inspect the closure before the pour, and keep all steel/anchor bonding faces uncoated. The existing material/coupon qualification remains Pending. Fixing length uses the remaining board below each rebate floor.
 
 Mill joint detail decision (2026-10-25): retain the four M12 clamp centres and use three fully threaded ISO 4026 flat-point M8 × 25 jacks in a 3 mm grout gap. The fully threaded source holes need ordinary bore protection and no counterbore. Jack bearing and strength remain unqualified. Jack/fixture spacing and access depth follow the hole policy and a 2.5 mm driver clearance; the two anchor lands are sized from demand. All four sole pads have the same jack and dedicated fixture drilling; three jacks are installed, with unused holes protected during the pour. Cure precedes final clamp torque. The lifting selector admits 36 × 100 × 30 mm blanks: the centred M12 thread retains the policy's 12 mm radial wall, the demand-sized M6 pattern fits, and exact neighbour/cover checks pass. Front base lifts quarter-turn that same part. The rear chamber floor also retains the declared roof web above the bolt-access ceiling.
-Mill passage detail decision (2026-10-25): use the shared in-house minimum passage/aggregate ratio of 3. Maximum aggregate size remains a required compound-datasheet input; no grading value or material qualification is assumed.
+Mill passage detail decision (2026-10-25, aggregate declaration updated 2026-10-26): use the shared in-house minimum flow-passage/aggregate ratio of 3 with the shop mix design's declared 8 mm top size. Actual grading and compound properties still need qualification.
 
 ## Source-simplification leftover sweep (2026-10-26)
 
@@ -1909,3 +1910,28 @@ Removed: retained-box feature authoring (`BoxAlgebra.retain`), the unused flared
 Kept: chamfers and exact prismatic envelope fillers (`MillPedestal` declares a 30 mm chamfer), and ordinary EPS supports/bridges and former flanges (production mill/hobber tooling). Production strut, pour-face-bridge and retained-EPS paths were already deleted. The redundant box-example override and the stored ID-keyed setup override field/resolver are deleted. Recipe rules and source withdrawal axes are the only strategy inputs; resolved per-feature associations stay in memory. Tooling format 27 rejects old records; all four kits are regenerated. Source geometry stays unchanged.
 
 The unused fragment ancestry field and parent-opening aliases are deleted. Casting feature format 5 rejects old records; core units carry one exact feature ID while shared physical core membership is retained.
+
+## Aggregate gate scope (user, 2026-10-26)
+
+The shop mix declares 8 mm maximum aggregate (`SOURCING.md`, Vetonek 4–8 mm).
+Compound strength and modulus remain unqualified pending coupons. Finished-resin
+measurements use these separate recipe classes:
+
+| Class | Requirement at dg = 8 mm |
+| --- | --- |
+| Wall/rib between cavity, mold or free faces | 5 dg = 40 mm (Rampf EPUMENT 140/8B pairing) |
+| Pour-flow passage between cores and/or mold walls | 3 dg = 24 mm |
+| Steel cover to mold, EPS or free face | dg + 5 = 13 mm |
+| Clear spacing between separate insert assemblies | max(dg + 5, 4/3 dg) = 13 mm |
+| Within one insert assembly, including its own anchors | No passage-spacing floor; recesses must open to bulk resin, with no narrow enclosed/dead-end pocket along its whole depth; open gaps fill with matrix fines |
+
+The aggregate-related steel terms are adopted from EN 1992-1-1 8.2 (`dg + 5`)
+and ACI 318 (`4/3 dg`); this is not a full reinforced-concrete code check.
+Where a structural resin wall also carries a flow path, both rules apply.
+Report one row per source feature pair and rule class: minimum measurement,
+required clearance, witness count and location bounding box. Attach every raw
+witness. Keep socket-tail shadow coverage Unsupported where exact projection is
+unavailable. No geometry change is authorised by the report; source corrections
+wait for the user's decision.
+
+Status: aggregate-gate code complete; the four-casting grouped report records source geometry holds, with socket-tail coverage Unsupported and the compound section limit Pending. No gate-driven geometry correction has been applied. The source-only `haxeon.aggregate-review.json` entry and normal kit export use the same process-analysis pipeline and report renderer.
