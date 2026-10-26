@@ -9780,10 +9780,10 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "0a89ca6800c36e949902d732872a9dcaa4aa98c9edd4a9dfdf0821c3e67cb531",
+      "sourceFingerprint": "5f37b6405a5b0a9cd19bcb4c3b3b37dba7ab512956e9091097a1bb72d2a19e06",
       "sourceCodecVersion": 27,
-      "volumeMm3": 42272723.07897126,
-      "massKg": 101.45453538953103,
+      "volumeMm3": 42287649.752636716,
+      "massKg": 101.49035940632812,
       "boxStatus": "unsupported",
       "boxReason": "Post-cure receiver bores require non-box collision decomposition: hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper",
       "unsupportedFeatures": [

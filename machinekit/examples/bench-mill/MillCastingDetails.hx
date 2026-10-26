@@ -48,8 +48,10 @@ class MillCastingDetails {
 	/** 30 mm stock accommodates the selected M12 service screw, full thread,
 	 * bottoming-tap runout, tip gap and intact policy back wall. */
 	public var columnAnchorThickness:Float = 30;
-	/** Source radius, sized from the declared profile cutter and shop margin. */
-	public var columnFootCornerRadiusMm:Float = CastingShopRecipe.formerCornerRadiusMm();
+	/** Structural re-entrant fillet, independent of the board-former cutter.
+	 * User correction 2026-10-26: 1.5 times the declared 8 mm aggregate.
+	 * The step is formed by EPS; board-former radii retain their shop rule. */
+	public var columnFootCornerRadiusMm:Float = 12;
 	public var columnBoltLengthIncrement:Float = 5;
 	public var hatchInsertDiameter:Float = 12;
 	public var hatchReceiverDiameter:Float = 12.2;

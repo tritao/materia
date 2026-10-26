@@ -20,10 +20,10 @@ class MillProject {
   return SceneArtifact.encode(data);
  }
 
- public static function smallFrame():BenchMillFrame {
+ public static function smallFrame(?casting:MillCastingDetails):BenchMillFrame {
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
-  return BenchMillFrame.create(f,z,xy);
+  return BenchMillFrame.create(f,z,xy,casting);
  }
  public static function smallAssembly():MachineAssembly {
   return MillFramePreview.concept(new BenchMill(false,false),smallFrame());

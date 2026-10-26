@@ -1,0 +1,571 @@
+{
+  "status": "conditional elastic comparison; physical qualification Pending",
+  "solver": "CalculiX SPOOLES, one thread",
+  "materials": {
+    "mineral-cast": {
+      "youngsPa": 35000000000,
+      "poissonRatio": 0.25,
+      "densityKgPerM3": 2400,
+      "assumed": true,
+      "source": "MaterialLibrary modulus/density; Poisson ratio is an explicit study assumption",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        }
+      ]
+    },
+    "machined-steel": {
+      "youngsPa": 210000000000,
+      "poissonRatio": 0.3,
+      "densityKgPerM3": 7850,
+      "assumed": true,
+      "source": "Study isotropic machined-steel assumption: E=210 GPa, nu=0.30; density=7850 kg/m3 retained from MaterialLibrary. No material certificate supplied.",
+      "overrides": [
+        {
+          "property": "poissonRatio",
+          "source": "Explicit study assumption; no library value"
+        },
+        {
+          "property": "youngsPa",
+          "source": "Explicit study steel modulus; no library value"
+        }
+      ]
+    }
+  },
+  "bendingForceN": 500,
+  "stressMeasure": "Integration-point first principal stress in elements bordering the actual step fillets",
+  "assumptions": [
+    "clamped sole, bonded source pads and rigid bolt-head patches",
+    "policy assembly preload; linear superposition of preload and +/-X, +/-Y top-diaphragm bending",
+    "other inserts and anchors omit stiffness; source voids retained",
+    "no material strength, shrinkage, thermal-cycle or aggregate-scale qualification"
+  ],
+  "meshRelativeTolerance": 0.05,
+  "refinement": [
+    {
+      "radiusMm": 3.2,
+      "peakPrincipalMPaByLevel": [
+        0.895304655598635,
+        0.8819450935690318
+      ],
+      "relativePeakChange": 0.015147838711296734,
+      "withinStatedMeshTolerance": true
+    },
+    {
+      "radiusMm": 12,
+      "peakPrincipalMPaByLevel": [
+        0.5492723400009711,
+        0.5657732137507915
+      ],
+      "relativePeakChange": 0.029165173162631473,
+      "withinStatedMeshTolerance": true
+    }
+  ],
+  "meshes": [
+    {
+      "radiusMm": 3.2,
+      "filletSizeMm": 1.0666666666666667,
+      "radiusToMeshSize": 3.0,
+      "bulkSizeMm": 25.0,
+      "steelSizeMm": 3.0,
+      "elements": 229825,
+      "filletElements": 5882,
+      "filletFaces": [
+        6,
+        67
+      ],
+      "minimumJacobian": 0.008530757622978197,
+      "materialVolumeRelativeErrors": {
+        "CASTING": 1.187612379016656e-05,
+        "STEEL": 0.004053141207975397
+      },
+      "cases": [
+        {
+          "bendingForceN": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.004047701324925662,
+          "minimumPrincipalMPa": -0.006370736353442295,
+          "peakElement": 117508,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            159.98987057229058,
+            65.01032165300671,
+            152.16502990390748
+          ]
+        },
+        {
+          "bendingForceN": [
+            500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5649299704399735,
+          "minimumPrincipalMPa": -0.5597408324896551,
+          "peakElement": 123956,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.06190819087342,
+            -112.51119122300676,
+            151.93323498421404
+          ]
+        },
+        {
+          "bendingForceN": [
+            -500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5560831382343092,
+          "minimumPrincipalMPa": -0.5708429320202659,
+          "peakElement": 119427,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            160.01877769243936,
+            -69.14706275061566,
+            151.9104006982245
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.7045560572462659,
+          "minimumPrincipalMPa": -0.9041216846388684,
+          "peakElement": 132299,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            159.96694015663715,
+            -126.7808442390226,
+            151.92768986354804
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            -500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.895304655598635,
+          "minimumPrincipalMPa": -0.7133021316004401,
+          "peakElement": 102790,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -159.90813725095137,
+            125.4732910068025,
+            152.077025821423
+          ]
+        }
+      ],
+      "balances": [
+        {
+          "forceRelativeError": 2.861359093876031e-16,
+          "momentRelativeError": 2.935646476490088e-14,
+          "energyRelativeError": 5.0094104642184334e-08
+        },
+        {
+          "forceRelativeError": 1.4986153662804345e-11,
+          "momentRelativeError": 1.4958330595427806e-11,
+          "energyRelativeError": 2.3460988152201878e-07
+        },
+        {
+          "forceRelativeError": 4.434849034297529e-12,
+          "momentRelativeError": 1.6805774358181815e-11,
+          "energyRelativeError": 1.1626584583979138e-08
+        }
+      ],
+      "packetSha256": "058826c9b01ca8ffa1a806a2ff9e4ae057e5319964d833cdcc115c64b77b3880",
+      "deckSha256": "5cc3aeae4075d2557b8118767dbe25f3ff741b56217b6f1921ab87edfe0a98fd",
+      "resultSha256": "87be2b26fa8d6e23b4ab5d083cefa60f36ee600b446b32d4e7dbf1384bd596cd",
+      "filletArcSegments": [
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "radiusMm": 3.2,
+      "filletSizeMm": 0.8,
+      "radiusToMeshSize": 4.0,
+      "bulkSizeMm": 25.0,
+      "steelSizeMm": 3.0,
+      "elements": 254273,
+      "filletElements": 10252,
+      "filletFaces": [
+        6,
+        67
+      ],
+      "filletArcSegments": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "minimumJacobian": 0.00912221897446275,
+      "materialVolumeRelativeErrors": {
+        "CASTING": 1.0466030959443984e-05,
+        "STEEL": 0.004056300526885659
+      },
+      "cases": [
+        {
+          "bendingForceN": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.004040036729759011,
+          "minimumPrincipalMPa": -0.00639070557535292,
+          "peakElement": 143799,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            -160.00967813750114,
+            59.49223049146236,
+            152.14487061303979
+          ]
+        },
+        {
+          "bendingForceN": [
+            500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5550142299915438,
+          "minimumPrincipalMPa": -0.5588009739556594,
+          "peakElement": 142056,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            -160.04175568759445,
+            -80.91017638707056,
+            152.0119732024561
+          ]
+        },
+        {
+          "bendingForceN": [
+            -500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5616667841508052,
+          "minimumPrincipalMPa": -0.5484596011885515,
+          "peakElement": 140373,
+          "peakIntegrationPoint": 3,
+          "peakElementCentroidMm": [
+            159.9982178919636,
+            -92.88947465097243,
+            151.97905867452647
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.7019094737726875,
+          "minimumPrincipalMPa": -0.8906459391602767,
+          "peakElement": 109741,
+          "peakIntegrationPoint": 3,
+          "peakElementCentroidMm": [
+            -160.223186573628,
+            -126.20406143960008,
+            151.57270226586576
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            -500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.8819450935690318,
+          "minimumPrincipalMPa": -0.7116148807299997,
+          "peakElement": 114062,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.08898692289858,
+            126.20075976093898,
+            151.9270155962192
+          ]
+        }
+      ],
+      "balances": [
+        {
+          "forceRelativeError": 4.805178396896753e-16,
+          "momentRelativeError": 5.2806726791793196e-14,
+          "energyRelativeError": 3.224844169480434e-08
+        },
+        {
+          "forceRelativeError": 1.0027387874272821e-11,
+          "momentRelativeError": 1.0246591641114297e-11,
+          "energyRelativeError": 2.5775995027288445e-07
+        },
+        {
+          "forceRelativeError": 4.448843220672129e-12,
+          "momentRelativeError": 1.155581443386617e-11,
+          "energyRelativeError": 9.954416768653829e-08
+        }
+      ],
+      "packetSha256": "058826c9b01ca8ffa1a806a2ff9e4ae057e5319964d833cdcc115c64b77b3880",
+      "deckSha256": "43c3351c52b7ecf70c728243f74fbcad571978823c6bf2ae613db18609561549",
+      "resultSha256": "13980fc84a6c3c0d2bf45b6beda055c103b0d470b4da797d911d53089cfa3b9f"
+    },
+    {
+      "radiusMm": 12,
+      "filletSizeMm": 4.0,
+      "radiusToMeshSize": 3.0,
+      "bulkSizeMm": 25.0,
+      "steelSizeMm": 3.0,
+      "elements": 204008,
+      "filletElements": 1587,
+      "filletFaces": [
+        6,
+        67
+      ],
+      "filletArcSegments": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "minimumJacobian": 0.04878015709915363,
+      "materialVolumeRelativeErrors": {
+        "CASTING": 2.7388188349908305e-05,
+        "STEEL": 0.0040514790117731625
+      },
+      "cases": [
+        {
+          "bendingForceN": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.002453305490013912,
+          "minimumPrincipalMPa": -0.0037853962091967904,
+          "peakElement": 110083,
+          "peakIntegrationPoint": 3,
+          "peakElementCentroidMm": [
+            -171.65953350272832,
+            7.49895551040843,
+            147.28328788495185
+          ]
+        },
+        {
+          "bendingForceN": [
+            500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.3195799026748609,
+          "minimumPrincipalMPa": -0.32156708691386443,
+          "peakElement": 139143,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.22731145758667,
+            -129.31653759418091,
+            158.32932146107788
+          ]
+        },
+        {
+          "bendingForceN": [
+            -500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.3180575109928545,
+          "minimumPrincipalMPa": -0.3228666661062513,
+          "peakElement": 111725,
+          "peakIntegrationPoint": 3,
+          "peakElementCentroidMm": [
+            159.75926430653936,
+            -127.26405492025663,
+            157.5253115052175
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.44533938617226226,
+          "minimumPrincipalMPa": -0.5527311153856055,
+          "peakElement": 139143,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.22731145758667,
+            -129.31653759418091,
+            158.32932146107788
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            -500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5492723400009711,
+          "minimumPrincipalMPa": -0.448631653807736,
+          "peakElement": 137609,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.09257624304615,
+            129.02024892487242,
+            158.31571522254598
+          ]
+        }
+      ],
+      "balances": [
+        {
+          "forceRelativeError": 6.262324081578086e-16,
+          "momentRelativeError": 1.946086346968627e-14,
+          "energyRelativeError": 9.034144143882372e-08
+        },
+        {
+          "forceRelativeError": 4.26014192576278e-12,
+          "momentRelativeError": 4.479222684925926e-12,
+          "energyRelativeError": 4.5285124761207385e-08
+        },
+        {
+          "forceRelativeError": 4.8586543795232944e-12,
+          "momentRelativeError": 4.926861373307688e-12,
+          "energyRelativeError": 5.5484516758852465e-08
+        }
+      ],
+      "packetSha256": "750c6615e57c90147a7b06ff79054113e0516228b37a47b59d894aacecfa9dd2",
+      "deckSha256": "8ea23a3807e64f28a072932af837047fbdf4ff730e9b260512a3eb2a185d678e",
+      "resultSha256": "09bf51e0ca614cc834a6730a10a5c7646db8a09dd1a6f38a1b93ade6b81d4117"
+    },
+    {
+      "radiusMm": 12,
+      "filletSizeMm": 3.0,
+      "radiusToMeshSize": 4.0,
+      "bulkSizeMm": 25.0,
+      "steelSizeMm": 3.0,
+      "elements": 221182,
+      "filletElements": 2790,
+      "filletFaces": [
+        6,
+        67
+      ],
+      "filletArcSegments": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "minimumJacobian": 0.008530757622978197,
+      "materialVolumeRelativeErrors": {
+        "CASTING": 2.1011458951836204e-05,
+        "STEEL": 0.0040643736517733675
+      },
+      "cases": [
+        {
+          "bendingForceN": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.0026498744615293486,
+          "minimumPrincipalMPa": -0.003914073811195484,
+          "peakElement": 130793,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            159.68248955659467,
+            -64.15212782329755,
+            158.81249366721096
+          ]
+        },
+        {
+          "bendingForceN": [
+            500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.3307017504180574,
+          "minimumPrincipalMPa": -0.3407197093130803,
+          "peakElement": 120853,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            -159.88303408452703,
+            -106.49448952697315,
+            158.29446635269414
+          ]
+        },
+        {
+          "bendingForceN": [
+            -500,
+            0.0,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.33951901959905895,
+          "minimumPrincipalMPa": -0.3311501318037649,
+          "peakElement": 132615,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            159.90629560036052,
+            -113.55863467276272,
+            158.13176320210084
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.45097336971847485,
+          "minimumPrincipalMPa": -0.569650560765882,
+          "peakElement": 118135,
+          "peakIntegrationPoint": 1,
+          "peakElementCentroidMm": [
+            -160.41437394038465,
+            -128.58996887036886,
+            157.7288630508914
+          ]
+        },
+        {
+          "bendingForceN": [
+            0.0,
+            -500,
+            0.0
+          ],
+          "maximumPrincipalMPa": 0.5657732137507915,
+          "minimumPrincipalMPa": -0.45464323958539526,
+          "peakElement": 118012,
+          "peakIntegrationPoint": 2,
+          "peakElementCentroidMm": [
+            -160.49961648094572,
+            128.69823424054593,
+            157.73097359633513
+          ]
+        }
+      ],
+      "balances": [
+        {
+          "forceRelativeError": 2.4383916103915867e-16,
+          "momentRelativeError": 2.552212140721812e-14,
+          "energyRelativeError": 6.62982337917839e-08
+        },
+        {
+          "forceRelativeError": 1.5007538942044963e-13,
+          "momentRelativeError": 2.281158610141442e-13,
+          "energyRelativeError": 2.249179926749889e-07
+        },
+        {
+          "forceRelativeError": 3.641036134717051e-12,
+          "momentRelativeError": 1.8843210824558321e-13,
+          "energyRelativeError": 9.706551962196386e-08
+        }
+      ],
+      "packetSha256": "750c6615e57c90147a7b06ff79054113e0516228b37a47b59d894aacecfa9dd2",
+      "deckSha256": "61642d01757873d5d7f76173e59bebaf4bf4c1bd7498307ee937a44d77233be6",
+      "resultSha256": "ab66e067d8ca505cdf7b52220bb3c8c0e0af5df58523a47e08eff3e0d99d99f3"
+    }
+  ]
+}

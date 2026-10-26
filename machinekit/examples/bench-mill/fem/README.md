@@ -506,3 +506,52 @@ open and 6.376 GN·mm/rad with the ideal bolted plate (2.29×). Refinement chang
 are 0.65% and 0.20%; material-volume error is below 0.005%. Torque and strain
 energy balance pass. The production source stays open; this result does not
 qualify compound properties or bolt-interface slip.
+
+
+## Conditional column-foot corner comparison
+
+The approved source correction changes the two structural inside radii from
+3.2 to 12 mm. Export both cases from the same Small-frame factory:
+
+```sh
+haxeon/scripts/haxeon build --project=machinekit/examples/bench-mill/haxeon.fem.json --compiler-only
+hl machinekit/examples/bench-mill/build/fem-export/host/main.hl --column-foot-corners
+python machinekit/examples/bench-mill/fem/column_foot_corners.py \
+  machinekit/examples/bench-mill/build/fem/column-foot-corners \
+  --ccx /path/to/ccx --output /path/to/corner-study
+```
+
+Use the existing FEM virtual environment, native-library paths and resource
+limits. Both packets retain all source voids and the same four clamp holes.
+The model includes the four source steel sole pads, perfectly bonded, with a
+clamped sole and rigid bolt-head patches. It combines each M12 policy preload
+(39.6 kN) with the frame study's ±500 N top-diaphragm bending cases. Other
+inserts and anchors contribute no stiffness. The assumed cast E = 35 GPa,
+ν = 0.25 and steel E = 210 GPa, ν = 0.30 match the torsion comparison.
+
+The study checks positive Jacobians, material volumes, force/moment/energy
+balance and refinement of first-principal stress at the actual curved faces.
+It reports the mesh change explicitly. The result is conditional continuum
+evidence: compound strength, aggregate-scale effects, contact/slip, shrinkage
+and thermal cycling remain unqualified. The isolated study does not need the
+full-machine motor inertia, which remains a separate source-input hold.
+
+The corner decks explicitly select serial SPOOLES. An `ITERATIVE CHOLESKY`
+trial failed agreement with the same direct-solver deck and is not used.
+The solver-selection parameter is documented in the
+[CalculiX static-analysis manual](https://web.mit.edu/calculix_v2.7/CalculiX/ccx_2.7/doc/ccx/node243.html).
+This isolated comparison does not requalify the historical full-machine
+studies above.
+
+Recorded comparison: [column-foot-corner-comparison.json](column-foot-corner-comparison.json).
+
+| Source radius | Refined peak first-principal stress | Last mesh change |
+| --- | --- | --- |
+| 3.2 mm | 0.882 MPa | 1.5% |
+| 12 mm | 0.566 MPa | 2.9% |
+
+The peak occurs under preload plus the −Y 500 N bending case for both radii.
+The modeled reduction is 36%. Both refinements meet the stated 5% numerical
+tolerance; force/moment/energy checks pass, Jacobians are positive and each
+material-volume error is below 1%. This is conditional elastic evidence,
+not measured compound strength or a fracture/thermal-cycle qualification.

@@ -48,7 +48,8 @@
       "Compression levelling feet with removable post-cure roof plates",
       "Source M6 anchor family and centred M12 lifting plates; 36 x 100 x 30 mm common blank",
       "3 mm base-column gap, four M12 clamps and three fully threaded ISO 4026 M8 jacks; source access and retained roof",
-      "Post-cure bonded D12 x 12 mm hatch inserts in D12.2 x 12 mm receivers"
+      "Post-cure bonded D12 x 12 mm hatch inserts in D12.2 x 12 mm receivers",
+      "Structural 12 mm column-step inside radius, replacing router-derived 3.2 mm (user, 2026-10-26); service-hole positions unchanged"
     ],
     "files": [
       {
@@ -59,9 +60,9 @@
       },
       {
         "id": "mill-column",
-        "stepSha256": "63dd7f694fb470df397fae77d899e36e13aea392947dd69e8713b35e60a08b67",
-        "stepBytes": 2698014,
-        "compressedBytes": 408001
+        "stepSha256": "c7316f83dc5160962503bbac6537710fe812e29d822d47338dd289487e9546af",
+        "stepBytes": 2697458,
+        "compressedBytes": 407912
       }
     ],
     "sourceAlignment": {
@@ -75,6 +76,16 @@
       "formerStandaloneMoldBaseDifferenceMm3": 325228.3959974856,
       "reason": "The standalone mold helper omitted the selected supplier Y drive and its authored clearances. Align mold references with the unchanged Small machine source.",
       "authoring": "Author the selected shaft passage only through the retained web, with explicit feature openings into the Z drive channel and rear motor bay; preserve the existing machine cavity union."
+    },
+    "columnCornerCorrection": {
+      "decision": "Approved source correction (user, 2026-10-26)",
+      "sourceParameter": "MillCastingDetails.columnFootCornerRadiusMm",
+      "beforeMm": 3.2,
+      "afterMm": 12,
+      "reason": "Brittle re-entrant corner under clamp load, shrinkage and thermal cycling; sub-aggregate radius leaves a resin-rich fillet. EPS-forming geometry is independent of the board cutter.",
+      "castingAddedMm3": 14926.67366525739,
+      "castingRemovedMm3": 0.0,
+      "geometryCertificate": "Exact difference is confined to the two 12 mm fillet regions and agrees with the analytic fillet addition; base and all column insert/service-hole positions are unchanged."
     }
   },
   "approvedHobberSimplification": {

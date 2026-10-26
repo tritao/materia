@@ -23,6 +23,55 @@ class FoundationDesignTests {
 		Sys.println(id + " symmetric difference: " + difference);
 	}
 
+	/** Certify that the approved radius adds only the two intended fillets,
+	 * leaving the base and every column service-hole frame unchanged. */
+	static function columnCornerCorrection(frame:BenchMillFrame):Void {
+		var details = new MillCastingDetails();
+		details.columnFootCornerRadiusMm = 3.2;
+		var previous = BenchMillFrame.create(frame.layout, frame.zAxis, frame.xyAxis, details);
+		var scope = new cadkit.modeling.Scope();
+		try {
+			var radius = frame.casting.columnFootCornerRadiusMm;
+			assertions++;
+			if (radius != 12) throw "Approved structural column corner radius must be 12 mm";
+			var before = scope.own(previous.column.body.geometry());
+			var after = scope.own(frame.column.body.geometry());
+			var added = scope.own(after.subtract(before));
+			var removed = scope.own(before.subtract(after));
+			var regions:Array<Part> = [];
+			for (side in [-1, 1]) {
+				var local = scope.own(Part.box(radius, frame.layout.columnDepth, radius));
+				regions.push(scope.own(local.translated(new cadkit.modeling.Vector(
+					side*(frame.layout.columnWidth/2+radius/2), 0,
+					machinekit.milling.MillFrameLayout.COLUMN_FOOT_HEIGHT))));
+			}
+			var outside = scope.own(added.subtractAll(regions));
+			var expected = 2*frame.layout.columnDepth*(1-Math.PI/4)*(radius*radius-3.2*3.2);
+			assertions++;
+			if (removed.volume()>1e-3 || outside.volume()>1e-3 || Math.abs(added.volume()-expected)>1e-3)
+				throw "Column corner correction changes geometry outside the approved fillets";
+			Sys.println("Approved column corner correction adds "+added.volume()+" mm3; removed "+removed.volume()+" mm3");
+			var oldRows:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement> =
+				[for (row in previous.column.insertLocations()) {id:row.id, part:row.part, pose:row.pose}];
+			oldRows = oldRows.concat(previous.column.postCureLocations());
+			var rows:Array<machinekit.structural.MineralFoundation.PostCureInsertPlacement> =
+				[for (row in frame.column.insertLocations()) {id:row.id, part:row.part, pose:row.pose}];
+			rows = rows.concat(frame.column.postCureLocations());
+			for (row in rows) {
+				var old = oldRows.filter(entry -> entry.id==row.id);
+				assertions++;
+				if (old.length!=1 || materia.tooling.ToolingCodec.canonical(old[0].pose)
+					!=materia.tooling.ToolingCodec.canonical(row.pose)
+					|| materia.tooling.ToolingCodec.canonical(old[0].part.insertSpec().holes)
+					!=materia.tooling.ToolingCodec.canonical(row.part.insertSpec().holes))
+					throw "Column corner correction moved an insert or service hole: "+row.id;
+			}
+			same(scope.own(previous.base.body.geometry()), scope.own(frame.base.body.geometry()),
+				"mill-base unchanged by column corner correction");
+			scope.close();
+		} catch (error:Dynamic) {scope.close();throw error;}
+	}
+
 	/** Source pockets meet at declared openings; they never share interior.
 	 * Bounds only discard separated pairs. Profiles use the exact CAD cavity. */
 	static function disjointPockets(source:MineralCasting, id:String):Void {
@@ -249,6 +298,7 @@ class FoundationDesignTests {
 		var cwd = Sys.getCwd(),
 			root = (sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/tests/tooling" : cwd) + "/fixtures/foundation-design";
 		var frame = MillProject.smallFrame();
+		columnCornerCorrection(frame);
 		if(Sys.args().indexOf("--export-approved-mill")>=0) {
 			for(row in [{id:"mill-base",body:frame.base.body},{id:"mill-column",body:frame.column.body}]) {
 				var part=row.body.geometry();

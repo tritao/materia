@@ -4,8 +4,8 @@ import itertools
 import math
 
 
-def principal(matrix):
-    """Jacobi eigensystem of the symmetric part; columns are world directions."""
+def symmetric_eigensystem(matrix):
+    """Unit-neutral Jacobi eigensystem; columns are world directions."""
     a = [[(matrix[i][j] + matrix[j][i]) / 2 for j in range(3)] for i in range(3)]
     vectors = [[float(i == j) for j in range(3)] for i in range(3)]
     for _ in range(60):
@@ -23,8 +23,14 @@ def principal(matrix):
     for j in range(3):
         direction = [vectors[i][j] for i in range(3)]
         sign = 1 if direction[max(range(3), key=lambda i: abs(direction[i]))] >= 0 else -1
-        result.append({"complianceUmPerN": a[j][j], "worldDirection": [sign * x for x in direction]})
-    return sorted(result, key=lambda x: x["complianceUmPerN"], reverse=True)
+        result.append({"value": a[j][j], "worldDirection": [sign * x for x in direction]})
+    return sorted(result, key=lambda x: x["value"], reverse=True)
+
+
+def principal(matrix):
+    """Principal compliance values retain their physical output units."""
+    return [{"complianceUmPerN": mode["value"], "worldDirection": mode["worldDirection"]}
+            for mode in symmetric_eigensystem(matrix)]
 
 
 def reduce(matrix, envelope_n):

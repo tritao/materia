@@ -23,11 +23,9 @@ class MillFemExport {
 		return path;
 	}
 
-	public static function build():{assembly:MachineAssembly, frame:BenchMillFrame} {
-		var reference = new BenchMill(false, false), layout = MillFramePreview.layout(reference);
-		var z = MillFramePreview.zLayout(reference, layout);
-		var xy = new MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
-		var frame = BenchMillFrame.create(layout, z, xy);
+	public static function build(?casting:MillCastingDetails):{assembly:MachineAssembly, frame:BenchMillFrame} {
+		var reference = new BenchMill(false, false);
+		var frame = MillProject.smallFrame(casting);
 		return {assembly:MillFramePreview.concept(reference, frame), frame:frame};
 	}
 
@@ -206,7 +204,61 @@ class MillFemExport {
 		Sys.println("Column torsion packet: "+folder+"/column.json");
 	}
 
+	/** Two explicit source radii; geometry and hole positions use the normal frame
+	 * factory and posed-body exporter. Only this study includes the sole pads so
+	 * clamp preload follows their actual source load path into the clamped sole. */
+	static function columnFootPackets():Void {
+		for (radius in [3.2, new MillCastingDetails().columnFootCornerRadiusMm]) {
+			var details = new MillCastingDetails();
+			details.columnFootCornerRadiusMm = radius;
+			var frame = build(details).frame, layout = frame.layout;
+			var folder = root()+"/"+DIRECTORY+"/build/fem/column-foot-corners/radius-"+radius;
+			ensure(folder);
+			var pads = frame.column.insertLocations().filter(row ->
+				row.part.parameterToken("role") == (materia.casting.InsertSpec.InsertRole.ColumnMount:String));
+			if (pads.length != 4) throw "Column corner study requires the four source sole pads";
+			var padIds = pads.map(row -> row.id);
+			var model = new AssemblyModel("mm");
+			frame.column.addTo(model, "");
+			var state = new AssemblyState(model.definition("column-foot-corners"));
+			state.forwardKinematics();
+			var exported = machinekit.structural.fem.AssemblyFemExport.bodies(frame.column, state, folder,
+				id -> id == "casting" || padIds.indexOf(id) >= 0);
+			var source = exported.parts.filter(part -> part.id == "casting")[0];
+			var clamps:Array<Dynamic> = [];
+			var head = machinekit.standard.SocketHeadCapScrew.catalog().get(details.columnAnchorThread.thread.designation);
+			for (pad in pads) {
+				var holes = pad.part.insertSpec().holes.filter(hole -> hole.thread == null
+					&& Math.abs(hole.diameter-details.columnAnchorThread.clearanceDiameter) < 1e-7);
+				if (holes.length != 1) throw "Expected one source service clearance hole: "+pad.id;
+				var body = exported.parts.filter(part -> part.id == pad.id)[0];
+				var pose:AssemblyFrame = cast body.poseMm;
+				var hole = F.compose(pose, holes[0].frame);
+				clamps.push({memberId:pad.id, holeId:holes[0].id,
+					thread:details.columnAnchorThread.thread.designation,
+					preloadN:machinekit.design.ThreadedHolePolicy.assemblyPreloadN(details.columnAnchorThread.thread),
+					bearingPointMm:{x:hole.x, y:hole.y, z:body.boundsMm.maxZ},
+					patchRadiusMm:head.headDiameter/2});
+			}
+			var packet = {source:source,
+				pads:exported.parts.filter(part -> padIds.indexOf(part.id) >= 0),
+				sourceRevision:StringTools.trim(command(root(), ["rev-parse", "HEAD"])),
+				radiusMm:radius, sourcePoseMm:source.poseMm,
+				stemHalfWidthMm:layout.columnWidth/2,
+				footHeightMm:MillFrameLayout.COLUMN_FOOT_HEIGHT,
+				clamps:clamps,
+				boundary:"sole clamped; bonded source sole pads; rigid bolt-head patches; top diaphragm under the frame-study bending force",
+				limitations:["same assumed elastic material inputs as the column torsion study",
+					"ideal bonded pads and rigid bolt-head patches; no contact, slip, preload scatter or bond qualification",
+					"other cast-in steel and anchors omitted from stiffness; their exact source voids remain",
+					"no shrinkage, thermal-cycle or aggregate-scale/resin-rich-fillet model; conditional continuum comparison only"]};
+			File.saveContent(folder+"/column.json", haxe.Json.stringify(packet, null, "  ")+"\n");
+			Sys.println("Column foot corner packet: "+folder+"/column.json");
+		}
+	}
+
 	public static function main():Void {
+		if (Sys.args().indexOf("--column-foot-corners") >= 0) {columnFootPackets();return;}
 		if(Sys.args().indexOf("--column-torsion")>=0) {columnTorsionPacket();return;}
 		var mill = build(), zLayout:MillZAxisLayout = mill.frame.zAxis;
 		var name = "center", x = 0.0, y = 0.0, z = zLayout.lower / 2;
