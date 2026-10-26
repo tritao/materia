@@ -1,0 +1,42 @@
+{
+  "status": "Conditional local analytic estimate, not qualified mount compliance or braking prediction",
+  "units": "mm/N",
+  "geometry": {
+    "cleatWidthMm": 60,
+    "cleatThicknessMm": 6,
+    "unsupportedArmMm": 20,
+    "receiverSectionMm": [
+      20,
+      22
+    ],
+    "maxAnchorSpanMm": 125,
+    "hostBoltsPerCleat": 2,
+    "receiverBoltsPerCleat": 2,
+    "assumedBolt": "M6, pitch 1",
+    "hostGripMm": 18,
+    "receiverGripMm": 20
+  },
+  "terms": {
+    "receiver-axial": 1.3528138528138528e-06,
+    "cleat-tangential-shear": 6.878306878306879e-07,
+    "two-host-bolts-shear": 6.227302655825082e-06,
+    "two-receiver-bolts-shear": 6.91922517313898e-06,
+    "rack-bolt-shear": 9.410146235469012e-06,
+    "radial-cleat-bending": 1.753537927088215e-06,
+    "radial-host-bolt-uplift": 3.572038302913348e-07,
+    "helix-cleat-bending": 1.4790232728901663e-06
+  },
+  "projectedComplianceMPerN": 2.8187083635347333e-08,
+  "equivalentStiffnessNPerM": 35477242.446819656,
+  "excluded": [
+    "receiver torsion and bending under pressure/helix loads",
+    "rack bore net section and bolt bearing/slip",
+    "cleat prying/contact opening",
+    "host wall/pad bending",
+    "replication compression under actual contact footprint",
+    "section-joint flexibility",
+    "pivot and fork compliance",
+    "full X host geometry"
+  ],
+  "notForStructuralExport": true
+}

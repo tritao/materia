@@ -83,3 +83,58 @@ No optional unmounted overload. Recheck contact load paths and orientation from
 mesh plus declared host face; remove the bounding-box side heuristic. Keep frame
 and braces unchanged. Fabrication release still requires native clearances,
 actual mass/compliance, structural replay, weld checks and commissioning.
+
+
+## Added compliance screen and outstanding prediction — 2026-10-26
+
+The [explicit component calculation](lightweight-compliance-estimate.json) uses
+this proposed receiver, 60 × 40 × 6 mm cleats, a 20 mm unsupported cleat arm,
+two M6 host and two M6 receiver bolts per cleat, assumed 18/20 mm bolt grips and
+125 mm maximum anchor span. With steel E=210 GPa and Poisson ratio 0.3, the
+projected component compliance is **0.02819 µm/N**, equivalent to **35.48 MN/m**.
+It sums receiver axial extension, cleat shear/bending, bolt shear and radial
+bolt uplift under pressure-angle/helical force components. Values are derived
+from the new dimensions; the previous 20.49 MN/m is not reused.
+
+**This is an incomplete component sum, not the mount stiffness.** Receiver
+bending/torsion, drilled net section, bolt bearing/slip, cleat prying, contact
+opening, host wall/pad deformation, replication contact, section joints and
+fork/pivot compliance remain to be resolved. Do not insert 35.48 MN/m in the
+structural model. In particular, a 6 mm cleat and two M6 fasteners are proposed
+geometry, not a demonstrated adequate connection. The moving-mass budget must
+also include the newly explicit four fasteners per cleat before it becomes a
+BOM; the 2 kg hardware allowance is still a budget, not verified coverage.
+
+| Required prediction for this mount | Current evidence |
+|---|---|
+| Nominal executed stop, both beds | Not yet calculated on this mount; prior-model numbers are not transferable |
+| Stop A/J fractions 0.64/0.512 | New executed stop-only histories pending; uniform k=0.8 is not an equivalent history |
+| Stop A/J fractions 0.36/0.216 | New executed stop-only histories pending; uniform k=0.6 is not an equivalent history |
+
+Consequently the present note does **not** establish that this mount alone meets
+0.05 mm, or that the mount plus either requested stop policy meets it. The design
+intent is a lightweight mount plus reduced stop; approval of that direction is
+not a measured or simulated pass. Complete the load path/compliance and explicit
+mass model before presenting numerical predictions for this geometry. Until the
+new exports arrive, any policy calculation must be labelled a counterfactual
+screen and cannot close acceptance. No fabricated interpolation from old mass
+or stiffness results is offered as a prediction.
+
+## One final structural verification, after implementation
+
+After approval and landing the real mount plus all-caller driveRack migration,
+and after the motion session supplies the reduced-stop executed histories,
+perform **one final verification campaign on that final geometry**, closing:
+
+1. **SR5:** braking-following ≤0.05 mm on both beds, reporting the 0.04 mm reserve,
+   geometric contour and physical-rest residual separately.
+2. **SR6:** recompute the dynamic stress envelope from the executed J7 histories,
+   including the changed mount load path, and requalify all affected weld groups
+   at 100 million full-load reversals. Explicitly replace the old J4 W066 result
+   of 13.03 MPa against 12.67 MPa; no reduced-load or improved-detail credit without
+   checking the actual final connection and applicable fatigue category.
+
+Do not run a separate SR6 requalification on the frozen frame. Retain both beds,
+mesh/pose coverage and modal-history provenance, with the approved serial router
+worker/resource limits. SR13/SR16 remain held on OM-R1 plus SR6-C; other hardware
+and workshop gates remain in force. Stop at this note; nothing else is unblocked.

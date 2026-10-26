@@ -202,3 +202,14 @@ Future-run resource decision (2026-10-26): a second shared heavy-run slot is
 allowed for **one sequential router case**. Keep the 3 GB case cap, ≥8 GiB
 available-RAM pre-solve gate, motion-session memory priority and ≥8 GB root floor.
 No additional router concurrency or relaxed memory gate is implied.
+
+
+Final-verification sequencing decision (2026-10-26): after the approved real mount
+and all-caller API migration land, and reduced-stop executed histories arrive,
+run one final geometry campaign for SR5 braking-following ≤0.05 mm on both beds
+and SR6 dynamic weld-envelope requalification with executed J7 histories. Replace
+the old J4 W066 13.03/12.67 MPa comparison using the actual final load path and
+100-million-reversal fatigue criterion. Do not run SR6 separately on the frozen
+frame. The [mount note](../mounting/LIGHTWEIGHT_PROPOSAL.md) identifies the still
+incomplete geometry-compliance and stop-only prediction evidence; it claims no
+new pass. All other router work remains gated pending note approval.
