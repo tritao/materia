@@ -1,0 +1,2422 @@
+{
+  "status": "Frozen-frame reference only; no rack mount or controller acceptance",
+  "historyCount": 186,
+  "meshResponses": 372,
+  "structuralCases": 36,
+  "modeCountPerPose": 40,
+  "cycleTimeReporting": "Excluded",
+  "maximumCaseMemoryPeakBytes": 919220224,
+  "nominalDamping": 0.01,
+  "uncertaintyScreen": {
+    "frequencyPoints": 17,
+    "dampingValues": [
+      0.005,
+      0.01,
+      0.03
+    ],
+    "selectedGoverningHistoriesOnly": false
+  },
+  "governingHistoryRefinement": {
+    "frequencyPoints": 129,
+    "dampingValues": [
+      0.005,
+      0.0075,
+      0.01,
+      0.015,
+      0.02,
+      0.025,
+      0.03
+    ],
+    "selectedGoverningHistoriesOnly": true
+  },
+  "beds": [
+    {
+      "bedMm": 2600,
+      "minFineMeshStaticXYNPerUm": [
+        2.1649433418422324,
+        2.050513622528811
+      ],
+      "worst": {
+        "2600:peakElasticFollowingMm": {
+          "valueMm": 0.05023957611571224,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "2600:finalRestResidualMm": {
+          "valueMm": 0.0046212162177957485,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y2600/p4/exports/2600-arc-hold-stop",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        },
+        "2600:brakingFollowingPeakMm": {
+          "valueMm": 0.05023957611571224,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "2600:brakingYPeakMm": {
+          "valueMm": 0.050196571748442644,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "2600:peakContourErrorMm": {
+          "valueMm": 0.015128367365672274,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y2600/p5/exports/2600-nominal",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 2600.0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        },
+        "2600:movingHandoverPeakMm": {
+          "valueMm": 9.511691034658e-06,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y2600/p8/exports/2600-arc-hold-resume",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 1600.0,
+            "y": 2600.0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        },
+        "2600:residualAfterStopMm": {
+          "valueMm": 0.0046212162177957485,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y2600/p4/exports/2600-arc-hold-stop",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        },
+        "2600:screenedBrakingFollowingMm": {
+          "valueMm": 0.07869884869134976,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase250/y2600/p3/exports/2600-arc-hold-resume",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "2600:physicalRestResidualMm": {
+          "valueMm": 0.004660537198622199,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase250/y2600/p4/exports/2600-arc-hold-stop",
+          "bedMm": 2600,
+          "poseMm": {
+            "x": 800.0,
+            "y": 1300.0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        }
+      }
+    },
+    {
+      "bedMm": 3150,
+      "minFineMeshStaticXYNPerUm": [
+        2.10938924463965,
+        2.0444448071743855
+      ],
+      "worst": {
+        "3150:peakElasticFollowingMm": {
+          "valueMm": 0.06866154307341897,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-resume",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:finalRestResidualMm": {
+          "valueMm": 0.00520824557239722,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-stop",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:brakingFollowingPeakMm": {
+          "valueMm": 0.06866154307341897,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-resume",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:brakingYPeakMm": {
+          "valueMm": 0.0686602979641765,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-resume",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:peakContourErrorMm": {
+          "valueMm": 0.02199982178823813,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y3150/p3/exports/3150-nominal",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:movingHandoverPeakMm": {
+          "valueMm": 0.00024279021131685358,
+          "dataset": "j6-executed-pose-grid",
+          "history": "y3150/p6/exports/3150-nominal",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 1600.0,
+            "y": 0,
+            "z": 200.0
+          },
+          "meshMm": 100
+        },
+        "3150:residualAfterStopMm": {
+          "valueMm": 0.00520824557239722,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-stop",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:screenedBrakingFollowingMm": {
+          "valueMm": 0.09967410371148687,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase500/y3150/p5/exports/3150-arc-hold-resume",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        },
+        "3150:physicalRestResidualMm": {
+          "valueMm": 0.005317923571634577,
+          "dataset": "j6-executed-phase-grid",
+          "history": "phase750/y3150/p5/exports/3150-arc-hold-stop",
+          "bedMm": 3150,
+          "poseMm": {
+            "x": 800.0,
+            "y": 3150.0,
+            "z": 200.0
+          },
+          "meshMm": 50
+        }
+      }
+    }
+  ],
+  "models": [
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1754683141517215,
+        2.6704127881895463
+      ],
+      "memoryPeakBytes": 509009920,
+      "cuttingReciprocityRelativeError": 6.838222068856269e-08,
+      "summarySha256": "c8753808ad70768bc30d6d772b966e7bdfcdf1d9c5400693d555baaf1ba4717b",
+      "solverInputSha256": "05ab7569afd5423420b602a17332ed91cf31656de5cab9a026cc5d0d2673b72d",
+      "firstModeFrequenciesHz": [
+        27.36588,
+        28.26942,
+        29.68953,
+        34.88824,
+        38.62363,
+        42.09988
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.1649627003350105,
+        2.6421161538957874
+      ],
+      "memoryPeakBytes": 853876736,
+      "cuttingReciprocityRelativeError": 1.67423782130854e-08,
+      "summarySha256": "8ddb1cadedecbd37e6b3c86b36a850ab8e9b95735f1b9afaaf60cfbf1be17f85",
+      "solverInputSha256": "5b36e654f516da3a5e2ec6deb350226a4d5a9b538162585d86d581871798c9bf",
+      "firstModeFrequenciesHz": [
+        27.29221,
+        28.06854,
+        29.62766,
+        34.68869,
+        38.47856,
+        42.01063
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.3813345851532977,
+        2.4483201343102725
+      ],
+      "memoryPeakBytes": 481710080,
+      "cuttingReciprocityRelativeError": 1.5542177055303785e-08,
+      "summarySha256": "85d57b553d790676ad8021a3ba8a18f87cc0612901b7095c6d7b956ca31104f4",
+      "solverInputSha256": "a1a3f5248aaa2e4fe22e4e8af1369afa2257fd40576138e9314b7aa012d131a5",
+      "firstModeFrequenciesHz": [
+        26.88042,
+        28.28956,
+        30.03446,
+        34.93087,
+        42.69597,
+        49.32695
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.3660371270185974,
+        2.4190868116944477
+      ],
+      "memoryPeakBytes": 722149376,
+      "cuttingReciprocityRelativeError": 7.058677427455217e-08,
+      "summarySha256": "7666c26bd4dd489b9a0aec2b3af4e82a55f0362fda67af162043fba0edc0a130",
+      "solverInputSha256": "e35fabfa77f47019b363af258246de884c1e8ca3765dd978390b01e0109a461d",
+      "firstModeFrequenciesHz": [
+        26.81601,
+        28.08705,
+        29.98254,
+        34.73089,
+        42.61702,
+        49.22272
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.2213937081881405,
+        2.677050961624413
+      ],
+      "memoryPeakBytes": 501202944,
+      "cuttingReciprocityRelativeError": 4.1466015891086426e-08,
+      "summarySha256": "1131fd61a0d36da3485fa6938067ff09fbdc109e493ac0f0ad320d86b19e11ad",
+      "solverInputSha256": "349b8ec8b0044f72a57f03ec062ff1c7ca0816ed1e52bc5f06713475f5d1ceaa",
+      "firstModeFrequenciesHz": [
+        28.27668,
+        29.3703,
+        29.90256,
+        34.90891,
+        42.51949,
+        43.90327
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 0,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.211890889486853,
+        2.6489316828943155
+      ],
+      "memoryPeakBytes": 859783168,
+      "cuttingReciprocityRelativeError": 3.02291754937668e-08,
+      "summarySha256": "944fc4e094f55f939706ae276137528a9ca6cf56fd6490e79c1a1b7c54020880",
+      "solverInputSha256": "642ee3b02752b6152fcf9769e64d94ea47335529adda7065ed477585e8a9223f",
+      "firstModeFrequenciesHz": [
+        28.07498,
+        29.303,
+        29.84244,
+        34.70895,
+        42.43949,
+        43.78325
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1754612292372237,
+        2.6697530174374005
+      ],
+      "memoryPeakBytes": 499400704,
+      "cuttingReciprocityRelativeError": 2.9731303470287456e-08,
+      "summarySha256": "1d69610838b20a58447cd12beb5bf4dd167ae7db29b3f0781cc714dc931d6ed4",
+      "solverInputSha256": "19665f4b672fb6134c2801b9a2e341e64c18a159ea44d9cc45c3e5aa9aa41090",
+      "firstModeFrequenciesHz": [
+        27.36332,
+        28.27501,
+        30.10009,
+        34.90054,
+        38.89845,
+        41.1798
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.1649433418422324,
+        2.641490866108922
+      ],
+      "memoryPeakBytes": 856207360,
+      "cuttingReciprocityRelativeError": 8.443279031721526e-08,
+      "summarySha256": "8743b1810dba29fe21886cfcac8655b46b561553f1a8c95507f44eb3e37c5551",
+      "solverInputSha256": "eb3e158579c66e1e96cdb4d1e5025ef2ec5b287e2557088c362b5f1bf287ea09",
+      "firstModeFrequenciesHz": [
+        27.28951,
+        28.07331,
+        30.03857,
+        34.70109,
+        38.75397,
+        41.09704
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.3813299729486475,
+        2.447740775244216
+      ],
+      "memoryPeakBytes": 482131968,
+      "cuttingReciprocityRelativeError": 6.331162619501922e-08,
+      "summarySha256": "11410498c93b45d3789efea0743c11eb8692c4232a1adf99cfb61c7f708caead",
+      "solverInputSha256": "ffc37cf154d6524f04428866eb61ea668fe8951ff53dcd4ca71b97dc6e67f12c",
+      "firstModeFrequenciesHz": [
+        26.88074,
+        28.29023,
+        30.45012,
+        34.94682,
+        41.59325,
+        49.7853
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.3660319954090148,
+        2.41855477883839
+      ],
+      "memoryPeakBytes": 720244736,
+      "cuttingReciprocityRelativeError": 7.424608401570968e-08,
+      "summarySha256": "2834b1c837c21a804ba10c1312ad1bd2a92a4770bca497dad159a35cc1dd65f9",
+      "solverInputSha256": "9c5884794340d49ea7923b01bd5027abd15b34850240e9f5481c84f146b2ba56",
+      "firstModeFrequenciesHz": [
+        26.81631,
+        28.08757,
+        30.39814,
+        34.74725,
+        41.51545,
+        49.68257
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.2214067355821574,
+        2.676359940404637
+      ],
+      "memoryPeakBytes": 499613696,
+      "cuttingReciprocityRelativeError": 6.227343549856645e-08,
+      "summarySha256": "0e62712c89bb52ccb497cf45c5a5f3c0548aed8131869f5b70045db8258eb976",
+      "solverInputSha256": "ebfedcd0bb1fff5a0ad13b79e694a3848fc51464ad785bbd09483b6b85c7c385",
+      "firstModeFrequenciesHz": [
+        28.27681,
+        29.47314,
+        30.2158,
+        34.92271,
+        41.38432,
+        44.35629
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 1600,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.211906039912473,
+        2.6482786954714737
+      ],
+      "memoryPeakBytes": 862396416,
+      "cuttingReciprocityRelativeError": 2.0128344969707664e-08,
+      "summarySha256": "4f80082d6246247617e6f20828701d8a7bff8fa0c6f5af7523046d5086745550",
+      "solverInputSha256": "c0853948dff109adeb6bc4b14907aaab381ddcb35d0fce544f4f979fd8452a3a",
+      "firstModeFrequenciesHz": [
+        28.0752,
+        29.40105,
+        30.16002,
+        34.72295,
+        41.30523,
+        44.23483
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.206951333634097,
+        2.2230831241712106
+      ],
+      "memoryPeakBytes": 500662272,
+      "cuttingReciprocityRelativeError": 4.2667725787574375e-08,
+      "summarySha256": "41a5f86224b83be0899c672a5cc244d047c33fd1eef5b06586c9ff587ea0919e",
+      "solverInputSha256": "5947597ea400908279ebc66118b51c05ea2e891e9ff52e03d56a6157ce1b1b2c",
+      "firstModeFrequenciesHz": [
+        27.35472,
+        27.51377,
+        28.30906,
+        34.82021,
+        35.68976,
+        41.48007
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.1966102044585814,
+        2.200566926409129
+      ],
+      "memoryPeakBytes": 852070400,
+      "cuttingReciprocityRelativeError": 3.514576324998024e-08,
+      "summarySha256": "1b17d9316810b84373b812df235a83d709a9f9e56adf6f2fae56415d9ce78489",
+      "solverInputSha256": "4617b81351895ff8349c3ba9d3862339905c5b4019d11a032ad9998e02f871ce",
+      "firstModeFrequenciesHz": [
+        27.28149,
+        27.43884,
+        28.10971,
+        34.62608,
+        35.55403,
+        41.37884
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.413841294263724,
+        2.073695946626716
+      ],
+      "memoryPeakBytes": 480518144,
+      "cuttingReciprocityRelativeError": 2.7507797926300334e-08,
+      "summarySha256": "79a1c9b79ecca3b26350959ec9ccad10b624858e96dfce40018fad4002c54230",
+      "solverInputSha256": "014a785f6c7e143c27325ddbe5a53350356ff56910bbdba8e08e1b861b667524",
+      "firstModeFrequenciesHz": [
+        26.90465,
+        27.87844,
+        28.2961,
+        34.89964,
+        42.72278,
+        43.8053
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 1300,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.3984176775151065,
+        2.050513622528811
+      ],
+      "memoryPeakBytes": 719470592,
+      "cuttingReciprocityRelativeError": 1.9970635707857847e-08,
+      "summarySha256": "a4b8cec5e11ddbfc7f2eb6e1d17852754366422a4af4738cf0804e1680911e57",
+      "solverInputSha256": "679efa155fd2d3f95645d4fd52ae7c92dc5b1ad7432024b0ab54b2b2ee0dddfe",
+      "firstModeFrequenciesHz": [
+        26.84016,
+        27.81379,
+        28.09495,
+        34.69839,
+        42.62663,
+        43.69169
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.2691924725348858,
+        2.2358807630087334
+      ],
+      "memoryPeakBytes": 498712576,
+      "cuttingReciprocityRelativeError": 4.510822360961028e-08,
+      "summarySha256": "9c7bf3062e7bd594fb15bece8fdb1af1f769db719ecd1d1f6b3e9e13a69f9de7",
+      "solverInputSha256": "31f85db955fe3b507b04490d95222db28851305ef48f6681dc93068bf17e146b",
+      "firstModeFrequenciesHz": [
+        27.63947,
+        28.28817,
+        29.60261,
+        34.87239,
+        39.58852,
+        42.40286
+      ]
+    },
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 2600,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.259657175960905,
+        2.213656951845415
+      ],
+      "memoryPeakBytes": 854540288,
+      "cuttingReciprocityRelativeError": 3.3942739937671e-08,
+      "summarySha256": "d9dfee422175dc62b3a06ddc1695ad2261145a96f1db2dcd9171931b0de08a1c",
+      "solverInputSha256": "2b869d7599a77c0803e7cf9b1aed453f1f42420d05b6886ec8d22af284749099",
+      "firstModeFrequenciesHz": [
+        27.57265,
+        28.08807,
+        29.52956,
+        34.67194,
+        39.4731,
+        42.31058
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1196877685220463,
+        2.6638344045243394
+      ],
+      "memoryPeakBytes": 524779520,
+      "cuttingReciprocityRelativeError": 3.4197629325738336e-08,
+      "summarySha256": "6eaef248ede7650759e10ed979d7c1db20cb3c4bf8fc4415c24098fb929fa50d",
+      "solverInputSha256": "ece58a629e2fa44c801344cec1ff28f43f1c9f64802e5dbde4d16555ab0dc334",
+      "firstModeFrequenciesHz": [
+        24.95095,
+        27.93742,
+        29.3339,
+        34.75345,
+        35.05045,
+        36.37406
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.109400439698897,
+        2.6358139142086148
+      ],
+      "memoryPeakBytes": 905977856,
+      "cuttingReciprocityRelativeError": 7.284462851621789e-08,
+      "summarySha256": "ab2a18ce5f2e275a827abf235564ca17057ea95d4ad09c44d387e395c96e9f9e",
+      "solverInputSha256": "9b9be55ce14b552c17ab9908a2d61b853117dd4cb1385aec289ee5e26ce4e6c1",
+      "firstModeFrequenciesHz": [
+        24.88349,
+        27.73999,
+        29.27378,
+        34.55981,
+        34.93934,
+        36.23454
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.3758727273490434,
+        2.4439894521781835
+      ],
+      "memoryPeakBytes": 487768064,
+      "cuttingReciprocityRelativeError": 3.7697180600463543e-08,
+      "summarySha256": "2cc9a81a6759568963798231c616bd8378a3480766e745e4908d25cc77ce7cd2",
+      "solverInputSha256": "766086598212dca2f22392057f44ae2f46aa810cd89377dd525acfbfac737fba",
+      "firstModeFrequenciesHz": [
+        24.14256,
+        27.9494,
+        29.36725,
+        34.85076,
+        38.11159,
+        40.02597
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.360702481162047,
+        2.4148752684564516
+      ],
+      "memoryPeakBytes": 750436352,
+      "cuttingReciprocityRelativeError": 8.341148766502914e-08,
+      "summarySha256": "86d08d765c81155347264a8ab985c94f8409b6b8277878c13dde7c57ec0ee342",
+      "solverInputSha256": "60febbd8ee15914b7c765513705472531353301c709133e0916131673c02b428",
+      "firstModeFrequenciesHz": [
+        24.08225,
+        27.75103,
+        29.31378,
+        34.65189,
+        37.99779,
+        39.9143
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1724499142034355,
+        2.6683803918722333
+      ],
+      "memoryPeakBytes": 527802368,
+      "cuttingReciprocityRelativeError": 2.5272834004943765e-08,
+      "summarySha256": "86f11dcb64dc14b2d4a62871f8387a2c383925e8442325a429a8b56d4227a1b7",
+      "solverInputSha256": "c97e40c71a97d19d53e87f23973909973c3881aad15e6bab660f01a4d5d533e5",
+      "firstModeFrequenciesHz": [
+        26.60609,
+        27.93693,
+        29.00225,
+        34.75182,
+        35.84093,
+        38.52454
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 0,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.163182872667918,
+        2.6403934457666636
+      ],
+      "memoryPeakBytes": 918974464,
+      "cuttingReciprocityRelativeError": 1.7161250790397476e-08,
+      "summarySha256": "e31db0bf2979a57010bc9ade95e1c8311b1215bf4b5102254fda9953b5ad2d13",
+      "solverInputSha256": "60d415d735fc59ac787244330022f9b4ddfa5010f6996c571a14ed27a3e4198b",
+      "firstModeFrequenciesHz": [
+        26.53833,
+        27.73875,
+        28.94784,
+        34.55549,
+        35.72891,
+        38.40642
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1196775093809612,
+        2.6630959608530356
+      ],
+      "memoryPeakBytes": 524939264,
+      "cuttingReciprocityRelativeError": 2.578940969975125e-08,
+      "summarySha256": "466a70a6edf2ecc62b37754c479efbedbfd765c420cb00f06fc219bc739619a0",
+      "solverInputSha256": "9e96169b65bdbe21f65cd503058eea7693fc77464bb8e34b1451aecdfaea0b9a",
+      "firstModeFrequenciesHz": [
+        24.94902,
+        27.94071,
+        29.74594,
+        34.77386,
+        35.0459,
+        36.61198
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.10938924463965,
+        2.6352299359295754
+      ],
+      "memoryPeakBytes": 917364736,
+      "cuttingReciprocityRelativeError": 2.2148587065977606e-08,
+      "summarySha256": "f727325875a226e777cc70e0863caab4276c04abee5b730567dfd06477c65863",
+      "solverInputSha256": "76e1760760d7bd8e6058d80df0eb50c6ee8d562cca7d88b7ceafead95b51fdab",
+      "firstModeFrequenciesHz": [
+        24.88156,
+        27.74263,
+        29.68611,
+        34.57867,
+        34.93615,
+        36.47366
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.375891430504906,
+        2.4434209965647122
+      ],
+      "memoryPeakBytes": 486940672,
+      "cuttingReciprocityRelativeError": 3.099746352805573e-08,
+      "summarySha256": "118a53dea302f4f83df59c4ef0a8bf02499a8da3f8ec47ecd16b2cfb5d08f388",
+      "solverInputSha256": "b4ad728d879812474694ea0f68d1bf5c2812a5fe596ba250c885062c08e1acec",
+      "firstModeFrequenciesHz": [
+        24.14162,
+        27.95064,
+        29.74457,
+        34.86416,
+        38.11976,
+        39.93093
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.360719125722466,
+        2.414333956713556
+      ],
+      "memoryPeakBytes": 748978176,
+      "cuttingReciprocityRelativeError": 7.29462210004851e-08,
+      "summarySha256": "a75ee85a0f3082767f06249590a565ee9191eec5713aff64244f8be9e078bc2f",
+      "solverInputSha256": "8162e29d3dac0fc15f21407d875903e95d1c82cf41abf5d88b0bed3830c0cc87",
+      "firstModeFrequenciesHz": [
+        24.08131,
+        27.75201,
+        29.69089,
+        34.66556,
+        38.00621,
+        39.82866
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.1724280629593693,
+        2.6677419689542794
+      ],
+      "memoryPeakBytes": 527867904,
+      "cuttingReciprocityRelativeError": 5.517967280243925e-08,
+      "summarySha256": "264850bbbe686e733b48a41cc01677bf59b94ef56feeaddfb0728d3910eea6c0",
+      "solverInputSha256": "f003b8016e589593dd7353564b6f9f2047ae8f867d7d7d13196b2761b21b8dee",
+      "firstModeFrequenciesHz": [
+        26.61054,
+        27.93685,
+        29.39667,
+        34.76099,
+        35.83738,
+        38.71374
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 1600,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.1631696457574643,
+        2.639760633749235
+      ],
+      "memoryPeakBytes": 919220224,
+      "cuttingReciprocityRelativeError": 7.42688244811959e-08,
+      "summarySha256": "31fb1da1c61ca56a9a6ca66dde8a59d691fe7aa2aebc3756f409b965a1460cd5",
+      "solverInputSha256": "31101ae352d0769593701f1a58ed4c5cbbaccb0de25f60fa9870da2bfb89970f",
+      "firstModeFrequenciesHz": [
+        26.5428,
+        27.73863,
+        29.34186,
+        34.56456,
+        35.72529,
+        38.59577
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.144561898001102,
+        2.215398993528582
+      ],
+      "memoryPeakBytes": 524238848,
+      "cuttingReciprocityRelativeError": 5.1257888775715995e-08,
+      "summarySha256": "0ae5e033ac9204c7068efe30210c49896d86691b32b65e3c2acf51422fd1bb9f",
+      "solverInputSha256": "eb4f357393c54d35509efdd16576f46bf20706eb662870db27b03eea1bfb4980",
+      "firstModeFrequenciesHz": [
+        24.92748,
+        27.24202,
+        27.97409,
+        33.86542,
+        34.87405,
+        34.99222
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.1344735421577545,
+        2.1930893855998814
+      ],
+      "memoryPeakBytes": 909656064,
+      "cuttingReciprocityRelativeError": 4.268947084614145e-08,
+      "summarySha256": "a9f65ca2d44619a50fcf5be886b2a1acaa2a639e06d6a8eded235ef03c1b94de",
+      "solverInputSha256": "0a474b61ef9bd74cc5dc4ce3bee6ad7b168f6a7f248286b0036a20f6389720a8",
+      "firstModeFrequenciesHz": [
+        24.86061,
+        27.16831,
+        27.77876,
+        33.73964,
+        34.67782,
+        34.88352
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.4035180389677087,
+        2.0674639823137007
+      ],
+      "memoryPeakBytes": 486346752,
+      "cuttingReciprocityRelativeError": 6.763157096608738e-08,
+      "summarySha256": "c261e2049a21284aca29a4c88642d16e148b44a83ccb18c180103db417f63ed8",
+      "solverInputSha256": "7db0f0102ed38f80f8126fd7843a3663bfd2bac8afe4c9dd1df6dfdccd4c2699",
+      "firstModeFrequenciesHz": [
+        24.14706,
+        27.34751,
+        27.96418,
+        34.81932,
+        38.10424,
+        40.37478
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 1575,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.3883165084927103,
+        2.0444448071743855
+      ],
+      "memoryPeakBytes": 746225664,
+      "cuttingReciprocityRelativeError": 8.654134867216171e-08,
+      "summarySha256": "1b5379b1a859d7b79763a090f32c4a8d1e4fdd3285178eee8dd33ea47bd40208",
+      "solverInputSha256": "0836ff136ec3a64503893f9d99aa83133d2f912b34bf9e26e47b79b041cd485b",
+      "firstModeFrequenciesHz": [
+        24.08686,
+        27.28318,
+        27.76719,
+        34.61953,
+        37.99207,
+        40.25335
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 100,
+      "xyStiffnessNPerUm": [
+        2.228019479396067,
+        2.224441616498306
+      ],
+      "memoryPeakBytes": 528519168,
+      "cuttingReciprocityRelativeError": 6.732643290017646e-08,
+      "summarySha256": "8df8dfae6920db9c43d0517a2d1a451593c649f4142584df52c22de57fd8095e",
+      "solverInputSha256": "192e56c46cb590a5677e9edaf9a550c17e47aad60418d7b07ddfbbd0c4fd927c",
+      "firstModeFrequenciesHz": [
+        26.65724,
+        27.03722,
+        27.93597,
+        34.65093,
+        35.92851,
+        36.36681
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 50,
+      "xyStiffnessNPerUm": [
+        2.218640399857572,
+        2.2023508660002253
+      ],
+      "memoryPeakBytes": 915308544,
+      "cuttingReciprocityRelativeError": 9.110391412016942e-08,
+      "summarySha256": "b04cebe0987b7ecd3a81bda7104f7b22f618e8707e33f46ccd76020cea78480d",
+      "solverInputSha256": "55cb024a040b7178f2028bd991c62fdb212b94e35ef106a81dddd9555e9e6370",
+      "firstModeFrequenciesHz": [
+        26.58972,
+        26.97321,
+        27.73816,
+        34.46212,
+        35.81609,
+        36.24913
+      ]
+    }
+  ],
+  "evidence": {
+    "archive": "build/sheet-router-evidence/j6-frozen-20261026.tar.gz",
+    "bytes": 2623008,
+    "sha256": "8d53472419cfa55475607d1e9c81cfe8b48e240dc6376c6deb363ba8078de90f",
+    "baseCommit": "0c6f922e739c74376c28c1663e95dd1e56224f36",
+    "verifiedFiles": [
+      {
+        "path": "build/sheet-router-j6/after_baseline.py",
+        "sha256": "6ce8bb3923d0488708982baa0f19b91ec2402c5c4e49dc6a8ae4fc842c743c35",
+        "bytes": 788
+      },
+      {
+        "path": "build/sheet-router-j6/baseline-progress.log",
+        "sha256": "b63789425ef162a9b7a629c4e0a05fd362f069a7dda3c55c3918d738b7eeb1ba",
+        "bytes": 2683
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y0-h100.log",
+        "sha256": "5b81d743e74484a0967d973fb139171806d320d3be23c17c864f668ed848f91d",
+        "bytes": 483
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y0-h50.log",
+        "sha256": "6e94c1b857d3d09ec9b997a13e8a77aff3e8ffea6fdb49a03b07a1bd866f9b05",
+        "bytes": 482
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y1300-h100.log",
+        "sha256": "b48fa9a1d2dc7475fbab672979dc46ad64c27c1a77c2b6023a45b43534d5b233",
+        "bytes": 491
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y1300-h50.log",
+        "sha256": "07b9e9f7c7e19ebfce5fdfbdc8a690a4602554a161c67d94f7b4657d2c2c1d73",
+        "bytes": 490
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y2600-h100.log",
+        "sha256": "4451b741b6f9bbc57839c6eec97373eb88ef41421d8b19e0d7eca396fc8a279f",
+        "bytes": 487
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x0-y2600-h50.log",
+        "sha256": "b74f382c9afdc7124ebdcd7907806a0b87fa83d004a4bf63be31b2dcc358ec60",
+        "bytes": 487
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y0-h100.log",
+        "sha256": "ada4e5388fb553183871bd8037b70dc97f2493e5dfcc1d713d96a0d2a8895642",
+        "bytes": 489
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y0-h50.log",
+        "sha256": "2ab07c5126aea4e4d3af73ad8170c230d0be08c1c77facf25165f0db8ddb88ba",
+        "bytes": 487
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y1300-h100.log",
+        "sha256": "2705e9865e79ba48b5fda931ec9ef7b507ef602d3049e84965c12ebed069f213",
+        "bytes": 496
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y1300-h50.log",
+        "sha256": "8c04ee5589db6de4871dd54b27e2273a8ff3e0270933c802f05ef29ca6eb3ee2",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y2600-h100.log",
+        "sha256": "df3b64bcb9b0f408431a4eb9a8f6d749009cac2a50d5ed543cf28f48cfd54bd9",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x1600-y2600-h50.log",
+        "sha256": "acd963f00ee52d67ee62f0722c459b8eda1528dbd9c4ca42d3805ad48f3d86e3",
+        "bytes": 492
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y0-h100.log",
+        "sha256": "8933b50e86356e788a2bf3eb6561187307b7d77b9fb1cd8f453b93f6367b69a9",
+        "bytes": 486
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y0-h50.log",
+        "sha256": "dae5e4a7cbdcbcf3d55bf6d46daa0066567b463262d67cab5eadcc4c5b30ea0f",
+        "bytes": 485
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y1300-h100.log",
+        "sha256": "5c59de1440dc84ebb07cbe8424ccd76103099170736299008a7abf97890e8366",
+        "bytes": 493
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y1300-h50.log",
+        "sha256": "8cf6fc316b46c147b0b424ded1b173ecdde42090aa95827d5a3b0ccfff075d11",
+        "bytes": 493
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y2600-h100.log",
+        "sha256": "a9b86d21d5c3b3273b0fdec865f6184df3273f4e5d709b2bc28b1c9ee510554e",
+        "bytes": 493
+      },
+      {
+        "path": "build/sheet-router-j6/case-y2600-x800-y2600-h50.log",
+        "sha256": "a5c139fe8a2403fff021c19fc34ba09b0985d92e38197da8da284c61acacdc23",
+        "bytes": 490
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y0-h100.log",
+        "sha256": "f66095dd48e732a93e9246265141630faf936c8f0cb79682004fccf09b3db22e",
+        "bytes": 483
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y0-h50.log",
+        "sha256": "3347d0526b90cf31c7d08086f4511e4f7c495ecd438748b3f357dec7df59ec69",
+        "bytes": 480
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y1575-h100.log",
+        "sha256": "2b2b4c49f1f23fea62374e09217c84b4674ffa88b81c1a0953f131183253470e",
+        "bytes": 491
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y1575-h50.log",
+        "sha256": "debc020e169928bde14b033521ddc2520b538b2482d427ac052b05daa45e28f3",
+        "bytes": 488
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y3150-h100.log",
+        "sha256": "10c3700bb28c5dcec51bdb2a588f50bc222a691eb2848edf418a6d15488871c6",
+        "bytes": 489
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x0-y3150-h50.log",
+        "sha256": "a22eaef14cf257f8d9574f191dda7e630bbf31a7ca5d4cf1fdcdf1825be39954",
+        "bytes": 486
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y0-h100.log",
+        "sha256": "11d4aef3834a3b56146b070c395d27b99c32ed5da4ef003a9027dd913d894160",
+        "bytes": 489
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y0-h50.log",
+        "sha256": "a3d647e90e04147e188736692f401cec458e61138ec83c4d8bb0d747cf1f38c5",
+        "bytes": 485
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y1575-h100.log",
+        "sha256": "91fd8f4ed154a1ac9a7b753248c1ea9abf16e6579ebe735005fae56109768bb6",
+        "bytes": 495
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y1575-h50.log",
+        "sha256": "eebbf99b96b6b682ae4a2f65e3404258917987ed45deba0622f9c28b6254a5b9",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y3150-h100.log",
+        "sha256": "f47ffce9be3e2a945d407ea5cf973786aa30f1db3d8347683255bb22115fa56e",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x1600-y3150-h50.log",
+        "sha256": "9f41700a35373edcc70c228d790b99d374eb14c8a481650d49e3602ed4d5045a",
+        "bytes": 492
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y0-h100.log",
+        "sha256": "a67e926cf4ffeab3b543c9096f3a1f973e9e4f227f5ffa62e4f531ddb36f2d69",
+        "bytes": 484
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y0-h50.log",
+        "sha256": "aae85acc4d82383122b1068421402caa5b76bbb719696f97cb236ac2ae462662",
+        "bytes": 486
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y1575-h100.log",
+        "sha256": "59dff4457786dd29999cc36d796c2e18079752c90569cdd45a3d36d3db3d7f7d",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y1575-h50.log",
+        "sha256": "9a3489cbd458a16219a91bc6341acc38bdeea9d4cb67ad3edf4056f1b39f8a13",
+        "bytes": 494
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y3150-h100.log",
+        "sha256": "d79b912d1ba7f7eb203f8a0d72b2de10ff18ca191b807e52e493420b0de18b46",
+        "bytes": 490
+      },
+      {
+        "path": "build/sheet-router-j6/case-y3150-x800-y3150-h50.log",
+        "sha256": "1b370337676a26d4f039c2ff338b0cbb2183158f4773e09d4010fc8d155d84fc",
+        "bytes": 490
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/index-y2600.json",
+        "sha256": "e43d891bcf9f084e2d4ef35f48fed281d6ec4786d74a5f358cdcadf883aa38e6",
+        "bytes": 600
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/index-y3150.json",
+        "sha256": "d84e4f059fb439d3c2db5a46acc810f7d0a00cf079e1c12e5c5e52d5bc4f05b3",
+        "bytes": 600
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/changes.json",
+        "sha256": "b548e59f7a1e816e33d06ea98e090a31b0b89576b0e4c039f1305e7f4e7bfb66",
+        "bytes": 156
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/packet.json",
+        "sha256": "58f35fba91bf75ba64cce6e6cd94b2edb95c6fb53c3aa388feaa8ad4e052af82",
+        "bytes": 224551
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y0-h100/summary.json",
+        "sha256": "c8753808ad70768bc30d6d772b966e7bdfcdf1d9c5400693d555baaf1ba4717b",
+        "bytes": 219168
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y0-h50/summary.json",
+        "sha256": "8ddb1cadedecbd37e6b3c86b36a850ab8e9b95735f1b9afaaf60cfbf1be17f85",
+        "bytes": 219388
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y1300-h100/summary.json",
+        "sha256": "85d57b553d790676ad8021a3ba8a18f87cc0612901b7095c6d7b956ca31104f4",
+        "bytes": 219476
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y1300-h50/summary.json",
+        "sha256": "7666c26bd4dd489b9a0aec2b3af4e82a55f0362fda67af162043fba0edc0a130",
+        "bytes": 219649
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y2600-h100/summary.json",
+        "sha256": "1131fd61a0d36da3485fa6938067ff09fbdc109e493ac0f0ad320d86b19e11ad",
+        "bytes": 219332
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x0-y2600-h50/summary.json",
+        "sha256": "944fc4e094f55f939706ae276137528a9ca6cf56fd6490e79c1a1b7c54020880",
+        "bytes": 219367
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y0-h100/summary.json",
+        "sha256": "1d69610838b20a58447cd12beb5bf4dd167ae7db29b3f0781cc714dc931d6ed4",
+        "bytes": 218036
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y0-h50/summary.json",
+        "sha256": "8743b1810dba29fe21886cfcac8655b46b561553f1a8c95507f44eb3e37c5551",
+        "bytes": 217964
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y1300-h100/summary.json",
+        "sha256": "11410498c93b45d3789efea0743c11eb8692c4232a1adf99cfb61c7f708caead",
+        "bytes": 218022
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y1300-h50/summary.json",
+        "sha256": "2834b1c837c21a804ba10c1312ad1bd2a92a4770bca497dad159a35cc1dd65f9",
+        "bytes": 218027
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y2600-h100/summary.json",
+        "sha256": "0e62712c89bb52ccb497cf45c5a5f3c0548aed8131869f5b70045db8258eb976",
+        "bytes": 217658
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x1600-y2600-h50/summary.json",
+        "sha256": "4f80082d6246247617e6f20828701d8a7bff8fa0c6f5af7523046d5086745550",
+        "bytes": 218108
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y0-h100/summary.json",
+        "sha256": "41a5f86224b83be0899c672a5cc244d047c33fd1eef5b06586c9ff587ea0919e",
+        "bytes": 217972
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y0-h50/summary.json",
+        "sha256": "1b17d9316810b84373b812df235a83d709a9f9e56adf6f2fae56415d9ce78489",
+        "bytes": 218082
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y1300-h100/summary.json",
+        "sha256": "79a1c9b79ecca3b26350959ec9ccad10b624858e96dfce40018fad4002c54230",
+        "bytes": 218195
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y1300-h50/summary.json",
+        "sha256": "a4b8cec5e11ddbfc7f2eb6e1d17852754366422a4af4738cf0804e1680911e57",
+        "bytes": 218141
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y2600-h100/summary.json",
+        "sha256": "9c7bf3062e7bd594fb15bece8fdb1af1f769db719ecd1d1f6b3e9e13a69f9de7",
+        "bytes": 217959
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y2600/baseline/x800-y2600-h50/summary.json",
+        "sha256": "d9dfee422175dc62b3a06ddc1695ad2261145a96f1db2dcd9171931b0de08a1c",
+        "bytes": 218151
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/changes.json",
+        "sha256": "b548e59f7a1e816e33d06ea98e090a31b0b89576b0e4c039f1305e7f4e7bfb66",
+        "bytes": 156
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/packet.json",
+        "sha256": "554831d191f00e0cdae143a74490e15e20a1f2cdf3dcd400412bbe3d91964995",
+        "bytes": 223868
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y0-h100/summary.json",
+        "sha256": "6eaef248ede7650759e10ed979d7c1db20cb3c4bf8fc4415c24098fb929fa50d",
+        "bytes": 219303
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y0-h50/summary.json",
+        "sha256": "ab2a18ce5f2e275a827abf235564ca17057ea95d4ad09c44d387e395c96e9f9e",
+        "bytes": 219333
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y1575-h100/summary.json",
+        "sha256": "2cc9a81a6759568963798231c616bd8378a3480766e745e4908d25cc77ce7cd2",
+        "bytes": 219400
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y1575-h50/summary.json",
+        "sha256": "86d08d765c81155347264a8ab985c94f8409b6b8277878c13dde7c57ec0ee342",
+        "bytes": 219376
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y3150-h100/summary.json",
+        "sha256": "86f11dcb64dc14b2d4a62871f8387a2c383925e8442325a429a8b56d4227a1b7",
+        "bytes": 219279
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x0-y3150-h50/summary.json",
+        "sha256": "e31db0bf2979a57010bc9ade95e1c8311b1215bf4b5102254fda9953b5ad2d13",
+        "bytes": 219182
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y0-h100/summary.json",
+        "sha256": "466a70a6edf2ecc62b37754c479efbedbfd765c420cb00f06fc219bc739619a0",
+        "bytes": 217641
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y0-h50/summary.json",
+        "sha256": "f727325875a226e777cc70e0863caab4276c04abee5b730567dfd06477c65863",
+        "bytes": 217948
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y1575-h100/summary.json",
+        "sha256": "118a53dea302f4f83df59c4ef0a8bf02499a8da3f8ec47ecd16b2cfb5d08f388",
+        "bytes": 217923
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y1575-h50/summary.json",
+        "sha256": "a75ee85a0f3082767f06249590a565ee9191eec5713aff64244f8be9e078bc2f",
+        "bytes": 217889
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y3150-h100/summary.json",
+        "sha256": "264850bbbe686e733b48a41cc01677bf59b94ef56feeaddfb0728d3910eea6c0",
+        "bytes": 217725
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x1600-y3150-h50/summary.json",
+        "sha256": "31fb1da1c61ca56a9a6ca66dde8a59d691fe7aa2aebc3756f409b965a1460cd5",
+        "bytes": 217882
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y0-h100/summary.json",
+        "sha256": "0ae5e033ac9204c7068efe30210c49896d86691b32b65e3c2acf51422fd1bb9f",
+        "bytes": 218190
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y0-h50/summary.json",
+        "sha256": "a9f65ca2d44619a50fcf5be886b2a1acaa2a639e06d6a8eded235ef03c1b94de",
+        "bytes": 218278
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y1575-h100/summary.json",
+        "sha256": "c261e2049a21284aca29a4c88642d16e148b44a83ccb18c180103db417f63ed8",
+        "bytes": 218343
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y1575-h50/summary.json",
+        "sha256": "1b5379b1a859d7b79763a090f32c4a8d1e4fdd3285178eee8dd33ea47bd40208",
+        "bytes": 218293
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y3150-h100/summary.json",
+        "sha256": "8df8dfae6920db9c43d0517a2d1a451593c649f4142584df52c22de57fd8095e",
+        "bytes": 217913
+      },
+      {
+        "path": "build/sheet-router-j6/frozen/y3150/baseline/x800-y3150-h50/summary.json",
+        "sha256": "b04cebe0987b7ecd3a81bda7104f7b22f618e8707e33f46ccd76020cea78480d",
+        "bytes": 218028
+      },
+      {
+        "path": "build/sheet-router-j6/frozen-refined.json",
+        "sha256": "46081191a33f5e2ee3218de4964e9f088ba670d70994340c50b0c58890841d39",
+        "bytes": 11345
+      },
+      {
+        "path": "build/sheet-router-j6/frozen-response.json",
+        "sha256": "58b59970d60232db8975e8c6c2665b5285fffc9070a5a2ab095300ccd6c64b6a",
+        "bytes": 299932
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/fabrication/y2600/native.json",
+        "sha256": "81cb133104cb8bfe7270ea4047bd78768ab276575feaa93c9c7ea7e99a049d42",
+        "bytes": 689968
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/fabrication/y2600/weld-stitches.csv",
+        "sha256": "6c5bb23aa719558930d7a414690d428fb70915a3b94ebd92d84bfd5417064648",
+        "bytes": 196571
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/fabrication/y3150/native.json",
+        "sha256": "6203f41c32ab6281b8b931017133ac0278833ce6d6642c639316c0b5cb6914f5",
+        "bytes": 658868
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/fabrication/y3150/weld-stitches.csv",
+        "sha256": "7dd7c68196e47ded72a61c7c30acc1c3530f06a60ba10460d2860b19544c8bed",
+        "bytes": 175986
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/packets/y2600/manifest.json",
+        "sha256": "c4b0c4d674788a41ebfe5fa6febede29992aa9b34f316150b18c7c43dfffd0ec",
+        "bytes": 329756
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/packets/y3150/manifest.json",
+        "sha256": "eb1a8771a39b174fec586b53c021fcb56f3169d546f8378df4a10dd1eb5565de",
+        "bytes": 329073
+      },
+      {
+        "path": "build/sheet-router-j6/inputs/provenance.json",
+        "sha256": "1fe71c0c226b37fff99446d15a00795c4433ac6d10aa9a201a1c92f09cc41833",
+        "bytes": 995
+      },
+      {
+        "path": "build/sheet-router-j6/run_baseline.py",
+        "sha256": "fd478e0cdeb8cfdf47fed3871ac0566e377c8080be2d5a34663e9256a4bdd52e",
+        "bytes": 1357
+      },
+      {
+        "path": "build/sheet-router-work/j6-verified-20261026.json",
+        "sha256": "895b146f4928b8f101300edfa89cd2ef12c855473ba3c1fec1196371714e1167",
+        "bytes": 159750
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/ccx_deck.py",
+        "sha256": "a5fc21e0dd0c51a252f8965e139401ed344e5d0137b974e101ace6f154cb6840",
+        "bytes": 3227
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/column_torsion.py",
+        "sha256": "c4362704df11ae4469d88f5508988987282ef2447533902fc1eed48cffde8386",
+        "bytes": 10900
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/compliance.py",
+        "sha256": "4e25b65415df5851b5502b6d34f372ecb73cd64afb73ebb5882c39e0cb9c5884",
+        "bytes": 2388
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/compliance_budget.py",
+        "sha256": "1ce8a4003a48a41219ec113d6c1f16493ddf9f577bfc67daaa07403bda345377",
+        "bytes": 9454
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/excitation_context.py",
+        "sha256": "5c2fcd00ec8f0e6de20357e1705489022a157f59024d7eb71c3e78351c73b1fd",
+        "bytes": 4586
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/frame_mesh.py",
+        "sha256": "cc48afa80cebd97f1341b3655b2107e25525954f795e34e08d2e9f86889281d2",
+        "bytes": 9540
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/frame_solver.py",
+        "sha256": "d4facf76391946014b452c94f18790a8cd5df34a5d40e2cca8290a5c397cf596",
+        "bytes": 19897
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/independent_static.py",
+        "sha256": "f29384049c9c900ef8e9082135fa1a8a43aaa6e4cdc38f8afe8aff016e2548de",
+        "bytes": 2200
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/leveling.py",
+        "sha256": "e2568c6d976be77e44e203848a9618b05012dfc1bb02a985be0f4da05035a1f0",
+        "bytes": 2925
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/leveling_fixture.py",
+        "sha256": "2c2202982917daee2a1abcd98abe18f7ee6198b34fa02c71b94d135ca7eedaa7",
+        "bytes": 2223
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/mesh_cache.py",
+        "sha256": "47e2ecd6c10b95fe31912368e8ae7001e4b3ce0fcd0d701e50b0032719dc82ff",
+        "bytes": 2088
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/mesh_pilot.py",
+        "sha256": "7119b70c3d96dd343e5791e80783e63bca5d23a60f1dfe03f6fe577db2c25597",
+        "bytes": 4931
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/mesh_resolution.py",
+        "sha256": "554098390d3d7e523457a5352a3eddfbe3f179ff94a2d01eba47cd7c983ed049",
+        "bytes": 5704
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/modal_fixture.py",
+        "sha256": "f6c0f8acc7620126c34d18212424855283c0dc89082c06dab18c66851f5e1c69",
+        "bytes": 2958
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/modal_mass.py",
+        "sha256": "f22ae3ae4c804757953335c39fedd778d7f5137159ef5dd112075dca22d7cdb5",
+        "bytes": 2761
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/modal_motion.py",
+        "sha256": "1461d61ad81cc71c43a20bbfc17d0f48cbee2bedcfc76be38415791fc612a37c",
+        "bytes": 8237
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/modal_solid_fixture.py",
+        "sha256": "af6d00f44451d818705ed94a13ae1844508afd38b1f345baa33f2a4ffa413557",
+        "bytes": 4746
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/modal_study.py",
+        "sha256": "0d3f8bc6dfd1205314d9cad5e8620551e32f2d4899c132b2d6435b813af11425",
+        "bytes": 17645
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/packet.py",
+        "sha256": "d6e7f8b441bf15465907d1768024e342c443fca0215e53c62cc09f146263fd96",
+        "bytes": 9823
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/pose_sweep.py",
+        "sha256": "38a761c64fe1d507ed6bc04738ffd2fcce19d82f3d6f11a1a1a6e032589819ea",
+        "bytes": 3956
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/provenance.py",
+        "sha256": "4eff3bd846a4e0874c0a8658725d3e9fabfeba06c684e7b1bbb99a141e3430bd",
+        "bytes": 5093
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/resource_guard.py",
+        "sha256": "f3fb477b23e330ca38989e452340fa355b14ace68010bc481bc4640d4d2f0bcb",
+        "bytes": 4183
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/solver_fixtures.py",
+        "sha256": "2adc533f6fb04ace3d317c57beb9ac1d75e6b21feda85f728e0e1493a3245121",
+        "bytes": 10084
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/spring_fixture.py",
+        "sha256": "8f97fdfc581e858f214b3b11ed4e55c83b3e9505f83c51a3715559876b5d2b8f",
+        "bytes": 1988
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/static_study.py",
+        "sha256": "3879b0753bb8f37b61a6e78fd8e072edbfa1f55e74858eeac9b07ef7adc2ead2",
+        "bytes": 21461
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/sweep_report.py",
+        "sha256": "829c8d408d08f15cbd63549cf490fbf6c1538590b107c6e1ee90c13c212ab655",
+        "bytes": 15059
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_compliance.py",
+        "sha256": "49200294f2a21879d7f289af9557f0d06d6a24e19677141b4aad2f73ab93d52a",
+        "bytes": 3144
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_fem.py",
+        "sha256": "bb9736a9214b7817b3dd7f5e6da218f233542d64b62ce0e49a1509438965be53",
+        "bytes": 4940
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_independent_static.py",
+        "sha256": "1a3e25eebd4384ef84a95dad7804c3ab3a6b758c5acc52e888ff43b4d1561732",
+        "bytes": 823
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_leveling.py",
+        "sha256": "f0a6a45602d6e33040a7ab16ad26b888dac1cc46a8a0f1a7360bd6d07f0744fc",
+        "bytes": 1927
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_mesh_cache.py",
+        "sha256": "63782c870e92241bafbff85f887483aebc9add640c9581fa82d75a9c50811cdf",
+        "bytes": 1737
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_modal_mass.py",
+        "sha256": "f19607e5240fcdea82e0ecca444dbddd49c688cb6f49a682cface637e1001510",
+        "bytes": 1830
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_modal_motion.py",
+        "sha256": "1d5957a27c29dc42d898d3b983998c7397c91c377d6093ff39907cc43e5bbdae",
+        "bytes": 2390
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_pose_sweep.py",
+        "sha256": "4bd03f6963ca11083e1a1845c95775d5068c25a23cc422049b7ee2686520bce6",
+        "bytes": 849
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_resource_guard.py",
+        "sha256": "4e5e963ab97b3e97349d72da96d120e39e9e2d7300bd488485f3e12b9f372f23",
+        "bytes": 3198
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/test_tool_cases.py",
+        "sha256": "22246cd2a98a6d85fd1c18295fcb387a3d223003c993c79e4dc62bdc90d2af40",
+        "bytes": 3372
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/tet_fixture.py",
+        "sha256": "db5665d50b1aa0ff7def788d7306fe42c93001ac5b484c3e54b04eeac6556d8d",
+        "bytes": 4819
+      },
+      {
+        "path": "machinekit/examples/bench-mill/fem/tool_cases.py",
+        "sha256": "8a7f5a795de2777ffe47d58df9eacf585341a2ed9c001640b62be63d68bb8aaa",
+        "bytes": 6116
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/acceptance.py",
+        "sha256": "31c373d8c2a395a892392e0102ce365f9c49fa9eca125b862aebd66ea0f57233",
+        "bytes": 2799
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/architecture.py",
+        "sha256": "0d5371fe3ddd621f7215811dde51b2aecd23bc6488494a2b22cd63c296d8c198",
+        "bytes": 8503
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/brace_checks.py",
+        "sha256": "2add101776481e9d85546f9e8b6ffb5c94f0538f3600d69b07e0725f69a9a46b",
+        "bytes": 2894
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/brace_macro.py",
+        "sha256": "7aac510034de0b8f0f787a7a770a2ba16b43895cb5c9c7d396b6d05ebe88d606",
+        "bytes": 7316
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/brace_motion.py",
+        "sha256": "e93881718d66e496d1497d847477dbfe7df462721a6ffcce7b3eb292bb83e3b3",
+        "bytes": 10852
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/brace_report.py",
+        "sha256": "a25e6a2ce87e09a18b16f9c8eb1d71aa5ce7630bcadb09a4eaac722a16ccfab4",
+        "bytes": 7836
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/brace_study.py",
+        "sha256": "9409bc328f75a9c91fe0a428e4121e0fd32f27a2bc8a4c751617ee16bc5f603b",
+        "bytes": 14123
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/compare.py",
+        "sha256": "c97446d9e4fcba5387ca9d1071494e9bac9a56bb1bab1bf4c85b85bb2d2955a7",
+        "bytes": 1443
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/control_export_audit.py",
+        "sha256": "d8130655e2ade2c34b826c9706709b1828b2334680201be7c4dd726c2b4c0054",
+        "bytes": 4150
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/diagnose.py",
+        "sha256": "622b078af2c99013c448d22ea8e7b783c87b4f91d24858594107eac141287665",
+        "bytes": 8667
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/diy_feet.py",
+        "sha256": "d049195668f454ae4608d5b74f99c5bf0e4a73a64d173e9323096e732770289f",
+        "bytes": 1970
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/drive_options_prepare.py",
+        "sha256": "923babb04e24f92668e911a1c1f0d48ad4c615a03f1c4b8ec1147d5980208918",
+        "bytes": 4729
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/dynamic_error.py",
+        "sha256": "47ad38d2be3d5b51307b7366f2295123f4c9ab83514c471dafcb0b8dd608f2ed",
+        "bytes": 11488
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/envelope_audit.py",
+        "sha256": "9e170c7a71bd1a163d2f151384a07abc74c48bbc3f71040e6fe0a70a8e3b5b07",
+        "bytes": 5201
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/executed_rerun.py",
+        "sha256": "32b09fc5c5c55f083a25369891c1fb1ae81d2a1a6e512c949cde01ba1dab9ae6",
+        "bytes": 13543
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/extended_modes.py",
+        "sha256": "7a6d780aead2ec9eacfee9e660a755c7ba9d93928968c99c823b002fe88501d9",
+        "bytes": 2523
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/front_guides.py",
+        "sha256": "5dac4f765e6ae209e5729eb4521c36b4d45d924ac2bb2086b594da5e832a9134",
+        "bytes": 6883
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/j6_response.py",
+        "sha256": "377e6202cf4dbcd0b38830ea83ac78b7a57072fa94e5c91843a4e3f243540d6c",
+        "bytes": 10311
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/j6_structural_case.py",
+        "sha256": "4d51196796559bb78e08f5d5ccd15364b6d18bd27258246d342db0596b25864f",
+        "bytes": 5664
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/modes.py",
+        "sha256": "1bb03d226040ad4142267c3acb77866b9d46f3832f8b55cf01c494be49181a23",
+        "bytes": 5918
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/mount_clearance_plan.py",
+        "sha256": "9486f0be3c70a3f138ed6758517f5177404eb818ffdfaeb8f478a0b7bf9c50db",
+        "bytes": 8401
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/mount_compliance.py",
+        "sha256": "c279b71482af8c54b9b47c65e32cf01f6d5c7f7fa598fd729620201b02bc606f",
+        "bytes": 14314
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/plot_dynamic.py",
+        "sha256": "f5c7e7ebaa87f305a49ebded83dada5a3c3ac5c21222c7bdd075b261fff2cfd0",
+        "bytes": 2248
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/qualify_welds.py",
+        "sha256": "d411defc1a955c10b9e2734d2ad93c8e1dc1479ec875d943286e431a7b9c5354",
+        "bytes": 11459
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_checks.py",
+        "sha256": "996a5f9c8b07f5154163b0c3b7b7e19a6b92acf7d2228443abb4b692bbab7d55",
+        "bytes": 2629
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_drive_screen.py",
+        "sha256": "87de27f9bdc093b434453d78f820096fb33a90ccfc461ea73cf6af4913d111c1",
+        "bytes": 4175
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_joint.py",
+        "sha256": "80cee9101b5ee73d500de89f04a2a2517a3c87289c425926984019cea52c41f5",
+        "bytes": 3427
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_joint_native.py",
+        "sha256": "a9b2de94ee2b0cf84bddb1e6562e22e35371bda4bc57c4c91ef13ebc1c889f96",
+        "bytes": 1051
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_policy.py",
+        "sha256": "6b17061a558c5116543b7568325f0773a5fee55b06ff50e0e397546b850c7f96",
+        "bytes": 5361
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_report.py",
+        "sha256": "7565125328fd6c3bcad295b1ef7ed542fd0b7b72d09c8b4da290a7d3a9f4bf0b",
+        "bytes": 3040
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/rack_seat_compliance.py",
+        "sha256": "9dcf6eda52b283fadc9821ed00af18e737cff3d608e1442ed7799f5a33f5c30c",
+        "bytes": 3422
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/report.py",
+        "sha256": "ca58ce9e7b65f2676313dc8865f35de92c23c78a318aa64ee78abda837e33220",
+        "bytes": 15039
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/sensitivity.py",
+        "sha256": "75cf8ed55819538212fe47df43194fed34cb344c3d26554f563a184c48833b0d",
+        "bytes": 7386
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/study.py",
+        "sha256": "069642aa57b4ed203d6f5959cfb6fe1a82e494e7cf72a7189a257404eaf64ef1",
+        "bytes": 31450
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/verify.py",
+        "sha256": "3b9fd7eaeb5803ac7a227d1ca837de0415078b4a28cecb4632376a52d909f699",
+        "bytes": 5672
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/verify_dynamic.py",
+        "sha256": "0ba26ac2f039aa7625b56c24dadf73d6d65b381dc2b1c2b22514b88a9c5575b9",
+        "bytes": 1251
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_checks.py",
+        "sha256": "cd3b25dfdfa0b5c2d69b61ddd1c21f178eaa9b2e809501f131ae212469ce3b34",
+        "bytes": 2182
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_convergence.py",
+        "sha256": "172ef191d2388a8236281e5ab5627cde524146a317a46594d2122091718c5cd6",
+        "bytes": 1614
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_dynamics.py",
+        "sha256": "3b297aff01b4c4adf3ccb622990d8dd3a82763a38f618bcd63d0924dc71ee98e",
+        "bytes": 7589
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_effective.py",
+        "sha256": "1692dbaf7d306f3bab9a7ed447d320d2f2b47bca5ad517563f0992d57dd6779d",
+        "bytes": 3204
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_model.py",
+        "sha256": "98cd794f7a7966468439f10f784cecbd043015bd259932b12b59253eb2d8d8d1",
+        "bytes": 9224
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_motion_checks.py",
+        "sha256": "ac921811f53ac82024802e0d1b6e65df87a60551920f85dc986688116cce2766",
+        "bytes": 3408
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_qualification.py",
+        "sha256": "3278f393fc4303ca61bcfa73877443b6aa34b61101ffb7b3f6511fd0b6a94688",
+        "bytes": 9708
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/weld_report.py",
+        "sha256": "c04b2cd101b02d95255b8fbfa664e24b43701a19c537a1602f0c77c4a5212944",
+        "bytes": 4963
+      }
+    ]
+  },
+  "limitations": [
+    "Computed unmeasured modes, guide and floor assumptions retained",
+    "17x3 screen across all histories,129x7 refinement of two screened governing histories per bed; not continuous uncertainty qualification",
+    "40 modes at every pose; higher-mode convergence still required before release",
+    "Mount-required API and physical mount adoption held; no frozen CAD edit",
+    "No cycle-time acceptance"
+  ],
+  "governingModeDetails": [
+    {
+      "bedMm": 2600,
+      "poseMm": {
+        "x": 800,
+        "y": 0,
+        "z": 200
+      },
+      "meshMm": 50,
+      "modes": [
+        {
+          "frequencyHz": 27.28149,
+          "gantryKineticFraction": 0.38258142722565924,
+          "strainEnergyShare": {
+            "frame": 0.4622819079362512,
+            "rigid": 9.879816847022113e-05,
+            "coupling": 1.1337308954700702e-06,
+            "gantry": 0.01760881047796202,
+            "feetplates": 0.0022385328923054696,
+            "Xplate": 0.005087422595907105,
+            "Zplate": 0.0004393124944691294,
+            "Zribs": 5.256035308831116e-05,
+            "movingRails": 3.982793487715578e-06,
+            "feet": 0.17099121925786273,
+            "Yblocks": 0.009694091682227847,
+            "welds": 1.330394396170056e-06,
+            "Ydrive": 0.005224466245676604,
+            "Xblocks": 0.0009568840300786993,
+            "Xdrive": 0.04363893318345377,
+            "Zblocks": 0.0010717697554242513,
+            "Zscrew": 1.2319390090080375e-06,
+            "railBolts": 1.84039664112806e-05,
+            "saddleBolts": 2.121198058463659e-05,
+            "bedMounts": 0.0017083470509248093,
+            "brace_side": 0.07155132659435602,
+            "brace_end": 0.1334674465462108,
+            "brace_plan": 0.07384080786415152
+          }
+        },
+        {
+          "frequencyHz": 27.43884,
+          "gantryKineticFraction": 0.9369512228413479,
+          "strainEnergyShare": {
+            "frame": 0.1460503528932751,
+            "rigid": 8.388274670138801e-06,
+            "coupling": 8.482571595067811e-06,
+            "gantry": 0.33429504709019886,
+            "feetplates": 0.03303781651884988,
+            "Xplate": 0.0026515058542869985,
+            "Zplate": 0.00033247807844180577,
+            "Zribs": 0.0001227986986969225,
+            "movingRails": 4.957850915778514e-06,
+            "feet": 0.04271876267654187,
+            "Yblocks": 0.11562661401440594,
+            "welds": 1.0843673401935889e-05,
+            "Ydrive": 0.30690662399151974,
+            "Xblocks": 0.0009686096088195996,
+            "Xdrive": 0.0007608845952295507,
+            "Zblocks": 0.0005694000766512319,
+            "Zscrew": 6.74174187887025e-06,
+            "railBolts": 3.683178075727906e-06,
+            "saddleBolts": 2.349404853297027e-05,
+            "bedMounts": 0.0004556423225349512,
+            "brace_side": 0.011074458565099886,
+            "brace_end": 0.0027073404806155573,
+            "brace_plan": 0.0016550765601445517
+          }
+        },
+        {
+          "frequencyHz": 28.10971,
+          "gantryKineticFraction": 0.03918726742287478,
+          "strainEnergyShare": {
+            "frame": 0.9077856020604553,
+            "rigid": 0.000397854674696987,
+            "coupling": 6.708387474984585e-07,
+            "gantry": 0.014832838345401686,
+            "feetplates": 0.0014334320736155905,
+            "Xplate": 0.00011218127258107662,
+            "Zplate": 1.6034861152992275e-05,
+            "Zribs": 5.632125694548302e-06,
+            "movingRails": 2.2592001998837423e-07,
+            "feet": 0.01679286370773179,
+            "Yblocks": 0.0050419509451860136,
+            "welds": 4.794123655460584e-07,
+            "Ydrive": 0.013434588735518423,
+            "Xblocks": 4.083265455457463e-05,
+            "Xdrive": 3.674559033230062e-05,
+            "Zblocks": 2.6606847201084e-05,
+            "Zscrew": 3.6953528914535024e-07,
+            "railBolts": 1.7393406299347283e-07,
+            "saddleBolts": 1.053423571493479e-06,
+            "bedMounts": 0.005118266610603039,
+            "brace_side": 0.03335256172062485,
+            "brace_end": 0.0007560638828311803,
+            "brace_plan": 0.0008129701866146868
+          }
+        },
+        {
+          "frequencyHz": 34.62608,
+          "gantryKineticFraction": 0.0626679587409438,
+          "strainEnergyShare": {
+            "frame": 0.9163017063097815,
+            "rigid": 8.216109374892613e-05,
+            "coupling": 3.2848233239061722e-06,
+            "gantry": 0.03268826528636289,
+            "feetplates": 0.0008961509583655483,
+            "Xplate": 0.0012378293053016127,
+            "Zplate": 0.0007132747869511679,
+            "Zribs": 2.2580322229500187e-05,
+            "movingRails": 1.8194278910763238e-06,
+            "feet": 0.033773358632230015,
+            "Yblocks": 0.0010413973871350457,
+            "welds": 1.975802427540404e-07,
+            "Ydrive": 0.002104432673350538,
+            "Xblocks": 0.00026301065841991813,
+            "Xdrive": 3.2312629106701807e-06,
+            "Zblocks": 0.00018854633439406983,
+            "Zscrew": 0.0006518839821887237,
+            "railBolts": 4.883306932422946e-06,
+            "saddleBolts": 5.057572256666944e-06,
+            "bedMounts": 0.0011072385430652553,
+            "brace_side": 0.007579415035779836,
+            "brace_end": 0.0008910298204942103,
+            "brace_plan": 0.0004392461642521242
+          }
+        },
+        {
+          "frequencyHz": 35.55403,
+          "gantryKineticFraction": 0.8904357789170125,
+          "strainEnergyShare": {
+            "frame": 0.3617031868583193,
+            "rigid": 3.334156231453422e-05,
+            "coupling": 3.236622664959236e-06,
+            "gantry": 0.48225143843408974,
+            "feetplates": 0.013617936762016211,
+            "Xplate": 0.020780217147239273,
+            "Zplate": 0.012281355869037044,
+            "Zribs": 0.0003728504584244617,
+            "movingRails": 3.0048034047970502e-05,
+            "feet": 0.07157103876559101,
+            "Yblocks": 0.005851752528018158,
+            "welds": 2.333536225940431e-06,
+            "Ydrive": 0.0001590616030393398,
+            "Xblocks": 0.004823068130207471,
+            "Xdrive": 4.898168398912781e-05,
+            "Zblocks": 0.0032310266375660127,
+            "Zscrew": 0.011231446741390982,
+            "railBolts": 8.372075147607668e-05,
+            "saddleBolts": 8.150303730515782e-05,
+            "bedMounts": 0.0007531865789933706,
+            "brace_side": 0.009957312038932915,
+            "brace_end": 0.00027494441715278194,
+            "brace_plan": 0.000857008996574696
+          }
+        },
+        {
+          "frequencyHz": 41.37884,
+          "gantryKineticFraction": 0.7953905289094932,
+          "strainEnergyShare": {
+            "frame": 0.16867933110718245,
+            "rigid": 1.862579263025457e-05,
+            "coupling": 8.369673601251308e-05,
+            "gantry": 0.40127744816476846,
+            "feetplates": 0.003281332838490089,
+            "Xplate": 0.016647615940568166,
+            "Zplate": 0.0017946413796663745,
+            "Zribs": 0.00016884295200790095,
+            "movingRails": 1.4888990095294297e-05,
+            "feet": 0.05171198407298288,
+            "Yblocks": 0.008604197255493416,
+            "welds": 7.391811780491249e-07,
+            "Ydrive": 0.16170162692247173,
+            "Xblocks": 0.0034747825324827866,
+            "Xdrive": 0.11869954693918972,
+            "Zblocks": 0.003945795040761258,
+            "Zscrew": 1.023655844008977e-06,
+            "railBolts": 6.296758698906584e-05,
+            "saddleBolts": 8.713489874140825e-05,
+            "bedMounts": 0.0011912250240129574,
+            "brace_side": 0.033314162198004274,
+            "brace_end": 0.012829547371988841,
+            "brace_plan": 0.012408846377224676
+          }
+        }
+      ]
+    },
+    {
+      "bedMm": 3150,
+      "poseMm": {
+        "x": 800,
+        "y": 3150,
+        "z": 200
+      },
+      "meshMm": 50,
+      "modes": [
+        {
+          "frequencyHz": 26.58972,
+          "gantryKineticFraction": 0.14023861615621144,
+          "strainEnergyShare": {
+            "frame": 0.43101647716609365,
+            "rigid": 0.0001431363052614615,
+            "coupling": 1.5197871688385688e-06,
+            "gantry": 0.010557174813027016,
+            "feetplates": 0.002503363228295725,
+            "Xplate": 0.0017711822537352744,
+            "Zplate": 0.0001500638307521521,
+            "Zribs": 1.6059957380189547e-05,
+            "movingRails": 1.0004348533902314e-06,
+            "feet": 0.2015691623257218,
+            "Yblocks": 0.011771064919246371,
+            "welds": 1.2564665007297491e-06,
+            "Ydrive": 0.0037729573044854667,
+            "Xblocks": 0.0003176682742235608,
+            "Xdrive": 0.015285684713516413,
+            "Zblocks": 0.00035302381238446867,
+            "Zscrew": 2.1024769048226152e-12,
+            "railBolts": 5.4452344623746755e-06,
+            "saddleBolts": 7.4643202355676125e-06,
+            "bedMounts": 0.0014479575761822993,
+            "brace_side": 0.08867963500653349,
+            "brace_end": 0.13814595035042354,
+            "brace_plan": 0.09248275191741367
+          }
+        },
+        {
+          "frequencyHz": 26.97321,
+          "gantryKineticFraction": 0.9706122363644708,
+          "strainEnergyShare": {
+            "frame": 0.15217310234790496,
+            "rigid": 6.951954610704017e-06,
+            "coupling": 9.915082383062165e-06,
+            "gantry": 0.352621277481318,
+            "feetplates": 0.03383876681578961,
+            "Xplate": 0.003106039736032737,
+            "Zplate": 0.0006770833956662392,
+            "Zribs": 0.00012043755782570394,
+            "movingRails": 4.490940600463788e-06,
+            "feet": 0.02916627661065252,
+            "Yblocks": 0.11236580441365832,
+            "welds": 1.0696198062006927e-05,
+            "Ydrive": 0.2989232693300992,
+            "Xblocks": 0.001287206881609529,
+            "Xdrive": 1.572295023517768e-05,
+            "Zblocks": 0.0006456453368885824,
+            "Zscrew": 0.0003324265790450536,
+            "railBolts": 5.161554678086953e-06,
+            "saddleBolts": 2.2845142788359064e-05,
+            "bedMounts": 9.139690674901763e-05,
+            "brace_side": 0.01391344764135022,
+            "brace_end": 0.0002661531122705681,
+            "brace_plan": 0.00039588175124714034
+          }
+        },
+        {
+          "frequencyHz": 27.73816,
+          "gantryKineticFraction": 0.0062860265715187075,
+          "strainEnergyShare": {
+            "frame": 0.9232641402970195,
+            "rigid": 0.0006600280392522586,
+            "coupling": 1.1423222615134758e-06,
+            "gantry": 0.0015724766568328353,
+            "feetplates": 0.00017530542728383852,
+            "Xplate": 4.090001915735094e-05,
+            "Zplate": 2.0755314678709577e-05,
+            "Zribs": 1.0245373606775528e-06,
+            "movingRails": 4.842743465437668e-08,
+            "feet": 0.02877455616926678,
+            "Yblocks": 0.0006575904262712442,
+            "welds": 6.605061517257363e-08,
+            "Ydrive": 0.0011501947516129654,
+            "Xblocks": 7.952450073044442e-06,
+            "Xdrive": 1.230532674161201e-05,
+            "Zblocks": 8.323116445839362e-06,
+            "Zscrew": 1.637223361205477e-05,
+            "railBolts": 1.3541041335180752e-07,
+            "saddleBolts": 2.3189373547631134e-07,
+            "bedMounts": 0.005892739412248614,
+            "brace_side": 0.03616616376193558,
+            "brace_end": 0.0007018639507558105,
+            "brace_plan": 0.0008756853218695169
+          }
+        },
+        {
+          "frequencyHz": 34.46212,
+          "gantryKineticFraction": 0.06633180547608312,
+          "strainEnergyShare": {
+            "frame": 0.8988993618565417,
+            "rigid": 0.00012772148099154888,
+            "coupling": 6.493558148445565e-06,
+            "gantry": 0.03439430591334028,
+            "feetplates": 0.0010685546778764865,
+            "Xplate": 0.0016091535193573476,
+            "Zplate": 0.0009905458989714108,
+            "Zribs": 3.0357583230622954e-05,
+            "movingRails": 1.2972741005168319e-06,
+            "feet": 0.04289013316816105,
+            "Yblocks": 0.0004235772386311264,
+            "welds": 1.7867538501041194e-07,
+            "Ydrive": 1.2991318728731353e-05,
+            "Xblocks": 0.00040577041854562395,
+            "Xdrive": 9.499956328956677e-06,
+            "Zblocks": 0.0002597714728927098,
+            "Zscrew": 0.0008920680421201262,
+            "railBolts": 4.993989070015437e-06,
+            "saddleBolts": 6.554465953418536e-06,
+            "bedMounts": 0.0010552350556922083,
+            "brace_side": 0.015273824237461826,
+            "brace_end": 0.0010083635825103388,
+            "brace_plan": 0.000629244483127778
+          }
+        },
+        {
+          "frequencyHz": 35.81609,
+          "gantryKineticFraction": 0.09599240506415699,
+          "strainEnergyShare": {
+            "frame": 0.7452633429414072,
+            "rigid": 8.079808859221766e-05,
+            "coupling": 0.00011728637464890545,
+            "gantry": 0.01664129116561545,
+            "feetplates": 0.0030018508785092848,
+            "Xplate": 0.002850642633769163,
+            "Zplate": 0.00048778095242790303,
+            "Zribs": 2.3729433104505235e-05,
+            "movingRails": 2.0279429168808994e-06,
+            "feet": 0.035064208163534026,
+            "Yblocks": 0.014035946124143958,
+            "welds": 1.4615439175797835e-06,
+            "Ydrive": 0.003304859167013004,
+            "Xblocks": 0.0005122291203521789,
+            "Xdrive": 0.023718774914299176,
+            "Zblocks": 0.0007517229555740134,
+            "Zscrew": 6.23247229843269e-05,
+            "railBolts": 1.2096044694872646e-05,
+            "saddleBolts": 1.3599545521727195e-05,
+            "bedMounts": 0.003461627596717888,
+            "brace_side": 0.11974702987027375,
+            "brace_end": 0.020898623177263733,
+            "brace_plan": 0.0099467308457437
+          }
+        },
+        {
+          "frequencyHz": 36.24913,
+          "gantryKineticFraction": 0.6981030750769261,
+          "strainEnergyShare": {
+            "frame": 0.43426229516724507,
+            "rigid": 4.3393727682046174e-05,
+            "coupling": 3.6567073941280166e-05,
+            "gantry": 0.36445344353344344,
+            "feetplates": 0.012730394174537963,
+            "Xplate": 0.01804802975609989,
+            "Zplate": 0.011018033279536743,
+            "Zribs": 0.0003764316612037033,
+            "movingRails": 1.558659217592863e-05,
+            "feet": 0.07623862289651188,
+            "Yblocks": 0.01984465231838941,
+            "welds": 3.132716131180396e-06,
+            "Ydrive": 0.024818130217051048,
+            "Xblocks": 0.004104527670075448,
+            "Xdrive": 1.911923294432648e-05,
+            "Zblocks": 0.0027862717272162524,
+            "Zscrew": 0.010013558586799734,
+            "railBolts": 5.3991204416059585e-05,
+            "saddleBolts": 7.865891302799764e-05,
+            "bedMounts": 0.001053048553475645,
+            "brace_side": 0.017244902866854463,
+            "brace_end": 0.0014507350056277113,
+            "brace_plan": 0.0013064738967120421
+          }
+        }
+      ]
+    }
+  ]
+}

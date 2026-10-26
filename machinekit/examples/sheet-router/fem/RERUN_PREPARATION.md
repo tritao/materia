@@ -1,5 +1,9 @@
 # Supported-rack rerun preparation — 2026-10-25
 
+2026-10-26: the [executed rerun](J6_EXECUTED_RERUN.md) now records the completed
+36-case frozen reference and 186-history replay. The preparation text below is
+historical scope, not a claim that the real mount has been qualified.
+
 No frozen CAD change, structural solve, modal replay or new acceptance claim is
 made here. Root has about 5.3 GB free; the minimum for replay/solves remains 8 GB.
 DATA1 is full and receives no writes.

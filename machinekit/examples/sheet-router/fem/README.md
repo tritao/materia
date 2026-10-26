@@ -1,5 +1,12 @@
 # SR5 structural screen
 
+## Executed J6 frozen reference (2026-10-26)
+
+[Rerun report](J6_EXECUTED_RERUN.md): 36 fresh structural cases, 186 validated
+histories, both beds/meshes/all full-Z poses. Static targets pass; sampled
+uncertainty braking-following remains above 0.05 mm. No frozen CAD edit or cycle-
+time acceptance; drive/mount and policy screens follow.
+
 ## Executed-history preparation (2026-10-25)
 
 [Preparation](RERUN_PREPARATION.md) records the 186-history J6 preflight,

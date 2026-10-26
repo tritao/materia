@@ -1909,3 +1909,14 @@ lateral rail error on both beds. Catalogue mount connectors and the widened
 RM2 plan are already present; unsupported-rack API enforcement remains pending.
 J7 publication reserve/cycle time is excluded from frame acceptance. The Y drive
 and motor mount remain first in the braking-following study ranking.
+
+Executed J6 frozen-reference checkpoint (2026-10-26): all 186 histories validate;
+36 new structural cases cover both beds, both meshes and all full-Z poses.
+Worst fine-mesh X/Y stiffness is 2.165/2.051 N/µm short and 2.109/2.044 long.
+Observed uncertainty braking-following peaks are 0.07870/0.09967 mm against the
+requested 0.05 mm target. These are sampled uncertainty results, distinct from
+nominal geometric contour/residual error; no new acceptance or geometry approval.
+See [rerun report](fem/J6_EXECUTED_RERUN.md) for search coverage and retained evidence.
+Serial cases stayed below 0.92 GB peak under a 3 GB cap; bulk output is removed
+after each case, with root/RAM floors enforced. Drive/motor-mount, end-anchor,
+mount-mass and policy screens follow; cycle times remain excluded.
