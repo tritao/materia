@@ -53,3 +53,30 @@ shaping and reduced-limit bounds. Those policy bounds are offline transformed
 loads, not newly executed J6 exports. Real mount geometry, full-length/X-host
 qualification, native clearance fixes, the mount-required API migration,
 higher-mode convergence and measured-mode/damping commissioning remain held.
+
+## Offline policy bounds
+
+All 186 histories and both meshes were screened, with the same sampled uncertainty
+and governing-history refinement. These are transformed loads on the solved
+frozen reference, **not** new executed J6 histories or controller acceptance.
+
+| Counterfactual load policy | Short braking, mm | Long braking, mm |
+|---|---:|---:|
+| Extra whole-command ZV | 0.06833 | 0.09258 |
+| Extra whole-command ZVD | 0.06475 | 0.08898 |
+| Uniform timing k=0.8, including stop | 0.04367 | 0.05974 |
+| Uniform timing k=0.6, including stop | 0.02563 | 0.03496 |
+
+The tested shaping bounds remain over 0.05 mm. Cartesian whole-command shaping
+also needs a contour-safe implementation; these load screens do not validate it.
+The k=0.6 load bound is below the 0.04 mm reserve, but scales velocity,
+acceleration and jerk by 0.6, 0.36 and 0.216, including the ready stop. It is not
+an existing 60% override command, not a demonstrated pose-scheduled replan, and
+not performance at the original feeds/limits. Preserve nominal contour feeds
+only after replanning/exporting a new stop-limit policy and rerunning it.
+Cycle-time comparisons remain excluded.
+
+[Policy evidence](rack-results/j6-policy-bounds-20261026.json) records each
+history, pose, mesh and uncertainty point governing these bounds. Replay peaks
+remain under 0.13 GB. The priority motion landing suite still owns the shared
+heavy-run slot; no structural option has bypassed it.

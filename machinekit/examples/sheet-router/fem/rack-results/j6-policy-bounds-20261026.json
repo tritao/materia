@@ -1,0 +1,458 @@
+{
+  "status": "Offline load-response bounds only; no new executor histories or controller acceptance",
+  "rows": [
+    {
+      "policy": "ZV-bound",
+      "bedMm": 2600,
+      "screenedBrakingMm": 0.068331757624603,
+      "governing": {
+        "valueMm": 0.068331757624603,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase250/y2600/p3/exports/2600-arc-hold-resume",
+        "bedMm": 2600,
+        "poseMm": {
+          "x": 800.0,
+          "y": 0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.06832052647161044,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.068331757624603,
+        "coarseFineAbsoluteMm": 1.1231152992563498e-05
+      },
+      "belowBudget": false,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 119914496
+    },
+    {
+      "policy": "ZV-bound",
+      "bedMm": 3150,
+      "screenedBrakingMm": 0.0925847540033867,
+      "governing": {
+        "valueMm": 0.0925847540033867,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase500/y3150/p4/exports/3150-arc-hold-resume",
+        "bedMm": 3150,
+        "poseMm": {
+          "x": 800.0,
+          "y": 1575.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.09257702404021452,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.0925847540033867,
+        "coarseFineAbsoluteMm": 7.729963172178889e-06
+      },
+      "belowBudget": false,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 119914496
+    },
+    {
+      "policy": "ZVD-bound",
+      "bedMm": 2600,
+      "screenedBrakingMm": 0.06474873005864118,
+      "governing": {
+        "valueMm": 0.06474873005864118,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase250/y2600/p3/exports/2600-arc-hold-resume",
+        "bedMm": 2600,
+        "poseMm": {
+          "x": 800.0,
+          "y": 0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.06473580288722765,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.06474873005864118,
+        "coarseFineAbsoluteMm": 1.2927171413532057e-05
+      },
+      "belowBudget": false,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 121204736
+    },
+    {
+      "policy": "ZVD-bound",
+      "bedMm": 3150,
+      "screenedBrakingMm": 0.08897763625004122,
+      "governing": {
+        "valueMm": 0.08897763625004122,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase500/y3150/p4/exports/3150-arc-hold-resume",
+        "bedMm": 3150,
+        "poseMm": {
+          "x": 800.0,
+          "y": 1575.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.08897611955135017,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.02,
+        "fineDtPeakMm": 0.08897763625004122,
+        "coarseFineAbsoluteMm": 1.5166986910564173e-06
+      },
+      "belowBudget": false,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 129,
+        "dampingValues": [
+          0.005,
+          0.0075,
+          0.01,
+          0.015,
+          0.02,
+          0.025,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": true
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 121204736
+    },
+    {
+      "policy": "slow80-bound",
+      "bedMm": 2600,
+      "screenedBrakingMm": 0.04366773709010445,
+      "governing": {
+        "valueMm": 0.04366773709010445,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+        "bedMm": 2600,
+        "poseMm": {
+          "x": 800.0,
+          "y": 1300.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.043662516056025384,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.04366773709010445,
+        "coarseFineAbsoluteMm": 5.221034079065656e-06
+      },
+      "belowBudget": true,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 124129280
+    },
+    {
+      "policy": "slow80-bound",
+      "bedMm": 3150,
+      "screenedBrakingMm": 0.059739614879040503,
+      "governing": {
+        "valueMm": 0.059739614879040503,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase500/y3150/p5/exports/3150-arc-hold-resume",
+        "bedMm": 3150,
+        "poseMm": {
+          "x": 800.0,
+          "y": 3150.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.05973349368569294,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.059739614879040503,
+        "coarseFineAbsoluteMm": 6.121193347564946e-06
+      },
+      "belowBudget": false,
+      "belowReserve": false,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 124129280
+    },
+    {
+      "policy": "slow60-bound",
+      "bedMm": 2600,
+      "screenedBrakingMm": 0.025633000225774274,
+      "governing": {
+        "valueMm": 0.025633000225774274,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase250/y2600/p4/exports/2600-arc-hold-resume",
+        "bedMm": 2600,
+        "poseMm": {
+          "x": 800.0,
+          "y": 1300.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.02563025127311216,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.025633000225774274,
+        "coarseFineAbsoluteMm": 2.7489526621127247e-06
+      },
+      "belowBudget": true,
+      "belowReserve": true,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 131407872
+    },
+    {
+      "policy": "slow60-bound",
+      "bedMm": 3150,
+      "screenedBrakingMm": 0.034958703875972295,
+      "governing": {
+        "valueMm": 0.034958703875972295,
+        "dataset": "j6-executed-phase-grid",
+        "history": "phase500/y3150/p4/exports/3150-arc-hold-resume",
+        "bedMm": 3150,
+        "poseMm": {
+          "x": 800.0,
+          "y": 1575.0,
+          "z": 200.0
+        },
+        "meshMm": 50
+      },
+      "uncertainty": {
+        "valueMm": 0.0349539970430652,
+        "frequencyScale": 0.85,
+        "dampingRatio": 0.005,
+        "fineDtPeakMm": 0.034958703875972295,
+        "coarseFineAbsoluteMm": 4.706832907097613e-06
+      },
+      "belowBudget": true,
+      "belowReserve": true,
+      "executorQualified": false,
+      "refinedGrid": {
+        "frequencyPoints": 17,
+        "dampingValues": [
+          0.005,
+          0.01,
+          0.03
+        ],
+        "selectedGoverningHistoriesOnly": false
+      },
+      "allHistoryCount": 186,
+      "maximumReplayPeakRssBytes": 131407872
+    }
+  ],
+  "cycleTimeReporting": "Excluded",
+  "evidence": {
+    "archive": "build/sheet-router-evidence/j6-policy-bounds-20261026.tar.gz",
+    "sha256": "7553ef96d207c33e2bd9e1644ef19ad7b886dca26ba9012b6c2d5ba0c0df3e33",
+    "bytes": 155091,
+    "verifiedFiles": [
+      {
+        "path": "build/sheet-router-j6/ZV-bound-response.json",
+        "sha256": "fab6c8ad74b6e91a960b01f79ec2bb488e84c9ed85cfa2ca3c1f4cc0f2c97970",
+        "bytes": 251944
+      },
+      {
+        "path": "build/sheet-router-j6/ZV-bound-refined.json",
+        "sha256": "97e0b2ac4894db91fc87e0d425ea0cf5e5d91e58b4c99a2fdbff8463b3d69fc3",
+        "bytes": 9109
+      },
+      {
+        "path": "build/sheet-router-j6/ZV-bound.log",
+        "sha256": "aba51eacf969a7992c20b5b26fe09d87c006ecb49d0f04d092bb393e527c3c6b",
+        "bytes": 12027
+      },
+      {
+        "path": "build/sheet-router-j6/ZV-bound-refined.log",
+        "sha256": "46d530af963b7edce10dc072386ab72fd5984dc3eadee4617bc3d7db207ef473",
+        "bytes": 256
+      },
+      {
+        "path": "build/sheet-router-j6/ZVD-bound-response.json",
+        "sha256": "ebf3919b4890619ead321c269038f83e0f82b877e1e8d3b28c2cf28e5f63bb58",
+        "bytes": 251943
+      },
+      {
+        "path": "build/sheet-router-j6/ZVD-bound-refined.json",
+        "sha256": "1dc78288458b7b057a6cd0ccc3489dd53c546af2e29e38cdae2684381b9d19be",
+        "bytes": 9121
+      },
+      {
+        "path": "build/sheet-router-j6/ZVD-bound.log",
+        "sha256": "96c9f6b4e846a645422f762f1e8e46810d13c45eb3db931310fda6f39d853f67",
+        "bytes": 12213
+      },
+      {
+        "path": "build/sheet-router-j6/ZVD-bound-refined.log",
+        "sha256": "97e8a31037226ea35447ec471465b30299376027b10446cb812b4bf0ab914533",
+        "bytes": 260
+      },
+      {
+        "path": "build/sheet-router-j6/slow80-bound-response.json",
+        "sha256": "295e96fe24bc1151cf3b841f41b686b799db77c986de33188ef3ed801290d5ba",
+        "bytes": 300808
+      },
+      {
+        "path": "build/sheet-router-j6/slow80-bound-refined.json",
+        "sha256": "262bbb44b4f1b3cb2148561ac690525703830e037fb4b114b1af0344e25e0e1d",
+        "bytes": 11524
+      },
+      {
+        "path": "build/sheet-router-j6/slow80-bound.log",
+        "sha256": "94b72a6401684d886fe6f9bb0db1e396105c0cb74801ceb3a2b89e6ee27f21df",
+        "bytes": 12771
+      },
+      {
+        "path": "build/sheet-router-j6/slow80-bound-refined.log",
+        "sha256": "7f39645744d9b559db2745bfce4c0aa7dca2f925650a29d9391f1bf195af3b5c",
+        "bytes": 272
+      },
+      {
+        "path": "build/sheet-router-j6/slow60-bound-response.json",
+        "sha256": "1ea15ca9f415176fa87d8721949ebbefca47076162a3eaccdb59cb6f94d5dca7",
+        "bytes": 301792
+      },
+      {
+        "path": "build/sheet-router-j6/slow60-bound-refined.json",
+        "sha256": "2555460e62e5f18c7d329ce869d8a6c73b6b8fc358ab743de6df2552dba24d45",
+        "bytes": 11552
+      },
+      {
+        "path": "build/sheet-router-j6/slow60-bound.log",
+        "sha256": "c57653f093b1f44c918c64262582cd0388b16197d1b0d3a349c79a13b56ecb3a",
+        "bytes": 12771
+      },
+      {
+        "path": "build/sheet-router-j6/slow60-bound-refined.log",
+        "sha256": "269c8fe19a026a2ae9374200536ae54b17a2ff24b7084d9b9460bf8efdf81601",
+        "bytes": 272
+      },
+      {
+        "path": "machinekit/examples/sheet-router/fem/j6_response.py",
+        "sha256": "377e6202cf4dbcd0b38830ea83ac78b7a57072fa94e5c91843a4e3f243540d6c",
+        "bytes": 10311
+      },
+      {
+        "path": "build/sheet-router-j6/run_policies.py",
+        "sha256": "6dbe4cb9b782e61281134357a83d242d0479264f2b6c50bbece9cc0269006b25",
+        "bytes": 670
+      },
+      {
+        "path": "build/sheet-router-j6/refine_policies.py",
+        "sha256": "46d32ea242810767894e9cd78f9466ad4c4d792ed17a7d1034e441046e212862",
+        "bytes": 806
+      },
+      {
+        "path": "build/sheet-router-j6/policy-progress.log",
+        "sha256": "aa890b97e9fdae12d54276ee701aa909c355d4faffda2afa9de9624b7b60c4c0",
+        "bytes": 109
+      },
+      {
+        "path": "build/sheet-router-j6/policy-refinement-progress.log",
+        "sha256": "e8a299c3384d99a5428b0a9ca312ef4a9708c7ae99588d4b93571e7cdf0c643f",
+        "bytes": 77
+      },
+      {
+        "path": "build/sheet-router-work/j6-verified-20261026.json",
+        "sha256": "895b146f4928b8f101300edfa89cd2ef12c855473ba3c1fec1196371714e1167",
+        "bytes": 159750
+      },
+      {
+        "path": "/home/joao/dev/materia-worktrees/jerk-timing/machinekit/examples/sheet-router/fem/modal_response.py",
+        "sha256": "be29f42d9184f26dea510cd4a7791c03c1adda774b6626843308dfd94c438212",
+        "bytes": 6155
+      },
+      {
+        "path": "/home/joao/dev/materia-worktrees/jerk-timing/machinekit/examples/sheet-router/fem/contour_response.py",
+        "sha256": "713e5a2e3d63d2a50cd5238bd9d61174d026200993bdbd5cb3676016ccea14ba",
+        "bytes": 5805
+      },
+      {
+        "path": "/home/joao/dev/materia-worktrees/jerk-timing/machinekit/examples/sheet-router/fem/curved_error.py",
+        "sha256": "a4cd3fc479418a6f56deb450a3098b7c5d2b71272602b2d5eab165cb058b4dc0",
+        "bytes": 11964
+      },
+      {
+        "path": "/home/joao/dev/materia-worktrees/jerk-timing/machinekit/examples/sheet-router/fem/dynamic_error.py",
+        "sha256": "06f86acea05a29d634dfff8b2504c8af4478cf3152f22a62062d2dc7a62230bf",
+        "bytes": 11727
+      }
+    ]
+  },
+  "limitations": [
+    "Whole-command Cartesian shaping does not establish contour-safe distance-shaper integration",
+    "Uniform timing scales the ready stop as well as source motion; not the existing override knob",
+    "k=.6 reduces v,a,j by .6,.36,.216; does not establish performance at original feeds/limits",
+    "Every history sampled at17x3; two screened governing histories/bed refined at129x7; no continuous uncertainty qualification",
+    "Measured damping/modes, high-mode convergence, new J6 exports and real mount selection remain required"
+  ]
+}
