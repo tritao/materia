@@ -1918,5 +1918,20 @@ requested 0.05 mm target. These are sampled uncertainty results, distinct from
 nominal geometric contour/residual error; no new acceptance or geometry approval.
 See [rerun report](fem/J6_EXECUTED_RERUN.md) for search coverage and retained evidence.
 Serial cases stayed below 0.92 GB peak under a 3 GB cap; bulk output is removed
-after each case, with root/RAM floors enforced. Drive/motor-mount, end-anchor,
-mount-mass and policy screens follow; cycle times remain excluded.
+after each case, with root/RAM floors enforced. Cycle times remain excluded.
+
+Executed J6 drive/mount screens (2026-10-26): 28 additional governing-pose
+structural cases complete the 64-case study. All use the original serial/3 GB
+limits; all 186 input histories still validate unchanged at completion. The best
+zero-added-mass preload ×4/reducer ×2/end-anchor bound gives 0.06947/0.09131 mm
+braking-following; the gross mount-stock mass sensitivity gives 0.08098/0.11696.
+No tested mechanical bound meets 0.05 mm. The latter mass model adds 34.76 kg
+moving Y and 49.77/57.70 kg fixed; it is not a qualified mount or catalogue BOM.
+Its offline k=0.6 timing bound, including the ready stop, gives 0.02717/0.03811 mm
+at the two tested governing poses. This is not a demonstrated policy at nominal
+feeds or an existing override command; new executed J6 exports are required.
+The drawn preload hinge implies tangential pivot motion while sizing assumes
+radial preload. Correct that layout and the native clearance conflicts in the
+future lightweight mount proposal. Keep frozen CAD, mount/API adoption and
+cutting release held; higher-mode/real-mount/weld qualification and SR6-C remain
+open. [Full comparison and retained evidence](fem/J6_EXECUTED_RERUN.md).

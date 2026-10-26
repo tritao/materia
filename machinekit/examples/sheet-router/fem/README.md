@@ -1,11 +1,14 @@
 # SR5 structural screen
 
-## Executed J6 frozen reference (2026-10-26)
+## Executed J6 frame/drive study (2026-10-26)
 
-[Rerun report](J6_EXECUTED_RERUN.md): 36 fresh structural cases, 186 validated
-histories, both beds/meshes/all full-Z poses. Static targets pass; sampled
-uncertainty braking-following remains above 0.05 mm. No frozen CAD edit or cycle-
-time acceptance; drive/mount and policy screens follow.
+[Rerun report](J6_EXECUTED_RERUN.md): 36 baseline plus 28 governing-pose drive/mount
+cases, using 186 validated executed histories. Frozen static targets pass; all
+tested mechanical braking bounds miss 0.05 mm. A reduced-timing load bound on the
+gross mount-mass sensitivity is below the 0.04 mm reserve, pending real nominal-
+feed executor exports and mount qualification. Frozen CAD is unchanged; cycle
+times are excluded. Reports retain histories, mode/energy evidence and hashes;
+reproducible working outputs are removed.
 
 ## Executed-history preparation (2026-10-25)
 

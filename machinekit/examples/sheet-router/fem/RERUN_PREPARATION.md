@@ -1,8 +1,10 @@
 # Supported-rack rerun preparation — 2026-10-25
 
-2026-10-26: the [executed rerun](J6_EXECUTED_RERUN.md) now records the completed
-36-case frozen reference and 186-history replay. The preparation text below is
-historical scope, not a claim that the real mount has been qualified.
+2026-10-26: the [executed study](J6_EXECUTED_RERUN.md) now records the completed
+36-case frozen reference, 28 governing-pose drive/mount cases and 186-history
+baseline replay. None of the tested mechanical bounds meets the braking target;
+offline timing bounds need new nominal-feed executor exports. The preparation
+text below is historical scope, not a claim that the real mount is qualified.
 
 No frozen CAD change, structural solve, modal replay or new acceptance claim is
 made here. Root has about 5.3 GB free; the minimum for replay/solves remains 8 GB.

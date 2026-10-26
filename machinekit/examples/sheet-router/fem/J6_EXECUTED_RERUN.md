@@ -1,9 +1,24 @@
-# Executed J6 rerun — 2026-10-26
+# Executed J6 frame/drive study — 2026-10-26
 
-Frozen-frame baseline is complete: both beds, 100/50 mm meshes, all nine full-Z
-poses, 40 modes per pose. All 186 producer histories pass manifest/output/provider
-hash validation; 372 pose/mesh responses use the executed motion, including the
-full feed-resume histories. No frozen CAD changed. Cycle times are excluded.
+The frozen reference passes static stiffness but misses the requested 0.05 mm
+braking-following target. None of the tested mechanical bounds closes that gap.
+An offline reduced-timing bound is below the 0.04 mm reserve at the studied
+joint-model poses, including the gross mount-mass sensitivity, but does not
+establish a controller policy at nominal feeds. Frozen CAD, SR-D3 and mount/API
+adoption remain unchanged. Cycle times are excluded throughout.
+
+## Coverage and frozen reference
+
+All 186 executed histories pass manifest, output, provider and clock-certificate
+hash/limit checks: 90 pose-grid, 64 phase-grid and 32 full-feed-resume histories.
+Coverage is nominal motion, executed hold/resume and ≤100% overrides; raised-feed
+replans above 100% remain outside this cohort. No offline stop suffix or producer
+structural-response number is substituted for a new result.
+
+The new structural baseline covers both beds, 100/50 mm meshes, all nine full-Z
+poses and 40 modes per pose (36 cases). Modal history starts at the rapid lead-in.
+The anchored-floor reference retains assumed 50,000 N/mm horizontal and vertical
+foot-support springs.
 
 | Frozen reference | 2600 bed | 3150 bed |
 |---|---:|---:|
@@ -14,69 +29,125 @@ full feed-resume histories. No frozen CAD changed. Cycle times are excluded.
 | Nominal geometric contour deviation, mm | 0.01513 | 0.02200 |
 | Nominal physical-rest residual, mm | 0.00466 | 0.00532 |
 
-Both static targets pass. Both braking-following screens fail the requested
-0.05 mm target (and 0.04 mm reserve). Geometric contour and rest residual remain
-separate quantities; the nominal figures are not uncertainty bounds or a new
-SR-D3 release. No producer structural-response numbers were transplanted.
+Braking-following is distinct from geometric contour error and rest residual;
+the SR-D3 criteria are not rewritten. Nominal values use computed frequencies
+and assumed 1% damping. They are not uncertainty bounds or a cutting release.
 
-The braking uncertainty screen evaluates all histories at 17 frequency scales
-from 0.85–1.15 and damping ratios 0.5%, 1%, 3%. It then refines two screened
-governing histories per bed at 129 scales and seven damping ratios from 0.5–3%.
-These are sampled searches, not continuous uncertainty qualification or a full
-129×7 sweep on every history. Modal history starts at the rapid lead-in. Each
-screened peak is rechecked at the export timestep after the 1 ms coarse response.
-Nominal values use the computed frequencies and assumed 1% damping.
+The braking search evaluates every admitted history/mesh at 17 **uniform** mode-
+frequency scales from 0.85–1.15 and damping ratios 0.5%, 1%, 3%. Two screened
+governing histories per bed are refined at 129 scales and seven damping ratios
+from 0.5–3%. This is a sampled search, not continuous uncertainty qualification
+or a 129×7 sweep on every history. Peaks found with the 1 ms response are checked
+again at the export timestep; the largest difference is 0.000064 mm.
 
-Governing screened braking poses: X800/Y0/Z200 on the short bed and
-X800/Y3150/Z200 on the long bed, on the 50 mm mesh. The short-bed governing
-history is phase250/p3 hold/resume; long-bed is phase500/p5 hold/resume. Their
-coupled frame-X/gantry-Y modes lie near 27 Hz. The frame-X mode stores energy in
-frame/feet/braces; the gantry-Y roll mode involves beam bending, Y guides and the
-Y drive. At short-bed centre, the latter has approximately 34% beam and 32% Y-drive
-strain energy; this supports ranking the motor mount/drive ahead of local plates.
+Governing baseline braking poses are X800/Y0/Z200 and X800/Y3150/Z200 on the
+short/long beds, on the 50 mm mesh. Histories are phase250/p3 hold/resume and
+phase500/p5 hold/resume respectively. Coupled frame-X/gantry-Y modes lie near
+27 Hz. Frame-X sway loads frame/feet/braces; gantry-Y roll involves the beam,
+Y guides and drive. At short-bed centre the latter stores about 34% of strain
+energy in the beam and 32% in the Y drive. Frequency remains a reported quantity.
 
-All 36 structural cases ran serially through `heavy-run --slots 1` with a
-3,000,000,000-byte scope cap, an 8 GiB available-RAM gate, an immediate pre-CCX RAM
-check and an 8 GB root-space floor. Maximum measured scope peak was 919,220,224
-bytes. No completed case retains bulk solver output. The motion landing suite has
-priority; structural options wait for its shared slot.
+## Drive and seat screens
 
-[Compact results and verified archive inventory](rack-results/j6-frozen-20261026.json)
-retain source/packet/deck hashes, per-case stiffness, first-mode energy shares,
-response provenance and resource evidence. The hash-verified compact archive is
-on root; producer histories/providers remain at the handoff location. No DATA1
-writes. The existing 15 preparation tests pass.
+Each mechanical variant has both meshes at the two governing braking poses
+(28 additional structural cases). Its 58 matching executed histories are replayed;
+these variants are not all-pose acceptance runs. No physical mount is adopted.
+Except for the frozen reference and three-anchor row, every row below includes
+the proposed end-anchored seat compliance. Stiffness-only rows hold mass fixed.
 
-Next: drive/motor-mount and end-anchor screens at the two governing poses,
-including an explicitly illustrative gross-section mount-mass sensitivity, then
-shaping and reduced-limit bounds. Those policy bounds are offline transformed
-loads, not newly executed J6 exports. Real mount geometry, full-length/X-host
-qualification, native clearance fixes, the mount-required API migration,
-higher-mode convergence and measured-mode/damping commissioning remain held.
+| Mechanical model | Dual-Y series stiffness, MN/m | Short braking, mm | Long braking, mm |
+|---|---:|---:|---:|
+| Frozen reference: no seat spring | 17.065 | 0.07870 | 0.09967 |
+| Three-anchor seat, original drive | 8.546 | 0.10163 | 0.13602 |
+| End-anchored seat, original drive | 12.047 | 0.08573 | 0.11919 |
+| End anchors + reducer stiffness ×2 | 12.865 | 0.08308 | 0.11866 |
+| End anchors + preload stiffness ×2 + reducer ×2 | 17.034 | 0.07877 | 0.09976 |
+| End anchors + preload stiffness ×4 | 18.358 | 0.07540 | 0.09584 |
+| End anchors + preload stiffness ×4 + reducer ×2 | 20.327 | 0.06947 | 0.09131 |
+| Previous row + gross mount-mass sensitivity | 20.327 | 0.08098 | 0.11696 |
 
-## Offline policy bounds
+End anchoring improves seat stiffness from 8.56 to 20.49 MN/m per pinion and
+reduces error relative to the three-anchor seat. Added local hardware is 0.0243 kg
+per studied 500 mm section; whole-axis hardware/joint details remain pending.
+The three-anchor case also fails static Y stiffness at the tested poses
+(approximately 1.95 N/µm). End anchoring is valuable, but insufficient by itself.
 
-All 186 histories and both meshes were screened, with the same sampled uncertainty
-and governing-history refinement. These are transformed loads on the solved
-frozen reference, **not** new executed J6 histories or controller acceptance.
+The ×2/×4 preload cases change the **radial spring/pressure-angle compliance**
+in `RackDriveSizing`, not merely steel motor-plate bending. A stiffer plate alone
+cannot remove that term. Any real change must reconcile preload force, rack-
+height variation and travel. The reducer and mesh properties remain assumed;
+no replacement gearbox or mass-neutral hardware upgrade has been selected.
+Module 2 is not credited: substituting its pitch height leaves a 5.08 mm foot
+under a 6 mm counterbore, and permissible feed force is not a mesh-stiffness rating.
 
-| Counterfactual load policy | Short braking, mm | Long braking, mm |
+There is also a geometry/model mismatch to resolve before the mount proposal:
+the nominal Y preload connectors imply pivot motion along Y (tangential), while
+the sizing formula assumes radial motion. The audit records the hinge-axis cross
+hinge-to-pinion-arm vector as (0, −100, 0) mm/rad on both sides/beds, with zero
+radial alignment. This static nominal plate has no simulated revolute joint;
+the audit describes its drawn connector layout, not a measured mechanism.
+Correct the mechanism in the future proposal without silently substituting a
+new stiffness into these reference results.
+
+## Mass and joint-model policy bounds
+
+The mass sensitivity extends gross local section volumes, not fixture totals:
+a 22×20 mm receiver with its 44.9×9.5845 mm foot, a 140×8 mm pad and 140×4 mm
+assumed replication layer. Existing Y pads are replaced in the mass accounting.
+This adds **34.76 kg moving Y**, plus **49.77/57.70 kg fixed** on the short/long
+beds. It is an illustrative lumped stock-mass penalty: X host, drilling, hardware,
+joints, contact and composite stiffening remain unqualified; frozen rack masses
+are retained. It is not a completed catalogue BOM or a qualified mount layout.
+No composite host-stiffness credit is taken for the added stock.
+
+The strongest zero-added-mass candidate has lowest modes 27.28/26.60 Hz and
+first ≥50%-gantry-kinetic modes 28.29/27.62 Hz. With the mass penalty, lowest modes
+fall to 25.55/25.02 Hz and braking error returns above the frozen reference.
+Native checks confirm mass-only changes leave static cutting stiffness unchanged.
+The real mount must earn its mass; these screens do not justify adding this stock.
+
+The following offline policies are replayed **on that drive/seat/mass sensitivity**,
+using its 58 matching histories and both meshes, with the same uncertainty search:
+
+| Counterfactual load policy on mass model | Short braking, mm | Long braking, mm |
 |---|---:|---:|
-| Extra whole-command ZV | 0.06833 | 0.09258 |
-| Extra whole-command ZVD | 0.06475 | 0.08898 |
-| Uniform timing k=0.8, including stop | 0.04367 | 0.05974 |
-| Uniform timing k=0.6, including stop | 0.02563 | 0.03496 |
+| Extra whole-command ZV | 0.07500 | 0.10296 |
+| Extra whole-command ZVD | 0.07103 | 0.09717 |
+| Uniform timing k=0.8, including stop | 0.05005 | 0.06819 |
+| Uniform timing k=0.6, including stop | **0.02717** | **0.03811** |
 
-The tested shaping bounds remain over 0.05 mm. Cartesian whole-command shaping
-also needs a contour-safe implementation; these load screens do not validate it.
-The k=0.6 load bound is below the 0.04 mm reserve, but scales velocity,
-acceleration and jerk by 0.6, 0.36 and 0.216, including the ready stop. It is not
-an existing 60% override command, not a demonstrated pose-scheduled replan, and
-not performance at the original feeds/limits. Preserve nominal contour feeds
-only after replanning/exporting a new stop-limit policy and rerunning it.
-Cycle-time comparisons remain excluded.
+These are transformed loads, not new executed J6 exports. Whole-command Cartesian
+shaping does not establish contour-safe path-distance shaping. The k=0.6 bound
+scales velocity/acceleration/jerk by 0.6/0.36/0.216, including the ready stop; it is
+not an existing 60% override command, not a demonstrated pose-scheduled replan,
+and not performance at the original feeds. Frozen-only policy endpoints, screened
+across all 186 histories, remain in the [earlier policy record](rack-results/j6-policy-bounds-20261026.json).
 
-[Policy evidence](rack-results/j6-policy-bounds-20261026.json) records each
-history, pose, mesh and uncertainty point governing these bounds. Replay peaks
-remain under 0.13 GB. The priority motion landing suite still owns the shared
-heavy-run slot; no structural option has bypassed it.
+Recommendation: retain the frozen frame/braces. Keep real mount/API adoption
+held. Develop a lightweight mount with correct radial preload motion and end
+anchoring, clear the preload/switch conflicts, and obtain new executed J6
+histories for reduced ready-stop A/J at nominal contour feeds (and proper
+path-distance ZVD if selected). Recheck with the real mount mass/compliance,
+new publication-reserve histories, higher-mode convergence and measured modes/
+damping from SR6-C. New mount weld reactions/fatigue remain unqualified here.
+
+## Validation and retained evidence
+
+All 64 structural cases ran serially through `heavy-run --slots 1`, with a
+3,000,000,000-byte scope cap, an 8 GiB available-RAM gate and immediate pre-CCX RAM
+check. Root stayed above 8 GB. Motion landing work kept priority. Maximum measured
+case peak was **919,220,224 bytes**; modal replay peaked below 0.14 GB.
+
+Native force-balance, energy and reciprocity checks pass. Maximum relative errors
+are 0.0207%, 0.0061% and 0.000011% respectively. Independent equal-share series
+estimates agree with native static compliance within 0.0006% of total compliance
+across 24 cases. Four mass-only invariance checks pass. The 15 preparation tests
+also pass. No completed case retains bulk solver output; no DATA1 writes occurred.
+
+[Joint results and verified archive inventory](rack-results/j6-joint-options-20261026.json)
+include histories, poses, meshes, uncertainty points, mode/energy summaries,
+input/deck/response/source hashes and resource evidence. A hash-verified compact
+archive on root retains generator/reader snapshots, packets and parsed modal
+summaries; reproducible working outputs are removed. The [frozen baseline](rack-results/j6-frozen-20261026.json)
+and its archive remain separately identifiable. No cycle-time acceptance or
+comparison is made.
