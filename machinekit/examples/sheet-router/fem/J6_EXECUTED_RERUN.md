@@ -151,3 +151,54 @@ archive on root retains generator/reader snapshots, packets and parsed modal
 summaries; reproducible working outputs are removed. The [frozen baseline](rack-results/j6-frozen-20261026.json)
 and its archive remain separately identifiable. No cycle-time acceptance or
 comparison is made.
+
+
+## Motion-session handoff: executed reduced ready-stop timing
+
+Requested 2026-10-26. Export two **new executed** J7/J4/J5/J6 cohorts, retaining
+nominal contour feeds and axis limits, changing the ready-stop policy only:
+
+| Cohort | Stop acceleration cap / reference | Stop jerk cap / reference |
+|---|---:|---:|
+| S08 | 0.64 | 0.512 |
+| S06 | 0.36 | 0.216 |
+
+These are k²/k³ fractions motivated by the offline k=0.8/0.6 screens, not a
+request to time-scale the entire move or apply an override. Apply them to each
+axis's documented reference ready-stop acceleration/jerk caps; publish both
+absolute caps and fractions. Where 3 m/s² is the applicable reference acceleration,
+the caps are 1.92 and 1.08 m/s². Do not infer an absolute jerk from contour jerk:
+record the actual ready-stop reference J and the resulting 0.512J/0.216J.
+The current brake/drive limits remain ceilings. Preserve continuous position,
+velocity and acceleration at hold and resume; execute the real reduced-limit
+stop and full-feed resume. If the inherited acceleration cannot enter the new
+cap instantaneously, export the actual jerk-limited transition and its limits;
+do not clip samples or relabel a reference history.
+
+Use **both 2600 and 3150 beds**, the same pose/phase grid and binding identities
+as the existing 186-history handoff (90 pose-grid, 64 phase-grid, 32 full-feed
+resume), for each cohort. Preserve the existing nominal feed settings, including
+20 m/min contour and 40 m/min rapid where the original case requests them;
+publish any axis-limited reductions. In particular include X800/Y0/Z200 on 2600
+and X800/Y3150/Z200 on 3150, with phase250/p3 and phase500/p5 holds and the
+remaining phase-grid hold locations. Retain nominal, hold/resume and ≤100%
+override cases; no above-100% executor time scaling. Preserve the whole rapid
+lead-in through braking, resume, cutting and final physical-rest tail so modal
+history is continuous. Do not export an offline suffix replacement.
+
+Deliver J4-compatible manifests, execution/provider identities, content hashes,
+clock certificates, mapped V/A/J limits, absolute feed/stop policy metadata,
+pose bindings and a handoff identifying publication-reserve revision. Export
+actual position/velocity/acceleration/jerk and stop/resume phase boundaries at
+the original resolution. Include an unmodified reference cohort from the same
+landing/revision if execution or reserve behavior changed. If any binding cannot
+be reproduced, list it explicitly rather than silently shrinking the cohort.
+We will compare braking-following against 0.05 mm and report 0.04 mm reserve,
+geometric contour and physical-rest residual separately. **No cycle-time frame
+acceptance.** These stop-only exports may differ materially from uniform timing;
+the offline results are not a promised pass.
+
+Future-run resource decision (2026-10-26): a second shared heavy-run slot is
+allowed for **one sequential router case**. Keep the 3 GB case cap, ≥8 GiB
+available-RAM pre-solve gate, motion-session memory priority and ≥8 GB root floor.
+No additional router concurrency or relaxed memory gate is implied.
