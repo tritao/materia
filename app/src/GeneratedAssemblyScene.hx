@@ -7,6 +7,8 @@ import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 
 typedef GeneratedAssemblyScene = {
+  @:optional var sourceMap:materia.project.SceneSourceMap;
+  @:optional var navigation:Array<materia.project.SceneSourceMap.SceneNavigation>;
   @:optional var projectVariant:String;
   /** Legacy source jobs retain their original saved identifier. */
   @:optional var projectJob:String;

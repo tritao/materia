@@ -143,7 +143,7 @@ class ProductionAnchorTests {
 			return;
 		}
 		var sourceStart=Sys.time();
-		var frame = MillMoldSetup.frame();
+		var frame = MillProject.smallFrame();
 		Sys.println("ANCHOR-SOURCE-WALL-TIME "+(Sys.time()-sourceStart)+" seconds (complete frame construction)");
 		var foundations=[frame.base,frame.column];
 		var depth=Math.max(frame.layout.roof,frame.casting.minimumColumnPadDepth(frame.layout.insertThickness,frame.casting.anchorRule));

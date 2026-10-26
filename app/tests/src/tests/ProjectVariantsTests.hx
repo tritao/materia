@@ -65,6 +65,9 @@ class ProjectVariantsTests {
   var editor=new ReferenceEditorApp(fonts,dir+"/workspace.json",null,null,null,null,null,null,true);
   var small=ProjectSourceLoader.load(source,null,null,"small");
   check(small.projectVariant=="small"&&small.projectJob==null&&small.missions==null,"configuration load invents neither jobs nor missions");
+  var links:Array<materia.project.SceneSourceMap.SceneNavigation>=[
+    {occurrence:"machine",label:"Open mold",variant:"large",target:"missing-target"}];
+  small.navigation=links;
   editor.session.openGeneratedProject(small,source);editor.documentChanged();
   var original=editor.session.document,smallGeometry=editor.scene.records()[0].width;
   var frame=new LayoutFrame(800,600);
@@ -74,7 +77,17 @@ class ProjectVariantsTests {
   var mission=editor.ui.submit(new MissionPanel().build(editor.missionController,editor.appearance.theme.tokens),frame);
   check(!find(mission,"Configuration"),"mission panel does not manage project configurations");
   check(editor.missionController.snapshot().mission==null,"plain machine does not have a synthetic mission");
-  editor.projectVariants.select("large");
+  var link=editor.projectVariants.navigation("project:machine");
+  if(link==null)throw "Missing generated scene navigation";
+  editor.projectVariants.navigate(link);
+  var invalidDeadline=Sys.time()+180;
+  while(editor.projectVariants.isLoading()&&Sys.time()<invalidDeadline){editor.tick();Sys.sleep(0.01);}
+  var invalid=editor.projectVariants.snapshot();
+  check(!invalid.loading && invalid.error!=null && invalid.error.indexOf("Linked project occurrence is missing")>=0
+    && editor.session.document==original,"A missing linked target preserves the installed machine");
+  links[0].target="machine";
+  editor.session.openGeneratedProject(small,source);editor.documentChanged();original=editor.session.document;
+  editor.projectVariants.navigate(links[0]);
   check(editor.projectVariants.isLoading()&&editor.session.document==original&&editor.session.projectVariant=="small","preparation preserves installed scene and selection");
   var pending=editor.projectVariants.snapshot();
   check(find(editor.submit(frame),"Opening large"),"variant loading is visible in shared editor chrome without its chooser");
@@ -85,6 +98,7 @@ class ProjectVariantsTests {
   while(editor.projectVariants.isLoading()&&Sys.time()<deadline){editor.tick();Sys.sleep(0.01);}
   check(!editor.projectVariants.isLoading()&&editor.projectVariants.snapshot().error==null,"variant installs: "+editor.projectVariants.snapshot().error);
   check(editor.session.projectVariant=="large"&&editor.session.document!=original,"variant installation updates document and selection together");
+  check(editor.scene.selectedId=="project:machine","Scene navigation selects its declared target after installation");
   check(editor.scene.records()[0].width!=smallGeometry,"switch changes actual geometry");
   var saved=dir+"/selected.materia";editor.session.save(saved);
   var record:Null<app.ProjectSceneRecord> = SceneCodec.decodeProject(File.getContent(saved));
@@ -101,6 +115,10 @@ class ProjectVariantsTests {
   var artifact=MateriaProjectRunner.exportArtifact(source,"large"),decoded=SceneArtifact.decodeView(artifact);
   var portable:Null<materia.project.SceneArtifact.SceneArtifactProject> = decoded.project;
   check(portable!=null&&portable.variant=="large"&&portable.job==null,"portable artifact retains variant semantics");
+  if(portable==null)throw "Missing portable project metadata";
+  var sources=portable.sources,navigation=portable.navigation;
+  check(sources!=null && sources.features[0].id=="fixture-body" && navigation!=null && navigation[0].variant=="small",
+    "Portable export preserves generated source links and return navigation");
   var artifactPath=dir+"/large.mtrg";File.saveBytes(artifactPath,artifact);
   check(ProjectSourceLoader.load(artifactPath,null,null,"large").projectVariant=="large","artifact reload retains variant");
   rejects(()->ProjectSourceLoader.load(artifactPath,null,null,"small"),"prebuilt artifact cannot switch source geometry");
@@ -112,6 +130,15 @@ class ProjectVariantsTests {
   while(editor.projectVariants.isLoading()&&Sys.time()<deadline){editor.tick();Sys.sleep(0.01);}
   check(!editor.projectVariants.isLoading()&&editor.projectVariants.snapshot().error==null&&
     editor.session.document==installed&&editor.session.projectVariant=="large","cancelled variant preserves the installed scene without an error");
+  var back=editor.projectVariants.navigation("project:machine");
+  if(back==null)throw "Missing return navigation";
+  editor.projectVariants.navigate(back);
+  deadline=Sys.time()+180;
+  while(editor.projectVariants.isLoading()&&Sys.time()<deadline){editor.tick();Sys.sleep(0.01);}
+  check(editor.session.projectVariant=="small" && editor.scene.selectedId=="project:machine",
+    "Return navigation restores the source variant and casting selection");
+  editor.session.openGeneratedProject(ProjectSourceLoader.load(artifactPath),artifactPath);editor.documentChanged();
+  check(editor.projectVariants.navigation("project:machine")==null,"A standalone artifact offers no unavailable source-variant action");
   editor.dispose();fonts.dispose();
  }
 }

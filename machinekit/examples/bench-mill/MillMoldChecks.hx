@@ -103,11 +103,12 @@ class MillMoldChecks {
 	public static function columnPlan(frame:BenchMillFrame):Void {
 		var count=0;
 		function verify(ok:Bool,message:String):Void {count++;if(!ok)throw message;}
-		var plan=CastingMoldCad.plan(MillColumnMoldSetup.document(frame),MillColumnMoldSetup.options(frame));
-		for(id in ["column-step-clearance-left","column-step-clearance-right","rear-y-motor-cheek-left","rear-y-motor-cheek-right"]) {
+		var plan=CastingMoldCad.plan(MillMoldSetup.document(frame,CastingShopRecipe.BOARD_THICKNESS_MM,Column),MillMoldSetup.options(frame,Column));
+		for(source in plan.document.input.features)if(source.kind!=materia.casting.CastingFeature.CastingFeatureKind.InsertRecess) {
+			var id=source.id;
 			var records=plan.features.filter(feature -> feature.featureId==id);
 			verify(records.length==1 && records[0].kind==FeatureToolingKind.EPSFeature,
-				"Deep face-open cavity uses declared sacrificial EPS: "+id);
+				"Column source cavity uses declared sacrificial EPS: "+id);
 			verify(plan.formers.filter(former -> former.featureIds.indexOf(id)>=0).length==0,
 				"Deep cavity needs no unbuildable rigid former: "+id);
 			verify(plan.cores.filter(core -> records[0].memberIds.indexOf(core.id)>=0).length>0,

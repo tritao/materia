@@ -8,6 +8,16 @@ class HobberMoldPreview {
   default:throw "Unknown hobber mold casting: "+casting;
  };
 
+ public static function plinthScene():haxe.io.Bytes return linkedScene(Plinth);
+ public static function columnScene():haxe.io.Bytes return linkedScene(Column);
+ static function linkedScene(casting:HobberMoldCasting):haxe.io.Bytes {
+  var data=materia.project.SceneArtifact.decode(scene(casting));
+  var project:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
+  project.navigation=[{occurrence:machinekit.tooling.CastingMoldView.REFERENCE_ID,label:"Back to Machine",variant:"machine",
+   target:casting==Plinth?"machine/bed/casting":"machine/column/casting"}];
+  return materia.project.SceneArtifact.encode(data);
+ }
+
  public static function scene(casting:HobberMoldCasting=Plinth):haxe.io.Bytes {
   var foundation=foundation(casting);
   var document=HobberMoldSetup.document(foundation,casting);

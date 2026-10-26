@@ -310,8 +310,11 @@ private class MillCastingSizing {
 			if (a.supplierY) {
 				// The shorter selected motor moves the bracket rearward. Keep a real
 				// shaft passage through the web separating the Z channel and rear bay.
-				var tunnelFront = l.columnFront, tunnelBack = bayFront;
-				columnVoids.push(CastingFeaturePatterns.box("selected-y-shaft-passage",ServiceOpening, [CastingPatterns.face("body.y-min")], details.selectedShaftClearance, tunnelBack
+				var tunnelFront = zAxis == null ? l.columnFront : zAxis.channelBack, tunnelBack = bayFront;
+				var shaftOpenings = zAxis == null
+					? [CastingPatterns.face("body.y-min"), CastingPatterns.feature("rear-y-motor-bay")]
+					: [CastingPatterns.feature("z-drive-channel"), CastingPatterns.feature("rear-y-motor-bay")];
+				columnVoids.push(CastingFeaturePatterns.box("selected-y-shaft-passage",ServiceOpening, shaftOpenings, details.selectedShaftClearance, tunnelBack
 					- tunnelFront, details.selectedShaftClearance, 0,
 					(tunnelFront + tunnelBack) / 2
 					- l.columnCentreY, a.yScrewZ

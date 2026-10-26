@@ -1,7 +1,7 @@
 /** Mill entry point; the kit exporter and workshop declarations are shared. */
 class MillFabricationPreview {
  public static function main():Void {
-  var frame=MillMoldSetup.frame();
+  var frame=MillProject.smallFrame();
   write(MillMoldSetup.document(frame),MillMoldSetup.options(frame),frame.base,"base","mill-base-process-review",
    (plan,review)->MillMoldChecks.run(frame,plan,review));
  }

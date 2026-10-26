@@ -53,17 +53,29 @@
     "files": [
       {
         "id": "mill-base",
-        "stepSha256": "68879dbeb36eb51bcaa23c9124b82d1492994aac008e36ad1b006b36820882b3",
-        "stepBytes": 2903960,
-        "compressedBytes": 437359
+        "stepSha256": "0c5415dae0fed1813dcf9e0273ffb825d26dc52aa0b89d5873fd01c3fe624375",
+        "stepBytes": 2904208,
+        "compressedBytes": 437469
       },
       {
         "id": "mill-column",
-        "stepSha256": "140046c416427d9489a49fd438246ee3a0a6f17c417fd5600e2dbf0819f9c0e8",
-        "stepBytes": 2699894,
-        "compressedBytes": 410892
+        "stepSha256": "63dd7f694fb470df397fae77d899e36e13aea392947dd69e8713b35e60a08b67",
+        "stepBytes": 2698014,
+        "compressedBytes": 408001
       }
-    ]
+    ],
+    "sourceAlignment": {
+      "direction": "Mill mold setup sharing: use the selected machine frame (user, 2026-10-25)",
+      "controlCommit": "c18f4f3ad",
+      "controlFunction": "MillProject.smallAssembly",
+      "symmetricDifferenceMm3": {
+        "mill-base": 0,
+        "mill-column": 0
+      },
+      "formerStandaloneMoldBaseDifferenceMm3": 325228.3959974856,
+      "reason": "The standalone mold helper omitted the selected supplier Y drive and its authored clearances. Align mold references with the unchanged Small machine source.",
+      "authoring": "Author the selected shaft passage only through the retained web, with explicit feature openings into the Z drive channel and rear motor bay; preserve the existing machine cavity union."
+    }
   },
   "approvedHobberSimplification": {
     "decision": "Hobber source decision 2 and Source simplification decision (user, 2026-10-25); lifting-land corrections (user, 2026-10-25/26)",

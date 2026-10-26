@@ -9769,10 +9769,10 @@
   "currentDesign": [
     {
       "id": "mill-base",
-      "sourceFingerprint": "35383393d1b465f35b337364fe8df5db15b2b0b744d798dbea1707e4b1099845",
+      "sourceFingerprint": "1a73fe35f001c987f2ec597ae7605d14e5e26226332d57eed2d55e5ce644a79b",
       "sourceCodecVersion": 26,
-      "volumeMm3": 68874053.65577689,
-      "massKg": 165.29772877386455,
+      "volumeMm3": 68796700.8557764,
+      "massKg": 165.1120820538634,
       "boxStatus": "unsupported",
       "boxReason": "Non-box anchor occupancy for inserts: columnLeftFront, columnLeftRear, columnRightFront, columnRightRear, driveYFixed, driveYFloating, liftLeftFront, liftLeftRear, liftRightFront, liftRightRear, railYLeft, railYRight",
       "unsupportedFeatures": [],
@@ -9780,10 +9780,10 @@
     },
     {
       "id": "mill-column",
-      "sourceFingerprint": "909a49081e0e32fde055c29efe0fb9ffb35d5cd63e57ff1eb2db2f18a8a23ec8",
+      "sourceFingerprint": "488bf81f94d0259bb3354cb460fc55ca43ac071373977f4a8ec84a8c96ee6e54",
       "sourceCodecVersion": 26,
-      "volumeMm3": 42102473.07897135,
-      "massKg": 101.04593538953124,
+      "volumeMm3": 42272723.07897126,
+      "massKg": 101.45453538953103,
       "boxStatus": "unsupported",
       "boxReason": "Post-cure receiver bores require non-box collision decomposition: hatchRearLeftLower, hatchRearLeftUpper, hatchRearRightLower, hatchRearRightUpper",
       "unsupportedFeatures": [

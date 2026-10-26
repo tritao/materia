@@ -416,6 +416,36 @@ class ProjectKitTests {
     return data;
   }
 
+  static function sourceLinks():Void {
+    var data=sceneData();data.parts[0].id="body";
+    data.parts[0].faceRanges=[{faceIndex:0,firstIndex:0,indexCount:12}];
+    data.assemblyDefinition=definition();
+    var map:materia.project.SceneSourceMap={
+      features:[{id:"seat",label:"Guide seat",occurrence:"base",faces:[0],whole:false}],
+      members:[{occurrence:"arm",sources:["seat"],shared:false}]
+    };
+    data.project={dynamicParts:[],motions:[],sources:map,
+      navigation:[{occurrence:"base",label:"Open mold",variant:"fixture-mold",target:"finished-casting"}]};
+    var encoded=SceneArtifact.encode(data),decoded=SceneArtifact.decode(encoded);
+    var project:materia.project.SceneArtifact.SceneArtifactProject=cast decoded.project;
+    var copied:materia.project.SceneSourceMap=cast project.sources;
+    check(materia.project.SceneSourceMap.SceneSourceMaps.tooling(copied,"seat")[0]=="arm","Source resolves forming tooling");
+    check(materia.project.SceneSourceMap.SceneSourceMaps.sources(copied,"arm")[0]=="seat","Tooling resolves source intent");
+    check(copied.features[0].faces[0]==0 && project.navigation[0].target=="finished-casting","Face and navigation links round trip");
+    map.features[0].faces=[1];
+    rejects(()->SceneArtifact.encode(data),"Unknown source face rejected");map.features[0].faces=[0];
+    map.members[0].sources=["missing"];
+    rejects(()->SceneArtifact.encode(data),"Dangling source rejected");map.members[0].sources=["seat"];
+    map.members.push(map.members[0]);
+    rejects(()->SceneArtifact.encode(data),"Duplicate member provenance rejected");map.members.pop();
+    map.members[0].shared=true;
+    rejects(()->SceneArtifact.encode(data),"Shared hardware cannot claim source ownership");map.members[0].shared=false;
+    var sourceProject:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
+    var navigation:Array<materia.project.SceneSourceMap.SceneNavigation>=cast sourceProject.navigation;
+    navigation[0].occurrence="missing";
+    rejects(()->SceneArtifact.encode(data),"Dangling navigation occurrence rejected");
+  }
+
   static function scene():Void {
     var data = sceneData();
     var encoded = SceneArtifact.encode(data);
@@ -1393,7 +1423,7 @@ class ProjectKitTests {
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
     assembly(); hydraulic();
-    homingDependencies(); frames(); scene(); screwEntrySearchProfile(); machineMetadata(); machining(); printing();
+    homingDependencies(); frames(); sourceLinks(); scene(); screwEntrySearchProfile(); machineMetadata(); machining(); printing();
     mobileBase(); toolChangerMission(); perControllerPrograms(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");

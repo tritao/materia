@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "mold-source-link-tests"
+  },
+  "entry": "tests.MoldSourceLinkTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/mold-source-links"
+}

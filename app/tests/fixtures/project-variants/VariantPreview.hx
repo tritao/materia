@@ -16,6 +16,10 @@ class VariantPreview {
     parts:[{id:"machine",name:"Fixture machine",red:0.5,green:0.5,blue:0.6,materialId:"machined-steel",
      vertexCount:mesh.vertexCount,indexCount:mesh.indexCount,vertices:mesh.vertices,normals:mesh.normals,indices:mesh.indices,
      faceRanges:[for(range in mesh.faceRanges){faceIndex:range.faceIndex,firstIndex:range.firstIndex,indexCount:range.indexCount}]}],
+    project:{dynamicParts:[],motions:[],sources:{features:[
+      {id:"fixture-body",label:"Fixture body",occurrence:"machine",faces:[],whole:true}],
+      members:[{occurrence:"machine",sources:["fixture-body"],shared:false}]},
+      navigation:[{occurrence:"machine",label:size==10?"Open mold":"Back to machine",variant:size==10?"large":"small",target:"machine"}]},
     assemblyDefinition:{schemaVersion:AssemblyDefinitionCodec.VERSION,id:"variant-fixture",lengthUnit:"mm",
      definitions:[{id:"machine",connectors:[]}],occurrences:[{id:"machine",definition:"machine",grounded:true,initialPose:AssemblyFrames.identity()}],joints:[]}});
    shape.close();return bytes;

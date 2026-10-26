@@ -12,9 +12,43 @@
       "kind": "cad-preview",
       "module": "HobberEnclosurePreview",
       "function": "scene",
-      "cache": {
-        "inputs": []
-      }
+      "cache": {}
+    },
+    "plinth-mold": {
+      "kind": "cad-preview",
+      "module": "HobberMoldPreview",
+      "function": "plinthScene",
+      "cache": {}
+    },
+    "column-mold": {
+      "kind": "cad-preview",
+      "module": "HobberMoldPreview",
+      "function": "columnScene",
+      "cache": {}
     }
-  }
+  },
+  "defaultVariant": "machine",
+  "variants": [
+    {
+      "id": "machine",
+      "label": "Machine",
+      "entrypoint": "machine",
+      "kind": "configuration",
+      "summary": "Complete enclosed flexspline hobber."
+    },
+    {
+      "id": "plinth-mold",
+      "label": "Machine \u2014 Plinth mold",
+      "entrypoint": "plinth-mold",
+      "kind": "study",
+      "summary": "Plinth tooling and finished casting from the machine source."
+    },
+    {
+      "id": "column-mold",
+      "label": "Machine \u2014 Column mold",
+      "entrypoint": "column-mold",
+      "kind": "study",
+      "summary": "Column tooling and finished casting from the machine source."
+    }
+  ]
 }

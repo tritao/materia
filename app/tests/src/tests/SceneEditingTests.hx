@@ -52,6 +52,7 @@ import materia.project.SceneArtifact;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 
+@:access(app.EditorScene)
 @:access(app.EditorPerspectiveViewport)
 @:access(app.ApplicationSimulation)
 @:access(app.Main.ReferenceEditorApp)
@@ -1417,8 +1418,11 @@ class SceneEditingTests {
         hit.id, hit.faceIndex);
       check(view.visibilityOverrideCount() == 1,
         "CAD face hover presents a dedicated face overlay node");
-      check(view.hoverOverrideCount() == 0,
-        "CAD face hover does not replace the whole-object presentation");
+      var overlays=view.hoverOverrideValues(),faceNode=scene.faceHoverNodes.get(hit.id);
+      check(overlays.length==1 && faceNode!=null
+          && overlays[0].get_node().get_value()==faceNode.stableValue()
+          && overlays[0].get_node().get_value()!=scene.info(hit.id).node().stableValue(),
+        "CAD face hover tints the dedicated face node, preserving the whole-object presentation");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1467,8 +1471,11 @@ class SceneEditingTests {
         hit.id, hit.faceIndex);
       check(view.visibilityOverrideCount() == 1,
         "CAD preview face hover presents a dedicated face overlay node");
-      check(view.hoverOverrideCount() == 0,
-        "CAD preview face hover does not replace the whole-object presentation");
+      var overlays=view.hoverOverrideValues(),faceNode=scene.faceHoverNodes.get(hit.id);
+      check(overlays.length==1 && faceNode!=null
+          && overlays[0].get_node().get_value()==faceNode.stableValue()
+          && overlays[0].get_node().get_value()!=scene.info(hit.id).node().stableValue(),
+        "CAD preview face hover tints the dedicated face node, preserving the whole-object presentation");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;

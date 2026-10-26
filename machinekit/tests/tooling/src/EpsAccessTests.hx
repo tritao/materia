@@ -475,7 +475,45 @@ class EpsAccessTests {
 		assertions+=7;
 	}
 
+	static function declaredBedNetwork():Void {
+		var document=SinglePocketSetup.document();
+		document.input.inserts=[];
+		document.setup.sourceToMold=F.identity();
+		document.input.features=[for(index in 0...2) {
+			id:index==0?"shaft":"drive-channel",kind:materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
+			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(60,index==0?60:30,index==0?50:30)),
+				pose:F.translation(index==0?-20:40,0,index==0?0:10)},
+			openings:index==0 ? [materia.casting.CastingPatterns.face("body.z-min"),materia.casting.CastingPatterns.feature("drive-channel")]
+				: [materia.casting.CastingPatterns.feature("shaft")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
+			cornerRadius:0,owner:null,adjustable:[],derivedFrom:null
+		}];
+		document.setup.features=[for(feature in document.input.features) {
+			featureId:feature.id,strategy:materia.tooling.casting.CastingSetup.CoreStrategy.SacrificialEPS,
+			priority:0,withdrawal:{x:0.0,y:0.0,z:-1.0}
+		}];
+		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
+		var before=materia.tooling.ToolingCodec.encodeInput(document.input);
+		var plan=machinekit.tooling.CastingMoldCad.plan(document,options());
+		check(plan.cores.length==1 && plan.features.filter(feature->feature.memberIds.indexOf(plan.cores[0].id)>=0).length==2,
+			"Face-connected declared cuts share one real portal and retain both source IDs");
+		check(materia.tooling.ToolingCodec.encodeInput(plan.document.input)==before,"Access grouping changes no source geometry");
+		var source=machinekit.tooling.CastingMoldCad.source(plan),rebuilt=machinekit.tooling.CastingMoldCad.reconstructed(plan);
+		var missing=source.subtractAll([rebuilt]),excess=rebuilt.subtractAll([source]);
+		check(missing.volume()+excess.volume()<1e-5,"Shared face-open EPS access exactly reconstructs source resin");
+		missing.close();excess.close();source.close();rebuilt.close();
+		document.input.features.push({id:"round-neighbour",kind:materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
+			geometry:{solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(20,50)),pose:F.translation(90,0,0)},
+			openings:[materia.casting.CastingPatterns.face("body.z-min")],draft:{degrees:0,axis:{x:0,y:0,z:1}},
+			cornerRadius:0,owner:null,adjustable:[],derivedFrom:null});
+		document.setup.features.push({featureId:"round-neighbour",strategy:SacrificialEPS,priority:0,withdrawal:{x:0.0,y:0.0,z:-1.0}});
+		document.setup.sourceFingerprint=materia.tooling.ToolingCodec.inputFingerprint(document.input);
+		var networks=materia.tooling.casting.EPSAccessNetworks.plan(document,document.setup.features,[]);
+		check(networks.length==1 && networks[0].featureIds.length==2 && networks[0].featureIds.indexOf("round-neighbour")<0,
+			"Unrelated non-box cuts retain their native route without disabling exact box networks");
+	}
+
 	static function main():Void {
+		declaredBedNetwork();
 		transverseBore();elevatedThroughMask();
 		contactAndLocatingFoot();
 		fixture(false);fixture(true);

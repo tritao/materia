@@ -143,7 +143,7 @@ class FormerManufacturingTests {
 			"drafted tall former reports the missing leaning-panel construction explicitly");
 		if (Sys.args().indexOf("--mill")>=0) {
 			var started=Sys.time();
-			var frame=MillMoldSetup.frame();
+			var frame=MillProject.smallFrame();
 			Sys.println("FORMER production frame seconds "+(Sys.time()-started));
 			var plan=materia.tooling.casting.CastingMoldPlanner.plan(MillMoldSetup.document(frame),MillMoldSetup.options(frame));
 			Sys.println("FORMER production plan seconds "+(Sys.time()-started));

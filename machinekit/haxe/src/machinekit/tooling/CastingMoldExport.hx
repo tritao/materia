@@ -93,6 +93,8 @@ class CastingMoldExport {
 			casting.close();
 			throw error;
 		}
+		var sourceFeatures:Array<materia.project.SceneSourceMap.SceneSourceFeature>;
+		try sourceFeatures=MoldSceneSources.features(p,casting) catch(error:Dynamic){casting.close();throw error;}
 		var castingMesh = AssemblyPreview.part(CastingMoldView.REFERENCE_ID, "Finished casting", casting,
 			materia.project.MaterialLibrary.fromSpec("mineral cast"));
 		var assembled = CastingMoldCad.assembly(p),
@@ -102,7 +104,7 @@ class CastingMoldExport {
 		if (restored.encode() != saved)
 			throw "Assembly recipe did not restore exactly";
 		text(dir + "/mold.assembly.json", saved);
-		scene(dir, "mold", assembled, p, review, castingMesh);
+		scene(dir, "mold", assembled, p, review, castingMesh,sourceFeatures);
 		var coreList = [for (c in p.cores) switch c.support.kind {
 			case RoutedSocket: c.id+": "+c.layers.length+" layers, routed socket "+c.support.socketOperationId;
 			case RegisteredFlange: c.id+": "+c.layers.length+" layers, externally clamped registered flange at "+MoldCores.receiverId(c);
@@ -141,15 +143,18 @@ class CastingMoldExport {
 	/** Viewport-only generation shares the exported scene, without writing a kit. */
 	public static function artifact(plan:CastingMoldPlan):haxe.io.Bytes {
 		var casting = CastingMoldCad.reconstructed(plan);
+		var sourceFeatures:Array<materia.project.SceneSourceMap.SceneSourceFeature>;
+		try sourceFeatures=MoldSceneSources.features(plan,casting) catch(error:Dynamic){casting.close();throw error;}
 		var mesh = AssemblyPreview.part(CastingMoldView.REFERENCE_ID, "Finished casting", casting,
 			materia.project.MaterialLibrary.fromSpec("mineral cast"));
-		return SceneArtifact.encode(sceneData("mold", CastingMoldCad.assembly(plan), plan, null, mesh));
+		return SceneArtifact.encode(sceneData("mold", CastingMoldCad.assembly(plan), plan, null, mesh,sourceFeatures));
 	}
 
 	static function sceneData(id:String, a:MachineAssembly, plan:CastingMoldPlan,
-			review:Null<CastingMoldCad.CastingMoldReview>, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):materia.project.SceneArtifact.SceneArtifactData {
+			review:Null<CastingMoldCad.CastingMoldReview>, castingMesh:materia.project.SceneArtifact.SceneArtifactPart,sourceFeatures:Array<materia.project.SceneSourceMap.SceneSourceFeature>):materia.project.SceneArtifact.SceneArtifactData {
 		var sceneData=AssemblyPreview.scene(a,id);
 		CastingMoldView.geometry(sceneData, castingMesh);
+		MoldSceneSources.attach(sceneData,plan,sourceFeatures);
 		if (review == null) {
 			if (sceneData.assemblyDefinition == null) throw "Mold scene requires an assembly";
 			sceneData.presentation = CastingMoldCad.presentation(plan,sceneData.assemblyDefinition);
@@ -168,8 +173,8 @@ class CastingMoldExport {
 	}
 
 	static function scene(dir:String, id:String, a:MachineAssembly, plan:CastingMoldPlan,
-			review:CastingMoldCad.CastingMoldReview, castingMesh:materia.project.SceneArtifact.SceneArtifactPart):Void {
-		var record = sceneData(id, a, plan, review, castingMesh);
+			review:CastingMoldCad.CastingMoldReview, castingMesh:materia.project.SceneArtifact.SceneArtifactPart,sourceFeatures:Array<materia.project.SceneSourceMap.SceneSourceFeature>):Void {
+		var record = sceneData(id, a, plan, review, castingMesh,sourceFeatures);
 		sys.io.File.saveBytes(dir+"/"+id+".mtrg",SceneArtifact.encode(record));
 		var rows:Array<Dynamic> = [], poses = a.solvedPoses();
 		for (row in a.components()) {

@@ -1,6 +1,6 @@
 # Reusable panel tooling and mineral-casting molds
 
-Status: phases 1–5 and the phase 6 process-analysis foundation are implemented as review tooling. The fabrication package reports unresolved process, structural, fixture and finishing requirements; physical qualification remains pending.
+Status: phases 1–8 are code complete as review tooling for the mill base, mill column, hobber plinth and hobber column. The packages report unresolved user and workshop inputs honestly; phase 9 physical qualification remains pending.
 
 ## Scope freeze and definition of done (2026-10-21)
 
@@ -29,7 +29,7 @@ Status: phases 1–5 and the phase 6 process-analysis foundation are implemented
 - [x] Phase 5: checked drawing/CAM/shop packages; fabrication readiness remains evidence-dependent.
 - [x] Phase 6: exact fill, castability and compound-datasheet reporting integrated into all four verified kits; workshop inputs remain Pending.
 - [x] Phase 7: records, requirements, exact geometry, checked former CAM and cleanup landed; EPS selected and protected square contacts retained.
-- [ ] Phase 8: approved mill and hobber source corrections and four-kit final verification complete, with zero Fail; shared mold scene integration remains. No flared former work.
+- [x] Phase 8: approved source corrections, four verified zero-Fail kits and shared mold scenes with role groups, source highlighting and navigation are code complete. No flared former work.
 - [ ] Phase 9: workshop calibration and physical release remain Pending.
 
 See [README.md](README.md#casting-tooling-inputs) for the implemented API and checks.
@@ -1281,6 +1281,10 @@ bounding-box material approximation enters a claimed relation.
    casting there, and offers a way back.
 4. Mold geometry stays out of machine assembly scenes.
 
+Implementation decisions (scene integration): the selected Y shaft is authored only in the retained web, with explicit openings into its adjoining drive channel and motor bay. Their union remains the existing machine geometry; source-pocket disjointness and panel ligaments remain checked. Unrelated non-box cuts retain their native allocation rather than disabling a box access network. The selected machine frame includes its selected Y-drive shaft passage, which the former standalone mold-frame constructor omitted. Finished machine geometry is unchanged. The frozen mold references now match the pre-refactor `MillProject.smallAssembly` at `c18f4f3ad` with zero symmetric difference for both castings; the old standalone base mold reference differed by 325,228 mm³ because its drive selection was missing.
+
+Implementation decisions (scene integration): use the existing authored occurrence paths for role groups; carry explicit source IDs and exact CAD face indices in scene metadata. Source overlays have no independent occurrence or mass. Navigation selects the linked casting after the existing asynchronous variant switch, and each mold reference offers the return link. One setup and preview take the selected frame and casting; Compact VMC is checked at planner level without a new mold variant.
+
 Acceptance: every mold occurrence sits in exactly one role group, every tooling
 occurrence names at least one source ID or is listed as shared hardware, and
 the cross-links round-trip for the base and the column.
@@ -1363,6 +1367,8 @@ running automated checks. Keep generated full-size geometry under ignored build
 directories; commit source setups, small test fixtures and documentation.
 
 ## Deferred scope
+
+- Generic app `MachineControlTests.posePersistenceChecks` has a generated-source-baseline fixture failure reproduced on shared main before mold scene integration; repair that fixture separately. Mold source links, project variants and presentation invariants remain required here.
 
 - Drafted melamine formers (source Draft adjustability, its mapped proposal/application, leaning hollow-former walls): not built; the comparison closed on EPS (2026-10-23).
 

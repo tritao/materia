@@ -142,12 +142,12 @@ review and load/access checks below; phase 9 supplies physical evidence.
 ## Column review (phase 8)
 
 ```sh
-./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.column-tooling.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.tooling.json -- --column
 ./app/run-built.sh --project="$PWD/machinekit/examples/bench-mill/build/tooling/column/mold.mtrg" --perspective
-./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.column-tooling.json -- --fabrication --checks
+./haxeon/scripts/haxeon run --project=machinekit/examples/bench-mill/haxeon.tooling.json -- --column --fabrication --checks
 ```
 
-`MillColumnMoldSetup` copies the actual `frame.column`, lays its front on the bed
+`MillMoldSetup` takes the selected machine frame and casting, copies its actual `frame.column`, lays its front on the bed
 and fills toward its rear. The stepped foot uses ordinary EPS access cores;
 there are no flared-envelope fillers. The shared planner constructs source-thread
 datum carriers and registered bed/side EPS access. The preview checks
@@ -490,3 +490,5 @@ coverage, protected bonding faces and preparation before assembly. Five Pending
 records cover EPS safety and the four product/timing inputs; chemical coupon
 evidence remains in the existing compatibility check. All 475 prior CAD, drawing
 and CAM artifacts across the base, box and socket kits remain unchanged.
+
+Mold scene trees group shell, formers, EPS units, insert fixtures and shared hardware from the plan. Source rows beneath the casting cross-highlight their forming tooling and exact CAD faces. In the Small machine, use **Open mold** on either casting; the mold reference offers **Back to Small**. Preview generators reuse the same setup without exporting a kit or running full verification.

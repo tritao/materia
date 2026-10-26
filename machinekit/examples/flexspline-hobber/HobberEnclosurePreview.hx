@@ -104,6 +104,12 @@ class HobberEnclosurePreview {
         length:machine.mandrel.parameterNumber("sleeveLength"),radialTravel:machine.mandrel.parameterNumber("radialFitGap"),retractX:machinekit.hobbing.HobberXLayout.RETRACT,
         frontApproachMm:machinekit.hobbing.HobberXLayout.FRONT_APPROACH,liftMm:machinekit.hobbing.HobberXLayout.FRONT_LIFT};
     }
+    if(scene.project==null)scene.project={dynamicParts:[],motions:[]};
+    var project:materia.project.SceneArtifact.SceneArtifactProject=cast scene.project;
+    project.navigation=[
+      {occurrence:"machine/bed/casting",label:"Open mold",variant:"plinth-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID},
+      {occurrence:"machine/column/casting",label:"Open mold",variant:"column-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID}
+    ];
     HobberInspectionViews.apply(scene,machine,"machine/");
     return scene;
   }

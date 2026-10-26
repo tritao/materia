@@ -84,6 +84,7 @@ class ProjectDocumentSession {
   /** Source definition bound to the runtime; compiled models own a separate snapshot. */
   var assemblyRuntimeDefinition:Null<AssemblyDefinition> = null;
   public var presentationGeometryFingerprint(default,null):String = "";
+  public var navigation(default,null):Null<Array<materia.project.SceneSourceMap.SceneNavigation>> = null;
   public var presentation(default,null):Null<AssemblyPresentation> = null;
   var generatedPresentation:Null<AssemblyPresentation>;
   var authoredPresentation:Null<AuthoredPresentation>;
@@ -297,6 +298,7 @@ class ProjectDocumentSession {
     projectVariant = generated.projectVariant;
     projectJob = generated.projectJob;
     presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
+    scene.sourceMap=generated.sourceMap;navigation=generated.navigation;
     generatedPresentation=generated.presentation;
     var presentationDefinition=generated.assemblyDefinition;
     presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
@@ -441,6 +443,7 @@ class ProjectDocumentSession {
     projectJob = generated.projectJob;
     authoredPresentation=savedPresentation;
     presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
+    scene.sourceMap=generated.sourceMap;navigation=generated.navigation;
     generatedPresentation=generated.presentation;
     var presentationDefinition=generated.assemblyDefinition;
     presentation=presentationDefinition==null?null:PresentationEdits.merge(presentationDefinition,generatedPresentation,authoredPresentation);
@@ -1177,6 +1180,7 @@ class ProjectDocumentSession {
     projectReference = null;
     projectVariant = null;
     projectJob = null;
+    scene.sourceMap=null;navigation=null;
     presentation = null;generatedPresentation=null;authoredPresentation=null;presentationGeometryFingerprint="";
     recipeDocument = null;
     projectBaseline = null;
@@ -1263,6 +1267,7 @@ class ProjectDocumentSession {
     var data = materializeProject(generated.objects, saved.record, saved.authored, diagnostics, customMaterials);
     scene.refreshGenerated(data, generated.geometryBySnapshot);
     presentationGeometryFingerprint=generated.presentationGeometryFingerprint==null?"":generated.presentationGeometryFingerprint;
+    scene.sourceMap=generated.sourceMap;navigation=generated.navigation;
     generatedPresentation=generated.presentation;presentation=nextPresentation;
     projectBaseline = generated.objects;
     installAssemblyRuntime(generated.assemblyDefinition,

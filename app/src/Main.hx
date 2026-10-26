@@ -955,7 +955,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
     }
     if (hierarchyMenuVisible && documentDialog == null) {
-      var objectMenu = new Menu("hierarchy-object-menu", [
+      var sceneLink=projectVariants.navigation(treeModel.selectionKey());
+      var objectItems = [
         new MenuItem("visibility", "Show / hide (Space)", function() treeModel.toggleVisibility(treeModel.selectionKey()), !documents.blocked()),
         new MenuItem("isolate", "Isolate selected", function() treeModel.isolateSelected(), !documents.blocked()),
         new MenuItem("show-all", "Show all", function() treeModel.showAll(), !documents.blocked()),
@@ -971,7 +972,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
           commands.get("scene.delete").isEnabled(ui.commandContext)),
         new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"), scene.object(scene.selectedId)!=null)
-      ], hierarchyMenuX, hierarchyMenuY, function() { hierarchyMenuVisible = false; invalidateView(); });
+      ];
+      if(sceneLink!=null)objectItems.unshift(new MenuItem("open-linked-scene",sceneLink.label,function() {
+        projectVariants.navigate(sceneLink);hierarchyMenuVisible=false;invalidateView();
+      },projectVariants.snapshot().switchAllowed));
+      var objectMenu = new Menu("hierarchy-object-menu",objectItems,hierarchyMenuX,hierarchyMenuY,
+        function() { hierarchyMenuVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("hierarchy-object-menu", objectMenu, 0.0, 0.0, 26));
     }
     if (renameId != null && documentDialog == null) {

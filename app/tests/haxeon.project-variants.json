@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {
+    "name": "project-variants-tests"
+  },
+  "entry": "tests.ProjectVariantsTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "app": {
+      "path": ".."
+    }
+  },
+  "target": "host",
+  "outputDir": "../build/project-variants"
+}

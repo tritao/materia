@@ -23,6 +23,7 @@ import nativekit.scene.ChangeSet;
 /** SceneKit resources, renderer changes, and hover presentation state. */
 @:access(app.EditorScene)
 class ScenePresentation {
+  public final sourceFaces:SourceFacePresentation = new SourceFacePresentation();
   public final threads:CosmeticThreadPresentation = new CosmeticThreadPresentation();
   public var bridge:SceneBridge;
   public var snapshot:SceneSnapshot;
@@ -198,6 +199,7 @@ class ScenePresentation {
       else for (node in workerVisual.character.model.primitiveNodes) selection.add(node, selectedMaterial);
     }
     view.applySelection(selection, selectionMaterial);
+    sourceFaces.apply(owner,view);
     var highlightMaterial = hoverMaterial;
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
@@ -244,6 +246,7 @@ class ScenePresentation {
             var child=owner.renderSnapshot().findNode(node);
             if(child!=null){poseNodes.push(node);poseTransforms.push(transform.multiplied(child.localTransform()));}
           }
+          for(entry in sourceFaces.entries)if(entry.id==pose.id){poseNodes.push(entry.node);poseTransforms.push(transform);}
           for (node in threads.nodesFor(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.

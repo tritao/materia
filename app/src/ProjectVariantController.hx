@@ -28,6 +28,7 @@ class ProjectVariantController {
   var reference:Null<String>;
   var loadGeneration = -1;
   var loadingLabel = "";
+  var targetSelection:Null<String>;
 
   public function new(session:ProjectDocumentSession,simulation:ApplicationSimulation,
       requestChange:(Void->Void)->Void,changed:Void->Void,installed:Void->Void,blocked:Void->Bool) {
@@ -59,13 +60,24 @@ class ProjectVariantController {
       switchAllowed:!simulation.isActive()&&loading==null&&!blocked(),simulationActive:simulation.isActive(),
       loading:loading!=null,status:loading==null?"":"Opening "+loadingLabel+" · "+loading.control.currentPhase()+" · "+Std.int(loading.elapsedSeconds())+" s",error:failure};
   }
-  public function select(id:String):Void {
+  public function navigation(occurrence:String):Null<materia.project.SceneSourceMap.SceneNavigation> {
+    var id=StringTools.startsWith(occurrence,"project:")?occurrence.substr(8):occurrence;
+    var state=snapshot(),links=session.navigation;
+    if(links!=null)for(link in links)if(link.occurrence==id && state.variants.filter(variant->variant.id==link.variant).length==1)return link;
+    return null;
+  }
+  public function navigate(link:materia.project.SceneSourceMap.SceneNavigation):Void {
+    var declared=navigation(link.occurrence);
+    if(declared==null || declared.variant!=link.variant || declared.target!=link.target)throw "Unknown scene navigation";
+    select(link.variant,link.target);
+  }
+  public function select(id:String,?target:String):Void {
     var state=snapshot();if(!state.switchAllowed||id==state.selected)return;
     if(state.variants.filter(v->v.id==id).length!=1)throw 'Unknown project variant "$id"';
     var path=session.projectReference,expectedGeneration=session.generation;if(path==null)return;
     requestChange(function() {
       if(simulation.isActive()||isLoading()||session.generation!=expectedGeneration)return;
-      reference=path;loadGeneration=session.generation;failure=null;
+      reference=path;loadGeneration=session.generation;failure=null;targetSelection=target;
       for(variant in variants)if(variant.id==id)loadingLabel=variant.label;
       loading=new ProjectLoadJob(path,id);changed();
     });
@@ -79,9 +91,14 @@ class ProjectVariantController {
       var candidate=task.take();
       if(simulation.isActive())throw "Stop simulation before changing project variants";
       var path=reference;if(path==null)throw "Project source is missing";
-      session.openGeneratedProject(candidate,path);sync();installed();
+      var target=targetSelection;
+      if(target!=null && candidate.objects.filter(item->item.id=="project:"+target).length!=1)
+        throw "Linked project occurrence is missing: "+target;
+      session.openGeneratedProject(candidate,path);
+      if(target!=null)session.scene.select("project:"+target);
+      targetSelection=null;sync();installed();
     }catch(error:Dynamic)failure="Could not load project variant: "+Std.string(error);
     changed();
   }
-  public function cancel():Void {if(loading!=null)loading.control.cancel();loading=null;changed();}
+  public function cancel():Void {if(loading!=null)loading.control.cancel();loading=null;targetSelection=null;changed();}
 }

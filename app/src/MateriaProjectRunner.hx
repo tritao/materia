@@ -237,6 +237,23 @@ class MateriaProjectRunner {
     return records;
   }
 
+  /** Manifest runtime choices override those fields only; producer provenance
+   * and scene navigation survive both portable export routes. */
+  static function mergeProjectSettings(artifact:materia.project.SceneArtifact.SceneArtifactData,manifest:Dynamic,
+      selected:Null<app.ProjectVariants.ProjectVariant>,motion:Dynamic):Void {
+    var dynamicParts:Dynamic=Reflect.field(manifest,"dynamicParts");
+    var parts:Array<Dynamic>=dynamicParts==null?[]:cast dynamicParts;
+    var tracks:Array<Dynamic>=motion==null?[]:cast Reflect.field(motion,"tracks");
+    var resolved=SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
+      job:selected==null||selected.kind!="job"?null:selected.id,dynamicParts:parts,motions:tracks});
+    var settings=artifact.project;
+    if(settings==null)artifact.project=resolved;
+    else {
+      settings.variant=resolved.variant;settings.job=resolved.job;
+      settings.dynamicParts=resolved.dynamicParts;settings.motions=resolved.motions;
+    }
+  }
+
   /** Resolves source-only runtime settings into a self-contained downloadable artifact. */
   public static function exportArtifact(projectPath:String, ?variantId:String):Bytes {
     var path = FileSystem.fullPath(projectPath);
@@ -244,12 +261,7 @@ class MateriaProjectRunner {
     var manifest:Dynamic = Json.parse(File.getContent(path));
     var selected = ProjectVariants.selected(manifest, variantId);
     var motion:Dynamic = motionDocument(path);
-    var dynamicParts:Dynamic = Reflect.field(manifest, "dynamicParts");
-    var parts:Array<Dynamic> = dynamicParts == null ? [] : cast dynamicParts;
-    var tracks:Array<Dynamic> = motion == null ? [] : cast Reflect.field(motion, "tracks");
-    artifact.project = SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
-      job: selected == null || selected.kind!="job" ? null : selected.id,
-      dynamicParts: parts, motions: tracks});
+    mergeProjectSettings(artifact,manifest,selected,motion);
     if (artifact.machining != null && artifact.machining.programFile != null)
       throw "Use exportArtifactBundle for a project with an external machining program";
     return SceneArtifact.encode(artifact);
@@ -271,12 +283,7 @@ class MateriaProjectRunner {
       var manifest:Dynamic = Json.parse(File.getContent(path));
       var selected = ProjectVariants.selected(manifest,variantId);
       var motion:Dynamic = motionDocument(path);
-      var dynamicParts:Dynamic = Reflect.field(manifest,"dynamicParts");
-      var parts:Array<Dynamic> = dynamicParts == null ? [] : cast dynamicParts;
-      var tracks:Array<Dynamic> = motion == null ? [] : cast Reflect.field(motion,"tracks");
-      artifact.project = SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
-        job:selected==null||selected.kind!="job"?null:selected.id,
-        dynamicParts:parts,motions:tracks});
+      mergeProjectSettings(artifact,manifest,selected,motion);
       files.set("preview.mtrg",SceneArtifact.encode(artifact));
     } else files.set("preview.mtrg",exportArtifact(path,variantId));
     return files;
@@ -558,7 +565,7 @@ class MateriaProjectRunner {
       item.z = worldCenter.z * generated.metresPerUnit;
       item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
     }
-    return {objects: objects, presentation:generated.presentation, presentationGeometryFingerprint:generated.presentationGeometryFingerprint, projectVariant:generated.projectVariant, projectJob: generated.projectJob,
+    return {objects: objects, sourceMap:generated.sourceMap,navigation:generated.navigation,presentation:generated.presentation, presentationGeometryFingerprint:generated.presentationGeometryFingerprint, projectVariant:generated.projectVariant, projectJob: generated.projectJob,
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: state.definition,
       assemblyState: state.record(), assemblyModel: state.model, localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,

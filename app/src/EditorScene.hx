@@ -289,6 +289,8 @@ class EditorScene {
   function get_selectionRevision():Int return selection.revision;
   public var onSelectionChanged:Null<Void->Void> = null;
   /** Optional hierarchy selection, including members of a selected assembly group. */
+  public var sourceMap:Null<materia.project.SceneSourceMap> = null;
+  public var sourceSelection:Null<Void->Array<materia.project.SceneSourceMap.SceneSourceFeature>> = null;
   public var selectionObjects:Null<Void->Array<String>> = null;
   var disposed:Bool = false;
 
@@ -1796,6 +1798,7 @@ class EditorScene {
 
   public function renderSnapshot():SceneSnapshot {
     refreshPresentationIfStale();
+    presentation.sourceFaces.prepare(this);
     return snapshot;
   }
 
@@ -2035,6 +2038,8 @@ class EditorScene {
     clearSelectedCadFace();
     var item=object(id);
     var subelement=hit.subelement();
+    var sourceFace=presentation.sourceFaces.face(hit.node());
+    if(sourceFace>=0)subelement=sourceFace;
     // Stock meshes have no subelement ranges: the hit reports its triangle plus one.
     if(item!=null&&item.kind==StockSimulationSession.KIND&&subelement>0&&(subelement & 0x40000000)==0)
       stockSimulation(id).pick(subelement-1);
@@ -2051,6 +2056,10 @@ class EditorScene {
         installSelectedCadFace(session,face,index,hit.worldX()-item.x,hit.worldY()-item.y);
       } catch(error:Dynamic){clearSelectedCadFace();}
     }
+    var sources=sourceMap;
+    if(item!=null && item.kind=="cad-preview" && sources!=null && subelement>=0 && (subelement & 0x40000000)==0
+        && sources.features.filter(feature->"project:"+feature.occurrence==id).length>0)
+      selection.selectedCadFaceIndex=subelement;
     if(previousFace!=selectedCadFaceIndex||previousEdge!=selectedCadEdgeIndex)
       selection.changed(this);
     return id;
@@ -2058,6 +2067,7 @@ class EditorScene {
 
   function idForHit(hit:PickResult):String {
     var id = bridge.idForNode(hit.node());
+    if(id==null)id=presentation.sourceFaces.owner(hit.node());
     return id == null ? "scene" : id;
   }
 
@@ -3092,6 +3102,7 @@ class EditorScene {
     if (disposed) return;
     disposed = true;
     cadDisplayGeometry.clear();
+    presentation.sourceFaces.dispose(this);
     presentation.threads.dispose(this);
     for (visual in workerVisuals) visual.dispose(scene, false);
     workerVisuals.clear();

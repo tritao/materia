@@ -7,23 +7,39 @@ import materia.tooling.ToolingCodec;
 import materia.tooling.panel.PanelJoints;
 import materia.assembly.AssemblyFrames as F;
 
+enum abstract MillMoldCasting(String) {
+	var Base = "base";
+	var Column = "column";
+}
+
 /** Tooling uses the complete frame instantiated by the mechanical preview. */
 class MillMoldSetup {
-	public static function frame():BenchMillFrame {
-		var reference = new BenchMill(false, false),
-			layout = MillFramePreview.layout(reference);
-		var z = MillFramePreview.zLayout(reference, layout),
-			xy = new MillXYStageLayout(layout, z.spindleY, BenchMill.RAIL);
-		return BenchMillFrame.create(layout, z, xy);
-	}
 
-	public static function input(frame:BenchMillFrame):CastingToolingInput {
+	public static function input(frame:BenchMillFrame, casting:MillMoldCasting = Base):CastingToolingInput {
+		if (casting == Column) {
+			var context = machinekit.tooling.FoundationAssemblyContext.snapshot(frame,"column/casting",
+				[for (insert in frame.column.insertLocations()) {id:insert.id,member:"column/"+insert.id}]);
+			return FoundationToolingAdapter.snapshot(frame.column,"bench-mill-column",1,context);
+		}
 		var context=machinekit.tooling.FoundationAssemblyContext.snapshot(frame,"base/casting",
 			[for (insert in frame.base.insertLocations()) {id:insert.id,member:"base/"+insert.id}]);
 		return FoundationToolingAdapter.snapshot(frame.base,"bench-mill-base",1,context);
 	}
 
-	public static function document(frame:BenchMillFrame, thickness:Float = CastingShopRecipe.BOARD_THICKNESS_MM):ToolingDocument {
+	public static function document(frame:BenchMillFrame, thickness:Float = CastingShopRecipe.BOARD_THICKNESS_MM, casting:MillMoldCasting = Base):ToolingDocument {
+		if (casting == Column) {
+			var document = document(frame,thickness,Base), source = input(frame,Column);
+			var depth = frame.layout.columnDepth;
+			document.input = source;
+			document.setup = {id:"column-front-on-bed",revision:1,sourceFingerprint:ToolingCodec.inputFingerprint(source),
+				fillHeightMm:depth,freeboardMm:0,sourceToMold:F.fromRotationMatrix(0,0,depth/2,[0,0,1,1,0,0,0,1,0]),features:[]};
+			document.recipe.id = "mill-column-panel-eps-review";
+			document.recipe.coreWireAxis = materia.tooling.ToolingRecipe.CoreWireAxis.Z;
+			for (rule in document.recipe.featureRules)
+				if (rule.kind == materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening)
+					rule.preferredAxis = materia.tooling.casting.CastingStrategies.WithdrawalAxis.Y;
+			return document;
+		}
 		var input = input(frame), height = frame.layout.railPlane;
 		var recipe = CastingShopRecipe.tooling("mill-base-panel-eps-review", thickness);
 		return {
@@ -41,8 +57,8 @@ class MillMoldSetup {
 		};
 	}
 
-	public static function options(frame:BenchMillFrame):CastingMoldOptions {
-		var input = input(frame);
+	public static function options(frame:BenchMillFrame, casting:MillMoldCasting = Base):CastingMoldOptions {
+		var input = input(frame,casting);
 		return {
 			replicationJigs: [],
 			foundationJointProcesses: [],

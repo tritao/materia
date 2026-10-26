@@ -117,6 +117,8 @@ typedef SceneArtifactCellSignal = {
 }
 
 typedef SceneArtifactProject = {
+  @:optional var sources:materia.project.SceneSourceMap;
+  @:optional var navigation:Array<materia.project.SceneSourceMap.SceneNavigation>;
   /** Source configuration selected by the generated project. */
   @:optional var variant:String;
   @:optional var job:String;
@@ -929,7 +931,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 43;
+	public static inline var VERSION:Int = 44;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1145,7 +1147,11 @@ class SceneArtifact {
     }
     for (field in ["initialView", "inspectionCameras", "hiddenPrefixes"])
       if (Reflect.hasField(raw,field)) throw 'Removed project presentation field "$field"; use AssemblyPresentation';
-    return {variant:variant,job:job,dynamicParts:dynamicParts,motions:tracks};
+    var sources:Null<materia.project.SceneSourceMap> = Reflect.field(raw,"sources") == null ? null
+      : materia.project.SceneSourceMap.SceneSourceMaps.decode(Reflect.field(raw,"sources"));
+    var navigation:Null<Array<materia.project.SceneSourceMap.SceneNavigation>> = Reflect.field(raw,"navigation") == null ? null
+      : materia.project.SceneSourceMap.SceneSourceMaps.decodeNavigation(Reflect.field(raw,"navigation"));
+    return {variant:variant,job:job,dynamicParts:dynamicParts,motions:tracks,sources:sources,navigation:navigation};
   }
 
   static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {
@@ -1153,6 +1159,16 @@ class SceneArtifact {
     if (project.dynamicParts.length > 1000 || project.motions.length > 64) throw "Too many project settings";
     var definition = data.assemblyDefinition == null ? null : AssemblyDefinitionFlattener.flattenView(data.assemblyDefinition);
     var occurrences = definition == null ? [for (part in data.parts) part.id] : [for (item in definition.occurrences) item.id];
+    if (project.sources != null) materia.project.SceneSourceMap.SceneSourceMaps.validate(project.sources,data);
+    if (project.navigation != null) {
+      var navigationIds=new Map<String,Bool>();
+      for (link in project.navigation) {
+        if (occurrences.indexOf(link.occurrence)<0 || navigationIds.exists(link.occurrence))
+          throw "Invalid scene navigation occurrence";
+        navigationIds.set(link.occurrence,true);
+        for (text in [link.label,link.variant,link.target]) materia.project.SceneSourceMap.SceneSourceMaps.text(text);
+      }
+    }
     var joints = definition == null ? [] : [for (item in definition.joints) item.id];
     var seen = new Map<String, Bool>();
     for (id in project.dynamicParts) {

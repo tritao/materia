@@ -95,7 +95,7 @@ class FoundationDesignTests {
 			postCureInserts:[],
 			envelope: source.castingEnvelope(), features: [feature], inserts: []
 		};
-		var frame = MillMoldSetup.frame();
+		var frame = MillProject.smallFrame();
 		var document = MillMoldSetup.document(frame), options = MillMoldSetup.options(frame);
 		document.input = input;
 		document.setup.sourceToMold = F.identity();
@@ -349,7 +349,7 @@ class FoundationDesignTests {
 			throw "Legacy insert hole encoding must be rejected";
 		var cwd = Sys.getCwd(),
 			root = (sys.FileSystem.exists(cwd + "/machinekit") ? cwd + "/machinekit/tests/tooling" : cwd) + "/fixtures/foundation-design";
-		var frame = MillMoldSetup.frame();
+		var frame = MillProject.smallFrame();
 		if(Sys.args().indexOf("--export-approved-mill")>=0) {
 			for(row in [{id:"mill-base",body:frame.base.body},{id:"mill-column",body:frame.column.body}]) {
 				var part=row.body.geometry();
@@ -390,11 +390,16 @@ class FoundationDesignTests {
 			for (source in [frame.base.body, frame.column.body])
 				for (feature in source.castingFeatures())
 					Sys.println(feature.id + " " + haxe.Json.stringify(feature.openings));
+		var millOnly=Sys.args().indexOf("--mill-only")>=0;
+		if(millOnly && Sys.args().indexOf("--write-baseline-current")>=0)
+			throw "A focused mill check cannot overwrite the four-foundation baseline";
 		var foundations:Array<{id:String, part:machinekit.structural.MineralFoundation}> = [
-			{id: "mill-base", part: frame.base}, {id: "mill-column", part: frame.column},
-			{id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()},
-			{id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()}
+			{id: "mill-base", part: frame.base}, {id: "mill-column", part: frame.column}
 		];
+		if(!millOnly) {
+			foundations.push({id:"hobber-bed",part:new machinekit.hobbing.MineralCastBed()});
+			foundations.push({id:"hobber-column",part:new machinekit.hobbing.MineralCastColumn()});
+		}
 		var baseline:Dynamic = haxe.Json.parse(sys.io.File.getContent(root + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json"));
 		if (baseline.format != "machinekit.foundation-baseline" || baseline.version != 3)
 			throw "Unsupported foundation migration baseline";

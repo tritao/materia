@@ -105,7 +105,10 @@ class EPSAccessNetworks {
   excluded:Array<String>,?reserved:Array<Box3>):Array<EPSAccessNetwork> {
   var ids=[for(strategy in strategies)if(strategy.strategy==SacrificialEPS
    && excluded.indexOf(strategy.featureId)<0)strategy.featureId];
-  var selected=d.input.features.filter(feature->ids.indexOf(feature.id)>=0);
+  // Non-box features keep their exact native allocation path. An unrelated
+  // circular or stepped cut must not disable a connected box access network.
+  var selected=d.input.features.filter(feature->ids.indexOf(feature.id)>=0
+   && MoldRegions.boxes(MoldRegions.feature(d,feature.id))!=null);
   var seeds=selected.filter(feature->{
    var openings=feature.openings.filter(opening->opening.kind==BodyFace);
    if(openings.length==0)return true;
@@ -119,7 +122,8 @@ class EPSAccessNetworks {
    });
    if(bedFacing.length==0)return false;
    var boxes=MoldRegions.boxes(MoldRegions.feature(d,feature.id));
-   return boxes!=null && boxes.filter(box->reserved.filter(piece->BoxAlgebra.intersection(box,piece)!=null).length>0).length>0;
+   if(boxes==null)return false;
+   return reserved!=null && boxes.filter(box->reserved.filter(piece->BoxAlgebra.intersection(box,piece)!=null).length>0).length>0;
   });
   if(seeds.length==0)return [];
   var byFeature=new Map<String,Array<Box3>>(),voids:Array<Box3>=[];

@@ -4,7 +4,7 @@ import machinekit.tooling.CastingMoldCad;
 /** Phase 4 acceptance is a test suite, independent of full artifact export. */
 class MillMoldSuite {
 	public static function main():Void {
-		var frame = MillMoldSetup.frame();
+		var frame = MillProject.smallFrame();
 		if(Sys.args().indexOf("--column-plan")>=0) {MillMoldChecks.columnPlan(frame);return;}
 		var p = machinekit.tooling.CastingMoldCad.plan(MillMoldSetup.document(frame), MillMoldSetup.options(frame));
 		var review=CastingMoldCad.review(p);

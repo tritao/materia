@@ -13,7 +13,7 @@ class LiftingSourceTests {
 		var after=machinekit.structural.FoundationSizing.asCastMass(witness);
 		check(Math.abs(after.mass-poured.mass)<1e-9,"post-cure removable hardware does not inflate pour lifting demand");
 		check(witness.massProperties().mass>poured.mass,"the installed assembly still includes its removable hardware mass");
-		var frame=MillMoldSetup.frame();
+		var frame=MillProject.smallFrame();
 		for (foundation in [frame.base,frame.column]) {
 			var rows=foundation.insertLocations().filter(row -> row.part.parameterToken("role")==InsertRole.LiftingMount);
 			check(rows.length==4,"each mill foundation declares four source lifting connections");

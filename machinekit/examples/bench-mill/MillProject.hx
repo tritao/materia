@@ -10,20 +10,38 @@ import materia.project.SceneArtifact;
  * Study-specific checks remain executable separately; old projects are view aliases.
  */
 class MillProject {
- public static function baseMold():Bytes return MillMoldPreview.scene();
- public static function columnMold():Bytes return MillMoldPreview.scene(true);
+ public static function baseMold():Bytes return moldScene(Base);
+ public static function columnMold():Bytes return moldScene(Column);
+ static function moldScene(casting:MillMoldSetup.MillMoldCasting):Bytes {
+  var data=SceneArtifact.decode(MillMoldPreview.scene(smallFrame(),casting));
+  var project:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
+  project.navigation=[{occurrence:machinekit.tooling.CastingMoldView.REFERENCE_ID,label:"Back to Small",
+   variant:"small",target:casting==Base?"frame/base/casting":"frame/column/casting"}];
+  return SceneArtifact.encode(data);
+ }
 
- public static function smallAssembly():MachineAssembly {
+ public static function smallFrame():BenchMillFrame {
   var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
   var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
-  return MillFramePreview.concept(reference,BenchMillFrame.create(f,z,xy));
+  return BenchMillFrame.create(f,z,xy);
+ }
+ public static function smallAssembly():MachineAssembly {
+  return MillFramePreview.concept(new BenchMill(false,false),smallFrame());
  }
  public static function small():Bytes {
-  var reference=new BenchMill(false,false),frame=MillFramePreview.layout(reference);
-  var z=MillFramePreview.zLayout(reference,frame,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER));
-  var xy=new MillXYStageLayout(frame,z.spindleY,BenchMill.RAIL,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER),MillScrewDrive.m60dBk12());
-  return new MillMachiningSetup(smallAssembly(),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
+  var frame=smallFrame();
+  if (frame.xyAxis == null) throw "Small mill frame requires its XY stage";
+  var xy:MillXYStageLayout = cast frame.xyAxis;
+  var bytes = new MillMachiningSetup(MillFramePreview.concept(new BenchMill(false,false),frame),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
    .scene("mill-small",["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]);
+  var data=SceneArtifact.decode(bytes);
+  if(data.project==null)data.project={dynamicParts:[],motions:[]};
+  var project:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
+  project.navigation=[
+   {occurrence:"frame/base/casting",label:"Open mold",variant:"small-base-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID},
+   {occurrence:"frame/column/casting",label:"Open mold",variant:"small-column-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID}
+  ];
+  return SceneArtifact.encode(data);
  }
  public static function large():Bytes {
   var layout=new MillCapacityLayout();

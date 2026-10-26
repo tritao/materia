@@ -170,3 +170,5 @@ Reproduce a named view from the repository root with:
 The Explode slider at 100% (captured through the editor):
 
 ![Assembly separated with presentation offsets](images/socket-fixture-explode.png)
+
+The source project also offers **Machine — Plinth mold** and **Machine — Column mold**. Use **Open mold** on a casting in the machine tree and **Back to Machine** on its mold reference. These use the same mold planner and shop recipe as the verified kits; opening a view does not export a kit or run full verification.

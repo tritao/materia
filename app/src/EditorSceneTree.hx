@@ -29,7 +29,30 @@ class EditorSceneTree implements TreeViewModel {
     return objectPath(selectionKey());
   }
   /** Authored tree path for a physical object, independent of expansion and search. */
+  function sourceFeature(key:String):Null<materia.project.SceneSourceMap.SceneSourceFeature> {
+    var map=scene.sourceMap;
+    if (!StringTools.startsWith(key,"source:") || map==null) return null;
+    for (feature in map.features) if (key=="source:"+feature.id) return feature;
+    return null;
+  }
+  public function sourceFeatures():Array<materia.project.SceneSourceMap.SceneSourceFeature> {
+    var map=scene.sourceMap;if(map==null)return [];
+    var feature=sourceFeature(selectionKey());if(feature!=null)return [feature];
+    var id=StringTools.startsWith(scene.selectedId,PROJECT)?scene.selectedId.substr(PROJECT.length):scene.selectedId;
+    if(scene.selectedCadFaceIndex>=0) {
+      var matches=map.features.filter(feature->feature.occurrence==id && feature.faces.indexOf(scene.selectedCadFaceIndex)>=0);
+      if(matches.length>1) {
+        var rootIds=materia.project.SceneSourceMap.SceneSourceMaps.sources(map,id);
+        matches=matches.filter(feature->rootIds.indexOf(feature.id)<0);
+      }
+      if(matches.length>0)return matches;
+    }
+    var ids=materia.project.SceneSourceMap.SceneSourceMaps.sources(map,id);
+    return map.features.filter(feature->ids.indexOf(feature.id)>=0);
+  }
   public function objectPath(key:String):Array<String> {
+    var source=sourceFeature(key);
+    if(source!=null)return objectPath(PROJECT+source.occurrence).concat([key]);
     if (key == "scene") return ["scene"];
     var path = [key], cursor = key;
     var marker = cursor.indexOf(":feature:");
@@ -50,7 +73,11 @@ class EditorSceneTree implements TreeViewModel {
   }
   public function selectKey(key:String):Void {
     var previous = selectionKey();
-    if (isGroup(key)) {
+    var source=sourceFeature(key);
+    if(source!=null) {
+      scene.select(PROJECT+source.occurrence);selectedGroup=key;
+      scene.refreshSelectionRevision();groupSelectionRevision=scene.selectionRevision;
+    } else if (isGroup(key)) {
       scene.select("scene");selectedGroup=key;groupSelectionRevision=scene.selectionRevision;
       if (previous != key) {
         // Publish the new tree-only selection as well as its 3D highlight.
@@ -66,6 +93,13 @@ class EditorSceneTree implements TreeViewModel {
   var selectedMembers:Array<String> =[];
   public function selectedObjects():Array<String> {
     var key=selectionKey();
+    var map=scene.sourceMap;
+    if(map!=null && (sourceFeature(key)!=null || scene.selectedCadFaceIndex>=0)) {
+      var result:Array<String>=[];
+      for(feature in sourceFeatures())for(id in materia.project.SceneSourceMap.SceneSourceMaps.tooling(map,feature.id))
+        if(id!=feature.occurrence && result.indexOf(PROJECT+id)<0)result.push(PROJECT+id);
+      return result;
+    }
     // Authored membership is fixed for this tree's lifetime; moving or hiding a member does not change it.
     if(key!=selectedMembersKey) {selectedMembersKey=key;selectedMembers=key=="scene" ? [] : visibilityMembers(key);}
     return selectedMembers;
@@ -166,11 +200,13 @@ class EditorSceneTree implements TreeViewModel {
   }
   /** Object names are resolved when project overrides are materialized, never in the tree. */
   function displayLabel(key:String):String {
+    var source=sourceFeature(key);if(source!=null)return source.label;
     var item = scene.object(key);
     return item == null ? key : item.label;
   }
   function matches(key:String):Bool {
     if (filter == "" || key == selectionKey()) return true;
+    var source=sourceFeature(key);if(source!=null)return source.label.toLowerCase().indexOf(filter)>=0;
     var group = children.get(key);
     if (isGroup(key)) {
       var info=groups.get(key);
@@ -183,6 +219,8 @@ class EditorSceneTree implements TreeViewModel {
       if (displayLabel(key).toLowerCase().indexOf(filter) >= 0 ||
           item.kind.toLowerCase().indexOf(filter) >= 0) return true;
       if (group != null) for (child in group) if (matches(child)) return true;
+      var map=scene.sourceMap;
+      if(map!=null)for(source in map.features)if(PROJECT+source.occurrence==key && source.label.toLowerCase().indexOf(filter)>=0)return true;
       for (index in 0...scene.cadFeatureCount(key))
         if (scene.cadFeatureNameAt(key, index).toLowerCase().indexOf(filter) >= 0) return true;
       return false;
@@ -204,6 +242,9 @@ class EditorSceneTree implements TreeViewModel {
     } else {
       var members = children.get(parentKey);
       if (members != null) for (child in members) if (matches(child)) result.push(child);
+      var sourceMap=scene.sourceMap;
+      if(sourceMap!=null)for(feature in sourceMap.features)
+        if(PROJECT+feature.occurrence==parentKey && matches("source:"+feature.id))result.push("source:"+feature.id);
       if (!isGroup(parentKey))
         for (index in 0...scene.cadFeatureCount(parentKey)) {
           var key = parentKey + ":feature:" + index;
@@ -218,6 +259,7 @@ class EditorSceneTree implements TreeViewModel {
   public function new(scene:EditorScene, ?definition:AssemblyDefinition) {
     this.scene=scene;
     scene.selectionObjects=selectedObjects;
+    scene.sourceSelection=sourceFeatures;
     if(definition==null)return;
     var authored=new AssemblyHierarchy(definition,[for(item in scene.items())item.id]);
     hierarchy=authored;
@@ -283,6 +325,12 @@ class EditorSceneTree implements TreeViewModel {
       shown>0 && shown<members.length,members.length==0 ? null : () -> {toggleVisibility(key);});
   }
   public function buildItem(key:String):View {
+    var source=sourceFeature(key);
+    if(source!=null) {
+      var map=scene.sourceMap;
+      var linked=map==null?[]:materia.project.SceneSourceMap.SceneSourceMaps.tooling(map,source.id);
+      return iconLabeledItem(key,source.label,IconName.Grid,"Source feature · "+linked.length+" tooling occurrences");
+    }
     var info=groupInfo(key);
     if (info != null) {
       return iconLabeledItem(key,info.label+" ("+info.count+")",IconName.Hierarchy,

@@ -19,7 +19,7 @@ class RailSeatTests {
 			"current HG family exposes its existing pinned drilling geometry");
 		check(larger.mountingThread().designation=="M6" && larger.mountingThread().internal,
 			"the rail table's mounting bolt produces a typed source thread");
-		var frame=MillMoldSetup.frame();
+		var frame=MillProject.smallFrame();
 		var assembly=new MachineAssembly();assembly.include("frame",frame);
 		var groups=[
 			{name:"xyStage",foundation:frame.base,prefix:"frame/base",rails:MillRailPlacement.y(frame.xyAxis.guided())},
