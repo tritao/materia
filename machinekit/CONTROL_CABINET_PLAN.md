@@ -306,7 +306,7 @@ the screen. For the cabinet case: HDMI to the monitor and USB for touch.
 | CC2 | Operator HMI app on the desktop GTK build, drill-tap and hobber sims | CC0, CC1 |
 | CC3 | Embedded spike: aarch64 cross-build, `cage` on a Pi 5, measure boot, memory, frame time, touch; decide on `linux-drm` | CC2 |
 | CC3b | `linux-drm` NativeKit backend (only if CC3 says so) | CC3 |
-| CC4 | CNC pendant, one SKU, own design: see `PENDANT_PLAN.md` (small FDCAN MCU, bought MPG wheel and E-stop, axis encoder, step switch, buttons, small text-only OLED, 12-pin M12 with enabling-switch pins reserved); bench on a Nucleo-G474, then a pcbkit board and a CadKit case | CC1 |
+| CC4 | CNC pendant, one SKU, own design: see `PENDANT_PLAN.md` (small FDCAN MCU, bought MPG wheel and E-stop, 12-position axis switch, step switch, buttons, small text-only OLED, 12-pin M12 with enabling-switch pins reserved); bench on a Nucleo-G474, then a pcbkit board and a CadKit case | CC1 |
 | CC5 | Cabinet generator from the drive list; drill-tap first, hobber rack second | CC0, B3 |
 | CC6 | Bind drill-tap and hobber profiles to `EnclosureGuard`; hobber gearbox-aware jog rules | CC1, CC2, B2 |
 | CC7 | Arm teach pendant: screen plus MCU, puck, modes, teach pages | CC1, B1 |

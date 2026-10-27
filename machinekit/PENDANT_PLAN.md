@@ -12,8 +12,9 @@ Numbers and part families below are targets or unchecked suggestions unless stat
    GitHub) is a reference for ideas only: its BOM and schematic show input protection and part
    choices, its case uses a printed TPU cable relief and a button jig. Neither repo has a
    licence, so nothing is copied.
-2. **One SKU.** The pendant has no per-machine wiring or labels. What each selector position
-   means comes from the machine profile (CC0), sent by the host.
+2. **One SKU.** The pendant has no per-machine wiring or labels. The selector positions are
+   printed as numbers; what each means comes from the machine profile (CC0), sent by the host and
+   shown by name on the OLED.
 3. **Small display.** A monochrome OLED (128×64, I2C, about 1" to 1.3") shows text only. No
    graphic UI and no touch. The main HMI already shows the DRO and program, and a second UI on
    the pendant would duplicate it.
@@ -28,16 +29,18 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 | Control | Part | Notes |
 |---|---|---|
 | MPG wheel | Bought, 60 mm, 100 PPR | Read on an MCU encoder timer; 400 counts per turn. Check the output type and supply. |
-| Axis | Endless detented rotary encoder with push | Turning steps through the axes the profile defines; push returns to OFF. Axis name shows on the OLED. Resets to OFF on power-up and on any lease change. |
+| Axis | 12-position panel rotary switch: OFF plus positions 1 to 11 | The position is the state, so it survives power cycles, reads with a glove and does not depend on the display. Positions are printed as plain numbers; the profile maps each to an axis and the OLED shows the name ("3: Z"). If the OLED fails, the printed number and the main HMI still identify the axis. |
 | Step | 3-position panel rotary switch | ×1, ×10, ×100. Universal across machines, so fixed. |
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
 | Buttons | About 6 with LEDs | Start, hold, stop, and user keys. The set is not decided (see open questions). Unused buttons stay dark. |
 | E-stop | Bought 22 mm mushroom, NC contact block | In the v1 chain. |
 | Display | 128×64 mono OLED | Text only; footprint for a one-character display as an option. |
 
-Fallback if the axis encoder or display proves troublesome: a 7-position rotary switch (OFF plus
-six axes) with a legend overlay generated from the profile. The cable, messages and profile map
-are the same either way.
+An endless rotary encoder for the axis was considered and rejected: the selection would live only
+in firmware and on the OLED, so a display fault would leave the operator jogging blind, and the
+state would have to reset on power-up and lease changes. Eleven axes is more than any planned
+CNC needs (the hobber has six). A machine with more than that, such as a seven-joint arm, uses
+its own pendant. If the OLED proves troublesome, the switch and the HMI still work without it.
 
 ## Electrical
 
