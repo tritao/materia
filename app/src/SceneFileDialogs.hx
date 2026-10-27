@@ -14,7 +14,7 @@ import haxe.io.Bytes;
  */
 class SceneFileDialogs {
   final host:DesktopUiHostContext;
-  var request:Null<haxe.Int64> = null;
+  var request:Null<haxeon.platform.NativeFuture<NativeKitEventValue>> = null;
 
   public function new(host:DesktopUiHostContext) this.host = host;
 
@@ -44,8 +44,16 @@ class SceneFileDialogs {
     var parent = new Handle(host.window.rawValue());
     var id = save ? NativeKit.nk_dialog_save_resource_checked(parent, options)
       : NativeKit.nk_dialog_open_resource_checked(parent, options);
-    request = id;
-    host.events.requests.track(id, function(event) {
+    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.NativeKitRequestOutcome<NativeKitEventValue> return Success(event),
+      function() NativeKit.nk_dialog_cancel_checked(id));
+    request = pending;
+    pending.onComplete(function(outcome) {
+      var event = switch outcome {
+        case Success(value): value;
+        case Stopped: return;
+        case Cancelled: request = null; complete(null, null); return;
+        case Failure(error): request = null; complete(null, error.message); return;
+      };
       request = null;
       switch (event) {
         case Resources(_, _, result, accepted, items):
@@ -82,8 +90,16 @@ class SceneFileDialogs {
     }
     var resource = new haxeon.platform.resource.Resource(item.uri, null, item.displayName).nativeValue();
     var id = NativeKit.nk_resource_load_async_checked(resource);
-    request = id;
-    host.events.requests.track(id, function(event) {
+    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.NativeKitRequestOutcome<NativeKitEventValue> return Success(event),
+      function() NativeKit.nk_resource_load_cancel_checked(id));
+    request = pending;
+    pending.onComplete(function(outcome) {
+      var event = switch outcome {
+        case Success(value): value;
+        case Stopped: return;
+        case Cancelled: request = null; complete(null, null); return;
+        case Failure(error): request = null; complete(null, error.message); return;
+      };
       request = null;
       switch (event) {
         case Raw(kind, _, _, result, _, _, data) if (kind == EventKind.ResourceDataComplete):
@@ -101,11 +117,15 @@ class SceneFileDialogs {
   #end
 
   public function dispose():Void {
-    var id = request;
-    if (id == null) return;
-    host.events.requests.forget(id);
-    NativeKit.nk_dialog_cancel(id);
+    var pending = request;
+    if (pending == null) return;
     request = null;
+    // Request native cancellation, then detach the UI completion.
+    try pending.cancel() catch (error:Dynamic) {
+      pending.stopObserving();
+      throw error;
+    }
+    pending.stopObserving();
   }
 
   public static function localPath(uri:String):String {
