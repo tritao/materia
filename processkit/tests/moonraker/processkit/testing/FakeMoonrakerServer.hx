@@ -1,15 +1,16 @@
 package processkit.testing;
 
+import haxeon.platform.Runtime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.internal.event.EventBytes;
+import haxeon.platform.interop.TransportInterop;
+
 import haxe.Json;
 import haxe.io.Bytes;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitRuntime;
 import nativekit.ffi.NativeKitTypes;
 import processkit.moonraker.HttpFrames;
 import processkit.moonraker.MoonrakerStatus.MoonrakerHeater;
 import processkit.moonraker.WebSocketFrames;
-import haxeon.platform.NativeTransport;
 
 private class Link {
   public final transport:TransportHandle;
@@ -77,14 +78,14 @@ class FakeMoonrakerServer {
   }
 
   /** Listens on `port`; connections are accepted as the runtime's events are polled. */
-  public static function start(runtime:NativeKitRuntime, port:Int):FakeMoonrakerServer {
-    var listener = NativeTransport.listen(port);
+  public static function start(runtime:Runtime, port:Int):FakeMoonrakerServer {
+    var listener = TransportInterop.listen(port);
     var holder:Array<FakeMoonrakerServer> = [];
-    var token = runtime.events.listen(function(event:NativeKitEventValue) {
+    var token = runtime.events.listen(function(event:PlatformEvent) {
       switch event {
         case Raw(kind, source, _, _, _, _, data):
           if (kind == EventKind.TransportAccepted && source.rawValue() == listener.borrow().rawValue() && holder.length == 1)
-            holder[0].links.push(new Link(new TransportHandle(NativeKitEventBytes.readU32(data, 4))));
+            holder[0].links.push(new Link(new TransportHandle(EventBytes.readU32(data, 4))));
         case _: return;
       }
     });
@@ -104,7 +105,7 @@ class FakeMoonrakerServer {
   }
 
   public function drop():Void {
-    for (link in links) if (!link.dropped) { NativeTransport.close(link.transport); link.dropped = true; }
+    for (link in links) if (!link.dropped) { TransportInterop.close(link.transport); link.dropped = true; }
   }
 
   function length():Float {
@@ -191,12 +192,12 @@ class FakeMoonrakerServer {
   }
 
   function sendHttp(link:Link, status:Int, reason:String, value:Dynamic):Void
-    NativeTransport.send(link.transport, FakeHttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value))));
+    TransportInterop.send(link.transport, FakeHttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value))));
 
   function sendSocket(link:Link, value:Dynamic):Void {
     var payload = Bytes.ofString(Json.stringify(value));
     if (!fragmentedSocketMessages) {
-      NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.TEXT, payload));
+      TransportInterop.send(link.transport, WebSocketFrames.encode(WebSocketMessage.TEXT, payload));
       return;
     }
     var first = WebSocketFrames.encode(WebSocketMessage.TEXT,payload.sub(0,3));
@@ -205,7 +206,7 @@ class FakeMoonrakerServer {
     wire.add(first);
     wire.add(WebSocketFrames.encode(WebSocketMessage.PING,Bytes.ofString("alive")));
     wire.add(WebSocketFrames.encode(0,payload.sub(3,payload.length-3)));
-    NativeTransport.send(link.transport,wire.getBytes());
+    TransportInterop.send(link.transport,wire.getBytes());
   }
 
   /** Tells each subscriber the fields that changed since it was last told. */
@@ -246,7 +247,7 @@ class FakeMoonrakerServer {
       var received = nativekit.ffi.NativeKit.nk_transport_receive(link.transport, buffer);
       if (received.status == -205) continue;
       if (received.status == -206) {
-        NativeTransport.close(link.transport); link.dropped = true; continue;
+        TransportInterop.close(link.transport); link.dropped = true; continue;
       }
       if (received.status != Result.Ok) throw 'Fake Moonraker receive failed: ${received.status}';
       var bytes = Bytes.view(buffer,0,haxe.Int64.toInt(received.out_received));
@@ -257,9 +258,9 @@ class FakeMoonrakerServer {
           var message = socket.next();
           if (message == null) break;
           if (message.opcode == WebSocketMessage.TEXT) rpc(link, Json.parse(message.text()));
-          else if (message.opcode == WebSocketMessage.PING) NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.PONG, message.payload));
+          else if (message.opcode == WebSocketMessage.PING) TransportInterop.send(link.transport, WebSocketFrames.encode(WebSocketMessage.PONG, message.payload));
           else if (message.opcode == WebSocketMessage.PONG) { if (message.text() == "alive") pongs++; }
-          else if (message.opcode == WebSocketMessage.CLOSE) { NativeTransport.close(link.transport); link.dropped = true; }
+          else if (message.opcode == WebSocketMessage.CLOSE) { TransportInterop.close(link.transport); link.dropped = true; }
         }
         continue;
       }
@@ -347,7 +348,7 @@ class FakeMoonrakerServer {
           var name=[for (part in parts) percentDecode(part)].join("/");
           var content=root == "config" ? configFiles.get(name) : root == "gcodes" ? files.get(name) : null;
           if (content == null) sendHttp(link,404,"Not Found",{error:{message:"file not found"}});
-          else NativeTransport.send(link.transport,FakeHttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
+          else TransportInterop.send(link.transport,FakeHttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
         } else sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
     }
   }
@@ -355,7 +356,7 @@ class FakeMoonrakerServer {
   function upgrade(link:Link, request:HttpRequest):Void {
     var key = request.header("Sec-WebSocket-Key");
     if (key == null || request.header("Upgrade") == null) { sendHttp(link, 400, "Bad Request", {error: {message: "not an upgrade"}}); return; }
-    NativeTransport.send(link.transport, Bytes.ofString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+    TransportInterop.send(link.transport, Bytes.ofString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
       "Sec-WebSocket-Accept: " + WebSocketFrames.acceptFor(key) + "\r\n\r\n"));
     link.socket = new WebSocketReader();
   }

@@ -1,13 +1,13 @@
+import haxeon.platform.Runtime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.internal.event.EventBytes;
+import haxeon.platform.interop.TransportInterop;
 import haxe.io.Bytes;
 import processkit.screwdriving.openprotocol.*;
 import processkit.screwdriving.*;
 import processkit.screwdriving.ScrewdriverIo.ScrewdriverIoSample;
 import haxe.Int64;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitRuntime;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeTransport;
 
 private class ScriptedTighteningController implements OpenProtocolTransport {
 	public final requests:Array<OpenProtocolFrame> = [];
@@ -185,14 +185,14 @@ class ScrewControllerTests {
 		rejects(() -> {var p = new ScrewdriverIoProfile([0],[{slot:1,code:1},{slot:2,code:1}],2,3,4,0,1,2,false,"clock",0.05);});
 	}
 	static function tcp():Void {
-		var runtime = NativeKitRuntime.start();
-		var listener = NativeTransport.listen(36279);
+		var runtime = Runtime.start();
+		var listener = TransportInterop.listen(36279);
 		var accepted:Array<TransportHandle> = [];
-		var subscription = runtime.events.listen(function(event:NativeKitEventValue) {
+		var subscription = runtime.events.listen(function(event:PlatformEvent) {
 			switch event {
 				case Raw(kind,source,_,_,_,_,data):
 					if (kind == EventKind.TransportAccepted && source.rawValue() == listener.borrow().rawValue())
-						accepted.push(new TransportHandle(NativeKitEventBytes.readU32(data,4)));
+						accepted.push(new TransportHandle(EventBytes.readU32(data,4)));
 				case _: return;
 			}
 		});
@@ -206,19 +206,19 @@ class ScrewControllerTests {
 			var stage = 0;
 			while (stage < 4 && Sys.time() < deadline) {
 				runtime.events.poll();
-				var bytes = NativeTransport.receive(accepted[0],2048); if (bytes.length > 0) stream.feed(bytes);
+				var bytes = TransportInterop.receive(accepted[0],2048); if (bytes.length > 0) stream.feed(bytes);
 				while (true) {var frame = stream.next(); if (frame == null) break; script.send(frame.bytes);}
 				while (script.replies.length > 0) {
 					var reply = script.receive();
-					NativeTransport.send(accepted[0],Bytes.view(reply,0,5));
-					NativeTransport.send(accepted[0],Bytes.view(reply,5,reply.length - 5));
+					TransportInterop.send(accepted[0],Bytes.view(reply,0,5));
+					TransportInterop.send(accepted[0],Bytes.view(reply,5,reply.length - 5));
 				}
 				client.poll(Sys.time());
 				if (client.fault != null) throw client.fault;
 				if (stage == 0 && client.initialized) {client.selectProgram(7); stage = 1;}
 				else if (stage == 1 && client.selectedProgram == 7) {client.enable(); stage = 2;}
 				else if (stage == 2 && client.ready()) {
-					NativeTransport.send(accepted[0],result("0000000001").bytes); stage = 3;
+					TransportInterop.send(accepted[0],result("0000000001").bytes); stage = 3;
 				} else if (stage == 3) {
 					var value = client.nextResult();
 					if (value != null) {check(value.ok && value.torqueNm == 16.5,"TCP result decoded in measured Nm"); stage = 4;}
@@ -229,16 +229,16 @@ class ScrewControllerTests {
 			client.safe();
 			while (!client.safeAcknowledged() && Sys.time() < deadline) {
 				runtime.events.poll();
-				var bytes = NativeTransport.receive(accepted[0],2048); if (bytes.length > 0) stream.feed(bytes);
+				var bytes = TransportInterop.receive(accepted[0],2048); if (bytes.length > 0) stream.feed(bytes);
 				while (true) {var frame = stream.next(); if (frame == null) break; script.send(frame.bytes);}
-				while (script.replies.length > 0) NativeTransport.send(accepted[0],script.receive());
+				while (script.replies.length > 0) TransportInterop.send(accepted[0],script.receive());
 				client.poll(Sys.time()); runtime.events.wait(0.001);
 			}
 			check(client.safeAcknowledged(),"TCP disable acknowledged after result");
 			check([for (request in script.requests) request.mid].join(",") == "1,42,60,18,43,62,42","TCP uses exactly the commissioned protocol commands");
 		} catch (error:Dynamic) failure = error;
 		client.close();
-		for (transport in accepted) NativeTransport.close(transport);
+		for (transport in accepted) TransportInterop.close(transport);
 		subscription.dispose(); listener.close(); runtime.dispose();
 		if (failure != null) throw failure;
 	}

@@ -1,7 +1,8 @@
 package tests;
 
+import haxeon.platform.Runtime;
+
 import haxe.Int64;
-import haxeon.platform.NativeKitRuntime;
 import robotkit.behavior.WorldBehavior;
 import robotkit.behavior.WorldBehaviorContext;
 import robotkit.behavior.WorldBehaviorRunner;
@@ -24,7 +25,7 @@ private class DetectionBehavior implements WorldBehavior {
 
 class PerceptionTcpIntegration {
   public static function run(host:String, port:Int):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var worldHost = new WorldHost();
     var remote = worldHost.addRemoteRobot("tcp-perception", false, null, IntegrationCredentials.controller());
     remote.enableCamera();

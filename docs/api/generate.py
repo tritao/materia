@@ -16,6 +16,7 @@ committed sources only.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -142,10 +143,30 @@ def member(node, owner_kind):
 def convert(xml_text, kit):
     root = ET.fromstring(xml_text)
     by_package = {}
+    imports_by_file = {}
     for node in root:
         if node.get("private") == "1":
             continue
         path = node.get("path")
+        # Decoder and disposal machinery are implementation details, not public platform API.
+        if path and path.startswith("haxeon.platform.internal."):
+            continue
+        # Public signatures should name the actual type, not a file-local import alias.
+        source_file = node.get("file", "")
+        if source_file not in imports_by_file:
+            source_path = source_file if os.path.isabs(source_file) else os.path.join(SOURCE, source_file)
+            aliases = {}
+            if os.path.isfile(source_path):
+                with open(source_path, encoding="utf-8") as handle:
+                    aliases = {alias: target for target, alias in re.findall(
+                        r"^import\s+([\w.]+)\s+as\s+(\w+)\s*;", handle.read(), re.MULTILINE)}
+            imports_by_file[source_file] = aliases
+        aliases = imports_by_file[source_file]
+        for typed in node.iter():
+            if typed.tag in ("c", "t", "x", "e") and typed.get("path"):
+                head, separator, tail = typed.get("path").partition(".")
+                if head in aliases:
+                    typed.set("path", aliases[head] + (separator + tail if separator else ""))
         kind = node.tag
         if kind == "class" and node.get("interface") == "1":
             kind = "interface"

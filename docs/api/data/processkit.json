@@ -4106,7 +4106,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(host:String, port:Int, events:NativeKitEvents, ?timeout:Float, ?secure:Bool):Void"
+       "signature": "(host:String, port:Int, events:EventPump, ?timeout:Float, ?secure:Bool):Void"
       },
       {
        "name": "idle",
@@ -4281,7 +4281,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(host:String, port:Int, events:NativeKitEvents, ?timeout:Float, ?secure:Bool):Void"
+       "signature": "(host:String, port:Int, events:EventPump, ?timeout:Float, ?secure:Bool):Void"
       },
       {
        "name": "isOpen",

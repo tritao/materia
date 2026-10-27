@@ -1,12 +1,13 @@
 package tests;
 
+import haxeon.platform.event.EventPump;
+
 import app.EditorScene;
 import app.EditorSceneTree;
 import app.EditorPerspectiveViewport;
 import haxeon.ui.*;
 import haxeon.ui.core.*;
 import haxeon.ui.host.UiHostContext;
-import haxeon.platform.NativeKitEvents;
 import haxeon.ui.widgets.collections.TreeView;
 
 @:access(tests.SceneVisibilityTests)
@@ -21,7 +22,7 @@ class ViewportSelectionTests {
     var definition=SceneVisibilityTests.definition();
     for(occurrence in definition.occurrences)occurrence.includePath="machine/axes/tooling";
     var scene=new EditorScene(data),tree=new EditorSceneTree(scene,definition);
-    var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
+    var host=new UiHostContext(null,new EventPump(),function(){},function(){});
     var style=new LayoutStyle();style.width=LayoutAxis.grow();style.height=LayoutAxis.grow();
     var fonts=FontCollection.create(),font:Null<String> =null;
     for(candidate in ["haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf","../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])

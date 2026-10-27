@@ -12,7 +12,7 @@ class PresentationArtifactInvariantTests {
     session.openGeneratedProject(new app.ProjectArtifactLoader().load(sys.io.File.getBytes(path)),path);
     var definition=session.projectAssemblyDefinition,state=session.projectAssemblyState,record=session.presentation;
     if(definition==null||state==null||record==null)throw "Artifact requires an engineering assembly and presentation";
-    var host=new haxeon.ui.host.UiHostContext(null,new haxeon.platform.NativeKitEvents(),()->{},()->{});
+    var host=new haxeon.ui.host.UiHostContext(null,new haxeon.platform.event.EventPump(),()->{},()->{});
     var viewport=new app.EditorPerspectiveViewport("artifact-invariants",session.scene,host);
     viewport.setPresentation(record,definition,session.presentationCenters(),session.assemblyUnitMetres());
     viewport.solvePresentationJoints=session.presentationJointPoses;

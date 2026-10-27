@@ -1,5 +1,7 @@
 package tests;
 
+import haxeon.platform.event.EventPump;
+
 import app.AppSettings;
 import app.EditorPerspectiveViewport;
 import app.EditorScene;
@@ -7,7 +9,6 @@ import app.Main.ReferenceEditorApp;
 import app.SceneCollision;
 import app.SceneCollision.SceneCollisionPair;
 import collisionkit.native.NativeCollisionWorld;
-import haxeon.platform.NativeKitEvents;
 import haxeon.ui.properties.PropertyValue;
 import haxeon.ui.host.UiHostContext;
 import nativekit.scene.SceneView;
@@ -107,7 +108,7 @@ class SceneCollisionTests {
     check(tinted(pairs) == 4, "Diagnostic tints stay below the independent selection layer");
     check(tinted() == 0, "without pairs nothing is tinted");
 
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {});
+    var host = new UiHostContext(null, new EventPump(), function() {}, function() {});
     var viewport = new EditorPerspectiveViewport("collision-test", scene, host);
     var before = viewport.presentationKey();
     viewport.setCollisions(pairs);

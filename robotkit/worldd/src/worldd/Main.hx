@@ -1,7 +1,8 @@
 package worldd;
 
+import haxeon.platform.Runtime;
+
 import haxe.Int64;
-import haxeon.platform.NativeKitRuntime;
 import robotkit.deployment.SerialDeployment;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
@@ -28,7 +29,7 @@ class Main {
       throw "worldd: --remote and --deployment must be provided together";
 
     var host = new WorldHost();
-    var runtime:Null<NativeKitRuntime> = null;
+    var runtime:Null<Runtime> = null;
     try {
       for (index in 0...robotCount)
         host.addSimulatedRobot('sim-$index', demoModel('sim-$index'));
@@ -38,7 +39,7 @@ class Main {
         var port = Std.parseInt(remoteAddress.substr(separator + 1));
         if (port == null || port <= 0 || port > 65535)
           throw "worldd: --remote port is invalid";
-        runtime = NativeKitRuntime.start();
+        runtime = Runtime.start();
         var remote = host.addRemoteRobot("remote", false, new SerialDeployment(deploymentPath),
           new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"), Sys.getEnv("ROBOTKIT_TOKEN")));
         remote.connect(remoteAddress.substr(0, separator), port, runtime.events);

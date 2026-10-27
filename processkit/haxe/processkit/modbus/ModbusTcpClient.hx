@@ -1,8 +1,9 @@
 package processkit.modbus;
 
+import haxeon.platform.interop.TransportInterop;
+
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeTransport;
 
 private class Request {
   public final pdu:Bytes;
@@ -28,7 +29,7 @@ class ModbusTcpClient {
   public function new(host:String, port:Int, unit:Int, timeout:Float = 0.5) {
     if (unit < 1 || unit > 247 || !Math.isFinite(timeout) || timeout <= 0.0) throw "Invalid Modbus TCP configuration";
     this.unit = unit; this.timeout = timeout;
-    transport = NativeTransport.connect(host, port);
+    transport = TransportInterop.connect(host, port);
   }
   public function idle():Bool return pending == null && queue.length == 0;
   function enqueue(pdu:Bytes, complete:Bytes->Void):Void {
@@ -71,7 +72,7 @@ class ModbusTcpClient {
     try {
       if (!Math.isFinite(now) || now < lastNow) throw "Modbus owner clock moved backwards";
       lastNow = now;
-      var bytes = NativeTransport.receive(transport.borrow(), 2048);
+      var bytes = TransportInterop.receive(transport.borrow(), 2048);
       if (bytes.length > 0) stream.feed(bytes);
       while (true) {
         var frame = stream.next(); if (frame == null) break;
@@ -87,7 +88,7 @@ class ModbusTcpClient {
         if (request != null) {
           transaction = (transaction + 1) & 65535; pending = request; deadline = now + timeout;
           var encoded = new ModbusFrame(transaction, unit, request.pdu).encode();
-          var status = NativeTransport.sendStatus(transport.borrow(), encoded);
+          var status = TransportInterop.sendStatus(transport.borrow(), encoded);
           if (status != 0) throw 'Modbus transport send failed: $status';
           sentBytes += encoded.length;
         }

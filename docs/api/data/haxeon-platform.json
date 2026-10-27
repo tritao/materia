@@ -5,6 +5,98 @@
    "name": "haxeon.platform",
    "types": [
     {
+     "name": "BindingError",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/BindingError.hx",
+     "extends": [
+      "PlatformError"
+     ],
+     "doc": "Managed API validation or lifecycle failure. Native backend errors keep their own domain.",
+     "fields": [
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":BindingErrorKind",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(kind:BindingErrorKind, operation:String, message:String):Void"
+      },
+      {
+       "name": "invalidArgument",
+       "kind": "method",
+       "signature": "(operation:String, message:String):BindingError",
+       "static": true
+      },
+      {
+       "name": "invalidState",
+       "kind": "method",
+       "signature": "(operation:String, message:String):BindingError",
+       "static": true
+      },
+      {
+       "name": "disposed",
+       "kind": "method",
+       "signature": "(operation:String, message:String):BindingError",
+       "static": true
+      },
+      {
+       "name": "invalidData",
+       "kind": "method",
+       "signature": "(operation:String, message:String):BindingError",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "BindingErrorKind",
+     "kind": "abstract",
+     "file": "haxeon/packages/platform/src/haxeon/platform/BindingErrorKind.hx",
+     "underlying": "Int",
+     "doc": "Stable managed error categories, separate from backend result codes.",
+     "fields": [
+      {
+       "name": "InvalidArgument",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "InvalidState",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "Disposed",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "InvalidData",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "DisposalRegistration",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/DisposalRegistration.hx",
+     "doc": "Detach after manual disposal; release invokes the owner's cleanup first.",
+     "fields": [
+      {
+       "name": "detach",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
      "name": "GraphicsImageRef",
      "kind": "class",
      "file": "haxeon/packages/platform/src/haxeon/platform/GraphicsImageRef.hx",
@@ -48,64 +140,46 @@
      ]
     },
     {
-     "name": "NativeFuture",
-     "kind": "class",
-     "params": [
-      "T"
-     ],
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeFuture.hx",
-     "doc": "A one-shot result completed by a NativeKit event.",
-     "fields": [
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "onComplete",
-       "kind": "method",
-       "signature": "(callback:(NativeKitRequestOutcome<T>) -> Void):NativeFuture<T>"
-      },
-      {
-       "name": "isComplete",
-       "kind": "method",
-       "signature": "():Bool"
-      },
-      {
-       "name": "cancel",
-       "kind": "method",
-       "signature": "():Void",
-       "doc": "Cancels the native operation when this future owns one."
-      }
-     ]
-    },
-    {
-     "name": "NativeKitAudioEvents",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitAudioEvents.hx",
-     "doc": "Decodes lifecycle, completion, and concurrency events emitted by the optional audio module.",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(c:NativeKitEventContext):Null<NativeKitEventValue>",
-       "static": true
-      }
-     ]
-    },
-    {
      "name": "NativeKitError",
      "kind": "class",
      "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitError.hx",
      "extends": [
-      "haxe.Exception"
+      "PlatformError"
      ],
-     "doc": "A failed NativeKit operation with its machine-readable result and native diagnostic.",
+     "doc": "NativeKit failure with its typed platform result.",
      "fields": [
       {
        "name": "result",
        "kind": "var",
        "signature": ":Result",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(result:Result, operation:String, ?diagnostic:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "PlatformError",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/PlatformError.hx",
+     "extends": [
+      "haxe.Exception"
+     ],
+     "doc": "Structured binding or backend failure. Codes are scoped to domain.",
+     "fields": [
+      {
+       "name": "domain",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "code",
+       "kind": "var",
+       "signature": ":Int",
        "final": true
       },
       {
@@ -123,217 +197,883 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(result:Result, operation:String, ?diagnostic:String):Void"
+       "signature": "(domain:String, code:Int, operation:String, ?diagnostic:String):Void"
       }
      ]
     },
     {
-     "name": "NativeKitEvent",
+     "name": "Runtime",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEvent.hx",
-     "doc": "Owns one polled NativeKit event and releases its native payload exactly once.",
+     "file": "haxeon/packages/platform/src/haxeon/platform/Runtime.hx",
+     "doc": "Owns one initialized NativeKit generation and all windows created through it.",
      "fields": [
       {
-       "name": "kind",
+       "name": "events",
        "kind": "var",
-       "signature": ":EventKind",
+       "signature": ":EventPump",
        "final": true
       },
       {
-       "name": "source",
-       "kind": "var",
-       "signature": ":Handle",
-       "final": true
-      },
-      {
-       "name": "request",
-       "kind": "var",
-       "signature": ":haxe.Int64",
-       "final": true
-      },
-      {
-       "name": "result",
-       "kind": "var",
-       "signature": ":Result",
-       "final": true
-      },
-      {
-       "name": "flags",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "dataCount",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "dataSize",
-       "kind": "var",
-       "signature": ":haxe.Int64",
-       "final": true
-      },
-      {
-       "name": "payload",
+       "name": "start",
        "kind": "method",
-       "signature": "():haxe.io.Bytes",
-       "doc": "Copies the native payload. The returned bytes remain valid after release."
+       "signature": "(?options:RuntimeOptions):Runtime",
+       "static": true
       },
       {
-       "name": "snapshot",
+       "name": "createWindow",
        "kind": "method",
-       "signature": "():NativeKitEventContext",
-       "doc": "Creates a managed decoder snapshot which remains valid after release."
+       "signature": "(options:WindowOptions):Window"
       },
       {
-       "name": "decodeContext",
+       "name": "startNative",
        "kind": "method",
-       "signature": "(context:NativeKitEventContext):NativeKitEventValue",
-       "static": true,
-       "doc": "Decodes a managed event snapshot without retaining native memory."
+       "signature": "(?options:InitOptions):Runtime",
+       "static": true
       },
       {
-       "name": "decode",
+       "name": "createWindowNative",
        "kind": "method",
-       "signature": "():NativeKitEventValue",
-       "doc": "Decodes known event formats without releasing this event."
+       "signature": "(options:nativekit.ffi.NativeKitTypes.WindowOptions):Window"
       },
       {
-       "name": "take",
+       "name": "dispose",
        "kind": "method",
-       "signature": "():NativeKitEventValue",
-       "doc": "Decodes and releases the event, including when decoding throws."
+       "signature": "():Void",
+       "doc": "Destroys owned children, then ends the NativeKit generation."
       },
       {
-       "name": "release",
-       "kind": "method",
-       "signature": "():Bool",
-       "doc": "Releases the native payload. Returns false after the first release."
-      },
-      {
-       "name": "isReleased",
+       "name": "isDisposed",
        "kind": "method",
        "signature": "():Bool"
       }
      ]
     },
     {
-     "name": "NativeKitEventBytes",
+     "name": "RuntimeOptions",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEventBytes.hx",
-     "doc": "Validates and decodes byte-oriented NativeKit event payloads.",
+     "file": "haxeon/packages/platform/src/haxeon/platform/RuntimeOptions.hx",
+     "doc": "Application identity and event-queue options used to start a runtime.",
      "fields": [
       {
-       "name": "requireSize",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, size:Int):Void",
-       "static": true
+       "name": "eventQueueCapacity",
+       "kind": "var",
+       "signature": ":Int"
       },
       {
-       "name": "requireMinimumSize",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, size:Int):Void",
-       "static": true
+       "name": "applicationId",
+       "kind": "var",
+       "signature": ":Null<String>"
       },
       {
-       "name": "readU32",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, offset:Int):Int",
-       "static": true
+       "name": "applicationName",
+       "kind": "var",
+       "signature": ":Null<String>"
       },
       {
-       "name": "decodeClipboardFiles",
+       "name": "new",
        "kind": "method",
-       "signature": "(data:haxe.io.Bytes, expectedCount:Int):Array<String>",
-       "static": true
+       "signature": "():Void"
       },
       {
-       "name": "decodeDropItems",
+       "name": "nativeValue",
        "kind": "method",
-       "signature": "(data:haxe.io.Bytes, expectedCount:Int):Array<String>",
-       "static": true
-      },
-      {
-       "name": "decodeResourceList",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, listOffset:Int):{accepted:Bool, items:Array<NativeKitResource>}",
-       "static": true
-      },
-      {
-       "name": "readOptionalString",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, offset:Int, minimum:Int):Null<String>",
-       "static": true
-      },
-      {
-       "name": "readUtf8Slice",
-       "kind": "method",
-       "signature": "(data:haxe.io.Bytes, offset:Int, length:Int, minimum:Int):Null<String>",
-       "static": true
+       "signature": "():InitOptions"
       }
      ]
     },
     {
-     "name": "NativeKitEventContext",
+     "name": "Surface",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEventContext.hx",
-     "doc": "Immutable, fully managed snapshot passed to typed event decoders.",
+     "file": "haxeon/packages/platform/src/haxeon/platform/Surface.hx",
+     "doc": "Owns one graphics surface attached to a NativeKit window.",
      "fields": [
       {
-       "name": "kind",
-       "kind": "var",
-       "signature": ":EventKind",
-       "final": true
+       "name": "borrowNativeHandle",
+       "kind": "method",
+       "signature": "(value:SurfaceHandle):Surface",
+       "static": true,
+       "doc": "Creates a non-owning view of a surface managed by a raw NativeKit host."
       },
       {
-       "name": "source",
-       "kind": "var",
-       "signature": ":Handle",
-       "final": true
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():SurfaceHandle"
       },
       {
-       "name": "request",
-       "kind": "var",
-       "signature": ":haxe.Int64",
-       "final": true
+       "name": "onFrame",
+       "kind": "method",
+       "signature": "(handler:(Int, Int) -> Void):SurfaceFrameSubscription",
+       "doc": "Replaces the current frame handler and roots it until dispose/detach succeeds."
       },
       {
-       "name": "result",
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "releaseBorrowed",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Releases a borrowed wrapper without destroying its host-owned surface."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SurfaceFrameSubscription",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/SurfaceFrameSubscription.hx",
+     "doc": "Registration token for one retained NativeKit frame callback.",
+     "fields": [
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "SurfaceOptions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/SurfaceOptions.hx",
+     "doc": "Graphics API, logical bounds, sharing, and flags for a window surface.",
+     "fields": [
+      {
+       "name": "width",
        "kind": "var",
-       "signature": ":Result",
-       "final": true
+       "signature": ":Int"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Int"
       },
       {
        "name": "flags",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":SurfaceFlags"
       },
       {
-       "name": "dataCount",
+       "name": "api",
        "kind": "var",
-       "signature": ":Int",
-       "final": true
+       "signature": ":GraphicsApi"
       },
       {
-       "name": "data",
+       "name": "majorVersion",
        "kind": "var",
-       "signature": ":haxe.io.Bytes",
+       "signature": ":Int"
+      },
+      {
+       "name": "minorVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "shareSurface",
+       "kind": "var",
+       "signature": ":Null<Surface>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.SurfaceOptions"
+      }
+     ]
+    },
+    {
+     "name": "WebView",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/WebView.hx",
+     "doc": "Owns one native child WebView.",
+     "fields": [
+      {
+       "name": "create",
+       "kind": "method",
+       "signature": "(parent:Window, options:WebViewOptions):WebView",
+       "static": true
+      },
+      {
+       "name": "createNative",
+       "kind": "method",
+       "signature": "(parent:Handle, options:nativekit.ffi.NativeKitTypes.WebviewOptions):WebView",
+       "static": true
+      },
+      {
+       "name": "show",
+       "kind": "method",
+       "signature": "(visible:Bool):Void"
+      },
+      {
+       "name": "setBounds",
+       "kind": "method",
+       "signature": "(x:Int, y:Int, width:Int, height:Int):Void"
+      },
+      {
+       "name": "setHtml",
+       "kind": "method",
+       "signature": "(html:String, ?baseUrl:String):Void"
+      },
+      {
+       "name": "navigate",
+       "kind": "method",
+       "signature": "(url:String):Void"
+      },
+      {
+       "name": "reload",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():WebViewHandle"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "WebViewOptions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/WebViewOptions.hx",
+     "doc": "Logical bounds, flags, and initial URL for an owned child WebView.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "flags",
+       "kind": "var",
+       "signature": ":WebviewFlags"
+      },
+      {
+       "name": "initialUrl",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.WebviewOptions"
+      }
+     ]
+    },
+    {
+     "name": "Window",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/Window.hx",
+     "doc": "Owns one NativeKit top-level window and resources created inside it.",
+     "fields": [
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():WindowHandle"
+      },
+      {
+       "name": "setDecorationRegions",
+       "kind": "method",
+       "signature": "(regions:Array<WindowDecorationRegion>):Void",
+       "doc": "Replaces the logical hit-test regions used by custom native window chrome."
+      },
+      {
+       "name": "setDecorationRegionsNative",
+       "kind": "method",
+       "signature": "(regions:Array<nativekit.ffi.NativeKitTypes.WindowDecorationRegion>):Void",
+       "doc": "Raw ABI entrypoint for native window chrome integrations."
+      },
+      {
+       "name": "createSurface",
+       "kind": "method",
+       "signature": "(options:SurfaceOptions):Surface"
+      },
+      {
+       "name": "createSurfaceNative",
+       "kind": "method",
+       "signature": "(options:nativekit.ffi.NativeKitTypes.SurfaceOptions):Surface"
+      },
+      {
+       "name": "createWebView",
+       "kind": "method",
+       "signature": "(options:WebViewOptions):WebView"
+      },
+      {
+       "name": "createWebViewNative",
+       "kind": "method",
+       "signature": "(options:nativekit.ffi.NativeKitTypes.WebviewOptions):WebView"
+      },
+      {
+       "name": "registerDependent",
+       "kind": "method",
+       "signature": "(dispose:() -> Void):DisposalRegistration",
+       "doc": "Registers an adapter-owned child that must be released before this window."
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void",
+       "doc": "Destroys children before the window; safe to call more than once."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    },
+    {
+     "name": "WindowDecorationRegion",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/WindowDecorationRegion.hx",
+     "doc": "A native window-chrome hit region, measured in logical client coordinates.",
+     "fields": [
+      {
+       "name": "x",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "y",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":WindowDecorationRegionKind"
+      },
+      {
+       "name": "cursorShape",
+       "kind": "var",
+       "signature": ":CursorShape"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(x:Float, y:Float, width:Float, height:Float, kind:WindowDecorationRegionKind):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.WindowDecorationRegion"
+      }
+     ]
+    },
+    {
+     "name": "WindowOptions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/WindowOptions.hx",
+     "doc": "Initial logical size, title, ownership, and flags for a window.",
+     "fields": [
+      {
+       "name": "width",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "height",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "title",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "flags",
+       "kind": "var",
+       "signature": ":WindowFlags"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":WindowKind"
+      },
+      {
+       "name": "owner",
+       "kind": "var",
+       "signature": ":Null<Window>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(width:Int, height:Int):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.WindowOptions"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.async",
+   "types": [
+    {
+     "name": "Future",
+     "kind": "class",
+     "params": [
+      "T"
+     ],
+     "file": "haxeon/packages/platform/src/haxeon/platform/async/Future.hx",
+     "doc": "A one-shot managed completion with explicit native cancellation and observation lifetime.",
+     "fields": [
+      {
+       "name": "onComplete",
+       "kind": "method",
+       "signature": "(callback:(Outcome<T>) -> Void):Future<T>"
+      },
+      {
+       "name": "isComplete",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "canCancel",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "isCancellationRequested",
+       "kind": "method",
+       "signature": "():Bool"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Requests native cancellation and awaits a terminal event. False means no request was made."
+      },
+      {
+       "name": "stopObserving",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Detaches tracking and settles as Stopped without cancelling native work."
+      }
+     ]
+    },
+    {
+     "name": "Outcome",
+     "kind": "enum",
+     "params": [
+      "T"
+     ],
+     "file": "haxeon/packages/platform/src/haxeon/platform/async/Outcome.hx",
+     "doc": "Result of one asynchronous NativeKit request.",
+     "fields": [
+      {
+       "name": "Success",
+       "kind": "case",
+       "signature": "(value:T)",
+       "doc": "The asynchronous operation completed successfully."
+      },
+      {
+       "name": "Cancelled",
+       "kind": "case",
+       "signature": "",
+       "doc": "The operation was cancelled, dismissed, or ended by runtime shutdown."
+      },
+      {
+       "name": "Stopped",
+       "kind": "case",
+       "signature": "",
+       "doc": "Managed observation ended explicitly; native work may still be running."
+      },
+      {
+       "name": "Failure",
+       "kind": "case",
+       "signature": "(error:PlatformError)",
+       "doc": "The operation failed with a structured backend or managed error."
+      }
+     ]
+    },
+    {
+     "name": "Promise",
+     "kind": "class",
+     "params": [
+      "T"
+     ],
+     "file": "haxeon/packages/platform/src/haxeon/platform/async/Promise.hx",
+     "doc": "Completion owner for one Future.",
+     "fields": [
+      {
+       "name": "future",
+       "kind": "var",
+       "signature": ":Future<T>",
        "final": true
       },
       {
        "name": "new",
        "kind": "method",
-       "signature": "(kind:EventKind, source:Handle, request:haxe.Int64, result:Result, flags:Int, dataCount:Int, data:haxe.io.Bytes):Void"
+       "signature": "():Void"
+      },
+      {
+       "name": "complete",
+       "kind": "method",
+       "signature": "(value:T):Void"
+      },
+      {
+       "name": "fail",
+       "kind": "method",
+       "signature": "(error:PlatformError):Void"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
       }
      ]
     },
     {
-     "name": "NativeKitEventSubscription",
+     "name": "Requests",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEvents.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/async/Requests.hx",
+     "doc": "One registry owns completion, cancellation, and detachment for every request and task.",
+     "fields": [
+      {
+       "name": "readClipboardText",
+       "kind": "method",
+       "signature": "():Future<String>"
+      },
+      {
+       "name": "readClipboardFiles",
+       "kind": "method",
+       "signature": "():Future<Array<String>>"
+      },
+      {
+       "name": "readClipboardResources",
+       "kind": "method",
+       "signature": "():Future<Array<Resource>>"
+      },
+      {
+       "name": "openResource",
+       "kind": "method",
+       "signature": "(parent:Window, options:FileDialogOptions):Future<Array<Resource>>"
+      },
+      {
+       "name": "saveResource",
+       "kind": "method",
+       "signature": "(parent:Window, options:FileDialogOptions):Future<Array<Resource>>"
+      },
+      {
+       "name": "selectResourceDirectory",
+       "kind": "method",
+       "signature": "(parent:Window, options:FileDialogOptions):Future<Array<Resource>>"
+      },
+      {
+       "name": "commitResourceNative",
+       "kind": "method",
+       "signature": "(stream:ResourceStreamHandle):Future<Bool>",
+       "doc": "Commits a raw writable stream; Success(true) means a download was initiated."
+      },
+      {
+       "name": "messageDialog",
+       "kind": "method",
+       "signature": "(parent:Window, options:MessageDialogOptions):Future<MessageResult>"
+      },
+      {
+       "name": "evaluateWebView",
+       "kind": "method",
+       "signature": "(webview:WebView, script:String):Future<String>"
+      },
+      {
+       "name": "trackNative",
+       "kind": "method",
+       "signature": "(request:haxe.Int64, decode:(PlatformEvent) -> Outcome<T>, ?cancelNative:() -> Void):Future<T>",
+       "doc": "Explicit interop for a native request; decoder failures become terminal Failure outcomes."
+      },
+      {
+       "name": "trackTask",
+       "kind": "method",
+       "signature": "(task:Task, decode:(haxe.io.Bytes) -> T):Future<T>",
+       "doc": "Observes a native task without installing a managed worker callback. The caller owns the task."
+      },
+      {
+       "name": "handle",
+       "kind": "method",
+       "signature": "(value:PlatformEvent):Bool",
+       "doc": "Detaches a terminal entry before invoking observers, allowing safe reentrant tracking."
+      },
+      {
+       "name": "pending",
+       "kind": "method",
+       "signature": "():Int"
+      }
+     ]
+    },
+    {
+     "name": "Task",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/async/Task.hx",
+     "doc": "Managed owner for a native task handle; it never supplies a worker callback.",
+     "fields": [
+      {
+       "name": "adopt",
+       "kind": "method",
+       "signature": "(value:TaskHandle):Task",
+       "static": true,
+       "doc": "Adopts a handle returned by native code or a Haxeon native trampoline."
+      },
+      {
+       "name": "nativeHandle",
+       "kind": "method",
+       "signature": "():TaskHandle"
+      },
+      {
+       "name": "cancel",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "state",
+       "kind": "method",
+       "signature": "():TaskState"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.dialog",
+   "types": [
+    {
+     "name": "FileDialogFilter",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/dialog/FileDialogFilter.hx",
+     "doc": "One named group of file patterns accepted by a resource dialog.",
+     "fields": [
+      {
+       "name": "name",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "patterns",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(name:String, patterns:String):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():DialogFilter"
+      }
+     ]
+    },
+    {
+     "name": "FileDialogOptions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/dialog/FileDialogOptions.hx",
+     "doc": "Title, initial resource location, suggested name, flags, and chooser filters.",
+     "fields": [
+      {
+       "name": "title",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "initialPath",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "suggestedName",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "flags",
+       "kind": "var",
+       "signature": ":DialogFlags"
+      },
+      {
+       "name": "filters",
+       "kind": "var",
+       "signature": ":Array<FileDialogFilter>"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.FileDialogOptions"
+      }
+     ]
+    },
+    {
+     "name": "MessageDialogOptions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/dialog/MessageDialogOptions.hx",
+     "doc": "Message text, presentation kind, and buttons for a native dialog.",
+     "fields": [
+      {
+       "name": "message",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "title",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":MessageKind"
+      },
+      {
+       "name": "buttons",
+       "kind": "var",
+       "signature": ":MessageButtons"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(message:String):Void"
+      },
+      {
+       "name": "nativeValue",
+       "kind": "method",
+       "signature": "():nativekit.ffi.NativeKitTypes.MessageDialogOptions"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.event",
+   "types": [
+    {
+     "name": "EventPump",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/event/EventPump.hx",
+     "doc": "The managed owner of NativeKit's native event queue.",
+     "fields": [
+      {
+       "name": "requests",
+       "kind": "var",
+       "signature": ":Requests",
+       "final": true
+      },
+      {
+       "name": "poll",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Polls and releases one native event, then routes its managed snapshot."
+      },
+      {
+       "name": "wait",
+       "kind": "method",
+       "signature": "(timeoutSeconds:Float):Void",
+       "doc": "Pumps native events and waits until input or the timeout expires."
+      },
+      {
+       "name": "listen",
+       "kind": "method",
+       "signature": "(listener:(PlatformEvent) -> Void):EventSubscription",
+       "doc": "Adds an observer which receives decoded, fully managed events."
+      },
+      {
+       "name": "isDisposed",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Reports whether this runtime's event pump has been shut down."
+      },
+      {
+       "name": "dispatch",
+       "kind": "method",
+       "signature": "(value:PlatformEvent):Void",
+       "doc": "Routes a decoded value through the same request and listener path as poll()."
+      }
+     ]
+    },
+    {
+     "name": "EventSubscription",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/event/EventSubscription.hx",
      "doc": "One listener registration owned by a NativeKit event pump.",
      "fields": [
       {
@@ -349,9 +1089,9 @@
      ]
     },
     {
-     "name": "NativeKitEventValue",
+     "name": "PlatformEvent",
      "kind": "enum",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEventValue.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/event/PlatformEvent.hx",
      "fields": [
       {
        "name": "None",
@@ -446,7 +1186,7 @@
       {
        "name": "HttpHeaders",
        "kind": "case",
-       "signature": "(source:Handle, request:haxe.Int64, result:Result, response:NativeKitHttpResponse)"
+       "signature": "(source:Handle, request:haxe.Int64, result:Result, response:HttpResponse)"
       },
       {
        "name": "HttpDataAvailable",
@@ -461,7 +1201,7 @@
       {
        "name": "HttpComplete",
        "kind": "case",
-       "signature": "(source:Handle, request:haxe.Int64, result:Result, response:NativeKitHttpResponse)"
+       "signature": "(source:Handle, request:haxe.Int64, result:Result, response:HttpResponse)"
       },
       {
        "name": "Raw",
@@ -511,7 +1251,7 @@
       {
        "name": "TextEdit",
        "kind": "case",
-       "signature": "(source:Handle, edit:NativeKitTextEdit)"
+       "signature": "(source:Handle, edit:haxeon.platform.input.TextEdit)"
       },
       {
        "name": "AccessibilityAction",
@@ -586,17 +1326,17 @@
       {
        "name": "Resources",
        "kind": "case",
-       "signature": "(kind:EventKind, request:haxe.Int64, result:Result, accepted:Bool, items:Array<NativeKitResource>)"
+       "signature": "(kind:EventKind, request:haxe.Int64, result:Result, accepted:Bool, items:Array<Resource>)"
       },
       {
        "name": "ShareReceived",
        "kind": "case",
-       "signature": "(?text:String, ?subject:String, items:Array<NativeKitResource>)"
+       "signature": "(?text:String, ?subject:String, items:Array<Resource>)"
       },
       {
        "name": "ResourceDrop",
        "kind": "case",
-       "signature": "(source:Handle, x:Float, y:Float, ?text:String, items:Array<NativeKitResource>)"
+       "signature": "(source:Handle, x:Float, y:Float, ?text:String, items:Array<Resource>)"
       },
       {
        "name": "ResourceCommit",
@@ -684,69 +1424,16 @@
        "signature": ""
       }
      ]
-    },
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.http",
+   "types": [
     {
-     "name": "NativeKitEvents",
+     "name": "HttpHeader",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEvents.hx",
-     "doc": "The managed owner of NativeKit's native event queue.",
-     "fields": [
-      {
-       "name": "requests",
-       "kind": "var",
-       "signature": ":NativeKitRequests",
-       "final": true
-      },
-      {
-       "name": "poll",
-       "kind": "method",
-       "signature": "():Bool",
-       "doc": "Polls and releases one native event, then routes its managed snapshot."
-      },
-      {
-       "name": "wait",
-       "kind": "method",
-       "signature": "(timeoutSeconds:Float):Void",
-       "doc": "Pumps native events and waits until input or the timeout expires."
-      },
-      {
-       "name": "listen",
-       "kind": "method",
-       "signature": "(listener:(NativeKitEventValue) -> Void):NativeKitEventSubscription",
-       "doc": "Adds an observer which receives decoded, fully managed events."
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool",
-       "doc": "Reports whether this runtime's event pump has been shut down."
-      },
-      {
-       "name": "dispatch",
-       "kind": "method",
-       "signature": "(value:NativeKitEventValue):Void",
-       "doc": "Routes a decoded value through the same request and listener path as poll()."
-      }
-     ]
-    },
-    {
-     "name": "NativeKitHttpEvents",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitHttpEvents.hx",
-     "doc": "Copies NativeKit HTTP event views into managed values before event release.",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(event:NativeKitEvent):Null<NativeKitEventValue>",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "NativeKitHttpHeader",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitHttpResponse.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/http/HttpHeader.hx",
      "doc": "One copied HTTP response header. Duplicate headers remain separate entries.",
      "fields": [
       {
@@ -769,9 +1456,9 @@
      ]
     },
     {
-     "name": "NativeKitHttpResponse",
+     "name": "HttpResponse",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitHttpResponse.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/http/HttpResponse.hx",
      "doc": "Fully managed HTTP response snapshot, safe after its NativeKit event is released.",
      "fields": [
       {
@@ -795,7 +1482,7 @@
       {
        "name": "headers",
        "kind": "var",
-       "signature": ":Array<NativeKitHttpHeader>",
+       "signature": ":Array<HttpHeader>",
        "final": true
       },
       {
@@ -807,316 +1494,19 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(statusCode:Int, flags:Int, contentLength:haxe.Int64, headers:Array<NativeKitHttpHeader>, body:haxe.io.Bytes):Void"
+       "signature": "(statusCode:Int, flags:Int, contentLength:haxe.Int64, headers:Array<HttpHeader>, body:haxe.io.Bytes):Void"
       }
      ]
-    },
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.input",
+   "types": [
     {
-     "name": "NativeKitInputEvents",
+     "name": "TextEdit",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitInputEvents.hx",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(c:NativeKitEventContext):Null<NativeKitEventValue>",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "NativeKitRequestOutcome",
-     "kind": "enum",
-     "params": [
-      "T"
-     ],
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitRequestOutcome.hx",
-     "doc": "Result of one asynchronous NativeKit request.",
-     "fields": [
-      {
-       "name": "Success",
-       "kind": "case",
-       "signature": "(value:T)",
-       "doc": "The asynchronous operation completed successfully."
-      },
-      {
-       "name": "Cancelled",
-       "kind": "case",
-       "signature": "",
-       "doc": "A dialog was cancelled or dismissed without an accepted result."
-      },
-      {
-       "name": "Failure",
-       "kind": "case",
-       "signature": "(result:Result, ?message:String)",
-       "doc": "The operation failed; `message` is optional backend-specific detail."
-      }
-     ]
-    },
-    {
-     "name": "NativeKitRequests",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitRequests.hx",
-     "doc": "Maps asynchronous NativeKit request IDs to one-shot typed completions.",
-     "fields": [
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "readClipboardText",
-       "kind": "method",
-       "signature": "(handler:(NativeKitRequestOutcome<String>) -> Void):haxe.Int64",
-       "doc": "Starts a clipboard-text read and tracks its typed completion."
-      },
-      {
-       "name": "readClipboardFiles",
-       "kind": "method",
-       "signature": "(handler:(NativeKitRequestOutcome<Array<String>>) -> Void):haxe.Int64",
-       "doc": "Starts a clipboard-file read and tracks its typed completion."
-      },
-      {
-       "name": "readClipboardResources",
-       "kind": "method",
-       "signature": "(handler:(NativeKitRequestOutcome<Array<NativeKitResource>>) -> Void):haxe.Int64",
-       "doc": "Starts a structured-resource clipboard read and tracks its typed completion."
-      },
-      {
-       "name": "openResource",
-       "kind": "method",
-       "signature": "(parent:NativeKitWindow, configured:FileDialogOptions, handler:(NativeKitRequestOutcome<Array<NativeKitResource>>) -> Void):haxe.Int64"
-      },
-      {
-       "name": "saveResource",
-       "kind": "method",
-       "signature": "(parent:NativeKitWindow, configured:FileDialogOptions, handler:(NativeKitRequestOutcome<Array<NativeKitResource>>) -> Void):haxe.Int64"
-      },
-      {
-       "name": "selectResourceDirectory",
-       "kind": "method",
-       "signature": "(parent:NativeKitWindow, configured:FileDialogOptions, handler:(NativeKitRequestOutcome<Array<NativeKitResource>>) -> Void):haxe.Int64"
-      },
-      {
-       "name": "commitResource",
-       "kind": "method",
-       "signature": "(stream:ResourceStreamHandle, handler:(NativeKitRequestOutcome<Bool>) -> Void):haxe.Int64",
-       "doc": "Commits a writable stream; Success(true) means a download was only initiated."
-      },
-      {
-       "name": "messageDialog",
-       "kind": "method",
-       "signature": "(parent:NativeKitWindow, options:MessageDialogOptions, handler:(NativeKitRequestOutcome<MessageResult>) -> Void):haxe.Int64"
-      },
-      {
-       "name": "evaluateWebView",
-       "kind": "method",
-       "signature": "(webview:NativeKitWebView, script:String, handler:(NativeKitRequestOutcome<String>) -> Void):haxe.Int64"
-      },
-      {
-       "name": "track",
-       "kind": "method",
-       "signature": "(request:haxe.Int64, handler:(NativeKitEventValue) -> Void):Void"
-      },
-      {
-       "name": "cancelDialog",
-       "kind": "method",
-       "signature": "(request:haxe.Int64):Bool",
-       "doc": "Cancels a tracked native dialog while retaining its terminal completion."
-      },
-      {
-       "name": "forget",
-       "kind": "method",
-       "signature": "(request:haxe.Int64):Bool",
-       "doc": "Stops dispatching a completion without cancelling native work."
-      },
-      {
-       "name": "cancel",
-       "kind": "method",
-       "signature": "(request:haxe.Int64):Bool",
-       "doc": "Compatibility alias for forgetting a completion; does not cancel native work."
-      },
-      {
-       "name": "trackTask",
-       "kind": "method",
-       "signature": "(task:NativeTask, decode:(haxe.io.Bytes) -> T):NativeFuture<T>",
-       "doc": "Tracks a native task without installing a managed worker callback."
-      },
-      {
-       "name": "handle",
-       "kind": "method",
-       "signature": "(value:NativeKitEventValue):Bool",
-       "doc": "Routes a decoded event to its matching one-shot request handler."
-      },
-      {
-       "name": "pending",
-       "kind": "method",
-       "signature": "():Int"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitResource",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEventValue.hx",
-     "fields": [
-      {
-       "name": "flags",
-       "kind": "var",
-       "signature": ":ResourceFlags",
-       "final": true
-      },
-      {
-       "name": "uri",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "mimeType",
-       "kind": "var",
-       "signature": ":Null<String>",
-       "final": true
-      },
-      {
-       "name": "displayName",
-       "kind": "var",
-       "signature": ":Null<String>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(flags:ResourceFlags, uri:String, ?mimeType:String, ?displayName:String):Void"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitResourceEvents",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitResourceEvents.hx",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(c:NativeKitEventContext):Null<NativeKitEventValue>",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "NativeKitRuntime",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitRuntime.hx",
-     "doc": "Owns one initialized NativeKit generation and all windows created through it.",
-     "fields": [
-      {
-       "name": "events",
-       "kind": "var",
-       "signature": ":NativeKitEvents",
-       "final": true
-      },
-      {
-       "name": "start",
-       "kind": "method",
-       "signature": "(?options:InitOptions):NativeKitRuntime",
-       "static": true
-      },
-      {
-       "name": "createWindow",
-       "kind": "method",
-       "signature": "(options:WindowOptions):NativeKitWindow"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void",
-       "doc": "Destroys owned children, then ends the NativeKit generation."
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitServiceEvents",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitServiceEvents.hx",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(c:NativeKitEventContext):Null<NativeKitEventValue>",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "NativeKitSurface",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitSurface.hx",
-     "doc": "Owns one graphics surface attached to a NativeKit window.",
-     "fields": [
-      {
-       "name": "borrowNativeHandle",
-       "kind": "method",
-       "signature": "(value:SurfaceHandle):NativeKitSurface",
-       "static": true,
-       "doc": "Creates a non-owning view of a surface managed by a raw NativeKit host."
-      },
-      {
-       "name": "nativeHandle",
-       "kind": "method",
-       "signature": "():SurfaceHandle"
-      },
-      {
-       "name": "onFrame",
-       "kind": "method",
-       "signature": "(handler:(Int, Int) -> Void):NativeKitSurfaceFrameSubscription",
-       "doc": "Replaces the current frame handler and roots it until dispose/detach succeeds."
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "releaseBorrowed",
-       "kind": "method",
-       "signature": "():Void",
-       "doc": "Releases a borrowed wrapper without destroying its host-owned surface."
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitSurfaceFrameSubscription",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitSurface.hx",
-     "doc": "Registration token for one retained NativeKit frame callback.",
-     "fields": [
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitTextEdit",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitEventValue.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/input/TextEdit.hx",
      "fields": [
       {
        "name": "action",
@@ -1186,284 +1576,195 @@
      ]
     },
     {
-     "name": "NativeKitTextInput",
+     "name": "TextInput",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitTextInput.hx",
-     "doc": "Builds and submits owned text-input state for custom native surfaces.",
+     "file": "haxeon/packages/platform/src/haxeon/platform/input/TextInput.hx",
+     "doc": "Synchronizes managed text-input state and visibility with the platform IME.",
      "fields": [
-      {
-       "name": "state",
-       "kind": "method",
-       "signature": "(text:String, textStart:Int, documentLength:Int, selectionStart:Int, selectionEnd:Int, ?compositionStart:Int, ?compositionEnd:Int, ?inputType:TextInputType, ?flags:TextInputFlags, ?action:TextInputAction, ?cursorX:Float, ?cursorY:Float, ?cursorWidth:Float, ?cursorHeight:Float):TextInputState",
-       "static": true,
-       "doc": "Creates a complete IME state. Omitted composition positions mean no active composition."
-      },
       {
        "name": "update",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface, text:String, textStart:Int, documentLength:Int, selectionStart:Int, selectionEnd:Int, ?compositionStart:Int, ?compositionEnd:Int, ?inputType:TextInputType, ?flags:TextInputFlags, ?action:TextInputAction, ?cursorX:Float, ?cursorY:Float, ?cursorWidth:Float, ?cursorHeight:Float):Void",
-       "static": true,
-       "doc": "Synchronizes the platform IME with the editor's current state."
+       "signature": "(surface:Surface, state:TextInputState):Void",
+       "static": true
       },
       {
        "name": "updateWindow",
        "kind": "method",
-       "signature": "(window:NativeKitWindow, text:String, textStart:Int, documentLength:Int, selectionStart:Int, selectionEnd:Int, ?compositionStart:Int, ?compositionEnd:Int, ?inputType:TextInputType, ?flags:TextInputFlags, ?action:TextInputAction, ?cursorX:Float, ?cursorY:Float, ?cursorWidth:Float, ?cursorHeight:Float):Void",
-       "static": true,
-       "doc": "Synchronizes desktop IME input when the platform backend targets a window directly."
-      },
-      {
-       "name": "updateGeometryResult",
-       "kind": "method",
-       "signature": "(surface:NativeKitSurface, selectionStart:Int, selectionEnd:Int, compositionStart:Int, compositionEnd:Int, selectionRects:haxe.io.Bytes, compositionRects:haxe.io.Bytes):Result",
-       "static": true,
-       "doc": "Publishes packed surface-local selection and composition rectangles."
+       "signature": "(window:Window, state:TextInputState):Void",
+       "static": true
       },
       {
        "name": "updateResult",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface, text:String, textStart:Int, documentLength:Int, selectionStart:Int, selectionEnd:Int, ?compositionStart:Int, ?compositionEnd:Int, ?inputType:TextInputType, ?flags:TextInputFlags, ?action:TextInputAction, ?cursorX:Float, ?cursorY:Float, ?cursorWidth:Float, ?cursorHeight:Float):Result",
+       "signature": "(surface:Surface, state:TextInputState):Result",
        "static": true,
-       "doc": "Submits IME state without throwing, for callers that handle unsupported backends."
+       "doc": "Returns the backend result so callers can handle unsupported IME backends."
+      },
+      {
+       "name": "updateGeometryResult",
+       "kind": "method",
+       "signature": "(surface:Surface, selectionStart:Int, selectionEnd:Int, compositionStart:Int, compositionEnd:Int, selectionRects:haxe.io.Bytes, compositionRects:haxe.io.Bytes):Result",
+       "static": true,
+       "doc": "Publishes packed surface-local selection and composition rectangles."
       },
       {
        "name": "setActive",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface, active:Bool):Void",
-       "static": true,
-       "doc": "Shows or hides the platform text-input UI for a custom surface."
+       "signature": "(surface:Surface, active:Bool):Void",
+       "static": true
       },
       {
        "name": "setWindowActive",
        "kind": "method",
-       "signature": "(window:NativeKitWindow, active:Bool):Void",
-       "static": true,
-       "doc": "Shows or hides the platform text-input UI when the backend targets a window directly."
+       "signature": "(window:Window, active:Bool):Void",
+       "static": true
       },
       {
        "name": "setActiveResult",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface, active:Bool):Result",
-       "static": true,
-       "doc": "Changes platform text-input visibility without throwing on unsupported backends."
-      }
-     ]
-    },
-    {
-     "name": "NativeKitVulkanExtensions",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitVulkanExtensions.hx",
-     "doc": "Safe Haxe view of NativeKit's process-lifetime Vulkan extension names.",
-     "fields": [
-      {
-       "name": "requiredInstanceExtensions",
-       "kind": "method",
-       "signature": "(window:NativeKitWindow):Array<String>",
-       "static": true,
-       "doc": "Queries and copies the instance extensions required by a window's presentation backend."
-      }
-     ]
-    },
-    {
-     "name": "NativeKitWebView",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitWebView.hx",
-     "doc": "Owns one native child WebView.",
-     "fields": [
-      {
-       "name": "create",
-       "kind": "method",
-       "signature": "(parent:Handle, options:WebviewOptions):NativeKitWebView",
-       "static": true
-      },
-      {
-       "name": "show",
-       "kind": "method",
-       "signature": "(visible:Bool):Void"
-      },
-      {
-       "name": "setBounds",
-       "kind": "method",
-       "signature": "(x:Int, y:Int, width:Int, height:Int):Void"
-      },
-      {
-       "name": "setHtml",
-       "kind": "method",
-       "signature": "(html:String, ?baseUrl:String):Void"
-      },
-      {
-       "name": "navigate",
-       "kind": "method",
-       "signature": "(url:String):Void"
-      },
-      {
-       "name": "reload",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "nativeHandle",
-       "kind": "method",
-       "signature": "():WebViewHandle"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitWindow",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitWindow.hx",
-     "doc": "Owns one NativeKit top-level window and resources created inside it.",
-     "fields": [
-      {
-       "name": "nativeHandle",
-       "kind": "method",
-       "signature": "():WindowHandle"
-      },
-      {
-       "name": "setDecorationRegions",
-       "kind": "method",
-       "signature": "(regions:Array<WindowDecorationRegion>):Void",
-       "doc": "Replaces the logical hit-test regions used by custom native window chrome."
-      },
-      {
-       "name": "createSurface",
-       "kind": "method",
-       "signature": "(options:SurfaceOptions):NativeKitSurface"
-      },
-      {
-       "name": "createWebView",
-       "kind": "method",
-       "signature": "(options:WebviewOptions):NativeKitWebView"
-      },
-      {
-       "name": "registerDependent",
-       "kind": "method",
-       "signature": "(dispose:() -> Void):Void",
-       "doc": "Registers an adapter-owned child that must be released before this window."
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void",
-       "doc": "Destroys children before the window; safe to call more than once."
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeKitWindowEvents",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeKitWindowEvents.hx",
-     "fields": [
-      {
-       "name": "decode",
-       "kind": "method",
-       "signature": "(c:NativeKitEventContext):Null<NativeKitEventValue>",
+       "signature": "(surface:Surface, active:Bool):Result",
        "static": true
       }
      ]
     },
     {
-     "name": "NativePromise",
+     "name": "TextInputState",
      "kind": "class",
-     "params": [
-      "T"
-     ],
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativePromise.hx",
-     "doc": "Internal completion owner used by NativeKit task/request adapters.",
+     "file": "haxeon/packages/platform/src/haxeon/platform/input/TextInputState.hx",
+     "doc": "Managed IME state. Text positions use NativeKit's document coordinate convention.",
      "fields": [
       {
-       "name": "future",
+       "name": "text",
        "kind": "var",
-       "signature": ":NativeFuture<T>",
-       "final": true
+       "signature": ":String"
+      },
+      {
+       "name": "textStart",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "documentLength",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "selectionStart",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "selectionEnd",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "compositionStart",
+       "kind": "var",
+       "signature": ":Null<Int>"
+      },
+      {
+       "name": "compositionEnd",
+       "kind": "var",
+       "signature": ":Null<Int>"
+      },
+      {
+       "name": "inputType",
+       "kind": "var",
+       "signature": ":TextInputType"
+      },
+      {
+       "name": "flags",
+       "kind": "var",
+       "signature": ":TextInputFlags"
+      },
+      {
+       "name": "action",
+       "kind": "var",
+       "signature": ":TextInputAction"
+      },
+      {
+       "name": "cursorX",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cursorY",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cursorWidth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "cursorHeight",
+       "kind": "var",
+       "signature": ":Float"
       },
       {
        "name": "new",
        "kind": "method",
-       "signature": "():Void"
+       "signature": "(text:String, documentLength:Int, selectionStart:Int, selectionEnd:Int):Void"
       },
       {
-       "name": "complete",
+       "name": "nativeValue",
        "kind": "method",
-       "signature": "(value:T):Void"
-      },
-      {
-       "name": "fail",
-       "kind": "method",
-       "signature": "(result:Result, ?message:String):Void"
-      },
-      {
-       "name": "cancel",
-       "kind": "method",
-       "signature": "():Void"
+       "signature": "():nativekit.ffi.NativeKitTypes.TextInputState",
+       "doc": "Creates ABI storage for the duration of a platform call."
       }
      ]
-    },
+    }
+   ]
+  },
+  {
+   "name": "haxeon.platform.interop",
+   "types": [
     {
-     "name": "NativeTask",
+     "name": "TransportInterop",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeTask.hx",
-     "doc": "Managed owner for a native task handle; it never supplies a worker callback.",
-     "fields": [
-      {
-       "name": "adopt",
-       "kind": "method",
-       "signature": "(value:TaskHandle):NativeTask",
-       "static": true,
-       "doc": "Adopts a handle returned by native code or a Haxeon native trampoline."
-      },
-      {
-       "name": "nativeHandle",
-       "kind": "method",
-       "signature": "():TaskHandle"
-      },
-      {
-       "name": "cancel",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "state",
-       "kind": "method",
-       "signature": "():TaskState"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "isDisposed",
-       "kind": "method",
-       "signature": "():Bool"
-      }
-     ]
-    },
-    {
-     "name": "NativeTransport",
-     "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeTransport.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/interop/TransportInterop.hx",
      "doc": "Small Haxe façade over NativeKit's asynchronous transports."
     },
     {
      "name": "TransportSendQueue",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/NativeTransport.hx"
+     "file": "haxeon/packages/platform/src/haxeon/platform/interop/TransportSendQueue.hx",
+     "fields": [
+      {
+       "name": "queuedBytes",
+       "kind": "var",
+       "signature": ":Int64",
+       "final": true
+      },
+      {
+       "name": "capacity",
+       "kind": "var",
+       "signature": ":Int64",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(queuedBytes:Int64, capacity:Int64):Void"
+      }
+     ]
+    },
+    {
+     "name": "VulkanExtensions",
+     "kind": "class",
+     "file": "haxeon/packages/platform/src/haxeon/platform/interop/VulkanExtensions.hx",
+     "doc": "Safe Haxe view of NativeKit's process-lifetime Vulkan extension names.",
+     "fields": [
+      {
+       "name": "requiredInstanceExtensions",
+       "kind": "method",
+       "signature": "(window:Window):Array<String>",
+       "static": true,
+       "doc": "Queries and copies the instance extensions required by a window's presentation backend."
+      }
+     ]
     }
    ]
   },
@@ -1631,7 +1932,7 @@
     {
      "name": "ResourceCacheLoad",
      "kind": "class",
-     "file": "haxeon/packages/platform/src/haxeon/platform/resource/ResourceCache.hx",
+     "file": "haxeon/packages/platform/src/haxeon/platform/resource/ResourceCacheLoad.hx",
      "doc": "Result of joining or starting an asynchronous resource cache load.",
      "fields": [
       {

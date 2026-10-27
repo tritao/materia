@@ -1,11 +1,12 @@
 package app;
 
-import haxeon.platform.NativeKitEventValue.NativeKitResource;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.resource.Resource;
+import nativekit.ffi.NativeKitTypes.FileDialogOptions as NativeFileDialogOptions;
 
 import haxeon.ui.host.DesktopUiHostContext;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitEventValue;
 import haxe.io.Bytes;
 
 /**
@@ -14,7 +15,7 @@ import haxe.io.Bytes;
  */
 class SceneFileDialogs {
   final host:DesktopUiHostContext;
-  var request:Null<haxeon.platform.NativeFuture<NativeKitEventValue>> = null;
+  var request:Null<haxeon.platform.async.Future<PlatformEvent>> = null;
 
   public function new(host:DesktopUiHostContext) this.host = host;
 
@@ -34,7 +35,7 @@ class SceneFileDialogs {
 
   function chooseResource(save:Bool,title:String,suggestedName:Null<String>,current:Null<String>,
       complete:Null<String>->Null<String>->Void):Void {
-    var options = new FileDialogOptions();
+    var options = new NativeFileDialogOptions();
     options.set_title(title);
     if (save) {
       options.set_flags(DialogFlags.ConfirmOverwrite);
@@ -44,7 +45,7 @@ class SceneFileDialogs {
     var parent = new Handle(host.window.rawValue());
     var id = save ? NativeKit.nk_dialog_save_resource_checked(parent, options)
       : NativeKit.nk_dialog_open_resource_checked(parent, options);
-    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.NativeKitRequestOutcome<NativeKitEventValue> return Success(event),
+    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.async.Outcome<PlatformEvent> return Success(event),
       function() NativeKit.nk_dialog_cancel_checked(id));
     request = pending;
     pending.onComplete(function(outcome) {
@@ -80,7 +81,7 @@ class SceneFileDialogs {
    * a path. The document becomes /files/<name> in the editor's storage: a picked file is read into it first, and a
    * save target is linked to it, so the writes the editor makes there reach the user's file.
    */
-  function browserFile(save:Bool, item:NativeKitResource, suggestedName:Null<String>,
+  function browserFile(save:Bool, item:Resource, suggestedName:Null<String>,
       complete:Null<String>->Null<String>->Void):Void {
     var path = BrowserFiles.pathFor(item.displayName != null ? item.displayName : suggestedName);
     if (save) {
@@ -90,7 +91,7 @@ class SceneFileDialogs {
     }
     var resource = new haxeon.platform.resource.Resource(item.uri, null, item.displayName).nativeValue();
     var id = NativeKit.nk_resource_load_async_checked(resource);
-    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.NativeKitRequestOutcome<NativeKitEventValue> return Success(event),
+    var pending = host.events.requests.trackNative(id, function(event):haxeon.platform.async.Outcome<PlatformEvent> return Success(event),
       function() NativeKit.nk_resource_load_cancel_checked(id));
     request = pending;
     pending.onComplete(function(outcome) {

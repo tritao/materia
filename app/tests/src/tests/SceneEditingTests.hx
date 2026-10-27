@@ -1,7 +1,8 @@
 package tests;
 
-import haxeon.ui.widgets.text.Text;
+import haxeon.platform.event.EventPump;
 
+import haxeon.ui.widgets.text.Text;
 
 import app.EditorScene;
 import app.EditorSceneTree;
@@ -13,7 +14,6 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
 import haxeon.ui.LayoutFrame;
-import haxeon.platform.NativeKitEvents;
 import app.ProjectDocumentSession;
 import app.SceneCodec;
 import app.SensorConfiguration;
@@ -1221,7 +1221,7 @@ class SceneEditingTests {
     FileSystem.createDirectory(directory);
     var app = new ReferenceEditorApp(fonts, directory + "/workspace.json");
     var requests = 0;
-    var host = new UiHostContext(fonts, new NativeKitEvents(), function() {}, function() requests++);
+    var host = new UiHostContext(fonts, new EventPump(), function() {}, function() requests++);
     var viewport = new EditorPerspectiveViewport("scene-perspective", app.scene, host);
     app.perspectiveViewport = viewport;
     app.workspace.activate("perspective");
@@ -1329,7 +1329,7 @@ class SceneEditingTests {
   static function perspectiveHoverInput():Void {
     var scene = new EditorScene();
     var frameRequests = 0;
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {
+    var host = new UiHostContext(null, new EventPump(), function() {}, function() {
       frameRequests++;
     });
     var viewport = new EditorPerspectiveViewport("hover-test", scene, host);

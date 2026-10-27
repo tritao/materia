@@ -262,7 +262,7 @@ class MachineControlTests {
     var session=editor.session,panel=new app.editor.MachineControlPanel(),frame=new haxeon.ui.LayoutFrame(360,2000);
     try {
       session.openGeneratedProject(app.ProjectSourceLoader.load(path),path);editor.documentChanged();
-      var host=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.NativeKitEvents(),function(){},function(){});
+      var host=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.event.EventPump(),function(){},function(){});
       var viewport=new app.EditorPerspectiveViewport("spindle-section-audit",session.scene,host);
       editor.perspectiveViewport=viewport;
       var housing=nativePose(session.scene,"spindle/spindle");

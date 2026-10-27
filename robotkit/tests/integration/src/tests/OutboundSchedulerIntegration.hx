@@ -1,11 +1,13 @@
 package tests;
 
+import haxeon.platform.Runtime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.internal.event.EventBytes;
+import haxeon.platform.interop.TransportInterop;
+
 import haxe.Int64;
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitRuntime;
 import robotd.OutboundScheduler.OutboundScheduler;
 import robotd.OutboundFamily;
 import robotkit.protocol.RobotFrame;
@@ -14,24 +16,23 @@ import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.Hello;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.StreamSubscription;
-import haxeon.platform.NativeTransport;
 
 /** Exercises real NativeKit queue/transport behavior with a bounded dispatch step. */
 class OutboundSchedulerIntegration {
   public static function run(port:Int):Void {
-    var runtime = NativeKitRuntime.start();
-    var listener = NativeTransport.listen(port + 1);
+    var runtime = Runtime.start();
+    var listener = TransportInterop.listen(port + 1);
     var accepted:Null<TransportHandle> = null;
-    var subscription = runtime.events.listen(function(value:NativeKitEventValue) {
+    var subscription = runtime.events.listen(function(value:PlatformEvent) {
       switch value {
         case Raw(kind, source, _, _, _, _, data):
           if (kind == EventKind.TransportAccepted &&
               source.rawValue() == listener.borrow().rawValue())
-            accepted = new TransportHandle(NativeKitEventBytes.readU32(data, 4));
+            accepted = new TransportHandle(EventBytes.readU32(data, 4));
         case _: return;
       }
     });
-    var client = NativeTransport.connect("127.0.0.1", port + 1);
+    var client = TransportInterop.connect("127.0.0.1", port + 1);
     var failure:Dynamic = null;
     try {
       var deadline = Sys.time() + 5.0;
@@ -90,7 +91,7 @@ class OutboundSchedulerIntegration {
       if (!scheduler.flush(1)) throw "rate-limited flush failed";
       var quietUntil = Sys.time() + 0.1;
       while (Sys.time() < quietUntil) {
-        if (NativeTransport.receive(client.borrow()).length > 0)
+        if (TransportInterop.receive(client.borrow()).length > 0)
           throw "per-key rate limit delivered frames too quickly";
         runtime.events.wait(0.01);
       }
@@ -143,7 +144,7 @@ class OutboundSchedulerIntegration {
       scheduler.offer(OutboundFamily.Sensor, "imu", Int64.ofInt(0), numeric);
       if (!scheduler.flush(1) || receiveOne(client.borrow(), stream, runtime) != "imu1")
         throw "sensor sequence reset did not resume delivery";
-      NativeTransport.send(server,
+      TransportInterop.send(server,
         new RobotFrame(RobotMessageType.RobotState, Bytes.ofString("essential")).encode());
       if (receiveOne(client.borrow(), stream, runtime) != "essential")
         throw "essential frame was blocked by over-budget bulk traffic";
@@ -152,7 +153,7 @@ class OutboundSchedulerIntegration {
     subscription.dispose();
     client.close();
     var acceptedHandle = accepted;
-    if (acceptedHandle != null) NativeTransport.close(acceptedHandle);
+    if (acceptedHandle != null) TransportInterop.close(acceptedHandle);
     listener.close();
     runtime.dispose();
     if (failure != null) throw failure;
@@ -163,10 +164,10 @@ class OutboundSchedulerIntegration {
   }
 
   static function receiveOne(client:TransportHandle, stream:RobotFrameStream,
-      runtime:NativeKitRuntime):String {
+      runtime:Runtime):String {
     var deadline = Sys.time() + 5.0;
     while (Sys.time() < deadline) {
-      var bytes = NativeTransport.receive(client);
+      var bytes = TransportInterop.receive(client);
       if (bytes.length > 0) {
         var frames = stream.push(bytes);
         if (frames.length > 0) return frames[0].payload.toString();

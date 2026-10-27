@@ -2306,10 +2306,10 @@ worktree’s clones; no recorded pins were edited and no shared checkout was mod
 
 The compiler-only app check on these recorded Haxeon/NativeKit sources fails outside the
 welder code with the exact error:
-robotkit/transport/NativeTransport.hx:72:18: E1008: Function
+robotkit/transport/TransportInterop.hx:72:18: E1008: Function
 "nativekit.ffi.NativeKit.nk_transport_receive" expects 2 arguments, got 3.
 The compiler loads the tracked nativekit/bindings/haxe/nativekit.hxi; its data parameter
-is an input array whose size is projected away. NativeTransport still supplies buffer and
+is an input array whose size is projected away. TransportInterop still supplies buffer and
 capacity separately, and the unchanged call is present on current main. This is not a disk
 error or a missing local object. Log: ignored app/build/p3-latest-main-app-build.log.
 Per the user’s outside-scope stop rule, do not repair unrelated RobotKit transport here.
@@ -2322,7 +2322,7 @@ All production trials are stopped; no heavy check is left running.
 
 ### Authorized transport repair and package-boundary stop (2026-10-05)
 
-The user authorized repairing the transport prerequisite. NativeTransport.receive now passes
+The user authorized repairing the transport prerequisite. TransportInterop.receive now passes
 its allocated Bytes buffer to nk_transport_receive without a separate capacity argument: the
 tracked input-array FFI projection derives that count from the buffer. Buffer allocation,
 partial-result slicing and would-block/error handling are unchanged. No compatibility API

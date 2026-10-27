@@ -120,7 +120,7 @@ carrying the editor's state across through `saveState` and `restoreState`
 |---|---|
 | NativeKit C ABI | `haxeon/vendor/nativekit` (`include/nativekit*.h`, contracts in `docs/api.md`) |
 | GPU module | `haxeon/vendor/nativekit/modules/gpu` (`nativekit_gpu.h`, `NativeKit::gpu`) |
-| Platform bindings | `haxeon/packages/platform` (`haxeon-platform`): `NativeKitEvents`, `NativeKitWindow`, `NativeKitSurface`, `NativeTransport` |
+| Platform bindings | `haxeon/packages/platform` (`haxeon-platform`): `EventPump`, `Window`, `Surface`, `TransportInterop` |
 | GPU bindings | `haxeon/packages/gpu` (`haxeon-gpu`): `haxeon.gpu.Renderer`, `Pipeline`, `Buffer`, `Image` |
 | Native UI | `haxeon/packages/ui` (`nativekit_ui.h`, `NativeKit::ui`): layout, text, `RenderPlan`, `UiRenderer` |
 | UI framework | `haxeon.ui.core`: `View`, `RenderNode`, `UiContext`, `BuildContext`, `State`, `RetainedView` |

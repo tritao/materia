@@ -144,7 +144,7 @@ class EnclosureRuntimeTests {
       editor.switchMode(app.EditorMode.Simulate);
       check(editor.workspace.isOpen("inspection-camera")&&belowPanel(editor.workspace.root,"sensors","inspection-camera"),"Returning to Simulate restores the inspection dock");
       editor.switchMode(app.EditorMode.Design);
-      var cameraHost=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.NativeKitEvents(),function(){},function(){});
+      var cameraHost=new haxeon.ui.host.UiHostContext(fonts,new haxeon.platform.event.EventPump(),function(){},function(){});
       var closeup=new app.EditorPerspectiveViewport("inspection-test",editor.session.scene,cameraHost);
       var editorPresentation=editor.session.presentation;if(editorPresentation==null)throw "Missing editor presentation";
       var preset=editorPresentation.views[1];

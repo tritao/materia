@@ -2579,7 +2579,7 @@
       {
        "name": "fromNativeSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Surface",
+       "signature": "(surface:haxeon.platform.Surface):Surface",
        "static": true
       }
      ]
@@ -3654,7 +3654,7 @@
       {
        "name": "platformSurface",
        "kind": "var",
-       "signature": ":Null<NativeKitSurface>"
+       "signature": ":Null<Surface>"
       },
       {
        "name": "textInput",
@@ -3829,7 +3829,7 @@
       {
        "name": "setPlatformSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:Surface):Void",
        "doc": "Provides the NativeKit surface used for IME and other platform services."
       },
       {
@@ -4060,7 +4060,7 @@
       {
        "name": "consume",
        "kind": "method",
-       "signature": "(event:NativeKitEventValue):Bool",
+       "signature": "(event:PlatformEvent):Bool",
        "doc": "Consumes a decoded clipboard completion only when this service owns its request."
       },
       {
@@ -4789,7 +4789,7 @@
       {
        "name": "cursorShape",
        "kind": "method",
-       "signature": "(?pointerId:Int):UiCursorShape",
+       "signature": "(?pointerId:Int):haxeon.ui.core.CursorShape",
        "doc": "Returns the deepest cursor intent for the hovered or captured pointer path."
       }
      ]
@@ -5151,7 +5151,7 @@
       {
        "name": "apply",
        "kind": "method",
-       "signature": "(shape:UiCursorShape):Void",
+       "signature": "(shape:haxeon.ui.core.CursorShape):Void",
        "doc": "Best-effort application; cursor decoration must not break input delivery."
       },
       {
@@ -5182,7 +5182,7 @@
       {
        "name": "attach",
        "kind": "method",
-       "signature": "(events:NativeKitEvents):Void",
+       "signature": "(events:EventPump):Void",
        "doc": "Subscribes this adapter to the runtime's shared event pump."
       },
       {
@@ -5194,7 +5194,7 @@
       {
        "name": "consume",
        "kind": "method",
-       "signature": "(event:NativeKitEventValue):Bool",
+       "signature": "(event:PlatformEvent):Bool",
        "doc": "Consumes recognized input for this window; other event kinds/sources pass through."
       }
      ]
@@ -5855,7 +5855,7 @@
       {
        "name": "attach",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void"
+       "signature": "(surface:Surface):Void"
       },
       {
        "name": "activate",
@@ -6165,7 +6165,7 @@
       {
        "name": "attachPlatformSurface",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:haxeon.platform.Surface):Void",
        "doc": "Attaches the host surface used by platform text-input synchronization."
       },
       {
@@ -6200,7 +6200,7 @@
       {
        "name": "updateAccessibility",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void",
+       "signature": "(surface:haxeon.platform.Surface):Void",
        "doc": "Connects this frame's semantic projection to a NativeKit platform surface."
       },
       {
@@ -9631,7 +9631,7 @@
       {
        "name": "tick",
        "kind": "method",
-       "signature": "(now:Float, pump:NativeKitEvents, window:WindowHandle, checkpoint:(String) -> Void, before:(Float) -> Void, after:(Float) -> Void):Bool",
+       "signature": "(now:Float, pump:EventPump, window:WindowHandle, checkpoint:(String) -> Void, before:(Float) -> Void, after:(Float) -> Void):Bool",
        "doc": "Dispatch one due event; the host drains overdue input before requesting the next frame."
       }
      ]
@@ -9699,7 +9699,7 @@
       {
        "name": "events",
        "kind": "var",
-       "signature": ":NativeKitEvents",
+       "signature": ":EventPump",
        "final": true
       },
       {
@@ -9728,7 +9728,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(fonts:FontCollection, events:NativeKitEvents, close:() -> Void, scheduleFrame:() -> Void):Void"
+       "signature": "(fonts:FontCollection, events:EventPump, close:() -> Void, scheduleFrame:() -> Void):Void"
       },
       {
        "name": "supports",
@@ -11877,7 +11877,7 @@
       {
        "name": "new",
        "kind": "method",
-       "signature": "(surface:NativeKitSurface):Void"
+       "signature": "(surface:Surface):Void"
       },
       {
        "name": "project",
@@ -24423,7 +24423,7 @@
       {
        "name": "applyTextEdit",
        "kind": "method",
-       "signature": "(edit:NativeKitTextEdit):Bool",
+       "signature": "(edit:TextEdit):Bool",
        "doc": "Applies one transactional NativeKit composition/edit update."
       },
       {

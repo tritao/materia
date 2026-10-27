@@ -1,9 +1,9 @@
+import haxeon.platform.Runtime;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.internal.event.EventBytes;
+import haxeon.platform.interop.TransportInterop;
 import processkit.testing.FakeModbusServer;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeKitRuntime;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeTransport;
 import processkit.modbus.ModbusTcpClient;
 import processkit.modbus.ModbusWelder;
 import processkit.modbus.ModbusWelderMap;
@@ -11,14 +11,14 @@ import processkit.modbus.ModbusRegister;
 
 class ModbusTcpTests {
   public static function run():Void {
-    var runtime = NativeKitRuntime.start();
-    var listener = NativeTransport.listen(36277);
+    var runtime = Runtime.start();
+    var listener = TransportInterop.listen(36277);
     var accepted:Array<TransportHandle> = [];
-    var subscription = runtime.events.listen(function(event:NativeKitEventValue) {
+    var subscription = runtime.events.listen(function(event:PlatformEvent) {
       switch event {
         case Raw(kind, source, _, _, _, _, data):
           if (kind == EventKind.TransportAccepted && source.rawValue() == listener.borrow().rawValue())
-            accepted.push(new TransportHandle(NativeKitEventBytes.readU32(data, 4)));
+            accepted.push(new TransportHandle(EventBytes.readU32(data, 4)));
         case _: return;
       }
     });

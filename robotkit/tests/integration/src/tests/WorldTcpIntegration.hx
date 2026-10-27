@@ -1,7 +1,8 @@
 package tests;
 
+import haxeon.platform.Runtime;
+
 import RobotKitRuntime;
-import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import motionkit.trajectory.Trajectory;
 import robotkit.execution.ExecutionPlanSubmission;
@@ -52,7 +53,7 @@ class WorldTcpIntegration {
 
   /** Checks a fresh robotd process against a serial device that stayed powered. */
   public static function runRestartCheck(host:String, port:Int):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID, IntegrationCredentials.controller());
     world.attach(remote);
@@ -85,7 +86,7 @@ class WorldTcpIntegration {
   }
 
   public static function run(host:String, port:Int, ?cameraFixture:Bool = false):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID, IntegrationCredentials.controller());
     if (cameraFixture) remote.enableCamera();
@@ -390,7 +391,7 @@ class WorldTcpIntegration {
     if (failure != null) throw failure;
   }
 
-  static function waitUntil(runtime:NativeKitRuntime, condition:Void -> Bool, failure:String):Void {
+  static function waitUntil(runtime:Runtime, condition:Void -> Bool, failure:String):Void {
     for (_ in 0...500) {
       while (runtime.events.poll()) {
       }

@@ -32,9 +32,9 @@ class PrinterLink {
   var installer:Null<ConfigInstaller> = null;
   var clock = 0.0;
 
-  final events:Null<haxeon.platform.NativeKitEvents>;
+  final events:Null<haxeon.platform.event.EventPump>;
 
-  public function new(?events:haxeon.platform.NativeKitEvents) { this.events = events; }
+  public function new(?events:haxeon.platform.event.EventPump) { this.events = events; }
 
   /**
    * The host and port of an endpoint, `host` or `host:port`. An IPv6 literal is written in brackets with an optional port

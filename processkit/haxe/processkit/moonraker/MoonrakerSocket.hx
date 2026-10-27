@@ -1,11 +1,12 @@
 package processkit.moonraker;
 
+import haxeon.platform.event.EventPump;
+import haxeon.platform.event.EventSubscription;
+import haxeon.platform.interop.TransportInterop;
+
 import haxe.Json;
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeTransport;
-import haxeon.platform.NativeKitEvents;
-import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
 
 private class Call {
   public final id:Int;
@@ -23,7 +24,7 @@ private class Call {
  */
 class MoonrakerSocket {
   final transport:OwnedTransportHandle;
-  final subscription:NativeKitEventSubscription;
+  final subscription:EventSubscription;
   var transportError:Null<String> = null;
   public final host:String;
   public final port:Int;
@@ -47,11 +48,11 @@ class MoonrakerSocket {
   var started = false;
   var subscribed = false;
 
-  public function new(host:String, port:Int, events:NativeKitEvents, timeout:Float = 2.0, secure:Bool = false) {
+  public function new(host:String, port:Int, events:EventPump, timeout:Float = 2.0, secure:Bool = false) {
     if (!Math.isFinite(timeout) || timeout <= 0.0) throw "Invalid Moonraker timeout";
     this.host = host; this.port = port; this.timeout = timeout;
     if (events == null || events.isDisposed()) throw "Moonraker requires the owner's NativeKit event pump";
-    transport = NativeTransport.websocket(host, port, "/websocket", timeout, secure);
+    transport = TransportInterop.websocket(host, port, "/websocket", timeout, secure);
     subscription = events.listen(event -> switch event {
       case Raw(kind, source, _, result, _, _, _):
         if (closed || source.rawValue() != transport.borrow().rawValue()) return;
@@ -114,7 +115,7 @@ class MoonrakerSocket {
   }
 
   function sendFrame(bytes:Bytes):Void {
-    var code = NativeTransport.sendStatus(transport.borrow(), bytes);
+    var code = TransportInterop.sendStatus(transport.borrow(), bytes);
     if (code != 0) throw 'Moonraker transport send failed: $code';
   }
 
@@ -147,7 +148,7 @@ class MoonrakerSocket {
       if (!open && now >= deadline) throw "Moonraker WebSocket handshake timed out";
       if (open) {
         while (true) {
-          var message = NativeTransport.receiveMessage(transport.borrow());
+          var message = TransportInterop.receiveMessage(transport.borrow());
           if (message == null) break;
           handle(message, now);
           if (closed) return;

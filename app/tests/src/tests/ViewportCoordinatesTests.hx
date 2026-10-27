@@ -1,9 +1,10 @@
 package tests;
 
+import haxeon.platform.event.EventPump;
+
 import app.EditorScene;
 import app.EditorPerspectiveViewport;
 import nativekit.scene.SceneView;
-import haxeon.platform.NativeKitEvents;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutFrame;
 import haxeon.ui.LayoutStyle;
@@ -35,7 +36,7 @@ class ViewportCoordinatesTests {
     var scene=new EditorScene([{id:"part",label:"Part",type:"rectangle",x:0.0,y:0.0,z:0.0,
       width:0.2,height:0.2,depth:0.4,collisionEnabled:false,dynamicBody:false,mass:1.0,
       red:0.5,green:0.5,blue:0.5,visible:true}]);
-    var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
+    var host=new UiHostContext(null,new EventPump(),function(){},function(){});
     var viewport=new EditorPerspectiveViewport("section-test",scene,host,fill()),ui=new UiContext();
     var definition:materia.assembly.AssemblyDefinition={schemaVersion:materia.assembly.AssemblyDefinitionCodec.VERSION,id:"section-test",
       definitions:[{id:"part",connectors:[]}],occurrences:[{id:"part",definition:"part",initialPose:materia.assembly.AssemblyFrames.identity()}],joints:[]};
@@ -79,7 +80,7 @@ class ViewportCoordinatesTests {
     var scene=new EditorScene([{id:"target",label:"Target",type:"rectangle",x:0.3,y:-0.2,z:0.0,
       width:0.2,height:0.2,depth:0.2,collisionEnabled:false,dynamicBody:false,mass:1.0,
       red:0.5,green:0.5,blue:0.5,visible:true}]);
-    var host=new UiHostContext(null,new NativeKitEvents(),function(){},function(){});
+    var host=new UiHostContext(null,new EventPump(),function(){},function(){});
     var viewport=new EditorPerspectiveViewport("coordinate-test",scene,host,fill()), ui=new UiContext();
     var row=new Row("docked-row",[
       new KeyedView("left",new Spacer("hierarchy",LayoutAxis.fixed(300),LayoutAxis.grow())),

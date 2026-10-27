@@ -1,11 +1,13 @@
 package robotd;
+
+import haxeon.platform.Runtime;
+import haxeon.platform.event.EventSubscription;
+import haxeon.platform.event.PlatformEvent;
+import haxeon.platform.internal.event.EventBytes;
+import haxeon.platform.interop.TransportInterop;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import haxeon.platform.NativeKitEventBytes;
-import haxeon.platform.NativeKitEventValue;
-import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
-import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;
@@ -38,7 +40,6 @@ import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.protocol.SensorFrameMsg;
-import haxeon.platform.NativeTransport;
 import robotkit.core.RobotSensorFrames;
 import robotkit.runtime.RuntimeRobotAdapter;
 import robotkit.core.RobotEvent;
@@ -62,7 +63,7 @@ class RobotServer {
   final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
   final simulation:Null<SimulationHarness>;
-  final nativeRuntime:NativeKitRuntime;
+  final nativeRuntime:Runtime;
   final listener:OwnedListenerHandle;
   final port:Int;
   final authorization:robotkit.auth.RobotAuthorization;
@@ -71,7 +72,7 @@ class RobotServer {
   public var nextDeployment(default, null):Null<String> = null;
   final listenAddress:String;
   final robotId:Int;
-  final subscription:NativeKitEventSubscription;
+  final subscription:EventSubscription;
   final behaviorRunner:Null<RobotBehaviorRunner>;
   var client:Null<TransportHandle>;
   final observers:Array<TransportHandle> = [];
@@ -131,11 +132,11 @@ class RobotServer {
     perception = pipelines.length == 0 ? null : new PerceptionHost(pipelines);
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     if (behaviorRunner != null) controlOwner = LocalBehavior;
-    nativeRuntime = NativeKitRuntime.start();
+    nativeRuntime = Runtime.start();
     try {
       if (simulation != null) simulation.start();
       else runtime.start();
-      listener = NativeTransport.listen(port, listenAddress);
+      listener = TransportInterop.listen(port, listenAddress);
       stream = new RobotFrameStream();
       subscription = nativeRuntime.events.listen(onEvent);
     } catch (error:Dynamic) {
@@ -241,10 +242,10 @@ class RobotServer {
     client = null;
     helloComplete = false;
     if (currentClient != null) {
-      try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
+      try { TransportInterop.close(currentClient); } catch (_:Dynamic) {}
     }
     for (observer in observers) {
-      try { NativeTransport.close(observer); } catch (_:Dynamic) {}
+      try { TransportInterop.close(observer); } catch (_:Dynamic) {}
     }
     observers.resize(0);
     observerStreams.clear();
@@ -260,7 +261,7 @@ class RobotServer {
     nativeRuntime.dispose();
   }
 
-  function onEvent(value:NativeKitEventValue):Void switch value {
+  function onEvent(value:PlatformEvent):Void switch value {
     case Raw(kind, source, _, _, _, _, data):
       var currentClient = client;
       if (kind == EventKind.TransportAccepted &&
@@ -287,15 +288,15 @@ class RobotServer {
   }
 
   function accept(data:Bytes):Void {
-    NativeKitEventBytes.requireMinimumSize(data, 32);
-    var accepted = new TransportHandle(NativeKitEventBytes.readU32(data, 4));
+    EventBytes.requireMinimumSize(data, 32);
+    var accepted = new TransportHandle(EventBytes.readU32(data, 4));
     if (!accepted.isValid())
       return;
     var scheduler:OutboundScheduler;
     try scheduler = new OutboundScheduler(accepted, bulkBudgetBytes)
     catch (error:Dynamic) {
       Sys.println('robotd: rejecting connection: $error');
-      NativeTransport.close(accepted);
+      TransportInterop.close(accepted);
       return;
     }
     if (client == null) {
@@ -323,7 +324,7 @@ class RobotServer {
     while (true) {
       var bytes:haxe.io.Bytes;
       try {
-        bytes = NativeTransport.receive(transport);
+        bytes = TransportInterop.receive(transport);
       } catch (_:Dynamic) {
         closeClient(transport);
         return;
@@ -341,7 +342,7 @@ class RobotServer {
     while (true) {
       var bytes:haxe.io.Bytes;
       try {
-        bytes = NativeTransport.receive(transport);
+        bytes = TransportInterop.receive(transport);
       } catch (_:Dynamic) {
         closeObserver(transport);
         return;
@@ -886,7 +887,7 @@ class RobotServer {
     if (OutboundPolicy.family(frame.messageType) != OutboundFamily.Essential)
       throw "bulk RKF1 frames must use the outbound scheduler";
     try {
-      NativeTransport.send(target, frame.encode());
+      TransportInterop.send(target, frame.encode());
     } catch (_:Dynamic) {
       if (client != null && client.rawValue() == target.rawValue())
         closeClient(target);
@@ -933,7 +934,7 @@ class RobotServer {
     principals.remove(currentClient.rawValue());
     deploymentSequences.remove(currentClient.rawValue());
     outbound.remove(currentClient.rawValue());
-    try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
+    try { TransportInterop.close(currentClient); } catch (_:Dynamic) {}
   }
 
   function findObserver(value:TransportHandle):Null<TransportHandle> {
@@ -956,6 +957,6 @@ class RobotServer {
     principals.remove(value.rawValue());
     deploymentSequences.remove(value.rawValue());
     outbound.remove(value.rawValue());
-    try { NativeTransport.close(value); } catch (_:Dynamic) {}
+    try { TransportInterop.close(value); } catch (_:Dynamic) {}
   }
 }

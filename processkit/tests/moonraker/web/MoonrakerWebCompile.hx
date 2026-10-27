@@ -1,9 +1,9 @@
-import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.Runtime;
 import processkit.moonraker.MoonrakerClient;
 import processkit.moonraker.MoonrakerSocket;
 class MoonrakerWebCompile {
   static function main() {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var http = new MoonrakerClient("127.0.0.1",7125,runtime.events);
     var socket = new MoonrakerSocket("127.0.0.1",7125,runtime.events);
     socket.subscribe();

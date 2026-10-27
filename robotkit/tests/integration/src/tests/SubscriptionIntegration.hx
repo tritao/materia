@@ -1,12 +1,13 @@
 package tests;
 
+import haxeon.platform.Runtime;
+
 import robotkit.client.RobotClient;
-import haxeon.platform.NativeKitRuntime;
 
 /** Two observers request different RKF1 families from one real robotd. */
 class SubscriptionIntegration {
   public static function run(host:String, port:Int):Void {
-    var runtime = NativeKitRuntime.start();
+    var runtime = Runtime.start();
     var numeric = new RobotClient("numeric-only", "observer", IntegrationCredentials.observer());
     numeric.subscribeCamera = false;
     var images = new RobotClient("camera-reader", "observer", IntegrationCredentials.observer());

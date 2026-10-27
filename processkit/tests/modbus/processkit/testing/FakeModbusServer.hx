@@ -1,12 +1,13 @@
 package processkit.testing;
 
+import haxeon.platform.interop.TransportInterop;
+
 import sys.thread.Mutex;
 import sys.thread.Lock;
 import sys.thread.Thread;
 
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import haxeon.platform.NativeTransport;
 import processkit.modbus.ModbusFrame;
 import processkit.modbus.ModbusFrameStream;
 import processkit.modbus.ModbusWelderMap;
@@ -33,14 +34,14 @@ class FakeModbusServer {
   }
   public function register(address:Int):Int return registers[address];
   public function setRegister(address:Int, value:Int):Void registers[address] = value;
-  public function drop():Void { if (!disconnected) NativeTransport.close(transport); disconnected = true; }
+  public function drop():Void { if (!disconnected) TransportInterop.close(transport); disconnected = true; }
   public function poll(now:Float):Void {
     if (expires >= 0.0 && now >= expires) {
       registers[map.arcAddress] = 0; registers[map.wire.address] = 0;
     }
     updateModel(now);
     if (!disconnected) {
-      var bytes = NativeTransport.receive(transport, 2048);
+      var bytes = TransportInterop.receive(transport, 2048);
       received += bytes.length;
       if (bytes.length > 0) stream.feed(bytes);
       while (true) {
@@ -64,7 +65,7 @@ class FakeModbusServer {
           reply = Bytes.alloc(2 + argument * 2); reply.set(0, 3); reply.set(1, argument * 2);
           for (i in 0...argument) ModbusFrame.putWord(reply, 2 + i * 2, registers[address + i]);
         } else throw "Unsupported fake Modbus function";
-        NativeTransport.send(transport, new ModbusFrame(request.transaction, map.unit, reply).encode());
+        TransportInterop.send(transport, new ModbusFrame(request.transaction, map.unit, reply).encode());
       }
     }
     updateModel(now);

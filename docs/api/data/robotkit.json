@@ -1459,7 +1459,7 @@
       {
        "name": "connectWithEvents",
        "kind": "method",
-       "signature": "(host:String, port:Int, events:NativeKitEvents):Void",
+       "signature": "(host:String, port:Int, events:EventPump):Void",
        "doc": "Connects using an event pump owned by an embedding application.\n\nThis keeps the editor's single NativeKit initialization and event loop\nauthoritative while retaining the same typed client API."
       },
       {
@@ -16890,7 +16890,7 @@
       {
        "name": "connect",
        "kind": "method",
-       "signature": "(host:String, port:Int, events:NativeKitEvents):Void",
+       "signature": "(host:String, port:Int, events:EventPump):Void",
        "doc": "Connects this adapter using the host's event pump."
       },
       {

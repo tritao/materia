@@ -73,9 +73,9 @@ Line numbers are approximate. Re-read before editing.
     `applyBehavior` for local behaviors, then pumps transport events and checks
     the control lease.
   - The native `RobotRuntime` has its own owner thread.
-- **The transport queues sends.** `NativeTransport.send` →
+- **The transport queues sends.** `TransportInterop.send` →
   `nk_transport_send` appends to one FIFO per connection. A writer thread drains
-  it, and the queue is capped at 4 MiB (set in `transport/NativeTransport.hx`
+  it, and the queue is capped at 4 MiB (set in `transport/TransportInterop.hx`
   ~27).
   - A full queue returns `NK_ERROR_QUEUE_FULL`
     (`nativekit/src/transport/transport.cpp` ~1791-1830).
