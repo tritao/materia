@@ -103,7 +103,7 @@ class SceneFileDialogs {
   public function dispose():Void {
     var id = request;
     if (id == null) return;
-    host.events.requests.cancel(id);
+    host.events.requests.forget(id);
     NativeKit.nk_dialog_cancel(id);
     request = null;
   }
