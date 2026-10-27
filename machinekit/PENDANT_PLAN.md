@@ -32,7 +32,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 | Axis | 12-position panel rotary switch: OFF plus positions 1 to 11 | The position is the state, so it survives power cycles, reads with a glove and does not depend on the display. Positions are printed as plain numbers; the profile maps each to an axis and the OLED shows the name ("3: Z"). If the OLED fails, the printed number and the main HMI still identify the axis. |
 | Step | 3-position panel rotary switch | ×1, ×10, ×100. Universal across machines, so fixed. |
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
-| Buttons | About 6 with LEDs | Start, hold, stop, and user keys. The set is not decided (see open questions). Unused buttons stay dark. |
+| Buttons | 6 with LEDs | **Fixed (3):** Start, Hold, Stop/Reset, with standard icons, the same on every machine. **User keys F1 to F3 (3):** the function comes from the machine profile and the OLED's bottom line shows the current names next to the keys, so the one SKU needs no relabelling. Default profile assignment: F1 door open/close, F2 spindle jog (manual, hold-to-run), F3 work light or MQL toggle; the router can use F3 for the vacuum table. Unused keys stay dark. |
 | E-stop | Bought 22 mm mushroom, NC contact block | In the v1 chain. |
 | Display | 128×64 mono OLED | Text only; footprint for a one-character display as an option. |
 
@@ -108,8 +108,8 @@ several KB. Values are placeholders.
 
 ## Open questions
 
-- **Button set.** Starting list: start, hold, stop and two user keys. Which functions do your
-  machines need (spindle, door, tool change)?
+- **Button set.** Settled for v1 as three fixed keys and F1 to F3 profile keys. More user keys
+  wait until a real machine shows what is missing.
 - **MPG choice.** Output type, supply, wheel feel, detent and price from a real part.
 - **E-stop contact block.** Rating and terminals.
 - **pcbkit.** Whether it covers a G0B1 with FDCAN and an isolated transceiver today.
