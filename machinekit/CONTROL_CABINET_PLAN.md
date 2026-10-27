@@ -10,9 +10,11 @@ references are to be verified against the current revisions (CC9).
 
 ## Principles
 
-1. **Safety is hardwired and bought.** E-stop, enabling switch, guard locking and stop
-   categories go through a certified safety relay or controller. Our boards and software only
-   observe. Nothing safety-relevant is touch-only or software-only.
+1. **Safety is hardwired and separate from our software.** E-stop, door and stop go through a
+   hardwired chain that our boards and software only observe. Nothing safety-relevant is
+   touch-only or software-only. **v1 is the uncertified bench chain** (see "v1 safety chain");
+   the certified relay, enabling switch and locking interlock are a later drop-in upgrade of
+   the same module.
 2. **Everything else is a thin client of the runtime.** The runtime has one motion owner. A jog
    from the pendant is another command source (like the keyboard, a remote client or a test),
    taken as a **lease**. Loss of link or release of the enabling switch ends the lease and stops.
@@ -46,6 +48,28 @@ A profile is the data a machine hands to the platform:
 | Main HMI page | DRO, program, tool table, probing | Gearbox sync status, hob shift, pass counter, error budget | Program select, cell mode, safety banner |
 | Cabinet | On the machine base | Separate floor rack (already modelled) | Small controller box |
 | Modes | Auto, Manual, Setup (door open, hold-to-run) | Same | Auto, T1, optional T2 |
+
+## v1 safety chain (uncertified bench build)
+
+For a machine only the owner operates. Not for sale, not for other operators, and not for an
+arm moving near people.
+
+- **No motion with the door open.** Door closed: jog and cut from the pendant. Door open: drives
+  disabled and spindle stopped. There is no setup mode with the door open in v1, so no enabling
+  switch and no setup speed-limit logic.
+- **The chain.** An NC E-stop mushroom in series with a door switch (reed or limit), cutting the
+  drives' STO inputs and the spindle enable or a contactor through a plain relay. NC contacts
+  fail safe on a broken wire. Estimated cost €30–50 (unchecked).
+- **What it is not.** No redundancy, no stuck-contact monitoring, no rating. Operating rules:
+  never reach in while powered, test the E-stop regularly, nobody else uses the machine.
+- **Read-back.** The cabinet controller reads the chain state (E-stop, door, drives enabled) so the
+  HMI, the guard logic and the lease know it. It is observed only and never in the chain.
+- **Upgrade path.** The chain is one module with a fixed interface: loop terminals plus read-back
+  signals. A certified relay, 3-position enabling switch and guard-locking interlock replace it
+  later without changing the pendant, the runtime or the profile. Adding the door-open setup
+  mode then restores the `EnclosureGuard` setup policy.
+- **The arm.** The v1 cell is kept clear of people while powered and runs with the software speed
+  limits only. B1 (certified safety controller) waits until the arm is used near people.
 
 ## Long-term architecture
 
@@ -215,7 +239,9 @@ the screen. For the cabinet case: HDMI to the monitor and USB for touch.
   industrial carrier (or a DIN-rail unit such as the RevPi Connect 5).
 
 ### CNC pendant (drill-tap, hobber)
-- Dual-channel E-stop mushroom and 3-position enabling switch to the safety relay.
+- v1: an E-stop mushroom (NC contact) into the safety chain. No enabling switch, because v1
+  allows no motion with the door open. The certified upgrade adds a dual-channel E-stop and a
+  3-position enabling switch (IEC 60947-5-8) to a certified relay.
 - MPG, 100 PPR, axis select (X, Y, Z, A, spindle), steps ×1 / ×10 / ×100 (0.001 / 0.01 /
   0.1 mm), feed override encoder, cycle start / hold / stop, mode key, a few soft keys with LEDs.
 - No onboard compute: a small RKD6-family node on CAN-FD or Ethernet. 3–5 m coiled cable,
@@ -280,7 +306,7 @@ the screen. For the cabinet case: HDMI to the monitor and USB for touch.
 | CC2 | Operator HMI app on the desktop GTK build, drill-tap and hobber sims | CC0, CC1 |
 | CC3 | Embedded spike: aarch64 cross-build, `cage` on a Pi 5, measure boot, memory, frame time, touch; decide on `linux-drm` | CC2 |
 | CC3b | `linux-drm` NativeKit backend (only if CC3 says so) | CC3 |
-| CC4 | CNC pendant bench prototype: Nucleo, real MPG, E-stop and enable into a safety relay, CAN-FD to the host; connector bridge or detect | CC1 |
+| CC4 | CNC pendant bench prototype: small FDCAN MCU (G0B1-class; Nucleo-G474 as stand-in), real MPG, axis and step rotary selectors, buttons and LEDs, E-stop into the v1 chain, CAN-FD to the host, no display; then board in pcbkit and a CadKit case | CC1 |
 | CC5 | Cabinet generator from the drive list; drill-tap first, hobber rack second | CC0, B3 |
 | CC6 | Bind drill-tap and hobber profiles to `EnclosureGuard`; hobber gearbox-aware jog rules | CC1, CC2, B2 |
 | CC7 | Arm teach pendant: screen plus MCU, puck, modes, teach pages | CC1, B1 |
