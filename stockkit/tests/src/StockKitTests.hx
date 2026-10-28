@@ -10,47 +10,25 @@ import toolpathkit.tool.CutterProfile;
 class StockKitTests {
   public static function main():Void {
     // Each group is independent of the others, so that the workspace can run them as parallel shards.
+    // The quick groups are native, hobbing-schedule and sampled-reference checks; the thorough ones add the HB4 reference cut and compare
+    // the core with the OCCT oracle on every fixture and contour each result. `--quick` runs only the quick groups.
     var groups:Array<TestGroup> = [
       {name: "RingMetrologyTests", run: RingMetrologyTests.run, weight: 0.1},
-      {
-        name: "HobbingTests",
-        run: HobbingTests.run,
-        weight: 2
-      },
-      {
-        name: "RingStockTests",
-        run: RingStockTests.run,
-        weight: 0.05
-      },
-      {
-        name: "profiles",
-        run: profiles,
-        weight: 0.05
-      },
-      {
-        name: "CutMoveTests",
-        run: CutMoveTests.run,
-        weight: 0.05
-      },
-      {
-        name: "SampledReferenceFixtures",
-        run: SampledReferenceFixtures.run,
-        weight: 4
-      },
-      {
-        name: "CoreFixtures",
-        run: CoreFixtures.run,
-        weight: 4.5
-      },
-      {
-        name: "OracleFixtures",
-        run: OracleFixtures.run,
-        weight: 4.3
-      }
+      {name: "HobbingTests", run: HobbingTests.run, weight: 0.3},
+      {name: "RingStockTests", run: RingStockTests.run, weight: 0.05},
+      {name: "profiles", run: profiles, weight: 0.05},
+      {name: "CutMoveTests", run: CutMoveTests.run, weight: 0.05},
+      {name: "SampledReferenceFixtures", run: SampledReferenceFixtures.run, weight: 4}
     ];
-    for (group in ChainFixtures.groups()) groups.push(group);
+    var quick = Sys.args().indexOf("--quick") >= 0;
+    if (!quick) {
+      groups.push({name: "HobbingReference", run: HobbingTests.reference, weight: 1.8});
+      groups.push({name: "CoreFixtures", run: CoreFixtures.run, weight: 4.5});
+      groups.push({name: "OracleFixtures", run: OracleFixtures.run, weight: 4.3});
+      for (group in ChainFixtures.groups()) groups.push(group);
+    }
     var everything = Shards.run(groups);
-    if (everything) Sys.println('StockKit tests passed (${Assert.count} assertions, '
+    if (everything) Sys.println('StockKit ${quick ? "quick " : ""}tests passed (${Assert.count} assertions, '
       + '${CoreComparison.raysCompared} core rays checked against references)');
   }
 

@@ -246,13 +246,19 @@ class HobbingTests {
       fine.facets > coarse.facets && twoStart.facets < coarse.facets,
       "generating-cut density responds to gashes and starts"
     );
+    Sys.println('HobbingTests: $assertions assertions passed');
+  }
+
+  /** The slow acceptance cases: the HB4 reference cut and the feed-marks comparison. */
+  public static function reference():Void {
     referenceCase();
     feedCase();
-    Sys.println('HobbingTests: $assertions assertions passed');
+    Sys.println('HobbingTests reference: $assertions assertions passed');
   }
   public static function main():Void {
     if (Sys.args().length == 0) {
       run();
+      reference();
       return;
     }
     switch (Sys.args()[0]) {

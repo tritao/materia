@@ -18,9 +18,6 @@ Roughly in priority order.
 - [ ] Show large stock as `StockPreview` chunks on child nodes, so playback
   re-uploads only the chunks that changed. Contouring the whole 200×200 mm
   benchmark stock takes about 0.8 s, a dirty 4×4-tile chunk 2–8 ms.
-- [ ] Split `tests` (about 5 minutes) into a quick run (native checks, the
-  sampled reference, a few oracle rays) and a thorough run (every OCCT
-  comparison and contoured volume).
 - [ ] STL export of the contoured stock (and of targets), reporting
   non-manifold edges until manifold contouring lands.
 - [ ] Manifold dual contouring: one vertex per separate piece of surface in
@@ -75,5 +72,3 @@ See [`docs/RING.md`](docs/RING.md) and [`docs/HOBBING.md`](docs/HOBBING.md).
 - [ ] Decide whether `stockkit.ring` and `stockkit.hobbing` become their own
   package (depending on StockKit and GearKit) so CAM users no longer pull in
   GearKit.
-- [ ] Split the test run into quick and thorough sets (see above); the HB4
-  reference acceptance is the slow part.
