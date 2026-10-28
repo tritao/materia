@@ -42,6 +42,8 @@
 	path = simkit/vendor/mujoco-deps/lodepng
 	url = https://github.com/lvandeve/lodepng.git
 	shallow = true
+	# MuJoCo's fetchpackage(CUSTOM_CMAKE) copies its own CMakeLists.txt into this source directory on every configure.
+	ignore = untracked
 [submodule "simkit/vendor/mujoco-deps/marchingcubecpp"]
 	path = simkit/vendor/mujoco-deps/marchingcubecpp
 	url = https://github.com/aparis69/MarchingCubeCpp.git
