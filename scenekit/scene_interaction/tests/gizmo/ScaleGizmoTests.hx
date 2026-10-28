@@ -14,11 +14,7 @@ class ScaleGizmoTests {
     var pivot = new GizmoVec3(0, 0, 0), camera = new GizmoCamera(
       new GizmoVec3(10, 10, 10),
       pivot,
-      new GizmoVec3(
-        0,
-        0,
-        1
-      ),
+      new GizmoVec3(0, 0, 1),
       800,
       600
     );

@@ -39,21 +39,9 @@ class ScaleGizmo {
       Uniform,
       [
         new GizmoPoint(center.x - 6, center.y - 6, center.depth),
-        new GizmoPoint(
-          center.x + 6,
-          center.y - 6,
-          center.depth
-        ),
-        new GizmoPoint(
-          center.x + 6,
-          center.y + 6,
-          center.depth
-        ),
-        new GizmoPoint(
-          center.x - 6,
-          center.y + 6,
-          center.depth
-        )
+        new GizmoPoint(center.x + 6, center.y - 6, center.depth),
+        new GizmoPoint(center.x + 6, center.y + 6, center.depth),
+        new GizmoPoint(center.x - 6, center.y + 6, center.depth)
       ]
     ));
   }

@@ -12,21 +12,9 @@ class TranslationGizmoTests {
     check(failed, "Expected gizmo rejection");
   }
   static function camera(distance:Float = 10, width:Float = 800, height:Float = 600):GizmoCamera return new GizmoCamera(
-    new GizmoVec3(
-      distance,
-      distance,
-      distance
-    ),
-    new GizmoVec3(
-      0,
-      0,
-      0
-    ),
-    new GizmoVec3(
-      0,
-      0,
-      1
-    ),
+    new GizmoVec3(distance, distance, distance),
+    new GizmoVec3(0, 0, 0),
+    new GizmoVec3(0, 0, 1),
     width,
     height
   );
@@ -48,12 +36,7 @@ class TranslationGizmoTests {
     var rotationView = camera(), rotationPivot = new GizmoVec3(0, 0, 0);
     for (rotationBasis in [
       GizmoBasis.world(),
-      GizmoBasis.fromQuaternion(
-        0,
-        0,
-        Math.sin(Math.PI / 12),
-        Math.cos(Math.PI / 12)
-      )
+      GizmoBasis.fromQuaternion(0, 0, Math.sin(Math.PI / 12), Math.cos(Math.PI / 12))
     ]) {
       var rotation = new RotationGizmo(rotationView, rotationPivot, 75, rotationBasis);
       check(rotation.shapes().length == 3, "Missing rotation rings");
@@ -216,11 +199,7 @@ class TranslationGizmoTests {
     check(
       new TranslationGizmo(nearView, new GizmoVec3(0, -9.5, 0)).shapes().length == 0 && new TranslationGizmo(
         nearView,
-        new GizmoVec3(
-          0,
-          20,
-          0
-        )
+        new GizmoVec3(0, 20, 0)
       ).shapes().length == 0,
       "Depth clipping produced pickable handles"
     );

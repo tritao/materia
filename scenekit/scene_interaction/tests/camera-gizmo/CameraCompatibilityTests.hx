@@ -15,16 +15,8 @@ class CameraCompatibilityTests {
       var eye = camera.eyePosition();
       var snapshot = new GizmoCamera(
         new GizmoVec3(eye[0], eye[1], eye[2]),
-        new GizmoVec3(
-          camera.targetX,
-          camera.targetY,
-          camera.targetZ
-        ),
-        new GizmoVec3(
-          0,
-          0,
-          1
-        ),
+        new GizmoVec3(camera.targetX, camera.targetY, camera.targetZ),
+        new GizmoVec3(0, 0, 1),
         800,
         600,
         PerspectiveCamera.FOV_Y,
@@ -63,16 +55,8 @@ class CameraCompatibilityTests {
     camera.frame(initial.x, initial.y, initial.z, 6, 6, 6, 800.0 / 600.0);
     var eye = camera.eyePosition(), snapshot = new GizmoCamera(
       new GizmoVec3(eye[0], eye[1], eye[2]),
-      new GizmoVec3(
-        camera.targetX,
-        camera.targetY,
-        camera.targetZ
-      ),
-      new GizmoVec3(
-        0,
-        0,
-        1
-      ),
+      new GizmoVec3(camera.targetX, camera.targetY, camera.targetZ),
+      new GizmoVec3(0, 0, 1),
       800,
       600
     );

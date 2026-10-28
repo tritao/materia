@@ -17,11 +17,7 @@ class GizmoBasis {
   public static function world():GizmoBasis return new GizmoBasis(
     new GizmoVec3(1, 0, 0),
     new GizmoVec3(0, 1, 0),
-    new GizmoVec3(
-      0,
-      0,
-      1
-    )
+    new GizmoVec3(0, 0, 1)
   );
   /** Rotation only, from a finite nonzero quaternion. Normalize without inheriting object/parent scale. */
   public static function fromQuaternion(qx:Float, qy:Float, qz:Float, qw:Float):GizmoBasis {
@@ -40,16 +36,8 @@ class GizmoBasis {
     qw /= length;
     return new GizmoBasis(
       new GizmoVec3(1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy + qw * qz), 2 * (qx * qz - qw * qy)),
-      new GizmoVec3(
-        2 * (qx * qy - qw * qz),
-        1 - 2 * (qx * qx + qz * qz),
-        2 * (qy * qz + qw * qx)
-      ),
-      new GizmoVec3(
-        2 * (qx * qz + qw * qy),
-        2 * (qy * qz - qw * qx),
-        1 - 2 * (qx * qx + qy * qy)
-      )
+      new GizmoVec3(2 * (qx * qy - qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qw * qx)),
+      new GizmoVec3(2 * (qx * qz + qw * qy), 2 * (qy * qz - qw * qx), 1 - 2 * (qx * qx + qy * qy))
     );
   }
   public function axis(handle:TranslationHandle):GizmoVec3 return switch handle {
