@@ -195,20 +195,28 @@ The bought parts, the panel layout and its checks are generic and live in `machi
   in the right-hand column, E-stop, display, the two rotary switches, F1 and F2 on the left, F3 and the
   fixed Start, Hold and Stop/Reset keys along the bottom. The cheap E-stop is 43 mm deep, so the case is
   48 mm and the pendant 89 mm tall face up with the handle (the wheel stands 38 mm).
-- **Case.** `PendantCase` builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
-  top, six M3 screw posts rising to the plate, a 9 mm cable hole through the bottom wall at mid depth, and
-  a matching plate with six counterbored holes. Posts go where nothing in front or behind needs the room.
-  `PendantTests` checks that the posts avoid every part and body, the shell and plate are single solids
-  that only touch, the shell's volume matches an analytic estimate, and no part overlaps another, the plate
-  or the shell.
+- **Case.** `PendantCase` plans and builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
+  top; six M3 screw posts rising to the plate; an M12 receptacle hole in the bottom wall (16.2 mm, an assumed M16
+  rear-mount thread) with room for its body; a **board envelope** behind the shallow controls (1.6 mm, 10 mm of
+  components on the back side) on four standoffs, notched for the posts, the receptacle, the enabling switch and the
+  deep E-stop that passes through its plane; two strap slots through the back wall; the **blanked enabling-switch
+  pocket** (22.3 mm opening, 0.8 mm skin to cut out); and on the plate a **perimeter tongue** that fits inside the
+  walls, interrupted around every rear body and post. `PendantTests` checks that the posts avoid every part and
+  body, the shell and plate are single solids, the shell's volume matches an analytic estimate, and the whole
+  assembly (plate, shell, board, every part) has no overlaps under `AssemblyIntegrity`.
 
 Findings so far, all on assumed rear bodies (measure the real parts):
 
-- **No post on the left edge.** The E-stop, the knobs and the left buttons fill that side, so the six
-  posts sit in the middle and on the right. A printed 3 mm plate may gape on the left; the next steps are
-  a perimeter tongue or clips on the shell and smaller measured bodies.
-- **Not yet modelled:** gasket, strap and hang point, the enabling-switch hole, the board and its
-  mounting, M12 receptacle and gland.
+- **The enabling switch fits on the left.** A free 26 mm column exists behind the display module (only 12 mm deep),
+  left of centre, so the switch can sit under the holding hand. If the display module turns out deeper, the planner
+  says so in `notes` and falls back to behind the wheel.
+- **The left edge now has a tongue,** which stops the plate gaping where no post fits; it is interrupted where the
+  E-stop, knobs and buttons come near the wall.
+- **Board:** it sits 26 mm behind the face (behind the 25 mm buttons and switches) with the deep E-stop through a
+  notch, leaving about 10 mm for the connector and components. That is the board's real constraint, to confirm when
+  the board is designed.
+- **Strap slots** keep clear of parts that leave under 8 mm to the back wall.
+- **Not yet modelled:** gasket, the M12 receptacle's own geometry and the real board, the wheel handle's removal.
 - **Printing:** the shell is deep (51 mm) and prints best open side up; the plate prints face down.
 
 ## Mechanics

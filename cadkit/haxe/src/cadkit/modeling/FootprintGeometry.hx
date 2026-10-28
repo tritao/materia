@@ -9,6 +9,13 @@ class FootprintGeometry {
     case _: throw "Unknown footprint";
   };
 
+  /** The shape grown by a margin on every side. */
+  public static function grow(f:Footprint, margin:Float):Footprint return switch f {
+    case Circle(d): Circle(d + 2 * margin);
+    case Rect(w, h): Rect(w + 2 * margin, h + 2 * margin);
+    case _: throw "Unknown footprint";
+  };
+
   /** Radius of the smallest circle around the shape. */
   public static function maxRadius(f:Footprint):Float return switch f {
     case Circle(d): d / 2;

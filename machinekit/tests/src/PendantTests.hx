@@ -1,3 +1,4 @@
+import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.RoundedRectangle;
 import machinekit.assembly.AssemblyIntegrity;
@@ -27,7 +28,7 @@ class PendantTests {
       check(FootprintGeometry.distanceTo(c.keepOut(), c.x, c.y, post.x, post.y) >= 6.0, 'A screw head lands on ${c.id}');
       check(FootprintGeometry.distanceTo(c.body(), c.x, c.y, post.x, post.y) >= 4.0 + 1.5 - 1e-9, 'A post hits the body of ${c.id}');
     }
-    check(Math.abs(pendantCase.cableX) < layout.width / 2 - layout.wall - 15.0, "Cable hole inside the bottom wall");
+    check(Math.abs(pendantCase.connectorX) < layout.width / 2 - layout.wall - 15.0, "Receptacle hole inside the bottom wall");
     var shell = pendantCase.shell();
     var plate = pendantCase.plate();
     check(shell.solidCount() == 1 && plate.solidCount() == 1, "Shell and plate are each one solid");
@@ -37,14 +38,33 @@ class PendantTests {
     var touching = plate.intersect(shell);
     check(touching.volume() < 1e-3, "The plate must only rest on the shell: " + touching.volume());
     touching.close();
-    // Outer box less the cavity, plus six posts, less the cable hole through a 3 mm wall and six pilot holes.
+    // Outer box less the cavity, plus six posts and four standoffs, less the receptacle hole through a 3 mm wall, two strap slots
+    // through the back wall, the enabling pocket and the pilot holes.
     var r = PanelFacePlate.CORNER_RADIUS;
+    var underside = pendantCase.boardTop - PendantCase.BOARD_THICKNESS;
     var shellExpected = RoundedRectangle.area(190.0, 110.0, r) * 51.0 - RoundedRectangle.area(184.0, 104.0, r - 3.0) * 48.0
-      + 6 * Math.PI * 16.0 * 48.0 - Math.PI * 4.5 * 4.5 * 3.0 - 6 * Math.PI * 1.3 * 1.3 * PendantCase.PILOT_DEPTH;
-    check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.003, "Shell volume " + shell.volume() + " vs " + shellExpected);
+      + 6 * Math.PI * 16.0 * 48.0 + 4 * Math.PI * 9.0 * (underside + 48.0)
+      - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 2.2
+      - 6 * Math.PI * 1.3 * 1.3 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.1 * 1.1 * 8.0;
+    check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.005, "Shell volume " + shell.volume() + " vs " + shellExpected);
+
+    // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling pocket and a tongue.
+    check(pendantCase.standoffs.length == 4 && pendantCase.strapSlots.length == 2, "Four standoffs and two strap slots");
+    for (slot in pendantCase.strapSlots) for (c in layout.controls)
+      if (c.behind() > 40.0) check(FootprintGeometry.gap(c.body(), c.x, c.y, Rect(PendantCase.STRAP_SLOT_WIDTH, PendantCase.STRAP_SLOT_HEIGHT), slot.x, slot.y) >= 1.5 - 1e-9, "A strap slot behind the deep " + c.id);
+    check(Math.abs(pendantCase.boardTop + 26.0) < 1e-9, "The board sits behind the 25 mm parts: " + pendantCase.boardTop);
+    // Behind the shallow display module there is a free column for the enabling switch, left of centre.
+    var pocket = pendantCase.enabling;
+    check(pocket != null && pocket.x < 0 && pendantCase.notes.length == 0, "The enabling switch fits on the left: " + pendantCase.notes.join(" | "));
+    var board = pendantCase.board();
+    check(board.solidCount() == 1 && board.volume() > 0.5 * 180.0 * 100.0 * 1.6 && board.volume() < 180.0 * 100.0 * 1.6, "Board envelope " + board.volume());
+    board.close();
+    var plain = PanelFacePlate.part(layout, pendantCase.posts);
+    check(plate.volume() > plain.volume() + 100.0 && plate.volume() < plain.volume() + 4000.0, "The tongue adds material: " + (plate.volume() - plain.volume()));
+    plain.close();
 
     // Every part's solid is clear of the others, the plate and the shell.
-    var report = AssemblyIntegrity.check(PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell()));
+    var report = AssemblyIntegrity.check(PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell(), [{id: "board", solid: () -> pendantCase.board()}]));
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
 
     var stepDir = Sys.getEnv("PENDANT_CASE_STEP_DIR");
