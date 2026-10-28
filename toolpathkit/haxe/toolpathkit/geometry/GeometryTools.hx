@@ -1,4 +1,4 @@
-package toolpathkit.path;
+package toolpathkit.geometry;
 
 /** Preview queries that do not require MotionKit. */
 class GeometryTools {

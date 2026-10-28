@@ -1,6 +1,6 @@
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.SetupStock;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Broad stock for geometry round-trip fixtures; focused tests use real bounds. */
 class CamTestSetup {

@@ -3,7 +3,7 @@ package camkit;
 import materia.casting.CastingProfile.CastingSegment;
 import materia.casting.CastingProfileGeometry;
 import materia.casting.CastingProfiles;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Neutral finished line/arc profiles -> CAM contours, without compensation.
  * Profile coordinates and XY normalization are mm; tolerance, margin and Z are m.

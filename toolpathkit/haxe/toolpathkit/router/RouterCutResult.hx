@@ -1,4 +1,4 @@
-package toolpathkit.tool;
+package toolpathkit.router;
 
 typedef RouterCutResult = {
   var operation:String;

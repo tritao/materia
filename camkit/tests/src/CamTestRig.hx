@@ -3,7 +3,7 @@ import cnckit.CncCompileResult;
 import cnckit.CncController;
 import cnckit.CncWriter;
 import toolpathkit.motion.MachineBinding;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.TravelEnvelope;

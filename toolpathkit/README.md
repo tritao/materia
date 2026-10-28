@@ -19,12 +19,13 @@ in machine space.
 
 - `haxe/toolpathkit` is the format, with no dependencies:
   - `path` holds the program and its operations (`ToolpathProgram`, `ToolpathOp`, `Provenance`,
-    `ToolpathFrame`, `MoveKind`), path geometry (`PathGeometry`, `Point3`, `ArcPlane`,
-    `GeometryTools`, `GeometryOffset`, `ArcFitting`) and the printing helpers (`PrinterOps`,
-    `PrintFeature`, `BeadSection`).
+    `ToolpathFrame`, `MoveKind`), `ArcFitting`, and the printing helpers (`PrinterOps`, `PrintFeature`,
+    `BeadSection`).
+  - `geometry` holds path geometry (`PathGeometry`, `Point3`, `ArcPlane`, `GeometryTools`,
+    `GeometryOffset`); it depends on nothing else in the format.
   - `setup` holds `Setup`, `SetupStock`, `Fixture` and `TravelEnvelope`.
-  - `tool` holds cutter shapes (`CutterProfile`), `Tool`, `ToolLibrary` and the router planning
-    helpers (`RouterBit`, `RouterCut`).
+  - `tool` holds cutter shapes (`CutterProfile`), `Tool` and `ToolLibrary`.
+  - `router` holds the router planning helpers (`RouterBit`, `RouterCut`).
 - `motion/` is the separate `toolpathkit-motion` package that lowers a program onto MotionKit; see
   [motion/README.md](motion/README.md).
 - `tests/` is the standalone suite; `docs/` holds the decision record and plans.

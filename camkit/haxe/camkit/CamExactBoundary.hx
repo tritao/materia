@@ -4,8 +4,8 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Plane;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 
 /** Exact compensation belongs to CamKit. Native geometry uses mm for its tolerance.
  * Offset edges stay exact lines/arcs in metres; chord samples only check area.
@@ -163,9 +163,9 @@ class CamExactBoundary {
   static function connect(edges:Array<PathGeometry>):Array<PathGeometry> {
     if (edges.length == 0) throw "CAM exact offset has no edges";
     var remaining = edges.copy(), result = [remaining.shift()];
-    function point(edge:PathGeometry, end:Bool):Point3 return toolpathkit.path.GeometryTools.pointAt(
+    function point(edge:PathGeometry, end:Bool):Point3 return toolpathkit.geometry.GeometryTools.pointAt(
       edge,
-      end ? toolpathkit.path.GeometryTools.length(edge) : 0
+      end ? toolpathkit.geometry.GeometryTools.length(edge) : 0
     );
     while (remaining.length > 0) {
       var end = point(result[result.length - 1], true), match = -1, reverse = false;

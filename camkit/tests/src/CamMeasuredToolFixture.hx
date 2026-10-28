@@ -3,9 +3,9 @@ import camkit.CamJob;
 import motionkit.program.MotionOp;
 import stockkit.CutMoves;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /**
   Measured tools are programmed at their tips through G43, while the machine

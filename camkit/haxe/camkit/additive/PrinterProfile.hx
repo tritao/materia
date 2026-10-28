@@ -1,6 +1,6 @@
 package camkit.additive;
 
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /**
  * The machine the slicer writes for: where the bed is and the start and end sequences. Positions are

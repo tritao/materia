@@ -1,4 +1,4 @@
-package toolpathkit.tool;
+package toolpathkit.router;
 
 /** Explicit planning inputs: chip loads in mm/tooth; energy in J/mm3.
     Values are assumptions until qualified for the actual bit/material lot. */

@@ -2,7 +2,7 @@ import materia.tooling.ToolingRecipe;
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.export.FabricationSpec;
 import camkit.CamToolingPanels.PanelCamSettings;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.tool.Tool;
 import materia.tooling.panel.PanelPlan;

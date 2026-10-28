@@ -11,7 +11,7 @@ import nativekit.sim.SimSession;
 import robotkit.runtime.EncoderMonitor;
 import motionkit.robot.StepperSlip;
 import toolpathkit.motion.ToolpathSourceMap;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathProgram;
 

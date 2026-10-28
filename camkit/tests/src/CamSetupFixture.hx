@@ -4,7 +4,7 @@ import toolpathkit.path.MoveKind;
 import toolpathkit.setup.Fixture;
 import cnckit.CncWriter;
 import camkit.CamJob;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
 import toolpathkit.setup.Setup;
@@ -12,7 +12,7 @@ import toolpathkit.setup.SetupStock;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.tool.ToolLibrary;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Generated plate and clamp keep-out, independent of external example files. */
 class CamSetupFixture {

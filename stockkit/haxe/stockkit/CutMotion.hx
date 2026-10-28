@@ -1,6 +1,6 @@
 package stockkit;
 
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 
 /** How the tool moves during one cut, in the workpiece frame. */
 enum CutMotion {

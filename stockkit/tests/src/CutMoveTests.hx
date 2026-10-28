@@ -6,7 +6,7 @@ import toolpathkit.path.Provenance;
 import toolpathkit.tool.ToolLibrary;
 import camkit.CamJob;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.setup.Setup;
 import toolpathkit.tool.CutterProfile;
 import stockkit.CutMoves;

@@ -7,7 +7,7 @@ import materia.casting.CastingProfiles;
 import materia.casting.CastingProfileOffsets;
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.panel.PanelPlan.PanelOperationKind;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.tool.Tool;
 import toolpathkit.tool.CutterProfile;

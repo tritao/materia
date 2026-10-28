@@ -5,7 +5,7 @@ import camkit.CamContour;
 import camkit.CamJob;
 import cnckit.CncController;
 import cnckit.CncWriter;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.setup.Fixture;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.SetupStock;

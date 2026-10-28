@@ -2,11 +2,11 @@ package cnckit;
 
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.TravelEnvelope;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.ArcPlane;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.ArcPlane;
+import toolpathkit.geometry.Point3;
 
 /** LinuxCNC post for shared toolpath operations, in millimetres. */
 class CncWriter {

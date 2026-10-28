@@ -2,11 +2,11 @@ package cnckit;
 
 import toolpathkit.path.MoveKind;
 import cnckit.CncDiagnostic.CncSeverity;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.ArcPlane;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.ArcPlane;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 import cnckit.interp.CncInterpOp;
 

@@ -1,5 +1,5 @@
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 
@@ -86,7 +86,7 @@ class PrintTimeEstimate {
   static function segmentsOf(program:ToolpathProgram,
     axisSpeed:Array<Float>, axisAcceleration:Array<Float>):Array<Segment> {
     var result:Array<Segment> = [];
-    function add(from:toolpathkit.path.Point3, to:toolpathkit.path.Point3, feed:Float):Void {
+    function add(from:toolpathkit.geometry.Point3, to:toolpathkit.geometry.Point3, feed:Float):Void {
       var dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
       var length = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (length < 1e-12) return;

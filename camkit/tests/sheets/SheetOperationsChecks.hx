@@ -4,6 +4,7 @@ import camkit.CamSheetOrder.CamSheetOperation;
 import stockkit.*;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.*;
+import toolpathkit.geometry.*;
 
 class SheetOperationsChecks {
   static var assertions = 0;

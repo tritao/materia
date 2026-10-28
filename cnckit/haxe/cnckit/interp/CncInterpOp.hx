@@ -1,6 +1,6 @@
 package cnckit.interp;
 
-import toolpathkit.path.ArcPlane;
+import toolpathkit.geometry.ArcPlane;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 

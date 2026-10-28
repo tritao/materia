@@ -1,6 +1,6 @@
 package cnckit.interp;
 
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 
 /** Modal state. A block is committed only after its interpretation succeeds. */

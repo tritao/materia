@@ -1,5 +1,6 @@
 package toolpathkit.path;
 
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.tool.ToolLibrary;
 import toolpathkit.setup.Setup;
 

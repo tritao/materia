@@ -1,8 +1,8 @@
 import stockkit.*;
 import stockkit.StockPreviewUpdate;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 
 class SheetPreviewChecks {

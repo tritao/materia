@@ -359,13 +359,13 @@ class PrintingBenchmark {
         ToolpathOp.SetSetup("offset", tag),
         ToolpathOp.Move(
           Cut,
-          toolpathkit.path.PathGeometry.Line(
-            new toolpathkit.path.Point3(
+          toolpathkit.geometry.PathGeometry.Line(
+            new toolpathkit.geometry.Point3(
               0.01,
               0.01,
               0.01
             ),
-            new toolpathkit.path.Point3(
+            new toolpathkit.geometry.Point3(
               0.02,
               0.01,
               0.01
@@ -380,7 +380,7 @@ class PrintingBenchmark {
       [
         new toolpathkit.setup.Setup(
           "1",
-          new toolpathkit.path.Point3(
+          new toolpathkit.geometry.Point3(
             0,
             0,
             0
@@ -388,7 +388,7 @@ class PrintingBenchmark {
         ),
         new toolpathkit.setup.Setup(
           "offset",
-          new toolpathkit.path.Point3(
+          new toolpathkit.geometry.Point3(
             0.1,
             0.1,
             0
@@ -418,7 +418,7 @@ class PrintingBenchmark {
     machine.binding.compiler.planCheck = new motionkit.robot.PlanCheck(model, ids, options);
     var motors = ["pulleyA-turn", "pulleyB-turn"];
     var rates = [for (id in motors) model.coupledLimits(id, null, true).requireVelocity()];
-    var origin = new toolpathkit.path.Point3(0, 0, 0);
+    var origin = new toolpathkit.geometry.Point3(0, 0, 0);
     var report:Array<String> = [];
     var seconds = new Map<String, Float>();
     for (move in [
@@ -432,12 +432,12 @@ class PrintingBenchmark {
       }
     ]) {
       var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
-      var from = new toolpathkit.path.Point3(0.11 - 0.05 * move.dx / length, 0.11 - 0.05 * move.dy / length, 0.01);
-      var to = new toolpathkit.path.Point3(0.11 + 0.05 * move.dx / length, 0.11 + 0.05 * move.dy / length, 0.01);
+      var from = new toolpathkit.geometry.Point3(0.11 - 0.05 * move.dx / length, 0.11 - 0.05 * move.dy / length, 0.01);
+      var to = new toolpathkit.geometry.Point3(0.11 + 0.05 * move.dx / length, 0.11 + 0.05 * move.dy / length, 0.01);
       var program = new ToolpathProgram(
         [ToolpathOp.Move(
           Cut,
-          toolpathkit.path.PathGeometry.Line(from, to),
+          toolpathkit.geometry.PathGeometry.Line(from, to),
           1.0,
           0.0001,
           new toolpathkit.path.Provenance(
@@ -533,7 +533,7 @@ class PrintingBenchmark {
    */
   static function shapingChecks(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
     var shaped = new PrinterAxes(0.0, true);
-    var origin = new toolpathkit.path.Point3(0, 0, 0);
+    var origin = new toolpathkit.geometry.Point3(0, 0, 0);
     var ids = [for (joint in machine.planning.joints) joint.id];
     var resonances = new Map<String, {mass:Float, stiffness:Float, frequency:Float}>();
     var tails = new Map<String, Float>();
@@ -558,13 +558,13 @@ class PrintingBenchmark {
     var report:Array<String> = [];
     for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}]) {
       var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
-      var from = new toolpathkit.path.Point3(0.11 - 0.025 * move.dx / length, 0.11 - 0.025 * move.dy / length, 0.01);
-      var to = new toolpathkit.path.Point3(0.11 + 0.025 * move.dx / length, 0.11 + 0.025 * move.dy / length, 0.01);
+      var from = new toolpathkit.geometry.Point3(0.11 - 0.025 * move.dx / length, 0.11 - 0.025 * move.dy / length, 0.01);
+      var to = new toolpathkit.geometry.Point3(0.11 + 0.025 * move.dx / length, 0.11 + 0.025 * move.dy / length, 0.01);
       function plans(axes:PrinterAxes):ExecutionPlan {
         var program = new ToolpathProgram(
           [ToolpathOp.Move(
             Cut,
-            toolpathkit.path.PathGeometry.Line(from, to),
+            toolpathkit.geometry.PathGeometry.Line(from, to),
             1.0,
             0.0001,
             new toolpathkit.path.Provenance(
@@ -680,7 +680,7 @@ class PrintingBenchmark {
     var authored = [0, 0, 0];
     for (op in moves.ops) switch op {
       case Move(_, geometry, _, _, _), MachineMove(_, geometry, _, _, _):
-        var length = toolpathkit.path.GeometryTools.length(geometry);
+        var length = toolpathkit.geometry.GeometryTools.length(geometry);
         for (bin in 0...3) if (length < [0.0001, 0.00025, 0.0005][bin]) authored[bin]++;
       case _:
     }
@@ -1045,7 +1045,7 @@ class PrintingBenchmark {
       var read = CncCompiler.compileDetailed(
         sys.io.File.getContent(file),
         machine.controller,
-        new toolpathkit.path.Point3(
+        new toolpathkit.geometry.Point3(
           0.0,
           0.0,
           0.01
@@ -1069,7 +1069,7 @@ class PrintingBenchmark {
       var controller = machine.controller;
       var text = PrinterWriter.write(sliced.program, controller, PrinterFlavour.Klipper);
       var began = Sys.time();
-      var read = CncCompiler.compileDetailed(text, machine.controller, new toolpathkit.path.Point3(0.0, 0.0, 0.01));
+      var read = CncCompiler.compileDetailed(text, machine.controller, new toolpathkit.geometry.Point3(0.0, 0.0, 0.01));
       for (item in read.diagnostics) if (item.severity
         == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code round trip: " + item.message;
       Sys

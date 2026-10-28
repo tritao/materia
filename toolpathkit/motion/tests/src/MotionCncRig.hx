@@ -1,6 +1,6 @@
 import cnckit.CncController;
 import toolpathkit.motion.MachineBinding;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** CNC controller and physical binding for integration tests pending relocation. */
 class MotionCncRig {

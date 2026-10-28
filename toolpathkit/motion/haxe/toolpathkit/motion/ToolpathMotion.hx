@@ -2,7 +2,7 @@ package toolpathkit.motion;
 
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
-import toolpathkit.path.GeometryOffset;
+import toolpathkit.geometry.GeometryOffset;
 import toolpathkit.path.ToolpathFrame;
 
 /**

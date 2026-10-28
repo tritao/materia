@@ -1,7 +1,8 @@
 import camkit.*;
 import gearkit.*;
 import toolpathkit.path.*;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.*;
+import toolpathkit.geometry.Point3;
 import toolpathkit.motion.*;
 import motionkit.trajectory.Trajectory;
 import motionkit.program.MotionOp;

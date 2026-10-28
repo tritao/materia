@@ -7,7 +7,7 @@ import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
 
 /** CAD fixtures authored locally so CamKit tests have no example-project dependency. */
@@ -21,58 +21,58 @@ class CamGeneratedFixtures {
 
   static function concavePockets(check:Bool -> String -> Void):Void {
     var l = new CamContour([
-      new toolpathkit.path.Point3(0, 0, 0),
-      new toolpathkit.path.Point3(0.03, 0, 0),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(0, 0, 0),
+      new toolpathkit.geometry.Point3(0.03, 0, 0),
+      new toolpathkit.geometry.Point3(
         0.03,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0,
         0.03,
         0
       )
     ]);
     var u = new CamContour([
-      new toolpathkit.path.Point3(0, 0, 0),
-      new toolpathkit.path.Point3(0.03, 0, 0),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(0, 0, 0),
+      new toolpathkit.geometry.Point3(0.03, 0, 0),
+      new toolpathkit.geometry.Point3(
         0.03,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.02,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.02,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0,
         0.03,
         0
@@ -143,7 +143,7 @@ class CamGeneratedFixtures {
     for (op in program.ops) switch op {
       case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 && Math.abs(b.z - depth) < 1e-9):
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = new toolpathkit.path.Point3(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction, depth);
+          var point = new toolpathkit.geometry.Point3(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction, depth);
           var clearance = Math.POSITIVE_INFINITY;
           for (i in 0...contour.vertices.length) clearance = Math.min(
             clearance,
@@ -161,7 +161,7 @@ class CamGeneratedFixtures {
       case _:
     }
     for (ix in 0...30) for (iy in 0...30) {
-      var point = new toolpathkit.path.Point3((ix + 0.5) * 0.001, (iy + 0.5) * 0.001, depth);
+      var point = new toolpathkit.geometry.Point3((ix + 0.5) * 0.001, (iy + 0.5) * 0.001, depth);
       if (!inside(point, contour.vertices)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
@@ -185,7 +185,7 @@ class CamGeneratedFixtures {
     }
   }
 
-  static function inside(point:toolpathkit.path.Point3, polygon:Array<toolpathkit.path.Point3>):Bool {
+  static function inside(point:toolpathkit.geometry.Point3, polygon:Array<toolpathkit.geometry.Point3>):Bool {
     var hit = false;
     for (i in 0...polygon.length) {
       var a = polygon[i], b = polygon[(i + 1) % polygon.length];
@@ -196,24 +196,24 @@ class CamGeneratedFixtures {
 
   static function concavePlate(check:Bool -> String -> Void):Void {
     var contour = new CamContour([
-      new toolpathkit.path.Point3(0, 0, 0),
-      new toolpathkit.path.Point3(0.03, 0, 0),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(0, 0, 0),
+      new toolpathkit.geometry.Point3(0.03, 0, 0),
+      new toolpathkit.geometry.Point3(
         0.03,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0,
         0.03,
         0
@@ -316,34 +316,34 @@ class CamGeneratedFixtures {
       10000).profile(contour, new Tool(6, 0, 0.05), -0.002, 0.005, "outside") catch (_:Dynamic) rejected = true;
     check(rejected, "oversized cutter is rejected at the narrow concave feature");
     var narrowNotch = new CamContour([
-      new toolpathkit.path.Point3(0, 0, 0),
-      new toolpathkit.path.Point3(0.03, 0, 0),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(0, 0, 0),
+      new toolpathkit.geometry.Point3(0.03, 0, 0),
+      new toolpathkit.geometry.Point3(
         0.03,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.02,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.02,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.01,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0.01,
         0.03,
         0
       ),
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0,
         0.03,
         0
@@ -355,8 +355,8 @@ class CamGeneratedFixtures {
     check(rejected, "outside cutter wider than a U notch is rejected");
   }
 
-  static function segmentDistance(point:toolpathkit.path.Point3,
-    a:toolpathkit.path.Point3, b:toolpathkit.path.Point3):Float {
+  static function segmentDistance(point:toolpathkit.geometry.Point3,
+    a:toolpathkit.geometry.Point3, b:toolpathkit.geometry.Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var t = Math.max(0.0, Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
     return Math.sqrt(Math.pow(point.x - a.x - t * dx, 2) + Math.pow(point.y - a.y - t * dy, 2));

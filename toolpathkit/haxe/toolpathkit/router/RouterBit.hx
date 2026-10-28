@@ -1,4 +1,9 @@
-package toolpathkit.tool;
+package toolpathkit.router;
+
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.CutterSegment;
+import toolpathkit.tool.CutterZone;
+import toolpathkit.tool.Tool;
 
 /** Router tooling dimensions in metres; the holder envelope includes the collet/nut.
     Gauge length is spindle gauge plane to tip, independent of exposed cutting length. */

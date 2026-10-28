@@ -1,4 +1,4 @@
-package toolpathkit.path;
+package toolpathkit.geometry;
 
 /** Cartesian point in machine metres, independent of MotionKit. */
 class Point3 {

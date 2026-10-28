@@ -1,6 +1,6 @@
 package camkit;
 
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 typedef CamPocketPass = {y:Float, left:Float, right:Float};
 

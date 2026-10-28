@@ -2,10 +2,10 @@ package cnckit.printer;
 
 import cnckit.CncController;
 import cnckit.CncWriter;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.MoveKind;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.PrintFeature;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;

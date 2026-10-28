@@ -1,8 +1,8 @@
 package toolpathkit.path;
 
 import toolpathkit.path.Provenance;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.ArcPlane;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.ArcPlane;
 
 /**
   Controller-independent machining operations: milling and turning in LinuxCNC block order, with

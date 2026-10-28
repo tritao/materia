@@ -1,7 +1,7 @@
 import camkit.CamCastingContours;
 import camkit.CamJob;
 import materia.casting.CastingProfiles;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.tool.Tool;
 
 /** Neutral contours reach CAM without panel-shaped placeholder operations. */

@@ -5,7 +5,7 @@ import camkit.CamContour;
 import camkit.CamJob;
 import cnckit.CncController;
 import cnckit.CncWriter;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.SetupStock;
 
@@ -106,7 +106,7 @@ class BearingBlockJob {
         frame.advance(op);
         switch op {
           case Move(_, geometry, _, _, _):
-            var p = toolpathkit.path.GeometryTools.pointAt(geometry, toolpathkit.path.GeometryTools.length(geometry));
+            var p = toolpathkit.geometry.GeometryTools.pointAt(geometry, toolpathkit.geometry.GeometryTools.length(geometry));
             var shift = frame.toMachine();
             // Scene G54 is external to the CAM setup's work-coordinate origin.
             last = new Point3(

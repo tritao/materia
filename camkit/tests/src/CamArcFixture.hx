@@ -1,7 +1,7 @@
 import camkit.CamContour;
 import camkit.CamJob;
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.Point3;
 import toolpathkit.tool.Tool;
 
 /** A pocket in a polygonized circle is cut as arcs, as the circle was drawn. */

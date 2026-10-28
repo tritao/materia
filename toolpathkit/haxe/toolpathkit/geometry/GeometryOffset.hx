@@ -1,4 +1,4 @@
-package toolpathkit.path;
+package toolpathkit.geometry;
 
 /** Translates paths and offsets planar closed contours without CAM dependencies. */
 class GeometryOffset {

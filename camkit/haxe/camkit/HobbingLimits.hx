@@ -1,8 +1,8 @@
 package camkit;
 
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 
 /** Installed logical-axis travel in mm/radians plus speed limits. Supplied by the machine adapter. */
 class HobbingLimits {

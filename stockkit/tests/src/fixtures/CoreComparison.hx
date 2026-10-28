@@ -10,7 +10,7 @@ import stockkit.StockAxis;
 import stockkit.StockLattice;
 import stockkit.StockInterval;
 import stockkit.StockMesh;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.tool.Tool;
 

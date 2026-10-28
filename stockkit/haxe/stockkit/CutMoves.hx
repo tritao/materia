@@ -1,9 +1,9 @@
 package stockkit;
 
-import toolpathkit.path.GeometryOffset;
+import toolpathkit.geometry.GeometryOffset;
 import toolpathkit.path.ToolpathFrame;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;
 
 /** Builds stock moves from a controller-independent toolpath. */

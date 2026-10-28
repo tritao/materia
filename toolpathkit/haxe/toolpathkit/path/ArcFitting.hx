@@ -1,5 +1,8 @@
 package toolpathkit.path;
 
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
+
 /**
   Replaces runs of short cutting lines that lie on one circle with arcs, so a
   circle that CAM polygonized reaches the machine as G2/G3 again. A run

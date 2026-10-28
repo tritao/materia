@@ -8,7 +8,7 @@ import motionkit.robot.ProgramCompiler;
 import motionkit.robot.CompiledProgram;
 import motionkit.robot.StartTolerances;
 import toolpathkit.path.ToolpathProgram;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.setup.TravelEnvelope;
 
 /** Binds pure CncKit programs to the physical joints of a direct XYZ machine. */

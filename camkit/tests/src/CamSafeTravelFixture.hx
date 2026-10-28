@@ -3,9 +3,9 @@ import cnckit.CncWriter;
 import camkit.CamJob;
 import cnckit.CncCompiler;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Mixed profile and drill job verifies safe travel across tool changes. */
 class CamSafeTravelFixture {

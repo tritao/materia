@@ -4,7 +4,7 @@ import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathPosePrimitive;
 import toolpathkit.motion.ToolpathSourceMap;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
 import motionkit.event.EventValue;
@@ -476,7 +476,7 @@ class ToolpathLowering {
     };
     if (Math.abs(delta) < 1e-15) throw "Revolution feed line does not advance its axial coordinate";
     return revolutionFeed
-      * Math.abs(ratio) * spindleRpm / 60 * toolpathkit.path.GeometryTools.length(geometry) / Math.abs(delta);
+      * Math.abs(ratio) * spindleRpm / 60 * toolpathkit.geometry.GeometryTools.length(geometry) / Math.abs(delta);
   }
 
   static function primitive(geometry:PathGeometry):PathPrimitive return switch geometry {
@@ -495,5 +495,5 @@ class ToolpathLowering {
       }, rise);
   };
 
-  static function point(value:toolpathkit.path.Point3):PathPoint return new PathPoint(value.x, value.y, value.z);
+  static function point(value:toolpathkit.geometry.Point3):PathPoint return new PathPoint(value.x, value.y, value.z);
 }

@@ -1,4 +1,4 @@
-import toolpathkit.tool.RouterCut;
+import toolpathkit.router.RouterCut;
 import motionkit.robot.PlanCheck;
 class SheetRouterCuttingChecks {
   static function check(v:Bool, s:String) {

@@ -7,7 +7,7 @@ import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SolvedSketch;
 import cadkit.units.LengthUnits;
 import cadkit.modeling.Vector;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** One simple closed XY boundary, in machine metres. */
 class CamContour {

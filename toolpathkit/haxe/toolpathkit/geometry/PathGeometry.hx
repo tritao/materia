@@ -1,4 +1,4 @@
-package toolpathkit.path;
+package toolpathkit.geometry;
 
 /** Authored toolpath primitive. All coordinates and lengths are metres. */
 enum PathGeometry {

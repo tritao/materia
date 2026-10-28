@@ -2,7 +2,7 @@ import camkit.*;
 import SheetRouterVacuum.RouterVacuumReport;
 import camkit.CamSheetOrder.CamSheetOperation;
 import stockkit.*;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.tool.Tool;
 import sys.io.File;
 

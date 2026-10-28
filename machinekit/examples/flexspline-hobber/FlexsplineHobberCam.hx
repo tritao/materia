@@ -1,7 +1,7 @@
 import camkit.HobbingJob;
 import camkit.HobbingLimits;
 import camkit.HobbingSettings;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** HB8 adapter: CAM dimensions/limits come from the assembled HB6 reference machine. */
 class FlexsplineHobberCam {

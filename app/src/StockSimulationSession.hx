@@ -9,7 +9,7 @@ import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.CncDialect;
 import cnckit.CncWriter;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;

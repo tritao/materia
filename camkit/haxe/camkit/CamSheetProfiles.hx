@@ -1,6 +1,6 @@
 package camkit;
 
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import materia.sheet.SheetPartPlacement;
 import materia.sheet.SheetCutPlan;
 import cadkit.units.LengthUnits;

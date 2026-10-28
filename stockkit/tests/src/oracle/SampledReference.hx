@@ -1,6 +1,6 @@
 package oracle;
 
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.tool.CutterProfile;
 import stockkit.CutMove;
 

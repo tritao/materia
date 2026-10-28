@@ -3,7 +3,7 @@ package stockkit;
 import StockKitNative;
 import stockkit.internal.NativeTool;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.PathGeometry;
 import haxe.io.Bytes;
 
 /**
@@ -504,7 +504,7 @@ class Stock {
 
   static function arc(
     native:sk_move,
-    center:toolpathkit.path.Point3,
+    center:toolpathkit.geometry.Point3,
     radius:Float,
     startAngle:Float,
     sweepAngle:Float,

@@ -13,8 +13,8 @@ import robotkit.model.RobotModel;
 import robotkit.model.SteadyLoads;
 import robotkit.model.TorqueSpeedCurve;
 import robotkit.model.Transmission;
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 
 typedef DiagnosticJson = {severity:String, code:String, line:Int, column:Int, message:String};

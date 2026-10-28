@@ -27,7 +27,7 @@ import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.ToolpathFrame;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.tool.Tool;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.event.EventValue;
@@ -52,7 +52,7 @@ import toolpathkit.motion.MachiningContinuation;
 import toolpathkit.motion.MachiningRecipe;
 import toolpathkit.motion.MachiningRun;
 import motionkit.robot.SessionState;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /**
  * A project's machining job, as its generator describes it (see SceneArtifactMachining), with

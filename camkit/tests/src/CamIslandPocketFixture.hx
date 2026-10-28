@@ -11,9 +11,9 @@ import stockkit.CutMoves;
 import stockkit.Stock;
 import stockkit.StockLattice;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Generated plate pocket with a central raised boss. */
 class CamIslandPocketFixture {

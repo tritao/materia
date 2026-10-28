@@ -1,6 +1,6 @@
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.PrinterOps;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathFrame;

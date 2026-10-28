@@ -1,9 +1,9 @@
 package camkit;
 
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.GeometryOffset;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.GeometryOffset;
+import toolpathkit.geometry.Point3;
 
 typedef CamSheetProfileSettings = {
   @:optional var side:String;

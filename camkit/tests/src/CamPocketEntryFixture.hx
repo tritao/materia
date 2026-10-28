@@ -2,7 +2,7 @@ import camkit.CamContour;
 import camkit.CamJob;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 
 /** Long and short pocket spans exercise ramp and plunge entry. */
 class CamPocketEntryFixture {

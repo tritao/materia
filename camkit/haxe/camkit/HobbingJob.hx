@@ -3,6 +3,7 @@ package camkit;
 import gearkit.GearSpec;
 import gearkit.HobDesign;
 import toolpathkit.path.*;
+import toolpathkit.geometry.*;
 import toolpathkit.setup.Setup;
 import toolpathkit.tool.Tool;
 import toolpathkit.tool.ToolLibrary;

@@ -8,8 +8,8 @@ import stockkit.Stock;
 import stockkit.StockColoring;
 import stockkit.StockLattice;
 import toolpathkit.path.MoveKind;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.tool.Tool;
 

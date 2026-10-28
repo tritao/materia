@@ -5,9 +5,9 @@ import cnckit.CncCompiler;
 import cnckit.CncController;
 import toolpathkit.tool.Tool;
 import toolpathkit.tool.CutterProfile;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathFrame;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 
 /** Checks the authored G-code against the actual configured machine and tool datums. */
 class MillMachiningChecks {

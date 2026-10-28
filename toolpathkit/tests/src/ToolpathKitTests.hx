@@ -1,8 +1,8 @@
 import toolpathkit.ToolpathKit;
-import toolpathkit.path.GeometryTools;
+import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.MoveKind;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ProvenanceKind;
 import toolpathkit.path.SpindleDirection;
@@ -22,7 +22,7 @@ class ToolpathKitTests {
     // This non-quadrant arc makes length * samples / samples exceed length
     // by one floating-point step. The terminal sample is the exact endpoint.
     var endpointArc = PathGeometry.Arc(new Point3(0, 0, 0), 0.0035, 0, -0.8410686705678702);
-    toolpathkit.path.GeometryOffset.validateProfile(
+    toolpathkit.geometry.GeometryOffset.validateProfile(
       [
         new Point3(1, 1, 0),
         new Point3(2, 1, 0),

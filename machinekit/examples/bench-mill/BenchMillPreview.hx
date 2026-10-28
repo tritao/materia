@@ -421,7 +421,7 @@ class BenchMillChecks {
     var compiled = cnckit.CncCompiler.compileDetailed(
       job.program,
       controller,
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         mill.specs[0].initial / 1000,
         mill.specs[1].initial / 1000,
         mill.specs[2].initial / 1000
@@ -666,26 +666,26 @@ class EnclosedMillChecks {
     var probe = cnckit.CncCompiler.compileDetailed(
       "G21 G90 G54\nG0 X0 Y0 Z0\nM2",
       probeController,
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         0,
         0,
         0
       )
     );
     if (probe.diagnostics.length != 0) throw "G54 datum probe does not compile";
-    var commanded:Null<toolpathkit.path.Point3> = null;
+    var commanded:Null<toolpathkit.geometry.Point3> = null;
     var probeFrame = toolpathkit.path.ToolpathFrame.of(probe.program);
     for (op in probe.program.ops) {
       probeFrame.advance(op);
       switch op {
         case Move(_, geometry, _, _, _):
-          var machineGeometry = toolpathkit.path.GeometryOffset.translate(geometry, probeFrame.toMachine());
-          commanded = toolpathkit.path.GeometryTools.pointAt(
+          var machineGeometry = toolpathkit.geometry.GeometryOffset.translate(geometry, probeFrame.toMachine());
+          commanded = toolpathkit.geometry.GeometryTools.pointAt(
             machineGeometry,
-            toolpathkit.path.GeometryTools.length(machineGeometry)
+            toolpathkit.geometry.GeometryTools.length(machineGeometry)
           );
         case MachineMove(_, geometry, _, _, _):
-          commanded = toolpathkit.path.GeometryTools.pointAt(geometry, toolpathkit.path.GeometryTools.length(geometry));
+          commanded = toolpathkit.geometry.GeometryTools.pointAt(geometry, toolpathkit.geometry.GeometryTools.length(geometry));
         case _:
       }
     }
@@ -708,7 +708,7 @@ class EnclosedMillChecks {
     var compiled = cnckit.CncCompiler.compileDetailed(
       job.program,
       controller,
-      new toolpathkit.path.Point3(
+      new toolpathkit.geometry.Point3(
         cell.mill.specs[0].initial / 1000,
         cell.mill.specs[1].initial / 1000,
         cell.mill.specs[2].initial / 1000
@@ -722,10 +722,10 @@ class EnclosedMillChecks {
         null;
     }
     ];
-    var end:Null<toolpathkit.path.Point3> = null;
-    for (geometry in machineMoves) if (geometry != null) end = toolpathkit.path.GeometryTools.pointAt(
+    var end:Null<toolpathkit.geometry.Point3> = null;
+    for (geometry in machineMoves) if (geometry != null) end = toolpathkit.geometry.GeometryTools.pointAt(
       geometry,
-      toolpathkit.path.GeometryTools.length(geometry)
+      toolpathkit.geometry.GeometryTools.length(geometry)
     );
     if (end == null || Math.abs(end.x - cell.loadPosition[0] / 1000) > 1e-9
       || Math.abs(end.y - cell.loadPosition[1] / 1000) > 1e-9 || Math.abs(end.z - cell.loadPosition[2] / 1000)

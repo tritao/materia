@@ -3,12 +3,12 @@ package camkit;
 import toolpathkit.path.MoveKind;
 import cadkit.Face;
 import toolpathkit.tool.Tool;
-import toolpathkit.path.PathGeometry;
-import toolpathkit.path.GeometryTools;
-import toolpathkit.path.GeometryOffset;
+import toolpathkit.geometry.PathGeometry;
+import toolpathkit.geometry.GeometryTools;
+import toolpathkit.geometry.GeometryOffset;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ArcFitting;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.SpindleDirection;
@@ -638,7 +638,7 @@ class CamJob {
   ):Void {
     var path = offsetPath(contour, radius, depth, outside);
     if (path.length == 0) return;
-    var first = toolpathkit.path.GeometryTools.pointAt(path[0], 0.0);
+    var first = toolpathkit.geometry.GeometryTools.pointAt(path[0], 0.0);
     rapidToSafeXY(first.x, first.y, span);
     rapid(new Point3(first.x, first.y, Math.min(safeZ, prior + approachClearance)), span);
     feedTo(first, plungeFeed, span);
@@ -723,7 +723,7 @@ class CamJob {
 
   function feedGeometry(geometry:PathGeometry, speed:Float, span:Provenance):Void {
     ops.push(ToolpathOp.Move(MoveKind.Cut, geometry, speed, blendTolerance, span));
-    current = toolpathkit.path.GeometryTools.pointAt(geometry, toolpathkit.path.GeometryTools.length(geometry));
+    current = toolpathkit.geometry.GeometryTools.pointAt(geometry, toolpathkit.geometry.GeometryTools.length(geometry));
   }
 
   function selectTool(tool:Tool, span:Provenance):Void {

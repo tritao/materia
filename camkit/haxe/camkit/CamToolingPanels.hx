@@ -7,7 +7,7 @@ import materia.tooling.panel.PanelCodec;
 import materia.tooling.panel.PanelContours;
 import materia.casting.CastingProfileGeometry;
 import materia.tooling.ToolingEnums.MachiningSide;
-import toolpathkit.path.Point3;
+import toolpathkit.geometry.Point3;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.tool.Tool;
 import toolpathkit.setup.Setup;
