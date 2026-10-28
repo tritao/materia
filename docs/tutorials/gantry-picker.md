@@ -99,24 +99,43 @@ The whole machine is defined in two files in
 `GantryPicker.hx` describes the hardware. The gantry itself comes from
 MachineKit's `Gantry`, configured by a `GantrySpec`:
 
-<!-- snippet: machinekit/examples/gantry-picker/GantryPicker.hx#L25-L40 -->
+<!-- snippet: machinekit/examples/gantry-picker/GantryPicker.hx#L25-L59 -->
 ```haxe
-	public function new(?headKind:GantryHead = GantryHead.None) {
-		var belt:GantryDrive = Belt(TimingBeltProfile.GT2, 20, 9);
-		var driveBus = headKind == GantryHead.None ? new machinekit.power.DcVoltage(24) :
-			machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS;
-		// The suction tool projects in front of the slide. Keep the front crossbar
-		// beyond its vertical sweep, including the guide's homing overtravel.
-		// A rotating carton needs its diagonal reach, preserving the original
-		// clearance to the Z switch mount during turns at the home height.
-		super(new GantrySpec(1500, 1000, 500, belt, belt, belt, true, "MGN12C", 23,
-			"HFS5-4040", "HFS5-4040", false, headKind, 0.5, driveBus, 16, 200, 100, 50,
-			headKind == GantryHead.None ? 60 : 60 + BOX_WIDTH * (Math.sqrt(2) - 1) / 2));
-		var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
-		tool = new SuctionTool(flange);
-		include("tool", tool);
-		var output = connector("toolFlange");
-		addMate("tool-mount", "fixed", output.instanceId, output.connectorName, "tool/plate", "robot");
+  public function new(?headKind:GantryHead = GantryHead.None) {
+    var belt:GantryDrive = Belt(TimingBeltProfile.GT2, 20, 9);
+    var driveBus = headKind
+      == GantryHead.None ? new machinekit.power.DcVoltage(24) : machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS;
+    // The suction tool projects in front of the slide. Keep the front crossbar
+    // beyond its vertical sweep, including the guide's homing overtravel.
+    // A rotating carton needs its diagonal reach, preserving the original
+    // clearance to the Z switch mount during turns at the home height.
+    super(new GantrySpec(
+      1500,
+      1000,
+      500,
+      belt,
+      belt,
+      belt,
+      true,
+      "MGN12C",
+      23,
+      "HFS5-4040",
+      "HFS5-4040",
+      false,
+      headKind,
+      0.5,
+      driveBus,
+      16,
+      200,
+      100,
+      50,
+      headKind == GantryHead.None ? 60 : 60 + BOX_WIDTH * (Math.sqrt(2) - 1) / 2
+    ));
+    var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
+    tool = new SuctionTool(flange);
+    include("tool", tool);
+    var output = connector("toolFlange");
+    addMate("tool-mount", "fixed", output.instanceId, output.connectorName, "tool/plate", "robot");
 ```
 
 - `Belt(TimingBeltProfile.GT2, 20, 9)`: every axis uses a GT2 belt on a
@@ -133,23 +152,40 @@ MachineKit's `Gantry`, configured by a `GantrySpec`:
 
 `GantryPickerPreview.hx` turns the machine into a scene and gives it its job:
 
-<!-- snippet: machinekit/examples/gantry-picker/GantryPickerPreview.hx#L10-L24 -->
+<!-- snippet: machinekit/examples/gantry-picker/GantryPickerPreview.hx#L10-L41 -->
 ```haxe
-	static function build(yaw:Bool):Bytes {
-		var picker = new GantryPicker(yaw ? machinekit.gantry.GantrySpec.GantryHead.C : machinekit.gantry.GantrySpec.GantryHead.None);
-		var scene = AssemblyPreview.scene(picker, "gantry-picker");
-		scene.robotTools = machinekit.robot.RobotScene.robotTools(picker.tool, "tool");
-		var steps:Array<materia.project.SceneArtifact.SceneArtifactMissionStep> = [];
-		for (index in 0...GantryPicker.BOX_COUNT) {
-			var pick:materia.project.SceneArtifact.SceneArtifactMissionStep = {kind: "pick", at: {occurrence: "box" + index, connector: "top"}};
-			var place:materia.project.SceneArtifact.SceneArtifactMissionStep = {kind: "place", at: {occurrence: "slot" + index, connector: "top"}};
-			if (yaw) { pick.yaw = 0.0; place.yaw = (index % 2 == 0 ? 1 : -1) * Math.PI / 2; }
-			steps.push(pick); steps.push(place);
-		}
-		scene.missions = [{loop: false, steps: steps,
-			powerUpSideOffsets: [{homeSwitch: "switchYRighthome", offset: 0.001}]}];
-		return SceneArtifact.encode(scene);
-	}
+  static function build(yaw:Bool):Bytes {
+    var picker = new GantryPicker(yaw
+      ? machinekit.gantry.GantrySpec.GantryHead.C : machinekit.gantry.GantrySpec.GantryHead.None);
+    var scene = AssemblyPreview.scene(picker, "gantry-picker");
+    scene.robotTools = machinekit.robot.RobotScene.robotTools(picker.tool, "tool");
+    var steps:Array<materia.project.SceneArtifact.SceneArtifactMissionStep> = [];
+    for (index in 0...GantryPicker.BOX_COUNT) {
+      var pick:materia.project.SceneArtifact.SceneArtifactMissionStep = {
+        kind: "pick",
+        at: {
+          occurrence: "box" + index,
+          connector: "top"
+        }
+      };
+      var place:materia.project.SceneArtifact.SceneArtifactMissionStep = {
+        kind: "place",
+        at: {
+          occurrence: "slot" + index,
+          connector: "top"
+        }
+      };
+      if (yaw) {
+        pick.yaw = 0.0;
+        place.yaw = (index % 2 == 0 ? 1 : -1) * Math.PI / 2;
+      }
+      steps.push(pick);
+      steps.push(place);
+    }
+    scene.missions = [{loop: false,
+      steps: steps, powerUpSideOffsets: [{homeSwitch: "switchYRighthome", offset: 0.001}]}];
+    return SceneArtifact.encode(scene);
+  }
 ```
 
 The mission is declarative: "pick at `box0/top`, place at `slot0/top`", and so
