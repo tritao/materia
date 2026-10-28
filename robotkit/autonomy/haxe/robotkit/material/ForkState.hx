@@ -14,13 +14,18 @@ class ForkState {
   public final sourceClockId:String;
   public final receivedClockId:String;
 
-  public function new(robotId:RobotId, lift:ForkAxisState,
-      tilt:Null<ForkAxisState>, spread:Null<ForkAxisState>,
-      sourceTimestampNs:Int64, receivedTimestampNs:Int64,
-      sourceClockId:String, receivedClockId:String) {
-    if (robotId == null || lift == null || sourceClockId == null || sourceClockId.length == 0 ||
-        receivedClockId == null || receivedClockId.length == 0)
-      throw "Fork state requires robot, lift, and clock identities";
+  public function new(
+    robotId:RobotId,
+    lift:ForkAxisState,
+    tilt:Null<ForkAxisState>,
+    spread:Null<ForkAxisState>,
+    sourceTimestampNs:Int64,
+    receivedTimestampNs:Int64,
+    sourceClockId:String,
+    receivedClockId:String
+  ) {
+    if (robotId == null || lift == null || sourceClockId == null || sourceClockId.length == 0 || receivedClockId == null
+      || receivedClockId.length == 0) throw "Fork state requires robot, lift, and clock identities";
     this.robotId = robotId;
     this.lift = lift;
     this.tilt = tilt;

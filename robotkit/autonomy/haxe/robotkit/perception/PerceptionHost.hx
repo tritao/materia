@@ -12,8 +12,8 @@ class PerceptionHost {
     this.pipelines = pipelines.copy();
     var ids = new Map<String, Bool>();
     for (pipeline in this.pipelines) {
-      if (pipeline == null || pipeline.id() == null || pipeline.id().length == 0 || ids.exists(pipeline.id()))
-        throw "PerceptionHost needs distinct pipeline IDs";
+      if (pipeline == null || pipeline.id() == null
+        || pipeline.id().length == 0 || ids.exists(pipeline.id())) throw "PerceptionHost needs distinct pipeline IDs";
       ids.set(pipeline.id(), true);
     }
   }

@@ -27,8 +27,8 @@ class DeviceLayout {
     for (index in 0...model.actuators.length) {
       var mapping = mappings[index];
       var peers = 0;
-      if (mapping.singleLeader) for (candidate in mappings)
-        if (candidate.singleLeader && candidate.jointIndex == mapping.jointIndex) peers++;
+      if (mapping.singleLeader) for (candidate in mappings) if (candidate.singleLeader
+        && candidate.jointIndex == mapping.jointIndex) peers++;
       var bound = 0.0;
       if (peers > 1) {
         var leader = model.joints[mapping.jointIndex];
@@ -42,11 +42,14 @@ class DeviceLayout {
   }
 
   public static function encode(layout:DeviceLayout):Bytes {
-    var bytes = Bytes.ofString(Json.stringify({schemaVersion: VERSION, channels: [for (channel in layout.channels)
-      {index: channel.index, actuator: channel.actuator, direction: channel.direction,
-        direction_setup_ticks: channel.directionSetupTicks, skew_bound: channel.skewBound}],
-      inputs: [for (input in layout.inputs) {index: input.index, switch_id: input.switchId,
-        actuator: input.actuator, active_high: input.activeHigh, pin: input.pin}]}));
+    var bytes = Bytes.ofString(Json.stringify({schemaVersion: VERSION, channels: [for (channel in layout.channels) {
+      index:channel.index, actuator:channel.actuator,
+        direction:channel.direction, direction_setup_ticks:channel.directionSetupTicks, skew_bound:channel.skewBound
+    }
+    ], inputs:[for (input in layout.inputs) {
+      index:input.index, switch_id:input.switchId, actuator:input.actuator, active_high:input.activeHigh, pin:input.pin
+    }
+    ]}));
     var validated = decode(bytes);
     return bytes;
   }
@@ -62,8 +65,7 @@ class DeviceLayout {
 
   public static function decode(bytes:Bytes):DeviceLayout {
     var root:Dynamic;
-    try root = Json.parse(bytes.toString()) catch (_:Dynamic)
-      throw "robotd: malformed device layout JSON";
+    try root = Json.parse(bytes.toString()) catch (_:Dynamic) throw "robotd: malformed device layout JSON";
     var version:Dynamic = Reflect.field(root, "schemaVersion");
     if (version != VERSION) throw 'schema v$version is unsupported; expected v$VERSION';
     var records:Dynamic = Reflect.field(root, "channels");
@@ -73,22 +75,21 @@ class DeviceLayout {
     for (record in channelRecords) {
       var index:Dynamic = Reflect.field(record, "index");
       var actuator:Dynamic = Reflect.field(record, "actuator");
-      if (!Std.isOfType(index, Int) || !Std.isOfType(actuator, String) || StringTools.trim(actuator).length == 0)
-        throw "robotd: device layout channel requires an integer index and an actuator ID";
-      if (Reflect.hasField(record, "joint") || Reflect.hasField(record, "microsteps"))
-        throw "robotd: device layout channels contain wiring only; driver settings belong to actuators";
+      if (!Std.isOfType(index, Int) || !Std.isOfType(actuator, String) || StringTools.trim(actuator).length
+        == 0) throw "robotd: device layout channel requires an integer index and an actuator ID";
+      if (Reflect.hasField(record, "joint") || Reflect.hasField(record,
+        "microsteps")) throw "robotd: device layout channels contain wiring only; driver settings belong to actuators";
       var direction:Dynamic = Reflect.field(record, "direction");
       if (direction == null) direction = 1;
-      if (direction != 1 && direction != -1)
-        throw 'robotd: device layout channel $index direction must be 1 or -1';
+      if (direction != 1 && direction != -1) throw 'robotd: device layout channel $index direction must be 1 or -1';
       var setup:Dynamic = Reflect.field(record, "direction_setup_ticks");
       if (setup == null) setup = 0;
-      if (!Std.isOfType(setup, Int) || setup < 0 || setup > 65535)
-        throw 'robotd: device layout channel $index direction_setup_ticks must be an integer from 0 to 65535';
+      if (!Std.isOfType(setup, Int) || setup < 0 || setup
+        > 65535) throw 'robotd: device layout channel $index direction_setup_ticks must be an integer from 0 to 65535';
       var skew:Dynamic = Reflect.field(record, "skew_bound");
       if (skew == null) skew = 0.0;
-      if ((!Std.isOfType(skew, Int) && !Std.isOfType(skew, Float)) || !Math.isFinite(skew) || skew < 0)
-        throw 'robotd: device layout channel $index skew_bound must be a finite nonnegative number';
+      if ((!Std.isOfType(skew, Int) && !Std.isOfType(skew, Float)) || !Math.isFinite(skew)
+        || skew < 0) throw 'robotd: device layout channel $index skew_bound must be a finite nonnegative number';
       channels.push(new DeviceChannel(index, actuator, direction, setup, skew));
     }
     var inputs:Array<DeviceInput> = [];
@@ -106,11 +107,17 @@ class DeviceLayout {
         var polarity:Dynamic = Reflect.field(record, "active_high");
         var pin:Dynamic = Reflect.field(record, "pin");
         if (pin == null) pin = "";
-        if (!Std.isOfType(index, Int) || index != inputs.length ||
-            !Std.isOfType(id, String) || StringTools.trim(id).length == 0 ||
-            !Std.isOfType(actuator, String) || StringTools.trim(actuator).length == 0 ||
-            !Std.isOfType(polarity, Bool) || !Std.isOfType(pin, String))
-          throw "robotd: device input requires ordered index, switch ID, actuator ID and electrical polarity";
+        if (!Std.isOfType(index, Int) || index != inputs.length || !Std.isOfType(id,
+          String) || StringTools.trim(id).length == 0 || !Std.isOfType(
+            actuator,
+            String
+          ) || StringTools.trim(actuator).length == 0 || !Std.isOfType(
+            polarity,
+            Bool
+          ) || !Std.isOfType(
+            pin,
+            String
+          )) throw "robotd: device input requires ordered index, switch ID, actuator ID and electrical polarity";
         if (switches.exists(id)) throw "robotd: duplicate switch input";
         if (pin != "" && pins.exists(pin)) throw "robotd: duplicate input pin";
         switches.set(id, true);

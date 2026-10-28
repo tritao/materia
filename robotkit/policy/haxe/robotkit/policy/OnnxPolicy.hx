@@ -72,14 +72,13 @@ class OnnxPolicy {
     for (tensor in inputs) {
       var given = values.get(tensor.name);
       if (given == null) throw 'missing policy input "${tensor.name}"';
-      if (given.length != tensor.elements)
-        throw 'policy input "${tensor.name}" needs ${tensor.elements} values, got ${given.length}';
+      if (given.length
+        != tensor.elements) throw 'policy input "${tensor.name}" needs ${tensor.elements} values, got ${given.length}';
       for (i in 0...tensor.elements) io.set_inputs(tensor.offset + i, given[i]);
     }
     check(RobotKitPolicy.rk_policy_run(owner.borrow(), io).status, "policy.run");
     var result = new Map<String, Array<Float>>();
-    for (tensor in outputs)
-      result.set(tensor.name, [for (i in 0...tensor.elements) io.get_outputs(tensor.offset + i)]);
+    for (tensor in outputs) result.set(tensor.name, [for (i in 0...tensor.elements) io.get_outputs(tensor.offset + i)]);
     return result;
   }
 

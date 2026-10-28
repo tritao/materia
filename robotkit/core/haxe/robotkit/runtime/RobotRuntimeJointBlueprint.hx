@@ -45,11 +45,22 @@ class RobotRuntimeJointBlueprint {
   public var limitDampingRatio:Float = 0.0;
   public var limitImpedance:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0];
 
-  public function new(joint:Int, type:Int, parentLink:Int, childLink:Int,
-      lowerLimit:Float, upperLimit:Float, maxEffort:Null<Float>, ?maxRate:Float,
-      ?parentFramePosition:Array<Float>, ?parentFrameRotation:Array<Float>,
-      ?childFramePosition:Array<Float>, ?childFrameRotation:Array<Float>, ?axis:Array<Float>,
-      ?maxAcceleration:Float) {
+  public function new(
+    joint:Int,
+    type:Int,
+    parentLink:Int,
+    childLink:Int,
+    lowerLimit:Float,
+    upperLimit:Float,
+    maxEffort:Null<Float>,
+    ?maxRate:Float,
+    ?parentFramePosition:Array<Float>,
+    ?parentFrameRotation:Array<Float>,
+    ?childFramePosition:Array<Float>,
+    ?childFrameRotation:Array<Float>,
+    ?axis:Array<Float>,
+    ?maxAcceleration:Float
+  ) {
     this.joint = joint;
     this.type = type;
     this.parentLink = parentLink;
@@ -78,8 +89,7 @@ class RobotRuntimeJointBlueprint {
     return value;
   }
 
-  @:allow(RobotRuntimeBlueprint)
-  function nativeValue():rk_robot_runtime_joint {
+  @:allow(RobotRuntimeBlueprint) function nativeValue():rk_robot_runtime_joint {
     var value = new rk_robot_runtime_joint();
     value.set_joint(joint);
     value.set_type(type);
@@ -90,9 +100,9 @@ class RobotRuntimeJointBlueprint {
     value.set_max_effort(maxEffort == null ? 0.0 : maxEffort);
     value.set_max_acceleration(maxAcceleration == null ? 0.0 : maxAcceleration);
     value.set_max_velocity(maxRate == null ? 0.0 : maxRate);
-    value.set_limit_flags((maxEffort == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_EFFORT) |
-      (maxRate == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_VELOCITY) |
-      (maxAcceleration == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_ACCELERATION));
+    value.set_limit_flags((maxEffort == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_EFFORT) | (maxRate
+      == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_VELOCITY) | (maxAcceleration
+      == null ? 0 : RobotKitRuntimeConstants.RK_LIMIT_ACCELERATION));
     for (i in 0...3) {
       value.set_parent_frame_position(i, parentFramePosition[i]);
       value.set_child_frame_position(i, childFramePosition[i]);

@@ -20,43 +20,57 @@ class LidarObstaclePerception implements Perception {
   public final segmentToleranceMeters:Float;
 
   /** Builds a scan processor from the LiDAR settings compiled from a robot model. */
-  public static function fromSensor(sensor:RobotRuntimeSensorBlueprint,
-      obstacleRadiusMeters:Float, ?minRangeMeters:Float = 0.05,
-      ?minConfidence:Float = 0.5, ?maxClusterGapMeters:Float = 0.1):LidarObstaclePerception {
-    if (sensor == null || sensor.kind != "lidar")
-      throw "LiDAR perception requires a compiled LiDAR sensor";
-    return new LidarObstaclePerception(sensor.maxRange, obstacleRadiusMeters,
-      minRangeMeters, minConfidence, maxClusterGapMeters,
-      sensor.startAngleRadians, sensor.fieldOfViewRadians);
+  public static function fromSensor(
+    sensor:RobotRuntimeSensorBlueprint,
+    obstacleRadiusMeters:Float,
+    ?minRangeMeters:Float = 0.05,
+    ?minConfidence:Float = 0.5,
+    ?maxClusterGapMeters:Float = 0.1
+  ):LidarObstaclePerception {
+    if (sensor == null || sensor.kind != "lidar") throw "LiDAR perception requires a compiled LiDAR sensor";
+    return new LidarObstaclePerception(
+      sensor.maxRange,
+      obstacleRadiusMeters,
+      minRangeMeters,
+      minConfidence,
+      maxClusterGapMeters,
+      sensor.startAngleRadians,
+      sensor.fieldOfViewRadians
+    );
   }
 
   /** Builds perception from a sensor selected by its stable authored ID. */
-  public static function fromBlueprint(blueprint:RobotRuntimeBlueprint,
-      sensorId:String, obstacleRadiusMeters:Float,
-      ?minRangeMeters:Float = 0.05, ?minConfidence:Float = 0.5,
-      ?maxClusterGapMeters:Float = 0.1):LidarObstaclePerception {
+  public static function fromBlueprint(
+    blueprint:RobotRuntimeBlueprint,
+    sensorId:String,
+    obstacleRadiusMeters:Float,
+    ?minRangeMeters:Float = 0.05,
+    ?minConfidence:Float = 0.5,
+    ?maxClusterGapMeters:Float = 0.1
+  ):LidarObstaclePerception {
     if (blueprint == null) throw "LiDAR perception requires a compiled robot blueprint";
     var sensor = blueprint.sensorById(sensorId);
-    if (sensor == null)
-      throw 'Compiled robot has no sensor with ID "$sensorId"';
-    return fromSensor(sensor, obstacleRadiusMeters, minRangeMeters,
-      minConfidence, maxClusterGapMeters);
+    if (sensor == null) throw 'Compiled robot has no sensor with ID "$sensorId"';
+    return fromSensor(sensor, obstacleRadiusMeters, minRangeMeters, minConfidence, maxClusterGapMeters);
   }
 
-  public function new(maxRangeMeters:Float, obstacleRadiusMeters:Float,
-      ?minRangeMeters:Float = 0.05, ?minConfidence:Float = 0.5,
-      ?maxClusterGapMeters:Float = 0.1, ?startAngleRadians:Float = 0.0,
-      ?fieldOfViewRadians:Float = Math.PI * 2.0, ?segmentToleranceMeters:Float = 0.05) {
-    if (!Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0 ||
-        !Math.isFinite(obstacleRadiusMeters) || obstacleRadiusMeters <= 0.0 ||
-        !Math.isFinite(minRangeMeters) || minRangeMeters < 0.0 ||
-        minRangeMeters >= maxRangeMeters || !Math.isFinite(minConfidence) ||
-        minConfidence < 0.0 || minConfidence > 1.0 ||
-        !Math.isFinite(maxClusterGapMeters) || maxClusterGapMeters < 0.0 ||
-        !Math.isFinite(startAngleRadians) || !Math.isFinite(fieldOfViewRadians) ||
-        fieldOfViewRadians <= 0.0 || fieldOfViewRadians > Math.PI * 2.0 + 1e-6 ||
-        !Math.isFinite(segmentToleranceMeters) || segmentToleranceMeters < 0.0)
-      throw "LiDAR perception configuration is invalid";
+  public function new(
+    maxRangeMeters:Float,
+    obstacleRadiusMeters:Float,
+    ?minRangeMeters:Float = 0.05,
+    ?minConfidence:Float = 0.5,
+    ?maxClusterGapMeters:Float = 0.1,
+    ?startAngleRadians:Float = 0.0,
+    ?fieldOfViewRadians:Float = Math.PI * 2.0,
+    ?segmentToleranceMeters:Float = 0.05
+  ) {
+    if (!Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0
+      || !Math.isFinite(obstacleRadiusMeters) || obstacleRadiusMeters <= 0.0 || !Math.isFinite(minRangeMeters)
+      || minRangeMeters < 0.0 || minRangeMeters >= maxRangeMeters || !Math.isFinite(minConfidence)
+      || minConfidence < 0.0 || minConfidence > 1.0 || !Math.isFinite(maxClusterGapMeters) || maxClusterGapMeters < 0.0
+      || !Math.isFinite(startAngleRadians) || !Math.isFinite(fieldOfViewRadians) || fieldOfViewRadians <= 0.0
+      || fieldOfViewRadians > Math.PI * 2.0 + 1e-6 || !Math.isFinite(segmentToleranceMeters)
+      || segmentToleranceMeters < 0.0) throw "LiDAR perception configuration is invalid";
     this.maxRangeMeters = maxRangeMeters;
     this.obstacleRadiusMeters = obstacleRadiusMeters;
     this.minRangeMeters = minRangeMeters;
@@ -86,10 +100,8 @@ class LidarObstaclePerception implements Perception {
           continue;
         }
         var angle = bearing(index, rays, startAngleRadians, fieldOfViewRadians);
-        var point = new LidarPoint(index, range * Math.cos(angle),
-          range * Math.sin(angle), range);
-        if (active.length > 0 && !connects(active[active.length - 1], point,
-            angleIncrement)) {
+        var point = new LidarPoint(index, range * Math.cos(angle), range * Math.sin(angle), range);
+        if (active.length > 0 && !connects(active[active.length - 1], point, angleIncrement)) {
           clusters.push(active);
           active = [];
         }
@@ -102,8 +114,11 @@ class LidarObstaclePerception implements Perception {
       if (fullCircle && clusters.length > 1) {
         var first = clusters[0];
         var last = clusters[clusters.length - 1];
-        if (first[0].rayIndex == 0 && last[last.length - 1].rayIndex == rays - 1 &&
-            connects(last[last.length - 1], first[0], angleIncrement)) {
+        if (first[0].rayIndex == 0 && last[last.length - 1].rayIndex == rays - 1 && connects(
+          last[last.length - 1],
+          first[0],
+          angleIncrement
+        )) {
           var merged = last.concat(first);
           clusters[0] = merged;
           clusters.pop();
@@ -120,27 +135,38 @@ class LidarObstaclePerception implements Perception {
         }
         centerX /= cluster.length;
         centerY /= cluster.length;
-        var confidence = Math.min(1.0,
-          minConfidence + (cluster.length - 1) * 0.03);
-        function detect(id:String, pose:Pose2):Detection
-          return new Detection(id, "obstacle", confidence, pose, frame.frameId,
-            frame.sequence, frame.sourceTimestampNs, frame.receivedTimestampNs,
-            frame.sourceClockId, frame.receivedClockId);
+        var confidence = Math.min(1.0, minConfidence + (cluster.length - 1) * 0.03);
+        function detect(id:String, pose:Pose2):Detection return new Detection(
+          id,
+          "obstacle",
+          confidence,
+          pose,
+          frame.frameId,
+          frame.sequence,
+          frame.sourceTimestampNs,
+          frame.receivedTimestampNs,
+          frame.sourceClockId,
+          frame.receivedClockId
+        );
         var baseId = '${frame.sensorId}:${Std.string(frame.sequence)}:$clusterIndex';
         detections.push(detect(baseId, new Pose2(centerX, centerY, 0.0)));
         // The obstacle follows the hits along the visible surface: a capsule per straight run of them, so a
         // flat wall is a thin segment, a corner two, and a lone return a disk.
         var corners = simplify(cluster, 0, cluster.length - 1);
         if (corners.length == 1) {
-          obstacles.push(new Obstacle(detect(baseId, new Pose2(cluster[0].x, cluster[0].y, 0.0)), obstacleRadiusMeters));
+          obstacles.push(new Obstacle(detect(baseId,
+            new Pose2(cluster[0].x, cluster[0].y, 0.0)), obstacleRadiusMeters));
         } else {
           for (index in 1...corners.length) {
             var from = cluster[corners[index - 1]], to = cluster[corners[index]];
             var dx = to.x - from.x, dy = to.y - from.y;
             var length = Math.sqrt(dx * dx + dy * dy);
             var mid = new Pose2((from.x + to.x) * 0.5, (from.y + to.y) * 0.5, Math.atan2(dy, dx));
-            obstacles.push(new Obstacle(detect(corners.length == 2 ? baseId : '$baseId.${index - 1}', mid),
-              obstacleRadiusMeters, length * 0.5));
+            obstacles.push(new Obstacle(
+              detect(corners.length == 2 ? baseId : '$baseId.${index - 1}', mid),
+              obstacleRadiusMeters,
+              length * 0.5
+            ));
           }
         }
       }
@@ -162,7 +188,10 @@ class LidarObstaclePerception implements Perception {
       var p = points[index];
       var distance = length <= 1e-9 ? Math.sqrt((p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y))
         : Math.abs(dx * (p.y - a.y) - dy * (p.x - a.x)) / length;
-      if (distance > farthestDistance) { farthest = index; farthestDistance = distance; }
+      if (distance > farthestDistance) {
+        farthest = index;
+        farthestDistance = distance;
+      }
     }
     if (farthest < 0 || farthestDistance <= segmentToleranceMeters) return [first, last];
     var left = simplify(points, first, farthest), right = simplify(points, farthest, last);
@@ -172,15 +201,15 @@ class LidarObstaclePerception implements Perception {
   /** Angle between adjacent rays of a scan of `rays` returns over `fieldOfViewRadians`. */
   static function increment(rays:Int, fieldOfViewRadians:Float):Float {
     var fullCircle = Math.abs(fieldOfViewRadians - Math.PI * 2.0) <= 1e-6;
-    return fullCircle
-      ? fieldOfViewRadians / rays
-      : (rays <= 1 ? 0.0 : fieldOfViewRadians / (rays - 1));
+    return fullCircle ? fieldOfViewRadians / rays : (rays <= 1 ? 0.0 : fieldOfViewRadians / (rays - 1));
   }
 
   /** Bearing of ray `index` in the sensor frame, as the simulated sensor lays its rays out. */
-  public static function bearing(index:Int, rays:Int, startAngleRadians:Float,
-      fieldOfViewRadians:Float):Float
-    return startAngleRadians + increment(rays, fieldOfViewRadians) * index;
+  public static function bearing(index:Int,
+    rays:Int, startAngleRadians:Float, fieldOfViewRadians:Float):Float return startAngleRadians + increment(
+      rays,
+      fieldOfViewRadians
+    ) * index;
 
   function connects(from:LidarPoint, to:LidarPoint, angularStep:Float):Bool {
     var dx = to.x - from.x;

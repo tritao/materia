@@ -10,8 +10,13 @@ class PerceptionSnapshot {
   final dockingValues:Array<DockingTarget>;
   final free:Null<FreeSpaceView>;
 
-  public function new(?detections:Array<Detection>, ?obstacles:Array<Obstacle>,
-      ?pallets:Array<Pallet>, ?dockingTargets:Array<DockingTarget>, ?freeSpace:FreeSpaceView) {
+  public function new(
+    ?detections:Array<Detection>,
+    ?obstacles:Array<Obstacle>,
+    ?pallets:Array<Pallet>,
+    ?dockingTargets:Array<DockingTarget>,
+    ?freeSpace:FreeSpaceView
+  ) {
     free = freeSpace;
     detectionValues = detections == null ? [] : detections.copy();
     obstacleValues = obstacles == null ? [] : obstacles.copy();

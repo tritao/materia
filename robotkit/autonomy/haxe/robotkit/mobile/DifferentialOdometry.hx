@@ -20,15 +20,21 @@ class DifferentialOdometry {
   var previousTimestamp:Null<Int64> = null;
   var previousClock:Null<String> = null;
 
-  public function new(leftWheelJoint:Int, rightWheelJoint:Int,
-      wheelRadius:Float, trackWidth:Float, ?initialPose:Pose2, leftDirection:Int = 1, rightDirection:Int = 1) {
-    if (leftWheelJoint < 0 || rightWheelJoint < 0 || leftWheelJoint == rightWheelJoint)
-      throw "Odometry requires two distinct non-negative wheel joint indices";
-    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 ||
-        !Math.isFinite(trackWidth) || trackWidth <= 0.0)
-      throw "Odometry dimensions must be finite and positive";
-    if (Math.abs(leftDirection) != 1 || Math.abs(rightDirection) != 1)
-      throw "Odometry wheel directions must be 1 or -1";
+  public function new(
+    leftWheelJoint:Int,
+    rightWheelJoint:Int,
+    wheelRadius:Float,
+    trackWidth:Float,
+    ?initialPose:Pose2,
+    leftDirection:Int = 1,
+    rightDirection:Int = 1
+  ) {
+    if (leftWheelJoint < 0 || rightWheelJoint < 0
+      || leftWheelJoint == rightWheelJoint) throw "Odometry requires two distinct non-negative wheel joint indices";
+    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0
+      || !Math.isFinite(trackWidth) || trackWidth <= 0.0) throw "Odometry dimensions must be finite and positive";
+    if (Math.abs(leftDirection) != 1
+      || Math.abs(rightDirection) != 1) throw "Odometry wheel directions must be 1 or -1";
     this.leftDirection = leftDirection;
     this.rightDirection = rightDirection;
     this.leftWheelJoint = leftWheelJoint;
@@ -42,17 +48,16 @@ class DifferentialOdometry {
   public function update(snapshot:RobotSnapshot):Pose2 {
     if (snapshot == null) throw "Wheel odometry requires a robot snapshot";
     var positions = snapshot.positions;
-    if (positions.length <= leftWheelJoint || positions.length <= rightWheelJoint)
-      throw "Wheel odometry joint index is outside the robot snapshot";
+    if (positions.length <= leftWheelJoint
+      || positions.length <= rightWheelJoint) throw "Wheel odometry joint index is outside the robot snapshot";
     var left = positions.get(leftWheelJoint);
     var right = positions.get(rightWheelJoint);
     lastDistance = 0.0;
     lastHeadingChange = 0.0;
     var clockChanged = previousClock != null && previousClock != snapshot.sourceClockId;
-    var timestampRegressed = previousTimestamp != null &&
-      Int64.compare(snapshot.sourceTimestampNs, previousTimestamp) <= 0;
-    if (timestampRegressed && !clockChanged)
-      return pose;
+    var timestampRegressed = previousTimestamp != null && Int64.compare(snapshot.sourceTimestampNs,
+      previousTimestamp) <= 0;
+    if (timestampRegressed && !clockChanged) return pose;
     if (previousLeft == null || previousRight == null || clockChanged) {
       setBaseline(snapshot, left, right);
       return pose;

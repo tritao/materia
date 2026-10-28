@@ -9,8 +9,8 @@ package robotkit.perception;
  * accidentally coupled to that one call site.
  */
 class JacobiEigenSolver {
-  public static function solveSymmetric(matrix:Array<Array<Float>>, ?maxSweeps:Int = 100,
-      ?tolerance:Float = 1e-12):EigenDecomposition {
+  public static function solveSymmetric(matrix:Array<Array<Float>>,
+    ?maxSweeps:Int = 100, ?tolerance:Float = 1e-12):EigenDecomposition {
     if (matrix == null || matrix.length == 0) throw "Jacobi eigensolver requires a non-empty matrix";
     var n = matrix.length;
     for (row in matrix) if (row == null || row.length != n) throw "Jacobi eigensolver requires a square matrix";

@@ -8,10 +8,9 @@ class ProcessVelocityDrive {
   public final radiansPerSpeedUnit:Float;
 
   public function new(speedChannel:String, directionChannel:String, radiansPerSpeedUnit:Float) {
-    if (speedChannel == null || speedChannel.length == 0 || directionChannel == null ||
-        directionChannel.length == 0 || speedChannel == directionChannel ||
-        !(radiansPerSpeedUnit > 0.0) || !Math.isFinite(radiansPerSpeedUnit))
-      throw "Process velocity drive needs two analog channels and a positive finite speed scale";
+    if (speedChannel == null || speedChannel.length == 0 || directionChannel == null
+      || directionChannel.length == 0 || speedChannel == directionChannel || !(radiansPerSpeedUnit > 0.0) || !Math
+      .isFinite(radiansPerSpeedUnit)) throw "Process velocity drive needs two analog channels and a positive finite speed scale";
     this.speedChannel = speedChannel;
     this.directionChannel = directionChannel;
     this.radiansPerSpeedUnit = radiansPerSpeedUnit;

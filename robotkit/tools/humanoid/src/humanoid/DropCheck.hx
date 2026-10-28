@@ -55,21 +55,20 @@ class DropCheck {
         // succeeds). Touchdown has been observed by then.
         var stops = [for (index in 0...model.joints.length) {
           var joint = model.joints[index], position = snapshot.q.get(index);
-          if (joint.type == robotkit.model.JointType.Revolute &&
-              (position < joint.limits.lower + 0.01 || position > joint.limits.upper - 0.01))
-            joint.name;
-        }];
+          if (joint.type == robotkit.model.JointType.Revolute
+            && (position < joint.limits.lower + 0.01 || position > joint.limits.upper - 0.01)) joint.name;
+        }
+        ];
         fault = '${step * TIMESTEP} s: robot fault ${snapshot.faultCode}; joints at their stops: ${stops.join(", ")}';
         break;
       }
       var z = simulation.robotPose(0).position[2];
       if (z < lowest) lowest = z;
       if (firstStep < 0) {
-        for (contact in simulation.robotContacts(runtime))
-          if (contact.active && contact.otherObject == floor) {
-            var name = model.links[contact.linkIndex].name;
-            if (first.indexOf(name) < 0) first.push(name);
-          }
+        for (contact in simulation.robotContacts(runtime)) if (contact.active && contact.otherObject == floor) {
+          var name = model.links[contact.linkIndex].name;
+          if (first.indexOf(name) < 0) first.push(name);
+        }
         if (first.length > 0) firstStep = step;
       }
     }

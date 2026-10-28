@@ -22,36 +22,40 @@ class Main {
     var tickCount = option(args, "--ticks=", 3);
     var remoteAddress = stringOption(args, "--remote=");
     var deploymentPath = stringOption(args, "--deployment=");
-    if (robotCount < 0 || tickCount < 0 || (robotCount == 0 && remoteAddress == null))
-      throw "worldd: --robots and --ticks must be non-negative, with at least one robot";
-    if ((remoteAddress == null) != (deploymentPath == null))
-      throw "worldd: --remote and --deployment must be provided together";
+    if (robotCount < 0 || tickCount < 0 || (robotCount == 0
+      && remoteAddress == null)) throw "worldd: --robots and --ticks must be non-negative, with at least one robot";
+    if ((remoteAddress
+      == null) != (deploymentPath == null)) throw "worldd: --remote and --deployment must be provided together";
 
     var host = new WorldHost();
     var runtime:Null<NativeKitRuntime> = null;
     try {
-      for (index in 0...robotCount)
-        host.addSimulatedRobot('sim-$index', demoModel('sim-$index'));
+      for (index in 0...robotCount) host.addSimulatedRobot('sim-$index', demoModel('sim-$index'));
       if (remoteAddress != null && deploymentPath != null) {
         var separator = remoteAddress.lastIndexOf(":");
         if (separator <= 0) throw "worldd: --remote must be HOST:PORT";
         var port = Std.parseInt(remoteAddress.substr(separator + 1));
-        if (port == null || port <= 0 || port > 65535)
-          throw "worldd: --remote port is invalid";
+        if (port == null || port <= 0 || port > 65535) throw "worldd: --remote port is invalid";
         runtime = NativeKitRuntime.start();
-        var remote = host.addRemoteRobot("remote", false, new SerialDeployment(deploymentPath),
-          new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"), Sys.getEnv("ROBOTKIT_TOKEN")));
+        var remote = host.addRemoteRobot(
+          "remote",
+          false,
+          new SerialDeployment(deploymentPath),
+          new robotkit.auth.ClientCredentials(
+            Sys.getEnv("ROBOTKIT_IDENTITY"),
+            Sys.getEnv("ROBOTKIT_TOKEN")
+          )
+        );
         remote.connect(remoteAddress.substr(0, separator), port, runtime.events);
       }
       var snapshot:Null<WorldSnapshot> = null;
       for (tick in 0...tickCount) {
-        if (runtime != null) while (runtime.events.poll()) {}
+        if (runtime != null) while (runtime.events.poll()) {
+        }
         snapshot = host.step(Int64.ofInt((tick + 1) * 10_000_000));
       }
-      if (snapshot == null)
-        snapshot = host.world.snapshot();
-      Sys.println('worldd: robots=${snapshot.robotIds().length} '
-        + 'sequence=${snapshot.sequence} ticks=$tickCount');
+      if (snapshot == null) snapshot = host.world.snapshot();
+      Sys.println('worldd: robots=${snapshot.robotIds().length} ' + 'sequence=${snapshot.sequence} ticks=$tickCount');
     } catch (error:Dynamic) {
       host.close();
       if (runtime != null) runtime.dispose();

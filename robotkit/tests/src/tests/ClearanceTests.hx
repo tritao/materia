@@ -45,18 +45,32 @@ class ClearanceTests {
     var model = new RobotModel("described clearance");
     var base = model.addLink(new Link("base")), tool = model.addLink(new Link("tool"));
     var slide = model.addJoint(new Joint("slide", JointType.Prismatic, base, tool));
-    slide.axis = [1,0,0]; slide.limits.lower = -0.1; slide.limits.upper = 0.1;
+    slide.axis = [1, 0, 0];
+    slide.limits.lower = -0.1;
+    slide.limits.upper = 0.1;
     var frame = model.addFrame(new Frame("tip", tool));
     var arm = new Manipulator(model, base.id, frame.id);
-    var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Box(0.01,0.01,0.01));
-    shape.name = "tool skin"; shape.inflation = 0.002;
+    var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Box(0.01, 0.01, 0.01));
+    shape.name = "tool skin";
+    shape.inflation = 0.002;
     var scene = CollisionClearance.shapes(tool.id, [shape], true);
-    var wall = scene.addFixed("wall", collisionkit.CollisionPose.translation(0.03,0,0),
-      collisionkit.CollisionGeometry.Box(0.01,0.01,0.01), 0);
+    var wall = scene.addFixed(
+      "wall",
+      collisionkit.CollisionPose.translation(0.03, 0, 0),
+      collisionkit.CollisionGeometry.Box(
+        0.01,
+        0.01,
+        0.01
+      ),
+      0
+    );
     var clearance = new CollisionClearance(arm, scene, [0.02], () -> new NativeCollisionWorld());
-    check(clearance.violation([0.02]) != null, "environment overlap at reference stays checked beside an adjacent link");
-    check(clearance.violation([0.005]) != null && clearance.violation([0.005], true) == null,
-      "general shape inflation and tool contact margins come from the described tool body");
+    check(clearance.violation([0.02]) != null,
+      "environment overlap at reference stays checked beside an adjacent link");
+    check(
+      clearance.violation([0.005]) != null && clearance.violation([0.005], true) == null,
+      "general shape inflation and tool contact margins come from the described tool body"
+    );
     scene.setObjectRule(0, wall, collisionkit.CollisionPairRule.Allow, collisionkit.CollisionPairStatus.ProcessContact);
     clearance.reset();
     check(clearance.violation([0.02]) == null, "description contact rules are honored by clearance");
@@ -71,29 +85,61 @@ class ClearanceTests {
     var model = new RobotModel("link-named structure");
     var base = model.addLink(new Link("base")), upper = model.addLink(new Link("upper"));
     var hinge = model.addJoint(new Joint("hinge", JointType.Revolute, base, upper));
-    hinge.axis = [0,0,1]; hinge.limits.lower = -1.0; hinge.limits.upper = 1.0;
+    hinge.axis = [0, 0, 1];
+    hinge.limits.lower = -1.0;
+    hinge.limits.upper = 1.0;
     var frame = model.addFrame(new Frame("tip", upper));
     var arm = new Manipulator(model, base.id, frame.id);
     function cube(name:String, x:Float):robotkit.model.CollisionShape {
-      var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Box(0.02,0.02,0.02),
-        [x, 0, 0], [0, 0, 0, 1]);
+      var shape = new robotkit.model.CollisionShape(
+        collisionkit.CollisionGeometry.Box(0.02, 0.02, 0.02),
+        [x, 0, 0],
+        [
+          0,
+          0,
+          0,
+          1
+        ]
+      );
       shape.name = name;
       return shape;
     }
     var scene = CollisionClearance.combine([
       CollisionClearance.shapes(base.id, [cube("base block", 0.0)]),
-      CollisionClearance.shapes(upper.id, [cube("upper block", 0.015)]),
-      CollisionClearance.shapes(upper.id, [cube("tool block", 0.03)], true)]);
+      CollisionClearance.shapes(
+        upper.id,
+        [cube(
+          "upper block",
+          0.015
+        )]
+      ),
+      CollisionClearance.shapes(
+        upper.id,
+        [cube(
+          "tool block",
+          0.03
+        )],
+        true
+      )
+    ]);
     var copy = scene.copy();
     var clearance = new CollisionClearance(arm, scene, [0.0], () -> new NativeCollisionWorld());
-    check(clearance.violation([0.0]) == null, "adjacent links and a tool on its link are not checked against each other");
+    check(
+      clearance.violation([0.0]) == null,
+      "adjacent links and a tool on its link are not checked against each other"
+    );
     check(clearance.violation([0.5]) == null, "the structural rules hold away from the reference");
     clearance.world.dispose();
     copy.setObjectMargins(0, 2, null, 0.001);
     var copied = copy.copy();
-    check(copied.marginBetweenObjects(0, 2, true) == 0.001 &&
-      copied.marginBetweenObjects(0, 2) == copy.marginBetweenObjects(0, 2),
-      "a contact-only object margin survives a description copy");
+    check(
+      copied.marginBetweenObjects(0,
+      2, true) == 0.001 && copied.marginBetweenObjects(0, 2) == copy.marginBetweenObjects(
+        0,
+        2
+      ),
+      "a contact-only object margin survives a description copy"
+    );
   }
 
   static function testCoupledDriveContact():Void {
@@ -102,7 +148,9 @@ class ClearanceTests {
     var carriage = model.addLink(new Link("carriage"));
     var shaft = model.addLink(new Link("shaft"));
     var slide = model.addJoint(new Joint("x", JointType.Prismatic, base, carriage));
-    slide.axis = [1.0, 0, 0]; slide.limits.lower = -0.05; slide.limits.upper = 0.4;
+    slide.axis = [1.0, 0, 0];
+    slide.limits.lower = -0.05;
+    slide.limits.upper = 0.4;
     var screw = model.addJoint(new Joint("screw", JointType.Continuous, base, shaft));
     screw.axis = [1.0, 0, 0];
     model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
@@ -113,11 +161,15 @@ class ClearanceTests {
     fixture.mechanism("screw", shaft.id, box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006));
     fixture.fixture("work", box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), true);
     var clearance = fixture.clearance();
-    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
-      "a driven nut's designed engagement stays clear at rest and through travel");
+    check(
+      clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a driven nut's designed engagement stays clear at rest and through travel"
+    );
     var hit = clearance.violation([0.3]);
-    check(hit != null && (hit.a == "work" || hit.b == "work"),
-      "drive contact does not exempt the carriage from a workpiece collision");
+    check(
+      hit != null && (hit.a == "work" || hit.b == "work"),
+      "drive contact does not exempt the carriage from a workpiece collision"
+    );
   }
 
   static function testMovingRackContact():Void {
@@ -126,8 +178,10 @@ class ClearanceTests {
     var carriage = model.addLink(new Link("carriage"));
     var pinion = model.addLink(new Link("pinion"));
     var slide = model.addJoint(new Joint("track", JointType.Prismatic, base, carriage));
-    slide.axis = [1.0, 0, 0]; slide.parentFramePosition = [0.0, 0, 0.02];
-    slide.limits.lower = 0.0; slide.limits.upper = 0.4;
+    slide.axis = [1.0, 0, 0];
+    slide.parentFramePosition = [0.0, 0, 0.02];
+    slide.limits.lower = 0.0;
+    slide.limits.upper = 0.4;
     var shaft = model.addJoint(new Joint("pinion", JointType.Continuous, carriage, pinion));
     shaft.axis = [0.0, 1, 0];
     model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
@@ -139,11 +193,15 @@ class ClearanceTests {
     fixture.mechanism("rack", base.id, box(-0.1, 0.6, -0.01, 0.01, -0.02, 0));
     fixture.fixture("work", box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), true);
     var clearance = fixture.clearance();
-    check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
-      "a moving pinion retains its designed engagement with the fixed rack");
+    check(
+      clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
+      "a moving pinion retains its designed engagement with the fixed rack"
+    );
     var hit = clearance.violation([0.3]);
-    check(hit != null && (hit.a == "work" || hit.b == "work") && (hit.a == "pinion" || hit.b == "pinion"),
-      "rack engagement does not exempt the pinion from another body on the same fixed link");
+    check(
+      hit != null && (hit.a == "work" || hit.b == "work") && (hit.a == "pinion" || hit.b == "pinion"),
+      "rack engagement does not exempt the pinion from another body on the same fixed link"
+    );
   }
 
   /** The vertices of the box spanning the given ranges. */
@@ -161,7 +219,14 @@ class ClearanceTests {
    * A 2R arm in the XY plane, links 0.3 m long (bars of 5 cm), with `fixed` bodies on the base link. The second link is
    * the tool.
    */
-  static function rig(fixed:Array<{name:String, vertices:Array<Float>}>, ?linkWidth:Float = 0.025, ?reference:Array<Float>):{arm:Manipulator, clearance:CollisionClearance} {
+  static function rig(
+    fixed:Array<{name:String, vertices:Array<Float>}>,
+    ?linkWidth:Float = 0.025,
+    ?reference:Array<Float>
+  ): {
+    arm: Manipulator,
+    clearance: CollisionClearance
+  } {
     var model = new RobotModel("clearance-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -195,9 +260,15 @@ class ClearanceTests {
     check(hit != null && hit.distance <= 0.0, "the arm overlaps the post");
     // A motion whose end poses are both clear but whose path goes through the post: the arm swings from along X to nearly along Y.
     check(cell.clearance.violation([1.4, 0.0]) == null, "the arm swung well past the post is clear");
-    check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
+    check(
+      cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null,
+      "the arm swinging round through the post is found along the way"
+    );
     check(cell.clearance.sweep([0.0, 0.0], [-1.4, 0.0]) == null, "the same swing away from the post is clear");
-    check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 6, "three mechanical frames and three collision bodies check the arm against the post");
+    check(
+      cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 6,
+      "three mechanical frames and three collision bodies check the arm against the post"
+    );
   }
 
   static function testMargins():Void {
@@ -205,11 +276,20 @@ class ClearanceTests {
     var table = {name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.003)};
     var cell = rig([table]);
     var tight = cell.clearance.violation([0.0, 0.0]);
-    check(tight != null && tight.distance > 0.0 && tight.distance < CollisionClearance.MARGIN, "3 mm above the table is a violation of the margin, not a collision");
-    check(tight != null && Math.abs(tight.distance - 0.003) < 0.0005, 'its distance is 3 mm, got ${tight == null ? -1 : tight.distance * 1000} mm');
+    check(
+      tight != null && tight.distance > 0.0 && tight.distance < CollisionClearance.MARGIN,
+      "3 mm above the table is a violation of the margin, not a collision"
+    );
+    check(
+      tight != null && Math.abs(tight.distance - 0.003) < 0.0005,
+      'its distance is 3 mm, got ${tight == null ? -1 : tight.distance * 1000} mm'
+    );
     // The tool in the contact zone may come as close as the contact margin: 3 mm is clear for the forearm but not the upper arm.
     var contact = cell.clearance.violation([0.0, 0.0], true);
-    check(contact != null && contact.a != "forearm" && contact.b != "forearm", 'only the arm itself, not the tool, is held to the margin there, got ${contact == null ? "" : contact.a + "," + contact.b}');
+    check(
+      contact != null && contact.a != "forearm" && contact.b != "forearm",
+      'only the arm itself, not the tool, is held to the margin there, got ${contact == null ? "" : contact.a + "," + contact.b}'
+    );
     var lifted = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.00025)}]);
     check(lifted.clearance.violation([0.0, 0.0], true) != null, "0.25 mm is closer than even the contact margin");
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
@@ -220,7 +300,10 @@ class ClearanceTests {
     wideFixture.fixture("table", box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), true);
     var strict = wideFixture.clearance();
     var found = strict.violation([0.0, 0.0]);
-    check(found != null && Math.abs(found.distance - 0.0123) < 1e-6, 'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}');
+    check(
+      found != null && Math.abs(found.distance - 0.0123) < 1e-6,
+      'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}'
+    );
   }
 
   static function testMultiHullContactWindow():Void {
@@ -238,23 +321,67 @@ class ClearanceTests {
     var toolHull = box(0.0, 0.3, -0.01, 0.01, -0.01, 0.01);
     var bodies = CollisionClearance.combine([
       CollisionClearance.convex("tool", tool.id, toolHull, true),
-      CollisionClearance.convex("tool", tool.id, toolHull.copy(), true),
-      CollisionClearance.convex("fixture", base.id, box(0.4, 0.42, -0.01, 0.01, 0.01025, 0.03)),
-      CollisionClearance.convex("fixture", base.id, box(0.43, 0.45, -0.01, 0.01, 0.01025, 0.03)),
-      CollisionClearance.convex("other", base.id, box(0.46, 0.48, -0.01, 0.01, 0.01025, 0.03))
+      CollisionClearance.convex(
+        "tool",
+        tool.id,
+        toolHull.copy(),
+        true
+      ),
+      CollisionClearance.convex(
+        "fixture",
+        base.id,
+        box(
+          0.4,
+          0.42,
+          -0.01,
+          0.01,
+          0.01025,
+          0.03
+        )
+      ),
+      CollisionClearance.convex(
+        "fixture",
+        base.id,
+        box(
+          0.43,
+          0.45,
+          -0.01,
+          0.01,
+          0.01025,
+          0.03
+        )
+      ),
+      CollisionClearance.convex(
+        "other",
+        base.id,
+        box(
+          0.46,
+          0.48,
+          -0.01,
+          0.01,
+          0.01025,
+          0.03
+        )
+      )
     ]);
     var clearance = new CollisionClearance(arm, bodies, [0.0, 0.0], () -> new NativeCollisionWorld());
     var initial = clearance.violation([0.0, 0.0], true);
-    check(initial != null && (initial.a == "fixture" || initial.b == "fixture"),
-      "named CAD member initially violates the contact margin across its compound hulls");
+    check(
+      initial != null && (initial.a == "fixture" || initial.b == "fixture"),
+      "named CAD member initially violates the contact margin across its compound hulls"
+    );
     clearance.apply(ClearanceChange.OpenWindow("tool", "fixture", null), [0.0, 0.0]);
     var outsideWindow = clearance.violation([0.0, 0.0], true);
-    check(outsideWindow != null && (outsideWindow.a == "other" || outsideWindow.b == "other"),
-      "a contact window covers every tool/target hull but keeps other obstacle pairs checked");
+    check(
+      outsideWindow != null && (outsideWindow.a == "other" || outsideWindow.b == "other"),
+      "a contact window covers every tool/target hull but keeps other obstacle pairs checked"
+    );
     clearance.apply(ClearanceChange.CloseWindow("tool", "fixture"), [0.0, 0.0]);
     var restored = clearance.violation([0.0, 0.0], true);
-    check(restored != null && (restored.a == "fixture" || restored.b == "fixture"),
-      "closing a compound contact window restores the original checks");
+    check(
+      restored != null && (restored.a == "fixture" || restored.b == "fixture"),
+      "closing a compound contact window restores the original checks"
+    );
     clearance.world.dispose();
   }
 
@@ -285,7 +412,14 @@ class ClearanceTests {
     var obstacles = [
       box(-2.0, 2.0, 0.07, 0.09, -0.01, 0.01),
       box(0.44, 0.46, -2.0, 2.0, -0.01, 0.01),
-      box(-2.0, 2.0, -2.0, 2.0, -0.04, -0.026)
+      box(
+        -2.0,
+        2.0,
+        -2.0,
+        2.0,
+        -0.04,
+        -0.026
+      )
     ];
     for (vertices in obstacles) {
       var model = new RobotModel("bounds-clearance");
@@ -308,16 +442,20 @@ class ClearanceTests {
         function placed(points:Array<Float>, pose:Transform3):Array<Float> {
           var result:Array<Float> = [];
           for (i in 0...Std.int(points.length / 3)) {
-            var point = pose.transformPoint(new Vec3(points[3*i], points[3*i+1], points[3*i+2]));
-            result.push(point.x); result.push(point.y); result.push(point.z);
+            var point = pose.transformPoint(new Vec3(points[3 * i], points[3 * i + 1], points[3 * i + 2]));
+            result.push(point.x);
+            result.push(point.y);
+            result.push(point.z);
           }
           return result;
         }
         for (contact in [false, true]) {
           var margin = contact ? CollisionClearance.CONTACT_MARGIN : CollisionClearance.MARGIN;
           var exact = ConvexDistance.between(placed(tool, poses[0]), placed(vertices, poses[1]), margin);
-          check((clearance.violation(q, contact) != null) == (exact < margin),
-            "bounds preserve exact rotated hull clearance and contact margins");
+          check(
+            (clearance.violation(q, contact) != null) == (exact < margin),
+            "bounds preserve exact rotated hull clearance and contact margins"
+          );
         }
       }
     }
@@ -327,13 +465,35 @@ class ClearanceTests {
     // The distance between hulls: two boxes 0.05 apart face to face, and 0.05 apart edge to edge (a diagonal gap of 0.05 * sqrt(2)).
     var a = box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
     near(ConvexDistance.between(a, box(1.05, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0), 0.05, 1e-9, "boxes apart face to face");
-    near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 0.0, 1.0), 1.0), 0.05 * Math.sqrt(2), 1e-9, "boxes apart edge to edge");
-    near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 1.05, 2.0), 1.0), 0.05 * Math.sqrt(3), 1e-9, "boxes apart corner to corner");
-    check(ConvexDistance.between(a, box(0.5, 1.5, 0.5, 1.5, 0.5, 1.5), 1.0) == 0.0, "overlapping boxes are at no distance");
-    check(ConvexDistance.between(a, box(1.0, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0) == 0.0, "touching boxes are at no distance");
+    near(
+      ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 0.0, 1.0), 1.0),
+      0.05 * Math.sqrt(2),
+      1e-9,
+      "boxes apart edge to edge"
+    );
+    near(
+      ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 1.05, 2.0), 1.0),
+      0.05 * Math.sqrt(3),
+      1e-9,
+      "boxes apart corner to corner"
+    );
+    check(
+      ConvexDistance.between(a, box(0.5, 1.5, 0.5, 1.5, 0.5, 1.5), 1.0) == 0.0,
+      "overlapping boxes are at no distance"
+    );
+    check(ConvexDistance.between(a,
+      box(1.0, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0) == 0.0, "touching boxes are at no distance");
     // Two bars that cross, edges against faces, with no corner of either inside the other.
-    check(ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, -0.02, 0.02), 1.0) == 0.0, "crossing bars overlap");
-    near(ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, 0.03, 0.05), 1.0), 0.02, 1e-9, "crossing bars one above the other");
+    check(
+      ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, -0.02, 0.02), 1.0) == 0.0,
+      "crossing bars overlap"
+    );
+    near(
+      ConvexDistance.between(box(0.0, 1.0, 0.4, 0.6, -0.01, 0.01), box(0.4, 0.6, 0.0, 1.0, 0.03, 0.05), 1.0),
+      0.02,
+      1e-9,
+      "crossing bars one above the other"
+    );
     // A cylinder (a 24-sided prism, as hulls of round parts are) against a box face, upright and tilted 45 degrees: the nearest
     // corner to the face is the distance. Prisms are symmetric and give flat simplices, which a naive search takes for overlap.
     for (tilt in [0.0, Math.PI / 4, 1.0]) {
@@ -347,15 +507,24 @@ class ClearanceTests {
       }
       var lowest = Math.POSITIVE_INFINITY;
       for (i in 0...48) lowest = Math.min(lowest, prism[3 * i + 2]);
-      near(ConvexDistance.between(prism, box(-1.0, 1.0, -1.0, 1.0, lowest - 0.5, lowest - 0.003), 1.0), 0.003, 1e-9, 'a cylinder tilted $tilt rad over a face');
+      near(
+        ConvexDistance.between(prism, box(-1.0, 1.0, -1.0, 1.0, lowest - 0.5, lowest - 0.003), 1.0),
+        0.003,
+        1e-9,
+        'a cylinder tilted $tilt rad over a face'
+      );
     }
     // Far apart: the search stops at a separating plane's gap, which is at least `enough`.
-    check(ConvexDistance.between(a, box(5.0, 6.0, 0.0, 1.0, 0.0, 1.0), 0.1) >= 0.1, "far boxes are reported farther than the margin asked");
+    check(
+      ConvexDistance.between(a, box(5.0, 6.0, 0.0, 1.0, 0.0, 1.0), 0.1) >= 0.1,
+      "far boxes are reported farther than the margin asked"
+    );
   }
 
   static function near(actual:Float, expected:Float, tolerance:Float, message:String):Void {
     assertions++;
-    if (!(Math.abs(actual - expected) <= tolerance)) throw 'Assertion failed: $message (expected $expected, got $actual)';
+    if (!(Math.abs(actual - expected)
+      <= tolerance)) throw 'Assertion failed: $message (expected $expected, got $actual)';
 
   }
 

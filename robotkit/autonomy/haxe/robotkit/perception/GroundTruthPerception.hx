@@ -14,8 +14,7 @@ class GroundTruthPerception implements Perception {
    * carry the scene's reference frame and timestamp metadata.
    */
   public function new(snapshotProvider:Void -> PerceptionSnapshot) {
-    if (snapshotProvider == null)
-      throw "Ground-truth perception requires a scene snapshot provider";
+    if (snapshotProvider == null) throw "Ground-truth perception requires a scene snapshot provider";
     this.snapshotProvider = snapshotProvider;
   }
 
@@ -23,7 +22,6 @@ class GroundTruthPerception implements Perception {
     if (frames == null) throw "Ground-truth perception requires a sensor frame batch";
     var value = snapshotProvider();
     if (value == null) throw "Ground-truth scene provider returned no snapshot";
-    return new PerceptionSnapshot(value.detections(), value.obstacles(),
-      value.pallets(), value.dockingTargets());
+    return new PerceptionSnapshot(value.detections(), value.obstacles(), value.pallets(), value.dockingTargets());
   }
 }

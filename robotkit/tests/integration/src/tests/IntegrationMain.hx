@@ -16,15 +16,11 @@ class IntegrationMain {
     else if (arguments.indexOf("--perception") >= 0) PerceptionTcpIntegration.run(host, port);
     else if (arguments.indexOf("--subscriptions") >= 0) SubscriptionIntegration.run(host, port);
     else if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run(host, port);
-    else if (arguments.indexOf("--lease-timeout") >= 0)
-      RobotSessionIntegration.runLeaseTimeout(host, port);
-    else if (arguments.indexOf("--device") >= 0)
-      RobotSessionIntegration.runDevice(host, port);
-    else if (arguments.indexOf("--local-owner") >= 0)
-      RobotSessionIntegration.runLocalOwner(host, port);
+    else if (arguments.indexOf("--lease-timeout") >= 0) RobotSessionIntegration.runLeaseTimeout(host, port);
+    else if (arguments.indexOf("--device") >= 0) RobotSessionIntegration.runDevice(host, port);
+    else if (arguments.indexOf("--local-owner") >= 0) RobotSessionIntegration.runLocalOwner(host, port);
     else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run(host, port);
-    else if (arguments.indexOf("--restart-check") >= 0)
-      WorldTcpIntegration.runRestartCheck(host, port);
+    else if (arguments.indexOf("--restart-check") >= 0) WorldTcpIntegration.runRestartCheck(host, port);
     else WorldTcpIntegration.run(host, port, arguments.indexOf("--camera-fixture") >= 0);
   }
 
@@ -39,8 +35,8 @@ class IntegrationMain {
         return;
       }
       var parent = haxe.io.Path.directory(directory);
-      if (parent == directory || parent.length == 0)
-        throw "Cannot locate robotkit/tests/world-tcp.sh; run the integration suite inside the repository";
+      if (parent == directory || parent.length
+        == 0) throw "Cannot locate robotkit/tests/world-tcp.sh; run the integration suite inside the repository";
       directory = parent;
     }
   }

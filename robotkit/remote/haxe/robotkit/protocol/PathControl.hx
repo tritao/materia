@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Native path lifecycle action: 1=HOLD, 2=RESUME, 3=ABORT. */
-@:wire
-class PathControl {
+@:wire class PathControl {
   @:id(1) public var robotId:haxe.Int64;
   @:id(2) public var action:Int;
 

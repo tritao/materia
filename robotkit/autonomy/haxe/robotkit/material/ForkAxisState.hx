@@ -7,8 +7,8 @@ class ForkAxisState {
   public final effort:Float;
 
   public function new(position:Float, velocity:Float, effort:Float) {
-    for (value in [position, velocity, effort])
-      if (!Math.isFinite(value)) throw "Fork axis state values must be finite";
+    for (value in [position,
+      velocity, effort]) if (!Math.isFinite(value)) throw "Fork axis state values must be finite";
     this.position = position;
     this.velocity = velocity;
     this.effort = effort;

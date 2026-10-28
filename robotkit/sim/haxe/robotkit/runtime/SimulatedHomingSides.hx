@@ -10,22 +10,27 @@ class SimulatedHomingSides implements HomingSideControl {
   final leaders:Map<String, Int> = new Map();
   var squaring:Array<String> = [];
 
-  @:allow(robotkit.runtime.Simulation)
-  private function new(simulation:Simulation, robotIndex:Int, runtime:RobotRuntime,
-      blueprint:RobotRuntimeBlueprint) {
-    this.simulation = simulation; this.robotIndex = robotIndex; this.runtime = runtime;
+  @:allow(robotkit.runtime.Simulation) private function new(
+    simulation:Simulation,
+    robotIndex:Int,
+    runtime:RobotRuntime,
+    blueprint:RobotRuntimeBlueprint
+  ) {
+    this.simulation = simulation;
+    this.robotIndex = robotIndex;
+    this.runtime = runtime;
     if (blueprint == null) throw "Homing sides require a compiled blueprint";
     for (contact in blueprint.switches) if (contact.role == "home" && contact.driveJoint != null) {
       if (drives.exists(contact.id)) throw "Duplicate side home switch";
       drives.set(contact.id, SwitchDriveBinding.resolve(blueprint, contact));
-      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint)
-        leaders.set(contact.id, i);
+      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint) leaders.set(contact.id,
+        i);
     }
   }
 
   public function beginSquaring(switchIds:Array<String>):Void {
-    if (squaring.length > 0 || switchIds == null || switchIds.length < 2)
-      throw "Squaring requires an idle controller and multiple sides";
+    if (squaring.length > 0
+      || switchIds == null || switchIds.length < 2) throw "Squaring requires an idle controller and multiple sides";
     var shafts:Array<Int> = [];
     for (id in switchIds) {
       var drive = drives.get(id);
@@ -65,8 +70,8 @@ class SimulatedHomingSides implements HomingSideControl {
   }
 
   public function calibrate(switchIds:Array<String>):Void {
-    if (switchIds == null || switchIds.length != squaring.length || squaring.length == 0)
-      throw "Calibrate the complete active squaring group";
+    if (switchIds == null || switchIds.length != squaring.length
+      || squaring.length == 0) throw "Calibrate the complete active squaring group";
     var seen = new Map<String, Bool>();
     for (id in switchIds) {
       if (squaring.indexOf(id) < 0 || seen.exists(id)) throw "Calibration does not match the squaring group";

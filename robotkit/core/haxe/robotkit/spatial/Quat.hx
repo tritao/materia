@@ -1,11 +1,7 @@
 package robotkit.spatial;
 
 /** Pure roll/pitch/yaw data, radians, ZYX intrinsic (see Quat.fromRollPitchYaw). */
-typedef RollPitchYaw = {
-  roll:Float,
-  pitch:Float,
-  yaw:Float
-};
+typedef RollPitchYaw = {roll:Float, pitch:Float, yaw:Float};
 
 /**
  * Immutable unit quaternion, component order x, y, z, w, matching
@@ -19,11 +15,10 @@ class Quat {
   public final w:Float;
 
   public function new(x:Float = 0.0, y:Float = 0.0, z:Float = 0.0, w:Float = 1.0) {
-    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z) || !Math.isFinite(w))
-      throw "Quat components must be finite";
+    if (!Math.isFinite(x)
+      || !Math.isFinite(y) || !Math.isFinite(z) || !Math.isFinite(w)) throw "Quat components must be finite";
     var norm = Math.sqrt(x * x + y * y + z * z + w * w);
-    if (!Math.isFinite(norm) || norm <= 1e-12)
-      throw "Quat cannot be built from a zero-length quaternion";
+    if (!Math.isFinite(norm) || norm <= 1e-12) throw "Quat cannot be built from a zero-length quaternion";
     this.x = x / norm;
     this.y = y / norm;
     this.z = z / norm;
@@ -56,11 +51,7 @@ class Quat {
     var tx = 2.0 * (y * v.z - z * v.y);
     var ty = 2.0 * (z * v.x - x * v.z);
     var tz = 2.0 * (x * v.y - y * v.x);
-    return new Vec3(
-      v.x + w * tx + y * tz - z * ty,
-      v.y + w * ty + z * tx - x * tz,
-      v.z + w * tz + x * ty - y * tx
-    );
+    return new Vec3(v.x + w * tx + y * tz - z * ty, v.y + w * ty + z * tx - x * tz, v.z + w * tz + x * ty - y * tx);
   }
 
   public function dot(other:Quat):Float return x * other.x + y * other.y + z * other.z + w * other.w;
@@ -81,12 +72,7 @@ class Quat {
     }
     if (cosHalfTheta > 0.9995) {
       // Nearly parallel: fall back to a normalized linear blend.
-      return new Quat(
-        x + (target.x - x) * t,
-        y + (target.y - y) * t,
-        z + (target.z - z) * t,
-        w + (target.w - w) * t
-      );
+      return new Quat(x + (target.x - x) * t, y + (target.y - y) * t, z + (target.z - z) * t, w + (target.w - w) * t);
     }
     var halfTheta = Math.acos(cosHalfTheta);
     var sinHalfTheta = Math.sqrt(1.0 - cosHalfTheta * cosHalfTheta);
@@ -106,50 +92,35 @@ class Quat {
     var xy = x * y, xz = x * z, yz = y * z;
     var wx = w * x, wy = w * y, wz = w * z;
     return [
-      1.0 - 2.0 * (yy + zz), 2.0 * (xy + wz), 2.0 * (xz - wy),
-      2.0 * (xy - wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz + wx),
-      2.0 * (xz + wy), 2.0 * (yz - wx), 1.0 - 2.0 * (xx + yy)
+      1.0 - 2.0 * (yy + zz),
+      2.0 * (xy + wz),
+      2.0 * (xz - wy),
+      2.0 * (xy - wz),
+      1.0 - 2.0 * (xx + zz),
+      2.0 * (yz + wx),
+      2.0 * (xz + wy),
+      2.0 * (yz - wx),
+      1.0 - 2.0 * (xx + yy)
     ];
   }
 
   /** Builds from a column-major 3x3 rotation matrix (9 values). */
   public static function fromRotationMatrix(m:Array<Float>):Quat {
-    if (m == null || m.length != 9)
-      throw "Rotation matrix requires exactly nine components";
+    if (m == null || m.length != 9) throw "Rotation matrix requires exactly nine components";
     function at(row:Int, col:Int):Float return m[col * 3 + row];
     var trace = at(0, 0) + at(1, 1) + at(2, 2);
     if (trace > 0.0) {
       var s = Math.sqrt(trace + 1.0) * 2.0;
-      return new Quat(
-        (at(2, 1) - at(1, 2)) / s,
-        (at(0, 2) - at(2, 0)) / s,
-        (at(1, 0) - at(0, 1)) / s,
-        0.25 * s
-      );
+      return new Quat((at(2, 1) - at(1, 2)) / s, (at(0, 2) - at(2, 0)) / s, (at(1, 0) - at(0, 1)) / s, 0.25 * s);
     } else if (at(0, 0) > at(1, 1) && at(0, 0) > at(2, 2)) {
       var s = Math.sqrt(1.0 + at(0, 0) - at(1, 1) - at(2, 2)) * 2.0;
-      return new Quat(
-        0.25 * s,
-        (at(0, 1) + at(1, 0)) / s,
-        (at(0, 2) + at(2, 0)) / s,
-        (at(2, 1) - at(1, 2)) / s
-      );
+      return new Quat(0.25 * s, (at(0, 1) + at(1, 0)) / s, (at(0, 2) + at(2, 0)) / s, (at(2, 1) - at(1, 2)) / s);
     } else if (at(1, 1) > at(2, 2)) {
       var s = Math.sqrt(1.0 + at(1, 1) - at(0, 0) - at(2, 2)) * 2.0;
-      return new Quat(
-        (at(0, 1) + at(1, 0)) / s,
-        0.25 * s,
-        (at(1, 2) + at(2, 1)) / s,
-        (at(0, 2) - at(2, 0)) / s
-      );
+      return new Quat((at(0, 1) + at(1, 0)) / s, 0.25 * s, (at(1, 2) + at(2, 1)) / s, (at(0, 2) - at(2, 0)) / s);
     } else {
       var s = Math.sqrt(1.0 + at(2, 2) - at(0, 0) - at(1, 1)) * 2.0;
-      return new Quat(
-        (at(0, 2) + at(2, 0)) / s,
-        (at(1, 2) + at(2, 1)) / s,
-        0.25 * s,
-        (at(1, 0) - at(0, 1)) / s
-      );
+      return new Quat((at(0, 2) + at(2, 0)) / s, (at(1, 2) + at(2, 1)) / s, 0.25 * s, (at(1, 0) - at(0, 1)) / s);
     }
   }
 
@@ -175,14 +146,13 @@ class Quat {
     var sinYawCosPitch = 2.0 * (w * z + x * y);
     var cosYawCosPitch = 1.0 - 2.0 * (y * y + z * z);
     var yaw = Math.atan2(sinYawCosPitch, cosYawCosPitch);
-    return { roll: roll, pitch: pitch, yaw: yaw };
+    return {roll: roll, pitch: pitch, yaw: yaw};
   }
 
   public function toArray():Array<Float> return [x, y, z, w];
 
   public static function fromArray(values:Array<Float>):Quat {
-    if (values == null || values.length != 4)
-      throw "Quat requires exactly four components (x, y, z, w)";
+    if (values == null || values.length != 4) throw "Quat requires exactly four components (x, y, z, w)";
     return new Quat(values[0], values[1], values[2], values[3]);
   }
 }

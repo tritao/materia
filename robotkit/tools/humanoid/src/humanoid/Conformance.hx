@@ -33,7 +33,7 @@ class Conformance {
     var model = RobotModelCodec.decode(sys.io.File.getBytes(args[0]));
     var rows = [for (line in sys.io.File.getContent(args[1]).split("\n")) if (StringTools.trim(line) != "") line];
     var header = rows.shift().split(",");
-    var reference = [for (row in rows) [for (value in row.split(",")) Std.parseFloat(value)]];
+    var reference = [for (row in rows)[for (value in row.split(",")) Std.parseFloat(value)]];
     var period = Std.parseFloat(args[2]);
     var substeps = Std.parseInt(args[3]);
     var amplitude = Std.parseFloat(args[4]);
@@ -54,15 +54,30 @@ class Conformance {
     var pose = args.length == 12 ? Pose.load(args[10], args[11]) : null;
 
     var start = reference[0];
-    var harness = new SimulationHarness(period, substeps, SimulationSpace.MUJOCO,
-      {integrator: integrator, solverIterations: solverIterations,
-        lineSearchIterations: lineSearchIterations});
+    var harness = new SimulationHarness(
+      period,
+      substeps,
+      SimulationSpace.MUJOCO,
+      {
+        integrator: integrator,
+        solverIterations: solverIterations,
+        lineSearchIterations: lineSearchIterations
+      }
+    );
     var simulation = harness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // A leg pressed onto its compliant knee stop passes it slightly.
     blueprint.observedLimitTolerance = 0.05;
-    var runtime = simulation.addRobotAtPose(blueprint,
-      [start[1], start[2], start[3]], [start[4], start[5], start[6], start[7]]);
+    var runtime = simulation.addRobotAtPose(
+      blueprint,
+      [start[1], start[2], start[3]],
+      [
+        start[4],
+        start[5],
+        start[6],
+        start[7]
+      ]
+    );
     harness.spawnPlane();
     if (pose != null) simulation.setJointPositions(0, pose.jointPositions(model));
 
@@ -76,15 +91,21 @@ class Conformance {
       for (i in 0...model.actuators.length) {
         var actuator = model.actuators[i];
         var joint = actuators.joints[i], gear = actuators.gears[i];
-        var control = (pose == null ? 0.0 : pose.actuatorTarget(actuator.id))
-          + amplitude * Math.sin(2.0 * Math.PI * (0.7 + 0.3 * i) * t + 0.5 * i);
+        var control = (pose == null ? 0.0
+          : pose.actuatorTarget(actuator.id)) + amplitude * Math.sin(2.0 * Math.PI * (0.7 + 0.3 * i) * t + 0.5 * i);
         if (actuator.servoStiffness > 0.0) {
           // A position actuator: force = kp (ctrl - gear q) - kv gear qdot on
           // an actuator length of gear q, with ctrl clamped to the joint range.
           var limits = model.joints[joint].limits;
           var position = Math.min(limits.upper, Math.max(limits.lower, control / gear));
-          targets.push(JointTarget.servo(joint, position, 0.0, gear * gear * actuator.servoStiffness,
-            gear * gear * actuator.servoDamping, 0.0));
+          targets.push(JointTarget.servo(
+            joint,
+            position,
+            0.0,
+            gear * gear * actuator.servoStiffness,
+            gear * gear * actuator.servoDamping,
+            0.0
+          ));
         } else {
           targets.push(JointTarget.effort(joint, gear * control));
         }
@@ -102,21 +123,24 @@ class Conformance {
       var jointError = 0.0, worstColumn = 0;
       for (column in 0...jointColumns.length) {
         var error = Math.abs(snapshot.q.get(jointColumns[column]) - expected[8 + column]);
-        if (error > jointError) { jointError = error; worstColumn = column; }
+        if (error > jointError) {
+          jointError = error;
+          worstColumn = column;
+        }
       }
       worstPosition = Math.max(worstPosition, positionError);
       worstAngle = Math.max(worstAngle, Math.max(angleError, jointError));
       worstJoint = Math.max(worstJoint, jointError);
-      if (firstFailure < 0 && (positionError > positionTolerance ||
-          Math.max(angleError, jointError) > angleTolerance)) {
+      if (firstFailure < 0 && (positionError > positionTolerance || Math.max(angleError,
+        jointError) > angleTolerance)) {
         firstFailure = tick + 1;
         Sys.println('first over tolerance, t=${expected[0]}: base ${positionError} m, ${angleError} rad; '
           + 'joints ${jointError} rad (worst ${header[8 + worstColumn]} at '
           + '${snapshot.q.get(jointColumns[worstColumn])}, reference ${expected[8 + worstColumn]})');
       }
-      if (tick < 3 || (tick + 1) % Std.int(Math.max(1, Math.round(0.25 / period))) == 0)
-        Sys.println('t=${expected[0]}: base ${positionError} m, ${angleError} rad; joints ${jointError} rad'
-          + ' (worst ${header[8 + worstColumn]})');
+      if (tick < 3 || (tick + 1) % Std.int(Math.max(1, Math.round(0.25 / period)))
+        == 0) Sys.println('t=${expected[0]}: base ${positionError} m, ${angleError} rad; joints ${jointError} rad'
+        + ' (worst ${header[8 + worstColumn]})');
     }
     harness.dispose();
     Sys.println('${model.name}: ${reference.length - 1} ticks, worst base position $worstPosition m, '

@@ -49,8 +49,8 @@ class PolicySession {
     this.tickSeconds = tickSeconds == null ? period : tickSeconds;
     var ratio = period / this.tickSeconds;
     ticksPerControl = Std.int(Math.round(ratio));
-    if (ticksPerControl < 1 || Math.abs(ratio - ticksPerControl) > 1e-6)
-      throw 'the control period ($period s) must be a whole number of ticks of $tickSeconds s';
+    if (ticksPerControl < 1 || Math.abs(ratio - ticksPerControl)
+      > 1e-6) throw 'the control period ($period s) must be a whole number of ticks of $tickSeconds s';
     var limits = controller.spec.command;
     this.reference = reference == null ? new VelocityReference(limits.limit, limits.acceleration) : reference;
   }
@@ -72,12 +72,18 @@ class PolicySession {
    * Submits a velocity command valid until `deadlineNs` on the robot's clock;
    * sequences must increase, and this session numbers them itself.
    */
-  public function command(velocity:VelocityCommand, deadlineNs:Int64):Null<CommandRejection>
-    return reference.submit(velocity, ++commandSequence, deadlineNs, nowNs);
+  public function command(velocity:VelocityCommand, deadlineNs:Int64):Null<CommandRejection> return reference.submit(
+    velocity,
+    ++ commandSequence,
+    deadlineNs,
+    nowNs
+  );
 
   /** Commands `velocity` for `seconds` from the robot's present time. */
-  public function commandFor(velocity:VelocityCommand, seconds:Float):Null<CommandRejection>
-    return command(velocity, nowNs + Int64.fromFloat(seconds * 1e9 + 0.5));
+  public function commandFor(velocity:VelocityCommand, seconds:Float):Null<CommandRejection> return command(
+    velocity,
+    nowNs + Int64.fromFloat(seconds * 1e9 + 0.5)
+  );
 
   /**
    * One tick: read the robot and feed its IMU to the gravity filter, and once
@@ -89,13 +95,12 @@ class PolicySession {
     nowNs = snapshot.sourceTimestampNs;
     var sensors = snapshot.sensors.toArray();
     controller.observeImu(sensors);
-    if (++ticks % ticksPerControl != 0 || ticks <= warmupTicks) return [];
+    if (++ ticks % ticksPerControl != 0 || ticks <= warmupTicks) return [];
     lastCommand = reference.sample(nowNs);
     var targets = controller.update(snapshot.positions.toArray(), snapshot.velocities.toArray(), sensors, lastCommand);
     send(targets);
     return targets;
   }
 
-  function send(targets:Array<JointTarget>):Void
-    robot.submit(RobotCommand.JointTargets(targets, null));
+  function send(targets:Array<JointTarget>):Void robot.submit(RobotCommand.JointTargets(targets, null));
 }

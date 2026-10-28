@@ -8,10 +8,9 @@ class RobotRuntimeBrakePhysicsBlueprint {
   public final applicationDelay:Float;
 
   public function new(joint:Int, holdingEffort:Float, releaseDelay:Float, applicationDelay:Float) {
-    if (joint < 0 || !Math.isFinite(holdingEffort) || holdingEffort <= 0.0 ||
-        !Math.isFinite(releaseDelay) || releaseDelay < 0.0 ||
-        !Math.isFinite(applicationDelay) || applicationDelay < 0.0)
-      throw "Invalid physical brake parameters";
+    if (joint < 0
+      || !Math.isFinite(holdingEffort) || holdingEffort <= 0.0 || !Math.isFinite(releaseDelay) || releaseDelay < 0.0
+      || !Math.isFinite(applicationDelay) || applicationDelay < 0.0) throw "Invalid physical brake parameters";
     this.joint = joint;
     this.holdingEffort = holdingEffort;
     this.releaseDelay = releaseDelay;

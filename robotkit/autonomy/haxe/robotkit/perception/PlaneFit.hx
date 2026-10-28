@@ -45,11 +45,16 @@ class PlaneFit {
    * `inlierThreshold`, then refits (`fit`) over just that consensus set for
    * the final estimate. Deterministic for a fixed `seed`.
    */
-  public static function fitRansac(points:Array<Vec3>, seed:Int, ?maxIterations:Int = 500,
-      ?inlierThreshold:Float = 0.01, ?referenceNormal:Vec3):PlaneEstimate {
+  public static function fitRansac(
+    points:Array<Vec3>,
+    seed:Int,
+    ?maxIterations:Int = 500,
+    ?inlierThreshold:Float = 0.01,
+    ?referenceNormal:Vec3
+  ):PlaneEstimate {
     if (points == null || points.length < 3) throw "RANSAC plane fit requires at least three points";
-    if (!Math.isFinite(inlierThreshold) || inlierThreshold <= 0.0)
-      throw "RANSAC plane fit inlier threshold must be positive and finite";
+    if (!Math.isFinite(inlierThreshold)
+      || inlierThreshold <= 0.0) throw "RANSAC plane fit inlier threshold must be positive and finite";
     var rng = new SeededRandom(seed);
     var bestInliers:Array<Int> = [];
 
@@ -92,14 +97,14 @@ class PlaneFit {
     var xx = 0.0, xy = 0.0, xz = 0.0, yy = 0.0, yz = 0.0, zz = 0.0;
     for (point in points) {
       var d = point.sub(centroid);
-      xx += d.x * d.x; xy += d.x * d.y; xz += d.x * d.z;
-      yy += d.y * d.y; yz += d.y * d.z; zz += d.z * d.z;
+      xx += d.x * d.x;
+      xy += d.x * d.y;
+      xz += d.x * d.z;
+      yy += d.y * d.y;
+      yz += d.y * d.z;
+      zz += d.z * d.z;
     }
     var n = points.length;
-    return [
-      [xx / n, xy / n, xz / n],
-      [xy / n, yy / n, yz / n],
-      [xz / n, yz / n, zz / n]
-    ];
+    return [[xx / n, xy / n, xz / n], [xy / n, yy / n, yz / n], [xz / n, yz / n, zz / n]];
   }
 }

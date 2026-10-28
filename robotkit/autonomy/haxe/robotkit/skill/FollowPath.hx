@@ -15,10 +15,8 @@ class FollowPath implements Skill {
   final speedLimits:Null<Array<PathSpeedLimit>>;
   final lifecycle:SkillLifecycle = new SkillLifecycle();
 
-  public function new(navigation:Navigation, path:Path, ?goal:NavigationGoal,
-      ?speedLimits:Array<PathSpeedLimit>) {
-    if (navigation == null || path == null)
-      throw "FollowPath requires navigation and a path";
+  public function new(navigation:Navigation, path:Path, ?goal:NavigationGoal, ?speedLimits:Array<PathSpeedLimit>) {
+    if (navigation == null || path == null) throw "FollowPath requires navigation and a path";
     this.navigation = navigation;
     this.path = path;
     this.goal = goal;
@@ -27,14 +25,13 @@ class FollowPath implements Skill {
 
   public function start():Void {
     lifecycle.begin();
-    try navigation.follow(path, goal, speedLimits)
-    catch (error:Dynamic) lifecycle.fail(Std.string(error));
+    try navigation.follow(path, goal, speedLimits) catch (error:Dynamic) lifecycle.fail(Std.string(error));
   }
 
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
     if (!lifecycle.isRunning()) return lifecycle.status();
-    try sync(navigation.updateObservation(snapshot, durationSeconds))
-    catch (error:Dynamic) lifecycle.fail(Std.string(error));
+    try sync(navigation.updateObservation(snapshot,
+      durationSeconds)) catch (error:Dynamic) lifecycle.fail(Std.string(error));
     return lifecycle.status();
   }
 
@@ -49,9 +46,13 @@ class FollowPath implements Skill {
 
   function sync(value:NavigationStatus):Void switch value {
     case Following:
-    case Succeeded: lifecycle.succeed("path completed");
-    case Cancelled: lifecycle.cancel();
-    case Failed(message): lifecycle.fail(message);
-    case Idle: lifecycle.fail("navigation returned to idle");
+    case Succeeded:
+      lifecycle.succeed("path completed");
+    case Cancelled:
+      lifecycle.cancel();
+    case Failed(message):
+      lifecycle.fail(message);
+    case Idle:
+      lifecycle.fail("navigation returned to idle");
   }
 }

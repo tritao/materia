@@ -1,6 +1,9 @@
 package robotkit.manipulation;
 
-private typedef RouteNode = {var q:Array<Float>; var parent:Int;}
+private typedef RouteNode = {
+  var q:Array<Float>;
+  var parent:Int;
+}
 
 /** Bounded, deterministic bidirectional joint-space search. The caller verifies directed motion edges. */
 class JointRoute {
@@ -18,7 +21,10 @@ class JointRoute {
 
   static function distance(a:Array<Float>, b:Array<Float>, spans:Array<Float>):Float {
     var sum = 0.0;
-    for (i in 0...a.length) { var d = (a[i] - b[i]) / spans[i]; sum += d * d; }
+    for (i in 0...a.length) {
+      var d = (a[i] - b[i]) / spans[i];
+      sum += d * d;
+    }
     return Math.sqrt(sum);
   }
 
@@ -26,29 +32,45 @@ class JointRoute {
     var best = 0, cost = Math.POSITIVE_INFINITY;
     for (i in 0...tree.length) {
       var found = distance(tree[i].q, q, spans);
-      if (found < cost) { cost = found; best = i; }
+      if (found < cost) {
+        cost = found;
+        best = i;
+      }
     }
     return best;
   }
 
   static function branch(tree:Array<RouteNode>, index:Int):Array<Array<Float>> {
     var result:Array<Array<Float>> = [];
-    while (index >= 0) { result.push(tree[index].q.copy()); index = tree[index].parent; }
+    while (index >= 0) {
+      result.push(tree[index].q.copy());
+      index = tree[index].parent;
+    }
     result.reverse();
     return result;
   }
 
   /** Includes both endpoints. A failed bounded search is explicit, never evidence that no route exists. */
-  public static function plan(from:Array<Float>, to:Array<Float>, lower:Array<Float>, upper:Array<Float>,
-      clear:(Array<Float>, Array<Float>) -> Bool, iterations:Int = 1024, step:Float = 0.08):Array<Array<Float>> {
-    if (from == null || to == null || lower == null || upper == null || clear == null || from.length == 0 ||
-        from.length > PRIMES.length || to.length != from.length || lower.length != from.length || upper.length != from.length ||
-        iterations < 1 || !(step > 0)) throw "Joint route needs matching finite bounds and a positive search budget";
+  public static function plan(
+    from:Array<Float>,
+    to:Array<Float>,
+    lower:Array<Float>,
+    upper:Array<Float>,
+    clear:(
+      Array<Float>,
+      Array<Float>
+    ) -> Bool,
+    iterations:Int = 1024,
+    step:Float = 0.08
+  ):Array<Array<Float>> {
+    if (from == null || to == null || lower == null || upper == null || clear == null || from.length == 0 || from.length
+      > PRIMES.length || to.length != from.length || lower.length != from.length || upper.length != from.length
+      || iterations < 1 || !(step > 0)) throw "Joint route needs matching finite bounds and a positive search budget";
     var spans:Array<Float> = [];
     for (i in 0...from.length) {
-      if (!Math.isFinite(lower[i]) || !Math.isFinite(upper[i]) || !(upper[i] > lower[i]) ||
-          !Math.isFinite(from[i]) || !Math.isFinite(to[i]) || from[i] < lower[i] || from[i] > upper[i] ||
-          to[i] < lower[i] || to[i] > upper[i]) throw "Joint route endpoint is outside its finite bounds";
+      if (!Math.isFinite(lower[i]) || !Math.isFinite(upper[i]) || !(upper[i] > lower[i])
+        || !Math.isFinite(from[i]) || !Math.isFinite(to[i]) || from[i] < lower[i] || from[i] > upper[i]
+        || to[i] < lower[i] || to[i] > upper[i]) throw "Joint route endpoint is outside its finite bounds";
       spans.push(upper[i] - lower[i]);
     }
     if (!clear(from, from) || !clear(to, to)) throw "Joint route endpoint is blocked";
@@ -79,7 +101,8 @@ class JointRoute {
       while (index < route.length - 1) {
         var next = route.length - 1;
         while (next > index + 1 && !clear(route[index], route[next])) next--;
-        result.push(route[next]); index = next;
+        result.push(route[next]);
+        index = next;
       }
       return result;
     }

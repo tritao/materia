@@ -6,26 +6,23 @@ import haxe.Int64;
 class IntentBuffer {
   var latest:Null<JointTargetIntent> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function publish(intent:JointTargetIntent):Void {
-    if (intent == null)
-      throw "RobotKit intent buffer cannot publish null";
+    if (intent == null) throw "RobotKit intent buffer cannot publish null";
     latest = intent;
   }
 
   public function current(nowNs:Int64):Null<JointTargetIntent> {
     var intent = latest;
-    if (intent == null)
-      return null;
-    if (Int64.compare(intent.expiryNs, Int64.ofInt(0)) != 0
-        && Int64.compare(intent.expiryNs, nowNs) <= 0) {
+    if (intent == null) return null;
+    if (Int64.compare(intent.expiryNs, Int64.ofInt(0)) != 0 && Int64.compare(intent.expiryNs, nowNs) <= 0) {
       latest = null;
       return null;
     }
     return intent;
   }
 
-  public function clear():Void
-    latest = null;
+  public function clear():Void latest = null;
 }

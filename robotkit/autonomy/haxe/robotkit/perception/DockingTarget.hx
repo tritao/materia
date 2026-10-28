@@ -10,8 +10,7 @@ class DockingTarget {
   public final approachPose:Pose2;
 
   public function new(detection:Detection, approachPose:Pose2) {
-    if (detection == null || approachPose == null)
-      throw "Docking target requires a detection and approach pose";
+    if (detection == null || approachPose == null) throw "Docking target requires a detection and approach pose";
     this.detection = detection;
     this.approachPose = new Pose2(approachPose.x, approachPose.y, approachPose.yaw);
   }

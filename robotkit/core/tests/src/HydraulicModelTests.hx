@@ -16,18 +16,39 @@ import robotkit.runtime.RobotRuntimeCompiler;
 class HydraulicModelTests {
   static var assertions:Int = 0;
   public static function main():Void run();
-  static function drive(home:Float = 0, sign:Float = 1):HydraulicDrive
-    return new HydraulicDrive(0.160, 0.100, 0.100, 10e6, 0.080, 0.008, 0.070, 0.0685,
-      "valve/coilA", "valve/coilB", sign, home);
+  static function drive(home:Float = 0, sign:Float = 1):HydraulicDrive return new HydraulicDrive(
+    0.160,
+    0.100,
+    0.100,
+    10e6,
+    0.080,
+    0.008,
+    0.070,
+    0.0685,
+    "valve/coilA",
+    "valve/coilB",
+    sign,
+    home
+  );
   static function model(home:Float = 0, type:JointType = JointType.Prismatic):RobotModel {
     var result = new RobotModel("hydraulic-reference");
     var base = result.addLink(new Link("base")), ram = result.addLink(new Link("ram"));
     var joint = result.addJoint(new Joint("ram", type, base, ram));
-    joint.limits.lower = home; joint.limits.upper = home + 0.1;
+    joint.limits.lower = home;
+    joint.limits.upper = home + 0.1;
     var hydraulic = drive(home);
-    var actuator = new Actuator("cylinder", hydraulic.extensionForce(), hydraulic.ratedSpeed,
-      Transmission.SimpleTransmission(joint.id, 1, 0));
-    actuator.drive = hydraulic; result.addActuator(actuator);
+    var actuator = new Actuator(
+      "cylinder",
+      hydraulic.extensionForce(),
+      hydraulic.ratedSpeed,
+      Transmission.SimpleTransmission(
+        joint.id,
+        1,
+        0
+      )
+    );
+    actuator.drive = hydraulic;
+    result.addActuator(actuator);
     return result;
   }
   public static function run():Void {
@@ -49,9 +70,14 @@ class HydraulicModelTests {
     cylinderCapability(hydraulic);
     var source = model();
     var blueprint = RobotRuntimeCompiler.compile(source, new RobotProfile());
-    check(blueprint.cylinderDrives.length == 1 && blueprint.channels.length == 2, "one shared process binding and two coils");
-    for (channel in blueprint.channels)
-      check(!channel.keepOnStop, "hydraulic stop de-energizes the closed-centre valve");
+    check(
+      blueprint.cylinderDrives.length == 1 && blueprint.channels.length == 2,
+      "one shared process binding and two coils"
+    );
+    for (channel in blueprint.channels) check(
+      !channel.keepOnStop,
+      "hydraulic stop de-energizes the closed-centre valve"
+    );
     var binding = blueprint.cylinderDrives[0];
     check(binding.control == CylinderControl.FlowLimited, "hydraulic binding selects flow control");
     near(binding.extensionForce, hydraulic.extensionForce(), "compiled extension force");
@@ -83,24 +109,41 @@ class HydraulicModelTests {
     if (restoredDrive == null) throw "Saved hydraulic actuator lost its drive";
     var restoredHydraulic = restoredDrive.hydraulic();
     if (restoredHydraulic == null) throw "Saved hydraulic actuator lost its typed hydraulic data";
-    check(restored.schemaVersion == robotkit.model.RobotModel.CURRENT_VERSION && restoredDrive.kind() == "hydraulic", "one current RobotModel format");
+    check(
+      restored.schemaVersion == robotkit.model.RobotModel.CURRENT_VERSION && restoredDrive.kind() == "hydraulic",
+      "one current RobotModel format"
+    );
     near(restoredHydraulic.changePoint, 0.0685, "saved phase boundary");
     near(restoredHydraulic.extensionForce(), hydraulic.extensionForce(), "saved pressure-area force");
-    check(restoredHydraulic.channelA == "valve/coilA" && restoredHydraulic.channelB == "valve/coilB",
-      "saved valve channels");
+    check(
+      restoredHydraulic.channelA == "valve/coilA" && restoredHydraulic.channelB == "valve/coilB",
+      "saved valve channels"
+    );
     var text = encoded.toString();
-    check(text.indexOf('"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION) >= 0, "serialized current version");
+    check(
+      text.indexOf('"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION) >= 0,
+      "serialized current version"
+    );
     for (version in [9, 10, 11, 12]) {
-      var old = Bytes.ofString(StringTools.replace(text, '"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION, '"schemaVersion":' + version));
-      reject(function() { var invalid = RobotModelCodec.decode(old); }, "older RobotModel rejected");
+      var old = Bytes.ofString(StringTools.replace(
+        text,
+        '"schemaVersion":' + robotkit.model.RobotModel.CURRENT_VERSION,
+        '"schemaVersion":' + version
+      ));
+      reject(function() {
+        var invalid = RobotModelCodec.decode(old);
+      }, "older RobotModel rejected");
     }
   }
   static function invalidBindings():Void {
     var posed = RobotRuntimeCompiler.compile(model(-0.025), new RobotProfile());
     near(posed.cylinderDrives[0].retractedPosition, -0.025, "edited placement preserves the retracted coordinate");
-    var shortGuide = model(); shortGuide.joints[0].limits.upper = 0.099;
+    var shortGuide = model();
+    shortGuide.joints[0].limits.upper = 0.099;
     diagnosed(shortGuide, "RK_HYDRAULIC_TRAVEL");
-    var wrongHome = model(); wrongHome.joints[0].limits.lower = 0.01; wrongHome.joints[0].limits.upper = 0.11;
+    var wrongHome = model();
+    wrongHome.joints[0].limits.lower = 0.01;
+    wrongHome.joints[0].limits.upper = 0.11;
     diagnosed(wrongHome, "RK_HYDRAULIC_HOME");
     var rotating = model(0, JointType.Revolute);
     diagnosed(rotating, "RK_CYLINDER_JOINT");
@@ -118,30 +161,39 @@ class HydraulicModelTests {
     var source = model();
     source.joints[0].passive = true;
     diagnosed(source, "RK_PASSIVE_ACTUATOR");
-    reject(function() { var encoded = RobotModelCodec.encode(source); },
-      "passive joint cannot retain a cylinder actuator");
+    reject(function() {
+      var encoded = RobotModelCodec.encode(source);
+    }, "passive joint cannot retain a cylinder actuator");
     source.actuators.resize(0);
     var restored = RobotModelCodec.decode(RobotModelCodec.encode(source));
     check(restored.joints[0].passive, "saved passive ownership");
     var blueprint = RobotRuntimeCompiler.compile(restored, new RobotProfile());
-    check(blueprint.joints[0].passive && blueprint.cylinderDrives.length == 0,
-      "passive ownership reaches runtime without a drive");
+    check(
+      blueprint.joints[0].passive && blueprint.cylinderDrives.length == 0,
+      "passive ownership reaches runtime without a drive"
+    );
     source.joints[0].passive = false;
     var controlled = RobotModelCodec.decode(RobotModelCodec.encode(source));
     check(!controlled.joints[0].passive, "ordinary joints retain host ownership");
   }
   static function diagnosed(model:RobotModel, code:String):Void {
     var found = false;
-    for (diagnostic in RobotRuntimeCompiler.validate(model, new RobotProfile())) if (diagnostic.code == code) found = true;
+    for (diagnostic in RobotRuntimeCompiler.validate(model,
+      new RobotProfile())) if (diagnostic.code == code) found = true;
     check(found, 'missing $code diagnosis');
   }
-  static function near(actual:Float, expected:Float, message:String):Void
-    check(Math.isFinite(actual) && Math.abs(actual - expected) <= 1e-9 * Math.max(1, Math.abs(expected)), message);
+  static function near(actual:Float, expected:Float, message:String):Void check(
+    Math.isFinite(actual) && Math.abs(actual - expected) <= 1e-9 * Math.max(
+      1,
+      Math.abs(expected)
+    ),
+    message
+  );
   static function check(value:Bool, message:String):Void {
     assertions++;
     if (!value) throw message;
   }
-  static function reject(action:Void->Void, message:String):Void {
+  static function reject(action:Void -> Void, message:String):Void {
     var failed = false;
     try action() catch (_:Dynamic) failed = true;
     check(failed, message);

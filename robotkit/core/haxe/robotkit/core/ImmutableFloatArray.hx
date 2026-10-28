@@ -14,8 +14,7 @@ class ImmutableFloatArray {
 
   inline function get_length():Int return values.length;
 
-  @:arrayAccess
-  public inline function get(index:Int):Float return values[index];
+  @:arrayAccess public inline function get(index:Int):Float return values[index];
 
   /** Returns independent mutable storage for adapters or serialization. */
   public function toArray():Array<Float> return values.copy();

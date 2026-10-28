@@ -53,23 +53,71 @@ class WeldTests {
     return assertions;
   }
 
-  static function config(?maxCurrent:Float = 350, ?efficiency:Float = 0.88, ?wire:Float = 1.2, ?stickout:Float = 15):WeldArcConfig
-    return {maxCurrentA: maxCurrent, efficiency: efficiency, wireDiameterMm: wire, stickoutMm: stickout};
+  static function config(?maxCurrent:Float = 350,
+    ?efficiency:Float = 0.88, ?wire:Float = 1.2, ?stickout:Float = 15):WeldArcConfig return {
+      maxCurrentA: maxCurrent,
+      efficiency: efficiency,
+      wireDiameterMm: wire,
+      stickoutMm: stickout
+    };
 
   /** The plate: 20 cm square, 1 cm thick, its top at z = 0. */
-  static function plate():GroundedWork
-    return new GroundedWork().addFixed(ConvexSolid.box(-0.1, -0.1, -0.01, 0.1, 0.1, 0.0));
+  static function plate():GroundedWork return new GroundedWork().addFixed(ConvexSolid.box(
+    -0.1,
+    -0.1,
+    -0.01,
+    0.1,
+    0.1,
+    0.0
+  ));
 
   /** One step of the model with the wire tip `height` metres above the plate's top, pointing down. */
-  static function step(model:WeldArcModel, work:GroundedWork, height:Float, arc:Bool, ?wire:Float = 8.0, ?volts:Float = 24.0,
-      ?ready:Bool = true, ?x:Float = 0.0, ?dt:Float = STEP):WeldReading {
-    return model.step(dt, {arcCommanded: arc, wireSpeed: wire, voltageSet: volts, supplyReady: ready,
-      tipDistance: work.distance(x, 0.0, height), wireDistance: work.ray(x, 0.0, height, 0.0, 0.0, -1.0, WeldArcModel.STRIKE_REACH)});
+  static function step(
+    model:WeldArcModel,
+    work:GroundedWork,
+    height:Float,
+    arc:Bool,
+    ?wire:Float = 8.0,
+    ?volts:Float = 24.0,
+    ?ready:Bool = true,
+    ?x:Float = 0.0,
+    ?dt:Float = STEP
+  ):WeldReading {
+    return model.step(
+      dt,
+      {
+        arcCommanded: arc,
+        wireSpeed: wire,
+        voltageSet: volts,
+        supplyReady: ready,
+        tipDistance: work.distance(
+          x,
+          0.0,
+          height
+        ),
+        wireDistance: work.ray(
+          x,
+          0.0,
+          height,
+          0.0,
+          0.0,
+          -1.0,
+          WeldArcModel.STRIKE_REACH
+        )
+      }
+    );
   }
 
   /** Runs `seconds` of steps at a height and returns the last reading. */
-  static function hold(model:WeldArcModel, work:GroundedWork, height:Float, arc:Bool, seconds:Float, ?wire:Float = 8.0,
-      ?volts:Float = 24.0):WeldReading {
+  static function hold(
+    model:WeldArcModel,
+    work:GroundedWork,
+    height:Float,
+    arc:Bool,
+    seconds:Float,
+    ?wire:Float = 8.0,
+    ?volts:Float = 24.0
+  ):WeldReading {
     var reading = model.reading;
     for (i in 0...Math.round(seconds / STEP)) reading = step(model, work, height, arc, wire, volts);
     return reading;
@@ -114,13 +162,17 @@ class WeldTests {
     var round:Array<Float> = [];
     for (i in 0...64) for (z in [-1.0, 1.0]) {
       var angle = i * 2 * Math.PI / 64;
-      round.push(Math.cos(angle)); round.push(Math.sin(angle)); round.push(z);
+      round.push(Math.cos(angle));
+      round.push(Math.sin(angle));
+      round.push(z);
     }
     var boxed = new ConvexSolid(round).cornerPoints();
     check(boxed.length == 24, "a boxed round cloud supplies all eight box corners");
-    for (i in 0...8) check(Math.abs(Math.abs(boxed[3 * i]) - 1) < 1e-9 &&
-      Math.abs(Math.abs(boxed[3 * i + 1]) - 1) < 1e-9 && Math.abs(Math.abs(boxed[3 * i + 2]) - 1) < 1e-9,
-      "box corners are constructed from bounds, even when absent from the input cloud");
+    for (i in 0...8) check(
+      Math.abs(Math.abs(boxed[3 * i]) - 1) < 1e-9
+      && Math.abs(Math.abs(boxed[3 * i + 1]) - 1) < 1e-9 && Math.abs(Math.abs(boxed[3 * i + 2]) - 1) < 1e-9,
+      "box corners are constructed from bounds, even when absent from the input cloud"
+    );
     var flat = false;
     try new ConvexSolid([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]) catch (_:Dynamic) flat = true;
     check(flat, "a flat set of vertices is no solid");
@@ -128,16 +180,40 @@ class WeldTests {
 
   static function testWorkFollowsItsBody():Void {
     var body = {x: 0.0, turn: 0.0};
-    var work = new GroundedWork().add(ConvexSolid.box(-1, -1, -1, 1, 1, 1), function() return {position: [body.x, 0.0, 0.0],
-      rotation: [0.0, 0.0, Math.sin(body.turn / 2), Math.cos(body.turn / 2)]});
+    var work = new GroundedWork().add(
+      ConvexSolid.box(-1, -1, -1, 1, 1, 1),
+      function() return {
+        position: [
+          body.x,
+          0.0,
+          0.0
+        ],
+        rotation: [
+          0.0,
+          0.0,
+          Math.sin(body.turn / 2),
+          Math.cos(body.turn / 2)
+        ]
+      }
+    );
     near(work.distance(3, 0, 0), 2.0, "the work is where its body is", 1e-9);
     body.x = 4;
     near(work.distance(4, 0, 0), -1.0, "the work moved with its body: its centre is now at 4", 1e-9);
     body.x = 0;
     body.turn = Math.PI / 2;
     // A box [-1, 1] x [-2, 2] turned a quarter about Z reaches 2 along X rather than Y.
-    work = new GroundedWork().add(ConvexSolid.box(-1, -2, -1, 1, 2, 1), function() return {position: [body.x, 0.0, 0.0],
-      rotation: [0.0, 0.0, Math.sin(body.turn / 2), Math.cos(body.turn / 2)]});
+    work = new GroundedWork().add(
+      ConvexSolid.box(-1, -2, -1, 1, 2, 1),
+      function() return {
+        position: [body.x, 0.0, 0.0],
+        rotation: [
+          0.0,
+          0.0,
+          Math.sin(body.turn / 2),
+          Math.cos(body.turn / 2)
+        ]
+      }
+    );
     near(work.distance(2, 0, 0), 0.0, "the turned box reaches 2 along X", 1e-9);
     near(work.distance(0, 2, 0), 1.0, "and only 1 along Y", 1e-9);
     near(work.ray(5, 0, 0, -1, 0, 0, 10), 3.0, "a ray meets the turned box", 1e-9);
@@ -170,8 +246,10 @@ class WeldTests {
       time += STEP;
       if (reading.arc && established < 0) established = time;
     }
-    check(established >= WeldArcModel.IGNITION_DELAY - 1e-9 && established <= WeldArcModel.IGNITION_DELAY + STEP + 1e-9,
-      'the arc lights after the ignition delay, got $established s');
+    check(
+      established >= WeldArcModel.IGNITION_DELAY - 1e-9 && established <= WeldArcModel.IGNITION_DELAY + STEP + 1e-9,
+      'the arc lights after the ignition delay, got $established s'
+    );
     // The delay restarts when the wire leaves the work before it is over.
     var restart = new WeldArcModel(config());
     for (i in 0...5) step(restart, work, 0.001, true);
@@ -192,7 +270,10 @@ class WeldTests {
     near(rate * 60 / 1000, 8.0, "the current burns off the wire that is fed", 1e-6);
     var slow = new WeldArcModel(config());
     var slowReading = hold(slow, work, 0.0, true, 0.3, 4.0, 20.0);
-    check(slowReading.currentA < reading.currentA - 50 && slowReading.currentA > 100, 'slower wire, less current, got ${slowReading.currentA}');
+    check(
+      slowReading.currentA < reading.currentA - 50 && slowReading.currentA > 100,
+      'slower wire, less current, got ${slowReading.currentA}'
+    );
     near(slowReading.voltageV, 20.0, "the voltage follows the setpoint", 1e-9);
     var lifted = new WeldArcModel(config());
     var liftedReading = hold(lifted, work, 0.004, true, 0.3, 8.0, 24.0);
@@ -202,9 +283,15 @@ class WeldTests {
     near(hold(capped, work, 0.0, true, 0.3, 8.0, 24.0).currentA, 200.0, "the supply's rating caps the current", 1e-9);
     var thin = new WeldArcModel(config(350, 0.88, 0.8));
     var thinReading = hold(thin, work, 0.0, true, 0.3, 8.0, 24.0);
-    check(thinReading.currentA < reading.currentA, 'thinner wire burns off at less current, got ${thinReading.currentA}');
+    check(
+      thinReading.currentA < reading.currentA,
+      'thinner wire burns off at less current, got ${thinReading.currentA}'
+    );
     var long = new WeldArcModel(config(350, 0.88, 1.2, 25));
-    check(hold(long, work, 0.0, true, 0.3, 8.0, 24.0).currentA < reading.currentA, "a longer stickout burns off at less current");
+    check(
+      hold(long, work, 0.0, true, 0.3, 8.0, 24.0).currentA < reading.currentA,
+      "a longer stickout burns off at less current"
+    );
     near(new WeldArcModel(config()).currentFor(0.0), 0.0, "no wire, no current", 0);
   }
 
@@ -216,7 +303,10 @@ class WeldTests {
     reading = hold(model, work, 0.006, true, 0.1);
     check(reading.arc, "the arc stretches to 9 mm and holds");
     reading = hold(model, work, 0.012, true, 0.05);
-    check(!reading.arc && reading.fault == WeldFault.ArcLost && reading.currentA == 0.0, "the arc is lost past the longest arc length");
+    check(
+      !reading.arc && reading.fault == WeldFault.ArcLost && reading.currentA == 0.0,
+      "the arc is lost past the longest arc length"
+    );
     reading = hold(model, work, 0.0, true, 0.5);
     check(!reading.arc && reading.fault == WeldFault.ArcLost, "the fault holds while the arc is still commanded");
     reading = hold(model, work, 0.002, false, 0.05);
@@ -229,9 +319,15 @@ class WeldTests {
     var work = plate();
     var model = new WeldArcModel(config());
     var reading = step(model, work, 0.0002, false, 0.0, 24.0);
-    check(reading.touch && !reading.arc && reading.voltageV == 0.0, "the wire on the work closes the touch and collapses the sensing voltage");
+    check(
+      reading.touch && !reading.arc && reading.voltageV == 0.0,
+      "the wire on the work closes the touch and collapses the sensing voltage"
+    );
     reading = step(model, work, 0.01, false, 0.0, 24.0);
-    check(!reading.touch && reading.voltageV == WeldArcModel.SENSE_VOLTAGE, "10 mm off the work the circuit is open at the sensing voltage");
+    check(
+      !reading.touch && reading.voltageV == WeldArcModel.SENSE_VOLTAGE,
+      "10 mm off the work the circuit is open at the sensing voltage"
+    );
     reading = step(model, work, -0.002, false, 0.0, 24.0);
     check(reading.touch, "a wire pressed into the work touches it");
     reading = step(model, work, 0.0002, false, 0.0, 24.0, false);
@@ -254,7 +350,10 @@ class WeldTests {
     check(reading.fault == WeldFault.NoArc && !reading.arc, "no arc within the timeout is a fault");
     check(WeldSensor.faultMessage(reading.fault) != null, "the fault has words");
     reading = hold(model, work, 0.0, true, 0.5);
-    check(!reading.arc && reading.fault == WeldFault.NoArc, "the fault keeps the arc off, though the wire is at the work now");
+    check(
+      !reading.arc && reading.fault == WeldFault.NoArc,
+      "the fault keeps the arc off, though the wire is at the work now"
+    );
     reading = hold(model, work, 0.0, false, 0.02);
     check(reading.fault == 0, "arc off clears it");
     reading = hold(model, work, 0.0, true, 0.3);
@@ -267,7 +366,12 @@ class WeldTests {
       var model = new WeldArcModel(config(350, efficiency));
       var reading = hold(model, work, 0.003, true, 0.3, 8.0, 24.0);
       check(reading.arc, "the arc burns");
-      near(reading.powerW, reading.currentA * reading.voltageV / efficiency, "the mains power is I·U/η at η = " + efficiency, 1e-6);
+      near(
+        reading.powerW,
+        reading.currentA * reading.voltageV / efficiency,
+        "the mains power is I·U/η at η = " + efficiency,
+        1e-6
+      );
     }
     var idle = new WeldArcModel(config());
     near(hold(idle, work, 0.05, true, 0.2).powerW, 0.0, "no arc draws no arc power", 0);
@@ -287,7 +391,10 @@ class WeldTests {
     var stuck = new WeldArcModel(config());
     hold(stuck, work, 0.0, true, 0.3);
     reading = step(stuck, work, 0.0, false, 8.0);
-    check(!reading.arc && reading.fault == WeldFault.WireStuck && reading.touch, "arc off with the wire feeding on the work sticks the wire");
+    check(
+      !reading.arc && reading.fault == WeldFault.WireStuck && reading.touch,
+      "arc off with the wire feeding on the work sticks the wire"
+    );
     reading = step(stuck, work, 0.0, false, 0.0);
     check(reading.fault == WeldFault.WireStuck, "it stays stuck while the torch is on the work");
     reading = step(stuck, work, 0.02, false, 0.0);
@@ -311,7 +418,10 @@ class WeldTests {
   }
 
   static function testChannelsGoSafeOnStop():Void {
-    check(!WeldChannelPolicy.ARC_KEEPS_ON_STOP, "the arc channel does not keep its output through a stop: it goes safe, off");
+    check(
+      !WeldChannelPolicy.ARC_KEEPS_ON_STOP,
+      "the arc channel does not keep its output through a stop: it goes safe, off"
+    );
     check(!WeldChannelPolicy.WIRE_SPEED_KEEPS_ON_STOP, "the wire stops on a stop");
     check(WeldChannelPolicy.VOLTAGE_KEEPS_ON_STOP, "the voltage setpoint is kept");
     // The model has no output of its own: with the arc channel back at its safe value the arc is off.
@@ -319,7 +429,10 @@ class WeldTests {
     var model = new WeldArcModel(config());
     hold(model, work, 0.002, true, 0.3);
     var reading = step(model, work, 0.002, false, 0.0);
-    check(!reading.arc && reading.fault == 0 && reading.currentA == 0.0, "the arc goes out when its channel returns to off");
+    check(
+      !reading.arc && reading.fault == 0 && reading.currentA == 0.0,
+      "the arc goes out when its channel returns to off"
+    );
   }
 
   static function testSensorFrame():Void {
@@ -328,17 +441,49 @@ class WeldTests {
     var reading = hold(model, work, 0.003, true, 0.3);
     var values = WeldSensor.values(reading);
     check(values.length == WeldSensor.COUNT && WeldSensor.valid(values), "a reading is a valid six-value frame");
-    check(values[WeldSensor.ARC] == 1.0 && values[WeldSensor.CURRENT] == reading.currentA &&
-      values[WeldSensor.VOLTAGE] == reading.voltageV && values[WeldSensor.POWER] == reading.powerW, "the values are in the documented order");
+    check(
+      values[WeldSensor.ARC] == 1.0 && values[WeldSensor.CURRENT] == reading.currentA
+      && values[WeldSensor.VOLTAGE] == reading.voltageV && values[WeldSensor.POWER] == reading.powerW,
+      "the values are in the documented order"
+    );
     var back = WeldSensor.reading(values);
-    check(back.arc && back.currentA == reading.currentA && back.fault == 0 && !back.touch, "a frame reads back as the reading");
-    check(!WeldSensor.valid([1.0, 0.0]) && !WeldSensor.valid([2.0, 0, 0, 0, 0, 0]) && !WeldSensor.valid([0.0, -1, 0, 0, 0, 0]) &&
-      !WeldSensor.valid([0.0, 0, 0, 0, 7, 0]), "malformed frames are refused");
+    check(
+      back.arc && back.currentA == reading.currentA && back.fault == 0 && !back.touch,
+      "a frame reads back as the reading"
+    );
+    check(
+      !WeldSensor.valid([1.0, 0.0]) && !WeldSensor.valid([2.0, 0, 0, 0, 0, 0]) && !WeldSensor.valid([
+        0.0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ]) && !WeldSensor.valid([
+        0.0,
+        0,
+        0,
+        0,
+        7,
+        0
+      ]),
+      "malformed frames are refused"
+    );
   }
 
   /** A 100 mm seam along +X on the plate's top (z = 0) against an upright's face that looks toward -Y. */
-  static function seam(?wire:Float = 1.2):WeldBead
-    return new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], wire, EFFICIENCY);
+  static function seam(?wire:Float = 1.2):WeldBead return new WeldBead(
+    [0.0, 0.0, 0.0],
+    [0.1, 0.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    wire,
+    EFFICIENCY
+  );
 
   /** The tip travels the seam from `from` to `to` (metres along it) at `speed` m/s, wire at `wire` m/min, in 1 ms steps. */
   static function travel(bead:WeldBead, from:Float, to:Float, speed:Float, wire:Float, ?arc:Bool = true):Void {
@@ -354,7 +499,12 @@ class WeldTests {
     // 8 m/min of 1.2 mm wire at 11.46 mm/s deposits an equal-leg fillet of 5 mm.
     var area = (8.0 / 60.0 * 1000.0) * (Math.PI * 0.6 * 0.6) * EFFICIENCY / (0.01146 * 1000.0);
     travel(bead, 0.0, 0.1, 0.01146, 8.0);
-    near(bead.meanLeg(0.1, 0.9) * 1000.0, Math.sqrt(2.0 * area), "the leg is the deposition rate over travel speed", 0.02);
+    near(
+      bead.meanLeg(0.1, 0.9) * 1000.0,
+      Math.sqrt(2.0 * area),
+      "the leg is the deposition rate over travel speed",
+      0.02
+    );
     near(bead.meanLeg(0.1, 0.9) * 1000.0, 5.0, "a fillet of 5 mm legs", 0.02);
     check(bead.gaps() == 0 && bead.covered() == 100, "the bead covers the seam without a gap");
     near(bead.extent(), 0.1, "and is as long as the seam", 1e-9);
@@ -363,11 +513,17 @@ class WeldTests {
     // Twice the wire speed at the same travel speed deposits twice the section: the leg grows with its root.
     var rich = seam();
     travel(rich, 0.0, 0.1, 0.01146, 16.0);
-    near(rich.meanLeg(0.1, 0.9) / bead.meanLeg(0.1, 0.9), Math.sqrt(2.0), "twice the section is root two the leg", 1e-3);
+    near(rich.meanLeg(0.1,
+      0.9) / bead.meanLeg(0.1, 0.9), Math.sqrt(2.0), "twice the section is root two the leg", 1e-3);
     // Twice the travel speed halves it.
     var quick = seam();
     travel(quick, 0.0, 0.1, 0.02292, 8.0);
-    near(bead.meanLeg(0.1, 0.9) / quick.meanLeg(0.1, 0.9), Math.sqrt(2.0), "twice the travel speed is root two less leg", 1e-3);
+    near(
+      bead.meanLeg(0.1, 0.9) / quick.meanLeg(0.1, 0.9),
+      Math.sqrt(2.0),
+      "twice the travel speed is root two less leg",
+      1e-3
+    );
     // A thicker wire melts more metal at the same wire speed.
     var thick = seam(1.6);
     travel(thick, 0.0, 0.1, 0.01146, 8.0);
@@ -388,7 +544,10 @@ class WeldTests {
     // Standing still piles the metal into one station.
     var pile = seam();
     for (i in 0...300) pile.step(0.001, true, 8.0, [0.05, 0.0, 0.0]);
-    check(pile.covered() == 1 && pile.leg(50) > 0.008, "standing still piles the metal into one station, a crater's blob");
+    check(
+      pile.covered() == 1 && pile.leg(50) > 0.008,
+      "standing still piles the metal into one station, a crater's blob"
+    );
     // Past the end by less than the overrun, the metal lands in the end station.
     var end = seam();
     end.step(0.1, true, 8.0, [0.102, 0.0, 0.0]);
@@ -409,7 +568,10 @@ class WeldTests {
     near(twice, 10, "the restart overlaps by the 10 mm it backed up", 1);
     check(bead.leg(55) > bead.leg(20) * 1.3, "the overlap carries both runs' metal, a hump of root two the leg");
     var changed = bead.takeChanges();
-    check(changed != null && changed.first >= 49 && changed.first <= 51 && changed.last == 99, "what grew is reported once");
+    check(
+      changed != null && changed.first >= 49 && changed.first <= 51 && changed.last == 99,
+      "what grew is reported once"
+    );
     check(bead.takeChanges() == null, "and not again");
     // A restart that skips a stretch leaves the gap showing.
     var gappy = seam();
@@ -421,10 +583,27 @@ class WeldTests {
   }
 
   static function testWeldPlan():Void {
-    var parameters:WeldParameters = {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.15,
-      craterDwell: 0.15, burnback: 0.1};
-    var plan = WeldPlan.straight(new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
-      new Transform3(new Vec3(0.1, 0.5, 0.0), Quat.identity()), parameters);
+    var parameters:WeldParameters = {
+      wireSpeed: 8.0,
+      voltage: 24.0,
+      travelSpeed: 0.0115,
+      approach: 0.04,
+      startDwell: 0.15,
+      craterDwell: 0.15,
+      burnback: 0.1
+    };
+    var plan = WeldPlan.straight(
+      new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
+      new Transform3(
+        new Vec3(
+          0.1,
+          0.5,
+          0.0
+        ),
+        Quat.identity()
+      ),
+      parameters
+    );
     near(plan.length(), 0.5, "a plan's length is the seam's", 1e-12);
     check(plan.segments.length == 1, "a straight seam is a path of one segment");
     // In a frame turned a quarter about Z and shifted 1 m along X, the start (0.1, 0, 0) lands at (1, 0.1, 0), the stop
@@ -441,22 +620,67 @@ class WeldTests {
     try WeldPlan.straight(plan.start(), plan.start(), parameters) catch (_:Dynamic) failed = true;
     check(failed, "a plan needs a seam with a length");
     failed = false;
-    try WeldPlan.straight(plan.start(), plan.stop(), {wireSpeed: 0.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
-      craterDwell: 0.0, burnback: 0.0}) catch (_:Dynamic) failed = true;
+    try WeldPlan.straight(
+      plan.start(),
+      plan.stop(),
+      {
+        wireSpeed: 0.0,
+        voltage: 24.0,
+        travelSpeed: 0.0115,
+        approach: 0.04,
+        startDwell: 0.0,
+        craterDwell: 0.0,
+        burnback: 0.0
+      }
+    ) catch (_:Dynamic) failed = true;
     check(failed, "a plan needs a wire speed");
     failed = false;
-    try WeldPlan.straight(plan.start(), plan.stop(), {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.0115, approach: 0.04, startDwell: 0.0,
-      craterDwell: 0.0, burnback: 0.0}) catch (_:Dynamic) failed = true;
+    try WeldPlan.straight(
+      plan.start(),
+      plan.stop(),
+      {
+        wireSpeed: 8.0,
+        voltage: 24.0,
+        travelSpeed: 0.0115,
+        approach: 0.04,
+        startDwell: 0.0,
+        craterDwell: 0.0,
+        burnback: 0.0
+      }
+    ) catch (_:Dynamic) failed = true;
     check(failed, "a plan needs a burnback, or the wire sticks in the pool");
     // A chain: along +Y, then a corner and along -X (the torch turns a quarter about Z at the corner).
     var turned = new Transform3(new Vec3(0.1, 0.5, 0.0), quarter);
-    var chain = new WeldPlan([new WeldSegment(plan.start(), plan.stop()), new WeldSegment(turned, new Transform3(new Vec3(-0.1, 0.5, 0.0), quarter))],
-      parameters);
+    var chain = new WeldPlan(
+      [
+        new WeldSegment(plan.start(), plan.stop()),
+        new WeldSegment(
+          turned,
+          new Transform3(
+            new Vec3(
+              -0.1,
+              0.5,
+              0.0
+            ),
+            quarter
+          )
+        )
+      ],
+      parameters
+    );
     near(chain.length(), 0.7, "a chain's length is the sum of its segments", 1e-12);
     near(chain.stop().translation.x, -0.1, "a chain ends where its last segment does", 1e-12);
-    near(chain.transformed(new Transform3(new Vec3(1.0, 0.0, 0.0), quarter)).segments[1].start.translation.x, 0.5, "every segment moves with the frame", 1e-12);
+    near(
+      chain.transformed(new Transform3(new Vec3(1.0, 0.0, 0.0), quarter)).segments[1].start.translation.x,
+      0.5,
+      "every segment moves with the frame",
+      1e-12
+    );
     failed = false;
-    try new WeldPlan([new WeldSegment(plan.start(), plan.stop()), new WeldSegment(plan.start(), plan.stop())], parameters) catch (_:Dynamic) failed = true;
+    try new WeldPlan(
+      [new WeldSegment(plan.start(), plan.stop()), new WeldSegment(plan.start(), plan.stop())],
+      parameters
+    ) catch (_:Dynamic) failed = true;
     check(failed, "a path's segments must join end to start");
   }
 
@@ -466,9 +690,42 @@ class WeldTests {
    * corner goes to the first seam, and metal put down away from both is stray.
    */
   static function testPathBead():Void {
-    var path = new WeldPathBead([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]], [[0.1, 0.0, 0.0], [0.1, 0.06, 0.0]],
-      [[[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]]], 1.2, EFFICIENCY);
-    check(path.beads.length == 2 && path.beads[0].count == 100 && path.beads[1].count == 60, "a path bead has a bead per segment");
+    var path = new WeldPathBead(
+      [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]],
+      [[0.1, 0.0, 0.0], [0.1, 0.06, 0.0]],
+      [
+        [
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            -1.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0
+          ]
+        ]
+      ],
+      1.2,
+      EFFICIENCY
+    );
+    check(
+      path.beads.length == 2 && path.beads[0].count == 100 && path.beads[1].count == 60,
+      "a path bead has a bead per segment"
+    );
     near(path.length(), 0.16, "its length is the segments' together", 1e-12);
     // 8 m/min at 11.46 mm/s lays a 5 mm leg; the tip travels 100 mm, then 60 mm, 1 ms steps.
     var speed = 0.01146;
@@ -484,9 +741,13 @@ class WeldTests {
     }
     near(path.beads[0].meanLeg(0.1, 0.9), 0.005, "the first seam gets its leg", 2e-4);
     near(path.beads[1].meanLeg(0.1, 0.9), 0.005, "so does the second", 2e-4);
-    check(path.gaps() == 0 && path.covered() == 160, "the path has metal along all of it, covering " + path.covered() + " stations");
+    check(
+      path.gaps() == 0 && path.covered() == 160,
+      "the path has metal along all of it, covering " + path.covered() + " stations"
+    );
     check(path.stray < 0.02 * path.deposited, "and little went elsewhere");
-    near(path.deposited, path.beads[0].deposited + path.beads[1].deposited, "the deposit is the beads' together", 1e-15);
+    near(path.deposited,
+      path.beads[0].deposited + path.beads[1].deposited, "the deposit is the beads' together", 1e-15);
     // Metal put down 3 cm off the second seam is stray.
     var before = path.stray;
     path.step(0.001, true, 8.0, [0.13, 0.03, 0.0]);
@@ -507,7 +768,14 @@ class WeldTests {
   static function testLegFollowsTravelSpeed():Void {
     var wireSpeed = 8.0, diameter = 1.2, length = 0.1;
     function weld(speed:Float, efficiency:Float):WeldBead {
-      var bead = new WeldBead([0.0, 0.0, 0.0], [length, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], diameter, efficiency);
+      var bead = new WeldBead(
+        [0.0, 0.0, 0.0],
+        [length, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, -1.0, 0.0],
+        diameter,
+        efficiency
+      );
       var steps = Math.round(length / speed / 0.001);
       for (i in 0...steps) bead.step(0.001, true, wireSpeed, [length * (i + 0.5) / steps, 0.0, 0.0]);
       return bead;
@@ -516,7 +784,12 @@ class WeldTests {
     near(reference, 0.005, "at the recipe's speed the leg is the one asked for", 1.5e-4);
     for (factor in [0.5, 2.0, 0.25]) {
       var leg = weld(0.01146 * factor, EFFICIENCY).meanLeg(0.1, 0.9);
-      near(leg / reference, Math.sqrt(1.0 / factor), 'at ${factor} of the speed the leg is ${Math.sqrt(1.0 / factor)} of the reference', 2e-3);
+      near(
+        leg / reference,
+        Math.sqrt(1.0 / factor),
+        'at ${factor} of the speed the leg is ${Math.sqrt(1.0 / factor)} of the reference',
+        2e-3
+      );
     }
     // Metal balance: the volume in the bead is the wire fed over the time it took, times the efficiency.
     for (speed in [0.005, 0.01146, 0.02]) {
@@ -525,21 +798,38 @@ class WeldTests {
       near(bead.deposited / (fed * EFFICIENCY), 1.0, "the bead holds the wire fed times its efficiency", 2e-3);
     }
     // A wire that deposits less lays a smaller leg, by the root of the ratio.
-    near(weld(0.01146, 0.8).meanLeg(0.1, 0.9) / reference, Math.sqrt(0.8 / EFFICIENCY), "a wire of another efficiency lays another leg", 2e-3);
+    near(
+      weld(0.01146, 0.8).meanLeg(0.1, 0.9) / reference,
+      Math.sqrt(0.8 / EFFICIENCY),
+      "a wire of another efficiency lays another leg",
+      2e-3
+    );
   }
 
   static function testBeadFaces():Void {
     // Faces at 120 degrees (an obtuse T-joint corner): the legs run along each face, away from the corner.
     var s = Math.sqrt(0.75);
     var bead = new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -s, 0.5], 1.2, EFFICIENCY);
-    near(bead.legA[0] * bead.normalA[0] + bead.legA[1] * bead.normalA[1] + bead.legA[2] * bead.normalA[2], 0.0, "leg A lies in face A", 1e-12);
-    near(bead.legB[0] * bead.normalB[0] + bead.legB[1] * bead.normalB[1] + bead.legB[2] * bead.normalB[2], 0.0, "leg B lies in face B", 1e-12);
+    near(
+      bead.legA[0] * bead.normalA[0] + bead.legA[1] * bead.normalA[1] + bead.legA[2] * bead.normalA[2],
+      0.0,
+      "leg A lies in face A",
+      1e-12
+    );
+    near(
+      bead.legB[0] * bead.normalB[0] + bead.legB[1] * bead.normalB[1] + bead.legB[2] * bead.normalB[2],
+      0.0,
+      "leg B lies in face B",
+      1e-12
+    );
     check(bead.legA[1] < 0 && bead.legB[2] > 0, "each leg leaves the corner toward the open side");
     var failed = false;
-    try new WeldBead([0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -2.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
+    try new WeldBead([0.0,
+      0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -2.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
     check(failed, "opposed faces have no corner to fill");
     failed = false;
-    try new WeldBead([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
+    try new WeldBead([0.0,
+      0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0], 1.2, EFFICIENCY) catch (_:Dynamic) failed = true;
     check(failed, "a seam needs a length");
   }
 

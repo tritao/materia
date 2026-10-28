@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Requested RKF1 outbound family and maximum delivery rate. Zero is unlimited. */
-@:wire
-class StreamSubscription {
+@:wire class StreamSubscription {
   @:id(1) public var family:String;
   @:id(2) public var maxRateHz:Float;
 

@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Renews one controller's lease without relying on synchronized clocks. */
-@:wire
-class ControlHeartbeat {
+@:wire class ControlHeartbeat {
   @:id(1) public var robotId:haxe.Int64;
   @:id(2) public var leaseId:haxe.Int64;
 

@@ -26,15 +26,20 @@ class RobotKinematics {
     var bodies = new Map<String, Int>();
     for (link in robot.links) if (link != null) bodies.set(link.id, builder.addBody(link.id));
     for (joint in robot.joints) if (joint != null) addJoint(builder, joint, bodies);
-    for (coupling in robot.couplings) builder.couple(coupling.follower, coupling.leader, coupling.ratio, coupling.offset);
+    for (coupling in robot.couplings) builder.couple(
+      coupling.follower,
+      coupling.leader,
+      coupling.ratio,
+      coupling.offset
+    );
     addFrames(builder, robot, bodies);
     return builder.build();
   }
 
   /** Sensor positions at the scalar RobotModel boundary, converted once into full DOF state. */
   public static function observedState(robot:RobotModel, positions:Array<Float>):kinematicskit.KinematicState {
-    if (positions == null || positions.length != robot.joints.length)
-      throw "Robot observations need one scalar position per model joint";
+    if (positions == null
+      || positions.length != robot.joints.length) throw "Robot observations need one scalar position per model joint";
     for (position in positions) if (!Math.isFinite(position)) throw "Robot joint observations must be finite";
     var model = compile(robot);
     return new kinematicskit.KinematicState(model, [for (dof in 0...model.dofCount()) positions[model.dofJoint[dof]]]);
@@ -45,8 +50,19 @@ class RobotKinematics {
     return new Transform(t.x, t.y, t.z, r.x, r.y, r.z, r.w);
   }
 
-  public static function toTransform3(value:Transform):Transform3
-    return new Transform3(new Vec3(value.x, value.y, value.z), new Quat(value.qx, value.qy, value.qz, value.qw));
+  public static function toTransform3(value:Transform):Transform3 return new Transform3(
+    new Vec3(
+      value.x,
+      value.y,
+      value.z
+    ),
+    new Quat(
+      value.qx,
+      value.qy,
+      value.qz,
+      value.qw
+    )
+  );
 
   static function addJoint(builder:KinematicModelBuilder, joint:Joint, bodies:Map<String, Int>):Void {
     var parent = joint.parent == null ? null : bodies.get(joint.parent.id);
@@ -63,8 +79,19 @@ class RobotKinematics {
         var continuous = joint.type == JointType.Continuous;
         // `lower >= upper` is the model's convention for an unbounded joint (see JointGroup).
         var limited = !continuous && joint.limits != null && joint.limits.lower < joint.limits.upper;
-        builder.addJoint(joint.id, kind, parent, child, parentTJoint, jointTChild, axis,
-          limited ? joint.limits.lower : null, limited ? joint.limits.upper : null, 0.0, continuous);
+        builder.addJoint(
+          joint.id,
+          kind,
+          parent,
+          child,
+          parentTJoint,
+          jointTChild,
+          axis,
+          limited ? joint.limits.lower : null,
+          limited ? joint.limits.upper : null,
+          0.0,
+          continuous
+        );
       case other:
         throw 'Joint "${joint.id}" has unsupported kinematic chain type "$other"';
     }
@@ -78,16 +105,18 @@ class RobotKinematics {
   }
 
   /** Same arithmetic as `Transform3.fromArrays`, whose `Quat` normalizes its input. */
-  static function transform(position:Array<Float>, rotation:Array<Float>):Transform
-    return toTransform(Transform3.fromArrays(position, rotation));
+  static function transform(position:Array<Float>,
+    rotation:Array<Float>):Transform return toTransform(Transform3.fromArrays(
+      position,
+      rotation
+    ));
 
   static function unitAxis(joint:Joint):Vector3 {
-    if (joint.axis == null || joint.axis.length != 3)
-      throw 'Joint "${joint.id}" has an invalid motion axis';
+    if (joint.axis == null || joint.axis.length != 3) throw 'Joint "${joint.id}" has an invalid motion axis';
     var x = joint.axis[0], y = joint.axis[1], z = joint.axis[2];
     var norm = Math.sqrt(x * x + y * y + z * z);
-    if (!Math.isFinite(norm) || Math.abs(norm - 1.0) > 1e-6)
-      throw 'Joint "${joint.id}" motion axis must be unit length';
+    if (!Math.isFinite(norm)
+      || Math.abs(norm - 1.0) > 1e-6) throw 'Joint "${joint.id}" motion axis must be unit length';
     return new Vector3(x, y, z);
   }
 }

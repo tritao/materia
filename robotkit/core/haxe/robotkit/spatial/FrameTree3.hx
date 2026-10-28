@@ -10,13 +10,14 @@ package robotkit.spatial;
 class FrameTree3 {
   final transforms:Array<FrameTransform3> = [];
 
-  public function new() {}
+  public function new() {
+  }
 
   /** Adds one parent-child edge; each child may have only one parent. */
   public function add(edge:FrameTransform3):Void {
     if (edge == null) throw "Frame tree cannot add a null transform";
-    for (value in transforms) if (value.childFrame == edge.childFrame)
-      throw 'Frame "${edge.childFrame}" already has a parent';
+    for (value in transforms) if (value.childFrame
+      == edge.childFrame) throw 'Frame "${edge.childFrame}" already has a parent';
     transforms.push(edge);
     var path:Array<String> = [];
     var current = edge.childFrame;
@@ -38,14 +39,12 @@ class FrameTree3 {
 
   /** Returns `target_T_source`: the source frame pose expressed in target coordinates. */
   public function lookup(targetFrame:String, sourceFrame:String):Transform3 {
-    if (targetFrame == null || targetFrame.length == 0 ||
-        sourceFrame == null || sourceFrame.length == 0)
-      throw "Frame lookup requires non-empty frame IDs";
+    if (targetFrame == null || targetFrame.length == 0
+      || sourceFrame == null || sourceFrame.length == 0) throw "Frame lookup requires non-empty frame IDs";
     if (targetFrame == sourceFrame) return Transform3.identity();
     var source = rootTransform(sourceFrame);
     var target = rootTransform(targetFrame);
-    if (source.root != target.root)
-      throw 'Frames "$targetFrame" and "$sourceFrame" are disconnected';
+    if (source.root != target.root) throw 'Frames "$targetFrame" and "$sourceFrame" are disconnected';
     return target.transform.inverse().compose(source.transform);
   }
 
@@ -56,8 +55,7 @@ class FrameTree3 {
     var rootFromFrame = Transform3.identity();
     var visited:Array<String> = [];
     while (true) {
-      if (visited.indexOf(current) >= 0)
-        throw "Frame tree contains a cycle";
+      if (visited.indexOf(current) >= 0) throw "Frame tree contains a cycle";
       visited.push(current);
       var edge:Null<FrameTransform3> = null;
       for (value in transforms) if (value.childFrame == current) {

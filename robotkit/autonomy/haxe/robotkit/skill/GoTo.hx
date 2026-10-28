@@ -26,13 +26,16 @@ class GoTo implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var blockedSeconds:Float = 0.0;
 
-  public function new(navigator:Navigator, goal:NavigationGoal,
-      observePerception:RobotSnapshot -> PerceptionSnapshot,
-      ?blockedTimeoutSeconds:Float = 10.0) {
-    if (navigator == null || goal == null || observePerception == null)
-      throw "GoTo requires a Navigator, goal, and robot observation processor";
-    if (!Math.isFinite(blockedTimeoutSeconds) || blockedTimeoutSeconds < 0.0)
-      throw "GoTo blocked timeout must be finite and non-negative";
+  public function new(
+    navigator:Navigator,
+    goal:NavigationGoal,
+    observePerception:RobotSnapshot -> PerceptionSnapshot,
+    ?blockedTimeoutSeconds:Float = 10.0
+  ) {
+    if (navigator == null || goal == null
+      || observePerception == null) throw "GoTo requires a Navigator, goal, and robot observation processor";
+    if (!Math.isFinite(blockedTimeoutSeconds)
+      || blockedTimeoutSeconds < 0.0) throw "GoTo blocked timeout must be finite and non-negative";
     this.navigator = navigator;
     this.goal = goal;
     this.observePerception = observePerception;
@@ -42,12 +45,10 @@ class GoTo implements Skill {
   public function start():Void {
     lifecycle.begin();
     blockedSeconds = 0.0;
-    try sync(navigator.navigateTo(goal), 0.0)
-    catch (error:Dynamic) failAndStop(Std.string(error));
+    try sync(navigator.navigateTo(goal), 0.0) catch (error:Dynamic) failAndStop(Std.string(error));
   }
 
-  public function update(snapshot:RobotSnapshot,
-      durationSeconds:Float):SkillStatus {
+  public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
     if (!lifecycle.isRunning()) return lifecycle.status();
     if (snapshot == null || !Math.isFinite(durationSeconds) || durationSeconds <= 0.0) {
       failAndStop("GoTo update requires a robot snapshot and positive finite duration");
@@ -73,19 +74,24 @@ class GoTo implements Skill {
   public function result():Null<SkillResult> return lifecycle.result();
 
   function sync(value:NavigatorStatus, elapsedSeconds:Float):Void switch value {
-    case Idle: failAndStop("Navigator returned to idle");
-    case Navigating: blockedSeconds = 0.0;
+    case Idle:
+      failAndStop("Navigator returned to idle");
+    case Navigating:
+      blockedSeconds = 0.0;
     case Blocked(reason):
       blockedSeconds += elapsedSeconds;
-      if (blockedSeconds > blockedTimeoutSeconds)
-        failAndStop('GoTo remained blocked beyond its timeout: $reason');
-    case Succeeded: lifecycle.succeed("goal reached");
-    case Cancelled: lifecycle.cancel();
-    case Failed(message): failAndStop(message);
+      if (blockedSeconds > blockedTimeoutSeconds) failAndStop('GoTo remained blocked beyond its timeout: $reason');
+    case Succeeded:
+      lifecycle.succeed("goal reached");
+    case Cancelled:
+      lifecycle.cancel();
+    case Failed(message):
+      failAndStop(message);
   }
 
   function failAndStop(message:String):Void {
-    try navigator.cancel() catch (_:Dynamic) {}
+    try navigator.cancel() catch (_:Dynamic) {
+    }
     lifecycle.fail(message == null || message.length == 0 ? "GoTo failed" : message);
   }
 }

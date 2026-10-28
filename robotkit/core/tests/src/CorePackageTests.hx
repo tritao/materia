@@ -22,8 +22,8 @@ class CorePackageTests {
     var blueprint = RobotRuntimeCompiler.compile(decoded, new RobotProfile());
     var runtime = RobotRuntime.create(blueprint);
     var capabilities = runtime.capabilities("core-only");
-    if (capabilities.jointCount != 1 || !capabilities.execution.plans)
-      throw "Core-only runtime did not retain joint and execution contracts";
+    if (capabilities.jointCount != 1
+      || !capabilities.execution.plans) throw "Core-only runtime did not retain joint and execution contracts";
     runtime.dispose();
     Sys.println("RobotKit core-only package test passed");
   }

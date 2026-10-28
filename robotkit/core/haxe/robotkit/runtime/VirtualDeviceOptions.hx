@@ -29,5 +29,6 @@ class VirtualDeviceOptions {
   public var clockBoundNs:Int64 = Int64.ofInt(5000000);
   public var linkLossTimeoutNs:Int64 = Int64.ofInt(500000000);
 
-  public function new() {}
+  public function new() {
+  }
 }

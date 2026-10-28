@@ -9,14 +9,13 @@ package robotkit.runtime;
 class RobotSnapshotMailbox {
   var current:Null<RobotSnapshot> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function publish(snapshot:RobotSnapshot):Void {
-    if (snapshot == null)
-      throw "RobotSnapshot mailbox cannot publish null";
+    if (snapshot == null) throw "RobotSnapshot mailbox cannot publish null";
     current = snapshot;
   }
 
-  public function latest():Null<RobotSnapshot>
-    return current;
+  public function latest():Null<RobotSnapshot> return current;
 }

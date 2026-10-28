@@ -12,8 +12,7 @@ import haxeon.platform.NativeTransport;
 /** The sole outbound RKF1 family classification. New families register here. */
 class OutboundPolicy {
   public static function capabilities():Array<String> {
-    return [OutboundFamily.Essential, OutboundFamily.Sensor, OutboundFamily.Camera,
-      OutboundFamily.Observation];
+    return [OutboundFamily.Essential, OutboundFamily.Sensor, OutboundFamily.Camera, OutboundFamily.Observation];
   }
 
   public static function family(messageType:Int):OutboundFamily {
@@ -62,9 +61,8 @@ class OutboundScheduler {
     var capacity = Int64.toInt(NativeTransport.sendQueue(transport).capacity);
     capacityBytes = capacity;
     this.budgetBytes = budgetBytes == 0 ? Std.int(capacity / 2) : budgetBytes;
-    if (capacity <= MIN_ESSENTIAL_RESERVE || this.budgetBytes <= 0 ||
-        this.budgetBytes > capacity - MIN_ESSENTIAL_RESERVE)
-      throw "bulk send budget must leave the minimum essential reserve";
+    if (capacity <= MIN_ESSENTIAL_RESERVE || this.budgetBytes <= 0 || this.budgetBytes
+      > capacity - MIN_ESSENTIAL_RESERVE) throw "bulk send budget must leave the minimum essential reserve";
   }
 
   public function dropCount(family:OutboundFamily):Int {
@@ -75,11 +73,13 @@ class OutboundScheduler {
   public function configure(subscriptions:Array<StreamSubscription>):Void {
     var validated:Map<String, Float> = new Map<String, Float>();
     if (subscriptions != null) for (item in subscriptions) {
-      if (item == null || item.maxRateHz < 0 || !Math.isFinite(item.maxRateHz))
-        throw "invalid RKF1 stream subscription";
-      if (item.family == OutboundFamily.Essential || item.family == OutboundFamily.Sensor ||
-          item.family == OutboundFamily.Camera || item.family == OutboundFamily.Observation)
-        validated.set(item.family, item.maxRateHz);
+      if (item == null
+        || item.maxRateHz < 0 || !Math.isFinite(item.maxRateHz)) throw "invalid RKF1 stream subscription";
+      if (item.family == OutboundFamily.Essential || item.family == OutboundFamily.Sensor
+        || item.family == OutboundFamily.Camera || item.family == OutboundFamily.Observation) validated.set(
+          item.family,
+          item.maxRateHz
+        );
     }
     rates.clear();
     lastOfferNs.clear();
@@ -103,8 +103,7 @@ class OutboundScheduler {
   }
 
   /** Records each sensor sequence even when filtered, so old frames are not retried. */
-  public function shouldOffer(family:OutboundFamily, sensorId:String, sequence:Int64,
-      nowNs:Int64):Bool {
+  public function shouldOffer(family:OutboundFamily, sensorId:String, sequence:Int64, nowNs:Int64):Bool {
     var key = family + ":" + sensorId;
     if (!accepts(family, sensorId, sequence)) return false;
     if (!subscribed(family)) {
@@ -115,8 +114,7 @@ class OutboundScheduler {
     if (rate != null && rate > 0) {
       var previous = lastOfferNs.get(key);
       var interval = 1000000000.0 / rate;
-      if (!slots.exists(key) && previous != null &&
-          Int64.toFloat(Int64.sub(nowNs, previous)) < interval) {
+      if (!slots.exists(key) && previous != null && Int64.toFloat(Int64.sub(nowNs, previous)) < interval) {
         rememberSequence(key, sequence);
         return false;
       }
@@ -145,15 +143,12 @@ class OutboundScheduler {
     lastSequence.set(key, sequence);
   }
 
-  public function offer(family:OutboundFamily, sensorId:String, sequence:Int64,
-      frame:RobotFrame):Void {
-    if (OutboundPolicy.family(frame.messageType) != family)
-      throw "outbound frame family does not match its policy";
+  public function offer(family:OutboundFamily, sensorId:String, sequence:Int64, frame:RobotFrame):Void {
+    if (OutboundPolicy.family(frame.messageType) != family) throw "outbound frame family does not match its policy";
     if (family == OutboundFamily.Essential) throw "essential frames cannot enter bulk scheduler";
     var key = family + ":" + sensorId;
     if (!accepts(family, sensorId, sequence)) return;
-    var oldKey = (family == OutboundFamily.Camera ? OutboundFamily.Sensor : OutboundFamily.Camera)
-      + ":" + sensorId;
+    var oldKey = (family == OutboundFamily.Camera ? OutboundFamily.Sensor : OutboundFamily.Camera) + ":" + sensorId;
     var old = family == OutboundFamily.Observation ? null : slots.get(oldKey);
     if (old != null) {
       slots.remove(oldKey);
@@ -189,8 +184,8 @@ class OutboundScheduler {
       var rate = rates.get(slot.family);
       var lastSent = lastSentNs.get(key);
       var nowNs = NativeKit.nk_time_now_ns();
-      if (rate != null && rate > 0 && lastSent != null &&
-          Int64.toFloat(Int64.sub(nowNs, lastSent)) < 1000000000.0 / rate) {
+      if (rate != null && rate > 0 && lastSent != null && Int64.toFloat(Int64.sub(nowNs,
+        lastSent)) < 1000000000.0 / rate) {
         nextKey++;
         continue;
       }
@@ -207,9 +202,13 @@ class OutboundScheduler {
         keys.splice(nextKey, 1);
         continue;
       }
-      if (Int64.compare(queue.queuedBytes, Int64.ofInt(budgetBytes)) >= 0 ||
-          Int64.compare(Int64.add(queue.queuedBytes, Int64.ofInt(frameBytes)),
-            Int64.ofInt(capacityBytes - MIN_ESSENTIAL_RESERVE)) > 0) {
+      if (Int64.compare(queue.queuedBytes, Int64.ofInt(budgetBytes)) >= 0 || Int64.compare(
+        Int64.add(
+          queue.queuedBytes,
+          Int64.ofInt(frameBytes)
+        ),
+        Int64.ofInt(capacityBytes - MIN_ESSENTIAL_RESERVE)
+      ) > 0) {
         nextKey++;
         continue;
       }
@@ -237,8 +236,7 @@ class OutboundScheduler {
   }
 
   public function logDrops(nowNs:Int64, sessionId:Int64):Void {
-    if (Int64.compare(Int64.sub(nowNs, lastLogNs), Int64.ofInt(1000000000)) < 0)
-      return;
+    if (Int64.compare(Int64.sub(nowNs, lastLogNs), Int64.ofInt(1000000000)) < 0) return;
     lastLogNs = nowNs;
     var parts:Array<String> = [];
     for (family in [OutboundFamily.Sensor, OutboundFamily.Camera, OutboundFamily.Observation]) {
@@ -252,8 +250,7 @@ class OutboundScheduler {
       parts.push('sequence_resets=${sequenceResets - loggedSequenceResets}');
       loggedSequenceResets = sequenceResets;
     }
-    if (parts.length > 0)
-      Sys.println('robotd: session $sessionId outbound ' + parts.join(' '));
+    if (parts.length > 0) Sys.println('robotd: session $sessionId outbound ' + parts.join(' '));
   }
 
   function countDrop(family:OutboundFamily):Void {

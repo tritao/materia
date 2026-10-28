@@ -14,9 +14,9 @@ import robotkit.runtime.SimulationStepObserver;
 
 private class TickRecorder implements SimulationStepObserver {
   public final times:Array<Int64> = [];
-  public function new() {}
-  public function afterSimulationStep(sourceTimestampNs:Int64):Void
-    times.push(sourceTimestampNs);
+  public function new() {
+  }
+  public function afterSimulationStep(sourceTimestampNs:Int64):Void times.push(sourceTimestampNs);
 }
 
 /** Robots joining a session another owner steps, alongside its props and people. */
@@ -29,69 +29,86 @@ class SharedSessionTests {
     for (centre in [-0.3, 0.3]) {
       var coordinates:Array<Float> = [];
       for (x in [-0.1, 0.1]) for (y in [-0.2, 0.2]) for (z in [-0.05, 0.05]) {
-        coordinates.push(centre + x); coordinates.push(y); coordinates.push(z);
+        coordinates.push(centre + x);
+        coordinates.push(y);
+        coordinates.push(z);
       }
       pieces.push(coordinates);
     }
     var compoundShape = SimShape.compoundConvex(pieces);
     pieces[0][0] = 100;
-    var copied = compoundShape.convexVertices(); copied[0] = 200;
-    var counts = compoundShape.convexPieceCounts(); counts[0] = 0;
-    if (compoundShape.convexVertices()[0] != -0.4 || compoundShape.convexPieceCounts()[0] != 24)
-      throw "Compound shape lost ownership of its piece geometry";
+    var copied = compoundShape.convexVertices();
+    copied[0] = 200;
+    var counts = compoundShape.convexPieceCounts();
+    counts[0] = 0;
+    if (compoundShape.convexVertices()[0] != -0.4
+      || compoundShape.convexPieceCounts()[0] != 24) throw "Compound shape lost ownership of its piece geometry";
     var compound = session.createObject(MotionType.Dynamic, compoundShape, new SimPose(5, 0, 2), 0.8);
-    if (compound.overlapsVolume(new SimPose(5, 0, 2), [0.02, 0.02, 0.02]) ||
-        !compound.overlapsVolume(new SimPose(5.3, 0, 2), [0.02, 0.02, 0.02]))
-      throw "Compound object's query filled its empty gap or lost its material";
-    if (Math.abs(session.raycast(new SimPose(5, 0, 3), 0, 0, -1, 3) - 3) > 1e-9 ||
-        Math.abs(session.raycast(new SimPose(5.3, 0, 3), 0, 0, -1, 3) - 0.95) > 1e-9)
-      throw "Compound object's ray query did not preserve its empty gap";
+    if (compound.overlapsVolume(new SimPose(5, 0, 2), [0.02, 0.02, 0.02]) || !compound.overlapsVolume(
+      new SimPose(
+        5.3,
+        0,
+        2
+      ),
+      [
+        0.02,
+        0.02,
+        0.02
+      ]
+    )) throw "Compound object's query filled its empty gap or lost its material";
+    if (Math.abs(session.raycast(new SimPose(5, 0, 3), 0, 0, -1, 3) - 3) > 1e-9 || Math.abs(session.raycast(
+      new SimPose(
+        5.3,
+        0,
+        3
+      ),
+      0,
+      0,
+      -1,
+      3
+    ) - 0.95) > 1e-9) throw "Compound object's ray query did not preserve its empty gap";
     compound.dispose();
     var simulation = Simulation.inSession(session);
-    var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0]);
+    var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
     var ticks = new TickRecorder();
     simulation.addStepObserver(ticks);
-    var crate = session.createObject(MotionType.Dynamic, SimShape.box(0.2, 0.2, 0.2),
-      new SimPose(3.0, 0.0, 2.0), 1.0);
-    var connected = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1),
-      new SimPose(3.6, 0.0, 2.0), 1.0);
+    var crate = session.createObject(MotionType.Dynamic, SimShape.box(0.2, 0.2, 0.2), new SimPose(3.0, 0.0, 2.0), 1.0);
+    var connected = session.createObject(
+      MotionType.Dynamic,
+      SimShape.box(0.1, 0.1, 0.1),
+      new SimPose(3.6, 0.0, 2.0),
+      1.0
+    );
     var rigid = session.createFixedJoint(crate, connected);
     var person = session.createActor([SimShape.capsule(0.2, 1.2)], [new SimPose(-2.0, 0.0, 0.8)]);
-    var held = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1),
-      new SimPose(-1.5, 0.0, 1.0), 1.0);
+    var held = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1), new SimPose(-1.5, 0.0, 1.0), 1.0);
     session.holdObject(held, person.partBody(0), new SimPose(0.5, 0.0, 0.2));
-    if (session.objectCarrier(held) != person.partBody(0))
-      throw "Held object did not report its actor carrier";
+    if (session.objectCarrier(held) != person.partBody(0)) throw "Held object did not report its actor carrier";
     person.pushKeyframe(0.0, [new SimPose(-2.0, 0.0, 0.8)]);
     person.pushKeyframe(1.0, [new SimPose(-1.0, 0.0, 0.8)]);
 
     // A joined session's clock belongs to its owner: Simulation has no
     // step/start/stop/reset of its own to misuse; only the session does.
     for (_ in 0...50) session.step();
-    if (ticks.times.length != 50 || ticks.times[0] != Int64.ofInt(10000000) ||
-        ticks.times[49] != Int64.ofInt(500000000) ||
-        simulation.sourceTimestampNs() != ticks.times[49])
-      throw "Joined robot did not observe every shared session step";
-    if (Int64.toInt(runtime.snapshot().sequence) < 1)
-      throw "robots did not publish from the shared session's ticks";
+    if (ticks.times.length != 50 || ticks.times[0] != Int64.ofInt(10000000)
+      || ticks.times[49] != Int64.ofInt(500000000) || simulation.sourceTimestampNs()
+      != ticks.times[49]) throw "Joined robot did not observe every shared session step";
+    if (Int64.toInt(runtime.snapshot().sequence) < 1) throw "robots did not publish from the shared session's ticks";
 
     var frame = session.capture();
     var presentation = simulation.presentFrame(frame);
-    if (presentation.poses.length != 2 || Int64.toInt(presentation.stepIndex) != 50)
-      throw 'robots were not presented from the shared frame: ${presentation.poses.length}';
+    if (presentation.poses.length != 2 || Int64.toInt(presentation.stepIndex)
+      != 50) throw 'robots were not presented from the shared frame: ${presentation.poses.length}';
     var base = presentation.poses[0];
-    if (base.kind != SimulationPresentationSnapshot.ROBOT_BASE || Math.abs(base.position[0]) > 1e-9)
-      throw "robot base pose missing from the shared frame";
-    if (Math.abs(frame.actorPose(person, 0).x + 1.5) > 1e-6)
-      throw "person did not follow its keyframes on the shared clock";
-    if (frame.objectPose(crate).z >= 2.0)
-      throw "the shared session's crate did not fall";
-    if (Math.abs(frame.objectPose(connected).x - frame.objectPose(crate).x - 0.6) > 1e-6 ||
-        Math.abs(frame.objectPose(connected).z - frame.objectPose(crate).z) > 1e-6)
-      throw "The session's fixed connection lost its relative frame while falling";
-    if (Math.abs(frame.objectPose(held).x + 1.0) > 1e-6)
-      throw "held object did not follow its carrier";
+    if (base.kind != SimulationPresentationSnapshot.ROBOT_BASE
+      || Math.abs(base.position[0]) > 1e-9) throw "robot base pose missing from the shared frame";
+    if (Math.abs(frame.actorPose(person,
+      0).x + 1.5) > 1e-6) throw "person did not follow its keyframes on the shared clock";
+    if (frame.objectPose(crate).z >= 2.0) throw "the shared session's crate did not fall";
+    if (Math.abs(frame.objectPose(connected).x - frame.objectPose(crate).x - 0.6) > 1e-6
+      || Math.abs(frame.objectPose(connected).z - frame.objectPose(crate).z)
+      > 1e-6) throw "The session's fixed connection lost its relative frame while falling";
+    if (Math.abs(frame.objectPose(held).x + 1.0) > 1e-6) throw "held object did not follow its carrier";
     presentation.dispose();
     frame.dispose();
 
@@ -99,12 +116,10 @@ class SharedSessionTests {
     rigid.dispose();
     connected.dispose();
     session.releaseObject(held);
-    if (session.objectCarrier(held) == person.partBody(0))
-      throw "Released object still reports a carrier";
+    if (session.objectCarrier(held) == person.partBody(0)) throw "Released object still reports a carrier";
     simulation.dispose();
     session.step();
-    if (ticks.times.length != 50)
-      throw "Disposed simulation still observed shared session steps";
+    if (ticks.times.length != 50) throw "Disposed simulation still observed shared session steps";
     session.dispose();
     world.dispose();
     scene.dispose();

@@ -53,12 +53,18 @@ class ObservationBuilder {
   function appendTerm(out:Array<Float>, term:ObservationTerm, observed:Observed):Void {
     var n = spec.joints.length;
     switch term {
-      case AngularVelocity(scale): scaled(out, observed.angularVelocity, scale);
-      case ProjectedGravity(scale): scaled(out, observed.down, scale);
-      case VelocityCommand(scale): scaled(out, [observed.command.vx, observed.command.vy, observed.command.wz], scale);
-      case JointPosition(scale): scaled(out, [for (i in 0...n) observed.q[i] - spec.defaultPose[i]], scale);
-      case JointVelocity(scale): scaled(out, observed.dq, scale);
-      case LastAction(scale): scaled(out, observed.lastAction, scale);
+      case AngularVelocity(scale):
+        scaled(out, observed.angularVelocity, scale);
+      case ProjectedGravity(scale):
+        scaled(out, observed.down, scale);
+      case VelocityCommand(scale):
+        scaled(out, [observed.command.vx, observed.command.vy, observed.command.wz], scale);
+      case JointPosition(scale):
+        scaled(out, [for (i in 0...n) observed.q[i] - spec.defaultPose[i]], scale);
+      case JointVelocity(scale):
+        scaled(out, observed.dq, scale);
+      case LastAction(scale):
+        scaled(out, observed.lastAction, scale);
       case GaitPhase(period):
         var phase = (observed.gaitTime % period) / period;
         out.push(Math.sin(2.0 * Math.PI * phase));
@@ -66,6 +72,6 @@ class ObservationBuilder {
     }
   }
 
-  static function scaled(out:Array<Float>, values:Array<Float>, scale:Array<Float>):Void
-    for (i in 0...values.length) out.push(values[i] * (scale.length == 1 ? scale[0] : scale[i]));
+  static function scaled(out:Array<Float>, values:Array<Float>, scale:Array<Float
+    >):Void for (i in 0...values.length) out.push(values[i] * (scale.length == 1 ? scale[0] : scale[i]));
 }

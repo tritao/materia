@@ -26,13 +26,13 @@ class RecordingRobot implements Robot {
   var streamRecording:robotkit.streams.SensorStreamSubscription;
 
   public function new(source:Robot, recording:RobotRecordingSink) {
-    if (source == null || recording == null)
-      throw "RecordingRobot requires a source robot and recording sink";
+    if (source == null || recording == null) throw "RecordingRobot requires a source robot and recording sink";
     this.source = source;
     this.recording = recording;
     streamRecording = source.streams().subscribe("*", function(sample) {
       if (sample.frame != null) record(function() recording.recordSensor(source.id(), sample.frame));
-    });
+    }
+    );
   }
 
   public function id():RobotId return source.id();
@@ -80,8 +80,7 @@ class RecordingRobot implements Robot {
   public function stop(mode:StopMode):Void source.stop(mode);
   public function resetSafety():Void source.resetSafety();
 
-  public function setChangeListener(listener:Null<RobotId->Void>):Void
-    source.setChangeListener(listener);
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void source.setChangeListener(listener);
 
   public function close():Void {
     streamRecording.cancel();
@@ -89,7 +88,7 @@ class RecordingRobot implements Robot {
     source.close();
   }
 
-  function record(action:Void->Void):Void {
+  function record(action:Void -> Void):Void {
     try action() catch (error:Dynamic) {
       if (recordingError == null) recordingError = Std.string(error);
     }

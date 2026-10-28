@@ -91,8 +91,7 @@ class ConstructionSkillTests {
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
     var blueprint = RobotRuntimeCompiler.compile(model, fixture.profile);
-    blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
-      ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new ProcessChannelDeclaration("surface.process", ProcessEventValue.Digital(false)));
 
     var simulationHarness = new SimulationHarness(0.02);
 
@@ -101,8 +100,7 @@ class ConstructionSkillTests {
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-construction-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var runtime = simulation.addRobot(blueprint);
-    var sourceRobot = new SimulatedRobot("construction-robot", runtime,
-      model.name, linkNames, jointNames);
+    var sourceRobot = new SimulatedRobot("construction-robot", runtime, model.name, linkNames, jointNames);
     var robot = new RecordingRobot(sourceRobot, writer);
 
     var base = MobileBase.fromBlueprint(robot, blueprint);
@@ -139,18 +137,24 @@ class ConstructionSkillTests {
 
     // -- design surface (small wall; see PlacementTests for this exact map_T_surface convention) --
     var boundary = new Polygon2([
-      new Point2(-0.25, 0.0), new Point2(0.25, 0.0), new Point2(0.25, 0.3), new Point2(-0.25, 0.3)
+      new Point2(-0.25, 0.0),
+      new Point2(0.25, 0.0),
+      new Point2(0.25, 0.3),
+      new Point2(
+        -0.25,
+        0.3
+      )
     ]);
     var rotation = Quat.fromRotationMatrix([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
     var map_T_surface = new Transform3(new Vec3(-0.47, 0.0, -0.15), rotation);
     var design = new WorkSurface("skill-wall", "odom", map_T_surface, boundary);
 
     // -- ScanSurface --
-    var trueOffset = new Transform3(new Vec3(0.0, 0.0, 0.003),
-      Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), 0.004));
+    var trueOffset = new Transform3(new Vec3(0.0, 0.0, 0.003), Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), 0.004));
     var scan = new ScanSurface(function() {
       return SimulatedSurfaceScanner.scan(design, trueOffset, 0.0015, 0.02, 0.0003, 5, Int64.ofInt(0));
-    });
+    }
+    );
     check(runToCompletion(scan) == SkillStatus.Succeeded, "ScanSurface completes through SkillRunner");
     check(scan.cloud != null && scan.cloud.size() > 20, "ScanSurface captures a non-trivial point cloud");
 
@@ -158,44 +162,98 @@ class ConstructionSkillTests {
     var register = new RegisterSurface(design, scan.cloud, 5);
     check(runToCompletion(register) == SkillStatus.Succeeded, "RegisterSurface completes through SkillRunner");
     var registrationOutcome = register.registration;
-    check(registrationOutcome != null && registrationOutcome.accepted,
-      "RegisterSurface accepts the injected offset");
-    if (registrationOutcome == null || registrationOutcome.registered == null)
-      throw "RegisterSurface did not produce a registered surface";
+    check(registrationOutcome != null && registrationOutcome.accepted, "RegisterSurface accepts the injected offset");
+    if (registrationOutcome == null
+      || registrationOutcome.registered == null) throw "RegisterSurface did not produce a registered surface";
     var registered:WorkSurface = registrationOutcome.registered;
 
     var spec:FinishSpec = {
-      toolWidth: 0.08, overlap: 0.2, standoff: 0.02, feedRate: 0.2, leadInOut: 0.0,
-      maxPatchWidth: 1.0, standoffDistanceMin: 0.46, standoffDistanceMax: 0.5,
-      maxAcceleration: 0.3, coverageCellSize: 0.01, footprintRadius: 0.04, maxJointStep: 4.0 * Math.PI
+      toolWidth: 0.08,
+      overlap: 0.2,
+      standoff: 0.02,
+      feedRate: 0.2,
+      leadInOut: 0.0,
+      maxPatchWidth: 1.0,
+      standoffDistanceMin: 0.46,
+      standoffDistanceMax: 0.5,
+      maxAcceleration: 0.3,
+      coverageCellSize: 0.01,
+      footprintRadius: 0.04,
+      maxJointStep: 4.0 * Math.PI
     };
     var seed = [0.2, -1.0, 1.3, -0.3, 0.5, 0.0];
 
     // -- Paint --
     var sprayer = new SimulatedSprayer();
-    function eventSource():{events:Array<robotkit.execution.FiredProcessEvent>, overflow:Bool} {
+    function eventSource(): {events: Array<robotkit.execution.FiredProcessEvent>, overflow: Bool} {
       var batch = runtime.pollEvents();
       for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
       return batch;
     }
-    var paintMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
-      spec.feedRate, PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration), spec.maxJointStep);
-    var paint = new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
-      observe, sprayer, 0.3, 2.0, seed, paintMotion);
+    var paintMotion = SurfacePlanRunner.create(
+      robot,
+      manipulator,
+      eventSource,
+      spec.feedRate,
+      PlanningLimits.ofGroup(
+        manipulator,
+        null,
+        spec.maxAcceleration
+      ),
+      spec.maxJointStep
+    );
+    var paint = new Paint(
+      navigator,
+      manipulator,
+      robot,
+      registered.frame_T_surface,
+      registered,
+      spec,
+      observe,
+      sprayer,
+      0.3,
+      2.0,
+      seed,
+      paintMotion
+    );
     check(runToCompletion(paint) == SkillStatus.Succeeded, 'Paint completes through SkillRunner (${paint.status()})');
     var paintCoverage = paint.coverage();
-    check(paintCoverage != null && paintCoverage.coverageFraction() >= 0.9,
-      'Paint covers at least 90% of the wall (got ${paintCoverage == null ? -1.0 : paintCoverage.coverageFraction()})');
+    check(
+      paintCoverage != null && paintCoverage.coverageFraction() >= 0.9,
+      'Paint covers at least 90% of the wall (got ${paintCoverage == null ? -1.0 : paintCoverage.coverageFraction()})'
+    );
     var sprayedOn = false;
     for (event in sprayer.history) if (event.flow > 0.0) sprayedOn = true;
     check(sprayedOn, "Paint commands the simulated sprayer while the raster is process-on");
 
     // -- Sand --
     var sander = new SimulatedSander();
-    var sandMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
-      spec.feedRate, PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration), spec.maxJointStep);
-    var sand = new Sand(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
-      observe, sander, 8000.0, 15.0, seed, sandMotion);
+    var sandMotion = SurfacePlanRunner.create(
+      robot,
+      manipulator,
+      eventSource,
+      spec.feedRate,
+      PlanningLimits.ofGroup(
+        manipulator,
+        null,
+        spec.maxAcceleration
+      ),
+      spec.maxJointStep
+    );
+    var sand = new Sand(
+      navigator,
+      manipulator,
+      robot,
+      registered.frame_T_surface,
+      registered,
+      spec,
+      observe,
+      sander,
+      8000.0,
+      15.0,
+      seed,
+      sandMotion
+    );
     check(runToCompletion(sand) == SkillStatus.Succeeded, 'Sand completes through SkillRunner (${sand.status()})');
     var sandedOn = false;
     for (event in sander.history) if (event.contactForce > 0.0) sandedOn = true;
@@ -203,32 +261,84 @@ class ConstructionSkillTests {
 
     // A skill must pass its mounted tool and cell obstacles to the planner,
     // then stop before navigation or process output when the tool is blocked.
-    var mounted = new Tool("paint-head", "paint head", Transform3.identity(),
-      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
+    var mounted = new Tool(
+      "paint-head",
+      "paint head",
+      Transform3.identity(),
+      ToolGeometry.box(new Vec3(
+        0.05,
+        0.05,
+        0.05
+      ))
+    );
     var obstacles = new CollisionDescription();
-    obstacles.addFixed("wall", CollisionPose.identity(), Box(10,10,10), 0);
+    obstacles.addFixed("wall", CollisionPose.identity(), Box(10, 10, 10), 0);
     var worlds = 0;
-    var cell = new ToolPlanningContext(mounted, obstacles, () -> { worlds++; return new NativeCollisionWorld(); });
+    var cell = new ToolPlanningContext(mounted, obstacles, () -> {worlds++;
+    return new NativeCollisionWorld();
+    });
     var preparedBeforeSkill = cell.obstacles.objects.length;
-    var blockedPaint = new Paint(navigator, manipulator, robot,
-      registered.frame_T_surface, registered, spec, observe, new SimulatedSprayer(),
-      0.3, 2.0, seed, paintMotion, null, cell);
+    var blockedPaint = new Paint(
+      navigator,
+      manipulator,
+      robot,
+      registered.frame_T_surface,
+      registered,
+      spec,
+      observe,
+      new SimulatedSprayer(),
+      0.3,
+      2.0,
+      seed,
+      paintMotion,
+      null,
+      cell
+    );
     var blockedStatus = runToCompletion(blockedPaint);
-    check(cell.obstacles.objects.length == preparedBeforeSkill && worlds > 0,
-      "FinishSurface preserves the planning description and uses its collision backend");
-    check(switch blockedStatus { case Failed(_): true; case _: false; },
-      "Paint rejects a path blocked by a 3D obstacle at planning time");
-    check(blockedPaint.coverage() == null,
-      "Blocked Paint does not start coverage or process execution");
+    check(
+      cell.obstacles.objects.length == preparedBeforeSkill && worlds > 0,
+      "FinishSurface preserves the planning description and uses its collision backend"
+    );
+    check(switch blockedStatus {
+      case Failed(_):
+        true;
+      case _:
+        false;
+    }, "Paint rejects a path blocked by a 3D obstacle at planning time");
+    check(blockedPaint.coverage() == null, "Blocked Paint does not start coverage or process execution");
 
-    var wrongTcp = new Tool("wrong-tcp", "wrong TCP",
+    var wrongTcp = new Tool(
+      "wrong-tcp",
+      "wrong TCP",
       new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
-      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
+      ToolGeometry.box(new Vec3(
+        0.05,
+        0.05,
+        0.05
+      ))
+    );
     var rejected = false;
     try {
-      new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered,
-        spec, observe, new SimulatedSprayer(), 0.3, 2.0, seed, paintMotion, null,
-        new ToolPlanningContext(wrongTcp, cell.obstacles, cell.makeWorld));
+      new Paint(
+        navigator,
+        manipulator,
+        robot,
+        registered.frame_T_surface,
+        registered,
+        spec,
+        observe,
+        new SimulatedSprayer(),
+        0.3,
+        2.0,
+        seed,
+        paintMotion,
+        null,
+        new ToolPlanningContext(
+          wrongTcp,
+          cell.obstacles,
+          cell.makeWorld
+        )
+      );
     } catch (_:Dynamic) rejected = true;
     check(rejected, "Paint rejects a tool whose TCP differs from the manipulator TCP");
 
@@ -236,35 +346,66 @@ class ConstructionSkillTests {
     robot.close();
     simulationHarness.dispose();
     var recording = McapRecordingReader.load(recordingPath);
-    check(recording.commands.length > 10 && recording.snapshots.length > 10,
-      "construction skill run is recorded to MCAP");
+    check(
+      recording.commands.length > 10 && recording.snapshots.length > 10,
+      "construction skill run is recorded to MCAP"
+    );
 
     // Replay the plan command stream and inspect its recorded process output.
-    var replayDescription = new RobotDescription("construction-robot",
-      "recorded construction robot", linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("construction-robot",
+    var replayDescription = new RobotDescription(
+      "construction-robot",
+      "recorded construction robot",
+      linkNames,
+      jointNames
+    );
+    var replayCapabilities = new RobotCapabilities(
+      "construction-robot",
       jointNames.length,
-      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
-      new robotkit.core.ExecutionCapabilities(true, 5, 64, 4096, true, true, true, trajectorykit.validation.ValidationGuarantee.Unchecked),
-      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
-    var replay = new ReplayRobot("construction-robot", recording,
-      replayDescription, replayCapabilities);
+      [
+        robotkit.core.JointTargetMode.Position,
+        robotkit.core.JointTargetMode.Velocity,
+        robotkit.core.JointTargetMode.Effort
+      ],
+      new robotkit.core.ExecutionCapabilities(
+        true,
+        5,
+        64,
+        4096,
+        true,
+        true,
+        true,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      ),
+      new robotkit.core.TimingCapabilities(
+        false,
+        false,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      )
+    );
+    var replay = new ReplayRobot("construction-robot", recording, replayDescription, replayCapabilities);
     for (command in recording.commands) {
       replay.submit(command);
       replay.advance();
     }
-    check(replay.generatedCommands.commands.length == recording.commands.length,
-      "ReplayRobot preserves the plan and navigation command stream");
-    check(recording.processEvents.length > 0,
-      "MCAP preserves process output records from Paint and Sand");
+    check(
+      replay.generatedCommands.commands.length == recording.commands.length,
+      "ReplayRobot preserves the plan and navigation command stream"
+    );
+    check(recording.processEvents.length > 0, "MCAP preserves process output records from Paint and Sand");
     replay.close();
 
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
-    if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
-      sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
+    if (sys.FileSystem.exists(recordingPath
+      + ".incomplete.status")) sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
-  static function buildFixture():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
+  static function buildFixture(): {
+    model: RobotModel,
+    profile: robotkit.profile.RobotProfile,
+    arm: Manipulator,
+    wheelRadius: Float,
+    baseRadius: Float
+  } {
     var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("construction-skill-robot");
     var base = model.addLink(new Link("base", "link/base"));
@@ -287,31 +428,60 @@ class ConstructionSkillTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
-      0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
+      RobotDriveConfiguration.Holonomic(
+        wheelIds,
+        wheelRadius,
+        baseRadius
+      ),
+      0.4,
+      0.6,
+      0.5,
+      1.0,
+      0.5,
+      0.5
+    );
 
-    var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
-      a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
-    var linkNames = ["shoulder_link", "upper_arm_link", "forearm_link",
-      "wrist_1_link", "wrist_2_link", "wrist_3_link"];
+    var d1 = 0.089159, shoulderOffset = 0.13585,
+      elbowOffset = -0.1197, a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
+    var linkNames = ["shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"];
     var links = [base].concat([for (name in linkNames) model.addLink(new Link(name, 'link/$name'))]);
     var offsets = [
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(0.0, 0.0, a3),
-      new Vec3(0.0, d4, 0.0),
-      new Vec3(0.0, 0.0, d5)
+      new Vec3(
+        0.0,
+        0.0,
+        a3
+      ),
+      new Vec3(
+        0.0,
+        d4,
+        0.0
+      ),
+      new Vec3(
+        0.0,
+        0.0,
+        d5
+      )
     ];
-    var axes = [
-      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var jointNames = [
+      "shoulder_pan_joint",
+      "shoulder_lift_joint",
+      "elbow_joint",
+      "wrist_1_joint",
+      "wrist_2_joint",
+      "wrist_3_joint"
     ];
-    var jointNames = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"];
     for (i in 0...6) {
-      var joint = model.addJoint(new Joint(jointNames[i], JointType.Revolute, links[i], links[i + 1],
-        'joint/${jointNames[i]}'));
+      var joint = model.addJoint(new Joint(
+        jointNames[i],
+        JointType.Revolute,
+        links[i],
+        links[i + 1],
+        'joint/${jointNames[i]}'
+      ));
       joint.parentFramePosition = offsets[i].toArray();
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
@@ -323,7 +493,7 @@ class ConstructionSkillTests {
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = [0.0, d6, 0.0];
     var arm = new Manipulator(model, base.id, flange.id, null, null, null, profile);
-    return { model: model, profile: profile, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
+    return {model: model, profile: profile, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius};
   }
 
   static function check(value:Bool, message:String):Void {

@@ -18,14 +18,19 @@ class Tool {
   /** Null when the tool has no stated centre of mass. */
   public final massProperties:Null<MassProperties>;
 
-  public function new(id:ToolId, name:String, flangeTTcp:Transform3,
-      ?collision:Array<CollisionShape>, ?mass:Float = 0.0,
-      ?massProperties:MassProperties) {
+  public function new(
+    id:ToolId,
+    name:String,
+    flangeTTcp:Transform3,
+    ?collision:Array<CollisionShape>,
+    ?mass:Float = 0.0,
+    ?massProperties:MassProperties
+  ) {
     if (id == null || id.length == 0) throw "Tool requires a non-empty id";
     if (flangeTTcp == null) throw "Tool requires a flange_T_tcp transform";
     if (!Math.isFinite(mass) || mass < 0.0) throw "Tool mass must be finite and non-negative";
-    if (massProperties != null && mass != 0.0 && Math.abs(mass - massProperties.massKg) > 1e-9)
-      throw "Tool mass and mass properties disagree";
+    if (massProperties != null
+      && mass != 0.0 && Math.abs(mass - massProperties.massKg) > 1e-9) throw "Tool mass and mass properties disagree";
     this.id = id;
     this.name = name;
     this.flangeTTcp = flangeTTcp;

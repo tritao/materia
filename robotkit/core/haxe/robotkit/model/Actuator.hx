@@ -59,17 +59,26 @@ class Actuator {
 
   function get_fullStepsPerRevolution():Float {
     var current = drive;
-    return current != null && Std.isOfType(current, StepperDrive) ? cast(current, StepperDrive).fullStepsPerRevolution : 0.0;
+    return current != null && Std.isOfType(current,
+      StepperDrive) ? cast(current, StepperDrive).fullStepsPerRevolution : 0.0;
   }
 
   function set_fullStepsPerRevolution(value:Float):Float {
     var current = drive;
     if (value > 0.0) {
-      if (current == null || !Std.isOfType(current, StepperDrive) ||
-          cast(current, StepperDrive).fullStepsPerRevolution != value)
-        drive = current != null && Std.isOfType(current, StepperDrive) ?
-          new StepperDrive(value, current.rotorInertia, cast(current, StepperDrive).holdingTorque, current.curve) :
-          StepperDrive.stepsOnly(value);
+      if (current == null || !Std.isOfType(current, StepperDrive) || cast(current,
+        StepperDrive).fullStepsPerRevolution != value) drive = current != null && Std.isOfType(
+          current,
+          StepperDrive
+        ) ? new StepperDrive(
+          value,
+          current.rotorInertia,
+          cast(
+            current,
+            StepperDrive
+          ).holdingTorque,
+          current.curve
+        ) : StepperDrive.stepsOnly(value);
     } else if (current != null && Std.isOfType(current, StepperDrive)) drive = null;
     return value;
   }
@@ -89,8 +98,10 @@ class Actuator {
   public function planningRate():Null<Float> {
     var current = drive, rate = maxRate;
     if (processVelocity != null || (current != null && current.cylinder() != null)) return null;
-    if (current != null && Std.isOfType(current, ServoDrive))
-      rate = rate == null ? current.maxSpeed() : Math.min(rate, current.maxSpeed());
+    if (current != null && Std.isOfType(current, ServoDrive)) rate = rate == null ? current.maxSpeed() : Math.min(
+      rate,
+      current.maxSpeed()
+    );
     var setting = microsteps, inputRate = maxStepRate;
     if (fullStepsPerRevolution > 0 && setting != null && inputRate != null) {
       var ceiling = inputRate * 2 * Math.PI / (fullStepsPerRevolution * setting);
@@ -118,32 +129,31 @@ class Actuator {
     if (input == null || setting == null || fullStepsPerRevolution <= 0) return "";
     var ceiling = input * 2 * Math.PI / (fullStepsPerRevolution * setting);
     var current = drive, motorRate = maxRate;
-    if (current != null && Std.isOfType(current, ServoDrive))
-      motorRate = motorRate == null ? current.maxSpeed() : Math.min(motorRate, current.maxSpeed());
+    if (current != null && Std.isOfType(current,
+      ServoDrive)) motorRate = motorRate == null ? current.maxSpeed() : Math.min(
+        motorRate,
+        current.maxSpeed()
+      );
     return motorRate == null || ceiling <= motorRate ? "driver step input" : "";
   }
 
   /** The torque-speed curve the plan check holds this actuator to: its drive's, or flat at its effort and rate. */
   public function torqueCurve():TorqueSpeedCurve {
     var current = drive;
-    if (current != null && (!Std.isOfType(current, StepperDrive) || cast(current, StepperDrive).hasTorqueData()))
-      return current.curve;
+    if (current != null && (!Std.isOfType(current,
+      StepperDrive) || cast(current, StepperDrive).hasTorqueData())) return current.curve;
     return TorqueSpeedCurve.flat(requireEffort(), requireRate());
   }
 
-  public function new(id:String, maxEffort:Null<Float>, maxRate:Null<Float>,
-      transmission:Transmission) {
-    if (id == null || StringTools.trim(id).length == 0)
-      throw "Actuator ID must be non-empty";
-    if ((maxEffort != null && (!Math.isFinite(maxEffort) || maxEffort < 0.0)) ||
-        (maxRate != null && (!Math.isFinite(maxRate) || maxRate < 0.0)))
-      throw "Actuator limits must be finite and non-negative";
+  public function new(id:String, maxEffort:Null<Float>, maxRate:Null<Float>, transmission:Transmission) {
+    if (id == null || StringTools.trim(id).length == 0) throw "Actuator ID must be non-empty";
+    if ((maxEffort != null && (!Math.isFinite(maxEffort) || maxEffort < 0.0)) || (maxRate != null
+      && (!Math.isFinite(maxRate) || maxRate < 0.0))) throw "Actuator limits must be finite and non-negative";
     if (transmission == null) throw "Actuator transmission is required";
     switch transmission {
       case SimpleTransmission(jointId, ratio, offset):
-        if (jointId == null || StringTools.trim(jointId).length == 0 ||
-            !Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
-          throw "Simple transmission needs a joint ID, nonzero finite ratio and finite offset";
+        if (jointId == null || StringTools.trim(jointId).length == 0 || !Math.isFinite(ratio) || ratio == 0.0 || !Math
+          .isFinite(offset)) throw "Simple transmission needs a joint ID, nonzero finite ratio and finite offset";
     }
     this.id = id;
     this.maxEffort = maxEffort;

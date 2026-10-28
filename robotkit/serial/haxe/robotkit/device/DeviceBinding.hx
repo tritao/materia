@@ -30,9 +30,23 @@ class BoundChannel {
   public final holdStiffness:Float;
   public final holdInertia:Float;
 
-  public function new(channel:Int, actuatorId:String, jointIndex:Int, ratio:Float, offset:Float,
-      stepsPerUnit:Float, maxRate:Float, minStepTicks:Int, directionSetupTicks:Int, skewBound:Float,
-      feedbackJointIndex:Int, feedbackRatio:Float, feedbackOffset:Float, holdStiffness:Float = 0.0, holdInertia:Float = 0.0) {
+  public function new(
+    channel:Int,
+    actuatorId:String,
+    jointIndex:Int,
+    ratio:Float,
+    offset:Float,
+    stepsPerUnit:Float,
+    maxRate:Float,
+    minStepTicks:Int,
+    directionSetupTicks:Int,
+    skewBound:Float,
+    feedbackJointIndex:Int,
+    feedbackRatio:Float,
+    feedbackOffset:Float,
+    holdStiffness:Float = 0.0,
+    holdInertia:Float = 0.0
+  ) {
     this.channel = channel;
     this.actuatorId = actuatorId;
     this.jointIndex = jointIndex;
@@ -56,7 +70,8 @@ class BoundInput {
   public final wiring:DeviceInput;
   public final actuatorChannel:Int;
   public function new(wiring:DeviceInput, actuatorChannel:Int) {
-    this.wiring = wiring; this.actuatorChannel = actuatorChannel;
+    this.wiring = wiring;
+    this.actuatorChannel = actuatorChannel;
   }
 }
 
@@ -87,45 +102,52 @@ class DeviceBinding {
   /** Controller rate ceilings for host planning; GPIO deployment is not implied. */
   public static function planningModel(robot:RobotModel, stepTickHz:Int):RobotModel {
     var layout = DeviceLayout.forSteppers(robot);
-    var model = layout.channels.length == 0 ? RobotModelCodec.decode(RobotModelCodec.encode(robot))
-      : bindActuators(robot, layout, stepTickHz).model;
+    var model = layout.channels.length == 0 ? RobotModelCodec.decode(RobotModelCodec.encode(robot)) : bindActuators(
+      robot,
+      layout,
+      stepTickHz
+    ).model;
     model.materializeLimits();
     return model;
   }
 
-  static function bindActuators(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int):{
-      model:RobotModel, channels:Array<BoundChannel>, wired:Map<String, Int>} {
+  static function bindActuators(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int): {
+    model: RobotModel,
+    channels: Array<BoundChannel>,
+    wired: Map<
+      String,
+      Int
+  >
+  } {
     if (robot == null || layout == null) throw "Device binding requires a model and a layout";
     if (stepTickHz <= 0) throw "Device binding requires a positive step tick rate";
-    if (layout.channels.length == 0 || layout.channels.length > 64)
-      throw "Device layout needs from 1 to 64 channels";
+    if (layout.channels.length == 0 || layout.channels.length > 64) throw "Device layout needs from 1 to 64 channels";
     var tightened = RobotModelCodec.decode(RobotModelCodec.encode(robot));
     var wired = new Map<String, Int>();
     var bound:Array<BoundChannel> = [];
     for (position in 0...layout.channels.length) {
       var channel = layout.channels[position];
-      if (channel.index != position)
-        throw 'Device layout channel ${channel.index} is out of order: expected channel $position';
+      if (channel.index
+        != position) throw 'Device layout channel ${channel.index} is out of order: expected channel $position';
       var name = channel.actuator;
-      if (name == null)
-        throw 'Device layout channel $position names no actuator; a joint-only channel cannot be wired';
-      if (wired.exists(name))
-        throw 'Device layout drives actuator "$name" from channels ${wired.get(name)} and $position';
+      if (name == null) throw 'Device layout channel $position names no actuator; a joint-only channel cannot be wired';
+      if (wired
+        .exists(name)) throw 'Device layout drives actuator "$name" from channels ${wired.get(name)} and $position';
       wired.set(name, position);
       var actuator = find(robot, name);
-      if (actuator == null)
-        throw 'Device layout channel $position names actuator "$name", which the model does not have';
-      if (actuator.fullStepsPerRevolution <= 0.0)
-        throw 'Actuator "$name" on channel $position is not a stepper: the model gives it no full steps per revolution';
+      if (actuator
+        == null) throw 'Device layout channel $position names actuator "$name", which the model does not have';
+      if (actuator.fullStepsPerRevolution
+        <= 0.0) throw 'Actuator "$name" on channel $position is not a stepper: the model gives it no full steps per revolution';
       var mapping = DeviceTransmission.of(robot, actuator);
-      if (!mapping.singleLeader && channel.skewBound > 0)
-        throw "RKD6 cannot guard skew on a multiple-input transmission";
+      if (!mapping.singleLeader
+        && channel.skewBound > 0) throw "RKD6 cannot guard skew on a multiple-input transmission";
       var jointIndex = mapping.jointIndex;
       var ratio = mapping.ratio;
       var offset = mapping.offset;
       var setting = actuator.microsteps, driverRate = actuator.maxStepRate;
-      if (setting == null || driverRate == null)
-        throw 'Stepper actuator "$name" requires microsteps and a driver step-rate ceiling';
+      if (setting == null
+        || driverRate == null) throw 'Stepper actuator "$name" requires microsteps and a driver step-rate ceiling';
       var stepsPerUnit = StepTicks.wire(actuator.fullStepsPerRevolution * setting / (2.0 * Math.PI));
       var pulseRate:Float = Math.min(stepTickHz, driverRate);
       var ceiling = pulseRate / stepsPerUnit;
@@ -133,8 +155,10 @@ class DeviceBinding {
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
       // The device steps at most once per `ticks` (an integer chosen here, from the driver's ceiling and the
       // motor's speed in deployed steps), so planning uses the rate those ticks reach, never more.
-      var ticks = StepTicks.forLimit(motorRate == null ? driverRate
-        : Math.min(driverRate, motorRate * stepsPerUnit), stepTickHz);
+      var ticks = StepTicks.forLimit(
+        motorRate == null ? driverRate : Math.min(driverRate, motorRate * stepsPerUnit),
+        stepTickHz
+      );
       var feedbackJoint = -1, feedbackRatio = 0.0, feedbackOffset = 0.0;
       switch actuator.transmission {
         case SimpleTransmission(shaft, directRatio, directOffset):
@@ -142,8 +166,8 @@ class DeviceBinding {
           feedbackRatio = directRatio * channel.direction;
           feedbackOffset = directOffset;
       }
-      if (feedbackJoint < 0 || !Math.isFinite(feedbackRatio) || feedbackRatio == 0 || !Math.isFinite(feedbackOffset))
-        throw "Device actuator has no valid physical feedback mapping";
+      if (feedbackJoint < 0 || !Math.isFinite(feedbackRatio) || feedbackRatio == 0
+        || !Math.isFinite(feedbackOffset)) throw "Device actuator has no valid physical feedback mapping";
       // A stepper that drives a belt's pulley holds it against the belt with its torque-angle stiffness: the torque it
       // keeps at holding current, times the rotor teeth (a quarter of the full steps) per radian. Without it the
       // simulation holds the pulley with a ten hertz position loop, a softer spring than the belt, and the carriage
@@ -152,30 +176,45 @@ class DeviceBinding {
       var stepper = actuator.drive == null ? null : actuator.drive.stepper();
       if (stepper != null && stepper.hasTorqueData() && robot.followsSpring(robot.joints[feedbackJoint].id)) {
         holdStiffness = stepper.holdingTorque * stepper.fullStepsPerRevolution * 0.25 * feedbackRatio * feedbackRatio;
-        holdInertia = Math.max(robot.turningInertia(robot.joints[feedbackJoint]), stepper.rotorInertia * feedbackRatio * feedbackRatio);
+        holdInertia = Math.max(
+          robot.turningInertia(robot.joints[feedbackJoint]),
+          stepper.rotorInertia * feedbackRatio * feedbackRatio
+        );
       }
-      bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
-        stepsPerUnit, rate, ticks, channel.directionSetupTicks, channel.skewBound,
-        feedbackJoint, feedbackRatio, feedbackOffset, holdStiffness, holdInertia));
+      bound.push(new BoundChannel(
+        position,
+        name,
+        jointIndex,
+        ratio * channel.direction,
+        offset,
+        stepsPerUnit,
+        rate,
+        ticks,
+        channel.directionSetupTicks,
+        channel.skewBound,
+        feedbackJoint,
+        feedbackRatio,
+        feedbackOffset,
+        holdStiffness,
+        holdInertia
+      ));
       var capped = find(tightened, name);
       if (capped != null) {
-        if ((stepTickHz < driverRate) &&
-            (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
+        if ((stepTickHz < driverRate)
+          && (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
         // Plan at the rate the device's whole ticks reach rather than letting the motor lag a faster
         // continuous-rate trajectory and keep moving after its nominal stop.
         capped.maxRate = Math.min(rate, StepTicks.rate(ticks, stepsPerUnit, stepTickHz));
       }
     }
-    for (actuator in robot.actuators)
-      if (actuator.fullStepsPerRevolution > 0.0 && !wired.exists(actuator.id))
-        throw 'Stepper actuator "${actuator.id}" has no channel in the device layout';
+    for (actuator in robot.actuators) if (actuator.fullStepsPerRevolution > 0.0
+      && !wired.exists(actuator.id)) throw 'Stepper actuator "${actuator.id}" has no channel in the device layout';
     // RKD6 skew comparison normalizes pulse counts by ratio, but carries no
     // coordinate zeros. Equal zeros cancel; distinct zeros need a wire extension.
     for (first in 0...bound.length) for (second in first + 1...bound.length) {
       var a = bound[first], b = bound[second];
-      if (a.jointIndex == b.jointIndex && (a.skewBound > 0 || b.skewBound > 0) &&
-          Math.abs(a.offset - b.offset) > 1e-12)
-        throw "RKD6 skew groups require equal leader-coordinate offsets";
+      if (a.jointIndex == b.jointIndex && (a.skewBound > 0 || b.skewBound > 0)
+        && Math.abs(a.offset - b.offset) > 1e-12) throw "RKD6 skew groups require equal leader-coordinate offsets";
     }
     return {model: tightened, channels: bound, wired: wired};
   }
@@ -187,7 +226,8 @@ class DeviceBinding {
     var seen = new Map<String, Bool>();
     if (layout.inputs.length > 64) throw "Device layout supports at most 64 inputs";
     for (input in layout.inputs) {
-      if (input.index != inputs.length || seen.exists(input.switchId)) throw "Device input indices or switch IDs are duplicated";
+      if (input.index != inputs.length
+        || seen.exists(input.switchId)) throw "Device input indices or switch IDs are duplicated";
       seen.set(input.switchId, true);
       var matching = [for (contact in robot.switches) if (contact.id == input.switchId) contact];
       if (matching.length != 1) throw "Device input must name one model switch";
@@ -195,17 +235,20 @@ class DeviceBinding {
       if (actuatorChannel == null) throw "Device input names an unwired actuator";
       var channel = bound[actuatorChannel];
       var contact = matching[0];
-      if (robot.joints[channel.jointIndex].id != contact.joint)
-        throw "Device input actuator does not drive its switch axis";
+      if (robot.joints[channel.jointIndex].id
+        != contact.joint) throw "Device input actuator does not drive its switch axis";
       var actuator = find(robot, input.actuator);
       if (actuator == null) throw "Device input actuator is missing";
-      var shaft = switch actuator.transmission { case SimpleTransmission(joint, _, _): joint; };
-      if (contact.driveJoint != null && shaft != contact.driveJoint)
-        throw "Device input actuator does not match its physical switch side";
+      var shaft = switch actuator.transmission {
+        case SimpleTransmission(joint, _, _):
+          joint;
+      };
+      if (contact.driveJoint != null
+        && shaft != contact.driveJoint) throw "Device input actuator does not match its physical switch side";
       inputs.push(new BoundInput(input, actuatorChannel));
     }
-    for (contact in robot.switches) if (!seen.exists(contact.id))
-      throw "Model switch has no deployment input: " + contact.id;
+    for (contact in robot.switches) if (!seen.exists(contact.id)) throw "Model switch has no deployment input: "
+      + contact.id;
     tightened.materializeLimits();
     return new DeviceBinding(bound, tightened, stepTickHz, inputs);
   }
@@ -219,22 +262,38 @@ class DeviceBinding {
       var contact = matched[0];
       var channel = channels[input.actuatorChannel];
       var raw = channel.ratio * (contact.trip - channel.offset) * channel.stepsPerUnit;
-      if (!Math.isFinite(raw) || Math.abs(raw) > 9007199254740991.0)
-        throw "Virtual switch step threshold exceeds exact integer precision";
+      if (!Math.isFinite(raw)
+        || Math.abs(raw) > 9007199254740991.0) throw "Virtual switch step threshold exceeds exact integer precision";
       var above = contact.side * channel.ratio > 0;
       var quantized = above ? Math.fceil(raw) : Math.ffloor(raw);
-      result.push(new robotkit.runtime.VirtualInputOptions(contact.id, input.actuatorChannel,
-        haxe.Int64.fromFloat(quantized), above, input.wiring.activeHigh));
+      result.push(new robotkit.runtime.VirtualInputOptions(
+        contact.id,
+        input.actuatorChannel,
+        haxe.Int64.fromFloat(quantized),
+        above,
+        input.wiring.activeHigh
+      ));
     }
     return result;
   }
 
   /** The channels as an in-process virtual device's actuators. */
-  public function virtualActuators():Array<VirtualActuatorOptions>
-    return [for (channel in channels) new VirtualActuatorOptions(channel.actuatorId,
-      channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.minStepTicks,
-      channel.directionSetupTicks, channel.skewBound, channel.feedbackJointIndex,
-      channel.feedbackRatio, channel.feedbackOffset, channel.holdStiffness, channel.holdInertia)];
+  public function virtualActuators():Array<VirtualActuatorOptions
+    > return [for (channel in channels) new VirtualActuatorOptions(
+      channel.actuatorId,
+      channel.jointIndex,
+      channel.ratio,
+      channel.offset,
+      channel.stepsPerUnit,
+      channel.minStepTicks,
+      channel.directionSetupTicks,
+      channel.skewBound,
+      channel.feedbackJointIndex,
+      channel.feedbackRatio,
+      channel.feedbackOffset,
+      channel.holdStiffness,
+      channel.holdInertia
+    )];
 
   static function find(robot:RobotModel, id:String):Null<Actuator> {
     for (actuator in robot.actuators) if (actuator.id == id) return actuator;

@@ -15,8 +15,15 @@ class IKResult {
   /** World pose of the robot's root after a solve that moved the base (`IkOptions.movingBase`); null otherwise. */
   public final rootPose:Null<Transform3>;
 
-  public function new(converged:Bool, q:Array<Float>, positionError:Float,
-      orientationError:Float, iterations:Int, status:KinematicStatus, ?rootPose:Transform3) {
+  public function new(
+    converged:Bool,
+    q:Array<Float>,
+    positionError:Float,
+    orientationError:Float,
+    iterations:Int,
+    status:KinematicStatus,
+    ?rootPose:Transform3
+  ) {
     this.converged = converged;
     this.q = q.copy();
     this.positionError = positionError;

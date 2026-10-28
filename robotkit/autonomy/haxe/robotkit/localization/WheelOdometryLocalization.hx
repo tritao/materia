@@ -22,16 +22,18 @@ class WheelOdometryLocalization implements Localization {
   var varianceYaw:Float = 0.0;
   var currentState:Null<LocalizationState> = null;
 
-  public function new(base:MobileBase, ?referenceFrame:String = "odom",
-      ?bodyFrame:String = "base", ?variancePerMeter:Float = 0.01,
-      ?yawVariancePerRadian:Float = 0.02) {
+  public function new(
+    base:MobileBase,
+    ?referenceFrame:String = "odom",
+    ?bodyFrame:String = "base",
+    ?variancePerMeter:Float = 0.01,
+    ?yawVariancePerRadian:Float = 0.02
+  ) {
     if (base == null) throw "Wheel odometry requires a MobileBase";
     var configuredOdometry = base.driveModel.createOdometry();
-    if (configuredOdometry == null)
-      throw "Wheel odometry localization requires a drive model with wheel odometry";
-    if (!Math.isFinite(variancePerMeter) || variancePerMeter < 0.0 ||
-        !Math.isFinite(yawVariancePerRadian) || yawVariancePerRadian < 0.0)
-      throw "Wheel odometry noise rates must be finite and non-negative";
+    if (configuredOdometry == null) throw "Wheel odometry localization requires a drive model with wheel odometry";
+    if (!Math.isFinite(variancePerMeter) || variancePerMeter < 0.0 || !Math.isFinite(yawVariancePerRadian)
+      || yawVariancePerRadian < 0.0) throw "Wheel odometry noise rates must be finite and non-negative";
     this.base = base;
     this.referenceFrame = referenceFrame;
     this.bodyFrame = bodyFrame;
@@ -45,12 +47,25 @@ class WheelOdometryLocalization implements Localization {
     varianceX += variancePerMeter * Math.abs(odometry.lastDistance);
     varianceY += variancePerMeter * Math.abs(odometry.lastDistance);
     varianceYaw += yawVariancePerRadian * Math.abs(odometry.lastHeadingChange);
-    currentState = new LocalizationState(snapshot.sourceSequence, pose,
-      referenceFrame, bodyFrame,
-      new PoseCovariance2(varianceX, covarianceXY, covarianceXYaw,
-        varianceY, covarianceYYaw, varianceYaw),
-      LocalizationQuality.Degraded, snapshot.sourceTimestampNs,
-      snapshot.receivedTimestampNs, snapshot.sourceClockId, snapshot.receivedClockId);
+    currentState = new LocalizationState(
+      snapshot.sourceSequence,
+      pose,
+      referenceFrame,
+      bodyFrame,
+      new PoseCovariance2(
+        varianceX,
+        covarianceXY,
+        covarianceXYaw,
+        varianceY,
+        covarianceYYaw,
+        varianceYaw
+      ),
+      LocalizationQuality.Degraded,
+      snapshot.sourceTimestampNs,
+      snapshot.receivedTimestampNs,
+      snapshot.sourceClockId,
+      snapshot.receivedClockId
+    );
     return currentState;
   }
 
@@ -58,14 +73,19 @@ class WheelOdometryLocalization implements Localization {
 
   /** Re-anchors wheel integration from a same-tick localization observation, retaining its uncertainty. */
   public function rebase(observation:LocalizationState, snapshot:RobotSnapshot):LocalizationState {
-    if (observation == null || snapshot == null)
-      throw "Wheel odometry rebase requires a localization observation and robot snapshot";
-    if (observation.referenceFrame != referenceFrame || observation.bodyFrame != bodyFrame)
-      throw "Wheel odometry rebase localization frames do not match its configured frames";
-    if (observation.sequence != snapshot.sourceSequence)
-      throw "Wheel odometry rebase requires a localization observation from the same snapshot";
-    if (switch observation.quality { case Invalid: true; case _: false; })
-      throw "Wheel odometry cannot rebase from an invalid localization observation";
+    if (observation == null
+      || snapshot == null) throw "Wheel odometry rebase requires a localization observation and robot snapshot";
+    if (observation.referenceFrame != referenceFrame || observation.bodyFrame
+      != bodyFrame) throw "Wheel odometry rebase localization frames do not match its configured frames";
+    if (observation.sequence != snapshot
+      .sourceSequence) throw "Wheel odometry rebase requires a localization observation from the same snapshot";
+    if (switch observation.quality {
+      case Invalid:
+        true;
+      case _:
+        false;
+    }
+    ) throw "Wheel odometry cannot rebase from an invalid localization observation";
 
     odometry.reset(observation.pose);
     varianceX = observation.covariance.xx;

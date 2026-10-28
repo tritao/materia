@@ -10,6 +10,5 @@ class HoldJointBehavior implements WorldBehavior {
     this.target = target;
   }
 
-  public function update(context:WorldBehaviorContext):Void
-    context.jointPosition(joint, target);
+  public function update(context:WorldBehaviorContext):Void context.jointPosition(joint, target);
 }

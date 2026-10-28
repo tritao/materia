@@ -13,8 +13,8 @@ class SimulatedVacuum implements Vacuum {
   var measuredVacuumKpa = 0.0;
 
   public function new(holdThresholdKpa:Float = 40.0) {
-    if (!Math.isFinite(holdThresholdKpa) || holdThresholdKpa <= 0.0)
-      throw "Vacuum hold threshold must be finite and positive";
+    if (!Math.isFinite(holdThresholdKpa)
+      || holdThresholdKpa <= 0.0) throw "Vacuum hold threshold must be finite and positive";
     this.holdThresholdKpa = holdThresholdKpa;
   }
 
@@ -34,8 +34,7 @@ class SimulatedVacuum implements Vacuum {
 
   /** Report measured vacuum magnitude in kPa below ambient pressure. */
   public function observeVacuumKpa(value:Float, timestampNs:Int64):Void {
-    if (!Math.isFinite(value) || value < 0.0)
-      throw "Measured vacuum must be finite and non-negative";
+    if (!Math.isFinite(value) || value < 0.0) throw "Measured vacuum must be finite and non-negative";
     measuredVacuumKpa = value;
     holdingState = enabledState && value >= holdThresholdKpa;
     observations.push(new VacuumObservation(value, holdingState, timestampNs));
@@ -45,8 +44,7 @@ class SimulatedVacuum implements Vacuum {
   public function isHolding():Bool return holdingState;
   public function vacuumKpa():Float return measuredVacuumKpa;
 
-  function record(timestampNs:Int64):Void
-    history.push(new VacuumEvent(enabledState, holdingState, timestampNs));
+  function record(timestampNs:Int64):Void history.push(new VacuumEvent(enabledState, holdingState, timestampNs));
 }
 
 /** One pressure observation and the resulting holding state. */

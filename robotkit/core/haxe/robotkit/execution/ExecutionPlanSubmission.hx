@@ -31,45 +31,56 @@ class ExecutionPlanSubmission {
   public final replaceAfterPlanId:Int64;
   public final replaceAfterTimeNs:Int64;
 
-  public function new(planId:Int64, modelRevision:Int64, calibrationRevision:Int64,
-      requiredCapabilities:Int, startPosition:Array<Float>, startVelocity:Array<Float>,
-      startAcceleration:Array<Float>, segments:Null<Array<TrajectorySegment>>,
-      ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
-      ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
-      ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
-      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays, ?controlAcceleration:Array<Float>, ?purpose:ExecutionPlanPurpose = Program) {
-    var payloadJoints = arrays != null ? arrays.robotJointCount() :
-      segments == null || segments.length == 0 || segments[0] == null ? -1 : segments[0].jointCount;
-    if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
-        startPosition == null || startVelocity == null || startAcceleration == null ||
-        (arrays == null) == (segments == null) ||
-        startPosition.length != startVelocity.length ||
-        startPosition.length != startAcceleration.length ||
-        payloadJoints != startPosition.length)
-      throw "Invalid execution plan submission";
-    for (state in [startPosition, startVelocity, startAcceleration])
-      for (value in state) if (!Math.isFinite(value)) throw "Invalid execution plan start state";
+  public function new(
+    planId:Int64,
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    requiredCapabilities:Int,
+    startPosition:Array<Float>,
+    startVelocity:Array<Float>,
+    startAcceleration:Array<Float>,
+    segments:Null<Array<TrajectorySegment>>,
+    ?replaceAfterPlanId:Int64,
+    ?replaceAfterTimeNs:Int64,
+    ?positionTolerances:Array<Float>,
+    ?velocityTolerances:Array<Float>,
+    ?accelerationTolerances:Array<Float>,
+    ?endsAtRest:Bool = true,
+    ?events:Array<ProcessTimedEvent>,
+    ?jerkUnchecked:Bool = false,
+    ?arrays:SegmentArrays,
+    ?controlAcceleration:Array<Float>,
+    ?purpose:ExecutionPlanPurpose = Program
+  ) {
+    var payloadJoints = arrays != null ? arrays.robotJointCount() : segments == null
+      || segments.length == 0 || segments[0] == null ? -1 : segments[0].jointCount;
+    if (planId == null || Int64.compare(planId,
+      Int64.ofInt(0)) <= 0 || startPosition == null || startVelocity == null || startAcceleration == null
+      || (arrays == null) == (segments == null) || startPosition.length != startVelocity.length || startPosition.length
+      != startAcceleration.length || payloadJoints != startPosition.length) throw "Invalid execution plan submission";
+    for (state in [startPosition, startVelocity,
+      startAcceleration]) for (value in state) if (!Math.isFinite(value)) throw "Invalid execution plan start state";
     var count = arrays != null ? arrays.count() : segments == null ? 0 : segments.length;
-    if (count < 1 || count > RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS)
-      throw "Invalid execution plan segment count";
+    if (count < 1
+      || count > RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS) throw "Invalid execution plan segment count";
     var expected = Int64.ofInt(0);
     if (arrays != null) {
       var origin = arrays.starts.get(0);
       for (index in 0...count) {
         var duration = arrays.durations.get(index);
-        if (Int64.compare(Int64.sub(arrays.starts.get(index), origin), expected) != 0 ||
-            Int64.compare(duration, Int64.ofInt(0)) <= 0 ||
-            arrays.degrees.get(index) < 0 || arrays.degrees.get(index) > SegmentArrays.STRIDE - 1)
-          throw "Execution plan segments must be contiguous";
+        if (Int64.compare(Int64.sub(arrays.starts.get(index), origin), expected) != 0 || Int64.compare(
+          duration,
+          Int64.ofInt(0)
+        ) <= 0 || arrays.degrees.get(index) < 0
+          || arrays.degrees.get(index) > SegmentArrays.STRIDE - 1) throw "Execution plan segments must be contiguous";
         var end = Int64.add(expected, duration);
         if (Int64.compare(end, expected) <= 0) throw "Invalid execution plan duration";
         expected = end;
       }
     } else {
       for (segment in segments) {
-        if (segment == null || segment.jointCount != payloadJoints ||
-            Int64.compare(segment.timeFromStartNs, expected) != 0)
-          throw "Execution plan segments must be contiguous with one joint count";
+        if (segment == null || segment.jointCount != payloadJoints || Int64.compare(segment.timeFromStartNs,
+          expected) != 0) throw "Execution plan segments must be contiguous with one joint count";
         var end = Int64.add(expected, segment.durationNs);
         if (Int64.compare(end, expected) <= 0) throw "Invalid execution plan duration";
         expected = end;
@@ -79,18 +90,16 @@ class ExecutionPlanSubmission {
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.events = events == null ? [] : events.copy();
-    if (purpose != Program && this.events.length > 0)
-      throw "Jog and homing plans cannot carry process events";
+    if (purpose != Program && this.events.length > 0) throw "Jog and homing plans cannot carry process events";
     this.purpose = purpose;
     var previous = Int64.ofInt(0);
     for (event in this.events) {
-      if (event == null || Int64.compare(event.timeNs, previous) < 0 ||
-          Int64.compare(event.timeNs, expected) > 0)
-        throw "Plan events must be sorted and within the plan duration";
+      if (event == null || Int64.compare(event.timeNs, previous) < 0 || Int64.compare(event.timeNs,
+        expected) > 0) throw "Plan events must be sorted and within the plan duration";
       previous = event.timeNs;
     }
-    this.requiredCapabilities = requiredCapabilities |
-      (this.events.length > 0 ? RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS : 0);
+    this.requiredCapabilities = requiredCapabilities | (this.events.length
+      > 0 ? RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS : 0);
     this.startPosition = new ImmutableFloatArray(startPosition);
     this.startVelocity = new ImmutableFloatArray(startVelocity);
     this.startAcceleration = new ImmutableFloatArray(startAcceleration);
@@ -98,20 +107,18 @@ class ExecutionPlanSubmission {
     var pTol = positionTolerances == null ? [for (_ in 0...joints) 0.0] : positionTolerances;
     var vTol = velocityTolerances == null ? [for (_ in 0...joints) 0.0] : velocityTolerances;
     var aTol = accelerationTolerances == null ? [for (_ in 0...joints) 0.0] : accelerationTolerances;
-    if (pTol.length != joints || vTol.length != joints || aTol.length != joints)
-      throw "Execution plan tolerance count mismatch";
-    for (joint in 0...joints)
-      if (!Math.isFinite(pTol[joint]) || pTol[joint] < 0.0 ||
-          !Math.isFinite(vTol[joint]) || vTol[joint] < 0.0 ||
-          !Math.isFinite(aTol[joint]) || aTol[joint] < 0.0)
-        throw "Invalid execution plan start tolerance";
+    if (pTol.length != joints
+      || vTol.length != joints || aTol.length != joints) throw "Execution plan tolerance count mismatch";
+    for (joint in 0...joints) if (!Math.isFinite(pTol[joint])
+      || pTol[joint] < 0.0 || !Math.isFinite(vTol[joint]) || vTol[joint] < 0.0
+      || !Math.isFinite(aTol[joint]) || aTol[joint] < 0.0) throw "Invalid execution plan start tolerance";
     this.positionTolerances = new ImmutableFloatArray(pTol);
     this.velocityTolerances = new ImmutableFloatArray(vTol);
     this.accelerationTolerances = new ImmutableFloatArray(aTol);
     var control = controlAcceleration == null ? [for (_ in 0...joints) 0.0] : controlAcceleration;
     if (control.length != joints) throw "Execution plan control acceleration joint count mismatch";
-    for (value in control) if (!Math.isFinite(value) || value < 0.0)
-      throw "Invalid execution plan control acceleration";
+    for (value in control) if (!Math.isFinite(value)
+      || value < 0.0) throw "Invalid execution plan control acceleration";
     this.controlAcceleration = new ImmutableFloatArray(control);
     this.endsAtRest = endsAtRest;
     this.jerkUnchecked = jerkUnchecked;
@@ -125,16 +132,43 @@ class ExecutionPlanSubmission {
     A plan whose payload is native segment arrays, read in place by an
     in-process runtime and copied out for any other robot.
   **/
-  public static function ofArrays(planId:Int64, modelRevision:Int64, calibrationRevision:Int64,
-      requiredCapabilities:Int, startPosition:Array<Float>, startVelocity:Array<Float>,
-      startAcceleration:Array<Float>, arrays:SegmentArrays, positionTolerances:Array<Float>,
-      velocityTolerances:Array<Float>, accelerationTolerances:Array<Float>, endsAtRest:Bool,
-      events:Array<ProcessTimedEvent>, jerkUnchecked:Bool,
-      ?purpose:ExecutionPlanPurpose = Program):ExecutionPlanSubmission
-    return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
-      requiredCapabilities, startPosition, startVelocity, startAcceleration, null, null, null,
-      positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest, events,
-      jerkUnchecked, arrays, null, purpose);
+  public static function ofArrays(
+    planId:Int64,
+    modelRevision:Int64,
+    calibrationRevision:Int64,
+    requiredCapabilities:Int,
+    startPosition:Array<Float>,
+    startVelocity:Array<Float>,
+    startAcceleration:Array<Float>,
+    arrays:SegmentArrays,
+    positionTolerances:Array<Float>,
+    velocityTolerances:Array<Float>,
+    accelerationTolerances:Array<Float>,
+    endsAtRest:Bool,
+    events:Array<ProcessTimedEvent>,
+    jerkUnchecked:Bool,
+    ?purpose:ExecutionPlanPurpose = Program
+  ):ExecutionPlanSubmission return new ExecutionPlanSubmission(
+    planId,
+    modelRevision,
+    calibrationRevision,
+    requiredCapabilities,
+    startPosition,
+    startVelocity,
+    startAcceleration,
+    null,
+    null,
+    null,
+    positionTolerances,
+    velocityTolerances,
+    accelerationTolerances,
+    endsAtRest,
+    events,
+    jerkUnchecked,
+    arrays,
+    null,
+    purpose
+  );
 
   function get_segments():Array<TrajectorySegment> {
     var stored = storedSegments;
@@ -153,10 +187,25 @@ class ExecutionPlanSubmission {
     return null;
   }
 
-  public function copy():ExecutionPlanSubmission
-    return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
-      requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
-      startAcceleration.toArray(), arrays == null ? segments : null, replaceAfterPlanId,
-      replaceAfterTimeNs, positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays, controlAcceleration.toArray(), purpose);
+  public function copy():ExecutionPlanSubmission return new ExecutionPlanSubmission(
+    planId,
+    modelRevision,
+    calibrationRevision,
+    requiredCapabilities,
+    startPosition.toArray(),
+    startVelocity.toArray(),
+    startAcceleration.toArray(),
+    arrays == null ? segments : null,
+    replaceAfterPlanId,
+    replaceAfterTimeNs,
+    positionTolerances.toArray(),
+    velocityTolerances.toArray(),
+    accelerationTolerances.toArray(),
+    endsAtRest,
+    events,
+    jerkUnchecked,
+    arrays,
+    controlAcceleration.toArray(),
+    purpose
+  );
 }

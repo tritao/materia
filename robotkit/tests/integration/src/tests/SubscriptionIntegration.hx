@@ -36,13 +36,11 @@ class SubscriptionIntegration {
         images.poll();
         numeric.wait(0.01);
       }
-      if (numericFrames == 0 || imageCameras == 0 || numericCameras != 0)
-        throw 'RKF1 subscription filtering failed: numeric=$numericFrames camera=$imageCameras filtered=$numericCameras';
+      if (numericFrames == 0 || imageCameras == 0 || numericCameras
+        != 0) throw 'RKF1 subscription filtering failed: numeric=$numericFrames camera=$imageCameras filtered=$numericCameras';
       var welcome = numeric.welcome;
-      if (welcome == null || welcome.capabilities.indexOf("essential") < 0 ||
-          welcome.capabilities.indexOf("sensor") < 0 ||
-          welcome.capabilities.indexOf("camera") < 0)
-        throw "RKF1 Welcome stream capabilities are incomplete";
+      if (welcome == null || welcome.capabilities.indexOf("essential") < 0 || welcome.capabilities.indexOf("sensor") < 0
+        || welcome.capabilities.indexOf("camera") < 0) throw "RKF1 Welcome stream capabilities are incomplete";
       Sys.println("robotd subscriptions filtered camera per observer and reported capabilities");
     } catch (error:Dynamic) failure = error;
     images.close();

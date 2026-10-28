@@ -26,29 +26,42 @@ class RobotRuntimeCompiler {
    * This is the domain-typing boundary: it checks topology and backend
    * support before assigning deterministic runtime indices.
    */
-  public static function compile(robot:RobotModel, profile:RobotProfile, ?revision:Int = 1,
-      ?calibrationRevision:Int = 0):RobotRuntimeBlueprint {
+  public static function compile(
+    robot:RobotModel,
+    profile:RobotProfile,
+    ?revision:Int = 1,
+    ?calibrationRevision:Int = 0
+  ):RobotRuntimeBlueprint {
     var diagnostics = validate(robot, profile, revision, calibrationRevision);
-    if (diagnostics.length > 0)
-      throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
+    if (diagnostics.length > 0) throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
     // A robot whose authored sensors are all external still gets the native
     // runtime's default sensor slots, ahead of its authored ones.
     var authoredNativeSensors = false;
-    for (sensor in robot.sensors)
-      if (!RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind)) authoredNativeSensors = true;
+    for (sensor in robot.sensors) if (!RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind)) authoredNativeSensors =
+      true;
     var sensorIdentityIds = [for (sensor in robot.sensors) sensor.id];
-    if (!authoredNativeSensors)
-      sensorIdentityIds = ["joint_encoders", "imu", "lidar"].concat(sensorIdentityIds);
-    var result = new RobotRuntimeBlueprint(revision, robot.joints.length,
-      robot.links.length, robot.frames.length, new RobotRuntimeIdentity(
+    if (!authoredNativeSensors) sensorIdentityIds = ["joint_encoders", "imu", "lidar"].concat(sensorIdentityIds);
+    var result = new RobotRuntimeBlueprint(
+      revision,
+      robot.joints.length,
+      robot.links.length,
+      robot.frames.length,
+      new RobotRuntimeIdentity(
         [for (link in robot.links) link.id],
         [for (joint in robot.joints) joint.id],
         sensorIdentityIds,
         [for (frame in robot.frames) frame.id],
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
-        [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
-      compileConfiguration(robot, profile), calibrationRevision);
+        [for (link in robot.links) link.collisionGeometry],
+        robot.collisionApproximation
+      ),
+      compileConfiguration(
+        robot,
+        profile
+      ),
+      calibrationRevision
+    );
     for (actuator in robot.actuators) {
       var drive = actuator.drive;
       var cylinder = drive == null ? null : drive.cylinder();
@@ -66,19 +79,31 @@ class RobotRuntimeCompiler {
     }
 
     for (contact in robot.switches) result.switches.push(new robotkit.model.JointSwitch(
-      contact.id, contact.joint, contact.frameId, contact.role, contact.side, contact.trip,
-      contact.hysteresis, contact.repeatability, contact.seed, contact.driveJoint, contact.homeAfter));
+      contact.id,
+      contact.joint,
+      contact.frameId,
+      contact.role,
+      contact.side,
+      contact.trip,
+      contact.hysteresis,
+      contact.repeatability,
+      contact.seed,
+      contact.driveJoint,
+      contact.homeAfter
+    ));
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
-      case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
-      case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
-      default: throw 'Unknown collision approximation ${robot.collisionApproximation}';
+      case CollisionApproximation.None:
+        RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
+      case CollisionApproximation.BoundsBox:
+        RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+      default:
+        throw 'Unknown collision approximation ${robot.collisionApproximation}';
     };
     for (index in 0...robot.links.length) {
       var link = robot.links[index];
       result.links[index] = new RobotRuntimeLinkBlueprint(link.mass, link.centerOfMass, link.inertiaTensor);
-      for (shape in link.collisionShapes)
-        result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
+      for (shape in link.collisionShapes) result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
     }
     var inCoupling = new Map<String, Bool>();
     for (coupling in robot.couplings) {
@@ -89,23 +114,35 @@ class RobotRuntimeCompiler {
       var joint:robotkit.model.Joint = robot.joints[index];
       var parent = robot.links.indexOf(joint.parent);
       var child = robot.links.indexOf(joint.child);
-      if (parent < 0 || child < 0)
-        throw 'Joint ${joint.name} references a link outside robot ${robot.name}';
+      if (parent < 0 || child < 0) throw 'Joint ${joint.name} references a link outside robot ${robot.name}';
       var nativeType = switch (joint.type) {
-        case JointType.Fixed: RobotKitRuntimeConstants.RK_RUNTIME_JOINT_FIXED;
+        case JointType.Fixed:
+          RobotKitRuntimeConstants.RK_RUNTIME_JOINT_FIXED;
         case JointType.Revolute, JointType.Continuous:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
-        case JointType.Prismatic: RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
+        case JointType.Prismatic:
+          RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
         case JointType.Floating:
           throw 'Joint ${joint.name} has unsupported floating type; set RobotModel.floatingBase';
         default:
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
-      var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
-        joint.limits.lower, joint.limits.upper, joint.limits.effort, joint.limits.velocity,
-        joint.parentFramePosition, joint.parentFrameRotation,
-        joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        joint.limits.maxAcceleration);
+      var compiled = new RobotRuntimeJointBlueprint(
+        index,
+        nativeType,
+        parent,
+        child,
+        joint.limits.lower,
+        joint.limits.upper,
+        joint.limits.effort,
+        joint.limits.velocity,
+        joint.parentFramePosition,
+        joint.parentFrameRotation,
+        joint.childFramePosition,
+        joint.childFrameRotation,
+        joint.axis,
+        joint.limits.maxAcceleration
+      );
       compiled.overtravel = joint.limits.overtravel;
       compiled.passive = joint.passive;
       for (actuator in robot.actuators) switch actuator.transmission {
@@ -117,10 +154,22 @@ class RobotRuntimeCompiler {
           }
           if (actuator.processVelocity != null) {
             var process = actuator.processVelocity;
-            result.velocityDrives.push(new RobotRuntimeVelocityDriveBlueprint(index,
-              process.speedChannel, process.directionChannel, process.radiansPerSpeedUnit,
-              requiredProcessLimit(actuator.maxEffort, actuator.id, "effort") * Math.abs(ratio) * actuator.efficiency,
-              requiredProcessLimit(actuator.maxRate, actuator.id, "rate") / Math.abs(ratio)));
+            result.velocityDrives.push(new RobotRuntimeVelocityDriveBlueprint(
+              index,
+              process.speedChannel,
+              process.directionChannel,
+              process.radiansPerSpeedUnit,
+              requiredProcessLimit(
+                actuator.maxEffort,
+                actuator.id,
+                "effort"
+              ) * Math.abs(ratio) * actuator.efficiency,
+              requiredProcessLimit(
+                actuator.maxRate,
+                actuator.id,
+                "rate"
+              ) / Math.abs(ratio)
+            ));
           }
         case _:
       }
@@ -131,24 +180,23 @@ class RobotRuntimeCompiler {
         case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
           var drive = actuator.drive;
           var servo = drive == null ? null : drive.servo();
-          if (actuator.processVelocity == null && servo != null &&
-              (inCoupling.exists(joint.id) || robot.brakes.filter(brake->brake.joint==joint.id).length>0 || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)) {
-          var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : servo.defaultStiffness();
-          var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
-          compiled.servoStiffness += stiffness * ratio * ratio;
-          compiled.servoDamping += damping * ratio * ratio;
-          compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
-          // The inertia the servo's spring is integrated against. A rigid load turns with the shaft; a compliant one (a
-          // belt, a screw's stretch) does not, so the shaft turns only itself and its rotor, however heavy the load.
-          if (robot.followsSpring(joint.id)) {
-            compiled.compliantLoad = true;
-            compiled.reflectedInertia += Math.max(robot.turningInertia(joint), servo.rotorInertia * ratio * ratio);
-          } else for (load in robotkit.model.DriveLoads.of(robot))
-            if (load.motors.length == 1) {
+          if (actuator.processVelocity == null && servo != null
+            && (inCoupling.exists(joint.id) || robot.brakes.filter(brake -> brake.joint == joint.id).length > 0
+            || actuator.servoStiffness > 0.0 || actuator.servoDamping > 0.0)) {
+            var stiffness = actuator.servoStiffness > 0.0 ? actuator.servoStiffness : servo.defaultStiffness();
+            var damping = actuator.servoDamping > 0.0 ? actuator.servoDamping : ServoDrive.defaultDamping(stiffness);
+            compiled.servoStiffness += stiffness * ratio * ratio;
+            compiled.servoDamping += damping * ratio * ratio;
+            compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
+            // The inertia the servo's spring is integrated against. A rigid load turns with the shaft; a compliant one (a
+            // belt, a screw's stretch) does not, so the shaft turns only itself and its rotor, however heavy the load.
+            if (robot.followsSpring(joint.id)) {
+              compiled.compliantLoad = true;
+              compiled.reflectedInertia += Math.max(robot.turningInertia(joint), servo.rotorInertia * ratio * ratio);
+            } else for (load in robotkit.model.DriveLoads.of(robot)) if (load.motors.length == 1) {
               var motor = load.motors[0];
-              if (motor.actuator.id == actuator.id)
-                compiled.reflectedInertia += load.axis == joint.id ? load.mass :
-                  (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio)) * ratio * ratio;
+              if (motor.actuator.id == actuator.id) compiled.reflectedInertia += load.axis == joint.id
+                ? load.mass : (motor.rotorInertia + load.mass / (motor.ratio * motor.ratio)) * ratio * ratio;
             }
           }
         case _:
@@ -171,11 +219,10 @@ class RobotRuntimeCompiler {
     for (pair in robot.contactPairs) {
       // Validation guarantees both links exist.
       var firstAValue = firstShape.get(pair.linkA), firstBValue = firstShape.get(pair.linkB);
-      if (firstAValue == null || firstBValue == null)
-        throw 'Contact pair "${pair.linkA}/${pair.linkB}" references an unknown link';
+      if (firstAValue == null
+        || firstBValue == null) throw 'Contact pair "${pair.linkA}/${pair.linkB}" references an unknown link';
       var firstA = firstAValue, firstB = firstBValue;
-      result.contactPairs.push(new RobotRuntimeContactPair(firstA + pair.shapeA,
-        firstB + pair.shapeB, pair.surface));
+      result.contactPairs.push(new RobotRuntimeContactPair(firstA + pair.shapeA, firstB + pair.shapeB, pair.surface));
     }
     for (coupling in robot.couplings) {
       var leader = -1, follower = -1;
@@ -183,50 +230,87 @@ class RobotRuntimeCompiler {
         if (robot.joints[index].id == coupling.leader) leader = index;
         if (robot.joints[index].id == coupling.follower) follower = index;
       }
-      var compiledCoupling = new RobotRuntimeJointCouplingBlueprint(
-        leader, follower, coupling.ratio, coupling.offset);
+      var compiledCoupling = new RobotRuntimeJointCouplingBlueprint(leader, follower, coupling.ratio, coupling.offset);
       compiledCoupling.stiffness = coupling.stiffness / (coupling.ratio * coupling.ratio);
       compiledCoupling.dampingRatio = coupling.dampingRatio;
-      if (coupling.stiffnessLaw != null) compiledCoupling.stiffnessLaw = [
-        for (spring in coupling.stiffnessLaw.springs) {compliance:spring.compliance*coupling.ratio*coupling.ratio,
+      if (coupling.stiffnessLaw
+        != null) compiledCoupling.stiffnessLaw = [for (spring in coupling.stiffnessLaw.springs) {
+        compliance:spring.compliance * coupling.ratio * coupling.ratio,
           coordinates:[for (coordinate in spring.coordinates) {
-            var joint = -1;
-            for (index in 0...robot.joints.length) if (robot.joints[index].id == coordinate.joint) joint = index;
-            if (joint<0) throw 'Unknown stiffness joint "${coordinate.joint}"';
-            {joint:joint,coefficient:coordinate.coefficient*coupling.ratio*coupling.ratio};
-          }]}
+          var joint = -1;
+          for (index in 0...robot.joints.length) if (robot.joints[index].id == coordinate.joint) joint = index;
+          if (joint < 0) throw 'Unknown stiffness joint "${coordinate.joint}"';
+          {
+            joint:joint, coefficient:coordinate.coefficient * coupling.ratio * coupling.ratio
+          };
+        }
+        ]
+      }
       ];
       result.couplings.push(compiledCoupling);
     }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];
-    for (link in robot.links) if (children.indexOf(link) < 0) { root = link; break; }
-    if (!authoredNativeSensors)
-      for (sensor in RobotRuntimeSensorBlueprint.defaults(robot.links.indexOf(root), root.id))
-        result.sensors.push(sensor);
+    for (link in robot.links) if (children.indexOf(link) < 0) {
+      root = link;
+      break;
+    }
+    if (!authoredNativeSensors) for (sensor in RobotRuntimeSensorBlueprint.defaults(robot.links.indexOf(root),
+      root.id)) result.sensors.push(sensor);
     for (sensor in robot.sensors) {
       var frame = sensor.frame;
       var link = frame == null ? root : frame.link;
       var sensorJoint = -1;
-      if (sensor.joint != null) for (jointIndex in 0...robot.joints.length)
-        if (robot.joints[jointIndex].id == sensor.joint) sensorJoint = jointIndex;
-      result.sensors.push(new RobotRuntimeSensorBlueprint(sensor.id, sensor.kind,
-        frame == null ? link.id : frame.id, link.id, robot.links.indexOf(link),
-        frame == null ? [0.0, 0.0, 0.0] : frame.position,
-        frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
-        sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed,
-        sensor.startAngleRadians, sensor.fieldOfViewRadians, sensorJoint,
-        sensor.windowLower, sensor.windowUpper, sensor.hysteresis, sensor.zoneBoxes));
+      if (sensor.joint != null) for (jointIndex in 0...robot.joints.length) if (robot.joints[jointIndex].id
+        == sensor.joint) sensorJoint = jointIndex;
+      result.sensors.push(new RobotRuntimeSensorBlueprint(
+        sensor.id,
+        sensor.kind,
+        frame == null ? link.id : frame.id,
+        link.id,
+        robot.links.indexOf(link),
+        frame == null ? [
+          0.0,
+          0.0,
+          0.0
+        ] : frame.position,
+        frame == null ? [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ] : frame.rotation,
+        sensor.updateRate,
+        sensor.rayCount,
+        sensor.maxRange,
+        sensor.noiseStddev,
+        sensor.noiseSeed,
+        sensor.startAngleRadians,
+        sensor.fieldOfViewRadians,
+        sensorJoint,
+        sensor.windowLower,
+        sensor.windowUpper,
+        sensor.hysteresis,
+        sensor.zoneBoxes
+      ));
     }
     for (brake in robot.brakes) {
       var jointIndex = -1;
       for (i in 0...robot.joints.length) if (robot.joints[i].id == brake.joint) jointIndex = i;
       ensureDigitalChannel(result, brake.releaseChannel, true);
-      result.brakes.push(new RobotRuntimeBrakeBlueprint(jointIndex, brake.releaseChannel,
-        brake.releasedSensor, haxe.Int64.ofInt(brake.releaseTimeoutMs) * haxe.Int64.ofInt(1000000),
-        haxe.Int64.ofInt(brake.feedbackMaxAgeMs) * haxe.Int64.ofInt(1000000)));
-      result.brakePhysics.push(new RobotRuntimeBrakePhysicsBlueprint(jointIndex,
-        brake.holdingEffort, brake.releaseDelay, brake.applicationDelay));
+      result.brakes.push(new RobotRuntimeBrakeBlueprint(
+        jointIndex,
+        brake.releaseChannel,
+        brake.releasedSensor,
+        haxe.Int64.ofInt(brake.releaseTimeoutMs) * haxe.Int64.ofInt(1000000),
+        haxe.Int64.ofInt(brake.feedbackMaxAgeMs) * haxe.Int64.ofInt(1000000)
+      ));
+      result.brakePhysics.push(new RobotRuntimeBrakePhysicsBlueprint(
+        jointIndex,
+        brake.holdingEffort,
+        brake.releaseDelay,
+        brake.applicationDelay
+      ));
     }
     return result;
   }
@@ -237,8 +321,8 @@ class RobotRuntimeCompiler {
   }
 
   static function requiredProcessLimit(value:Null<Float>, actuatorId:String, label:String):Float {
-    if (value == null || !(value > 0.0) || !Math.isFinite(value))
-      throw 'Process actuator "$actuatorId" needs a positive finite $label limit';
+    if (value == null || !(value > 0.0)
+      || !Math.isFinite(value)) throw 'Process actuator "$actuatorId" needs a positive finite $label limit';
     return value;
   }
 
@@ -249,36 +333,39 @@ class RobotRuntimeCompiler {
   }
 
   /** Whether a joint is the follower of a spring coupling (stiffness and a damping ratio, simulated as a spring): a belt's pulley. */
-  static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String,
-      keepOnStop:Bool):Void {
+  static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String, keepOnStop:Bool):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
-      if (channel.safeValue != robotkit.execution.ProcessEventValue.Digital(false))
-        throw 'Cylinder valve channel "$id" must be digital and safe when de-energized';
-      if (channel.keepOnStop != keepOnStop)
-        throw 'Cylinder valve channel "$id" has the wrong normal-stop policy';
+      if (channel.safeValue != robotkit.execution.ProcessEventValue
+        .Digital(false)) throw 'Cylinder valve channel "$id" must be digital and safe when de-energized';
+      if (channel.keepOnStop != keepOnStop) throw 'Cylinder valve channel "$id" has the wrong normal-stop policy';
       return;
     }
-    blueprint.channels.push(new ProcessChannelDeclaration(id,
-      robotkit.execution.ProcessEventValue.Digital(false), keepOnStop));
+    blueprint.channels.push(new ProcessChannelDeclaration(
+      id,
+      robotkit.execution.ProcessEventValue.Digital(false),
+      keepOnStop
+    ));
   }
 
   static function ensureAnalogChannel(blueprint:RobotRuntimeBlueprint, id:String):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
-      if (channel.safeValue != ProcessEventValue.Analog(0.0))
-        throw 'Process velocity channel "$id" must be analog and safe at zero';
+      if (channel.safeValue
+        != ProcessEventValue.Analog(0.0)) throw 'Process velocity channel "$id" must be analog and safe at zero';
       return;
     }
-    blueprint.channels.push(new ProcessChannelDeclaration(id,
-      ProcessEventValue.Analog(0.0), false));
+    blueprint.channels.push(new ProcessChannelDeclaration(id, ProcessEventValue.Analog(0.0), false));
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
-  public static function validate(robot:RobotModel, profile:RobotProfile, ?revision:Int = 1,
-      ?calibrationRevision:Int = 0):Array<RobotCompileDiagnostic> {
+  public static function validate(
+    robot:RobotModel,
+    profile:RobotProfile,
+    ?revision:Int = 1,
+    ?calibrationRevision:Int = 0
+  ):Array<RobotCompileDiagnostic> {
     var diagnostics:Array<RobotCompileDiagnostic> = [];
     if (robot == null) {
-      diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NULL", "robot",
-        "robot model is null"));
+      diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NULL", "robot", "robot model is null"));
       return diagnostics;
     }
     if (profile == null) {
@@ -297,33 +384,52 @@ class RobotRuntimeCompiler {
       for (joint in robot.joints) if (joint != null && joint.id == contact.driveJoint) driveFound = true;
       for (joint in robot.joints) if (joint != null && joint.id == contact.joint) jointFound = true;
       for (frame in robot.frames) if (frame != null && frame.id == contact.frameId) frameFound = true;
-      for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "trip_switch" &&
-          sensor.frame != null && sensor.frame.id == contact.frameId) sensorFound = true;
-      if (switchIds.exists(contact.id) || !jointFound || !frameFound || !sensorFound || !driveFound)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SWITCH_BINDING", path,
-          "switch needs a unique ID, monitored joint and matching mounted external digital sensor"));
+      for (sensor in robot.sensors) if (sensor != null && sensor.id == contact.id && sensor.kind == "trip_switch"
+        && sensor.frame != null && sensor.frame.id == contact.frameId) sensorFound = true;
+      if (switchIds.exists(contact.id)
+        || !jointFound || !frameFound || !sensorFound || !driveFound) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SWITCH_BINDING",
+          path,
+          "switch needs a unique ID, monitored joint and matching mounted external digital sensor"
+        ));
       switchIds.set(contact.id, true);
     }
-    if (revision < 0)
-      diagnostics.push(new RobotCompileDiagnostic("RK_REVISION", "revision",
-        "runtime revision must be non-negative"));
-    if (calibrationRevision < 0)
-      diagnostics.push(new RobotCompileDiagnostic("RK_CALIBRATION_REVISION", "calibrationRevision",
-        "runtime calibration revision must be non-negative"));
-    if (robot.name == null || robot.name.length == 0)
-      diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NAME", "robot.name",
-        "robot name is empty"));
-    if (robot.links.length == 0)
-      diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_EMPTY", "links",
-        "robot must contain at least one link"));
-    if (robot.joints.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
-      diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_LIMIT", "joints",
-        'robot contains ${robot.joints.length} joints, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_JOINTS}'));
-    if (robot.links.length > RobotKitRuntimeConstants.RK_MAX_LINKS)
-      diagnostics.push(new RobotCompileDiagnostic("RK_LINK_LIMIT", "links",
-        'robot contains ${robot.links.length} links, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_LINKS}'));
-    if (robot.collisionApproximation != CollisionApproximation.None && robot.collisionApproximation != CollisionApproximation.BoundsBox)
-      diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_APPROXIMATION", "collisionApproximation", "unsupported collision approximation"));
+    if (revision < 0) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_REVISION",
+      "revision",
+      "runtime revision must be non-negative"
+    ));
+    if (calibrationRevision < 0) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_CALIBRATION_REVISION",
+      "calibrationRevision",
+      "runtime calibration revision must be non-negative"
+    ));
+    if (robot.name == null || robot.name.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_MODEL_NAME",
+      "robot.name",
+      "robot name is empty"
+    ));
+    if (robot.links.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_TOPOLOGY_EMPTY",
+      "links",
+      "robot must contain at least one link"
+    ));
+    if (robot.joints.length > RobotKitRuntimeConstants.RK_MAX_JOINTS) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_JOINT_LIMIT",
+      "joints",
+      'robot contains ${robot.joints.length} joints, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_JOINTS}'
+    ));
+    if (robot.links.length > RobotKitRuntimeConstants.RK_MAX_LINKS) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_LINK_LIMIT",
+      "links",
+      'robot contains ${robot.links.length} links, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_LINKS}'
+    ));
+    if (robot.collisionApproximation != CollisionApproximation.None
+      && robot.collisionApproximation != CollisionApproximation.BoundsBox) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COLLISION_APPROXIMATION",
+        "collisionApproximation",
+        "unsupported collision approximation"
+      ));
 
     var linkIds = new Map<String, Bool>();
     var linkNames = new Map<String, Bool>();
@@ -331,43 +437,65 @@ class RobotRuntimeCompiler {
       var link = robot.links[index];
       var path = 'links[$index]';
       if (link == null) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_NULL", path,
-          "link is null"));
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_NULL", path, "link is null"));
         continue;
       }
-      if (link.id == null || link.id.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_ID", '$path.id',
-          "link ID is empty"));
-      else if (linkIds.exists(link.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_ID_DUPLICATE", '$path.id',
-          'duplicate link ID "${link.id}"'));
-      else
-        linkIds.set(link.id, true);
-      if (link.name == null || link.name.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_NAME", '$path.name',
-          "link name is empty"));
-      else if (linkNames.exists(link.name))
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_DUPLICATE", '$path.name',
-          'duplicate link name "${link.name}"'));
-      else
-        linkNames.set(link.name, true);
-      if (!Math.isFinite(link.mass) || link.mass <= 0.0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_MASS", '$path.mass', "link mass must be finite and positive"));
-      if (!validVector(link.centerOfMass, 3))
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_COM", '$path.centerOfMass', "center of mass requires three finite values"));
-      if (!validInertia(link.inertiaTensor))
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_INERTIA", '$path.inertiaTensor', "inertia tensor must be finite, symmetric, and positive definite"));
-      if (!validGeometryReference(link.visualGeometry) || !validGeometryReference(link.collisionGeometry))
-        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_GEOMETRY", path, "geometry reference must be null or a non-empty string"));
-      if (link.collisionShapes == null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE", '$path.collisionShapes',
-          "collision shape list is missing"));
+      if (link.id == null || link.id.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_ID",
+        '$path.id',
+        "link ID is empty"
+      ));
+      else if (linkIds.exists(link.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_ID_DUPLICATE",
+        '$path.id',
+        'duplicate link ID "${link.id}"'
+      ));
+      else linkIds.set(link.id, true);
+      if (link.name == null || link.name.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_NAME",
+        '$path.name',
+        "link name is empty"
+      ));
+      else if (linkNames.exists(link.name)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_DUPLICATE",
+        '$path.name',
+        'duplicate link name "${link.name}"'
+      ));
+      else linkNames.set(link.name, true);
+      if (!Math.isFinite(link.mass) || link.mass <= 0.0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_MASS",
+        '$path.mass',
+        "link mass must be finite and positive"
+      ));
+      if (!validVector(link.centerOfMass, 3)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_COM",
+        '$path.centerOfMass',
+        "center of mass requires three finite values"
+      ));
+      if (!validInertia(link.inertiaTensor)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LINK_INERTIA",
+        '$path.inertiaTensor',
+        "inertia tensor must be finite, symmetric, and positive definite"
+      ));
+      if (!validGeometryReference(link.visualGeometry)
+        || !validGeometryReference(link.collisionGeometry)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_LINK_GEOMETRY",
+          path,
+          "geometry reference must be null or a non-empty string"
+        ));
+      if (link.collisionShapes == null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COLLISION_SHAPE",
+        '$path.collisionShapes',
+        "collision shape list is missing"
+      ));
       else for (shapeIndex in 0...link.collisionShapes.length) {
         var shape = link.collisionShapes[shapeIndex];
         var error = shape == null ? "collision shape is null" : shape.validate();
-        if (error != null)
-          diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE",
-            '$path.collisionShapes[$shapeIndex]', error));
+        if (error != null) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_COLLISION_SHAPE",
+          '$path.collisionShapes[$shapeIndex]',
+          error
+        ));
       }
     }
 
@@ -384,81 +512,116 @@ class RobotRuntimeCompiler {
       var joint = robot.joints[index];
       var path = 'joints[$index]';
       if (joint == null) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_NULL", path,
-          "joint is null"));
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_NULL", path, "joint is null"));
         continue;
       }
-      if (joint.id == null || joint.id.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_ID", '$path.id',
-          "joint ID is empty"));
-      else if (jointIds.exists(joint.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_ID_DUPLICATE", '$path.id',
-          'duplicate joint ID "${joint.id}"'));
-      else
-        jointIds.set(joint.id, true);
-      if (joint.name == null || joint.name.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_NAME", '$path.name',
-          "joint name is empty"));
-      else if (jointNames.exists(joint.name))
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_DUPLICATE", '$path.name',
-          'duplicate joint name "${joint.name}"'));
-      else
-        jointNames.set(joint.name, true);
+      if (joint.id == null || joint.id.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_ID",
+        '$path.id',
+        "joint ID is empty"
+      ));
+      else if (jointIds.exists(joint.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_ID_DUPLICATE",
+        '$path.id',
+        'duplicate joint ID "${joint.id}"'
+      ));
+      else jointIds.set(joint.id, true);
+      if (joint.name == null || joint.name.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_NAME",
+        '$path.name',
+        "joint name is empty"
+      ));
+      else if (jointNames.exists(joint.name)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_DUPLICATE",
+        '$path.name',
+        'duplicate joint name "${joint.name}"'
+      ));
+      else jointNames.set(joint.name, true);
 
       var parent = joint.parent == null ? -1 : robot.links.indexOf(joint.parent);
       var child = joint.child == null ? -1 : robot.links.indexOf(joint.child);
-      if (joint.parent == null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_PARENT_NULL", '$path.parent',
-          "joint parent is null"));
-      else if (parent < 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_PARENT_FOREIGN", '$path.parent',
-          "joint parent does not belong to this robot"));
-      if (joint.child == null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_CHILD_NULL", '$path.child',
-          "joint child is null"));
-      else if (child < 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_CHILD_FOREIGN", '$path.child',
-          "joint child does not belong to this robot"));
+      if (joint.parent == null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_PARENT_NULL",
+        '$path.parent',
+        "joint parent is null"
+      ));
+      else if (parent < 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_PARENT_FOREIGN",
+        '$path.parent',
+        "joint parent does not belong to this robot"
+      ));
+      if (joint.child == null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_CHILD_NULL",
+        '$path.child',
+        "joint child is null"
+      ));
+      else if (child < 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_CHILD_FOREIGN",
+        '$path.child',
+        "joint child does not belong to this robot"
+      ));
       if (parent >= 0 && child >= 0) {
-        if (parent == child)
-          diagnostics.push(new RobotCompileDiagnostic("RK_SELF_JOINT", path,
-            "joint parent and child must be different links"));
+        if (parent == child) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SELF_JOINT",
+          path,
+          "joint parent and child must be different links"
+        ));
         else {
           adjacency[parent].push(child);
           indegree[child]++;
         }
       }
 
-      if (joint.passive && (joint.type == JointType.Fixed || joint.type == JointType.Floating))
-        diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_JOINT", path,
-          "passive ownership requires a movable single-axis joint"));
-      if (joint.limits == null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS_NULL", '$path.limits',
-          "joint limits are missing"));
+      if (joint.passive && (joint.type == JointType.Fixed
+        || joint.type == JointType.Floating)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_PASSIVE_JOINT",
+          path,
+          "passive ownership requires a movable single-axis joint"
+        ));
+      if (joint.limits == null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_LIMITS_NULL",
+        '$path.limits',
+        "joint limits are missing"
+      ));
       else {
         var limitError = joint.limits.validate();
-        if (limitError != null)
-          diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS", '$path.limits', limitError));
+        if (limitError != null) diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS", '$path.limits', limitError));
       }
-      if (!validVector(joint.parentFramePosition, 3) || !validRotation(joint.parentFrameRotation)
-          || !validVector(joint.childFramePosition, 3) || !validRotation(joint.childFrameRotation))
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_FRAME", path, "joint frames require finite translations and unit xyzw quaternions"));
-      if (!validUnitVector(joint.axis))
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
-      if (!(joint.armature >= 0.0) || !(joint.damping >= 0.0) || !(joint.frictionLoss >= 0.0) ||
-          !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping) || !Math.isFinite(joint.frictionLoss) ||
-          !(joint.limitTimeConstant >= 0.0) || !(joint.limitDampingRatio >= 0.0) ||
-          !Math.isFinite(joint.limitTimeConstant) || !Math.isFinite(joint.limitDampingRatio) ||
-          !validVector(joint.limitImpedance, 5))
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_DYNAMICS", path,
-          "joint armature, damping and friction loss must be finite and non-negative"));
-      if (joint.type == JointType.Floating)
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_UNSUPPORTED", '$path.type',
-          "floating joints are not supported; set RobotModel.floatingBase to free the root link"));
-      else if (joint.type != JointType.Fixed && joint.type != JointType.Revolute
-          && joint.type != JointType.Continuous && joint.type != JointType.Prismatic)
-        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_TYPE", '$path.type',
-          'unknown joint type "${joint.type}"'));
+      if (!validVector(joint.parentFramePosition, 3) || !validRotation(joint.parentFrameRotation) || !validVector(
+        joint.childFramePosition,
+        3
+      ) || !validRotation(joint.childFrameRotation)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_FRAME",
+        path,
+        "joint frames require finite translations and unit xyzw quaternions"
+      ));
+      if (!validUnitVector(joint.axis)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_AXIS",
+        '$path.axis',
+        "joint axis must be a finite unit vector"
+      ));
+      if (!(joint.armature >= 0.0) || !(joint.damping >= 0.0)
+        || !(joint.frictionLoss >= 0.0) || !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping)
+        || !Math.isFinite(joint.frictionLoss) || !(joint.limitTimeConstant >= 0.0) || !(joint.limitDampingRatio >= 0.0)
+        || !Math.isFinite(joint.limitTimeConstant) || !Math.isFinite(joint.limitDampingRatio) || !validVector(
+          joint.limitImpedance,
+          5
+        )) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_JOINT_DYNAMICS",
+          path,
+          "joint armature, damping and friction loss must be finite and non-negative"
+        ));
+      if (joint.type == JointType.Floating) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_JOINT_UNSUPPORTED",
+        '$path.type',
+        "floating joints are not supported; set RobotModel.floatingBase to free the root link"
+      ));
+      else if (joint.type != JointType.Fixed && joint.type != JointType.Revolute && joint.type != JointType.Continuous
+        && joint.type != JointType.Prismatic) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_JOINT_TYPE",
+          '$path.type',
+          'unknown joint type "${joint.type}"'
+        ));
     }
 
     for (index in 0...robot.contactPairs.length) {
@@ -469,10 +632,13 @@ class RobotRuntimeCompiler {
         if (pair != null && link.id == pair.linkA) a = link;
         if (pair != null && link.id == pair.linkB) b = link;
       }
-      if (pair == null || a == null || b == null || a == b || pair.shapeA < 0 || pair.shapeB < 0 ||
-          pair.shapeA >= a.collisionShapes.length || pair.shapeB >= b.collisionShapes.length)
-        diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path,
-          "contact pair must name one shape on each of two different links"));
+      if (pair == null || a == null
+        || b == null || a == b || pair.shapeA < 0 || pair.shapeB < 0 || pair.shapeA >= a.collisionShapes.length
+        || pair.shapeB >= b.collisionShapes.length) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_CONTACT_PAIR",
+          path,
+          "contact pair must name one shape on each of two different links"
+        ));
       else {
         var error = pair.surface == null ? "contact pair surface is missing" : pair.surface.validate();
         if (error != null) diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path, error));
@@ -480,8 +646,12 @@ class RobotRuntimeCompiler {
     }
 
     var actuatorIds = new Map<String, Bool>();
-    if (robot.couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
-      diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_LIMIT", "couplings", "too many joint couplings"));
+    if (robot.couplings.length
+      > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COUPLING_LIMIT",
+        "couplings",
+        "too many joint couplings"
+      ));
     var couplingIds = new Map<String, Bool>();
     var pairs = new Map<String, Bool>();
     for (index in 0...robot.couplings.length) {
@@ -491,68 +661,115 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_NULL", path, "joint coupling is null"));
         continue;
       }
-      if (couplingIds.exists(coupling.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_ID", path, "duplicate joint coupling ID"));
+      if (couplingIds.exists(coupling.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COUPLING_ID",
+        path,
+        "duplicate joint coupling ID"
+      ));
       couplingIds.set(coupling.id, true);
-      if (pairs.exists(coupling.follower + "\n" + coupling.leader))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint is coupled to the same leader twice"));
+      if (pairs.exists(coupling.follower + "\n" + coupling.leader)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COUPLING_FOLLOWER",
+        path,
+        "joint is coupled to the same leader twice"
+      ));
       pairs.set(coupling.follower + "\n" + coupling.leader, true);
-      if (!jointIds.exists(coupling.leader) || !jointIds.exists(coupling.follower))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_JOINT", path, "coupling references an unknown joint"));
-      for (joint in robot.joints) if (joint != null &&
-          (joint.id == coupling.leader || joint.id == coupling.follower) &&
-          joint.type == JointType.Fixed)
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FIXED", path,
-          "joint coupling requires movable joints"));
-      try coupling.validateStiffnessLaw(robot.joints) catch (error:Dynamic)
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_STIFFNESS", path, Std.string(error)));
-      if (!Math.isFinite(coupling.ratio) || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_VALUE", path, "invalid coupling ratio or offset"));
+      if (!jointIds.exists(coupling.leader)
+        || !jointIds.exists(coupling.follower)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_COUPLING_JOINT",
+          path,
+          "coupling references an unknown joint"
+        ));
+      for (joint in robot.joints) if (joint != null && (joint.id == coupling.leader
+        || joint.id == coupling.follower) && joint.type == JointType.Fixed) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_COUPLING_FIXED",
+          path,
+          "joint coupling requires movable joints"
+        ));
+      try coupling.validateStiffnessLaw(robot.joints) catch (error:Dynamic) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_COUPLING_STIFFNESS",
+        path,
+        Std.string(error)
+      ));
+      if (!Math.isFinite(coupling.ratio)
+        || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_COUPLING_VALUE",
+          path,
+          "invalid coupling ratio or offset"
+        ));
     }
     var cycle = JointCoupling.cycleThrough([for (coupling in robot.couplings) if (coupling != null) coupling]);
-    if (cycle != null)
-      diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_CYCLE", "couplings", 'joint $cycle depends on itself through its couplings'));
+    if (cycle != null) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_COUPLING_CYCLE",
+      "couplings",
+      'joint $cycle depends on itself through its couplings'
+    ));
     for (index in 0...robot.actuators.length) {
       var actuator = robot.actuators[index];
       var path = 'actuators[$index]';
       if (actuator == null) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_NULL", path,
-          "actuator is null"));
+        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_NULL", path, "actuator is null"));
         continue;
       }
-      if (actuator.id == null || actuator.id.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID", '$path.id',
-          "actuator ID is empty"));
-      else if (actuatorIds.exists(actuator.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID_DUPLICATE", '$path.id',
-          'duplicate actuator ID "${actuator.id}"'));
+      if (actuator.id == null || actuator.id.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_ACTUATOR_ID",
+        '$path.id',
+        "actuator ID is empty"
+      ));
+      else if (actuatorIds.exists(actuator.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_ACTUATOR_ID_DUPLICATE",
+        '$path.id',
+        'duplicate actuator ID "${actuator.id}"'
+      ));
       else actuatorIds.set(actuator.id, true);
-      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
-          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
-        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_LIMIT", path,
-          "actuator limits must be finite and non-negative"));
-      if (actuator.fullStepsPerRevolution > 0.0 &&
-          (actuator.microsteps == null || actuator.maxStepRate == null))
-        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path,
-          "stepper requires microsteps and a driver step-rate ceiling"));
-      if (actuator.microsteps != null && (actuator.microsteps < 1 || actuator.microsteps > 1024))
-        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "microsteps must be from 1 to 1024"));
-      if (actuator.maxStepRate != null && (!Math.isFinite(actuator.maxStepRate) || actuator.maxStepRate <= 0.0))
-        diagnostics.push(new RobotCompileDiagnostic("RK_STEPPER_DRIVER", path, "driver step-rate ceiling must be positive"));
-      if (actuator.transmission == null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_NULL", '$path.transmission',
-          "actuator transmission is missing"));
+      if ((actuator.maxEffort != null
+        && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) || (actuator.maxRate != null
+        && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0))) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_ACTUATOR_LIMIT",
+          path,
+          "actuator limits must be finite and non-negative"
+        ));
+      if (actuator.fullStepsPerRevolution > 0.0
+        && (actuator.microsteps == null || actuator.maxStepRate == null)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_STEPPER_DRIVER",
+          path,
+          "stepper requires microsteps and a driver step-rate ceiling"
+        ));
+      if (actuator.microsteps != null
+        && (actuator.microsteps < 1 || actuator.microsteps > 1024)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_STEPPER_DRIVER",
+          path,
+          "microsteps must be from 1 to 1024"
+        ));
+      if (actuator.maxStepRate != null && (!Math.isFinite(actuator.maxStepRate)
+        || actuator.maxStepRate <= 0.0)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_STEPPER_DRIVER",
+          path,
+          "driver step-rate ceiling must be positive"
+        ));
+      if (actuator.transmission == null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_TRANSMISSION_NULL",
+        '$path.transmission',
+        "actuator transmission is missing"
+      ));
       else switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, offset):
-          for (joint in robot.joints) if (joint != null && joint.id == jointId && joint.passive)
-            diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_ACTUATOR", '$path.transmission.jointId',
-              'an actuator cannot drive passive joint "$jointId"'));
-          if (!jointIds.exists(jointId))
-            diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_JOINT",
-              '$path.transmission.jointId', 'unknown joint ID "$jointId"'));
-          if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
-            diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_VALUE",
-              '$path.transmission', "transmission ratio must be finite and nonzero, and offset finite"));
+          for (joint in robot.joints) if (joint != null
+            && joint.id == jointId && joint.passive) diagnostics.push(new RobotCompileDiagnostic(
+              "RK_PASSIVE_ACTUATOR",
+              '$path.transmission.jointId',
+              'an actuator cannot drive passive joint "$jointId"'
+            ));
+          if (!jointIds.exists(jointId)) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_TRANSMISSION_JOINT",
+            '$path.transmission.jointId',
+            'unknown joint ID "$jointId"'
+          ));
+          if (!Math.isFinite(ratio)
+            || ratio == 0.0 || !Math.isFinite(offset)) diagnostics.push(new RobotCompileDiagnostic(
+              "RK_TRANSMISSION_VALUE",
+              '$path.transmission',
+              "transmission ratio must be finite and nonzero, and offset finite"
+            ));
       }
       var cylinderDrive = actuator.drive == null ? null : actuator.drive.cylinder();
       if (cylinderDrive != null) {
@@ -562,19 +779,27 @@ class RobotRuntimeCompiler {
             for (joint in robot.joints) if (joint.id == jointId) cylinderJoint = joint;
           case _:
         }
-        if (cylinderJoint == null || cylinderJoint.type != JointType.Prismatic)
-          diagnostics.push(new RobotCompileDiagnostic("RK_CYLINDER_JOINT", '$path.drive',
-            "a cylinder process drive needs a prismatic joint in this model"));
+        if (cylinderJoint == null
+          || cylinderJoint.type != JointType.Prismatic) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_CYLINDER_JOINT",
+            '$path.drive',
+            "a cylinder process drive needs a prismatic joint in this model"
+          ));
         var hydraulic = cylinderDrive.hydraulic();
         if (hydraulic != null && cylinderJoint != null) {
           var lower = cylinderJoint.limits.lower, upper = cylinderJoint.limits.upper;
-          if (!Math.isFinite(lower + upper) || Math.abs(upper - lower - hydraulic.stroke) > 1e-9)
-            diagnostics.push(new RobotCompileDiagnostic("RK_HYDRAULIC_TRAVEL", '$path.drive.stroke',
-              "hydraulic stroke must match the guide's nominal travel"));
+          if (!Math.isFinite(lower + upper)
+            || Math.abs(upper - lower - hydraulic.stroke) > 1e-9) diagnostics.push(new RobotCompileDiagnostic(
+              "RK_HYDRAULIC_TRAVEL",
+              '$path.drive.stroke',
+              "hydraulic stroke must match the guide's nominal travel"
+            ));
           var home = hydraulic.extendSign > 0.0 ? lower : upper;
-          if (Math.abs(hydraulic.retractedPosition - home) > 1e-9)
-            diagnostics.push(new RobotCompileDiagnostic("RK_HYDRAULIC_HOME", '$path.drive.retractedPosition',
-              "hydraulic retracted position must be its guide's extension-side limit"));
+          if (Math.abs(hydraulic.retractedPosition - home) > 1e-9) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_HYDRAULIC_HOME",
+            '$path.drive.retractedPosition',
+            "hydraulic retracted position must be its guide's extension-side limit"
+          ));
         }
       }
       if (actuator.processVelocity != null) {
@@ -585,20 +810,27 @@ class RobotRuntimeCompiler {
             for (joint in robot.joints) if (joint.id == jointId) processJoint = joint;
           case _:
         }
-        if (process.speedChannel == null || process.speedChannel.length == 0 ||
-            process.directionChannel == null || process.directionChannel.length == 0 ||
-            process.speedChannel == process.directionChannel ||
-            !(process.radiansPerSpeedUnit > 0.0) || !Math.isFinite(process.radiansPerSpeedUnit) ||
-            !positiveFinite(actuator.maxRate) || !positiveFinite(actuator.maxEffort))
-          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY", '$path.processVelocity',
-            "process velocity needs distinct channels, positive finite speed scale, effort and rate"));
-        if (processJoint == null || processJoint.type != JointType.Continuous)
-          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_JOINT", '$path.processVelocity',
-            "process velocity drive needs a continuous joint in this model"));
+        if (process.speedChannel == null || process.speedChannel.length == 0
+          || process.directionChannel == null || process.directionChannel.length == 0
+          || process.speedChannel == process.directionChannel || !(process.radiansPerSpeedUnit > 0.0)
+          || !Math.isFinite(process.radiansPerSpeedUnit) || !positiveFinite(actuator.maxRate)
+          || !positiveFinite(actuator.maxEffort)) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_PROCESS_VELOCITY",
+            '$path.processVelocity',
+            "process velocity needs distinct channels, positive finite speed scale, effort and rate"
+          ));
+        if (processJoint == null
+          || processJoint.type != JointType.Continuous) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_PROCESS_VELOCITY_JOINT",
+            '$path.processVelocity',
+            "process velocity drive needs a continuous joint in this model"
+          ));
         var drive = actuator.drive;
-        if (drive != null && drive.cylinder() != null)
-          diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_DRIVE", '$path.processVelocity',
-            "a process velocity joint cannot also be a cylinder joint"));
+        if (drive != null && drive.cylinder() != null) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_PROCESS_VELOCITY_DRIVE",
+          '$path.processVelocity',
+          "a process velocity joint cannot also be a cylinder joint"
+        ));
       }
     }
 
@@ -610,121 +842,177 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_NULL", path, "frame is null"));
         continue;
       }
-      if (frame.id == null || frame.id.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_ID", '$path.id', "frame ID is empty"));
-      else if (frameIds.exists(frame.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_ID_DUPLICATE", '$path.id', "duplicate frame ID"));
+      if (frame.id == null || frame.id.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_FRAME_ID",
+        '$path.id',
+        "frame ID is empty"
+      ));
+      else if (frameIds.exists(frame.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_FRAME_ID_DUPLICATE",
+        '$path.id',
+        "duplicate frame ID"
+      ));
       else frameIds.set(frame.id, true);
-      if (frame.name == null || frame.name.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_NAME", '$path.name', "frame name is empty"));
-      if (frame.link == null || robot.links.indexOf(frame.link) < 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_LINK", '$path.link', "frame link does not belong to this robot"));
-      if (!validVector(frame.position, 3) || !validRotation(frame.rotation))
-        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_POSE", path, "mount requires finite translation and unit xyzw quaternion"));
+      if (frame.name == null || frame.name.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_FRAME_NAME",
+        '$path.name',
+        "frame name is empty"
+      ));
+      if (frame.link == null || robot.links.indexOf(frame.link) < 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_FRAME_LINK",
+        '$path.link',
+        "frame link does not belong to this robot"
+      ));
+      if (!validVector(frame.position,
+        3) || !validRotation(frame.rotation)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_FRAME_POSE",
+          path,
+          "mount requires finite translation and unit xyzw quaternion"
+        ));
     }
 
     // The sensors' values share one pool in every state, so what they report together must fit it.
     var pooledValues = 0;
-    for (sensor in robot.sensors) if (sensor != null)
-      pooledValues += sensor.kind == "lidar" ? sensor.rayCount : sensor.kind == "imu" ? 6
-        : sensor.kind == "joint_encoder" ? robot.joints.length
-        : sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "presence" || sensor.kind == "brake_released" ? 1 : 0;
-    if (pooledValues > RobotKitRuntimeConstants.RK_SENSOR_VALUE_POOL)
-      diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_VALUES", "sensors", "sensors report more values together than a state holds"));
+    for (sensor in robot.sensors) if (sensor != null) pooledValues += sensor.kind == "lidar" ? sensor.rayCount
+      : sensor.kind == "imu" ? 6 : sensor.kind == "joint_encoder" ? robot.joints.length : sensor.kind == "joint_switch"
+      || sensor.kind == "at_speed" || sensor.kind == "presence" || sensor.kind == "brake_released" ? 1 : 0;
+    if (pooledValues > RobotKitRuntimeConstants.RK_SENSOR_VALUE_POOL) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_SENSOR_VALUES",
+      "sensors",
+      "sensors report more values together than a state holds"
+    ));
     var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
     var nativeSensorCount = 0;
-    for (sensor in robot.sensors) if (sensor != null && RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind))
-      nativeSensorCount++;
-    if (nativeSensorCount > RobotKitRuntimeConstants.RK_MAX_SENSORS)
-      diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_LIMIT", "sensors", "too many sensors"));
+    for (sensor in robot.sensors) if (sensor != null
+      && RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind)) nativeSensorCount++;
+    if (nativeSensorCount > RobotKitRuntimeConstants.RK_MAX_SENSORS) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_SENSOR_LIMIT",
+      "sensors",
+      "too many sensors"
+    ));
     for (index in 0...robot.sensors.length) {
       var sensor = robot.sensors[index];
       var path = 'sensors[$index]';
       if (sensor == null) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NULL", path,
-          "sensor is null"));
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NULL", path, "sensor is null"));
         continue;
       }
-      if (sensor.id == null || sensor.id.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ID", '$path.id',
-          "sensor ID is empty"));
-      else if (sensorIds.exists(sensor.id))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ID_DUPLICATE", '$path.id',
-          'duplicate sensor ID "${sensor.id}"'));
-      else
-        sensorIds.set(sensor.id, true);
-      if (sensor.name == null || sensor.name.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NAME", '$path.name',
-          "sensor name is empty"));
-      else if (sensorNames.exists(sensor.name))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_DUPLICATE", '$path.name',
-          'duplicate sensor name "${sensor.name}"'));
-      else
-        sensorNames.set(sensor.name, true);
-      if (sensor.kind == null || sensor.kind.length == 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_KIND", '$path.kind',
-          "sensor kind is empty"));
-      if (!RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind) &&
-          !RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_UNSUPPORTED", '$path.kind', "unsupported sensor kind"));
-      if (sensor.frame != null && robot.frames.indexOf(sensor.frame) < 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_FRAME", '$path.frame', "sensor frame does not belong to model"));
-      if (!Math.isFinite(sensor.noiseStddev) || sensor.noiseStddev < 0.0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NOISE", path, "invalid noise standard deviation"));
-      if (sensor.kind == "lidar" && (sensor.rayCount < 1 || sensor.rayCount > RobotKitRuntimeConstants.RK_MAX_SENSOR_VALUES
-          || !Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0
-          || !Math.isFinite(sensor.startAngleRadians) || !Math.isFinite(sensor.fieldOfViewRadians)
-          || sensor.fieldOfViewRadians <= 0.0 || sensor.fieldOfViewRadians > Math.PI * 2.0 + 1e-6))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path,
-          "invalid LiDAR resolution, range, or angular coverage"));
+      if (sensor.id == null || sensor.id.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_ID",
+        '$path.id',
+        "sensor ID is empty"
+      ));
+      else if (sensorIds.exists(sensor.id)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_ID_DUPLICATE",
+        '$path.id',
+        'duplicate sensor ID "${sensor.id}"'
+      ));
+      else sensorIds.set(sensor.id, true);
+      if (sensor.name == null || sensor.name.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_NAME",
+        '$path.name',
+        "sensor name is empty"
+      ));
+      else if (sensorNames.exists(sensor.name)) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_DUPLICATE",
+        '$path.name',
+        'duplicate sensor name "${sensor.name}"'
+      ));
+      else sensorNames.set(sensor.name, true);
+      if (sensor.kind == null || sensor.kind.length == 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_KIND",
+        '$path.kind',
+        "sensor kind is empty"
+      ));
+      if (!RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind)
+        && !RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_UNSUPPORTED",
+          '$path.kind',
+          "unsupported sensor kind"
+        ));
+      if (sensor.frame != null && robot.frames.indexOf(sensor.frame) < 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_FRAME",
+        '$path.frame',
+        "sensor frame does not belong to model"
+      ));
+      if (!Math.isFinite(sensor.noiseStddev) || sensor.noiseStddev < 0.0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_NOISE",
+        path,
+        "invalid noise standard deviation"
+      ));
+      if (sensor.kind == "lidar"
+        && (sensor.rayCount < 1 || sensor.rayCount > RobotKitRuntimeConstants.RK_MAX_SENSOR_VALUES
+        || !Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0 || !Math.isFinite(sensor.startAngleRadians)
+        || !Math.isFinite(sensor.fieldOfViewRadians) || sensor.fieldOfViewRadians <= 0.0
+        || sensor.fieldOfViewRadians > Math.PI * 2.0 + 1e-6)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_SCAN",
+          path,
+          "invalid LiDAR resolution, range, or angular coverage"
+        ));
       if (sensor.kind == "joint_switch" || sensor.kind == "at_speed" || sensor.kind == "brake_released") {
         var index = -1;
         for (jointIndex in 0...robot.joints.length) if (robot.joints[jointIndex].id == sensor.joint) index = jointIndex;
-        if (index < 0) diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_JOINT", '$path.joint',
-          "native joint sensor needs a joint in this model"));
-        if (!Math.isFinite(sensor.windowLower) || !Math.isFinite(sensor.windowUpper) ||
-            !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0.0 ||
-            (sensor.kind == "joint_switch" && sensor.windowLower > sensor.windowUpper) ||
-            (sensor.kind == "at_speed" && (sensor.windowLower <= 0.0 || sensor.windowLower >= 1.0 ||
-              sensor.hysteresis >= 1.0)))
-          diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_WINDOW", path,
-            "invalid joint sensor window or speed threshold"));
+        if (index < 0) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_JOINT",
+          '$path.joint',
+          "native joint sensor needs a joint in this model"
+        ));
+        if (!Math.isFinite(sensor.windowLower) || !Math.isFinite(sensor.windowUpper)
+          || !Math.isFinite(sensor.hysteresis) || sensor.hysteresis < 0.0 || (sensor.kind == "joint_switch"
+          && sensor.windowLower > sensor.windowUpper) || (sensor.kind == "at_speed" && (sensor.windowLower <= 0.0
+          || sensor.windowLower >= 1.0 || sensor.hysteresis >= 1.0))) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_SENSOR_WINDOW",
+            path,
+            "invalid joint sensor window or speed threshold"
+          ));
       }
-      if (sensor.kind == "presence" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
-          "presence range must be positive"));
-      if (sensor.kind == "presence_input" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
-          "presence input range must be positive"));
+      if (sensor.kind == "presence"
+        && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_RANGE",
+          '$path.maxRange',
+          "presence range must be positive"
+        ));
+      if (sensor.kind == "presence_input"
+        && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_RANGE",
+          '$path.maxRange',
+          "presence input range must be positive"
+        ));
       var zone = sensor.zoneBoxes;
-      if ((sensor.kind == "zone_input") != (zone != null) || (zone != null && !Sensor.validZoneBoxes(zone)))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ZONE", '$path.zoneBoxes',
-          "a zone input needs boxes of a centre and three positive half extents, and only a zone input has them"));
-      if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
-          "sensor update rate must be non-negative"));
+      if ((sensor.kind == "zone_input") != (zone != null)
+        || (zone != null && !Sensor.validZoneBoxes(zone))) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_SENSOR_ZONE",
+          '$path.zoneBoxes',
+          "a zone input needs boxes of a centre and three positive half extents, and only a zone input has them"
+        ));
+      if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_SENSOR_RATE",
+        '$path.updateRate',
+        "sensor update rate must be non-negative"
+      ));
     }
 
     validateUserConfiguration(robot, profile, diagnostics);
 
     var roots:Array<Int> = [];
-    for (index in 0...indegree.length)
-      if (indegree[index] == 0) roots.push(index);
-    if (robot.links.length > 0 && roots.length != 1)
-      diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_ROOT", "links",
-        'robot must have exactly one root link, found ${roots.length}'));
-    for (index in 0...indegree.length)
-      if (indegree[index] > 1)
-        diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_PARENT", 'links[$index]',
-          "link has more than one parent joint"));
+    for (index in 0...indegree.length) if (indegree[index] == 0) roots.push(index);
+    if (robot.links.length > 0 && roots.length != 1) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_TOPOLOGY_ROOT",
+      "links",
+      'robot must have exactly one root link, found ${roots.length}'
+    ));
+    for (index in 0...indegree.length) if (indegree[index] > 1) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_TOPOLOGY_PARENT",
+      'links[$index]',
+      "link has more than one parent joint"
+    ));
 
     // Kahn's algorithm detects cycles without recursion, keeping validation
     // safe for imported models with very deep link chains.
     var remainingIndegree = indegree.copy();
     var queue:Array<Int> = [];
-    for (index in 0...remainingIndegree.length)
-      if (remainingIndegree[index] == 0) queue.push(index);
+    for (index in 0...remainingIndegree.length) if (remainingIndegree[index] == 0) queue.push(index);
     var processed = 0;
     while (queue.length > 0) {
       var parent = queue.shift();
@@ -734,9 +1022,11 @@ class RobotRuntimeCompiler {
         if (remainingIndegree[child] == 0) queue.push(child);
       }
     }
-    if (processed < robot.links.length)
-      diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_CYCLE", "joints",
-        "joint graph contains a cycle"));
+    if (processed < robot.links.length) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_TOPOLOGY_CYCLE",
+      "joints",
+      "joint graph contains a cycle"
+    ));
     if (roots.length == 1) {
       var reachable:Array<Bool> = [];
       for (_ in 0...robot.links.length) reachable.push(false);
@@ -747,10 +1037,11 @@ class RobotRuntimeCompiler {
         reachable[node] = true;
         for (child in adjacency[node]) pending.push(child);
       }
-      for (index in 0...reachable.length)
-        if (!reachable[index])
-          diagnostics.push(new RobotCompileDiagnostic("RK_TOPOLOGY_DISCONNECTED", 'links[$index]',
-            "link is not reachable from the robot root"));
+      for (index in 0...reachable.length) if (!reachable[index]) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_TOPOLOGY_DISCONNECTED",
+        'links[$index]',
+        "link is not reachable from the robot root"
+      ));
     }
     var brakeIds = new Map<String, Bool>(), brakeJoints = new Map<String, Bool>();
     var brakeOutputs = new Map<String, Bool>(), brakeContacts = new Map<String, Bool>();
@@ -760,10 +1051,12 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_NULL", path, "brake is null"));
         continue;
       }
-      if (brakeIds.exists(brake.id) || brakeJoints.exists(brake.joint) ||
-          brakeOutputs.exists(brake.releaseChannel) || brakeContacts.exists(brake.releasedSensor))
-        diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_DUPLICATE", path,
-          "brakes need distinct identities, joints, release outputs and contact sensors"));
+      if (brakeIds.exists(brake.id) || brakeJoints.exists(brake.joint) || brakeOutputs.exists(brake.releaseChannel)
+        || brakeContacts.exists(brake.releasedSensor)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_BRAKE_DUPLICATE",
+          path,
+          "brakes need distinct identities, joints, release outputs and contact sensors"
+        ));
       brakeIds.set(brake.id, true);
       brakeJoints.set(brake.joint, true);
       brakeOutputs.set(brake.releaseChannel, true);
@@ -773,90 +1066,116 @@ class RobotRuntimeCompiler {
       var servo = false;
       for (actuator in robot.actuators) if (actuator != null) switch actuator.transmission {
         case SimpleTransmission(joint, _, _):
-          if (joint == brake.joint && actuator.drive != null && actuator.drive.servo() != null)
-            servo = true;
+          if (joint == brake.joint && actuator.drive != null && actuator.drive.servo() != null) servo = true;
       }
-      if (jointIndex < 0 || jointIndex >= 64 || !servo)
-        diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_JOINT", path,
-          "brake needs a servo motor joint in the native servo range"));
+      if (jointIndex < 0 || jointIndex >= 64 || !servo) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_BRAKE_JOINT",
+        path,
+        "brake needs a servo motor joint in the native servo range"
+      ));
       var contact = false;
-      for (sensor in robot.sensors) if (sensor != null && sensor.id == brake.releasedSensor &&
-          sensor.kind == "brake_released" && sensor.joint == brake.joint) contact = true;
-      if (!contact) diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_CONTACT", path,
-        "brake needs its dedicated released-contact sensor on the same joint"));
+      for (sensor in robot.sensors) if (sensor != null && sensor.id == brake.releasedSensor
+        && sensor.kind == "brake_released" && sensor.joint == brake.joint) contact = true;
+      if (!contact) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_BRAKE_CONTACT",
+        path,
+        "brake needs its dedicated released-contact sensor on the same joint"
+      ));
       for (actuator in robot.actuators) if (actuator != null) {
         var pneumatic = actuator.drive == null ? null : actuator.drive.pneumatic();
         var process = actuator.processVelocity;
-        if ((pneumatic != null && (pneumatic.channelA == brake.releaseChannel ||
-            pneumatic.channelB == brake.releaseChannel)) || (process != null &&
-            (process.speedChannel == brake.releaseChannel || process.directionChannel == brake.releaseChannel)))
-          diagnostics.push(new RobotCompileDiagnostic("RK_BRAKE_CHANNEL", path,
-            "brake release cannot share a pneumatic or speed output"));
+        if ((pneumatic != null && (pneumatic.channelA == brake.releaseChannel || pneumatic.channelB
+          == brake.releaseChannel)) || (process != null && (process.speedChannel == brake.releaseChannel
+          || process.directionChannel == brake.releaseChannel))) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_BRAKE_CHANNEL",
+            path,
+            "brake release cannot share a pneumatic or speed output"
+          ));
       }
     }
     return diagnostics;
   }
 
-  static function validateUserConfiguration(robot:RobotModel, profile:RobotProfile,
-      diagnostics:Array<RobotCompileDiagnostic>):Void {
+  static function validateUserConfiguration(
+    robot:RobotModel,
+    profile:RobotProfile,
+    diagnostics:Array<RobotCompileDiagnostic>
+  ):Void {
     var roleOwners = new Map<String, String>();
-    function resolveRole(id:Null<String>, path:String,
-        allowed:Array<JointType>):Null<Int> {
+    function resolveRole(id:Null<String>, path:String, allowed:Array<JointType>):Null<Int> {
       if (id == null || id.length == 0) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path,
-          "mechanism role requires a joint ID"));
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path, "mechanism role requires a joint ID"));
         return null;
       }
       var index = -1;
       for (i in 0...robot.joints.length) {
         var candidate = robot.joints[i];
-        if (candidate != null && candidate.id == id) { index = i; break; }
+        if (candidate != null && candidate.id == id) {
+          index = i;
+          break;
+        }
       }
       if (index < 0) {
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path,
-          'joint ID "$id" is not part of this robot'));
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path, 'joint ID "$id" is not part of this robot'));
         return null;
       }
       var joint = robot.joints[index];
-      if (allowed.indexOf(joint.type) < 0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_TYPE", path,
-          'joint "${joint.name}" has type ${joint.type}, which cannot fill this role'));
+      if (allowed.indexOf(joint.type) < 0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_ROLE_TYPE",
+        path,
+        'joint "${joint.name}" has type ${joint.type}, which cannot fill this role'
+      ));
       var previous = roleOwners.get(id);
-      if (previous != null)
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_DUPLICATE", path,
-          'joint "$id" is already assigned to $previous'));
-      else
-        roleOwners.set(id, path);
+      if (previous != null) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_ROLE_DUPLICATE",
+        path,
+        'joint "$id" is already assigned to $previous'
+      ));
+      else roleOwners.set(id, path);
       return index;
     }
     function positive(value:Float, path:String):Void {
-      if (!Math.isFinite(value) || value <= 0.0)
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_VALUE", path,
-          "value must be finite and positive"));
+      if (!Math.isFinite(value) || value <= 0.0) diagnostics.push(new RobotCompileDiagnostic(
+        "RK_ROLE_VALUE",
+        path,
+        "value must be finite and positive"
+      ));
     }
 
     var mobile = profile.mobileBase;
-    if (mobile != null && robot.floatingBase)
-      diagnostics.push(new RobotCompileDiagnostic("RK_FLOATING_MOBILE", "mobileBase",
-        "a floating base moves under physics and cannot also be a wheeled mobile base"));
+    if (mobile != null && robot.floatingBase) diagnostics.push(new RobotCompileDiagnostic(
+      "RK_FLOATING_MOBILE",
+      "mobileBase",
+      "a floating base moves under physics and cannot also be a wheeled mobile base"
+    ));
     if (mobile != null) {
       positive(mobile.maxLinearSpeed, "mobileBase.maxLinearSpeed");
       positive(mobile.maxAngularSpeed, "mobileBase.maxAngularSpeed");
       positive(mobile.maxLinearAcceleration, "mobileBase.maxLinearAcceleration");
       positive(mobile.maxAngularAcceleration, "mobileBase.maxAngularAcceleration");
-      if ((mobile.footprintLength == null) != (mobile.footprintWidth == null))
-        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_FOOTPRINT", "mobileBase.footprint",
-          "footprint length and width must both be set or both be omitted"));
+      if ((mobile.footprintLength
+        == null) != (mobile.footprintWidth == null)) diagnostics.push(new RobotCompileDiagnostic(
+          "RK_ROLE_FOOTPRINT",
+          "mobileBase.footprint",
+          "footprint length and width must both be set or both be omitted"
+        ));
       if (mobile.footprintLength != null) positive(mobile.footprintLength, "mobileBase.footprint.length");
       if (mobile.footprintWidth != null) positive(mobile.footprintWidth, "mobileBase.footprint.width");
       switch mobile.drive {
         case Differential(leftId, rightId, radius, trackWidth):
-          for (role in [{id: leftId, path: "mobileBase.drive.leftWheelJointId"},
-              {id: rightId, path: "mobileBase.drive.rightWheelJointId"}]) {
+          for (role in [
+            {id: leftId, path: "mobileBase.drive.leftWheelJointId"},
+            {
+              id: rightId,
+              path: "mobileBase.drive.rightWheelJointId"
+            }
+          ]) {
             var index = resolveRole(role.id, role.path, [JointType.Revolute, JointType.Continuous]);
-            if (index != null && wheelDirection(robot, index) == 0)
-              diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_WHEEL_AXIS", role.path,
-                'wheel joint "${robot.joints[index].name}" must turn about the base\'s lateral (Y) axis'));
+            if (index != null && wheelDirection(robot, index) == 0) diagnostics.push(new RobotCompileDiagnostic(
+              "RK_ROLE_WHEEL_AXIS",
+              role.path,
+              'wheel joint "${robot.joints[index].name}" must turn about the base\'s lateral (Y) axis'
+            ));
           }
           positive(radius, "mobileBase.drive.wheelRadius");
           positive(trackWidth, "mobileBase.drive.trackWidth");
@@ -865,21 +1184,34 @@ class RobotRuntimeCompiler {
           resolveRole(driveId, "mobileBase.drive.driveWheelJointId", [JointType.Revolute, JointType.Continuous]);
           positive(wheelBase, "mobileBase.drive.wheelBase");
           positive(radius, "mobileBase.drive.wheelRadius");
-          if (!Math.isFinite(maxSteeringAngle) || maxSteeringAngle <= 0.0 || maxSteeringAngle >= Math.PI * 0.5)
-            diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_VALUE", "mobileBase.drive.maxSteeringAngle",
-              "steering angle must be finite and between zero and pi/2"));
+          if (!Math.isFinite(maxSteeringAngle) || maxSteeringAngle <= 0.0
+            || maxSteeringAngle >= Math.PI * 0.5) diagnostics.push(new RobotCompileDiagnostic(
+              "RK_ROLE_VALUE",
+              "mobileBase.drive.maxSteeringAngle",
+              "steering angle must be finite and between zero and pi/2"
+            ));
         case Holonomic(wheelIds, radius, baseRadius):
-          if (wheelIds == null || wheelIds.length != 3)
-            diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", "mobileBase.drive.wheelJointIds",
-              "holonomic drive requires exactly three wheel joint IDs"));
-          else for (index in 0...wheelIds.length)
-            resolveRole(wheelIds[index], 'mobileBase.drive.wheelJointIds[$index]',
-              [JointType.Revolute, JointType.Continuous]);
+          if (wheelIds == null || wheelIds.length != 3) diagnostics.push(new RobotCompileDiagnostic(
+            "RK_ROLE_JOINT",
+            "mobileBase.drive.wheelJointIds",
+            "holonomic drive requires exactly three wheel joint IDs"
+          ));
+          else for (index in 0...wheelIds.length) resolveRole(
+            wheelIds[index],
+            'mobileBase.drive.wheelJointIds[$index]',
+            [
+              JointType.Revolute,
+              JointType.Continuous
+            ]
+          );
           positive(radius, "mobileBase.drive.wheelRadius");
           positive(baseRadius, "mobileBase.drive.baseRadius");
         case null:
-          diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_DRIVE", "mobileBase.drive",
-            "mobile base drive configuration is missing"));
+          diagnostics.push(new RobotCompileDiagnostic(
+            "RK_ROLE_DRIVE",
+            "mobileBase.drive",
+            "mobile base drive configuration is missing"
+          ));
       }
     }
 
@@ -887,10 +1219,8 @@ class RobotRuntimeCompiler {
     if (forks != null) {
       var linear = [JointType.Prismatic];
       resolveRole(forks.liftJointId, "forkMechanism.liftJointId", linear);
-      if (forks.tiltJointId != null)
-        resolveRole(forks.tiltJointId, "forkMechanism.tiltJointId", [JointType.Revolute]);
-      if (forks.spreadJointId != null)
-        resolveRole(forks.spreadJointId, "forkMechanism.spreadJointId", linear);
+      if (forks.tiltJointId != null) resolveRole(forks.tiltJointId, "forkMechanism.tiltJointId", [JointType.Revolute]);
+      if (forks.spreadJointId != null) resolveRole(forks.spreadJointId, "forkMechanism.spreadJointId", linear);
       positive(forks.maxMassKg, "forkMechanism.maxMassKg");
       positive(forks.maxLoadMomentKgMeters, "forkMechanism.maxLoadMomentKgMeters");
       positive(forks.maxLiftHeightMeters, "forkMechanism.maxLiftHeightMeters");
@@ -899,8 +1229,7 @@ class RobotRuntimeCompiler {
 
   static function compileConfiguration(robot:RobotModel, profile:RobotProfile):RobotRuntimeConfiguration {
     function jointIndex(id:String):Int {
-      for (index in 0...robot.joints.length)
-        if (robot.joints[index].id == id) return index;
+      for (index in 0...robot.joints.length) if (robot.joints[index].id == id) return index;
       throw 'Validated robot configuration references missing joint "$id"';
     }
     var mobileConfig:Null<RobotRuntimeMobileConfiguration> = null;
@@ -909,36 +1238,65 @@ class RobotRuntimeCompiler {
       var drive:RobotRuntimeDriveConfiguration = switch mobile.drive {
         case Differential(leftId, rightId, radius, trackWidth):
           var leftIndex = jointIndex(leftId), rightIndex = jointIndex(rightId);
-          RobotRuntimeDriveConfiguration.Differential(leftIndex, robot.joints[leftIndex].name,
-            rightIndex, robot.joints[rightIndex].name, radius, trackWidth,
-            wheelDirection(robot, leftIndex), wheelDirection(robot, rightIndex));
+          RobotRuntimeDriveConfiguration.Differential(
+            leftIndex,
+            robot.joints[leftIndex].name,
+            rightIndex,
+            robot.joints[rightIndex].name,
+            radius,
+            trackWidth,
+            wheelDirection(
+              robot,
+              leftIndex
+            ),
+            wheelDirection(
+              robot,
+              rightIndex
+            )
+          );
         case Ackermann(steeringId, driveId, wheelBase, radius, maxAngle):
           var steeringIndex = jointIndex(steeringId), driveIndex = jointIndex(driveId);
-          RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, robot.joints[steeringIndex].name,
-            driveIndex, robot.joints[driveIndex].name, wheelBase, radius, maxAngle);
+          RobotRuntimeDriveConfiguration.Ackermann(
+            steeringIndex,
+            robot.joints[steeringIndex].name,
+            driveIndex,
+            robot.joints[driveIndex].name,
+            wheelBase,
+            radius,
+            maxAngle
+          );
         case Holonomic(wheelIds, radius, baseRadius):
           var indices = [for (id in wheelIds) jointIndex(id)];
           var names = [for (index in indices) robot.joints[index].name];
           RobotRuntimeDriveConfiguration.Holonomic(indices, names, radius, baseRadius);
-        case null: throw "Validated robot configuration has no drive";
+        case null:
+          throw "Validated robot configuration has no drive";
       };
-      mobileConfig = new RobotRuntimeMobileConfiguration(drive,
-        mobile.maxLinearSpeed, mobile.maxAngularSpeed,
-        mobile.maxLinearAcceleration, mobile.maxAngularAcceleration,
-        mobile.footprintLength, mobile.footprintWidth);
+      mobileConfig = new RobotRuntimeMobileConfiguration(
+        drive,
+        mobile.maxLinearSpeed,
+        mobile.maxAngularSpeed,
+        mobile.maxLinearAcceleration,
+        mobile.maxAngularAcceleration,
+        mobile.footprintLength,
+        mobile.footprintWidth
+      );
     }
     var forkConfig:Null<RobotRuntimeForkConfiguration> = null;
     var forks = profile.forkMechanism;
     if (forks != null) {
       function axis(id:String):RobotRuntimeForkAxisConfiguration {
         var index = jointIndex(id), joint = robot.joints[index];
-        return new RobotRuntimeForkAxisConfiguration(index, joint.name,
-          joint.limits.lower, joint.limits.upper);
+        return new RobotRuntimeForkAxisConfiguration(index, joint.name, joint.limits.lower, joint.limits.upper);
       }
-      forkConfig = new RobotRuntimeForkConfiguration(axis(forks.liftJointId),
+      forkConfig = new RobotRuntimeForkConfiguration(
+        axis(forks.liftJointId),
         forks.tiltJointId == null ? null : axis(forks.tiltJointId),
         forks.spreadJointId == null ? null : axis(forks.spreadJointId),
-        forks.maxMassKg, forks.maxLoadMomentKgMeters, forks.maxLiftHeightMeters);
+        forks.maxMassKg,
+        forks.maxLoadMomentKgMeters,
+        forks.maxLiftHeightMeters
+      );
     }
     return new RobotRuntimeConfiguration(mobileConfig, forkConfig);
   }
@@ -958,8 +1316,8 @@ class RobotRuntimeCompiler {
       var above:Null<Joint> = null;
       for (candidate in robot.joints) if (candidate != null && candidate.child == link) above = candidate;
       if (above == null) break;
-      rotation = Quat.fromArray(above.parentFrameRotation)
-        .multiply(Quat.fromArray(above.childFrameRotation).conjugate()).multiply(rotation);
+      rotation = Quat.fromArray(above
+        .parentFrameRotation).multiply(Quat.fromArray(above.childFrameRotation).conjugate()).multiply(rotation);
       link = above.parent;
     }
     var axis = rotation.rotate(new Vec3(joint.axis[0], joint.axis[1], joint.axis[2]));
@@ -978,14 +1336,14 @@ class RobotRuntimeCompiler {
   static function validRotation(value:Array<Float>):Bool {
     if (!validVector(value, 4)) return false;
     var norm = 0.0;
-    for (v in value) norm += v*v;
+    for (v in value) norm += v * v;
     return Math.abs(norm - 1.0) < 0.000001;
   }
 
   static function validUnitVector(value:Array<Float>):Bool {
     if (!validVector(value, 3)) return false;
     var norm = 0.0;
-    for (v in value) norm += v*v;
+    for (v in value) norm += v * v;
     return Math.abs(norm - 1.0) < 0.000001;
   }
 
@@ -994,12 +1352,13 @@ class RobotRuntimeCompiler {
     var scale = 1.0;
     for (v in value) if (Math.abs(v) > scale) scale = Math.abs(v);
     var epsilon = scale * 1e-10;
-    if (Math.abs(value[1]-value[3]) > epsilon || Math.abs(value[2]-value[6]) > epsilon || Math.abs(value[5]-value[7]) > epsilon) return false;
-    var minor2 = value[0]*value[4]-value[1]*value[3];
-    var det = value[0]*(value[4]*value[8]-value[5]*value[7])-value[1]*(value[3]*value[8]-value[5]*value[6])+value[2]*(value[3]*value[7]-value[4]*value[6]);
-    return value[0] > epsilon && minor2 > epsilon*epsilon && det > epsilon*epsilon*epsilon;
+    if (Math.abs(value[1] - value[3]) > epsilon
+      || Math.abs(value[2] - value[6]) > epsilon || Math.abs(value[5] - value[7]) > epsilon) return false;
+    var minor2 = value[0] * value[4] - value[1] * value[3];
+    var det = value[0] * (value[4] * value[8] - value[5] * value[7])
+      - value[1] * (value[3] * value[8] - value[5] * value[6]) + value[2] * (value[3] * value[7] - value[4] * value[6]);
+    return value[0] > epsilon && minor2 > epsilon * epsilon && det > epsilon * epsilon * epsilon;
   }
 
-  static function validGeometryReference(value:Null<String>):Bool
-    return value == null || value.length > 0;
+  static function validGeometryReference(value:Null<String>):Bool return value == null || value.length > 0;
 }

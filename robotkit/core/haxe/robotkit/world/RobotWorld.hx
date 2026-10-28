@@ -26,7 +26,7 @@ class RobotWorld {
   final robotMap:Map<RobotId, Robot>;
   final pendingEvents:Array<RobotWorldEvent> = [];
   final eventMutex = new Mutex();
-  final observers:Array<RobotWorldEvent->Void> = [];
+  final observers:Array<RobotWorldEvent -> Void> = [];
   var pendingEventCountValue:Int = 0;
 
   var sequence:Int = 0;
@@ -45,8 +45,7 @@ class RobotWorld {
     if (robot == null) throw "RobotWorld cannot attach a null robot";
     robot.setChangeListener(onRobotChanged);
     try {
-      if (robotMap.exists(robot.id()))
-        throw 'RobotWorld already contains "${robot.id()}"';
+      if (robotMap.exists(robot.id())) throw 'RobotWorld already contains "${robot.id()}"';
       robotMap.set(robot.id(), robot);
     } catch (error:Dynamic) {
       robot.setChangeListener(null);
@@ -93,7 +92,7 @@ class RobotWorld {
   }
 
   /** Observes lifecycle and adapter changes; callbacks run during pump(). */
-  public function subscribe(listener:RobotWorldEvent->Void):RobotWorldSubscription {
+  public function subscribe(listener:RobotWorldEvent -> Void):RobotWorldSubscription {
     ensureOpen();
     ensureOwner();
     if (listener == null) throw "RobotWorld subscription requires a listener";
@@ -101,7 +100,8 @@ class RobotWorld {
     return new RobotWorldSubscription(function() {
       var index = observers.indexOf(listener);
       if (index >= 0) observers.splice(index, 1);
-    });
+    }
+    );
   }
 
   /** Returns descriptions in deterministic logical-ID order. */
@@ -121,10 +121,14 @@ class RobotWorld {
     var disconnected = 0;
     var faulted = 0;
     for (robot in allRobots()) switch robot.status() {
-      case Ready: ready++;
-      case Connecting: connecting++;
-      case Disconnected: disconnected++;
-      case Fault: faulted++;
+      case Ready:
+        ready++;
+      case Connecting:
+        connecting++;
+      case Disconnected:
+        disconnected++;
+      case Fault:
+        faulted++;
     }
     var total = 0;
     for (_ in robotMap.keys()) total++;
@@ -146,8 +150,7 @@ class RobotWorld {
     // that notification before publishing the snapshot so its sequence describes
     // the state that was actually returned.
     pump();
-    return new WorldSnapshot(sequence, topologyRevision, sourceTimestampNs, source,
-      NativeKit.nk_time_now_ns());
+    return new WorldSnapshot(sequence, topologyRevision, sourceTimestampNs, source, NativeKit.nk_time_now_ns());
   }
 
   /** Enqueues an adapter notification for application by the world owner. */
@@ -258,8 +261,8 @@ class RobotWorld {
   }
 
   function ensureOwner():Void {
-    if (RobotThreadToken.current() != ownerThread)
-      throw "RobotWorld is single-owner; enqueue an event for the owner thread";
+    if (RobotThreadToken.current()
+      != ownerThread) throw "RobotWorld is single-owner; enqueue an event for the owner thread";
   }
 
   function requireRobot(id:RobotId):Robot {

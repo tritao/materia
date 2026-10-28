@@ -17,7 +17,8 @@ class JointReferenceState {
 
   public function new(blueprint:RobotRuntimeBlueprint, ?template:JointReferenceState) {
     if (template != null) {
-      homes = template.homes.copy(); couplings = template.couplings.copy();
+      homes = template.homes.copy();
+      couplings = template.couplings.copy();
       for (value in template.names) names.push(value);
       for (value in template.homeJoints) homeJoints.push(value);
       for (value in template.homeDrives) homeDrives.push(value);
@@ -33,19 +34,23 @@ class JointReferenceState {
     for (joint in 0...blueprint.jointCount) {
       var id = blueprint.identity == null ? null : blueprint.identity.jointId(joint);
       names.push(id == null ? 'joint[$joint]' : id);
-      referenced.push(true); offsets.push(0.0);
+      referenced.push(true);
+      offsets.push(0.0);
     }
     homes = [for (contact in blueprint.switches) if (contact.role == "home") contact];
     couplings = blueprint.couplings.copy();
     for (term in couplings) {
       if (term == null) throw "Reference state has a null coupling";
-      requireJoint(term.leader); requireJoint(term.follower);
+      requireJoint(term.leader);
+      requireJoint(term.follower);
       if (!Math.isFinite(term.ratio) || term.ratio == 0) throw "Reference coupling needs a finite nonzero ratio";
     }
     for (contact in homes) {
       var joint = names.indexOf(contact.joint);
       if (joint < 0) throw 'Home switch "${contact.id}" monitors an unknown joint';
-      homeJoints.push(joint); latched.push(false); latchOffsets.push(0.0);
+      homeJoints.push(joint);
+      latched.push(false);
+      latchOffsets.push(0.0);
       leaderLatchOffsets.push(0.0);
       homeDrives.push(SwitchDriveBinding.resolve(blueprint, contact));
       driveCalibrated.push(false);
@@ -80,8 +85,7 @@ class JointReferenceState {
     if (joints == null) throw "Reference admission requires joint indices";
     for (joint in joints) {
       requireJoint(joint);
-      if (!referenced[joint])
-        throw 'RK_JOINT_UNREFERENCED: joint "${names[joint]}" requires homing';
+      if (!referenced[joint]) throw 'RK_JOINT_UNREFERENCED: joint "${names[joint]}" requires homing';
     }
   }
 
@@ -141,14 +145,22 @@ class JointReferenceState {
 
   /** A power cycle loses every switch-derived reference and calibrated zero. */
   public function invalidate():Void {
-    for (i in 0...latched.length) { latched[i] = false; latchOffsets[i] = 0.0; leaderLatchOffsets[i] = 0.0; driveCalibrated[i] = false; }
+    for (i in 0...latched.length) {
+      latched[i] = false;
+      latchOffsets[i] = 0.0;
+      leaderLatchOffsets[i] = 0.0;
+      driveCalibrated[i] = false;
+    }
     refresh();
   }
 
   public function invalidateJoint(joint:Int):Void {
     requireJoint(joint);
     for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
-      latched[i] = false; latchOffsets[i] = 0.0; leaderLatchOffsets[i] = 0.0; driveCalibrated[i] = false;
+      latched[i] = false;
+      latchOffsets[i] = 0.0;
+      leaderLatchOffsets[i] = 0.0;
+      driveCalibrated[i] = false;
     }
     refresh();
   }
@@ -167,17 +179,24 @@ class JointReferenceState {
     return logical - offsets[joint];
   }
 
-  public function offset(joint:Int):Float { requireJoint(joint); return offsets[joint]; }
+  public function offset(joint:Int):Float {
+    requireJoint(joint);
+    return offsets[joint];
+  }
 
   function refresh():Void {
     for (joint in 0...names.length) {
-      referenced[joint] = true; offsets[joint] = 0.0;
+      referenced[joint] = true;
+      offsets[joint] = 0.0;
       var first = true;
       for (i in 0...homeJoints.length) if (homeJoints[i] == joint) {
         if (!latched[i]) referenced[joint] = false;
         // The first authored home is the leader's coordinate reference. Other
         // side latches are required independently; their zeros are not averaged.
-        if (first) { offsets[joint] = latched[i] ? leaderLatchOffsets[i] : 0.0; first = false; }
+        if (first) {
+          offsets[joint] = latched[i] ? leaderLatchOffsets[i] : 0.0;
+          first = false;
+        }
       }
     }
     // Fixed-point propagation handles chained and multiple-input followers.

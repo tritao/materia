@@ -8,9 +8,12 @@ class GearTerm {
   public final quantum:Float;
   public final extrapolate:Bool;
   public function new(master:Int, ratio:Float, latencyNs:Int, quantum:Float, extrapolate:Bool = true) {
-    if (master < 0 || !Math.isFinite(ratio) || ratio == 0 || latencyNs < 0 || latencyNs > 1000000000 ||
-        !Math.isFinite(quantum) || quantum < 0) throw "Invalid electronic gear encoder term";
-    this.master = master; this.ratio = ratio; this.latencyNs = latencyNs;
-    this.quantum = quantum; this.extrapolate = extrapolate;
+    if (master < 0 || !Math.isFinite(ratio) || ratio == 0 || latencyNs < 0
+      || latencyNs > 1000000000 || !Math.isFinite(quantum) || quantum < 0) throw "Invalid electronic gear encoder term";
+    this.master = master;
+    this.ratio = ratio;
+    this.latencyNs = latencyNs;
+    this.quantum = quantum;
+    this.extrapolate = extrapolate;
   }
 }

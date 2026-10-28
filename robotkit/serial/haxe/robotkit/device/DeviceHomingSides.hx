@@ -29,26 +29,39 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
   var calibrating:Null<Array<String>> = null;
   var ending:Bool = false;
 
-  public function new(runtime:RobotRuntime, endpoint:NativeRuntimeEndpoint,
-      blueprint:RobotRuntimeBlueprint, binding:DeviceBinding, skewBound:Float) {
-    if (runtime == null || endpoint == null || blueprint == null || binding == null ||
-        !Math.isFinite(skewBound) || skewBound <= 0 || skewBound > 3.4028234663852886e38) throw "Device homing requires explicit wiring and a finite skew bound";
-    this.runtime = runtime; this.endpoint = endpoint; this.skewBound = skewBound;
+  public function new(
+    runtime:RobotRuntime,
+    endpoint:NativeRuntimeEndpoint,
+    blueprint:RobotRuntimeBlueprint,
+    binding:DeviceBinding,
+    skewBound:Float
+  ) {
+    if (runtime == null
+      || endpoint == null || blueprint == null || binding == null || !Math.isFinite(skewBound) || skewBound <= 0
+      || skewBound > 3.4028234663852886e38) throw "Device homing requires explicit wiring and a finite skew bound";
+    this.runtime = runtime;
+    this.endpoint = endpoint;
+    this.skewBound = skewBound;
     normalBounds = [for (value in binding.channels) value.skewBound];
     for (contact in blueprint.switches) if (contact.role == "home" && contact.driveJoint != null) {
       drives.set(contact.id, SwitchDriveBinding.resolve(blueprint, contact));
-      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint)
-        leaders.set(contact.id, i);
-      for (input in binding.inputs) if (input.wiring.switchId == contact.id)
-        channels.set(contact.id, input.actuatorChannel);
+      for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint) leaders.set(contact.id,
+        i);
+      for (input in binding.inputs) if (input.wiring.switchId == contact.id) channels.set(
+        contact.id,
+        input.actuatorChannel
+      );
     }
   }
 
   /** Bind protocol-backed input sensors and side control to a serial or virtual runtime. */
-  public static function install(runtime:RobotRuntime, blueprint:RobotRuntimeBlueprint,
-      binding:DeviceBinding, skewBound:Float):DeviceHomingSides {
-    if (!Std.isOfType(runtime.endpoint, NativeRuntimeEndpoint))
-      throw "Device homing requires a native device runtime";
+  public static function install(
+    runtime:RobotRuntime,
+    blueprint:RobotRuntimeBlueprint,
+    binding:DeviceBinding,
+    skewBound:Float
+  ):DeviceHomingSides {
+    if (!Std.isOfType(runtime.endpoint, NativeRuntimeEndpoint)) throw "Device homing requires a native device runtime";
     var endpoint:NativeRuntimeEndpoint = cast runtime.endpoint;
     var sides = new DeviceHomingSides(runtime, endpoint, blueprint, binding, skewBound);
     var switches = new DeviceSwitchSensorAdapter(blueprint, runtime, binding);
@@ -61,8 +74,12 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
     sequence = sequence + Int64.ofInt(1);
     var control = new rk_device_homing_control();
     control.set_struct_size(rk_device_homing_control.size());
-    control.set_action(action); control.set_sequence(sequence); control.set_scope(scope);
-    control.set_first(first); control.set_second(second); control.set_skew_bound(skewBound);
+    control.set_action(action);
+    control.set_sequence(sequence);
+    control.set_scope(scope);
+    control.set_first(first);
+    control.set_second(second);
+    control.set_skew_bound(skewBound);
     pending.push(control);
   }
 
@@ -75,14 +92,15 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
   }
 
   public function beginSquaring(switchIds:Array<String>):Void {
-    if (squaring.length != 0 || ending || switchIds == null || switchIds.length != 2)
-      throw "Device squaring requires one idle two-side group";
+    if (squaring.length != 0
+      || ending || switchIds == null || switchIds.length != 2) throw "Device squaring requires one idle two-side group";
     var first = channel(switchIds[0]), second = channel(switchIds[1]);
     var a = drives.get(switchIds[0]), b = drives.get(switchIds[1]);
     var firstLeader = leaders.get(switchIds[0]), secondLeader = leaders.get(switchIds[1]);
     if (firstLeader == null || secondLeader == null) throw "Squaring pair has no leader axis";
-    if (first == second || a == null || b == null || a.joint == b.joint ||
-        firstLeader != secondLeader || skewBound < bindingSkew(first) || skewBound < bindingSkew(second)) throw "Device squaring requires distinct shafts on one axis";
+    if (first == second
+      || a == null || b == null || a.joint == b.joint || firstLeader != secondLeader || skewBound < bindingSkew(first)
+      || skewBound < bindingSkew(second)) throw "Device squaring requires distinct shafts on one axis";
     scope = sequence + Int64.ofInt(1);
     squaring = switchIds.copy();
     enqueue(0, first, second);
@@ -118,8 +136,10 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
     squaring = [];
     held.clear();
     if (group.length == 0) return;
-    RobotRuntime.check(endpoint.deviceHomingControl(5, sequence, scope,
-      channel(group[0]), channel(group[1]), skewBound), "cancel device homing");
+    RobotRuntime.check(
+      endpoint.deviceHomingControl(5, sequence, scope, channel(group[0]), channel(group[1]), skewBound),
+      "cancel device homing"
+    );
   }
 
   public function endSquaring():Void {
@@ -142,10 +162,10 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
   }
 
   public function calibrate(switchIds:Array<String>):Void {
-    if (ending || calibrating != null || switchIds == null || switchIds.length != 2 ||
-        squaring.length != 2 || switchIds[0] == switchIds[1]) throw "Calibrate the complete active device pair";
-    for (id in switchIds) if (squaring.indexOf(id) < 0 || held.exists(id))
-      throw "Release both physical sides before calibration";
+    if (ending || calibrating != null || switchIds == null || switchIds.length != 2
+      || squaring.length != 2 || switchIds[0] == switchIds[1]) throw "Calibrate the complete active device pair";
+    for (id in switchIds) if (squaring.indexOf(id) < 0
+      || held.exists(id)) throw "Release both physical sides before calibration";
     calibrating = switchIds.copy();
   }
 
@@ -158,8 +178,10 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
     }
     if (pending.length > 0) {
       var control = pending[0];
-      RobotRuntime.check(RobotKitRuntime.rk_robot_runtime_device_homing_control(endpoint.nativeHandle(), control),
-        "device homing control");
+      RobotRuntime.check(
+        RobotKitRuntime.rk_robot_runtime_device_homing_control(endpoint.nativeHandle(), control),
+        "device homing control"
+      );
       outstanding = control.get_sequence();
       pending.shift();
       return false;
@@ -171,7 +193,10 @@ class DeviceHomingSides implements HomingSideControl implements HomingControlRea
       // Native counter calibration consumes the next sequence in this stream.
       sequence = sequence + Int64.ofInt(1);
     }
-    if (ending) { squaring = []; ending = false; }
+    if (ending) {
+      squaring = [];
+      ending = false;
+    }
     return true;
   }
 }

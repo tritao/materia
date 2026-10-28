@@ -14,9 +14,8 @@ class CoupledJoint {
   public final offset:Float;
 
   public function new(follower:Int, leader:Int, ratio:Float, offset:Float) {
-    if (follower < 0 || leader < 0 || follower == leader || !Math.isFinite(ratio) ||
-        ratio == 0.0 || !Math.isFinite(offset))
-      throw "A coupled joint needs distinct joints, a nonzero finite ratio and a finite offset";
+    if (follower < 0 || leader < 0 || follower == leader || !Math.isFinite(ratio) || ratio == 0.0 || !Math
+      .isFinite(offset)) throw "A coupled joint needs distinct joints, a nonzero finite ratio and a finite offset";
     this.follower = follower;
     this.leader = leader;
     this.ratio = ratio;

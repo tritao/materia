@@ -31,14 +31,23 @@ class WorldHost {
     ensureOpen();
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     var runtime = simulation.simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot(id, runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      id,
+      runtime,
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     world.attach(robot);
     return robot;
   }
 
-  public function addRemoteRobot(id:String, ?camera:Bool = false,
-      ?deployment:SerialDeployment, ?credentials:robotkit.auth.ClientCredentials):RemoteRobot {
+  public function addRemoteRobot(
+    id:String,
+    ?camera:Bool = false,
+    ?deployment:SerialDeployment,
+    ?credentials:robotkit.auth.ClientCredentials
+  ):RemoteRobot {
     ensureOpen();
     var robot = new RemoteRobot(id, credentials);
     if (camera) robot.enableCamera();

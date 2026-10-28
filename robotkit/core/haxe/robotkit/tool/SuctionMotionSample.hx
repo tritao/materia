@@ -10,8 +10,8 @@ class SuctionMotionSample {
   public final baseAccelerationAtWorkpieceCom:Vec3;
 
   public function new(baseTFlange:Transform3, baseAccelerationAtWorkpieceCom:Vec3) {
-    if (baseTFlange == null || baseAccelerationAtWorkpieceCom == null)
-      throw "Suction motion sample requires a flange pose and COM acceleration";
+    if (baseTFlange == null || baseAccelerationAtWorkpieceCom
+      == null) throw "Suction motion sample requires a flange pose and COM acceleration";
     this.baseTFlange = baseTFlange;
     this.baseAccelerationAtWorkpieceCom = baseAccelerationAtWorkpieceCom;
   }

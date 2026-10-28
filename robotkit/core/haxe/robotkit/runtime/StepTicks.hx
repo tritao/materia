@@ -17,8 +17,7 @@ class StepTicks {
   }
 
   /** The rate, in units per second, a device stepping every `ticks` reaches with `stepsPerUnit` (already `wire`). */
-  public static function rate(ticks:Int, stepsPerUnit:Float, tickHz:Int):Float
-    return tickHz / (ticks * stepsPerUnit);
+  public static function rate(ticks:Int, stepsPerUnit:Float, tickHz:Int):Float return tickHz / (ticks * stepsPerUnit);
 
   /**
    * Steps per unit as the wire carries them (f32). The binding quantises its steps per unit here once and

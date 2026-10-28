@@ -11,8 +11,14 @@ class PathProjection {
   public final crossTrackError:Float;
   public final distanceToPath:Float;
 
-  public function new(distanceAlongPath:Float, segmentIndex:Int, pose:Pose2,
-      tangentYaw:Float, crossTrackError:Float, distanceToPath:Float) {
+  public function new(
+    distanceAlongPath:Float,
+    segmentIndex:Int,
+    pose:Pose2,
+    tangentYaw:Float,
+    crossTrackError:Float,
+    distanceToPath:Float
+  ) {
     this.distanceAlongPath = distanceAlongPath;
     this.segmentIndex = segmentIndex;
     this.pose = pose;

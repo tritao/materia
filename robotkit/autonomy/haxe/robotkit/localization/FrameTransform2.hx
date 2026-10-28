@@ -9,12 +9,10 @@ class FrameTransform2 {
   public final childPoseInParent:Pose2;
 
   public function new(parentFrame:String, childFrame:String, childPoseInParent:Pose2) {
-    if (parentFrame == null || parentFrame.length == 0 || childFrame == null ||
-        childFrame.length == 0 || parentFrame == childFrame || childPoseInParent == null)
-      throw "Frame transform requires distinct frame IDs and a pose";
+    if (parentFrame == null || parentFrame.length == 0 || childFrame == null || childFrame.length == 0 || parentFrame
+      == childFrame || childPoseInParent == null) throw "Frame transform requires distinct frame IDs and a pose";
     this.parentFrame = parentFrame;
     this.childFrame = childFrame;
-    this.childPoseInParent = new Pose2(childPoseInParent.x, childPoseInParent.y,
-      childPoseInParent.yaw);
+    this.childPoseInParent = new Pose2(childPoseInParent.x, childPoseInParent.y, childPoseInParent.yaw);
   }
 }

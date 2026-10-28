@@ -10,13 +10,18 @@ class Pose3 {
   public final qz:Float;
   public final qw:Float;
 
-  public function new(?x:Float = 0.0, ?y:Float = 0.0, ?z:Float = 0.0,
-      ?qx:Float = 0.0, ?qy:Float = 0.0, ?qz:Float = 0.0, ?qw:Float = 1.0) {
-    for (value in [x, y, z, qx, qy, qz, qw])
-      if (!Math.isFinite(value)) throw "Pose3 values must be finite";
+  public function new(
+    ?x:Float = 0.0,
+    ?y:Float = 0.0,
+    ?z:Float = 0.0,
+    ?qx:Float = 0.0,
+    ?qy:Float = 0.0,
+    ?qz:Float = 0.0,
+    ?qw:Float = 1.0
+  ) {
+    for (value in [x, y, z, qx, qy, qz, qw]) if (!Math.isFinite(value)) throw "Pose3 values must be finite";
     var norm = qx * qx + qy * qy + qz * qz + qw * qw;
-    if (Math.abs(norm - 1.0) > 0.000001)
-      throw "Pose3 rotation must be a unit quaternion";
+    if (Math.abs(norm - 1.0) > 0.000001) throw "Pose3 rotation must be a unit quaternion";
     this.x = x;
     this.y = y;
     this.z = z;
@@ -35,8 +40,15 @@ class Pose3 {
     var z = qw * local.qz + qx * local.qy - qy * local.qx + qz * local.qw;
     var w = qw * local.qw - qx * local.qx - qy * local.qy - qz * local.qz;
     var norm = Math.pow(x * x + y * y + z * z + w * w, 0.5);
-    return new Pose3(this.x + translation.x, this.y + translation.y,
-      this.z + translation.z, x / norm, y / norm, z / norm, w / norm);
+    return new Pose3(
+      this.x + translation.x,
+      this.y + translation.y,
+      this.z + translation.z,
+      x / norm,
+      y / norm,
+      z / norm,
+      w / norm
+    );
   }
 
   /** Projects the position and local +X heading onto a Z-up planar frame. */
@@ -47,14 +59,10 @@ class Pose3 {
   }
 
   /** Rotates a vector from this pose's local frame into its parent frame. */
-  public function rotate(x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float} {
+  public function rotate(x:Float, y:Float, z:Float): {x: Float, y: Float, z: Float} {
     var tx = 2.0 * (qy * z - qz * y);
     var ty = 2.0 * (qz * x - qx * z);
     var tz = 2.0 * (qx * y - qy * x);
-    return {
-      x: x + qw * tx + qy * tz - qz * ty,
-      y: y + qw * ty + qz * tx - qx * tz,
-      z: z + qw * tz + qx * ty - qy * tx
-    };
+    return {x: x + qw * tx + qy * tz - qz * ty, y: y + qw * ty + qz * tx - qx * tz, z: z + qw * tz + qx * ty - qy * tx};
   }
 }

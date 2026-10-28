@@ -7,6 +7,9 @@ class StreamSequence {
   public final sequence:Int64;
   public final sourceClockId:String;
   public function new(streamId:String, kind:String, sequence:Int64, sourceClockId:String) {
-    this.streamId = streamId; this.kind = kind; this.sequence = sequence; this.sourceClockId = sourceClockId;
+    this.streamId = streamId;
+    this.kind = kind;
+    this.sequence = sequence;
+    this.sourceClockId = sourceClockId;
   }
 }

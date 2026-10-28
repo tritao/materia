@@ -28,21 +28,56 @@ class HandlePart implements Skill {
   final approach:Null<Void -> Vec3>;
   final lifecycle = new SkillLifecycle();
 
-  public static function pick(runner:HandlingRunner, localization:Localization, grasp:Void -> Vec3,
-      ?graspSensor:String, holdThreshold:Float = 40.0, ?orientation:Void -> Quat,
-      ?approach:Void -> Vec3):HandlePart
-    return new HandlePart(runner, localization, grasp, true, graspSensor, holdThreshold, orientation, approach);
+  public static function pick(
+    runner:HandlingRunner,
+    localization:Localization,
+    grasp:Void -> Vec3,
+    ?graspSensor:String,
+    holdThreshold:Float = 40.0,
+    ?orientation:Void -> Quat,
+    ?approach:Void -> Vec3
+  ):HandlePart return new HandlePart(
+    runner,
+    localization,
+    grasp,
+    true,
+    graspSensor,
+    holdThreshold,
+    orientation,
+    approach
+  );
 
-  public static function place(runner:HandlingRunner, localization:Localization, contact:Void -> Vec3,
-      ?graspSensor:String, holdThreshold:Float = 40.0, ?orientation:Void -> Quat,
-      ?approach:Void -> Vec3):HandlePart
-    return new HandlePart(runner, localization, contact, false, graspSensor, holdThreshold, orientation, approach);
+  public static function place(
+    runner:HandlingRunner,
+    localization:Localization,
+    contact:Void -> Vec3,
+    ?graspSensor:String,
+    holdThreshold:Float = 40.0,
+    ?orientation:Void -> Quat,
+    ?approach:Void -> Vec3
+  ):HandlePart return new HandlePart(
+    runner,
+    localization,
+    contact,
+    false,
+    graspSensor,
+    holdThreshold,
+    orientation,
+    approach
+  );
 
-  public function new(runner:HandlingRunner, localization:Localization, contact:Void -> Vec3, hold:Bool,
-      ?graspSensor:String, holdThreshold:Float = 40.0, ?orientation:Void -> Quat,
-      ?approach:Void -> Vec3) {
-    if (runner == null || localization == null || contact == null || !(holdThreshold > 0))
-      throw "HandlePart needs a runner, localization, contact point and a positive hold threshold";
+  public function new(
+    runner:HandlingRunner,
+    localization:Localization,
+    contact:Void -> Vec3,
+    hold:Bool,
+    ?graspSensor:String,
+    holdThreshold:Float = 40.0,
+    ?orientation:Void -> Quat,
+    ?approach:Void -> Vec3
+  ) {
+    if (runner == null || localization == null || contact == null || !(holdThreshold
+      > 0)) throw "HandlePart needs a runner, localization, contact point and a positive hold threshold";
     this.runner = runner;
     this.localization = localization;
     this.contact = contact;
@@ -60,9 +95,12 @@ class HandlePart implements Skill {
       if (state == null) throw "HandlePart has no robot pose";
       var base_T_map = Transform3.fromPose2(state.pose).inverse();
       var requested = orientation;
-      runner.run(base_T_map.transformPoint(contact()), hold,
+      runner.run(
+        base_T_map.transformPoint(contact()),
+        hold,
         requested == null ? null : base_T_map.rotation.multiply(requested()),
-        approach == null ? null : base_T_map.rotation.rotate(approach()).normalized());
+        approach == null ? null : base_T_map.rotation.rotate(approach()).normalized()
+      );
     } catch (error:Dynamic) {
       lifecycle.fail(Std.string(error));
     }
@@ -107,7 +145,8 @@ class HandlePart implements Skill {
   }
 
   function fail(message:String):Void {
-    try runner.abort() catch (_:Dynamic) {}
+    try runner.abort() catch (_:Dynamic) {
+    }
     lifecycle.fail(message);
   }
 }

@@ -12,6 +12,5 @@ class RobotCompileDiagnostic {
     this.message = message;
   }
 
-  public function toString():String
-    return '$code at $path: $message';
+  public function toString():String return '$code at $path: $message';
 }

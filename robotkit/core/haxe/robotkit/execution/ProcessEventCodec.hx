@@ -8,9 +8,8 @@ import RobotKitRuntime;
 /** ASCII ABI encoding shared by plan submission, blueprint and event polling. */
 class ProcessEventCodec {
   public static function validateId(value:String):Void {
-    if (value == null || value.length == 0 || value.length >=
-        RobotKitRuntimeConstants.RK_PROCESS_CHANNEL_ID_BYTES)
-      throw "Process channel ID must fit the runtime ABI";
+    if (value == null || value.length == 0 || value.length
+      >= RobotKitRuntimeConstants.RK_PROCESS_CHANNEL_ID_BYTES) throw "Process channel ID must fit the runtime ABI";
     for (i in 0...value.length) {
       var code = value.charCodeAt(i);
       if (code <= ' '.code || code > '~'.code) throw "Process channel ID must be printable ASCII";
@@ -24,9 +23,9 @@ class ProcessEventCodec {
       case Analog(number):
         if (!Math.isFinite(number)) throw "Process analog value must be finite";
       case Process(command, argument):
-        if (command == null || command.length == 0 || command.length >=
-            RobotKitRuntimeConstants.RK_PROCESS_COMMAND_BYTES || !Math.isFinite(argument))
-          throw "Invalid process command";
+        if (command == null
+          || command.length == 0 || command.length >= RobotKitRuntimeConstants.RK_PROCESS_COMMAND_BYTES
+          || !Math.isFinite(argument)) throw "Invalid process command";
         for (i in 0...command.length) {
           var code = command.charCodeAt(i);
           if (code <= ' '.code || code > '~'.code) throw "Process command must be printable ASCII";
@@ -60,7 +59,8 @@ class ProcessEventCodec {
         ProcessEventValue.Analog(value.get_analog());
       case RobotKitRuntimeConstants.RK_EVENT_PROCESS:
         ProcessEventValue.Process(readCommand(value), value.get_argument());
-      default: throw "Unknown runtime process value";
+      default:
+        throw "Unknown runtime process value";
     };
   }
 

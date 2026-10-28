@@ -12,11 +12,21 @@ class DeviceInputReading {
   public final capturedTimestampNs:Int64;
   public final capturedPosition:Float;
 
-  public function new(active:Bool, sourceTimestampNs:Int64, closingCount:Int64,
-      openingCount:Int64, capturedSteps:Int64, capturedTimestampNs:Int64, capturedPosition:Float) {
-    this.active = active; this.sourceTimestampNs = sourceTimestampNs;
-    this.closingCount = closingCount; this.openingCount = openingCount;
-    this.capturedSteps = capturedSteps; this.capturedTimestampNs = capturedTimestampNs;
+  public function new(
+    active:Bool,
+    sourceTimestampNs:Int64,
+    closingCount:Int64,
+    openingCount:Int64,
+    capturedSteps:Int64,
+    capturedTimestampNs:Int64,
+    capturedPosition:Float
+  ) {
+    this.active = active;
+    this.sourceTimestampNs = sourceTimestampNs;
+    this.closingCount = closingCount;
+    this.openingCount = openingCount;
+    this.capturedSteps = capturedSteps;
+    this.capturedTimestampNs = capturedTimestampNs;
     this.capturedPosition = capturedPosition;
   }
 }

@@ -48,17 +48,20 @@ class ToolTests {
     // Single revolute joint about +Z; a tool offset of 0.2m along local +X
     // at the flange should land at +Y once the arm has rotated 90 degrees.
     var fixture = buildSingleJointFixture();
-    var tool = new Tool("probe", "probe", new Transform3(new Vec3(0.2, 0.0, 0.0), Quat.identity()),
-      [], 0.1);
+    var tool = new Tool("probe", "probe", new Transform3(new Vec3(0.2, 0.0, 0.0), Quat.identity()), [], 0.1);
     var manipulator = fixture.arm.withTool(tool.flangeTTcp);
 
     var zero = manipulator.tcpPose([0.0]);
-    check(approx(zero.translation.x, 1.2, 1e-9) && approx(zero.translation.y, 0.0, 1e-9),
-      "TCP pose at zero joint angle offsets straight out along the flange's +X");
+    check(
+      approx(zero.translation.x, 1.2, 1e-9) && approx(zero.translation.y, 0.0, 1e-9),
+      "TCP pose at zero joint angle offsets straight out along the flange's +X"
+    );
 
     var rotated = manipulator.tcpPose([Math.PI * 0.5]);
-    check(approx(rotated.translation.x, 0.0, 1e-9) && approx(rotated.translation.y, 1.2, 1e-9),
-      "TCP pose rotates the tool offset with the flange, landing at +Y after a 90deg turn");
+    check(
+      approx(rotated.translation.x, 0.0, 1e-9) && approx(rotated.translation.y, 1.2, 1e-9),
+      "TCP pose rotates the tool offset with the flange, landing at +Y after a 90deg turn"
+    );
   }
 
   static function testIkToTcpTarget():Void {
@@ -72,12 +75,22 @@ class ToolTests {
     var result = manipulator.solve(target, seed, new IkOptions(1e-4, 1e-3, 100, 0.02));
     check(result.converged, "IK to a TCP target converges");
     var achieved = manipulator.tcpPose(result.q);
-    check(approx(achieved.translation.x, target.translation.x, 1e-3) &&
-      approx(achieved.translation.y, target.translation.y, 1e-3) &&
-      approx(achieved.translation.z, target.translation.z, 1e-3),
-      "IK solution's TCP pose matches the requested TCP target position");
-    check(achieved.rotation.angularDistance(target.rotation) < 1e-3,
-      "IK solution's TCP pose matches the requested TCP target orientation");
+    check(
+      approx(achieved.translation.x, target.translation.x, 1e-3) && approx(
+        achieved.translation.y,
+        target.translation.y,
+        1e-3
+      ) && approx(
+        achieved.translation.z,
+        target.translation.z,
+        1e-3
+      ),
+      "IK solution's TCP pose matches the requested TCP target position"
+    );
+    check(
+      achieved.rotation.angularDistance(target.rotation) < 1e-3,
+      "IK solution's TCP pose matches the requested TCP target orientation"
+    );
   }
 
   static function testMaskedToolTasks():Void {
@@ -95,42 +108,76 @@ class ToolTests {
     var flange = model.addFrame(new Frame("flange", parent));
     var group = new Manipulator(model, base.id, flange.id);
     var seed = [0.0, 0.0, 0.0];
-    var spun = new Transform3(new Vec3(0.2, -0.3, 0.1),
-      Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.7));
+    var spun = new Transform3(new Vec3(0.2, -0.3, 0.1), Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.7));
     var axisOptions = new IkOptions().freedom(Axis(0, 0, 1));
     var copied = axisOptions.copy();
     axisOptions.freedom(Full, 1);
     check(copied.positionAxes == 7, "Copied IK options preserve the position mask");
     var axis = group.solve(spun, seed, copied);
-    check(axis.converged && axis.positionError < 1e-4 && axis.orientationError < 1e-3,
-      "XYZ follows a tool-Z task while leaving unreachable spin free");
-    check(group.tcpPose(axis.q).rotation.angularDistance(spun.rotation) > 0.6,
-      "Free spin is not secretly solved as a full orientation");
+    check(
+      axis.converged && axis.positionError < 1e-4 && axis.orientationError < 1e-3,
+      "XYZ follows a tool-Z task while leaving unreachable spin free"
+    );
+    check(
+      group.tcpPose(axis.q).rotation.angularDistance(spun.rotation) > 0.6,
+      "Free spin is not secretly solved as a full orientation"
+    );
     var full = group.solve(spun, seed, new IkOptions());
-    check(!full.converged && full.orientationError > 0.6,
-      "The same XYZ target fails when spin is a hard orientation row");
-    var tilted = new Transform3(spun.translation,
-      Quat.fromAxisAngle(new Vec3(1, 0, 0), 0.4));
+    check(
+      !full.converged && full.orientationError > 0.6,
+      "The same XYZ target fails when spin is a hard orientation row"
+    );
+    var tilted = new Transform3(spun.translation, Quat.fromAxisAngle(new Vec3(1, 0, 0), 0.4));
     var free = group.solve(tilted, seed, new IkOptions().freedom(Free));
-    check(free.converged && free.positionError < 1e-4 && free.orientationError == 0.0,
-      "Position-only XYZ task drops every orientation row");
+    check(
+      free.converged && free.positionError < 1e-4 && free.orientationError == 0.0,
+      "Position-only XYZ task drops every orientation row"
+    );
     var tiltedAxis = group.solve(tilted, seed, copied);
-    check(!tiltedAxis.converged && tiltedAxis.orientationError > 0.3,
-      "Tool-axis task retains unreachable tilt as an orientation residual");
-    var masked = group.solve(new Transform3(new Vec3(0.25, 0.4, -0.6), Quat.identity()),
-      seed, new IkOptions().freedom(Free, 1));
-    check(masked.converged && approx(masked.q[0], 0.25, 1e-4) &&
-      approx(masked.q[1], 0, 1e-12) && approx(masked.q[2], 0, 1e-12),
-      "A selected position axis moves only its constrained XYZ DOF");
-    var worldMasked = group.solve(new Transform3(new Vec3(0.15, -0.4, 0.7), Quat.identity()), seed,
-      new IkOptions().freedom(Free, 1).movingBase(Transform3.identity(), 0));
-    check(worldMasked.converged && approx(worldMasked.q[0], 0.15, 1e-4) &&
-      approx(worldMasked.q[1], 0, 1e-12) && approx(worldMasked.q[2], 0, 1e-12),
-      "World-target moving-base solve receives the selected position and orientation rows");
-    var preference = new IkOptions().freedom(Axis(0, 0, 1))
-      .preferringOrientation(spun.rotation, 0.2).copy();
-    check(preference.orientationPreference == spun.rotation && preference.orientationPreferenceWeight == 0.2,
-      "Copied IK options preserve their immutable soft orientation preference");
+    check(
+      !tiltedAxis.converged && tiltedAxis.orientationError > 0.3,
+      "Tool-axis task retains unreachable tilt as an orientation residual"
+    );
+    var masked = group.solve(
+      new Transform3(new Vec3(0.25, 0.4, -0.6), Quat.identity()),
+      seed,
+      new IkOptions().freedom(
+        Free,
+        1
+      )
+    );
+    check(
+      masked.converged && approx(masked.q[0], 0.25, 1e-4) && approx(masked.q[1], 0, 1e-12) && approx(
+        masked.q[2],
+        0,
+        1e-12
+      ),
+      "A selected position axis moves only its constrained XYZ DOF"
+    );
+    var worldMasked = group.solve(
+      new Transform3(new Vec3(0.15, -0.4, 0.7), Quat.identity()),
+      seed,
+      new IkOptions().freedom(
+        Free,
+        1
+      ).movingBase(
+        Transform3.identity(),
+        0
+      )
+    );
+    check(
+      worldMasked.converged && approx(worldMasked.q[0], 0.15, 1e-4) && approx(worldMasked.q[1], 0, 1e-12) && approx(
+        worldMasked.q[2],
+        0,
+        1e-12
+      ),
+      "World-target moving-base solve receives the selected position and orientation rows"
+    );
+    var preference = new IkOptions().freedom(Axis(0, 0, 1)).preferringOrientation(spun.rotation, 0.2).copy();
+    check(
+      preference.orientationPreference == spun.rotation && preference.orientationPreferenceWeight == 0.2,
+      "Copied IK options preserve their immutable soft orientation preference"
+    );
   }
 
   static function testSimulatedSprayerStateHistory():Void {
@@ -140,35 +187,75 @@ class ToolTests {
     sprayer.setFlow(0.8, Int64.ofInt(2000));
 
     check(sprayer.history.length == 3, "Simulated sprayer records one event per command");
-    check(approx(sprayer.history[0].flow, 0.5, 1e-9) && Int64.toInt(sprayer.history[0].timestampNs) == 1000,
-      "First recorded event captures the commanded flow and its timestamp");
-    check(approx(sprayer.history[1].flow, 0.5, 1e-9) && approx(sprayer.history[1].pressure, 3.0, 1e-9) &&
-      Int64.toInt(sprayer.history[1].timestampNs) == 1500,
-      "Pressure command records the flow unchanged alongside the new pressure");
-    check(approx(sprayer.history[2].flow, 0.8, 1e-9) && Int64.toInt(sprayer.history[2].timestampNs) == 2000,
-      "Later flow command overwrites the recorded flow and advances the timestamp");
-    check(approx(sprayer.flow(), 0.8, 1e-9) && approx(sprayer.pressure(), 3.0, 1e-9),
-      "Simulated sprayer exposes its latest commanded state");
+    check(
+      approx(sprayer.history[0].flow, 0.5, 1e-9) && Int64.toInt(sprayer.history[0].timestampNs) == 1000,
+      "First recorded event captures the commanded flow and its timestamp"
+    );
+    check(
+      approx(sprayer.history[1].flow, 0.5,
+      1e-9) && approx(sprayer.history[1].pressure, 3.0, 1e-9) && Int64.toInt(sprayer.history[1].timestampNs) == 1500,
+      "Pressure command records the flow unchanged alongside the new pressure"
+    );
+    check(
+      approx(sprayer.history[2].flow, 0.8, 1e-9) && Int64.toInt(sprayer.history[2].timestampNs) == 2000,
+      "Later flow command overwrites the recorded flow and advances the timestamp"
+    );
+    check(
+      approx(sprayer.flow(), 0.8, 1e-9) && approx(sprayer.pressure(), 3.0, 1e-9),
+      "Simulated sprayer exposes its latest commanded state"
+    );
   }
 
   static function testWorkpieceMassRollup():Void {
-    var tool = new MassProperties(2.0, new Vec3(0.1, 0, 0),
-      new Inertia3(0.02, 0, 0, 0.03, 0, 0.04));
-    var part = new WorkpieceLoad("pick-a", new MassProperties(1.0,
-      new Vec3(0.1, 0, 0), new Inertia3(0.01, 0, 0, 0.02, 0, 0.01)),
-      new Transform3(new Vec3(0, 0.2, 0),
-        Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI * 0.5)));
+    var tool = new MassProperties(2.0, new Vec3(0.1, 0, 0), new Inertia3(0.02, 0, 0, 0.03, 0, 0.04));
+    var part = new WorkpieceLoad(
+      "pick-a",
+      new MassProperties(
+        1.0,
+        new Vec3(0.1, 0, 0),
+        new Inertia3(
+          0.01,
+          0,
+          0,
+          0.02,
+          0,
+          0.01
+        )
+      ),
+      new Transform3(
+        new Vec3(
+          0,
+          0.2,
+          0
+        ),
+        Quat.fromAxisAngle(
+          new Vec3(
+            0,
+            0,
+            1
+          ),
+          Math.PI * 0.5
+        )
+      )
+    );
     var combined = tool.combined(part.atFlange());
-    check(approx(combined.massKg, 3.0, 1e-12) &&
-      approx(combined.centerOfMass.x, 1.0 / 15.0, 1e-12) &&
-      approx(combined.centerOfMass.y, 0.1, 1e-12),
-      "Pick-specific workpiece pose changes the combined flange centre of mass");
-    check(combined.inertia != null && approx(combined.inertia.zz, 7.0 / 60.0, 1e-12),
-      "Combined centroidal inertia uses the parallel-axis theorem");
-    var rotated = new Inertia3(1, 0, 0, 2, 0, 3)
-      .rotated(Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI * 0.5));
-    check(approx(rotated.xx, 1, 1e-12) && approx(rotated.yy, 3, 1e-12) &&
-      approx(rotated.zz, 2, 1e-12), "Inertia rotates with the workpiece frame");
+    check(
+      approx(combined.massKg, 3.0, 1e-12) && approx(combined.centerOfMass.x, 1.0 / 15.0, 1e-12) && approx(
+        combined.centerOfMass.y,
+        0.1,
+        1e-12
+      ),
+      "Pick-specific workpiece pose changes the combined flange centre of mass"
+    );
+    check(
+      combined.inertia != null && approx(combined.inertia.zz, 7.0 / 60.0, 1e-12),
+      "Combined centroidal inertia uses the parallel-axis theorem"
+    );
+    var rotated = new Inertia3(1, 0, 0, 2, 0, 3).rotated(Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI * 0.5));
+    check(
+      approx(rotated.xx, 1, 1e-12) && approx(rotated.yy, 3, 1e-12) && approx(rotated.zz, 2, 1e-12),
+      "Inertia rotates with the workpiece frame"
+    );
   }
 
   static function testPayloadChartAcrossJointMotion():Void {
@@ -181,87 +268,165 @@ class ToolTests {
     joint.limits.upper = 3.0;
     var flange = model.addFrame(new Frame("flange", carriage));
     var manipulator = new Manipulator(model, base.id, flange.id);
-    var tool = new Tool("pickup", "pickup", Transform3.identity(),
-      [], 1.0,
-      new MassProperties(1.0, new Vec3(0.1, 0, 0), Inertia3.zero()));
-    var part = new WorkpieceLoad("part-a", new MassProperties(2.0,
-      new Vec3(0.1, 0, 0), Inertia3.zero()), Transform3.identity());
+    var tool = new Tool(
+      "pickup",
+      "pickup",
+      Transform3.identity(),
+      [],
+      1.0,
+      new MassProperties(
+        1.0,
+        new Vec3(0.1, 0, 0),
+        Inertia3.zero()
+      )
+    );
+    var part = new WorkpieceLoad(
+      "part-a",
+      new MassProperties(2.0, new Vec3(0.1, 0, 0), Inertia3.zero()),
+      Transform3.identity()
+    );
     var chart = new ReachLoadChart([
       new ReachLoadBand(0.5, new RobotPayloadLimit(4.0, 4.0)),
-      new ReachLoadBand(2.0, new RobotPayloadLimit(4.0, 2.0))
+      new ReachLoadBand(
+        2.0,
+        new RobotPayloadLimit(
+          4.0,
+          2.0
+        )
+      )
     ]);
     var bare = PayloadChecker.checkPath(manipulator, tool, null, chart, [[0.2], [1.2]], 0.1);
     check(bare.safe, "Tool alone fits the load chart through the move");
-    var loaded = PayloadChecker.checkPath(manipulator, tool, part, chart,
-      [[0.2], [1.2]], 0.1);
-    check(!loaded.safe && loaded.firstFailureSegment == 1 &&
-      loaded.segmentFraction > 0 && loaded.segmentFraction < 1 &&
-      loaded.reason != null && loaded.reason.indexOf("moment") >= 0,
-      "Workpiece load violates the chart between two sampled waypoints");
+    var loaded = PayloadChecker.checkPath(manipulator, tool, part, chart, [[0.2], [1.2]], 0.1);
+    check(
+      !loaded.safe && loaded.firstFailureSegment == 1 && loaded.segmentFraction > 0
+      && loaded.segmentFraction < 1 && loaded.reason != null && loaded.reason.indexOf("moment") >= 0,
+      "Workpiece load violates the chart between two sampled waypoints"
+    );
     check(loaded.checkedSamples > 2, "Payload checker samples the joint path between waypoints");
     var outside = PayloadChecker.checkPath(manipulator, tool, null, chart, [[2.0]]);
     check(outside.safe, "Last chart band includes its reach boundary");
     var beyond = PayloadChecker.checkPath(manipulator, tool, null, chart, [[2.1]]);
-    check(!beyond.safe && beyond.reason != null && beyond.reason.indexOf("outside") >= 0,
-      "Robot poses beyond the load chart are rejected");
+    check(
+      !beyond.safe && beyond.reason != null && beyond.reason.indexOf("outside") >= 0,
+      "Robot poses beyond the load chart are rejected"
+    );
     var missingCentre = false;
-    try PayloadChecker.checkPath(manipulator,
+    try PayloadChecker.checkPath(
+      manipulator,
       new Tool("mass-only", "mass-only", Transform3.identity(), [], 1.0),
-      null, chart, [[0.2]])
-    catch (error:Dynamic) missingCentre = Std.string(error).indexOf("centre of mass") >= 0;
+      null,
+      chart,
+      [[0.2]]
+    ) catch (error:Dynamic) missingCentre = Std.string(error).indexOf("centre of mass") >= 0;
     check(missingCentre, "Payload check rejects legacy tools with mass but no centre of mass");
   }
 
   static function testSuctionCapacityAcrossMotion():Void {
-    var part = new WorkpieceLoad("panel", new MassProperties(2.0,
-      Vec3.zero(), Inertia3.zero()), Transform3.identity());
-    var down = new Transform3(Vec3.zero(),
-      Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
+    var part = new WorkpieceLoad("panel", new MassProperties(2.0, Vec3.zero(), Inertia3.zero()), Transform3.identity());
+    var down = new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
     var area = Math.PI * 0.02 * 0.02;
     var grip = new SuctionGrip(down, area, 60, 0.5, 2.0);
     var staticSample = new SuctionMotionSample(Transform3.identity(), Vec3.zero());
     var staticResult = SuctionCapacityChecker.checkPath(part, grip, [staticSample]);
-    check(staticResult.safe && approx(staticResult.normalCapacityN, 60e3 * area, 1e-9),
-      "Cup capacity uses minimum vacuum at the sealed area");
-    var moving = SuctionCapacityChecker.checkPath(part, grip, [staticSample,
-      new SuctionMotionSample(Transform3.identity(), new Vec3(4, 0, 0))]);
-    check(moving.safe && moving.worstShearMarginN > 0,
-      "Moderate sideways acceleration stays within the friction margin");
-    var slipping = SuctionCapacityChecker.checkPath(part, grip, [staticSample,
-      new SuctionMotionSample(Transform3.identity(), new Vec3(5, 0, 0))]);
-    check(!slipping.safe && slipping.firstFailureIndex == 1 &&
-      slipping.reason != null && slipping.reason.indexOf("Tangential") >= 0,
-      "Path reports the first sideways slip risk separately from suction tension");
-    var lifting = SuctionCapacityChecker.checkPath(part, grip, [
-      new SuctionMotionSample(Transform3.identity(), new Vec3(0, 0, 10))]);
-    check(!lifting.safe && lifting.reason != null && lifting.reason.indexOf("Normal") >= 0,
-      "Upward acceleration can exceed normal suction capacity");
-    var weakVacuum = SuctionCapacityChecker.checkPath(part,
-      new SuctionGrip(down, area, 10, 0.5, 2.0), [staticSample]);
-    check(!weakVacuum.safe && weakVacuum.worstNormalMarginN < 0,
-      "Low cup vacuum fails even with no commanded acceleration");
-    var sidewaysCup = new Transform3(Vec3.zero(),
-      Quat.fromAxisAngle(new Vec3(0, 1, 0), Math.PI * 0.5));
-    var vertical = SuctionCapacityChecker.checkPath(part,
-      new SuctionGrip(sidewaysCup, area, 60, 0.5, 2.0), [staticSample]);
-    check(!vertical.safe && vertical.reason != null && vertical.reason.indexOf("Tangential") >= 0,
-      "A vertical cup must hold the workpiece through friction");
-    var offsetPart = new WorkpieceLoad("offset", new MassProperties(2.0,
-      new Vec3(0.1, 0, 0), Inertia3.zero()), Transform3.identity());
+    check(
+      staticResult.safe && approx(staticResult.normalCapacityN, 60e3 * area, 1e-9),
+      "Cup capacity uses minimum vacuum at the sealed area"
+    );
+    var moving = SuctionCapacityChecker.checkPath(
+      part,
+      grip,
+      [
+        staticSample,
+        new SuctionMotionSample(
+          Transform3.identity(),
+          new Vec3(
+            4,
+            0,
+            0
+          )
+        )
+      ]
+    );
+    check(
+      moving.safe && moving.worstShearMarginN > 0,
+      "Moderate sideways acceleration stays within the friction margin"
+    );
+    var slipping = SuctionCapacityChecker.checkPath(
+      part,
+      grip,
+      [
+        staticSample,
+        new SuctionMotionSample(
+          Transform3.identity(),
+          new Vec3(
+            5,
+            0,
+            0
+          )
+        )
+      ]
+    );
+    check(
+      !slipping.safe
+      && slipping.firstFailureIndex == 1 && slipping.reason != null && slipping.reason.indexOf("Tangential") >= 0,
+      "Path reports the first sideways slip risk separately from suction tension"
+    );
+    var lifting = SuctionCapacityChecker.checkPath(
+      part,
+      grip,
+      [new SuctionMotionSample(
+        Transform3.identity(),
+        new Vec3(
+          0,
+          0,
+          10
+        )
+      )]
+    );
+    check(
+      !lifting.safe && lifting.reason != null && lifting.reason.indexOf("Normal") >= 0,
+      "Upward acceleration can exceed normal suction capacity"
+    );
+    var weakVacuum = SuctionCapacityChecker.checkPath(part, new SuctionGrip(down, area, 10, 0.5, 2.0), [staticSample]);
+    check(
+      !weakVacuum.safe && weakVacuum.worstNormalMarginN < 0,
+      "Low cup vacuum fails even with no commanded acceleration"
+    );
+    var sidewaysCup = new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(0, 1, 0), Math.PI * 0.5));
+    var vertical = SuctionCapacityChecker.checkPath(
+      part,
+      new SuctionGrip(sidewaysCup, area, 60, 0.5, 2.0),
+      [staticSample]
+    );
+    check(
+      !vertical.safe && vertical.reason != null && vertical.reason.indexOf("Tangential") >= 0,
+      "A vertical cup must hold the workpiece through friction"
+    );
+    var offsetPart = new WorkpieceLoad(
+      "offset",
+      new MassProperties(2.0, new Vec3(0.1, 0, 0), Inertia3.zero()),
+      Transform3.identity()
+    );
     var unknownMoment = SuctionCapacityChecker.checkPath(offsetPart, grip, [staticSample]);
-    check(!unknownMoment.safe && unknownMoment.reason != null &&
-      unknownMoment.reason.indexOf("unverified") >= 0,
-      "An offset workpiece cannot pass without a cup moment rating");
-    var ratedMoment = SuctionCapacityChecker.checkPath(offsetPart,
-      new SuctionGrip(down, area, 60, 0.5, 2.0, 5.0), [staticSample]);
-    check(ratedMoment.safe && ratedMoment.worstMomentMarginNm != null &&
-      ratedMoment.worstMomentMarginNm > 0,
-      "A rated cup can carry the offset moment within its safety margin");
+    check(
+      !unknownMoment.safe && unknownMoment.reason != null && unknownMoment.reason.indexOf("unverified") >= 0,
+      "An offset workpiece cannot pass without a cup moment rating"
+    );
+    var ratedMoment = SuctionCapacityChecker.checkPath(
+      offsetPart,
+      new SuctionGrip(down, area, 60, 0.5, 2.0, 5.0),
+      [staticSample]
+    );
+    check(
+      ratedMoment.safe && ratedMoment.worstMomentMarginNm != null && ratedMoment.worstMomentMarginNm > 0,
+      "A rated cup can carry the offset moment within its safety margin"
+    );
   }
 
   // -- fixtures --------------------------------------------------------
 
-  static function buildSingleJointFixture():{model:RobotModel, arm:Manipulator} {
+  static function buildSingleJointFixture(): {model: RobotModel, arm: Manipulator} {
     var model = new RobotModel("single-joint-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -270,31 +435,53 @@ class ToolTests {
     var flange = model.addFrame(new Frame("flange", link1));
     flange.position = [1.0, 0.0, 0.0];
     var arm = new Manipulator(model, base.id, flange.id);
-    return { model: model, arm: arm };
+    return {model: model, arm: arm};
   }
 
   /** A 6R arm laid out with the axis pattern and published DH-equivalent offsets of a UR5. */
-  static function buildUR5Fixture():{model:RobotModel, arm:Manipulator} {
-    var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
-      a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
+  static function buildUR5Fixture(): {model: RobotModel, arm: Manipulator} {
+    var d1 = 0.089159, shoulderOffset = 0.13585,
+      elbowOffset = -0.1197, a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
     var model = new RobotModel("ur5-fixture");
-    var linkNames = ["base_link", "shoulder_link", "upper_arm_link", "forearm_link",
-      "wrist_1_link", "wrist_2_link", "wrist_3_link"];
+    var linkNames = [
+      "base_link",
+      "shoulder_link",
+      "upper_arm_link",
+      "forearm_link",
+      "wrist_1_link",
+      "wrist_2_link",
+      "wrist_3_link"
+    ];
     var links = [for (name in linkNames) model.addLink(new Link(name))];
     var offsets = [
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(0.0, 0.0, a3),
-      new Vec3(0.0, d4, 0.0),
-      new Vec3(0.0, 0.0, d5)
+      new Vec3(
+        0.0,
+        0.0,
+        a3
+      ),
+      new Vec3(
+        0.0,
+        d4,
+        0.0
+      ),
+      new Vec3(
+        0.0,
+        0.0,
+        d5
+      )
     ];
-    var axes = [
-      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var jointNames = [
+      "shoulder_pan_joint",
+      "shoulder_lift_joint",
+      "elbow_joint",
+      "wrist_1_joint",
+      "wrist_2_joint",
+      "wrist_3_joint"
     ];
-    var jointNames = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"];
     for (i in 0...6) {
       var joint = model.addJoint(new Joint(jointNames[i], JointType.Revolute, links[i], links[i + 1]));
       joint.parentFramePosition = offsets[i].toArray();
@@ -307,7 +494,7 @@ class ToolTests {
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = flangeOffset.toArray();
     var arm = new Manipulator(model, links[0].id, flange.id);
-    return { model: model, arm: arm };
+    return {model: model, arm: arm};
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

@@ -25,8 +25,8 @@ class BimFrameBridge {
     if (bim == null || tree == null) throw "BIM frame bridge requires a document and a frame tree";
     for (relationship in bim.cad.allRelationships()) {
       if (relationship.typeName != BimSchema.Aggregates) continue;
-      if (relationship.source.documentId.value != bim.cad.id.value || relationship.target.documentId.value != bim.cad.id.value)
-        continue;
+      if (relationship.source.documentId.value != bim.cad.id.value
+        || relationship.target.documentId.value != bim.cad.id.value) continue;
       var parentId = relationship.source.elementId;
       var childId = relationship.target.elementId;
       tree.add(new FrameTransform3(frameName(parentId), frameName(childId), storeyTransform(bim, childId)));

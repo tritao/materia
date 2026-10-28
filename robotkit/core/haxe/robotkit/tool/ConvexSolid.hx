@@ -22,8 +22,8 @@ class ConvexSolid {
 
   /** `vertices` is x, y, z per vertex, in the solid's own frame. */
   public function new(vertices:Array<Float>) {
-    if (vertices == null || vertices.length % 3 != 0 || vertices.length < 12)
-      throw "A convex solid needs at least four vertices as x, y, z triples";
+    if (vertices == null || vertices.length % 3 != 0
+      || vertices.length < 12) throw "A convex solid needs at least four vertices as x, y, z triples";
     for (value in vertices) if (!Math.isFinite(value)) throw "A convex solid needs finite vertices";
     var count = Std.int(vertices.length / 3);
     if (count > EXACT_LIMIT) addBox(vertices, count);
@@ -53,19 +53,17 @@ class ConvexSolid {
     for (index in 0...count) {
       var x = vertices[3 * index], y = vertices[3 * index + 1], z = vertices[3 * index + 2];
       var on:Array<Int> = [];
-      for (plane in 0...offsets.length)
-        if (Math.abs(normals[3 * plane] * x + normals[3 * plane + 1] * y + normals[3 * plane + 2] * z - offsets[plane]) <= slack)
-          on.push(plane);
+      for (plane in 0...offsets.length) if (Math.abs(normals[3 * plane]
+        * x + normals[3 * plane + 1] * y + normals[3 * plane + 2] * z - offsets[plane]) <= slack) on.push(plane);
       // A vertex on fewer than three planes is inside a face or an edge of a boxed hull.
       if (on.length < 3) continue;
       var duplicate = false;
       var seen = Std.int(corners.length / 3);
-      for (other in 0...seen)
-        if (Math.abs(corners[3 * other] - x) <= slack && Math.abs(corners[3 * other + 1] - y) <= slack &&
-            Math.abs(corners[3 * other + 2] - z) <= slack) {
-          duplicate = true;
-          break;
-        }
+      for (other in 0...seen) if (Math.abs(corners[3 * other] - x) <= slack
+        && Math.abs(corners[3 * other + 1] - y) <= slack && Math.abs(corners[3 * other + 2] - z) <= slack) {
+        duplicate = true;
+        break;
+      }
       if (duplicate) continue;
       corners.push(x);
       corners.push(y);
@@ -79,8 +77,8 @@ class ConvexSolid {
 
   function addPlane(nx:Float, ny:Float, nz:Float, offset:Float):Void {
     for (index in 0...offsets.length) {
-      if (Math.abs(normals[3 * index] - nx) < 1e-9 && Math.abs(normals[3 * index + 1] - ny) < 1e-9 &&
-          Math.abs(normals[3 * index + 2] - nz) < 1e-9 && Math.abs(offsets[index] - offset) < 1e-9) return;
+      if (Math.abs(normals[3 * index] - nx) < 1e-9 && Math.abs(normals[3 * index + 1] - ny) < 1e-9
+        && Math.abs(normals[3 * index + 2] - nz) < 1e-9 && Math.abs(offsets[index] - offset) < 1e-9) return;
     }
     normals.push(nx);
     normals.push(ny);
@@ -103,7 +101,9 @@ class ConvexSolid {
     }
     // The box corners generally are not among the original cloud's vertices.
     for (x in [low[0], high[0]]) for (y in [low[1], high[1]]) for (z in [low[2], high[2]]) {
-      corners.push(x); corners.push(y); corners.push(z);
+      corners.push(x);
+      corners.push(y);
+      corners.push(z);
     }
   }
 
@@ -112,8 +112,10 @@ class ConvexSolid {
     for (value in vertices) scale = Math.max(scale, Math.abs(value));
     var slack = 1e-9 * Math.max(scale, 1e-6);
     for (i in 0...count) for (j in i + 1...count) for (k in j + 1...count) {
-      var ax = vertices[3 * j] - vertices[3 * i], ay = vertices[3 * j + 1] - vertices[3 * i + 1], az = vertices[3 * j + 2] - vertices[3 * i + 2];
-      var bx = vertices[3 * k] - vertices[3 * i], by = vertices[3 * k + 1] - vertices[3 * i + 1], bz = vertices[3 * k + 2] - vertices[3 * i + 2];
+      var ax = vertices[3 * j] - vertices[3 * i],
+        ay = vertices[3 * j + 1] - vertices[3 * i + 1], az = vertices[3 * j + 2] - vertices[3 * i + 2];
+      var bx = vertices[3 * k] - vertices[3 * i],
+        by = vertices[3 * k + 1] - vertices[3 * i + 1], bz = vertices[3 * k + 2] - vertices[3 * i + 2];
       var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
       var length = Math.sqrt(nx * nx + ny * ny + nz * nz);
       if (length < 1e-12 * Math.max(scale * scale, 1e-12)) continue;
@@ -152,14 +154,15 @@ class ConvexSolid {
     }
     if (result <= 0.0) return result;
     // The foot of the perpendicular on the farthest plane: if the solid is there, nothing is nearer.
-    var fx = x - normals[3 * farthest] * result, fy = y - normals[3 * farthest + 1] * result, fz = z - normals[3 * farthest + 2] * result;
+    var fx = x - normals[3 * farthest] * result,
+      fy = y - normals[3 * farthest + 1] * result, fz = z - normals[3 * farthest + 2] * result;
     var slack = 1e-9 * Math.max(1.0, result);
     var inside = true;
-    for (index in 0...offsets.length)
-      if (normals[3 * index] * fx + normals[3 * index + 1] * fy + normals[3 * index + 2] * fz - offsets[index] > slack) {
-        inside = false;
-        break;
-      }
+    for (index in 0...offsets.length) if (normals[3
+      * index] * fx + normals[3 * index + 1] * fy + normals[3 * index + 2] * fz - offsets[index] > slack) {
+      inside = false;
+      break;
+    }
     if (inside) return result;
     // Dykstra's alternating projections.
     var count = offsets.length;

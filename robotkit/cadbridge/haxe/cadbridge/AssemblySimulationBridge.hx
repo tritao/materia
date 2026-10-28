@@ -39,15 +39,16 @@ typedef AssemblySimulationModel = {
   /** Part pairs that form designed interfaces across a moving assembly joint. */
   var jointInterfaces:Array<AssemblyJointInterface>;
   /** Each simulated part's link and its frame within that link. */
-  var partLinks:Map<String, AssemblyPartLink>;
+  var partLinks:Map<String,
+  AssemblyPartLink>;
   var closureIds:Array<String>;
   var closures:Array<AssemblySimulationClosure>;
 }
 
 /** Candidate occurrence hulls on opposite sides of a mechanical joint. */
 typedef AssemblyJointInterface = {
-	var first:String;
-	var second:String;
+  var first:String;
+  var second:String;
 }
 
 /** Where a part rides: link `link`, at `offset` (metres) in the link's frame. */
@@ -112,15 +113,18 @@ class AssemblySimulationBridge {
    * authored pieces when it has them, else the part's measured hull, else none. Everything that
    * collides an assembly's parts (simulation, clearance, the editor) takes them from here.
    */
-  public static function collisionPieces(occurrence:String, component:AssemblyDefinition.AssemblyComponentDefinition,
-      part:Null<AssemblyPhysicalPart>):Array<Array<Float>> {
-    var pieces = component.collisionHulls != null ? component.collisionHulls
-      : part != null && part.collisionHull != null ? [part.collisionHull] : [];
+  public static function collisionPieces(
+    occurrence:String,
+    component:AssemblyDefinition.AssemblyComponentDefinition,
+    part:Null<AssemblyPhysicalPart>
+  ):Array<Array<Float>> {
+    var pieces = component.collisionHulls != null ? component.collisionHulls : part != null
+      && part.collisionHull != null ? [part.collisionHull] : [];
     for (hull in pieces) {
-      if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
-        throw 'Assembly occurrence "$occurrence" has an invalid collision hull';
-      for (value in hull) if (!Math.isFinite(value))
-        throw 'Assembly occurrence "$occurrence" has a non-finite collision hull';
+      if (hull.length < 12 || hull.length > 64 * 3
+        || hull.length % 3 != 0) throw 'Assembly occurrence "$occurrence" has an invalid collision hull';
+      for (value in hull) if (!Math
+        .isFinite(value)) throw 'Assembly occurrence "$occurrence" has a non-finite collision hull';
     }
     return pieces;
   }
@@ -131,10 +135,10 @@ class AssemblySimulationBridge {
    * and geometry is rebased at the root occurrence. This keeps a removable robot tool's CAD mass,
    * collision pieces and internal joints in one floating runtime.
    */
-  public static function subtree(definition:AssemblyDefinition, rootOccurrence:String,
-      ?savedState:AssemblyStateRecord):AssemblySimulationSubtree {
-    if (definition == null || rootOccurrence == null || rootOccurrence.length == 0)
-      throw "Assembly subtree needs a definition and named root occurrence";
+  public static function subtree(definition:AssemblyDefinition,
+    rootOccurrence:String, ?savedState:AssemblyStateRecord):AssemblySimulationSubtree {
+    if (definition == null || rootOccurrence == null
+      || rootOccurrence.length == 0) throw "Assembly subtree needs a definition and named root occurrence";
     var flat = AssemblyDefinitionFlattener.flatten(definition);
     AssemblyDefinitionCodec.validate(flat);
     var rootFound = false;
@@ -154,8 +158,8 @@ class AssemblySimulationBridge {
     while (pending.length > 0) {
       var parent = pending.pop();
       if (parent == null) continue;
-      for (joint in flat.joints) if (joint.role == AssemblyJointRole.Tree && joint.parent == parent &&
-          !occurrenceSet.exists(joint.child)) {
+      for (joint in flat.joints) if (joint.role == AssemblyJointRole.Tree
+        && joint.parent == parent && !occurrenceSet.exists(joint.child)) {
         occurrenceSet.set(joint.child, true);
         pending.push(joint.child);
       }
@@ -167,53 +171,59 @@ class AssemblySimulationBridge {
     for (joint in flat.joints) {
       var parentInside = occurrenceSet.exists(joint.parent);
       var childInside = occurrenceSet.exists(joint.child);
-      if (joint.role == AssemblyJointRole.Closure && parentInside != childInside)
-        throw 'Assembly closure "${joint.id}" crosses detached subtree "$rootOccurrence"';
+      if (joint.role == AssemblyJointRole.Closure && parentInside
+        != childInside) throw 'Assembly closure "${joint.id}" crosses detached subtree "$rootOccurrence"';
       if (!parentInside || !childInside) continue;
       jointSet.set(joint.id, true);
       selectedJoints.push(joint.id);
       selectedEdges.push(joint);
     }
 
-    var sub:AssemblyDefinition = {schemaVersion: flat.schemaVersion,
-      id: flat.id + "/tool/" + rootOccurrence, lengthUnit: flat.lengthUnit,
-      definitions: [for (component in flat.definitions) component], occurrences: [], joints: selectedEdges};
+    var sub:AssemblyDefinition = {
+      schemaVersion: flat.schemaVersion,
+      id: flat.id + "/tool/" + rootOccurrence,
+      lengthUnit: flat.lengthUnit,
+      definitions: [for (component in flat.definitions) component],
+      occurrences: [],
+      joints: selectedEdges
+    };
     for (occurrence in flat.occurrences) if (occurrenceSet.exists(occurrence.id)) {
       var local = AssemblyFrames.compose(rootInverse, rest.worldPose(occurrence.id));
-      sub.occurrences.push({id: occurrence.id, definition: occurrence.definition,
-        initialPose: local, grounded: occurrence.id == rootOccurrence ? false : occurrence.grounded,
-        includePath: occurrence.includePath});
+      sub.occurrences.push({
+        id: occurrence.id,
+        definition: occurrence.definition,
+        initialPose: local,
+        grounded: occurrence.id == rootOccurrence ? false : occurrence.grounded,
+        includePath : occurrence.includePath
+      });
     }
-    sub.definitions = [for (component in flat.definitions)
-      if ([for (occurrence in sub.occurrences) if (occurrence.definition == component.id) occurrence].length > 0) component];
+    sub.definitions = [for (component in flat.definitions) if ([for (occurrence in sub
+      .occurrences) if (occurrence.definition == component.id) occurrence].length > 0) component];
     if (flat.couplings != null) {
       sub.couplings = [];
       for (coupling in flat.couplings) {
         var sourceInside = jointSet.exists(coupling.source), targetInside = jointSet.exists(coupling.target);
-        if (sourceInside != targetInside)
-          throw 'Assembly coupling "${coupling.id}" crosses detached subtree "$rootOccurrence"';
+        if (sourceInside
+          != targetInside) throw 'Assembly coupling "${coupling.id}" crosses detached subtree "$rootOccurrence"';
         if (sourceInside) sub.couplings.push(coupling);
       }
     }
-    if (flat.exposedConnectors != null)
-      sub.exposedConnectors = [for (entry in flat.exposedConnectors)
-        if (occurrenceSet.exists(entry.occurrence)) entry];
-    if (flat.mates != null)
-      sub.mates = [for (mate in flat.mates)
-        if (occurrenceSet.exists(mate.first) && occurrenceSet.exists(mate.second)) mate];
-    if (flat.actuators != null)
-      sub.actuators = [for (actuator in flat.actuators) if (jointSet.exists(actuator.joint)) actuator];
-    if (flat.encoders != null)
-      sub.encoders = [for (encoder in flat.encoders) if (jointSet.exists(encoder.joint)) encoder];
-    if (flat.sensors != null)
-      sub.sensors = [for (sensor in flat.sensors)
-        if ((sensor.joint != null && jointSet.exists(sensor.joint)) ||
-            (sensor.occurrence != null && occurrenceSet.exists(sensor.occurrence))) sensor];
+    if (flat.exposedConnectors != null) sub.exposedConnectors =
+      [for (entry in flat.exposedConnectors) if (occurrenceSet.exists(entry.occurrence)) entry];
+    if (flat.mates != null) sub.mates = [for (mate in flat.mates) if (occurrenceSet.exists(mate.first)
+      && occurrenceSet.exists(mate.second)) mate];
+    if (flat.actuators
+      != null) sub.actuators = [for (actuator in flat.actuators) if (jointSet.exists(actuator.joint)) actuator];
+    if (flat.encoders
+      != null) sub.encoders = [for (encoder in flat.encoders) if (jointSet.exists(encoder.joint)) encoder];
+    if (flat.sensors != null) sub.sensors = [for (sensor in flat.sensors) if ((sensor.joint != null
+      && jointSet.exists(sensor.joint))
+      || (sensor.occurrence != null && occurrenceSet.exists(sensor.occurrence))) sensor];
     if (flat.switches != null) {
       sub.switches = [];
       for (contact in flat.switches) if (jointSet.exists(contact.joint)) {
-        if (!occurrenceSet.exists(contact.part) || !occurrenceSet.exists(contact.trigger))
-          throw 'Assembly switch "${contact.id}" crosses detached subtree "$rootOccurrence"';
+        if (!occurrenceSet.exists(contact.part) || !occurrenceSet
+          .exists(contact.trigger)) throw 'Assembly switch "${contact.id}" crosses detached subtree "$rootOccurrence"';
         sub.switches.push(contact);
       }
     }
@@ -221,28 +231,41 @@ class AssemblySimulationBridge {
       sub.elasticNetworks = [];
       for (network in flat.elasticNetworks) {
         var inside = 0, outside = 0;
-        for (span in network.spans) for (term in span.terms)
-          if (jointSet.exists(term.joint)) inside++; else outside++;
-        if (inside > 0 && outside > 0)
-          throw 'Assembly elastic network "${network.id}" crosses detached subtree "$rootOccurrence"';
+        for (span in network.spans) for (term in span.terms) if (jointSet.exists(term.joint)) inside++;
+        else outside++;
+        if (inside > 0
+          && outside > 0) throw 'Assembly elastic network "${network.id}" crosses detached subtree "$rootOccurrence"';
         if (inside > 0) sub.elasticNetworks.push(network);
       }
     }
     AssemblyDefinitionCodec.validate(sub);
 
     var subState:Null<AssemblyStateRecord> = null;
-    if (flatState != null) subState = {schemaVersion: sub.schemaVersion, definition: sub.id,
-      jointCoordinates: [for (coordinate in flatState.jointCoordinates)
-        if (jointSet.exists(coordinate.joint)) coordinate], rootPoses: []};
-    return {definition: sub, state: subState, rootOccurrence: rootOccurrence,
-      rootPose: rootPose, occurrences: [for (occurrence in sub.occurrences) occurrence.id],
-      joints: selectedJoints};
+    if (flatState != null) subState = {
+      schemaVersion: sub.schemaVersion,
+      definition: sub.id,
+      jointCoordinates: [for (coordinate in flatState
+      .jointCoordinates) if (jointSet.exists(coordinate.joint)) coordinate],
+      rootPoses: []
+    };
+    return {
+      definition: sub,
+      state: subState,
+      rootOccurrence: rootOccurrence,
+      rootPose: rootPose,
+      occurrences: [for (occurrence in sub.occurrences) occurrence.id],
+      joints: selectedJoints
+    };
   }
 
   /** Convert a detached CAD subtree to one floating articulated robot runtime. */
-  public static function toFloatingRobotModel(definition:AssemblyDefinition,
-      artifact:AssemblyPhysicalData, rootOccurrence:String, ?savedState:AssemblyStateRecord,
-      ?massOf:String->Null<Float>):AssemblySimulationFloatingModel {
+  public static function toFloatingRobotModel(
+    definition:AssemblyDefinition,
+    artifact:AssemblyPhysicalData,
+    rootOccurrence:String,
+    ?savedState:AssemblyStateRecord,
+    ?massOf:String -> Null<Float>
+  ):AssemblySimulationFloatingModel {
     var isolated = subtree(definition, rootOccurrence, savedState);
     var converted = toRobotModel(isolated.definition, artifact, isolated.state, null, massOf);
     converted.model.floatingBase = true;
@@ -261,36 +284,37 @@ class AssemblySimulationBridge {
   static function selectRobot(definition:AssemblyDefinition, root:String):AssemblyDefinition {
     var prefix = root + "/";
     var inside = new Map<String, Bool>();
-    for (occurrence in definition.occurrences)
-      if (StringTools.startsWith(occurrence.id, prefix)) inside.set(occurrence.id, true);
+    for (occurrence in definition.occurrences) if (StringTools.startsWith(occurrence.id, prefix)) inside.set(
+      occurrence.id,
+      true
+    );
     if ([for (id in inside.keys()) id].length == 0) throw 'Mobile robot "$root" has no occurrences';
-    for (edge in definition.joints) if (inside.exists(edge.parent) != inside.exists(edge.child))
-      throw 'Joint "${edge.id}" crosses the mobile robot boundary';
+    for (edge in definition.joints) if (inside.exists(edge.parent)
+      != inside.exists(edge.child)) throw 'Joint "${edge.id}" crosses the mobile robot boundary';
     definition.occurrences = [for (occurrence in definition.occurrences) if (inside.exists(occurrence.id)) occurrence];
     definition.joints = [for (edge in definition.joints) if (inside.exists(edge.parent)) edge];
     var joints = new Map<String, Bool>();
     for (edge in definition.joints) joints.set(edge.id, true);
     if (definition.couplings != null) {
-      for (coupling in definition.couplings) if (joints.exists(coupling.source) != joints.exists(coupling.target))
-        throw 'Coupling "${coupling.id}" crosses the mobile robot boundary';
+      for (coupling in definition.couplings) if (joints.exists(coupling.source)
+        != joints.exists(coupling.target)) throw 'Coupling "${coupling.id}" crosses the mobile robot boundary';
       definition.couplings = [for (coupling in definition.couplings) if (joints.exists(coupling.source)) coupling];
     }
-    if (definition.actuators != null)
-      definition.actuators = [for (actuator in definition.actuators) if (joints.exists(actuator.joint)) actuator];
-    if (definition.encoders != null)
-      definition.encoders = [for (encoder in definition.encoders) if (joints.exists(encoder.joint)) encoder];
-    if (definition.sensors != null)
-      definition.sensors = [for (sensor in definition.sensors)
-        if ((sensor.joint != null && joints.exists(sensor.joint)) ||
-          (sensor.occurrence != null && inside.exists(sensor.occurrence))) sensor];
+    if (definition.actuators != null) definition.actuators =
+      [for (actuator in definition.actuators) if (joints.exists(actuator.joint)) actuator];
+    if (definition.encoders
+      != null) definition.encoders = [for (encoder in definition.encoders) if (joints.exists(encoder.joint)) encoder];
+    if (definition.sensors != null) definition.sensors = [for (sensor in definition.sensors) if ((sensor.joint != null
+      && joints.exists(sensor.joint)) || (sensor.occurrence != null && inside.exists(sensor.occurrence))) sensor];
     if (definition.elasticNetworks != null) {
       var selected:Array<materia.assembly.AssemblyDefinition.AssemblyElasticNetwork> = [];
       for (network in definition.elasticNetworks) {
         var contained = false, external = false;
-        for (span in network.spans) for (term in span.terms)
-          if (joints.exists(term.joint)) contained = true; else external = true;
-        if (network.clearances != null) for (clearance in network.clearances)
-          if (joints.exists(clearance.joint)) contained = true; else external = true;
+        for (span in network.spans) for (term in span.terms) if (joints.exists(term.joint)) contained = true;
+        else external = true;
+        if (network.clearances
+          != null) for (clearance in network.clearances) if (joints.exists(clearance.joint)) contained = true;
+        else external = true;
         if (contained && external) throw 'Elastic network "${network.id}" crosses the mobile robot boundary';
         if (contained) selected.push(network);
       }
@@ -314,44 +338,71 @@ class AssemblySimulationBridge {
    * rolls over the floor, framed at the robot's `origin` on the floor (the assembly origin without
    * one), and the named wheel joints drive it.
    */
-  public static function toRobotModel(definition:AssemblyDefinition,
-      artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
-      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>,
-      ?mobileBase:SceneArtifactMobileBase, ?ownedJoints:Array<String>,
-      ?ownedSensors:Array<String>):AssemblySimulationModel {
+  public static function toRobotModel(
+    definition:AssemblyDefinition,
+    artifact:AssemblyPhysicalData,
+    ?savedState:AssemblyStateRecord,
+    ?freeOccurrences:Array<String>,
+    ?massOf:String -> Null<Float>,
+    ?mobileBase:SceneArtifactMobileBase,
+    ?ownedJoints:Array<String>,
+    ?ownedSensors:Array<String>
+  ):AssemblySimulationModel {
     var free = new Map<String, Bool>();
     if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
-		var selected = new Map<String, Bool>();
-		if (ownedJoints != null) for (id in ownedJoints) selected.set(id, true);
-		var selectedSensors = new Map<String, Bool>();
-		if (ownedSensors != null) for (id in ownedSensors) selectedSensors.set(id, true);
+    var selected = new Map<String, Bool>();
+    if (ownedJoints != null) for (id in ownedJoints) selected.set(id, true);
+    var selectedSensors = new Map<String, Bool>();
+    if (ownedSensors != null) for (id in ownedSensors) selectedSensors.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
     var sourceDefinition = definition;
     definition = AssemblyDefinitionFlattener.flatten(definition);
-    if (artifact == null || artifact.parts == null || artifact.metresPerUnit <= 0)
-      throw "Assembly simulation needs a valid scene artifact";
+    if (artifact == null || artifact.parts == null
+      || artifact.metresPerUnit <= 0) throw "Assembly simulation needs a valid scene artifact";
     var scale = artifact.metresPerUnit;
     var parts = new Map<String, AssemblyPhysicalPart>();
     for (part in artifact.parts) parts.set(part.id, part);
     var definitions = new Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>();
     for (component in definition.definitions) definitions.set(component.id, component);
-    for (edge in definition.joints) if (free.exists(edge.parent) || free.exists(edge.child))
-      throw 'Free part is joined by "${edge.id}"; a part the simulation holds or moves on its own cannot be joined';
+    for (edge in definition.joints) if (free.exists(edge.parent) || free.exists(edge
+      .child)) throw 'Free part is joined by "${edge.id}"; a part the simulation holds or moves on its own cannot be joined';
     var placement = new AssemblyState(sourceDefinition, savedState);
     // Robot membership is not dynamic-body ownership: stationary external assemblies may be joined.
-    if (mobileBase != null && mobileBase.robot != null)
-      definition = selectRobot(definition, mobileBase.robot);
-    var rootFrame = mobileBase == null || mobileBase.origin == null ? AssemblyFrames.identity() :
-      {x: mobileBase.origin.x / scale, y: mobileBase.origin.y / scale, z: 0.0, qx: 0.0, qy: 0.0,
-        qz: Math.sin(mobileBase.origin.yaw / 2), qw: Math.cos(mobileBase.origin.yaw / 2)};
+    if (mobileBase != null && mobileBase.robot != null) definition = selectRobot(definition, mobileBase.robot);
+    var rootFrame = mobileBase == null || mobileBase.origin == null ? AssemblyFrames.identity() : {
+      x : mobileBase.origin.x / scale,
+      y : mobileBase.origin.y / scale,
+      z : 0.0,
+      qx : 0.0,
+      qy : 0.0,
+      qz : Math.sin(mobileBase.origin.yaw / 2),
+      qw : Math.cos(mobileBase.origin.yaw / 2)
+    };
     var model = new RobotModel(definition.id);
     var profile = new robotkit.profile.RobotProfile();
     var root = model.addLink(new Link("assembly-root"));
     var links = [root];
     // Mass, centre of mass (link frame, metres) and inertia (about that centre, link axes) of each
     // part, per link, combined once every part is placed.
-    var masses:Array<Array<{mass:Float, center:Array<Float>, inertia:Array<Float>}>> = [[
-      {mass: 0.001, center: [0.0, 0.0, 0.0], inertia: [1e-6, 0, 0, 0, 1e-6, 0, 0, 0, 1e-6]}]];
+    var masses:Array<Array<{mass:Float, center:Array<Float>, inertia:Array<Float>}>> = [[{
+      mass: 0.001,
+      center: [
+        0.0,
+        0.0,
+        0.0
+      ],
+      inertia: [
+        1e-6,
+        0,
+        0,
+        0,
+        1e-6,
+        0,
+        0,
+        0,
+        1e-6
+      ]
+    }]];
     var partLinks = new Map<String, AssemblyPartLink>();
     var offsets = new Map<String, AssemblyFrame>();
     var linkIndexOfPart = new Map<String, Int>();
@@ -364,11 +415,11 @@ class AssemblySimulationBridge {
           var occurrences = new Map<String, Bool>();
           for (id in body.occurrences) occurrences.set(id, true);
           var attached = 0, foreign = 0;
-          for (edge in definition.joints)
-            if (edge.role == AssemblyJointRole.Tree && edge.type != AssemblyJointType.Fixed &&
-                occurrences.exists(edge.parent)) {
-              if (selected.exists(edge.id)) attached++; else foreign++;
-            }
+          for (edge in definition.joints) if (edge.role == AssemblyJointRole.Tree
+            && edge.type != AssemblyJointType.Fixed && occurrences.exists(edge.parent)) {
+            if (selected.exists(edge.id)) attached++;
+            else foreign++;
+          }
           if (attached == 0) continue;
           // A stationary support shared by control domains belongs to the world.
           // Keep its frames as root anchors without duplicating its mass or hull.
@@ -388,26 +439,29 @@ class AssemblySimulationBridge {
         var occurrence = [for (item in definition.occurrences) if (item.id == id) item][0];
         var part = parts.get(occurrence.definition);
         if (part == null) throw 'Assembly occurrence "$id" has no physical part';
-        if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
-            part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3 ||
-            part.inertia == null || part.inertia.length != 9 ||
-            part.physicalMassKg != null && (!Math.isFinite(part.physicalMassKg) || part.physicalMassKg < 0) ||
-            part.physicalInertiaKgM2 != null && part.physicalInertiaKgM2.length != 9)
-          throw 'Assembly occurrence "$id" has invalid mass properties';
-        for (coordinate in part.centerOfMass) if (!Math.isFinite(coordinate))
-          throw 'Assembly occurrence "$id" has a non-finite centre of mass';
-        for (component in part.inertia) if (!Math.isFinite(component))
-          throw 'Assembly occurrence "$id" has a non-finite inertia';
-        if (part.physicalInertiaKgM2 != null) for (component in part.physicalInertiaKgM2)
-          if (!Math.isFinite(component)) throw 'Assembly occurrence "$id" has a non-finite physical inertia';
+        if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density)
+          || part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3
+          || part.inertia == null || part.inertia.length != 9 || part.physicalMassKg != null
+          && (!Math.isFinite(part.physicalMassKg) || part.physicalMassKg < 0) || part.physicalInertiaKgM2 != null
+          && part.physicalInertiaKgM2.length != 9) throw 'Assembly occurrence "$id" has invalid mass properties';
+        for (coordinate in part.centerOfMass) if (!Math
+          .isFinite(coordinate)) throw 'Assembly occurrence "$id" has a non-finite centre of mass';
+        for (component in part
+          .inertia) if (!Math.isFinite(component)) throw 'Assembly occurrence "$id" has a non-finite inertia';
+        if (part.physicalInertiaKgM2 != null) for (component in part.physicalInertiaKgM2) if (!Math
+          .isFinite(component)) throw 'Assembly occurrence "$id" has a non-finite physical inertia';
         // The part's frame in its link's frame; fixed joints keep it constant.
         var offset = AssemblyFrames.compose(toLink, placement.worldPose(id));
         offsets.set(id, offset);
         linkIndexOfPart.set(id, index);
         if (environmentAnchor) continue;
         partLinks.set(id, {link: index, offset: scaled(offset, scale)});
-        var center = AssemblyFrames.transformPoint(offset, part.centerOfMass[0], part.centerOfMass[1],
-          part.centerOfMass[2]);
+        var center = AssemblyFrames.transformPoint(
+          offset,
+          part.centerOfMass[0],
+          part.centerOfMass[1],
+          part.centerOfMass[2]
+        );
         var baseMass = part.volume * part.density * scale * scale * scale;
         var chosen = massOf == null ? null : massOf(id);
         var resolvedMass = part.physicalMassKg;
@@ -415,11 +469,20 @@ class AssemblySimulationBridge {
         if (!Math.isFinite(mass) || mass < 0) throw 'Assembly occurrence "$id" has an invalid mass';
         var inertia = resolvedMass == 0.0 ? null : part.physicalInertiaKgM2;
         // Zero-mass visual/collision pieces are accounted for by a module lump.
-        var tensor:Array<Float> = mass == 0.0 ? [for (_ in 0...9) 0.0] : inertia == null
-          ? rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)
-          : rotated(inertia, offset, mass / (resolvedMass == null ? mass : resolvedMass));
-        masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
-          inertia: tensor});
+        var tensor:Array<Float> = mass == 0.0 ? [for (_ in 0...9) 0.0] : inertia == null ? rotated(
+          part.inertia,
+          offset,
+          part.density * Math.pow(
+            scale,
+            5
+          ) * mass / baseMass
+        ) : rotated(
+          inertia,
+          offset,
+          mass / (resolvedMass == null ? mass : resolvedMass)
+        );
+        masses[index].push({mass: mass,
+          center: [center.x * scale, center.y * scale, center.z * scale], inertia: tensor});
         var component = [for (entry in definition.definitions) if (entry.id == occurrence.definition) entry][0];
         for (hull in collisionPieces(id, component, part)) {
           var vertices:Array<Float> = [];
@@ -440,22 +503,22 @@ class AssemblySimulationBridge {
     function linkOf(id:String):Link {
       var index = linkIndexOfPart.get(id);
       if (index == null) {
-        var bodyNames = [for (body in AssemblyBodies.of(definition))
-          if (body.occurrences.indexOf(id) >= 0) '${body.id} (joint=${body.joint})'];
+        var bodyNames = [for (body in AssemblyBodies.of(definition)) if (body.occurrences.indexOf(id)
+          >= 0) '${body.id} (joint=${body.joint})'];
         var ownerJoints = ownedJoints == null ? "all" : ownedJoints.join(",");
-        throw 'Assembly occurrence "$id" has no simulated link (free=${free.exists(id)}, ' +
-          'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
+        throw 'Assembly occurrence "$id" has no simulated link (free=${free.exists(id)}, '
+          + 'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
       }
       return links[index];
     }
     function offsetOf(id:String):AssemblyFrame {
       var offset = offsets.get(id);
       if (offset == null) {
-        var bodyNames = [for (body in AssemblyBodies.of(definition)) if (body.occurrences.indexOf(id) >= 0)
-          '${body.id} (joint=${body.joint})'];
+        var bodyNames = [for (body in AssemblyBodies.of(definition)) if (body.occurrences.indexOf(id)
+          >= 0) '${body.id} (joint=${body.joint})'];
         var ownerJoints = ownedJoints == null ? "all" : ownedJoints.join(",");
-        throw 'Assembly occurrence "$id" has no simulated link offset (free=${free.exists(id)}, ' +
-          'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
+        throw 'Assembly occurrence "$id" has no simulated link offset (free=${free.exists(id)}, '
+          + 'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
       }
       return offset;
     }
@@ -463,46 +526,87 @@ class AssemblySimulationBridge {
     var closureGeometry:Array<AssemblySimulationClosure> = [];
     for (edge in definition.joints) {
       if (edge.role == AssemblyJointRole.Closure) {
-				if (ownedJoints != null) {
-					var parentIncluded = linkIndexOfPart.exists(edge.parent), childIncluded = linkIndexOfPart.exists(edge.child);
-					if (!parentIncluded && !childIncluded) continue;
-					if (!parentIncluded || !childIncluded) throw 'Assembly closure "${edge.id}" crosses controllers';
-				}
+        if (ownedJoints != null) {
+          var parentIncluded = linkIndexOfPart.exists(edge.parent), childIncluded = linkIndexOfPart.exists(edge.child);
+          if (!parentIncluded && !childIncluded) continue;
+          if (!parentIncluded || !childIncluded) throw 'Assembly closure "${edge.id}" crosses controllers';
+        }
         // Fixed tree mounts are already collapsed into rigid links. A redundant
         // fixed assembly closure within that link remains an authored constraint,
         // but must not become an invalid physics constraint from a body to itself.
-        var parentLink=linkOf(edge.parent).id,childLink=linkOf(edge.child).id;
-        if(parentLink==childLink && edge.type==AssemblyJointType.Fixed) {
-          var a=AssemblyFrames.compose(offsetOf(edge.parent),connector(definitions.get(occurrenceDefinition(definition,edge.parent)),edge.parentConnector));
-          var b=AssemblyFrames.compose(offsetOf(edge.child),connector(definitions.get(occurrenceDefinition(definition,edge.child)),edge.childConnector));
-          var dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
-          var tolerance=edge.closureTolerance==null?1e-6/scale:edge.closureTolerance;
-          var rotation=1-Math.abs(a.qx*b.qx+a.qy*b.qy+a.qz*b.qz+a.qw*b.qw);
-          if(Math.sqrt(dx*dx+dy*dy+dz*dz)>tolerance || rotation>1e-5)
-            throw 'Inconsistent rigid assembly closure "${edge.id}"';
+        var parentLink = linkOf(edge.parent).id, childLink = linkOf(edge.child).id;
+        if (parentLink == childLink && edge.type == AssemblyJointType.Fixed) {
+          var a = AssemblyFrames.compose(
+            offsetOf(edge.parent),
+            connector(
+              definitions.get(occurrenceDefinition(
+                definition,
+                edge.parent
+              )),
+              edge.parentConnector
+            )
+          );
+          var b = AssemblyFrames.compose(
+            offsetOf(edge.child),
+            connector(
+              definitions.get(occurrenceDefinition(
+                definition,
+                edge.child
+              )),
+              edge.childConnector
+            )
+          );
+          var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+          var tolerance = edge.closureTolerance == null ? 1e-6 / scale : edge.closureTolerance;
+          var rotation = 1 - Math.abs(a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw);
+          if (Math.sqrt(dx * dx + dy * dy + dz * dz) > tolerance
+            || rotation > 1e-5) throw 'Inconsistent rigid assembly closure "${edge.id}"';
           continue;
         }
         closures.push(edge.id);
-        var frame = AssemblyFrames.compose(offsetOf(edge.parent),
-          connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
+        var frame = AssemblyFrames.compose(
+          offsetOf(edge.parent),
+          connector(
+            definitions.get(occurrenceDefinition(
+              definition,
+              edge.parent
+            )),
+            edge.parentConnector
+          )
+        );
         var endpoint = AssemblyFrames.transformPoint(frame, edge.axis.x, edge.axis.y, edge.axis.z);
-        closureGeometry.push({id: edge.id, parent: linkOf(edge.parent).id,
-          child: linkOf(edge.child).id, type: edge.type,
-          anchorParent: [frame.x * scale, frame.y * scale, frame.z * scale],
-          axisParent: [endpoint.x - frame.x, endpoint.y - frame.y, endpoint.z - frame.z]});
+        closureGeometry.push({
+          id: edge.id,
+          parent: linkOf(edge.parent).id,
+          child: linkOf(edge.child).id,
+          type: edge.type,
+          anchorParent: [
+            frame.x * scale,
+            frame.y * scale,
+            frame.z * scale
+          ],
+          axisParent: [
+            endpoint.x - frame.x,
+            endpoint.y - frame.y,
+            endpoint.z - frame.z
+          ]
+        });
         continue;
       }
       // Fixed joints hold parts inside one body; they are not joints of the robot.
       if (edge.type == AssemblyJointType.Fixed) continue;
-			if (ownedJoints != null && !selected.exists(edge.id)) continue;
+      if (ownedJoints != null && !selected.exists(edge.id)) continue;
       var kind:JointType = switch (edge.type) {
-        case AssemblyJointType.Revolute: JointType.Revolute;
-        case AssemblyJointType.Continuous: JointType.Continuous;
-        case AssemblyJointType.Prismatic: JointType.Prismatic;
-        default: throw 'Unsupported assembly joint type "${edge.type}"';
+        case AssemblyJointType.Revolute:
+          JointType.Revolute;
+        case AssemblyJointType.Continuous:
+          JointType.Continuous;
+        case AssemblyJointType.Prismatic:
+          JointType.Prismatic;
+        default:
+          throw 'Unsupported assembly joint type "${edge.type}"';
       };
-      var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent),
-        linkOf(edge.child)));
+      var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent), linkOf(edge.child)));
       joint.includePath = edge.includePath == null ? "" : edge.includePath;
       joint.passive = edge.passive == true;
       var stop = edge.stop;
@@ -510,81 +614,118 @@ class AssemblySimulationBridge {
         joint.limitTimeConstant = stop.timeConstantSec;
         joint.limitDampingRatio = stop.dampingRatio;
       }
-      var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
-        connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
+      var parentFrame = AssemblyFrames.compose(
+        offsetOf(edge.parent),
+        connector(
+          definitions.get(occurrenceDefinition(
+            definition,
+            edge.parent
+          )),
+          edge.parentConnector
+        )
+      );
       var initial = placement.joint(edge.id);
-      setFrame(joint, AssemblyFrames.compose(parentFrame,
-        AssemblyFrames.axisMotion(edge.type, edge.axis, initial)), true, scale);
-      setFrame(joint, AssemblyFrames.compose(offsetOf(edge.child),
-        connector(definitions.get(occurrenceDefinition(definition, edge.child)), edge.childConnector)), false, scale);
+      setFrame(
+        joint,
+        AssemblyFrames.compose(parentFrame, AssemblyFrames.axisMotion(edge.type, edge.axis, initial)),
+        true,
+        scale
+      );
+      setFrame(
+        joint,
+        AssemblyFrames.compose(
+          offsetOf(edge.child),
+          connector(
+            definitions.get(occurrenceDefinition(
+              definition,
+              edge.child
+            )),
+            edge.childConnector
+          )
+        ),
+        false,
+        scale
+      );
       joint.axis = [edge.axis.x, edge.axis.y, edge.axis.z];
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
-      joint.limits = new JointLimits(edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
+      joint.limits = new JointLimits(
+        edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
         edge.limits.velocity == null ? null : edge.limits.velocity * factor,
-        edge.limits.effort);
-      if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions)
-        {quantity: value.quantity, label: value.label}];
+        edge.limits.effort
+      );
+      if (edge.limits.assumptions != null) joint.limits.assumptions = [for (value in edge.limits.assumptions) {
+        quantity:value.quantity, label:value.label
+      }
+      ];
       if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
-      joint.limits.rackingTolerance = edge.limits.rackingTolerance == null ? 0.0 : edge.limits.rackingTolerance * factor;
-      joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
-        edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
+      joint.limits.rackingTolerance = edge.limits.rackingTolerance
+        == null ? 0.0 : edge.limits.rackingTolerance * factor;
+      joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor
+        : edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
     // A follower summing several couplings' terms has its placement taken off once, in its first.
     var offsetTargets = new Map<String, Bool>();
     if (definition.couplings != null) for (coupling in definition.couplings) {
-			if (ownedJoints != null) {
-				if (!selected.exists(coupling.source) && !selected.exists(coupling.target)) continue;
-				if (!selected.exists(coupling.source) || !selected.exists(coupling.target))
-					throw 'Assembly coupling "${coupling.id}" crosses controllers';
-			}
+      if (ownedJoints != null) {
+        if (!selected.exists(coupling.source) && !selected.exists(coupling.target)) continue;
+        if (!selected.exists(coupling.source)
+          || !selected.exists(coupling.target)) throw 'Assembly coupling "${coupling.id}" crosses controllers';
+      }
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       var follower:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       for (edge in definition.joints) {
         if (edge.id == coupling.source) leader = edge;
         if (edge.id == coupling.target) follower = edge;
       }
-      if (leader == null || follower == null || leader.role == AssemblyJointRole.Closure ||
-          follower.role == AssemblyJointRole.Closure)
-        throw 'Assembly coupling "${coupling.id}" requires tree joints';
+      if (leader == null || follower == null || leader.role == AssemblyJointRole.Closure
+        || follower.role == AssemblyJointRole.Closure) throw 'Assembly coupling "${coupling.id}" requires tree joints';
       var leaderScale = leader.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var followerScale = follower.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var ratio = coupling.ratio * followerScale / leaderScale;
       var placed = offsetTargets.exists(coupling.target) ? 0.0 : placement.joint(coupling.target);
       offsetTargets.set(coupling.target, true);
       var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset - placed) * followerScale;
-      var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
-        coupling.target, ratio, offset));
-      if (coupling.calibration != null) added.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(coupling.calibration,id -> id);
+      var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source, coupling.target, ratio, offset));
+      if (coupling.calibration != null) added.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(
+        coupling.calibration,
+        id -> id
+      );
       if (coupling.efficiency != null) added.efficiency = coupling.efficiency;
       // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
       var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
       if (coupling.stiffnessLaw != null) {
-        var raw = new materia.assembly.PositionStiffness([for (spring in coupling.stiffnessLaw)
-          {compliance:spring.compliance,coordinates:[for (coordinate in spring.coordinates)
-            {joint:coordinate.joint,coefficient:coordinate.coefficient}]}]);
-        var law = raw.scaled(leaderScale, id -> {
-          for (joint in definition.joints) if (joint.id == id) return joint.type == AssemblyJointType.Prismatic ? scale : 1.0;
-          throw 'Unknown stiffness coordinate "$id"';
+        var raw = new materia.assembly.PositionStiffness([for (spring in coupling.stiffnessLaw) {
+          compliance:spring.compliance, coordinates:[for (coordinate in spring.coordinates) {
+            joint:coordinate.joint, coefficient:coordinate.coefficient
+          }
+          ]
+        }
+        ]);
+        var law = raw.scaled(leaderScale, id -> {for (joint in definition.joints) if (joint.id
+          == id) return joint.type == AssemblyJointType.Prismatic ? scale : 1.0;
+        throw 'Unknown stiffness coordinate "$id"';
         }, id -> placement.joint(id));
-        added.setStiffnessLaw(law,model.joints);
+        added.setStiffnessLaw(law, model.joints);
       }
       if (coupling.dampingRatio != null) added.dampingRatio = coupling.dampingRatio;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
-      if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions)
-        {quantity: value.quantity, label: value.label}];
+      if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions) {
+        quantity:value.quantity, label:value.label
+      }
+      ];
       if (coupling.assumed != null) added.assumed = [for (label in coupling.assumed) label];
     }
     if (definition.elasticNetworks != null) for (network in definition.elasticNetworks) {
-			if (ownedJoints != null) {
-				var inside = 0, outside = 0;
-				for (span in network.spans) for (term in span.terms)
-					if (selected.exists(term.joint)) inside++; else outside++;
-				if (inside == 0) continue;
-				if (outside > 0) throw 'Elastic network "${network.id}" crosses controllers';
-			}
+      if (ownedJoints != null) {
+        var inside = 0, outside = 0;
+        for (span in network.spans) for (term in span.terms) if (selected.exists(term.joint)) inside++;
+        else outside++;
+        if (inside == 0) continue;
+        if (outside > 0) throw 'Elastic network "${network.id}" crosses controllers';
+      }
       var spans:Array<robotkit.model.ElasticNetwork.ElasticSpan> = [];
       for (span in network.spans) {
         var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
@@ -601,8 +742,8 @@ class AssemblySimulationBridge {
       if (network.assumptions != null) added.assumptions = network.assumptions.copy();
       if (network.clearances != null) for (clearance in network.clearances) {
         var coordinateScale = 1.0;
-        for (edge in definition.joints) if (edge.id == clearance.joint && edge.type == AssemblyJointType.Prismatic)
-          coordinateScale = scale;
+        for (edge in definition.joints) if (edge.id == clearance.joint
+          && edge.type == AssemblyJointType.Prismatic) coordinateScale = scale;
         added.clearances.push({joint: clearance.joint, allowance: clearance.allowance * coordinateScale});
       }
       added.validate(model.joints, model.couplings);
@@ -610,7 +751,7 @@ class AssemblySimulationBridge {
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {
-			if (ownedJoints != null && !selected.exists(actuator.joint)) continue;
+      if (ownedJoints != null && !selected.exists(actuator.joint)) continue;
       var driven:Null<Joint> = null;
       for (joint in model.joints) if (joint.id == actuator.joint) driven = joint;
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -622,33 +763,61 @@ class AssemblySimulationBridge {
       var initial = placement.joint(actuator.joint);
       // A gearbox turns the motor `gearRatio` times for one unit of the joint: the actuator coordinate is that much more.
       var gear = actuator.gearRatio == null ? 1.0 : actuator.gearRatio;
-      var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
-        Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor));
+      var added = new Actuator(
+        actuator.id,
+        actuator.maxEffort,
+        actuator.maxRate,
+        Transmission.SimpleTransmission(
+          driven.id,
+          gear / factor,
+          -initial * factor
+        )
+      );
       if (actuator.pneumatic != null) {
         var p = actuator.pneumatic;
         // Pneumatic force is already in newtons; only linear dimensions and speed need unit scaling.
-        added.drive = new robotkit.model.ActuatorDrive.PneumaticDrive(p.bore * scale, p.rod * scale,
-          p.stroke * scale, p.ratedSpeed * scale, p.pressurePa, p.channelA, p.channelB,
-          p.normallyToA, p.extendSign);
+        added.drive = new robotkit.model.ActuatorDrive.PneumaticDrive(
+          p.bore * scale,
+          p.rod * scale,
+          p.stroke * scale,
+          p.ratedSpeed * scale,
+          p.pressurePa,
+          p.channelA,
+          p.channelB,
+          p.normallyToA,
+          p.extendSign
+        );
         var pneumatic = added.drive.pneumatic();
         if (pneumatic != null && edge.stop == null && driven.limits.overtravel > 0.0) {
-          driven.limitTimeConstant = pneumatic.limitTimeConstant(driven.child.mass,
-            driven.limits.overtravel);
+          driven.limitTimeConstant = pneumatic.limitTimeConstant(driven.child.mass, driven.limits.overtravel);
           driven.limitDampingRatio = 1.0;
         }
       }
       if (actuator.hydraulic != null) {
         var h = actuator.hydraulic;
         var retracted = h.extendSign > 0.0 ? driven.limits.lower : driven.limits.upper;
-        added.drive = new robotkit.model.ActuatorDrive.HydraulicDrive(h.bore * scale, h.rod * scale,
-          h.stroke * scale, h.pressurePa, h.approachSpeed * scale, h.workingSpeed * scale,
-          h.returnSpeed * scale, h.changePoint * scale, h.channelA, h.channelB, h.extendSign,
-          retracted);
+        added.drive = new robotkit.model.ActuatorDrive.HydraulicDrive(
+          h.bore * scale,
+          h.rod * scale,
+          h.stroke * scale,
+          h.pressurePa,
+          h.approachSpeed * scale,
+          h.workingSpeed * scale,
+          h.returnSpeed * scale,
+          h.changePoint * scale,
+          h.channelA,
+          h.channelB,
+          h.extendSign,
+          retracted
+        );
       }
       if (actuator.processVelocity != null) {
         var process = actuator.processVelocity;
-        added.processVelocity = new robotkit.model.ProcessVelocityDrive(process.speedChannel,
-          process.directionChannel, process.radiansPerSpeedUnit);
+        added.processVelocity = new robotkit.model.ProcessVelocityDrive(
+          process.speedChannel,
+          process.directionChannel,
+          process.radiansPerSpeedUnit
+        );
       }
       if (actuator.gearEfficiency != null) added.efficiency = actuator.gearEfficiency;
       if (actuator.assumed != null) added.assumed = [for (label in actuator.assumed) label];
@@ -660,34 +829,57 @@ class AssemblySimulationBridge {
       // The drive's speeds are in the actuator's own units, like `maxRate`.
       var curve = actuator.torqueSpeed == null ? null : TorqueSpeedCurve.unflatten(actuator.torqueSpeed);
       var holding = actuator.holdingTorque;
-      var rated = actuator.ratedTorque, peak = actuator.peakTorque, ratedSpeed = actuator.ratedSpeed, topSpeed = actuator.maxSpeed;
-      if (actuator.drive == "stepper" && steps != null && curve != null && holding != null)
-        added.drive = new StepperDrive(steps, inertia, holding, curve);
-      else if (actuator.drive == "servo" && rated != null && peak != null && ratedSpeed != null && topSpeed != null)
-        added.drive = new ServoDrive(rated, peak, ratedSpeed, topSpeed, inertia,
-          actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts, curve);
+      var rated = actuator.ratedTorque,
+        peak = actuator.peakTorque, ratedSpeed = actuator.ratedSpeed, topSpeed = actuator.maxSpeed;
+      if (actuator.drive == "stepper"
+        && steps != null && curve != null && holding != null) added.drive = new StepperDrive(
+          steps,
+          inertia,
+          holding,
+          curve
+        );
+      else if (actuator.drive == "servo"
+        && rated != null && peak != null && ratedSpeed != null && topSpeed != null) added.drive = new ServoDrive(
+          rated,
+          peak,
+          ratedSpeed,
+          topSpeed,
+          inertia,
+          actuator.encoderCounts == null ? 0.0 : actuator.encoderCounts,
+          curve
+        );
       if (actuator.positionLoopRate != null) added.positionLoopRate = actuator.positionLoopRate;
       if (actuator.servoStiffness != null) added.servoStiffness = actuator.servoStiffness;
       if (actuator.servoDamping != null) added.servoDamping = actuator.servoDamping;
       // The encoder that reads the motor is its own sensor; a servo that names one does not also hold a count.
       if (actuator.encoder != null) added.encoder = actuator.encoder;
-      if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions)
-        {quantity: value.quantity, label: value.label}];
+      if (actuator.assumptions != null) added.assumptions = [for (value in actuator.assumptions) {
+        quantity:value.quantity, label:value.label
+      }
+      ];
       model.addActuator(added);
       if (actuator.brake != null) {
         var brake = actuator.brake;
-        model.brakes.push(new robotkit.model.Brake(brake.id, actuator.joint,
-          brake.releaseChannel, brake.releasedSensor, brake.holdingEffort,
-          brake.releaseDelay, brake.applicationDelay, brake.releaseTimeoutMs, brake.feedbackMaxAgeMs));
+        model.brakes.push(new robotkit.model.Brake(
+          brake.id,
+          actuator.joint,
+          brake.releaseChannel,
+          brake.releasedSensor,
+          brake.holdingEffort,
+          brake.releaseDelay,
+          brake.applicationDelay,
+          brake.releaseTimeoutMs,
+          brake.feedbackMaxAgeMs
+        ));
       }
       if (actuator.rotorInertia != null)
-        // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
-        driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
+      // The rotor turns `gear` times as fast as the joint, so its inertia at the joint is `gear` squared times as much.
+      driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia * gear * gear;
     }
     model.materializeLimits();
     // Encoders: sensors on joints. Counts per millimetre on a sliding joint, per revolution on a turning one.
     if (definition.encoders != null) for (encoder in definition.encoders) {
-			if (ownedJoints != null && !selected.exists(encoder.joint)) continue;
+      if (ownedJoints != null && !selected.exists(encoder.joint)) continue;
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       for (candidate in definition.joints) if (candidate.id == encoder.joint) edge = candidate;
       var onJoint:Null<Joint> = null;
@@ -695,17 +887,28 @@ class AssemblySimulationBridge {
       if (edge == null || onJoint == null) throw 'Assembly encoder "${encoder.id}" reads no simulated joint';
       var kind:EncoderKind = encoder.kind;
       var index = encoder.index == true;
-      model.addEncoder(edge.type == AssemblyJointType.Prismatic
-        ? Encoder.perMillimetre(encoder.id, onJoint.id, kind, encoder.counts, index)
-        : Encoder.perRevolution(encoder.id, onJoint.id, kind, encoder.counts, index));
+      model.addEncoder(edge.type == AssemblyJointType.Prismatic ? Encoder.perMillimetre(
+        encoder.id,
+        onJoint.id,
+        kind,
+        encoder.counts,
+        index
+      ) : Encoder.perRevolution(
+        encoder.id,
+        onJoint.id,
+        kind,
+        encoder.counts,
+        index
+      ));
     }
     if (definition.sensors != null) for (sensor in definition.sensors) {
-			if (ownedSensors != null && !selectedSensors.exists(sensor.id)) continue;
+      if (ownedSensors != null && !selectedSensors.exists(sensor.id)) continue;
       // Assembly presence heads are cabinet inputs backed by the simulated
       // free-object volume source. Keep that source external to RobotKit's
       // bounded native sensor pool, just like wired cell digital inputs.
       // A robot zone is the same kind of cabinet input, backed by the robots' bodies.
-      var runtimeKind = sensor.kind == "presence" ? "presence_input" : sensor.kind == "robot_zone" ? "zone_input" : sensor.kind;
+      var runtimeKind = sensor.kind
+        == "presence" ? "presence_input" : sensor.kind == "robot_zone" ? "zone_input" : sensor.kind;
       var added = model.addSensor(new Sensor(sensor.id, runtimeKind, 0.0, sensor.id));
       if (sensor.kind == "brake_released") {
         if (sensor.joint == null) throw 'Brake contact "${sensor.id}" has no motor joint';
@@ -715,19 +918,18 @@ class AssemblySimulationBridge {
         var driven:Null<Joint> = null;
         for (candidate in definition.joints) if (candidate.id == sensor.joint) edge = candidate;
         for (joint in model.joints) if (joint.id == sensor.joint) driven = joint;
-        if (edge == null || driven == null)
-          throw 'Assembly sensor "${sensor.id}" has no simulated joint';
+        if (edge == null || driven == null) throw 'Assembly sensor "${sensor.id}" has no simulated joint';
         var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
         var initial = placement.joint(edge.id);
-        var windowLower = requiredFloat(sensor.windowLower,
-          'Assembly sensor "${sensor.id}" has no lower window');
+        var windowLower = requiredFloat(sensor.windowLower, 'Assembly sensor "${sensor.id}" has no lower window');
         added.joint = edge.id;
-		added.windowLower = sensor.kind == "at_speed" ? windowLower : (windowLower - initial) * factor;
+        added.windowLower = sensor.kind == "at_speed" ? windowLower : (windowLower - initial) * factor;
         added.windowUpper = sensor.windowUpper == null ? 0.0 : (sensor.windowUpper - initial) * factor;
-		added.hysteresis = sensor.hysteresis == null ? 0.0 : sensor.hysteresis * (sensor.kind == "at_speed" ? 1.0 : factor);
+        added.hysteresis = sensor.hysteresis
+          == null ? 0.0 : sensor.hysteresis * (sensor.kind == "at_speed" ? 1.0 : factor);
       } else if (sensor.kind == "presence" || sensor.kind == "robot_zone") {
-        if (sensor.occurrence == null || sensor.connector == null)
-          throw 'Assembly presence sensor "${sensor.id}" has no connector or range';
+        if (sensor.occurrence == null
+          || sensor.connector == null) throw 'Assembly presence sensor "${sensor.id}" has no connector or range';
         var definitionId = occurrenceDefinition(definition, sensor.occurrence);
         var local = connector(definitions.get(definitionId), sensor.connector);
         var index = linkIndexOfPart.get(sensor.occurrence);
@@ -743,13 +945,12 @@ class AssemblySimulationBridge {
             bodyId = body.id;
             bodyJoint = body.joint;
           }
-          if (bodyId == null)
-            throw 'Assembly presence sensor "${sensor.id}" is mounted on no rigid body';
-          if (free.exists(sensor.occurrence) || free.exists(bodyId))
-            throw 'Assembly presence sensor "${sensor.id}" cannot be mounted on a free body';
+          if (bodyId == null) throw 'Assembly presence sensor "${sensor.id}" is mounted on no rigid body';
+          if (free.exists(sensor.occurrence)
+            || free.exists(bodyId)) throw 'Assembly presence sensor "${sensor.id}" cannot be mounted on a free body';
           if (bodyJoint != null) {
-            if (ownedJoints != null && !selected.exists(bodyJoint))
-              throw 'Assembly presence sensor "${sensor.id}" is mounted on a moving body owned by another controller';
+            if (ownedJoints != null && !selected
+              .exists(bodyJoint)) throw 'Assembly presence sensor "${sensor.id}" is mounted on a moving body owned by another controller';
             throw 'Assembly presence sensor "${sensor.id}" has no simulated link for its moving body';
           }
           var worldMount = AssemblyFrames.compose(placement.worldPose(sensor.occurrence), local);
@@ -764,16 +965,18 @@ class AssemblySimulationBridge {
         if (sensor.kind == "robot_zone") {
           if (zone == null) throw 'Assembly robot zone "${sensor.id}" has no boxes';
           added.zoneBoxes = [for (value in zone) value * scale];
-        } else added.maxRange = requiredFloat(sensor.range,
-          'Assembly presence sensor "${sensor.id}" has no connector or range') * scale;
+        } else added.maxRange = requiredFloat(
+          sensor.range,
+          'Assembly presence sensor "${sensor.id}" has no connector or range'
+        ) * scale;
       }
     }
     // Switch coordinates use the same placed zero as the monitored robot joint.
     if (definition.switches != null) for (contact in definition.switches) {
       var edge:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       for (candidate in definition.joints) if (candidate.id == contact.joint) edge = candidate;
-      if (edge == null || edge.type != AssemblyJointType.Prismatic)
-        throw 'Assembly switch "${contact.id}" requires a prismatic monitored joint';
+      if (edge == null || edge.type
+        != AssemblyJointType.Prismatic) throw 'Assembly switch "${contact.id}" requires a prismatic monitored joint';
       var occurrence = [for (item in definition.occurrences) if (item.id == contact.part) item][0];
       if (occurrence == null) throw 'Assembly switch "${contact.id}" has no physical part';
       var component = definitions.get(occurrence.definition);
@@ -781,9 +984,19 @@ class AssemblySimulationBridge {
       var frame = model.addFrame(new Frame(contact.id + " switch mount", linkOf(contact.part)));
       frame.position = [mount.x * scale, mount.y * scale, mount.z * scale];
       frame.rotation = [mount.qx, mount.qy, mount.qz, mount.qw];
-      var added = new robotkit.model.JointSwitch(contact.id, contact.joint, frame.id, contact.role,
-        contact.side, (contact.trip - placement.joint(contact.joint)) * scale,
-        contact.hysteresis * scale, contact.repeatability * scale, contact.seed, contact.driveJoint, contact.homeAfter);
+      var added = new robotkit.model.JointSwitch(
+        contact.id,
+        contact.joint,
+        frame.id,
+        contact.role,
+        contact.side,
+        (contact.trip - placement.joint(contact.joint)) * scale,
+        contact.hysteresis * scale,
+        contact.repeatability * scale,
+        contact.seed,
+        contact.driveJoint,
+        contact.homeAfter
+      );
       model.addSwitch(added);
       var sensor = new robotkit.model.Sensor(contact.id, "trip_switch", 0.0, contact.id);
       sensor.frame = frame;
@@ -796,7 +1009,8 @@ class AssemblySimulationBridge {
       // but they must not publish frames for a flange in another controller's
       // excluded moving tree.
       if (ownedJoints != null && !offsets.exists(occurrence.id)) continue;
-      var component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition = definitions.get(occurrence.definition);
+      var component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition =
+        definitions.get(occurrence.definition);
       if (component == null) throw "Missing assembly component definition";
       if (component.robotFlangeConnector == null) continue;
       var mount = AssemblyFrames.compose(offsetOf(occurrence.id), connector(component, component.robotFlangeConnector));
@@ -806,41 +1020,56 @@ class AssemblySimulationBridge {
       frame.flangeIncludePath = occurrence.includePath == null ? "" : occurrence.includePath;
     }
     if (mobileBase != null) {
-      for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
-        if ([for (joint in model.joints) if (joint.id == wheel) joint].length != 1)
-          throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
+      for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel]) if ([for (joint in model.joints) if (joint.id
+        == wheel) joint].length != 1) throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
       profile.mobileBase = new RobotMobileConfiguration(
-        RobotDriveConfiguration.Differential(mobileBase.leftWheel, mobileBase.rightWheel,
-          mobileBase.wheelRadius, mobileBase.trackWidth),
-        mobileBase.maxLinearSpeed, mobileBase.maxAngularSpeed,
-        mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
-        mobileBase.footprintLength, mobileBase.footprintWidth);
+        RobotDriveConfiguration.Differential(
+          mobileBase.leftWheel,
+          mobileBase.rightWheel,
+          mobileBase.wheelRadius,
+          mobileBase.trackWidth
+        ),
+        mobileBase.maxLinearSpeed,
+        mobileBase.maxAngularSpeed,
+        mobileBase.maxLinearAcceleration,
+        mobileBase.maxAngularAcceleration,
+        mobileBase.footprintLength,
+        mobileBase.footprintWidth
+      );
     }
-    return {model: model, profile: profile,
-      jointInterfaces: jointInterfaces(definition, model), partLinks: partLinks,
-      closureIds: closures, closures: closureGeometry};
+    return {
+      model: model,
+      profile: profile,
+      jointInterfaces: jointInterfaces(definition, model),
+      partLinks: partLinks,
+      closureIds: closures,
+      closures: closureGeometry
+    };
   }
 
-/** Candidate part pairs across a mechanical joint, derived from the kinematic tree.
+  /** Candidate part pairs across a mechanical joint, derived from the kinematic tree.
  * `CollisionClearance` activates the smaller interface margin only for pairs within the
  * ordinary clearance at its planning reference. */
-  public static function jointInterfaces(definition:AssemblyDefinition, model:RobotModel):Array<AssemblyJointInterface> {
+  public static function jointInterfaces(definition:AssemblyDefinition,
+    model:RobotModel):Array<AssemblyJointInterface> {
     var hulls = shapes(model);
     var available = new Map<String, robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape>();
     for (hull in hulls) available.set(hull.shape.name, hull);
     var result:Array<AssemblyJointInterface> = [];
     var seen = new Map<String, Bool>();
     var pneumatic = new Map<String, Bool>();
-    if (definition.actuators != null) for (actuator in definition.actuators)
-      if (actuator.pneumatic != null) pneumatic.set(actuator.joint, true);
+    if (definition.actuators
+      != null) for (actuator in definition.actuators) if (actuator.pneumatic != null) pneumatic.set(
+        actuator.joint,
+        true
+      );
     function add(first:String, second:String):Void {
       var a = available.get(first), b = available.get(second);
       if (a == null || b == null || a.link == b.link) return;
       var parent = model.links[a.link].id, child = model.links[b.link].id;
       var adjacent = false;
-      for (joint in model.joints)
-        if ((joint.parent.id == parent && joint.child.id == child) ||
-            (joint.parent.id == child && joint.child.id == parent)) adjacent = true;
+      for (joint in model.joints) if ((joint.parent.id == parent
+        && joint.child.id == child) || (joint.parent.id == child && joint.child.id == parent)) adjacent = true;
       if (!adjacent || seen.exists(first + "\n" + second)) return;
       seen.set(first + "\n" + second, true);
       seen.set(second + "\n" + first, true);
@@ -862,15 +1091,17 @@ class AssemblySimulationBridge {
         // the moving jaw. Those two accessories are also a designed interface of
         // this slide, even though neither is an endpoint of the actuator joint.
         var parentAccessories:Array<String> = [], childAccessories:Array<String> = [];
-        for (mounted in definition.joints) if (mounted.role == AssemblyJointRole.Tree &&
-            mounted.type == AssemblyJointType.Fixed) {
+        for (mounted in definition.joints) if (mounted.role == AssemblyJointRole.Tree
+          && mounted.type == AssemblyJointType.Fixed) {
           if (mounted.parent == joint.parent) parentAccessories.push(mounted.child);
           else if (mounted.child == joint.parent) parentAccessories.push(mounted.parent);
           if (mounted.parent == joint.child) childAccessories.push(mounted.child);
           else if (mounted.child == joint.child) childAccessories.push(mounted.parent);
         }
-        for (parentAccessory in parentAccessories) for (childAccessory in childAccessories)
-          add(parentAccessory, childAccessory);
+        for (parentAccessory in parentAccessories) for (childAccessory in childAccessories) add(
+          parentAccessory,
+          childAccessory
+        );
       }
     }
     // Fixed mounts can be nested several levels below either joint endpoint
@@ -897,14 +1128,23 @@ class AssemblySimulationBridge {
   }
 
   /** Link-owned collision shapes, with their runtime link indices. */
-  public static function shapes(model:RobotModel):Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape>
-    return [for (link in 0...model.links.length) for (shape in model.links[link].collisionShapes)
-      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(link, shape)];
+  public static function shapes(model:RobotModel):Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape
+    > return [for (link in 0...model.links.length) for (shape in model
+    .links[link].collisionShapes) new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(
+      link,
+      shape
+    )];
 
   /** A frame with its translation scaled to metres. */
-  static function scaled(frame:AssemblyFrame, scale:Float):AssemblyFrame
-    return {x: frame.x * scale, y: frame.y * scale, z: frame.z * scale, qx: frame.qx, qy: frame.qy,
-      qz: frame.qz, qw: frame.qw};
+  static function scaled(frame:AssemblyFrame, scale:Float):AssemblyFrame return {
+    x: frame.x * scale,
+    y: frame.y * scale,
+    z: frame.z * scale,
+    qx: frame.qx,
+    qy: frame.qy,
+    qz: frame.qz,
+    qw: frame.qw
+  };
 
   /** A part's unit-density inertia, scaled by `factor` and turned into its link's axes. */
   static function rotated(inertia:Array<Float>, offset:AssemblyFrame, factor:Float):Array<Float> {
@@ -931,8 +1171,8 @@ class AssemblySimulationBridge {
     for (piece in pieces) {
       var d = [for (axis in 0...3) piece.center[axis] - center[axis]];
       var squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
-      for (i in 0...3) for (j in 0...3)
-        inertia[i * 3 + j] += piece.inertia[i * 3 + j] + piece.mass * ((i == j ? squared : 0.0) - d[i] * d[j]);
+      for (i in 0...3) for (j in 0...3) inertia[i * 3 + j] += piece.inertia[i * 3 + j] + piece.mass * ((i
+        == j ? squared : 0.0) - d[i] * d[j]);
     }
     link.mass = mass;
     link.centerOfMass = center;
@@ -950,7 +1190,7 @@ class AssemblySimulationBridge {
   }
 
   static function connector(component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition,
-      name:String):AssemblyFrame {
+    name:String):AssemblyFrame {
     if (component == null) throw "Missing assembly component definition";
     for (item in component.connectors) if (item.name == name) return item.frame;
     throw 'Missing assembly connector "$name"';

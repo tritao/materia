@@ -20,9 +20,7 @@ class JointLimits {
   /** Permitted dual-drive disagreement in SI joint units; zero means unstated. */
   public var rackingTolerance:Float = 0.0;
 
-  public function new(?lower:Float = 0.0, ?upper:Float = 0.0,
-      ?velocity:Float, ?effort:Float,
-      ?maxAcceleration:Float) {
+  public function new(?lower:Float = 0.0, ?upper:Float = 0.0, ?velocity:Float, ?effort:Float, ?maxAcceleration:Float) {
     this.lower = lower;
     this.upper = upper;
     this.velocity = velocity;
@@ -32,7 +30,10 @@ class JointLimits {
 
   public function copy():JointLimits {
     var result = new JointLimits(lower, upper, velocity, effort, maxAcceleration);
-    result.assumptions = [for (value in assumptions) {quantity: value.quantity, label: value.label}];
+    result.assumptions = [for (value in assumptions) {
+      quantity:value.quantity, label:value.label
+    }
+    ];
     result.overtravel = overtravel;
     result.rackingTolerance = rackingTolerance;
     result.velocityLimiter = velocityLimiter;
@@ -62,12 +63,11 @@ class JointLimits {
     if (lower > upper) return "lower limit exceeds upper limit";
     if (velocity != null && (!Math.isFinite(velocity) || velocity < 0.0)) return "velocity limit must be non-negative";
     if (effort != null && (!Math.isFinite(effort) || effort < 0.0)) return "effort limit must be non-negative";
-    if (maxAcceleration != null && (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0))
-      return "maximum acceleration must be finite and non-negative";
-    if (!Math.isFinite(rackingTolerance) || rackingTolerance < 0.0)
-      return "racking tolerance must be finite and non-negative";
-    if (!Math.isFinite(overtravel) || overtravel < 0.0)
-      return "overtravel must be finite and non-negative";
+    if (maxAcceleration != null && (!Math.isFinite(maxAcceleration)
+      || maxAcceleration < 0.0)) return "maximum acceleration must be finite and non-negative";
+    if (!Math.isFinite(rackingTolerance)
+      || rackingTolerance < 0.0) return "racking tolerance must be finite and non-negative";
+    if (!Math.isFinite(overtravel) || overtravel < 0.0) return "overtravel must be finite and non-negative";
     return null;
   }
 }

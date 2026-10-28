@@ -34,8 +34,7 @@ class RobotEventRing {
   /** Used by replay; stored ordinals must remain strictly increasing. */
   public function restore(event:RobotEvent):Void {
     var ordinal = ordinalOf(event);
-    if (Int64.compare(ordinal, nextOrdinal) < 0)
-      throw "Robot event ordinals must increase";
+    if (Int64.compare(ordinal, nextOrdinal) < 0) throw "Robot event ordinals must increase";
     append(event);
   }
 
@@ -60,9 +59,13 @@ class RobotEventRing {
       if (result.length >= max) break;
       var ordinal = ordinalOf(event);
       var missing = Int64.sub(ordinal, Int64.add(previous, Int64.ofInt(1)));
-      if (Int64.compare(missing, Int64.ofInt(0)) > 0 &&
-          switch event { case Overflow(_, _): false; case _: true; } &&
-          Int64.compare(ordinal, afterOrdinal) > 0) {
+      if (Int64.compare(missing, Int64.ofInt(0)) > 0 && switch event {
+        case Overflow(_, _):
+          false;
+        case _:
+          true;
+      }
+      && Int64.compare(ordinal, afterOrdinal) > 0) {
         result.push(RobotEvent.Overflow(Int64.sub(ordinal, Int64.ofInt(1)), Int64.toInt(missing)));
       }
       if (result.length < max && Int64.compare(ordinal, afterOrdinal) > 0) result.push(event);
@@ -72,7 +75,9 @@ class RobotEventRing {
   }
 
   public static function ordinalOf(event:RobotEvent):Int64 return switch event {
-    case Observation(ordinal, _): ordinal;
-    case Overflow(ordinal, _): ordinal;
+    case Observation(ordinal, _):
+      ordinal;
+    case Overflow(ordinal, _):
+      ordinal;
   };
 }

@@ -23,17 +23,19 @@ class Dock implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var approach:Null<GoTo> = null;
 
-  public function new(navigator:Navigator, target:DockingTarget,
-      observePerception:RobotSnapshot -> PerceptionSnapshot,
-      ?minimumConfidence:Float = 0.5, ?positionTolerance:Float = DEFAULT_POSITION_TOLERANCE,
-      ?headingTolerance:Float = DEFAULT_HEADING_TOLERANCE,
-      ?blockedTimeoutSeconds:Float = 10.0) {
-    if (navigator == null || target == null || observePerception == null ||
-        !Math.isFinite(minimumConfidence) || minimumConfidence < 0.0 ||
-        minimumConfidence > 1.0 || !Math.isFinite(positionTolerance) ||
-        positionTolerance <= 0.0 || !Math.isFinite(headingTolerance) ||
-        headingTolerance <= 0.0)
-      throw "Dock requires a Navigator, target, observation processor, confidence, and positive tolerances";
+  public function new(
+    navigator:Navigator,
+    target:DockingTarget,
+    observePerception:RobotSnapshot -> PerceptionSnapshot,
+    ?minimumConfidence:Float = 0.5,
+    ?positionTolerance:Float = DEFAULT_POSITION_TOLERANCE,
+    ?headingTolerance:Float = DEFAULT_HEADING_TOLERANCE,
+    ?blockedTimeoutSeconds:Float = 10.0
+  ) {
+    if (navigator == null || target == null || observePerception == null || !Math.isFinite(minimumConfidence)
+      || minimumConfidence < 0.0 || minimumConfidence > 1.0 || !Math.isFinite(positionTolerance)
+      || positionTolerance <= 0.0 || !Math.isFinite(headingTolerance) || headingTolerance
+      <= 0.0) throw "Dock requires a Navigator, target, observation processor, confidence, and positive tolerances";
     this.navigator = navigator;
     this.target = target;
     this.observePerception = observePerception;
@@ -47,13 +49,20 @@ class Dock implements Skill {
     lifecycle.begin();
     var estimate = navigator.navigation.localization.state();
     if (estimate == null) return lifecycle.fail("Dock has no localization state");
-    if (target.detection.confidence < minimumConfidence)
-      return lifecycle.fail("Docking target confidence is too low");
-    if (estimate.referenceFrame != target.detection.frameId)
-      return lifecycle.fail("Docking target and localization frames differ");
-    var value = new GoTo(navigator,
-      new NavigationGoal(target.approachPose, estimate.referenceFrame,
-        positionTolerance, headingTolerance), observePerception, blockedTimeoutSeconds);
+    if (target.detection.confidence < minimumConfidence) return lifecycle.fail("Docking target confidence is too low");
+    if (estimate.referenceFrame
+      != target.detection.frameId) return lifecycle.fail("Docking target and localization frames differ");
+    var value = new GoTo(
+      navigator,
+      new NavigationGoal(
+        target.approachPose,
+        estimate.referenceFrame,
+        positionTolerance,
+        headingTolerance
+      ),
+      observePerception,
+      blockedTimeoutSeconds
+    );
     approach = value;
     value.start();
     sync(value.status());
@@ -81,10 +90,14 @@ class Dock implements Skill {
   public function result():Null<SkillResult> return lifecycle.result();
 
   function sync(value:SkillStatus):Void switch value {
-    case Idle: lifecycle.fail("Dock navigation returned to idle");
+    case Idle:
+      lifecycle.fail("Dock navigation returned to idle");
     case Running:
-    case Succeeded: lifecycle.succeed("docking approach reached");
-    case Cancelled: lifecycle.cancel();
-    case Failed(message): lifecycle.fail(message);
+    case Succeeded:
+      lifecycle.succeed("docking approach reached");
+    case Cancelled:
+      lifecycle.cancel();
+    case Failed(message):
+      lifecycle.fail(message);
   }
 }

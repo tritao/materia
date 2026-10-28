@@ -13,7 +13,8 @@ class SimulatedGripper implements Gripper {
   var openState = true;
   var graspedState = false;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function open(timestampNs:Int64):Void {
     openState = true;
@@ -37,8 +38,7 @@ class SimulatedGripper implements Gripper {
 
   public function isGrasped():Bool return graspedState;
 
-  function record(timestampNs:Int64):Void
-    history.push(new GripperEvent(openState, graspedState, timestampNs));
+  function record(timestampNs:Int64):Void history.push(new GripperEvent(openState, graspedState, timestampNs));
 }
 
 /** One contact observation and the resulting grasp state. */

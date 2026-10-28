@@ -17,9 +17,7 @@ class AStarPlanner implements Planner {
   public final costmap:Costmap2;
 
   static final SQRT_TWO:Float = 1.4142135623730951;
-  static final DIRECTIONS:Array<Array<Int>> = [
-    [-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]
-  ];
+  static final DIRECTIONS:Array<Array<Int>> = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
 
   public function new(costmap:Costmap2) {
     if (costmap == null) throw "AStarPlanner requires a costmap";
@@ -34,24 +32,21 @@ class AStarPlanner implements Planner {
     if (goalCell == null) throw "AStarPlanner goal lies outside the costmap";
     var startIndex = index(cast startCell);
     var goalIndex = index(cast goalCell);
-    if (!costmap.isTraversable(goalCell.x, goalCell.y))
-      throw "AStarPlanner goal lies in a blocked cell";
+    if (!costmap.isTraversable(goalCell.x, goalCell.y)) throw "AStarPlanner goal lies in a blocked cell";
 
     var count = costmap.grid.width * costmap.grid.height;
     var scores:Array<Float> = [for (_ in 0...count) 1.0e300];
-    var parents:Array<Int> = [for (_ in 0...count) -1];
+    var parents:Array<Int> = [for (_ in 0...count) - 1];
     var closed:Array<Bool> = [for (_ in 0...count) false];
     var open:Array<OpenNode> = [];
     scores[startIndex] = 0.0;
-    push(open, new OpenNode(startIndex, 0.0,
-      heuristic(startCell.x, startCell.y, goalCell.x, goalCell.y)));
+    push(open, new OpenNode(startIndex, 0.0, heuristic(startCell.x, startCell.y, goalCell.x, goalCell.y)));
 
     var escapeCost = Math.max(10.0, 2.0 * costmap.inflationCostWeight);
     var found = false;
     while (open.length > 0) {
       var current = pop(open);
-      if (closed[current.index] || current.score != scores[current.index])
-        continue;
+      if (closed[current.index] || current.score != scores[current.index]) continue;
       if (current.index == goalIndex) {
         found = true;
         break;
@@ -67,20 +62,20 @@ class AStarPlanner implements Planner {
         var nextY = currentY + direction[1];
         if (!enterable(nextX, nextY, escaping)) continue;
         var diagonal = direction[0] != 0 && direction[1] != 0;
-        if (diagonal && (!enterable(currentX + direction[0], currentY, escaping) ||
-            !enterable(currentX, currentY + direction[1], escaping)))
-          continue;
+        if (diagonal && (!enterable(currentX + direction[0], currentY, escaping) || !enterable(
+          currentX,
+          currentY + direction[1],
+          escaping
+        ))) continue;
         var nextIndex = nextY * costmap.grid.width + nextX;
         if (closed[nextIndex]) continue;
         var step = costmap.grid.resolutionMeters * (diagonal ? SQRT_TWO : 1.0);
-        var cellCost = costmap.isTraversable(nextX, nextY)
-          ? costmap.cellCost(nextX, nextY) : escapeCost;
+        var cellCost = costmap.isTraversable(nextX, nextY) ? costmap.cellCost(nextX, nextY) : escapeCost;
         var candidate = scores[current.index] + step * (1.0 + cellCost);
         if (candidate < scores[nextIndex]) {
           scores[nextIndex] = candidate;
           parents[nextIndex] = current.index;
-          var estimate = heuristic(nextX, nextY, goalCell.x, goalCell.y) *
-            costmap.grid.resolutionMeters;
+          var estimate = heuristic(nextX, nextY, goalCell.x, goalCell.y) * costmap.grid.resolutionMeters;
           push(open, new OpenNode(nextIndex, candidate, candidate + estimate));
         }
       }
@@ -91,8 +86,11 @@ class AStarPlanner implements Planner {
 
   function index(cell:GridCell2):Int return cell.y * costmap.grid.width + cell.x;
 
-  function enterable(x:Int, y:Int, escaping:Bool):Bool
-    return costmap.isTraversable(x, y) || (escaping && !costmap.isLethal(x, y));
+  function enterable(x:Int,
+    y:Int, escaping:Bool):Bool return costmap.isTraversable(x, y) || (escaping && !costmap.isLethal(
+      x,
+      y
+    ));
 
   function heuristic(x:Int, y:Int, goalX:Int, goalY:Int):Float {
     var dx = Math.abs(goalX - x);
@@ -101,8 +99,7 @@ class AStarPlanner implements Planner {
     return diagonal * SQRT_TWO + Math.max(dx, dy) - diagonal;
   }
 
-  function reconstruct(parents:Array<Int>, startIndex:Int,
-      goalIndex:Int):Array<Int> {
+  function reconstruct(parents:Array<Int>, startIndex:Int, goalIndex:Int):Array<Int> {
     var reversed = [goalIndex];
     var current = goalIndex;
     while (current != startIndex) {
@@ -126,8 +123,7 @@ class AStarPlanner implements Planner {
       appendDistinct(positions, costmap.grid.cellCenter(x, y));
     }
     appendDistinct(positions, goal);
-    if (positions.length < 2)
-      throw "AStarPlanner start and goal are the same pose";
+    if (positions.length < 2) throw "AStarPlanner start and goal are the same pose";
     var oriented:Array<Pose2> = [];
     for (index in 0...positions.length) {
       var point = positions[index];

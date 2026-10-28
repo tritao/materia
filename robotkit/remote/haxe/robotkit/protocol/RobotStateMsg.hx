@@ -1,7 +1,6 @@
 package robotkit.protocol;
 
-@:wire
-class RobotStateMsg {
+@:wire class RobotStateMsg {
   @:id(1) public var robotId:haxe.Int64;
   @:id(2) public var sequence:haxe.Int64;
   @:id(3) public var sourceTimestampNs:haxe.Int64;
@@ -25,29 +24,39 @@ class RobotStateMsg {
 
   @:id(21) public var streamSequences:Array<StreamSequenceMsg>;
 
-  public function new(?robotId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
-      ?sourceTimestampNs:haxe.Int64 = null, ?q:Array<Float> = null,
-      ?dq:Array<Float> = null, ?effort:Array<Float> = null, ?mode:Int = 0,
-      ?fault:Int = 0, ?receivedTimestampNs:haxe.Int64 = null, ?safety:Int = 0,
-      ?trajectoryQueueDepth:Int = 0, ?trajectoryActive:Bool = false,
-      ?trajectoryTimeNs:haxe.Int64, ?trajectoryDurationNs:haxe.Int64,
-      ?trajectoryTag:haxe.Int64, ?trajectoryTagTimeNs:haxe.Int64,
-      ?sessionState:Int = 0, ?activePlanId:haxe.Int64,
-      ?committedUntilNs:haxe.Int64, ?queueEndTimeNs:haxe.Int64, ?streamSequences:Array<StreamSequenceMsg>) {
+  public function new(
+    ?robotId:haxe.Int64 = null,
+    ?sequence:haxe.Int64 = null,
+    ?sourceTimestampNs:haxe.Int64 = null,
+    ?q:Array<Float> = null,
+    ?dq:Array<Float> = null,
+    ?effort:Array<Float> = null,
+    ?mode:Int = 0,
+    ?fault:Int = 0,
+    ?receivedTimestampNs:haxe.Int64 = null,
+    ?safety:Int = 0,
+    ?trajectoryQueueDepth:Int = 0,
+    ?trajectoryActive:Bool = false,
+    ?trajectoryTimeNs:haxe.Int64,
+    ?trajectoryDurationNs:haxe.Int64,
+    ?trajectoryTag:haxe.Int64,
+    ?trajectoryTagTimeNs:haxe.Int64,
+    ?sessionState:Int = 0,
+    ?activePlanId:haxe.Int64,
+    ?committedUntilNs:haxe.Int64,
+    ?queueEndTimeNs:haxe.Int64,
+    ?streamSequences:Array<StreamSequenceMsg>
+  ) {
     this.streamSequences = streamSequences == null ? [] : streamSequences.copy();
     this.robotId = robotId == null ? haxe.Int64.ofInt(0) : robotId;
     this.sequence = sequence == null ? haxe.Int64.ofInt(0) : sequence;
-    this.sourceTimestampNs = sourceTimestampNs == null
-      ? haxe.Int64.ofInt(0)
-      : sourceTimestampNs;
+    this.sourceTimestampNs = sourceTimestampNs == null ? haxe.Int64.ofInt(0) : sourceTimestampNs;
     this.q = q == null ? [] : q;
     this.dq = dq == null ? [] : dq;
     this.effort = effort == null ? [] : effort;
     this.mode = mode;
     this.fault = fault;
-    this.receivedTimestampNs = receivedTimestampNs == null
-      ? this.sourceTimestampNs
-      : receivedTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null ? this.sourceTimestampNs : receivedTimestampNs;
     this.safety = safety;
     this.trajectoryQueueDepth = trajectoryQueueDepth;
     this.trajectoryActive = trajectoryActive;

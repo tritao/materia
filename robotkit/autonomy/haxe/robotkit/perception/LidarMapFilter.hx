@@ -21,19 +21,29 @@ class LidarMapFilter implements ScanFilter {
   public final fieldOfViewRadians:Float;
 
   /** Builds a filter for a LiDAR compiled from a robot model. */
-  public static function fromSensor(grid:OccupancyGrid2, sensor:RobotRuntimeSensorBlueprint,
-      toleranceMeters:Float):LidarMapFilter {
+  public static function fromSensor(grid:OccupancyGrid2,
+    sensor:RobotRuntimeSensorBlueprint, toleranceMeters:Float):LidarMapFilter {
     if (sensor == null || sensor.kind != "lidar") throw "LiDAR map filter requires a compiled LiDAR sensor";
-    return new LidarMapFilter(grid, toleranceMeters, sensor.maxRange, sensor.startAngleRadians,
-      sensor.fieldOfViewRadians);
+    return new LidarMapFilter(
+      grid,
+      toleranceMeters,
+      sensor.maxRange,
+      sensor.startAngleRadians,
+      sensor.fieldOfViewRadians
+    );
   }
 
-  public function new(grid:OccupancyGrid2, toleranceMeters:Float, maxRangeMeters:Float,
-      ?startAngleRadians:Float = 0.0, ?fieldOfViewRadians:Float = Math.PI * 2.0) {
-    if (grid == null || !Math.isFinite(toleranceMeters) || toleranceMeters < 0.0 ||
-        !Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0 || !Math.isFinite(startAngleRadians) ||
-        !Math.isFinite(fieldOfViewRadians) || fieldOfViewRadians <= 0.0)
-      throw "LiDAR map filter requires a grid, a nonnegative tolerance, and a finite scan layout";
+  public function new(
+    grid:OccupancyGrid2,
+    toleranceMeters:Float,
+    maxRangeMeters:Float,
+    ?startAngleRadians:Float = 0.0,
+    ?fieldOfViewRadians:Float = Math.PI * 2.0
+  ) {
+    if (grid == null || !Math.isFinite(toleranceMeters)
+      || toleranceMeters < 0.0 || !Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0
+      || !Math.isFinite(startAngleRadians) || !Math.isFinite(fieldOfViewRadians) || fieldOfViewRadians
+      <= 0.0) throw "LiDAR map filter requires a grid, a nonnegative tolerance, and a finite scan layout";
     this.grid = grid;
     this.toleranceMeters = toleranceMeters;
     this.maxRangeMeters = maxRangeMeters;
@@ -58,8 +68,20 @@ class LidarMapFilter implements ScanFilter {
       }
     }
     if (explained == 0) return frame;
-    return new SensorFrame(frame.sensorId, frame.kind, frame.frameId, frame.sequence, frame.sourceTimestampNs,
-      values, frame.receivedTimestampNs, frame.linkId, frame.mountPosition.toArray(), frame.mountRotation.toArray(),
-      frame.sourceClockId, frame.receivedClockId, frame.image);
+    return new SensorFrame(
+      frame.sensorId,
+      frame.kind,
+      frame.frameId,
+      frame.sequence,
+      frame.sourceTimestampNs,
+      values,
+      frame.receivedTimestampNs,
+      frame.linkId,
+      frame.mountPosition.toArray(),
+      frame.mountRotation.toArray(),
+      frame.sourceClockId,
+      frame.receivedClockId,
+      frame.image
+    );
   }
 }

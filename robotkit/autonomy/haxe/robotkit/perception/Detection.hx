@@ -18,15 +18,22 @@ class Detection {
   public final sourceClockId:String;
   public final receivedClockId:String;
 
-  public function new(id:String, kind:String, confidence:Float, pose:Pose2,
-      frameId:String, sourceSequence:Int64, sourceTimestampNs:Int64,
-      receivedTimestampNs:Int64, sourceClockId:String, receivedClockId:String) {
-    if (id == null || id.length == 0 || kind == null || kind.length == 0 ||
-        pose == null || frameId == null || frameId.length == 0 ||
-        !Math.isFinite(confidence) || confidence < 0.0 || confidence > 1.0 ||
-        sourceClockId == null || sourceClockId.length == 0 ||
-        receivedClockId == null || receivedClockId.length == 0)
-      throw "Detection requires identity, frame, pose, confidence, and clock metadata";
+  public function new(
+    id:String,
+    kind:String,
+    confidence:Float,
+    pose:Pose2,
+    frameId:String,
+    sourceSequence:Int64,
+    sourceTimestampNs:Int64,
+    receivedTimestampNs:Int64,
+    sourceClockId:String,
+    receivedClockId:String
+  ) {
+    if (id == null || id.length == 0 || kind == null || kind.length == 0
+      || pose == null || frameId == null || frameId.length == 0 || !Math.isFinite(confidence) || confidence < 0.0
+      || confidence > 1.0 || sourceClockId == null || sourceClockId.length == 0 || receivedClockId == null
+      || receivedClockId.length == 0) throw "Detection requires identity, frame, pose, confidence, and clock metadata";
     this.id = id;
     this.kind = kind;
     this.confidence = confidence;

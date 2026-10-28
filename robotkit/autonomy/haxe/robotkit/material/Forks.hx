@@ -22,45 +22,56 @@ class Forks {
   final spreadIndex:Null<Int>;
 
   /** Builds the fork view from roles and limits authored on a RobotProfile, resolved against a RobotModel. */
-  public static function fromRobot(robot:Robot, model:RobotModel, profile:robotkit.profile.RobotProfile):Forks
-    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model, profile));
+  public static function fromRobot(robot:Robot,
+    model:RobotModel, profile:robotkit.profile.RobotProfile):Forks return fromBlueprint(
+      robot,
+      RobotRuntimeCompiler.compile(
+        model,
+        profile
+      )
+    );
 
   /** Builds the fork view from a previously compiled robot blueprint. */
-  public static function fromBlueprint(robot:Robot,
-      blueprint:RobotRuntimeBlueprint):Forks {
-    if (robot == null || blueprint == null)
-      throw "Robot blueprint has no fork-mechanism configuration";
+  public static function fromBlueprint(robot:Robot, blueprint:RobotRuntimeBlueprint):Forks {
+    if (robot == null || blueprint == null) throw "Robot blueprint has no fork-mechanism configuration";
     var configuration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
-    if (configuration == null)
-      throw "Robot blueprint has no fork-mechanism configuration";
+    if (configuration == null) throw "Robot blueprint has no fork-mechanism configuration";
     var maybeConfig:Null<RobotRuntimeForkConfiguration> = configuration.forks;
     if (maybeConfig == null) throw "Robot blueprint has no fork-mechanism configuration";
     var config:RobotRuntimeForkConfiguration = cast maybeConfig;
     requireJoint(robot, config.lift);
     if (config.tilt != null) requireJoint(robot, cast config.tilt);
     if (config.spread != null) requireJoint(robot, cast config.spread);
-    return new Forks(robot, new ForkConfig(axisConfig(config.lift),
-      new LoadLimits(config.maxMassKg, config.maxLoadMomentKgMeters,
-        config.maxLiftHeightMeters),
-      config.tilt == null ? null : axisConfig(cast config.tilt),
-      config.spread == null ? null : axisConfig(cast config.spread)));
+    return new Forks(
+      robot,
+      new ForkConfig(
+        axisConfig(config.lift),
+        new LoadLimits(
+          config.maxMassKg,
+          config.maxLoadMomentKgMeters,
+          config.maxLiftHeightMeters
+        ),
+        config.tilt == null ? null : axisConfig(cast config.tilt),
+        config.spread == null ? null : axisConfig(cast config.spread)
+      )
+    );
   }
 
-  static function axisConfig(value:RobotRuntimeForkAxisConfiguration):ForkAxisConfig
-    return new ForkAxisConfig(value.jointName, value.minimum, value.maximum);
+  static function axisConfig(value:RobotRuntimeForkAxisConfiguration):ForkAxisConfig return new ForkAxisConfig(
+    value.jointName,
+    value.minimum,
+    value.maximum
+  );
 
-  static function requireJoint(robot:Robot,
-      expected:RobotRuntimeForkAxisConfiguration):Void {
+  static function requireJoint(robot:Robot, expected:RobotRuntimeForkAxisConfiguration):Void {
     var joints = robot.description().joints;
-    if (expected.jointIndex < 0 || expected.jointIndex >= joints.length ||
-        joints[expected.jointIndex] != expected.jointName ||
-        joints.indexOf(expected.jointName) != expected.jointIndex)
-      throw 'Robot description does not match authored joint "${expected.jointName}" at index ${expected.jointIndex}';
+    if (expected.jointIndex < 0 || expected.jointIndex >= joints.length
+      || joints[expected.jointIndex] != expected.jointName || joints.indexOf(expected.jointName) != expected
+      .jointIndex) throw 'Robot description does not match authored joint "${expected.jointName}" at index ${expected.jointIndex}';
   }
 
   public function new(robot:Robot, config:ForkConfig) {
-    if (robot == null || config == null)
-      throw "Forks requires a robot and fork configuration";
+    if (robot == null || config == null) throw "Forks requires a robot and fork configuration";
     var joints = robot.description().joints;
     liftIndex = resolve(joints, config.lift);
     tiltIndex = config.tilt == null ? null : resolve(joints, config.tilt);
@@ -71,11 +82,24 @@ class Forks {
 
   public function state():ForkState {
     var snapshot = robot.snapshot();
-    return new ForkState(robot.id(), readAxis(snapshot, config.lift, liftIndex),
-      config.tilt == null ? null : readAxis(snapshot, config.tilt, cast tiltIndex),
-      config.spread == null ? null : readAxis(snapshot, config.spread, cast spreadIndex),
-      snapshot.sourceTimestampNs, snapshot.receivedTimestampNs,
-      snapshot.sourceClockId, snapshot.receivedClockId);
+    return new ForkState(
+      robot.id(),
+      readAxis(snapshot, config.lift, liftIndex),
+      config.tilt == null ? null : readAxis(
+        snapshot,
+        config.tilt,
+        cast tiltIndex
+      ),
+      config.spread == null ? null : readAxis(
+        snapshot,
+        config.spread,
+        cast spreadIndex
+      ),
+      snapshot.sourceTimestampNs,
+      snapshot.receivedTimestampNs,
+      snapshot.sourceClockId,
+      snapshot.receivedClockId
+    );
   }
 
   public function setLoadState(value:LoadState):Void {
@@ -85,12 +109,9 @@ class Forks {
 
   /** Submits all requested axis positions in one heterogeneous-safe joint batch. */
   public function command(?lift:Float, ?tilt:Float, ?spread:Float):Void {
-    if (lift == null && tilt == null && spread == null)
-      throw "Fork command requires at least one target";
-    if (tilt != null && config.tilt == null)
-      throw "Fork tilt axis is not configured";
-    if (spread != null && config.spread == null)
-      throw "Fork spread axis is not configured";
+    if (lift == null && tilt == null && spread == null) throw "Fork command requires at least one target";
+    if (tilt != null && config.tilt == null) throw "Fork tilt axis is not configured";
+    if (spread != null && config.spread == null) throw "Fork spread axis is not configured";
     if (lift != null) config.lift.validate(lift);
     if (tilt != null) config.tilt.validate(tilt);
     if (spread != null) config.spread.validate(spread);
@@ -106,10 +127,10 @@ class Forks {
     if (spread != null) targets.push(JointTarget.position(cast spreadIndex, spread));
     var capabilities = robot.capabilities();
     if (capabilities.jointCount > 0) {
-      if (!capabilities.accepts(robotkit.core.JointTargetMode.Position))
-        throw "Robot does not support fork position targets";
-      for (target in targets) if (target.joint >= capabilities.jointCount)
-        throw 'Fork target joint ${target.joint} exceeds robot joint count ${capabilities.jointCount}';
+      if (!capabilities
+        .accepts(robotkit.core.JointTargetMode.Position)) throw "Robot does not support fork position targets";
+      for (target in targets) if (target.joint >= capabilities
+        .jointCount) throw 'Fork target joint ${target.joint} exceeds robot joint count ${capabilities.jointCount}';
     }
     robot.submit(RobotCommand.JointTargets(JointTarget.copyBatch(targets), null));
   }
@@ -124,12 +145,10 @@ class Forks {
     return index;
   }
 
-  static function readAxis(snapshot:robotkit.core.RobotSnapshot,
-      config:ForkAxisConfig, index:Int):ForkAxisState {
-    if (snapshot.positions.length <= index || snapshot.velocities.length <= index ||
-        snapshot.efforts.length <= index)
-      throw 'Robot snapshot does not contain fork joint "${config.jointName}"';
-    return new ForkAxisState(snapshot.positions.get(index), snapshot.velocities.get(index),
-      snapshot.efforts.get(index));
+  static function readAxis(snapshot:robotkit.core.RobotSnapshot, config:ForkAxisConfig, index:Int):ForkAxisState {
+    if (snapshot.positions.length <= index || snapshot.velocities.length <= index
+      || snapshot.efforts.length <= index) throw 'Robot snapshot does not contain fork joint "${config.jointName}"';
+    return new ForkAxisState(snapshot.positions.get(index),
+      snapshot.velocities.get(index), snapshot.efforts.get(index));
   }
 }

@@ -6,8 +6,8 @@ class ReachLoadBand {
   public final limits:RobotPayloadLimit;
 
   public function new(maxReachMeters:Float, limits:RobotPayloadLimit) {
-    if (!Math.isFinite(maxReachMeters) || maxReachMeters <= 0 || limits == null)
-      throw "Reach load band requires positive reach and payload limits";
+    if (!Math.isFinite(maxReachMeters)
+      || maxReachMeters <= 0 || limits == null) throw "Reach load band requires positive reach and payload limits";
     this.maxReachMeters = maxReachMeters;
     this.limits = limits;
   }

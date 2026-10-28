@@ -11,10 +11,16 @@ class RobotCapabilities {
   public final execution:ExecutionCapabilities;
   public final timing:TimingCapabilities;
   public var streams(get, never):Array<String>;
-  public function new(id:RobotId, jointCount:Int, controlModes:Array<JointTargetMode>,
-      execution:ExecutionCapabilities, timing:TimingCapabilities, ?streams:Array<String>) {
-    if (jointCount < 0 || controlModes == null || execution == null || timing == null)
-      throw "Invalid robot capabilities";
+  public function new(
+    id:RobotId,
+    jointCount:Int,
+    controlModes:Array<JointTargetMode>,
+    execution:ExecutionCapabilities,
+    timing:TimingCapabilities,
+    ?streams:Array<String>
+  ) {
+    if (jointCount < 0
+      || controlModes == null || execution == null || timing == null) throw "Invalid robot capabilities";
     this.id = id;
     this.jointCount = jointCount;
     modes = controlModes.copy();

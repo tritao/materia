@@ -26,10 +26,12 @@ class CadDecompositionCache {
   final entries = new Map<String, ConvexDecomposition>();
   public var decompositions(default, null) = 0;
 
-  public function new() {}
+  public function new() {
+  }
 
   /** The cached decomposition of `mesh` for `part`, or a new one; the key covers the mesh's contents. */
-  public function get(part:String, mesh:CadCollisionMesh, maxPieces:Int, decomposer:ConvexDecomposer):ConvexDecomposition {
+  public function get(part:String,
+    mesh:CadCollisionMesh, maxPieces:Int, decomposer:ConvexDecomposer):ConvexDecomposition {
     var key = '$part|$maxPieces|${mesh.fingerprint()}';
     var found = entries.get(key);
     if (found != null) return found;
@@ -80,8 +82,11 @@ class CadCollisionMesh {
  */
 class CadCollision {
   /** A CAD mechanism, converted to a RobotKit model, with its link hulls (CAD-sourced). */
-  public static function describeMechanism(description:CollisionDescription, mechanism:AssemblySimulationModel,
-      options:RobotCollisionOptions):RobotCollisionBodies {
+  public static function describeMechanism(
+    description:CollisionDescription,
+    mechanism:AssemblySimulationModel,
+    options:RobotCollisionOptions
+  ):RobotCollisionBodies {
     description.note('Mechanism "${options.name}": CAD hulls are enclosing hulls of the parts\' tessellations');
     return RobotCollision.describe(description, mechanism.model, options);
   }
@@ -91,30 +96,68 @@ class CadCollision {
    * `group`; returns its described objects. Decomposition needs a
    * `decomposer` and caches through `cache`.
    */
-  public static function describePart(description:CollisionDescription, name:String, pose:AssemblyFrame,
-      metresPerUnit:Float, collision:CadPartCollision, group:Int, ?decomposer:ConvexDecomposer,
-      ?cache:CadDecompositionCache):Array<Int> {
-    var body = description.addBody(name, group, true, new CollisionPose(pose.x * metresPerUnit,
-      pose.y * metresPerUnit, pose.z * metresPerUnit, pose.qx, pose.qy, pose.qz, pose.qw));
+  public static function describePart(
+    description:CollisionDescription,
+    name:String,
+    pose:AssemblyFrame,
+    metresPerUnit:Float,
+    collision:CadPartCollision,
+    group:Int,
+    ?decomposer:ConvexDecomposer,
+    ?cache:CadDecompositionCache
+  ):Array<Int> {
+    var body = description.addBody(
+      name,
+      group,
+      true,
+      new CollisionPose(
+        pose.x * metresPerUnit,
+        pose.y * metresPerUnit,
+        pose.z * metresPerUnit,
+        pose.qx,
+        pose.qy,
+        pose.qz,
+        pose.qw
+      )
+    );
     var at = CollisionPose.identity();
     return switch collision {
       case Hull(vertices):
         description.note('Part "$name" is its enclosing convex hull');
-        [description.addObject(name, body, at, CollisionGeometry.Convex([for (v in vertices) v * metresPerUnit]), 0.0,
-          "enclosing hull")];
+        [description.addObject(
+          name,
+          body,
+          at,
+          CollisionGeometry.Convex([for (v in vertices) v * metresPerUnit]),
+          0.0,
+          "enclosing hull"
+        )];
       case Surface(shape, deflection):
         var mesh = CadCollisionMesh.of(shape.tessellate(deflection), metresPerUnit);
-        description.note('Part "$name" is a surface mesh (a shape inside it reads as clear), tessellated to ${mesh.linearDeflection} m');
-        [description.addObject(name, body, at, CollisionGeometry.Mesh(mesh.vertices, mesh.indices), 0.0, "surface mesh")];
+        description
+          .note('Part "$name" is a surface mesh (a shape inside it reads as clear), tessellated to ${mesh.linearDeflection} m');
+        [description.addObject(name,
+          body, at, CollisionGeometry.Mesh(mesh.vertices, mesh.indices), 0.0, "surface mesh")];
       case Decomposed(shape, deflection, maxPieces):
         if (decomposer == null) throw 'Part "$name" needs a convex decomposer';
         var mesh = CadCollisionMesh.of(shape.tessellate(deflection), metresPerUnit);
-        var pieces = cache == null ? decomposer.decompose(mesh.vertices, mesh.indices, maxPieces, 0.0)
-          : cache.get(name, mesh, maxPieces, decomposer);
-        description.note('Part "$name" is ${pieces.pieces.length} convex pieces inflated by ${pieces.inflation} m to enclose its tessellation (measured ${pieces.measured} m, sampled every ${pieces.spacing} m); the tessellation lies within ${mesh.linearDeflection} m of the part');
-        [for (i in 0...pieces.pieces.length)
-          description.addObject('$name/piece$i', body, at, CollisionGeometry.Convex(pieces.pieces[i]), pieces.inflation,
-            "decomposed piece", name)];
+        var pieces = cache == null ? decomposer.decompose(mesh.vertices, mesh.indices, maxPieces, 0.0) : cache.get(
+          name,
+          mesh,
+          maxPieces,
+          decomposer
+        );
+        description
+          .note('Part "$name" is ${pieces.pieces.length} convex pieces inflated by ${pieces.inflation} m to enclose its tessellation (measured ${pieces.measured} m, sampled every ${pieces.spacing} m); the tessellation lies within ${mesh.linearDeflection} m of the part');
+        [for (i in 0...pieces.pieces.length) description.addObject(
+          '$name/piece$i',
+          body,
+          at,
+          CollisionGeometry.Convex(pieces.pieces[i]),
+          pieces.inflation,
+          "decomposed piece",
+          name
+        )];
     }
   }
 }

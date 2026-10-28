@@ -33,17 +33,23 @@ class PlacePallet implements Skill {
   var stage:PlaceStage = Approach;
   var approach:Null<GoTo> = null;
 
-  public function new(navigator:Navigator,
-      observePerception:RobotSnapshot -> PerceptionSnapshot,
-      forks:Forks, payload:Payload, approachPose:Pose2, liftHeightMeters:Float,
-      ?tiltRadians:Float, ?spreadMeters:Float,
-      ?positionTolerance:Float = 0.08, ?headingTolerance:Float = 0.08,
-      ?blockedTimeoutSeconds:Float = 10.0) {
-    if (navigator == null || observePerception == null || forks == null ||
-        payload == null || approachPose == null || !Math.isFinite(liftHeightMeters) ||
-        !Math.isFinite(positionTolerance) || positionTolerance <= 0.0 ||
-        !Math.isFinite(headingTolerance) || headingTolerance <= 0.0)
-      throw "PlacePallet requires navigation, perception, forks, payload, and valid approach settings";
+  public function new(
+    navigator:Navigator,
+    observePerception:RobotSnapshot -> PerceptionSnapshot,
+    forks:Forks,
+    payload:Payload,
+    approachPose:Pose2,
+    liftHeightMeters:Float,
+    ?tiltRadians:Float,
+    ?spreadMeters:Float,
+    ?positionTolerance:Float = 0.08,
+    ?headingTolerance:Float = 0.08,
+    ?blockedTimeoutSeconds:Float = 10.0
+  ) {
+    if (navigator == null || observePerception == null || forks == null || payload == null
+      || approachPose == null || !Math.isFinite(liftHeightMeters) || !Math.isFinite(positionTolerance)
+      || positionTolerance <= 0.0 || !Math.isFinite(headingTolerance) || headingTolerance
+      <= 0.0) throw "PlacePallet requires navigation, perception, forks, payload, and valid approach settings";
     this.navigator = navigator;
     this.observePerception = observePerception;
     this.forks = forks;
@@ -60,15 +66,23 @@ class PlacePallet implements Skill {
   public function start():Void {
     lifecycle.begin();
     stage = Approach;
-    if (!forks.loadState.secured || forks.loadState.payload != payload)
-      return lifecycle.fail("PlacePallet requires the expected payload to be secured");
+    if (!forks.loadState.secured || forks.loadState.payload
+      != payload) return lifecycle.fail("PlacePallet requires the expected payload to be secured");
     var estimate = navigator.navigation.localization.state();
     if (estimate == null) return lifecycle.fail("PlacePallet has no localization state");
     var violation = forks.config.loadLimits.violation(payload, liftHeightMeters);
     if (violation != null) return lifecycle.fail(violation);
-    var value = new GoTo(navigator,
-      new NavigationGoal(approachPose, estimate.referenceFrame,
-        positionTolerance, headingTolerance), observePerception, blockedTimeoutSeconds);
+    var value = new GoTo(
+      navigator,
+      new NavigationGoal(
+        approachPose,
+        estimate.referenceFrame,
+        positionTolerance,
+        headingTolerance
+      ),
+      observePerception,
+      blockedTimeoutSeconds
+    );
     approach = value;
     value.start();
     syncApproach(value.status());
@@ -85,9 +99,8 @@ class PlacePallet implements Skill {
         }
         syncApproach(value.update(snapshot, durationSeconds));
       case WaitForReleaseConfirmation:
-        if (forks.loadState.observed && forks.loadState.payload == null &&
-            !forks.loadState.secured)
-          lifecycle.succeed("pallet release confirmed");
+        if (forks.loadState.observed
+          && forks.loadState.payload == null && !forks.loadState.secured) lifecycle.succeed("pallet release confirmed");
     }
     return lifecycle.status();
   }
@@ -96,7 +109,8 @@ class PlacePallet implements Skill {
     if (!lifecycle.isRunning()) return;
     var value:Null<GoTo> = approach;
     if (value != null) value.cancel();
-    try forks.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {}
+    try forks.robot.stop(robotkit.core.StopMode.Normal) catch (_:Dynamic) {
+    }
     lifecycle.cancel();
   }
 
@@ -104,7 +118,8 @@ class PlacePallet implements Skill {
   public function result():Null<SkillResult> return lifecycle.result();
 
   function syncApproach(value:SkillStatus):Void switch value {
-    case Idle: lifecycle.fail("PlacePallet navigation returned to idle");
+    case Idle:
+      lifecycle.fail("PlacePallet navigation returned to idle");
     case Running:
     case Succeeded:
       try {
@@ -113,7 +128,9 @@ class PlacePallet implements Skill {
       } catch (error:Dynamic) {
         lifecycle.fail(Std.string(error));
       }
-    case Cancelled: lifecycle.cancel();
-    case Failed(message): lifecycle.fail(message);
+    case Cancelled:
+      lifecycle.cancel();
+    case Failed(message):
+      lifecycle.fail(message);
   }
 }

@@ -9,8 +9,14 @@ class RobotRuntimeVelocityDriveBlueprint {
   public final maxEffort:Float;
   public final maxRate:Float;
 
-  public function new(joint:Int, speedChannel:String, directionChannel:String,
-      radiansPerSpeedUnit:Float, maxEffort:Float, maxRate:Float) {
+  public function new(
+    joint:Int,
+    speedChannel:String,
+    directionChannel:String,
+    radiansPerSpeedUnit:Float,
+    maxEffort:Float,
+    maxRate:Float
+  ) {
     this.joint = joint;
     this.speedChannel = speedChannel;
     this.directionChannel = directionChannel;

@@ -15,17 +15,19 @@ class OccupancyGrid2 {
 
   final values:Array<OccupancyCell>;
 
-  public function new(resolutionMeters:Float, origin:Pose2, width:Int,
-      height:Int, ?frameId:String = "map",
-      ?initialValue:OccupancyCell = OccupancyCell.Unknown) {
-    if (!Math.isFinite(resolutionMeters) || resolutionMeters <= 0.0 ||
-        origin == null || width <= 0 || height <= 0 ||
-        width > Std.int(0x3fffffff / height) ||
-        frameId == null || frameId.length == 0)
-      throw "OccupancyGrid2 requires a finite resolution, origin, positive dimensions, and frame";
-    if (initialValue != OccupancyCell.Unknown && initialValue != OccupancyCell.Free &&
-        initialValue != OccupancyCell.Occupied)
-      throw "OccupancyGrid2 initial value is invalid";
+  public function new(
+    resolutionMeters:Float,
+    origin:Pose2,
+    width:Int,
+    height:Int,
+    ?frameId:String = "map",
+    ?initialValue:OccupancyCell = OccupancyCell.Unknown
+  ) {
+    if (!Math.isFinite(resolutionMeters) || resolutionMeters <= 0.0 || origin == null
+      || width <= 0 || height <= 0 || width > Std.int(0x3fffffff / height) || frameId == null || frameId.length
+      == 0) throw "OccupancyGrid2 requires a finite resolution, origin, positive dimensions, and frame";
+    if (initialValue != OccupancyCell.Unknown && initialValue != OccupancyCell.Free
+      && initialValue != OccupancyCell.Occupied) throw "OccupancyGrid2 initial value is invalid";
     this.resolutionMeters = resolutionMeters;
     this.origin = new Pose2(origin.x, origin.y, origin.yaw);
     this.width = width;
@@ -35,8 +37,7 @@ class OccupancyGrid2 {
     for (_ in 0...(width * height)) values.push(initialValue);
   }
 
-  public function contains(x:Int, y:Int):Bool
-    return x >= 0 && x < width && y >= 0 && y < height;
+  public function contains(x:Int, y:Int):Bool return x >= 0 && x < width && y >= 0 && y < height;
 
   public function cell(x:Int, y:Int):OccupancyCell {
     requireCell(x, y);
@@ -45,9 +46,8 @@ class OccupancyGrid2 {
 
   public function setCell(x:Int, y:Int, value:OccupancyCell):Void {
     requireCell(x, y);
-    if (value != OccupancyCell.Unknown && value != OccupancyCell.Free &&
-        value != OccupancyCell.Occupied)
-      throw "OccupancyGrid2 cell value is invalid";
+    if (value != OccupancyCell.Unknown
+      && value != OccupancyCell.Free && value != OccupancyCell.Occupied) throw "OccupancyGrid2 cell value is invalid";
     values[y * width + x] = value;
   }
 
@@ -68,21 +68,20 @@ class OccupancyGrid2 {
     var maxX = Std.int(Math.floor((local.x + reach) / resolutionMeters));
     var minY = Std.int(Math.floor((local.y - reach) / resolutionMeters));
     var maxY = Std.int(Math.floor((local.y + reach) / resolutionMeters));
-    for (cy in (minY < 0 ? 0 : minY)...(maxY >= height ? height : maxY + 1))
-      for (cx in (minX < 0 ? 0 : minX)...(maxX >= width ? width : maxX + 1)) {
-        if (values[cy * width + cx] != OccupancyCell.Occupied) continue;
-        var dx = (cx + 0.5) * resolutionMeters - local.x;
-        var dy = (cy + 0.5) * resolutionMeters - local.y;
-        if (dx * dx + dy * dy <= reach * reach) return true;
-      }
+    for (cy in (minY < 0 ? 0 : minY)...(maxY
+      >= height ? height : maxY + 1)) for (cx in (minX < 0 ? 0 : minX)...(maxX >= width ? width : maxX + 1)) {
+      if (values[cy * width + cx] != OccupancyCell.Occupied) continue;
+      var dx = (cx + 0.5) * resolutionMeters - local.x;
+      var dy = (cy + 0.5) * resolutionMeters - local.y;
+      if (dx * dx + dy * dy <= reach * reach) return true;
+    }
     return false;
   }
 
   /** Returns the center pose of a grid cell in `frameId`. */
   public function cellCenter(x:Int, y:Int):Pose2 {
     requireCell(x, y);
-    return origin.compose(new Pose2((x + 0.5) * resolutionMeters,
-      (y + 0.5) * resolutionMeters));
+    return origin.compose(new Pose2((x + 0.5) * resolutionMeters, (y + 0.5) * resolutionMeters));
   }
 
   function requireCell(x:Int, y:Int):Void {

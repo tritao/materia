@@ -17,28 +17,43 @@ class JointSwitch {
   public final driveJoint:Null<JointId>;
   public final homeAfter:Array<String>;
 
-  public function new(id:String, joint:JointId, frameId:FrameId, role:String, side:Int,
-      trip:Float, hysteresis:Float, repeatability:Float, seed:Int = 1, ?driveJoint:JointId, ?homeAfter:Array<String>) {
-    if (id == null || StringTools.trim(id).length == 0 ||
-        joint == null || StringTools.trim(joint).length == 0 ||
-        frameId == null || StringTools.trim(frameId).length == 0)
-      throw "A joint switch needs an ID, monitored joint and physical frame";
+  public function new(
+    id:String,
+    joint:JointId,
+    frameId:FrameId,
+    role:String,
+    side:Int,
+    trip:Float,
+    hysteresis:Float,
+    repeatability:Float,
+    seed:Int = 1,
+    ?driveJoint:JointId,
+    ?homeAfter:Array<String>
+  ) {
+    if (id == null
+      || StringTools.trim(id).length == 0 || joint == null || StringTools.trim(joint).length == 0 || frameId == null
+      || StringTools.trim(frameId).length == 0) throw "A joint switch needs an ID, monitored joint and physical frame";
     if (role != "home" && role != "limit") throw "A joint switch is home or limit";
     if (side != -1 && side != 1) throw "A joint switch side must be -1 or 1";
-    if (!Math.isFinite(trip) || !Math.isFinite(hysteresis) || hysteresis < 0 ||
-        !Math.isFinite(repeatability) || repeatability < 0)
-      throw "Switch trip and non-negative hysteresis/repeatability must be finite";
+    if (!Math.isFinite(trip) || !Math.isFinite(hysteresis) || hysteresis < 0 || !Math.isFinite(repeatability)
+      || repeatability < 0) throw "Switch trip and non-negative hysteresis/repeatability must be finite";
     if (driveJoint != null && StringTools.trim(driveJoint).length == 0) throw "Switch drive joint is empty";
     this.homeAfter = homeAfter == null ? [] : homeAfter.copy();
     var seen = new Map<String, Bool>();
     for (id in this.homeAfter) {
-      if (role != "home" || id == null || StringTools.trim(id).length == 0 || id == joint || seen.exists(id))
-        throw "Home dependencies must name distinct other coordinates";
+      if (role != "home" || id == null || StringTools.trim(id).length == 0
+        || id == joint || seen.exists(id)) throw "Home dependencies must name distinct other coordinates";
       seen.set(id, true);
     }
     this.driveJoint = driveJoint;
-    this.id = id; this.joint = joint; this.frameId = frameId; this.role = role;
-    this.side = side; this.trip = trip; this.hysteresis = hysteresis;
-    this.repeatability = repeatability; this.seed = seed;
+    this.id = id;
+    this.joint = joint;
+    this.frameId = frameId;
+    this.role = role;
+    this.side = side;
+    this.trip = trip;
+    this.hysteresis = hysteresis;
+    this.repeatability = repeatability;
+    this.seed = seed;
   }
 }

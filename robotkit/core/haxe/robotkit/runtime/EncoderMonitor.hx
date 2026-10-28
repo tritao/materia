@@ -30,8 +30,16 @@ class EncoderFinding {
   public final steps:Float;
   public final timeSeconds:Float;
 
-  public function new(kind:EncoderFindingKind, encoder:String, joint:String, motor:String, error:Float, bound:Float, steps:Float,
-      timeSeconds:Float) {
+  public function new(
+    kind:EncoderFindingKind,
+    encoder:String,
+    joint:String,
+    motor:String,
+    error:Float,
+    bound:Float,
+    steps:Float,
+    timeSeconds:Float
+  ) {
     this.kind = kind;
     this.encoder = encoder;
     this.joint = joint;
@@ -114,7 +122,8 @@ class EncoderMonitor {
   /** The actuator that drives `joint` directly, if one does. */
   function motorOn(joint:String):Null<Actuator> {
     for (actuator in model.actuators) switch actuator.transmission {
-      case SimpleTransmission(jointId, _, _): if (jointId == joint) return actuator;
+      case SimpleTransmission(jointId, _, _):
+        if (jointId == joint) return actuator;
     }
     return null;
   }
@@ -124,7 +133,10 @@ class EncoderMonitor {
       var drive = motor.drive;
       if (drive != null && Std.isOfType(drive, StepperDrive)) {
         // A step of the rotor is 2 pi / full steps radians of the actuator, which the transmission scales to the joint.
-        var ratio = switch motor.transmission { case SimpleTransmission(_, ratio, _): Math.abs(ratio); }
+        var ratio = switch motor.transmission {
+          case SimpleTransmission(_, ratio, _):
+            Math.abs(ratio);
+        }
         return STEPPER_BOUND_STEPS * 2.0 * Math.PI / cast(drive, StepperDrive).fullStepsPerRevolution / ratio;
       }
     }
@@ -155,11 +167,22 @@ class EncoderMonitor {
       var stepper = motor.drive != null && Std.isOfType(motor.drive, StepperDrive);
       var steps = 0.0;
       if (stepper) {
-        var ratio = switch motor.transmission { case SimpleTransmission(_, ratio, _): Math.abs(ratio); }
+        var ratio = switch motor.transmission {
+          case SimpleTransmission(_, ratio, _):
+            Math.abs(ratio);
+        }
         steps = Math.abs(error) * ratio / (2.0 * Math.PI / cast(motor.drive, StepperDrive).fullStepsPerRevolution);
       }
-      findings.push(new EncoderFinding(stepper ? EncoderFindingKind.LostSteps : EncoderFindingKind.FollowingError, encoder.id,
-        encoder.joint, motor.id, error, bound[index], steps, timeSeconds));
+      findings.push(new EncoderFinding(
+        stepper ? EncoderFindingKind.LostSteps : EncoderFindingKind.FollowingError,
+        encoder.id,
+        encoder.joint,
+        motor.id,
+        error,
+        bound[index],
+        steps,
+        timeSeconds
+      ));
     }
   }
 
@@ -167,9 +190,12 @@ class EncoderMonitor {
   public function faults():Bool return findings.length > 0;
 
   /** The path error a load-side (or any) encoder has measured so far: its latest, worst and RMS error against the command, in joint units. */
-  public function pathError(encoderId:String):{last:Float, peak:Float, rms:Float} {
-    for (index in 0...readings.length) if (readings[index].encoder.id == encoderId)
-      return {last: lastError[index], peak: peakError[index], rms: samples[index] == 0 ? 0.0 : Math.sqrt(squares[index] / samples[index])};
+  public function pathError(encoderId:String): {last: Float, peak: Float, rms: Float} {
+    for (index in 0...readings.length) if (readings[index].encoder.id == encoderId) return {
+      last: lastError[index],
+      peak: peakError[index],
+      rms: samples[index] == 0 ? 0.0 : Math.sqrt(squares[index] / samples[index])
+    };
     throw 'Unknown encoder $encoderId';
   }
 

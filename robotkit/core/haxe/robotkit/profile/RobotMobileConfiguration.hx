@@ -14,10 +14,10 @@ class RobotMobileConfiguration {
     drive:RobotDriveConfiguration,
     maxLinearSpeed:Float,
     maxAngularSpeed:Float,
-    ? maxLinearAcceleration:Float = 1.0e300,
-    ? maxAngularAcceleration:Float = 1.0e300,
-    ? footprintLength:Float,
-    ? footprintWidth:Float
+    ?maxLinearAcceleration:Float = 1.0e300,
+    ?maxAngularAcceleration:Float = 1.0e300,
+    ?footprintLength:Float,
+    ?footprintWidth:Float
   ) {
     this.drive = drive;
     this.maxLinearSpeed = maxLinearSpeed;

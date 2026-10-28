@@ -14,8 +14,8 @@ class JointGroup {
   final limits:Array<JointLimits>;
 
   public function new(jointIds:Array<JointId>, limits:Array<JointLimits>) {
-    if (jointIds == null || limits == null || jointIds.length == 0 || jointIds.length != limits.length)
-      throw "Joint group requires matching, non-empty joint ID and limit lists";
+    if (jointIds == null || limits == null || jointIds.length == 0
+      || jointIds.length != limits.length) throw "Joint group requires matching, non-empty joint ID and limit lists";
     var seen = new Map<String, Bool>();
     for (id in jointIds) {
       if (id == null || id.length == 0) throw "Joint group entries require a non-empty joint ID";
@@ -35,8 +35,8 @@ class JointGroup {
 
   /** Clamps each value to its joint's limits; leaves unlimited joints (lower >= upper) untouched. */
   public function clamp(q:Array<Float>):Array<Float> {
-    if (q == null || q.length != limits.length)
-      throw 'Joint group requires ${limits.length} values, got ${q == null ? 0 : q.length}';
+    if (q == null || q.length
+      != limits.length) throw 'Joint group requires ${limits.length} values, got ${q == null ? 0 : q.length}';
     var result:Array<Float> = [];
     for (index in 0...q.length) {
       var limit = limits[index];

@@ -15,9 +15,9 @@ class Obstacle {
   public final halfLengthMeters:Float;
 
   public function new(detection:Detection, radiusMeters:Float, ?halfLengthMeters:Float = 0.0) {
-    if (detection == null || !Math.isFinite(radiusMeters) || radiusMeters <= 0.0 ||
-        !Math.isFinite(halfLengthMeters) || halfLengthMeters < 0.0)
-      throw "Obstacle requires a detection, a positive finite radius, and a nonnegative half length";
+    if (detection == null
+      || !Math.isFinite(radiusMeters) || radiusMeters <= 0.0 || !Math.isFinite(halfLengthMeters) || halfLengthMeters
+      < 0.0) throw "Obstacle requires a detection, a positive finite radius, and a nonnegative half length";
     this.detection = detection;
     this.radiusMeters = radiusMeters;
     this.halfLengthMeters = halfLengthMeters;
@@ -41,22 +41,42 @@ class Obstacle {
     return [for (index in 0...count) {
       var along = (count == 1 ? 0.0 : (index / (count - 1) * 2.0 - 1.0)) * halfLengthMeters;
       new Pose2(pose.x + Math.cos(pose.yaw) * along, pose.y + Math.sin(pose.yaw) * along, pose.yaw);
-    }];
+    }
+    ];
   }
 
   /** Shortest distance between this obstacle's segment and `other`'s (zero when they cross). */
   public function gapTo(other:Obstacle):Float {
     var a = ends(), b = other.ends();
     if (crosses(a[0], a[1], b[0], b[1])) return 0.0;
-    return Math.min(Math.min(pointToSegment(a[0], b[0], b[1]), pointToSegment(a[1], b[0], b[1])),
-      Math.min(pointToSegment(b[0], a[0], a[1]), pointToSegment(b[1], a[0], a[1])));
+    return Math.min(
+      Math.min(pointToSegment(a[0], b[0], b[1]), pointToSegment(a[1], b[0], b[1])),
+      Math.min(
+        pointToSegment(
+          b[0],
+          a[0],
+          a[1]
+        ),
+        pointToSegment(
+          b[1],
+          a[0],
+          a[1]
+        )
+      )
+    );
   }
 
   /** Distance from a point to the segment from `a` to `b`. */
   public static function pointToSegment(point:Pose2, a:Pose2, b:Pose2):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var lengthSquared = dx * dx + dy * dy;
-    var t = lengthSquared <= 1e-18 ? 0.0 : Math.max(0.0, Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+    var t = lengthSquared <= 1e-18 ? 0.0 : Math.max(
+      0.0,
+      Math.min(
+        1.0,
+        ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared
+      )
+    );
     var ex = a.x + t * dx - point.x, ey = a.y + t * dy - point.y;
     return Math.sqrt(ex * ex + ey * ey);
   }

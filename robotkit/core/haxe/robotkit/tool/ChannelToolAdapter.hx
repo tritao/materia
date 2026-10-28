@@ -7,7 +7,8 @@ import robotkit.execution.ProcessEventValue;
 class ChannelToolAdapter {
   final handlers:Map<String, FiredProcessEvent -> Void> = new Map();
 
-  public function new() {}
+  public function new() {
+  }
 
   /** A true output closes the gripper; false opens it. */
   public function bindGripper(channel:String, gripper:Gripper):Void {
@@ -15,7 +16,8 @@ class ChannelToolAdapter {
     bind(channel, function(event) {
       if (digital(event.value, "Gripper")) gripper.close(event.scheduledTimeNs);
       else gripper.open(event.scheduledTimeNs);
-    });
+    }
+    );
   }
 
   /** A true output enables vacuum; false releases it. */
@@ -24,7 +26,8 @@ class ChannelToolAdapter {
     bind(channel, function(event) {
       if (digital(event.value, "Vacuum")) vacuum.enable(event.scheduledTimeNs);
       else vacuum.disable(event.scheduledTimeNs);
-    });
+    }
+    );
   }
 
   /** A true output holds the changer locked; false requests release. */
@@ -33,46 +36,44 @@ class ChannelToolAdapter {
     bind(channel, function(event) {
       if (digital(event.value, "Changer lock")) changerLock.lock(event.scheduledTimeNs);
       else changerLock.unlock(event.scheduledTimeNs);
-    });
+    }
+    );
   }
 
   public function bindSprayerFlow(channel:String, sprayer:Sprayer, onFlow:Float):Void {
-    if (sprayer == null || !Math.isFinite(onFlow) || onFlow < 0.0)
-      throw "Invalid sprayer channel binding";
-    bind(channel, function(event) sprayer.setFlow(number(event.value, onFlow),
-      event.scheduledTimeNs));
+    if (sprayer == null || !Math.isFinite(onFlow) || onFlow < 0.0) throw "Invalid sprayer channel binding";
+    bind(channel, function(event) sprayer.setFlow(number(event.value, onFlow), event.scheduledTimeNs));
   }
 
   public function bindSprayerPressure(channel:String, sprayer:Sprayer, onPressure:Float):Void {
-    if (sprayer == null || !Math.isFinite(onPressure) || onPressure < 0.0)
-      throw "Invalid sprayer pressure binding";
-    bind(channel, function(event) sprayer.setPressure(number(event.value, onPressure),
-      event.scheduledTimeNs));
+    if (sprayer == null || !Math.isFinite(onPressure) || onPressure < 0.0) throw "Invalid sprayer pressure binding";
+    bind(channel, function(event) sprayer.setPressure(number(event.value, onPressure), event.scheduledTimeNs));
   }
 
   public function bindSurfaceTool(channel:String, tool:SurfaceTool):Void {
     if (tool == null) throw "Surface tool binding requires a tool";
     bind(channel, function(event) {
       var enabled = switch event.value {
-        case Digital(value): value;
-        case Analog(value): value > 0.0;
-        case Process(_, _): throw "Surface tool needs a digital or analog event";
+        case Digital(value):
+          value;
+        case Analog(value):
+          value > 0.0;
+        case Process(_, _):
+          throw "Surface tool needs a digital or analog event";
       };
       if (enabled) tool.enable(event.scheduledTimeNs);
       else tool.disable(event.scheduledTimeNs);
-    });
+    }
+    );
   }
 
   public function bindSanderSpeed(channel:String, sander:Sander, onRpm:Float):Void {
-    if (sander == null || !Math.isFinite(onRpm) || onRpm < 0.0)
-      throw "Invalid sander channel binding";
-    bind(channel, function(event) sander.setSpeed(number(event.value, onRpm),
-      event.scheduledTimeNs));
+    if (sander == null || !Math.isFinite(onRpm) || onRpm < 0.0) throw "Invalid sander channel binding";
+    bind(channel, function(event) sander.setSpeed(number(event.value, onRpm), event.scheduledTimeNs));
   }
 
   public function bind(channel:String, handler:FiredProcessEvent -> Void):Void {
-    if (channel == null || channel.length == 0 || handler == null)
-      throw "Invalid process channel binding";
+    if (channel == null || channel.length == 0 || handler == null) throw "Invalid process channel binding";
     if (handlers.exists(channel)) throw "Duplicate process channel binding";
     handlers.set(channel, handler);
   }
@@ -91,16 +92,21 @@ class ChannelToolAdapter {
 
   static function number(value:ProcessEventValue, onValue:Float):Float {
     return switch value {
-      case Digital(enabled): enabled ? onValue : 0.0;
-      case Analog(number): number;
-      case Process(_, _): throw "Numeric tool channel needs a digital or analog event";
+      case Digital(enabled):
+        enabled ? onValue : 0.0;
+      case Analog(number):
+        number;
+      case Process(_, _):
+        throw "Numeric tool channel needs a digital or analog event";
     };
   }
 
   static function digital(value:ProcessEventValue, capability:String):Bool {
     return switch value {
-      case Digital(enabled): enabled;
-      case Analog(_), Process(_, _): throw '$capability channel needs a digital event';
+      case Digital(enabled):
+        enabled;
+      case Analog(_), Process(_, _):
+        throw '$capability channel needs a digital event';
     };
   }
 }

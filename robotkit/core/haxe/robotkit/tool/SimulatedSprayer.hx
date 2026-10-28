@@ -9,11 +9,11 @@ class SimulatedSprayer implements Sprayer {
   var flowState = 0.0;
   var pressureState = 0.0;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function setFlow(litersPerMinute:Float, timestampNs:Int64):Void {
-    if (!Math.isFinite(litersPerMinute) || litersPerMinute < 0.0)
-      throw "Sprayer flow must be finite and non-negative";
+    if (!Math.isFinite(litersPerMinute) || litersPerMinute < 0.0) throw "Sprayer flow must be finite and non-negative";
     flowState = litersPerMinute;
     record(timestampNs);
   }
@@ -28,8 +28,7 @@ class SimulatedSprayer implements Sprayer {
 
   public function pressure():Float return pressureState;
 
-  function record(timestampNs:Int64):Void
-    history.push(new SprayerEvent(flowState, pressureState, timestampNs));
+  function record(timestampNs:Int64):Void history.push(new SprayerEvent(flowState, pressureState, timestampNs));
 }
 
 /** One recorded `SimulatedSprayer` state change. */

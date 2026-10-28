@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** One transport representation inside an atomic JointTargets message. */
-@:wire
-class JointTargetValue {
+@:wire class JointTargetValue {
   @:id(1) public var joint:Int;
   /** 1=position, 2=velocity, 3=effort. */
   @:id(2) public var mode:Int;

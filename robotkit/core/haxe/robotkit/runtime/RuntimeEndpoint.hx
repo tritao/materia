@@ -19,10 +19,24 @@ interface RuntimeEndpoint {
   /** Configure the authoritative admission gate before motion starts. */
   public function requireReference(joint:Int, required:Bool):Int;
   public function limitInput(joint:Int, active:Bool):Int;
-  public function submitPlanArrays(header:rk_plan_header, starts:Array<Int64>, durations:Array<Int64>,
-    degrees:Array<Int>, coefficients:Array<Float>, joints:Array<Int>, events:Array<rk_timed_event>):Int;
-  public function submitPlanSpan(header:rk_plan_header, starts:NativeSpan<Int64>, durations:NativeSpan<Int64>,
-    degrees:NativeSpan<Int>, coefficients:NativeSpan<Float>, joints:NativeSpan<Int>, events:Array<rk_timed_event>):Int;
+  public function submitPlanArrays(
+    header:rk_plan_header,
+    starts:Array<Int64>,
+    durations:Array<Int64>,
+    degrees:Array<Int>,
+    coefficients:Array<Float>,
+    joints:Array<Int>,
+    events:Array<rk_timed_event>
+  ):Int;
+  public function submitPlanSpan(
+    header:rk_plan_header,
+    starts:NativeSpan<Int64>,
+    durations:NativeSpan<Int64>,
+    degrees:NativeSpan<Int>,
+    coefficients:NativeSpan<Float>,
+    joints:NativeSpan<Int>,
+    events:Array<rk_timed_event>
+  ):Int;
   public function pollEvents(batch:rk_event_record_batch):Int;
   public function channelValue(channel:String, value:rk_event_value):Int;
   public function writeOutput(channel:String, value:rk_event_value):Int;

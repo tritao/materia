@@ -48,16 +48,16 @@ class GravityEstimator {
    * down vector.
    */
   public function update(angularVelocity:Array<Float>, specificForce:Array<Float>, seconds:Float):Array<Float> {
-    var norm = Math.sqrt(specificForce[0] * specificForce[0] + specificForce[1] * specificForce[1]
-      + specificForce[2] * specificForce[2]);
+    var norm = Math.sqrt(specificForce[0]
+      * specificForce[0] + specificForce[1] * specificForce[1] + specificForce[2] * specificForce[2]);
     var measured = norm > 1e-6 ? [-specificForce[0] / norm, -specificForce[1] / norm, -specificForce[2] / norm] : null;
     if (!started) {
       // Start from the accelerometer only if it reads about 1 g and the body is still: a first sample taken
       // while the robot settles or is being handled says nothing about which way is down,
       // and the filter then starts upright and lets the accelerometer pull it in.
       if (measured != null) {
-        var rate = Math.sqrt(angularVelocity[0] * angularVelocity[0] + angularVelocity[1] * angularVelocity[1]
-          + angularVelocity[2] * angularVelocity[2]);
+        var rate = Math.sqrt(angularVelocity[0]
+          * angularVelocity[0] + angularVelocity[1] * angularVelocity[1] + angularVelocity[2] * angularVelocity[2]);
         if (Math.abs(norm - gravity) <= trust * gravity && rate <= stillRate) down = measured;
         started = true;
       }
@@ -73,15 +73,21 @@ class GravityEstimator {
       var angle = -speed * seconds;
       var axis = [w[0] / speed, w[1] / speed, w[2] / speed];
       var c = Math.cos(angle), sn = Math.sin(angle);
-      var cross = [axis[1] * down[2] - axis[2] * down[1], axis[2] * down[0] - axis[0] * down[2], axis[0] * down[1] - axis[1] * down[0]];
+      var cross = [
+        axis[1] * down[2] - axis[2] * down[1],
+        axis[2] * down[0] - axis[0] * down[2],
+        axis[0] * down[1] - axis[1] * down[0]
+      ];
       var along = axis[0] * down[0] + axis[1] * down[1] + axis[2] * down[2];
       for (i in 0...3) rotated[i] = down[i] * c + cross[i] * sn + axis[i] * along * (1.0 - c);
     }
     if (measured != null) {
       // Trust the accelerometer only while the robot is still: walking accelerates the body in step
       // with its bobbing, and the accelerometer then reads a gravity that leans with the gait.
-      var weight = Math.max(0.0, 1.0 - Math.abs(norm - gravity) / (trust * gravity))
-        * Math.max(0.0, 1.0 - speed / stillRate);
+      var weight = Math.max(0.0, 1.0 - Math.abs(norm - gravity) / (trust * gravity)) * Math.max(
+        0.0,
+        1.0 - speed / stillRate
+      );
       var pull = Math.min(1.0, gain * seconds * weight);
       for (i in 0...3) rotated[i] += pull * (measured[i] - rotated[i]);
     }

@@ -5,7 +5,8 @@ class SkillLifecycle {
   var currentStatus:SkillStatus = Idle;
   var currentResult:Null<SkillResult> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function begin():Void {
     currentStatus = Running;
@@ -20,8 +21,10 @@ class SkillLifecycle {
   public function result():Null<SkillResult> return currentResult;
 
   public function isRunning():Bool return switch currentStatus {
-    case Running: true;
-    case _: false;
+    case Running:
+      true;
+    case _:
+      false;
   };
 
   function finish(value:SkillStatus, message:String):Void {

@@ -79,30 +79,30 @@ class RobotSnapshot {
     this.id = id;
     this.sourceSequence = sourceSequence;
     this.sourceTimestampNs = sourceTimestampNs;
-    this.receivedTimestampNs = receivedTimestampNs == null
-      ? Int64.ofInt(0)
-      : receivedTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null ? Int64.ofInt(0) : receivedTimestampNs;
     this.sourceClockId = sourceClockId;
     this.receivedClockId = receivedClockId;
     this.positions = new ImmutableFloatArray(positions);
     this.velocities = new ImmutableFloatArray(velocities);
     this.efforts = new ImmutableFloatArray(efforts);
     var frames = sensors == null ? [] : sensors;
-    this.sensors = new ImmutableSensorArray([for (frame in frames) if (robotkit.streams.SensorStreamSample.smallControlFrame(frame)) frame]);
-    sequences = streamSequences == null
-      ? [for (frame in frames) new robotkit.streams.StreamSequence(frame.sensorId, frame.kind, frame.sequence, frame.sourceClockId)]
-      : streamSequences.copy();
+    this.sensors = new ImmutableSensorArray([for (frame in frames) if (robotkit
+      .streams.SensorStreamSample.smallControlFrame(frame)) frame]);
+    sequences = streamSequences == null ? [for (frame in frames) new robotkit.streams.StreamSequence(
+      frame.sensorId,
+      frame.kind,
+      frame.sequence,
+      frame.sourceClockId
+    )] : streamSequences.copy();
     this.mode = mode;
     this.faultCode = faultCode;
     this.safety = safety;
     this.trajectoryQueueDepth = trajectoryQueueDepth == null ? 0 : trajectoryQueueDepth;
     this.trajectoryActive = trajectoryActive == true;
     this.trajectoryTimeNs = trajectoryTimeNs == null ? Int64.ofInt(0) : trajectoryTimeNs;
-    this.trajectoryDurationNs = trajectoryDurationNs == null
-      ? Int64.ofInt(0) : trajectoryDurationNs;
+    this.trajectoryDurationNs = trajectoryDurationNs == null ? Int64.ofInt(0) : trajectoryDurationNs;
     this.trajectoryTag = trajectoryTag == null ? Int64.ofInt(0) : trajectoryTag;
-    this.trajectoryTagTimeNs = trajectoryTagTimeNs == null
-      ? Int64.ofInt(0) : trajectoryTagTimeNs;
+    this.trajectoryTagTimeNs = trajectoryTagTimeNs == null ? Int64.ofInt(0) : trajectoryTagTimeNs;
     this.sessionState = sessionState;
     this.activePlanId = activePlanId == null ? Int64.ofInt(0) : activePlanId;
     this.committedUntilNs = committedUntilNs == null ? Int64.ofInt(0) : committedUntilNs;

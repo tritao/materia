@@ -45,17 +45,18 @@ class Costmap2 {
   var touchedCells:Array<Int> = [];
   var touchedFlags:Array<Bool>;
 
-  public function new(grid:OccupancyGrid2, footprintRadiusMeters:Float,
-      ?unknownIsBlocked:Bool = true,
-      ?inflationCostDistanceMeters:Float = 0.5,
-      ?inflationCostWeight:Float = 2.0, ?obstacleMemorySeconds:Float = 0.0) {
-    if (grid == null || !Math.isFinite(footprintRadiusMeters) ||
-        footprintRadiusMeters < 0.0 ||
-        !Math.isFinite(inflationCostDistanceMeters) ||
-        inflationCostDistanceMeters < 0.0 ||
-        !Math.isFinite(inflationCostWeight) || inflationCostWeight < 0.0 ||
-        !Math.isFinite(obstacleMemorySeconds) || obstacleMemorySeconds < 0.0)
-      throw "Costmap2 requires a grid and finite nonnegative inflation settings";
+  public function new(
+    grid:OccupancyGrid2,
+    footprintRadiusMeters:Float,
+    ?unknownIsBlocked:Bool = true,
+    ?inflationCostDistanceMeters:Float = 0.5,
+    ?inflationCostWeight:Float = 2.0,
+    ?obstacleMemorySeconds:Float = 0.0
+  ) {
+    if (grid == null || !Math.isFinite(footprintRadiusMeters)
+      || footprintRadiusMeters < 0.0 || !Math.isFinite(inflationCostDistanceMeters) || inflationCostDistanceMeters < 0.0
+      || !Math.isFinite(inflationCostWeight) || inflationCostWeight < 0.0 || !Math.isFinite(obstacleMemorySeconds)
+      || obstacleMemorySeconds < 0.0) throw "Costmap2 requires a grid and finite nonnegative inflation settings";
     this.grid = grid;
     this.footprintRadiusMeters = footprintRadiusMeters;
     this.unknownIsBlocked = unknownIsBlocked;
@@ -69,8 +70,8 @@ class Costmap2 {
   public function refresh():Void {
     for (obstacle in dynamicObstacles) {
       if (obstacle == null) throw "Costmap2 obstacles cannot contain null";
-      if (obstacle.detection.frameId != grid.frameId)
-        throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
+      if (obstacle.detection.frameId != grid
+        .frameId) throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
     }
     var count = grid.width * grid.height;
     blockedValues = [for (_ in 0...count) false];
@@ -79,11 +80,15 @@ class Costmap2 {
     var halfCellDiagonal = grid.resolutionMeters * Math.sqrt(2.0) * 0.5;
     for (y in 0...grid.height) for (x in 0...grid.width) {
       var value = grid.cell(x, y);
-      if (value == OccupancyCell.Occupied ||
-          (unknownIsBlocked && value == OccupancyCell.Unknown)) {
-        rasterizeObstacle((x + 0.5) * grid.resolutionMeters,
-          (y + 0.5) * grid.resolutionMeters, (x + 0.5) * grid.resolutionMeters,
-          (y + 0.5) * grid.resolutionMeters, halfCellDiagonal, false);
+      if (value == OccupancyCell.Occupied || (unknownIsBlocked && value == OccupancyCell.Unknown)) {
+        rasterizeObstacle(
+          (x + 0.5) * grid.resolutionMeters,
+          (y + 0.5) * grid.resolutionMeters,
+          (x + 0.5) * grid.resolutionMeters,
+          (y + 0.5) * grid.resolutionMeters,
+          halfCellDiagonal,
+          false
+        );
       }
     }
     staticBlocked = blockedValues;
@@ -122,8 +127,8 @@ class Costmap2 {
     if (obstacles == null) throw "Costmap2 obstacles cannot be null";
     for (obstacle in obstacles) {
       if (obstacle == null) throw "Costmap2 obstacles cannot contain null";
-      if (obstacle.detection.frameId != grid.frameId)
-        throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
+      if (obstacle.detection.frameId != grid
+        .frameId) throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
     }
     if (sameObstacles(obstacles)) return;
     dynamicObstacles = obstacles.copy();
@@ -137,7 +142,8 @@ class Costmap2 {
    * the elapsed durations, so it follows the caller's (simulation) clock.
    */
   public function senseObstacles(seen:Array<Obstacle>, ?view:FreeSpaceView, ?elapsedSeconds:Float = 0.0):Void {
-    if (!Math.isFinite(elapsedSeconds) || elapsedSeconds < 0.0) throw "Costmap2 elapsed time must be finite and nonnegative";
+    if (!Math.isFinite(elapsedSeconds)
+      || elapsedSeconds < 0.0) throw "Costmap2 elapsed time must be finite and nonnegative";
     clockSeconds += elapsedSeconds;
     if (obstacleMemorySeconds <= 0.0) {
       setDynamicObstacles(seen);
@@ -147,8 +153,10 @@ class Costmap2 {
     for (old in remembered) {
       if (clockSeconds - old.seenAt > obstacleMemorySeconds) continue;
       var resighted = false;
-      for (obstacle in seen)
-        if (obstacle.gapTo(old.obstacle) < obstacle.radiusMeters + old.obstacle.radiusMeters) { resighted = true; break; }
+      for (obstacle in seen) if (obstacle.gapTo(old.obstacle) < obstacle.radiusMeters + old.obstacle.radiusMeters) {
+        resighted = true;
+        break;
+      }
       if (resighted) continue;
       if (view != null && seenThrough(old.obstacle, view)) continue;
       next.push(old);
@@ -159,8 +167,7 @@ class Costmap2 {
 
   /** True when `view` sees free space past every part of the obstacle's capsule. */
   static function seenThrough(obstacle:Obstacle, view:FreeSpaceView):Bool {
-    for (at in obstacle.disks(obstacle.radiusMeters))
-      if (!view.freeAt(at.x, at.y, obstacle.radiusMeters)) return false;
+    for (at in obstacle.disks(obstacle.radiusMeters)) if (!view.freeAt(at.x, at.y, obstacle.radiusMeters)) return false;
     return true;
   }
 
@@ -177,10 +184,9 @@ class Costmap2 {
     if (next.length != dynamicObstacles.length) return false;
     for (index in 0...next.length) {
       var a = next[index], b = dynamicObstacles[index];
-      if (a.radiusMeters != b.radiusMeters || a.halfLengthMeters != b.halfLengthMeters ||
-          a.detection.pose.x != b.detection.pose.x || a.detection.pose.y != b.detection.pose.y ||
-          a.detection.pose.yaw != b.detection.pose.yaw)
-        return false;
+      if (a.radiusMeters != b.radiusMeters
+        || a.halfLengthMeters != b.halfLengthMeters || a.detection.pose.x != b.detection.pose.x
+        || a.detection.pose.y != b.detection.pose.y || a.detection.pose.yaw != b.detection.pose.yaw) return false;
     }
     return true;
   }
@@ -207,8 +213,8 @@ class Costmap2 {
   }
 
   /** Blocks the cells within an obstacle capsule (the segment a to b, grown by `obstacleRadiusMeters`) and its robot-sized margin. */
-  function rasterizeObstacle(ax:Float, ay:Float, bx:Float, by:Float, obstacleRadiusMeters:Float,
-      dynamicLayer:Bool):Void {
+  function rasterizeObstacle(ax:Float,
+    ay:Float, bx:Float, by:Float, obstacleRadiusMeters:Float, dynamicLayer:Bool):Void {
     var resolution = grid.resolutionMeters;
     var cellRadius = resolution * Math.sqrt(2.0) * 0.5;
     var lethalRadius = obstacleRadiusMeters + footprintRadiusMeters;
@@ -227,8 +233,13 @@ class Costmap2 {
     for (y in minY...maxY + 1) for (x in minX...maxX + 1) {
       var centerX = (x + 0.5) * resolution;
       var centerY = (y + 0.5) * resolution;
-      var t = lengthSquared <= 1e-18 ? 0.0
-        : Math.max(0.0, Math.min(1.0, ((centerX - ax) * sx + (centerY - ay) * sy) / lengthSquared));
+      var t = lengthSquared <= 1e-18 ? 0.0 : Math.max(
+        0.0,
+        Math.min(
+          1.0,
+          ((centerX - ax) * sx + (centerY - ay) * sy) / lengthSquared
+        )
+      );
       var dx = centerX - (ax + t * sx);
       var dy = centerY - (ay + t * sy);
       var distance = Math.sqrt(dx * dx + dy * dy);
@@ -241,9 +252,11 @@ class Costmap2 {
       } else if (inflationCostDistanceMeters > 0.0) {
         var clearance = distance - hardRadius;
         if (clearance < inflationCostDistanceMeters) {
-          var cost = inflationCostWeight *
-            (1.0 - clearance / inflationCostDistanceMeters);
-          if (cost > costs[index]) { costs[index] = cost; changed = true; }
+          var cost = inflationCostWeight * (1.0 - clearance / inflationCostDistanceMeters);
+          if (cost > costs[index]) {
+            costs[index] = cost;
+            changed = true;
+          }
         }
       }
       if (changed && dynamicLayer && !touchedFlags[index]) {

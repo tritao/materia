@@ -7,8 +7,8 @@ class Twist2 {
   public final lateral:Float;
 
   public function new(linear:Float = 0.0, angular:Float = 0.0, lateral:Float = 0.0) {
-    if (!Math.isFinite(linear) || !Math.isFinite(angular) || !Math.isFinite(lateral))
-      throw "Twist2 values must be finite";
+    if (!Math.isFinite(linear)
+      || !Math.isFinite(angular) || !Math.isFinite(lateral)) throw "Twist2 values must be finite";
     this.linear = linear;
     this.angular = angular;
     this.lateral = lateral;

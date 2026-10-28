@@ -37,22 +37,24 @@ class MotionGuard {
   var observations:Null<PerceptionSnapshot> = null;
   var attached:Bool = true;
 
-  public function new(navigation:Navigation, ?footprint:Footprint,
-      ?reactionTimeSeconds:Float = 0.2,
-      ?decelerationMetersPerSecondSquared:Float,
-      ?marginMeters:Float = 0.1,
-      ?slowdownDistanceMeters:Float = 0.5, ?costmap:Costmap2) {
+  public function new(
+    navigation:Navigation,
+    ?footprint:Footprint,
+    ?reactionTimeSeconds:Float = 0.2,
+    ?decelerationMetersPerSecondSquared:Float,
+    ?marginMeters:Float = 0.1,
+    ?slowdownDistanceMeters:Float = 0.5,
+    ?costmap:Costmap2
+  ) {
     if (navigation == null) throw "MotionGuard requires Navigation";
     var selectedFootprint = footprint == null ? navigation.base.footprint : footprint;
     if (selectedFootprint == null) throw "MotionGuard requires a robot footprint";
-    var chosenDeceleration = decelerationMetersPerSecondSquared == null
-      ? navigation.base.motionLimits.maxLinearAcceleration
-      : cast decelerationMetersPerSecondSquared;
-    if (!Math.isFinite(reactionTimeSeconds) || reactionTimeSeconds < 0.0 ||
-        !Math.isFinite(chosenDeceleration) || chosenDeceleration <= 0.0 ||
-        !Math.isFinite(marginMeters) || marginMeters < 0.0 ||
-        !Math.isFinite(slowdownDistanceMeters) || slowdownDistanceMeters < 0.0)
-      throw "MotionGuard requires finite nonnegative margins and positive braking limits";
+    var chosenDeceleration = decelerationMetersPerSecondSquared
+      == null ? navigation.base.motionLimits.maxLinearAcceleration : cast decelerationMetersPerSecondSquared;
+    if (!Math.isFinite(reactionTimeSeconds) || reactionTimeSeconds < 0.0
+      || !Math.isFinite(chosenDeceleration) || chosenDeceleration <= 0.0 || !Math.isFinite(marginMeters)
+      || marginMeters < 0.0 || !Math.isFinite(slowdownDistanceMeters) || slowdownDistanceMeters
+      < 0.0) throw "MotionGuard requires finite nonnegative margins and positive braking limits";
     this.navigation = navigation;
     this.footprint = cast selectedFootprint;
     this.reactionTimeSeconds = reactionTimeSeconds;
@@ -61,22 +63,23 @@ class MotionGuard {
     this.slowdownDistanceMeters = slowdownDistanceMeters;
     this.costmap = costmap;
     points = this.footprint.vertices();
-    if (navigation.hasCommandFilter())
-      throw "Navigation already has a command filter";
+    if (navigation.hasCommandFilter()) throw "Navigation already has a command filter";
     navigation.setCommandFilter(filterCommand);
   }
 
   /** Updates the obstacle set and advances one navigation control iteration. */
-  public function update(perception:PerceptionSnapshot,
-      durationSeconds:Float):MotionGuardState {
+  public function update(perception:PerceptionSnapshot, durationSeconds:Float):MotionGuardState {
     updatePerception(perception);
     navigation.update(durationSeconds);
     return state;
   }
 
   /** Updates localization and obstacle data from the same robot observation. */
-  public function updateObservation(snapshot:robotkit.core.RobotSnapshot,
-      perception:PerceptionSnapshot, durationSeconds:Float):MotionGuardState {
+  public function updateObservation(
+    snapshot:robotkit.core.RobotSnapshot,
+    perception:PerceptionSnapshot,
+    durationSeconds:Float
+  ):MotionGuardState {
     updatePerception(perception);
     navigation.updateObservation(snapshot, durationSeconds);
     return state;
@@ -100,8 +103,8 @@ class MotionGuard {
   }
 
   /** What the guard judges: the costmap's dynamic layer, which remembers, when it has one; else the latest observation. */
-  function obstacleSet(latest:PerceptionSnapshot):Array<Obstacle>
-    return costmap == null ? latest.obstacles() : costmap.dynamicLayer();
+  function obstacleSet(latest:PerceptionSnapshot):Array<Obstacle
+    > return costmap == null ? latest.obstacles() : costmap.dynamicLayer();
 
   function filterCommand(desired:Twist2):Twist2 return evaluate(desired);
 
@@ -109,16 +112,14 @@ class MotionGuard {
     if (!attached) return desired;
     if (observations == null) return block("Perception observation is unavailable");
     var estimate:Null<LocalizationState> = navigation.localization.state();
-    if (estimate == null || estimate.quality == LocalizationQuality.Invalid)
-      return block("Localization is unavailable or invalid");
+    if (estimate == null
+      || estimate.quality == LocalizationQuality.Invalid) return block("Localization is unavailable or invalid");
     var localization:LocalizationState = cast estimate;
 
     var current = navigation.base.currentCommand();
-    var direction = desired.linear < -1e-9 ||
-      (Math.abs(desired.linear) <= 1e-9 && current.linear < -1e-9) ? -1.0 : 1.0;
+    var direction = desired.linear < -1e-9 || (Math.abs(desired.linear) <= 1e-9 && current.linear < -1e-9) ? -1.0 : 1.0;
     var speed = Math.max(Math.abs(desired.linear), Math.abs(current.linear));
-    var envelope = new StoppingEnvelope(speed, reactionTimeSeconds,
-      decelerationMetersPerSecondSquared);
+    var envelope = new StoppingEnvelope(speed, reactionTimeSeconds, decelerationMetersPerSecondSquared);
     var frontExtent = 0.0;
     var rearExtent = 0.0;
     var lateralExtent = 0.0;
@@ -131,8 +132,8 @@ class MotionGuard {
 
     // A base that is not translating only turns: it sweeps its footprint's circumscribed circle, whichever
     // way the obstacle lies, and can turn away from one ahead of it while keeping clear of it.
-    var turning = Math.abs(desired.linear) <= 1e-9 && Math.abs(current.linear) <= 1e-9 &&
-      Math.abs(desired.lateral) <= 1e-9;
+    var turning = Math.abs(desired.linear) <= 1e-9
+      && Math.abs(current.linear) <= 1e-9 && Math.abs(desired.lateral) <= 1e-9;
     var nearest:Null<Obstacle> = null;
     var nearestClearance = 1.0e300;
     var nearestSweep = 1.0e300;
@@ -149,8 +150,8 @@ class MotionGuard {
           return block('Obstacle ${obstacle.detection.id} has unresolved frame ${obstacle.detection.frameId}');
         }
 
-        var sweepClearance = Math.sqrt(localPose.x * localPose.x + localPose.y * localPose.y) -
-          radius - footprint.radius;
+        var sweepClearance = Math.sqrt(localPose.x
+          * localPose.x + localPose.y * localPose.y) - radius - footprint.radius;
         if (sweepClearance < nearestSweep) nearestSweep = sweepClearance;
         if (turning) {
           if (sweepClearance < nearestClearance) {
@@ -160,10 +161,8 @@ class MotionGuard {
           continue;
         }
         var along = localPose.x * direction;
-        if (Math.abs(localPose.y) > lateralExtent + radius + marginMeters)
-          continue;
-        if (along + radius < -rearExtent - marginMeters)
-          continue;
+        if (Math.abs(localPose.y) > lateralExtent + radius + marginMeters) continue;
+        if (along + radius < -rearExtent - marginMeters) continue;
         var clearance = along - frontExtent - radius;
         if (clearance < nearestClearance) {
           nearest = obstacle;
@@ -177,8 +176,8 @@ class MotionGuard {
       return desired;
     }
     if (turning) {
-      if (nearestClearance <= marginMeters)
-        return block('Obstacle ${nearest.detection.id} is inside the turning margin');
+      if (nearestClearance
+        <= marginMeters) return block('Obstacle ${nearest.detection.id} is inside the turning margin');
       state = Clear;
       return desired;
     }

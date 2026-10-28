@@ -10,9 +10,8 @@ class TrajectorySample {
   public final twist:Twist2;
 
   public function new(timeFromStartSeconds:Float, pose:Pose2, twist:Twist2) {
-    if (!Math.isFinite(timeFromStartSeconds) || timeFromStartSeconds < 0.0 ||
-        pose == null || twist == null)
-      throw "Trajectory samples require a finite time, pose, and twist";
+    if (!Math.isFinite(timeFromStartSeconds) || timeFromStartSeconds < 0.0
+      || pose == null || twist == null) throw "Trajectory samples require a finite time, pose, and twist";
     this.timeFromStartSeconds = timeFromStartSeconds;
     this.pose = new Pose2(pose.x, pose.y, pose.yaw);
     this.twist = new Twist2(twist.linear, twist.angular, twist.lateral);

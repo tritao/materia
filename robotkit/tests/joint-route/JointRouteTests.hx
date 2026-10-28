@@ -29,13 +29,14 @@ class JointRouteTests {
     try JointRoute.plan([0.0, 0.0], to, [-1.0, -1.0], [1.0, 1.0], clear) catch (_:Dynamic) blocked = true;
     check(blocked, "A blocked start fails explicitly");
     var exhausted = false;
-    try JointRoute.plan(from, to, [-1.0, -1.0], [1.0, 1.0],
-      (a, b) -> a[0] == b[0] && a[1] == b[1], 8) catch (_:Dynamic) exhausted = true;
+    try JointRoute.plan(from,
+      to, [-1.0, -1.0], [1.0, 1.0], (a, b) -> a[0] == b[0] && a[1] == b[1], 8) catch (_:Dynamic) exhausted = true;
     check(exhausted, "Disconnected endpoints exhaust the bounded search explicitly");
-    var directed = JointRoute.plan(from, to, [-1.0, -1.0], [1.0, 1.0],
-      (a, b) -> b[0] >= a[0] && clear(a, b));
-    for (i in 1...directed.length)
-      check(directed[i][0] >= directed[i - 1][0] && clear(directed[i - 1], directed[i]), "Goal-tree edges respect execution direction");
+    var directed = JointRoute.plan(from, to, [-1.0, -1.0], [1.0, 1.0], (a, b) -> b[0] >= a[0] && clear(a, b));
+    for (i in 1...directed.length) check(
+      directed[i][0] >= directed[i - 1][0] && clear(directed[i - 1], directed[i]),
+      "Goal-tree edges respect execution direction"
+    );
     check(from[0] == -0.8 && to[0] == 0.8, "Input configurations are not mutated");
     Sys.println('Joint route: $assertions assertions passed');
   }

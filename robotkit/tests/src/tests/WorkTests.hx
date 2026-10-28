@@ -29,8 +29,10 @@ class WorkTests {
     var rectangle = rect(0.0, 0.0, 2.0, 1.0);
     var intervals = rectangle.scanlineIntervals(0.5);
     check(intervals.length == 1, "Scanline through a rectangle yields one interval");
-    check(approx(intervals[0][0], 0.0, 1e-9) && approx(intervals[0][1], 2.0, 1e-9),
-      "Scanline interval matches the rectangle's horizontal extent");
+    check(
+      approx(intervals[0][0], 0.0, 1e-9) && approx(intervals[0][1], 2.0, 1e-9),
+      "Scanline interval matches the rectangle's horizontal extent"
+    );
     check(rectangle.contains(new Point2(1.0, 0.5)), "Point inside the rectangle is contained");
     check(!rectangle.contains(new Point2(3.0, 0.5)), "Point outside the rectangle is not contained");
     check(approx(rectangle.area(), 2.0, 1e-9), "Rectangle area matches width times height");
@@ -42,7 +44,10 @@ class WorkTests {
     tree.add(surface.frameEdge());
     var lookup = tree.lookup("wall-1/panel", surface.surfaceFrameId);
     check(approx(lookup.translation.norm(), 0.0, 1e-9), "Identity frame_T_surface registers cleanly into a FrameTree3");
-    check(surface.provenance.designElementId == "wall-1", "Default provenance uses the surface id as the design element id");
+    check(
+      surface.provenance.designElementId == "wall-1",
+      "Default provenance uses the surface id as the design element id"
+    );
   }
 
   static function testRasterCoversWallWithDoorExclusion():Void {
@@ -52,14 +57,22 @@ class WorkTests {
 
     var toolWidth = 0.1, overlap = 0.4, standoff = 0.05, feedRate = 0.1, leadInOut = 0.05;
     var toolpath = RasterToolpathGenerator.generate(surface, toolWidth, overlap, standoff, feedRate, leadInOut);
-    check(toolpath.frameId == surface.surfaceFrameId, "Generated toolpath is expressed in the surface's own local frame");
+    check(
+      toolpath.frameId == surface.surfaceFrameId,
+      "Generated toolpath is expressed in the surface's own local frame"
+    );
 
     var coverage = new CoverageMap(surface, 0.02);
     sweepProcessMoves(coverage, toolpath, toolWidth * 0.5, 0.01);
 
-    check(coverage.coverageFraction() >= 0.99, 'Raster covers at least 99% of the allowed wall area (got ${coverage.coverageFraction()})');
-    check(coverage.exclusionCoverageFraction() <= 0.0001,
-      'Raster covers none of the door exclusion (got ${coverage.exclusionCoverageFraction()})');
+    check(
+      coverage.coverageFraction() >= 0.99,
+      'Raster covers at least 99% of the allowed wall area (got ${coverage.coverageFraction()})'
+    );
+    check(
+      coverage.exclusionCoverageFraction() <= 0.0001,
+      'Raster covers none of the door exclusion (got ${coverage.exclusionCoverageFraction()})'
+    );
   }
 
   static function testCoverageFromSimulatedExecutionMatchesPlanned():Void {
@@ -80,46 +93,74 @@ class WorkTests {
     for (step in 0...steps) {
       var fromDistance = path.length() * step / steps;
       var toDistance = path.length() * (step + 1) / steps;
-      while (eventIndex < path.events.length &&
-          path.events[eventIndex].distance <= fromDistance + 1e-9) {
+      while (eventIndex < path.events.length && path.events[eventIndex].distance <= fromDistance + 1e-9) {
         processOn = switch path.events[eventIndex].value {
-          case EventValue.Digital(on): on;
-          case _: false;
+          case EventValue.Digital(on):
+            on;
+          case _:
+            false;
         };
         eventIndex++;
       }
       if (!processOn) continue;
       var fromPose = path.waypointAt(fromDistance).pose;
       var toPose = path.waypointAt(toDistance).pose;
-      simulated.markSweep(new Point2(fromPose.x, fromPose.y),
-        new Point2(toPose.x, toPose.y), toolWidth * 0.5, 0.005);
+      simulated.markSweep(new Point2(fromPose.x, fromPose.y), new Point2(toPose.x, toPose.y), toolWidth * 0.5, 0.005);
     }
 
-    check(planned.coverageFraction() >= 0.99, 'Planned coverage over the small surface is at least 99% (got ${planned.coverageFraction()})');
-    check(Math.abs(simulated.coverageFraction() - planned.coverageFraction()) < 0.01,
-      'Simulated-execution coverage (${simulated.coverageFraction()}) matches planned coverage (${planned.coverageFraction()})');
+    check(
+      planned.coverageFraction() >= 0.99,
+      'Planned coverage over the small surface is at least 99% (got ${planned.coverageFraction()})'
+    );
+    check(
+      Math.abs(simulated.coverageFraction() - planned.coverageFraction()) < 0.01,
+      'Simulated-execution coverage (${simulated.coverageFraction()}) matches planned coverage (${planned.coverageFraction()})'
+    );
     check(planned.exclusionCoverageFraction() <= 0.0001, "Planned coverage avoids the exclusion");
     check(simulated.exclusionCoverageFraction() <= 0.0001, "Simulated execution also avoids the exclusion");
   }
 
   static function testRasterOffsetsRotatedAndConcaveExclusions():Void {
     var diamond = new Polygon2([
-      new Point2(1.5, 0.85), new Point2(2.15, 1.5),
-      new Point2(1.5, 2.15), new Point2(0.85, 1.5)
+      new Point2(1.5, 0.85),
+      new Point2(2.15, 1.5),
+      new Point2(1.5, 2.15),
+      new Point2(
+        0.85,
+        1.5
+      )
     ]);
-    var diamondSurface = new WorkSurface("rotated-exclusion", "panel", Transform3.identity(),
-      rect(0.0, 0.0, 3.0, 3.0), [diamond]);
-    assertRasterAvoidsExclusion(diamondSurface,
-      "Raster offsets a 45-degree exclusion without process-on contact");
+    var diamondSurface = new WorkSurface(
+      "rotated-exclusion",
+      "panel",
+      Transform3.identity(),
+      rect(0.0, 0.0, 3.0, 3.0),
+      [diamond]
+    );
+    assertRasterAvoidsExclusion(diamondSurface, "Raster offsets a 45-degree exclusion without process-on contact");
 
     var concave = new Polygon2([
-      new Point2(0.8, 0.8), new Point2(2.2, 0.8), new Point2(2.2, 1.3),
-      new Point2(1.3, 1.3), new Point2(1.3, 2.2), new Point2(0.8, 2.2)
+      new Point2(0.8, 0.8),
+      new Point2(2.2, 0.8),
+      new Point2(2.2, 1.3),
+      new Point2(1.3, 1.3),
+      new Point2(
+        1.3,
+        2.2
+      ),
+      new Point2(
+        0.8,
+        2.2
+      )
     ]);
-    var concaveSurface = new WorkSurface("concave-exclusion", "panel", Transform3.identity(),
-      rect(0.0, 0.0, 3.0, 3.0), [concave]);
-    assertRasterAvoidsExclusion(concaveSurface,
-      "Raster offsets an L-shaped exclusion without process-on contact");
+    var concaveSurface = new WorkSurface(
+      "concave-exclusion",
+      "panel",
+      Transform3.identity(),
+      rect(0.0, 0.0, 3.0, 3.0),
+      [concave]
+    );
+    assertRasterAvoidsExclusion(concaveSurface, "Raster offsets an L-shaped exclusion without process-on contact");
   }
 
   static function assertRasterAvoidsExclusion(surface:WorkSurface, label:String):Void {
@@ -127,15 +168,21 @@ class WorkTests {
     var toolpath = RasterToolpathGenerator.generate(surface, toolWidth, 0.4, 0.05, 0.2, 0.03);
     var coverage = new CoverageMap(surface, 0.025);
     sweepProcessMoves(coverage, toolpath, toolWidth * 0.5, 0.005);
-    check(coverage.coverageFraction() >= 0.98,
-      '$label while covering the allowed area (got ${coverage.coverageFraction()})');
-    check(coverage.exclusionCoverageFraction() <= 0.0001,
-      '$label (got ${coverage.exclusionCoverageFraction()})');
+    check(
+      coverage.coverageFraction() >= 0.98,
+      '$label while covering the allowed area (got ${coverage.coverageFraction()})'
+    );
+    check(coverage.exclusionCoverageFraction() <= 0.0001, '$label (got ${coverage.exclusionCoverageFraction()})');
   }
 
   // -- helpers -----------------------------------------------------------
 
-  static function sweepProcessMoves(coverage:CoverageMap, toolpath:processkit.path.Toolpath, radius:Float, stepSize:Float):Void {
+  static function sweepProcessMoves(
+    coverage:CoverageMap,
+    toolpath:processkit.path.Toolpath,
+    radius:Float,
+    stepSize:Float
+  ):Void {
     for (i in 0...(toolpath.points.length - 1)) if (toolpath.points[i].processOn) {
       var from = toolpath.points[i].work_T_tcp.translation;
       var to = toolpath.points[i + 1].work_T_tcp.translation;
@@ -144,7 +191,19 @@ class WorkTests {
   }
 
   static function rect(x:Float, y:Float, width:Float, height:Float):Polygon2 return new Polygon2([
-    new Point2(x, y), new Point2(x + width, y), new Point2(x + width, y + height), new Point2(x, y + height)
+    new Point2(x, y),
+    new Point2(
+      x + width,
+      y
+    ),
+    new Point2(
+      x + width,
+      y + height
+    ),
+    new Point2(
+      x,
+      y + height
+    )
   ]);
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

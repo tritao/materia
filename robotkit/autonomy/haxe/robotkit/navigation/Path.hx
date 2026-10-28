@@ -11,10 +11,8 @@ class Path {
   public final length:Float;
 
   public function new(waypoints:Array<Pose2>, ?frameId:String = "map") {
-    if (waypoints == null || waypoints.length < 2)
-      throw "A path requires at least two poses";
-    if (frameId == null || frameId.length == 0)
-      throw "A path requires a frame ID";
+    if (waypoints == null || waypoints.length < 2) throw "A path requires at least two poses";
+    if (frameId == null || frameId.length == 0) throw "A path requires a frame ID";
     this.frameId = frameId;
     this.waypoints = [];
     distances = [0.0];
@@ -31,8 +29,7 @@ class Path {
         distances.push(total);
       }
     }
-    if (!Math.isFinite(total) || total <= 1e-9)
-      throw "Path length must be finite and positive";
+    if (!Math.isFinite(total) || total <= 1e-9) throw "Path length must be finite and positive";
     length = total;
   }
 
@@ -40,8 +37,7 @@ class Path {
 
   /** Returns the accumulated arc length at one authored waypoint. */
   public function distanceAtWaypoint(index:Int):Float {
-    if (index < 0 || index >= distances.length)
-      throw "Path waypoint index is out of range";
+    if (index < 0 || index >= distances.length) throw "Path waypoint index is out of range";
     return distances[index];
   }
 
@@ -55,8 +51,7 @@ class Path {
     return new Pose2(point.x, point.y, point.yaw);
   }
 
-  public function poses():Array<Pose2>
-    return [for (point in waypoints) new Pose2(point.x, point.y, point.yaw)];
+  public function poses():Array<Pose2> return [for (point in waypoints) new Pose2(point.x, point.y, point.yaw)];
 
   /** Returns the path pose at an arc-length distance from its start. */
   public function poseAt(distance:Float):Pose2 {
@@ -72,8 +67,7 @@ class Path {
       var from = waypoints[index];
       var to = waypoints[index + 1];
       var yawDelta = Pose2.wrapAngle(to.yaw - from.yaw);
-      return new Pose2(from.x + (to.x - from.x) * alpha,
-        from.y + (to.y - from.y) * alpha, from.yaw + yawDelta * alpha);
+      return new Pose2(from.x + (to.x - from.x) * alpha, from.y + (to.y - from.y) * alpha, from.yaw + yawDelta * alpha);
     }
     return goal();
   }
@@ -83,18 +77,15 @@ class Path {
    * never moves backwards; callers can also cap forward progress to avoid
    * jumping onto a later branch at a crossing or loop.
    */
-  public function project(pose:Pose2, minimumDistance:Float,
-      ?maximumDistance:Float):PathProjection {
-    if (pose == null || !Math.isFinite(minimumDistance) ||
-        (maximumDistance != null && !Math.isFinite(maximumDistance)))
-      throw "Path projection requires a pose and finite progress";
+  public function project(pose:Pose2, minimumDistance:Float, ?maximumDistance:Float):PathProjection {
+    if (pose == null || !Math.isFinite(minimumDistance) || (maximumDistance != null
+      && !Math.isFinite(maximumDistance))) throw "Path projection requires a pose and finite progress";
     var minimum = minimumDistance < 0.0 ? 0.0 : minimumDistance;
     if (minimum > length) minimum = length;
     var maximum = maximumDistance == null ? length : cast maximumDistance;
     if (maximum < 0.0) maximum = 0.0;
     if (maximum > length) maximum = length;
-    if (maximum < minimum)
-      throw "Path projection maximum progress must not precede its minimum";
+    if (maximum < minimum) throw "Path projection maximum progress must not precede its minimum";
     var bestDistance = 1.0e300;
     var bestProgress = minimum;
     var bestSegment = -1;
@@ -105,14 +96,12 @@ class Path {
       var startDistance = distances[index];
       var endDistance = distances[index + 1];
       var segmentLength = endDistance - startDistance;
-      if (segmentLength <= 1e-9 || endDistance < minimum || startDistance > maximum)
-        continue;
+      if (segmentLength <= 1e-9 || endDistance < minimum || startDistance > maximum) continue;
       var from = waypoints[index];
       var to = waypoints[index + 1];
       var dx = to.x - from.x;
       var dy = to.y - from.y;
-      var alpha = ((pose.x - from.x) * dx + (pose.y - from.y) * dy) /
-        (segmentLength * segmentLength);
+      var alpha = ((pose.x - from.x) * dx + (pose.y - from.y) * dy) / (segmentLength * segmentLength);
       var minimumAlpha = Math.max(0.0, (minimum - startDistance) / segmentLength);
       var maximumAlpha = Math.min(1.0, (maximum - startDistance) / segmentLength);
       if (alpha < minimumAlpha) alpha = minimumAlpha;
@@ -133,13 +122,21 @@ class Path {
         bestCrossTrack = (dx * errorY - dy * errorX) / segmentLength;
       }
     }
-    if (bestPose == null)
-      throw "Path projection could not find a non-degenerate segment";
-    return new PathProjection(bestProgress, bestSegment, cast bestPose,
-      bestTangent, bestCrossTrack, Math.pow(bestDistance, 0.5));
+    if (bestPose == null) throw "Path projection could not find a non-degenerate segment";
+    return new PathProjection(
+      bestProgress,
+      bestSegment,
+      cast bestPose,
+      bestTangent,
+      bestCrossTrack,
+      Math.pow(
+        bestDistance,
+        0.5
+      )
+    );
   }
 
   /** Compatibility helper returning only the projected arc length. */
-  public function nearestDistance(pose:Pose2, minimumDistance:Float):Float
-    return project(pose, minimumDistance).distanceAlongPath;
+  public function nearestDistance(pose:Pose2,
+    minimumDistance:Float):Float return project(pose, minimumDistance).distanceAlongPath;
 }

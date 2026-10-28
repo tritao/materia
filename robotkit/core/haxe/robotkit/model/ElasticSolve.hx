@@ -7,7 +7,7 @@ class ElasticSolve {
   public final compliance:Array<Array<Float>>;
   public final backlash:Array<Float>;
 
-  public function new(model:RobotModel, loads:Array<AxisLoad>, ?response:JointCoupling->Float) {
+  public function new(model:RobotModel, loads:Array<AxisLoad>, ?response:JointCoupling -> Float) {
     var ids:Array<String> = [];
     for (load in loads) ids.push(load.axis);
     // A saved model may contain a separate, unactuated mechanism. It cannot
@@ -17,23 +17,25 @@ class ElasticSolve {
       changed = false;
       for (coupling in model.couplings) {
         if (connected.indexOf(coupling.leader) >= 0 && connected.indexOf(coupling.follower) < 0) {
-          connected.push(coupling.follower); changed = true;
+          connected.push(coupling.follower);
+          changed = true;
         }
         if (connected.indexOf(coupling.follower) >= 0 && connected.indexOf(coupling.leader) < 0) {
-          connected.push(coupling.leader); changed = true;
+          connected.push(coupling.leader);
+          changed = true;
         }
       }
       for (network in model.elasticNetworks) {
         var touches = false;
-        for (span in network.spans) for (term in span.terms)
-          if (connected.indexOf(term.joint) >= 0) touches = true;
-        if (touches) for (span in network.spans) for (term in span.terms)
-          if (connected.indexOf(term.joint) < 0) { connected.push(term.joint); changed = true; }
+        for (span in network.spans) for (term in span.terms) if (connected.indexOf(term.joint) >= 0) touches = true;
+        if (touches) for (span in network.spans) for (term in span.terms) if (connected.indexOf(term.joint) < 0) {
+          connected.push(term.joint);
+          changed = true;
+        }
       }
     }
-    var networks = [for (network in model.elasticNetworks)
-      if ([for (span in network.spans) for (term in span.terms) if (connected.indexOf(term.joint) >= 0) term].length > 0)
-        network];
+    var networks = [for (network in model.elasticNetworks) if ([for (span in network
+      .spans) for (term in span.terms) if (connected.indexOf(term.joint) >= 0) term].length > 0) network];
     var owned:Array<String> = [];
     for (network in networks) {
       network.validate(model.joints, model.couplings);
@@ -44,13 +46,13 @@ class ElasticSolve {
       for (span in network.spans) for (term in span.terms) if (ids.indexOf(term.joint) < 0) ids.push(term.joint);
     }
     // Include the complete connected transmission graph, preserving intermediate shafts.
-    for (_ in 0...model.joints.length) for (coupling in model.couplings)
-      if (owned.indexOf(coupling.id) < 0 && (ids.indexOf(coupling.leader) >= 0 || ids.indexOf(coupling.follower) >= 0)) {
-        if (ids.indexOf(coupling.leader) < 0) ids.push(coupling.leader);
-        if (ids.indexOf(coupling.follower) < 0) ids.push(coupling.follower);
-      }
+    for (_ in 0...model.joints.length) for (coupling in model.couplings) if (owned.indexOf(coupling.id) < 0
+      && (ids.indexOf(coupling.leader) >= 0 || ids.indexOf(coupling.follower) >= 0)) {
+      if (ids.indexOf(coupling.leader) < 0) ids.push(coupling.leader);
+      if (ids.indexOf(coupling.follower) < 0) ids.push(coupling.follower);
+    }
     var count = ids.length;
-    var stiffness = [for (_ in 0...count) [for (_ in 0...count) 0.0]];
+    var stiffness = [for (_ in 0...count)[for (_ in 0...count) 0.0]];
     var rigid:Array<Array<Float>> = [], basis:Array<Array<Float>> = [];
     var softLosses:Array<{row:Array<Float>, stiffness:Float, bound:Float}> = [];
     var rigidLosses:Array<{index:Int, bound:Float}> = [];
@@ -60,16 +62,16 @@ class ElasticSolve {
       spring(stiffness, row, span.stiffness);
     }
     var targets:Array<String> = [];
-    for (coupling in model.couplings) if (owned.indexOf(coupling.id) < 0 && targets.indexOf(coupling.follower) < 0)
-      targets.push(coupling.follower);
+    for (coupling in model.couplings) if (owned.indexOf(coupling.id) < 0
+      && targets.indexOf(coupling.follower) < 0) targets.push(coupling.follower);
     for (target in targets) {
       if (ids.indexOf(target) < 0) continue;
       var row = [for (_ in 0...count) 0.0];
       row[ids.indexOf(target)] = 1.0;
       var k = 0.0, loss = 0.0;
       for (coupling in model.couplings) if (coupling.follower == target) {
-        if (owned.indexOf(coupling.id) >= 0)
-          throw "A summed follower cannot mix a network motion term and an independent scalar transmission";
+        if (owned.indexOf(coupling.id)
+          >= 0) throw "A summed follower cannot mix a network motion term and an independent scalar transmission";
         row[ids.indexOf(coupling.leader)] -= coupling.ratio;
         loss = Math.max(loss, Math.abs(coupling.ratio) * coupling.backlash);
         var value = response == null ? coupling.stiffness : response(coupling);
@@ -90,15 +92,16 @@ class ElasticSolve {
       case SimpleTransmission(joint, _, _):
         var at = ids.indexOf(joint);
         if (at >= 0) {
-          var row = [for (_ in 0...count) 0.0]; row[at] = 1.0;
+          var row = [for (_ in 0...count) 0.0];
+          row[at] = 1.0;
           var held = constraint(rigid, basis, row);
         }
     }
     var size = count + rigid.length;
-    var system = [for (i in 0...size) [for (j in 0...size)
-      i < count && j < count ? stiffness[i][j] : i < count ? rigid[j - count][i] : j < count ? rigid[i - count][j] : 0.0]];
+    var system = [for (i in 0...size)[for (j in 0...size) i < count
+      && j < count ? stiffness[i][j] : i < count ? rigid[j - count][i] : j < count ? rigid[i - count][j] : 0.0]];
     var inverse = DriveCompliance.invert(system);
-    compliance = [for (i in 0...loads.length) [for (j in 0...loads.length) inverse[i][j]]];
+    compliance = [for (i in 0...loads.length)[for (j in 0...loads.length) inverse[i][j]]];
     backlash = [for (_ in loads) 0.0];
     // Contact clearances shift all adjoining spans together, preserving their correlation.
     for (network in networks) for (clearance in network.clearances) {
@@ -106,8 +109,7 @@ class ElasticSolve {
       for (span in network.spans) {
         var coefficient = 0.0;
         for (term in span.terms) if (term.joint == clearance.joint) coefficient = term.coefficient;
-        for (term in span.terms)
-          effort[ids.indexOf(term.joint)] += span.stiffness * term.coefficient * coefficient;
+        for (term in span.terms) effort[ids.indexOf(term.joint)] += span.stiffness * term.coefficient * coefficient;
       }
       for (axis in 0...loads.length) {
         var response = 0.0;
@@ -120,8 +122,8 @@ class ElasticSolve {
       for (i in 0...count) response += inverse[axis][i] * loss.row[i];
       backlash[axis] += Math.abs(response) * loss.stiffness * loss.bound;
     }
-    for (loss in rigidLosses) for (axis in 0...loads.length)
-      backlash[axis] += Math.abs(inverse[axis][count + loss.index]) * loss.bound;
+    for (loss in rigidLosses) for (axis in 0...loads.length) backlash[axis] += Math.abs(inverse[axis][count
+      + loss.index]) * loss.bound;
   }
 
   static function spring(matrix:Array<Array<Float>>, row:Array<Float>, k:Float):Void {

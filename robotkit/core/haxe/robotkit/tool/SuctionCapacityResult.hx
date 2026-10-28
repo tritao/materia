@@ -11,9 +11,15 @@ class SuctionCapacityResult {
   /** Null when no moment rating was supplied. */
   public final worstMomentMarginNm:Null<Float>;
 
-  public function new(safe:Bool, firstFailureIndex:Int, reason:Null<String>,
-      normalCapacityN:Float, worstNormalMarginN:Float, worstShearMarginN:Float,
-      worstMomentMarginNm:Null<Float>) {
+  public function new(
+    safe:Bool,
+    firstFailureIndex:Int,
+    reason:Null<String>,
+    normalCapacityN:Float,
+    worstNormalMarginN:Float,
+    worstShearMarginN:Float,
+    worstMomentMarginNm:Null<Float>
+  ) {
     this.safe = safe;
     this.firstFailureIndex = firstFailureIndex;
     this.reason = reason;

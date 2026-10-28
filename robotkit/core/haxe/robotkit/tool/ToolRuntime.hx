@@ -17,17 +17,23 @@ class ToolRuntime {
   public final surface:Null<SurfaceTool>;
   public final sprayer:Null<Sprayer>;
   public final sander:Null<Sander>;
-  @:allow(robotkit.tool.ToolRuntimeSelection)
-  final adapter:ChannelToolAdapter = new ChannelToolAdapter();
+  @:allow(robotkit.tool.ToolRuntimeSelection) final adapter:ChannelToolAdapter = new ChannelToolAdapter();
   final declaredChannels:Array<ProcessChannelDeclaration> = [];
   final channelValues:Map<String, ProcessEventValue> = new Map();
 
-  public function new(tool:Tool, ?gripper:Gripper, ?vacuum:Vacuum,
-      ?surface:SurfaceTool, ?sprayer:Sprayer, ?sander:Sander,
-      ?changerLock:ChangerLock, ?changerToolId:String) {
+  public function new(
+    tool:Tool,
+    ?gripper:Gripper,
+    ?vacuum:Vacuum,
+    ?surface:SurfaceTool,
+    ?sprayer:Sprayer,
+    ?sander:Sander,
+    ?changerLock:ChangerLock,
+    ?changerToolId:String
+  ) {
     if (tool == null) throw "Tool runtime requires a mounted tool";
-    if (changerLock != null && (changerToolId == null || changerToolId.length == 0))
-      throw "Changer-backed tool runtime requires its physical tool ID";
+    if (changerLock != null && (changerToolId == null
+      || changerToolId.length == 0)) throw "Changer-backed tool runtime requires its physical tool ID";
     this.tool = tool;
     this.gripper = gripper;
     this.vacuum = vacuum;
@@ -68,23 +74,25 @@ class ToolRuntime {
     declaredChannels.push(declaration);
   }
 
-  public function channelDeclarations():Array<ProcessChannelDeclaration>
-    return declaredChannels.copy();
+  public function channelDeclarations():Array<ProcessChannelDeclaration> return declaredChannels.copy();
 
-  @:allow(robotkit.tool.ToolRuntimeSelection)
-  function apply(event:robotkit.execution.FiredProcessEvent):Void {
+  @:allow(robotkit.tool.ToolRuntimeSelection) function apply(event:robotkit.execution.FiredProcessEvent):Void {
     adapter.apply(event);
     channelValues.set(event.channel, event.value);
   }
 
-  @:allow(robotkit.tool.ToolRuntimeSelection)
-  function applySafeValues(timestampNs:haxe.Int64):Void {
+  @:allow(robotkit.tool.ToolRuntimeSelection) function applySafeValues(timestampNs:haxe.Int64):Void {
     for (channel in declaredChannels) apply(new robotkit.execution.FiredProcessEvent(
-      haxe.Int64.ofInt(0), channel.id, channel.safeValue, timestampNs, timestampNs, 0));
+      haxe.Int64.ofInt(0),
+      channel.id,
+      channel.safeValue,
+      timestampNs,
+      timestampNs,
+      0
+    ));
   }
 
-  @:allow(robotkit.tool.ToolRuntimeSelection)
-  function unsafeChannels():Array<String> {
+  @:allow(robotkit.tool.ToolRuntimeSelection) function unsafeChannels():Array<String> {
     var result:Array<String> = [];
     for (channel in declaredChannels) {
       var value = channelValues.get(channel.id);
@@ -94,10 +102,13 @@ class ToolRuntime {
   }
 
   static function sameValue(a:ProcessEventValue, b:ProcessEventValue):Bool return switch [a, b] {
-    case [Digital(left), Digital(right)]: left == right;
-    case [Analog(left), Analog(right)]: left == right;
+    case [Digital(left), Digital(right)]:
+      left == right;
+    case [Analog(left), Analog(right)]:
+      left == right;
     case [Process(leftCommand, leftArgument), Process(rightCommand, rightArgument)]:
       leftCommand == rightCommand && leftArgument == rightArgument;
-    case _: false;
+    case _:
+      false;
   }
 }

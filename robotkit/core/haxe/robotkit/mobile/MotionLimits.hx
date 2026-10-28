@@ -9,11 +9,14 @@ class MotionLimits {
   public final maxLateralSpeed:Float;
   public final maxLateralAcceleration:Float;
 
-  public function new(maxLinearSpeed:Float, maxAngularSpeed:Float,
-      ?maxLinearAcceleration:Float = 1.0e300,
-      ?maxAngularAcceleration:Float = 1.0e300,
-      ?maxLateralSpeed:Float = -1.0,
-      ?maxLateralAcceleration:Float = -1.0) {
+  public function new(
+    maxLinearSpeed:Float,
+    maxAngularSpeed:Float,
+    ?maxLinearAcceleration:Float = 1.0e300,
+    ?maxAngularAcceleration:Float = 1.0e300,
+    ?maxLateralSpeed:Float = -1.0,
+    ?maxLateralAcceleration:Float = -1.0
+  ) {
     requirePositive(maxLinearSpeed, "maxLinearSpeed");
     requirePositive(maxAngularSpeed, "maxAngularSpeed");
     requirePositive(maxLinearAcceleration, "maxLinearAcceleration");
@@ -37,8 +40,8 @@ class MotionLimits {
     var angular = clamp(target.angular, maxAngularSpeed);
     var lateral = clamp(target.lateral, maxLateralSpeed);
     if (durationSeconds != null) {
-      if (!Math.isFinite(durationSeconds) || durationSeconds <= 0.0)
-        throw "Acceleration limiting requires a finite positive duration";
+      if (!Math.isFinite(durationSeconds)
+        || durationSeconds <= 0.0) throw "Acceleration limiting requires a finite positive duration";
       var origin = previous == null ? Twist2.zero() : previous;
       linear = approach(origin.linear, linear, maxLinearAcceleration * durationSeconds);
       angular = approach(origin.angular, angular, maxAngularAcceleration * durationSeconds);
@@ -57,7 +60,6 @@ class MotionLimits {
   }
 
   static function requirePositive(value:Float, name:String):Void {
-    if (Math.isNaN(value) || value <= 0.0)
-      throw '$name must be positive';
+    if (Math.isNaN(value) || value <= 0.0) throw '$name must be positive';
   }
 }

@@ -7,10 +7,8 @@ class LoadState {
   public final secured:Bool;
 
   public function new(payload:Null<Payload>, observed:Bool, secured:Bool) {
-    if (!observed && (payload != null || secured))
-      throw "An unobserved load state cannot claim payload or restraint";
-    if (secured && payload == null)
-      throw "A secured load state requires a payload";
+    if (!observed && (payload != null || secured)) throw "An unobserved load state cannot claim payload or restraint";
+    if (secured && payload == null) throw "A secured load state requires a payload";
     this.payload = payload;
     this.observed = observed;
     this.secured = secured;

@@ -17,17 +17,24 @@ class RobotRecordingEntry {
   /** Payload schema used when this entry was loaded, or the current schema for new entries. */
   public final schemaVersion:Int;
 
-  public function new(ordinal:Int64, robotId:RobotId, event:RobotRecordingEvent,
-      ?sourceSequence:Int64, ?sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified",
-      ?recordingTimestampNs:Int64, ?schemaVersion:Int = VERSION) {
+  public function new(
+    ordinal:Int64,
+    robotId:RobotId,
+    event:RobotRecordingEvent,
+    ?sourceSequence:Int64,
+    ?sourceTimestampNs:Int64,
+    ?sourceClockId:String = "unspecified",
+    ?recordingTimestampNs:Int64,
+    ?schemaVersion:Int = VERSION
+  ) {
     this.ordinal = ordinal;
     this.robotId = robotId;
     this.event = event;
     this.sourceSequence = sourceSequence == null ? Int64.ofInt(0) : sourceSequence;
     this.sourceTimestampNs = sourceTimestampNs == null ? Int64.ofInt(0) : sourceTimestampNs;
     this.sourceClockId = sourceClockId;
-    this.recordingTimestampNs = recordingTimestampNs == null
-      ? Int64.fromFloat(Sys.time() * 1000000000.0) : recordingTimestampNs;
+    this.recordingTimestampNs = recordingTimestampNs
+      == null ? Int64.fromFloat(Sys.time() * 1000000000.0) : recordingTimestampNs;
     this.schemaVersion = schemaVersion;
   }
 }

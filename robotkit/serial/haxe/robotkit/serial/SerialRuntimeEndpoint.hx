@@ -13,26 +13,30 @@ class SerialRuntimeEndpoint {
    * binding's model so its limits are the device's. The board must be that controller and agree
    * with the configuration, or this throws with the device's reason on stderr.
    */
-  public static function create(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
-      ?baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RuntimeEndpoint {
+  public static function create(
+    blueprint:RobotRuntimeBlueprint,
+    devicePath:String,
+    controllerHex:String,
+    binding:DeviceBinding,
+    maxTargetError:Float,
+    ?baud:Int = 115200,
+    ?linkLossTimeoutNs:haxe.Int64,
+    ?clockSyncBoundNs:haxe.Int64
+  ):RuntimeEndpoint {
     if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
-    if (devicePath == null || StringTools.trim(devicePath).length == 0)
-      throw "Serial runtime requires a device path";
+    if (devicePath == null || StringTools.trim(devicePath).length == 0) throw "Serial runtime requires a device path";
     if (binding == null) throw "Serial runtime requires a device binding";
-    if (controllerHex == null || !~/^[0-9a-fA-F]{32}$/.match(controllerHex) ||
-        controllerHex.toLowerCase() == "00000000000000000000000000000000")
-      throw "Serial runtime requires a nonzero 32-digit controller id";
-    if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
-      throw "Serial runtime requires a finite nonnegative target error budget";
+    if (controllerHex == null || !~/^[0-9a-fA-F]{32}$/.match(controllerHex) || controllerHex.toLowerCase()
+      == "00000000000000000000000000000000") throw "Serial runtime requires a nonzero 32-digit controller id";
+    if (!Math.isFinite(maxTargetError)
+      || maxTargetError < 0.0) throw "Serial runtime requires a finite nonnegative target error budget";
     if (linkLossTimeoutNs == null) linkLossTimeoutNs = haxe.Int64.ofInt(500000000);
     if (clockSyncBoundNs == null) clockSyncBoundNs = haxe.Int64.ofInt(30000000);
     var device = new rk_serial_device_desc();
     device.set_struct_size(rk_serial_device_desc.size());
     device.set_actuator_count(binding.channels.length);
     device.set_feedback_count(binding.channels.length);
-    for (i in 0...16)
-      device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
+    for (i in 0...16) device.set_controller(i, Std.parseInt("0x" + controllerHex.substr(i * 2, 2)));
     for (i in 0...binding.channels.length) {
       var channel = binding.channels[i];
       device.set_actuator_joint(i, channel.jointIndex);
@@ -46,8 +50,10 @@ class SerialRuntimeEndpoint {
       device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
       device.set_actuator_skew_bound(i, channel.skewBound);
       if (channel.actuatorId.length > 63) throw "Serial actuator ID is longer than 63 characters";
-      for (byte in 0...channel.actuatorId.length)
-        device.set_actuator_ids(i * 64 + byte, channel.actuatorId.charCodeAt(byte));
+      for (byte in 0...channel.actuatorId.length) device.set_actuator_ids(
+        i * 64 + byte,
+        channel.actuatorId.charCodeAt(byte)
+      );
     }
     device.set_input_count(binding.inputs.length);
     for (i in 0...binding.inputs.length) {
@@ -59,19 +65,44 @@ class SerialRuntimeEndpoint {
       for (byte in 0...id.length) device.set_input_switch_ids(i * 64 + byte, id.charCodeAt(byte));
     }
     var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
-      blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
-      binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
+      blueprint.nativeValue(),
+      devicePath,
+      baud,
+      device,
+      maxTargetError,
+      binding.stepTickHz,
+      linkLossTimeoutNs,
+      clockSyncBoundNs,
+      haxe.Int64.ofInt(100000)
+    );
     RobotRuntime.check(result.status, "serialEndpoint.create");
-    return new NativeRuntimeEndpoint(result.out_runtime,
-      new robotkit.time.SourceClock("robotkit.device." + controllerHex.toLowerCase()));
+    return new NativeRuntimeEndpoint(
+      result.out_runtime,
+      new robotkit.time.SourceClock("robotkit.device." + controllerHex.toLowerCase())
+    );
   }
 
   /** Create a runtime with its physical device switches published during observation. */
-  public static function createRuntime(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, controllerHex:String, binding:DeviceBinding, maxTargetError:Float,
-      baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
-    var endpoint = create(blueprint, devicePath, controllerHex, binding, maxTargetError,
-      baud, linkLossTimeoutNs, clockSyncBoundNs);
+  public static function createRuntime(
+    blueprint:RobotRuntimeBlueprint,
+    devicePath:String,
+    controllerHex:String,
+    binding:DeviceBinding,
+    maxTargetError:Float,
+    baud:Int = 115200,
+    ?linkLossTimeoutNs:haxe.Int64,
+    ?clockSyncBoundNs:haxe.Int64
+  ):RobotRuntime {
+    var endpoint = create(
+      blueprint,
+      devicePath,
+      controllerHex,
+      binding,
+      maxTargetError,
+      baud,
+      linkLossTimeoutNs,
+      clockSyncBoundNs
+    );
     var runtime = RobotRuntime.create(blueprint, endpoint);
     try {
       var switches = new robotkit.device.DeviceSwitchSensorAdapter(blueprint, runtime, binding);
@@ -85,8 +116,8 @@ class SerialRuntimeEndpoint {
 
   /** Reads the unique id (32 lowercase hex digits) of the board on a serial port. */
   public static function identify(devicePath:String, baud:Int):String {
-    if (devicePath == null || StringTools.trim(devicePath).length == 0)
-      throw "Identifying a serial device requires a device path";
+    if (devicePath == null
+      || StringTools.trim(devicePath).length == 0) throw "Identifying a serial device requires a device path";
     var result = RobotKitRuntime.rk_serial_device_identify(devicePath, baud);
     RobotRuntime.check(result.status, "serialEndpoint.identify");
     var text = "";

@@ -30,7 +30,7 @@ class RuntimeRobotAdapter implements Robot {
   final robotCapabilities:RobotCapabilities;
   final ownsRuntime:Bool;
   final faultMessage:String;
-  var changeListener:Null < RobotId -> Void > = null;
+  var changeListener:Null<RobotId -> Void> = null;
   var observationOwner:RobotThreadToken;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
@@ -41,14 +41,19 @@ class RuntimeRobotAdapter implements Robot {
   final sensorStreams = new robotkit.streams.SensorStreams();
   var closed:Bool = false;
 
-  public function new(id:RobotId, runtime:RobotRuntime, name:String,
-      links:Array<String>, joints:Array<String>, ?ownsRuntime:Bool = false,
-      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault",
-      ?executionPolicy:ExecutionCapabilities) {
-    if (id == null || id.length == 0)
-      throw "RuntimeRobotAdapter requires a non-empty logical ID";
-    if (runtime == null)
-      throw "RuntimeRobotAdapter requires a runtime";
+  public function new(
+    id:RobotId,
+    runtime:RobotRuntime,
+    name:String,
+    links:Array<String>,
+    joints:Array<String>,
+    ?ownsRuntime:Bool = false,
+    ?startRuntime:Bool = false,
+    ?faultMessage:String = "robot runtime fault",
+    ?executionPolicy:ExecutionCapabilities
+  ) {
+    if (id == null || id.length == 0) throw "RuntimeRobotAdapter requires a non-empty logical ID";
+    if (runtime == null) throw "RuntimeRobotAdapter requires a runtime";
     logicalId = id;
     observationOwner = RobotThreadToken.current();
     this.runtime = runtime;
@@ -59,20 +64,30 @@ class RuntimeRobotAdapter implements Robot {
     var policy = executionPolicy;
     var execution = actual.execution;
     if (policy != null) {
-      if ((policy.plans && !execution.plans) ||
-          policy.maximumPolynomialDegree > execution.maximumPolynomialDegree ||
-          policy.maximumJoints > execution.maximumJoints || policy.maximumSegments > execution.maximumSegments ||
-          (policy.timedEvents && !execution.timedEvents) ||
-          (policy.replacementBoundaries && !execution.replacementBoundaries) ||
-          (policy.holdResume && !execution.holdResume))
-        throw "Execution policy exceeds endpoint capabilities";
-      execution = policy.plans ? new ExecutionCapabilities(true, policy.maximumPolynomialDegree,
-        policy.maximumJoints, policy.maximumSegments, policy.timedEvents,
-        policy.replacementBoundaries, policy.holdResume, actual.execution.polynomialLimits)
-        : ExecutionCapabilities.unavailable();
+      if ((policy.plans && !execution.plans) || policy.maximumPolynomialDegree > execution.maximumPolynomialDegree
+        || policy.maximumJoints > execution.maximumJoints
+        || policy.maximumSegments > execution.maximumSegments || (policy.timedEvents
+        && !execution.timedEvents) || (policy.replacementBoundaries && !execution.replacementBoundaries)
+        || (policy.holdResume && !execution.holdResume)) throw "Execution policy exceeds endpoint capabilities";
+      execution = policy.plans ? new ExecutionCapabilities(
+        true,
+        policy.maximumPolynomialDegree,
+        policy.maximumJoints,
+        policy.maximumSegments,
+        policy.timedEvents,
+        policy.replacementBoundaries,
+        policy.holdResume,
+        actual.execution.polynomialLimits
+      ) : ExecutionCapabilities.unavailable();
     }
-    robotCapabilities = new RobotCapabilities(id, actual.jointCount, actual.controlModes,
-      execution, actual.timing, actual.streams);
+    robotCapabilities = new RobotCapabilities(
+      id,
+      actual.jointCount,
+      actual.controlModes,
+      execution,
+      actual.timing,
+      actual.streams
+    );
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();
@@ -97,35 +112,67 @@ class RuntimeRobotAdapter implements Robot {
     var owner = RobotThreadToken.current() == observationOwner;
     if (owner) observe(value);
     var sensors = owner ? currentSensors : sensorFrames(value);
-    var sequences = owner ? sensorStreams.sequences() : [for (frame in sensors)
-      new robotkit.streams.StreamSequence(frame.sensorId, frame.kind, frame.sequence, frame.sourceClockId)];
-    return new RobotSnapshot(logicalId, value.sequence, value.sourceTimestampNs,
-      value.q.toArray(), value.dq.toArray(), value.effort.toArray(), value.mode,
-      value.faultCode, value.receivedTimestampNs, sensors,
-      runtime.endpoint.sourceClockId(), "robotkit.monotonic", value.safety,
-      value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs,
-      value.trajectoryTag, value.trajectoryTagTimeNs,
-      value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray(), sequences);
+    var sequences = owner ? sensorStreams.sequences() : [for (frame in sensors) new robotkit.streams.StreamSequence(
+      frame.sensorId,
+      frame.kind,
+      frame.sequence,
+      frame.sourceClockId
+    )];
+    return new RobotSnapshot(
+      logicalId,
+      value.sequence,
+      value.sourceTimestampNs,
+      value.q.toArray(),
+      value.dq.toArray(),
+      value.effort.toArray(),
+      value.mode,
+      value.faultCode,
+      value.receivedTimestampNs,
+      sensors,
+      runtime.endpoint.sourceClockId(),
+      "robotkit.monotonic",
+      value.safety,
+      value.trajectoryQueueDepth,
+      value.trajectoryActive,
+      value.trajectoryTimeNs,
+      value.trajectoryDurationNs,
+      value.trajectoryTag,
+      value.trajectoryTagTimeNs,
+      value.sessionState,
+      value.activePlanId,
+      value.committedUntilNs,
+      value.queueEndTimeNs,
+      value.setpoint.toArray(),
+      sequences
+    );
   }
 
   public function fault():Null<RobotFault> {
     if (closed) return null;
     var value = runtime.snapshot();
-    if (value.faultCode == 0 && value.safety != RobotKitRuntimeConstants.RK_SAFETY_FAULT)
-      return null;
-    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW)
-      return new RobotFault(logicalId, value.faultCode, "trajectory_underflow", false);
-    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_LIMIT_SWITCH)
-      return new RobotFault(logicalId, value.faultCode, "limit_switch", true);
-    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_RAMP_LIMIT)
-      return new RobotFault(logicalId, value.faultCode, "ramp_limit", true);
+    if (value.faultCode == 0 && value.safety != RobotKitRuntimeConstants.RK_SAFETY_FAULT) return null;
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW) return new RobotFault(
+      logicalId,
+      value.faultCode,
+      "trajectory_underflow",
+      false
+    );
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_LIMIT_SWITCH) return new RobotFault(
+      logicalId,
+      value.faultCode,
+      "limit_switch",
+      true
+    );
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_RAMP_LIMIT) return new RobotFault(
+      logicalId,
+      value.faultCode,
+      "ramp_limit",
+      true
+    );
     return new RobotFault(logicalId, value.faultCode, faultMessage, true);
   }
 
-  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
-    return eventRing.events(afterOrdinal, max);
+  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent> return eventRing.events(afterOrdinal, max);
 
   public function publishObservation(value:robotkit.streams.ImageDetectionObservation):RobotEvent {
     sensorStreams.publish(robotkit.streams.SensorStreamSample.inference(value));
@@ -138,22 +185,28 @@ class RuntimeRobotAdapter implements Robot {
       case JointTargets(targets, expiryNs):
         // In-process, the deadline is on the snapshot's source clock, which the runtime maps itself.
         commandSequence++;
-        runtime.submitTargets(targets, commandSequence, null,
-          expiryNs == null || Int64.compare(expiryNs, Int64.ofInt(0)) == 0 ? null : expiryNs);
+        runtime.submitTargets(
+          targets,
+          commandSequence,
+          null,
+          expiryNs == null || Int64.compare(
+            expiryNs,
+            Int64.ofInt(0)
+          ) == 0 ? null : expiryNs
+        );
       case ExecutionPlan(plan):
-        if (!robotCapabilities.execution.plans)
-          throw "Runtime endpoint does not support execution plans";
+        if (!robotCapabilities.execution.plans) throw "Runtime endpoint does not support execution plans";
         var contract = robotCapabilities.execution;
         var payload = plan.arrays;
         var count = payload == null ? plan.segments.length : payload.count();
-        if (plan.startPosition.length > contract.maximumJoints || count > contract.maximumSegments ||
-            (plan.events.length > 0 && !contract.timedEvents) ||
-            (Int64.compare(plan.replaceAfterPlanId, Int64.ofInt(0)) != 0 && !contract.replacementBoundaries))
-          throw "Plan exceeds endpoint execution capabilities";
+        if (plan.startPosition.length > contract.maximumJoints
+          || count > contract.maximumSegments || (plan.events.length > 0 && !contract.timedEvents) || (Int64.compare(
+            plan.replaceAfterPlanId,
+            Int64.ofInt(0)
+          ) != 0 && !contract.replacementBoundaries)) throw "Plan exceeds endpoint execution capabilities";
         for (index in 0...count) {
           var degree = payload == null ? plan.segments[index].degree : payload.degrees.get(index);
-          if (degree > contract.maximumPolynomialDegree)
-            throw "Plan exceeds endpoint polynomial degree";
+          if (degree > contract.maximumPolynomialDegree) throw "Plan exceeds endpoint polynomial degree";
         }
         commandSequence++;
         runtime.submitPlan(plan, commandSequence);
@@ -195,7 +248,7 @@ class RuntimeRobotAdapter implements Robot {
     return sensorStreams;
   }
 
-  public function setChangeListener(listener:Null < RobotId -> Void >):Void {
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void {
     if (listener != null) observationOwner = RobotThreadToken.current();
     changeListener = listener;
   }
@@ -213,23 +266,33 @@ class RuntimeRobotAdapter implements Robot {
     var sensors = RobotSensorFrames.fromRuntimeSnapshot(value);
     // Native slots are sampled by the endpoint on its joint clock. External frames retain
     // their publisher's domain; an unspecified external clock must remain unresolved.
-    sensors = [for (frame in sensors)
-      if (frame.sourceClockId == "unspecified" &&
-          RobotRuntimeSensorBlueprint.isNativeKind(frame.kind))
-        new SensorFrame(frame.sensorId, frame.kind, frame.frameId, frame.sequence,
-          frame.sourceTimestampNs, frame.values.toArray(), frame.receivedTimestampNs,
-          frame.linkId, frame.mountPosition.toArray(), frame.mountRotation.toArray(),
-          runtime.endpoint.sourceClockId(), frame.receivedClockId, frame.image)
-      else frame];
+    sensors = [for (frame in sensors) if (frame.sourceClockId == "unspecified"
+      && RobotRuntimeSensorBlueprint.isNativeKind(frame.kind)) new SensorFrame(
+        frame.sensorId,
+        frame.kind,
+        frame.frameId,
+        frame.sequence,
+        frame.sourceTimestampNs,
+        frame.values.toArray(),
+        frame.receivedTimestampNs,
+        frame.linkId,
+        frame.mountPosition.toArray(),
+        frame.mountRotation.toArray(),
+        runtime.endpoint.sourceClockId(),
+        frame.receivedClockId,
+        frame.image
+      ) else frame];
     return sensors;
   }
 
   function observe(value:robotkit.runtime.RobotSnapshot):Void {
     var sensors = sensorFrames(value);
     var clock = runtime.endpoint.sourceClockId();
-    if (clock == observedClock && value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt &&
-        sameSensors(currentSensors, sensors))
-      return;
+    if (clock == observedClock
+      && value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt && sameSensors(
+        currentSensors,
+        sensors
+      )) return;
     observedSequence = value.sequence;
     observedReceipt = value.receivedTimestampNs;
     observedClock = clock;
@@ -243,11 +306,8 @@ class RuntimeRobotAdapter implements Robot {
     if (left == null || left.length != right.length) return false;
     for (index in 0...left.length) {
       var a = left[index], b = right[index];
-      if (a.sensorId != b.sensorId || a.sequence != b.sequence ||
-          a.sourceClockId != b.sourceClockId ||
-          a.sourceTimestampNs != b.sourceTimestampNs ||
-          a.receivedTimestampNs != b.receivedTimestampNs)
-        return false;
+      if (a.sensorId != b.sensorId || a.sequence != b.sequence || a.sourceClockId != b.sourceClockId
+        || a.sourceTimestampNs != b.sourceTimestampNs || a.receivedTimestampNs != b.receivedTimestampNs) return false;
     }
     return true;
   }

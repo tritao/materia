@@ -11,21 +11,25 @@ class TorqueSpeedCurve {
   public final torques:Array<Float>;
 
   public function new(speeds:Array<Float>, torques:Array<Float>) {
-    if (speeds == null || torques == null || speeds.length != torques.length || speeds.length == 0)
-      throw "A torque-speed curve needs the same, non-zero number of speeds and torques";
+    if (speeds == null || torques == null || speeds.length != torques.length
+      || speeds.length == 0) throw "A torque-speed curve needs the same, non-zero number of speeds and torques";
     for (index in 0...speeds.length) {
-      if (!Math.isFinite(speeds[index]) || speeds[index] < 0.0 || !Math.isFinite(torques[index]) || torques[index] < 0.0)
-        throw "Torque-speed curve points must be finite and non-negative";
-      if (index > 0 && !(speeds[index] > speeds[index - 1]))
-        throw "Torque-speed curve speeds must increase";
+      if (!Math.isFinite(speeds[index]) || speeds[index] < 0.0 || !Math.isFinite(torques[index])
+        || torques[index] < 0.0) throw "Torque-speed curve points must be finite and non-negative";
+      if (index > 0 && !(speeds[index] > speeds[index - 1])) throw "Torque-speed curve speeds must increase";
     }
     this.speeds = speeds.copy();
     this.torques = torques.copy();
   }
 
   /** The same torque up to `maxSpeed`, then nothing: how a drive with only two numbers behaves. */
-  public static function flat(torque:Float, maxSpeed:Float):TorqueSpeedCurve
-    return new TorqueSpeedCurve([0.0, maxSpeed], [torque, torque]);
+  public static function flat(torque:Float, maxSpeed:Float):TorqueSpeedCurve return new TorqueSpeedCurve(
+    [0.0, maxSpeed],
+    [
+      torque,
+      torque
+    ]
+  );
 
   /** Torque available at `speed`, in either direction. */
   public function torqueAt(speed:Float):Float {
@@ -62,13 +66,17 @@ class TorqueSpeedCurve {
   }
 
   public static function unflatten(values:Array<Float>):TorqueSpeedCurve {
-    if (values == null || values.length == 0 || values.length % 2 != 0)
-      throw "A flattened torque-speed curve needs speed and torque pairs";
-    return new TorqueSpeedCurve([for (index in 0...Std.int(values.length / 2)) values[2 * index]],
-      [for (index in 0...Std.int(values.length / 2)) values[2 * index + 1]]);
+    if (values == null || values.length == 0
+      || values.length % 2 != 0) throw "A flattened torque-speed curve needs speed and torque pairs";
+    return new TorqueSpeedCurve(
+      [for (index in 0...Std.int(values.length / 2)) values[2 * index]],
+      [for (index in 0...Std.int(values.length / 2)) values[2 * index + 1]]
+    );
   }
 
   /** A copy with every speed multiplied by `factor`, for a change of the coordinate's units. */
-  public function scaledSpeeds(factor:Float):TorqueSpeedCurve
-    return new TorqueSpeedCurve([for (speed in speeds) speed * factor], torques);
+  public function scaledSpeeds(factor:Float):TorqueSpeedCurve return new TorqueSpeedCurve(
+    [for (speed in speeds) speed * factor],
+    torques
+  );
 }

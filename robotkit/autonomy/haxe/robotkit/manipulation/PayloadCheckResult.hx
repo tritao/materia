@@ -8,8 +8,13 @@ class PayloadCheckResult {
   public final reason:Null<String>;
   public final checkedSamples:Int;
 
-  public function new(safe:Bool, firstFailureSegment:Int, segmentFraction:Float,
-      reason:Null<String>, checkedSamples:Int) {
+  public function new(
+    safe:Bool,
+    firstFailureSegment:Int,
+    segmentFraction:Float,
+    reason:Null<String>,
+    checkedSamples:Int
+  ) {
     this.safe = safe;
     this.firstFailureSegment = firstFailureSegment;
     this.segmentFraction = segmentFraction;

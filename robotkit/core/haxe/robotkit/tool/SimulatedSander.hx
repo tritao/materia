@@ -9,7 +9,8 @@ class SimulatedSander implements Sander {
   var speedState = 0.0;
   var contactForceState = 0.0;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function setSpeed(rpm:Float, timestampNs:Int64):Void {
     if (!Math.isFinite(rpm) || rpm < 0.0) throw "Sander speed must be finite and non-negative";
@@ -20,16 +21,14 @@ class SimulatedSander implements Sander {
   public function speed():Float return speedState;
 
   public function setContactForce(newtons:Float, timestampNs:Int64):Void {
-    if (!Math.isFinite(newtons) || newtons < 0.0)
-      throw "Sander contact force must be finite and non-negative";
+    if (!Math.isFinite(newtons) || newtons < 0.0) throw "Sander contact force must be finite and non-negative";
     contactForceState = newtons;
     record(timestampNs);
   }
 
   public function contactForce():Float return contactForceState;
 
-  function record(timestampNs:Int64):Void
-    history.push(new SanderEvent(speedState, contactForceState, timestampNs));
+  function record(timestampNs:Int64):Void history.push(new SanderEvent(speedState, contactForceState, timestampNs));
 }
 
 /** One recorded `SimulatedSander` state change. */

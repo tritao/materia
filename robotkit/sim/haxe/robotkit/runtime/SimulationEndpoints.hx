@@ -8,9 +8,15 @@ class SimulationEndpoints {
     native.beginSourceEpoch();
   }
   public static function simulation(owner:Ownedrk_robot_runtime,
-      contacts:Void -> Array<RobotContact>):RuntimeEndpoint
-    return new NativeRuntimeEndpoint(owner, new robotkit.time.SourceClock("robotkit.simulation"), contacts);
+    contacts:Void -> Array<RobotContact>):RuntimeEndpoint return new NativeRuntimeEndpoint(
+      owner,
+      new robotkit.time.SourceClock("robotkit.simulation"),
+      contacts
+    );
   public static function virtualDevice(owner:Ownedrk_robot_runtime,
-      contacts:Void -> Array<RobotContact>):RuntimeEndpoint
-    return new NativeRuntimeEndpoint(owner, new robotkit.time.SourceClock("robotkit.device"), contacts);
+    contacts:Void -> Array<RobotContact>):RuntimeEndpoint return new NativeRuntimeEndpoint(
+      owner,
+      new robotkit.time.SourceClock("robotkit.device"),
+      contacts
+    );
 }

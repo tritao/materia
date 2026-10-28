@@ -59,20 +59,22 @@ class WorldTcpIntegration {
     var failure:Dynamic = null;
     try {
       remote.connect(host, port, runtime.events);
-      waitUntil(runtime, function() return remote.status() == RobotStatus.Ready,
-        "restarted robotd did not become ready");
+      waitUntil(
+        runtime,
+        function() return remote.status() == RobotStatus.Ready,
+        "restarted robotd did not become ready"
+      );
       waitUntil(runtime, function() {
         var state = remote.snapshot();
-        return state.positions.length == 3 && state.safety ==
-          RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP;
+        return state.positions.length == 3 && state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP;
       }, "new host process did not latch the persistent device in emergency-stop");
       world.resetSafety(LOGICAL_ID);
-      waitUntil(runtime, function() return remote.snapshot().safety ==
-          RobotKitRuntimeConstants.RK_SAFETY_READY,
-        "restarted serial session did not accept an explicit safety reset");
-      remote.submit(robotkit.core.RobotCommand.JointTargets([
-        robotkit.core.JointTarget.position(0, 0.5)
-      ], null));
+      waitUntil(
+        runtime,
+        function() return remote.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "restarted serial session did not accept an explicit safety reset"
+      );
+      remote.submit(robotkit.core.RobotCommand.JointTargets([robotkit.core.JointTarget.position(0, 0.5)], null));
       waitUntil(runtime, function() {
         var state = remote.snapshot();
         return state.positions.length == 3 && state.positions.get(0) == 0.5;
@@ -100,29 +102,52 @@ class WorldTcpIntegration {
       var leftWheel = model.addLink(new robotkit.model.Link("left wheel", "link/left-wheel"));
       var rightWheel = model.addLink(new robotkit.model.Link("right wheel", "link/right-wheel"));
       var carriage = model.addLink(new robotkit.model.Link("fork carriage", "link/carriage"));
-      var leftWheelJoint = model.addJoint(new robotkit.model.Joint("left wheel joint",
-        robotkit.model.JointType.Continuous, base, leftWheel, "joint/left-wheel"));
+      var leftWheelJoint = model.addJoint(new robotkit.model.Joint(
+        "left wheel joint",
+        robotkit.model.JointType.Continuous,
+        base,
+        leftWheel,
+        "joint/left-wheel"
+      ));
       leftWheelJoint.axis = [0.0, 1.0, 0.0];
       leftWheelJoint.limits.lower = -100.0;
       leftWheelJoint.limits.upper = 100.0;
       leftWheelJoint.limits.effort = 100.0;
-      var rightWheelJoint = model.addJoint(new robotkit.model.Joint("right wheel joint",
-        robotkit.model.JointType.Continuous, base, rightWheel, "joint/right-wheel"));
+      var rightWheelJoint = model.addJoint(new robotkit.model.Joint(
+        "right wheel joint",
+        robotkit.model.JointType.Continuous,
+        base,
+        rightWheel,
+        "joint/right-wheel"
+      ));
       rightWheelJoint.axis = [0.0, 1.0, 0.0];
       rightWheelJoint.limits.lower = -100.0;
       rightWheelJoint.limits.upper = 100.0;
       rightWheelJoint.limits.effort = 100.0;
-      var liftJoint = model.addJoint(new robotkit.model.Joint("mast lift",
-        robotkit.model.JointType.Prismatic, base, carriage, "joint/lift"));
+      var liftJoint = model.addJoint(new robotkit.model.Joint(
+        "mast lift",
+        robotkit.model.JointType.Prismatic,
+        base,
+        carriage,
+        "joint/lift"
+      ));
       liftJoint.limits.lower = 0.0;
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
       profile.mobileBase = new robotkit.profile.RobotMobileConfiguration(
-        robotkit.profile.RobotDriveConfiguration.Differential("joint/left-wheel",
-          "joint/right-wheel", 0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
-      profile.forkMechanism = new robotkit.profile.RobotForkConfiguration("joint/lift",
-        1000.0, 600.0, 1.0);
+        robotkit.profile.RobotDriveConfiguration.Differential(
+          "joint/left-wheel",
+          "joint/right-wheel",
+          0.1,
+          0.5
+        ),
+        0.5,
+        1.0,
+        1.0,
+        1.0
+      );
+      profile.forkMechanism = new robotkit.profile.RobotForkConfiguration("joint/lift", 1000.0, 600.0, 1.0);
       var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
       mount.position = [0.2, 0.0, 0.0];
       for (kind in ["joint_encoder", "imu", "lidar"]) {
@@ -130,20 +155,27 @@ class WorldTcpIntegration {
         sensor.frame = mount;
       }
       if (cameraFixture) {
-        var camera = model.addSensor(new robotkit.model.Sensor("camera", "camera", 0,
-          "demo/camera"));
+        var camera = model.addSensor(new robotkit.model.Sensor("camera", "camera", 0, "demo/camera"));
         camera.frame = mount;
       }
-      var localRuntime = simulation.addRobot(
-        robotkit.runtime.RobotRuntimeCompiler.compile(model, profile));
-      var local = new robotkit.simulation.SimulatedRobot("local", localRuntime, model.name,
-        [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+      var localRuntime = simulation.addRobot(robotkit.runtime.RobotRuntimeCompiler.compile(model, profile));
+      var local = new robotkit.simulation.SimulatedRobot(
+        "local",
+        localRuntime,
+        model.name,
+        [for (link in model.links) link.name],
+        [for (joint in model.joints) joint.name]
+      );
       if (cameraFixture) {
         var pixels = haxe.io.Bytes.alloc(6);
         for (index in 0...6) pixels.set(index, index + 1);
-        localRuntime.publishCameraFrame("demo/camera",
+        localRuntime.publishCameraFrame(
+          "demo/camera",
           new robotkit.streams.CameraImage(2, 1, "rgb8", pixels),
-          Int64.ofInt(1), Int64.ofInt(1), "camera.fixture");
+          Int64.ofInt(1),
+          Int64.ofInt(1),
+          "camera.fixture"
+        );
       }
       world.attach(local);
       simulationHarness.step(Int64.ofInt(1));
@@ -151,9 +183,8 @@ class WorldTcpIntegration {
       remote.connect(host, port, runtime.events);
       waitUntil(runtime, function() return remote.status() == RobotStatus.Ready, "RemoteRobot did not become ready");
       var families = remote.streamCapabilities();
-      if (families.indexOf("essential") < 0 || families.indexOf("sensor") < 0 ||
-          families.indexOf("camera") < 0)
-        throw "robotd Welcome did not report stream capabilities";
+      if (families.indexOf("essential") < 0 || families.indexOf("sensor") < 0
+        || families.indexOf("camera") < 0) throw "robotd Welcome did not report stream capabilities";
       if (remote.id() != LOGICAL_ID) throw "world changed the logical robot ID";
       var protocolId = remote.protocolRobotId();
       if (protocolId == null || Int64.compare(protocolId,
@@ -161,57 +192,97 @@ class WorldTcpIntegration {
       waitUntil(runtime, function() {
         var capabilities = remote.capabilities();
         return capabilities.jointCount == 3 && capabilities.accepts(robotkit.core.JointTargetMode.Position)
-          && capabilities.accepts(robotkit.core.JointTargetMode.Velocity) && capabilities.accepts(robotkit.core.JointTargetMode.Effort);
+          && capabilities.accepts(robotkit.core.JointTargetMode.Velocity)
+          && capabilities.accepts(robotkit.core.JointTargetMode.Effort);
       }, "robotd did not advertise all joint target modes");
 
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
-      if (!remote.capabilities().execution.plans)
-        throw "robotd did not advertise its native plan queue";
+      if (!remote.capabilities().execution.plans) throw "robotd did not advertise its native plan queue";
       var initial = remote.snapshot().positions.toArray();
       var target = initial.copy();
       target[0] += 0.1;
-      var generated = Trajectory.generateStateToState(initial, [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0], target, [0.5, 0.5, 0.5],
-        [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]);
-      var planSegments:Array<TrajectorySegment> = [for (segment in generated.segments())
-        new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-          segment.coefficients)];
+      var generated = Trajectory.generateStateToState(
+        initial,
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        target,
+        [0.5, 0.5, 0.5],
+        [
+          0.5,
+          0.5,
+          0.5
+        ],
+        [
+          1.0,
+          1.0,
+          1.0
+        ]
+      );
+      var planSegments:Array<TrajectorySegment> = [for (segment in generated.segments()) new TrajectorySegment(
+        segment.timeFromStartNs,
+        segment.durationNs,
+        segment.coefficients
+      )];
       generated.dispose();
-      remote.submit(robotkit.core.RobotCommand.ExecutionPlan(
-        new ExecutionPlanSubmission(Int64.ofInt(1001), Int64.ofInt(1),
-          Int64.ofInt(0), 0, initial, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-          planSegments)));
-      waitUntil(runtime, function() return Int64.compare(
-        remote.snapshot().activePlanId, Int64.ofInt(1001)) == 0,
-        'remote Ruckig plan was not accepted: fault=${remote.fault()} state=${remote.snapshot().sessionState} id=${remote.snapshot().activePlanId} depth=${remote.snapshot().trajectoryQueueDepth} q=${remote.snapshot().positions.get(0)} safety=${remote.snapshot().safety} code=${remote.snapshot().faultCode} seq=${remote.snapshot().sourceSequence} status=${remote.status()}');
+      remote.submit(robotkit.core.RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
+        Int64.ofInt(1001),
+        Int64.ofInt(1),
+        Int64.ofInt(0),
+        0,
+        initial,
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        planSegments
+      )));
+      waitUntil(
+        runtime,
+        function() return Int64.compare(remote.snapshot().activePlanId, Int64.ofInt(1001)) == 0,
+        'remote Ruckig plan was not accepted: fault=${remote.fault()} state=${remote.snapshot().sessionState} id=${remote.snapshot().activePlanId} depth=${remote.snapshot().trajectoryQueueDepth} q=${remote.snapshot().positions.get(0)} safety=${remote.snapshot().safety} code=${remote.snapshot().faultCode} seq=${remote.snapshot().sourceSequence} status=${remote.status()}'
+      );
       remote.submit(robotkit.core.RobotCommand.Hold);
-      waitUntil(runtime, function() return remote.snapshot().sessionState ==
-        RobotKitRuntimeConstants.RK_SESSION_HELD,
-        'remote HOLD did not pause the native plan: state=${remote.snapshot().sessionState} q=${remote.snapshot().positions.get(0)} fault=${remote.fault()}');
+      waitUntil(
+        runtime,
+        function() return remote.snapshot().sessionState == RobotKitRuntimeConstants.RK_SESSION_HELD,
+        'remote HOLD did not pause the native plan: state=${remote.snapshot().sessionState} q=${remote.snapshot().positions.get(0)} fault=${remote.fault()}'
+      );
       remote.submit(robotkit.core.RobotCommand.Resume);
-      waitUntil(runtime, function() return Math.abs(remote.snapshot().positions.get(0) -
-        target[0]) < 1e-4 && !remote.snapshot().trajectoryActive,
-        "remote Ruckig plan did not resume and complete");
+      waitUntil(
+        runtime,
+        function() return Math.abs(remote.snapshot().positions.get(0) - target[0]) < 1e-4
+        && !remote.snapshot().trajectoryActive,
+        "remote Ruckig plan did not resume and complete"
+      );
       remote.stop(robotkit.core.StopMode.Emergency);
-      waitUntil(runtime, function() return remote.snapshot().safety ==
-          RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
-        "simulated robot did not latch an explicit remote emergency stop");
+      waitUntil(
+        runtime,
+        function() return remote.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
+        "simulated robot did not latch an explicit remote emergency stop"
+      );
       world.resetSafety(LOGICAL_ID);
-      waitUntil(runtime, function() return remote.snapshot().safety ==
-          RobotKitRuntimeConstants.RK_SAFETY_READY,
-        "explicit safety reset did not release the new serial session");
+      waitUntil(
+        runtime,
+        function() return remote.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "explicit safety reset did not release the new serial session"
+      );
       var deadlineRejected = false;
-      try remote.submit(robotkit.core.RobotCommand.JointTargets([
-        robotkit.core.JointTarget.position(0, 0.9)
-      ], Int64.ofInt(123)))
-      catch (_:Dynamic) deadlineRejected = true;
+      try remote.submit(robotkit.core.RobotCommand.JointTargets(
+        [robotkit.core.JointTarget.position(0, 0.9)],
+        Int64.ofInt(123)
+      )) catch (_:Dynamic) deadlineRejected = true;
       if (!deadlineRejected) throw "remote adapter forwarded an unmapped absolute deadline";
       var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.5));
-      if (behavior.update(remote) != 1)
-        throw "transport-neutral behavior did not submit a remote command";
+      if (behavior.update(remote) != 1) throw "transport-neutral behavior did not submit a remote command";
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.id == LOGICAL_ID && state.positions.length > 0 && state.positions.get(0) == 0.5;
@@ -219,23 +290,24 @@ class WorldTcpIntegration {
 
       var state = world.snapshot().robot(LOGICAL_ID);
       var position = state == null ? 0.0 : state.positions.get(0);
-      waitUntil(runtime, function() return remote.streams().latestFrames().length == (cameraFixture ? 4 : 3), "bulk sensor connection did not publish all frames");
-      if (state == null || state.sensors.length != 2)
-        throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
+      waitUntil(
+        runtime,
+        function() return remote.streams().latestFrames().length == (cameraFixture ? 4 : 3),
+        "bulk sensor connection did not publish all frames"
+      );
+      if (state == null
+        || state.sensors.length != 2) throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
       for (sensor in remote.streams().latestFrames()) {
-        if (sensor.sensorId != 'demo/${sensor.kind}' || sensor.frameId != "demo/sensor-mount"
-            || sensor.linkId != "base" || sensor.mountPosition.get(0) != 0.2)
-          throw "transport lost configured sensor identity or mount";
-        if (sensor.kind == "imu" && (sensor.values.length != 6 || Math.abs(sensor.values.get(5) - 9.81) > 1e-9))
-          throw "transport changed the stationary IMU specific force";
-        if (sensor.kind == "lidar")
-          for (range in sensor.values.toArray())
-            if (range != 10.0) throw "single-robot LiDAR must exclude self geometry";
-        if (sensor.kind == "camera" && (sensor.image == null ||
-            sensor.image.width != 2 || sensor.image.bytes().get(5) != 6))
-          throw "robotd did not transport the camera fixture pixels";
-        if (Int64.compare(sensor.receivedTimestampNs, sensor.sourceTimestampNs) == 0)
-          throw "sensor receipt reused simulation source time";
+        if (sensor.sensorId != 'demo/${sensor.kind}' || sensor.frameId != "demo/sensor-mount" || sensor.linkId != "base"
+          || sensor.mountPosition.get(0) != 0.2) throw "transport lost configured sensor identity or mount";
+        if (sensor.kind == "imu" && (sensor.values.length != 6
+          || Math.abs(sensor.values.get(5) - 9.81) > 1e-9)) throw "transport changed the stationary IMU specific force";
+        if (sensor.kind == "lidar") for (range in sensor.values.toArray()) if (range
+          != 10.0) throw "single-robot LiDAR must exclude self geometry";
+        if (sensor.kind == "camera" && (sensor.image == null || sensor.image.width != 2
+          || sensor.image.bytes().get(5) != 6)) throw "robotd did not transport the camera fixture pixels";
+        if (Int64.compare(sensor.receivedTimestampNs,
+          sensor.sourceTimestampNs) == 0) throw "sensor receipt reused simulation source time";
       }
       // Same behavior instance, fresh runner per adapter. Compare settled values,
       // not sequence numbers or timestamps from independently ticking clocks.
@@ -247,20 +319,24 @@ class WorldTcpIntegration {
         var shared = new HoldJointBehavior(0, target);
         var localRunner = new WorldBehaviorRunner(shared);
         var remoteRunner = new WorldBehaviorRunner(shared);
-        if (localRunner.update(local) != 1 || remoteRunner.update(remote) != 1)
-          throw "shared behavior did not emit one command on each adapter";
-        recording.recordCommand(robotkit.core.RobotCommand.JointTargets([
-          robotkit.core.JointTarget.position(0, target)
-        ], null), LOGICAL_ID);
-        if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
-          throw "runner emitted duplicate commands for an unchanged snapshot";
+        if (localRunner.update(local) != 1
+          || remoteRunner.update(remote) != 1) throw "shared behavior did not emit one command on each adapter";
+        recording.recordCommand(
+          robotkit.core.RobotCommand.JointTargets(
+            [robotkit.core.JointTarget.position(0, target)],
+            null
+          ),
+          LOGICAL_ID
+        );
+        if (localRunner.update(local) != 0
+          || remoteRunner.update(remote) != 0) throw "runner emitted duplicate commands for an unchanged snapshot";
         simulationHarness.step(Int64.ofInt(tick++));
         simulationHarness.step(Int64.ofInt(tick++));
         waitUntil(runtime, function() {
           var value = remote.snapshot();
           if (value.positions.length != 3 || value.positions.get(0) != target) return false;
-          for (sensor in value.sensors.toArray())
-            if (sensor.kind == "joint_encoder" && sensor.values.get(0) == target) return true;
+          for (sensor in value.sensors.toArray()) if (sensor.kind == "joint_encoder"
+            && sensor.values.get(0) == target) return true;
           return false;
         }, "shared behavior failed to converge remotely");
         var expected = local.snapshot();
@@ -268,8 +344,7 @@ class WorldTcpIntegration {
         recording.recordSnapshot(actual);
         recordedTargets.push(target);
         if (expected.positions.get(0) != target || actual.positions.get(0) != expected.positions.get(0)
-            || expected.faultCode != 0 || actual.faultCode != 0)
-          throw "local and remote behavior outcomes differ";
+          || expected.faultCode != 0 || actual.faultCode != 0) throw "local and remote behavior outcomes differ";
         if (actual.sensors.length != expected.sensors.length) throw "sensor counts differ";
         for (sensor in expected.sensors.toArray()) {
           var found = false;
@@ -277,16 +352,16 @@ class WorldTcpIntegration {
             if (other.sensorId != sensor.sensorId) continue;
             found = true;
             if (other.kind != sensor.kind || other.frameId != sensor.frameId || other.linkId != sensor.linkId
-                || other.values.length != sensor.values.length) throw "sensor contracts differ";
-            for (i in 0...3)
-              if (other.mountPosition.get(i) != sensor.mountPosition.get(i)) throw "sensor mounts differ";
-            for (i in 0...4)
-              if (other.mountRotation.get(i) != sensor.mountRotation.get(i)) throw "sensor rotations differ";
+              || other.values.length != sensor.values.length) throw "sensor contracts differ";
+            for (i in 0...3) if (other.mountPosition.get(i)
+              != sensor.mountPosition.get(i)) throw "sensor mounts differ";
+            for (i in 0...4) if (other.mountRotation.get(i)
+              != sensor.mountRotation.get(i)) throw "sensor rotations differ";
             for (i in 0...sensor.values.length) {
               var expectedValue = sensor.values.get(i);
               var actualValue = other.values.get(i);
-              if (Math.abs(actualValue - expectedValue) > 1e-9)
-                throw 'sensor measurements differ for ${sensor.sensorId}[$i]: expected=$expectedValue actual=$actualValue';
+              if (Math.abs(actualValue - expectedValue)
+                > 1e-9) throw 'sensor measurements differ for ${sensor.sensorId}[$i]: expected=$expectedValue actual=$actualValue';
             }
           }
           if (!found) throw "remote sensor identity missing";
@@ -297,68 +372,97 @@ class WorldTcpIntegration {
       var replay = new ReplayRobot(LOGICAL_ID, loaded);
       for (index in 0...recordedTargets.length) {
         if (index > 0 && !replay.advance()) throw "replay ended before recorded observations";
-        if (replay.snapshot().positions.get(0) != recordedTargets[index])
-          throw "replay changed the recorded observation sequence";
-        if (new WorldBehaviorRunner(new HoldJointBehavior(0,recordedTargets[index])).update(replay) != 1)
-          throw "replayed observation changed behavior output";
+        if (replay.snapshot().positions.get(0)
+          != recordedTargets[index]) throw "replay changed the recorded observation sequence";
+        if (new WorldBehaviorRunner(new HoldJointBehavior(0,
+          recordedTargets[index])).update(replay) != 1) throw "replayed observation changed behavior output";
       }
-      replay.close(); sys.FileSystem.deleteFile(recordingPath);
-      remote.submit(robotkit.core.RobotCommand.JointTargets([
-        robotkit.core.JointTarget.position(0, 0.25),
-        robotkit.core.JointTarget.velocity(1, 0.5),
-        robotkit.core.JointTarget.effort(2, 2.0)
-      ], null));
+      replay.close();
+      sys.FileSystem.deleteFile(recordingPath);
+      remote.submit(robotkit.core.RobotCommand.JointTargets(
+        [
+          robotkit.core.JointTarget.position(0, 0.25),
+          robotkit.core.JointTarget.velocity(
+            1,
+            0.5
+          ),
+          robotkit.core.JointTarget.effort(
+            2,
+            2.0
+          )
+        ],
+        null
+      ));
       waitUntil(runtime, function() {
         var state = remote.snapshot();
-        return state.positions.length == 3 && state.positions.get(0) == 0.25
-          && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
+        return state.positions.length == 3
+          && state.positions.get(0) == 0.25 && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
       }, "atomic mixed-mode target batch did not reach robotd runtime");
       var mobileBase = MobileBase.fromRobot(remote, model, profile);
       var localization = new WheelOdometryLocalization(mobileBase);
       var current = remote.snapshot();
       var estimate = localization.update(current);
       var goalPose = new Pose2(estimate.pose.x + 0.1, estimate.pose.y, estimate.pose.yaw);
-      var grid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
-        100, 100, "odom", OccupancyCell.Free);
+      var grid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0), 100, 100, "odom", OccupancyCell.Free);
       var costmap = new Costmap2(grid, 0.25);
       var navigation = new Navigation(mobileBase, localization, 0.2, 0.2, 0.8);
       var navigator = new Navigator(navigation, new AStarPlanner(costmap), costmap);
-      var goTo = new GoTo(navigator, new NavigationGoal(goalPose, "odom", 0.01, 0.05),
-        function(snapshot) {
-          localization.update(snapshot);
-          return new PerceptionSnapshot();
-        });
+      var goTo = new GoTo(navigator, new NavigationGoal(goalPose, "odom", 0.01, 0.05), function(snapshot) {
+        localization.update(snapshot);
+        return new PerceptionSnapshot();
+      }
+      );
       var skillRunner = new SkillRunner();
-      if (skillRunner.start(goTo) != SkillStatus.Running ||
-          skillRunner.activeSkill() != goTo)
-        throw "SkillRunner did not start goal-level GoTo for RemoteRobot";
-      if (skillRunner.update(current, 0.02) != SkillStatus.Running)
-        throw "RemoteRobot GoTo did not remain active after its first update";
+      if (skillRunner.start(goTo) != SkillStatus.Running
+        || skillRunner.activeSkill() != goTo) throw "SkillRunner did not start goal-level GoTo for RemoteRobot";
+      if (skillRunner.update(current,
+        0.02) != SkillStatus.Running) throw "RemoteRobot GoTo did not remain active after its first update";
       waitUntil(runtime, function() {
         var state = remote.snapshot();
-        return state.velocities.length == 3 && state.velocities.get(0) > 0.0
-          && state.velocities.get(1) > 0.0;
+        return state.velocities.length == 3 && state.velocities.get(0) > 0.0 && state.velocities.get(1) > 0.0;
       }, "GoTo did not send an atomic two-wheel velocity target through robotd");
       skillRunner.cancel();
-      if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null ||
-          skillRunner.result() == null)
-        throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
+      if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null
+        || skillRunner.result() == null) throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");
-      facility.addZone(new Zone("floor", "Floor", "map",
-        robotkit.mobile.Footprint.rectangle(5.0, 5.0)));
+      facility.addZone(new Zone("floor", "Floor", "map", robotkit.mobile.Footprint.rectangle(5.0, 5.0)));
       var receiving = new Station("receiving", "Receiving", "floor", "map", new Pose2());
       var staging = new Station("staging", "Staging", "floor", "map", new Pose2(0.1, 0.0, 0.0));
       facility.addStation(receiving);
       facility.addStation(staging);
-      facility.addLane(new Lane("receiving-to-staging", receiving.id, staging.id,
-        new Path([receiving.pose, staging.pose], "map"), 1.5, 0.5));
+      facility.addLane(new Lane(
+        "receiving-to-staging",
+        receiving.id,
+        staging.id,
+        new Path(
+          [
+            receiving.pose,
+            staging.pose
+          ],
+          "map"
+        ),
+        1.5,
+        0.5
+      ));
       var fleet = new Fleet("serial-fleet", world);
       fleet.addRobot(LOGICAL_ID);
-      var mission = new Mission("serial-transport", "Serial robot transport", [
-        new Transport("transport-pallet", receiving.id, staging.id,
-          new Payload(100.0, 0.8, 0.6, 0.4, 0.4))
-      ]);
+      var mission = new Mission(
+        "serial-transport",
+        "Serial robot transport",
+        [new Transport(
+          "transport-pallet",
+          receiving.id,
+          staging.id,
+          new Payload(
+            100.0,
+            0.8,
+            0.6,
+            0.4,
+            0.4
+          )
+        )]
+      );
       var assignmentValue = new Dispatcher(fleet).dispatch(mission);
       if (assignmentValue == null) throw "serial robot was not assigned the facility mission";
       var assignment:FleetAssignment = cast assignmentValue;
@@ -367,20 +471,36 @@ class WorldTcpIntegration {
       executor.start();
       var missionStatus = executor.status;
       var missionTicks = 0;
-      while (switch missionStatus { case MissionExecutionStatus.Running: true; case _: false; } &&
-          missionTicks < 800) {
-        while (runtime.events.poll()) {}
+      while (switch missionStatus {
+        case MissionExecutionStatus.Running:
+          true;
+        case _:
+          false;
+      }
+      && missionTicks < 800) {
+        while (runtime.events.poll()) {
+        }
         world.pump();
         missionStatus = executor.update(0.02);
         missionTicks++;
-        if (switch missionStatus { case MissionExecutionStatus.Running: true; case _: false; })
-          runtime.events.wait(0.01);
+        if (switch missionStatus {
+          case MissionExecutionStatus.Running:
+            true;
+          case _:
+            false;
+        }
+        ) runtime.events.wait(0.01);
       }
-      if (!switch missionStatus { case MissionExecutionStatus.Succeeded: true; case _: false; })
-        throw 'RemoteRobot mission did not succeed: ${Std.string(missionStatus)}';
-      if (mission.status != materia.automation.mission.MissionStatus.Succeeded ||
-          fleet.availableRobotIds().indexOf(LOGICAL_ID) < 0)
-        throw "serial mission did not complete and release its fleet assignment";
+      if (!switch missionStatus {
+        case MissionExecutionStatus.Succeeded:
+          true;
+        case _:
+          false;
+      }
+      ) throw 'RemoteRobot mission did not succeed: ${Std.string(missionStatus)}';
+      if (mission.status != materia.automation.mission.MissionStatus.Succeeded
+        || fleet.availableRobotIds().indexOf(LOGICAL_ID)
+        < 0) throw "serial mission did not complete and release its fleet assignment";
       Sys.println("SkillRunner GoTo, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
@@ -406,25 +526,23 @@ private class SerialTransportSkillFactory implements materia.automation.mission.
   final profile:robotkit.profile.RobotProfile;
 
   public function new(model:robotkit.model.RobotModel, profile:robotkit.profile.RobotProfile) {
-    this.model = model; this.profile = profile;
+    this.model = model;
+    this.profile = profile;
   }
 
-  public function create(task:Task, robot:robotkit.core.Robot,
-      facility:Facility):robotkit.skill.Skill {
+  public function create(task:Task, robot:robotkit.core.Robot, facility:Facility):robotkit.skill.Skill {
     return switch task.kind {
       case TaskKind.Transport:
         var transport:Transport = cast task;
-        var route = new FacilityRouter(facility).route(
-          transport.pickupStationId, transport.destinationStationId);
+        var route = new FacilityRouter(facility).route(transport.pickupStationId, transport.destinationStationId);
         var base = MobileBase.fromRobot(robot, model, profile);
         var localization = new WheelOdometryLocalization(base, route.path.frameId);
-        var navigation = new Navigation(base, localization, 0.2,
-          route.maximumSpeedMetersPerSecond, 1.0);
+        var navigation = new Navigation(base, localization, 0.2, route.maximumSpeedMetersPerSecond, 1.0);
         var goalStation = facility.station(transport.destinationStationId);
         if (goalStation == null) throw "transport mission destination is missing";
-        new FollowPath(navigation, route.path,
-          new NavigationGoal(goalStation.pose, goalStation.frameId, 0.02, 0.1));
-      case _: throw 'serial integration does not support task kind ${Std.string(task.kind)}';
+        new FollowPath(navigation, route.path, new NavigationGoal(goalStation.pose, goalStation.frameId, 0.02, 0.1));
+      case _:
+        throw 'serial integration does not support task kind ${Std.string(task.kind)}';
     }
   }
 }

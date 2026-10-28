@@ -185,7 +185,14 @@ class RobotWorldTests {
           var profile = robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(value, "profile"));
           Reflect.setField(value, "profile", robotkit.profile.RobotProfileCodec.toRecord(profile));
           sys.io.File.saveContent(path, haxe.Json.stringify(value));
-        } else if (Reflect.field(value, "schemaVersion") == DeviceLayout.VERSION && Reflect.hasField(value, "channels") && !Reflect.hasField(value, "device") && !Reflect.hasField(value, "model")) {
+        } else if (Reflect.field(value,
+          "schemaVersion") == DeviceLayout.VERSION && Reflect.hasField(value, "channels") && !Reflect.hasField(
+            value,
+            "device"
+          ) && !Reflect.hasField(
+            value,
+            "model"
+          )) {
           var layout = DeviceLayout.decode(sys.io.File.getBytes(path));
           sys.io.File.saveBytes(path, DeviceLayout.encode(layout));
         }
@@ -322,103 +329,274 @@ class RobotWorldTests {
     var channel = channels.get(name);
     if (channel == null) throw 'Missing recording channel $name';
     var decoded = channel.decode(channel.encode(entry));
-    return new RobotRecordingEntry(entry.ordinal, decoded.robotId, decoded.event,
-      entry.sourceSequence, entry.sourceTimestampNs, entry.sourceClockId,
-      entry.recordingTimestampNs);
+    return new RobotRecordingEntry(
+      entry.ordinal,
+      decoded.robotId,
+      decoded.event,
+      entry.sourceSequence,
+      entry.sourceTimestampNs,
+      entry.sourceClockId,
+      entry.recordingTimestampNs
+    );
   }
 
   static function testPolynomialExecutionPlan():Void {
-    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
-      [[0.0, 1.0], [0.0, -1.0]]);
-    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(7),
-      Int64.ofInt(1), Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0],
-      [0.0, 0.0], [segment], null, null, null, null, null, false);
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000), [[0.0, 1.0], [0.0, -1.0]]);
+    var plan = new robotkit.execution.ExecutionPlanSubmission(
+      Int64.ofInt(7),
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      0,
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [segment],
+      null,
+      null,
+      null,
+      null,
+      null,
+      false
+    );
     check(plan.segments.length == 1, "execution plan uses polynomial payload");
-    check(plan.copy().segments[0].coefficients[1][1] == -1.0,
-      "execution plan copy keeps coefficients");
+    check(plan.copy().segments[0].coefficients[1][1] == -1.0, "execution plan copy keeps coefficients");
     var gapRejected = false;
-    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
-      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0],
-      [segment, new TrajectorySegment(Int64.ofInt(100000001), Int64.ofInt(100000000),
-        [[0.1, 1.0], [-0.1, -1.0]])]) catch (_:Dynamic) gapRejected = true;
+    try new robotkit.execution.ExecutionPlanSubmission(
+      Int64.ofInt(8),
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      0,
+      [0.0, 0.0],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        segment,
+        new TrajectorySegment(
+          Int64.ofInt(100000001),
+          Int64.ofInt(100000000),
+          [
+            [
+              0.1,
+              1.0
+            ],
+            [
+              -0.1,
+              -1.0
+            ]
+          ]
+        )
+      ]
+    ) catch (_:Dynamic) gapRejected = true;
     check(gapRejected, "execution plan rejects a one-nanosecond segment gap");
     var eventRejected = false;
-    try new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(8), Int64.ofInt(1),
-      Int64.ofInt(1), 0, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment],
-      null, null, null, null, null, false,
-      [new ProcessTimedEvent(Int64.ofInt(100000001), "test", ProcessEventValue.Digital(true))])
-      catch (_:Dynamic) eventRejected = true;
+    try new robotkit.execution.ExecutionPlanSubmission(
+      Int64.ofInt(8),
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      0,
+      [0.0, 0.0],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [segment],
+      null,
+      null,
+      null,
+      null,
+      null,
+      false,
+      [new ProcessTimedEvent(
+        Int64.ofInt(100000001),
+        "test",
+        ProcessEventValue.Digital(true)
+      )]
+    ) catch (_:Dynamic) eventRejected = true;
     check(eventRejected, "execution plan rejects an event beyond its payload duration");
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.ExecutionPlan(plan));
     var replayed = roundTripRecording(recording.entries[0]);
     switch replayed.event {
       case Command(ExecutionPlan(value)):
-        check(value.planId == Int64.ofInt(7) && value.segments[0].degree == 1,
-          "polynomial plan survives recording round trip");
-      case _: throw "Expected recorded polynomial plan";
+        check(
+          value.planId == Int64.ofInt(7) && value.segments[0].degree == 1,
+          "polynomial plan survives recording round trip"
+        );
+      case _:
+        throw "Expected recorded polynomial plan";
     }
   }
 
   static function testMcapRobustness():Void {
-    var longPath='/tmp/robotkit-${Sys.getPid()}-long.mcap';
-    var writer=new McapRobotRecording(longPath,16*1024*1024,false);
-    equal(writer.memory,null,"file-only recording disables in-memory retention");
-    for(index in 0...1000) writer.recordSnapshot(new RobotSnapshot("long",Int64.ofInt(index),
-      Int64.ofInt(index),[index],[],[],1,0,Int64.ofInt(index),[],"long.clock","host"));
+    var longPath = '/tmp/robotkit-${Sys.getPid()}-long.mcap';
+    var writer = new McapRobotRecording(longPath, 16 * 1024 * 1024, false);
+    equal(writer.memory, null, "file-only recording disables in-memory retention");
+    for (index in 0...1000) writer.recordSnapshot(new RobotSnapshot(
+      "long",
+      Int64.ofInt(index),
+      Int64.ofInt(index),
+      [index],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(index),
+      [],
+      "long.clock",
+      "host"
+    ));
     writer.close();
-    var terminal=McapRecordingReader.status(longPath);
-    check(terminal!=null,"terminal recording status survives close");
-    var terminalValue:McapRecordingStatus=cast terminal;
-    equal(terminalValue.written,Int64.ofInt(1000),"persisted status retains write count");
-    var cursor=new McapRecordingReader(longPath),count=0,firstTime=Int64.ofInt(0);
-    while(true){var entry=cursor.next();if(entry==null)break;var entryValue:RobotRecordingEntry=cast entry;
-      if(count==0)firstTime=entryValue.recordingTimestampNs;count++;}
+    var terminal = McapRecordingReader.status(longPath);
+    check(terminal != null, "terminal recording status survives close");
+    var terminalValue:McapRecordingStatus = cast terminal;
+    equal(terminalValue.written, Int64.ofInt(1000), "persisted status retains write count");
+    var cursor = new McapRecordingReader(longPath), count = 0, firstTime = Int64.ofInt(0);
+    while (true) {
+      var entry = cursor.next();
+      if (entry == null) break;
+      var entryValue:RobotRecordingEntry = cast entry;
+      if (count == 0) firstTime = entryValue.recordingTimestampNs;
+      count++;
+    }
     cursor.close();
-    equal(count,1000,"incremental reader traverses a long recording");
-    check(Int64.compare(firstTime,Int64.ofInt(0))>0,"recording timestamp is captured independently");
-    sys.FileSystem.deleteFile(longPath);sys.FileSystem.deleteFile(longPath+".incomplete.status");
+    equal(count, 1000, "incremental reader traverses a long recording");
+    check(Int64.compare(firstTime, Int64.ofInt(0)) > 0, "recording timestamp is captured independently");
+    sys.FileSystem.deleteFile(longPath);
+    sys.FileSystem.deleteFile(longPath + ".incomplete.status");
 
-    var overflowPath='/tmp/robotkit-${Sys.getPid()}-overflow.mcap';
-    var overflow=new McapRobotRecording(overflowPath,1,false);
-    throws(function() overflow.recordSnapshot(new RobotSnapshot("overflow",Int64.ofInt(1),
-      Int64.ofInt(1),[1.0],[],[],1,0)),"byte-bounded queue reports oversized payload overflow");
-    throws(overflow.close,"close reports prior recording drop");
-    var overflowStatus=McapRecordingReader.status(overflowPath);
-    var overflowStatusValue:McapRecordingStatus=cast overflowStatus;
-    check(overflowStatus!=null&&Int64.compare(overflowStatusValue.dropped,Int64.ofInt(1))==0,
-      "drop status survives reopening");
-    sys.FileSystem.deleteFile(overflowPath);sys.FileSystem.deleteFile(overflowPath+".incomplete.status");
+    var overflowPath = '/tmp/robotkit-${Sys.getPid()}-overflow.mcap';
+    var overflow = new McapRobotRecording(overflowPath, 1, false);
+    throws(
+      function() overflow.recordSnapshot(new RobotSnapshot(
+        "overflow",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        [1.0],
+        [],
+        [],
+        1,
+        0
+      )),
+      "byte-bounded queue reports oversized payload overflow"
+    );
+    throws(overflow.close, "close reports prior recording drop");
+    var overflowStatus = McapRecordingReader.status(overflowPath);
+    var overflowStatusValue:McapRecordingStatus = cast overflowStatus;
+    check(
+      overflowStatus != null && Int64.compare(overflowStatusValue.dropped, Int64.ofInt(1)) == 0,
+      "drop status survives reopening"
+    );
+    sys.FileSystem.deleteFile(overflowPath);
+    sys.FileSystem.deleteFile(overflowPath + ".incomplete.status");
 
-    var failurePath='/tmp/robotkit-${Sys.getPid()}-write-failure';
+    var failurePath = '/tmp/robotkit-${Sys.getPid()}-write-failure';
     sys.FileSystem.createDirectory(failurePath);
-    throws(function() new McapRobotRecording(failurePath,1024,false),
-      "MCAP writer creation reports output open failure synchronously");
-    check(!sys.FileSystem.exists(failurePath+".incomplete"),
-      "failed writer creation removes its incomplete marker");
+    throws(
+      function() new McapRobotRecording(failurePath, 1024, false),
+      "MCAP writer creation reports output open failure synchronously"
+    );
+    check(!sys.FileSystem.exists(failurePath + ".incomplete"), "failed writer creation removes its incomplete marker");
     sys.FileSystem.deleteDirectory(failurePath);
 
   }
 
   static function testReplayCorrectness():Void {
     var recording = new RobotRecording();
-    recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 99.0)
-    ], null), "robot-a");
-    recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
-      [1.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-a.boot-1", "host"));
-    recording.recordSnapshot(new RobotSnapshot("robot-b", Int64.ofInt(7), Int64.ofInt(100),
-      [9.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-b.boot-1", "host"));
-    recording.recordSensor("robot-b", new SensorFrame("wrong", "imu", "b/frame",
-      Int64.ofInt(1), Int64.ofInt(101), [9.0], Int64.ofInt(201), "b/link"));
-    recording.recordSensor("robot-a", new SensorFrame("imu", "imu", "a/frame",
-      Int64.ofInt(1), Int64.ofInt(101), [1.0], Int64.ofInt(201), "a/link",
-      null, null, "robot-a.boot-1", "host"));
+    recording.recordCommand(RobotCommand.JointTargets([robotkit.core.JointTarget.position(0, 99.0)], null), "robot-a");
+    recording.recordSnapshot(new RobotSnapshot(
+      "robot-a",
+      Int64.ofInt(7),
+      Int64.ofInt(100),
+      [1.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(200),
+      [],
+      "robot-a.boot-1",
+      "host"
+    ));
+    recording.recordSnapshot(new RobotSnapshot(
+      "robot-b",
+      Int64.ofInt(7),
+      Int64.ofInt(100),
+      [9.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(200),
+      [],
+      "robot-b.boot-1",
+      "host"
+    ));
+    recording.recordSensor(
+      "robot-b",
+      new SensorFrame(
+        "wrong",
+        "imu",
+        "b/frame",
+        Int64.ofInt(1),
+        Int64.ofInt(101),
+        [9.0],
+        Int64.ofInt(201),
+        "b/link"
+      )
+    );
+    recording.recordSensor(
+      "robot-a",
+      new SensorFrame(
+        "imu",
+        "imu",
+        "a/frame",
+        Int64.ofInt(1),
+        Int64.ofInt(101),
+        [1.0],
+        Int64.ofInt(201),
+        "a/link",
+        null,
+        null,
+        "robot-a.boot-1",
+        "host"
+      )
+    );
     recording.recordFault(new RobotFault("robot-b", 90, "wrong robot", true));
     recording.recordFault(new RobotFault("robot-a", 12, "selected fault", false));
     // The source sequence repeats after a reset; clock identity distinguishes the observation.
-    recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(1),
-      [2.0], [], [], 1, 0, Int64.ofInt(300), [], "robot-a.boot-2", "host"));
+    recording.recordSnapshot(new RobotSnapshot(
+      "robot-a",
+      Int64.ofInt(7),
+      Int64.ofInt(1),
+      [2.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(300),
+      [],
+      "robot-a.boot-2",
+      "host"
+    ));
 
     var originalCommandCount = recording.commands.length;
     var replay = new ReplayRobot("robot-a", recording);
@@ -447,7 +625,10 @@ class RobotWorldTests {
     var source = [
       robotkit.core.JointTarget.position(0, 0.4),
       robotkit.core.JointTarget.velocity(1, -0.25),
-      robotkit.core.JointTarget.effort(2, 3.5)
+      robotkit.core.JointTarget.effort(
+        2,
+        3.5
+      )
     ];
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets(source, null), "batch-robot");
@@ -458,10 +639,16 @@ class RobotWorldTests {
       case JointTargets(targets, _):
         equal(targets.length, 3, "recording owns the full command batch");
         equal(targets[0].target, 0.4, "recording copies immutable target values");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
-          "recording preserves velocity interpretation");
-        equal(Std.string(targets[2].mode), Std.string(robotkit.core.JointTargetMode.Effort),
-          "recording preserves effort interpretation");
+        equal(
+          Std.string(targets[1].mode),
+          Std.string(robotkit.core.JointTargetMode.Velocity),
+          "recording preserves velocity interpretation"
+        );
+        equal(
+          Std.string(targets[2].mode),
+          Std.string(robotkit.core.JointTargetMode.Effort),
+          "recording preserves effort interpretation"
+        );
       case _:
         check(false, "recording retains a joint target batch");
     }
@@ -470,8 +657,11 @@ class RobotWorldTests {
     switch decoded.event {
       case Command(JointTargets(targets, _)):
         equal(targets.length, 3, "recording codec round-trips every target in a batch");
-        equal(Std.string(targets[0].mode), Std.string(robotkit.core.JointTargetMode.Position),
-          "recording codec preserves position mode");
+        equal(
+          Std.string(targets[0].mode),
+          Std.string(robotkit.core.JointTargetMode.Position),
+          "recording codec preserves position mode"
+        );
         equal(targets[1].target, -0.25, "recording codec preserves velocity values");
         equal(targets[2].target, 3.5, "recording codec preserves effort values");
       case _:
@@ -479,237 +669,382 @@ class RobotWorldTests {
     }
 
     var replay = new ReplayRobot("batch-robot", recording);
-    replay.submit(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, -0.1),
-      robotkit.core.JointTarget.velocity(1, 0.5)
-    ], null));
+    replay.submit(RobotCommand.JointTargets(
+      [
+        robotkit.core.JointTarget.position(0, -0.1),
+        robotkit.core.JointTarget.velocity(
+          1,
+          0.5
+        )
+      ],
+      null
+    ));
     switch replay.generatedCommands.commands[0] {
       case JointTargets(targets, _):
         equal(targets.length, 2, "replay captures generated commands as one batch");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
-          "replay preserves generated target modes");
+        equal(
+          Std.string(targets[1].mode),
+          Std.string(robotkit.core.JointTargetMode.Velocity),
+          "replay preserves generated target modes"
+        );
       case _:
         check(false, "replay generated command keeps batch form");
     }
     replay.close();
-    throws(function() robotkit.core.JointTarget.copyBatch([
-      robotkit.core.JointTarget.position(0, 0.0),
-      robotkit.core.JointTarget.effort(0, 1.0)
-    ]), "duplicate joints rejected within one atomic batch");
+    throws(
+      function() robotkit.core.JointTarget.copyBatch([
+        robotkit.core.JointTarget.position(0, 0.0),
+        robotkit.core.JointTarget.effort(
+          0,
+          1.0
+        )
+      ]),
+      "duplicate joints rejected within one atomic batch"
+    );
   }
 
   static function testMobileLayer():Void {
     var origin = new Pose2(1.0, 2.0, Math.PI * 0.5);
     var composed = origin.compose(new Pose2(1.0, 0.0, 0.0));
-    check(Math.abs(composed.x - 1.0) < 1e-9 && Math.abs(composed.y - 3.0) < 1e-9,
-      "Pose2 composes local translation in the parent frame");
+    check(
+      Math.abs(composed.x - 1.0) < 1e-9 && Math.abs(composed.y - 3.0) < 1e-9,
+      "Pose2 composes local translation in the parent frame"
+    );
     var roundTrip = composed.relativeTo(origin);
-    check(Math.abs(roundTrip.x - 1.0) < 1e-9 && Math.abs(roundTrip.y) < 1e-9,
-      "Pose2 computes frame-relative poses");
+    check(Math.abs(roundTrip.x - 1.0) < 1e-9 && Math.abs(roundTrip.y) < 1e-9, "Pose2 computes frame-relative poses");
     var straight = new Pose2().integrate(new Twist2(1.0, 0.0), 2.0);
-    check(Math.abs(straight.x - 2.0) < 1e-9 && Math.abs(straight.y) < 1e-9,
-      "Pose2 integrates straight body motion");
+    check(Math.abs(straight.x - 2.0) < 1e-9 && Math.abs(straight.y) < 1e-9, "Pose2 integrates straight body motion");
     var curve = new Pose2().integrate(new Twist2(1.0, 1.0), Math.PI * 0.5);
-    check(Math.abs(curve.x - 1.0) < 1e-9 && Math.abs(curve.y - 1.0) < 1e-9,
-      "Pose2 integrates constant-curvature motion");
+    check(
+      Math.abs(curve.x - 1.0) < 1e-9 && Math.abs(curve.y - 1.0) < 1e-9,
+      "Pose2 integrates constant-curvature motion"
+    );
     var bodyArc = new Pose2(2.0, -1.0, 0.4).integrate(new Twist2(1.0, 0.5, 0.25), 2.0);
     var expectedBodyArc = new Pose2(2.0, -1.0, 0.4).integrateDisplacement(2.0, 1.0, 0.5);
-    check(Math.abs(bodyArc.x - expectedBodyArc.x) < 1e-9 &&
-      Math.abs(bodyArc.y - expectedBodyArc.y) < 1e-9 &&
-      Math.abs(Pose2.wrapAngle(bodyArc.yaw - expectedBodyArc.yaw)) < 1e-9,
-      "Pose2 integrates forward, lateral, and yaw motion as one constant body twist");
+    check(
+      Math.abs(bodyArc.x - expectedBodyArc.x) < 1e-9 && Math.abs(bodyArc.y - expectedBodyArc.y) < 1e-9
+      && Math.abs(Pose2.wrapAngle(bodyArc.yaw - expectedBodyArc.yaw)) < 1e-9,
+      "Pose2 integrates forward, lateral, and yaw motion as one constant body twist"
+    );
 
     var footprint = Footprint.rectangle(2.0, 1.0);
     equal(footprint.vertices().length, 4, "rectangular footprint exposes copied vertices");
-    check(Math.abs(footprint.radius - 1.118033988749895) < 1e-9,
-      "footprint radius encloses its corners");
+    check(Math.abs(footprint.radius - 1.118033988749895) < 1e-9, "footprint radius encloses its corners");
     var vertices = footprint.vertices();
     vertices.pop();
     equal(footprint.vertices().length, 4, "footprint vertex list is immutable to callers");
-    throws(function() new Footprint([
-      new FootprintPoint(0.0, 0.0), new FootprintPoint(1.0, 0.0), new FootprintPoint(2.0, 0.0)
-    ]), "degenerate footprint polygons are rejected");
+    throws(
+      function() new Footprint([
+        new FootprintPoint(0.0, 0.0),
+        new FootprintPoint(1.0, 0.0),
+        new FootprintPoint(
+          2.0,
+          0.0
+        )
+      ]),
+      "degenerate footprint polygons are rejected"
+    );
 
     var differentialRobot = new FakeRobot("diff-base");
     differentialRobot.positions = [0.0, 0.0];
-    var differential = new MobileBase(differentialRobot,
+    var differential = new MobileBase(
+      differentialRobot,
       new DifferentialDrive(0, 1, 0.2, 0.6),
-      new MotionLimits(1.0, 2.0, 0.5, 1.0), footprint);
+      new MotionLimits(
+        1.0,
+        2.0,
+        0.5,
+        1.0
+      ),
+      footprint
+    );
     var bounded = differential.command(new Twist2(2.0, 4.0), 1.0);
-    check(Math.abs(bounded.linear - 0.5) < 1e-9 && Math.abs(bounded.angular - 1.0) < 1e-9,
-      "mobile command applies acceleration limits after speed limits");
+    check(
+      Math.abs(bounded.linear - 0.5) < 1e-9 && Math.abs(bounded.angular - 1.0) < 1e-9,
+      "mobile command applies acceleration limits after speed limits"
+    );
     check(switch differentialRobot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1 &&
-          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
-          Math.abs(targets[0].target - 1.0) < 1e-9 &&
-          Math.abs(targets[1].target - 4.0) < 1e-9;
-      case _: false;
+        targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1 && targets[0].mode
+          == robotkit.core.JointTargetMode.Velocity && targets[1].mode == robotkit.core.JointTargetMode.Velocity
+          && Math.abs(targets[0].target - 1.0) < 1e-9 && Math.abs(targets[1].target - 4.0) < 1e-9;
+      case _:
+        false;
     }, "differential drive submits both wheel velocities as one atomic command");
 
     var mobileBlueprint = new RobotRuntimeBlueprint(1, 2, 3);
-    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(0,
-      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -100.0, 100.0, 100.0, 50.0));
-    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(1,
-      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 2, -100.0, 100.0, 100.0, 50.0));
+    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(
+      0,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
+      0,
+      1,
+      -100.0,
+      100.0,
+      100.0,
+      50.0
+    ));
+    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(
+      1,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
+      0,
+      2,
+      -100.0,
+      100.0,
+      100.0,
+      50.0
+    ));
     var mobileSimulationHarness = new SimulationHarness(0.01);
 
     var mobileSimulation = mobileSimulationHarness.simulation;
-    var simulatedRobot = new SimulatedRobot("mobile-sim",
-      mobileSimulation.addRobot(mobileBlueprint), "mobile simulation",
-      ["base", "left-wheel", "right-wheel"], ["left-wheel-joint", "right-wheel-joint"]);
-    var simulatedBase = new MobileBase(simulatedRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var simulatedRobot = new SimulatedRobot(
+      "mobile-sim",
+      mobileSimulation.addRobot(mobileBlueprint),
+      "mobile simulation",
+      [
+        "base",
+        "left-wheel",
+        "right-wheel"
+      ],
+      [
+        "left-wheel-joint",
+        "right-wheel-joint"
+      ]
+    );
+    var simulatedBase = new MobileBase(
+      simulatedRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0)
+    );
     simulatedBase.command(new Twist2(0.2, 0.0));
     mobileSimulationHarness.step(Int64.ofInt(100));
     var simulatedState = simulatedRobot.snapshot();
-    check(Math.abs(simulatedState.velocities.get(0) - 2.0) < 1e-9 &&
-      Math.abs(simulatedState.velocities.get(1) - 2.0) < 1e-9,
-      "mobile base drives both simulated wheels through the shared Simulation runtime");
+    check(
+      Math.abs(simulatedState.velocities.get(0) - 2.0) < 1e-9
+      && Math.abs(simulatedState.velocities.get(1) - 2.0) < 1e-9,
+      "mobile base drives both simulated wheels through the shared Simulation runtime"
+    );
     simulatedRobot.close();
     mobileSimulationHarness.dispose();
 
     var speedLimited = differential.command(new Twist2(10.0, 0.0));
-    check(Math.abs(speedLimited.linear - 1.0) < 1e-9,
-      "mobile command applies configured body speed limits");
+    check(Math.abs(speedLimited.linear - 1.0) < 1e-9, "mobile command applies configured body speed limits");
     differential.stop();
     check(switch differentialRobot.lastStop {
-      case Normal: true;
-      case _: false;
-    },
-      "mobile base forwards stop through the wrapped robot");
+      case Normal:
+        true;
+      case _:
+        false;
+    }, "mobile base forwards stop through the wrapped robot");
 
     var ackermannRobot = new FakeRobot("ackermann-base");
     ackermannRobot.positions = [0.0, 0.0];
     var ackermann = new MobileBase(ackermannRobot,
       new AckermannDrive(0, 1, 1.2, 0.25, 0.5), new MotionLimits(2.0, 2.0));
     var ackermannCommand = ackermann.command(new Twist2(1.0, 1.0));
-    check(ackermannCommand.angular < 1.0 && ackermannCommand.angular > 0.0,
-      "Ackermann drive limits yaw rate to the configured steering angle");
+    check(
+      ackermannCommand.angular < 1.0 && ackermannCommand.angular > 0.0,
+      "Ackermann drive limits yaw rate to the configured steering angle"
+    );
     check(switch ackermannRobot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
-          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
-          Math.abs(targets[0].target) <= 0.5 && targets[1].target > 0.0;
-      case _: false;
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Position && targets[1].mode
+          == robotkit.core.JointTargetMode.Velocity && Math.abs(targets[0].target) <= 0.5 && targets[1].target > 0.0;
+      case _:
+        false;
     }, "Ackermann drive submits steering position and wheel velocity together");
-    throws(function() ackermann.command(new Twist2(0.0, 1.0)),
-      "Ackermann drive rejects a turn-in-place request");
-    throws(function() ackermann.command(new Twist2(1.0, 0.0, 0.1)),
-      "Ackermann drive rejects a lateral command");
+    throws(function() ackermann.command(new Twist2(0.0, 1.0)), "Ackermann drive rejects a turn-in-place request");
+    throws(function() ackermann.command(new Twist2(1.0, 0.0, 0.1)), "Ackermann drive rejects a lateral command");
     ackermann.command(Twist2.zero());
     check(switch ackermannRobot.lastCommand {
-      case JointTargets(targets, _): targets[0].target == 0.0 && targets[1].target == 0.0;
-      case _: false;
+      case JointTargets(targets, _):
+        targets[0].target == 0.0 && targets[1].target == 0.0;
+      case _:
+        false;
     }, "Ackermann drive safely emits zero steering and wheel targets at rest");
     var wideAckermann = new AckermannDrive(0, 1, 1.2, 0.25, 1.2);
     var wideTargets = wideAckermann.targets(new Twist2(1.0, 2.0));
-    check(wideTargets[0].target > 1.1 && wideTargets[0].target < 1.2,
-      "Ackermann curvature mapping handles steering ratios above one");
+    check(
+      wideTargets[0].target > 1.1 && wideTargets[0].target < 1.2,
+      "Ackermann curvature mapping handles steering ratios above one"
+    );
 
     var holonomicRobot = new FakeRobot("holonomic-base");
     holonomicRobot.positions = [0.0, 0.0, 0.0];
-    var holonomic = new MobileBase(holonomicRobot,
-      new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3), new MotionLimits(1.0, 2.0));
+    var holonomic = new MobileBase(
+      holonomicRobot,
+      new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3),
+      new MotionLimits(
+        1.0,
+        2.0
+      )
+    );
     holonomic.command(new Twist2(0.4, 0.5));
     check(switch holonomicRobot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 && targets[2].joint == 2 &&
-          targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
-          targets[2].mode == robotkit.core.JointTargetMode.Velocity;
-      case _: false;
+        targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1
+          && targets[2].joint == 2 && targets[0].mode == robotkit.core.JointTargetMode.Velocity && targets[1].mode
+          == robotkit.core.JointTargetMode.Velocity && targets[2].mode == robotkit.core.JointTargetMode.Velocity;
+      case _:
+        false;
     }, "holonomic drive submits all three wheel velocities as one atomic command");
     var straightTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(1.0, 0.0));
     var sumOfSpeeds = straightTargets[0].target + straightTargets[1].target + straightTargets[2].target;
-    check(Math.abs(sumOfSpeeds) < 1e-9,
-      "holonomic wheel speeds sum to zero for pure translation (three wheels at 120 degrees)");
+    check(
+      Math.abs(sumOfSpeeds) < 1e-9,
+      "holonomic wheel speeds sum to zero for pure translation (three wheels at 120 degrees)"
+    );
     var lateralTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(0.0, 0.0, 1.0));
     for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
-      check(Math.abs(lateralTargets[i].target - Math.cos(angle) / 0.05) < 1e-9,
-        "holonomic drive maps body lateral velocity to each wheel's tangent");
+      check(
+        Math.abs(lateralTargets[i].target - Math.cos(angle) / 0.05) < 1e-9,
+        "holonomic drive maps body lateral velocity to each wheel's tangent"
+      );
     }
     var spinTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(0.0, 2.0));
-    for (target in spinTargets)
-      check(Math.abs(target.target - 0.3 * 2.0 / 0.05) < 1e-9,
-        "holonomic in-place rotation drives every wheel at the same tangential rate");
-    check(new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).supportsInPlaceRotation(),
-      "holonomic drive supports in-place rotation");
-    throws(function() new robotkit.mobile.HolonomicDrive([0, 1, 1], 0.05, 0.3),
-      "holonomic drive rejects duplicate wheel joint indices");
-    throws(function() differential.command(new Twist2(0.0, 0.0, 0.1)),
-      "differential drive rejects a lateral command");
+    for (target in spinTargets) check(
+      Math.abs(target.target - 0.3 * 2.0 / 0.05) < 1e-9,
+      "holonomic in-place rotation drives every wheel at the same tangential rate"
+    );
+    check(
+      new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).supportsInPlaceRotation(),
+      "holonomic drive supports in-place rotation"
+    );
+    throws(
+      function() new robotkit.mobile.HolonomicDrive([0, 1, 1], 0.05, 0.3),
+      "holonomic drive rejects duplicate wheel joint indices"
+    );
+    throws(function() differential.command(new Twist2(0.0, 0.0, 0.1)), "differential drive rejects a lateral command");
 
     var reversedRobot = new FakeRobot("reversed-base");
     reversedRobot.positions = [0.0, 0.0];
-    var reversed = new MobileBase(reversedRobot, new DifferentialDrive(0, 1, 0.2, 0.6, 1, -1),
-      new MotionLimits(1.0, 2.0, 0.5, 1.0));
+    var reversed = new MobileBase(
+      reversedRobot,
+      new DifferentialDrive(0, 1, 0.2, 0.6, 1, -1),
+      new MotionLimits(
+        1.0,
+        2.0,
+        0.5,
+        1.0
+      )
+    );
     reversed.command(new Twist2(2.0, 4.0), 1.0);
     check(switch reversedRobot.lastCommand {
       case JointTargets(targets, _):
         Math.abs(targets[0].target - 1.0) < 1e-9 && Math.abs(targets[1].target + 4.0) < 1e-9;
-      case _: false;
+      case _:
+        false;
     }, "a reversed wheel gets the negated rate for the same twist");
     throws(function() new DifferentialDrive(0, 1, 0.2, 0.6, 1, 0), "wheel directions must be 1 or -1");
     var reversedOdometry = new DifferentialOdometry(0, 1, 0.1, 0.5, null, 1, -1);
-    function reversedSample(time:Int, left:Float, right:Float):RobotSnapshot
-      return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),
-        [left, right], [], [], 1, 0, null, [], "source-A", "host");
+    function reversedSample(time:Int, left:Float, right:Float):RobotSnapshot return new RobotSnapshot(
+      "odom",
+      Int64.ofInt(time),
+      Int64.ofInt(time),
+      [
+        left,
+        right
+      ],
+      [],
+      [],
+      1,
+      0,
+      null,
+      [],
+      "source-A",
+      "host"
+    );
     reversedOdometry.update(reversedSample(10, 0.0, 0.0));
     var reversedForward = reversedOdometry.update(reversedSample(20, 1.0, -1.0));
-    check(Math.abs(reversedForward.x - 0.1) < 1e-9 && Math.abs(reversedForward.yaw) < 1e-9,
-      "wheel odometry reads a reversed wheel's opposite rotation as straight travel");
+    check(
+      Math.abs(reversedForward.x - 0.1) < 1e-9 && Math.abs(reversedForward.yaw) < 1e-9,
+      "wheel odometry reads a reversed wheel's opposite rotation as straight travel"
+    );
 
     var odometry = new DifferentialOdometry(0, 1, 0.1, 0.5);
-    function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot
-      return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),
-        [left, right], [], [], 1, 0, null, [], clock, "host");
+    function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot return new RobotSnapshot(
+      "odom",
+      Int64.ofInt(time),
+      Int64.ofInt(time),
+      [
+        left,
+        right
+      ],
+      [],
+      [],
+      1,
+      0,
+      null,
+      [],
+      clock,
+      "host"
+    );
     var initial = odometry.update(sample(10, 0.0, 0.0, "source-A"));
     var forward = odometry.update(sample(20, 1.0, 1.0, "source-A"));
-    check(Math.abs(initial.x) < 1e-9 && Math.abs(forward.x - 0.1) < 1e-9,
-      "wheel odometry integrates straight wheel travel");
+    check(
+      Math.abs(initial.x) < 1e-9 && Math.abs(forward.x - 0.1) < 1e-9,
+      "wheel odometry integrates straight wheel travel"
+    );
     var turning = odometry.update(sample(30, 1.0, 2.0, "source-A"));
-    check(Math.abs(turning.yaw - 0.2) < 1e-9 && turning.y > forward.y,
-      "wheel odometry integrates differential wheel displacement");
+    check(
+      Math.abs(turning.yaw - 0.2) < 1e-9 && turning.y > forward.y,
+      "wheel odometry integrates differential wheel displacement"
+    );
     odometry.update(sample(1, 4.0, 4.0, "source-B"));
     var afterClockReset = odometry.update(sample(2, 4.2, 4.2, "source-B"));
-    check(Math.abs(afterClockReset.yaw - turning.yaw) < 1e-9 &&
-      Math.abs(afterClockReset.x - turning.x) < 0.03,
-      "wheel odometry resets its encoder baseline when the source clock changes");
+    check(
+      Math.abs(afterClockReset.yaw - turning.yaw) < 1e-9 && Math.abs(afterClockReset.x - turning.x) < 0.03,
+      "wheel odometry resets its encoder baseline when the source clock changes"
+    );
     odometry.update(sample(1, 20.0, 20.0, "source-B"));
     var afterStale = odometry.update(sample(3, 4.3, 4.3, "source-B"));
-    check(Math.abs(afterStale.x - afterClockReset.x) < 0.03,
-      "wheel odometry ignores stale timestamps without moving its baseline");
+    check(
+      Math.abs(afterStale.x - afterClockReset.x) < 0.03,
+      "wheel odometry ignores stale timestamps without moving its baseline"
+    );
 
     var holonomicOdometry = new HolonomicOdometry([0, 1, 2], 0.05, 0.3);
-    function omniSample(time:Int, positions:Array<Float>):RobotSnapshot
-      return new RobotSnapshot("omni-odom", Int64.ofInt(time), Int64.ofInt(time),
-        positions, [], [], 1, 0, null, [], "omni-clock", "host");
+    function omniSample(time:Int, positions:Array<Float>):RobotSnapshot return new RobotSnapshot(
+      "omni-odom",
+      Int64.ofInt(time),
+      Int64.ofInt(time),
+      positions,
+      [],
+      [],
+      1,
+      0,
+      null,
+      [],
+      "omni-clock",
+      "host"
+    );
     holonomicOdometry.update(omniSample(10, [0.0, 0.0, 0.0]));
     var lateralDistance = 0.1;
     var lateralPositions = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
       Math.cos(angle) * lateralDistance / 0.05;
-    }];
+    }
+    ];
     var lateralPose = holonomicOdometry.update(omniSample(20, lateralPositions));
-    check(Math.abs(lateralPose.x) < 1e-9 && Math.abs(lateralPose.y - lateralDistance) < 1e-9 &&
-      Math.abs(holonomicOdometry.lastLateralDistance - lateralDistance) < 1e-9,
-      "holonomic odometry recovers pure body lateral travel");
+    check(
+      Math.abs(lateralPose.x) < 1e-9 && Math.abs(lateralPose.y - lateralDistance) < 1e-9
+      && Math.abs(holonomicOdometry.lastLateralDistance - lateralDistance) < 1e-9,
+      "holonomic odometry recovers pure body lateral travel"
+    );
     var forwardDistance = 0.2, nextLateral = 0.1, headingChange = 0.3;
     var diagonalPositions = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
-      var wheelDistance = -Math.sin(angle) * forwardDistance +
-        Math.cos(angle) * nextLateral + 0.3 * headingChange;
+      var wheelDistance = -Math.sin(angle) * forwardDistance + Math.cos(angle) * nextLateral + 0.3 * headingChange;
       lateralPositions[i] + wheelDistance / 0.05;
-    }];
+    }
+    ];
     var diagonalPose = holonomicOdometry.update(omniSample(30, diagonalPositions));
     var expectedDiagonal = lateralPose.integrateDisplacement(forwardDistance, headingChange, nextLateral);
-    check(Math.abs(diagonalPose.x - expectedDiagonal.x) < 1e-9 &&
-      Math.abs(diagonalPose.y - expectedDiagonal.y) < 1e-9 &&
-      Math.abs(Pose2.wrapAngle(diagonalPose.yaw - expectedDiagonal.yaw)) < 1e-9,
-      "holonomic odometry recovers diagonal translation and yaw");
+    check(
+      Math.abs(diagonalPose.x - expectedDiagonal.x) < 1e-9 && Math.abs(diagonalPose.y - expectedDiagonal.y) < 1e-9
+      && Math.abs(Pose2.wrapAngle(diagonalPose.yaw - expectedDiagonal.yaw)) < 1e-9,
+      "holonomic odometry recovers diagonal translation and yaw"
+    );
   }
 
   static function testModelDrivenConfiguration():Void {
@@ -721,48 +1056,68 @@ class RobotWorldTests {
     var mast = model.addLink(new Link("mast", "link/mast"));
     var tilt = model.addLink(new Link("fork carriage", "link/carriage"));
     var spread = model.addLink(new Link("forks", "link/forks"));
-    function addJoint(id:String, name:String, type:JointType, child:Link,
-        lower:Float, upper:Float):Joint {
+    function addJoint(id:String, name:String, type:JointType, child:Link, lower:Float, upper:Float):Joint {
       var joint = new Joint(name, type, base, child, id);
       joint.limits = new JointLimits(lower, upper, 20.0, 100.0);
       return model.addJoint(joint);
     }
     addJoint("joint/left-wheel", "left wheel joint", JointType.Continuous, left, -100.0, 100.0).axis = [0.0, 1.0, 0.0];
-    addJoint("joint/right-wheel", "right wheel joint", JointType.Continuous, right, -100.0, 100.0).axis = [0.0, 1.0, 0.0];
+    addJoint("joint/right-wheel", "right wheel joint", JointType.Continuous, right, -100.0, 100.0).axis = [
+      0.0,
+      1.0,
+      0.0
+    ];
     addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, tilt, -0.5, 0.7);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, spread, 0.0, 0.8);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
-      1.2, 1.5, 0.8, 1.0, 2.2, 1.1);
-    profile.forkMechanism = new RobotForkConfiguration("joint/lift",
-      1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5,
+      0.8,
+      1.0,
+      2.2,
+      1.1
+    );
+    profile.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
 
     var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var runtimeConfiguration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
-    check(runtimeConfiguration != null,
-      "runtime compilation preserves authored mobile and fork roles");
+    check(runtimeConfiguration != null, "runtime compilation preserves authored mobile and fork roles");
     var resolvedConfiguration:RobotRuntimeConfiguration = cast runtimeConfiguration;
     var mobileRuntime:Null<RobotRuntimeMobileConfiguration> = resolvedConfiguration.mobileBase;
     var forkRuntime:Null<RobotRuntimeForkConfiguration> = resolvedConfiguration.forks;
-    check(mobileRuntime != null && forkRuntime != null,
-      "runtime compilation includes both mobile and fork views");
+    check(mobileRuntime != null && forkRuntime != null, "runtime compilation includes both mobile and fork views");
     var mobileConfig:RobotRuntimeMobileConfiguration = cast mobileRuntime;
     var forkConfig:RobotRuntimeForkConfiguration = cast forkRuntime;
     check(switch mobileConfig.drive {
-      case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(leftIndex, leftName,
-          rightIndex, rightName, radius, track, leftDirection, rightDirection):
-        leftIndex == 0 && leftName == "left wheel joint" && rightIndex == 1 &&
-          rightName == "right wheel joint" && radius == 0.1 && track == 0.5 &&
-          leftDirection == 1 && rightDirection == 1;
-      case _: false;
+      case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(
+        leftIndex,
+        leftName,
+        rightIndex,
+        rightName,
+        radius,
+        track,
+        leftDirection,
+        rightDirection
+      ):
+        leftIndex == 0 && leftName == "left wheel joint" && rightIndex == 1 && rightName == "right wheel joint"
+          && radius == 0.1 && track == 0.5 && leftDirection == 1 && rightDirection == 1;
+      case _:
+        false;
     }, "runtime compilation resolves stable drive joint IDs to command indices");
-    equal(forkConfig.lift.jointIndex, 2,
-      "runtime compilation resolves the authored fork lift role");
+    equal(forkConfig.lift.jointIndex, 2, "runtime compilation resolves the authored fork lift role");
     var tiltRuntime:RobotRuntimeForkAxisConfiguration = cast forkConfig.tilt;
     var spreadRuntime:RobotRuntimeForkAxisConfiguration = cast forkConfig.spread;
-    check(tiltRuntime.jointIndex == 3 && spreadRuntime.jointIndex == 4,
-      "runtime compilation resolves optional fork axes");
+    check(
+      tiltRuntime.jointIndex == 3 && spreadRuntime.jointIndex == 4,
+      "runtime compilation resolves optional fork axes"
+    );
 
     var robot = new FakeRobot("authored-forklift");
     robot.jointNames = [for (joint in model.joints) joint.name];
@@ -771,109 +1126,160 @@ class RobotWorldTests {
     robot.efforts = [0.0, 0.0, 2.0, 0.5, 0.25];
     var mobile = MobileBase.fromRobot(robot, model, profile);
     var footprint:Footprint = cast mobile.footprint;
-    check(mobile.footprint != null && Math.abs(footprint.radius - 1.23) < 0.01,
-      "MobileBase factory applies the model-authored footprint");
+    check(
+      mobile.footprint != null && Math.abs(footprint.radius - 1.23) < 0.01,
+      "MobileBase factory applies the model-authored footprint"
+    );
     mobile.command(new Twist2(0.4, 0.0));
     check(switch robot.lastCommand {
-      case JointTargets(targets, _): targets.length == 2 &&
-        targets[0].joint == 0 && targets[1].joint == 1 &&
-        Math.abs(targets[0].target - 4.0) < 1e-9 &&
-        Math.abs(targets[1].target - 4.0) < 1e-9;
-      case _: false;
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1
+          && Math.abs(targets[0].target - 4.0) < 1e-9 && Math.abs(targets[1].target - 4.0) < 1e-9;
+      case _:
+        false;
     }, "MobileBase factory commands the joints selected by authored roles");
     check(mobile.velocityEnvelope != null, "wheel rates supply a coupled velocity envelope");
     var previousTwist = mobile.currentCommand();
     var turning = mobile.command(new Twist2(1.0, 2.0), 0.01);
-    check(Math.abs(turning.linear - previousTwist.linear) <= mobile.motionLimits.maxLinearAcceleration * 0.01 + 1e-9 &&
-      Math.abs(turning.angular - previousTwist.angular) <= mobile.motionLimits.maxAngularAcceleration * 0.01 + 1e-9,
-      "coupled wheel-speed limiting must not jump past the acceleration limit in one tick");
+    check(
+      Math.abs(turning.linear - previousTwist.linear) <= mobile.motionLimits.maxLinearAcceleration * 0.01 + 1e-9
+      && Math.abs(turning.angular - previousTwist.angular) <= mobile.motionLimits.maxAngularAcceleration * 0.01 + 1e-9,
+      "coupled wheel-speed limiting must not jump past the acceleration limit in one tick"
+    );
     var wheelEnvelope = mobile.velocityEnvelope;
     if (wheelEnvelope == null) throw "Mobile base lost its wheel envelope";
-    check(Math.abs(turning.linear) + Math.abs(turning.angular) * wheelEnvelope.trackWidth / 2 <= wheelEnvelope.groundSpeed + 1e-9,
-      "the acceleration-limited command remains inside the wheel-speed envelope");
+    check(
+      Math.abs(turning.linear) + Math.abs(turning.angular) * wheelEnvelope.trackWidth / 2
+      <= wheelEnvelope.groundSpeed + 1e-9,
+      "the acceleration-limited command remains inside the wheel-speed envelope"
+    );
 
     var forks = Forks.fromRobot(robot, model, profile);
     var blueprintForks = Forks.fromBlueprint(robot, blueprint);
-    check(forks.config.lift.jointName == blueprintForks.config.lift.jointName,
-      "Forks can be constructed from either the model or its compiled blueprint");
+    check(
+      forks.config.lift.jointName == blueprintForks.config.lift.jointName,
+      "Forks can be constructed from either the model or its compiled blueprint"
+    );
     var forkState = forks.state();
     var tiltState:ForkAxisState = cast forkState.tilt;
     var spreadState:ForkAxisState = cast forkState.spread;
-    check(forkState.lift.position == 0.25 &&
-      tiltState.position == 0.1 && spreadState.position == 0.3,
-      "Forks factory maps model roles and limits into live fork state");
+    check(
+      forkState.lift.position == 0.25 && tiltState.position == 0.1 && spreadState.position == 0.3,
+      "Forks factory maps model roles and limits into live fork state"
+    );
     forks.raise(1.0);
     check(switch robot.lastCommand {
-      case JointTargets(targets, _): targets.length == 1 &&
-        targets[0].joint == 2 && targets[0].target == 1.0;
-      case _: false;
+      case JointTargets(targets, _):
+        targets.length == 1 && targets[0].joint == 2 && targets[0].target == 1.0;
+      case _:
+        false;
     }, "Forks factory commands the authored lift joint without manual names or indices");
 
     var savedForkConfig = profile.forkMechanism;
     profile.forkMechanism = null;
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel",
-        1.2, 0.1, 0.5), 1.2, 1.5);
+      RobotDriveConfiguration.Ackermann(
+        "joint/tilt",
+        "joint/left-wheel",
+        1.2,
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var ackermannBlueprint = RobotRuntimeCompiler.compile(model, profile);
     var ackermann = MobileBase.fromBlueprint(robot, ackermannBlueprint);
     ackermann.command(new Twist2(0.5, 0.2));
     check(switch robot.lastCommand {
-      case JointTargets(targets, _): targets.length == 2 &&
-        targets[0].joint == 3 && targets[0].mode == robotkit.core.JointTargetMode.Position &&
-        targets[1].joint == 0 && targets[1].mode == robotkit.core.JointTargetMode.Velocity;
-      case _: false;
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].joint == 3 && targets[0].mode == robotkit.core.JointTargetMode.Position
+          && targets[1].joint == 0 && targets[1].mode == robotkit.core.JointTargetMode.Velocity;
+      case _:
+        false;
     }, "model-driven Ackermann roles preserve the steering and wheel target modes");
     profile.forkMechanism = savedForkConfig;
 
     var mismatched = new FakeRobot("wrong-joint-order");
-    mismatched.jointNames = ["right wheel joint", "left wheel joint", "mast lift",
-      "fork tilt", "fork spread"];
-    throws(function() MobileBase.fromBlueprint(mismatched, blueprint),
-      "model-driven factory detects a runtime robot with a different joint order");
+    mismatched.jointNames = ["right wheel joint", "left wheel joint", "mast lift", "fork tilt", "fork spread"];
+    throws(
+      function() MobileBase.fromBlueprint(mismatched, blueprint),
+      "model-driven factory detects a runtime robot with a different joint order"
+    );
     var ambiguous = new FakeRobot("ambiguous-joint-description");
-    ambiguous.jointNames = ["mast lift", "right wheel joint", "mast lift",
-      "fork tilt", "fork spread"];
-    throws(function() Forks.fromBlueprint(ambiguous, blueprint),
-      "model-driven fork factory rejects ambiguous duplicate joint names");
+    ambiguous.jointNames = ["mast lift", "right wheel joint", "mast lift", "fork tilt", "fork spread"];
+    throws(
+      function() Forks.fromBlueprint(ambiguous, blueprint),
+      "model-driven fork factory rejects ambiguous duplicate joint names"
+    );
 
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("missing-left", "joint/right-wheel", 0.1, 0.5),
-      1.2, 1.5);
+      RobotDriveConfiguration.Differential(
+        "missing-left",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var missingDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasMissingRole = false;
     for (value in missingDiagnostics) if (value.code == "RK_ROLE_JOINT") hasMissingRole = true;
-    check(missingDiagnostics.length > 0 &&
-      hasMissingRole,
-      "robot model validation rejects mechanism roles that reference missing joints");
+    check(
+      missingDiagnostics.length > 0 && hasMissingRole,
+      "robot model validation rejects mechanism roles that reference missing joints"
+    );
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/lift", "joint/right-wheel", 0.1, 0.5),
-      1.2, 1.5);
+      RobotDriveConfiguration.Differential(
+        "joint/lift",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var typeDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasTypeError = false;
     for (value in typeDiagnostics) if (value.code == "RK_ROLE_TYPE") hasTypeError = true;
-    check(hasTypeError,
-      "robot model validation rejects joint types that cannot fill a mechanism role");
+    check(hasTypeError, "robot model validation rejects joint types that cannot fill a mechanism role");
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/left-wheel", 0.1, 0.5),
-      1.2, 1.5);
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/left-wheel",
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var duplicateDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasDuplicateRole = false;
     for (value in duplicateDiagnostics) if (value.code == "RK_ROLE_DUPLICATE") hasDuplicateRole = true;
-    check(hasDuplicateRole,
-      "robot model validation rejects assigning one joint to multiple mechanism roles");
+    check(hasDuplicateRole, "robot model validation rejects assigning one joint to multiple mechanism roles");
 
     // Each wheel's direction comes from its joint axis in the base frame: a right wheel
     // turning about its outward motor shaft (-Y) rolls back on a positive rate.
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
-      1.2, 1.5);
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var rightWheel = model.joints[1];
     function directions():Array<Int> {
       var configuration:RobotRuntimeConfiguration = cast RobotRuntimeCompiler.compile(model, profile).configuration;
       var mobile:RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
       return switch mobile.drive {
-        case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, _, _, left, right): [left, right];
-        case _: [];
+        case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, _, _, left, right):
+          [left, right];
+        case _:
+          [];
       };
     }
     rightWheel.axis = [0.0, -1.0, 0.0];
@@ -885,8 +1291,8 @@ class RobotWorldTests {
     rightWheel.axis = [0.0, 0.0, 1.0];
     var axisDiagnostics = RobotRuntimeCompiler.validate(model, profile);
     var hasAxisError = false;
-    for (value in axisDiagnostics)
-      if (value.code == "RK_ROLE_WHEEL_AXIS" && value.path == "mobileBase.drive.rightWheelJointId") hasAxisError = true;
+    for (value in axisDiagnostics) if (value.code == "RK_ROLE_WHEEL_AXIS"
+      && value.path == "mobileBase.drive.rightWheelJointId") hasAxisError = true;
     check(hasAxisError, "robot model validation rejects a wheel joint that does not turn about the lateral axis");
     rightWheel.axis = [0.0, 1.0, 0.0];
   }
@@ -904,18 +1310,34 @@ class RobotWorldTests {
     var plain = RobotModelCodec.encode(model).toString();
     check(plain.indexOf("encoders") < 0, "a model without encoders keeps its bytes");
     check(model.encoderFor(servo) == null, "feedback requires a wired encoder sensor");
-    var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 4096.0, true));
-    var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution("pulley", "turn", robotkit.model.EncoderKind.Absolute, 1024.0));
+    var shaft = model.addEncoder(robotkit.model.Encoder.perRevolution(
+      "shaft",
+      "turn",
+      robotkit.model.EncoderKind.Incremental,
+      4096.0,
+      true
+    ));
+    var absolute = model.addEncoder(robotkit.model.Encoder.perRevolution(
+      "pulley",
+      "turn",
+      robotkit.model.EncoderKind.Absolute,
+      1024.0
+    ));
     servo.encoder = "shaft";
     servo.efficiency = 0.85;
     check(model.encoderFor(servo) == shaft, "a motor that names an encoder reads that one");
     check(RobotModelCodec.encode(model).toString() != plain, "encoders are saved");
     var restored = RobotModelCodec.decode(RobotModelCodec.encode(model));
-    check(restored.encoders.length == 2 && restored.encoders[0].index && !restored.encoders[1].index &&
-      restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute && restored.actuators[0].encoder == "shaft" && restored.actuators[0].efficiency == 0.85 &&
-      Math.abs(restored.encoders[0].countsPerUnit - 4096.0 / (2.0 * Math.PI)) < 1e-9, "encoders and a motor's reference round-trip");
+    check(
+      restored.encoders.length == 2 && restored.encoders[0].index
+      && !restored.encoders[1].index && restored.encoders[1].kind == robotkit.model.EncoderKind.Absolute
+      && restored.actuators[0].encoder == "shaft" && restored.actuators[0].efficiency == 0.85
+      && Math.abs(restored.encoders[0].countsPerUnit - 4096.0 / (2.0 * Math.PI)) < 1e-9,
+      "encoders and a motor's reference round-trip"
+    );
     equal(RobotModelCodec.encode(restored).toString(), RobotModelCodec.encode(model).toString(), "and byte for byte");
-    model.addEncoder(robotkit.model.Encoder.perRevolution("shaft", "turn", robotkit.model.EncoderKind.Incremental, 1.0));
+    model.addEncoder(robotkit.model.Encoder.perRevolution("shaft",
+      "turn", robotkit.model.EncoderKind.Incremental, 1.0));
     var duplicated = false;
     try RobotModelCodec.encode(model) catch (_:Dynamic) duplicated = true;
     check(duplicated, "a duplicate encoder id is refused");
@@ -933,19 +1355,32 @@ class RobotWorldTests {
     equal(counted.count, 1.0, "and 0.6 of one as one");
     var counts = new robotkit.model.EncoderReading(absolute, power);
     counts.sample(1.0);
-    equal(counts.count, Math.fround(1.0 * 1024.0 / (2.0 * Math.PI)), "an absolute encoder counts from the joint's zero");
-    check(Math.abs(counts.position() - 1.0) <= 0.5 * absolute.resolution(), "its position is within half a count of the joint's");
+    equal(counts.count,
+      Math.fround(1.0 * 1024.0 / (2.0 * Math.PI)), "an absolute encoder counts from the joint's zero");
+    check(
+      Math.abs(counts.position() - 1.0) <= 0.5 * absolute.resolution(),
+      "its position is within half a count of the joint's"
+    );
     var invalid = false;
-    try new robotkit.model.Encoder("bad", "turn", robotkit.model.EncoderKind.Incremental, 0.0) catch (_:Dynamic) invalid = true;
+    try new robotkit.model.Encoder("bad",
+      "turn", robotkit.model.EncoderKind.Incremental, 0.0) catch (_:Dynamic) invalid = true;
     check(invalid, "an encoder needs a resolution");
   }
 
   static function testUnifiedCollisionShapes():Void {
     var model = new RobotModel("convex-codec");
     var link = model.addLink(new Link("base"));
-    var points = [for (i in 0...8) for (axis in 0...3) ((i >> axis) & 1) == 0 ? -0.1 : 0.1];
-    var shape = new CollisionShape(CollisionGeometry.Convex(points), [0.2, 0.3, 0.4],
-      [0.0, 0.0, Math.sin(Math.PI/4), Math.cos(Math.PI/4)]);
+    var points = [for (i in 0...8) for (axis in 0...3)((i >> axis) & 1) == 0 ? -0.1 : 0.1];
+    var shape = new CollisionShape(
+      CollisionGeometry.Convex(points),
+      [0.2, 0.3, 0.4],
+      [
+        0.0,
+        0.0,
+        Math.sin(Math.PI / 4),
+        Math.cos(Math.PI / 4)
+      ]
+    );
     shape.name = "part";
     shape.inflation = 0.005;
     shape.surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
@@ -954,21 +1389,47 @@ class RobotWorldTests {
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded).links[0].collisionShapes[0];
     var surface:ContactSurface = cast restored.surface;
-    check(restored.name == "part" && restored.inflation == 0.005 &&
-      restored.contact == ShapeContact.PairsAndEnvironment && surface.frictionDimensions == 4,
-      "convex link shapes retain inflation, identity and contact response");
-    check(switch restored.geometry { case Convex(value): value.join(",") == points.join(","); case _: false; },
-      "convex link geometry roundtrips without changing its points");
+    check(
+      restored.name == "part" && restored.inflation == 0.005
+      && restored.contact == ShapeContact.PairsAndEnvironment && surface.frictionDimensions == 4,
+      "convex link shapes retain inflation, identity and contact response"
+    );
+    check(switch restored.geometry {
+      case Convex(value):
+        value.join(",") == points.join(",");
+      case _:
+        false;
+    }, "convex link geometry roundtrips without changing its points");
     var posed = restored.convexVertices();
-    check(Math.abs(posed[0]-0.3) < 1e-12 && Math.abs(posed[1]-0.2) < 1e-12 && Math.abs(posed[2]-0.3) < 1e-12,
-      "convex points include their shape's rotated and translated pose");
+    check(
+      Math.abs(posed[0] - 0.3) < 1e-12 && Math.abs(posed[1] - 0.2) < 1e-12 && Math.abs(posed[2] - 0.3) < 1e-12,
+      "convex points include their shape's rotated and translated pose"
+    );
     var old = haxe.Json.parse(encoded.toString());
     Reflect.setField(old, "schemaVersion", 12);
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
-      "the previous collision schema is rejected without migration");
-    for (geometry in [CollisionGeometry.Mesh(points, [0,1,2]), CollisionGeometry.HalfSpace(0,0,1,0),
-        CollisionGeometry.HeightField(1,1,[0.0,0,0,0],2,-1)])
-      check(new CollisionShape(geometry).validate() != null, "scene geometry is rejected on links");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
+      "the previous collision schema is rejected without migration"
+    );
+    for (geometry in [
+      CollisionGeometry.Mesh(points, [0, 1, 2]),
+      CollisionGeometry.HalfSpace(0, 0, 1, 0),
+      CollisionGeometry.HeightField(
+        1,
+        1,
+        [
+          0.0,
+          0,
+          0,
+          0
+        ],
+        2,
+        -1
+      )
+    ]) check(
+      new CollisionShape(geometry).validate() != null,
+      "scene geometry is rejected on links"
+    );
     shape.inflation = -0.001;
     check(shape.validate() != null, "negative link inflation is rejected");
   }
@@ -983,27 +1444,52 @@ class RobotWorldTests {
     source.links[0].inertiaTensor = [2.0, 0.1, 0.0, 0.1, 3.0, 0.2, 0.0, 0.2, 4.0];
     source.links[0].visualGeometry = "meshes/base.glb";
     source.links[0].collisionGeometry = "colliders/base.obj";
-    source.addActuator(new Actuator("left-wheel-drive", 90.0, 12.0,
-      Transmission.SimpleTransmission(source.joints[0].id, 2.0, 0.1)));
-    source.addActuator(new Actuator("left-wheel-assist", 45.0, 8.0,
-      Transmission.SimpleTransmission(source.joints[0].id, -3.0, 0.1)));
-    source.addCoupling(new robotkit.model.JointCoupling("paired-wheels",
-      source.joints[0].id, source.joints[1].id, -2.0, 0.25));
+    source.addActuator(new Actuator(
+      "left-wheel-drive",
+      90.0,
+      12.0,
+      Transmission.SimpleTransmission(
+        source.joints[0].id,
+        2.0,
+        0.1
+      )
+    ));
+    source.addActuator(new Actuator(
+      "left-wheel-assist",
+      45.0,
+      8.0,
+      Transmission.SimpleTransmission(
+        source.joints[0].id,
+        -3.0,
+        0.1
+      )
+    ));
+    source.addCoupling(new robotkit.model.JointCoupling(
+      "paired-wheels",
+      source.joints[0].id,
+      source.joints[1].id,
+      -2.0,
+      0.25
+    ));
     source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
     source.joints[0].parentFrameRotation = [0.0, 0.1, 0.0, 0.99498743710662];
     source.joints[0].axis = [0.0, 1.0, 0.0];
     source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
     source.sensors[0].startAngleRadians = -0.4;
     source.sensors[0].fieldOfViewRadians = 2.4;
-    source.links[0].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.05),
-      [0.1, 0.0, -0.2]));
+    source.links[0].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.05), [0.1, 0.0, -0.2]));
     source.links[0].collisionShapes.push(new CollisionShape(
-      CollisionGeometry.Capsule(0.03, 0.12), [0.0, 0.0, 0.0],
-      [0.70710678118654757, 0.0, 0.0, 0.70710678118654757]));
-    source.links[1].collisionShapes.push(new CollisionShape(
-      CollisionGeometry.Cylinder(0.04, 0.1)));
-    source.links[1].collisionShapes.push(new CollisionShape(
-      CollisionGeometry.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
+      CollisionGeometry.Capsule(0.03, 0.12),
+      [0.0, 0.0, 0.0],
+      [
+        0.70710678118654757,
+        0.0,
+        0.0,
+        0.70710678118654757
+      ]
+    ));
+    source.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Cylinder(0.04, 0.1)));
+    source.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
     source.links[1].collisionShapes[1].surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
     source.joints[2].armature = 0.02;
     source.joints[2].damping = 1.5;
@@ -1023,205 +1509,339 @@ class RobotWorldTests {
     source.actuators[0].servoDamping = 2.0;
     // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
     var bare = RobotModelCodec.decode(RobotModelCodec.encode(source));
-    check(bare.actuators[0].drive != null && bare.actuators[0].fullStepsPerRevolution == 200.0 &&
-      !cast(bare.actuators[0].drive, robotkit.model.ActuatorDrive.StepperDrive).hasTorqueData(),
-      "a stepper known by its steps alone round-trips as such");
-    source.actuators[0].drive = new robotkit.model.ActuatorDrive.StepperDrive(200.0, 3e-5, 1.26,
-      new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315]));
-    if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(0.64, 1.9, 314.0, 500.0, 2e-5, 4096.0);
+    check(
+      bare.actuators[0].drive != null && bare.actuators[0].fullStepsPerRevolution == 200.0 && !cast(
+        bare.actuators[0].drive,
+        robotkit.model.ActuatorDrive.StepperDrive
+      ).hasTorqueData(),
+      "a stepper known by its steps alone round-trips as such"
+    );
+    source.actuators[0].drive = new robotkit.model.ActuatorDrive.StepperDrive(
+      200.0,
+      3e-5,
+      1.26,
+      new robotkit.model.TorqueSpeedCurve(
+        [
+          0.0,
+          100.0,
+          400.0
+        ],
+        [
+          1.26,
+          1.26,
+          0.315
+        ]
+      )
+    );
+    if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(
+      0.64,
+      1.9,
+      314.0,
+      500.0,
+      2e-5,
+      4096.0
+    );
 
-    check(RobotModelCodec.encode(source).toString().indexOf('"assumed"') < 0,
-      "models without provenance keep the field absent");
+    check(
+      RobotModelCodec.encode(source).toString().indexOf('"assumed"') < 0,
+      "models without provenance keep the field absent"
+    );
     source.couplings[0].assumed = ["belt stiffness", "belt drag"];
-    source.couplings[0].assumptions = [{quantity: "stiffness", label: "belt stiffness"}, {quantity: "drag", label: "belt drag"}];
+    source.couplings[0].assumptions = [
+      {quantity: "stiffness", label: "belt stiffness"},
+      {
+        quantity: "drag",
+        label: "belt drag"
+      }
+    ];
     source.actuators[0].assumed = ["rotor inertia"];
     source.actuators[0].assumptions = [{quantity: "inertia", label: "rotor inertia"}];
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
-    var restoredProfile = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(sourceProfile));
-    equal(restored.schemaVersion, RobotModel.CURRENT_VERSION,
-      "decoded RobotModel uses the current semantic schema");
-    equal(RobotModelCodec.encode(restored).toString(), encoded.toString(),
-      "canonical RobotModel artifact round-trips byte for byte");
+    var restoredProfile =
+      robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(sourceProfile));
+    equal(restored.schemaVersion, RobotModel.CURRENT_VERSION, "decoded RobotModel uses the current semantic schema");
+    equal(
+      RobotModelCodec.encode(restored).toString(),
+      encoded.toString(),
+      "canonical RobotModel artifact round-trips byte for byte"
+    );
     equal(restored.links[0].mass, 42.5, "RobotModel codec preserves link mass");
     equal(restored.joints[1].limits.overtravel, 0.004, "RobotModel codec preserves joint overtravel");
     equal(restored.joints[0].limits.overtravel, 0.0, "a joint written without overtravel has none");
     equal(restored.links[0].inertiaTensor[7], 0.2, "RobotModel codec preserves inertia tensor");
-    equal(restored.links[0].visualGeometry, "meshes/base.glb",
-      "RobotModel codec preserves geometry references");
-    equal(restored.joints[0].parentFramePosition[1], 0.25,
-      "RobotModel codec preserves joint frame transforms");
-    equal(restored.actuators.length, 2,
-      "v5 RobotModel accepts two actuators on one joint");
+    equal(restored.links[0].visualGeometry, "meshes/base.glb", "RobotModel codec preserves geometry references");
+    equal(restored.joints[0].parentFramePosition[1], 0.25, "RobotModel codec preserves joint frame transforms");
+    equal(restored.actuators.length, 2, "v5 RobotModel accepts two actuators on one joint");
     equal(restored.couplings.length, 1, "v5 RobotModel preserves joint couplings");
-    check(restored.couplings[0].assumed.join(",") == "belt stiffness,belt drag" &&
-      restored.actuators[0].assumed.join(",") == "rotor inertia", "RobotModel codec preserves engineering assumptions");
+    check(
+      restored.couplings[0].assumed.join(",") == "belt stiffness,belt drag"
+      && restored.actuators[0].assumed.join(",") == "rotor inertia",
+      "RobotModel codec preserves engineering assumptions"
+    );
     equal(restored.couplings[0].assumptions[0].quantity, "stiffness", "codec preserves quantity provenance");
     equal(restored.actuators[0].assumptions[0].quantity, "inertia", "codec preserves motor quantity provenance");
 
-    equal(restored.couplings[0].offset, 0.25,
-      "v5 RobotModel preserves coupling offset independently of transmissions");
-    equal(restored.actuators[0].maxRate, 12.0,
-      "RobotModel codec preserves actuator-unit limits");
+    equal(restored.couplings[0].offset, 0.25, "v5 RobotModel preserves coupling offset independently of transmissions");
+    equal(restored.actuators[0].maxRate, 12.0, "RobotModel codec preserves actuator-unit limits");
     check(switch restored.actuators[1].transmission {
       case SimpleTransmission(jointId, ratio, offset):
         jointId == source.joints[0].id && ratio == -3.0 && offset == 0.1;
     }, "v5 RobotModel preserves independent transmission ratios");
     equal(restored.frames[0].link.id, "link/base", "RobotModel codec resolves frame link references");
-    check(restored.sensors[0].frame == restored.frames[0],
-      "RobotModel codec resolves sensor frame references to shared frame objects");
-    equal(restored.sensors[0].startAngleRadians, -0.4,
-      "RobotModel codec preserves LiDAR angular origin");
-    check(restoredProfile.mobileBase != null && restoredProfile.forkMechanism != null,
-      "RobotProfile codec preserves mobile and fork configurations");
+    check(
+      restored.sensors[0].frame == restored.frames[0],
+      "RobotModel codec resolves sensor frame references to shared frame objects"
+    );
+    equal(restored.sensors[0].startAngleRadians, -0.4, "RobotModel codec preserves LiDAR angular origin");
+    check(
+      restoredProfile.mobileBase != null && restoredProfile.forkMechanism != null,
+      "RobotProfile codec preserves mobile and fork configurations"
+    );
     var mechanicalRecord:Dynamic = haxe.Json.parse(encoded.toString());
-    check(!Reflect.hasField(mechanicalRecord, "mobileBase") && !Reflect.hasField(mechanicalRecord, "forkMechanism"),
-      "the canonical mechanical model has no interpretation fields");
+    check(
+      !Reflect.hasField(mechanicalRecord, "mobileBase") && !Reflect.hasField(mechanicalRecord, "forkMechanism"),
+      "the canonical mechanical model has no interpretation fields"
+    );
     var wrongVersion = robotkit.profile.RobotProfileCodec.toRecord(restoredProfile);
     Reflect.setField(wrongVersion, "schemaVersion", 0);
     var oldProfileError = "";
-    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion)
-      catch (error:Dynamic) oldProfileError = Std.string(error);
+    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion) catch (error:Dynamic) oldProfileError =
+      Std.string(error);
     Reflect.setField(wrongVersion, "schemaVersion", 99);
     var futureProfileError = "";
-    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion)
-      catch (error:Dynamic) futureProfileError = Std.string(error);
-    check(oldProfileError == "Unsupported RobotProfile schema version" && futureProfileError == oldProfileError,
-      "all unsupported profile versions have one rejection message");
+    try robotkit.profile.RobotProfileCodec.fromRecord(wrongVersion) catch (error:Dynamic) futureProfileError =
+      Std.string(error);
+    check(
+      oldProfileError == "Unsupported RobotProfile schema version" && futureProfileError == oldProfileError,
+      "all unsupported profile versions have one rejection message"
+    );
     var holonomicProfile = new robotkit.profile.RobotProfile(new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(["wheel/left", "wheel/right", "wheel/back"], 0.1, 0.3), 0.5, 1.0));
-    var restoredHolonomic = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(holonomicProfile));
+      RobotDriveConfiguration.Holonomic(
+        [
+          "wheel/left",
+          "wheel/right",
+          "wheel/back"
+        ],
+        0.1,
+        0.3
+      ),
+      0.5,
+      1.0
+    ));
+    var restoredHolonomic =
+      robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(holonomicProfile));
     var holonomicConfiguration:RobotMobileConfiguration = cast restoredHolonomic.mobileBase;
     check(switch holonomicConfiguration.drive {
-      case Holonomic(ids, radius, baseRadius): ids.join(",") == "wheel/left,wheel/right,wheel/back" && radius == 0.1 && baseRadius == 0.3;
-      case _: false;
+      case Holonomic(ids, radius, baseRadius):
+        ids.join(",") == "wheel/left,wheel/right,wheel/back" && radius == 0.1 && baseRadius == 0.3;
+      case _:
+        false;
     }, "the profile's own record preserves all holonomic wheel IDs and geometry");
     Reflect.setField(mechanicalRecord, "mobileBase", null);
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(mechanicalRecord))),
-      "a current mechanical model rejects interpretation fields even when null");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(mechanicalRecord))),
+      "a current mechanical model rejects interpretation fields even when null"
+    );
 
-    equal(RobotRuntimeCompiler.compile(restored, restoredProfile).jointCount, source.joints.length,
-      "decoded canonical model compiles through the normal runtime path");
+    equal(
+      RobotRuntimeCompiler.compile(restored, restoredProfile).jointCount,
+      source.joints.length,
+      "decoded canonical model compiles through the normal runtime path"
+    );
     var ackermannSourceDefinition = configuredForkliftModel();
     var ackermannSource = ackermannSourceDefinition.model;
     var ackermannSourceProfile = ackermannSourceDefinition.profile;
     ackermannSourceProfile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel", 1.2, 0.1, 0.5),
-      1.2, 1.5);
+      RobotDriveConfiguration.Ackermann(
+        "joint/tilt",
+        "joint/left-wheel",
+        1.2,
+        0.1,
+        0.5
+      ),
+      1.2,
+      1.5
+    );
     var ackermannRestored = RobotModelCodec.decode(RobotModelCodec.encode(ackermannSource));
-    var ackermannProfile = robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(ackermannSourceProfile));
+    var ackermannProfile =
+      robotkit.profile.RobotProfileCodec.decode(robotkit.profile.RobotProfileCodec.encode(ackermannSourceProfile));
     var ackermannMobile:RobotMobileConfiguration = cast ackermannProfile.mobileBase;
     check(switch ackermannMobile.drive {
       case Ackermann(steering, drive, wheelBase, radius, maxAngle):
-        steering == "joint/tilt" && drive == "joint/left-wheel" &&
-          wheelBase == 1.2 && radius == 0.1 && maxAngle == 0.5;
-      case _: false;
+        steering == "joint/tilt" && drive == "joint/left-wheel" && wheelBase == 1.2 && radius == 0.1 && maxAngle == 0.5;
+      case _:
+        false;
     }, "RobotProfile codec round-trips Ackermann drive configuration");
 
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
     equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
     equal(restored.joints[2].frictionLoss, 0.3, "RobotModel codec preserves joint friction loss");
-    check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
-      "RobotModel codec preserves joint limit softness");
+    check(
+      restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
+      "RobotModel codec preserves joint limit softness"
+    );
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
-    check(restored.couplings[0].stiffness == 5.0e4 && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
-      "RobotModel codec preserves a coupling's stiffness, backlash and drag");
+    check(
+      restored.couplings[0].stiffness == 5.0e4
+      && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
+      "RobotModel codec preserves a coupling's stiffness, backlash and drag"
+    );
     equal(restored.couplings[0].dampingRatio, 0.1, "RobotModel codec preserves a coupling's damping ratio");
     equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
     var restoredStepper = restored.actuators[0].drive;
-    check(restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 &&
-      cast(restoredStepper, robotkit.model.ActuatorDrive.StepperDrive).holdingTorque == 1.26 &&
-      Math.abs(restoredStepper.curve.torqueAt(250.0) - 0.7875) < 1e-12 && restoredStepper.curve.torqueAt(500.0) == 0.0,
-      "RobotModel codec preserves a stepper's torque-speed curve");
+    check(
+      restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 && cast(
+        restoredStepper,
+        robotkit.model.ActuatorDrive.StepperDrive
+      ).holdingTorque == 1.26 && Math.abs(restoredStepper.curve.torqueAt(250.0) - 0.7875) < 1e-12
+      && restoredStepper.curve.torqueAt(500.0) == 0.0,
+      "RobotModel codec preserves a stepper's torque-speed curve"
+    );
     if (restored.actuators.length > 1) {
       var restoredServo = restored.actuators[1].drive;
-      check(restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 &&
-        cast(restoredServo, robotkit.model.ActuatorDrive.ServoDrive).encoderCounts == 4096.0 &&
-        restored.actuators[1].requireEffort() == 1.9,
-        "RobotModel codec preserves a servo's drive");
+      check(
+        restoredServo != null && restoredServo.kind() == "servo" && restoredServo.peakTorque() == 1.9 && cast(
+          restoredServo,
+          robotkit.model.ActuatorDrive.ServoDrive
+        ).encoderCounts == 4096.0 && restored.actuators[1].requireEffort() == 1.9,
+        "RobotModel codec preserves a servo's drive"
+      );
     }
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
-    check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
-      restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
-      "RobotModel codec preserves a collision shape's contact surface");
-    equal(restored.links[1].collisionShapes[0].surface, null,
-      "a shape without a surface keeps the simulator's defaults");
+    check(
+      restoredSurface != null && restoredSurface.frictionDimensions == 4
+      && restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
+      "RobotModel codec preserves a collision shape's contact surface"
+    );
+    equal(
+      restored.links[1].collisionShapes[0].surface,
+      null,
+      "a shape without a surface keeps the simulator's defaults"
+    );
     var nativeDynamics = RobotRuntimeCompiler.compile(restored, restoredProfile).nativeValue().get_joint_dynamics(2);
-    check(nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 &&
-      nativeDynamics.get_friction_loss() == 0.3 && nativeDynamics.get_limit_time_constant() == 0.008 &&
-      nativeDynamics.get_limit_impedance(2) == 0.01, "joint dynamics reach the native blueprint");
+    check(
+      nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 && nativeDynamics.get_friction_loss()
+      == 0.3 && nativeDynamics.get_limit_time_constant() == 0.008 && nativeDynamics.get_limit_impedance(2) == 0.01,
+      "joint dynamics reach the native blueprint"
+    );
     var negativeDamping = RobotModelCodec.decode(encoded);
     negativeDamping.joints[0].damping = -1.0;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping, new robotkit.profile.RobotProfile()), "RK_JOINT_DYNAMICS"),
-      "compiler rejects negative joint damping");
+    check(
+      hasDiagnostic(
+        RobotRuntimeCompiler.validate(negativeDamping, new robotkit.profile.RobotProfile()),
+        "RK_JOINT_DYNAMICS"
+      ),
+      "compiler rejects negative joint damping"
+    );
     var badSurface = RobotModelCodec.decode(encoded);
     var badSurfaceValue:ContactSurface = cast badSurface.links[1].collisionShapes[1].surface;
     badSurfaceValue.frictionDimensions = 2;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
-      "compiler rejects an invalid contact surface");
+    check(
+      hasDiagnostic(
+        RobotRuntimeCompiler.validate(badSurface, new robotkit.profile.RobotProfile()),
+        "RK_COLLISION_SHAPE"
+      ),
+      "compiler rejects an invalid contact surface"
+    );
 
     var paired = RobotModelCodec.decode(encoded);
     paired.links[0].collisionShapes[0].contact = ShapeContact.PairsAndEnvironment;
-    paired.contactPairs.push(new robotkit.model.ContactPair(paired.links[0].id, 1,
-      paired.links[1].id, 0, new ContactSurface([0.5, 0.0, 0.0], 3, 0.0, 0.0)));
+    paired.contactPairs.push(new robotkit.model.ContactPair(
+      paired.links[0].id,
+      1,
+      paired.links[1].id,
+      0,
+      new ContactSurface(
+        [
+          0.5,
+          0.0,
+          0.0
+        ],
+        3,
+        0.0,
+        0.0
+      )
+    ));
     var pairedRestored = RobotModelCodec.decode(RobotModelCodec.encode(paired));
-    check(pairedRestored.links[0].collisionShapes[0].contact == ShapeContact.PairsAndEnvironment &&
-      pairedRestored.contactPairs.length == 1 && pairedRestored.contactPairs[0].shapeA == 1 &&
-      pairedRestored.contactPairs[0].surface.friction[0] == 0.5,
-      "RobotModel codec preserves shape contact modes and contact pairs");
+    check(
+      pairedRestored.links[0].collisionShapes[0].contact == ShapeContact.PairsAndEnvironment
+      && pairedRestored.contactPairs.length == 1
+      && pairedRestored.contactPairs[0].shapeA == 1 && pairedRestored.contactPairs[0].surface.friction[0] == 0.5,
+      "RobotModel codec preserves shape contact modes and contact pairs"
+    );
     paired.contactPairs[0].shapeB = 5;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(paired, new robotkit.profile.RobotProfile()), "RK_CONTACT_PAIR"),
-      "compiler rejects a contact pair naming a missing shape");
+    check(
+      hasDiagnostic(RobotRuntimeCompiler.validate(paired, new robotkit.profile.RobotProfile()), "RK_CONTACT_PAIR"),
+      "compiler rejects a contact pair naming a missing shape"
+    );
     throws(function() RobotModelCodec.encode(paired), "codec rejects a contact pair naming a missing shape");
 
     var servo = robotkit.core.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
     var servoCopy = servo.copy();
-    check(servoCopy.mode == robotkit.core.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
-      servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
-    throws(function() robotkit.core.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
-      "servo targets reject negative stiffness");
+    check(
+      servoCopy.mode == robotkit.core.JointTargetMode.Servo
+      && servoCopy.stiffness == 100.0 && servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0,
+      "servo targets copy their terms"
+    );
+    throws(
+      function() robotkit.core.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
+      "servo targets reject negative stiffness"
+    );
     var servoHarness = new SimulationHarness(0.02);
     var servoRuntime = servoHarness.simulation.addRobot(RobotRuntimeCompiler.compile(restored, restoredProfile));
     servoRuntime.submitTargets([robotkit.core.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
     servoHarness.step(Int64.ofInt(0));
-    check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
-      "a servo target reaches the deterministic backend's joint");
+    check(
+      Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
+      "a servo target reaches the deterministic backend's joint"
+    );
     servoHarness.dispose();
     var servoRecording = new RobotRecording();
     servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
     switch roundTripRecording(servoRecording.entries[0]).event {
       case Command(JointTargets(targets, _)):
-        check(targets[0].mode == robotkit.core.JointTargetMode.Servo &&
-          targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
-          "a recorded servo target replays with its terms");
-      case _: throw "Expected recorded servo targets";
+        check(
+          targets[0].mode == robotkit.core.JointTargetMode.Servo
+          && targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
+          "a recorded servo target replays with its terms"
+        );
+      case _:
+        throw "Expected recorded servo targets";
     }
     equal(restored.links[0].collisionShapes.length, 2, "RobotModel codec preserves link collision shapes");
     check(switch restored.links[0].collisionShapes[1].geometry {
-      case CollisionGeometry.Capsule(radius, half): radius == 0.03 && half == 0.12;
-      case _: false;
+      case CollisionGeometry.Capsule(radius, half):
+        radius == 0.03 && half == 0.12;
+      case _:
+        false;
     }, "RobotModel codec preserves capsule radius and half-length");
-    equal(restored.links[0].collisionShapes[0].position[2], -0.2,
-      "RobotModel codec preserves collision shape poses");
+    equal(restored.links[0].collisionShapes[0].position[2], -0.2, "RobotModel codec preserves collision shape poses");
     var shapeBlueprint = RobotRuntimeCompiler.compile(restored, restoredProfile);
     equal(shapeBlueprint.linkCollisionShapes.length, 4, "every link collision shape compiles");
-    equal(shapeBlueprint.linkCollisionShapes[3].link, 1,
-      "compiled collision shapes keep their runtime link index");
+    equal(shapeBlueprint.linkCollisionShapes[3].link, 1, "compiled collision shapes keep their runtime link index");
     var shapeHarness = new SimulationHarness(0.02);
     shapeHarness.simulation.addRobot(shapeBlueprint);
     shapeHarness.step(Int64.ofInt(0));
     shapeHarness.dispose();
     var badShape = RobotModelCodec.decode(encoded);
     badShape.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.0)));
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
-      "compiler rejects a non-positive collision shape size");
+    check(
+      hasDiagnostic(
+        RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()),
+        "RK_COLLISION_SHAPE"
+      ),
+      "compiler rejects a non-positive collision shape size"
+    );
     throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
     var unknownShape:Dynamic = haxe.Json.parse(encoded.toString());
     var unknownLinks:Array<Dynamic> = cast Reflect.field(unknownShape, "links");
     var unknownShapes:Array<Dynamic> = cast Reflect.field(unknownLinks[0], "collisionShapes");
     Reflect.setField(unknownShapes[0], "kind", "cone");
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(unknownShape))),
-      "codec rejects unknown collision shape kinds");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(unknownShape))),
+      "codec rejects unknown collision shape kinds"
+    );
     var floatingDefinition = configuredForkliftModel();
     var floating = floatingDefinition.model;
     var floatingProfile = floatingDefinition.profile;
@@ -1232,38 +1852,52 @@ class RobotWorldTests {
     equal(floatingRestored.floatingBase, true, "v6 RobotModel preserves a floating base");
     var floatingBlueprint = RobotRuntimeCompiler.compile(floatingRestored, floatingProfile);
     equal(floatingBlueprint.floatingBase, true, "a floating base compiles into the blueprint");
-    equal(floatingBlueprint.nativeValue().get_floating_base(), 1,
-      "a floating base reaches the native blueprint");
-    equal(RobotRuntimeCompiler.compile(restored, restoredProfile).nativeValue().get_floating_base(), 0,
-      "a fixed base stays kinematic in the native blueprint");
+    equal(floatingBlueprint.nativeValue().get_floating_base(), 1, "a floating base reaches the native blueprint");
+    equal(
+      RobotRuntimeCompiler.compile(restored, restoredProfile).nativeValue().get_floating_base(),
+      0,
+      "a fixed base stays kinematic in the native blueprint"
+    );
     var wheeledFloatingDefinition = configuredForkliftModel();
     var wheeledFloating = wheeledFloatingDefinition.model;
     var wheeledFloatingProfile = wheeledFloatingDefinition.profile;
     wheeledFloating.floatingBase = true;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating, wheeledFloatingProfile), "RK_FLOATING_MOBILE"),
-      "a floating base cannot also be a wheeled mobile base");
+    check(
+      hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating, wheeledFloatingProfile), "RK_FLOATING_MOBILE"),
+      "a floating base cannot also be a wheeled mobile base"
+    );
     var missingFloating:Dynamic = haxe.Json.parse(encoded.toString());
     Reflect.deleteField(missingFloating, "floatingBase");
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(missingFloating))),
-      "v6 RobotModel requires the floatingBase field");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(missingFloating))),
+      "v6 RobotModel requires the floatingBase field"
+    );
 
     var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
     Reflect.setField(oldVersion, "schemaVersion", 5);
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
-      "v6-only RobotModel codec rejects old schemas");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
+      "v6-only RobotModel codec rejects old schemas"
+    );
     var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
     var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
     Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyDrive))),
-      "v5 codec rejects silently ignored joint-drive records");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyDrive))),
+      "v5 codec rejects silently ignored joint-drive records"
+    );
 
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
-      "future RobotModel schema versions are rejected");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
+      "future RobotModel schema versions are rejected"
+    );
     var brokenReference:Dynamic = haxe.Json.parse(encoded.toString());
     var brokenJoints:Array<Dynamic> = cast Reflect.field(brokenReference, "joints");
     Reflect.setField(brokenJoints[0], "parentLink", "link/missing");
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
-      "RobotModel codec rejects unresolved link references");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
+      "RobotModel codec rejects unresolved link references"
+    );
   }
 
   /**
@@ -1289,32 +1923,48 @@ class RobotWorldTests {
     equal(hip.armature, 0.01, "joint armature from a default class is imported");
     equal(hip.damping, 0.5, "joint damping from a default class is imported");
     equal(model.actuators[1].servoStiffness, 50.0, "a position actuator's kp becomes its servo stiffness");
-    check(model.links[3].collisionShapes[0].contact == ShapeContact.PairsOnly,
-      "a geom without contact bits collides only through its pairs");
-    check(model.links[0].collisionShapes[0].contact == ShapeContact.Layers,
-      "a geom with contact bits collides by layers");
+    check(
+      model.links[3].collisionShapes[0].contact == ShapeContact.PairsOnly,
+      "a geom without contact bits collides only through its pairs"
+    );
+    check(
+      model.links[0].collisionShapes[0].contact == ShapeContact.Layers,
+      "a geom with contact bits collides by layers"
+    );
     equal(model.contactPairs.length, 2, "pairs between robot geoms become contact pairs");
     var toePair = model.contactPairs[0];
-    check(toePair.linkA == "link/torso" && toePair.linkB == "link/left_foot" && toePair.shapeB == 0 &&
-      toePair.surface.friction[0] == 0.8 && toePair.surface.frictionDimensions == 4 &&
-      toePair.surface.contactTimeConstant == 0.01, "a contact pair keeps its own surface");
-    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).contactPairs[0].shapeB, 3,
-      "compiled contact pairs index the robot's shapes in link order");
+    check(
+      toePair.linkA == "link/torso"
+      && toePair.linkB == "link/left_foot" && toePair.shapeB == 0 && toePair.surface.friction[0] == 0.8
+      && toePair.surface.frictionDimensions == 4 && toePair.surface.contactTimeConstant == 0.01,
+      "a contact pair keeps its own surface"
+    );
+    equal(
+      RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).contactPairs[0].shapeB,
+      3,
+      "compiled contact pairs index the robot's shapes in link order"
+    );
     equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
     equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
     equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");
     var thigh = model.links[1].collisionShapes[0];
     check(switch thigh.geometry {
-      case CollisionGeometry.Capsule(radius, half): radius == 0.05 && half == 0.2;
-      case _: false;
+      case CollisionGeometry.Capsule(radius, half):
+        radius == 0.05 && half == 0.2;
+      case _:
+        false;
     }, "a fromto capsule keeps its radius and half-length");
     equal(thigh.position[2], -0.2, "a fromto capsule is centred between its ends");
-    equal(model.links[3].collisionShapes.length, 2,
-      "pair-only geoms collide and a geom that never collides is left out");
+    equal(
+      model.links[3].collisionShapes.length,
+      2,
+      "pair-only geoms collide and a geom that never collides is left out"
+    );
     equal(model.links[0].visualGeometry, "meshes/torso.stl", "visual meshes merge into one file per link");
     equal(model.actuators.length, 2, "joint actuators import");
     check(switch model.actuators[0].transmission {
-      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+      case SimpleTransmission(jointId, ratio, _):
+        jointId == hip.id && ratio == 2.0;
     }, "actuator gear becomes the transmission ratio");
     equal(model.actuators[0].maxEffort, 20.0, "actuator force range stays in actuator units");
     equal(model.sensors.length, 1, "one IMU per sensor site");
@@ -1337,29 +1987,43 @@ class RobotWorldTests {
     equal(model.links[0].id, "link/torso", "URDF link IDs follow RobotModel conventions");
     equal(model.links[0].visualGeometry, "package://walker/meshes/torso.stl", "visual mesh references are kept");
     check(switch model.links[0].collisionShapes[0].geometry {
-      case CollisionGeometry.Box(x, y, z): x == 0.15 && y == 0.1 && z == 0.2;
-      case _: false;
+      case CollisionGeometry.Box(x, y, z):
+        x == 0.15 && y == 0.1 && z == 0.2;
+      case _:
+        false;
     }, "a URDF box size becomes half extents");
     check(switch model.links[1].collisionShapes[0].geometry {
-      case CollisionGeometry.Cylinder(radius, half): radius == 0.05 && half == 0.2;
-      case _: false;
+      case CollisionGeometry.Cylinder(radius, half):
+        radius == 0.05 && half == 0.2;
+      case _:
+        false;
     }, "a URDF cylinder length becomes a half-length");
     equal(model.links[1].collisionShapes[0].position[2], -0.2, "collision origins are kept");
     equal(model.links[2].collisionShapes.length, 1, "only primitive collision geometry becomes a shape");
-    equal(model.links[2].collisionGeometry, "package://walker/meshes/foot.stl",
-      "a collision mesh is kept as a geometry reference");
-    check(Math.abs(model.links[2].inertiaTensor[0] - 0.001) < 1e-12 &&
-      Math.abs(model.links[2].inertiaTensor[4] - 0.002) < 1e-12,
-      "inertia in a rotated inertial frame is expressed in link axes");
-    equal(model.links[3].mass, robotkit.model.urdf.UrdfLoader.PLACEHOLDER_MASS,
-      "a link without inertial gets a placeholder mass");
+    equal(
+      model.links[2].collisionGeometry,
+      "package://walker/meshes/foot.stl",
+      "a collision mesh is kept as a geometry reference"
+    );
+    check(
+      Math.abs(model.links[2].inertiaTensor[0] - 0.001) < 1e-12
+      && Math.abs(model.links[2].inertiaTensor[4] - 0.002) < 1e-12,
+      "inertia in a rotated inertial frame is expressed in link axes"
+    );
+    equal(
+      model.links[3].mass,
+      robotkit.model.urdf.UrdfLoader.PLACEHOLDER_MASS,
+      "a link without inertial gets a placeholder mass"
+    );
     var hip = model.joints[0], knee = model.joints[1], toe = model.joints[2];
     equal(hip.axis[1], 1.0, "joint axes are normalised");
     equal(hip.limits.effort, 40.0, "limit effort is kept");
     equal(hip.parentFramePosition[1], 0.1, "the joint origin places the child frame in the parent");
-    check(Math.abs(knee.parentFrameRotation[0] - Math.sqrt(0.5)) < 1e-12 &&
-      Math.abs(knee.parentFrameRotation[3] - Math.sqrt(0.5)) < 1e-12,
-      "rpy converts to an xyzw quaternion");
+    check(
+      Math.abs(knee.parentFrameRotation[0] - Math.sqrt(0.5)) < 1e-12
+      && Math.abs(knee.parentFrameRotation[3] - Math.sqrt(0.5)) < 1e-12,
+      "rpy converts to an xyzw quaternion"
+    );
     equal(knee.childFramePosition[2], 0.0, "the URDF joint frame is the child link frame");
     equal(model.couplings.length, 1, "mimic becomes a joint coupling");
     equal(model.couplings[0].leader, knee.id, "the mimicked joint leads");
@@ -1367,64 +2031,210 @@ class RobotWorldTests {
     equal(model.couplings[0].ratio, 0.5, "mimic multiplier becomes the coupling ratio");
     equal(model.actuators.length, 1, "a simple transmission becomes an actuator");
     check(switch model.actuators[0].transmission {
-      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+      case SimpleTransmission(jointId, ratio, _):
+        jointId == hip.id && ratio == 2.0;
     }, "mechanical reduction becomes the transmission ratio");
     equal(model.actuators[0].maxEffort, 20.0, "actuator effort is the joint effort over the reduction");
     var warned = loaded.warnings.join("\n");
     equal(hip.damping, 0.5, "URDF dynamics damping becomes joint damping");
-    check(warned.indexOf("placeholder") >= 0 && warned.indexOf("foot.stl") >= 0,
-      "skipped and approximated elements are reported");
-    equal(RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length, 4,
-      "a loaded URDF round-trips through the RobotModel codec");
-    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).linkCollisionShapes.length, 3,
-      "a loaded URDF compiles");
-    var zeroEffort = robotkit.model.urdf.UrdfLoader.load(
-      "<robot name='zero'><link name='a'/><link name='b'/><joint name='j' type='revolute'><parent link='a'/><child link='b'/><limit lower='-1' upper='1' effort='0' velocity='1'/></joint></robot>").model;
-    check(zeroEffort.joints[0].limits.effort == null,
-      "URDF zero effort remains an unspecified rating, not an unpowered drive");
-    throws(function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
-      "malformed URDF XML is rejected");
-    throws(function() robotkit.model.urdf.UrdfLoader.load(
-      "<robot><link name='a'/><link name='b'/><joint name='j' type='planar'><parent link='a'/><child link='b'/></joint></robot>"),
-      "unsupported joint types are rejected");
+    check(
+      warned.indexOf("placeholder") >= 0 && warned.indexOf("foot.stl") >= 0,
+      "skipped and approximated elements are reported"
+    );
+    equal(
+      RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length,
+      4,
+      "a loaded URDF round-trips through the RobotModel codec"
+    );
+    equal(
+      RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).linkCollisionShapes.length,
+      3,
+      "a loaded URDF compiles"
+    );
+    var zeroEffort = robotkit.model.urdf.UrdfLoader
+      .load("<robot name='zero'><link name='a'/><link name='b'/><joint name='j' type='revolute'><parent link='a'/><child link='b'/><limit lower='-1' upper='1' effort='0' velocity='1'/></joint></robot>")
+      .model;
+    check(
+      zeroEffort.joints[0].limits.effort == null,
+      "URDF zero effort remains an unspecified rating, not an unpowered drive"
+    );
+    throws(
+      function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
+      "malformed URDF XML is rejected"
+    );
+    throws(
+      function() robotkit.model.urdf.UrdfLoader
+      .load("<robot><link name='a'/><link name='b'/><joint name='j' type='planar'><parent link='a'/><child link='b'/></joint></robot>"),
+      "unsupported joint types are rejected"
+    );
   }
 
   static function testGnssLocalization():Void {
     // 8.9832e-6 degrees of longitude is one metre east at the equator.
     var oneMetreEast = 0.000008983152841195214;
-    var gnss = new GnssPoseLocalization("gnss-front", "map", "base", 0.0, 0.0,
-      new Pose2(1.0, 0.0, 0.0), 0.04, 0.01, 500000000.0);
-    function fixSnapshot(sequence:Int, timestamp:Int, latitude:Float, longitude:Float,
-        yaw:Float, sampleTimestamp:Int, fixClock:String, fixReceivedClock:String,
-        frameId:String):RobotSnapshot {
-      var fix = new SensorFrame("gnss-front", "gnss_pose", frameId, Int64.ofInt(sequence),
-        Int64.ofInt(sampleTimestamp), [latitude, longitude, yaw],
-        Int64.ofInt(sampleTimestamp + 5), "antenna-link", null, null, fixClock, fixReceivedClock);
-      return new RobotSnapshot("gnss-base", Int64.ofInt(sequence), Int64.ofInt(timestamp),
-        [], [], [], 1, 0, Int64.ofInt(timestamp + 10), [fix], "gnss-clock", "host-clock");
+    var gnss = new GnssPoseLocalization(
+      "gnss-front",
+      "map",
+      "base",
+      0.0,
+      0.0,
+      new Pose2(1.0, 0.0, 0.0),
+      0.04,
+      0.01,
+      500000000.0
+    );
+    function fixSnapshot(
+      sequence:Int,
+      timestamp:Int,
+      latitude:Float,
+      longitude:Float,
+      yaw:Float,
+      sampleTimestamp:Int,
+      fixClock:String,
+      fixReceivedClock:String,
+      frameId:String
+    ):RobotSnapshot {
+      var fix = new SensorFrame(
+        "gnss-front",
+        "gnss_pose",
+        frameId,
+        Int64.ofInt(sequence),
+        Int64.ofInt(sampleTimestamp),
+        [
+          latitude,
+          longitude,
+          yaw
+        ],
+        Int64.ofInt(sampleTimestamp + 5),
+        "antenna-link",
+        null,
+        null,
+        fixClock,
+        fixReceivedClock
+      );
+      return new RobotSnapshot(
+        "gnss-base",
+        Int64.ofInt(sequence),
+        Int64.ofInt(timestamp),
+        [],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(timestamp + 10),
+        [fix],
+        "gnss-clock",
+        "host-clock"
+      );
     }
-    var state = gnss.update(fixSnapshot(1, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna"));
-    check(Math.abs(state.pose.x - 1.0) < 1e-4 && Math.abs(state.pose.y + 1.0) < 1e-4 &&
-      Math.abs(state.pose.yaw - Math.PI * 0.5) < 1e-8 && state.referenceFrame == "map",
-      "GNSS converts a geodetic fix to local ENU and removes the antenna lever arm");
-    check(Math.abs(state.covariance.xx - 0.05) < 1e-8 &&
-      Math.abs(state.covariance.xYaw - 0.01) < 1e-8 && state.sourceTimestampNs == Int64.ofInt(100),
-      "GNSS propagates heading variance through the lever arm and keeps the fix time");
-    check(gnss.update(fixSnapshot(2, 700000000, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna")).quality ==
-      LocalizationQuality.Invalid, "GNSS rejects a fix outside its age window");
-    check(gnss.update(fixSnapshot(3, 100, 0.0, oneMetreEast, Math.PI * 0.5, 150, "gnss-clock", "host-clock", "gnss-antenna")).quality !=
-      LocalizationQuality.Invalid, "GNSS accepts a fix newer than the robot state");
-    check(gnss.update(fixSnapshot(4, 100, 0.0, oneMetreEast, Math.PI * 0.5, 900000000, "receiver-clock", "host-clock", "gnss-antenna")).quality == LocalizationQuality.Invalid,
-      "GNSS ages a fix on its own receiver clock by the shared receive clock");
-    check(gnss.update(fixSnapshot(5, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "receiver-clock", "host-clock", "gnss-antenna")).quality != LocalizationQuality.Invalid,
-      "GNSS accepts a receiver-clock fix received close to the robot state");
-    check(gnss.update(fixSnapshot(6, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "receiver-clock", "other-host", "gnss-antenna")).quality == LocalizationQuality.Invalid,
-      "GNSS ignores a fix that shares no clock with the robot state");
+    var state = gnss.update(fixSnapshot(
+      1,
+      100,
+      0.0,
+      oneMetreEast,
+      Math.PI * 0.5,
+      100,
+      "gnss-clock",
+      "host-clock",
+      "gnss-antenna"
+    ));
+    check(
+      Math.abs(state.pose.x - 1.0) < 1e-4 && Math.abs(state.pose.y + 1.0) < 1e-4
+      && Math.abs(state.pose.yaw - Math.PI * 0.5) < 1e-8 && state.referenceFrame == "map",
+      "GNSS converts a geodetic fix to local ENU and removes the antenna lever arm"
+    );
+    check(
+      Math.abs(state.covariance.xx - 0.05) < 1e-8
+      && Math.abs(state.covariance.xYaw - 0.01) < 1e-8 && state.sourceTimestampNs == Int64.ofInt(100),
+      "GNSS propagates heading variance through the lever arm and keeps the fix time"
+    );
+    check(
+      gnss.update(fixSnapshot(
+        2,
+        700000000,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        100,
+        "gnss-clock",
+        "host-clock",
+        "gnss-antenna"
+      )).quality == LocalizationQuality.Invalid,
+      "GNSS rejects a fix outside its age window"
+    );
+    check(
+      gnss.update(fixSnapshot(
+        3,
+        100,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        150,
+        "gnss-clock",
+        "host-clock",
+        "gnss-antenna"
+      )).quality != LocalizationQuality.Invalid,
+      "GNSS accepts a fix newer than the robot state"
+    );
+    check(
+      gnss.update(fixSnapshot(
+        4,
+        100,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        900000000,
+        "receiver-clock",
+        "host-clock",
+        "gnss-antenna"
+      )).quality == LocalizationQuality.Invalid,
+      "GNSS ages a fix on its own receiver clock by the shared receive clock"
+    );
+    check(
+      gnss.update(fixSnapshot(
+        5,
+        100,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        100,
+        "receiver-clock",
+        "host-clock",
+        "gnss-antenna"
+      )).quality != LocalizationQuality.Invalid,
+      "GNSS accepts a receiver-clock fix received close to the robot state"
+    );
+    check(
+      gnss.update(fixSnapshot(
+        6,
+        100,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        100,
+        "receiver-clock",
+        "other-host",
+        "gnss-antenna"
+      )).quality == LocalizationQuality.Invalid,
+      "GNSS ignores a fix that shares no clock with the robot state"
+    );
     gnss.reset(new Pose2(4.0, 5.0, 0.25));
-    var aligned = gnss.update(fixSnapshot(7, 200, 0.0, oneMetreEast, Math.PI * 0.5, 200, "gnss-clock", "host-clock", "gnss-antenna"));
-    check(Math.abs(aligned.pose.x - 4.0) < 1e-8 && Math.abs(aligned.pose.y - 5.0) < 1e-8 &&
-      Math.abs(aligned.pose.yaw - 0.25) < 1e-8,
-      "GNSS reset establishes a new local alignment");
+    var aligned = gnss.update(fixSnapshot(
+      7,
+      200,
+      0.0,
+      oneMetreEast,
+      Math.PI * 0.5,
+      200,
+      "gnss-clock",
+      "host-clock",
+      "gnss-antenna"
+    ));
+    check(
+      Math.abs(aligned.pose.x - 4.0) < 1e-8
+      && Math.abs(aligned.pose.y - 5.0) < 1e-8 && Math.abs(aligned.pose.yaw - 0.25) < 1e-8,
+      "GNSS reset establishes a new local alignment"
+    );
 
     // Model-driven: the antenna lever arm and frame come from the authored mount.
     var model = new RobotModel("gnss robot");
@@ -1436,18 +2246,54 @@ class RobotWorldTests {
     antenna.position = [1.0, 0.0, 0.8];
     var sensor = model.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "gnss-front"));
     sensor.frame = antenna;
-    var authored = GnssPoseLocalization.fromRobotModel(model, "gnss-front", "gnss/base",
-      "map", "base", 0.0, 0.0, 0.04, 0.01, 500000000.0);
-    var authoredState = authored.update(fixSnapshot(1, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna"));
-    check(Math.abs(authoredState.pose.x - 1.0) < 1e-4 && Math.abs(authoredState.pose.y + 1.0) < 1e-4,
-      "model-driven GNSS takes its lever arm from the authored antenna frame");
-    check(authored.update(fixSnapshot(2, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "other-antenna")).quality == LocalizationQuality.Invalid,
-      "model-driven GNSS rejects fixes from another sensor frame");
+    var authored = GnssPoseLocalization.fromRobotModel(
+      model,
+      "gnss-front",
+      "gnss/base",
+      "map",
+      "base",
+      0.0,
+      0.0,
+      0.04,
+      0.01,
+      500000000.0
+    );
+    var authoredState = authored.update(fixSnapshot(
+      1,
+      100,
+      0.0,
+      oneMetreEast,
+      Math.PI * 0.5,
+      100,
+      "gnss-clock",
+      "host-clock",
+      "gnss-antenna"
+    ));
+    check(
+      Math.abs(authoredState.pose.x - 1.0) < 1e-4 && Math.abs(authoredState.pose.y + 1.0) < 1e-4,
+      "model-driven GNSS takes its lever arm from the authored antenna frame"
+    );
+    check(
+      authored.update(fixSnapshot(
+        2,
+        100,
+        0.0,
+        oneMetreEast,
+        Math.PI * 0.5,
+        100,
+        "gnss-clock",
+        "host-clock",
+        "other-antenna"
+      )).quality == LocalizationQuality.Invalid,
+      "model-driven GNSS rejects fixes from another sensor frame"
+    );
     var mastAntenna = model.addFrame(new Frame("mast antenna", mast, "mast-antenna"));
     var mastSensor = model.addSensor(new Sensor("mast gnss", "gnss_pose", 10.0, "mast-gnss"));
     mastSensor.frame = mastAntenna;
-    throws(function() GnssPoseLocalization.fromRobotModel(model, "mast-gnss", "gnss/base",
-      "map", "base", 0.0, 0.0), "must be mounted on body link");
+    throws(
+      function() GnssPoseLocalization.fromRobotModel(model, "mast-gnss", "gnss/base", "map", "base", 0.0, 0.0),
+      "must be mounted on body link"
+    );
 
     // End to end: a receiver publishes through the runtime, and the fix corrects fusion.
     var simulated = new RobotModel("gnss sim");
@@ -1463,24 +2309,48 @@ class RobotWorldTests {
     var robot = new SimulatedRobot("gnss-sim", runtime, simulated.name, [simBase.name], []);
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
-    runtime.publishSensorFrame("sim/gnss", [0.0, oneMetreEast, Math.PI * 0.5], Int64.ofInt(1),
-      Int64.ofInt(987654321), "gnss.receiver");
+    runtime.publishSensorFrame(
+      "sim/gnss",
+      [0.0, oneMetreEast, Math.PI * 0.5],
+      Int64.ofInt(1),
+      Int64.ofInt(987654321),
+      "gnss.receiver"
+    );
     var observed = robot.snapshot();
-    var receiver = GnssPoseLocalization.fromRobotModel(simulated, "sim/gnss", "sim/base",
-      "map", "base", 0.0, 0.0);
+    var receiver = GnssPoseLocalization.fromRobotModel(simulated, "sim/gnss", "sim/base", "map", "base", 0.0, 0.0);
     var fix = receiver.update(observed);
-    check(fix.quality != LocalizationQuality.Invalid && Math.abs(fix.pose.x - 1.0) < 1e-4 &&
-      Math.abs(fix.pose.y + 1.0) < 1e-4,
-      "a fix published through the runtime localizes the robot despite its own receiver clock");
-    var odometry = new FixedLocalization(new LocalizationState(observed.sourceSequence,
-      new Pose2(), "odom", "base", new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
-      LocalizationQuality.Good, observed.sourceTimestampNs, observed.receivedTimestampNs,
-      observed.sourceClockId, observed.receivedClockId));
+    check(
+      fix.quality != LocalizationQuality.Invalid
+      && Math.abs(fix.pose.x - 1.0) < 1e-4 && Math.abs(fix.pose.y + 1.0) < 1e-4,
+      "a fix published through the runtime localizes the robot despite its own receiver clock"
+    );
+    var odometry = new FixedLocalization(new LocalizationState(
+      observed.sourceSequence,
+      new Pose2(),
+      "odom",
+      "base",
+      new PoseCovariance2(
+        0.01,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.01
+      ),
+      LocalizationQuality.Good,
+      observed.sourceTimestampNs,
+      observed.receivedTimestampNs,
+      observed.sourceClockId,
+      observed.receivedClockId
+    ));
     var fusion = new PoseFusionLocalization(odometry, new FrameTree2(), "map", "base");
     fusion.update(observed);
     var fused = fusion.fuse(fix);
-    check(fused.quality != LocalizationQuality.Invalid && Math.abs(fused.pose.x - 1.0) < 1e-3 &&
-      Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
+    check(
+      fused.quality != LocalizationQuality.Invalid
+      && Math.abs(fused.pose.x - 1.0) < 1e-3 && Math.abs(fused.pose.y + 1.0) < 1e-3,
+      "GNSS fixes anchor pose fusion in the map frame"
+    );
     robot.close();
     simulationHarness.dispose();
   }
@@ -1490,75 +2360,232 @@ class RobotWorldTests {
     var body = model.addLink(new Link("base", "fiducial/base"));
     var mount = model.addFrame(new Frame("camera mount", body, "fiducial/camera"));
     mount.position = [0.5, 0.0, 1.0];
-    var sensor = model.addSensor(new Sensor("front camera", "camera", 10.0,
-      "fiducial/front"));
+    var sensor = model.addSensor(new Sensor("front camera", "camera", 10.0, "fiducial/front"));
     sensor.frame = mount;
-    var perception = FiducialPerception.fromRobotModel(model, "fiducial/front",
-      "fiducial/base", "base", "fiducial/base", [
-        new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15),
-        new FiducialTargetConfig(22, "dock", 0.0, 0.0, 0.0,
-          new Pose2(-0.5, 0.0))], 0.8);
-    var detections = new SensorFrame("fiducial/front", "camera_detections",
-      "fiducial/camera", Int64.ofInt(1), Int64.ofInt(100), [
-        11.0, 1.0, 0.0, 0.0, 0.95, 22.0, 2.0, 0.0, 0.0, 0.98,
-        99.0, 3.0, 0.0, 0.0, 0.99
-      ], Int64.ofInt(110), "fiducial/base");
+    var perception = FiducialPerception.fromRobotModel(
+      model,
+      "fiducial/front",
+      "fiducial/base",
+      "base",
+      "fiducial/base",
+      [
+        new FiducialTargetConfig(
+          11,
+          "pallet",
+          1.2,
+          0.8,
+          0.15
+        ),
+        new FiducialTargetConfig(
+          22,
+          "dock",
+          0.0,
+          0.0,
+          0.0,
+          new Pose2(
+            -0.5,
+            0.0
+          )
+        )
+      ],
+      0.8
+    );
+    var detections = new SensorFrame(
+      "fiducial/front",
+      "camera_detections",
+      "fiducial/camera",
+      Int64.ofInt(1),
+      Int64.ofInt(100),
+      [
+        11.0,
+        1.0,
+        0.0,
+        0.0,
+        0.95,
+        22.0,
+        2.0,
+        0.0,
+        0.0,
+        0.98,
+        99.0,
+        3.0,
+        0.0,
+        0.0,
+        0.99
+      ],
+      Int64.ofInt(110),
+      "fiducial/base"
+    );
     var mapped = perception.observe([detections]);
-    check(mapped.pallets().length == 1 && mapped.dockingTargets().length == 1 &&
-      Math.abs(mapped.pallets()[0].detection.pose.x - 1.5) < 1e-8 &&
-      Math.abs(mapped.dockingTargets()[0].approachPose.x - 2.0) < 1e-8 &&
-      mapped.detections()[0].frameId == "fiducial/base",
-      "fiducial IDs map to framed pallet and dock targets");
-    throws(function() perception.observe([new SensorFrame("fiducial/front",
-      "camera_detections", "fiducial/camera", Int64.ofInt(2), Int64.ofInt(120),
-      [11.0, 1.0], Int64.ofInt(130))]),
-      "fiducial records require complete values");
+    check(
+      mapped.pallets().length == 1
+      && mapped.dockingTargets().length == 1 && Math.abs(mapped.pallets()[0].detection.pose.x - 1.5) < 1e-8
+      && Math.abs(mapped.dockingTargets()[0].approachPose.x - 2.0) < 1e-8
+      && mapped.detections()[0].frameId == "fiducial/base",
+      "fiducial IDs map to framed pallet and dock targets"
+    );
+    throws(
+      function() perception.observe([new SensorFrame(
+        "fiducial/front",
+        "camera_detections",
+        "fiducial/camera",
+        Int64.ofInt(2),
+        Int64.ofInt(120),
+        [
+          11.0,
+          1.0
+        ],
+        Int64.ofInt(130)
+      )]),
+      "fiducial records require complete values"
+    );
     var pixels = haxe.io.Bytes.alloc(3);
-    pixels.set(0, 10); pixels.set(1, 20); pixels.set(2, 30);
-    var camera = new SensorFrame("fiducial/front", "camera", "fiducial/camera",
-      Int64.ofInt(3), Int64.ofInt(140), [], Int64.ofInt(150), "fiducial/base",
-      null, null, "camera.clock", "host.clock",
-      new CameraImage(1, 1, "rgb8", pixels));
-    var typed = perception.observeCameraFrames([camera], new PortFiducialDetector([
-      new FiducialMarkerObservation(11, new Pose2(1.0, 0.0), 0.95),
-      new FiducialMarkerObservation(22, new Pose2(2.0, 0.0), 0.98)]));
-    check(typed.pallets().length == 1 && typed.dockingTargets().length == 1,
-      "injected image detectors publish typed fiducial targets");
+    pixels.set(0, 10);
+    pixels.set(1, 20);
+    pixels.set(2, 30);
+    var camera = new SensorFrame(
+      "fiducial/front",
+      "camera",
+      "fiducial/camera",
+      Int64.ofInt(3),
+      Int64.ofInt(140),
+      [],
+      Int64.ofInt(150),
+      "fiducial/base",
+      null,
+      null,
+      "camera.clock",
+      "host.clock",
+      new CameraImage(
+        1,
+        1,
+        "rgb8",
+        pixels
+      )
+    );
+    var typed = perception.observeCameraFrames(
+      [camera],
+      new PortFiducialDetector([
+        new FiducialMarkerObservation(
+          11,
+          new Pose2(
+            1.0,
+            0.0
+          ),
+          0.95
+        ),
+        new FiducialMarkerObservation(
+          22,
+          new Pose2(
+            2.0,
+            0.0
+          ),
+          0.98
+        )
+      ])
+    );
+    check(
+      typed.pallets().length == 1 && typed.dockingTargets().length == 1,
+      "injected image detectors publish typed fiducial targets"
+    );
     mount.rotation = [Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
-    var tilted = FiducialPerception.fromRobotModel(model, "fiducial/front",
-      "fiducial/base", "base", "fiducial/base", [
-        new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15)]);
-    var tiltedResult = tilted.observeCameraFrames([camera], new PortFiducialDetector([
-      FiducialMarkerObservation.fromPose3(11, new Pose3(1.0, 0.0, 0.0), 0.95)]));
-    check(tiltedResult.pallets().length == 1 &&
-      Math.abs(tiltedResult.pallets()[0].detection.pose.x - 1.5) < 1e-8 &&
-      tiltedResult.pallets()[0].detection.frameId == "fiducial/base",
-      "3D fiducial poses compose through a tilted camera mount");
+    var tilted = FiducialPerception.fromRobotModel(
+      model,
+      "fiducial/front",
+      "fiducial/base",
+      "base",
+      "fiducial/base",
+      [new FiducialTargetConfig(
+        11,
+        "pallet",
+        1.2,
+        0.8,
+        0.15
+      )]
+    );
+    var tiltedResult = tilted.observeCameraFrames(
+      [camera],
+      new PortFiducialDetector([FiducialMarkerObservation.fromPose3(
+        11,
+        new Pose3(
+          1.0,
+          0.0,
+          0.0
+        ),
+        0.95
+      )])
+    );
+    check(
+      tiltedResult.pallets().length == 1 && Math.abs(tiltedResult.pallets()[0].detection.pose.x - 1.5) < 1e-8
+      && tiltedResult.pallets()[0].detection.frameId == "fiducial/base",
+      "3D fiducial poses compose through a tilted camera mount"
+    );
   }
 
   static function testDepthObstaclePerception():Void {
-    var cloudFrame = new SensorFrame("depth-front", "point_cloud", "depth-camera",
-      Int64.ofInt(10), Int64.ofInt(150), [
-        1.0, 0.0, 0.5, 1.04, 0.0, 0.5, 1.0, 0.04, 0.4,
-        3.0, 0.0, 0.4, 3.04, 0.0, 0.4,
-        0.5, 0.0, 3.0, 8.0, 0.0, 0.2
-      ], Int64.ofInt(160), "depth-link", null, null, "robot-boot", "host-clock");
-    var cloudObstacles = new PointCloudObstaclePerception(5.0, 0.15, 0.05,
-      0.9, 0.12, 0.1, 1.0, 2, 100).observe([cloudFrame]).obstacles();
-    check(cloudObstacles.length == 2 &&
-      Math.abs(cloudObstacles[0].detection.pose.x - 1.0133333333) < 1e-6 &&
-      Math.abs(cloudObstacles[0].detection.pose.y - 0.0133333333) < 1e-6 &&
-      cloudObstacles[0].detection.frameId == "depth-camera",
-      "point-cloud perception clusters XYZ returns in the source frame");
-    throws(function() new PointCloudObstaclePerception(5.0, 0.15).observe([
-      new SensorFrame("malformed-depth", "point_cloud", "camera",
-        Int64.ofInt(1), Int64.ofInt(1), [1.0, 2.0], Int64.ofInt(1))]),
-      "point-cloud perception rejects incomplete XYZ triples");
+    var cloudFrame = new SensorFrame(
+      "depth-front",
+      "point_cloud",
+      "depth-camera",
+      Int64.ofInt(10),
+      Int64.ofInt(150),
+      [
+        1.0,
+        0.0,
+        0.5,
+        1.04,
+        0.0,
+        0.5,
+        1.0,
+        0.04,
+        0.4,
+        3.0,
+        0.0,
+        0.4,
+        3.04,
+        0.0,
+        0.4,
+        0.5,
+        0.0,
+        3.0,
+        8.0,
+        0.0,
+        0.2
+      ],
+      Int64.ofInt(160),
+      "depth-link",
+      null,
+      null,
+      "robot-boot",
+      "host-clock"
+    );
+    var cloudObstacles = new PointCloudObstaclePerception(5.0,
+      0.15, 0.05, 0.9, 0.12, 0.1, 1.0, 2, 100).observe([cloudFrame]).obstacles();
+    check(
+      cloudObstacles.length == 2 && Math.abs(cloudObstacles[0].detection.pose.x - 1.0133333333) < 1e-6
+      && Math.abs(cloudObstacles[0].detection.pose.y - 0.0133333333) < 1e-6
+      && cloudObstacles[0].detection.frameId == "depth-camera",
+      "point-cloud perception clusters XYZ returns in the source frame"
+    );
+    throws(
+      function() new PointCloudObstaclePerception(5.0, 0.15).observe([new SensorFrame(
+        "malformed-depth",
+        "point_cloud",
+        "camera",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        [
+          1.0,
+          2.0
+        ],
+        Int64.ofInt(1)
+      )]),
+      "point-cloud perception rejects incomplete XYZ triples"
+    );
 
     var depthModel = new RobotModel("mounted depth camera");
     var depthBaseLink = depthModel.addLink(new Link("base", "base-link"));
-    var opticalMount = new Frame("depth optical mount", depthBaseLink,
-      "depth-optical");
+    var opticalMount = new Frame("depth optical mount", depthBaseLink, "depth-optical");
     opticalMount.position = [0.5, 0.0, 1.2];
     opticalMount.rotation = [-0.5, 0.5, -0.5, 0.5];
     depthModel.addFrame(opticalMount);
@@ -1566,56 +2593,130 @@ class RobotWorldTests {
     depthSensor.frame = opticalMount;
     depthModel.addSensor(depthSensor);
     var depthPerception = DepthCameraObstaclePerception.fromRobotModel(
-      depthModel, "front-depth", "base-link", "base", "base-link",
-      new PinholeCameraIntrinsics(100.0, 100.0, 1.0, 1.0),
-      5.0, 0.1, 0.1, 0.8, 0.1, -0.25, 2.5, 3, 8);
+      depthModel,
+      "front-depth",
+      "base-link",
+      "base",
+      "base-link",
+      new PinholeCameraIntrinsics(
+        100.0,
+        100.0,
+        1.0,
+        1.0
+      ),
+      5.0,
+      0.1,
+      0.1,
+      0.8,
+      0.1,
+      -0.25,
+      2.5,
+      3,
+      8
+    );
     var depthPixels = haxe.io.Bytes.alloc(4 * 4 * 4);
     for (index in 0...16) depthPixels.setFloat(index * 4, 2.0);
-    var depthFrame = new SensorFrame("front-depth", "camera", "depth-optical",
-      Int64.ofInt(7), Int64.ofInt(250), [], Int64.ofInt(260), "base-link",
-      null, null, "camera-clock", "host-clock",
-      new CameraImage(4, 4, "depth32f", depthPixels));
+    var depthFrame = new SensorFrame(
+      "front-depth",
+      "camera",
+      "depth-optical",
+      Int64.ofInt(7),
+      Int64.ofInt(250),
+      [],
+      Int64.ofInt(260),
+      "base-link",
+      null,
+      null,
+      "camera-clock",
+      "host-clock",
+      new CameraImage(
+        4,
+        4,
+        "depth32f",
+        depthPixels
+      )
+    );
     var depthObstacles = depthPerception.observe([depthFrame]).obstacles();
-    check(depthObstacles.length == 1 &&
-      Math.abs(depthObstacles[0].detection.pose.x - 2.5) < 1e-8 &&
-      Math.abs(depthObstacles[0].detection.pose.y) < 1e-8 &&
-      depthObstacles[0].detection.frameId == "base-link" &&
-      depthObstacles[0].detection.sourceSequence == Int64.ofInt(7),
-      "depth images unproject through the authored mount into body-frame obstacles");
+    check(
+      depthObstacles.length == 1 && Math.abs(depthObstacles[0].detection.pose.x - 2.5) < 1e-8
+      && Math.abs(depthObstacles[0].detection.pose.y) < 1e-8 && depthObstacles[0].detection.frameId == "base-link"
+      && depthObstacles[0].detection.sourceSequence == Int64.ofInt(7),
+      "depth images unproject through the authored mount into body-frame obstacles"
+    );
   }
 
   static function testWheelImuLocalization():Void {
     var robot = new FakeRobot("wheel-imu");
     robot.positions = [0.0, 0.0];
-    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 2.0));
-    var localization = new WheelImuLocalization(base, "imu", "odom", "base",
-      1.0, 0.01, 200000000.0, "imu-frame");
-    function observation(sequence:Int, timestamp:Int, left:Float, right:Float,
-        gyro:Float, ?frameId:String = "imu-frame", ?sampleTimestamp:Int = -1,
-        ?sourceClock:String = "clock", ?receiveClock:String = "host"):RobotSnapshot {
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var localization = new WheelImuLocalization(base, "imu", "odom", "base", 1.0, 0.01, 200000000.0, "imu-frame");
+    function observation(
+      sequence:Int,
+      timestamp:Int,
+      left:Float,
+      right:Float,
+      gyro:Float,
+      ?frameId:String = "imu-frame",
+      ?sampleTimestamp:Int = -1,
+      ?sourceClock:String = "clock",
+      ?receiveClock:String = "host"
+    ):RobotSnapshot {
       if (sampleTimestamp < 0) sampleTimestamp = timestamp;
-      var sensor = new SensorFrame("imu", "imu", frameId, Int64.ofInt(sequence),
-        Int64.ofInt(sampleTimestamp), [0.0, 0.0, gyro, 0.0, 0.0, 9.81],
-        Int64.ofInt(timestamp + 1), "base", null, null, sourceClock, receiveClock);
-      return new RobotSnapshot("wheel-imu", Int64.ofInt(sequence), Int64.ofInt(timestamp),
-        [left, right], [], [], 1, 0, Int64.ofInt(timestamp + 2), [sensor], "clock", "host");
+      var sensor = new SensorFrame(
+        "imu",
+        "imu",
+        frameId,
+        Int64.ofInt(sequence),
+        Int64.ofInt(sampleTimestamp),
+        [
+          0.0,
+          0.0,
+          gyro,
+          0.0,
+          0.0,
+          9.81
+        ],
+        Int64.ofInt(timestamp + 1),
+        "base",
+        null,
+        null,
+        sourceClock,
+        receiveClock
+      );
+      return new RobotSnapshot(
+        "wheel-imu",
+        Int64.ofInt(sequence),
+        Int64.ofInt(timestamp),
+        [left, right],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(timestamp + 2),
+        [sensor],
+        "clock",
+        "host"
+      );
     }
     localization.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
     var corrected = localization.update(observation(2, 100000100, 0.0, 1.0, 2.0, "imu-frame", -1, "clock", "host"));
-    check(Math.abs(corrected.pose.yaw - 0.2) < 1e-8 &&
-      Math.abs(corrected.pose.x - 0.05) < 0.01,
-      "IMU gyro rate corrects wheel heading while wheel travel supplies distance");
-    var fallback = localization.update(observation(3, 200000100, 0.0, 2.0, 9.0,
-      "other-frame", -1, "clock", "host"));
-    check(Math.abs(fallback.pose.yaw - 0.4) < 1e-8,
-      "IMU localization falls back to wheel heading for another sensor frame");
+    check(
+      Math.abs(corrected.pose.yaw - 0.2) < 1e-8 && Math.abs(corrected.pose.x - 0.05) < 0.01,
+      "IMU gyro rate corrects wheel heading while wheel travel supplies distance"
+    );
+    var fallback = localization.update(observation(3, 200000100, 0.0, 2.0, 9.0, "other-frame", -1, "clock", "host"));
+    check(
+      Math.abs(fallback.pose.yaw - 0.4) < 1e-8,
+      "IMU localization falls back to wheel heading for another sensor frame"
+    );
     var receiver = new WheelImuLocalization(base, "imu", "odom", "base", 1.0);
     receiver.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
-    var received = receiver.update(observation(2, 100000100, 0.0, 1.0, 2.0,
-      "imu-frame", 100000100, "receiver", "host"));
-    check(Math.abs(received.pose.yaw - 0.2) < 1e-8,
-      "IMU samples on a receiver clock use the shared local receive clock");
+    var received = receiver.update(observation(2,
+      100000100, 0.0, 1.0, 2.0, "imu-frame", 100000100, "receiver", "host"));
+    check(
+      Math.abs(received.pose.yaw - 0.2) < 1e-8,
+      "IMU samples on a receiver clock use the shared local receive clock"
+    );
     var model = new RobotModel("imu robot");
     var body = model.addLink(new Link("base", "imu/base"));
     var frame = model.addFrame(new Frame("imu mount", body, "imu-frame"));
@@ -1623,32 +2724,78 @@ class RobotWorldTests {
     sensor.frame = frame;
     var authored = WheelImuLocalization.fromRobotModel(base, model, "imu", "imu/base");
     authored.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
-    check(Math.abs(authored.update(observation(2, 100000100, 0.0, 1.0, 4.0, "imu-frame", -1, "clock", "host")).pose.yaw - 0.3) < 1e-8,
-      "model-driven IMU localization resolves its sensor frame and blends rate with wheels");
+    check(
+      Math.abs(authored.update(observation(2,
+      100000100, 0.0, 1.0, 4.0, "imu-frame", -1, "clock", "host")).pose.yaw - 0.3) < 1e-8,
+      "model-driven IMU localization resolves its sensor frame and blends rate with wheels"
+    );
     frame.rotation = [Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
-    var tilted = WheelImuLocalization.fromRobotModel(base, model, "imu", "imu/base",
-      "odom", "base", 1.0);
+    var tilted = WheelImuLocalization.fromRobotModel(base, model, "imu", "imu/base", "odom", "base", 1.0);
     tilted.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
-    var tiltedSample = new SensorFrame("imu", "imu", "imu-frame", Int64.ofInt(2),
-      Int64.ofInt(100000100), [0.0, 2.0, 0.0, 0.0, 0.0, 9.81],
-      Int64.ofInt(100000101), "imu/base", null, null, "clock", "host");
-    var tiltedSnapshot = new RobotSnapshot("wheel-imu", Int64.ofInt(2),
-      Int64.ofInt(100000100), [0.0, 1.0], [], [], 1, 0,
-      Int64.ofInt(100000102), [tiltedSample], "clock", "host");
-    check(Math.abs(tilted.update(tiltedSnapshot).pose.yaw - 0.2) < 1e-8,
-      "a tilted IMU mount rotates angular velocity into the body yaw axis");
+    var tiltedSample = new SensorFrame(
+      "imu",
+      "imu",
+      "imu-frame",
+      Int64.ofInt(2),
+      Int64.ofInt(100000100),
+      [
+        0.0,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        9.81
+      ],
+      Int64.ofInt(100000101),
+      "imu/base",
+      null,
+      null,
+      "clock",
+      "host"
+    );
+    var tiltedSnapshot = new RobotSnapshot(
+      "wheel-imu",
+      Int64.ofInt(2),
+      Int64.ofInt(100000100),
+      [0.0, 1.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(100000102),
+      [tiltedSample],
+      "clock",
+      "host"
+    );
+    check(
+      Math.abs(tilted.update(tiltedSnapshot).pose.yaw - 0.2) < 1e-8,
+      "a tilted IMU mount rotates angular velocity into the body yaw axis"
+    );
   }
 
   static function testLocalization():Void {
     var robot = new FakeRobot("localized-base");
     robot.positions = [0.0, 0.0];
-    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 2.0));
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     var localization = new WheelOdometryLocalization(base);
-    function observation(sequence:Int, timestamp:Int, left:Float, right:Float,
-        sourceClock:String):RobotSnapshot
-      return new RobotSnapshot("localized-base", Int64.ofInt(sequence), Int64.ofInt(timestamp),
-        [left, right], [], [], 1, 0, Int64.ofInt(timestamp + 10), [], sourceClock, "host-clock");
+    function observation(sequence:Int,
+      timestamp:Int, left:Float, right:Float, sourceClock:String):RobotSnapshot return new RobotSnapshot(
+        "localized-base",
+        Int64.ofInt(sequence),
+        Int64.ofInt(timestamp),
+        [
+          left,
+          right
+        ],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(timestamp + 10),
+        [],
+        sourceClock,
+        "host-clock"
+      );
 
     var initial = localization.update(observation(1, 100, 0.0, 0.0, "boot-A"));
     equal(initial.referenceFrame, "odom", "wheel localization labels its reference frame");
@@ -1656,117 +2803,294 @@ class RobotWorldTests {
     equal(initial.sourceClockId, "boot-A", "localization preserves source clock identity");
     equal(initial.receivedClockId, "host-clock", "localization preserves receive clock identity");
     var moved = localization.update(observation(2, 200, 1.0, 1.0, "boot-A"));
-    check(Math.abs(moved.pose.x - 0.1) < 1e-9 && moved.covariance.xx > 0.0 &&
-      moved.covariance.yawYaw == 0.0,
-      "wheel localization integrates pose and accumulates covariance");
+    check(
+      Math.abs(moved.pose.x - 0.1) < 1e-9 && moved.covariance.xx > 0.0 && moved.covariance.yawYaw == 0.0,
+      "wheel localization integrates pose and accumulates covariance"
+    );
     check(switch moved.quality {
-      case Degraded: true;
-      case _: false;
+      case Degraded:
+        true;
+      case _:
+        false;
     }, "wheel odometry marks its estimate degraded");
     var afterReset = localization.update(observation(1, 1, 4.0, 4.0, "boot-B"));
-    check(Math.abs(afterReset.pose.x - moved.pose.x) < 1e-9,
-      "wheel localization avoids a pose jump across source clock changes");
+    check(
+      Math.abs(afterReset.pose.x - moved.pose.x) < 1e-9,
+      "wheel localization avoids a pose jump across source clock changes"
+    );
     localization.update(observation(2, 2, 4.5, 4.5, "boot-B"));
     check(localization.state() != null, "localization retains its latest immutable state");
     localization.reset();
     equal(localization.state(), null, "localization reset clears its published state");
     var rebaseSnapshot = observation(3, 300, 4.5, 4.5, "boot-B");
-    var rebaseObservation = new LocalizationState(Int64.ofInt(3), new Pose2(2.0, -1.0, 0.25),
-      "odom", "base", new PoseCovariance2(0.04, 0.01, 0.002, 0.09, 0.003, 0.01),
-      Good, Int64.ofInt(300), Int64.ofInt(310), "map-clock", "host-clock");
+    var rebaseObservation = new LocalizationState(
+      Int64.ofInt(3),
+      new Pose2(2.0, -1.0, 0.25),
+      "odom",
+      "base",
+      new PoseCovariance2(
+        0.04,
+        0.01,
+        0.002,
+        0.09,
+        0.003,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(300),
+      Int64.ofInt(310),
+      "map-clock",
+      "host-clock"
+    );
     var rebased = localization.rebase(rebaseObservation, rebaseSnapshot);
-    check(Math.abs(rebased.pose.x - 2.0) < 1e-9 && Math.abs(rebased.pose.y + 1.0) < 1e-9 &&
-      Math.abs(rebased.pose.yaw - 0.25) < 1e-9 && rebased.covariance.xx == 0.04 &&
-      rebased.covariance.xy == 0.01 && rebased.covariance.xYaw == 0.002 &&
-      rebased.covariance.yy == 0.09 && rebased.covariance.yYaw == 0.003 &&
-      rebased.covariance.yawYaw == 0.01,
-      "wheel localization rebase seeds pose and preserves full localization covariance");
-    throws(function() localization.rebase(rebaseObservation,
-      observation(4, 400, 4.5, 4.5, "boot-B")),
-      "wheel localization rebase rejects an observation from another snapshot");
-    throws(function() new PoseCovariance2(-1.0),
-      "pose covariance rejects negative variances");
+    check(
+      Math.abs(rebased.pose.x - 2.0) < 1e-9
+      && Math.abs(rebased.pose.y + 1.0) < 1e-9 && Math.abs(rebased.pose.yaw - 0.25) < 1e-9
+      && rebased.covariance.xx == 0.04 && rebased.covariance.xy == 0.01 && rebased.covariance.xYaw == 0.002
+      && rebased.covariance.yy == 0.09 && rebased.covariance.yYaw == 0.003 && rebased.covariance.yawYaw == 0.01,
+      "wheel localization rebase seeds pose and preserves full localization covariance"
+    );
+    throws(
+      function() localization.rebase(rebaseObservation, observation(4, 400, 4.5, 4.5, "boot-B")),
+      "wheel localization rebase rejects an observation from another snapshot"
+    );
+    throws(function() new PoseCovariance2(-1.0), "pose covariance rejects negative variances");
 
     var frames = new FrameTree2();
     frames.add(new FrameTransform2("map", "facility", new Pose2(5.0, 0.0, 0.0)));
     frames.add(new FrameTransform2("base", "imu", new Pose2(0.2, 0.0, 0.0)));
-    check(Math.abs(frames.lookup("map", "facility").x - 5.0) < 1e-9 &&
-      Math.abs(frames.lookup("imu", "base").x + 0.2) < 1e-9,
-      "Frame tree lookups preserve target/source transform direction");
+    check(
+      Math.abs(frames.lookup("map",
+      "facility").x - 5.0) < 1e-9 && Math.abs(frames.lookup("imu", "base").x + 0.2) < 1e-9,
+      "Frame tree lookups preserve target/source transform direction"
+    );
     var cyclicFrames = new FrameTree2();
     cyclicFrames.add(new FrameTransform2("map", "odom", new Pose2()));
     cyclicFrames.add(new FrameTransform2("odom", "base", new Pose2()));
-    throws(function() cyclicFrames.add(new FrameTransform2("base", "map", new Pose2())),
-      "Frame tree rejects cyclic parent relationships");
+    throws(
+      function() cyclicFrames.add(new FrameTransform2("base", "map", new Pose2())),
+      "Frame tree rejects cyclic parent relationships"
+    );
 
     var fusionRobot = new FakeRobot("fused-base");
     fusionRobot.positions = [0.0, 0.0];
-    var fusionBase = new MobileBase(fusionRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var fusionBase = new MobileBase(fusionRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     var wheelSource = new WheelOdometryLocalization(fusionBase);
-    var fusion = new PoseFusionLocalization(wheelSource, frames, "map", "base",
-      new PoseFusionOptions(0.00000002, 0.00000005, 2.0, 0.5,
-        0.25, 0.1, 0.05));
-    var fusedInput = new RobotSnapshot("fused-base", Int64.ofInt(1), Int64.ofInt(100),
-      [0.0, 0.0], [], [], 1, 0, Int64.ofInt(110), [], "fused-clock", "host-clock");
+    var fusion = new PoseFusionLocalization(
+      wheelSource,
+      frames,
+      "map",
+      "base",
+      new PoseFusionOptions(
+        0.00000002,
+        0.00000005,
+        2.0,
+        0.5,
+        0.25,
+        0.1,
+        0.05
+      )
+    );
+    var fusedInput = new RobotSnapshot(
+      "fused-base",
+      Int64.ofInt(1),
+      Int64.ofInt(100),
+      [0.0, 0.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(110),
+      [],
+      "fused-clock",
+      "host-clock"
+    );
     var unanchored = fusion.update(fusedInput);
-    check(switch unanchored.quality { case Invalid: true; case _: false; },
-      "Pose fusion marks output invalid until frames are connected by an absolute pose");
-    var externalPose = new LocalizationState(Int64.ofInt(1),
-      new Pose2(0.3, 0.0, 0.0), "facility", "imu",
-      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01), Good,
-      Int64.ofInt(100), Int64.ofInt(110), "gps-clock", "host-clock");
+    check(switch unanchored.quality {
+      case Invalid:
+        true;
+      case _:
+        false;
+    }, "Pose fusion marks output invalid until frames are connected by an absolute pose");
+    var externalPose = new LocalizationState(
+      Int64.ofInt(1),
+      new Pose2(0.3, 0.0, 0.0),
+      "facility",
+      "imu",
+      new PoseCovariance2(
+        0.04,
+        0.0,
+        0.0,
+        0.04,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(100),
+      Int64.ofInt(110),
+      "gps-clock",
+      "host-clock"
+    );
     var fused = fusion.fuse(externalPose);
-    check(fused.referenceFrame == "map" && fused.bodyFrame == "base" &&
-      Math.abs(fused.pose.x - 5.1) < 1e-9 &&
-      switch fused.quality { case Good: true; case _: false; },
-      "Pose fusion transforms external sensor poses into the requested robot frame");
-    var secondExternalPose = new LocalizationState(Int64.ofInt(2),
-      new Pose2(0.5, 0.0, 0.0), "facility", "imu",
-      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01), Good,
-      Int64.ofInt(120), Int64.ofInt(130), "gps-clock", "host-clock");
+    check(fused.referenceFrame == "map"
+      && fused.bodyFrame == "base" && Math.abs(fused.pose.x - 5.1) < 1e-9 && switch fused.quality {
+      case Good:
+        true;
+      case _:
+        false;
+    }, "Pose fusion transforms external sensor poses into the requested robot frame");
+    var secondExternalPose = new LocalizationState(
+      Int64.ofInt(2),
+      new Pose2(0.5, 0.0, 0.0),
+      "facility",
+      "imu",
+      new PoseCovariance2(
+        0.04,
+        0.0,
+        0.0,
+        0.04,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(120),
+      Int64.ofInt(130),
+      "gps-clock",
+      "host-clock"
+    );
     var smoothed = fusion.fuse(secondExternalPose);
-    check(Math.abs(smoothed.pose.x - 5.2) < 1e-9 && smoothed.covariance.xx < 0.04,
-      "Pose fusion weights repeated absolute observations by covariance");
-    var fusedMoved = fusion.update(new RobotSnapshot("fused-base", Int64.ofInt(2),
-      Int64.ofInt(200), [1.0, 1.0], [], [], 1, 0, Int64.ofInt(210), [],
-      "fused-clock", "host-clock"));
-    check(Math.abs(fusedMoved.pose.x - 5.3) < 1e-9,
-      "Fused map pose continues to follow wheel odometry between absolute updates");
-    check(switch fusedMoved.quality { case Degraded: true; case _: false; } &&
-      fusedMoved.covariance.xx > smoothed.covariance.xx,
+    check(
+      Math.abs(smoothed.pose.x - 5.2) < 1e-9 && smoothed.covariance.xx < 0.04,
+      "Pose fusion weights repeated absolute observations by covariance"
+    );
+    var fusedMoved = fusion.update(new RobotSnapshot(
+      "fused-base",
+      Int64.ofInt(2),
+      Int64.ofInt(200),
+      [1.0, 1.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(210),
+      [],
+      "fused-clock",
+      "host-clock"
+    ));
+    check(
+      Math.abs(fusedMoved.pose.x - 5.3) < 1e-9,
+      "Fused map pose continues to follow wheel odometry between absolute updates"
+    );
+    check(switch fusedMoved.quality {
+      case Degraded:
+        true;
+      case _:
+        false;
+    }
+    && fusedMoved.covariance.xx > smoothed.covariance.xx,
       "absolute pose timeout degrades quality and grows uncertainty");
 
-    var outOfOrder = fusion.fuse(new LocalizationState(Int64.ofInt(1),
-      new Pose2(50.0, 0.0, 0.0), "map", "base",
-      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
-      Int64.ofInt(110), Int64.ofInt(210), "gps-clock", "host-clock"));
-    check(Math.abs(outOfOrder.pose.x - fusedMoved.pose.x) < 1e-9,
-      "pose fusion rejects duplicate or out-of-order absolute measurements");
+    var outOfOrder = fusion.fuse(new LocalizationState(
+      Int64.ofInt(1),
+      new Pose2(50.0, 0.0, 0.0),
+      "map",
+      "base",
+      new PoseCovariance2(
+        0.01,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(110),
+      Int64.ofInt(210),
+      "gps-clock",
+      "host-clock"
+    ));
+    check(
+      Math.abs(outOfOrder.pose.x - fusedMoved.pose.x) < 1e-9,
+      "pose fusion rejects duplicate or out-of-order absolute measurements"
+    );
 
-    var impossibleJump = fusion.fuse(new LocalizationState(Int64.ofInt(3),
-      new Pose2(25.0, 0.0, 0.0), "map", "base",
-      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
-      Int64.ofInt(220), Int64.ofInt(210), "gps-clock", "host-clock"));
-    check(Math.abs(impossibleJump.pose.x - fusedMoved.pose.x) < 1e-9 &&
-      switch impossibleJump.quality { case Degraded: true; case _: false; },
-      "innovation gating rejects a large localization jump and degrades quality");
+    var impossibleJump = fusion.fuse(new LocalizationState(
+      Int64.ofInt(3),
+      new Pose2(25.0, 0.0, 0.0),
+      "map",
+      "base",
+      new PoseCovariance2(
+        0.01,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(220),
+      Int64.ofInt(210),
+      "gps-clock",
+      "host-clock"
+    ));
+    check(Math.abs(impossibleJump.pose.x - fusedMoved.pose.x) < 1e-9 && switch impossibleJump.quality {
+      case Degraded:
+        true;
+      case _:
+        false;
+    }, "innovation gating rejects a large localization jump and degrades quality");
 
-    var recovered = fusion.fuse(new LocalizationState(Int64.ofInt(4),
-      new Pose2(5.9, 0.0, 0.0), "map", "base",
-      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
-      Int64.ofInt(230), Int64.ofInt(210), "gps-clock", "host-clock"));
-    check(Math.abs(recovered.pose.x - impossibleJump.pose.x) <= 0.25 &&
-      switch recovered.quality { case Good: true; case _: false; },
-      "valid absolute localization recovers through bounded pose corrections");
+    var recovered = fusion.fuse(new LocalizationState(
+      Int64.ofInt(4),
+      new Pose2(5.9, 0.0, 0.0),
+      "map",
+      "base",
+      new PoseCovariance2(
+        0.01,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(230),
+      Int64.ofInt(210),
+      "gps-clock",
+      "host-clock"
+    ));
+    check(Math.abs(recovered.pose.x - impossibleJump.pose.x) <= 0.25 && switch recovered.quality {
+      case Good:
+        true;
+      case _:
+        false;
+    }, "valid absolute localization recovers through bounded pose corrections");
 
-    var stale = fusion.fuse(new LocalizationState(Int64.ofInt(5),
-      new Pose2(6.0, 0.0, 0.0), "map", "base",
-      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
-      Int64.ofInt(240), Int64.ofInt(0), "gps-clock", "host-clock"));
-    check(Math.abs(stale.pose.x - recovered.pose.x) < 1e-9 &&
-      switch stale.quality { case Good: true; case _: false; },
-      "stale external localization is ignored without disturbing a fresh estimate");
+    var stale = fusion.fuse(new LocalizationState(
+      Int64.ofInt(5),
+      new Pose2(6.0, 0.0, 0.0),
+      "map",
+      "base",
+      new PoseCovariance2(
+        0.01,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.01
+      ),
+      Good,
+      Int64.ofInt(240),
+      Int64.ofInt(0),
+      "gps-clock",
+      "host-clock"
+    ));
+    check(Math.abs(stale.pose.x - recovered.pose.x) < 1e-9 && switch stale.quality {
+      case Good:
+        true;
+      case _:
+        false;
+    }, "stale external localization is ignored without disturbing a fresh estimate");
 
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
     var simulationHarness = new SimulationHarness();
@@ -1774,24 +3098,37 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     simulation.addRobot(blueprint);
     var yaw = Math.PI * 0.5;
-    simulationHarness.teleportRobot(0, [2.0, 3.0, 0.0],
-      [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)]);
+    simulationHarness.teleportRobot(0, [2.0, 3.0, 0.0], [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)]);
     var truth = new SimulationTruthLocalization(simulation, 0);
-    var source = new RobotSnapshot("truth", Int64.ofInt(5), Int64.ofInt(500),
-      [], [], [], 1, 0, Int64.ofInt(700), [], "simulation-clock", "host-clock");
+    var source = new RobotSnapshot(
+      "truth",
+      Int64.ofInt(5),
+      Int64.ofInt(500),
+      [],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(700),
+      [],
+      "simulation-clock",
+      "host-clock"
+    );
     var trueState = truth.update(source);
-    check(Math.abs(trueState.pose.x - 2.0) < 1e-9 &&
-      Math.abs(trueState.pose.y - 3.0) < 1e-9 &&
-      Math.abs(trueState.pose.yaw - yaw) < 1e-8,
-      "simulation truth localization projects a 3D simulation pose into Pose2");
+    check(
+      Math.abs(trueState.pose.x - 2.0) < 1e-9
+      && Math.abs(trueState.pose.y - 3.0) < 1e-9 && Math.abs(trueState.pose.yaw - yaw) < 1e-8,
+      "simulation truth localization projects a 3D simulation pose into Pose2"
+    );
     equal(trueState.referenceFrame, "map", "simulation truth uses an explicit map frame");
     check(switch trueState.quality {
-      case Good: true;
-      case _: false;
-    } && trueState.covariance.xx == 0.0,
-      "simulation truth publishes exact quality and zero truth covariance");
-    throws(function() truth.reset(new Pose2(9.0, 9.0, 0.0)),
-      "simulation truth cannot be reset to a fabricated pose");
+      case Good:
+        true;
+      case _:
+        false;
+    }
+    && trueState.covariance.xx == 0.0, "simulation truth publishes exact quality and zero truth covariance");
+    throws(function() truth.reset(new Pose2(9.0, 9.0, 0.0)), "simulation truth cannot be reset to a fabricated pose");
     simulationHarness.dispose();
   }
 
@@ -1799,254 +3136,478 @@ class RobotWorldTests {
     var points = [new Pose2(0.0, 0.0, 0.0), new Pose2(1.0, 0.0, 0.0)];
     var path = new Path(points, "odom");
     points[1] = new Pose2(9.0, 9.0, 1.0);
-    check(Math.abs(path.length - 1.0) < 1e-9 &&
-      Math.abs(path.poseAt(0.5).x - 0.5) < 1e-9,
-      "Path owns waypoints and interpolates by arc length");
+    check(
+      Math.abs(path.length - 1.0) < 1e-9 && Math.abs(path.poseAt(0.5).x - 0.5) < 1e-9,
+      "Path owns waypoints and interpolates by arc length"
+    );
     equal(path.count(), 2, "Path exposes a stable waypoint count");
-    throws(function() new Path([new Pose2(), new Pose2()], ""),
-      "Path requires an explicit frame ID");
+    throws(function() new Path([new Pose2(), new Pose2()], ""), "Path requires an explicit frame ID");
 
-    var trajectory = new Trajectory([
-      new TrajectorySample(0.0, new Pose2(), new Twist2()),
-      new TrajectorySample(2.0, new Pose2(2.0, 0.0, 1.0), new Twist2(1.0, 0.5))
-    ], "odom");
+    var trajectory = new Trajectory(
+      [
+        new TrajectorySample(0.0, new Pose2(), new Twist2()),
+        new TrajectorySample(
+          2.0,
+          new Pose2(
+            2.0,
+            0.0,
+            1.0
+          ),
+          new Twist2(
+            1.0,
+            0.5
+          )
+        )
+      ],
+      "odom"
+    );
     var midway = trajectory.sampleAt(1.0);
-    check(Math.abs(trajectory.durationSeconds - 2.0) < 1e-9 &&
-      Math.abs(midway.pose.x - 1.0) < 1e-9 &&
-      Math.abs(midway.pose.yaw - 0.5) < 1e-9 &&
-      Math.abs(midway.twist.angular - 0.25) < 1e-9,
-      "Trajectory interpolates pose and velocity samples");
-    throws(function() new Trajectory([
-      new TrajectorySample(0.0, new Pose2(), Twist2.zero()),
-      new TrajectorySample(0.0, new Pose2(), Twist2.zero())
-    ]), "Trajectory requires strictly increasing sample times");
+    check(
+      Math.abs(trajectory.durationSeconds - 2.0) < 1e-9 && Math.abs(midway.pose.x - 1.0) < 1e-9
+      && Math.abs(midway.pose.yaw - 0.5) < 1e-9 && Math.abs(midway.twist.angular - 0.25) < 1e-9,
+      "Trajectory interpolates pose and velocity samples"
+    );
+    throws(
+      function() new Trajectory([
+        new TrajectorySample(0.0, new Pose2(), Twist2.zero()),
+        new TrajectorySample(
+          0.0,
+          new Pose2(),
+          Twist2.zero()
+        )
+      ]),
+      "Trajectory requires strictly increasing sample times"
+    );
 
     var profileRobot = new FakeRobot("trajectory-profile");
     profileRobot.positions = [0.0, 0.0];
-    var profileBase = new MobileBase(profileRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0, 0.8, 0.5));
+    var profileBase = new MobileBase(
+      profileRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(
+        1.0,
+        1.0,
+        0.8,
+        0.5
+      )
+    );
     var profilePath = new Path([new Pose2(), new Pose2(2.0, 0.0, 0.0)], "odom");
     var profiled = Trajectory.fromPath(profilePath, profileBase, 1.0, 0.5, 0.1);
     var profiledSamples = profiled.samples();
-    var respectsLimits = profiledSamples.length > 10 &&
-      profiledSamples[0].twist.linear == 0.0 &&
-      profiledSamples[profiledSamples.length - 1].twist.linear == 0.0 &&
-      Math.abs(profiled.goal().x - 2.0) < 1e-9;
+    var respectsLimits = profiledSamples.length > 10 && profiledSamples[0].twist.linear == 0.0
+      && profiledSamples[profiledSamples.length - 1].twist.linear == 0.0 && Math.abs(profiled.goal().x - 2.0) < 1e-9;
     for (index in 0...profiledSamples.length - 1) {
       var from = profiledSamples[index];
       var to = profiledSamples[index + 1];
       var interval = to.timeFromStartSeconds - from.timeFromStartSeconds;
       var acceleration = Math.abs(to.twist.linear - from.twist.linear) / interval;
-      respectsLimits = respectsLimits && Math.abs(to.twist.linear) <= 1.0 + 1e-9 &&
-        acceleration <= 0.801;
+      respectsLimits = respectsLimits && Math.abs(to.twist.linear) <= 1.0 + 1e-9 && acceleration <= 0.801;
     }
     check(respectsLimits,
       "Trajectory parameterization preserves the path and profiles speed under acceleration limits");
     var arcPoses:Array<Pose2> = [];
     for (index in 0...9) {
       var angle = index * 0.125;
-      arcPoses.push(new Pose2(2.0 * Math.sin(angle),
-        2.0 * (1.0 - Math.cos(angle)), angle));
+      arcPoses.push(new Pose2(2.0 * Math.sin(angle), 2.0 * (1.0 - Math.cos(angle)), angle));
     }
-    var arcTrajectory = Trajectory.fromPath(new Path(arcPoses, "odom"),
-      profileBase, 1.0, 0.125, 0.1);
+    var arcTrajectory = Trajectory.fromPath(new Path(arcPoses, "odom"), profileBase, 1.0, 0.125, 0.1);
     var maxArcSpeed = 0.0;
-    for (sample in arcTrajectory.samples())
-      maxArcSpeed = Math.max(maxArcSpeed, Math.abs(sample.twist.linear));
+    for (sample in arcTrajectory.samples()) maxArcSpeed = Math.max(maxArcSpeed, Math.abs(sample.twist.linear));
     check(maxArcSpeed <= 0.51 && maxArcSpeed > 0.0,
       "Trajectory speed obeys lateral acceleration through a curved path");
     var trajectoryLocalization = new WheelOdometryLocalization(profileBase);
     trajectoryLocalization.reset(new Pose2());
-    var trajectoryNavigation = new Navigation(profileBase, trajectoryLocalization,
-      0.2, 1.0, 1.0);
+    var trajectoryNavigation = new Navigation(profileBase, trajectoryLocalization, 0.2, 1.0, 1.0);
     trajectoryNavigation.followTrajectory(profiled);
-    var trajectoryStatus = trajectoryNavigation.updateObservation(new RobotSnapshot(
-      "trajectory-profile", Int64.ofInt(1), Int64.ofInt(1), [0.0, 0.0], [], [],
-      1, 0, Int64.ofInt(2), [], "trajectory-clock", "host"), 0.1);
-    check(switch trajectoryStatus { case Following: true; case _: false; } &&
-      switch profileRobot.lastCommand {
-        case JointTargets(targets, _): targets.length == 2 && targets[0].target > 0.0 &&
-          targets[1].target > 0.0;
-        case _: false;
-      }, "Navigation tracks a time-parameterized trajectory through MobileBase");
+    var trajectoryStatus = trajectoryNavigation.updateObservation(
+      new RobotSnapshot(
+        "trajectory-profile",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        [
+          0.0,
+          0.0
+        ],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(2),
+        [],
+        "trajectory-clock",
+        "host"
+      ),
+      0.1
+    );
+    check(switch trajectoryStatus {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    && switch profileRobot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].target > 0.0 && targets[1].target > 0.0;
+      case _:
+        false;
+    }, "Navigation tracks a time-parameterized trajectory through MobileBase");
 
-    var reverseTrajectory = Trajectory.fromPath(new Path([
-      new Pose2(), new Pose2(-1.0, 0.0, 0.0)
-    ], "odom"), profileBase, 0.5, 0.5, 0.1);
-    check(reverseTrajectory.sampleAt(reverseTrajectory.durationSeconds * 0.5).twist.linear < 0.0,
-      "Trajectory parameterization preserves reverse body velocity");
-    var reversingTrajectory = Trajectory.fromPath(new Path([
-      new Pose2(), new Pose2(-0.4, 0.0, 0.0), new Pose2(0.2, 0.0, 0.0)
-    ], "odom"), profileBase, 0.5, 0.5, 0.1);
+    var reverseTrajectory = Trajectory.fromPath(
+      new Path([new Pose2(), new Pose2(-1.0, 0.0, 0.0)], "odom"),
+      profileBase,
+      0.5,
+      0.5,
+      0.1
+    );
+    check(
+      reverseTrajectory.sampleAt(reverseTrajectory.durationSeconds * 0.5).twist.linear < 0.0,
+      "Trajectory parameterization preserves reverse body velocity"
+    );
+    var reversingTrajectory = Trajectory.fromPath(
+      new Path(
+        [
+          new Pose2(),
+          new Pose2(-0.4, 0.0, 0.0),
+          new Pose2(
+            0.2,
+            0.0,
+            0.0
+          )
+        ],
+        "odom"
+      ),
+      profileBase,
+      0.5,
+      0.5,
+      0.1
+    );
     var reversedBeforeCusp = false;
     var stoppedAtCusp = false;
     var forwardAfterCusp = false;
     var reversingSamples = reversingTrajectory.samples();
     for (sample in reversingSamples) {
-      if (sample.pose.x < -0.05 && sample.pose.x > -0.4 && sample.twist.linear < 0.0)
-        reversedBeforeCusp = true;
-      if (Math.abs(sample.pose.x + 0.4) < 1e-9 && Math.abs(sample.twist.linear) < 1e-9)
-        stoppedAtCusp = true;
-      if (sample.pose.x > -0.35 && sample.twist.linear > 0.0)
-        forwardAfterCusp = true;
+      if (sample.pose.x < -0.05 && sample.pose.x > -0.4 && sample.twist.linear < 0.0) reversedBeforeCusp = true;
+      if (Math.abs(sample.pose.x + 0.4) < 1e-9 && Math.abs(sample.twist.linear) < 1e-9) stoppedAtCusp = true;
+      if (sample.pose.x > -0.35 && sample.twist.linear > 0.0) forwardAfterCusp = true;
     }
-    check(reversedBeforeCusp && stoppedAtCusp && forwardAfterCusp,
-      "Trajectory stops at a gear-change cusp and resumes with the new travel direction");
-    var shortTrajectory = Trajectory.fromPath(new Path([
-      new Pose2(), new Pose2(0.04, 0.0, 0.0)
-    ], "odom"), profileBase, 0.5, 0.5, 0.1);
-    check(shortTrajectory.count() >= 3 && shortTrajectory.durationSeconds > 0.0,
-      "Trajectory profiles short paths with an interior acceleration sample");
-    var ackermannProfileBase = new MobileBase(new FakeRobot("ackermann-profile"),
-      new AckermannDrive(0, 1, 1.0, 0.1, 0.2), new MotionLimits(1.0, 1.0));
-    throws(function() Trajectory.fromPath(new Path([
-      new Pose2(), new Pose2(1.0, 0.0, 1.0)
-    ], "odom"), ackermannProfileBase, 0.5, 0.5, 0.1),
-      "Trajectory rejects curvature beyond the authored Ackermann steering range");
-    throws(function() Trajectory.fromPath(new Path([
-      new Pose2(), new Pose2(0.0, 0.0, 1.0), new Pose2(1.0, 0.0, 1.0)
-    ], "odom"), profileBase),
-      "Trajectory rejects zero-distance pose changes that require an in-place rotation");
+    check(
+      reversedBeforeCusp && stoppedAtCusp && forwardAfterCusp,
+      "Trajectory stops at a gear-change cusp and resumes with the new travel direction"
+    );
+    var shortTrajectory = Trajectory.fromPath(
+      new Path([new Pose2(), new Pose2(0.04, 0.0, 0.0)], "odom"),
+      profileBase,
+      0.5,
+      0.5,
+      0.1
+    );
+    check(
+      shortTrajectory.count() >= 3 && shortTrajectory.durationSeconds > 0.0,
+      "Trajectory profiles short paths with an interior acceleration sample"
+    );
+    var ackermannProfileBase = new MobileBase(
+      new FakeRobot("ackermann-profile"),
+      new AckermannDrive(
+        0,
+        1,
+        1.0,
+        0.1,
+        0.2
+      ),
+      new MotionLimits(
+        1.0,
+        1.0
+      )
+    );
+    throws(
+      function() Trajectory.fromPath(
+        new Path([new Pose2(), new Pose2(1.0, 0.0, 1.0)], "odom"),
+        ackermannProfileBase,
+        0.5,
+        0.5,
+        0.1
+      ),
+      "Trajectory rejects curvature beyond the authored Ackermann steering range"
+    );
+    throws(
+      function() Trajectory.fromPath(
+        new Path(
+          [new Pose2(), new Pose2(0.0, 0.0, 1.0), new Pose2(1.0, 0.0, 1.0)],
+          "odom"
+        ),
+        profileBase
+      ),
+      "Trajectory rejects zero-distance pose changes that require an in-place rotation"
+    );
 
-    var cornerPath = new Path([
-      new Pose2(0.0, 0.0, 0.0),
-      new Pose2(1.0, 0.0, 0.0),
-      new Pose2(1.0, 1.0, Math.PI * 0.5)
-    ], "map");
+    var cornerPath = new Path(
+      [new Pose2(0.0, 0.0, 0.0), new Pose2(1.0, 0.0, 0.0), new Pose2(1.0, 1.0, Math.PI * 0.5)],
+      "map"
+    );
     var firstProjection = cornerPath.project(new Pose2(0.6, 0.2, 0.0), 0.0);
-    check(Math.abs(firstProjection.distanceAlongPath - 0.6) < 1e-9 &&
-      Math.abs(firstProjection.crossTrackError - 0.2) < 1e-9 &&
-      Math.abs(firstProjection.distanceToPath - 0.2) < 1e-9,
-      "Path projection returns arc length and signed cross-track error");
+    check(
+      Math.abs(firstProjection.distanceAlongPath - 0.6) < 1e-9 && Math.abs(firstProjection.crossTrackError - 0.2) < 1e-9
+      && Math.abs(firstProjection.distanceToPath - 0.2) < 1e-9,
+      "Path projection returns arc length and signed cross-track error"
+    );
     var forwardProjection = cornerPath.project(new Pose2(0.2, 0.3, 0.0), 1.2);
-    check(forwardProjection.distanceAlongPath >= 1.2 &&
-      Math.abs(forwardProjection.crossTrackError - 0.8) < 1e-9,
-      "Path projection stays monotonic and signs cross-track relative to the active segment");
-    var loopPath = new Path([
-      new Pose2(0.0, 0.0), new Pose2(1.0, 0.0), new Pose2(1.0, 1.0),
-      new Pose2(0.0, 1.0), new Pose2(0.0, 0.05)
-    ], "map");
+    check(
+      forwardProjection.distanceAlongPath >= 1.2 && Math.abs(forwardProjection.crossTrackError - 0.8) < 1e-9,
+      "Path projection stays monotonic and signs cross-track relative to the active segment"
+    );
+    var loopPath = new Path(
+      [
+        new Pose2(0.0, 0.0),
+        new Pose2(1.0, 0.0),
+        new Pose2(1.0, 1.0),
+        new Pose2(0.0, 1.0),
+        new Pose2(
+          0.0,
+          0.05
+        )
+      ],
+      "map"
+    );
     var nearLoopStart = new Pose2(0.0, 0.04, 0.0);
     var globalLoopProjection = loopPath.project(nearLoopStart, 0.0);
-    check(globalLoopProjection.distanceAlongPath > 3.9,
-      "unbounded path projection exposes a close future branch at a loop");
+    check(
+      globalLoopProjection.distanceAlongPath > 3.9,
+      "unbounded path projection exposes a close future branch at a loop"
+    );
     var boundedLoopProjection = loopPath.project(nearLoopStart, 0.0, 0.2);
-    check(boundedLoopProjection.distanceAlongPath <= 0.2 &&
-      boundedLoopProjection.segmentIndex == 0,
-      "bounded path projection stays on the nearby current branch");
-    throws(function() loopPath.project(nearLoopStart, 0.5, 0.4),
-      "bounded path projection rejects an upper bound before its minimum");
+    check(
+      boundedLoopProjection.distanceAlongPath <= 0.2 && boundedLoopProjection.segmentIndex == 0,
+      "bounded path projection stays on the nearby current branch"
+    );
+    throws(
+      function() loopPath.project(nearLoopStart, 0.5, 0.4),
+      "bounded path projection rejects an upper bound before its minimum"
+    );
 
     var loopRobot = new FakeRobot("nav-loop");
     loopRobot.positions = [0.0, 0.0];
-    var loopBase = new MobileBase(loopRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var loopBase = new MobileBase(loopRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     var loopLocalization = new WheelOdometryLocalization(loopBase);
     loopLocalization.reset(nearLoopStart);
     var loopNavigation = new Navigation(loopBase, loopLocalization);
     var loopGoal = new NavigationGoal(loopPath.goal(), "map", 0.001, 0.1);
     loopNavigation.follow(loopPath, loopGoal);
-    loopNavigation.updateObservation(new RobotSnapshot("nav-loop", Int64.ofInt(1),
-      Int64.ofInt(1), [0.0, 0.0], [], [], 1, 0, Int64.ofInt(2), [],
-      "loop-clock", "host"), 0.1);
-    check(loopNavigation.progressDistance <= 0.05,
-      "Navigation does not jump to a later loop branch from a small localization offset");
+    loopNavigation.updateObservation(
+      new RobotSnapshot(
+        "nav-loop",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        [0.0, 0.0],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(2),
+        [],
+        "loop-clock",
+        "host"
+      ),
+      0.1
+    );
+    check(
+      loopNavigation.progressDistance <= 0.05,
+      "Navigation does not jump to a later loop branch from a small localization offset"
+    );
     var resumedNavigation = new Navigation(loopBase, loopLocalization);
     resumedNavigation.follow(loopPath, loopGoal, null, 2.0);
-    equal(resumedNavigation.progressDistance, 2.0,
-      "Navigation accepts an explicit path distance when resuming mid-route");
-    throws(function() resumedNavigation.follow(loopPath, loopGoal, null,
-      loopPath.length + 0.1), "Navigation rejects a resume distance outside its path");
+    equal(
+      resumedNavigation.progressDistance,
+      2.0,
+      "Navigation accepts an explicit path distance when resuming mid-route"
+    );
+    throws(
+      function() resumedNavigation.follow(loopPath, loopGoal, null, loopPath.length + 0.1),
+      "Navigation rejects a resume distance outside its path"
+    );
 
     var robot = new FakeRobot("nav-base");
     robot.positions = [0.0, 0.0];
-    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 2.0));
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     var localization = new WheelOdometryLocalization(base);
     var navigation = new Navigation(base, localization, 0.25, 0.4, 0.8);
     var goal = new NavigationGoal(path.goal(), "odom", 0.15, 0.1);
     navigation.follow(path, goal);
-    function navSnapshot(sequence:Int, time:Int, left:Float, right:Float):RobotSnapshot
-      return new RobotSnapshot("nav-base", Int64.ofInt(sequence), Int64.ofInt(time),
-        [left, right], [], [], 1, 0, Int64.ofInt(time + 5), [], "nav-boot", "host");
+    function navSnapshot(sequence:Int, time:Int, left:Float, right:Float):RobotSnapshot return new RobotSnapshot(
+      "nav-base",
+      Int64.ofInt(sequence),
+      Int64.ofInt(time),
+      [
+        left,
+        right
+      ],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(time + 5),
+      [],
+      "nav-boot",
+      "host"
+    );
     var firstStatus = navigation.updateObservation(navSnapshot(1, 10, 0.0, 0.0), 0.1);
     check(switch firstStatus {
-      case Following: true;
-      case _: false;
+      case Following:
+        true;
+      case _:
+        false;
     }, "Navigation starts and updates a path-following request");
     check(switch robot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Velocity &&
-          targets[1].mode == robotkit.core.JointTargetMode.Velocity &&
-          Math.abs(targets[0].target - targets[1].target) < 1e-9;
-      case _: false;
+        targets.length == 2 && targets[0].mode == robotkit.core.JointTargetMode.Velocity && targets[1].mode
+          == robotkit.core.JointTargetMode.Velocity && Math.abs(targets[0].target - targets[1].target) < 1e-9;
+      case _:
+        false;
     }, "path follower commands both differential wheels through MobileBase");
     var finalStatus = navigation.updateObservation(navSnapshot(2, 20, 9.0, 9.0), 0.1);
     check(switch finalStatus {
-      case Succeeded: true;
-      case _: false;
+      case Succeeded:
+        true;
+      case _:
+        false;
     }, "Navigation succeeds when localized pose enters the goal tolerances");
     check(switch robot.lastStop {
-      case Normal: true;
-      case _: false;
+      case Normal:
+        true;
+      case _:
+        false;
     }, "Navigation stops the robot on successful arrival");
 
     localization.reset(new Pose2(0.0, 0.1, 0.0));
     navigation.follow(path);
     var offPathStatus = navigation.updateObservation(navSnapshot(3, 30, 0.0, 0.0), 0.1);
-    check(switch offPathStatus { case Following: true; case _: false; } &&
-      Math.abs(navigation.crossTrackError - 0.1) < 1e-9,
+    check(switch offPathStatus {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(navigation.crossTrackError - 0.1) < 1e-9,
       "Navigation exposes left-positive cross-track error from localization");
 
     localization.reset(new Pose2(0.0, 0.0, 0.0));
-    var reversePath = new Path([
-      new Pose2(0.0, 0.0, 0.0), new Pose2(-1.0, 0.0, 0.0)
-    ], "odom");
+    var reversePath = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(-1.0, 0.0, 0.0)], "odom");
     navigation.follow(reversePath);
     var reverseStatus = navigation.updateObservation(navSnapshot(4, 40, 0.0, 0.0), 0.1);
-    check(switch reverseStatus { case Following: true; case _: false; } &&
-      switch robot.lastCommand {
-        case JointTargets(targets, _): targets.length == 2 &&
-          targets[0].target < 0.0 && targets[1].target < 0.0;
-        case _: false;
-      }, "Navigation reverses along a path whose authored body heading faces opposite its tangent");
+    check(switch reverseStatus {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    && switch robot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].target < 0.0 && targets[1].target < 0.0;
+      case _:
+        false;
+    }, "Navigation reverses along a path whose authored body heading faces opposite its tangent");
 
     var overshootRobot = new FakeRobot("nav-overshoot");
     overshootRobot.positions = [0.0, 0.0];
-    var overshootBase = new MobileBase(overshootRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var overshootBase = new MobileBase(
+      overshootRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0)
+    );
     var overshootLocalization = new WheelOdometryLocalization(overshootBase);
-    overshootLocalization.update(new RobotSnapshot("nav-overshoot", Int64.ofInt(1),
-      Int64.ofInt(10), [0.0, 0.0], [], [], 1, 0, Int64.ofInt(11), [],
-      "overshoot-clock", "host"));
-    var overshootNavigation = new Navigation(overshootBase, overshootLocalization,
-      0.2, 0.5, 1.0);
+    overshootLocalization.update(new RobotSnapshot(
+      "nav-overshoot",
+      Int64.ofInt(1),
+      Int64.ofInt(10),
+      [0.0, 0.0],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(11),
+      [],
+      "overshoot-clock",
+      "host"
+    ));
+    var overshootNavigation = new Navigation(overshootBase, overshootLocalization, 0.2, 0.5, 1.0);
     var straightGoal = new NavigationGoal(new Pose2(1.0, 0.0, 0.0), "odom", 0.01, 0.1);
     overshootNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
-    overshootNavigation.updateObservation(new RobotSnapshot("nav-overshoot",
-      Int64.ofInt(2), Int64.ofInt(20), [0.0, 0.0], [], [], 1, 0,
-      Int64.ofInt(21), [], "overshoot-clock", "host"), 0.1);
-    var overshootStatus = overshootNavigation.updateObservation(new RobotSnapshot(
-      "nav-overshoot", Int64.ofInt(3), Int64.ofInt(30), [12.0, 12.0], [], [],
-      1, 0, Int64.ofInt(31), [], "overshoot-clock", "host"), 0.1);
-    check(switch overshootStatus { case Following: true; case _: false; } &&
-      switch overshootRobot.lastCommand {
-        case JointTargets(targets, _): targets.length == 2 &&
-          targets[0].target < 0.0 && targets[1].target < 0.0;
-        case _: false;
-      }, "Navigation reverses toward the goal if motion carries the robot past the path end");
+    overshootNavigation.updateObservation(
+      new RobotSnapshot(
+        "nav-overshoot",
+        Int64.ofInt(2),
+        Int64.ofInt(20),
+        [0.0, 0.0],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(21),
+        [],
+        "overshoot-clock",
+        "host"
+      ),
+      0.1
+    );
+    var overshootStatus = overshootNavigation.updateObservation(
+      new RobotSnapshot(
+        "nav-overshoot",
+        Int64.ofInt(3),
+        Int64.ofInt(30),
+        [
+          12.0,
+          12.0
+        ],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(31),
+        [],
+        "overshoot-clock",
+        "host"
+      ),
+      0.1
+    );
+    check(switch overshootStatus {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    && switch overshootRobot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].target < 0.0 && targets[1].target < 0.0;
+      case _:
+        false;
+    }, "Navigation reverses toward the goal if motion carries the robot past the path end");
 
     // A differential base turns in place toward a route behind it rather than sweeping an arc, and once
     // it has come within the goal's position tolerance it only turns to the goal heading, even if
     // braking carries it back out.
     function spinning(robot:FakeRobot):Bool return switch robot.lastCommand {
-      case JointTargets(targets, _): targets.length == 2 && Math.abs(targets[0].target + targets[1].target) < 1e-9 &&
-        Math.abs(targets[0].target) > 1e-6;
-      case _: false;
+      case JointTargets(targets, _):
+        targets.length == 2
+          && Math.abs(targets[0].target + targets[1].target) < 1e-9 && Math.abs(targets[0].target) > 1e-6;
+      case _:
+        false;
     };
-    function wheelSample(name:String, tick:Int, wheel:Float):RobotSnapshot
-      return new RobotSnapshot(name, Int64.ofInt(tick), Int64.ofInt(tick * 10), [wheel, wheel], [], [], 1, 0,
-        Int64.ofInt(tick * 10 + 1), [], name + "-clock", "host");
+    function wheelSample(name:String, tick:Int, wheel:Float):RobotSnapshot return new RobotSnapshot(
+      name,
+      Int64.ofInt(tick),
+      Int64.ofInt(tick * 10),
+      [
+        wheel,
+        wheel
+      ],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(tick * 10 + 1),
+      [],
+      name + "-clock",
+      "host"
+    );
     var turnRobot = new FakeRobot("nav-turn");
     turnRobot.positions = [0.0, 0.0];
     var turnBase = new MobileBase(turnRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
@@ -2069,89 +3630,154 @@ class RobotWorldTests {
     // 2 cm short of the goal, inside its 5 cm tolerance: the goal is still ahead, so it closes in.
     latchNavigation.updateObservation(wheelSample("nav-latch", 3, 9.8), 0.1);
     check(switch latchRobot.lastCommand {
-      case JointTargets(targets, _): targets[0].target > 0.0 && targets[1].target > 0.0;
-      case _: false;
+      case JointTargets(targets, _):
+        targets[0].target > 0.0 && targets[1].target > 0.0;
+      case _:
+        false;
     }, "Navigation keeps closing in on a goal still ahead inside its tolerance");
     // Rolled 1 cm past it: latched, it turns in place to the goal heading.
     latchNavigation.updateObservation(wheelSample("nav-latch", 4, 10.1), 0.1);
     check(spinning(latchRobot), "Navigation turns to the goal heading once it has reached the goal");
     var latchStatus = latchNavigation.updateObservation(wheelSample("nav-latch", 5, 10.7), 0.1);
-    check(switch latchStatus { case Following: true; case _: false; } && spinning(latchRobot),
-      "Navigation keeps turning in place after rolling back out of the position tolerance");
+    check(switch latchStatus {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    && spinning(latchRobot), "Navigation keeps turning in place after rolling back out of the position tolerance");
 
-    var noReverseNavigation = new Navigation(overshootBase, overshootLocalization,
-      0.2, 0.5, 1.0, false);
+    var noReverseNavigation = new Navigation(overshootBase, overshootLocalization, 0.2, 0.5, 1.0, false);
     noReverseNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
     check(switch noReverseNavigation.update(0.1) {
-      case Failed(message): message.indexOf("reverse motion is disabled") >= 0;
-      case _: false;
+      case Failed(message):
+        message.indexOf("reverse motion is disabled") >= 0;
+      case _:
+        false;
     }, "Navigation reports an unrecoverable path-end overshoot when reverse is disabled");
 
     for (yaw in [0.0, 1.8]) {
       overshootLocalization.reset(new Pose2(1.2, 0.08, yaw));
       overshootLocalization.update(wheelSample("nav-overshoot", 6, 12.0));
       noReverseNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
-      check(switch noReverseNavigation.update(0.1) { case Following: spinning(overshootRobot); case _: false; },
-        "Forward-only navigation turns back toward an endpoint outside the final path corridor");
+      check(switch noReverseNavigation.update(0.1) {
+        case Following:
+          spinning(overshootRobot);
+        case _:
+          false;
+      }, "Forward-only navigation turns back toward an endpoint outside the final path corridor");
     }
 
     function commandedSpeedAt(x:Float, id:String):Float {
       var speedRobot = new FakeRobot(id);
       speedRobot.positions = [0.0, 0.0];
-      var speedBase = new MobileBase(speedRobot,
-        new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0, 2.0, 10.0));
+      var speedBase = new MobileBase(
+        speedRobot,
+        new DifferentialDrive(0, 1, 0.1, 0.5),
+        new MotionLimits(
+          1.0,
+          2.0,
+          2.0,
+          10.0
+        )
+      );
       var speedLocalization = new WheelOdometryLocalization(speedBase);
       speedLocalization.reset(new Pose2(x, 0.0, 0.0));
-      var speedNavigation = new Navigation(speedBase, speedLocalization,
-        0.2, 0.5, 1.0);
+      var speedNavigation = new Navigation(speedBase, speedLocalization, 0.2, 0.5, 1.0);
       speedNavigation.follow(path, new NavigationGoal(path.goal(), "odom", 0.005, 0.1));
-      speedNavigation.updateObservation(new RobotSnapshot(id, Int64.ofInt(1), Int64.ofInt(1),
-        [0.0, 0.0], [], [], 1, 0, Int64.ofInt(2), [], "speed-clock", "host"), 1.0);
+      speedNavigation.updateObservation(
+        new RobotSnapshot(
+          id,
+          Int64.ofInt(1),
+          Int64.ofInt(1),
+          [0.0, 0.0],
+          [],
+          [],
+          1,
+          0,
+          Int64.ofInt(2),
+          [],
+          "speed-clock",
+          "host"
+        ),
+        1.0
+      );
       return switch speedRobot.lastCommand {
-        case JointTargets(targets, _): (targets[0].target + targets[1].target) * 0.05;
-        case _: 0.0;
+        case JointTargets(targets, _):
+          (targets[0].target + targets[1].target) * 0.05;
+        case _:
+          0.0;
       };
     }
     var farSpeed = commandedSpeedAt(0.0, "nav-speed-far");
     var nearSpeed = commandedSpeedAt(0.98, "nav-speed-near");
-    check(farSpeed > nearSpeed && nearSpeed > 0.0,
-      "Navigation profiles speed down using braking distance near the goal");
+    check(
+      farSpeed > nearSpeed && nearSpeed > 0.0,
+      "Navigation profiles speed down using braking distance near the goal"
+    );
 
     var zoneRobot = new FakeRobot("nav-speed-zone");
     zoneRobot.positions = [0.0, 0.0];
-    var zoneBase = new MobileBase(zoneRobot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 2.0, 1.0, 10.0));
+    var zoneBase = new MobileBase(
+      zoneRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(
+        1.0,
+        2.0,
+        1.0,
+        10.0
+      )
+    );
     zoneBase.command(new Twist2(0.6, 0.0));
     var zoneLocalization = new WheelOdometryLocalization(zoneBase);
     zoneLocalization.reset(new Pose2());
-    var zoneNavigation = new Navigation(zoneBase, zoneLocalization,
-      0.2, 0.8, 1.0);
+    var zoneNavigation = new Navigation(zoneBase, zoneLocalization, 0.2, 0.8, 1.0);
     var zonePath = new Path([new Pose2(), new Pose2(2.0, 0.0, 0.0)], "odom");
     zoneNavigation.follow(zonePath, null, [new PathSpeedLimit(0.01, 2.0, 0.05)]);
-    zoneNavigation.updateObservation(new RobotSnapshot("nav-speed-zone",
-      Int64.ofInt(1), Int64.ofInt(1), [0.0, 0.0], [], [], 1, 0,
-      Int64.ofInt(2), [], "speed-zone-clock", "host"), 1.0);
+    zoneNavigation.updateObservation(
+      new RobotSnapshot(
+        "nav-speed-zone",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        [0.0, 0.0],
+        [],
+        [],
+        1,
+        0,
+        Int64.ofInt(2),
+        [],
+        "speed-zone-clock",
+        "host"
+      ),
+      1.0
+    );
     var zoneSpeed = switch zoneRobot.lastCommand {
-      case JointTargets(targets, _): (targets[0].target + targets[1].target) * 0.05;
-      case _: 0.0;
+      case JointTargets(targets, _):
+        (targets[0].target + targets[1].target) * 0.05;
+      case _:
+        0.0;
     };
-    check(zoneSpeed > 0.14 && zoneSpeed <= 0.151,
-      "Navigation brakes before an upcoming lane speed limit");
-    throws(function() zoneNavigation.follow(zonePath, null,
-      [new PathSpeedLimit(1.0, 2.1, 0.2)]),
-      "Navigation rejects speed-limit intervals beyond the path");
+    check(zoneSpeed > 0.14 && zoneSpeed <= 0.151, "Navigation brakes before an upcoming lane speed limit");
+    throws(
+      function() zoneNavigation.follow(zonePath, null, [new PathSpeedLimit(1.0, 2.1, 0.2)]),
+      "Navigation rejects speed-limit intervals beyond the path"
+    );
 
     navigation.follow(path);
     navigation.cancel();
     check(switch navigation.status {
-      case Cancelled: true;
-      case _: false;
+      case Cancelled:
+        true;
+      case _:
+        false;
     }, "Navigation supports cancellation");
     navigation.follow(new Path([new Pose2(), new Pose2(1.0, 0.0, 0.0)], "map"));
     var mismatch = navigation.update(0.1);
     check(switch mismatch {
-      case Failed(_): true;
-      case _: false;
+      case Failed(_):
+        true;
+      case _:
+        false;
     }, "Navigation fails explicitly when path and localization frames differ");
   }
 
@@ -2161,21 +3787,29 @@ class RobotWorldTests {
     var baseLink = model.addLink(new Link("base", "base"));
     var leftLink = model.addLink(new Link("left wheel", "left-wheel"));
     var rightLink = model.addLink(new Link("right wheel", "right-wheel"));
-    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
-      "joint/left-wheel");
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink, "joint/left-wheel");
     left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(left);
-    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
-      "joint/right-wheel");
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink, "joint/right-wheel");
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
-        0.1, 0.5), 0.6, 1.0, 2.0, 4.0, 0.6, 0.4);
-    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0,
-      "sensor/front-lidar"));
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      0.6,
+      1.0,
+      2.0,
+      4.0,
+      0.6,
+      0.4
+    );
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0, "sensor/front-lidar"));
     lidar.rayCount = 64;
     lidar.maxRange = 5.0;
 
@@ -2184,14 +3818,27 @@ class RobotWorldTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("motion-guard-sim", runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "motion-guard-sim",
+      runtime,
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     var base = MobileBase.fromBlueprint(robot, blueprint);
-    var localization = new FixedLocalization(new LocalizationState(Int64.ofInt(0),
-      new Pose2(), "map", "base", PoseCovariance2.zero(), Good,
-      Int64.ofInt(0), Int64.ofInt(0), "sim-clock", "host-clock"));
-    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint,
-      "sensor/front-lidar", 0.08, 0.05, 0.4);
+    var localization = new FixedLocalization(new LocalizationState(
+      Int64.ofInt(0),
+      new Pose2(),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(0),
+      Int64.ofInt(0),
+      "sim-clock",
+      "host-clock"
+    ));
+    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint, "sensor/front-lidar", 0.08, 0.05, 0.4);
     var framedPerception = new FrameAwarePerception(lidarPerception, localization);
     var navigation = new Navigation(base, localization, 0.2, 0.6, 1.0);
     var guard = new MotionGuard(navigation, null, 0.2, 2.0, 0.15, 0.5);
@@ -2206,99 +3853,219 @@ class RobotWorldTests {
     var clear = observe(1);
     equal(clear.obstacles().length, 0, "simulated LiDAR reports a clear path initially");
     guard.update(clear, 1.0);
-    check(switch guard.state { case Clear: true; case _: false; } &&
-      base.currentCommand().linear > 0.5,
-      "MotionGuard leaves navigation speed unchanged when the path is clear");
+    check(switch guard.state {
+      case Clear:
+        true;
+      case _:
+        false;
+    }
+    && base.currentCommand().linear > 0.5, "MotionGuard leaves navigation speed unchanged when the path is clear");
 
     var objectId = simulationHarness.spawnBox([1.0, 0.0, 0.0], [0.1, 0.1, 0.1]);
     var detected = observe(2);
-    check(detected.obstacles().length > 0,
-      "simulated LiDAR perception detects an obstacle in the navigation corridor");
+    check(detected.obstacles().length > 0, "simulated LiDAR perception detects an obstacle in the navigation corridor");
     guard.update(detected, 0.1);
     var approachSpeed = base.currentCommand().linear;
-    check(switch guard.state { case Approaching(_, _, _): true; case _: false; } &&
-      approachSpeed > 0.0 && approachSpeed < 0.6,
-      "MotionGuard reduces navigation speed inside the stopping envelope");
+    check(switch guard.state {
+      case Approaching(_, _, _):
+        true;
+      case _:
+        false;
+    }
+    && approachSpeed > 0.0 && approachSpeed < 0.6, "MotionGuard reduces navigation speed inside the stopping envelope");
 
     simulationHarness.teleportObject(objectId, [0.55, 0.0, 0.0]);
     var blocked = observe(3);
-    check(blocked.obstacles().length > 0,
-      "simulated perception continues observing an obstacle near the footprint");
+    check(blocked.obstacles().length > 0, "simulated perception continues observing an obstacle near the footprint");
     guard.update(blocked, 0.1);
     guard.update(blocked, 0.1);
-    check(switch guard.state { case Blocked(_): true; case _: false; } &&
-      Math.abs(base.currentCommand().linear) < 1e-9,
+    check(switch guard.state {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().linear) < 1e-9,
       "MotionGuard commands a stop when obstacle clearance reaches its margin");
 
     simulationHarness.removeObject(objectId);
     var resumed = observe(4);
     equal(resumed.obstacles().length, 0, "simulated LiDAR clears the removed obstacle");
     guard.update(resumed, 0.1);
-    check(switch guard.state { case Clear: true; case _: false; } &&
-      base.currentCommand().linear > 0.0,
-      "MotionGuard lets navigation resume after the obstacle is removed");
-    var unframedObstacle = new Obstacle(new Detection("unframed-obstacle", "obstacle",
-      1.0, new Pose2(1.0, 0.0), "camera-frame", Int64.ofInt(1), Int64.ofInt(10),
-      Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    check(switch guard.state {
+      case Clear:
+        true;
+      case _:
+        false;
+    }
+    && base.currentCommand().linear > 0.0, "MotionGuard lets navigation resume after the obstacle is removed");
+    var unframedObstacle = new Obstacle(
+      new Detection(
+        "unframed-obstacle",
+        "obstacle",
+        1.0,
+        new Pose2(1.0, 0.0),
+        "camera-frame",
+        Int64.ofInt(1),
+        Int64.ofInt(10),
+        Int64.ofInt(10),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     guard.update(new PerceptionSnapshot([], [unframedObstacle]), 0.1);
-    check(switch guard.state { case Blocked(_): true; case _: false; },
-      "MotionGuard blocks when obstacle frame transforms are unavailable");
+    check(switch guard.state {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    }, "MotionGuard blocks when obstacle frame transforms are unavailable");
     guard.detach();
 
     // Stopped short of an obstacle ahead and to the side, the base may turn away from it: it is held
     // only by an obstacle within reach of its turning circle, not by the corridor it is not driving down.
-    var corner = new Obstacle(new Detection("corner", "obstacle", 1.0, new Pose2(0.5, 0.35), "map",
-      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    var corner = new Obstacle(
+      new Detection(
+        "corner",
+        "obstacle",
+        1.0,
+        new Pose2(0.5, 0.35),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(10),
+        Int64.ofInt(10),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     var driving = new Navigation(base, localization, 0.2, 0.6, 1.0);
     var corridorGuard = new MotionGuard(driving, null, 0.2, 2.0, 0.1, 0.5);
     driving.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
     corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
-    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
-      Math.abs(base.currentCommand().linear) < 1e-9,
+    check(switch corridorGuard.state {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().linear) < 1e-9,
       "MotionGuard stops a base driving at an obstacle inside its margin");
     driving.cancel();
     driving.follow(new Path([new Pose2(0.0, 0.0, Math.PI * 0.75), new Pose2(-3.0, 3.0, Math.PI * 0.75)], "map"));
     corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
-    check(switch corridorGuard.state { case Clear: true; case _: false; } &&
-      Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) > 0.1,
+    check(switch corridorGuard.state {
+      case Clear:
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) > 0.1,
       'MotionGuard lets a stopped base turn away from an obstacle it cannot drive at (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
     // Held short of it but asked to curve away, it pivots instead of stopping dead.
     driving.cancel();
     driving.follow(new Path([new Pose2(0.0, 0.0, -0.46), new Pose2(3.0, -1.5, -0.46)], "map"));
     corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
-    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
-      Math.abs(base.currentCommand().linear) < 1e-9 && base.currentCommand().angular < -0.05,
+    check(switch corridorGuard.state {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().linear) < 1e-9 && base.currentCommand().angular < -0.05,
       'MotionGuard lets a base held short of an obstacle pivot away along its route (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
-    var touching = new Obstacle(new Detection("touching", "obstacle", 1.0, new Pose2(0.4, 0.3), "map",
-      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    var touching = new Obstacle(
+      new Detection(
+        "touching",
+        "obstacle",
+        1.0,
+        new Pose2(0.4, 0.3),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(10),
+        Int64.ofInt(10),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     corridorGuard.update(new PerceptionSnapshot([], [touching]), 0.1);
-    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
-      Math.abs(base.currentCommand().angular) < 1e-9,
+    check(switch corridorGuard.state {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().angular) < 1e-9,
       "MotionGuard holds a stopped base whose turn would swing into an obstacle");
     corridorGuard.detach();
 
     // The guard judges the costmap's dynamic layer, so it holds for what the costmap remembers: an obstacle
     // seen and then out of view still slows the base until the memory times out or a scan sees through it.
-    function at(x:Float, y:Float, yaw:Float = 0.0, half:Float = 0.0):Obstacle
-      return new Obstacle(new Detection("remembered", "obstacle", 1.0, new Pose2(x, y, yaw), "map", Int64.ofInt(1),
-        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, half);
-    var memoryMap = new Costmap2(new OccupancyGrid2(0.5, new Pose2(-5.0, -5.0), 20, 20, "map", OccupancyCell.Free),
-      0.3, false, 0.0, 0.0, 3.0);
+    function at(x:Float, y:Float, yaw:Float = 0.0, half:Float = 0.0):Obstacle return new Obstacle(
+      new Detection(
+        "remembered",
+        "obstacle",
+        1.0,
+        new Pose2(
+          x,
+          y,
+          yaw
+        ),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1,
+      half
+    );
+    var memoryMap = new Costmap2(
+      new OccupancyGrid2(0.5, new Pose2(-5.0, -5.0), 20, 20, "map", OccupancyCell.Free),
+      0.3,
+      false,
+      0.0,
+      0.0,
+      3.0
+    );
     var remembering = new Navigation(base, localization, 0.2, 0.6, 1.0);
     var rememberingGuard = new MotionGuard(remembering, null, 0.2, 2.0, 0.1, 0.5, memoryMap);
     remembering.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
-    function held():Bool return switch rememberingGuard.state { case Clear: false; case _: true; };
+    function held():Bool return switch rememberingGuard.state {
+      case Clear:
+        false;
+      case _:
+        true;
+    };
     memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
     rememberingGuard.update(new PerceptionSnapshot([], [at(0.75, 0.0)]), 0.1);
     check(held(), "MotionGuard slows for an obstacle in the costmap");
     memoryMap.senseObstacles([], null, 1.0);
     rememberingGuard.update(new PerceptionSnapshot(), 0.1);
     check(held(), "MotionGuard still holds for an obstacle the sensor has lost sight of");
-    var blank = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), [for (_ in 0...72) 6.0],
-      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock");
+    var blank = new SensorFrame(
+      "scan",
+      "lidar",
+      "base",
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      [for (_ in 0...72) 6.0],
+      Int64.ofInt(1),
+      "base",
+      null,
+      null,
+      "sim-clock",
+      "host-clock"
+    );
     memoryMap.senseObstacles([], new LidarFreeSpace(6.0).viewing(blank, new Pose2(-3.0, 0.0, 0.0)), 0.1);
     rememberingGuard.update(new PerceptionSnapshot(), 0.1);
-    check(!held() && memoryMap.dynamicLayer().length == 0, "MotionGuard lets go once a scan sees through the obstacle's place");
+    check(
+      !held() && memoryMap.dynamicLayer().length == 0,
+      "MotionGuard lets go once a scan sees through the obstacle's place"
+    );
     memoryMap.senseObstacles([at(0.75, 0.0)], null, 0.1);
     memoryMap.senseObstacles([], null, 2.9);
     rememberingGuard.update(new PerceptionSnapshot(), 0.1);
@@ -2326,41 +4093,115 @@ class RobotWorldTests {
       var angle = ray * Math.PI / 180.0;
       var hit = Math.cos(angle) > 0.0 && Math.abs(2.0 * Math.tan(angle)) <= 0.6;
       hit ? 2.0 / Math.cos(angle) : 10.0;
-    }];
-    var scan = new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), face, Int64.ofInt(1), "base",
-      null, null, "sim-clock", "host-clock");
+    }
+    ];
+    var scan = new SensorFrame(
+      "scan",
+      "lidar",
+      "base",
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      face,
+      Int64.ofInt(1),
+      "base",
+      null,
+      null,
+      "sim-clock",
+      "host-clock"
+    );
     var wall = scanner.observe([scan]).obstacles();
-    check(wall.length == 1 && Math.abs(wall[0].halfLengthMeters - 0.6) < 0.05 && wall[0].radiusMeters == 0.1 &&
-      Math.abs(Math.abs(wall[0].detection.pose.yaw) - Math.PI / 2) < 0.01 && Math.abs(wall[0].detection.pose.x - 2.0) < 0.01,
-      "a flat wall seen face-on is one segment of its own length");
+    check(
+      wall.length == 1 && Math.abs(wall[0].halfLengthMeters - 0.6) < 0.05
+      && wall[0].radiusMeters == 0.1 && Math.abs(Math.abs(wall[0].detection.pose.yaw) - Math.PI / 2) < 0.01
+      && Math.abs(wall[0].detection.pose.x - 2.0) < 0.01,
+      "a flat wall seen face-on is one segment of its own length"
+    );
     // Seen from the map frame it keeps its length and turns with the robot.
-    var estimate = new LocalizationState(Int64.ofInt(1), new Pose2(1.0, 1.0, Math.PI / 2), "map", "base",
-      PoseCovariance2.zero(), Good, Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock");
+    var estimate = new LocalizationState(
+      Int64.ofInt(1),
+      new Pose2(1.0, 1.0, Math.PI / 2),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      "sim-clock",
+      "host-clock"
+    );
     var inMap = new FrameAwarePerception(scanner, new FixedLocalization(estimate)).observe([scan]).obstacles();
-    check(inMap.length == 1 && Math.abs(inMap[0].halfLengthMeters - 0.6) < 0.05 && Math.abs(inMap[0].detection.pose.x - 1.0) < 0.01 &&
-      Math.abs(inMap[0].detection.pose.y - 3.0) < 0.01 && Math.abs(Math.sin(inMap[0].detection.pose.yaw)) < 0.01,
-      "a segment is carried into the map frame with its length and heading");
+    check(
+      inMap.length == 1
+      && Math.abs(inMap[0].halfLengthMeters - 0.6) < 0.05 && Math.abs(inMap[0].detection.pose.x - 1.0) < 0.01
+      && Math.abs(inMap[0].detection.pose.y - 3.0) < 0.01 && Math.abs(Math.sin(inMap[0].detection.pose.yaw)) < 0.01,
+      "a segment is carried into the map frame with its length and heading"
+    );
     // A corner is two segments.
     var corner = [for (ray in 0...360) 10.0];
     for (ray in 0...360) {
       var angle = ray * Math.PI / 180.0, c = Math.cos(angle), s = Math.sin(angle);
       var near = 10.0;
       // Walls x = 2 for y in [-0.6, 0] and y = -0.6 for x in [1.4, 2].
-      if (c > 1e-6) { var y = 2.0 * s / c; if (y <= 0.0 && y >= -0.6) near = 2.0 / c; }
-      if (s < -1e-6) { var x = -0.6 * c / s; if (x >= 1.4 && x <= 2.0) near = Math.min(near, -0.6 / s); }
+      if (c > 1e-6) {
+        var y = 2.0 * s / c;
+        if (y <= 0.0 && y >= -0.6) near = 2.0 / c;
+      }
+      if (s < -1e-6) {
+        var x = -0.6 * c / s;
+        if (x >= 1.4 && x <= 2.0) near = Math.min(near, -0.6 / s);
+      }
       corner[ray] = near;
     }
-    var bent = scanner.observe([new SensorFrame("scan", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1), corner,
-      Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock")]).obstacles();
+    var bent = scanner.observe([new SensorFrame(
+      "scan",
+      "lidar",
+      "base",
+      Int64.ofInt(1),
+      Int64.ofInt(1),
+      corner,
+      Int64.ofInt(1),
+      "base",
+      null,
+      null,
+      "sim-clock",
+      "host-clock"
+    )]).obstacles();
     check(bent.length == 2, 'a corner is two segments (${bent.length})');
     // On the costmap a segment blocks the cells along it and not far past its ends.
-    var map = new Costmap2(new OccupancyGrid2(0.1, new Pose2(), 100, 100, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
-    var along = new Obstacle(new Detection("wall", "obstacle", 1.0, new Pose2(5.0, 5.0, 0.0), "map", Int64.ofInt(1), Int64.ofInt(1),
-      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1, 0.6);
+    var map = new Costmap2(
+      new OccupancyGrid2(0.1, new Pose2(), 100, 100, "map", OccupancyCell.Free),
+      0.0,
+      false,
+      0.0,
+      0.0
+    );
+    var along = new Obstacle(
+      new Detection(
+        "wall",
+        "obstacle",
+        1.0,
+        new Pose2(5.0, 5.0, 0.0),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1,
+      0.6
+    );
     map.senseObstacles([along], null, 0.1);
-    check(!map.isTraversable(54, 50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) &&
-      map.isTraversable(62, 50) && map.isTraversable(37, 50),
-      "a segment blocks the cells along it and nothing far past its ends or sides");
+    check(
+      !map.isTraversable(54, 50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) && map.isTraversable(
+        62,
+        50
+      ) && map.isTraversable(
+        37,
+        50
+      ),
+      "a segment blocks the cells along it and nothing far past its ends or sides"
+    );
     var cells = 0;
     for (x in 0...100) for (y in 0...100) if (!map.isTraversable(x, y)) cells++;
     check(cells < 12 * 4 + 20, 'a 1.2 m segment blocks a strip, not a wide disk (${cells} cells)');
@@ -2370,39 +4211,38 @@ class RobotWorldTests {
   }
 
   static function testGridPlanning():Void {
-    var rotated = new OccupancyGrid2(0.5, new Pose2(10.0, 20.0, Math.PI * 0.5),
-      4, 3, "rotated-map", OccupancyCell.Free);
+    var rotated = new OccupancyGrid2(0.5,
+      new Pose2(10.0, 20.0, Math.PI * 0.5), 4, 3, "rotated-map", OccupancyCell.Free);
     var worldCenter = rotated.cellCenter(2, 1);
     var roundTrip = rotated.worldToCell(worldCenter);
-    check(roundTrip != null && roundTrip.x == 2 && roundTrip.y == 1,
-      "occupancy grid maps cell centers through rotated origins");
-    check(rotated.worldToCell(rotated.origin.compose(new Pose2(-0.01, 0.0))) == null,
-      "occupancy grid rejects poses outside its lower-left boundary");
+    check(
+      roundTrip != null && roundTrip.x == 2 && roundTrip.y == 1,
+      "occupancy grid maps cell centers through rotated origins"
+    );
+    check(
+      rotated.worldToCell(rotated.origin.compose(new Pose2(-0.01, 0.0))) == null,
+      "occupancy grid rejects poses outside its lower-left boundary"
+    );
 
     var grid = new OccupancyGrid2(1.0, new Pose2(), 7, 7, "map", OccupancyCell.Free);
     for (y in 0...5) grid.setCell(3, y, OccupancyCell.Occupied);
     var costmap = new Costmap2(grid, 0.2, true, 0.5, 2.0);
-    check(!costmap.isTraversable(2, 2),
-      "costmap inflates static obstacles by the robot footprint");
-    check(costmap.isTraversable(3, 6),
-      "costmap preserves clearance beyond the inflated obstacle boundary");
+    check(!costmap.isTraversable(2, 2), "costmap inflates static obstacles by the robot footprint");
+    check(costmap.isTraversable(3, 6), "costmap preserves clearance beyond the inflated obstacle boundary");
     var planner = new AStarPlanner(costmap);
     var start = grid.cellCenter(0, 3);
     var goalCenter = grid.cellCenter(6, 3);
     var goal = new Pose2(goalCenter.x, goalCenter.y, 0.4);
     var path = planner.plan(start, goal);
     equal(path.frameId, "map", "grid planner frames its path in the map frame");
-    equal(path.goal().yaw, goal.yaw,
-      "grid planner preserves the requested final heading");
+    equal(path.goal().yaw, goal.yaw, "grid planner preserves the requested final heading");
     var visitsGap = false;
     var pathSignature:Array<String> = [];
     for (point in path.poses()) {
       var mapped = grid.worldToCell(point);
-      check(mapped != null,
-        "A* path waypoints remain inside the occupancy grid");
+      check(mapped != null, "A* path waypoints remain inside the occupancy grid");
       var cell:GridCell2 = cast mapped;
-      check(costmap.isTraversable(cell.x, cell.y),
-        "A* path waypoints remain in traversable costmap cells");
+      check(costmap.isTraversable(cell.x, cell.y), "A* path waypoints remain in traversable costmap cells");
       if (cell.y >= 5) visitsGap = true;
       pathSignature.push('${cell.x},${cell.y}');
     }
@@ -2413,83 +4253,158 @@ class RobotWorldTests {
       var cell:GridCell2 = cast grid.worldToCell(point);
       repeatedSignature.push('${cell.x},${cell.y}');
     }
-    equal(repeatedSignature.join(";"), pathSignature.join(";"),
-      "A* uses deterministic tie-breaking for repeated plans");
+    equal(repeatedSignature.join(";"),
+      pathSignature.join(";"), "A* uses deterministic tie-breaking for repeated plans");
 
     var unknownGrid = new OccupancyGrid2(1.0, new Pose2(), 5, 1, "map", OccupancyCell.Free);
     unknownGrid.setCell(2, 0, OccupancyCell.Unknown);
     var unknownCostmap = new Costmap2(unknownGrid, 0.0, true, 0.0, 0.0);
     var unknownPlanner = new AStarPlanner(unknownCostmap);
-    throws(function() unknownPlanner.plan(unknownGrid.cellCenter(0, 0),
-      unknownGrid.cellCenter(4, 0)),
-      "A* treats unknown cells as blocked by default");
+    throws(
+      function() unknownPlanner.plan(unknownGrid.cellCenter(0, 0), unknownGrid.cellCenter(4, 0)),
+      "A* treats unknown cells as blocked by default"
+    );
 
-    var dynamicGrid = new OccupancyGrid2(1.0, new Pose2(), 5, 5, "map",
-      OccupancyCell.Free);
+    var dynamicGrid = new OccupancyGrid2(1.0, new Pose2(), 5, 5, "map", OccupancyCell.Free);
     var dynamicCostmap = new Costmap2(dynamicGrid, 0.0, false, 1.0, 2.0);
-    var dynamicObstacle = new Obstacle(new Detection("dynamic-obstacle", "obstacle",
-      1.0, new Pose2(2.5, 2.5), "map", Int64.ofInt(1), Int64.ofInt(1),
-      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1);
+    var dynamicObstacle = new Obstacle(
+      new Detection(
+        "dynamic-obstacle",
+        "obstacle",
+        1.0,
+        new Pose2(2.5, 2.5),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
-    check(!dynamicCostmap.isTraversable(2, 2),
-      "costmap rasterizes dynamic perception obstacles");
-    check(dynamicCostmap.isTraversable(3, 2) && dynamicCostmap.cellCost(3, 2) > 0.0,
-      "costmap assigns soft costs around dynamic obstacles");
+    check(!dynamicCostmap.isTraversable(2, 2), "costmap rasterizes dynamic perception obstacles");
+    check(
+      dynamicCostmap.isTraversable(3, 2) && dynamicCostmap.cellCost(3, 2) > 0.0,
+      "costmap assigns soft costs around dynamic obstacles"
+    );
     dynamicCostmap.clearDynamicObstacles();
-    check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
-      "costmap clears removed dynamic obstacles");
+    check(
+      dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
+      "costmap clears removed dynamic obstacles"
+    );
     // The grid's own layer survives dynamic changes, and an unchanged set is not redrawn.
     dynamicGrid.setCell(0, 0, OccupancyCell.Occupied);
     dynamicCostmap.refresh();
     dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
     var drawn = dynamicCostmap.revision;
     dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
-    check(dynamicCostmap.revision == drawn && dynamicCostmap.dynamicLayer().length == 1 &&
-      !dynamicCostmap.isTraversable(0, 0) && !dynamicCostmap.isTraversable(2, 2),
-      "costmap keeps an unchanged dynamic layer as it is");
+    check(
+      dynamicCostmap.revision == drawn && dynamicCostmap.dynamicLayer().length == 1 && !dynamicCostmap.isTraversable(
+        0,
+        0
+      ) && !dynamicCostmap.isTraversable(
+        2,
+        2
+      ),
+      "costmap keeps an unchanged dynamic layer as it is"
+    );
     dynamicCostmap.clearDynamicObstacles();
-    check(dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) &&
-      dynamicCostmap.isTraversable(2, 2),
-      "costmap clearing the dynamic layer leaves the grid's obstacles");
+    check(
+      dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) && dynamicCostmap.isTraversable(
+        2,
+        2
+      ),
+      "costmap clearing the dynamic layer leaves the grid's obstacles"
+    );
 
     // Obstacles the sensor has lost sight of stay for the costmap's memory, unless a scan sees through their place.
-    function sightingAt(x:Float, y:Float):Obstacle
-      return new Obstacle(new Detection("sighting", "obstacle", 1.0, new Pose2(x, y), "map", Int64.ofInt(1),
-        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.3);
-    function scanOf(ranges:Array<Float>):FreeSpaceView
-      return new LidarFreeSpace(6.0).viewing(new SensorFrame("lidar", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1),
-        ranges, Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock"), new Pose2(0.0, 5.0, 0.0));
+    function sightingAt(x:Float, y:Float):Obstacle return new Obstacle(
+      new Detection(
+        "sighting",
+        "obstacle",
+        1.0,
+        new Pose2(
+          x,
+          y
+        ),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.3
+    );
+    function scanOf(ranges:Array<Float>):FreeSpaceView return new LidarFreeSpace(6.0).viewing(
+      new SensorFrame(
+        "lidar",
+        "lidar",
+        "base",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        ranges,
+        Int64.ofInt(1),
+        "base",
+        null,
+        null,
+        "sim-clock",
+        "host-clock"
+      ),
+      new Pose2(
+        0.0,
+        5.0,
+        0.0
+      )
+    );
     var memoryGrid = new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free);
     var memory = new Costmap2(memoryGrid, 0.0, false, 0.0, 0.0, 5.0);
     memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
     check(!memory.isTraversable(10, 10), "a sensed obstacle blocks the costmap");
     memory.senseObstacles([], null, 1.0);
-    check(!memory.isTraversable(10, 10) && memory.dynamicLayer().length == 1,
-      "an obstacle out of view keeps blocking while the memory lasts");
+    check(
+      !memory.isTraversable(10, 10) && memory.dynamicLayer().length == 1,
+      "an obstacle out of view keeps blocking while the memory lasts"
+    );
     var remembered = memory.revision;
     memory.senseObstacles([], null, 0.0);
     check(memory.revision == remembered, "an unchanged remembered layer costs nothing");
     memory.senseObstacles([sightingAt(5.2, 5.0)], null, 1.0);
-    check(memory.dynamicLayer().length == 1 && memory.dynamicLayer()[0].detection.pose.x == 5.2,
-      "an obstacle seen again replaces its memory");
+    check(
+      memory.dynamicLayer().length == 1 && memory.dynamicLayer()[0].detection.pose.x == 5.2,
+      "an obstacle seen again replaces its memory"
+    );
     memory.senseObstacles([], null, 4.5);
     check(!memory.isTraversable(10, 10), "a memory is counted from when the obstacle was last seen");
     memory.senseObstacles([], null, 1.0);
-    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
-      "an obstacle out of view is forgotten when the memory runs out");
+    check(
+      memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "an obstacle out of view is forgotten when the memory runs out"
+    );
     // The sensor at (0, 5) facing +x: 72 rays, one every five degrees, the first straight at the obstacle.
     memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
     var nothing = [for (_ in 0...72) 6.0];
-    var seesBox = nothing.copy(); seesBox[0] = 4.8;
-    var occluded = nothing.copy(); occluded[0] = 3.0;
+    var seesBox = nothing.copy();
+    seesBox[0] = 4.8;
+    var occluded = nothing.copy();
+    occluded[0] = 3.0;
     memory.senseObstacles([], scanOf(seesBox), 0.1);
     check(!memory.isTraversable(10, 10), "a scan that still returns from the obstacle's place keeps it");
     memory.senseObstacles([], scanOf(occluded), 0.1);
     check(!memory.isTraversable(10, 10), "a scan that is blocked short of the obstacle's place says nothing of it");
     memory.senseObstacles([], scanOf(nothing), 0.1);
-    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
-      "a scan that sees through the obstacle's place clears it");
-    var forgetful = new Costmap2(new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    check(
+      memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "a scan that sees through the obstacle's place clears it"
+    );
+    var forgetful = new Costmap2(
+      new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free),
+      0.0,
+      false,
+      0.0,
+      0.0
+    );
     forgetful.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
     forgetful.senseObstacles([], null, 0.1);
     check(forgetful.isTraversable(10, 10), "without a memory only the latest observation counts");
@@ -2498,12 +4413,32 @@ class RobotWorldTests {
     // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.
     var marginGrid = new OccupancyGrid2(0.2, new Pose2(), 25, 25, "map", OccupancyCell.Free);
     var marginCostmap = new Costmap2(marginGrid, 0.3, false, 0.3, 2.0);
-    marginCostmap.setDynamicObstacles([new Obstacle(new Detection("margin-obstacle",
-      "obstacle", 1.0, new Pose2(2.0, 2.0), "map", Int64.ofInt(1), Int64.ofInt(1),
-      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1)]);
-    check(!marginCostmap.isTraversable(12, 10) && !marginCostmap.isLethal(12, 10) &&
-      marginCostmap.isLethal(10, 10) && marginCostmap.isLethal(-1, 0),
-      "costmap separates lethal cells from its blocked discretization margin");
+    marginCostmap.setDynamicObstacles([new Obstacle(
+      new Detection(
+        "margin-obstacle",
+        "obstacle",
+        1.0,
+        new Pose2(
+          2.0,
+          2.0
+        ),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "sim-clock",
+        "host-clock"
+      ),
+      0.1
+    )]);
+    check(
+      !marginCostmap.isTraversable(12,
+      10) && !marginCostmap.isLethal(12, 10) && marginCostmap.isLethal(10, 10) && marginCostmap.isLethal(
+        -1,
+        0
+      ),
+      "costmap separates lethal cells from its blocked discretization margin"
+    );
     var marginPlanner = new AStarPlanner(marginCostmap);
     var marginGoal = new Pose2(4.3, 3.9);
     var escapePath = marginPlanner.plan(new Pose2(2.47, 2.0), marginGoal);
@@ -2516,12 +4451,13 @@ class RobotWorldTests {
       if (marginCostmap.isTraversable(cell.x, cell.y)) reachedFree = true;
       else if (reachedFree) escapeIsClean = false;
     }
-    check(reachedFree && escapeIsClean,
-      "A* escapes a start in the blocked margin without lethal cells or re-entry");
-    throws(function() marginPlanner.plan(new Pose2(2.1, 2.0), marginGoal),
-      "A* finds no route out of a start surrounded by lethal cells");
-    throws(function() marginPlanner.plan(marginGoal, new Pose2(2.47, 2.0)),
-      "A* still rejects a goal in a blocked cell");
+    check(reachedFree && escapeIsClean, "A* escapes a start in the blocked margin without lethal cells or re-entry");
+    throws(
+      function() marginPlanner.plan(new Pose2(2.1, 2.0), marginGoal),
+      "A* finds no route out of a start surrounded by lethal cells"
+    );
+    throws(function() marginPlanner.plan(marginGoal,
+      new Pose2(2.47, 2.0)), "A* still rejects a goal in a blocked cell");
   }
 
   static function requireLocalizationState(localization:Localization):LocalizationState {
@@ -2533,36 +4469,58 @@ class RobotWorldTests {
   static function testNavigator():Void {
     var recoveryRobot = new FakeRobot("navigator-recovery");
     recoveryRobot.positions = [0.0, 0.0];
-    var recoveryBase = new MobileBase(recoveryRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
+    var recoveryBase = new MobileBase(recoveryRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
     var recoveryLocalization = new FixedLocalization(new LocalizationState(
-      Int64.ofInt(0), new Pose2(0.5, 0.5), "map", "base",
-      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
-      "recovery-clock", "host-clock"));
+      Int64.ofInt(0),
+      new Pose2(0.5, 0.5),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(0),
+      Int64.ofInt(0),
+      "recovery-clock",
+      "host-clock"
+    ));
     var recoveryNavigation = new Navigation(recoveryBase, recoveryLocalization);
-    var recoveryGrid = new OccupancyGrid2(1.0, new Pose2(), 7, 1,
-      "map", OccupancyCell.Free);
+    var recoveryGrid = new OccupancyGrid2(1.0, new Pose2(), 7, 1, "map", OccupancyCell.Free);
     var recoveryCostmap = new Costmap2(recoveryGrid, 0.0, false, 0.0, 0.0);
-    var recoveryNavigator = new Navigator(recoveryNavigation,
-      new AStarPlanner(recoveryCostmap), recoveryCostmap, 0.1);
+    var recoveryNavigator = new Navigator(recoveryNavigation, new AStarPlanner(recoveryCostmap), recoveryCostmap, 0.1);
     var recoveryGoal = new NavigationGoal(recoveryGrid.cellCenter(6, 0), "map");
     recoveryNavigator.navigateTo(recoveryGoal);
-    var blockingObstacle = new Obstacle(new Detection("recovery-blocker", "obstacle",
-      1.0, recoveryGrid.cellCenter(3, 0), "map", Int64.ofInt(1), Int64.ofInt(1),
-      Int64.ofInt(1), "recovery-clock", "host-clock"), 0.1);
-    var blockedStatus = recoveryNavigator.update(
-      new PerceptionSnapshot([], [blockingObstacle]), 0.1);
+    var blockingObstacle = new Obstacle(
+      new Detection(
+        "recovery-blocker",
+        "obstacle",
+        1.0,
+        recoveryGrid.cellCenter(3, 0),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "recovery-clock",
+        "host-clock"
+      ),
+      0.1
+    );
+    var blockedStatus = recoveryNavigator.update(new PerceptionSnapshot([], [blockingObstacle]), 0.1);
     check(switch blockedStatus {
-      case NavigatorStatus.Blocked(_): true;
-      case _: false;
-    } && switch recoveryRobot.lastStop {
-      case Normal: true;
-      case _: false;
+      case NavigatorStatus.Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && switch recoveryRobot.lastStop {
+      case Normal:
+        true;
+      case _:
+        false;
     }, "Navigator stops and reports blocked when no route exists");
     var recoveredStatus = recoveryNavigator.update(new PerceptionSnapshot(), 0.1);
-    check(recoveredStatus == NavigatorStatus.Navigating &&
-      recoveryNavigator.replanCount >= 2,
-      "Navigator retries and resumes when a blocked route becomes clear");
+    check(
+      recoveredStatus == NavigatorStatus.Navigating && recoveryNavigator.replanCount >= 2,
+      "Navigator retries and resumes when a blocked route becomes clear"
+    );
     recoveryNavigator.cancel();
 
     // A robot that has cut into an obstacle's blocked margin, touching
@@ -2570,35 +4528,68 @@ class RobotWorldTests {
     // cell; the route ahead of the escape stays checked as usual.
     var marginRobot = new FakeRobot("navigator-margin");
     marginRobot.positions = [0.0, 0.0];
-    var marginBase = new MobileBase(marginRobot,
-      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
+    var marginBase = new MobileBase(marginRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
     var marginLocalization = new FixedLocalization(new LocalizationState(
-      Int64.ofInt(0), new Pose2(2.47, 1.0), "map", "base",
-      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
-      "margin-clock", "host-clock"));
+      Int64.ofInt(0),
+      new Pose2(2.47, 1.0),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(0),
+      Int64.ofInt(0),
+      "margin-clock",
+      "host-clock"
+    ));
     var marginNavigation = new Navigation(marginBase, marginLocalization);
     var marginGrid = new OccupancyGrid2(0.2, new Pose2(), 30, 10, "map", OccupancyCell.Free);
     var marginCostmap = new Costmap2(marginGrid, 0.3, false, 0.0, 0.0);
-    var marginObstacle = new Obstacle(new Detection("margin-obstacle", "obstacle", 1.0,
-      new Pose2(2.0, 1.0), "map", Int64.ofInt(1), Int64.ofInt(1), Int64.ofInt(1),
-      "margin-clock", "host-clock"), 0.1);
+    var marginObstacle = new Obstacle(
+      new Detection(
+        "margin-obstacle",
+        "obstacle",
+        1.0,
+        new Pose2(2.0, 1.0),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "margin-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     marginCostmap.setDynamicObstacles([marginObstacle]);
-    var marginNavigator = new Navigator(marginNavigation,
-      new AStarPlanner(marginCostmap), marginCostmap, 0.1);
-    var marginStatus = marginNavigator.navigateTo(
-      new NavigationGoal(new Pose2(5.0, 1.0), "map"));
-    for (_ in 0...5)
-      marginStatus = marginNavigator.update(new PerceptionSnapshot([], [marginObstacle]), 0.1);
-    check(marginStatus == NavigatorStatus.Navigating && marginNavigator.replanCount == 0,
-      'Navigator escapes a blocked margin without deadlocking or replanning ($marginStatus)');
-    var wall = new Obstacle(new Detection("margin-wall", "obstacle", 1.0,
-      new Pose2(4.0, 1.0), "map", Int64.ofInt(1), Int64.ofInt(1), Int64.ofInt(1),
-      "margin-clock", "host-clock"), 0.9);
-    marginStatus = marginNavigator.update(
-      new PerceptionSnapshot([], [marginObstacle, wall]), 0.1);
-    check(switch marginStatus { case NavigatorStatus.Blocked(_): true; case _: false; } &&
-      marginNavigator.replanCount == 1,
-      "Navigator still replans when the route ahead of an escape becomes blocked");
+    var marginNavigator = new Navigator(marginNavigation, new AStarPlanner(marginCostmap), marginCostmap, 0.1);
+    var marginStatus = marginNavigator.navigateTo(new NavigationGoal(new Pose2(5.0, 1.0), "map"));
+    for (_ in 0...5) marginStatus = marginNavigator.update(new PerceptionSnapshot([], [marginObstacle]), 0.1);
+    check(
+      marginStatus == NavigatorStatus.Navigating && marginNavigator.replanCount == 0,
+      'Navigator escapes a blocked margin without deadlocking or replanning ($marginStatus)'
+    );
+    var wall = new Obstacle(
+      new Detection(
+        "margin-wall",
+        "obstacle",
+        1.0,
+        new Pose2(4.0, 1.0),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "margin-clock",
+        "host-clock"
+      ),
+      0.9
+    );
+    marginStatus = marginNavigator.update(new PerceptionSnapshot([], [marginObstacle, wall]), 0.1);
+    check(switch marginStatus {
+      case NavigatorStatus.Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && marginNavigator.replanCount == 1, "Navigator still replans when the route ahead of an escape becomes blocked");
     marginNavigator.cancel();
 
     var profile = new robotkit.profile.RobotProfile();
@@ -2606,23 +4597,31 @@ class RobotWorldTests {
     var baseLink = model.addLink(new Link("base", "link/base"));
     var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
     var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
-    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
-      "joint/left-wheel");
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink, "joint/left-wheel");
     left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(left);
-    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
-      "joint/right-wheel");
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink, "joint/right-wheel");
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
-        0.1, 0.5), 0.8, 1.5, 1.5, 2.0, 0.6, 0.4);
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      0.8,
+      1.5,
+      1.5,
+      2.0,
+      0.6,
+      0.4
+    );
     var lidarFrame = model.addFrame(new Frame("lidar mount", baseLink, "frame/lidar"));
     lidarFrame.position = [0.3, 0.0, 0.2];
-    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0,
-      "sensor/front-lidar"));
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0, "sensor/front-lidar"));
     lidar.frame = lidarFrame;
     lidar.rayCount = 64;
     lidar.maxRange = 4.0;
@@ -2632,18 +4631,20 @@ class RobotWorldTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("navigator-sim", runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "navigator-sim",
+      runtime,
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     var base = MobileBase.fromBlueprint(robot, blueprint);
-    var localization = new SimulationTruthLocalization(simulation, 0,
-      "map", baseLink.id);
+    var localization = new SimulationTruthLocalization(simulation, 0, "map", baseLink.id);
     var scenarioLocalization = new QualityOverrideLocalization(localization);
-    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint,
-      "sensor/front-lidar", 0.12, 0.05, 0.25, 0.4);
+    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint, "sensor/front-lidar", 0.12, 0.05, 0.25, 0.4);
     var framedPerception = new FrameAwarePerception(lidarPerception, localization);
     var navigation = new Navigation(base, scenarioLocalization, 0.25, 0.55, 1.2);
-    var grid = new OccupancyGrid2(0.2, new Pose2(-2.0, -2.5),
-      50, 25, "map", OccupancyCell.Free);
+    var grid = new OccupancyGrid2(0.2, new Pose2(-2.0, -2.5), 50, 25, "map", OccupancyCell.Free);
     var footprint = base.footprint;
     if (footprint == null) throw "Simulation scenario requires a robot footprint";
     var costmap = new Costmap2(grid, footprint.radius, true, 0.3, 1.5);
@@ -2655,26 +4656,29 @@ class RobotWorldTests {
     // differential-drive plant couples commanded wheel rates to the chassis.
     var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     var lastPerception = new PerceptionSnapshot();
-    function robotObservation(tick:Int):RobotSnapshot
-      return plant.step(Int64.ofInt(tick));
+    function robotObservation(tick:Int):RobotSnapshot return plant.step(Int64.ofInt(tick));
     function perceive(snapshot:RobotSnapshot):PerceptionSnapshot {
-      lastPerception = framedPerception.observeRobotSnapshot(snapshot, model,
-        blueprint, baseLink.id, robot.streams().latestFrames());
+      lastPerception = framedPerception.observeRobotSnapshot(
+        snapshot,
+        model,
+        blueprint,
+        baseLink.id,
+        robot.streams().latestFrames()
+      );
       return lastPerception;
     }
     function observe(tick:Int):PerceptionSnapshot return perceive(robotObservation(tick));
     var initialPerception = observe(1);
-    equal(initialPerception.obstacles().length, 0,
-      "simulated navigation starts with a clear LiDAR observation");
+    equal(initialPerception.obstacles().length, 0, "simulated navigation starts with a clear LiDAR observation");
     var initialState = requireLocalizationState(localization);
-    var offPathGoalPose = new Pose2(initialState.pose.x + 1.0,
-      initialState.pose.y, initialState.pose.yaw);
+    var offPathGoalPose = new Pose2(initialState.pose.x + 1.0, initialState.pose.y, initialState.pose.yaw);
     var offPathGoal = new NavigationGoal(offPathGoalPose, "map", 0.12, 0.15);
     var goalRunner = new SkillRunner();
     var goalSkill = new GoTo(navigator, offPathGoal, perceive);
-    check(goalRunner.start(goalSkill) == SkillStatus.Running &&
-      navigator.status == NavigatorStatus.Navigating,
-      "GoTo plans and starts a goal through SkillRunner");
+    check(
+      goalRunner.start(goalSkill) == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      "GoTo plans and starts a goal through SkillRunner"
+    );
 
     plant.teleport(new Pose2(plant.pose.x, plant.pose.y + 0.6, plant.pose.yaw));
     var tick = 2;
@@ -2686,27 +4690,30 @@ class RobotWorldTests {
       status = navigator.status;
     }
     var offPathFinal = requireLocalizationState(localization);
-    check(initialOffPathError >= 0.45 && goalStatus == SkillStatus.Succeeded &&
-      status == NavigatorStatus.Succeeded && goalRunner.result() != null &&
-      Math.abs(offPathFinal.pose.x - offPathGoalPose.x) <= 0.16 &&
-      Math.abs(offPathFinal.pose.y - offPathGoalPose.y) <= 0.16,
-      "SkillRunner GoTo reaches its goal after starting off the planned path");
+    check(
+      initialOffPathError >= 0.45 && goalStatus == SkillStatus.Succeeded && status == NavigatorStatus.Succeeded
+      && goalRunner.result() != null && Math.abs(offPathFinal.pose.x - offPathGoalPose.x) <= 0.16
+      && Math.abs(offPathFinal.pose.y - offPathGoalPose.y) <= 0.16,
+      "SkillRunner GoTo reaches its goal after starting off the planned path"
+    );
 
-    var goalPose = new Pose2(initialState.pose.x + 4.0,
-      initialState.pose.y, initialState.pose.yaw);
+    var goalPose = new Pose2(initialState.pose.x + 4.0, initialState.pose.y, initialState.pose.yaw);
     var goal = new NavigationGoal(goalPose, "map", 0.12, 0.15);
     var obstacleGoalSkill = new GoTo(navigator, goal, perceive);
     var obstacleGoalStatus = goalRunner.start(obstacleGoalSkill);
-    check(obstacleGoalStatus == SkillStatus.Running &&
-      navigator.status == NavigatorStatus.Navigating,
-      "GoTo starts another simulated goal before an obstacle appears");
+    check(
+      obstacleGoalStatus == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      "GoTo starts another simulated goal before an obstacle appears"
+    );
     for (_ in 0...40) {
       obstacleGoalStatus = goalRunner.update(robotObservation(tick++), 0.02);
       status = navigator.status;
     }
     var movingState = requireLocalizationState(localization);
-    check(movingState.pose.x > offPathFinal.pose.x + 0.05,
-      "Navigator advances the simulated robot before an obstacle appears");
+    check(
+      movingState.pose.x > offPathFinal.pose.x + 0.05,
+      "Navigator advances the simulated robot before an obstacle appears"
+    );
     var obstaclePose = movingState.pose.compose(new Pose2(1.3, 0.0));
     simulationHarness.spawnBox([obstaclePose.x, obstaclePose.y, 0.2], [0.12, 0.12, 0.3]);
 
@@ -2718,15 +4725,12 @@ class RobotWorldTests {
       status = navigator.status;
       var currentPath:Null<Path> = navigator.activePath;
       if (navigator.replanCount > 0 && currentPath != null) {
-        for (point in currentPath.poses())
-          if (Math.abs(point.y - goalPose.y) > 0.45) pathDetoured = true;
+        for (point in currentPath.poses()) if (Math.abs(point.y - goalPose.y) > 0.45) pathDetoured = true;
       }
       if (obstacleGoalStatus == SkillStatus.Succeeded) break;
     }
-    check(detectedObstacle,
-      "simulated LiDAR perception detects an obstacle during navigation");
-    check(navigator.replanCount > 0 && pathDetoured,
-      "Navigator replans onto a route around the detected obstacle");
+    check(detectedObstacle, "simulated LiDAR perception detects an obstacle during navigation");
+    check(navigator.replanCount > 0 && pathDetoured, "Navigator replans onto a route around the detected obstacle");
     var finalState = requireLocalizationState(localization);
     var routeSummary:Array<String> = [];
     var finalPath:Null<Path> = navigator.activePath;
@@ -2737,41 +4741,54 @@ class RobotWorldTests {
         routeSummary.push('${point.x},${point.y},${point.yaw}');
       }
     }
-    check(obstacleGoalStatus == SkillStatus.Succeeded &&
-      status == NavigatorStatus.Succeeded,
-      'GoTo reaches its goal through SkillRunner after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})');
+    check(
+      obstacleGoalStatus == SkillStatus.Succeeded && status == NavigatorStatus.Succeeded,
+      'GoTo reaches its goal through SkillRunner after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})'
+    );
     var finalDx = finalState.pose.x - goalPose.x;
     var finalDy = finalState.pose.y - goalPose.y;
-    check(Math.sqrt(finalDx * finalDx + finalDy * finalDy) <= 0.16,
-      "replanned simulated route ends inside the goal position tolerance");
+    check(
+      Math.sqrt(finalDx * finalDx + finalDy * finalDy) <= 0.16,
+      "replanned simulated route ends inside the goal position tolerance"
+    );
 
-    var resumeGoal = new NavigationGoal(new Pose2(finalState.pose.x + 0.8,
-      finalState.pose.y, finalState.pose.yaw), "map", 0.12, 0.15);
+    var resumeGoal = new NavigationGoal(
+      new Pose2(finalState.pose.x + 0.8, finalState.pose.y, finalState.pose.yaw),
+      "map",
+      0.12,
+      0.15
+    );
     check(switch navigator.navigateTo(resumeGoal) {
-      case NavigatorStatus.Navigating: true;
-      case _: false;
+      case NavigatorStatus.Navigating:
+        true;
+      case _:
+        false;
     }, "Navigator accepts a follow-up goal before localization dropout");
     scenarioLocalization.setQualityOverride(Invalid);
     status = navigator.update(observe(tick++), 0.02);
-    check(switch status { case NavigatorStatus.Blocked(_): true; case _: false; } &&
-      Math.abs(base.currentCommand().linear) < 1e-9 &&
-      Math.abs(base.currentCommand().angular) < 1e-9,
+    check(switch status {
+      case NavigatorStatus.Blocked(_):
+        true;
+      case _:
+        false;
+    }
+    && Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) < 1e-9,
       "simulated Navigator stops and blocks when localization becomes invalid");
     scenarioLocalization.setQualityOverride(Good);
     for (_ in 0...1000) {
       if (status == NavigatorStatus.Succeeded) break;
       status = navigator.update(observe(tick++), 0.02);
     }
-    check(status == NavigatorStatus.Succeeded && navigator.replanCount > 0,
-      "simulated Navigator replans and reaches its goal after localization recovers");
+    check(
+      status == NavigatorStatus.Succeeded && navigator.replanCount > 0,
+      "simulated Navigator replans and reaches its goal after localization recovers"
+    );
 
     navigator.cancel();
     var reverseStart = requireLocalizationState(localization);
-    var reverseGoalPose = new Pose2(reverseStart.pose.x - 0.65,
-      reverseStart.pose.y, reverseStart.pose.yaw);
+    var reverseGoalPose = new Pose2(reverseStart.pose.x - 0.65, reverseStart.pose.y, reverseStart.pose.yaw);
     var reverseGoal = new NavigationGoal(reverseGoalPose, "map", 0.12, 0.2);
-    navigation.follow(new Path([reverseStart.pose, reverseGoalPose], "map"),
-      reverseGoal);
+    navigation.follow(new Path([reverseStart.pose, reverseGoalPose], "map"), reverseGoal);
     var reverseStatus = navigation.update(0.02);
     var commandedReverse = base.currentCommand().linear < 0.0;
     for (_ in 0...500) {
@@ -2780,28 +4797,29 @@ class RobotWorldTests {
       reverseStatus = navigation.update(0.02);
     }
     var reverseFinal = requireLocalizationState(localization);
-    check(commandedReverse && reverseStatus == NavigationStatus.Succeeded &&
-      Math.abs(reverseFinal.pose.x - reverseGoalPose.x) <= 0.16,
-      "simulated path follower executes and completes a reverse section");
+    check(
+      commandedReverse
+      && reverseStatus == NavigationStatus.Succeeded && Math.abs(reverseFinal.pose.x - reverseGoalPose.x) <= 0.16,
+      "simulated path follower executes and completes a reverse section"
+    );
 
     var wallColumn = 36;
-    for (y in 0...grid.height)
-      if (y < 7 || y > 17) grid.setCell(wallColumn, y, OccupancyCell.Occupied);
+    for (y in 0...grid.height) if (y < 7 || y > 17) grid.setCell(wallColumn, y, OccupancyCell.Occupied);
     costmap.refresh();
     var narrowGoalPose = new Pose2(7.0, 0.0, 0.0);
-    status = navigator.navigateTo(new NavigationGoal(narrowGoalPose,
-      "map", 0.14, 0.2));
+    status = navigator.navigateTo(new NavigationGoal(narrowGoalPose, "map", 0.14, 0.2));
     check(switch status {
-      case NavigatorStatus.Navigating: true;
-      case _: false;
+      case NavigatorStatus.Navigating:
+        true;
+      case _:
+        false;
     }, "Navigator plans through a footprint-inflated narrow passage");
     var usedNarrowGap = false;
     var narrowPath = navigator.activePath;
     if (narrowPath != null) {
       for (point in narrowPath.poses()) {
         var cell = grid.worldToCell(point);
-        if (cell != null && cell.x == wallColumn && cell.y >= 7 && cell.y <= 17)
-          usedNarrowGap = true;
+        if (cell != null && cell.x == wallColumn && cell.y >= 7 && cell.y <= 17) usedNarrowGap = true;
       }
     }
     for (_ in 0...1200) {
@@ -2809,9 +4827,10 @@ class RobotWorldTests {
       status = navigator.update(observe(tick++), 0.02);
     }
     var narrowFinal = requireLocalizationState(localization);
-    check(usedNarrowGap && status == NavigatorStatus.Succeeded &&
-      Math.abs(narrowFinal.pose.x - narrowGoalPose.x) <= 0.18,
-      "simulated Navigator traverses the narrow passage and reaches its goal");
+    check(
+      usedNarrowGap && status == NavigatorStatus.Succeeded && Math.abs(narrowFinal.pose.x - narrowGoalPose.x) <= 0.18,
+      "simulated Navigator traverses the narrow passage and reaches its goal"
+    );
     navigator.cancel();
     robot.close();
     simulationHarness.dispose();
@@ -2820,66 +4839,100 @@ class RobotWorldTests {
   static function testGoToBlockedTimeout():Void {
     var robot = new FakeRobot("goto-blocked");
     robot.positions = [0.0, 0.0];
-    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 1.0));
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
     var localization = new FixedLocalization(new LocalizationState(
-      Int64.ofInt(0), new Pose2(0.5, 0.5), "map", "base",
-      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
-      "blocked-clock", "host-clock"));
+      Int64.ofInt(0),
+      new Pose2(0.5, 0.5),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(0),
+      Int64.ofInt(0),
+      "blocked-clock",
+      "host-clock"
+    ));
     var navigation = new Navigation(base, localization);
     var grid = new OccupancyGrid2(1.0, new Pose2(), 7, 1, "map", OccupancyCell.Free);
     var costmap = new Costmap2(grid, 0.0, false, 0.0, 0.0);
     var navigator = new Navigator(navigation, new AStarPlanner(costmap), costmap, 0.1);
     var goal = new NavigationGoal(grid.cellCenter(6, 0), "map");
-    var blocker = new Obstacle(new Detection("goto-blocker", "obstacle",
-      1.0, grid.cellCenter(3, 0), "map", Int64.ofInt(1), Int64.ofInt(1),
-      Int64.ofInt(1), "blocked-clock", "host-clock"), 0.1);
+    var blocker = new Obstacle(
+      new Detection(
+        "goto-blocker",
+        "obstacle",
+        1.0,
+        grid.cellCenter(3, 0),
+        "map",
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        Int64.ofInt(1),
+        "blocked-clock",
+        "host-clock"
+      ),
+      0.1
+    );
     var blocked = new PerceptionSnapshot([], [blocker]);
     var clear = new PerceptionSnapshot();
     var perception = blocked;
     var observation = robot.snapshot();
-    function isBlocked():Bool
-      return switch navigator.status { case NavigatorStatus.Blocked(_): true; case _: false; };
+    function isBlocked():Bool return switch navigator.status {
+      case NavigatorStatus.Blocked(_):
+        true;
+      case _:
+        false;
+    };
 
     var sustained = new GoTo(navigator, goal, function(_) return perception, 0.35);
-    throws(function() new GoTo(navigator, goal, function(_) return perception, -1.0),
-      "GoTo rejects a negative blocked timeout");
+    throws(
+      function() new GoTo(navigator, goal, function(_) return perception, -1.0),
+      "GoTo rejects a negative blocked timeout"
+    );
     sustained.start();
     for (_ in 0...3) sustained.update(observation, 0.1);
-    check(sustained.status() == SkillStatus.Running && isBlocked() &&
-      navigator.replanCount >= 2,
-      "GoTo keeps running while the Navigator retries within its blocked timeout");
+    check(
+      sustained.status() == SkillStatus.Running && isBlocked() && navigator.replanCount >= 2,
+      "GoTo keeps running while the Navigator retries within its blocked timeout"
+    );
     sustained.update(observation, 0.1);
     var sustainedMessage = switch sustained.status() {
-      case Failed(message): message;
-      case _: "";
+      case Failed(message):
+        message;
+      case _:
+        "";
     };
-    check(sustainedMessage.indexOf("GoTo remained blocked beyond its timeout") == 0 &&
-      sustainedMessage.length > "GoTo remained blocked beyond its timeout: ".length &&
-      navigator.status == NavigatorStatus.Cancelled &&
-      switch robot.lastStop { case Normal: true; case _: false; },
-      'GoTo fails with the blocked reason and stops the Navigator after sustained blocking ($sustainedMessage)');
+    check(sustainedMessage.indexOf("GoTo remained blocked beyond its timeout") == 0
+      && sustainedMessage.length > "GoTo remained blocked beyond its timeout: ".length
+      && navigator.status == NavigatorStatus.Cancelled && switch robot.lastStop {
+      case Normal:
+        true;
+      case _:
+        false;
+    }, 'GoTo fails with the blocked reason and stops the Navigator after sustained blocking ($sustainedMessage)');
 
     perception = blocked;
     var recovering = new GoTo(navigator, goal, function(_) return perception, 0.35);
     recovering.start();
     recovering.update(observation, 0.1);
     recovering.update(observation, 0.1);
-    check(recovering.status() == SkillStatus.Running && isBlocked(),
-      "GoTo starts a second blocked interval");
+    check(recovering.status() == SkillStatus.Running && isBlocked(), "GoTo starts a second blocked interval");
     perception = clear;
     recovering.update(observation, 0.1);
-    check(recovering.status() == SkillStatus.Running &&
-      navigator.status == NavigatorStatus.Navigating,
-      "GoTo resumes when the Navigator finds a clear route");
+    check(
+      recovering.status() == SkillStatus.Running && navigator.status == NavigatorStatus.Navigating,
+      "GoTo resumes when the Navigator finds a clear route"
+    );
     perception = blocked;
     for (_ in 0...3) recovering.update(observation, 0.1);
-    check(recovering.status() == SkillStatus.Running && isBlocked(),
-      "GoTo restarts its blocked timeout after navigation resumes");
+    check(
+      recovering.status() == SkillStatus.Running && isBlocked(),
+      "GoTo restarts its blocked timeout after navigation resumes"
+    );
     recovering.cancel();
-    check(recovering.status() == SkillStatus.Cancelled &&
-      navigator.status == NavigatorStatus.Cancelled,
-      "GoTo cancels a blocked navigation cleanly");
+    check(
+      recovering.status() == SkillStatus.Cancelled && navigator.status == NavigatorStatus.Cancelled,
+      "GoTo cancels a blocked navigation cleanly"
+    );
   }
 
   static function testDifferentialDrivePlantKinematics():Void {
@@ -2888,40 +4941,52 @@ class RobotWorldTests {
     var baseLink = model.addLink(new Link("base", "link/base"));
     var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
     var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
-    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
-      "joint/left-wheel");
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink, "joint/left-wheel");
     left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(left);
-    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
-      "joint/right-wheel");
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink, "joint/right-wheel");
     right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
-        0.1, 0.5), 0.8, 1.5, 100.0, 100.0);
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      0.8,
+      1.5,
+      100.0,
+      100.0
+    );
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
     var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
-    var robot = new SimulatedRobot("plant-kinematics", simulation.addRobot(blueprint),
-      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "plant-kinematics",
+      simulation.addRobot(blueprint),
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
-    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3],
-      [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
+    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3], [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
     var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
-    check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
-      Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
-      "DifferentialDrivePlant starts from the simulated base pose and authored height");
+    check(
+      Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9
+      && Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
+      "DifferentialDrivePlant starts from the simulated base pose and authored height"
+    );
     var tick = 1;
     function imuFrame(snapshot:RobotSnapshot):Null<SensorFrame> {
-      for (index in 0...snapshot.sensors.length)
-        if (snapshot.sensors.get(index).sensorId == "sensor/imu")
-          return snapshot.sensors.get(index);
+      for (index in 0...snapshot.sensors.length) if (snapshot.sensors.get(index).sensorId
+        == "sensor/imu") return snapshot.sensors.get(index);
       return null; // Unpublished while the derivative is priming.
     }
     function imuSequence(snapshot:RobotSnapshot):Int64 {
@@ -2939,68 +5004,104 @@ class RobotWorldTests {
     var firstImu = imuSequence(plant.step(Int64.ofInt(tick++)));
     var snapshot = plant.step(Int64.ofInt(tick++));
     for (_ in 0...8) snapshot = plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.x - (1.0 + 0.1 * Math.cos(startYaw))) < 1e-9 &&
-      Math.abs(plant.pose.y - (2.0 + 0.1 * Math.sin(startYaw))) < 1e-9 &&
-      Math.abs(plant.pose.yaw - startYaw) < 1e-9,
-      "DifferentialDrivePlant rolls equal wheel rates straight along the heading for v*dt per tick");
+    check(
+      Math.abs(plant.pose.x - (1.0 + 0.1 * Math.cos(startYaw))) < 1e-9
+      && Math.abs(plant.pose.y - (2.0 + 0.1 * Math.sin(startYaw))) < 1e-9 && Math.abs(plant.pose.yaw - startYaw) < 1e-9,
+      "DifferentialDrivePlant rolls equal wheel rates straight along the heading for v*dt per tick"
+    );
     var physics = simulation.robotPose(0);
-    check(Math.abs(physics.position[0] - plant.pose.x) < 1e-6 &&
-      Math.abs(physics.position[1] - plant.pose.y) < 1e-6 &&
-      Math.abs(physics.position[2] - 0.3) < 1e-6,
-      "DifferentialDrivePlant drives the physics base and preserves its authored height");
-    check(Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
-      "IMU keeps publishing every tick while the plant drives the base");
-    check(Math.abs(imuValue(snapshot, 2)) < 1e-4 && Math.abs(imuValue(snapshot, 3)) < 1e-2 &&
-      Math.abs(imuValue(snapshot, 4)) < 1e-2 && Math.abs(imuValue(snapshot, 5) - 9.81) < 1e-6,
-      "IMU measures a straight constant-speed run as no rotation and no acceleration");
+    check(
+      Math.abs(physics.position[0] - plant.pose.x) < 1e-6
+      && Math.abs(physics.position[1] - plant.pose.y) < 1e-6 && Math.abs(physics.position[2] - 0.3) < 1e-6,
+      "DifferentialDrivePlant drives the physics base and preserves its authored height"
+    );
+    check(
+      Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
+      "IMU keeps publishing every tick while the plant drives the base"
+    );
+    check(
+      Math.abs(imuValue(snapshot, 2)) < 1e-4 && Math.abs(imuValue(snapshot, 3)) < 1e-2 && Math.abs(imuValue(
+        snapshot,
+        4
+      )) < 1e-2 && Math.abs(imuValue(
+        snapshot,
+        5
+      ) - 9.81) < 1e-6,
+      "IMU measures a straight constant-speed run as no rotation and no acceleration"
+    );
 
     // Turn sign: a positive yaw rate spins the right wheel forward and turns
     // counter-clockwise at (vr - vl) / track.
     base.command(new Twist2(0.0, 1.0));
     var turnStart = plant.pose;
     for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
-    check(Math.abs(Pose2.wrapAngle(plant.pose.yaw - turnStart.yaw) - 0.2) < 1e-9 &&
-      Math.abs(plant.pose.x - turnStart.x) < 1e-9 && Math.abs(plant.pose.y - turnStart.y) < 1e-9,
-      "DifferentialDrivePlant turns in place counter-clockwise at (vr-vl)/track");
-    check(Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 &&
-      Math.abs(imuValue(snapshot, 0)) < 1e-4 && Math.abs(imuValue(snapshot, 1)) < 1e-4 &&
-      Math.abs(imuValue(snapshot, 3)) < 1e-2 && Math.abs(imuValue(snapshot, 4)) < 1e-2,
-      "IMU gyro reads the in-place turn rate with no linear acceleration");
+    check(
+      Math.abs(Pose2.wrapAngle(plant.pose.yaw - turnStart.yaw) - 0.2) < 1e-9
+      && Math.abs(plant.pose.x - turnStart.x) < 1e-9 && Math.abs(plant.pose.y - turnStart.y) < 1e-9,
+      "DifferentialDrivePlant turns in place counter-clockwise at (vr-vl)/track"
+    );
+    check(
+      Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 && Math.abs(imuValue(snapshot, 0)) < 1e-4 && Math.abs(imuValue(
+        snapshot,
+        1
+      )) < 1e-4 && Math.abs(imuValue(
+        snapshot,
+        3
+      )) < 1e-2 && Math.abs(imuValue(
+        snapshot,
+        4
+      )) < 1e-2,
+      "IMU gyro reads the in-place turn rate with no linear acceleration"
+    );
 
     // An arc at 0.5 m/s and 1 rad/s pulls the IMU 0.5 m/s^2 to the left.
     base.command(new Twist2(0.5, 1.0));
     for (_ in 0...5) snapshot = plant.step(Int64.ofInt(tick++));
-    check(Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 &&
-      Math.abs(imuValue(snapshot, 3)) < 2e-2 && Math.abs(imuValue(snapshot, 4) - 0.5) < 2e-2,
-      "IMU measures the arc's yaw rate and centripetal acceleration");
+    check(
+      Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 && Math.abs(imuValue(snapshot, 3)) < 2e-2 && Math.abs(imuValue(
+        snapshot,
+        4
+      ) - 0.5) < 2e-2,
+      "IMU measures the arc's yaw rate and centripetal acceleration"
+    );
 
     // Combined motion is scaled before submission, preserving curvature at the wheel ceiling.
     base.command(new Twist2(0.8, 1.5));
     var saturatedStart = plant.pose;
     plant.step(Int64.ofInt(tick++));
     var expectedSaturated = saturatedStart.integrateDisplacement(
-      (4.25 / 1.175 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25 / 1.175) * 0.1 * 0.02 / 0.5);
-    check(Math.abs(plant.pose.x - expectedSaturated.x) < 1e-9 &&
-      Math.abs(plant.pose.y - expectedSaturated.y) < 1e-9 &&
-      Math.abs(plant.pose.yaw - expectedSaturated.yaw) < 1e-9 &&
-      Math.abs(plant.appliedWheelRates().right - 10.0) < 1e-12,
-      "DifferentialDrivePlant preserves curvature within the compiled wheel envelope");
+      (4.25 / 1.175 + 10.0) * 0.1 * 0.02 * 0.5,
+      (10.0 - 4.25 / 1.175) * 0.1 * 0.02 / 0.5
+    );
+    check(
+      Math.abs(plant.pose.x - expectedSaturated.x) < 1e-9
+      && Math.abs(plant.pose.y - expectedSaturated.y) < 1e-9 && Math.abs(plant.pose.yaw - expectedSaturated.yaw) < 1e-9
+      && Math.abs(plant.appliedWheelRates().right - 10.0) < 1e-12,
+      "DifferentialDrivePlant preserves curvature within the compiled wheel envelope"
+    );
 
     // Wheel targets submitted straight to the robot, bypassing MobileBase,
     // drive the chassis on the tick they are applied.
     base.stop();
     plant.step(Int64.ofInt(tick++));
     var directStart = plant.pose;
-    robot.submit(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.velocity(0, 3.0),
-      robotkit.core.JointTarget.velocity(1, 3.0)
-    ], null));
+    robot.submit(RobotCommand.JointTargets(
+      [
+        robotkit.core.JointTarget.velocity(0, 3.0),
+        robotkit.core.JointTarget.velocity(
+          1,
+          3.0
+        )
+      ],
+      null
+    ));
     plant.step(Int64.ofInt(tick++));
     var directExpected = directStart.integrateDisplacement(3.0 * 0.1 * 0.02, 0.0);
-    check(base.currentCommand().linear == 0.0 &&
-      Math.abs(plant.pose.x - directExpected.x) < 1e-9 &&
-      Math.abs(plant.pose.y - directExpected.y) < 1e-9,
-      "DifferentialDrivePlant moves with wheel targets submitted directly to the robot");
+    check(
+      base.currentCommand().linear == 0.0
+      && Math.abs(plant.pose.x - directExpected.x) < 1e-9 && Math.abs(plant.pose.y - directExpected.y) < 1e-9,
+      "DifferentialDrivePlant moves with wheel targets submitted directly to the robot"
+    );
 
     // A stop issued directly on the robot halts the chassis on the tick the
     // runtime applies it, even though MobileBase still caches its last command.
@@ -3009,33 +5110,37 @@ class RobotWorldTests {
     robot.stop(StopMode.Emergency);
     var stopped = plant.pose;
     for (_ in 0...4) plant.step(Int64.ofInt(tick++));
-    check(base.currentCommand().linear > 0.0 &&
-      Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
-      "DifferentialDrivePlant does not move a robot under a direct emergency stop");
+    check(
+      base.currentCommand().linear > 0.0
+      && Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
+      "DifferentialDrivePlant does not move a robot under a direct emergency stop"
+    );
     robot.resetSafety();
     for (_ in 0...3) plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
-      "DifferentialDrivePlant ignores the stale cached command after a safety reset");
+    check(
+      Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
+      "DifferentialDrivePlant ignores the stale cached command after a safety reset"
+    );
     base.command(new Twist2(0.5, 0.0));
     for (_ in 0...3) plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.x - stopped.x) > 1e-3,
-      "DifferentialDrivePlant moves again after a new command");
+    check(Math.abs(plant.pose.x - stopped.x) > 1e-3, "DifferentialDrivePlant moves again after a new command");
     robot.stop(StopMode.Normal);
     var normalStopped = plant.pose;
     for (_ in 0...4) snapshot = plant.step(Int64.ofInt(tick++));
-    check(base.currentCommand().linear > 0.0 &&
-      Math.abs(plant.pose.x - normalStopped.x) < 1e-12 &&
-      Math.abs(plant.pose.y - normalStopped.y) < 1e-12 &&
-      snapshot.velocities.get(0) == 0.0 && snapshot.velocities.get(1) == 0.0,
-      "DifferentialDrivePlant and the wheels stop during a direct normal stop");
+    check(
+      base.currentCommand().linear > 0.0 && Math.abs(plant.pose.x - normalStopped.x) < 1e-12 && Math.abs(plant.pose.y
+      - normalStopped.y) < 1e-12 && snapshot.velocities.get(0) == 0.0 && snapshot.velocities.get(1) == 0.0,
+      "DifferentialDrivePlant and the wheels stop during a direct normal stop"
+    );
 
     // Driving and teleporting never replace the reset pose chosen at add time.
     simulationHarness.resetRobot(0);
     simulationHarness.step(Int64.ofInt(tick++));
     var reset = simulation.robotPose(0);
-    check(Math.abs(reset.position[0]) < 1e-6 && Math.abs(reset.position[1]) < 1e-6 &&
-      Math.abs(reset.position[2]) < 1e-6,
-      "resetRobot restores the addRobot default pose after driving and teleporting");
+    check(
+      Math.abs(reset.position[0]) < 1e-6 && Math.abs(reset.position[1]) < 1e-6 && Math.abs(reset.position[2]) < 1e-6,
+      "resetRobot restores the addRobot default pose after driving and teleporting"
+    );
     robot.close();
     simulationHarness.dispose();
   }
@@ -3054,28 +5159,42 @@ class RobotWorldTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius), 0.8, 1.5, 100.0, 100.0);
+      RobotDriveConfiguration.Holonomic(
+        wheelIds,
+        wheelRadius,
+        baseRadius
+      ),
+      0.8,
+      1.5,
+      100.0,
+      100.0
+    );
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
     var blueprint = RobotRuntimeCompiler.compile(model, profile);
     var simulationHarness = new SimulationHarness(0.02);
 
     var simulation = simulationHarness.simulation;
-    var robot = new SimulatedRobot("omni-plant-kinematics", simulation.addRobot(blueprint),
-      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "omni-plant-kinematics",
+      simulation.addRobot(blueprint),
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
-    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3],
-      [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
+    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3], [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
     var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
-    check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
-      Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
-      "HolonomicDrivePlant starts from the simulated base pose and authored height");
+    check(
+      Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9
+      && Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
+      "HolonomicDrivePlant starts from the simulated base pose and authored height"
+    );
     var tick = 1;
     function imuFrame(snapshot:RobotSnapshot):Null<SensorFrame> {
-      for (index in 0...snapshot.sensors.length)
-        if (snapshot.sensors.get(index).sensorId == "sensor/imu")
-          return snapshot.sensors.get(index);
+      for (index in 0...snapshot.sensors.length) if (snapshot.sensors.get(index).sensorId
+        == "sensor/imu") return snapshot.sensors.get(index);
       return null;
     }
     function imuSequence(snapshot:RobotSnapshot):Int64 {
@@ -3093,25 +5212,30 @@ class RobotWorldTests {
     var firstImu = imuSequence(plant.step(Int64.ofInt(tick++)));
     var snapshot = plant.step(Int64.ofInt(tick++));
     for (_ in 0...8) snapshot = plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.x - (1.0 + 0.06 * Math.cos(startYaw))) < 1e-9 &&
-      Math.abs(plant.pose.y - (2.0 + 0.06 * Math.sin(startYaw))) < 1e-9 &&
-      Math.abs(plant.pose.yaw - startYaw) < 1e-9,
-      "HolonomicDrivePlant drives a forward twist along the heading for v*dt per tick");
+    check(
+      Math.abs(plant.pose.x - (1.0 + 0.06 * Math.cos(startYaw))) < 1e-9 && Math.abs(plant.pose.y
+      - (2.0 + 0.06 * Math.sin(startYaw))) < 1e-9 && Math.abs(plant.pose.yaw - startYaw) < 1e-9,
+      "HolonomicDrivePlant drives a forward twist along the heading for v*dt per tick"
+    );
     var physics = simulation.robotPose(0);
-    check(Math.abs(physics.position[0] - plant.pose.x) < 1e-6 &&
-      Math.abs(physics.position[1] - plant.pose.y) < 1e-6 &&
-      Math.abs(physics.position[2] - 0.3) < 1e-6,
-      "HolonomicDrivePlant drives the physics base and preserves its authored height");
-    check(Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
-      "IMU keeps publishing every tick while the holonomic plant drives the base");
+    check(
+      Math.abs(physics.position[0] - plant.pose.x) < 1e-6
+      && Math.abs(physics.position[1] - plant.pose.y) < 1e-6 && Math.abs(physics.position[2] - 0.3) < 1e-6,
+      "HolonomicDrivePlant drives the physics base and preserves its authored height"
+    );
+    check(
+      Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
+      "IMU keeps publishing every tick while the holonomic plant drives the base"
+    );
 
     // An arc at 0.3 m/s and 1 rad/s turns 0.02 rad per tick.
     base.command(new Twist2(0.3, 1.0));
     var arcStart = plant.pose;
     for (_ in 0...5) snapshot = plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.yaw - arcStart.yaw - 0.1) < 1e-9 &&
-      Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3,
-      "HolonomicDrivePlant turns at the commanded yaw rate and the gyro reads it");
+    check(
+      Math.abs(plant.pose.yaw - arcStart.yaw - 0.1) < 1e-9 && Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3,
+      "HolonomicDrivePlant turns at the commanded yaw rate and the gyro reads it"
+    );
 
     // Wheels driven straight on the robot can strafe, which Twist2 cannot
     // express: 0.3 m/s along body +Y for ten ticks is 0.06 m to the left.
@@ -3123,37 +5247,42 @@ class RobotWorldTests {
     base.command(new Twist2(0.0, 0.0, 0.3));
     for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
     var expectedStrafe = strafeStart.integrate(new Twist2(0.0, 0.0, 0.3), 0.2);
-    check(Math.abs(plant.pose.x - expectedStrafe.x) < 1e-9 &&
-      Math.abs(plant.pose.y - expectedStrafe.y) < 1e-9 &&
-      Math.abs(plant.pose.yaw - expectedStrafe.yaw) < 1e-9,
-      "HolonomicDrivePlant drives a pure lateral twist along body +Y");
+    check(
+      Math.abs(plant.pose.x - expectedStrafe.x) < 1e-9
+      && Math.abs(plant.pose.y - expectedStrafe.y) < 1e-9 && Math.abs(plant.pose.yaw - expectedStrafe.yaw) < 1e-9,
+      "HolonomicDrivePlant drives a pure lateral twist along body +Y"
+    );
     strafeOdometry.update(snapshot);
-    check(Math.abs(strafeOdometry.current().x - plant.pose.x) < 1e-9 &&
-      Math.abs(strafeOdometry.current().y - plant.pose.y) < 1e-9 &&
-      Math.abs(strafeOdometry.current().yaw - plant.pose.yaw) < 1e-9,
-      "Holonomic odometry agrees with the simulated pure lateral drive");
+    check(
+      Math.abs(strafeOdometry.current().x - plant.pose.x) < 1e-9 && Math.abs(strafeOdometry.current().y - plant.pose.y)
+      < 1e-9 && Math.abs(strafeOdometry.current().yaw - plant.pose.yaw) < 1e-9,
+      "Holonomic odometry agrees with the simulated pure lateral drive"
+    );
     base.command(new Twist2(0.2, 0.5, 0.15));
     var diagonalStart = plant.pose;
     for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
     var expectedDiagonal = diagonalStart.integrate(new Twist2(0.2, 0.5, 0.15), 0.2);
-    check(Math.abs(plant.pose.x - expectedDiagonal.x) < 1e-9 &&
-      Math.abs(plant.pose.y - expectedDiagonal.y) < 1e-9 &&
-      Math.abs(plant.pose.yaw - expectedDiagonal.yaw) < 1e-9,
-      "HolonomicDrivePlant integrates diagonal translation with yaw");
+    check(
+      Math.abs(plant.pose.x - expectedDiagonal.x) < 1e-9
+      && Math.abs(plant.pose.y - expectedDiagonal.y) < 1e-9 && Math.abs(plant.pose.yaw - expectedDiagonal.yaw) < 1e-9,
+      "HolonomicDrivePlant integrates diagonal translation with yaw"
+    );
     base.stop();
     plant.step(Int64.ofInt(tick++));
     var wheelStart = plant.pose;
     var strafe = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
       robotkit.core.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
-    }];
+    }
+    ];
     robot.submit(RobotCommand.JointTargets(strafe, null));
     for (_ in 0...10) plant.step(Int64.ofInt(tick++));
-    check(base.currentCommand().linear == 0.0 &&
-      Math.abs(plant.pose.x - (wheelStart.x - 0.06 * Math.sin(wheelStart.yaw))) < 1e-9 &&
-      Math.abs(plant.pose.y - (wheelStart.y + 0.06 * Math.cos(wheelStart.yaw))) < 1e-9 &&
-      Math.abs(plant.pose.yaw - wheelStart.yaw) < 1e-9,
-      "HolonomicDrivePlant strafes with wheel targets submitted directly to the robot");
+    check(
+      base.currentCommand().linear == 0.0 && Math.abs(plant.pose.x - (wheelStart.x - 0.06 * Math.sin(wheelStart.yaw)))
+      < 1e-9 && Math.abs(plant.pose.y - (wheelStart.y + 0.06 * Math.cos(wheelStart.yaw))) < 1e-9
+      && Math.abs(plant.pose.yaw - wheelStart.yaw) < 1e-9,
+      "HolonomicDrivePlant strafes with wheel targets submitted directly to the robot"
+    );
 
     // A stop issued directly on the robot halts the chassis at once, even
     // though MobileBase still caches its last command.
@@ -3163,17 +5292,20 @@ class RobotWorldTests {
     var stopped = plant.pose;
     for (_ in 0...4) plant.step(Int64.ofInt(tick++));
     var rates = plant.appliedWheelRates();
-    check(base.currentCommand().linear > 0.0 &&
-      Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12 &&
-      rates[0] == 0.0 && rates[1] == 0.0 && rates[2] == 0.0,
-      "HolonomicDrivePlant does not move a robot under a direct emergency stop");
+    check(
+      base.currentCommand().linear > 0.0 && Math.abs(plant.pose.x - stopped.x) < 1e-12
+      && Math.abs(plant.pose.y - stopped.y) < 1e-12 && rates[0] == 0.0 && rates[1] == 0.0 && rates[2] == 0.0,
+      "HolonomicDrivePlant does not move a robot under a direct emergency stop"
+    );
 
     // Teleport keeps the authored height.
     plant.teleport(new Pose2(3.0, 4.0, 0.0));
     plant.step(Int64.ofInt(tick++));
-    check(Math.abs(plant.pose.x - 3.0) < 1e-9 && Math.abs(plant.pose.y - 4.0) < 1e-9 &&
-      Math.abs(simulation.robotPose(0).position[2] - 0.3) < 1e-6,
-      "HolonomicDrivePlant teleports to a planar pose at the authored height");
+    check(
+      Math.abs(plant.pose.x - 3.0) < 1e-9
+      && Math.abs(plant.pose.y - 4.0) < 1e-9 && Math.abs(simulation.robotPose(0).position[2] - 0.3) < 1e-6,
+      "HolonomicDrivePlant teleports to a planar pose at the authored height"
+    );
     robot.close();
     simulationHarness.dispose();
   }
@@ -3184,16 +5316,30 @@ class RobotWorldTests {
     robot.positions = [0.5, 0.1, 0.3];
     robot.velocities = [0.0, -0.02, 0.0];
     robot.efforts = [2.0, 0.5, 0.25];
-    var config = new ForkConfig(new ForkAxisConfig("mast-lift", 0.0, 2.0),
+    var config = new ForkConfig(
+      new ForkAxisConfig("mast-lift", 0.0, 2.0),
       new LoadLimits(1000.0, 600.0, 1.8),
-      new ForkAxisConfig("fork-tilt", -0.5, 0.7),
-      new ForkAxisConfig("fork-spread", 0.0, 0.8));
+      new ForkAxisConfig(
+        "fork-tilt",
+        -0.5,
+        0.7
+      ),
+      new ForkAxisConfig(
+        "fork-spread",
+        0.0,
+        0.8
+      )
+    );
     var forks = new Forks(robot, config);
     var state = forks.state();
-    check(Math.abs(state.lift.position - 0.5) < 1e-9 &&
-      Math.abs(cast(state.tilt, robotkit.material.ForkAxisState).velocity + 0.02) < 1e-9 &&
-      Math.abs(cast(state.spread, robotkit.material.ForkAxisState).effort - 0.25) < 1e-9,
-      "ForkState maps named axes to robot snapshot position, velocity, and effort");
+    check(
+      Math.abs(state.lift.position - 0.5) < 1e-9 && Math.abs(cast(state.tilt,
+      robotkit.material.ForkAxisState).velocity + 0.02) < 1e-9 && Math.abs(cast(
+        state.spread,
+        robotkit.material.ForkAxisState
+      ).effort - 0.25) < 1e-9,
+      "ForkState maps named axes to robot snapshot position, velocity, and effort"
+    );
     equal(state.sourceClockId, "unspecified", "ForkState retains source clock identity");
 
     var payload = new Payload(500.0, 1.0, 0.8, 0.7, 0.6, 0.0, 0.35);
@@ -3201,13 +5347,12 @@ class RobotWorldTests {
     forks.command(1.5, 0.2, 0.4);
     check(switch robot.lastCommand {
       case JointTargets(targets, _):
-        targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 &&
-          targets[2].joint == 2 && targets[0].target == 1.5 &&
-          targets[1].target == 0.2 && targets[2].target == 0.4 &&
-          targets[0].mode == robotkit.core.JointTargetMode.Position &&
-          targets[1].mode == robotkit.core.JointTargetMode.Position &&
-          targets[2].mode == robotkit.core.JointTargetMode.Position;
-      case _: false;
+        targets.length == 3 && targets[0].joint == 0
+          && targets[1].joint == 1 && targets[2].joint == 2 && targets[0].target == 1.5 && targets[1].target == 0.2
+          && targets[2].target == 0.4 && targets[0].mode == robotkit.core.JointTargetMode.Position && targets[1].mode
+          == robotkit.core.JointTargetMode.Position && targets[2].mode == robotkit.core.JointTargetMode.Position;
+      case _:
+        false;
     }, "Forks sends lift, tilt, and spread targets as one atomic batch");
 
     forks.setLoadState(LoadState.carried(new Payload(1200.0, 1.0, 0.8, 0.7, 0.4)));
@@ -3215,126 +5360,278 @@ class RobotWorldTests {
     forks.setLoadState(LoadState.carried(payload));
     throws(function() forks.raise(2.0), "Forks enforces the configured maximum lift height");
     throws(function() forks.spreadTo(1.0), "Forks enforces configured axis position limits");
-    throws(function() new Forks(robot, new ForkConfig(
-      new ForkAxisConfig("missing-lift", 0.0, 1.0), new LoadLimits(100.0, 100.0, 1.0))),
-      "Forks requires configured joint names to exist in the robot description");
+    throws(
+      function() new Forks(
+        robot,
+        new ForkConfig(
+          new ForkAxisConfig("missing-lift", 0.0, 1.0),
+          new LoadLimits(
+            100.0,
+            100.0,
+            1.0
+          )
+        )
+      ),
+      "Forks requires configured joint names to exist in the robot description"
+    );
     throws(function() LoadState.detected(null), "detected load state requires a payload value");
-    check(!LoadState.unknown().observed && LoadState.empty().observed,
-      "load state distinguishes unknown from confirmed empty");
+    check(
+      !LoadState.unknown().observed && LoadState.empty().observed,
+      "load state distinguishes unknown from confirmed empty"
+    );
   }
 
   static function testPerceptionSafetyPower():Void {
-    var lidar = new SensorFrame("front-lidar", "lidar", "base", Int64.ofInt(8),
-      Int64.ofInt(100), [1.0, 10.0, 0.5, 0.0], Int64.ofInt(120), "base-link",
-      null, null, "robot-boot", "host-clock");
-    var imu = new SensorFrame("imu", "imu", "base", Int64.ofInt(2),
-      Int64.ofInt(100), [0.0, 0.0, 0.0], Int64.ofInt(120), "base-link",
-      null, null, "robot-boot", "host-clock");
+    var lidar = new SensorFrame(
+      "front-lidar",
+      "lidar",
+      "base",
+      Int64.ofInt(8),
+      Int64.ofInt(100),
+      [1.0, 10.0, 0.5, 0.0],
+      Int64.ofInt(120),
+      "base-link",
+      null,
+      null,
+      "robot-boot",
+      "host-clock"
+    );
+    var imu = new SensorFrame(
+      "imu",
+      "imu",
+      "base",
+      Int64.ofInt(2),
+      Int64.ofInt(100),
+      [0.0, 0.0, 0.0],
+      Int64.ofInt(120),
+      "base-link",
+      null,
+      null,
+      "robot-boot",
+      "host-clock"
+    );
     var perception = new LidarObstaclePerception(10.0, 0.2, 0.05, 0.85);
     var observed = perception.observe([lidar, imu]);
     var obstacles = observed.obstacles();
     equal(obstacles.length, 2, "LiDAR perception emits hits and ignores max-range and zero rays");
-    check(Math.abs(obstacles[0].detection.pose.x - 1.0) < 1e-9 &&
-      Math.abs(obstacles[1].detection.pose.x + 0.5) < 1e-9 &&
-      obstacles[1].detection.frameId == "base",
-      "LiDAR obstacle values retain planar coordinates and source frame");
-    equal(obstacles[0].detection.sourceClockId, "robot-boot",
-      "semantic obstacle preserves source clock identity");
-    var mapEstimate = new LocalizationState(Int64.ofInt(4),
-      new Pose2(5.0, 2.0, Math.PI * 0.5), "map", "base",
-      PoseCovariance2.zero(), Good, Int64.ofInt(140), Int64.ofInt(150),
-      "robot-boot", "host-clock");
+    check(
+      Math.abs(obstacles[0].detection.pose.x - 1.0) < 1e-9
+      && Math.abs(obstacles[1].detection.pose.x + 0.5) < 1e-9 && obstacles[1].detection.frameId == "base",
+      "LiDAR obstacle values retain planar coordinates and source frame"
+    );
+    equal(obstacles[0].detection.sourceClockId, "robot-boot", "semantic obstacle preserves source clock identity");
+    var mapEstimate = new LocalizationState(
+      Int64.ofInt(4),
+      new Pose2(5.0, 2.0, Math.PI * 0.5),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Good,
+      Int64.ofInt(140),
+      Int64.ofInt(150),
+      "robot-boot",
+      "host-clock"
+    );
     var perceptionModel = new RobotModel("framed-perception");
     var perceptionBase = perceptionModel.addLink(new Link("base", "base"));
     var mast = perceptionModel.addLink(new Link("mast", "mast"));
-    var mastLift = perceptionModel.addJoint(new Joint("mast-lift",
-      JointType.Prismatic, perceptionBase, mast));
+    var mastLift = perceptionModel.addJoint(new Joint("mast-lift", JointType.Prismatic, perceptionBase, mast));
     mastLift.limits = new JointLimits(0.0, 1.5, 0.5, 100.0);
-    var laserMount = perceptionModel.addFrame(new Frame("laser mount",
-      perceptionBase, "laser"));
+    var laserMount = perceptionModel.addFrame(new Frame("laser mount", perceptionBase, "laser"));
     laserMount.position = [0.2, 0.0, 0.3];
-    laserMount.rotation = [0.0, 0.0, Math.sin(Math.PI * 0.25),
-      Math.cos(Math.PI * 0.25)];
+    laserMount.rotation = [0.0, 0.0, Math.sin(Math.PI * 0.25), Math.cos(Math.PI * 0.25)];
     var mountedLidar = perceptionModel.addSensor(new Sensor("front-lidar", "lidar"));
     mountedLidar.frame = laserMount;
-    var mastCameraMount = perceptionModel.addFrame(new Frame("mast camera mount",
-      mast, "mast-camera"));
+    var mastCameraMount = perceptionModel.addFrame(new Frame("mast camera mount", mast, "mast-camera"));
     mastCameraMount.position = [0.4, 0.0, 0.2];
     var perceptionFrames = FrameTree2.fromRobotModel(perceptionModel, "base");
     var authoredMount = perceptionFrames.lookup("base", "laser");
-    check(Math.abs(authoredMount.x - 0.2) < 1e-9 &&
-      Math.abs(authoredMount.yaw - Math.PI * 0.5) < 1e-9,
-      "planar frame tree compiles body sensor mounts from the robot model");
-    throws(function() perceptionFrames.lookup("base", "mast-camera"),
-      "model frame helper omits articulated-link mounts that need joint-state transforms");
+    check(
+      Math.abs(authoredMount.x - 0.2) < 1e-9 && Math.abs(authoredMount.yaw - Math.PI * 0.5) < 1e-9,
+      "planar frame tree compiles body sensor mounts from the robot model"
+    );
+    throws(
+      function() perceptionFrames.lookup("base", "mast-camera"),
+      "model frame helper omits articulated-link mounts that need joint-state transforms"
+    );
     var articulatedBlueprint = RobotRuntimeCompiler.compile(perceptionModel, new robotkit.profile.RobotProfile());
-    var articulatedTree = RobotFrameTree2.fromSnapshot(perceptionModel,
-      articulatedBlueprint, new RobotSnapshot("mast", Int64.ofInt(1),
-        Int64.ofInt(100), [0.75], [0.0], [0.0], 1, 0), "base");
+    var articulatedTree = RobotFrameTree2.fromSnapshot(
+      perceptionModel,
+      articulatedBlueprint,
+      new RobotSnapshot(
+        "mast",
+        Int64.ofInt(1),
+        Int64.ofInt(100),
+        [0.75],
+        [0.0],
+        [0.0],
+        1,
+        0
+      ),
+      "base"
+    );
     var mastCamera = articulatedTree.lookup("base", "mast-camera");
-    check(Math.abs(mastCamera.x - 0.4) < 1e-9 &&
-      Math.abs(mastCamera.y) < 1e-9,
-      "snapshot frame tree resolves an elevated sensor through its current lift joint");
+    check(
+      Math.abs(mastCamera.x - 0.4) < 1e-9 && Math.abs(mastCamera.y) < 1e-9,
+      "snapshot frame tree resolves an elevated sensor through its current lift joint"
+    );
 
     var rotatingModel = new RobotModel("rotating-frame");
     var rotatingBase = rotatingModel.addLink(new Link("base", "base"));
     var turret = rotatingModel.addLink(new Link("turret", "turret"));
-    var turretJoint = rotatingModel.addJoint(new Joint("turret-yaw",
-      JointType.Revolute, rotatingBase, turret));
+    var turretJoint = rotatingModel.addJoint(new Joint("turret-yaw", JointType.Revolute, rotatingBase, turret));
     turretJoint.limits = new JointLimits(-Math.PI, Math.PI, 2.0, 100.0);
-    var turretFrame = rotatingModel.addFrame(new Frame("turret sensor", turret,
-      "turret-sensor"));
+    var turretFrame = rotatingModel.addFrame(new Frame("turret sensor", turret, "turret-sensor"));
     turretFrame.position = [1.0, 0.0, 0.0];
     var rotatingBlueprint = RobotRuntimeCompiler.compile(rotatingModel, new robotkit.profile.RobotProfile());
-    var rotatingTree = RobotFrameTree2.fromSnapshot(rotatingModel,
-      rotatingBlueprint, new RobotSnapshot("turret", Int64.ofInt(1),
-        Int64.ofInt(100), [Math.PI * 0.5], [0.0], [0.0], 1, 0), "base");
+    var rotatingTree = RobotFrameTree2.fromSnapshot(
+      rotatingModel,
+      rotatingBlueprint,
+      new RobotSnapshot(
+        "turret",
+        Int64.ofInt(1),
+        Int64.ofInt(100),
+        [Math.PI * 0.5],
+        [0.0],
+        [0.0],
+        1,
+        0
+      ),
+      "base"
+    );
     var turretSensor = rotatingTree.lookup("base", "turret-sensor");
-    check(Math.abs(turretSensor.x) < 1e-9 &&
-      Math.abs(turretSensor.y - 1.0) < 1e-9 &&
-      Math.abs(turretSensor.yaw - Math.PI * 0.5) < 1e-9,
-      "snapshot frame tree composes revolute joint motion with an authored sensor mount");
+    check(
+      Math.abs(turretSensor.x) < 1e-9
+      && Math.abs(turretSensor.y - 1.0) < 1e-9 && Math.abs(turretSensor.yaw - Math.PI * 0.5) < 1e-9,
+      "snapshot frame tree composes revolute joint motion with an authored sensor mount"
+    );
     var fixedLocalization = new FixedLocalization(mapEstimate);
     var framed = new FrameAwarePerception(perception, fixedLocalization);
-    var framedSensor = new SensorFrame("front-lidar", "lidar", "laser",
-      Int64.ofInt(9), Int64.ofInt(140), [1.0, 10.0, 10.0, 10.0],
-      Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
-      "robot-boot", "host-clock");
-    var framedLidar = framed.observeRobotSnapshot(new RobotSnapshot("framed-lidar",
-      Int64.ofInt(9), Int64.ofInt(140), [0.75], [0.0], [0.0], 1, 0,
-      Int64.ofInt(150), [framedSensor], "robot-boot", "host-clock"),
-      perceptionModel, articulatedBlueprint, "base", [framedSensor]);
+    var framedSensor = new SensorFrame(
+      "front-lidar",
+      "lidar",
+      "laser",
+      Int64.ofInt(9),
+      Int64.ofInt(140),
+      [
+        1.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      Int64.ofInt(150),
+      "base",
+      [
+        0.2,
+        0.0,
+        0.3
+      ],
+      laserMount.rotation,
+      "robot-boot",
+      "host-clock"
+    );
+    var framedLidar = framed.observeRobotSnapshot(
+      new RobotSnapshot(
+        "framed-lidar",
+        Int64.ofInt(9),
+        Int64.ofInt(140),
+        [0.75],
+        [0.0],
+        [0.0],
+        1,
+        0,
+        Int64.ofInt(150),
+        [framedSensor],
+        "robot-boot",
+        "host-clock"
+      ),
+      perceptionModel,
+      articulatedBlueprint,
+      "base",
+      [framedSensor]
+    );
     var framedObstacle = framedLidar.obstacles()[0];
-    check(framedObstacle.detection.frameId == "map" &&
-      Math.abs(framedObstacle.detection.pose.x - 4.0) < 1e-9 &&
-      Math.abs(framedObstacle.detection.pose.y - 2.2) < 1e-9 &&
-      Math.abs(Pose2.wrapAngle(framedObstacle.detection.pose.yaw - Math.PI)) < 1e-9,
-      "frame-aware perception composes localization and sensor mount transforms");
-    equal(fixedLocalization.updateCount, 1,
-      "robot-snapshot perception updates localization from the same observation");
-    equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters,
-      "frame-aware perception retains obstacle geometry");
+    check(
+      framedObstacle.detection.frameId == "map" && Math.abs(framedObstacle.detection.pose.x - 4.0) < 1e-9
+      && Math.abs(framedObstacle.detection.pose.y - 2.2) < 1e-9
+      && Math.abs(Pose2.wrapAngle(framedObstacle.detection.pose.yaw - Math.PI)) < 1e-9,
+      "frame-aware perception composes localization and sensor mount transforms"
+    );
+    equal(fixedLocalization.updateCount, 1, "robot-snapshot perception updates localization from the same observation");
+    equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters, "frame-aware perception retains obstacle geometry");
     equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
 
     // A map explains the returns that land on it: a wall at the first ray's hit point goes, the
     // return on free floor stays.
     var knownMap = new OccupancyGrid2(0.1, new Pose2(), 100, 50, "map", OccupancyCell.Free);
     knownMap.setCell(40, 22, OccupancyCell.Occupied);
-    var mappedFrame = new SensorFrame("front-lidar", "lidar", "laser", Int64.ofInt(10), Int64.ofInt(140),
-      [1.0, 10.0, 2.0, 10.0], Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
-      "robot-boot", "host-clock");
-    var mappedSnapshot = new RobotSnapshot("framed-lidar", Int64.ofInt(10), Int64.ofInt(140), [0.75], [0.0], [0.0],
-      1, 0, Int64.ofInt(150), [mappedFrame], "robot-boot", "host-clock");
+    var mappedFrame = new SensorFrame(
+      "front-lidar",
+      "lidar",
+      "laser",
+      Int64.ofInt(10),
+      Int64.ofInt(140),
+      [
+        1.0,
+        10.0,
+        2.0,
+        10.0
+      ],
+      Int64.ofInt(150),
+      "base",
+      [
+        0.2,
+        0.0,
+        0.3
+      ],
+      laserMount.rotation,
+      "robot-boot",
+      "host-clock"
+    );
+    var mappedSnapshot = new RobotSnapshot(
+      "framed-lidar",
+      Int64.ofInt(10),
+      Int64.ofInt(140),
+      [0.75],
+      [0.0],
+      [0.0],
+      1,
+      0,
+      Int64.ofInt(150),
+      [mappedFrame],
+      "robot-boot",
+      "host-clock"
+    );
     var unmapped = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate)).observeRobotSnapshot(
-      mappedSnapshot, perceptionModel, articulatedBlueprint, "base", [mappedFrame]);
+      mappedSnapshot,
+      perceptionModel,
+      articulatedBlueprint,
+      "base",
+      [mappedFrame]
+    );
     equal(unmapped.obstacles().length, 2, "without a map both returns are obstacles");
-    var mappedPerception = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate), null,
-      new LidarMapFilter(knownMap, 0.1, 10.0));
-    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base", [mappedFrame])
-      .obstacles();
-    check(leftOver.length == 1 && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 &&
-      Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
-      "a LiDAR map filter drops the returns the map explains and keeps the rest");
+    var mappedPerception = new FrameAwarePerception(
+      perception,
+      new FixedLocalization(mapEstimate),
+      null,
+      new LidarMapFilter(
+        knownMap,
+        0.1,
+        10.0
+      )
+    );
+    var leftOver = mappedPerception.observeRobotSnapshot(
+      mappedSnapshot,
+      perceptionModel,
+      articulatedBlueprint,
+      "base",
+      [mappedFrame]
+    ).obstacles();
+    check(
+      leftOver.length == 1
+      && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 && Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
+      "a LiDAR map filter drops the returns the map explains and keeps the rest"
+    );
     equal(mappedFrame.values.get(0), 1.0, "the map filter does not change the frame it was given");
 
     var detections = observed.detections();
@@ -3344,98 +5641,211 @@ class RobotWorldTests {
     scanRanges[63] = 2.0;
     scanRanges[10] = 1.0;
     scanRanges[11] = 1.0;
-    var clustered = perception.observe([new SensorFrame("dense-lidar", "lidar", "laser",
-      Int64.ofInt(9), Int64.ofInt(130), scanRanges, Int64.ofInt(135), "base-link",
-      null, null, "robot-boot", "host-clock")]);
+    var clustered = perception.observe([new SensorFrame(
+      "dense-lidar",
+      "lidar",
+      "laser",
+      Int64.ofInt(9),
+      Int64.ofInt(130),
+      scanRanges,
+      Int64.ofInt(135),
+      "base-link",
+      null,
+      null,
+      "robot-boot",
+      "host-clock"
+    )]);
     var clusteredObstacles = clustered.obstacles();
-    check(clusteredObstacles.length == 2 &&
-      clusteredObstacles[0].detection.confidence > perception.minConfidence &&
-      clusteredObstacles[0].detection.pose.x > 1.9 &&
-      Math.abs(clusteredObstacles[0].detection.pose.y) < 0.11 &&
-      clusteredObstacles[0].halfLengthMeters > 0.0,
-      "LiDAR clustering merges nearby returns across the circular scan seam");
-    var partialScan = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5,
-      0.1, -Math.PI * 0.5, Math.PI).observe([new SensorFrame("front-scan", "lidar",
-      "laser", Int64.ofInt(10), Int64.ofInt(140), [1.0, 10.0, 10.0],
-      Int64.ofInt(145), "base-link", null, null, "robot-boot", "host-clock")]);
-    check(Math.abs(partialScan.obstacles()[0].detection.pose.x) < 1e-9 &&
-      Math.abs(partialScan.obstacles()[0].detection.pose.y + 1.0) < 1e-9,
-      "LiDAR perception respects configured start angle and partial field of view");
+    check(
+      clusteredObstacles.length == 2 && clusteredObstacles[0].detection.confidence > perception.minConfidence
+      && clusteredObstacles[0].detection.pose.x > 1.9
+      && Math.abs(clusteredObstacles[0].detection.pose.y) < 0.11 && clusteredObstacles[0].halfLengthMeters > 0.0,
+      "LiDAR clustering merges nearby returns across the circular scan seam"
+    );
+    var partialScan = new LidarObstaclePerception(10.0,
+      0.1, 0.05, 0.5, 0.1, -Math.PI * 0.5, Math.PI).observe([new SensorFrame(
+        "front-scan",
+        "lidar",
+        "laser",
+        Int64.ofInt(10),
+        Int64.ofInt(140),
+        [
+          1.0,
+          10.0,
+          10.0
+        ],
+        Int64.ofInt(145),
+        "base-link",
+        null,
+        null,
+        "robot-boot",
+        "host-clock"
+      )]);
+    check(
+      Math.abs(partialScan.obstacles()[0].detection.pose.x) < 1e-9
+      && Math.abs(partialScan.obstacles()[0].detection.pose.y + 1.0) < 1e-9,
+      "LiDAR perception respects configured start angle and partial field of view"
+    );
     equal(observed.detections().length, 2, "perception snapshot returns owned collections");
 
-    var palletDetection = new Detection("pallet-1", "pallet", 0.95,
-      new Pose2(2.0, 1.0, 0.2), "laser", Int64.ofInt(1), Int64.ofInt(200),
-      Int64.ofInt(220), "camera-boot", "host-clock");
+    var palletDetection = new Detection(
+      "pallet-1",
+      "pallet",
+      0.95,
+      new Pose2(2.0, 1.0, 0.2),
+      "laser",
+      Int64.ofInt(1),
+      Int64.ofInt(200),
+      Int64.ofInt(220),
+      "camera-boot",
+      "host-clock"
+    );
     var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
-    var dock = new DockingTarget(new Detection("dock-1", "dock", 0.9,
-      new Pose2(4.0, 0.0, 0.0), "laser", Int64.ofInt(2), Int64.ofInt(210),
-      Int64.ofInt(230), "camera-boot", "host-clock"), new Pose2(3.0, 0.0, 0.0));
+    var dock = new DockingTarget(
+      new Detection(
+        "dock-1",
+        "dock",
+        0.9,
+        new Pose2(4.0, 0.0, 0.0),
+        "laser",
+        Int64.ofInt(2),
+        Int64.ofInt(210),
+        Int64.ofInt(230),
+        "camera-boot",
+        "host-clock"
+      ),
+      new Pose2(
+        3.0,
+        0.0,
+        0.0
+      )
+    );
     var semantic = new PerceptionSnapshot([palletDetection], [], [pallet], [dock]);
-    check(semantic.pallets()[0].lengthMeters == 1.2 &&
-      semantic.dockingTargets()[0].approachPose.x == 3.0,
-      "perception values represent pallet and docking targets");
+    check(
+      semantic.pallets()[0].lengthMeters == 1.2 && semantic.dockingTargets()[0].approachPose.x == 3.0,
+      "perception values represent pallet and docking targets"
+    );
     var sceneTruth:PerceptionSnapshot = semantic;
     var truthPerception = new GroundTruthPerception(function() return sceneTruth);
     var truthObservation = truthPerception.observe([]);
-    check(truthObservation.pallets()[0].detection.id == "pallet-1" &&
-      truthObservation.dockingTargets()[0].detection.id == "dock-1",
-      "ground-truth perception supplies semantic scene values through the perception API");
+    check(
+      truthObservation.pallets()[0].detection.id == "pallet-1"
+      && truthObservation.dockingTargets()[0].detection.id == "dock-1",
+      "ground-truth perception supplies semantic scene values through the perception API"
+    );
     var framedTruth = new FrameAwarePerception(truthPerception,
       new FixedLocalization(mapEstimate), perceptionFrames).observe([]);
     var framedPallet = framedTruth.pallets()[0];
     var framedDock = framedTruth.dockingTargets()[0];
-    check(framedPallet.detection.frameId == "map" &&
-      Math.abs(framedPallet.detection.pose.x - 3.0) < 1e-9 &&
-      framedDock.detection.frameId == "map" &&
-      Math.abs(framedDock.approachPose.x - 2.0) < 1e-9 &&
-      Math.abs(framedDock.approachPose.y - 2.2) < 1e-9,
-      "frame-aware perception transforms pallet poses and docking approach poses");
+    check(
+      framedPallet.detection.frameId == "map"
+      && Math.abs(framedPallet.detection.pose.x - 3.0) < 1e-9 && framedDock.detection.frameId == "map"
+      && Math.abs(framedDock.approachPose.x - 2.0) < 1e-9 && Math.abs(framedDock.approachPose.y - 2.2) < 1e-9,
+      "frame-aware perception transforms pallet poses and docking approach poses"
+    );
     var invalidEstimate = new FixedLocalization(new LocalizationState(
-      Int64.ofInt(5), new Pose2(), "map", "base", PoseCovariance2.zero(),
-      Invalid, Int64.ofInt(150), Int64.ofInt(160), "robot-boot", "host-clock"));
-    throws(function() new FrameAwarePerception(perception, invalidEstimate,
-      perceptionFrames).observe([lidar]),
-      "frame-aware perception refuses to project detections from invalid localization");
-    throws(function() new FrameAwarePerception(perception,
-      new FixedLocalization(mapEstimate), new FrameTree2()).observe([
-        new SensorFrame("unframed-lidar", "lidar", "unconnected-laser",
-          Int64.ofInt(10), Int64.ofInt(160), [1.0], Int64.ofInt(170),
-          "base-link", null, null, "robot-boot", "host-clock")]),
-      "frame-aware perception refuses disconnected sensor frames");
+      Int64.ofInt(5),
+      new Pose2(),
+      "map",
+      "base",
+      PoseCovariance2.zero(),
+      Invalid,
+      Int64.ofInt(150),
+      Int64.ofInt(160),
+      "robot-boot",
+      "host-clock"
+    ));
+    throws(
+      function() new FrameAwarePerception(perception, invalidEstimate, perceptionFrames).observe([lidar]),
+      "frame-aware perception refuses to project detections from invalid localization"
+    );
+    throws(
+      function() new FrameAwarePerception(perception,
+      new FixedLocalization(mapEstimate), new FrameTree2()).observe([new SensorFrame(
+        "unframed-lidar",
+        "lidar",
+        "unconnected-laser",
+        Int64.ofInt(10),
+        Int64.ofInt(160),
+        [1.0],
+        Int64.ofInt(170),
+        "base-link",
+        null,
+        null,
+        "robot-boot",
+        "host-clock"
+      )]),
+      "frame-aware perception refuses disconnected sensor frames"
+    );
     var tiltedModel = new RobotModel("tilted-sensor");
     var tiltedBase = tiltedModel.addLink(new Link("base", "base"));
-    var tiltedMount = tiltedModel.addFrame(new Frame("tilted laser", tiltedBase,
-      "tilted-laser"));
+    var tiltedMount = tiltedModel.addFrame(new Frame("tilted laser", tiltedBase, "tilted-laser"));
     tiltedMount.rotation = [Math.sin(0.1), 0.0, 0.0, Math.cos(0.1)];
-    throws(function() FrameTree2.fromRobotModel(tiltedModel, "base"),
-      "planar frame tree rejects authored sensor mounts with roll or pitch");
+    throws(
+      function() FrameTree2.fromRobotModel(tiltedModel, "base"),
+      "planar frame tree rejects authored sensor mounts with roll or pitch"
+    );
     sceneTruth = new PerceptionSnapshot([], [obstacles[0]], [], []);
-    check(truthPerception.observe([lidar]).obstacles()[0].detection.id ==
-      obstacles[0].detection.id && truthPerception.observe([]).pallets().length == 0,
-      "ground-truth perception reads current scene truth independently of sensor frames");
+    check(
+      truthPerception.observe([lidar]).obstacles()[0].detection.id == obstacles[0].detection.id
+      && truthPerception.observe([]).pallets().length == 0,
+      "ground-truth perception reads current scene truth independently of sensor frames"
+    );
 
     var envelope = new StoppingEnvelope(2.0, 0.5, 2.0);
-    check(Math.abs(envelope.distanceMeters - 2.0) < 1e-9,
-      "stopping envelope includes reaction distance and braking distance");
+    check(
+      Math.abs(envelope.distanceMeters - 2.0) < 1e-9,
+      "stopping envelope includes reaction distance and braking distance"
+    );
     var restrictions:Array<SafetyRestriction> = [SpeedLimited(0.4), StopRequired("aisle blocked")];
-    var safety = new SafetyState(SafetyPhase.Restricted, 0.4, envelope, restrictions,
-      Int64.ofInt(300), Int64.ofInt(320), "robot-boot", "host-clock");
+    var safety = new SafetyState(
+      SafetyPhase.Restricted,
+      0.4,
+      envelope,
+      restrictions,
+      Int64.ofInt(300),
+      Int64.ofInt(320),
+      "robot-boot",
+      "host-clock"
+    );
     restrictions.pop();
     equal(safety.restrictions().length, 2, "safety state owns active restrictions");
-    check(safety.speedLimitMetersPerSecond == 0.4 &&
-      safety.stoppingEnvelope.distanceMeters == 2.0,
-      "safety state exposes current speed limit and stopping envelope");
-    throws(function() new StoppingEnvelope(1.0, 0.0, 0.0),
-      "stopping envelope requires positive deceleration");
+    check(
+      safety.speedLimitMetersPerSecond == 0.4 && safety.stoppingEnvelope.distanceMeters == 2.0,
+      "safety state exposes current speed limit and stopping envelope"
+    );
+    throws(function() new StoppingEnvelope(1.0, 0.0, 0.0), "stopping envelope requires positive deceleration");
 
-    var battery = new BatteryState("traction-pack", 0.75, 48.0, 12.0, 31.0,
-      Int64.ofInt(400), Int64.ofInt(420), "battery-boot", "host-clock", 720.0);
-    check(battery.chargeFraction == 0.75 && battery.currentAmps > 0.0 &&
-      battery.remainingEnergyWattHours == 720.0,
-      "battery state exposes charge, electrical state, and remaining energy");
-    throws(function() new BatteryState("bad-pack", 1.1, 48.0, 0.0, 20.0,
-      Int64.ofInt(0), Int64.ofInt(0), "battery", "host"),
-      "battery state rejects invalid charge fractions");
+    var battery = new BatteryState(
+      "traction-pack",
+      0.75,
+      48.0,
+      12.0,
+      31.0,
+      Int64.ofInt(400),
+      Int64.ofInt(420),
+      "battery-boot",
+      "host-clock",
+      720.0
+    );
+    check(
+      battery.chargeFraction == 0.75 && battery.currentAmps > 0.0 && battery.remainingEnergyWattHours == 720.0,
+      "battery state exposes charge, electrical state, and remaining energy"
+    );
+    throws(
+      function() new BatteryState(
+        "bad-pack",
+        1.1,
+        48.0,
+        0.0,
+        20.0,
+        Int64.ofInt(0),
+        Int64.ofInt(0),
+        "battery",
+        "host"
+      ),
+      "battery state rejects invalid charge fractions"
+    );
   }
 
   static function testLoadSafetyPolicy():Void {
@@ -3444,27 +5854,45 @@ class RobotWorldTests {
     robot.positions = [0.0, 0.0, 0.0];
     robot.velocities = [0.0, 0.0, 0.0];
     robot.efforts = [0.0, 0.0, 0.0];
-    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(1.0, 2.0, 2.0, 3.0), Footprint.rectangle(0.8, 0.6));
-    var forks = new Forks(robot, new ForkConfig(new ForkAxisConfig("lift", 0.0, 2.0),
-      new LoadLimits(1000.0, 600.0, 2.0)));
+    var base = new MobileBase(
+      robot,
+      new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0, 2.0, 3.0),
+      Footprint.rectangle(
+        0.8,
+        0.6
+      )
+    );
+    var forks = new Forks(
+      robot,
+      new ForkConfig(
+        new ForkAxisConfig("lift", 0.0, 2.0),
+        new LoadLimits(1000.0, 600.0, 2.0)
+      )
+    );
     var policy = new LoadSafetyPolicy(base, forks, new LoadSafetyConfiguration());
     var unknown = policy.state();
-    check(unknown.phase == SafetyPhase.Restricted &&
-      base.motionLimits.maxLinearSpeed < base.nominalMotionLimits.maxLinearSpeed &&
-      switch unknown.restrictions()[0] { case LoadStateUnknown: true; case _: false; },
-      "Load safety applies conservative motion limits when load state is unknown");
+    check(unknown.phase == SafetyPhase.Restricted && base.motionLimits.maxLinearSpeed
+      < base.nominalMotionLimits.maxLinearSpeed && switch unknown.restrictions()[0] {
+      case LoadStateUnknown:
+        true;
+      case _:
+        false;
+    }, "Load safety applies conservative motion limits when load state is unknown");
     var unknownFootprint:Footprint = cast unknown.footprint;
     var baseFootprint:Footprint = cast base.footprint;
-    check(unknownFootprint.radius > baseFootprint.radius,
-      "Unknown load state expands the reported footprint by its configured margin");
+    check(
+      unknownFootprint.radius > baseFootprint.radius,
+      "Unknown load state expands the reported footprint by its configured margin"
+    );
 
     forks.setLoadState(LoadState.empty());
     var empty = policy.refresh();
     var emptyLimits:MotionLimits = cast empty.effectiveMotionLimits;
-    check(empty.phase == SafetyPhase.Normal &&
-      base.motionLimits.maxLinearSpeed == base.nominalMotionLimits.maxLinearSpeed,
-      "Confirmed empty forks restore nominal mobile limits");
+    check(
+      empty.phase == SafetyPhase.Normal && base.motionLimits.maxLinearSpeed == base.nominalMotionLimits.maxLinearSpeed,
+      "Confirmed empty forks restore nominal mobile limits"
+    );
     base.command(new Twist2(0.8, 0.0), 1.0);
     empty = policy.refresh();
 
@@ -3476,12 +5904,12 @@ class RobotWorldTests {
     var vertices = loadedFootprint.vertices();
     var maxX = vertices[0].x;
     for (point in vertices) maxX = Math.max(maxX, point.x);
-    check(loaded.phase == SafetyPhase.Restricted &&
-      loadedLimits.maxLinearSpeed < emptyLimits.maxLinearSpeed &&
-      loadedLimits.maxLinearAcceleration < emptyLimits.maxLinearAcceleration &&
-      loaded.stoppingEnvelope.distanceMeters > empty.stoppingEnvelope.distanceMeters &&
-      maxX >= 1.19,
-      "Payload mass reduces driving limits and stopping margin while expanding the footprint");
+    check(
+      loaded.phase == SafetyPhase.Restricted && loadedLimits.maxLinearSpeed < emptyLimits.maxLinearSpeed
+      && loadedLimits.maxLinearAcceleration < emptyLimits.maxLinearAcceleration
+      && loaded.stoppingEnvelope.distanceMeters > empty.stoppingEnvelope.distanceMeters && maxX >= 1.19,
+      "Payload mass reduces driving limits and stopping margin while expanding the footprint"
+    );
 
     robot.positions[2] = 1.5;
     var raised = policy.refresh();
@@ -3489,27 +5917,36 @@ class RobotWorldTests {
     var hasHeightRestriction = false;
     for (restriction in raised.restrictions()) {
       if (switch restriction {
-        case ForkHeightLimited(_): true;
-        case _: false;
-      }) hasHeightRestriction = true;
+        case ForkHeightLimited(_):
+          true;
+        case _:
+          false;
+      }
+      ) hasHeightRestriction = true;
     }
-    check(raisedLimits.maxAngularSpeed < loadedLimits.maxAngularSpeed &&
-      hasHeightRestriction,
-      "Raised forks further reduce turning speed and report the height restriction");
+    check(
+      raisedLimits.maxAngularSpeed < loadedLimits.maxAngularSpeed && hasHeightRestriction,
+      "Raised forks further reduce turning speed and report the height restriction"
+    );
 
     robot.positions[2] = 0.0;
-    forks.setLoadState(LoadState.carried(new Payload(1200.0,
-      1.0, 0.8, 0.8, 0.4)));
+    forks.setLoadState(LoadState.carried(new Payload(1200.0, 1.0, 0.8, 0.8, 0.4)));
     var invalid = policy.refresh();
-    check(invalid.phase == SafetyPhase.ProtectiveStop && base.safetyStopRequired &&
-      invalid.speedLimitMetersPerSecond == 0.0,
-      "Load envelope violations latch a protective stop in the mobile view");
-    throws(function() base.command(new Twist2(0.1, 0.0), 0.1),
-      "MobileBase blocks new motion commands while its load policy requires a stop");
+    check(
+      invalid.phase == SafetyPhase.ProtectiveStop
+      && base.safetyStopRequired && invalid.speedLimitMetersPerSecond == 0.0,
+      "Load envelope violations latch a protective stop in the mobile view"
+    );
+    throws(
+      function() base.command(new Twist2(0.1, 0.0), 0.1),
+      "MobileBase blocks new motion commands while its load policy requires a stop"
+    );
     forks.setLoadState(LoadState.empty());
     var recovered = policy.refresh();
-    check(recovered.phase == SafetyPhase.Normal && !base.safetyStopRequired,
-      "A valid refreshed load state clears the policy stop and restores nominal limits");
+    check(
+      recovered.phase == SafetyPhase.Normal && !base.safetyStopRequired,
+      "A valid refreshed load state clears the policy stop and restores nominal limits"
+    );
     base.command(new Twist2(0.1, 0.0), 0.1);
   }
 
@@ -3522,14 +5959,18 @@ class RobotWorldTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("material-handling", runtime, model.name,
-      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "material-handling",
+      runtime,
+      model.name,
+      [for (link in model.links) link.name],
+      [for (joint in model.joints) joint.name]
+    );
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var forks = Forks.fromBlueprint(robot, blueprint);
     forks.setLoadState(LoadState.empty());
     var loadSafety = new LoadSafetyPolicy(base, forks);
-    var localization = new SimulationTruthLocalization(simulation, 0,
-      "map", "link/base");
+    var localization = new SimulationTruthLocalization(simulation, 0, "map", "link/base");
     var navigation = new Navigation(base, localization, 0.3, 0.45, 1.0);
     var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     var runner = new SkillRunner();
@@ -3539,14 +5980,11 @@ class RobotWorldTests {
     localization.update(latestSnapshot);
     loadSafety.refresh();
     var unloadedLimits = base.motionLimits;
-    var grid = new OccupancyGrid2(0.2, new Pose2(-1.0, -2.0), 40, 20,
-      "map", OccupancyCell.Free);
+    var grid = new OccupancyGrid2(0.2, new Pose2(-1.0, -2.0), 40, 20, "map", OccupancyCell.Free);
     var baseFootprint = base.footprint;
-    if (baseFootprint == null)
-      throw "Forklift model did not provide a base footprint";
+    if (baseFootprint == null) throw "Forklift model did not provide a base footprint";
     var unloadedCostmap = new Costmap2(grid, baseFootprint.radius, true, 0.3, 1.5);
-    var unloadedNavigator = new Navigator(navigation,
-      new AStarPlanner(unloadedCostmap), unloadedCostmap);
+    var unloadedNavigator = new Navigator(navigation, new AStarPlanner(unloadedCostmap), unloadedCostmap);
 
     var dockApproach = new Pose2(0.4, 0.0, 0.0);
     var palletPose = new Pose2(1.4, 0.0, 0.0);
@@ -3555,10 +5993,18 @@ class RobotWorldTests {
     var chargerPose = new Pose2(3.4, 0.0, 0.0);
     var chargerApproach = new Pose2(3.0, 0.0, 0.0);
     function detection(id:String, kind:String, pose:Pose2):Detection {
-      return new Detection(id, kind, 0.98, pose, "map",
-        latestSnapshot.sourceSequence, latestSnapshot.sourceTimestampNs,
-        latestSnapshot.receivedTimestampNs, latestSnapshot.sourceClockId,
-        latestSnapshot.receivedClockId);
+      return new Detection(
+        id,
+        kind,
+        0.98,
+        pose,
+        "map",
+        latestSnapshot.sourceSequence,
+        latestSnapshot.sourceTimestampNs,
+        latestSnapshot.receivedTimestampNs,
+        latestSnapshot.sourceClockId,
+        latestSnapshot.receivedClockId
+      );
     }
     // Scene truth and a deterministic load sensor make pallet interaction
     // repeatable; chassis and fork actuation still advance through SimKit.
@@ -3566,22 +6012,38 @@ class RobotWorldTests {
       var palletDetection = detection("pallet-17", "pallet", palletPose);
       var dockDetection = detection("pallet-staging", "dock", palletPose);
       var chargerDetection = detection("charger-1", "charger", chargerPose);
-      return new PerceptionSnapshot([], [],
+      return new PerceptionSnapshot(
+        [],
+        [],
         [new Pallet(palletDetection, 1.2, 0.8, 0.15)],
-        [new DockingTarget(dockDetection, dockApproach),
-          new DockingTarget(chargerDetection, chargerApproach)]);
-    });
+        [
+          new DockingTarget(
+            dockDetection,
+            dockApproach
+          ),
+          new DockingTarget(
+            chargerDetection,
+            chargerApproach
+          )
+        ]
+      );
+    }
+    );
     var scene = groundTruth.observe(latestSnapshot.sensors.toArray());
-    check(scene.dockingTargets().length == 2 && scene.pallets().length == 1,
-      "simulated scene supplies pallet and charger detections");
+    check(
+      scene.dockingTargets().length == 2 && scene.pallets().length == 1,
+      "simulated scene supplies pallet and charger detections"
+    );
     var observeNavigation:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
       latestSnapshot = snapshot;
       localization.update(snapshot);
       return groundTruth.observe(snapshot.sensors.toArray());
     };
 
-    var observationHook:RobotSnapshot -> Void = function(_) {};
-    var controlHook:Void -> Void = function() {};
+    var observationHook:RobotSnapshot -> Void = function(_) {
+    };
+    var controlHook:Void -> Void = function() {
+    };
     function runSkill(skill:Skill):SkillStatus {
       var status = runner.start(skill);
       var steps = 0;
@@ -3597,39 +6059,51 @@ class RobotWorldTests {
       return status;
     }
 
-    var dock = new Dock(unloadedNavigator, scene.dockingTargets()[0],
-      observeNavigation);
-    check(runSkill(dock) == SkillStatus.Succeeded &&
-      runner.result() != null,
-      "SkillRunner docks at the pallet staging pose in simulation");
+    var dock = new Dock(unloadedNavigator, scene.dockingTargets()[0], observeNavigation);
+    check(
+      runSkill(dock) == SkillStatus.Succeeded && runner.result() != null,
+      "SkillRunner docks at the pallet staging pose in simulation"
+    );
 
     var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
     var pickScene = groundTruth.observe(latestSnapshot.sensors.toArray());
     var pallet = pickScene.pallets()[0];
-    var pick = new PickPallet(unloadedNavigator, observeNavigation, forks, pallet,
-      payload, pickApproach, 0.5, 0.1, 0.45, 0.06, 0.1);
+    var pick = new PickPallet(
+      unloadedNavigator,
+      observeNavigation,
+      forks,
+      pallet,
+      payload,
+      pickApproach,
+      0.5,
+      0.1,
+      0.45,
+      0.06,
+      0.1
+    );
     observationHook = function(_) {
-      if (runner.activeSkill() == pick && forks.loadState.payload == payload &&
-          !forks.loadState.secured && forks.state().lift.position >= 0.49)
-        forks.setLoadState(LoadState.carried(payload));
+      if (runner.activeSkill() == pick && forks.loadState.payload == payload && !forks.loadState.secured
+        && forks.state().lift.position >= 0.49) forks.setLoadState(LoadState.carried(payload));
     };
     var pickStatus = runSkill(pick);
-    observationHook = function(_) {};
-    check(pickStatus == SkillStatus.Succeeded && runner.result() != null &&
-      forks.loadState.secured && forks.loadState.payload == payload &&
-      Math.abs(forks.state().lift.position - 0.5) < 1e-6,
-      "SkillRunner picks and secures the pallet after simulated fork actuation");
+    observationHook = function(_) {
+    };
+    check(
+      pickStatus == SkillStatus.Succeeded && runner.result() != null && forks.loadState.secured
+      && forks.loadState.payload == payload && Math.abs(forks.state().lift.position - 0.5) < 1e-6,
+      "SkillRunner picks and secures the pallet after simulated fork actuation"
+    );
 
     var loadedState = loadSafety.refresh();
     var loadedLimits = base.motionLimits;
     var loadedFootprint = loadedState.footprint;
-    if (loadedFootprint == null)
-      throw "Forklift load policy did not provide both robot footprints";
-    check(loadedState.phase == SafetyPhase.Restricted &&
-      loadedLimits.maxLinearSpeed < unloadedLimits.maxLinearSpeed &&
-      loadedLimits.maxLinearAcceleration < unloadedLimits.maxLinearAcceleration &&
-      loadedFootprint.radius > baseFootprint.radius,
-      "confirmed pallet load lowers driving limits and expands the planning footprint");
+    if (loadedFootprint == null) throw "Forklift load policy did not provide both robot footprints";
+    check(
+      loadedState.phase == SafetyPhase.Restricted && loadedLimits.maxLinearSpeed < unloadedLimits.maxLinearSpeed
+      && loadedLimits.maxLinearAcceleration < unloadedLimits.maxLinearAcceleration
+      && loadedFootprint.radius > baseFootprint.radius,
+      "confirmed pallet load lowers driving limits and expands the planning footprint"
+    );
 
     var costmap = new Costmap2(grid, loadedFootprint.radius, true, 0.3, 1.5);
     var planner = new AStarPlanner(costmap);
@@ -3639,62 +6113,91 @@ class RobotWorldTests {
       new NavigationGoal(loadedGoalPose, "map", 0.12, 0.12), observeNavigation);
     var maxLoadedCommand = 0.0;
     controlHook = function() {
-      maxLoadedCommand = Math.max(maxLoadedCommand,
-        Math.abs(base.currentCommand().linear));
+      maxLoadedCommand = Math.max(maxLoadedCommand, Math.abs(base.currentCommand().linear));
     };
     var loadedStatus = runSkill(loadedGoal);
-    controlHook = function() {};
+    controlHook = function() {
+    };
     var loadedEstimate = localization.state();
-    check(loadedStatus == SkillStatus.Succeeded && runner.result() != null &&
-      maxLoadedCommand > 0.05 &&
-      maxLoadedCommand <= loadedLimits.maxLinearSpeed + 1e-9 &&
-      loadedEstimate != null && Math.abs(loadedEstimate.pose.x - loadedGoalPose.x) <= 0.14,
-      "goal-level GoTo reaches the delivery area within load-reduced speed limits");
+    check(
+      loadedStatus == SkillStatus.Succeeded
+      && runner.result() != null && maxLoadedCommand > 0.05 && maxLoadedCommand <= loadedLimits.maxLinearSpeed + 1e-9
+      && loadedEstimate != null && Math.abs(loadedEstimate.pose.x - loadedGoalPose.x) <= 0.14,
+      "goal-level GoTo reaches the delivery area within load-reduced speed limits"
+    );
 
-    var place = new PlacePallet(loadedNavigator, observeNavigation, forks,
-      payload, placeApproach, 0.0, 0.0, 0.45, 0.06, 0.1);
+    var place = new PlacePallet(
+      loadedNavigator,
+      observeNavigation,
+      forks,
+      payload,
+      placeApproach,
+      0.0,
+      0.0,
+      0.45,
+      0.06,
+      0.1
+    );
     observationHook = function(_) {
-      if (runner.activeSkill() == place && forks.loadState.secured &&
-          forks.state().lift.position <= 0.01)
-        forks.setLoadState(LoadState.empty());
+      if (runner.activeSkill() == place
+        && forks.loadState.secured && forks.state().lift.position <= 0.01) forks.setLoadState(LoadState.empty());
     };
     var placeStatus = runSkill(place);
-    check(placeStatus == SkillStatus.Succeeded && runner.result() != null &&
-      forks.loadState.observed && !forks.loadState.secured &&
-      forks.loadState.payload == null,
-      "SkillRunner places the pallet after simulated release confirmation");
+    check(
+      placeStatus == SkillStatus.Succeeded && runner.result() != null
+      && forks.loadState.observed && !forks.loadState.secured && forks.loadState.payload == null,
+      "SkillRunner places the pallet after simulated release confirmation"
+    );
     loadSafety.refresh();
-    check(base.motionLimits.maxLinearSpeed == unloadedLimits.maxLinearSpeed &&
-      !base.safetyStopRequired,
-      "confirmed pallet release restores the unloaded motion limits");
+    check(
+      base.motionLimits.maxLinearSpeed == unloadedLimits.maxLinearSpeed && !base.safetyStopRequired,
+      "confirmed pallet release restores the unloaded motion limits"
+    );
 
     var chargingScene = groundTruth.observe(latestSnapshot.sensors.toArray());
     var chargerTarget = chargingScene.dockingTargets()[1];
     var power = new FakePower();
-    power.battery = new BatteryState("traction-pack", 0.3, 48.0, 10.0, 25.0,
-      latestSnapshot.sourceTimestampNs, latestSnapshot.receivedTimestampNs,
-      latestSnapshot.sourceClockId, latestSnapshot.receivedClockId);
-    var charge = new Charge(loadedNavigator, chargerTarget, power, 0.8,
-      observeNavigation);
+    power.battery = new BatteryState(
+      "traction-pack",
+      0.3,
+      48.0,
+      10.0,
+      25.0,
+      latestSnapshot.sourceTimestampNs,
+      latestSnapshot.receivedTimestampNs,
+      latestSnapshot.sourceClockId,
+      latestSnapshot.receivedClockId
+    );
+    var charge = new Charge(loadedNavigator, chargerTarget, power, 0.8, observeNavigation);
     var chargeStatus = runner.start(charge);
     var chargeTicks = 0;
-    while (chargeStatus == SkillStatus.Running &&
-        charge.dock.status() == SkillStatus.Running && chargeTicks < 1500) {
+    while (chargeStatus == SkillStatus.Running && charge.dock.status() == SkillStatus.Running && chargeTicks < 1500) {
       latestSnapshot = plant.step(Int64.ofInt(tick++));
       loadSafety.refresh();
       chargeStatus = runner.update(latestSnapshot, timestep);
       chargeTicks++;
     }
-    check(chargeStatus == SkillStatus.Running &&
-      charge.dock.status() == SkillStatus.Succeeded && runner.activeSkill() == charge,
-      "Charge docks at the detected charger and waits while the battery is low");
-    power.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
-      latestSnapshot.sourceTimestampNs, latestSnapshot.receivedTimestampNs,
-      latestSnapshot.sourceClockId, latestSnapshot.receivedClockId);
+    check(
+      chargeStatus == SkillStatus.Running
+      && charge.dock.status() == SkillStatus.Succeeded && runner.activeSkill() == charge,
+      "Charge docks at the detected charger and waits while the battery is low"
+    );
+    power.battery = new BatteryState(
+      "traction-pack",
+      0.85,
+      48.0,
+      -4.0,
+      25.0,
+      latestSnapshot.sourceTimestampNs,
+      latestSnapshot.receivedTimestampNs,
+      latestSnapshot.sourceClockId,
+      latestSnapshot.receivedClockId
+    );
     chargeStatus = runner.update(latestSnapshot, timestep);
-    check(chargeStatus == SkillStatus.Succeeded && runner.result() != null &&
-      runner.activeSkill() == null,
-      "Charge completes through SkillRunner when the battery reaches its target");
+    check(
+      chargeStatus == SkillStatus.Succeeded && runner.result() != null && runner.activeSkill() == null,
+      "Charge completes through SkillRunner when the battery reaches its target"
+    );
 
     robot.close();
     simulationHarness.dispose();
@@ -3712,19 +6215,22 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-forklift-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
-    var sourceRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
-      "simulated forklift", linkNames, jointNames);
+    var sourceRobot = new SimulatedRobot(
+      "forklift",
+      simulation.addRobot(blueprint),
+      "simulated forklift",
+      linkNames,
+      jointNames
+    );
     var simulatedRobot = new RecordingRobot(sourceRobot, writer);
     var base = MobileBase.fromRobot(simulatedRobot, model, modelProfile);
     var localization = new WheelOdometryLocalization(base);
     var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
     var liveFootprint = base.footprint;
     if (liveFootprint == null) throw "Forklift model did not provide a footprint";
-    var liveGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
-      100, 100, "odom", OccupancyCell.Free);
+    var liveGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0), 100, 100, "odom", OccupancyCell.Free);
     var liveCostmap = new Costmap2(liveGrid, liveFootprint.radius);
-    var liveNavigator = new Navigator(navigation,
-      new AStarPlanner(liveCostmap), liveCostmap);
+    var liveNavigator = new Navigator(navigation, new AStarPlanner(liveCostmap), liveCostmap);
     var observeLive:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
       localization.update(snapshot);
       return new PerceptionSnapshot();
@@ -3732,54 +6238,69 @@ class RobotWorldTests {
     var forks = Forks.fromRobot(simulatedRobot, model, modelProfile);
     simulationHarness.step(Int64.ofInt(1));
     var configuredScan = new robotkit.core.ImmutableSensorArray(sourceRobot.streams().latestFrames());
-    check(configuredScan.length == 1 &&
-      configuredScan.get(0).sensorId == "sensor/front-lidar" &&
-      configuredScan.get(0).frameId == "frame/front-lidar" &&
-      configuredScan.get(0).linkId == "link/base" &&
-      configuredScan.get(0).mountPosition.get(0) == 0.35,
-      "authored sensor frame and mount reach the simulated forklift observation");
+    check(
+      configuredScan.length == 1
+      && configuredScan.get(0).sensorId == "sensor/front-lidar" && configuredScan.get(0).frameId == "frame/front-lidar"
+      && configuredScan.get(0).linkId == "link/base" && configuredScan.get(0).mountPosition.get(0) == 0.35,
+      "authored sensor frame and mount reach the simulated forklift observation"
+    );
     var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
-    var pathSkill = new FollowPath(navigation, path,
-      new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
+    var pathSkill = new FollowPath(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     var skillRunner = new SkillRunner();
     var liveStatus = skillRunner.start(pathSkill);
-    check(liveStatus == SkillStatus.Running && skillRunner.activeSkill() == pathSkill,
-      "SkillRunner starts one robot-local skill and exposes it as active");
+    check(
+      liveStatus == SkillStatus.Running && skillRunner.activeSkill() == pathSkill,
+      "SkillRunner starts one robot-local skill and exposes it as active"
+    );
     var conflictingSkill = new FollowPath(navigation, path);
-    throws(function() skillRunner.start(conflictingSkill),
-      "SkillRunner rejects a second skill while one is running");
+    throws(function() skillRunner.start(conflictingSkill), "SkillRunner rejects a second skill while one is running");
     var ticks = 0;
-    while (switch liveStatus { case Running: true; case _: false; } && ticks < 300) {
+    while (switch liveStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && ticks < 300) {
       var observation = simulatedRobot.snapshot();
       liveStatus = skillRunner.update(observation, 0.01);
-      if (switch liveStatus { case Running: true; case _: false; })
-        simulationHarness.step(Int64.ofInt((ticks + 1) * 10000000));
+      if (switch liveStatus {
+        case Running:
+          true;
+        case _:
+          false;
+      }
+      ) simulationHarness.step(Int64.ofInt((ticks + 1) * 10000000));
       ticks++;
     }
-    check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300 &&
-      skillRunner.activeSkill() == null && skillRunner.result() != null,
+    check(switch liveStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }
+    && ticks < 300 && skillRunner.activeSkill() == null && skillRunner.result() != null,
       "SkillRunner completes FollowPath and retains its terminal result");
     var liveSnapshot = simulatedRobot.snapshot();
     var liveEstimate = localization.state();
     var liveEstimateValue:robotkit.localization.LocalizationState = cast liveEstimate;
-    var cancelPose = new Pose2(liveEstimateValue.pose.x + 1.0,
-      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    var cancelPose = new Pose2(liveEstimateValue.pose.x + 1.0, liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
     var cancelPath = new Path([liveEstimateValue.pose, cancelPose], "odom");
     var cancelledSkill = new FollowPath(navigation, cancelPath);
     skillRunner.start(cancelledSkill);
     skillRunner.cancel();
-    check(skillRunner.status() == SkillStatus.Cancelled &&
-      skillRunner.activeSkill() == null && skillRunner.result() != null,
-      "SkillRunner cancels its active skill and records a terminal result");
+    check(
+      skillRunner.status() == SkillStatus.Cancelled
+      && skillRunner.activeSkill() == null && skillRunner.result() != null,
+      "SkillRunner cancels its active skill and records a terminal result"
+    );
 
     // Every approach below is far outside its goal tolerance, so each skill must
     // plan and drive the forklift before it can complete.
     var liveTick = ticks + 1;
-    function nextLiveTimestamp():Int64
-      return Int64.fromFloat((liveTick++) * 10000000.0);
+    function nextLiveTimestamp():Int64 return Int64.fromFloat((liveTick++) * 10000000.0);
     function liveApproachReached():Bool return liveNavigator.status == NavigatorStatus.Succeeded;
-    function runLive(initial:SkillStatus, update:RobotSnapshot -> SkillStatus,
-        until:Void -> Bool):SkillStatus {
+    function runLive(initial:SkillStatus, update:RobotSnapshot -> SkillStatus, until:Void -> Bool):SkillStatus {
       var status = initial;
       var count = 0;
       while (status == SkillStatus.Running && !until() && count < 3000) {
@@ -3793,157 +6314,278 @@ class RobotWorldTests {
       var estimate:robotkit.localization.LocalizationState = cast localization.state();
       return estimate.pose;
     }
-    function distance(a:Pose2, b:Pose2):Float
-      return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    function distance(a:Pose2, b:Pose2):Float return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 
     var dockStart = livePose();
     var dockPose = new Pose2(dockStart.x + 0.3, dockStart.y, dockStart.yaw);
-    var dockDetection = new Detection("charger-dock", "dock", 0.95, dockPose,
-      "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
-      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
-    var dock = new Dock(liveNavigator, new DockingTarget(dockDetection, dockPose),
-      observeLive);
-    var dockStatus = runLive(skillRunner.start(dock),
-      function(snapshot) return skillRunner.update(snapshot, 0.01), function() return false);
+    var dockDetection = new Detection(
+      "charger-dock",
+      "dock",
+      0.95,
+      dockPose,
+      "odom",
+      liveSnapshot.sourceSequence,
+      liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId,
+      liveSnapshot.receivedClockId
+    );
+    var dock = new Dock(liveNavigator, new DockingTarget(dockDetection, dockPose), observeLive);
+    var dockStatus = runLive(
+      skillRunner.start(dock),
+      function(snapshot) return skillRunner.update(snapshot, 0.01),
+      function() return false
+    );
     var dockEnd = livePose();
-    check(dockStatus == SkillStatus.Succeeded && skillRunner.activeSkill() == null &&
-      distance(dockEnd, dockStart) > 0.2 && distance(dockEnd, dockPose) <= 0.06,
-      'SkillRunner runs Dock and drives the forklift to its approach (status ${Std.string(dockStatus)}, pose ${dockEnd.x},${dockEnd.y})');
+    check(
+      dockStatus == SkillStatus.Succeeded && skillRunner.activeSkill() == null && distance(dockEnd,
+      dockStart) > 0.2 && distance(
+        dockEnd,
+        dockPose
+      ) <= 0.06,
+      'SkillRunner runs Dock and drives the forklift to its approach (status ${Std.string(dockStatus)}, pose ${dockEnd.x},${dockEnd.y})'
+    );
 
     var pickStart = livePose();
     var pickPose = new Pose2(pickStart.x + 0.3, pickStart.y, pickStart.yaw);
     liveSnapshot = simulatedRobot.snapshot();
-    var palletDetection = new Detection("pallet-17", "pallet", 0.98,
-      new Pose2(pickPose.x + 0.5, pickPose.y, pickPose.yaw), "odom",
-      liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
-      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var palletDetection = new Detection(
+      "pallet-17",
+      "pallet",
+      0.98,
+      new Pose2(
+        pickPose.x + 0.5,
+        pickPose.y,
+        pickPose.yaw
+      ),
+      "odom",
+      liveSnapshot.sourceSequence,
+      liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId,
+      liveSnapshot.receivedClockId
+    );
     var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
     var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
-    var pick = new PickPallet(liveNavigator, observeLive, forks, pallet, payload,
-      pickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
+    var pick = new PickPallet(liveNavigator, observeLive, forks, pallet, payload, pickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
     pick.start();
-    var pickStatus = runLive(pick.status(),
-      function(snapshot) return pick.update(snapshot, 0.01), liveApproachReached);
+    var pickStatus = runLive(pick.status(), function(snapshot) return pick.update(snapshot, 0.01), liveApproachReached);
     var pickEnd = livePose();
-    check(pickStatus == SkillStatus.Running && forks.loadState.payload == payload &&
-      !forks.loadState.secured && distance(pickEnd, pickStart) > 0.2 &&
-      distance(pickEnd, pickPose) <= 0.06,
-      "PickPallet drives to its approach and then commands its simulated fork mechanism");
+    check(
+      pickStatus == SkillStatus.Running && forks.loadState.payload == payload && !forks.loadState.secured && distance(
+        pickEnd,
+        pickStart
+      ) > 0.2 && distance(
+        pickEnd,
+        pickPose
+      ) <= 0.06,
+      "PickPallet drives to its approach and then commands its simulated fork mechanism"
+    );
     simulationHarness.step(nextLiveTimestamp());
     var forkObservation = forks.state();
-    check(Math.abs(forkObservation.lift.position - 0.5) < 1e-9 &&
-      Math.abs(cast(forkObservation.tilt, robotkit.material.ForkAxisState).position - 0.1) < 1e-9,
-      "simulated runtime applies the fork position batch");
+    check(
+      Math.abs(forkObservation.lift.position - 0.5) < 1e-9 && Math.abs(cast(
+        forkObservation.tilt,
+        robotkit.material.ForkAxisState
+      ).position - 0.1) < 1e-9,
+      "simulated runtime applies the fork position batch"
+    );
     forks.setLoadState(LoadState.carried(payload));
     pickStatus = pick.update(simulatedRobot.snapshot(), 0.01);
-    check(switch pickStatus { case Succeeded: true; case _: false; } && pick.result() != null,
-      "PickPallet completes only after secured-load confirmation");
+    check(switch pickStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }
+    && pick.result() != null, "PickPallet completes only after secured-load confirmation");
 
     var travelStart = localization.state();
     var travelStartValue:robotkit.localization.LocalizationState = cast travelStart;
-    var travelPose = new Pose2(travelStartValue.pose.x + 0.12,
-      travelStartValue.pose.y, travelStartValue.pose.yaw);
+    var travelPose = new Pose2(travelStartValue.pose.x + 0.12, travelStartValue.pose.y, travelStartValue.pose.yaw);
     var travelPath = new Path([travelStartValue.pose, travelPose], "odom");
-    var travel = new FollowPath(navigation, travelPath,
-      new NavigationGoal(travelPose, "odom", 0.02, 0.1));
+    var travel = new FollowPath(navigation, travelPath, new NavigationGoal(travelPose, "odom", 0.02, 0.1));
     travel.start();
     var travelStatus = travel.status();
     var travelTicks = 0;
-    while (switch travelStatus { case Running: true; case _: false; } && travelTicks < 300) {
+    while (switch travelStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && travelTicks < 300) {
       var observation = simulatedRobot.snapshot();
       travelStatus = travel.update(observation, 0.01);
-      if (switch travelStatus { case Running: true; case _: false; })
-        simulationHarness.step(nextLiveTimestamp());
+      if (switch travelStatus {
+        case Running:
+          true;
+        case _:
+          false;
+      }
+      ) simulationHarness.step(nextLiveTimestamp());
       travelTicks++;
     }
-    check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
-      "FollowPath drives the loaded forklift to a second location");
+    check(switch travelStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }
+    && travelTicks < 300, "FollowPath drives the loaded forklift to a second location");
 
     var placeStart = livePose();
     var placePose = new Pose2(placeStart.x + 0.3, placeStart.y, placeStart.yaw);
-    var place = new PlacePallet(liveNavigator, observeLive, forks, payload,
-      placePose, 0.0, 0.0, 0.35);
+    var place = new PlacePallet(liveNavigator, observeLive, forks, payload, placePose, 0.0, 0.0, 0.35);
     place.start();
-    var placeStatus = runLive(place.status(),
-      function(snapshot) return place.update(snapshot, 0.01), liveApproachReached);
+    var placeStatus = runLive(
+      place.status(),
+      function(snapshot) return place.update(snapshot, 0.01),
+      liveApproachReached
+    );
     var placeEnd = livePose();
-    check(switch placeStatus { case Running: true; case _: false; } &&
-      forks.loadState.secured && forks.loadState.payload == payload &&
-      distance(placeEnd, placeStart) > 0.2 && distance(placeEnd, placePose) <= 0.09,
-      "PlacePallet drives to its drop pose, commands the forks, and waits for release");
+    check(switch placeStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && forks.loadState.secured && forks.loadState.payload == payload && distance(placeEnd,
+      placeStart) > 0.2 && distance(
+        placeEnd,
+        placePose
+      ) <= 0.09, "PlacePallet drives to its drop pose, commands the forks, and waits for release");
     simulationHarness.step(nextLiveTimestamp());
     forks.setLoadState(LoadState.empty());
     placeStatus = place.update(simulatedRobot.snapshot(), 0.01);
-    check(switch placeStatus { case Succeeded: true; case _: false; },
-      "PlacePallet completes only after empty-load confirmation");
+    check(switch placeStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }, "PlacePallet completes only after empty-load confirmation");
 
     var chargeStart = livePose();
     var chargePose = new Pose2(chargeStart.x + 0.3, chargeStart.y, chargeStart.yaw);
     liveSnapshot = simulatedRobot.snapshot();
-    var chargeDetection = new Detection("charger-1", "charger", 0.95, chargePose,
-      "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
-      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var chargeDetection = new Detection(
+      "charger-1",
+      "charger",
+      0.95,
+      chargePose,
+      "odom",
+      liveSnapshot.sourceSequence,
+      liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId,
+      liveSnapshot.receivedClockId
+    );
     var livePower = new FakePower();
-    livePower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
-      liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
-      liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
-    var charge = new Charge(liveNavigator,
-      new DockingTarget(chargeDetection, chargePose), livePower, 0.8, observeLive);
+    livePower.battery = new BatteryState(
+      "traction-pack",
+      0.6,
+      48.0,
+      -4.0,
+      25.0,
+      liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId,
+      liveSnapshot.receivedClockId
+    );
+    var charge = new Charge(liveNavigator, new DockingTarget(chargeDetection, chargePose), livePower, 0.8, observeLive);
     charge.start();
-    var chargeStatus = runLive(charge.status(),
-      function(snapshot) return charge.update(snapshot, 0.01), liveApproachReached);
+    var chargeStatus = runLive(
+      charge.status(),
+      function(snapshot) return charge.update(snapshot, 0.01),
+      liveApproachReached
+    );
     var chargeEnd = livePose();
-    check(chargeStatus == SkillStatus.Running &&
-      charge.dock.status() == SkillStatus.Succeeded &&
-      distance(chargeEnd, chargeStart) > 0.2 && distance(chargeEnd, chargePose) <= 0.06,
-      "Charge docks at the charger and then waits while the battery is below its target");
+    check(
+      chargeStatus == SkillStatus.Running && charge.dock.status() == SkillStatus.Succeeded && distance(
+        chargeEnd,
+        chargeStart
+      ) > 0.2 && distance(
+        chargeEnd,
+        chargePose
+      ) <= 0.06,
+      "Charge docks at the charger and then waits while the battery is below its target"
+    );
     liveSnapshot = simulatedRobot.snapshot();
-    livePower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
-      liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
-      liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
-    check(switch charge.update(liveSnapshot, 0.01) { case Succeeded: true; case _: false; },
-      "Charge completes when the battery reaches its target fraction");
+    livePower.battery = new BatteryState(
+      "traction-pack",
+      0.85,
+      48.0,
+      -4.0,
+      25.0,
+      liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId,
+      liveSnapshot.receivedClockId
+    );
+    check(switch charge.update(liveSnapshot, 0.01) {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }, "Charge completes when the battery reaches its target fraction");
 
-    check(simulatedRobot.recordingError == null,
-      "recording adapter preserves an error-free forklift run");
-    check(Int64.compare(writer.status().dropped, Int64.ofInt(0)) == 0,
-      "MCAP recording accepts the complete forklift run");
+    check(simulatedRobot.recordingError == null, "recording adapter preserves an error-free forklift run");
+    check(
+      Int64.compare(writer.status().dropped, Int64.ofInt(0)) == 0,
+      "MCAP recording accepts the complete forklift run"
+    );
     writer.close();
     var recording = McapRecordingReader.load(recordingPath);
-    check(recording.commands.length > 3 && recording.snapshots.length > 3,
-      "MCAP stores forklift target batches and the observation stream");
+    check(
+      recording.commands.length > 3 && recording.snapshots.length > 3,
+      "MCAP stores forklift target batches and the observation stream"
+    );
 
-    var replayDescription = new RobotDescription("forklift", "recorded forklift",
-      linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("forklift",
+    var replayDescription = new RobotDescription("forklift", "recorded forklift", linkNames, jointNames);
+    var replayCapabilities = new RobotCapabilities(
+      "forklift",
       5,
-      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      [
+        robotkit.core.JointTargetMode.Position,
+        robotkit.core.JointTargetMode.Velocity,
+        robotkit.core.JointTargetMode.Effort
+      ],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      new robotkit.core.TimingCapabilities(
+        false,
+        false,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      )
+    );
 
-    var goalReplay = new ReplayRobot("forklift", recording,
-      replayDescription, replayCapabilities);
+    var goalReplay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
     var goalReplayBase = MobileBase.fromBlueprint(goalReplay, blueprint);
     var goalReplayLocalization = new WheelOdometryLocalization(goalReplayBase);
-    var goalReplayNavigation = new Navigation(goalReplayBase,
-      goalReplayLocalization, 0.2, 0.2, 0.8);
-    var goalReplayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
-      100, 100, "odom", OccupancyCell.Free);
+    var goalReplayNavigation = new Navigation(goalReplayBase, goalReplayLocalization, 0.2, 0.2, 0.8);
+    var goalReplayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0), 100, 100, "odom", OccupancyCell.Free);
     var goalReplayCostmap = new Costmap2(goalReplayGrid, 0.25);
-    var goalReplayNavigator = new Navigator(goalReplayNavigation,
-      new AStarPlanner(goalReplayCostmap), goalReplayCostmap);
+    var goalReplayNavigator = new Navigator(
+      goalReplayNavigation,
+      new AStarPlanner(goalReplayCostmap),
+      goalReplayCostmap
+    );
     goalReplayLocalization.update(goalReplay.snapshot());
     var goalReplaySkill = new GoTo(goalReplayNavigator,
       new NavigationGoal(path.goal(), "odom", 0.02, 0.1), function(snapshot) {
-        goalReplayLocalization.update(snapshot);
-        return new PerceptionSnapshot();
-      });
+      goalReplayLocalization.update(snapshot);
+      return new PerceptionSnapshot();
+    }
+    );
     var goalReplayRunner = new SkillRunner();
     var goalReplayStatus = goalReplayRunner.start(goalReplaySkill);
-    while (goalReplayStatus == SkillStatus.Running && goalReplay.advance())
-      goalReplayStatus = goalReplayRunner.update(goalReplay.snapshot(), 0.01);
-    check(goalReplayStatus == SkillStatus.Succeeded && goalReplayRunner.result() != null,
-      "goal-level GoTo completes against recorded ReplayRobot observations");
+    while (goalReplayStatus == SkillStatus.Running && goalReplay.advance()) goalReplayStatus = goalReplayRunner.update(
+      goalReplay.snapshot(),
+      0.01
+    );
+    check(
+      goalReplayStatus == SkillStatus.Succeeded && goalReplayRunner.result() != null,
+      "goal-level GoTo completes against recorded ReplayRobot observations"
+    );
     goalReplay.close();
 
     var replay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
@@ -3952,34 +6594,39 @@ class RobotWorldTests {
     var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
     var replayFootprint = replayBase.footprint;
     if (replayFootprint == null) throw "Recorded forklift model did not provide a footprint";
-    var replayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
-      100, 100, "odom", OccupancyCell.Free);
+    var replayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0), 100, 100, "odom", OccupancyCell.Free);
     var replayCostmap = new Costmap2(replayGrid, replayFootprint.radius);
-    var replayNavigator = new Navigator(replayNavigation,
-      new AStarPlanner(replayCostmap), replayCostmap);
+    var replayNavigator = new Navigator(replayNavigation, new AStarPlanner(replayCostmap), replayCostmap);
     var observeReplay:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
       replayLocalization.update(snapshot);
       return new PerceptionSnapshot();
     };
-    var replayFollowPath = new FollowPath(replayNavigation, path,
-      new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
+    var replayFollowPath = new FollowPath(replayNavigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     var replaySkillRunner = new SkillRunner();
     var replayStatus = replaySkillRunner.start(replayFollowPath);
     replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
-    while (switch replayStatus { case Running: true; case _: false; } && replay.advance())
-      replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
-    check(switch replayStatus { case Succeeded: true; case _: false; } &&
-      replaySkillRunner.activeSkill() == null && replaySkillRunner.result() != null,
+    while (switch replayStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && replay.advance()) replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
+    check(switch replayStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }
+    && replaySkillRunner.activeSkill() == null && replaySkillRunner.result() != null,
       "SkillRunner completes FollowPath against the recorded ReplayRobot observations");
-    function replayApproachReached():Bool
-      return replayNavigator.status == NavigatorStatus.Succeeded;
+    function replayApproachReached():Bool return replayNavigator.status == NavigatorStatus.Succeeded;
     // Mirrors runLive: one update per distinct recorded observation.
-    function runReplay(initial:SkillStatus, update:RobotSnapshot -> SkillStatus,
-        until:Void -> Bool):SkillStatus {
+    function runReplay(initial:SkillStatus, update:RobotSnapshot -> SkillStatus, until:Void -> Bool):SkillStatus {
       var status = initial;
       if (status == SkillStatus.Running && !until()) status = update(replay.snapshot());
-      while (status == SkillStatus.Running && !until() && advanceReplaySample(replay))
-        status = update(replay.snapshot());
+      while (status == SkillStatus.Running
+        && !until() && advanceReplaySample(replay)) status = update(replay.snapshot());
       return status;
     }
     function replayPose():Pose2 {
@@ -3988,111 +6635,231 @@ class RobotWorldTests {
     }
     var replaySnapshot = replay.snapshot();
     var replayDockStart = replayPose();
-    var replayDockPose = new Pose2(replayDockStart.x + 0.3,
-      replayDockStart.y, replayDockStart.yaw);
-    var replayDockDetection = new Detection("charger-dock", "dock", 0.95, replayDockPose,
-      "odom", replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
-      replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
-    var replayDock = new Dock(replayNavigator,
-      new DockingTarget(replayDockDetection, replayDockPose), observeReplay);
-    var replayDockStatus = runReplay(replaySkillRunner.start(replayDock),
-      function(snapshot) return replaySkillRunner.update(snapshot, 0.01),
-      function() return false);
-    check(replayDockStatus == SkillStatus.Succeeded &&
-      replaySkillRunner.activeSkill() == null &&
-      distance(replayPose(), dockEnd) < 1e-9,
-      "SkillRunner reproduces the recorded Dock approach through ReplayRobot");
+    var replayDockPose = new Pose2(replayDockStart.x + 0.3, replayDockStart.y, replayDockStart.yaw);
+    var replayDockDetection = new Detection(
+      "charger-dock",
+      "dock",
+      0.95,
+      replayDockPose,
+      "odom",
+      replaySnapshot.sourceSequence,
+      replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId,
+      replaySnapshot.receivedClockId
+    );
+    var replayDock = new Dock(replayNavigator, new DockingTarget(replayDockDetection, replayDockPose), observeReplay);
+    var replayDockStatus = runReplay(
+      replaySkillRunner.start(replayDock),
+      function(snapshot) return replaySkillRunner.update(
+        snapshot,
+        0.01
+      ),
+      function() return false
+    );
+    check(
+      replayDockStatus == SkillStatus.Succeeded && replaySkillRunner.activeSkill() == null && distance(
+        replayPose(),
+        dockEnd
+      ) < 1e-9,
+      "SkillRunner reproduces the recorded Dock approach through ReplayRobot"
+    );
     var replayForks = Forks.fromBlueprint(replay, blueprint);
     var replayPickStart = replayPose();
-    var replayPickPose = new Pose2(replayPickStart.x + 0.3,
-      replayPickStart.y, replayPickStart.yaw);
+    var replayPickPose = new Pose2(replayPickStart.x + 0.3, replayPickStart.y, replayPickStart.yaw);
     replaySnapshot = replay.snapshot();
-    var replayPallet = new Pallet(new Detection("pallet-17", "pallet", 0.98,
-      new Pose2(replayPickPose.x + 0.5, replayPickPose.y, replayPickPose.yaw), "odom",
-      replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
-      replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId,
-      replaySnapshot.receivedClockId), 1.2, 0.8, 0.15);
-    var replayPick = new PickPallet(replayNavigator, observeReplay, replayForks,
-      replayPallet, payload, replayPickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
+    var replayPallet = new Pallet(
+      new Detection(
+        "pallet-17",
+        "pallet",
+        0.98,
+        new Pose2(
+          replayPickPose.x + 0.5,
+          replayPickPose.y,
+          replayPickPose.yaw
+        ),
+        "odom",
+        replaySnapshot.sourceSequence,
+        replaySnapshot.sourceTimestampNs,
+        replaySnapshot.receivedTimestampNs,
+        replaySnapshot.sourceClockId,
+        replaySnapshot.receivedClockId
+      ),
+      1.2,
+      0.8,
+      0.15
+    );
+    var replayPick = new PickPallet(
+      replayNavigator,
+      observeReplay,
+      replayForks,
+      replayPallet,
+      payload,
+      replayPickPose,
+      0.5,
+      0.1,
+      0.45,
+      0.05,
+      0.1
+    );
     replayPick.start();
-    var replayPickStatus = runReplay(replayPick.status(),
-      function(snapshot) return replayPick.update(snapshot, 0.01), replayApproachReached);
-    check(replayPickStatus == SkillStatus.Running &&
-      replayForks.loadState.payload == payload && distance(replayPose(), pickEnd) < 1e-9,
-      "PickPallet reproduces the recorded approach before commanding the forks");
-    check(advanceReplaySample(replay),
-      "replay consumes the recorded fork-actuation tick");
+    var replayPickStatus = runReplay(
+      replayPick.status(),
+      function(snapshot) return replayPick.update(snapshot, 0.01),
+      replayApproachReached
+    );
+    check(
+      replayPickStatus == SkillStatus.Running && replayForks.loadState.payload == payload && distance(
+        replayPose(),
+        pickEnd
+      ) < 1e-9,
+      "PickPallet reproduces the recorded approach before commanding the forks"
+    );
+    check(advanceReplaySample(replay), "replay consumes the recorded fork-actuation tick");
     replayForks.setLoadState(LoadState.carried(payload));
     check(switch replayPick.update(replay.snapshot(), 0.01) {
-      case Succeeded: true;
-      case _: false;
+      case Succeeded:
+        true;
+      case _:
+        false;
     }, "PickPallet confirms the same load during replay");
 
     var replayTravelStart = replayLocalization.state();
     var replayTravelStartValue:robotkit.localization.LocalizationState = cast replayTravelStart;
     var replayTravelPose = new Pose2(travelPose.x, travelPose.y, travelPose.yaw);
     var replayTravelPath = new Path([replayTravelStartValue.pose, replayTravelPose], "odom");
-    var replayTravel = new FollowPath(replayNavigation, replayTravelPath,
-      new NavigationGoal(replayTravelPose, "odom", 0.02, 0.1));
+    var replayTravel = new FollowPath(
+      replayNavigation,
+      replayTravelPath,
+      new NavigationGoal(
+        replayTravelPose,
+        "odom",
+        0.02,
+        0.1
+      )
+    );
     replayTravel.start();
     var replayTravelStatus = replayTravel.update(replay.snapshot(), 0.01);
     var replayTravelTicks = 0;
-    while (switch replayTravelStatus { case Running: true; case _: false; } && advanceReplaySample(replay) &&
-        replayTravelTicks < 300) {
+    while (switch replayTravelStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && advanceReplaySample(replay) && replayTravelTicks < 300) {
       replaySnapshot = replay.snapshot();
       replayTravelStatus = replayTravel.update(replaySnapshot, 0.01);
       replayTravelTicks++;
     }
-    check(switch replayTravelStatus { case Succeeded: true; case _: false; },
-      "FollowPath reaches the second recorded location through ReplayRobot");
+    check(switch replayTravelStatus {
+      case Succeeded:
+        true;
+      case _:
+        false;
+    }, "FollowPath reaches the second recorded location through ReplayRobot");
     var replayPlaceStart = replayPose();
-    var replayPlacePose = new Pose2(replayPlaceStart.x + 0.3,
-      replayPlaceStart.y, replayPlaceStart.yaw);
-    var replayPlace = new PlacePallet(replayNavigator, observeReplay, replayForks,
-      payload, replayPlacePose, 0.0, 0.0, 0.35);
+    var replayPlacePose = new Pose2(replayPlaceStart.x + 0.3, replayPlaceStart.y, replayPlaceStart.yaw);
+    var replayPlace = new PlacePallet(
+      replayNavigator,
+      observeReplay,
+      replayForks,
+      payload,
+      replayPlacePose,
+      0.0,
+      0.0,
+      0.35
+    );
     replayPlace.start();
-    var replayPlaceStatus = runReplay(replayPlace.status(),
-      function(snapshot) return replayPlace.update(snapshot, 0.01), replayApproachReached);
-    check(switch replayPlaceStatus { case Running: true; case _: false; } &&
-      replayForks.loadState.secured && distance(replayPose(), placeEnd) < 1e-9,
-      "PlacePallet replays the same approach and fork command and awaits release");
-    check(advanceReplaySample(replay),
-      "replay consumes the recorded fork-release tick");
+    var replayPlaceStatus = runReplay(
+      replayPlace.status(),
+      function(snapshot) return replayPlace.update(snapshot, 0.01),
+      replayApproachReached
+    );
+    check(switch replayPlaceStatus {
+      case Running:
+        true;
+      case _:
+        false;
+    }
+    && replayForks.loadState.secured && distance(replayPose(),
+      placeEnd) < 1e-9, "PlacePallet replays the same approach and fork command and awaits release");
+    check(advanceReplaySample(replay), "replay consumes the recorded fork-release tick");
     replayForks.setLoadState(LoadState.empty());
     check(switch replayPlace.update(replay.snapshot(), 0.01) {
-      case Succeeded: true;
-      case _: false;
+      case Succeeded:
+        true;
+      case _:
+        false;
     }, "PlacePallet confirms release during replay");
 
     var replayChargeStart = replayPose();
-    var replayChargePose = new Pose2(replayChargeStart.x + 0.3,
-      replayChargeStart.y, replayChargeStart.yaw);
+    var replayChargePose = new Pose2(replayChargeStart.x + 0.3, replayChargeStart.y, replayChargeStart.yaw);
     replaySnapshot = replay.snapshot();
-    var replayChargeDetection = new Detection("charger-1", "charger", 0.95,
-      replayChargePose, "odom", replaySnapshot.sourceSequence,
-      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
-      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    var replayChargeDetection = new Detection(
+      "charger-1",
+      "charger",
+      0.95,
+      replayChargePose,
+      "odom",
+      replaySnapshot.sourceSequence,
+      replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId,
+      replaySnapshot.receivedClockId
+    );
     var replayPower = new FakePower();
-    replayPower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
-      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
-      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
-    var replayCharge = new Charge(replayNavigator,
-      new DockingTarget(replayChargeDetection, replayChargePose), replayPower, 0.8,
-      observeReplay);
+    replayPower.battery = new BatteryState(
+      "traction-pack",
+      0.6,
+      48.0,
+      -4.0,
+      25.0,
+      replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId,
+      replaySnapshot.receivedClockId
+    );
+    var replayCharge = new Charge(
+      replayNavigator,
+      new DockingTarget(replayChargeDetection, replayChargePose),
+      replayPower,
+      0.8,
+      observeReplay
+    );
     replayCharge.start();
-    var replayChargeStatus = runReplay(replayCharge.status(),
-      function(snapshot) return replayCharge.update(snapshot, 0.01), replayApproachReached);
-    check(replayChargeStatus == SkillStatus.Running &&
-      replayCharge.dock.status() == SkillStatus.Succeeded &&
-      distance(replayPose(), chargeEnd) < 1e-9,
-      "Charge reproduces the recorded docking and waits for the battery target");
+    var replayChargeStatus = runReplay(
+      replayCharge.status(),
+      function(snapshot) return replayCharge.update(
+        snapshot,
+        0.01
+      ),
+      replayApproachReached
+    );
+    check(
+      replayChargeStatus == SkillStatus.Running && replayCharge.dock.status() == SkillStatus.Succeeded && distance(
+        replayPose(),
+        chargeEnd
+      ) < 1e-9,
+      "Charge reproduces the recorded docking and waits for the battery target"
+    );
     replaySnapshot = replay.snapshot();
-    replayPower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
-      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
-      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    replayPower.battery = new BatteryState(
+      "traction-pack",
+      0.85,
+      48.0,
+      -4.0,
+      25.0,
+      replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId,
+      replaySnapshot.receivedClockId
+    );
     check(switch replayCharge.update(replaySnapshot, 0.01) {
-      case Succeeded: true;
-      case _: false;
+      case Succeeded:
+        true;
+      case _:
+        false;
     }, "Charge completes deterministically against ReplayRobot");
     var generated = replay.generatedCommands.commands;
     var generatedForkBatches = 0;
@@ -4101,8 +6868,10 @@ class RobotWorldTests {
         if (targets.length == 3 && targets[0].joint == 2) generatedForkBatches++;
       case _:
     }
-    check(generated.length >= 3 && generatedForkBatches == 2,
-      "ReplayRobot captures pick and place fork commands without altering source history");
+    check(
+      generated.length >= 3 && generatedForkBatches == 2,
+      "ReplayRobot captures pick and place fork commands without altering source history"
+    );
     var forkliftCommandsMatch = generated.length == recording.commands.length;
     var firstMismatch = -1;
     for (commandIndex in 0...recording.commands.length) {
@@ -4114,13 +6883,11 @@ class RobotWorldTests {
               if (sourceTargets.length != replayTargets.length) {
                 forkliftCommandsMatch = false;
                 if (firstMismatch < 0) firstMismatch = commandIndex;
-              }
-              else for (targetIndex in 0...sourceTargets.length) {
+              } else for (targetIndex in 0...sourceTargets.length) {
                 var sourceTarget = sourceTargets[targetIndex];
                 var replayTarget = replayTargets[targetIndex];
-                if (sourceTarget.joint != replayTarget.joint ||
-                    Std.string(sourceTarget.mode) != Std.string(replayTarget.mode) ||
-                    Math.abs(sourceTarget.target - replayTarget.target) > 1e-9) {
+                if (sourceTarget.joint != replayTarget.joint || Std.string(sourceTarget.mode)
+                  != Std.string(replayTarget.mode) || Math.abs(sourceTarget.target - replayTarget.target) > 1e-9) {
                   forkliftCommandsMatch = false;
                   if (firstMismatch < 0) firstMismatch = commandIndex;
                 }
@@ -4134,29 +6901,27 @@ class RobotWorldTests {
           if (firstMismatch < 0) firstMismatch = commandIndex;
       }
     }
-    if (firstMismatch < 0 && generated.length != recording.commands.length)
-      firstMismatch = generated.length < recording.commands.length ? generated.length : recording.commands.length;
+    if (firstMismatch < 0 && generated.length != recording.commands.length) firstMismatch = generated.length
+      < recording.commands.length ? generated.length : recording.commands.length;
     if (!forkliftCommandsMatch) {
-      Sys.println('forklift command batches: live=${recording.commands.length}, replay=${generated.length}, first mismatch=$firstMismatch');
+      Sys
+        .println('forklift command batches: live=${recording.commands.length}, replay=${generated.length}, first mismatch=$firstMismatch');
       var start = firstMismatch > 2 ? firstMismatch - 2 : 0;
-      var end = Std.int(Math.min(firstMismatch + 3,
-        Math.max(recording.commands.length, generated.length)));
+      var end = Std.int(Math.min(firstMismatch + 3, Math.max(recording.commands.length, generated.length)));
       for (commandIndex in start...end) {
-        var liveCommand = commandIndex < recording.commands.length
-          ? commandSummary(recording.commands[commandIndex]) : "<missing>";
-        var replayCommand = commandIndex < generated.length
-          ? commandSummary(generated[commandIndex]) : "<missing>";
+        var liveCommand = commandIndex
+          < recording.commands.length ? commandSummary(recording.commands[commandIndex]) : "<missing>";
+        var replayCommand = commandIndex < generated.length ? commandSummary(generated[commandIndex]) : "<missing>";
         Sys.println('command $commandIndex live=[$liveCommand] replay=[$replayCommand]');
       }
     }
-    check(forkliftCommandsMatch,
-      "forklift MCAP replay reproduces every recorded joint target batch");
+    check(forkliftCommandsMatch, "forklift MCAP replay reproduces every recorded joint target batch");
     replay.close();
     simulatedRobot.close();
     simulationHarness.dispose();
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
-    if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
-      sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
+    if (sys.FileSystem.exists(recordingPath
+      + ".incomplete.status")) sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
   static function configuredForkliftModel():robotkit.model.RobotDefinition {
@@ -4168,31 +6933,44 @@ class RobotWorldTests {
     var mast = model.addLink(new Link("mast", "link/mast"));
     var carriage = model.addLink(new Link("fork carriage", "link/carriage"));
     var forks = model.addLink(new Link("forks", "link/forks"));
-    function addJoint(id:String, name:String, type:JointType, child:robotkit.model.Link,
-        lower:Float, upper:Float, velocity:Float):Void {
+    function addJoint(
+      id:String,
+      name:String,
+      type:JointType,
+      child:robotkit.model.Link,
+      lower:Float,
+      upper:Float,
+      velocity:Float
+    ):Void {
       var joint = new Joint(name, type, base, child, id);
       // Wheels turn about the base's lateral axis.
       if (type == JointType.Continuous) joint.axis = [0.0, 1.0, 0.0];
       joint.limits = new JointLimits(lower, upper, velocity, 1000.0);
       model.addJoint(joint);
     }
-    addJoint("joint/left-wheel", "left-wheel", JointType.Continuous,
-      leftWheel, -1000.0, 1000.0, 20.0);
-    addJoint("joint/right-wheel", "right-wheel", JointType.Continuous,
-      rightWheel, -1000.0, 1000.0, 20.0);
+    addJoint("joint/left-wheel", "left-wheel", JointType.Continuous, leftWheel, -1000.0, 1000.0, 20.0);
+    addJoint("joint/right-wheel", "right-wheel", JointType.Continuous, rightWheel, -1000.0, 1000.0, 20.0);
     addJoint("joint/lift", "lift", JointType.Prismatic, mast, 0.0, 1.5, 1000.0);
     addJoint("joint/tilt", "tilt", JointType.Revolute, carriage, -0.5, 0.5, 1000.0);
     addJoint("joint/spread", "spread", JointType.Prismatic, forks, 0.0, 0.8, 1000.0);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
-        0.1, 0.5), 0.5, 1.0, 2.0, 10.0, 2.0, 1.0);
-    profile.forkMechanism = new RobotForkConfiguration("joint/lift",
-      1000.0, 700.0, 1.5, "joint/tilt", "joint/spread");
-    var lidarFrame = model.addFrame(new Frame("front lidar mount", base,
-      "frame/front-lidar"));
+      RobotDriveConfiguration.Differential(
+        "joint/left-wheel",
+        "joint/right-wheel",
+        0.1,
+        0.5
+      ),
+      0.5,
+      1.0,
+      2.0,
+      10.0,
+      2.0,
+      1.0
+    );
+    profile.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0, 700.0, 1.5, "joint/tilt", "joint/spread");
+    var lidarFrame = model.addFrame(new Frame("front lidar mount", base, "frame/front-lidar"));
     lidarFrame.position = [0.35, 0.0, 0.3];
-    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 10.0,
-      "sensor/front-lidar"));
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 10.0, "sensor/front-lidar"));
     lidar.frame = lidarFrame;
     lidar.rayCount = 32;
     lidar.maxRange = 8.0;
@@ -4202,103 +6980,198 @@ class RobotWorldTests {
   static function testMcapRoundTrip():Void {
     var path = '/tmp/robotkit-${Sys.getPid()}-roundtrip.mcap';
     var writer = new McapRobotRecording(path, 1024 * 1024);
-    var sensor = new SensorFrame("lidar/front", "lidar", "frame/front",
-      Int64.parseString("9007199254740993"), Int64.parseString("9223372036854775000"),
-      [1.25, 2.5], Int64.parseString("9223372036854775001"), "link/base",
-      [0.1, 0.2, 0.3], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2", "host.monotonic");
+    var sensor = new SensorFrame(
+      "lidar/front",
+      "lidar",
+      "frame/front",
+      Int64.parseString("9007199254740993"),
+      Int64.parseString("9223372036854775000"),
+      [
+        1.25,
+        2.5
+      ],
+      Int64.parseString("9223372036854775001"),
+      "link/base",
+      [
+        0.1,
+        0.2,
+        0.3
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "robot-a.reset-2",
+      "host.monotonic"
+    );
     var cameraBytes = haxe.io.Bytes.alloc(6);
     for (index in 0...6) cameraBytes.set(index, index + 1);
-    var camera = new SensorFrame("camera/front", "camera", "frame/camera-front",
-      Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
-      [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
-      "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
+    var camera = new SensorFrame(
+      "camera/front",
+      "camera",
+      "frame/camera-front",
+      Int64.ofInt(9),
+      Int64.ofInt(150),
+      [],
+      Int64.ofInt(160),
+      "link/base",
+      [
+        0.2,
+        0.0,
+        0.8
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "robot-a.reset-2",
+      "host.monotonic",
+      new CameraImage(
+        2,
+        1,
+        "rgb8",
+        cameraBytes
+      )
+    );
     var corruptSensor = robotkit.recording.RobotRecordingCodec.sensor(camera, "robot-a");
     corruptSensor.mountPosition = [0.0, 0.0];
     var decodeError = "";
-    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
-    catch (error:Dynamic) decodeError = Std.string(error);
-    check(decodeError.indexOf("mount dimensions") >= 0,
-      "recorded sensor mount position requires three finite values");
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor) catch (error:Dynamic) decodeError =
+      Std.string(error);
+    check(decodeError.indexOf("mount dimensions") >= 0, "recorded sensor mount position requires three finite values");
     corruptSensor.mountPosition = [0.0, 0.0, 0.0];
     corruptSensor.mountRotation = [0.0, 0.0, 0.0, 2.0];
     decodeError = "";
-    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor)
-    catch (error:Dynamic) decodeError = Std.string(error);
-    check(decodeError.indexOf("unit quaternion") >= 0,
-      "recorded sensor mount rotation requires unit length");
-    var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
-      Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
-      Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
-      RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
+    try robotkit.recording.RobotRecordingCodec.readSensor(corruptSensor) catch (error:Dynamic) decodeError =
+      Std.string(error);
+    check(decodeError.indexOf("unit quaternion") >= 0, "recorded sensor mount rotation requires unit length");
+    var first = new RobotSnapshot(
+      "robot-a",
+      Int64.parseString("9007199254740995"),
+      Int64.parseString("9223372036854775000"),
+      [0.5],
+      [0.25],
+      [0.125],
+      1,
+      0,
+      Int64.parseString("9223372036854775002"),
+      [
+        sensor,
+        camera
+      ],
+      "robot-a.reset-2",
+      "host.monotonic",
+      RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP
+    );
     var corruptSnapshot = robotkit.recording.RobotRecordingCodec.snapshot(first);
     corruptSnapshot.positions = [Math.sqrt(-1.0)];
     decodeError = "";
-    try robotkit.recording.RobotRecordingCodec.readSnapshot(corruptSnapshot)
-    catch (error:Dynamic) decodeError = Std.string(error);
-    check(decodeError.indexOf("not finite") >= 0,
-      "recorded snapshot rejects non-finite joint values");
-    var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
-      [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
-    writer.recordCommand(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 0.75),
-      robotkit.core.JointTarget.velocity(1, -0.25),
-      robotkit.core.JointTarget.effort(2, 3.5)
-    ], Int64.parseString("9223372036854775003")), "robot-a");
+    try robotkit.recording.RobotRecordingCodec.readSnapshot(corruptSnapshot) catch (error:Dynamic) decodeError =
+      Std.string(error);
+    check(decodeError.indexOf("not finite") >= 0, "recorded snapshot rejects non-finite joint values");
+    var second = new RobotSnapshot(
+      "robot-b",
+      Int64.ofInt(3),
+      Int64.ofInt(10),
+      [0.75],
+      [],
+      [],
+      1,
+      0,
+      Int64.ofInt(20),
+      [],
+      "robot-b.boot-1",
+      "host.monotonic"
+    );
+    writer.recordCommand(
+      RobotCommand.JointTargets(
+        [
+          robotkit.core.JointTarget.position(0, 0.75),
+          robotkit.core.JointTarget.velocity(
+            1,
+            -0.25
+          ),
+          robotkit.core.JointTarget.effort(
+            2,
+            3.5
+          )
+        ],
+        Int64.parseString("9223372036854775003")
+      ),
+      "robot-a"
+    );
     writer.recordSnapshot(first);
     writer.recordSensor("robot-a", sensor);
     writer.recordSensor("robot-a", camera);
     writer.recordFault(new RobotFault("robot-b", 42, "recorded fault", false));
-    var robots = new Map<RobotId,RobotSnapshot>(); robots.set(first.id,first); robots.set(second.id,second);
-    writer.recordWorld(new robotkit.world.WorldSnapshot(7,2,Int64.ofInt(0),robots,Int64.ofInt(50)));
+    var robots = new Map<RobotId, RobotSnapshot>();
+    robots.set(first.id, first);
+    robots.set(second.id, second);
+    writer.recordWorld(new robotkit.world.WorldSnapshot(7, 2, Int64.ofInt(0), robots, Int64.ofInt(50)));
     writer.recordEvent(RobotWorldEvent.RobotChanged("robot-a"));
-    writer.recordProcessEvent("robot-a", new FiredProcessEvent(Int64.ofInt(91),
-      "sprayer.flow", ProcessEventValue.Analog(1.25), Int64.ofInt(300),
-      Int64.ofInt(310), RobotKitRuntimeConstants.RK_EVENT_SCHEDULED));
+    writer.recordProcessEvent(
+      "robot-a",
+      new FiredProcessEvent(
+        Int64.ofInt(91),
+        "sprayer.flow",
+        ProcessEventValue.Analog(1.25),
+        Int64.ofInt(300),
+        Int64.ofInt(310),
+        RobotKitRuntimeConstants.RK_EVENT_SCHEDULED
+      )
+    );
     writer.close();
 
     var loaded = McapRecordingReader.load(path);
     var v5Path = Sys.getCwd() + "/robotkit/tests/fixtures/recording-v5.mcap";
-    if (!sys.FileSystem.exists(v5Path))
-      v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
+    if (!sys.FileSystem.exists(v5Path)) v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
     var v5Error = "";
     try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
-    check(v5Error.indexOf("schema version is not 8") >= 0,
-      "Haxe reader rejects a pre-v7 MCAP file");
+    check(v5Error.indexOf("schema version is not 8") >= 0, "Haxe reader rejects a pre-v7 MCAP file");
     var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
     var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
     var mismatch = new McapRecordingReader(mismatchPath, null, true);
     var schemaError = "";
     try mismatch.next() catch (error:Dynamic) schemaError = Std.string(error);
     mismatch.close();
-    check(schemaError.indexOf("schema mismatch") >= 0,
-      "strict Haxe reader rejects an embedded schema mismatch");
+    check(schemaError.indexOf("schema mismatch") >= 0, "strict Haxe reader rejects an embedded schema mismatch");
     mismatch = new McapRecordingReader(mismatchPath);
-    check(mismatch.next() == null && mismatch.skippedUnknown == 1,
-      "non-strict Haxe reader counts an embedded schema mismatch");
+    check(
+      mismatch.next() == null && mismatch.skippedUnknown == 1,
+      "non-strict Haxe reader counts an embedded schema mismatch"
+    );
     mismatch.close();
     var foreignPath = fixtureRoot + "recording-foreign.mcap";
     var foreign = new McapRecordingReader(foreignPath);
-    check(foreign.next() == null && foreign.skippedUnknown == 1,
-      "file-level v7 metadata permits a foreign MCAP channel");
+    check(
+      foreign.next() == null && foreign.skippedUnknown == 1,
+      "file-level v7 metadata permits a foreign MCAP channel"
+    );
     foreign.close();
     equal(loaded.entries.length, 8, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
-    equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300),
-      "MCAP preserves scheduled trajectory time");
+    equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300), "MCAP preserves scheduled trajectory time");
     switch loaded.commands[0] {
       case JointTargets(targets, expiry):
         equal(targets.length, 3, "MCAP preserves batched target count");
-        equal(Std.string(targets[1].mode), Std.string(robotkit.core.JointTargetMode.Velocity),
-          "MCAP preserves velocity mode");
+        equal(
+          Std.string(targets[1].mode),
+          Std.string(robotkit.core.JointTargetMode.Velocity),
+          "MCAP preserves velocity mode"
+        );
         equal(targets[2].target, 3.5, "MCAP preserves effort target value");
-        equal(expiry, Int64.parseString("9223372036854775003"),
-          "MCAP preserves command deadline integer");
+        equal(expiry, Int64.parseString("9223372036854775003"), "MCAP preserves command deadline integer");
       case _:
         check(false, "MCAP preserves command batch variant");
     }
     var recordedFrames:Array<SensorFrame> = [];
     for (event in loaded.events) switch event {
-      case Sensor(_, frame): recordedFrames.push(frame);
+      case Sensor(_, frame):
+        recordedFrames.push(frame);
       case _:
     }
     equal(loaded.snapshots[0].sourceTimestampNs, first.sourceTimestampNs, "MCAP preserves exact 64-bit timestamps");
@@ -4308,12 +7181,17 @@ class RobotWorldTests {
     equal(recordedFrames[0].frameId, "frame/front", "MCAP preserves sensor frame identity");
     equal(recordedFrames[0].mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
     var recordedCamera:CameraImage = cast recordedFrames[1].image;
-    check(recordedCamera != null && recordedCamera.width == 2 &&
-      recordedCamera.encoding == "rgb8" && recordedCamera.bytes().get(0) == 1 &&
-      recordedCamera.bytes().get(5) == 6,
-      "MCAP preserves camera dimensions, encoding, and pixels");
+    check(
+      recordedCamera != null && recordedCamera.width == 2
+      && recordedCamera.encoding == "rgb8" && recordedCamera.bytes().get(0) == 1 && recordedCamera.bytes().get(5) == 6,
+      "MCAP preserves camera dimensions, encoding, and pixels"
+    );
     equal(loaded.worlds[0].robotIds().length, 2, "MCAP preserves multiple robots");
-    for (index in 0...loaded.entries.length) equal(loaded.entries[index].ordinal, Int64.ofInt(index), "MCAP uses arrival ordinals");
+    for (index in 0...loaded.entries.length) equal(
+      loaded.entries[index].ordinal,
+      Int64.ofInt(index),
+      "MCAP uses arrival ordinals"
+    );
     var replay = new ReplayRobot("robot-a", loaded);
     var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
     equal(behavior.update(replay), 1, "reloaded observations use unchanged behavior APIs");
@@ -4326,13 +7204,33 @@ class RobotWorldTests {
       channels.register(new TestRecordingChannel());
       var pixels = haxe.io.Bytes.alloc(512 * 1024 * 3);
       for (index in 0...pixels.length) pixels.set(index, index % 251);
-      var variant = new McapRobotRecording(variantPath, 2 * 1024 * 1024, false,
-        compression, channels);
-      variant.recordSensor("camera-robot", new SensorFrame("camera", "camera", "optical",
-        Int64.ofInt(1), Int64.ofInt(2), [], Int64.ofInt(3), "mount", null, null,
-        "clock", "host", new CameraImage(512, 1024, "rgb8", pixels)));
+      var variant = new McapRobotRecording(variantPath, 2 * 1024 * 1024, false, compression, channels);
+      variant.recordSensor(
+        "camera-robot",
+        new SensorFrame(
+          "camera",
+          "camera",
+          "optical",
+          Int64.ofInt(1),
+          Int64.ofInt(2),
+          [],
+          Int64.ofInt(3),
+          "mount",
+          null,
+          null,
+          "clock",
+          "host",
+          new CameraImage(
+            512,
+            1024,
+            "rgb8",
+            pixels
+          )
+        )
+      );
       var custom = new TestRecordingPayload();
-      custom.robotId = "camera-robot"; custom.value = 42;
+      custom.robotId = "camera-robot";
+      custom.value = 42;
       variant.recordChannel("camera-robot", "custom", custom);
       variant.close();
       var known = new McapRecordingReader(variantPath);
@@ -4342,9 +7240,12 @@ class RobotWorldTests {
       switch decoded.entries[0].event {
         case Sensor(_, frame):
           var image:CameraImage = cast frame.image;
-          check(image.bytes().length == pixels.length && image.bytes().get(1001) == pixels.get(1001),
-            "large raw camera image round-trips with " + compression);
-        case _: throw "Expected camera event";
+          check(
+            image.bytes().length == pixels.length && image.bytes().get(1001) == pixels.get(1001),
+            "large raw camera image round-trips with " + compression
+          );
+        case _:
+          throw "Expected camera event";
       }
       equal(known.next(), null, "unknown custom channel is skipped");
       equal(known.skippedUnknown, 1, "unknown custom channel is counted");
@@ -4360,9 +7261,12 @@ class RobotWorldTests {
       switch customEntry.event {
         case Channel(robotId, "custom", payload):
           var value:TestRecordingPayload = cast payload;
-          check(robotId == "camera-robot" && value.value == 42,
-            "custom channel payload round-trips with " + compression);
-        case _: throw "Expected custom channel event";
+          check(
+            robotId == "camera-robot" && value.value == 42,
+            "custom channel payload round-trips with " + compression
+          );
+        case _:
+          throw "Expected custom channel event";
       }
       customReader.close();
       sys.FileSystem.deleteFile(variantPath);
@@ -4382,12 +7286,20 @@ class RobotWorldTests {
     var gnss = model.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "sensor/gnss"));
     gnss.frame = antennaMount;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    equal(blueprint.externalSensorLayout().length, 2,
-      "model compilation keeps camera and GNSS sensors outside the native runtime");
-    equal(blueprint.nativeSensorLayout().length, 3,
-      "a robot with only external sensors keeps the native runtime's default slots");
-    check(blueprint.sensorById("sensor/gnss") != null && blueprint.sensorById("imu") != null,
-      "compiled identity resolves both default native and authored external sensors");
+    equal(
+      blueprint.externalSensorLayout().length,
+      2,
+      "model compilation keeps camera and GNSS sensors outside the native runtime"
+    );
+    equal(
+      blueprint.nativeSensorLayout().length,
+      3,
+      "a robot with only external sensors keeps the native runtime's default slots"
+    );
+    check(
+      blueprint.sensorById("sensor/gnss") != null && blueprint.sensorById("imu") != null,
+      "compiled identity resolves both default native and authored external sensors"
+    );
 
     var simulationHarness = new SimulationHarness();
 
@@ -4400,14 +7312,21 @@ class RobotWorldTests {
     var nativeCount = robot.streams().latestFrames().length;
     var pixels = haxe.io.Bytes.alloc(6);
     for (index in 0...pixels.length) pixels.set(index, index + 31);
-    runtime.publishCameraFrame("sensor/front-camera", new CameraImage(2, 1, "rgb8", pixels),
-      Int64.ofInt(1), Int64.ofInt(100), "camera.boot-3");
+    runtime.publishCameraFrame(
+      "sensor/front-camera",
+      new CameraImage(2, 1, "rgb8", pixels),
+      Int64.ofInt(1),
+      Int64.ofInt(100),
+      "camera.boot-3"
+    );
     pixels.set(0, 255);
-    runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5, 0.3], Int64.ofInt(1),
-      Int64.ofInt(100), "gnss.receiver");
+    runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5, 0.3], Int64.ofInt(1), Int64.ofInt(100), "gnss.receiver");
     var snapshot = robot.snapshot();
-    equal(robot.streams().latestFrames().length, nativeCount + 2,
-      "external frames merge with native sensors without a physics step");
+    equal(
+      robot.streams().latestFrames().length,
+      nativeCount + 2,
+      "external frames merge with native sensors without a physics step"
+    );
     var cameraFrame:Null<SensorFrame> = null;
     var gnssFrame:Null<SensorFrame> = null;
     for (sensor in robot.streams().latestFrames()) {
@@ -4417,35 +7336,83 @@ class RobotWorldTests {
     if (cameraFrame == null || gnssFrame == null) throw "external frames are missing";
     var cameraSample:SensorFrame = cast cameraFrame;
     var gnssSample:SensorFrame = cast gnssFrame;
-    check(cameraSample.frameId == "external/front-optical" &&
-      cameraSample.linkId == "external/base" && cameraSample.mountPosition.get(2) == 0.7 &&
-      cameraSample.sourceClockId == "camera.boot-3",
-      "the runtime stamps the authored camera mount and keeps the source clock");
+    check(
+      cameraSample.frameId == "external/front-optical" && cameraSample.linkId == "external/base"
+      && cameraSample.mountPosition.get(2) == 0.7 && cameraSample.sourceClockId == "camera.boot-3",
+      "the runtime stamps the authored camera mount and keeps the source clock"
+    );
     var image = cameraSample.image;
-    check(image != null && image.width == 2 && image.bytes().get(0) == 31,
-      "a published camera image is owned by the frame");
-    check(gnssSample.frameId == "external/antenna" && gnssSample.values.get(0) == 48.1 &&
-      gnssSample.image == null, "a GNSS fix carries its values at the authored antenna mount");
-    throws(function() runtime.publishCameraFrame("sensor/missing",
-      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")), Int64.ofInt(2),
-      Int64.ofInt(101)), "externally sourced");
-    throws(function() runtime.publishSensorFrame("imu", [0.0, 0.0, 0.0], Int64.ofInt(2),
-      Int64.ofInt(101), "imu"), "externally sourced");
-    throws(function() runtime.publishCameraFrame("sensor/front-camera",
-      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")), Int64.ofInt(1),
-      Int64.ofInt(101)), "stale sequence");
-    throws(function() runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5], Int64.ofInt(2),
-      Int64.ofInt(101), "gnss.receiver"), "latitude, longitude, and yaw");
-    throws(function() runtime.publishSensorFrame("sensor/front-camera", [], Int64.ofInt(2),
-      Int64.ofInt(101), "camera.boot-3"), "requires an image");
-    throws(function() new CameraImage(2, 2, "rgb8", haxe.io.Bytes.alloc(5)),
-      "does not match its dimensions");
-    runtime.publishCameraFrame("sensor/front-camera",
-      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("y")), Int64.ofInt(2),
-      Int64.ofInt(102), "camera.boot-3");
+    check(
+      image != null && image.width == 2 && image.bytes().get(0) == 31,
+      "a published camera image is owned by the frame"
+    );
+    check(
+      gnssSample.frameId == "external/antenna" && gnssSample.values.get(0) == 48.1 && gnssSample.image == null,
+      "a GNSS fix carries its values at the authored antenna mount"
+    );
+    throws(
+      function() runtime.publishCameraFrame(
+        "sensor/missing",
+        new CameraImage(
+          1,
+          1,
+          "jpeg",
+          haxe.io.Bytes.ofString("x")
+        ),
+        Int64.ofInt(2),
+        Int64.ofInt(101)
+      ),
+      "externally sourced"
+    );
+    throws(
+      function() runtime.publishSensorFrame("imu", [0.0, 0.0, 0.0], Int64.ofInt(2), Int64.ofInt(101), "imu"),
+      "externally sourced"
+    );
+    throws(
+      function() runtime.publishCameraFrame(
+        "sensor/front-camera",
+        new CameraImage(
+          1,
+          1,
+          "jpeg",
+          haxe.io.Bytes.ofString("x")
+        ),
+        Int64.ofInt(1),
+        Int64.ofInt(101)
+      ),
+      "stale sequence"
+    );
+    throws(
+      function() runtime.publishSensorFrame(
+        "sensor/gnss",
+        [48.1, 11.5],
+        Int64.ofInt(2),
+        Int64.ofInt(101),
+        "gnss.receiver"
+      ),
+      "latitude, longitude, and yaw"
+    );
+    throws(
+      function() runtime.publishSensorFrame(
+        "sensor/front-camera",
+        [],
+        Int64.ofInt(2),
+        Int64.ofInt(101),
+        "camera.boot-3"
+      ),
+      "requires an image"
+    );
+    throws(function() new CameraImage(2, 2, "rgb8", haxe.io.Bytes.alloc(5)), "does not match its dimensions");
+    runtime.publishCameraFrame(
+      "sensor/front-camera",
+      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("y")),
+      Int64.ofInt(2),
+      Int64.ofInt(102),
+      "camera.boot-3"
+    );
     var updated = 0;
-    for (sensor in robot.streams().latestFrames())
-      if (sensor.sensorId == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
+    for (sensor in robot.streams().latestFrames()) if (sensor.sensorId
+      == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
     equal(updated, 2, "the simulated robot observes an image update without a physics step");
     robot.close();
     simulationHarness.dispose();
@@ -4454,13 +7421,14 @@ class RobotWorldTests {
   static function testToolFeedbackSensorRuntime():Void {
     var model = new RobotModel("tool feedback robot");
     var base = model.addLink(new Link("base", "tool-feedback/base"));
-    var contact = model.addSensor(new Sensor("cup contact", "tool_contact", 0.0,
-      "tool-feedback/contact"));
-    var pressure = model.addSensor(new Sensor("cup pressure", "tool_vacuum_kpa", 0.0,
-      "tool-feedback/pressure"));
+    var contact = model.addSensor(new Sensor("cup contact", "tool_contact", 0.0, "tool-feedback/contact"));
+    var pressure = model.addSensor(new Sensor("cup pressure", "tool_vacuum_kpa", 0.0, "tool-feedback/pressure"));
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    equal(blueprint.externalSensorLayout().length, 2,
-      "tool contact and vacuum pressure compile as external sensor inputs");
+    equal(
+      blueprint.externalSensorLayout().length,
+      2,
+      "tool contact and vacuum pressure compile as external sensor inputs"
+    );
     var simulationHarness = new SimulationHarness();
 
     var simulation = simulationHarness.simulation;
@@ -4468,9 +7436,15 @@ class RobotWorldTests {
     var robot = new SimulatedRobot("tool-feedback", runtime, model.name, [base.name], []);
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
-    var tool = new robotkit.tool.ToolRuntime(new robotkit.tool.Tool("cup", "cup",
-      robotkit.spatial.Transform3.identity()), new robotkit.tool.SimulatedGripper(),
-      new robotkit.tool.SimulatedVacuum());
+    var tool = new robotkit.tool.ToolRuntime(
+      new robotkit.tool.Tool(
+        "cup",
+        "cup",
+        robotkit.spatial.Transform3.identity()
+      ),
+      new robotkit.tool.SimulatedGripper(),
+      new robotkit.tool.SimulatedVacuum()
+    );
     tool.bindGripper("cup.close");
     tool.bindVacuum("cup.vacuum");
     var selection = new robotkit.tool.ToolRuntimeSelection();
@@ -4478,35 +7452,60 @@ class RobotWorldTests {
     adapter.bindGripperContact(tool, contact.id);
     adapter.bindVacuumPressure(tool, pressure.id);
     selection.select(tool, Int64.ofInt(3));
-    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.close",
-      ProcessEventValue.Digital(true), Int64.ofInt(3), Int64.ofInt(3), 1));
-    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.vacuum",
-      ProcessEventValue.Digital(true), Int64.ofInt(3), Int64.ofInt(3), 1));
-    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(1), Int64.ofInt(4),
-      "robotkit.monotonic");
-    runtime.publishSensorFrame(pressure.id, [45.0], Int64.ofInt(1), Int64.ofInt(4),
-      "robotkit.monotonic");
-    equal(adapter.applySnapshot(robot.snapshot()), 2,
-      "published tool sensor frames reach the selected tool through the robot snapshot");
-    check(tool.gripper.isGrasped() && tool.vacuum.isHolding(),
-      "published contact and vacuum pressure confirm the pickup");
-    runtime.publishSensorFrame(contact.id, [0.0], Int64.ofInt(2), Int64.ofInt(5),
-      "robotkit.monotonic");
-    runtime.publishSensorFrame(pressure.id, [10.0], Int64.ofInt(2), Int64.ofInt(5),
-      "robotkit.monotonic");
-    equal(adapter.applySnapshot(robot.snapshot()), 2,
-      "later tool sensor frames update the selected tool");
-    check(!tool.gripper.isGrasped() && !tool.vacuum.isHolding(),
-      "lost contact and vacuum pressure clear the pickup");
-    throws(function() runtime.publishSensorFrame(contact.id, [0.5], Int64.ofInt(3),
-      Int64.ofInt(6), "robotkit.monotonic"), "one digital value");
-    throws(function() runtime.publishSensorFrame(pressure.id, [-1.0], Int64.ofInt(3),
-      Int64.ofInt(6), "robotkit.monotonic"), "non-negative kPa");
+    selection.apply(new FiredProcessEvent(
+      Int64.ofInt(1),
+      "cup.close",
+      ProcessEventValue.Digital(true),
+      Int64.ofInt(3),
+      Int64.ofInt(3),
+      1
+    ));
+    selection.apply(new FiredProcessEvent(
+      Int64.ofInt(1),
+      "cup.vacuum",
+      ProcessEventValue.Digital(true),
+      Int64.ofInt(3),
+      Int64.ofInt(3),
+      1
+    ));
+    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(1), Int64.ofInt(4), "robotkit.monotonic");
+    runtime.publishSensorFrame(pressure.id, [45.0], Int64.ofInt(1), Int64.ofInt(4), "robotkit.monotonic");
+    equal(
+      adapter.applySnapshot(robot.snapshot()),
+      2,
+      "published tool sensor frames reach the selected tool through the robot snapshot"
+    );
+    check(
+      tool.gripper.isGrasped() && tool.vacuum.isHolding(),
+      "published contact and vacuum pressure confirm the pickup"
+    );
+    runtime.publishSensorFrame(contact.id, [0.0], Int64.ofInt(2), Int64.ofInt(5), "robotkit.monotonic");
+    runtime.publishSensorFrame(pressure.id, [10.0], Int64.ofInt(2), Int64.ofInt(5), "robotkit.monotonic");
+    equal(adapter.applySnapshot(robot.snapshot()), 2, "later tool sensor frames update the selected tool");
+    check(!tool.gripper.isGrasped() && !tool.vacuum.isHolding(), "lost contact and vacuum pressure clear the pickup");
+    throws(
+      function() runtime.publishSensorFrame(
+        contact.id,
+        [0.5],
+        Int64.ofInt(3),
+        Int64.ofInt(6),
+        "robotkit.monotonic"
+      ),
+      "one digital value"
+    );
+    throws(
+      function() runtime.publishSensorFrame(
+        pressure.id,
+        [-1.0],
+        Int64.ofInt(3),
+        Int64.ofInt(6),
+        "robotkit.monotonic"
+      ),
+      "non-negative kPa"
+    );
     selection.select(null, Int64.ofInt(6));
-    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(3), Int64.ofInt(7),
-      "robotkit.monotonic");
-    equal(adapter.applySnapshot(robot.snapshot()), 0,
-      "tool sensor frames do not update a detached tool");
+    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(3), Int64.ofInt(7), "robotkit.monotonic");
+    equal(adapter.applySnapshot(robot.snapshot()), 0, "tool sensor frames do not update a detached tool");
     robot.close();
     simulationHarness.dispose();
   }
@@ -4514,16 +7513,36 @@ class RobotWorldTests {
   static function testCameraFrameProtocol():Void {
     var pixels = haxe.io.Bytes.alloc(12);
     for (index in 0...pixels.length) pixels.set(index, index + 1);
-    var metadata = new CameraFrame(Int64.ofInt(42), "camera/front", "camera",
-      "robot/base/camera", Int64.ofInt(8), Int64.ofInt(100), Int64.ofInt(105),
-      2, 2, PixelFormat.RGB8, null, "base", [0.2, 0.0, 0.8],
-      [0.0, 0.0, 0.0, 1.0], "robot.boot-1", "sensor.monotonic");
-    var outgoing = RobotProtocol.cameraFrame(metadata, pixels, Int64.ofInt(7),
-      Int64.ofInt(8), Int64.ofInt(110));
-    equal(outgoing.attachments.length, 1,
-      "camera frame stores pixels in a separate RobotFrame attachment");
-    equal(metadata.pixels.length, 0,
-      "camera frame encoding does not mutate caller-owned metadata");
+    var metadata = new CameraFrame(
+      Int64.ofInt(42),
+      "camera/front",
+      "camera",
+      "robot/base/camera",
+      Int64.ofInt(8),
+      Int64.ofInt(100),
+      Int64.ofInt(105),
+      2,
+      2,
+      PixelFormat.RGB8,
+      null,
+      "base",
+      [
+        0.2,
+        0.0,
+        0.8
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "robot.boot-1",
+      "sensor.monotonic"
+    );
+    var outgoing = RobotProtocol.cameraFrame(metadata, pixels, Int64.ofInt(7), Int64.ofInt(8), Int64.ofInt(110));
+    equal(outgoing.attachments.length, 1, "camera frame stores pixels in a separate RobotFrame attachment");
+    equal(metadata.pixels.length, 0, "camera frame encoding does not mutate caller-owned metadata");
     var decoded = RobotProtocol.decodeCameraFrame(RobotFrame.decode(outgoing.encode()));
     equal(decoded.frame.robotId, Int64.ofInt(42), "camera protocol preserves robot identity");
     equal(decoded.frame.sensorId, "camera/front", "camera protocol preserves sensor identity");
@@ -4534,11 +7553,13 @@ class RobotWorldTests {
     equal(decoded.frame.mountPosition[0], 0.2, "camera protocol preserves sensor mount");
     var received = decoded.pixels();
     equal(received.length, pixels.length, "camera protocol resolves the complete attachment");
-    for (index in 0...pixels.length)
-      equal(received.get(index), index + 1, "camera protocol preserves pixel byte $index");
+    for (index in 0...pixels.length) equal(
+      received.get(index),
+      index + 1,
+      "camera protocol preserves pixel byte $index"
+    );
     outgoing.attachments[0].set(0, 255);
-    equal(decoded.pixels().get(0), 1,
-      "decoded camera pixels own a copy independent of the frame attachment");
+    equal(decoded.pixels().get(0), 1, "decoded camera pixels own a copy independent of the frame attachment");
     var remote = new RemoteRobot("camera-remote");
     remote.onCamera(decoded);
     var remoteSensors = remote.streams().latestFrames();
@@ -4551,44 +7572,136 @@ class RobotWorldTests {
       equal(remoteImage.width, 2, "remote camera retains image dimensions");
       equal(remoteImage.bytes().get(5), 6, "remote camera retains image bytes");
     }
-    equal(remoteSensors[0].sourceClockId, "robot.boot-1",
-      "remote camera retains the source clock");
-    equal(remoteSensors[0].receivedClockId, "robotkit.monotonic",
-      "remote camera stamps receipt time with the local monotonic clock");
+    equal(remoteSensors[0].sourceClockId, "robot.boot-1", "remote camera retains the source clock");
+    equal(
+      remoteSensors[0].receivedClockId,
+      "robotkit.monotonic",
+      "remote camera stamps receipt time with the local monotonic clock"
+    );
 
     var padded = haxe.io.Bytes.alloc(16);
     for (index in 0...12) padded.set(index + 2, index + 21);
-    var offsetMetadata = new CameraFrame(Int64.ofInt(42), "camera/offset", "camera",
-      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
-      PixelFormat.RGB8, new BufferRef(0, 2, 12), "base");
-    var offsetFrame = new RobotFrame(RobotMessageType.CameraFrame,
-      MessagePack.encode(offsetMetadata), 0, [padded]);
-    equal(RobotProtocol.decodeCameraFrame(offsetFrame).pixels().get(0), 21,
-      "camera protocol resolves a valid byte range inside an attachment");
+    var offsetMetadata = new CameraFrame(
+      Int64.ofInt(42),
+      "camera/offset",
+      "camera",
+      "camera-frame",
+      Int64.ofInt(1),
+      Int64.ofInt(2),
+      Int64.ofInt(3),
+      2,
+      2,
+      PixelFormat.RGB8,
+      new BufferRef(
+        0,
+        2,
+        12
+      ),
+      "base"
+    );
+    var offsetFrame = new RobotFrame(RobotMessageType.CameraFrame, MessagePack.encode(offsetMetadata), 0, [padded]);
+    equal(
+      RobotProtocol.decodeCameraFrame(offsetFrame).pixels().get(0),
+      21,
+      "camera protocol resolves a valid byte range inside an attachment"
+    );
 
-    throws(function() RobotProtocol.cameraFrame(new CameraFrame(Int64.ofInt(42),
-      "camera/bad", "camera", "camera-frame", Int64.ofInt(1), Int64.ofInt(2),
-      Int64.ofInt(3), 2, 2, PixelFormat.RGB8), haxe.io.Bytes.alloc(11)),
-      "camera protocol rejects pixel lengths inconsistent with dimensions");
-    var outside = new CameraFrame(Int64.ofInt(42), "camera/outside", "camera",
-      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
-      PixelFormat.RGB8, new BufferRef(0, 8, 12));
-    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
-      RobotMessageType.CameraFrame, MessagePack.encode(outside), 0, [haxe.io.Bytes.alloc(16)])),
-      "camera protocol rejects buffer ranges outside their attachments");
-    var missing = new CameraFrame(Int64.ofInt(42), "camera/missing", "camera",
-      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
-      PixelFormat.RGB8, new BufferRef(1, 0, 12));
-    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
-      RobotMessageType.CameraFrame, MessagePack.encode(missing), 0, [haxe.io.Bytes.alloc(12)])),
-      "camera protocol rejects references to missing attachments");
-    var wrongLength = new CameraFrame(Int64.ofInt(42), "camera/wrong-size", "camera",
-      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
-      PixelFormat.RGB8, new BufferRef(0, 0, 11));
-    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
-      RobotMessageType.CameraFrame, MessagePack.encode(wrongLength), 0,
-      [haxe.io.Bytes.alloc(11)])),
-      "camera protocol rejects malformed raw image dimensions on receipt");
+    throws(
+      function() RobotProtocol.cameraFrame(
+        new CameraFrame(
+          Int64.ofInt(42),
+          "camera/bad",
+          "camera",
+          "camera-frame",
+          Int64.ofInt(1),
+          Int64.ofInt(2),
+          Int64.ofInt(3),
+          2,
+          2,
+          PixelFormat.RGB8
+        ),
+        haxe.io.Bytes.alloc(11)
+      ),
+      "camera protocol rejects pixel lengths inconsistent with dimensions"
+    );
+    var outside = new CameraFrame(
+      Int64.ofInt(42),
+      "camera/outside",
+      "camera",
+      "camera-frame",
+      Int64.ofInt(1),
+      Int64.ofInt(2),
+      Int64.ofInt(3),
+      2,
+      2,
+      PixelFormat.RGB8,
+      new BufferRef(
+        0,
+        8,
+        12
+      )
+    );
+    throws(
+      function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+        RobotMessageType.CameraFrame,
+        MessagePack.encode(outside),
+        0,
+        [haxe.io.Bytes.alloc(16)]
+      )),
+      "camera protocol rejects buffer ranges outside their attachments"
+    );
+    var missing = new CameraFrame(
+      Int64.ofInt(42),
+      "camera/missing",
+      "camera",
+      "camera-frame",
+      Int64.ofInt(1),
+      Int64.ofInt(2),
+      Int64.ofInt(3),
+      2,
+      2,
+      PixelFormat.RGB8,
+      new BufferRef(
+        1,
+        0,
+        12
+      )
+    );
+    throws(
+      function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+        RobotMessageType.CameraFrame,
+        MessagePack.encode(missing),
+        0,
+        [haxe.io.Bytes.alloc(12)]
+      )),
+      "camera protocol rejects references to missing attachments"
+    );
+    var wrongLength = new CameraFrame(
+      Int64.ofInt(42),
+      "camera/wrong-size",
+      "camera",
+      "camera-frame",
+      Int64.ofInt(1),
+      Int64.ofInt(2),
+      Int64.ofInt(3),
+      2,
+      2,
+      PixelFormat.RGB8,
+      new BufferRef(
+        0,
+        0,
+        11
+      )
+    );
+    throws(
+      function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+        RobotMessageType.CameraFrame,
+        MessagePack.encode(wrongLength),
+        0,
+        [haxe.io.Bytes.alloc(11)]
+      )),
+      "camera protocol rejects malformed raw image dimensions on receipt"
+    );
   }
 
   /**
@@ -4634,12 +7747,20 @@ class RobotWorldTests {
       if (ranges.values.get(ray) < 6.0) hits++;
       if (Math.abs(ranges.values.get(ray) - ranges.values.get((360 - ray) % 360)) > 1e-6) symmetric = false;
     }
-    check(hits >= 10 && hits <= 25 && symmetric && ranges.values.get(180) == 6.0 && ranges.values.get(359) < 6.0,
-      "the rays on either side of the box read it, and the rest read their full range");
-    check(Math.abs(cast(motion, SensorFrame).values.get(5) - 9.81) < 1e-6, "the IMU's values are its own, not the scan's");
+    check(
+      hits >= 10 && hits <= 25 && symmetric && ranges.values.get(180) == 6.0 && ranges.values.get(359) < 6.0,
+      "the rays on either side of the box read it, and the rest read their full range"
+    );
+    check(
+      Math.abs(cast(motion, SensorFrame).values.get(5) - 9.81) < 1e-6,
+      "the IMU's values are its own, not the scan's"
+    );
     // Values live in a shared pool, not at every sensor's worst case: the snapshot is no larger than
     // it was when eight sensors could report 64 values each (21008 bytes).
-    check(rk_robot_snapshot.size() <= 21008, "a robot snapshot is no larger than before sensors could report 360 values");
+    check(
+      rk_robot_snapshot.size() <= 21008,
+      "a robot snapshot is no larger than before sensors could report 360 values"
+    );
     robot.close();
     simulationHarness.dispose();
   }
@@ -4655,8 +7776,11 @@ class RobotWorldTests {
     scan.rayCount = 16;
     scan.maxRange = 3.0;
     var noisy = model.addSensor(new robotkit.model.Sensor("noisy", "lidar", 10, "sensor/noisy"));
-    noisy.frame = mount; noisy.rayCount = 16; noisy.maxRange = 3.0;
-    noisy.noiseStddev = 0.01; noisy.noiseSeed = 42;
+    noisy.frame = mount;
+    noisy.rayCount = 16;
+    noisy.maxRange = 3.0;
+    noisy.noiseStddev = 0.01;
+    noisy.noiseSeed = 42;
     var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
     imu.frame = mount;
     var partial = model.addSensor(new robotkit.model.Sensor("partial", "lidar", 0, "sensor/partial"));
@@ -4692,39 +7816,73 @@ class RobotWorldTests {
     var partialScan = streamFrame(firstFrames, "sensor/partial");
     equal(partialScan.values.length, 3, "partial field of view keeps configured ray count");
     equal(partialScan.values.get(0), 3.0, "partial scan starts at configured bearing");
-    check(Math.abs(partialScan.values.get(1) - 1.75) < 0.000001,
-      "partial scan distributes rays across configured angular coverage");
+    check(
+      Math.abs(partialScan.values.get(1) - 1.75) < 0.000001,
+      "partial scan distributes rays across configured angular coverage"
+    );
     equal(partialScan.values.get(2), 3.0, "partial scan includes its final bearing");
-    var perception = LidarObstaclePerception.fromBlueprint(blueprint,
-      "sensor/partial", 0.1);
-    throws(function() LidarObstaclePerception.fromBlueprint(blueprint,
-      "sensor/missing", 0.1),
-      "LiDAR perception rejects unknown authored sensor IDs");
+    var perception = LidarObstaclePerception.fromBlueprint(blueprint, "sensor/partial", 0.1);
+    throws(
+      function() LidarObstaclePerception.fromBlueprint(blueprint, "sensor/missing", 0.1),
+      "LiDAR perception rejects unknown authored sensor IDs"
+    );
     var observations = perception.observe([partialScan]);
     equal(observations.obstacles().length, 1, "compiled LiDAR settings construct matching perception");
-    check(Math.abs(observations.obstacles()[0].detection.pose.x - 1.75) < 0.000001,
-      "perception ray angles match simulated scan angles");
+    check(
+      Math.abs(observations.obstacles()[0].detection.pose.x - 1.75) < 0.000001,
+      "perception ray angles match simulated scan angles"
+    );
     var noisyValue = streamFrame(firstFrames, "sensor/noisy").values.get(0);
     check(noisyValue != firstScan.values.get(0), "configured noise changes measurement");
     simulationHarness.step(Int64.ofInt(2));
     var second = robot.snapshot();
     var secondFrames = robot.streams().latestFrames();
-    equal(streamFrame(secondFrames, "sensor/scan").sequence, firstScan.sequence, "slow sensor sequence held between acquisitions");
-    equal(streamFrame(secondFrames, "sensor/scan").receivedTimestampNs, firstScan.receivedTimestampNs, "cached sensor receipt does not become fresh");
-    equal(streamFrame(secondFrames, "sensor/scan").sourceTimestampNs, firstScan.sourceTimestampNs, "cached sensor source time preserved");
+    equal(
+      streamFrame(secondFrames, "sensor/scan").sequence,
+      firstScan.sequence,
+      "slow sensor sequence held between acquisitions"
+    );
+    equal(
+      streamFrame(secondFrames, "sensor/scan").receivedTimestampNs,
+      firstScan.receivedTimestampNs,
+      "cached sensor receipt does not become fresh"
+    );
+    equal(
+      streamFrame(secondFrames, "sensor/scan").sourceTimestampNs,
+      firstScan.sourceTimestampNs,
+      "cached sensor source time preserved"
+    );
     equal(streamFrame(secondFrames, "sensor/imu").values.get(5), 9.81, "configured mounted IMU is measured");
     for (_ in 0...8) simulationHarness.step(Int64.ofInt(3));
-    equal(streamFrame(robot.streams().latestFrames(), "sensor/scan").sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
+    equal(
+      streamFrame(robot.streams().latestFrames(), "sensor/scan").sequence,
+      Int64.ofInt(2),
+      "10 Hz scan updates on source-clock schedule"
+    );
     var recording = new RobotRecording();
     recording.recordSnapshot(second);
     for (frame in secondFrames) recording.recordSensor("configured", frame);
     var replay = new ReplayRobot("configured", recording);
-    equal(streamFrame(replay.streams().latestFrames(), "sensor/scan").frameId, "frame/stable", "recording retains frame identity");
-    equal(streamFrame(replay.streams().latestFrames(), "sensor/scan").mountPosition.get(0), 0.5, "recording retains mount metadata");
+    equal(
+      streamFrame(replay.streams().latestFrames(), "sensor/scan").frameId,
+      "frame/stable",
+      "recording retains frame identity"
+    );
+    equal(
+      streamFrame(replay.streams().latestFrames(), "sensor/scan").mountPosition.get(0),
+      0.5,
+      "recording retains mount metadata"
+    );
     simulationHarness.reset();
     simulationHarness.step(Int64.ofInt(1));
-    equal(streamFrame(robot.streams().latestFrames(), "sensor/noisy").values.get(0), noisyValue, "reset repeats seeded noise deterministically");
-    robot.close(); simulationHarness.dispose(); replay.close();
+    equal(
+      streamFrame(robot.streams().latestFrames(), "sensor/noisy").values.get(0),
+      noisyValue,
+      "reset repeats seeded noise deterministically"
+    );
+    robot.close();
+    simulationHarness.dispose();
+    replay.close();
     scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
@@ -4732,8 +7890,10 @@ class RobotWorldTests {
     check(hasDiagnostic(diagnostics, "RK_SENSOR_SCAN"), "oversized scans rejected before native lowering");
     scan.rayCount = 16;
     partial.fieldOfViewRadians = Math.PI * 2.1;
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(model, new robotkit.profile.RobotProfile()), "RK_SENSOR_SCAN"),
-      "LiDAR angular coverage beyond one revolution is rejected");
+    check(
+      hasDiagnostic(RobotRuntimeCompiler.validate(model, new robotkit.profile.RobotProfile()), "RK_SENSOR_SCAN"),
+      "LiDAR angular coverage beyond one revolution is rejected"
+    );
     partial.fieldOfViewRadians = Math.PI;
     check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
     check(hasDiagnostic(diagnostics, "RK_SENSOR_RATE"), "negative sample rates rejected");
@@ -4741,8 +7901,7 @@ class RobotWorldTests {
 
   static function testSerialDeploymentVersions():Void {
     var fixture = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/";
-    if (!sys.FileSystem.exists(fixture + "deployment.json"))
-      fixture = Sys.getCwd() + "/fixtures/device-deployment/";
+    if (!sys.FileSystem.exists(fixture + "deployment.json")) fixture = Sys.getCwd() + "/fixtures/device-deployment/";
     var current = new SerialDeployment(fixture + "deployment.json");
     equal(current.protocol, "rkd6", "v5 deployment implies RKD6");
     equal(current.stepTickHz, 40000, "v5 step tick rate");
@@ -4750,11 +7909,15 @@ class RobotWorldTests {
     equal(current.controller, "0123456789abcdef0123456789abcdef", "v5 names the board it is for");
     equal(current.binding.channels.length, 3, "the layout wires three channels");
     // 200 full steps at 16 microsteps a turn; the lift's 8 mm lead gives its ratio. The binding holds it as the wire carries it (f32).
-    check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 3200.0 / (2.0 * Math.PI) * 6e-8,
-      "steps per radian come from the model and the wiring");
+    check(
+      Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 3200.0 / (2.0 * Math.PI) * 6e-8,
+      "steps per radian come from the model and the wiring"
+    );
     equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
-    check(current.binding.model.actuators[2].requireRate() > 0.0,
-      "the binding's model carries the step tick's rate ceiling");
+    check(
+      current.binding.model.actuators[2].requireRate() > 0.0,
+      "the binding's model carries the step tick's rate ceiling"
+    );
     // Deployments that named a compiled fingerprint say what to change.
     var legacy = sys.io.File.getContent(fixture + "deployment-v3.json");
     var legacyPath = fixture + "legacy-${Sys.getPid()}.json";
@@ -4766,11 +7929,17 @@ class RobotWorldTests {
       return message;
     }
     var v3 = loads(legacy);
-    check(v3.indexOf("Unsupported robot deployment schema version") >= 0, "old deployments have one schema rejection: " + v3);
+    check(
+      v3.indexOf("Unsupported robot deployment schema version") >= 0,
+      "old deployments have one schema rejection: " + v3
+    );
     var v4 = loads(StringTools.replace(legacy, "\"schemaVersion\": 3", "\"schemaVersion\": 4"));
     check(v4.indexOf("Unsupported robot deployment schema version") >= 0, "v4 uses the same schema rejection");
-    var withFingerprint = loads(StringTools.replace(sys.io.File.getContent(fixture + "deployment.json"),
-      "\"controller\"", "\"fingerprint\""));
+    var withFingerprint = loads(StringTools.replace(
+      sys.io.File.getContent(fixture + "deployment.json"),
+      "\"controller\"",
+      "\"fingerprint\""
+    ));
     check(withFingerprint.indexOf("fingerprint is gone") >= 0, "a v5 file with a fingerprint is rejected");
     var unwired = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment.json"));
     var unwiredLayout = haxe.Json.parse(sys.io.File.getContent(fixture + "layout.json"));
@@ -4782,8 +7951,7 @@ class RobotWorldTests {
     sys.FileSystem.deleteFile(fixture + "layout-unwired-${Sys.getPid()}.json");
     check(unwiredMessage.indexOf("has no channel") >= 0, "a stepper without a channel fails loudly: " + unwiredMessage);
     var bench = Sys.getCwd() + "/robotkit/deployment/bench-nucleo-g474re/deployment.json";
-    if (!sys.FileSystem.exists(bench))
-      bench = Sys.getCwd() + "/../deployment/bench-nucleo-g474re/deployment.json";
+    if (!sys.FileSystem.exists(bench)) bench = Sys.getCwd() + "/../deployment/bench-nucleo-g474re/deployment.json";
     var benchDeployment = new SerialDeployment(bench);
     equal(benchDeployment.protocol, "rkd6", "bench deployment selects RKD6");
     equal(benchDeployment.stepTickHz, 40000, "bench minimal step tick");
@@ -4805,23 +7973,41 @@ class RobotWorldTests {
     var layout = new DeviceLayout([new DeviceChannel(0, motor.id)]);
     var robot:Null<SerialRobot> = null;
     var failed = false;
-    try robot = new SerialRobot("serial-probe", model, new robotkit.profile.RobotProfile(),
+    try robot = new SerialRobot(
+      "serial-probe",
+      model,
+      new robotkit.profile.RobotProfile(),
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", layout, 1e-6) catch (_:Dynamic) failed = true;
+      "000102030405060708090a0b0c0d0e0f",
+      layout,
+      1e-6
+    ) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
     var timingMessage = "";
-    try new SerialRobot("under-period", model, new robotkit.profile.RobotProfile(),
+    try new SerialRobot(
+      "under-period",
+      model,
+      new robotkit.profile.RobotProfile(),
       '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", layout, 1e-6, 115200,
-      Int64.ofInt(1000000), Int64.ofInt(2000000))
-    catch (error:Dynamic) timingMessage = Std.string(error);
-    check(timingMessage.indexOf("serialEndpoint.create") >= 0,
-      "serial construction reports an unavailable device");
+      "000102030405060708090a0b0c0d0e0f",
+      layout,
+      1e-6,
+      115200,
+      Int64.ofInt(1000000),
+      Int64.ofInt(2000000)
+    ) catch (error:Dynamic) timingMessage = Std.string(error);
+    check(timingMessage.indexOf("serialEndpoint.create") >= 0, "serial construction reports an unavailable device");
     var unwiredMessage = "";
-    try new SerialRobot("unwired", model, new robotkit.profile.RobotProfile(), '/dev/robotkit-missing-${Sys.getPid()}',
-      "000102030405060708090a0b0c0d0e0f", new DeviceLayout([]), 1e-6)
-    catch (error:Dynamic) unwiredMessage = Std.string(error);
+    try new SerialRobot(
+      "unwired",
+      model,
+      new robotkit.profile.RobotProfile(),
+      '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f",
+      new DeviceLayout([]),
+      1e-6
+    ) catch (error:Dynamic) unwiredMessage = Std.string(error);
     check(unwiredMessage.indexOf("from 1 to 64") >= 0, "a serial robot needs a wired layout, not a default one");
   }
 
@@ -4837,11 +8023,14 @@ class RobotWorldTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("process-channel", runtime, "process-channel",
+    var robot = new SimulatedRobot(
+      "process-channel",
+      runtime,
+      "process-channel",
       [for (link in deployment.robot.links) link.id],
-      [for (joint in deployment.robot.joints) joint.id]);
-    equal(robot.description().channels.length, 1,
-      "simulation description exposes its declared process channels");
+      [for (joint in deployment.robot.joints) joint.id]
+    );
+    equal(robot.description().channels.length, 1, "simulation description exposes its declared process channels");
     simulationHarness.dispose();
   }
 
@@ -4853,28 +8042,52 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    blueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow",
-      ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow", ProcessEventValue.Digital(false)));
     var simulationHarness = new SimulationHarness();
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000),
-      [[0.0, 0.0]]);
-    var plan = new ExecutionPlanSubmission(Int64.ofInt(700),
-      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000), [[0.0, 0.0]]);
+    var plan = new ExecutionPlanSubmission(
+      Int64.ofInt(700),
+      Int64.ofInt(blueprint.revision),
+      Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0], [segment], null, null, null, null, null, true,
-      [new ProcessTimedEvent(Int64.ofInt(100000000), "sprayer.flow",
-        ProcessEventValue.Digital(true), ProcessHoldPolicy.RestoreOnResume),
-       new ProcessTimedEvent(Int64.ofInt(300000000), "sprayer.flow",
-        ProcessEventValue.Digital(false))]);
+      [0.0],
+      [0.0],
+      [0.0],
+      [segment],
+      null,
+      null,
+      null,
+      null,
+      null,
+      true,
+      [
+        new ProcessTimedEvent(
+          Int64.ofInt(100000000),
+          "sprayer.flow",
+          ProcessEventValue.Digital(true),
+          ProcessHoldPolicy.RestoreOnResume
+        ),
+        new ProcessTimedEvent(
+          Int64.ofInt(300000000),
+          "sprayer.flow",
+          ProcessEventValue.Digital(false)
+        )
+      ]
+    );
     runtime.submitPlan(plan, 1);
     var sprayer = new SimulatedSprayer();
     var adapter = new ChannelToolAdapter();
     adapter.bindSprayerFlow("sprayer.flow", sprayer, 1.5);
     var recorded = new RobotRecording();
-    function flowing():Bool return switch runtime.channelValue("sprayer.flow") { case Digital(on): on; case _: false; };
+    function flowing():Bool return switch runtime.channelValue("sprayer.flow") {
+      case Digital(on):
+        on;
+      case _:
+        false;
+    };
     check(!flowing(), "a channel reads its safe value before any event fires");
     var seen = new Map<Int, Bool>();
     for (tick in 1...36) {
@@ -4888,13 +8101,17 @@ class RobotWorldTests {
       }
     }
     equal(sprayer.history.length, 2, "runtime fires each process event once");
-    equal(sprayer.history[0].timestampNs, Int64.ofInt(100000000),
-      "sprayer receives the scheduled trajectory time");
-    equal(sprayer.history[1].timestampNs, Int64.ofInt(300000000),
-      "sprayer receives the later scheduled trajectory time");
+    equal(sprayer.history[0].timestampNs, Int64.ofInt(100000000), "sprayer receives the scheduled trajectory time");
+    equal(
+      sprayer.history[1].timestampNs,
+      Int64.ofInt(300000000),
+      "sprayer receives the later scheduled trajectory time"
+    );
     equal(recorded.processEvents.length, 2, "recording captures fired runtime events");
-    check(seen.get(5) == false && seen.get(20) == true && seen.get(35) == false,
-      "a channel's value follows the events fired on it, without draining them");
+    check(
+      seen.get(5) == false && seen.get(20) == true && seen.get(35) == false,
+      "a channel's value follows the events fired on it, without draining them"
+    );
     simulationHarness.dispose();
     // A commanded stop takes an ordinary channel to its safe value but leaves one that keeps on stop,
     // such as a vacuum holding a part; that one still goes safe on an emergency stop.
@@ -4903,13 +8120,44 @@ class RobotWorldTests {
     holdBlueprint.channels.push(new ProcessChannelDeclaration("tool.vacuum", ProcessEventValue.Digital(false), true));
     simulationHarness = new SimulationHarness();
     var holdRuntime = simulationHarness.simulation.addRobot(holdBlueprint);
-    function on(channel:String):Bool return switch holdRuntime.channelValue(channel) { case Digital(value): value; case _: false; };
+    function on(channel:String):Bool return switch holdRuntime.channelValue(channel) {
+      case Digital(value):
+        value;
+      case _:
+        false;
+    };
     var holdSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000), [[0.0, 0.0]]);
-    holdRuntime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(701), Int64.ofInt(holdBlueprint.revision),
-      Int64.ofInt(holdBlueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0], [holdSegment], null, null, null, null, null, true,
-      [new ProcessTimedEvent(Int64.ofInt(50000000), "sprayer.flow", ProcessEventValue.Digital(true)),
-       new ProcessTimedEvent(Int64.ofInt(50000000), "tool.vacuum", ProcessEventValue.Digital(true))]), 1);
+    holdRuntime.submitPlan(
+      new ExecutionPlanSubmission(
+        Int64.ofInt(701),
+        Int64.ofInt(holdBlueprint.revision),
+        Int64.ofInt(holdBlueprint.calibrationRevision),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+        [0.0],
+        [0.0],
+        [0.0],
+        [holdSegment],
+        null,
+        null,
+        null,
+        null,
+        null,
+        true,
+        [
+          new ProcessTimedEvent(
+            Int64.ofInt(50000000),
+            "sprayer.flow",
+            ProcessEventValue.Digital(true)
+          ),
+          new ProcessTimedEvent(
+            Int64.ofInt(50000000),
+            "tool.vacuum",
+            ProcessEventValue.Digital(true)
+          )
+        ]
+      ),
+      1
+    );
     for (tick in 1...11) simulationHarness.step(Int64.ofInt(tick * 10000000));
     check(on("sprayer.flow") && on("tool.vacuum"), "both channels turn on with the plan");
     holdRuntime.submitStop(2, false);
@@ -4928,27 +8176,32 @@ class RobotWorldTests {
     var tool = model.addLink(new Link("tool"));
     model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    blueprint.channels.push(new ProcessChannelDeclaration("controller.ready",
-      ProcessEventValue.Digital(false)));
-    blueprint.channels.push(new ProcessChannelDeclaration("controller.alarm_code",
-      ProcessEventValue.Analog(0.0)));
+    blueprint.channels.push(new ProcessChannelDeclaration("controller.ready", ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new ProcessChannelDeclaration("controller.alarm_code", ProcessEventValue.Analog(0.0)));
     var harness = new SimulationHarness();
     var runtime = harness.simulation.addRobot(blueprint);
     runtime.writeDigitalOutput("controller.ready", true);
     runtime.writeOutput("controller.alarm_code", ProcessEventValue.Analog(7.0));
-    check(runtime.channelValue("controller.ready") == ProcessEventValue.Digital(true),
-      "controller logic writes a declared digital output while idle");
-    check(runtime.channelValue("controller.alarm_code") == ProcessEventValue.Analog(7.0),
-      "controller logic writes a declared analog output while idle");
-    check(runtime.pollEvents().events.length == 2,
-      "controller output writes enter the process event stream");
+    check(
+      runtime.channelValue("controller.ready") == ProcessEventValue.Digital(true),
+      "controller logic writes a declared digital output while idle"
+    );
+    check(
+      runtime.channelValue("controller.alarm_code") == ProcessEventValue.Analog(7.0),
+      "controller logic writes a declared analog output while idle"
+    );
+    check(runtime.pollEvents().events.length == 2, "controller output writes enter the process event stream");
     runtime.submitStop(1, true);
     harness.step(Int64.ofInt(10000000));
-    throws(() -> runtime.writeDigitalOutput("controller.ready", true),
-      "an emergency-stopped runtime rejects an energized controller output");
+    throws(
+      () -> runtime.writeDigitalOutput("controller.ready", true),
+      "an emergency-stopped runtime rejects an energized controller output"
+    );
     runtime.writeDigitalOutput("controller.ready", false);
-    check(runtime.channelValue("controller.ready") == ProcessEventValue.Digital(false),
-      "a stopped runtime still accepts a safe digital output");
+    check(
+      runtime.channelValue("controller.ready") == ProcessEventValue.Digital(false),
+      "a stopped runtime still accepts a safe digital output"
+    );
     harness.dispose();
   }
 
@@ -4958,68 +8211,199 @@ class RobotWorldTests {
     var carriage = model.addLink(new Link("carriage"));
     var viseCarriage = model.addLink(new Link("vise-carriage"));
     var joint = model.addJoint(new Joint("door", JointType.Prismatic, base, carriage));
-    joint.limits.lower = 0.0; joint.limits.upper = 0.46; joint.axis = [0.0, 1.0, 0.0];
+    joint.limits.lower = 0.0;
+    joint.limits.upper = 0.46;
+    joint.axis = [0.0, 1.0, 0.0];
     var viseJoint = model.addJoint(new Joint("vise", JointType.Prismatic, base, viseCarriage));
-    viseJoint.limits.lower = 0.0; viseJoint.limits.upper = 0.006; viseJoint.axis = [1.0, 0.0, 0.0];
-    var drive = new PneumaticDrive(0.025, 0.010, 0.460, 0.300, 600000.0,
-      "door-valve/coilA", "door-valve/coilB", false, 1.0);
-    var actuator = new Actuator("door-cylinder", drive.extensionForce(), drive.ratedSpeed,
-      Transmission.SimpleTransmission(joint.id, 1.0, 0.0));
+    viseJoint.limits.lower = 0.0;
+    viseJoint.limits.upper = 0.006;
+    viseJoint.axis = [1.0, 0.0, 0.0];
+    var drive = new PneumaticDrive(
+      0.025,
+      0.010,
+      0.460,
+      0.300,
+      600000.0,
+      "door-valve/coilA",
+      "door-valve/coilB",
+      false,
+      1.0
+    );
+    var actuator = new Actuator(
+      "door-cylinder",
+      drive.extensionForce(),
+      drive.ratedSpeed,
+      Transmission.SimpleTransmission(
+        joint.id,
+        1.0,
+        0.0
+      )
+    );
     actuator.drive = drive;
     model.addActuator(actuator);
-    var viseDrive = new PneumaticDrive(0.032, 0.012, 0.006, 0.030, 600000.0,
-      "vise-valve/coilA", "vise-valve/coilB", false, 1.0);
-    var viseActuator = new Actuator("vise-cylinder", viseDrive.extensionForce(), viseDrive.ratedSpeed,
-      Transmission.SimpleTransmission(viseJoint.id, 1.0, 0.0));
+    var viseDrive = new PneumaticDrive(
+      0.032,
+      0.012,
+      0.006,
+      0.030,
+      600000.0,
+      "vise-valve/coilA",
+      "vise-valve/coilB",
+      false,
+      1.0
+    );
+    var viseActuator = new Actuator(
+      "vise-cylinder",
+      viseDrive.extensionForce(),
+      viseDrive.ratedSpeed,
+      Transmission.SimpleTransmission(
+        viseJoint.id,
+        1.0,
+        0.0
+      )
+    );
     viseActuator.drive = viseDrive;
     model.addActuator(viseActuator);
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    check(blueprint.cylinderDrives.length == 2 && blueprint.channels.length == 4,
-      "cylinder compilation binds process joints and declares digital valve coils");
-    check(Math.abs(blueprint.cylinderDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9 &&
-      Math.abs(blueprint.cylinderDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
-      "cylinder rated speed remains simulation metadata for flow damping");
-    check(model.actuators[0].planningEffort() == null && model.actuators[0].planningRate() == null,
-      "process-driven pneumatic axes are excluded from trajectory planning limits");
+    check(
+      blueprint.cylinderDrives.length == 2 && blueprint.channels.length == 4,
+      "cylinder compilation binds process joints and declares digital valve coils"
+    );
+    check(
+      Math.abs(blueprint.cylinderDrives[0].ratedSpeed - drive.ratedSpeed) < 1e-9
+      && Math.abs(blueprint.cylinderDrives[1].ratedSpeed - viseDrive.ratedSpeed) < 1e-9,
+      "cylinder rated speed remains simulation metadata for flow damping"
+    );
+    check(
+      model.actuators[0].planningEffort() == null && model.actuators[0].planningRate() == null,
+      "process-driven pneumatic axes are excluded from trajectory planning limits"
+    );
     var encoded = RobotModelCodec.encode(model);
-    check(RobotModelCodec.decode(encoded).actuators[0].drive.kind() == "pneumatic",
-      "Current RobotModel preserves pneumatic process drives");
+    check(
+      RobotModelCodec.decode(encoded).actuators[0].drive.kind() == "pneumatic",
+      "Current RobotModel preserves pneumatic process drives"
+    );
 
     var simulationHarness = new SimulationHarness();
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     function pressureForce(index:Int):Float return runtime.snapshot().effort.get(index);
-    check(Math.abs(pressureForce(0)) < 1e-9 && Math.abs(pressureForce(1)) < 1e-9,
-      "cylinders start with no reported force before first tick");
+    check(
+      Math.abs(pressureForce(0)) < 1e-9 && Math.abs(pressureForce(1)) < 1e-9,
+      "cylinders start with no reported force before first tick"
+    );
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0]]);
-    runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1200), Int64.ofInt(blueprint.revision),
-      Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
-      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [segment], null, null,
-      null, null, null, true, [new ProcessTimedEvent(Int64.ofInt(20000000), "door-valve/coilA",
-        ProcessEventValue.Digital(true)), new ProcessTimedEvent(Int64.ofInt(20000000), "vise-valve/coilA",
-        ProcessEventValue.Digital(true))]), 1);
+    runtime.submitPlan(
+      new ExecutionPlanSubmission(
+        Int64.ofInt(1200),
+        Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
+      | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [segment],
+      null,
+      null,
+      null,
+      null,
+      null,
+      true,
+      [
+        new ProcessTimedEvent(
+          Int64.ofInt(20000000),
+          "door-valve/coilA",
+          ProcessEventValue.Digital(true)
+        ),
+        new ProcessTimedEvent(
+          Int64.ofInt(20000000),
+          "vise-valve/coilA",
+          ProcessEventValue.Digital(true)
+        )
+      ]
+    ),
+      1
+    );
     for (tick in 1...5) simulationHarness.step(Int64.ofInt(tick * 10000000));
-    check(Math.abs(pressureForce(0) - drive.extensionForce()) < 1e-6 &&
-      Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
-      "door and vise coils select their pressure forces");
+    check(
+      Math.abs(pressureForce(0) - drive.extensionForce()) < 1e-6
+      && Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
+      "door and vise coils select their pressure forces"
+    );
     runtime.submitStop(2, true);
     simulationHarness.step(Int64.ofInt(50000000));
-    var doorSafe = switch runtime.channelValue("door-valve/coilA") {case Digital(value): !value; case _: false;};
-    var doorCoilBSafe = switch runtime.channelValue("door-valve/coilB") {case Digital(value): !value; case _: false;};
-    var viseSafe = switch runtime.channelValue("vise-valve/coilA") {case Digital(value): !value; case _: false;};
-    var viseCoilBSafe = switch runtime.channelValue("vise-valve/coilB") {case Digital(value): !value; case _: false;};
-    check(doorSafe && doorCoilBSafe && viseSafe && viseCoilBSafe &&
-      Math.abs(pressureForce(0) - drive.extensionForce()) < 1e-6 &&
-      Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
-      "emergency stop drops door and vise coils while latched valves retain supply force");
+    var doorSafe = switch runtime.channelValue("door-valve/coilA") {
+      case Digital(value):
+        !value;
+      case _:
+        false;
+    };
+    var doorCoilBSafe = switch runtime.channelValue("door-valve/coilB") {
+      case Digital(value):
+        !value;
+      case _:
+        false;
+    };
+    var viseSafe = switch runtime.channelValue("vise-valve/coilA") {
+      case Digital(value):
+        !value;
+      case _:
+        false;
+    };
+    var viseCoilBSafe = switch runtime.channelValue("vise-valve/coilB") {
+      case Digital(value):
+        !value;
+      case _:
+        false;
+    };
+    check(
+      doorSafe && doorCoilBSafe && viseSafe && viseCoilBSafe && Math.abs(pressureForce(0) - drive.extensionForce())
+      < 1e-6 && Math.abs(pressureForce(1) - viseDrive.extensionForce()) < 1e-6,
+      "emergency stop drops door and vise coils while latched valves retain supply force"
+    );
     var rejected = false;
     try runtime.submitPosition(0, 0.1, 2) catch (_:Dynamic) rejected = true;
     check(rejected, "host position commands cannot take ownership of a process-driven joint");
     rejected = false;
     try {
       var moving = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000), [[0.0, 1.0], [0.0, 0.0]]);
-      runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1201), Int64.ofInt(blueprint.revision),
-        Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-        [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [moving], null, null, null, null, null, true), 3);
+      runtime.submitPlan(
+        new ExecutionPlanSubmission(
+          Int64.ofInt(1201),
+          Int64.ofInt(blueprint.revision),
+          Int64.ofInt(blueprint.calibrationRevision),
+          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [moving],
+          null,
+          null,
+          null,
+          null,
+          null,
+          true
+        ),
+        3
+      );
     } catch (_:Dynamic) rejected = true;
     check(rejected, "trajectory validation rejects a moving process-driven joint");
     simulationHarness.dispose();
@@ -5034,44 +8418,49 @@ class RobotWorldTests {
     rotor.inertiaTensor = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
     var joint = model.addJoint(new Joint("shaft", JointType.Continuous, root, rotor, "shaft"));
     joint.limits = new robotkit.model.JointLimits(-100, 100, 20, 5);
-    var motor = model.addActuator(new Actuator("motor", 5, 20,
-      Transmission.SimpleTransmission(joint.id, 1, 0)));
+    var motor = model.addActuator(new Actuator("motor", 5, 20, Transmission.SimpleTransmission(joint.id, 1, 0)));
     motor.drive = new ServoDrive(2, 5, 10, 20, 0.001, 1000);
     motor.servoStiffness = 1000;
     motor.servoDamping = 10;
     motor.positionLoopRate = 2000;
     var contact = model.addSensor(new robotkit.model.Sensor("released", "brake_released", 0, "released"));
     contact.joint = joint.id;
-    model.brakes.push(new robotkit.model.Brake("brake", joint.id, "brake.release", contact.id,
-      4, 0.05, 0.03, 250, 30));
+    model.brakes.push(new robotkit.model.Brake("brake", joint.id, "brake.release", contact.id, 4, 0.05, 0.03, 250, 30));
     var profile = new robotkit.profile.RobotProfile();
     var blueprint = RobotRuntimeCompiler.compile(model, profile);
-    check(blueprint.brakes.length == 1 && blueprint.brakePhysics.length == 1 &&
-      blueprint.brakes[0].joint == 0 && blueprint.brakePhysics[0].holdingEffort == 4 &&
-      blueprint.channels.length == 1 && blueprint.channels[0].keepOnStop,
-      "authored brake compiles to separate controller policy and physical device settings");
+    check(
+      blueprint.brakes.length == 1 && blueprint.brakePhysics.length == 1
+      && blueprint.brakes[0].joint == 0 && blueprint.brakePhysics[0].holdingEffort == 4
+      && blueprint.channels.length == 1 && blueprint.channels[0].keepOnStop,
+      "authored brake compiles to separate controller policy and physical device settings"
+    );
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded);
-    check(restored.brakes.length == 1 && restored.brakes[0].applicationDelay == 0.03 &&
-      restored.brakes[0].releaseTimeoutMs == 250 &&
-      RobotModelCodec.encode(restored).toString() == encoded.toString(),
-      "current robot model preserves the complete brake binding canonically");
+    check(
+      restored.brakes.length == 1 && restored.brakes[0].applicationDelay == 0.03 && restored.brakes[0].releaseTimeoutMs
+      == 250 && RobotModelCodec.encode(restored).toString() == encoded.toString(),
+      "current robot model preserves the complete brake binding canonically"
+    );
     var old:Dynamic = haxe.Json.parse(encoded.toString());
     Reflect.setField(old, "schemaVersion", 11);
-    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
-      "previous robot model schema is rejected rather than losing brake data");
+    throws(
+      function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
+      "previous robot model schema is rejected rather than losing brake data"
+    );
     contact.joint = "absent";
-    check(RobotRuntimeCompiler.validate(model, profile).length > 0,
-      "a contact on another joint cannot admit the braked servo");
-    throws(function() RobotModelCodec.encode(model),
-      "saved brake data rejects a contact on another joint");
+    check(
+      RobotRuntimeCompiler.validate(model, profile).length > 0,
+      "a contact on another joint cannot admit the braked servo"
+    );
+    throws(function() RobotModelCodec.encode(model), "saved brake data rejects a contact on another joint");
     contact.joint = joint.id;
-    model.brakes.push(new robotkit.model.Brake("second", joint.id, "second.release", contact.id,
-      4, 0.05, 0.03, 250, 30));
-    check(RobotRuntimeCompiler.validate(model, profile).length > 0,
-      "duplicate physical joint and contact ownership are rejected");
-    throws(function() RobotModelCodec.encode(model),
-      "saved brake data rejects duplicate mechanical ownership");
+    model.brakes.push(new robotkit.model.Brake("second",
+      joint.id, "second.release", contact.id, 4, 0.05, 0.03, 250, 30));
+    check(
+      RobotRuntimeCompiler.validate(model, profile).length > 0,
+      "duplicate physical joint and contact ownership are rejected"
+    );
+    throws(function() RobotModelCodec.encode(model), "saved brake data rejects duplicate mechanical ownership");
   }
 
   static function testDiscreteNativeSensors():Void {
@@ -5087,59 +8476,92 @@ class RobotWorldTests {
     spindleJoint.axis = [0.0, 0.0, 1.0];
     spindleJoint.limits = new robotkit.model.JointLimits(-100.0, 100.0, 10.0, 1000.0);
     model.addJoint(spindleJoint);
-    var spindleActuator = new Actuator("spindle-drive", 5.0, 20.0,
-      Transmission.SimpleTransmission(spindleJoint.id, 1.0, 0.0));
+    var spindleActuator = new Actuator(
+      "spindle-drive",
+      5.0,
+      20.0,
+      Transmission.SimpleTransmission(
+        spindleJoint.id,
+        1.0,
+        0.0
+      )
+    );
     spindleActuator.drive = new ServoDrive(2.0, 5.0, 10.0, 20.0, 0.001, 1000.0);
     spindleActuator.processVelocity = new ProcessVelocityDrive("spindle.speed", "spindle.direction", 1.0);
     model.addActuator(spindleActuator);
 
-    var closed = model.addSensor(new robotkit.model.Sensor("door-closed", "joint_switch", 0,
-      "sensor/door-closed"));
+    var closed = model.addSensor(new robotkit.model.Sensor("door-closed", "joint_switch", 0, "sensor/door-closed"));
     closed.joint = slideJoint.id;
     closed.windowLower = 0.1;
     closed.windowUpper = 0.2;
     closed.hysteresis = 0.05;
-    var atSpeed = model.addSensor(new robotkit.model.Sensor("spindle-at-speed", "at_speed", 0,
-      "sensor/spindle-at-speed"));
+    var atSpeed = model.addSensor(new robotkit.model.Sensor(
+      "spindle-at-speed",
+      "at_speed",
+      0,
+      "sensor/spindle-at-speed"
+    ));
     atSpeed.joint = spindleJoint.id;
     atSpeed.windowLower = 0.25;
     var presenceFrame = model.addFrame(new robotkit.model.Frame("sensor-face", base, "frame/sensor-face"));
     presenceFrame.position = [0.0, 0.0, 0.5];
-    var presence = model.addSensor(new robotkit.model.Sensor("stock-present", "presence", 0,
-      "sensor/stock-present"));
+    var presence = model.addSensor(new robotkit.model.Sensor("stock-present", "presence", 0, "sensor/stock-present"));
     presence.frame = presenceFrame;
     presence.maxRange = 3.0;
 
     var simulationHarness = new SimulationHarness(0.01);
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    check(blueprint.velocityDrives.length == 1 && blueprint.channels.length == 2,
-      "process spindle compiles to typed analog speed and direction channels");
+    check(
+      blueprint.velocityDrives.length == 1 && blueprint.channels.length == 2,
+      "process spindle compiles to typed analog speed and direction channels"
+    );
     var encoded = RobotModelCodec.encode(model);
     var restored = RobotModelCodec.decode(encoded).actuators[0].processVelocity;
-    check(RobotModelCodec.VERSION == RobotModel.CURRENT_VERSION && restored != null &&
-      restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
-      Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
-      "Current RobotModel preserves the typed spindle process binding");
+    check(
+      RobotModelCodec.VERSION == RobotModel.CURRENT_VERSION
+      && restored != null && restored.speedChannel == "spindle.speed"
+      && restored.directionChannel == "spindle.direction" && Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
+      "Current RobotModel preserves the typed spindle process binding"
+    );
     // A zone input's field is the union of its boxes; the codec and compiler keep and check every one.
     var zoneModel = RobotModelCodec.decode(encoded);
     var zone = zoneModel.addSensor(new robotkit.model.Sensor("cell-zone", "zone_input", 0, "sensor/cell-zone"));
     zone.zoneBoxes = [0.0, 0.0, 0.5, 0.2, 0.2, 0.2, 0.6, 0.0, 0.1, 0.1, 0.05, 0.05];
     var zoneRestored = RobotModelCodec.decode(RobotModelCodec.encode(zoneModel));
     var restoredZone = [for (sensor in zoneRestored.sensors) if (sensor.kind == "zone_input") sensor];
-    check(restoredZone.length == 1 && restoredZone[0].zoneBoxes != null && restoredZone[0].zoneBoxes.length == 12 &&
-      restoredZone[0].zoneBoxes[6] == 0.6, "a zone input keeps both of its boxes through the model codec");
-    var zoneLayout = [for (sensor in RobotRuntimeCompiler.compile(zoneRestored, new robotkit.profile.RobotProfile())
-      .externalSensorLayout()) if (sensor.kind == "zone_input") sensor];
-    check(zoneLayout.length == 1 && zoneLayout[0].zoneBoxes != null && zoneLayout[0].zoneBoxes.length == 12,
-      "a compiled zone input carries every box to the runtime");
+    check(
+      restoredZone.length == 1 && restoredZone[0].zoneBoxes != null
+      && restoredZone[0].zoneBoxes.length == 12 && restoredZone[0].zoneBoxes[6] == 0.6,
+      "a zone input keeps both of its boxes through the model codec"
+    );
+    var zoneLayout = [for (sensor in RobotRuntimeCompiler.compile(zoneRestored,
+      new robotkit.profile.RobotProfile()).externalSensorLayout()) if (sensor.kind == "zone_input") sensor];
+    check(
+      zoneLayout.length == 1 && zoneLayout[0].zoneBoxes != null && zoneLayout[0].zoneBoxes.length == 12,
+      "a compiled zone input carries every box to the runtime"
+    );
     zone.zoneBoxes = [0.0, 0.0, 0.5, 0.2, 0.0, 0.2];
-    throws(() -> RobotRuntimeCompiler.compile(zoneModel, new robotkit.profile.RobotProfile()),
-      "a zone box needs three positive half extents");
+    throws(
+      () -> RobotRuntimeCompiler.compile(zoneModel, new robotkit.profile.RobotProfile()),
+      "a zone box needs three positive half extents"
+    );
     zone.zoneBoxes = null;
     throws(() -> RobotModelCodec.encode(zoneModel), "a zone input needs boxes");
     var runtime = simulationHarness.simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("discrete-process-sensors", runtime,
-      "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);
+    var robot = new SimulatedRobot(
+      "discrete-process-sensors",
+      runtime,
+      "discrete-process-sensors",
+      [
+        "base",
+        "carriage",
+        "spindle"
+      ],
+      [
+        "slide",
+        "spindle"
+      ]
+    );
     function value(snapshot:RobotSnapshot, id:String):Float {
       for (index in 0...snapshot.sensors.length) {
         var sample = snapshot.sensors.get(index);
@@ -5150,52 +8572,100 @@ class RobotWorldTests {
 
     simulationHarness.step(Int64.ofInt(1));
     var snapshot = robot.snapshot();
-    equal(value(snapshot, "sensor/stock-present"), 0.0,
-      "presence starts clear when its connector face sees no object");
+    equal(value(snapshot, "sensor/stock-present"), 0.0, "presence starts clear when its connector face sees no object");
     simulationHarness.spawnBox([0.0, 0.0, 2.0], [0.2, 0.2, 0.2]);
     simulationHarness.step(Int64.ofInt(2));
     snapshot = robot.snapshot();
-    equal(value(snapshot, "sensor/stock-present"), 0.0,
-      "presence ignores a static prop directly in front of its face");
+    equal(value(snapshot, "sensor/stock-present"), 0.0, "presence ignores a static prop directly in front of its face");
     simulationHarness.spawnBox([0.5, 0.0, 2.0], [0.2, 0.2, 0.2], true, 1.0);
     simulationHarness.step(Int64.ofInt(3));
     snapshot = robot.snapshot();
-    equal(value(snapshot, "sensor/stock-present"), 1.0,
-      "presence reports an offset free box inside the connector volume");
+    equal(
+      value(snapshot, "sensor/stock-present"),
+      1.0,
+      "presence reports an offset free box inside the connector volume"
+    );
 
     runtime.submitPosition(0, 0.15, 1);
     for (tick in 4...33) simulationHarness.step(Int64.ofInt(tick));
     snapshot = robot.snapshot();
-    equal(value(snapshot, "sensor/door-closed"), 1.0,
-      "joint switch closes inside its authored position window");
+    equal(value(snapshot, "sensor/door-closed"), 1.0, "joint switch closes inside its authored position window");
     runtime.submitPosition(0, 0.23, 2);
     for (tick in 33...63) simulationHarness.step(Int64.ofInt(tick));
-    equal(value(robot.snapshot(), "sensor/door-closed"), 1.0,
-      "joint switch hysteresis holds its state just outside the window");
+    equal(
+      value(robot.snapshot(), "sensor/door-closed"),
+      1.0,
+      "joint switch hysteresis holds its state just outside the window"
+    );
     runtime.submitPosition(0, 0.27, 3);
     for (tick in 63...93) simulationHarness.step(Int64.ofInt(tick));
-    equal(value(robot.snapshot(), "sensor/door-closed"), 0.0,
-      "joint switch opens after crossing its hysteresis boundary");
+    equal(
+      value(robot.snapshot(), "sensor/door-closed"),
+      0.0,
+      "joint switch opens after crossing its hysteresis boundary"
+    );
 
-    var spinSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(400000000),
-      [[0.27, 0.0], [0.0, 0.0]]);
-    runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1300), Int64.ofInt(blueprint.revision),
-      Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
-      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.27, 0.0], [0.0, 0.0], [0.0, 0.0],
-      [spinSegment], null, null, null, null, null, true,
-      [new ProcessTimedEvent(Int64.ofInt(0), "spindle.speed", ProcessEventValue.Analog(5.0)),
-       new ProcessTimedEvent(Int64.ofInt(0), "spindle.direction", ProcessEventValue.Analog(1.0)),
-       new ProcessTimedEvent(Int64.ofInt(200000000), "spindle.speed", ProcessEventValue.Analog(8.0))]), 4);
+    var spinSegment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(400000000), [[0.27, 0.0], [0.0, 0.0]]);
+    runtime.submitPlan(
+      new ExecutionPlanSubmission(
+        Int64.ofInt(1300),
+        Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
+      | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
+      [
+        0.27,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [spinSegment],
+      null,
+      null,
+      null,
+      null,
+      null,
+      true,
+      [
+        new ProcessTimedEvent(
+          Int64.ofInt(0),
+          "spindle.speed",
+          ProcessEventValue.Analog(5.0)
+        ),
+        new ProcessTimedEvent(
+          Int64.ofInt(0),
+          "spindle.direction",
+          ProcessEventValue.Analog(1.0)
+        ),
+        new ProcessTimedEvent(
+          Int64.ofInt(200000000),
+          "spindle.speed",
+          ProcessEventValue.Analog(8.0)
+        )
+      ]
+    ),
+      4
+    );
     for (tick in 94...104) simulationHarness.step(Int64.ofInt(tick));
     var firstSpeed = robot.snapshot().velocities.get(1);
     var firstAtSpeed = value(robot.snapshot(), "sensor/spindle-at-speed");
-    check(Math.abs(firstSpeed - 5.0) < 1e-3 && firstAtSpeed == 1.0,
-      'at-speed follows the lower commanded speed: velocity=$firstSpeed signal=$firstAtSpeed');
+    check(
+      Math.abs(firstSpeed - 5.0) < 1e-3 && firstAtSpeed == 1.0,
+      'at-speed follows the lower commanded speed: velocity=$firstSpeed signal=$firstAtSpeed'
+    );
     for (tick in 104...125) simulationHarness.step(Int64.ofInt(tick));
     var secondSpeed = robot.snapshot().velocities.get(1);
     var secondAtSpeed = value(robot.snapshot(), "sensor/spindle-at-speed");
-    check(Math.abs(secondSpeed - 8.0) < 1e-3 && secondAtSpeed == 1.0,
-      'at-speed follows an upward spindle command change: velocity=$secondSpeed signal=$secondAtSpeed');
+    check(
+      Math.abs(secondSpeed - 8.0) < 1e-3 && secondAtSpeed == 1.0,
+      'at-speed follows an upward spindle command change: velocity=$secondSpeed signal=$secondAtSpeed'
+    );
     robot.close();
     simulationHarness.dispose();
   }
@@ -5214,20 +8684,26 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint, null, options);
     for (tick in 1...21) simulationHarness.step(Int64.ofInt(tick));
-    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
-      [[0.0, 0.0, 0.0, 5.0, -7.5, 3.0]]);
-    var plan = new ExecutionPlanSubmission(Int64.ofInt(900),
-      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[0.0, 0.0, 0.0, 5.0, -7.5, 3.0]]);
+    var plan = new ExecutionPlanSubmission(
+      Int64.ofInt(900),
+      Int64.ofInt(blueprint.revision),
+      Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0], [segment]);
+      [0.0],
+      [0.0],
+      [0.0],
+      [segment]
+    );
     runtime.submitPlan(plan, 1);
     for (tick in 21...140) simulationHarness.step(Int64.ofInt(tick));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.5) <= 0.0011,
-      "RKD6 virtual device runs a scheduled plan in Simulation");
+    check(
+      Math.abs(runtime.snapshot().q.get(0) - 0.5) <= 0.0011,
+      "RKD6 virtual device runs a scheduled plan in Simulation"
+    );
     var toolPose = simulation.linkPose(0, 1);
     var plantAngle = 2.0 * Math.atan2(toolPose.rotation[2], toolPose.rotation[3]);
-    check(Math.abs(plantAngle - 0.5) <= 0.0011,
-      "virtual step position drives the SimKit joint");
+    check(Math.abs(plantAngle - 0.5) <= 0.0011, "virtual step position drives the SimKit joint");
     simulationHarness.dispose();
   }
 
@@ -5249,16 +8725,17 @@ class RobotWorldTests {
     simulationHarness.step(Int64.ofInt(100));
     var after = robot.snapshot();
     equal(after.sourceSequence, before.sourceSequence, "reset repeats source sequence");
-    equal(streamKind(robot.streams().latestFrames(), "lidar").values.get(0), 0.75,
-      "adapter refreshes sensors even when reset repeats sequence");
+    equal(
+      streamKind(robot.streams().latestFrames(), "lidar").values.get(0),
+      0.75,
+      "adapter refreshes sensors even when reset repeats sequence"
+    );
     equal(beforeScan.values.get(0), 1.75, "old sensor snapshot survives reset");
     simulationHarness.step(Int64.ofInt(200));
     equal(robot.streams().latestFrames().length, 3, "second sample publishes measured IMU");
     var rejected = false;
-    try robot.submit(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 0.0)
-    ], Int64.ofInt(100)))
-    catch (_:Dynamic) rejected = true;
+    try robot.submit(RobotCommand.JointTargets([robotkit.core.JointTarget.position(0,
+      0.0)], Int64.ofInt(100))) catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
     robot.close();
     simulationHarness.dispose();
@@ -5271,35 +8748,72 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     var yaw = Math.PI * 0.5;
     simulation.addRobot(blueprint, new Pose2(3.0, 2.0, yaw));
-    simulationHarness.teleportRobot(0, [8.0, 9.0, 0.0],
-      [0.0, 0.0, Math.sin(0.2), Math.cos(0.2)]);
+    simulationHarness.teleportRobot(0, [8.0, 9.0, 0.0], [0.0, 0.0, Math.sin(0.2), Math.cos(0.2)]);
     simulationHarness.resetRobot(0);
     var reset = simulation.robotPose(0);
-    check(Math.abs(reset.position[0] - 3.0) < 1e-9 &&
-      Math.abs(reset.position[1] - 2.0) < 1e-9 &&
-      Math.abs(reset.position[2]) < 1e-9 &&
-      Math.abs(reset.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
-      Math.abs(reset.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
-      "resetRobot restores the initial pose supplied to addRobot");
+    check(
+      Math.abs(reset.position[0] - 3.0) < 1e-9 && Math.abs(reset.position[1] - 2.0) < 1e-9
+      && Math.abs(reset.position[2]) < 1e-9 && Math.abs(reset.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9
+      && Math.abs(reset.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
+      "resetRobot restores the initial pose supplied to addRobot"
+    );
     simulationHarness.teleportRobot(0, [5.0, 6.0, 0.0]);
     simulationHarness.reset();
     var resetAll = simulation.robotPose(0);
-    check(Math.abs(resetAll.position[0] - 3.0) < 1e-9 &&
-      Math.abs(resetAll.position[1] - 2.0) < 1e-9 &&
-      Math.abs(resetAll.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
-      Math.abs(resetAll.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
-      "teleportRobot does not replace the stored reset pose");
+    check(
+      Math.abs(resetAll.position[0] - 3.0) < 1e-9
+      && Math.abs(resetAll.position[1] - 2.0) < 1e-9 && Math.abs(resetAll.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9
+      && Math.abs(resetAll.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
+      "teleportRobot does not replace the stored reset pose"
+    );
     simulationHarness.dispose();
   }
 
   static function testSensorAndClockContracts():Void {
     var input = [0.0, 0.0, 0.0, 0.0, 0.0, 9.81];
     var sourceFrames = [
-      new SensorFrame("enc", "joint_encoder", "base", Int64.ofInt(2), Int64.ofInt(3), [], Int64.ofInt(4)),
-      new SensorFrame("imu", "imu", "base", Int64.ofInt(2), Int64.ofInt(3), input, Int64.ofInt(4)),
-      new SensorFrame("lidar", "lidar", "base", Int64.ofInt(2), Int64.ofInt(3), [for (_ in 0...8) 2.0], Int64.ofInt(4))];
-    var snapshot = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(2),
-      Int64.ofInt(3), 0, 0, 1, 0, [], [], [], Int64.ofInt(4), sourceFrames);
+      new SensorFrame(
+        "enc",
+        "joint_encoder",
+        "base",
+        Int64.ofInt(2),
+        Int64.ofInt(3),
+        [],
+        Int64.ofInt(4)
+      ),
+      new SensorFrame(
+        "imu",
+        "imu",
+        "base",
+        Int64.ofInt(2),
+        Int64.ofInt(3),
+        input,
+        Int64.ofInt(4)
+      ),
+      new SensorFrame(
+        "lidar",
+        "lidar",
+        "base",
+        Int64.ofInt(2),
+        Int64.ofInt(3),
+        [for (_ in 0...8) 2.0],
+        Int64.ofInt(4)
+      )
+    ];
+    var snapshot = new robotkit.runtime.RobotSnapshot(
+      Int64.ofInt(1),
+      Int64.ofInt(2),
+      Int64.ofInt(3),
+      0,
+      0,
+      1,
+      0,
+      [],
+      [],
+      [],
+      Int64.ofInt(4),
+      sourceFrames
+    );
     input[5] = -1.0;
     equal(snapshot.sensors.get(1).values.get(5), 9.81, "runtime sensor payload owns a copy");
     var copy = snapshot.withRobotId(Int64.ofInt(5));
@@ -5309,11 +8823,24 @@ class RobotWorldTests {
     mutable[5] = 0.0;
     equal(frames[1].values.get(5), 9.81, "sensor frames expose defensive copies");
     equal(frames[1].receivedTimestampNs, Int64.ofInt(4), "projection preserves receive time");
-    var absent = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(0),
-      Int64.ofInt(999), 0, 0, 1, 0, [], [], []);
+    var absent = new robotkit.runtime.RobotSnapshot(
+      Int64.ofInt(1),
+      Int64.ofInt(0),
+      Int64.ofInt(999),
+      0,
+      0,
+      1,
+      0,
+      [],
+      [],
+      []
+    );
     equal(absent.receivedTimestampNs, Int64.ofInt(0), "unknown receipt is not source time");
-    equal(robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
-      "endpoints without sensors do not fabricate IMU or LiDAR");
+    equal(
+      robotkit.core.RobotSensorFrames.fromRuntimeSnapshot(absent).length,
+      0,
+      "endpoints without sensors do not fabricate IMU or LiDAR"
+    );
     var intents = new robotkit.behavior.IntentBuffer();
     intents.publish(new robotkit.behavior.JointTargetIntent(0, 1, 0.5, Int64.ofInt(100)));
     check(intents.current(Int64.ofInt(99)) != null, "intent valid before local deadline");
@@ -5325,10 +8852,8 @@ class RobotWorldTests {
     var base = model.addLink(new Link("base", "link/base"));
     var elbow = model.addLink(new Link("elbow", "link/elbow"));
     var tool = model.addLink(new Link("tool", "link/tool"));
-    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute,
-      base, elbow, "joint/shoulder"));
-    var wrist = model.addJoint(new Joint("wrist", JointType.Revolute,
-      elbow, tool, "joint/wrist"));
+    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, elbow, "joint/shoulder"));
+    var wrist = model.addJoint(new Joint("wrist", JointType.Revolute, elbow, tool, "joint/wrist"));
     var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 100, "sensor/imu"));
     model.addSensor(new robotkit.model.Sensor("lidar", "lidar", 10, "sensor/lidar"));
     var frame = model.addFrame(new robotkit.model.Frame("base frame", base, "frame/base"));
@@ -5341,8 +8866,7 @@ class RobotWorldTests {
     var revisionRuntime = revisionSimulation.addRobot(original);
     var revisionSnapshot = revisionRuntime.snapshot();
     equal(revisionSnapshot.modelRevision, Int64.ofInt(1), "snapshot carries model revision");
-    equal(revisionSnapshot.calibrationRevision, Int64.ofInt(9),
-      "snapshot carries calibration revision");
+    equal(revisionSnapshot.calibrationRevision, Int64.ofInt(9), "snapshot carries calibration revision");
     revisionSimulationHarness.dispose();
     var originalIds = original.identity;
     check(originalIds != null, "compiler supplies semantic identity mappings");
@@ -5369,10 +8893,12 @@ class RobotWorldTests {
     equal(editedIds.frameIndex(frame.id), 1, "frame ID survives rename and reorder");
     equal(editedIds.frameLinkId(1), base.id, "frame attachment survives link reorder");
     equal(editedIds.frameId(-1), null, "invalid frame index rejected");
-    equal(editedIds.linkId(edited.joints[0].parentLink), elbow.id,
-      "native parent index resolves to semantic parent after reorder");
-    equal(editedIds.jointId(edited.joints[0].joint), wrist.id,
-      "native joint index resolves to semantic joint");
+    equal(
+      editedIds.linkId(edited.joints[0].parentLink),
+      elbow.id,
+      "native parent index resolves to semantic parent after reorder"
+    );
+    equal(editedIds.jointId(edited.joints[0].joint), wrist.id, "native joint index resolves to semantic joint");
     equal(editedIds.linkIndex("missing"), -1, "unknown ID has no runtime index");
     equal(editedIds.jointId(-1), null, "invalid index has no semantic ID");
 
@@ -5415,32 +8941,29 @@ class RobotWorldTests {
     cycle.limits.upper = -2.0;
     invalid.addJoint(new Joint("cycle", JointType.Floating, branch, root));
     var diagnostics = RobotRuntimeCompiler.validate(invalid, new robotkit.profile.RobotProfile());
-    check(hasDiagnostic(diagnostics, "RK_LINK_DUPLICATE"),
-      "compiler reports duplicate link names");
-    check(hasDiagnostic(diagnostics, "RK_JOINT_DUPLICATE"),
-      "compiler reports duplicate joint names");
-    check(hasDiagnostic(diagnostics, "RK_LIMITS"),
-      "compiler reports invalid joint limits");
-    check(hasDiagnostic(diagnostics, "RK_JOINT_UNSUPPORTED"),
-      "compiler reports unsupported joint types");
-    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_CYCLE"),
-      "compiler reports topology cycles");
-    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_DISCONNECTED"),
-      "compiler reports links disconnected from the root");
+    check(hasDiagnostic(diagnostics, "RK_LINK_DUPLICATE"), "compiler reports duplicate link names");
+    check(hasDiagnostic(diagnostics, "RK_JOINT_DUPLICATE"), "compiler reports duplicate joint names");
+    check(hasDiagnostic(diagnostics, "RK_LIMITS"), "compiler reports invalid joint limits");
+    check(hasDiagnostic(diagnostics, "RK_JOINT_UNSUPPORTED"), "compiler reports unsupported joint types");
+    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_CYCLE"), "compiler reports topology cycles");
+    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_DISCONNECTED"), "compiler reports links disconnected from the root");
     var forest = new RobotModel("forest");
     forest.addLink(new Link("left"));
     forest.addLink(new Link("right"));
-    check(hasDiagnostic(RobotRuntimeCompiler.validate(forest, new robotkit.profile.RobotProfile()), "RK_TOPOLOGY_ROOT"),
-      "compiler requires exactly one topology root");
+    check(
+      hasDiagnostic(RobotRuntimeCompiler.validate(forest, new robotkit.profile.RobotProfile()), "RK_TOPOLOGY_ROOT"),
+      "compiler requires exactly one topology root"
+    );
     var threw = false;
     try {
       RobotRuntimeCompiler.compile(invalid, new robotkit.profile.RobotProfile());
     } catch (error:RobotCompileException) {
       threw = true;
-      check(error.diagnostics.length >= 5,
-        "compile exception retains all structured diagnostics");
-      check(error.diagnostics[0].path != null && error.diagnostics[0].code != null,
-        "compile diagnostics expose paths and stable codes");
+      check(error.diagnostics.length >= 5, "compile exception retains all structured diagnostics");
+      check(
+        error.diagnostics[0].path != null && error.diagnostics[0].code != null,
+        "compile diagnostics expose paths and stable codes"
+      );
     }
     check(threw, "invalid topology refuses native lowering");
   }
@@ -5451,26 +8974,34 @@ class RobotWorldTests {
     var host = new WorldHost();
     var robot = host.addSimulatedRobot("headless-arm", model);
     var snapshot = host.step(Int64.ofInt(3000));
-    check(snapshot.robot(robot.id()) != null,
-      "worldd composes one world and one shared simulation");
-    var deploymentPath = Sys.getCwd() +
-      "/robotkit/tests/fixtures/device-deployment/perception-worldd.json";
-    if (!sys.FileSystem.exists(deploymentPath))
-      deploymentPath = Sys.getCwd() + "/fixtures/device-deployment/perception-worldd.json";
-    var remote = host.addRemoteRobot("worldd-camera", false,
-      new SerialDeployment(deploymentPath));
+    check(snapshot.robot(robot.id()) != null, "worldd composes one world and one shared simulation");
+    var deploymentPath = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/perception-worldd.json";
+    if (!sys.FileSystem.exists(deploymentPath)) deploymentPath = Sys.getCwd()
+      + "/fixtures/device-deployment/perception-worldd.json";
+    var remote = host.addRemoteRobot("worldd-camera", false, new SerialDeployment(deploymentPath));
     var pixels = haxe.io.Bytes.alloc(8 * 4 * 3);
     for (index in 0...pixels.length) pixels.set(index, 51);
-    remote.onCamera(new robotkit.protocol.CameraFrameData(new CameraFrame(
-      Int64.ofInt(42), "front_camera", "camera", "frame/front", Int64.ofInt(1),
-      Int64.ofInt(10), Int64.ofInt(20), 8, 4, PixelFormat.RGB8), pixels));
+    remote.onCamera(new robotkit.protocol.CameraFrameData(
+      new CameraFrame(
+        Int64.ofInt(42),
+        "front_camera",
+        "camera",
+        "frame/front",
+        Int64.ofInt(1),
+        Int64.ofInt(10),
+        Int64.ofInt(20),
+        8,
+        4,
+        PixelFormat.RGB8
+      ),
+      pixels
+    ));
     var worldObservation = false;
     for (index in 0...500) {
       host.step(Int64.ofInt(4000 + index));
       for (event in remote.events(Int64.ofInt(0), 8)) switch event {
         case robotkit.core.RobotEvent.Observation(_, value):
-          if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front")
-            worldObservation = true;
+          if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front") worldObservation = true;
         case _:
       }
       if (worldObservation) break;
@@ -5480,10 +9011,8 @@ class RobotWorldTests {
     host.close();
   }
 
-  static function hasDiagnostic(diagnostics:Array<robotkit.runtime.RobotCompileDiagnostic>,
-      code:String):Bool {
-    for (diagnostic in diagnostics)
-      if (diagnostic.code == code) return true;
+  static function hasDiagnostic(diagnostics:Array<robotkit.runtime.RobotCompileDiagnostic>, code:String):Bool {
+    for (diagnostic in diagnostics) if (diagnostic.code == code) return true;
     return false;
   }
 
@@ -5565,7 +9094,8 @@ class RobotWorldTests {
       doneMutex.acquire();
       done = true;
       doneMutex.release();
-    });
+    }
+    );
     var completed = false;
     for (_ in 0...500) {
       doneMutex.acquire();
@@ -5586,9 +9116,7 @@ class RobotWorldTests {
     var world = new RobotWorld();
     var robot = new FakeRobot("arm");
     world.attach(robot);
-    var command = RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(3, 1.25)
-    ], Int64.ofInt(99));
+    var command = RobotCommand.JointTargets([robotkit.core.JointTarget.position(3, 1.25)], Int64.ofInt(99));
     world.submit("arm", command);
     equal(Std.string(robot.lastCommand), Std.string(command), "command forwarded to selected robot");
     world.stop("arm", StopMode.Emergency);
@@ -5610,8 +9138,7 @@ class RobotWorldTests {
     var subscription = recording.attach(world);
     var robot = new FakeRobot("recorded-arm");
     world.attach(robot);
-    equal(recording.events.length, 0,
-      "recording observes world events only on the owner pump");
+    equal(recording.events.length, 0, "recording observes world events only on the owner pump");
     world.pump();
     equal(recording.events.length, 1, "recording captures attachment events");
     switch recording.events[0] {
@@ -5625,16 +9152,16 @@ class RobotWorldTests {
     equal(recording.events.length, 2, "recording captures queued adapter changes");
     var snapshot = world.snapshot().robot("recorded-arm");
     check(snapshot != null, "recording test has a robot snapshot");
-    recording.recordCommand(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 0.5)
-    ], null));
+    recording.recordCommand(RobotCommand.JointTargets([robotkit.core.JointTarget.position(0, 0.5)], null));
     recording.recordSnapshot(cast snapshot);
     recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
     recording.recordWorld(world.snapshot());
     equal(recording.events.length, 6, "recording keeps one ordered typed event stream");
-    check(recording.commands.length == 1 && recording.snapshots.length == 1 &&
-      recording.faults.length == 1 && recording.worlds.length == 1,
-      "recording retains typed indexes alongside the event stream");
+    check(
+      recording.commands.length == 1
+      && recording.snapshots.length == 1 && recording.faults.length == 1 && recording.worlds.length == 1,
+      "recording retains typed indexes alongside the event stream"
+    );
     subscription.dispose();
     world.detach(robot.id());
     world.pump();
@@ -5670,14 +9197,20 @@ class RobotWorldTests {
       simulation.addRobot(blueprint),
       "simulated A",
       ["base", "tool", "wrist"],
-      ["shoulder", "wrist"]
+      [
+        "shoulder",
+        "wrist"
+      ]
     );
     var second = new SimulatedRobot(
       "sim-b",
       simulation.addRobot(blueprint),
       "simulated B",
       ["base", "tool", "wrist"],
-      ["shoulder", "wrist"]
+      [
+        "shoulder",
+        "wrist"
+      ]
     );
     var remote = new RemoteRobot("remote-c");
     var world = new RobotWorld();
@@ -5686,18 +9219,34 @@ class RobotWorldTests {
     world.attach(remote);
 
     var duplicateRejected = false;
-    try world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 0.1),
-      robotkit.core.JointTarget.effort(0, 2.0)
-    ], null)) catch (_:Dynamic) duplicateRejected = true;
+    try world.submit(
+      "sim-a",
+      RobotCommand.JointTargets(
+        [
+          robotkit.core.JointTarget.position(0, 0.1),
+          robotkit.core.JointTarget.effort(
+            0,
+            2.0
+          )
+        ],
+        null
+      )
+    ) catch (_:Dynamic) duplicateRejected = true;
     check(duplicateRejected, "simulated adapter rejects an ambiguous atomic batch");
-    world.submit("sim-a", RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, 0.4),
-      robotkit.core.JointTarget.position(1, -0.2)
-    ], null));
-    world.submit("sim-b", RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(0, -0.3)
-    ], null));
+    world.submit(
+      "sim-a",
+      RobotCommand.JointTargets(
+        [
+          robotkit.core.JointTarget.position(0, 0.4),
+          robotkit.core.JointTarget.position(
+            1,
+            -0.2
+          )
+        ],
+        null
+      )
+    );
+    world.submit("sim-b", RobotCommand.JointTargets([robotkit.core.JointTarget.position(0, -0.3)], null));
     simulationHarness.step(Int64.ofInt(1000));
 
     var value = world.snapshot();
@@ -5710,25 +9259,30 @@ class RobotWorldTests {
     var firstValue:RobotSnapshot = cast firstState;
     var secondValue:RobotSnapshot = cast secondState;
     var remoteValue:RobotSnapshot = cast remoteState;
-    check(Math.abs(firstValue.positions.get(0) - 0.4) < 0.000000001,
-      "first simulated command routed independently");
-    check(Math.abs(firstValue.positions.get(1) + 0.2) < 0.000000001,
-      "simulated adapter applies both targets in one batch");
-    check(Math.abs(secondValue.positions.get(0) + 0.3) < 0.000000001,
-      "second simulated command routed independently");
+    check(Math.abs(firstValue.positions.get(0) - 0.4) < 0.000000001, "first simulated command routed independently");
+    check(
+      Math.abs(firstValue.positions.get(1) + 0.2) < 0.000000001,
+      "simulated adapter applies both targets in one batch"
+    );
+    check(Math.abs(secondValue.positions.get(0) + 0.3) < 0.000000001, "second simulated command routed independently");
     equal(firstValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches first robot");
     equal(secondValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches second robot");
-    check(Int64.compare(firstValue.receivedTimestampNs, Int64.ofInt(1000)) > 0,
-      "runtime receive clock is not simulation tick argument");
-    check(Int64.compare(value.receivedTimestampNs, secondValue.receivedTimestampNs) >= 0,
-      "world stamps its own publication after runtime acceptance");
+    check(
+      Int64.compare(firstValue.receivedTimestampNs, Int64.ofInt(1000)) > 0,
+      "runtime receive clock is not simulation tick argument"
+    );
+    check(
+      Int64.compare(value.receivedTimestampNs, secondValue.receivedTimestampNs) >= 0,
+      "world stamps its own publication after runtime acceptance"
+    );
     equal(value.sourceTimestampNs, Int64.ofInt(0), "mixed source clocks are not aggregated");
-    equal(firstValue.sensors.length, 1,
-      "first sample primes IMU derivative and publishes encoders plus LiDAR");
-    equal(firstValue.sensors.get(0).sourceTimestampNs, Int64.ofInt(10000000),
-      "sensor source clock matches robot source clock");
-    equal(firstValue.streamSequences.length, 2,
-      "sensor frame identity is explicit");
+    equal(firstValue.sensors.length, 1, "first sample primes IMU derivative and publishes encoders plus LiDAR");
+    equal(
+      firstValue.sensors.get(0).sourceTimestampNs,
+      Int64.ofInt(10000000),
+      "sensor source clock matches robot source clock"
+    );
+    equal(firstValue.streamSequences.length, 2, "sensor frame identity is explicit");
     var recording = new RobotRecording();
     recording.recordSnapshot(firstValue);
     recording.recordSnapshot(secondValue);
@@ -5739,13 +9293,11 @@ class RobotWorldTests {
     var replayInitial = replayWorld.snapshot().robot("sim-a");
     check(replayInitial != null, "replay world publishes a robot snapshot");
     var replayInitialValue:RobotSnapshot = cast replayInitial;
-    equal(replayInitialValue.sourceTimestampNs, Int64.ofInt(10000000),
-      "replay preserves source timestamps");
+    equal(replayInitialValue.sourceTimestampNs, Int64.ofInt(10000000), "replay preserves source timestamps");
     check(replay.advance(), "replay advances through the same snapshot boundary");
     var replayNext = replayWorld.snapshot().robot("sim-a");
     var replayNextValue:RobotSnapshot = cast replayNext;
-    check(replayNextValue != null && replayNextValue.sensors.length == 1,
-      "replay preserves sensor frames");
+    check(replayNextValue != null && replayNextValue.sensors.length == 1, "replay preserves sensor frames");
     var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
     equal(behavior.update(first), 1, "world behavior emits a transport-neutral command");
     equal(behavior.update(first), 0, "world behavior does not repeat an unchanged snapshot");
@@ -5755,8 +9307,10 @@ class RobotWorldTests {
     equal(remoteValue.sourceSequence, Int64.ofInt(0), "remote state remains independently sourced");
     var remoteStatus = remote.status();
     check(switch remoteStatus {
-      case RobotStatus.Disconnected: true;
-      case _: false;
+      case RobotStatus.Disconnected:
+        true;
+      case _:
+        false;
     }, "unconnected remote remains disconnected");
 
     world.close();
@@ -5773,15 +9327,12 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.velocity = 2.0;
-    model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
-      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0, Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     model.materializeLimits();
     equal(model.joints[0].limits.requireVelocity(), 0.5, "the compiled model derives its motor speed cap");
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    equal(blueprint.joints[0].maxRate, 0.5,
-      "runtime blueprint reads the compiled joint rate");
-    equal(blueprint.joints[0].maxEffort, 200.0,
-      "runtime blueprint reads the compiled joint effort");
+    equal(blueprint.joints[0].maxRate, 0.5, "runtime blueprint reads the compiled joint rate");
+    equal(blueprint.joints[0].maxEffort, 200.0, "runtime blueprint reads the compiled joint effort");
 
     var simulationHarness = new SimulationHarness(0.1);
 
@@ -5790,11 +9341,15 @@ class RobotWorldTests {
     var runtime = simulation.addRobot(blueprint);
     runtime.submitPosition(0, 0.8, 1);
     simulationHarness.step(Int64.ofInt(100));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.05) < 0.000000001,
-      "runtime applies the compiled rate limit on the first shared tick");
+    check(
+      Math.abs(runtime.snapshot().q.get(0) - 0.05) < 0.000000001,
+      "runtime applies the compiled rate limit on the first shared tick"
+    );
     simulationHarness.step(Int64.ofInt(200));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
-      "runtime keeps advancing the same target on later shared ticks");
+    check(
+      Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
+      "runtime keeps advancing the same target on later shared ticks"
+    );
     simulationHarness.dispose();
 
     var segmentSimulationHarness = new SimulationHarness(0.1);
@@ -5802,17 +9357,33 @@ class RobotWorldTests {
 
     var segmentSimulation = segmentSimulationHarness.simulation;
     var segmentRuntime = segmentSimulation.addRobot(blueprint);
-    segmentRuntime.submitPlan(new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(1),
-      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
-      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0],
-      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]), 1);
+    segmentRuntime.submitPlan(
+      new robotkit.execution.ExecutionPlanSubmission(
+        Int64.ofInt(1),
+        Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+        [0.0],
+        [0.0],
+        [0.0],
+        [new TrajectorySegment(
+          Int64.ofInt(0),
+          Int64.ofInt(200000000),
+          [[
+            0.0,
+            0.5
+          ]]
+        )]
+      ),
+      1
+    );
     segmentSimulationHarness.step(Int64.ofInt(100));
-    check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
-      "Haxe segment submission reaches native knot queue");
+    check(segmentRuntime.snapshot().trajectoryQueueDepth == 1, "Haxe segment submission reaches native knot queue");
     segmentSimulationHarness.step(Int64.ofInt(200));
-    check(Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
-      "Haxe segment submission executes polynomial target");
+    check(
+      Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
+      "Haxe segment submission executes polynomial target"
+    );
     segmentSimulationHarness.dispose();
 
     var planSimulationHarness = new SimulationHarness(0.1);
@@ -5822,26 +9393,58 @@ class RobotWorldTests {
     var planRuntime = planSimulation.addRobot(blueprint);
     var planPath = '/tmp/robotkit-${Sys.getPid()}-plan-session.mcap';
     var writer = new McapRobotRecording(planPath, 1024 * 1024);
-    var recorded = new RecordingRobot(new SimulatedRobot("plan-session", planRuntime,
-      model.name, ["base", "tool"], ["shoulder"]), writer);
-    var plan = new robotkit.execution.ExecutionPlanSubmission(Int64.ofInt(77),
-      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+    var recorded = new RecordingRobot(
+      new SimulatedRobot(
+        "plan-session",
+        planRuntime,
+        model.name,
+        ["base", "tool"],
+        ["shoulder"]
+      ),
+      writer
+    );
+    var plan = new robotkit.execution.ExecutionPlanSubmission(
+      Int64.ofInt(77),
+      Int64.ofInt(blueprint.revision),
+      Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0],
-      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])],
-      null, null, [0.0001], [0.0002], [0.0003], true, null, false, null, [0.4]);
+      [0.0],
+      [0.0],
+      [0.0],
+      [new TrajectorySegment(
+        Int64.ofInt(0),
+        Int64.ofInt(200000000),
+        [[
+          0.0,
+          0.5
+        ]]
+      )],
+      null,
+      null,
+      [0.0001],
+      [0.0002],
+      [0.0003],
+      true,
+      null,
+      false,
+      null,
+      [0.4]
+    );
     var portable = robotkit.protocol.PlanSubmission.fromWorld(Int64.ofInt(1), plan);
     var decodedPortable:robotkit.protocol.PlanSubmission = MessagePack.decode(MessagePack.encode(portable));
-    equal(decodedPortable.toWorld().controlAcceleration.get(0), 0.4,
-      "wire plans preserve controlled stop acceleration independently of physical ratings");
+    equal(
+      decodedPortable.toWorld().controlAcceleration.get(0),
+      0.4,
+      "wire plans preserve controlled stop acceleration independently of physical ratings"
+    );
     equal(plan.copy().controlAcceleration.get(0), 0.4, "copied plans preserve stopping limits");
     recorded.submit(RobotCommand.ExecutionPlan(plan));
     var progress:Array<String> = [];
     for (time in [100, 200, 300]) {
       planSimulationHarness.step(Int64.ofInt(time));
       var snapshot = recorded.snapshot();
-      progress.push('${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
-        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}');
+      progress.push('${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:'
+        + '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}');
     }
     check(recorded.recordingError == null, "plan session records without errors");
     writer.close();
@@ -5850,8 +9453,7 @@ class RobotWorldTests {
     switch loaded.commands[0] {
       case ExecutionPlan(replayedPlan):
         equal(replayedPlan.planId, Int64.ofInt(77), "MCAP preserves plan identity");
-        equal(replayedPlan.positionTolerances.toArray()[0], 0.0001,
-          "MCAP preserves plan start tolerances");
+        equal(replayedPlan.positionTolerances.toArray()[0], 0.0001, "MCAP preserves plan start tolerances");
         check(replayedPlan.endsAtRest, "MCAP preserves declared plan completion");
         equal(replayedPlan.controlAcceleration.get(0), 0.4, "MCAP preserves controlled stop acceleration");
       case _:
@@ -5860,8 +9462,8 @@ class RobotWorldTests {
     var replay = new ReplayRobot("plan-session", loaded);
     for (expected in progress) {
       var snapshot = replay.snapshot();
-      var actual = '${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
-        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}';
+      var actual = '${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:'
+        + '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}';
       equal(actual, expected, "MCAP replay preserves session progress");
       replay.advance();
     }
@@ -5879,10 +9481,18 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.velocity = 2.0;
-    var first = model.addActuator(new Actuator("first", 100.0, 1.0,
-      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
-    var second = model.addActuator(new Actuator("second", 40.0, 0.3,
-      Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
+    var first = model.addActuator(new Actuator("first",
+      100.0, 1.0, Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    var second = model.addActuator(new Actuator(
+      "second",
+      40.0,
+      0.3,
+      Transmission.SimpleTransmission(
+        joint.id,
+        -1.0,
+        0.0
+      )
+    ));
     model.materializeLimits();
     var limits = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0];
     equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
@@ -5910,8 +9520,11 @@ class RobotWorldTests {
     equal(copied.joints[0].limits.velocity, 0.8, "saved mechanical facts survive a rebuild");
     joint.mechanicalLimits.velocity = 0.0;
     model.materializeLimits();
-    equal(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0].maxRate, 0.0,
-      "a stated zero velocity remains a stopped joint");
+    equal(
+      RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0].maxRate,
+      0.0,
+      "a stated zero velocity remains a stopped joint"
+    );
   }
 
   static function check(value:Bool, message:String):Void {
@@ -5920,22 +9533,26 @@ class RobotWorldTests {
   }
 
   static function commandSummary(command:RobotCommand):String return switch command {
-    case JointTargets(targets, _): [for (target in targets)
-      '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
-    case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
-    case Hold: 'hold';
-    case Resume: 'resume';
-    case Abort: 'abort';
+    case JointTargets(targets, _):
+      [for (target in targets) '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
+    case ExecutionPlan(plan):
+      'plan:${Int64.toStr(plan.planId)}';
+    case Hold:
+      'hold';
+    case Resume:
+      'resume';
+    case Abort:
+      'abort';
   };
 
   static function advanceReplaySample(replay:ReplayRobot):Bool {
     var current = replay.snapshot();
     while (replay.advance()) {
       var next = replay.snapshot();
-      if (Int64.compare(next.sourceSequence, current.sourceSequence) != 0 ||
-          Int64.compare(next.sourceTimestampNs, current.sourceTimestampNs) != 0 ||
-          next.sourceClockId != current.sourceClockId)
-        return true;
+      if (Int64.compare(next.sourceSequence, current.sourceSequence) != 0 || Int64.compare(
+        next.sourceTimestampNs,
+        current.sourceTimestampNs
+      ) != 0 || next.sourceClockId != current.sourceClockId) return true;
     }
     return false;
   }
@@ -5958,7 +9575,7 @@ private class FakeRobot implements Robot {
   public var velocities:Array<Float> = [0.0];
   public var efforts:Array<Float> = [0.0];
   public var jointNames:Array<String> = [];
-  public var listener:Null < RobotId -> Void > = null;
+  public var listener:Null<RobotId -> Void> = null;
   public var lastCommand:Null<RobotCommand> = null;
   public var lastStop:Null<StopMode> = null;
   public var resetCount = 0;
@@ -5968,13 +9585,22 @@ private class FakeRobot implements Robot {
   public function new(id:RobotId) logicalId = id;
   public function id():RobotId return logicalId;
   public function status():RobotStatus return Ready;
-  public function description():RobotDescription return new RobotDescription(
-    logicalId, logicalId, [], jointNames);
-  public function capabilities():RobotCapabilities return new RobotCapabilities(logicalId,
-      positions.length,
-      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
-      robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+  public function description():RobotDescription return new RobotDescription(logicalId, logicalId, [], jointNames);
+  public function capabilities():RobotCapabilities return new RobotCapabilities(
+    logicalId,
+    positions.length,
+    [
+      robotkit.core.JointTargetMode.Position,
+      robotkit.core.JointTargetMode.Velocity,
+      robotkit.core.JointTargetMode.Effort
+    ],
+    robotkit.core.ExecutionCapabilities.unavailable(),
+    new robotkit.core.TimingCapabilities(
+      false,
+      false,
+      trajectorykit.validation.ValidationGuarantee.Unchecked
+    )
+  );
   public function snapshot():RobotSnapshot return new RobotSnapshot(
     logicalId,
     Int64.ofInt(1),
@@ -5987,11 +9613,11 @@ private class FakeRobot implements Robot {
   );
   public function streams():robotkit.streams.SensorStreams return new robotkit.streams.SensorStreams();
   public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.core.RobotEvent> return [];
-  public function fault():Null < RobotFault > return null;
+  public function fault():Null<RobotFault> return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;
   public function resetSafety():Void resetCount++;
-  public function setChangeListener(value:Null < RobotId -> Void >):Void listener = value;
+  public function setChangeListener(value:Null<RobotId -> Void>):Void listener = value;
   public function emitChange():Void if (listener != null) listener(logicalId);
   public function close():Void {
     closed = true;
@@ -6002,7 +9628,8 @@ private class FakeRobot implements Robot {
 private class FakePower implements Power {
   public var battery:Null<BatteryState> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function batteryState():Null<BatteryState> return battery;
 }
@@ -6052,9 +9679,18 @@ private class QualityOverrideLocalization implements Localization {
 
   function applyOverride(value:LocalizationState):LocalizationState {
     var quality = hasQualityOverride ? qualityOverride : value.quality;
-    return new LocalizationState(value.sequence, value.pose, value.referenceFrame,
-      value.bodyFrame, value.covariance, quality, value.sourceTimestampNs,
-      value.receivedTimestampNs, value.sourceClockId, value.receivedClockId);
+    return new LocalizationState(
+      value.sequence,
+      value.pose,
+      value.referenceFrame,
+      value.bodyFrame,
+      value.covariance,
+      quality,
+      value.sourceTimestampNs,
+      value.receivedTimestampNs,
+      value.sourceClockId,
+      value.receivedClockId
+    );
   }
 
   public function reset(?pose:Pose2):Void {
@@ -6070,6 +9706,5 @@ private class PortFiducialDetector implements FiducialDetector {
     this.observations = observations;
   }
 
-  public function detect(frame:SensorFrame):Array<FiducialMarkerObservation>
-    return observations.copy();
+  public function detect(frame:SensorFrame):Array<FiducialMarkerObservation> return observations.copy();
 }

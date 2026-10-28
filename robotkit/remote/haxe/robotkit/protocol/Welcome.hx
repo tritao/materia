@@ -1,7 +1,6 @@
 package robotkit.protocol;
 
-@:wire
-class Welcome {
+@:wire class Welcome {
   @:id(1) public var protocolVersion:Int;
   @:id(2) public var serverName:String;
   @:id(3) public var sessionId:haxe.Int64;
@@ -14,11 +13,20 @@ class Welcome {
   @:id(9) public var identity:String;
   @:id(10) public var permissions:Array<String>;
 
-  public function new(?protocolVersion:Int = RobotFrame.VERSION, ?serverName:String = "robotd",
-      ?sessionId:haxe.Int64 = null, ?robotId:haxe.Int64 = null,
-      ?controlGranted:Bool = false, ?leaseId:haxe.Int64 = null,
-      ?leaseTimeoutMs:Int = 0, ?capabilities:Array<String>, ?identity:String = "", ?permissions:Array<String>) {
-    this.identity = identity; this.permissions = permissions == null ? [] : permissions.copy();
+  public function new(
+    ?protocolVersion:Int = RobotFrame.VERSION,
+    ?serverName:String = "robotd",
+    ?sessionId:haxe.Int64 = null,
+    ?robotId:haxe.Int64 = null,
+    ?controlGranted:Bool = false,
+    ?leaseId:haxe.Int64 = null,
+    ?leaseTimeoutMs:Int = 0,
+    ?capabilities:Array<String>,
+    ?identity:String = "",
+    ?permissions:Array<String>
+  ) {
+    this.identity = identity;
+    this.permissions = permissions == null ? [] : permissions.copy();
     this.protocolVersion = protocolVersion;
     this.serverName = serverName;
     this.sessionId = sessionId == null ? haxe.Int64.ofInt(0) : sessionId;

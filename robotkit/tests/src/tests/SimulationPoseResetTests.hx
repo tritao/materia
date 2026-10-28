@@ -31,8 +31,19 @@ class SimulationPoseResetTests {
       piece.push((index & 2) == 0 ? -0.01 : 0.01);
       piece.push((index & 4) == 0 ? 0.0 : 0.02);
     }
-    simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation,
-      null, null, null, ToolGeometry.convex([piece], 0.005), 0);
+    simulation.addRobotAtPose(
+      new RobotRuntimeBlueprint(1, 0, 1),
+      position,
+      rotation,
+      null,
+      null,
+      null,
+      ToolGeometry.convex(
+        [piece],
+        0.005
+      ),
+      0
+    );
     simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
     simulationHarness.resetRobot(0);
     checkPose(simulation, position, rotation, 'resetRobot on backend $backend');
@@ -43,12 +54,33 @@ class SimulationPoseResetTests {
     var boxSimulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var boxSimulation = boxSimulationHarness.simulation;
-    boxSimulation.addRobotAtPose(new RobotRuntimeBlueprint(2, 0, 1), [0, 0, 0],
-      [0, 0, 0, 1], null, null, null,
-      ToolGeometry.box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
+    boxSimulation.addRobotAtPose(
+      new RobotRuntimeBlueprint(2, 0, 1),
+      [0, 0, 0],
+      [0, 0, 0, 1],
+      null,
+      null,
+      null,
+      ToolGeometry.box(
+        new Vec3(
+          0.01,
+          0.01,
+          0.02
+        ),
+        new Vec3(
+          0,
+          0,
+          0.02
+        )
+      ),
+      0
+    );
     boxSimulationHarness.step(Int64.ofInt(0));
     boxSimulationHarness.dispose();
-    if (backend == 1) { toolProximity(); posedToolShapes(); }
+    if (backend == 1) {
+      toolProximity();
+      posedToolShapes();
+    }
     driveReferenceCompilation();
     downstreamInertia();
     compliantServoLoad();
@@ -73,16 +105,15 @@ class SimulationPoseResetTests {
     actuator.positionLoopRate = 4000;
     model.addActuator(actuator);
     var computed = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    if (computed.joints[0].servoStiffness != 0 || computed.fastestPositionLoopRate() != 0)
-      throw "Unspecified uncoupled gains must retain the existing tracking model";
+    if (computed.joints[0].servoStiffness != 0 || computed.fastestPositionLoopRate()
+      != 0) throw "Unspecified uncoupled gains must retain the existing tracking model";
     actuator.servoStiffness = 200;
     actuator.servoDamping = 1;
     var physical = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    if (physical.joints[0].servoStiffness != 2e6 || physical.joints[0].servoDamping != 1e4 ||
-        physical.fastestPositionLoopRate() != 4000)
-      throw "Explicit motor gains must be reflected to the joint drive";
-    if (Math.abs(physical.joints[0].reflectedInertia - 0.25) > 1e-12)
-      throw "An uncoupled geared joint must not reflect its load inertia twice";
+    if (physical.joints[0].servoStiffness != 2e6 || physical.joints[0].servoDamping != 1e4
+      || physical.fastestPositionLoopRate() != 4000) throw "Explicit motor gains must be reflected to the joint drive";
+    if (Math.abs(physical.joints[0].reflectedInertia - 0.25)
+      > 1e-12) throw "An uncoupled geared joint must not reflect its load inertia twice";
   }
 
   /**
@@ -120,19 +151,19 @@ class SimulationPoseResetTests {
     }
     var spring = build(80000.0), rigid = build(0.0);
     var springPulley = spring.joints[1], rigidPulley = rigid.joints[1];
-    if (!springPulley.compliantLoad || rigidPulley.compliantLoad)
-      throw "Only a pulley a spring belt stretches from is a compliant load";
+    if (!springPulley.compliantLoad
+      || rigidPulley.compliantLoad) throw "Only a pulley a spring belt stretches from is a compliant load";
     // The pulley's own 2e-5 kg m^2 outweighs the rotor's 5e-6.
-    if (Math.abs(springPulley.reflectedInertia - 2e-5) > 1e-12)
-      throw 'A compliant load reflects the pulley and its rotor only: ${springPulley.reflectedInertia}';
+    if (Math.abs(springPulley.reflectedInertia - 2e-5)
+      > 1e-12) throw 'A compliant load reflects the pulley and its rotor only: ${springPulley.reflectedInertia}';
     // Through a rigid belt the carriage turns with the pulley: 1 kg at 10 mm is 1e-4 kg m^2 more.
-    if (!(rigidPulley.reflectedInertia >= 1e-4))
-      throw 'A rigid load reflects the carriage it carries: ${rigidPulley.reflectedInertia}';
+    if (!(rigidPulley.reflectedInertia
+      >= 1e-4)) throw 'A rigid load reflects the carriage it carries: ${rigidPulley.reflectedInertia}';
     var compliant = spring.servoStabilityInterval(true);
-    if (!(Math.isFinite(compliant) && Math.abs(compliant - 0.5 * Math.sqrt(2e-5 / 20.0)) < 1e-12 && compliant < rigid.servoStabilityInterval()))
-      throw 'A servo on a spring belt needs the pulley\'s interval: $compliant against ${rigid.servoStabilityInterval()}';
-    if (rigid.servoStabilityInterval(true) != Math.POSITIVE_INFINITY)
-      throw "A rigid machine has no compliant servo load";
+    if (!(Math.isFinite(compliant) && Math.abs(compliant - 0.5 * Math.sqrt(2e-5 / 20.0)) < 1e-12 && compliant < rigid
+      .servoStabilityInterval())) throw 'A servo on a spring belt needs the pulley\'s interval: $compliant against ${rigid.servoStabilityInterval()}';
+    if (rigid.servoStabilityInterval(true)
+      != Math.POSITIVE_INFINITY) throw "A rigid machine has no compliant servo load";
   }
 
   /** The drive stability estimate includes masses beyond the immediate child. */
@@ -161,9 +192,8 @@ class SimulationPoseResetTests {
       model.addActuator(actuator);
     }
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
-    if (Math.abs(blueprint.joints[0].reflectedInertia - 8.15) > 1e-10 ||
-        Math.abs(blueprint.joints[1].reflectedInertia - 1.35) > 1e-10)
-      throw "Drive inertia must include downstream tensors and parallel-axis offsets";
+    if (Math.abs(blueprint.joints[0].reflectedInertia - 8.15) > 1e-10 || Math.abs(blueprint.joints[1].reflectedInertia
+      - 1.35) > 1e-10) throw "Drive inertia must include downstream tensors and parallel-axis offsets";
   }
 
   /** A joint a stepper lost steps on sits its slip behind the command, and what it turns with goes along. */
@@ -187,58 +217,58 @@ class SimulationPoseResetTests {
     harness.simulation.setJointSlip(0, 0, -0.05);
     for (index in 100...300) harness.step(Int64.ofInt(index));
     q = runtime.snapshot().q;
-    if (Math.abs(q.get(0) - 0.25) > tolerance || Math.abs(q.get(1) + 2.0 * q.get(0)) > tolerance)
-      throw 'slip did not hold the joint behind its command on backend $backend: ${q.get(0)}, ${q.get(1)}';
+    if (Math.abs(q.get(0) - 0.25) > tolerance || Math.abs(q.get(1) + 2.0 * q.get(0))
+      > tolerance) throw 'slip did not hold the joint behind its command on backend $backend: ${q.get(0)}, ${q.get(1)}';
     harness.simulation.setJointSlip(0, 0, 0.0);
     for (index in 300...500) harness.step(Int64.ofInt(index));
-    if (Math.abs(runtime.snapshot().q.get(0) - 0.3) > tolerance)
-      throw 'clearing the slip did not put the joint back on its command on backend $backend';
+    if (Math.abs(runtime.snapshot().q.get(0) - 0.3)
+      > tolerance) throw 'clearing the slip did not put the joint back on its command on backend $backend';
     harness.dispose();
   }
 
   /** A servo on a motor joint carries the joint coupled to it, which takes no commands of its own. */
   static function servoCoupling():Void {
-    var build = (peak:Float) -> {
-      var model = new RobotModel("servo pair");
-      var base = model.addLink(new Link("base"));
-      var load = model.addLink(new Link("load"));
-      var rotor = model.addLink(new Link("rotor"));
-      load.mass = 1.0;
-      load.inertiaTensor = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
-      rotor.mass = 0.1;
-      rotor.inertiaTensor = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4];
-      var arm = model.addJoint(new Joint("arm", JointType.Revolute, base, load));
-      var motor = model.addJoint(new Joint("motor", JointType.Continuous, base, rotor));
-      arm.limits = new JointLimits(-2, 2);
-      motor.limits = new JointLimits(-100, 100);
-      // The arm turns once for five turns of the motor.
-      model.addCoupling(new JointCoupling("gearbox", "arm", "motor", 5.0, 0.0));
-      var actuator = new Actuator("servo", null, null, Transmission.SimpleTransmission("motor", 1.0, 0.0));
-      actuator.drive = new ServoDrive(peak / 2.0, peak, 100.0, 200.0, 1e-4, 4096.0);
-      model.addActuator(actuator);
-      model.materializeLimits();
-      return model;
+    var build = (peak:Float) -> {var model = new RobotModel("servo pair");
+    var base = model.addLink(new Link("base"));
+    var load = model.addLink(new Link("load"));
+    var rotor = model.addLink(new Link("rotor"));
+    load.mass = 1.0;
+    load.inertiaTensor = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01];
+    rotor.mass = 0.1;
+    rotor.inertiaTensor = [1e-4, 0.0, 0.0, 0.0, 1e-4, 0.0, 0.0, 0.0, 1e-4];
+    var arm = model.addJoint(new Joint("arm", JointType.Revolute, base, load));
+    var motor = model.addJoint(new Joint("motor", JointType.Continuous, base, rotor));
+    arm.limits = new JointLimits(-2, 2);
+    motor.limits = new JointLimits(-100, 100);
+    // The arm turns once for five turns of the motor.
+    model.addCoupling(new JointCoupling("gearbox", "arm", "motor", 5.0, 0.0));
+    var actuator = new Actuator("servo", null, null, Transmission.SimpleTransmission("motor", 1.0, 0.0));
+    actuator.drive = new ServoDrive(peak / 2.0, peak, 100.0, 200.0, 1e-4, 4096.0);
+    model.addActuator(actuator);
+    model.materializeLimits();
+    return model;
     };
     var compiled = RobotRuntimeCompiler.compile(build(1.2), new robotkit.profile.RobotProfile());
-    if (!(compiled.joints[1].servoStiffness > 0.0) || compiled.joints[0].servoStiffness != 0.0)
-      throw 'only the motor joint is a servo: ${compiled.joints[0].servoStiffness}, ${compiled.joints[1].servoStiffness}';
-    if (compiled.joints[1].maxEffort != 1.2) throw 'the servo limits its joint to its peak torque: ${compiled.joints[1].maxEffort}';
+    if (!(compiled.joints[1].servoStiffness > 0.0) || compiled.joints[0].servoStiffness
+      != 0.0) throw 'only the motor joint is a servo: ${compiled.joints[0].servoStiffness}, ${compiled.joints[1].servoStiffness}';
+    if (compiled.joints[1].maxEffort
+      != 1.2) throw 'the servo limits its joint to its peak torque: ${compiled.joints[1].maxEffort}';
     var harness = new SimulationHarness(0.001, 1, 1);
     var runtime = harness.simulation.addRobot(compiled);
     // The plan commands the whole chain, as a trajectory does: the arm to 0.3, its motor to 1.5.
     runtime.submitPositions([0.3, 1.5], 1);
     for (index in 0...1500) harness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
-    if (Math.abs(q.get(0) - 0.3) > 0.02 || Math.abs(q.get(1) - 1.5) > 0.1)
-      throw 'the servo did not carry its coupled joint to the command: ${q.get(0)}, ${q.get(1)}';
+    if (Math.abs(q.get(0) - 0.3) > 0.02 || Math.abs(q.get(1) - 1.5)
+      > 0.1) throw 'the servo did not carry its coupled joint to the command: ${q.get(0)}, ${q.get(1)}';
     harness.dispose();
     // The arm alone is not commanded: with no target for the motor it stays put.
     var idle = new SimulationHarness(0.001, 1, 1);
     var held = idle.simulation.addRobot(RobotRuntimeCompiler.compile(build(1.2), new robotkit.profile.RobotProfile()));
     held.submitPosition(0, 0.3, 1);
     for (index in 0...500) idle.step(Int64.ofInt(index));
-    if (Math.abs(held.snapshot().q.get(0)) > 0.02)
-      throw 'a joint moved only through its coupling must not be commanded: ${held.snapshot().q.get(0)}';
+    if (Math.abs(held.snapshot().q.get(0))
+      > 0.02) throw 'a joint moved only through its coupling must not be commanded: ${held.snapshot().q.get(0)}';
     idle.dispose();
   }
 
@@ -252,34 +282,59 @@ class SimulationPoseResetTests {
       cup.push((index & 2) == 0 ? -0.01 : 0.01);
       cup.push((index & 4) == 0 ? 0.0 : 0.02);
     }
-    var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
-      [0, 0, 0], [0, 0, 0, 1], null, null, null,
-      ToolGeometry.convex([cup], 0.03), 0);
+    var runtime = simulation.addRobotAtPose(
+      new RobotRuntimeBlueprint(1, 0, 1),
+      [0, 0, 0],
+      [0, 0, 0, 1],
+      null,
+      null,
+      null,
+      ToolGeometry.convex(
+        [cup],
+        0.03
+      ),
+      0
+    );
     var obstacle = simulationHarness.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
     simulationHarness.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
-    if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active ||
-        contacts[0].otherObject != obstacle.handle.rawValue())
-      throw "Tool cup proximity was not reported";
+    if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active
+      || contacts[0].otherObject != obstacle.handle.rawValue()) throw "Tool cup proximity was not reported";
     simulationHarness.dispose();
   }
 
   static function posedToolShapes():Void {
     var harness = new SimulationHarness(0.01, 2, 1);
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
-    blueprint.linkCollisionShapes.push(new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(0,
-      new CollisionShape(collisionkit.CollisionGeometry.Box(0.01, 0.01, 0.01))));
-    var points:Array<Float> = [for (i in 0...8) for (a in 0...3)
-      ((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? 0.1 : 0.01)];
+    blueprint.linkCollisionShapes.push(new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(
+      0,
+      new CollisionShape(collisionkit.CollisionGeometry.Box(
+        0.01,
+        0.01,
+        0.01
+      ))
+    ));
+    var points:Array<Float> = [for (i in 0...8) for (a in 0...3)((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? 0.1 : 0.01)];
     var q = Math.sqrt(0.5);
-    var rotated = new CollisionShape(collisionkit.CollisionGeometry.Convex(points), [1,0,0], [0,0,q,q]);
-    var sphere = new CollisionShape(collisionkit.CollisionGeometry.Sphere(0.02), [-1,0,0]);
-    var runtime = harness.simulation.addRobotAtPose(blueprint, [0,0,0], [0,0,0,1],
-      null, null, null, [sphere,rotated], 0);
+    var rotated = new CollisionShape(collisionkit.CollisionGeometry.Convex(points), [1, 0, 0], [0, 0, q, q]);
+    var sphere = new CollisionShape(collisionkit.CollisionGeometry.Sphere(0.02), [-1, 0, 0]);
+    var runtime = harness.simulation.addRobotAtPose(
+      blueprint,
+      [0, 0, 0],
+      [0, 0, 0, 1],
+      null,
+      null,
+      null,
+      [
+        sphere,
+        rotated
+      ],
+      0
+    );
     // Physical contacts need a dynamic participant. Static/kinematic pairs
     // without an explicit proximity shell are excluded by MuJoCo's contract.
-    var atTool = harness.spawnBox([1,0.06,0], [0.01,0.01,0.01], true);
-    var atLink = harness.spawnBox([0.015,0,0], [0.01,0.01,0.01], true);
+    var atTool = harness.spawnBox([1, 0.06, 0], [0.01, 0.01, 0.01], true);
+    var atLink = harness.spawnBox([0.015, 0, 0], [0.01, 0.01, 0.01], true);
     harness.step(Int64.ofInt(0));
     var toolContact = false, linkContact = false;
     for (contact in runtime.contacts()) {
@@ -287,8 +342,8 @@ class SimulationPoseResetTests {
       if (contact.otherObject == atLink.handle.rawValue() && contact.toolPieceIndex == -1) linkContact = true;
     }
     harness.dispose();
-    if (!toolContact || !linkContact)
-      throw "Posed tool shapes must preserve tool-piece identity alongside link geometry";
+    if (!toolContact
+      || !linkContact) throw "Posed tool shapes must preserve tool-piece identity alongside link geometry";
   }
 
   static function coupling(backend:Int):Void {
@@ -306,15 +361,14 @@ class SimulationPoseResetTests {
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()));
     // A plan leaving the follower out turns it with its source, so the runtime names the pair.
-    if (runtime.couplings.length != 1 || runtime.couplings[0].leader != 0 ||
-        runtime.couplings[0].follower != 1 || runtime.couplings[0].ratio != -2.0)
-      throw 'runtime did not report its coupling on backend $backend';
+    if (runtime.couplings.length != 1 || runtime.couplings[0].leader != 0 || runtime.couplings[0].follower != 1
+      || runtime.couplings[0].ratio != -2.0) throw 'runtime did not report its coupling on backend $backend';
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
     var tolerance = backend == 0 ? 1e-9 : 0.02;
-    if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < tolerance))
-      throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
+    if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0))
+      < tolerance)) throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
     simulationHarness.dispose();
   }
 
@@ -338,17 +392,17 @@ class SimulationPoseResetTests {
     model.addCoupling(new JointCoupling("belt", "turn", "belt", 2.0, 0.0));
     var limits = model.coupledLimits("axis");
     var screwSpeed = 100 / (Math.PI * 1000), beltSpeed = 150 / (2 * Math.PI * 1000);
-    if (Math.abs(limits.requireVelocity() - Math.min(screwSpeed, beltSpeed)) > 1e-12)
-      throw 'coupled velocity limit ${limits.requireVelocity()}';
-    if (Math.abs(limits.requireAcceleration() - Math.min(0.5, 2000 / (2 * Math.PI * 1000))) > 1e-12)
-      throw 'coupled acceleration limit ${limits.requireAcceleration()}';
-    if (limits.lower != 0 || limits.upper != 0.3 || limits.effort != 400 || limits.overtravel != 0.005)
-      throw "coupled limits must keep the joint's own travel, effort and overtravel";
+    if (Math.abs(limits.requireVelocity() - Math.min(screwSpeed,
+      beltSpeed)) > 1e-12) throw 'coupled velocity limit ${limits.requireVelocity()}';
+    if (Math.abs(limits.requireAcceleration() - Math.min(0.5,
+      2000 / (2 * Math.PI * 1000))) > 1e-12) throw 'coupled acceleration limit ${limits.requireAcceleration()}';
+    if (limits.lower != 0 || limits.upper != 0.3 || limits.effort != 400
+      || limits.overtravel != 0.005) throw "coupled limits must keep the joint's own travel, effort and overtravel";
     if (axis.limits.requireVelocity() != 0.08) throw "coupled limits must not change the model";
     // A joint with no limit of its own takes its followers'.
     axis.limits.velocity = null;
-    if (Math.abs(model.coupledLimits("axis").requireVelocity() - Math.min(screwSpeed, beltSpeed)) > 1e-12)
-      throw "an unlimited joint should take its followers' limit";
+    if (Math.abs(model.coupledLimits("axis").requireVelocity() - Math.min(screwSpeed,
+      beltSpeed)) > 1e-12) throw "an unlimited joint should take its followers' limit";
     axis.limits.velocity = 0;
     if (model.coupledLimits("axis").requireVelocity() != 0) throw "a stated zero velocity must remain a stopped joint";
     axis.limits.velocity = null;
@@ -372,16 +426,24 @@ class SimulationPoseResetTests {
     var screwLead = new JointCoupling("lead", "slide", "screw", Math.PI * 1000, 0.0);
     screwLead.efficiency = 0.4;
     motorModel.addCoupling(screwLead);
-    motorModel.addActuator(new robotkit.model.Actuator("motor", 0.63, 137.0,
-      robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)));
+    motorModel.addActuator(new robotkit.model.Actuator(
+      "motor",
+      0.63,
+      137.0,
+      robotkit.model.Transmission.SimpleTransmission(
+        "screw",
+        1.0,
+        0.0
+      )
+    ));
     var driven = motorModel.coupledLimits("slide");
     var scale = Math.PI * 1000;
-    if (Math.abs(driven.requireVelocity() - 137.0 / scale) > 1e-12)
-      throw 'a motor caps its axis at its rate through the screw: ${driven.requireVelocity()}';
+    if (Math.abs(driven.requireVelocity() - 137.0 / scale)
+      > 1e-12) throw 'a motor caps its axis at its rate through the screw: ${driven.requireVelocity()}';
     // a = eta s T / (m + eta (J_screw + J_rotor) s²), with the screw's own 4e-6 about its axis.
     var expected = 0.4 * scale * 0.63 / (10.0 + 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(driven.requireAcceleration() - expected) > expected * 1e-12)
-      throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.requireAcceleration()}, expected $expected';
+    if (Math.abs(driven.requireAcceleration() - expected) > expected
+      * 1e-12) throw 'a motor accelerates its axis by its force over mass and turning inertia: ${driven.requireAcceleration()}, expected $expected';
     // Two motors, one per screw, as on a gantry's two sides: twice the force and twice the turning inertia.
     var second = motorModel.addLink(new Link("rotor2"));
     second.mass = 0.2;
@@ -392,33 +454,48 @@ class SimulationPoseResetTests {
     var otherLead = new JointCoupling("lead2", "slide", "screw2", -Math.PI * 1000, 0.0);
     otherLead.efficiency = 0.4;
     motorModel.addCoupling(otherLead);
-    motorModel.addActuator(new robotkit.model.Actuator("motor2", 0.63, 137.0,
-      robotkit.model.Transmission.SimpleTransmission("screw2", 1.0, 0.0)));
+    motorModel.addActuator(new robotkit.model.Actuator(
+      "motor2",
+      0.63,
+      137.0,
+      robotkit.model.Transmission.SimpleTransmission(
+        "screw2",
+        1.0,
+        0.0
+      )
+    ));
     var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(motorModel.coupledLimits("slide").requireAcceleration() - pair) > pair * 1e-12)
-      throw "two motors add their force and their screws' turning inertia";
+    if (Math.abs(motorModel.coupledLimits("slide").requireAcceleration() - pair)
+      > pair * 1e-12) throw "two motors add their force and their screws' turning inertia";
     // A servo with no explicit limits is held to its peak torque and maximum speed: 1.5 N m, 200 rad/s.
     motorModel.actuators.splice(0, motorModel.actuators.length);
-    var servo = new robotkit.model.Actuator("servo", null, null, robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0));
+    var servo = new robotkit.model.Actuator(
+      "servo",
+      null,
+      null,
+      robotkit.model.Transmission.SimpleTransmission(
+        "screw",
+        1.0,
+        0.0
+      )
+    );
     servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.5, 1.5, 100.0, 200.0, 3e-5, 4096.0);
     motorModel.addActuator(servo);
     // Only the first screw is driven now; the second joins the axis as turning inertia all the same.
     var servoLimits = motorModel.coupledLimits("slide");
     var servoExpected = 0.4 * scale * 1.5 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
-    if (Math.abs(servoLimits.requireVelocity() - 200.0 / scale) > 1e-12)
-      throw 'a servo caps its axis at its maximum speed: ${servoLimits.requireVelocity()}';
-    if (Math.abs(servoLimits.requireAcceleration() - servoExpected) > servoExpected * 1e-12)
-      throw 'a servo accelerates its axis at its peak torque: ${servoLimits.requireAcceleration()}, expected $servoExpected';
+    if (Math.abs(servoLimits.requireVelocity() - 200.0 / scale)
+      > 1e-12) throw 'a servo caps its axis at its maximum speed: ${servoLimits.requireVelocity()}';
+    if (Math.abs(servoLimits.requireAcceleration() - servoExpected) > servoExpected
+      * 1e-12) throw 'a servo accelerates its axis at its peak torque: ${servoLimits.requireAcceleration()}, expected $servoExpected';
   }
 
-  static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,
-      operation:String):Void {
+  static function checkPose(simulation:Simulation,
+    position:Array<Float>, rotation:Array<Float>, operation:String):Void {
     var actual = simulation.robotPose(0);
-    for (axis in 0...3)
-      if (!(Math.abs(actual.position[axis] - position[axis]) < 1e-6))
-        throw '$operation did not restore position axis $axis';
-    for (axis in 0...4)
-      if (!(Math.abs(actual.rotation[axis] - rotation[axis]) < 1e-6))
-        throw '$operation did not restore rotation axis $axis';
+    for (axis in 0...3) if (!(Math.abs(actual.position[axis] - position[axis])
+      < 1e-6)) throw '$operation did not restore position axis $axis';
+    for (axis in 0...4) if (!(Math.abs(actual.rotation[axis] - rotation[axis])
+      < 1e-6)) throw '$operation did not restore rotation axis $axis';
   }
 }

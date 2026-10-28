@@ -7,7 +7,7 @@ import robotkit.model.SwitchReading;
  * The reader supplies actual joint coordinates, including any simulated slip. */
 class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   final runtime:RobotRuntime;
-  final readPositionsInto:Array<Float>->Void;
+  final readPositionsInto:Array<Float> -> Void;
   final positions:Array<Float>;
   final counters:Array<Float>;
   final values:Array<Float> = [0.0, 0.0, 0.0, 0.0];
@@ -17,11 +17,11 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   final jointCount:Int;
   var sequence:Int64 = Int64.ofInt(0);
 
-  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
-      readPositionsInto:Array<Float>->Void) {
-    if (blueprint == null || blueprint.identity == null || runtime == null || readPositionsInto == null)
-      throw "Switch sensor adapter needs a model, runtime, actual-position reader and clock";
-    this.runtime = runtime; this.readPositionsInto = readPositionsInto;
+  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, readPositionsInto:Array<Float> -> Void) {
+    if (blueprint == null || blueprint.identity == null || runtime == null || readPositionsInto
+      == null) throw "Switch sensor adapter needs a model, runtime, actual-position reader and clock";
+    this.runtime = runtime;
+    this.readPositionsInto = readPositionsInto;
     jointCount = blueprint.jointCount;
     positions = [for (_ in 0...jointCount) 0.0];
     counters = [for (_ in 0...jointCount) 0.0];
@@ -44,8 +44,8 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
       for (i in 0...blueprint.jointCount) if (blueprint.identity.jointId(i) == contact.joint) index = i;
       if (index < 0) throw 'Switch ${contact.id} has no monitored joint';
       var mounted = false;
-      for (sensor in blueprint.sensors) if (sensor.id == contact.id && sensor.kind == "trip_switch" &&
-          sensor.frameId == contact.frameId) mounted = true;
+      for (sensor in blueprint.sensors) if (sensor.id == contact.id
+        && sensor.kind == "trip_switch" && sensor.frameId == contact.frameId) mounted = true;
       if (!mounted) throw 'Switch ${contact.id} has no matching external sensor mount';
       indices.push(SwitchDriveBinding.resolve(blueprint, contact).joint);
     }
@@ -74,15 +74,13 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
       var active = value.sample(drives[i].position(positions[joints[i]]));
       var physicalEdge = value.closingEdgePosition;
       var joint = joints[i];
-      var edge:Null<Float> = physicalEdge == null ? null : physicalEdge +
-        drives[i].position(counters[joint] - runtime.referenceOffset(joint)) -
-        drives[i].position(positions[joint]);
+      var edge:Null<Float> = physicalEdge == null ? null : physicalEdge
+        + drives[i].position(counters[joint] - runtime.referenceOffset(joint)) - drives[i].position(positions[joint]);
       values[0] = active ? 1.0 : 0.0;
       values[1] = edge == null ? 0.0 : 1.0;
       values[2] = edge == null ? 0.0 : edge;
       values[3] = value.closingEdges;
-      runtime.publishSensorFrame(value.source.id,
-        values, sequence, sourceTime, runtime.endpoint.sourceClockId(), null);
+      runtime.publishSensorFrame(value.source.id, values, sequence, sourceTime, runtime.endpoint.sourceClockId(), null);
     }
   }
 }

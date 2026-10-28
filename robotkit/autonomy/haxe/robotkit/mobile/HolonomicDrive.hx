@@ -17,17 +17,16 @@ class HolonomicDrive implements DriveModel {
   public final wheelAngles:Array<Float>;
 
   public function new(wheelJoints:Array<Int>, wheelRadius:Float, baseRadius:Float) {
-    if (wheelJoints == null || wheelJoints.length != 3)
-      throw "Holonomic drive requires exactly three wheel joint indices";
+    if (wheelJoints == null
+      || wheelJoints.length != 3) throw "Holonomic drive requires exactly three wheel joint indices";
     var seen = new Map<Int, Bool>();
     for (joint in wheelJoints) {
       if (joint < 0) throw "Holonomic drive wheel joint indices must be non-negative";
       if (seen.exists(joint)) throw "Holonomic drive requires three distinct wheel joint indices";
       seen.set(joint, true);
     }
-    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 ||
-        !Math.isFinite(baseRadius) || baseRadius <= 0.0)
-      throw "Holonomic drive dimensions must be finite and positive";
+    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 || !Math.isFinite(baseRadius)
+      || baseRadius <= 0.0) throw "Holonomic drive dimensions must be finite and positive";
     this.wheelJoints = wheelJoints.copy();
     this.wheelRadius = wheelRadius;
     this.baseRadius = baseRadius;
@@ -50,8 +49,8 @@ class HolonomicDrive implements DriveModel {
     for (i in 0...3) {
       // Tangential wheel speed for a body moving at (vx, vy) and yawing at
       // omega: s_i = -sin(theta_i)*vx + cos(theta_i)*vy + baseRadius*omega.
-      var wheelSpeed = -Math.sin(wheelAngles[i]) * twist.linear +
-        Math.cos(wheelAngles[i]) * twist.lateral + baseRadius * twist.angular;
+      var wheelSpeed = -Math.sin(wheelAngles[i])
+        * twist.linear + Math.cos(wheelAngles[i]) * twist.lateral + baseRadius * twist.angular;
       result.push(JointTarget.velocity(wheelJoints[i], wheelSpeed / wheelRadius));
     }
     return result;

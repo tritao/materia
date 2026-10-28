@@ -8,19 +8,29 @@ class CameraFrameData {
   public final frame:CameraFrame;
   final pixelBytes:Bytes;
 
-  public function new(frame:CameraFrame, pixels:Bytes, ?offset:Int = 0,
-      ?length:Int = -1) {
-    if (frame == null || pixels == null)
-      throw "Camera frame data requires metadata and pixel bytes";
+  public function new(frame:CameraFrame, pixels:Bytes, ?offset:Int = 0, ?length:Int = -1) {
+    if (frame == null || pixels == null) throw "Camera frame data requires metadata and pixel bytes";
     var resolvedLength = length < 0 ? pixels.length - offset : length;
-    if (offset < 0 || offset > pixels.length || resolvedLength <= 0 ||
-        resolvedLength > pixels.length - offset)
-      throw "Camera frame data references bytes outside the pixel buffer";
-    this.frame = new CameraFrame(frame.robotId, frame.sensorId, frame.kind,
-      frame.frameId, frame.sequence, frame.sourceTimestampNs,
-      frame.receivedTimestampNs, frame.width, frame.height, frame.format,
-      frame.pixels, frame.linkId, frame.mountPosition, frame.mountRotation,
-      frame.sourceClockId, frame.receivedClockId);
+    if (offset < 0 || offset > pixels.length || resolvedLength <= 0
+      || resolvedLength > pixels.length - offset) throw "Camera frame data references bytes outside the pixel buffer";
+    this.frame = new CameraFrame(
+      frame.robotId,
+      frame.sensorId,
+      frame.kind,
+      frame.frameId,
+      frame.sequence,
+      frame.sourceTimestampNs,
+      frame.receivedTimestampNs,
+      frame.width,
+      frame.height,
+      frame.format,
+      frame.pixels,
+      frame.linkId,
+      frame.mountPosition,
+      frame.mountRotation,
+      frame.sourceClockId,
+      frame.receivedClockId
+    );
     pixelBytes = copySlice(pixels, offset, resolvedLength);
   }
 
@@ -30,10 +40,14 @@ class CameraFrameData {
   /** Returns an owned world image while copying directly from retained bytes. */
   public function image():CameraImage {
     var encoding = switch frame.format {
-      case PixelFormat.RGB8: "rgb8";
-      case PixelFormat.Depth32F: "depth32f";
-      case PixelFormat.JPEG: "jpeg";
-      case _: throw "Camera frame has an unsupported pixel format";
+      case PixelFormat.RGB8:
+        "rgb8";
+      case PixelFormat.Depth32F:
+        "depth32f";
+      case PixelFormat.JPEG:
+        "jpeg";
+      case _:
+        throw "Camera frame has an unsupported pixel format";
     };
     return new CameraImage(frame.width, frame.height, encoding, pixelBytes);
   }

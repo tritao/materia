@@ -10,7 +10,8 @@ class CollisionClearanceLayout {
 
   public function new(description:CollisionDescription, bodies:ModelBodies) {
     if (description == null || bodies == null) throw "Described clearance needs geometry and kinematics";
-    this.description = description; this.bodies = bodies;
+    this.description = description;
+    this.bodies = bodies;
   }
 
 }

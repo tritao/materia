@@ -8,12 +8,15 @@ class SwitchDriveBinding {
   public final ratio:Float;
   public final offset:Float;
   function new(joint:Int, ratio:Float, offset:Float) {
-    this.joint = joint; this.ratio = ratio; this.offset = offset;
+    this.joint = joint;
+    this.ratio = ratio;
+    this.offset = offset;
   }
   public function position(shaft:Float):Float return (shaft - offset) / ratio;
 
   public static function resolve(blueprint:RobotRuntimeBlueprint, contact:JointSwitch):SwitchDriveBinding {
-    if (blueprint == null || blueprint.identity == null || contact == null) throw "Switch drive binding requires identity";
+    if (blueprint == null
+      || blueprint.identity == null || contact == null) throw "Switch drive binding requires identity";
     var leader = -1, drive = -1;
     for (i in 0...blueprint.jointCount) {
       var id = blueprint.identity.jointId(i);

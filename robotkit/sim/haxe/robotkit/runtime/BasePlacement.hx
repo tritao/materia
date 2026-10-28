@@ -10,16 +10,13 @@ class BasePlacement {
    * plants do while they drive. The jump carries the base's velocity and does
    * not read as motion; see Simulation.placeRobotBase.
    */
-  public static function place(simulation:Simulation, robotIndex:Int, pose:Pose2,
-      height:Float):Void {
+  public static function place(simulation:Simulation, robotIndex:Int, pose:Pose2, height:Float):Void {
     var q = simulation.robotPose(robotIndex).rotation;
     // Tilt = Rz(-heading) * rotation: the current rotation with its heading
     // (the body x axis projected on the floor) removed.
-    var heading = Math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
-      1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]));
+    var heading = Math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]), 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]));
     var tilt = multiply(yawRotation(-heading), q);
-    simulation.placeRobotBase(robotIndex, [pose.x, pose.y, height],
-      multiply(yawRotation(pose.yaw), tilt));
+    simulation.placeRobotBase(robotIndex, [pose.x, pose.y, height], multiply(yawRotation(pose.yaw), tilt));
   }
 
   static function yawRotation(yaw:Float):Array<Float> {

@@ -10,8 +10,8 @@ class DeviceChannel {
   /** Largest tolerated disagreement after pulse counts are normalized to SI leader coordinates. */
   public final skewBound:Float;
 
-  public function new(index:Int, actuator:String, direction:Int = 1,
-      directionSetupTicks:Int = 0, skewBound:Float = 0.0) {
+  public function new(index:Int,
+    actuator:String, direction:Int = 1, directionSetupTicks:Int = 0, skewBound:Float = 0.0) {
     this.index = index;
     this.actuator = actuator;
     this.direction = direction;

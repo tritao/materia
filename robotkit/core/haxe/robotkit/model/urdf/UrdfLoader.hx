@@ -70,10 +70,8 @@ class UrdfLoader {
         var mesh = meshFile(visualElement);
         if (mesh != null && link.visualGeometry == null) link.visualGeometry = mesh;
       }
-      if (visualCount > 1)
-        warnings.push('link $linkName: kept the first of $visualCount visual meshes');
-      for (collision in element.elementsNamed("collision"))
-        readCollision(collision, link, warnings);
+      if (visualCount > 1) warnings.push('link $linkName: kept the first of $visualCount visual meshes');
+      for (collision in element.elementsNamed("collision")) readCollision(collision, link, warnings);
     }
 
     var joints = new Map<String, Joint>();
@@ -85,21 +83,27 @@ class UrdfLoader {
       var childName = required(child(element, "child"), "link");
       if (parentName == world) {
         switch type {
-          case "floating": model.floatingBase = true;
+          case "floating":
+            model.floatingBase = true;
           case "fixed":
-          case _: throw 'URDF joint $jointName attaches to world with unsupported type $type';
+          case _:
+            throw 'URDF joint $jointName attaches to world with unsupported type $type';
         }
         continue;
       }
       var parent = links.get(parentName), childLink = links.get(childName);
-      if (parent == null || childLink == null)
-        throw 'URDF joint $jointName references an unknown link';
+      if (parent == null || childLink == null) throw 'URDF joint $jointName references an unknown link';
       var jointType = switch type {
-        case "revolute": JointType.Revolute;
-        case "continuous": JointType.Continuous;
-        case "prismatic": JointType.Prismatic;
-        case "fixed": JointType.Fixed;
-        case _: throw 'URDF joint $jointName has unsupported type $type';
+        case "revolute":
+          JointType.Revolute;
+        case "continuous":
+          JointType.Continuous;
+        case "prismatic":
+          JointType.Prismatic;
+        case "fixed":
+          JointType.Fixed;
+        case _:
+          throw 'URDF joint $jointName has unsupported type $type';
       };
       if (joints.exists(jointName)) throw 'Duplicate URDF joint $jointName';
       var joint = model.addJoint(new Joint(jointName, jointType, parent, childLink, "joint/" + jointName));
@@ -122,8 +126,8 @@ class UrdfLoader {
           limits.lower = number(limit, "lower", 0.0);
           limits.upper = number(limit, "upper", 0.0);
         }
-      } else if (jointType == JointType.Revolute || jointType == JointType.Prismatic)
-        throw 'URDF joint $jointName needs <limit>';
+      } else if (jointType == JointType.Revolute
+        || jointType == JointType.Prismatic) throw 'URDF joint $jointName needs <limit>';
       joint.limits = limits;
       var dynamics = child(element, "dynamics");
       if (dynamics != null) {
@@ -131,16 +135,31 @@ class UrdfLoader {
         joint.frictionLoss = Math.abs(number(dynamics, "friction", 0.0));
       }
       var mimic = child(element, "mimic");
-      if (mimic != null)
-        mimics.push({follower: jointName, leader: required(mimic, "joint"),
-          ratio: number(mimic, "multiplier", 1.0), offset: number(mimic, "offset", 0.0)});
+      if (mimic != null) mimics.push({
+        follower: jointName,
+        leader: required(mimic, "joint"),
+        ratio: number(
+          mimic,
+          "multiplier",
+          1.0
+        ),
+        offset: number(
+          mimic,
+          "offset",
+          0.0
+        )
+      });
     }
     for (mimic in mimics) {
       var leader = joints.get(mimic.leader), follower = joints.get(mimic.follower);
-      if (leader == null || follower == null)
-        throw 'URDF joint ${mimic.follower} mimics unknown joint ${mimic.leader}';
-      model.addCoupling(new JointCoupling("coupling/" + mimic.follower, leader.id,
-        follower.id, mimic.ratio, mimic.offset));
+      if (leader == null || follower == null) throw 'URDF joint ${mimic.follower} mimics unknown joint ${mimic.leader}';
+      model.addCoupling(new JointCoupling(
+        "coupling/" + mimic.follower,
+        leader.id,
+        follower.id,
+        mimic.ratio,
+        mimic.offset
+      ));
     }
 
     for (element in robot.elementsNamed("transmission")) {
@@ -158,8 +177,16 @@ class UrdfLoader {
       if (reductionElement != null) reduction = parseNumber(text(reductionElement), "mechanicalReduction");
       if (reduction == 0.0) throw 'URDF transmission for ${joint.name} has zero reduction';
       var effort:Null<Float> = joint.limits.effort == null ? null : joint.limits.effort / Math.abs(reduction);
-      model.addActuator(new Actuator("actuator/" + required(actuatorElement, "name"), effort, null,
-        SimpleTransmission(joint.id, reduction, 0.0)));
+      model.addActuator(new Actuator(
+        "actuator/" + required(actuatorElement, "name"),
+        effort,
+        null,
+        SimpleTransmission(
+          joint.id,
+          reduction,
+          0.0
+        )
+      ));
     }
     return new UrdfImport(model, warnings);
   }
@@ -179,9 +206,20 @@ class UrdfLoader {
     link.centerOfMass = origin.position;
     var inertia = child(inertial, "inertia");
     if (inertia == null) throw 'URDF link ${link.name} inertial needs <inertia>';
-    var ixx = number(inertia, "ixx", 0.0), ixy = number(inertia, "ixy", 0.0),
-      ixz = number(inertia, "ixz", 0.0), iyy = number(inertia, "iyy", 0.0),
-      iyz = number(inertia, "iyz", 0.0), izz = number(inertia, "izz", 0.0);
+    var ixx = number(inertia,
+      "ixx", 0.0), ixy = number(inertia, "ixy", 0.0), ixz = number(inertia, "ixz", 0.0), iyy = number(
+        inertia,
+        "iyy",
+        0.0
+      ), iyz = number(
+        inertia,
+        "iyz",
+        0.0
+      ), izz = number(
+        inertia,
+        "izz",
+        0.0
+      );
     var local = [ixx, ixy, ixz, ixy, iyy, iyz, ixz, iyz, izz];
     // Inertia is given in the inertial frame; the model keeps it in link axes: R I R^T.
     var r = rotationMatrix(origin.rotation);
@@ -204,17 +242,19 @@ class UrdfLoader {
       case "box":
         var size = vector(shape, "size", 3);
         CollisionGeometry.Box(size[0] / 2, size[1] / 2, size[2] / 2);
-      case "sphere": CollisionGeometry.Sphere(number(shape, "radius", 0.0));
+      case "sphere":
+        CollisionGeometry.Sphere(number(shape, "radius", 0.0));
       case "cylinder":
         CollisionGeometry.Cylinder(number(shape, "radius", 0.0), number(shape, "length", 0.0) / 2);
       case "mesh":
         if (link.collisionGeometry == null) link.collisionGeometry = required(shape, "filename");
-        warnings.push('link ${link.name}: collision mesh ${shape.get("filename")} is kept as a reference, not a collision shape');
+        warnings
+          .push('link ${link.name}: collision mesh ${shape.get("filename")} is kept as a reference, not a collision shape');
         null;
-      case other: throw 'URDF link ${link.name} has unsupported collision geometry $other';
+      case other:
+        throw 'URDF link ${link.name} has unsupported collision geometry $other';
     };
-    if (primitive != null)
-      link.collisionShapes.push(new CollisionShape(primitive, origin.position, origin.rotation));
+    if (primitive != null) link.collisionShapes.push(new CollisionShape(primitive, origin.position, origin.rotation));
   }
 
   static function meshFile(element:Xml):Null<String> {
@@ -223,7 +263,7 @@ class UrdfLoader {
     return mesh == null ? null : mesh.get("filename");
   }
 
-  static function readOrigin(element:Xml):{position:Array<Float>, rotation:Array<Float>} {
+  static function readOrigin(element:Xml): {position: Array<Float>, rotation: Array<Float>} {
     var origin = child(element, "origin");
     if (origin == null) return {position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0]};
     var position = origin.exists("xyz") ? vector(origin, "xyz", 3) : [0.0, 0.0, 0.0];
@@ -247,9 +287,15 @@ class UrdfLoader {
   static function rotationMatrix(q:Array<Float>):Array<Float> {
     var x = q[0], y = q[1], z = q[2], w = q[3];
     return [
-      1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
-      2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
-      2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)
+      1 - 2 * (y * y + z * z),
+      2 * (x * y - z * w),
+      2 * (x * z + y * w),
+      2 * (x * y + z * w),
+      1 - 2 * (x * x + z * z),
+      2 * (y * z - x * w),
+      2 * (x * z - y * w),
+      2 * (y * z + x * w),
+      1 - 2 * (x * x + y * y)
     ];
   }
 
@@ -267,8 +313,7 @@ class UrdfLoader {
   static function required(element:Null<Xml>, attribute:String):String {
     if (element == null) throw 'URDF element is missing where "$attribute" is required';
     var value = element.get(attribute);
-    if (value == null || value == "")
-      throw 'URDF <${element.nodeName}> needs attribute "$attribute"';
+    if (value == null || value == "") throw 'URDF <${element.nodeName}> needs attribute "$attribute"';
     return value;
   }
 
@@ -279,8 +324,7 @@ class UrdfLoader {
 
   static function vector(element:Xml, attribute:String, length:Int):Array<Float> {
     var parts = [for (part in StringTools.trim(required(element, attribute)).split(" ")) if (part != "") part];
-    if (parts.length != length)
-      throw 'URDF attribute "$attribute" needs $length numbers';
+    if (parts.length != length) throw 'URDF attribute "$attribute" needs $length numbers';
     return [for (part in parts) parseNumber(part, attribute)];
   }
 

@@ -30,8 +30,7 @@ class PlanarMath {
   }
 
   public static function atan2(y:Float, x:Float):Float {
-    if (!Math.isFinite(x) || !Math.isFinite(y))
-      throw "atan2 inputs must be finite";
+    if (!Math.isFinite(x) || !Math.isFinite(y)) throw "atan2 inputs must be finite";
     if (x > 0.0) return atan(y / x);
     if (x < 0.0) return y >= 0.0 ? atan(y / x) + Math.PI : atan(y / x) - Math.PI;
     if (y > 0.0) return Math.PI * 0.5;

@@ -33,11 +33,15 @@ class SwitchReading {
       rearm = false;
     }
     if (!active && distance >= variation) {
-      active = true; changed = true; closingEdges++;
+      active = true;
+      changed = true;
+      closingEdges++;
       edgePosition = source.trip + source.side * variation;
       closingEdgePosition = edgePosition;
     } else if (active && distance < variation - source.hysteresis) {
-      active = false; changed = true; rearm = true;
+      active = false;
+      changed = true;
+      rearm = true;
       edgePosition = source.trip + source.side * (variation - source.hysteresis);
     }
     return active;

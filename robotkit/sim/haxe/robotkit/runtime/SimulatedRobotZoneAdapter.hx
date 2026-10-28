@@ -35,11 +35,19 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
   final carried:Array<Bool> = [];
   var sequence:Int64 = Int64.ofInt(0);
 
-  public function new(simulation:Simulation, runtime:RobotRuntime, blueprint:RobotRuntimeBlueprint, robotIndex:Int,
-      mechanisms:Array<RobotZoneMechanism>, objects:Array<SimObject>, margin:Float, makeWorld:Void->CollisionWorld) {
-    if (simulation == null || runtime == null || blueprint == null || robotIndex < 0 || mechanisms == null ||
-        objects == null || !(margin >= 0.0) || !Math.isFinite(margin) || makeWorld == null)
-      throw "Simulated robot zones need a simulation, runtime, blueprint, robots, scene objects and a margin";
+  public function new(
+    simulation:Simulation,
+    runtime:RobotRuntime,
+    blueprint:RobotRuntimeBlueprint,
+    robotIndex:Int,
+    mechanisms:Array<RobotZoneMechanism>,
+    objects:Array<SimObject>,
+    margin:Float,
+    makeWorld:Void -> CollisionWorld
+  ) {
+    if (simulation == null || runtime == null || blueprint == null || robotIndex < 0
+      || mechanisms == null || objects == null || !(margin >= 0.0) || !Math.isFinite(margin) || makeWorld
+      == null) throw "Simulated robot zones need a simulation, runtime, blueprint, robots, scene objects and a margin";
     this.simulation = simulation;
     this.runtime = runtime;
     this.robotIndex = robotIndex;
@@ -48,14 +56,27 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
     sensors = [for (sensor in blueprint.externalSensorLayout()) if (sensor.kind == "zone_input") sensor];
     for (sensor in sensors) {
       var boxes = sensor.zoneBoxes;
-      if (sensor.link < 0 || sensor.link >= blueprint.linkCount || boxes == null || boxes.length == 0 ||
-          boxes.length % 6 != 0)
-        throw 'Robot zone "${sensor.id}" has an invalid mount or boxes';
+      if (sensor.link < 0 || sensor.link >= blueprint.linkCount || boxes == null
+        || boxes.length == 0 || boxes.length % 6 != 0) throw 'Robot zone "${sensor.id}" has an invalid mount or boxes';
       // One body per zone: its field is the union of its boxes.
       var zone = world.addBody(0);
-      for (box in 0...Std.int(boxes.length / 6))
-        world.add(zone, new CollisionPose(boxes.get(6 * box), boxes.get(6 * box + 1), boxes.get(6 * box + 2), 0, 0, 0, 1),
-          CollisionGeometry.Box(boxes.get(6 * box + 3), boxes.get(6 * box + 4), boxes.get(6 * box + 5)));
+      for (box in 0...Std.int(boxes.length / 6)) world.add(
+        zone,
+        new CollisionPose(
+          boxes.get(6 * box),
+          boxes.get(6 * box + 1),
+          boxes.get(6 * box + 2),
+          0,
+          0,
+          0,
+          1
+        ),
+        CollisionGeometry.Box(
+          boxes.get(6 * box + 3),
+          boxes.get(6 * box + 4),
+          boxes.get(6 * box + 5)
+        )
+      );
       zones.push(zone);
     }
     for (mechanism in mechanisms) {
@@ -66,8 +87,15 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
         if (body == null) {
           body = world.addBody(1);
           bodies.set(hull.link, body);
-          links.push({robotIndex: mechanism.robotIndex, link: hull.link, body: body,
-            carrier: simulation.linkBody(mechanism.robotIndex, hull.link)});
+          links.push({
+            robotIndex: mechanism.robotIndex,
+            link: hull.link,
+            body: body,
+            carrier: simulation.linkBody(
+              mechanism.robotIndex,
+              hull.link
+            )
+          });
         }
         world.add(body, CollisionPose.identity(), CollisionGeometry.Convex(hull.shape.convexVertices()));
       }
@@ -86,12 +114,24 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
     }
     // Only a zone and what may enter it are compared; a free part never occupies a zone.
     var watched = [for (link in links) link.body].concat([for (entry in this.objects) entry.body]);
-    for (i in 0...watched.length) for (j in i + 1...watched.length)
-      world.setBodyRule(watched[i], watched[j], CollisionPairRule.Allow, CollisionPairStatus.Rigid);
-    for (i in 0...zones.length) for (j in i + 1...zones.length)
-      world.setBodyRule(zones[i], zones[j], CollisionPairRule.Allow, CollisionPairStatus.Rigid);
-    for (zone in zones) for (entry in this.objects)
-      world.setBodyRule(zone, entry.body, CollisionPairRule.Allow, CollisionPairStatus.Rigid);
+    for (i in 0...watched.length) for (j in i + 1...watched.length) world.setBodyRule(
+      watched[i],
+      watched[j],
+      CollisionPairRule.Allow,
+      CollisionPairStatus.Rigid
+    );
+    for (i in 0...zones.length) for (j in i + 1...zones.length) world.setBodyRule(
+      zones[i],
+      zones[j],
+      CollisionPairRule.Allow,
+      CollisionPairStatus.Rigid
+    );
+    for (zone in zones) for (entry in this.objects) world.setBodyRule(
+      zone,
+      entry.body,
+      CollisionPairRule.Allow,
+      CollisionPairStatus.Rigid
+    );
   }
 
   public function afterSimulationStep(sourceTimestampNs:Int64):Void {
@@ -100,16 +140,51 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
     for (index in 0...sensors.length) {
       var sensor = sensors[index];
       var link = simulation.linkPose(robotIndex, sensor.link);
-      var parent = new Pose3(link.position[0], link.position[1], link.position[2],
-        link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3]);
-      var mount = parent.compose(new Pose3(sensor.position.get(0), sensor.position.get(1), sensor.position.get(2),
-        sensor.rotation.get(0), sensor.rotation.get(1), sensor.rotation.get(2), sensor.rotation.get(3)));
-      world.setBodyPose(zones[index], new CollisionPose(mount.x, mount.y, mount.z, mount.qx, mount.qy, mount.qz, mount.qw));
+      var parent = new Pose3(
+        link.position[0],
+        link.position[1],
+        link.position[2],
+        link.rotation[0],
+        link.rotation[1],
+        link.rotation[2],
+        link.rotation[3]
+      );
+      var mount = parent.compose(new Pose3(
+        sensor.position.get(0),
+        sensor.position.get(1),
+        sensor.position.get(2),
+        sensor.rotation.get(0),
+        sensor.rotation.get(1),
+        sensor.rotation.get(2),
+        sensor.rotation.get(3)
+      ));
+      world.setBodyPose(
+        zones[index],
+        new CollisionPose(
+          mount.x,
+          mount.y,
+          mount.z,
+          mount.qx,
+          mount.qy,
+          mount.qz,
+          mount.qw
+        )
+      );
     }
     for (link in links) {
       var pose = simulation.linkPose(link.robotIndex, link.link);
-      world.setBodyPose(link.body, new CollisionPose(pose.position[0], pose.position[1], pose.position[2],
-        pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
+      world.setBodyPose(
+        link.body,
+        new CollisionPose(
+          pose.position[0],
+          pose.position[1],
+          pose.position[2],
+          pose.rotation[0],
+          pose.rotation[1],
+          pose.rotation[2],
+          pose.rotation[3]
+        )
+      );
     }
     for (index in 0...objects.length) {
       var entry = objects[index];
@@ -117,8 +192,12 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
       for (link in links) if (link.carrier == carrier) held = true;
       if (held != carried[index]) {
         carried[index] = held;
-        for (zone in zones) world.setBodyRule(zone, entry.body,
-          held ? CollisionPairRule.Default : CollisionPairRule.Allow, CollisionPairStatus.Rigid);
+        for (zone in zones) world.setBodyRule(
+          zone,
+          entry.body,
+          held ? CollisionPairRule.Default : CollisionPairRule.Allow,
+          CollisionPairStatus.Rigid
+        );
       }
       if (held) {
         var pose = simulation.objectPose(entry.object);
@@ -126,11 +205,15 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
       }
     }
     var occupied = [for (_ in zones) false];
-    for (pair in world.colliding(margin)) for (index in 0...zones.length)
-      if (pair.bodyA == zones[index] || pair.bodyB == zones[index]) occupied[index] = true;
-    for (index in 0...sensors.length)
-      runtime.publishSensorFrame(sensors[index].id, [occupied[index] ? 1.0 : 0.0], sequence, sourceTimestampNs,
-        runtime.sourceClockId);
+    for (pair in world.colliding(margin)) for (index in 0...zones.length) if (pair.bodyA == zones[index]
+      || pair.bodyB == zones[index]) occupied[index] = true;
+    for (index in 0...sensors.length) runtime.publishSensorFrame(
+      sensors[index].id,
+      [occupied[index] ? 1.0 : 0.0],
+      sequence,
+      sourceTimestampNs,
+      runtime.sourceClockId
+    );
   }
 
   public function dispose():Void world.dispose();

@@ -29,28 +29,51 @@ import robotkit.runtime.RobotRuntimeCompiler;
 class SerialRobot implements Robot {
   final adapter:RuntimeRobotAdapter;
 
-  public function new(id:RobotId, model:RobotModel, profile:robotkit.profile.RobotProfile, devicePath:String,
-      controllerHex:String, layout:DeviceLayout, maxTargetError:Float, ?baud:Int = 115200,
-      ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64,
-      ?channels:Array<ProcessChannelDeclaration>, ?stepTickHz:Int = 40000,
-      ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64) {
-    if (id == null || id.length == 0)
-      throw "SerialRobot requires a non-empty logical ID";
+  public function new(
+    id:RobotId,
+    model:RobotModel,
+    profile:robotkit.profile.RobotProfile,
+    devicePath:String,
+    controllerHex:String,
+    layout:DeviceLayout,
+    maxTargetError:Float,
+    ?baud:Int = 115200,
+    ?ownerPeriodNs:haxe.Int64,
+    ?processingAllowanceNs:haxe.Int64,
+    ?channels:Array<ProcessChannelDeclaration>,
+    ?stepTickHz:Int = 40000,
+    ?linkLossTimeoutNs:haxe.Int64,
+    ?clockSyncBoundNs:haxe.Int64
+  ) {
+    if (id == null || id.length == 0) throw "SerialRobot requires a non-empty logical ID";
     if (model == null) throw "SerialRobot requires a robot model";
     if (layout == null) throw "SerialRobot requires a device layout";
     var binding = DeviceBinding.bind(model, layout, stepTickHz);
     // The runtime plans on the binding's model, whose actuator rates are what the step tick can drive.
     var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(binding.model, profile);
-    if (channels != null)
-      for (channel in channels) blueprint.channels.push(channel);
+    if (channels != null) for (channel in channels) blueprint.channels.push(channel);
     if (ownerPeriodNs != null) blueprint.ownerPeriodNs = ownerPeriodNs;
-    if (processingAllowanceNs != null)
-      blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
-    var runtime = robotkit.serial.SerialRuntimeEndpoint.createRuntime(blueprint, devicePath, controllerHex, binding,
-      maxTargetError, baud, linkLossTimeoutNs, clockSyncBoundNs);
-    adapter = new RuntimeRobotAdapter(id, runtime, model.name,
-      [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
-      true, true, "serial endpoint fault");
+    if (processingAllowanceNs != null) blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
+    var runtime = robotkit.serial.SerialRuntimeEndpoint.createRuntime(
+      blueprint,
+      devicePath,
+      controllerHex,
+      binding,
+      maxTargetError,
+      baud,
+      linkLossTimeoutNs,
+      clockSyncBoundNs
+    );
+    adapter = new RuntimeRobotAdapter(
+      id,
+      runtime,
+      model.name,
+      [for (link in model.links) link.id],
+      [for (joint in model.joints) joint.id],
+      true,
+      true,
+      "serial endpoint fault"
+    );
   }
 
   public function id():RobotId return adapter.id();
@@ -59,13 +82,11 @@ class SerialRobot implements Robot {
   public function capabilities():RobotCapabilities return adapter.capabilities();
   public function snapshot():RobotSnapshot return adapter.snapshot();
   public function streams():robotkit.streams.SensorStreams return adapter.streams();
-  public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent>
-    return adapter.events(afterOrdinal, max);
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent> return adapter.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return adapter.fault();
   public function submit(command:RobotCommand):Void adapter.submit(command);
   public function stop(mode:StopMode):Void adapter.stop(mode);
   public function resetSafety():Void adapter.resetSafety();
-  public function setChangeListener(listener:Null < RobotId -> Void >):Void
-    adapter.setChangeListener(listener);
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void adapter.setChangeListener(listener);
   public function close():Void adapter.close();
 }

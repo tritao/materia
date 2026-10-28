@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Typed MessagePack payload for the recording channel. */
-@:wire
-class RecordingJointTargetMsg {
+@:wire class RecordingJointTargetMsg {
   @:id(1) public var joint:Int;
   @:id(2) public var mode:Int;
   @:id(3) public var target:Float;
@@ -11,5 +10,6 @@ class RecordingJointTargetMsg {
   @:id(6) public var damping:Float;
   @:id(7) public var feedforward:Float;
 
-  public function new() {}
+  public function new() {
+  }
 }

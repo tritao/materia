@@ -52,19 +52,25 @@ class StepperDrive extends ActuatorDrive {
   public final fullStepsPerRevolution:Float;
   public final holdingTorque:Float;
 
-  public function new(fullStepsPerRevolution:Float, rotorInertia:Float, holdingTorque:Float,
-      pullOut:TorqueSpeedCurve) {
+  public function new(fullStepsPerRevolution:Float, rotorInertia:Float, holdingTorque:Float, pullOut:TorqueSpeedCurve) {
     super(rotorInertia, pullOut);
-    if (!Math.isFinite(fullStepsPerRevolution) || fullStepsPerRevolution <= 0.0)
-      throw "A stepper needs a positive number of full steps per revolution";
+    if (!Math.isFinite(fullStepsPerRevolution)
+      || fullStepsPerRevolution <= 0.0) throw "A stepper needs a positive number of full steps per revolution";
     if (!Math.isFinite(holdingTorque) || holdingTorque < 0.0) throw "Holding torque must be finite and non-negative";
     this.fullStepsPerRevolution = fullStepsPerRevolution;
     this.holdingTorque = holdingTorque;
   }
 
   /** A stepper with a stated step count and no torque ratings. */
-  public static function stepsOnly(fullStepsPerRevolution:Float):StepperDrive
-    return new StepperDrive(fullStepsPerRevolution, 0.0, 0.0, TorqueSpeedCurve.flat(0.0, 1.0));
+  public static function stepsOnly(fullStepsPerRevolution:Float):StepperDrive return new StepperDrive(
+    fullStepsPerRevolution,
+    0.0,
+    0.0,
+    TorqueSpeedCurve.flat(
+      0.0,
+      1.0
+    )
+  );
 
   /** Whether this drive knows its torque, or only its steps. */
   public function hasTorqueData():Bool return holdingTorque > 0.0;
@@ -85,12 +91,22 @@ class ServoDrive extends ActuatorDrive {
   public final maxSpeedValue:Float;
   public final encoderCounts:Float;
 
-  public function new(ratedTorque:Float, peakTorque:Float, ratedSpeed:Float, maxSpeed:Float,
-      rotorInertia:Float, encoderCounts:Float, ?envelope:TorqueSpeedCurve) {
-    super(rotorInertia, envelope == null ? ServoDrive.defaultEnvelope(ratedTorque, peakTorque, ratedSpeed, maxSpeed) : envelope);
-    if (!(ratedTorque > 0.0) || !(peakTorque >= ratedTorque) || !(ratedSpeed > 0.0) || !(maxSpeed >= ratedSpeed) ||
-        !Math.isFinite(peakTorque) || !Math.isFinite(maxSpeed))
-      throw "A servo needs 0 < rated torque <= peak torque and 0 < rated speed <= max speed";
+  public function new(
+    ratedTorque:Float,
+    peakTorque:Float,
+    ratedSpeed:Float,
+    maxSpeed:Float,
+    rotorInertia:Float,
+    encoderCounts:Float,
+    ?envelope:TorqueSpeedCurve
+  ) {
+    super(
+      rotorInertia,
+      envelope == null ? ServoDrive.defaultEnvelope(ratedTorque, peakTorque, ratedSpeed, maxSpeed) : envelope
+    );
+    if (!(ratedTorque > 0.0) || !(peakTorque >= ratedTorque)
+      || !(ratedSpeed > 0.0) || !(maxSpeed >= ratedSpeed) || !Math.isFinite(peakTorque) || !Math
+      .isFinite(maxSpeed)) throw "A servo needs 0 < rated torque <= peak torque and 0 < rated speed <= max speed";
     if (!Math.isFinite(encoderCounts) || encoderCounts < 0.0) throw "Encoder counts must be finite and non-negative";
     this.ratedTorque = ratedTorque;
     this.peakTorqueValue = peakTorque;
@@ -103,8 +119,8 @@ class ServoDrive extends ActuatorDrive {
    * Peak torque up to the rated speed, falling in a straight line to the rated torque at the
    * maximum speed: the usual shape of a servo's intermittent-duty envelope.
    */
-  public static function defaultEnvelope(ratedTorque:Float, peakTorque:Float, ratedSpeed:Float,
-      maxSpeed:Float):TorqueSpeedCurve {
+  public static function defaultEnvelope(ratedTorque:Float,
+    peakTorque:Float, ratedSpeed:Float, maxSpeed:Float):TorqueSpeedCurve {
     if (maxSpeed <= ratedSpeed) return TorqueSpeedCurve.flat(peakTorque, maxSpeed);
     return new TorqueSpeedCurve([0.0, ratedSpeed, maxSpeed], [peakTorque, peakTorque, ratedTorque]);
   }
@@ -136,17 +152,30 @@ class CylinderDrive extends ActuatorDrive {
   public final normallyToA:Bool;
   public final extendSign:Float;
 
-  function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
-      channelA:String, channelB:Null<String>, normallyToA:Bool, extendSign:Float) {
+  function new(
+    bore:Float,
+    rod:Float,
+    stroke:Float,
+    ratedSpeed:Float,
+    pressurePa:Float,
+    channelA:String,
+    channelB:Null<String>,
+    normallyToA:Bool,
+    extendSign:Float
+  ) {
     super(0.0, TorqueSpeedCurve.flat(0.0, ratedSpeed));
-    if (!(bore > rod && rod > 0 && stroke > 0 && ratedSpeed > 0 && pressurePa >= 0) ||
-        !Math.isFinite(bore + rod + stroke + ratedSpeed + pressurePa) ||
-        channelA == null || channelA.length == 0 || (channelB != null && channelB.length == 0) ||
-        (extendSign != 1.0 && extendSign != -1.0))
-      throw "Invalid cylinder drive";
-    this.bore = bore; this.rod = rod; this.stroke = stroke; this.ratedSpeed = ratedSpeed;
-    this.pressurePa = pressurePa; this.channelA = channelA; this.channelB = channelB;
-    this.normallyToA = normallyToA; this.extendSign = extendSign;
+    if (!(bore > rod && rod > 0 && stroke > 0 && ratedSpeed > 0 && pressurePa >= 0) || !Math.isFinite(bore
+      + rod + stroke + ratedSpeed + pressurePa) || channelA == null || channelA.length == 0 || (channelB != null
+      && channelB.length == 0) || (extendSign != 1.0 && extendSign != -1.0)) throw "Invalid cylinder drive";
+    this.bore = bore;
+    this.rod = rod;
+    this.stroke = stroke;
+    this.ratedSpeed = ratedSpeed;
+    this.pressurePa = pressurePa;
+    this.channelA = channelA;
+    this.channelB = channelB;
+    this.normallyToA = normallyToA;
+    this.extendSign = extendSign;
     if (!Math.isFinite(extensionForce() + retractionForce())) throw "Cylinder pressure-area force overflows";
   }
 
@@ -161,15 +190,23 @@ class CylinderDrive extends ActuatorDrive {
 
 /** Pressure effort with a spring-return or latched directional valve. */
 class PneumaticDrive extends CylinderDrive {
-  public function new(bore:Float, rod:Float, stroke:Float, ratedSpeed:Float, pressurePa:Float,
-      channelA:String, channelB:Null<String>, normallyToA:Bool, extendSign:Float) {
+  public function new(
+    bore:Float,
+    rod:Float,
+    stroke:Float,
+    ratedSpeed:Float,
+    pressurePa:Float,
+    channelA:String,
+    channelB:Null<String>,
+    normallyToA:Bool,
+    extendSign:Float
+  ) {
     super(bore, rod, stroke, ratedSpeed, pressurePa, channelA, channelB, normallyToA, extendSign);
   }
   /** A critically damped end stop: static deflection uses one quarter of the cushion's allowance. */
   public function limitTimeConstant(movingMass:Float, cushionCompression:Float):Float {
-    if (!(movingMass > 0.0) || !(cushionCompression > 0.0) || !(extensionForce() > 0.0) ||
-        !Math.isFinite(movingMass + cushionCompression))
-      throw "Pneumatic limit needs positive mass and cushion compression";
+    if (!(movingMass > 0.0) || !(cushionCompression > 0.0) || !(extensionForce() > 0.0) || !Math.isFinite(movingMass
+      + cushionCompression)) throw "Pneumatic limit needs positive mass and cushion compression";
     return Math.sqrt(movingMass * cushionCompression / extensionForce()) / 2.0;
   }
   override public function pneumatic():Null<PneumaticDrive> return this;
@@ -185,17 +222,38 @@ class HydraulicDrive extends CylinderDrive {
   /** Joint coordinate at which the cylinder is retracted, in metres. */
   public final retractedPosition:Float;
 
-  public function new(bore:Float, rod:Float, stroke:Float, pressurePa:Float,
-      approachSpeed:Float, workingSpeed:Float, returnSpeed:Float, changePoint:Float,
-      channelA:String, channelB:String, extendSign:Float, retractedPosition:Float = 0.0) {
-    super(bore, rod, stroke, Math.max(approachSpeed, Math.max(workingSpeed, returnSpeed)),
-      pressurePa, channelA, channelB, false, extendSign);
-    if (!(approachSpeed > 0.0 && workingSpeed > 0.0 && returnSpeed > 0.0) ||
-        changePoint < 0.0 || changePoint > stroke || channelB == null || channelA == channelB ||
-        !Math.isFinite(approachSpeed + workingSpeed + returnSpeed + changePoint + retractedPosition))
-      throw "Invalid hydraulic phase speeds, change point or valve channels";
-    this.approachSpeed = approachSpeed; this.workingSpeed = workingSpeed;
-    this.returnSpeed = returnSpeed; this.changePoint = changePoint;
+  public function new(
+    bore:Float,
+    rod:Float,
+    stroke:Float,
+    pressurePa:Float,
+    approachSpeed:Float,
+    workingSpeed:Float,
+    returnSpeed:Float,
+    changePoint:Float,
+    channelA:String,
+    channelB:String,
+    extendSign:Float,
+    retractedPosition:Float = 0.0
+  ) {
+    super(
+      bore,
+      rod,
+      stroke,
+      Math.max(approachSpeed, Math.max(workingSpeed, returnSpeed)),
+      pressurePa,
+      channelA,
+      channelB,
+      false,
+      extendSign
+    );
+    if (!(approachSpeed > 0.0 && workingSpeed > 0.0 && returnSpeed > 0.0) || changePoint < 0.0 || changePoint > stroke
+      || channelB == null || channelA == channelB || !Math.isFinite(approachSpeed + workingSpeed + returnSpeed
+      + changePoint + retractedPosition)) throw "Invalid hydraulic phase speeds, change point or valve channels";
+    this.approachSpeed = approachSpeed;
+    this.workingSpeed = workingSpeed;
+    this.returnSpeed = returnSpeed;
+    this.changePoint = changePoint;
     this.retractedPosition = retractedPosition;
   }
   override public function extensionSpeed(extension:Float):Float {

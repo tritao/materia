@@ -3,8 +3,7 @@ package robotkit.protocol;
 import haxe.Int64;
 
 /** Wire representation of a sensor frame; values stay transport-neutral. */
-@:wire
-class SensorFrameMsg {
+@:wire class SensorFrameMsg {
   @:id(1) public var robotId:Int64;
   @:id(2) public var sensorId:String;
   @:id(3) public var kind:String;
@@ -17,19 +16,26 @@ class SensorFrameMsg {
   @:id(10) public var mountPosition:Array<Float>;
   @:id(11) public var mountRotation:Array<Float>;
 
-  public function new(?robotId:Int64 = null, ?sensorId:String = "",
-      ?kind:String = "", ?frameId:String = "", ?sequence:Int64 = null,
-      ?sourceTimestampNs:Int64 = null, ?receivedTimestampNs:Int64 = null,
-      ?values:Array<Float> = null, ?linkId:String = "",
-      ?mountPosition:Array<Float> = null, ?mountRotation:Array<Float> = null) {
+  public function new(
+    ?robotId:Int64 = null,
+    ?sensorId:String = "",
+    ?kind:String = "",
+    ?frameId:String = "",
+    ?sequence:Int64 = null,
+    ?sourceTimestampNs:Int64 = null,
+    ?receivedTimestampNs:Int64 = null,
+    ?values:Array<Float> = null,
+    ?linkId:String = "",
+    ?mountPosition:Array<Float> = null,
+    ?mountRotation:Array<Float> = null
+  ) {
     this.robotId = robotId == null ? Int64.ofInt(0) : robotId;
     this.sensorId = sensorId;
     this.kind = kind;
     this.frameId = frameId;
     this.sequence = sequence == null ? Int64.ofInt(0) : sequence;
     this.sourceTimestampNs = sourceTimestampNs == null ? Int64.ofInt(0) : sourceTimestampNs;
-    this.receivedTimestampNs = receivedTimestampNs == null
-      ? Int64.ofInt(0) : receivedTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null ? Int64.ofInt(0) : receivedTimestampNs;
     this.values = values == null ? [] : values.copy();
     this.linkId = linkId;
     this.mountPosition = mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition.copy();

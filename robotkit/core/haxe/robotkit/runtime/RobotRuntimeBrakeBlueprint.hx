@@ -10,8 +10,13 @@ class RobotRuntimeBrakeBlueprint {
   public final releaseTimeoutNs:Int64;
   public final feedbackMaxAgeNs:Int64;
 
-  public function new(joint:Int, releaseChannel:String, releasedSensor:String,
-      releaseTimeoutNs:Int64, feedbackMaxAgeNs:Int64) {
+  public function new(
+    joint:Int,
+    releaseChannel:String,
+    releasedSensor:String,
+    releaseTimeoutNs:Int64,
+    feedbackMaxAgeNs:Int64
+  ) {
     this.joint = joint;
     this.releaseChannel = releaseChannel;
     this.releasedSensor = releasedSensor;

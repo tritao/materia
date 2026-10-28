@@ -59,7 +59,10 @@ class TerrainTests {
     var expectedLength = (c1 - c0 + 1) * cellSize;
     var expectedWidth = (rows - 1) * cellSize;
     var expectedVolume = expectedLength * expectedWidth * depth;
-    check(approx(volume.cut, expectedVolume, 1e-6), 'Trench cut volume matches the known geometric volume ($expectedVolume m^3)');
+    check(
+      approx(volume.cut, expectedVolume, 1e-6),
+      'Trench cut volume matches the known geometric volume ($expectedVolume m^3)'
+    );
     check(approx(volume.fill, 0.0, 1e-9), "A pure cut trench reports zero fill volume");
     check(approx(volume.net(), expectedVolume, 1e-6), "Net volume equals cut minus (zero) fill");
   }
@@ -82,12 +85,15 @@ class TerrainTests {
     var capsuleArea = length * (2.0 * halfWidth) + Math.PI * halfWidth * halfWidth;
     var expectedVolume = capsuleArea * depth;
     var relativeError = Math.abs(result.removedVolume - expectedVolume) / expectedVolume;
-    check(relativeError < 0.02,
-      'Bucket sweep removed volume (${result.removedVolume}) matches the swept capsule volume (${expectedVolume}) within 2%');
+    check(
+      relativeError < 0.02,
+      'Bucket sweep removed volume (${result.removedVolume}) matches the swept capsule volume (${expectedVolume}) within 2%'
+    );
 
-    check(approx(result.removedVolume,
-      HeightMap.volumeBetween(before, map).cut, 1e-9),
-      "Bucket sweep volume equals the integrated height-map cut volume");
+    check(
+      approx(result.removedVolume, HeightMap.volumeBetween(before, map).cut, 1e-9),
+      "Bucket sweep volume equals the integrated height-map cut volume"
+    );
 
     // Sweeping again with the same edge height removes nothing further.
     var second = BucketSweep.apply(map, from, to, halfWidth, -depth);
@@ -104,24 +110,41 @@ class TerrainTests {
     var map = new HeightMap("ground", -1.0, -1.5, cellSize, columns, rows);
     var design = map.copy();
     var footprint = new Polygon2([
-      new Point2(0.0, -0.4), new Point2(3.0, -0.4),
-      new Point2(3.0, 0.4), new Point2(0.0, 0.4)
+      new Point2(0.0, -0.4),
+      new Point2(3.0, -0.4),
+      new Point2(3.0, 0.4),
+      new Point2(
+        0.0,
+        0.4
+      )
     ]);
     for (row in 0...design.rows) for (col in 0...design.columns) {
       var point = new Point2(design.worldX(col), design.worldY(row));
       if (footprint.containsOrWithin(point, 1e-9)) design.setElevation(col, row, -0.3);
     }
 
-    var result = BucketSweep.apply(map, new Point2(0.0, 0.0), new Point2(3.0, 0.0),
-      0.4, -0.8, design, footprint, cellSize * 0.5);
+    var result = BucketSweep.apply(
+      map,
+      new Point2(0.0, 0.0),
+      new Point2(3.0, 0.0),
+      0.4,
+      -0.8,
+      design,
+      footprint,
+      cellSize * 0.5
+    );
     check(result.verticesLowered > 0, "Clamped bucket sweep lowers vertices inside its design footprint");
     for (row in 0...map.rows) for (col in 0...map.columns) {
       var point = new Point2(map.worldX(col), map.worldY(row));
       var actual = map.elevationAt(col, row);
-      check(actual >= design.elevationAt(col, row) - 1e-9,
-        "Bucket sweep never lowers a height-map vertex below the design surface");
-      if (!footprint.containsOrWithin(point, cellSize * 0.5))
-        check(actual == 0.0, "Bucket sweep leaves vertices outside the tolerated footprint untouched");
+      check(
+        actual >= design.elevationAt(col, row) - 1e-9,
+        "Bucket sweep never lowers a height-map vertex below the design surface"
+      );
+      if (!footprint.containsOrWithin(point, cellSize * 0.5)) check(
+        actual == 0.0,
+        "Bucket sweep leaves vertices outside the tolerated footprint untouched"
+      );
     }
   }
 
@@ -130,8 +153,7 @@ class TerrainTests {
     var columns = 10, rows = 10;
     var design = new HeightMap("ground", 0.0, 0.0, cellSize, columns, rows);
     var existingElevation:Array<Float> = [];
-    for (row in 0...rows) for (col in 0...columns)
-      existingElevation.push(((col + row) % 2 == 0) ? 0.001 : 0.05);
+    for (row in 0...rows) for (col in 0...columns) existingElevation.push(((col + row) % 2 == 0) ? 0.001 : 0.05);
     var existing = new HeightMap("ground", 0.0, 0.0, cellSize, columns, rows, existingElevation);
     var region = new EarthworkRegion("pad", existing, design, [], 0.005);
 
@@ -148,11 +170,22 @@ class TerrainTests {
     var wx = existing.worldX(1), wy = existing.worldY(0);
     var pad = cellSize * 0.5;
     var exclusion = new Polygon2([
-      new Point2(wx - pad, wy - pad), new Point2(wx + pad, wy - pad),
-      new Point2(wx + pad, wy + pad), new Point2(wx - pad, wy + pad)
+      new Point2(wx - pad, wy - pad),
+      new Point2(wx + pad, wy - pad),
+      new Point2(
+        wx + pad,
+        wy + pad
+      ),
+      new Point2(
+        wx - pad,
+        wy + pad
+      )
     ]);
     var excludedRegion = new EarthworkRegion("pad-excluded", existing, design, [exclusion], 0.005);
-    check(excludedRegion.isAtGrade(1, 0), "A vertex inside an exclusion polygon is reported at grade regardless of its delta");
+    check(
+      excludedRegion.isAtGrade(1, 0),
+      "A vertex inside an exclusion polygon is reported at grade regardless of its delta"
+    );
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

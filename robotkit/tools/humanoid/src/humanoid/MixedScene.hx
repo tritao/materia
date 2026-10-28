@@ -43,10 +43,23 @@ class MixedScene {
     var base = model.addLink(new Link("base", "link/base"));
     var names = ["shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"];
     var links = [base].concat([for (name in names) model.addLink(new Link(name, 'link/$name'))]);
-    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0], [0.0, -0.1197, 0.425],
-      [0.0, 0.0, 0.39225], [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
-    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var offsets = [
+      [0.0, 0.0, 0.089159],
+      [0.0, 0.13585, 0.0],
+      [0.0, -0.1197, 0.425],
+      [0.0, 0.0, 0.39225],
+      [
+        0.0,
+        0.10915,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.09465
+      ]
+    ];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (i in 0...6) {
       var joint = model.addJoint(new Joint('joint$i', JointType.Revolute, links[i], links[i + 1], 'joint/$i'));
       joint.parentFramePosition = offsets[i];
@@ -60,15 +73,20 @@ class MixedScene {
   }
 
   static function gantry():RobotRuntimeBlueprint {
-    return MachineKitRobotCompiler.compileGantry(new Gantry(new GantrySpec(200, 200, 200)),
-      0.02, 0.08).runtime;
+    return MachineKitRobotCompiler.compileGantry(new Gantry(new GantrySpec(200, 200, 200)), 0.02, 0.08).runtime;
   }
 
   /** The scripted job: positions for the arm's and the gantry's joints at a tick. */
   static function armTargets(tick:Int):Array<Float> {
     var t = tick * TIMESTEP;
-    return [0.4 * Math.sin(t), -1.0 + 0.3 * Math.sin(1.7 * t), 1.3 + 0.2 * Math.sin(0.7 * t),
-      -0.3, 0.5 + 0.2 * Math.sin(2.0 * t), 0.0];
+    return [
+      0.4 * Math.sin(t),
+      -1.0 + 0.3 * Math.sin(1.7 * t),
+      1.3 + 0.2 * Math.sin(0.7 * t),
+      -0.3,
+      0.5 + 0.2 * Math.sin(2.0 * t),
+      0.0
+    ];
   }
 
   static function gantryTargets(blueprint:RobotRuntimeBlueprint, tick:Int):Array<Float> {
@@ -80,13 +98,17 @@ class MixedScene {
       var mid = 0.5 * (joint.lowerLimit + joint.upperLimit);
       var rate = joint.maxRate, acceleration = joint.maxAcceleration;
       if (rate == null || acceleration == null) throw "Mixed-scene gantry needs physical drive limits";
-      var span = Math.min(0.3 * (joint.upperLimit - joint.lowerLimit),
-        Math.min(rate * 0.5 / frequency,
-          acceleration * 0.5 / (frequency * frequency)));
+      var span = Math.min(
+        0.3 * (joint.upperLimit - joint.lowerLimit),
+        Math.min(
+          rate * 0.5 / frequency,
+          acceleration * 0.5 / (frequency * frequency)
+        )
+      );
       positions[i] = mid + span * Math.sin(frequency * t);
     }
-    for (_ in blueprint.couplings) for (coupling in blueprint.couplings)
-      positions[coupling.follower] = coupling.ratio * positions[coupling.leader] + coupling.offset;
+    for (_ in blueprint.couplings) for (coupling in blueprint.couplings) positions[coupling.follower] = coupling.ratio
+      * positions[coupling.leader] + coupling.offset;
     return positions;
   }
 
@@ -115,8 +137,13 @@ class MixedScene {
   }
 
   /** Runs the job; with `humanoid`, the G1 falls 10 m away and is commanded every tick. */
-  static function job(humanoid:Null<RobotModel>):{trace:Array<Float>, failedSteps:Int,
-      safeties:Array<Int>, humanoidSafety:Int, record:Int} {
+  static function job(humanoid:Null<RobotModel>): {
+    trace: Array<Float>,
+    failedSteps: Int,
+    safeties: Array<Int>,
+    humanoidSafety: Int,
+    record: Int
+  } {
     var harness = new SimulationHarness(TIMESTEP, SUBSTEPS, SimulationSpace.MUJOCO);
     var simulation = harness.simulation;
     var armBlueprint = arm(), gantryBlueprint = gantry();
@@ -142,16 +169,20 @@ class MixedScene {
       armRuntime.submitPositions(armTargets(tick), sequence);
       gantryRuntime.submitPositions(gantryTargets(gantryBlueprint, tick), sequence);
       // A policy-like client: a fresh batch every tick, also after the fall.
-      if (g1 != null) try g1.submitPositions(g1Zero, sequence) catch (error:Dynamic) {}
+      if (g1 != null) try g1.submitPositions(g1Zero, sequence) catch (error:Dynamic) {
+      }
       sequence++;
       try harness.step(Int64.ofInt(tick)) catch (error:Dynamic) failed++;
       trace = trace.concat(robotsTrace(simulation, present, counts));
     }
-    var result = {trace: trace, failedSteps: failed,
+    var result = {
+      trace: trace,
+      failedSteps: failed,
       safeties: [for (runtime in present) runtime.snapshot().safety],
       humanoidSafety: g1 == null ? -1 : g1.snapshot().safety,
-      record: armBlueprint.jointCount * 3 + armBlueprint.linkCount * 7 +
-        gantryBlueprint.jointCount * 3 + gantryBlueprint.linkCount * 7};
+      record : armBlueprint.jointCount
+      * 3 + armBlueprint.linkCount * 7 + gantryBlueprint.jointCount * 3 + gantryBlueprint.linkCount * 7
+    };
     harness.dispose();
     return result;
   }
@@ -167,15 +198,14 @@ class MixedScene {
     } else {
       blueprint = arm();
     }
-    var boxes:Array<Null<Array<Float>>> = [for (index in 0...blueprint.links.length)
-      index == 0 ? [0.4, 0.4, 0.05] : null];
+    var boxes:Array<Null<Array<Float>>> = [for (index in 0...blueprint.links.length) index == 0 ? [0.4,
+      0.4, 0.05] : null];
     // The bed or base link is centred on the robot's origin, 0.5 m up: top at 0.55.
     machine = simulation.addRobotAtPose(blueprint, [3.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0], null, boxes);
     var g1Blueprint = RobotRuntimeCompiler.compile(humanoid, new robotkit.profile.RobotProfile());
     g1Blueprint.observedLimitTolerance = 0.05;
     // G1's authored base height puts its feet on the floor: 0.793 m up.
-    var g1 = simulation.addRobotAtPose(g1Blueprint, [3.0, 0.0, surfaceTop + 0.793 + 0.02],
-      [0.0, 0.0, 0.0, 1.0]);
+    var g1 = simulation.addRobotAtPose(g1Blueprint, [3.0, 0.0, surfaceTop + 0.793 + 0.02], [0.0, 0.0, 0.0, 1.0]);
     harness.spawnPlane();
     g1.submitPositions([for (_ in humanoid.joints) 0.0], 1);
     var ticks = Std.int(Math.round(seconds / TIMESTEP));
@@ -201,8 +231,7 @@ class MixedScene {
     // match to solver round-off (see MIXED_SCENE.md).
     var armWorst = 0.0, gantryWorst = 0.0, armLength = 6 * 3 + 7 * 7, record = mixed.record;
     var armTravel = 0.0;
-    for (tick in 0...TICKS)
-      armTravel = Math.max(armTravel, Math.abs(mixed.trace[tick * record] - mixed.trace[0]));
+    for (tick in 0...TICKS) armTravel = Math.max(armTravel, Math.abs(mixed.trace[tick * record] - mixed.trace[0]));
     check(armTravel > 0.05, 'the mixed-scene arm stayed frozen (joint travel $armTravel rad)');
     for (i in 0...alone.trace.length) {
       var difference = Math.abs(alone.trace[i] - mixed.trace[i]);
@@ -213,14 +242,18 @@ class MixedScene {
       + 'arm and gantry safety ${mixed.safeties}; trace difference: arm $armWorst, gantry $gantryWorst');
     check(mixed.humanoidSafety == RobotKitRuntimeConstants.RK_SAFETY_FAULT, "the G1 should have faulted");
     check(mixed.failedSteps == 0, 'a G1 fault failed ${mixed.failedSteps} session steps');
-    check(mixed.safeties[0] != RobotKitRuntimeConstants.RK_SAFETY_FAULT &&
-      mixed.safeties[1] != RobotKitRuntimeConstants.RK_SAFETY_FAULT, "the arm or the gantry faulted");
+    check(
+      mixed.safeties[0] != RobotKitRuntimeConstants.RK_SAFETY_FAULT
+      && mixed.safeties[1] != RobotKitRuntimeConstants.RK_SAFETY_FAULT,
+      "the arm or the gantry faulted"
+    );
     check(gantryWorst < 1e-9, 'the gantry trajectory changed by $gantryWorst with the G1 in the session');
     check(armWorst < 1e-9, 'the arm trajectory changed by $armWorst with the G1 in the session');
 
     for (name in ["gantry bed", "arm base"]) {
       var height = dropOnto(g1, name, 0.55, 0.5);
-      Sys.println('G1 dropped onto the $name: base height ${height} after 0.5 s (0.55 + 0.79 = 1.34 on it, 0.79 through it)');
+      Sys
+        .println('G1 dropped onto the $name: base height ${height} after 0.5 s (0.55 + 0.79 = 1.34 on it, 0.79 through it)');
       check(height > 1.2, 'the G1 fell through the $name (height $height)');
     }
     if (failures > 0) {

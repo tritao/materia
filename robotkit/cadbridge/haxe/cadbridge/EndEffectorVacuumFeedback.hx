@@ -28,39 +28,43 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
   var attached:Null<Simulation>;
   var observerId:Null<Int>;
 
-  public function new(set:EndEffectorSet, configurationId:String,
-      selection:ToolRuntimeSelection, bundle:EndEffectorRuntimeBundle,
-      robot:RobotRuntime, sealedVacuumKpa:Float = 60.0, ?state:AssemblyState) {
-    if (set == null || selection == null || bundle == null || robot == null ||
-        bundle.bindings.vacuumSensorId == null || bundle.runtime.vacuum == null)
-      throw "Simulation vacuum feedback needs a coupled pressure sensor and vacuum runtime";
-    if (!Math.isFinite(sealedVacuumKpa) || sealedVacuumKpa <= 0 || sealedVacuumKpa > 101.325)
-      throw "Simulated sealed vacuum must be within ambient pressure";
-    if (bundle.runtime.tool.id.indexOf(configurationId + "/") != 0)
-      throw "Vacuum feedback configuration does not match the mounted tool";
-    if (!robot.hasExternalSensor(bundle.bindings.vacuumSensorId, "tool_vacuum_kpa"))
-      throw "Robot blueprint needs the authored EOAT pressure sensor";
+  public function new(
+    set:EndEffectorSet,
+    configurationId:String,
+    selection:ToolRuntimeSelection,
+    bundle:EndEffectorRuntimeBundle,
+    robot:RobotRuntime,
+    sealedVacuumKpa:Float = 60.0,
+    ?state:AssemblyState
+  ) {
+    if (set == null || selection == null
+      || bundle == null || robot == null || bundle.bindings.vacuumSensorId == null || bundle.runtime.vacuum
+      == null) throw "Simulation vacuum feedback needs a coupled pressure sensor and vacuum runtime";
+    if (!Math.isFinite(sealedVacuumKpa) || sealedVacuumKpa <= 0
+      || sealedVacuumKpa > 101.325) throw "Simulated sealed vacuum must be within ambient pressure";
+    if (bundle.runtime.tool.id.indexOf(configurationId + "/")
+      != 0) throw "Vacuum feedback configuration does not match the mounted tool";
+    if (!robot.hasExternalSensor(bundle.bindings.vacuumSensorId,
+      "tool_vacuum_kpa")) throw "Robot blueprint needs the authored EOAT pressure sensor";
     var configuration = set.configuration(configurationId);
     var collision = EndEffectorCollision.pieces(configuration, state);
     var cups:Array<String> = [];
-    for (member in configuration.components())
-      if (Std.isOfType(member.component, SuctionCup)) cups.push(member.id);
-    if (cups.length != 1)
-      throw "Simulation vacuum feedback needs exactly one suction cup";
+    for (member in configuration.components()) if (Std.isOfType(member.component, SuctionCup)) cups.push(member.id);
+    if (cups.length != 1) throw "Simulation vacuum feedback needs exactly one suction cup";
     var cupIndex = -1;
-    for (index in 0...collision.pieces.length)
-      if (collision.pieces[index].memberIds.indexOf(cups[0]) >= 0) {
-        if (collision.pieces[index].memberIds.length != 1)
-          throw "Suction cup collision piece is merged with another member";
-        cupIndex = index;
-      }
+    for (index in 0...collision.pieces.length) if (collision.pieces[index].memberIds.indexOf(cups[0]) >= 0) {
+      if (collision.pieces[index].memberIds.length
+        != 1) throw "Suction cup collision piece is merged with another member";
+      cupIndex = index;
+    }
     if (cupIndex < 0) throw "Suction cup has no collision piece";
     var shapes = bundle.runtime.tool.collision;
-    if (shapes.length != collision.pieces.length)
-      throw "Mounted tool collision does not match the coupled configuration";
+    if (shapes.length
+      != collision.pieces.length) throw "Mounted tool collision does not match the coupled configuration";
     for (shape in shapes) switch shape.geometry {
       case Convex(_):
-      case _: throw "Simulation vacuum feedback needs per-member tool hulls";
+      case _:
+        throw "Simulation vacuum feedback needs per-member tool hulls";
     }
     this.selection = selection;
     this.bundle = bundle;
@@ -72,10 +76,8 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
 
   /** Register for every explicit private or joined-session step. */
   public function attach(simulation:Simulation):Void {
-    if (simulation == null || attached != null)
-      throw "Vacuum feedback needs one simulation attachment";
-    if (!simulation.ownsRobot(robot))
-      throw "Vacuum feedback robot does not belong to this simulation";
+    if (simulation == null || attached != null) throw "Vacuum feedback needs one simulation attachment";
+    if (!simulation.ownsRobot(robot)) throw "Vacuum feedback robot does not belong to this simulation";
     observerId = simulation.addStepObserver(this);
     attached = simulation;
   }
@@ -93,24 +95,30 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
 
   /** Publish one authored sensor frame and update the selected tool. */
   public function sample(timestampNs:Int64):Bool {
-    if (timestampNs == null || Int64.compare(timestampNs, Int64.ofInt(0)) < 0 ||
-        (lastTimestampNs != null && Int64.compare(timestampNs, lastTimestampNs) <= 0))
-      throw "Vacuum feedback needs increasing non-negative simulation timestamps";
+    if (timestampNs == null || Int64.compare(timestampNs,
+      Int64.ofInt(0)) < 0 || (lastTimestampNs != null && Int64.compare(
+        timestampNs,
+        lastTimestampNs
+      ) <= 0)) throw "Vacuum feedback needs increasing non-negative simulation timestamps";
     var sourceClockId = robot.sourceClockId;
-    if (selection.active() == bundle.runtime && selection.selectedClockId() != sourceClockId)
-      throw "Vacuum feedback selection needs the robot endpoint's current source clock";
+    if (selection.active() == bundle.runtime && selection.selectedClockId()
+      != sourceClockId) throw "Vacuum feedback selection needs the robot endpoint's current source clock";
     var vacuum:SimulatedVacuum = cast bundle.runtime.vacuum;
     var sealed = false;
-    if (selection.active() == bundle.runtime && vacuum.isEnabled())
-      for (contact in robot.contacts())
-        if (contact.toolPieceIndex == cupPieceIndex && contact.distance <= 0.0) {
-          sealed = true;
-          break;
-        }
+    if (selection.active() == bundle.runtime
+      && vacuum.isEnabled()) for (contact in robot.contacts()) if (contact.toolPieceIndex == cupPieceIndex
+      && contact.distance <= 0.0) {
+      sealed = true;
+      break;
+    }
     var nextSequence = Int64.add(sequence, Int64.ofInt(1));
-    var frame = robot.publishSensorFrameAndGet(bundle.bindings.vacuumSensorId,
-      [sealed ? sealedVacuumKpa : 0.0], nextSequence, timestampNs,
-      sourceClockId);
+    var frame = robot.publishSensorFrameAndGet(
+      bundle.bindings.vacuumSensorId,
+      [sealed ? sealedVacuumKpa : 0.0],
+      nextSequence,
+      timestampNs,
+      sourceClockId
+    );
     sequence = nextSequence;
     lastTimestampNs = timestampNs;
     return adapter.apply(frame);

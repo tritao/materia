@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Typed MessagePack payload for the recording channel. */
-@:wire
-class RecordingSensorMsg {
+@:wire class RecordingSensorMsg {
   @:id(1) public var sensorId:String;
   @:id(2) public var kind:String;
   @:id(3) public var frameId:String;
@@ -18,5 +17,6 @@ class RecordingSensorMsg {
   @:id(13) public var image:Null<RecordingImageMsg>;
   @:id(14) public var robotId:String;
 
-  public function new() {}
+  public function new() {
+  }
 }

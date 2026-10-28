@@ -43,7 +43,7 @@ class RemoteRobot implements Robot {
   final sensorStreams = new robotkit.streams.SensorStreams();
   var lastWireObservationOrdinal:Int64 = Int64.ofInt(0);
   final sensorSourceReceipts:Map<String, Int64> = [];
-  var changeListener:Null < RobotId -> Void > = null;
+  var changeListener:Null<RobotId -> Void> = null;
 
   public function new(id:RobotId, ?credentials:robotkit.auth.ClientCredentials) {
     if (id == null || id.length == 0) throw "RemoteRobot requires a non-empty logical ID";
@@ -84,20 +84,22 @@ class RemoteRobot implements Robot {
   public function id():RobotId return logicalId;
 
   /** Negotiated wire identity, exposed for transport diagnostics only. */
-  public function protocolRobotId():Null < Int64 > {
+  public function protocolRobotId():Null<Int64> {
     var value = client.welcome;
     return value == null ? null : value.robotId;
   }
 
   /** Connects this adapter using the host's event pump. */
   public function connect(host:String, port:Int, events:NativeKitEvents):Void {
-    connectionHost = host; connectionPort = port; connectionEvents = events;
-    client.connectWithEvents(host,port,events);
+    connectionHost = host;
+    connectionPort = port;
+    connectionEvents = events;
+    client.connectWithEvents(host, port, events);
   }
   function connectBulk():Void {
     if (!bulkStarted && client.isReady() && connectionEvents != null) {
       bulkStarted = true;
-      bulkClient.connectWithEvents(connectionHost,connectionPort,connectionEvents);
+      bulkClient.connectWithEvents(connectionHost, connectionPort, connectionEvents);
     }
   }
 
@@ -120,9 +122,20 @@ class RemoteRobot implements Robot {
 
   public function capabilities():RobotCapabilities {
     var value = client.capabilities;
-    return value == null ? new RobotCapabilities(logicalId, 0, [],
-      ExecutionCapabilities.unavailable(), new TimingCapabilities(false, false, Unchecked))
-      : robotkit.protocol.CapabilityCodec.decode(value, logicalId);
+    return value == null ? new RobotCapabilities(
+      logicalId,
+      0,
+      [],
+      ExecutionCapabilities.unavailable(),
+      new TimingCapabilities(
+        false,
+        false,
+        Unchecked
+      )
+    ) : robotkit.protocol.CapabilityCodec.decode(
+      value,
+      logicalId
+    );
   }
 
   public function snapshot():RobotSnapshot return new RobotSnapshot(
@@ -139,19 +152,25 @@ class RemoteRobot implements Robot {
     currentSnapshot.sourceClockId,
     currentSnapshot.receivedClockId,
     currentSnapshot.safety,
-    currentSnapshot.trajectoryQueueDepth, currentSnapshot.trajectoryActive,
-    currentSnapshot.trajectoryTimeNs, currentSnapshot.trajectoryDurationNs,
-    currentSnapshot.trajectoryTag, currentSnapshot.trajectoryTagTimeNs,
-    currentSnapshot.sessionState, currentSnapshot.activePlanId,
-    currentSnapshot.committedUntilNs, currentSnapshot.queueEndTimeNs, null, currentSnapshot.streamSequences
+    currentSnapshot.trajectoryQueueDepth,
+    currentSnapshot.trajectoryActive,
+    currentSnapshot.trajectoryTimeNs,
+    currentSnapshot.trajectoryDurationNs,
+    currentSnapshot.trajectoryTag,
+    currentSnapshot.trajectoryTagTimeNs,
+    currentSnapshot.sessionState,
+    currentSnapshot.activePlanId,
+    currentSnapshot.committedUntilNs,
+    currentSnapshot.queueEndTimeNs,
+    null,
+    currentSnapshot.streamSequences
   );
 
   public function streams():robotkit.streams.SensorStreams return sensorStreams;
 
-  public function fault():Null < RobotFault > return currentFault;
+  public function fault():Null<RobotFault> return currentFault;
 
-  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
-    return eventRing.events(afterOrdinal, max);
+  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent> return eventRing.events(afterOrdinal, max);
 
   public function publishObservation(value:robotkit.streams.ImageDetectionObservation):RobotEvent {
     sensorStreams.publish(robotkit.streams.SensorStreamSample.inference(value));
@@ -160,8 +179,7 @@ class RemoteRobot implements Robot {
     return event;
   }
 
-  @:allow(tests.RobotEventTests)
-  function onImageDetection(value:robotkit.protocol.ImageDetectionObservationMsg):Void {
+  @:allow(tests.RobotEventTests) function onImageDetection(value:robotkit.protocol.ImageDetectionObservationMsg):Void {
     var welcome = client.welcome;
     if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0) return;
     try {
@@ -170,8 +188,7 @@ class RemoteRobot implements Robot {
         var gap = Int64.sub(value.ordinal, lastWireObservationOrdinal);
         if (Int64.compare(gap, Int64.ofInt(1)) > 0) {
           var missing = Int64.sub(gap, Int64.ofInt(1));
-          if (Int64.compare(missing, Int64.ofInt(2147483647)) > 0)
-            throw "Observation gap exceeds supported range";
+          if (Int64.compare(missing, Int64.ofInt(2147483647)) > 0) throw "Observation gap exceeds supported range";
           eventRing.skip(Int64.toInt(missing));
         }
       }
@@ -185,10 +202,14 @@ class RemoteRobot implements Robot {
   public function submit(command:RobotCommand):Void switch command {
     case JointTargets(targets, expiryNs):
       client.sendJointTargets(targets, expiryNs);
-    case ExecutionPlan(plan): client.submitPlan(plan);
-    case Hold: client.hold();
-    case Resume: client.resume();
-    case Abort: client.abort();
+    case ExecutionPlan(plan):
+      client.submitPlan(plan);
+    case Hold:
+      client.hold();
+    case Resume:
+      client.resume();
+    case Abort:
+      client.abort();
   }
 
   public function stop(mode:StopMode):Void {
@@ -197,11 +218,15 @@ class RemoteRobot implements Robot {
 
   public function resetSafety():Void client.resetSafety();
 
-  public function setChangeListener(listener:Null < RobotId -> Void >):Void {
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void {
     changeListener = listener;
   }
 
-  public function close():Void { bulkClient.close(); client.close(); sensorStreams.clear(); }
+  public function close():Void {
+    bulkClient.close();
+    client.close();
+    sensorStreams.clear();
+  }
 
   function onState(value:RobotStateMsg):Void {
     connectBulk();
@@ -219,11 +244,18 @@ class RemoteRobot implements Robot {
       "unspecified",
       "robotkit.monotonic",
       value.safety,
-      value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs,
-      value.trajectoryTag, value.trajectoryTagTimeNs,
-      value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs, null, robotkit.protocol.StreamSequenceMsg.values(value.streamSequences)
+      value.trajectoryQueueDepth,
+      value.trajectoryActive,
+      value.trajectoryTimeNs,
+      value.trajectoryDurationNs,
+      value.trajectoryTag,
+      value.trajectoryTagTimeNs,
+      value.sessionState,
+      value.activePlanId,
+      value.committedUntilNs,
+      value.queueEndTimeNs,
+      null,
+      robotkit.protocol.StreamSequenceMsg.values(value.streamSequences)
     );
     notifyChanged();
   }
@@ -235,25 +267,42 @@ class RemoteRobot implements Robot {
 
   function onSensor(value:SensorFrameMsg):Void {
     var welcome = client.welcome;
-    if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0)
-      return;
-    var frame = new SensorFrame(value.sensorId, value.kind, value.frameId,
-      value.sequence, value.sourceTimestampNs, value.values,
-      NativeKit.nk_time_now_ns(), value.linkId, value.mountPosition, value.mountRotation);
+    if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0) return;
+    var frame = new SensorFrame(
+      value.sensorId,
+      value.kind,
+      value.frameId,
+      value.sequence,
+      value.sourceTimestampNs,
+      value.values,
+      NativeKit.nk_time_now_ns(),
+      value.linkId,
+      value.mountPosition,
+      value.mountRotation
+    );
     updateSensor(frame, value.receivedTimestampNs);
   }
 
-  @:allow(tests.RobotWorldTests)
-  function onCamera(value:CameraFrameData):Void {
+  @:allow(tests.RobotWorldTests) function onCamera(value:CameraFrameData):Void {
     var metadata = value.frame;
     var welcome = client.welcome;
-    if (welcome != null && Int64.compare(metadata.robotId, welcome.robotId) != 0)
-      return;
+    if (welcome != null && Int64.compare(metadata.robotId, welcome.robotId) != 0) return;
     var image = value.image();
-    var frame = new SensorFrame(metadata.sensorId, metadata.kind,
-      metadata.frameId, metadata.sequence, metadata.sourceTimestampNs, [],
-      NativeKit.nk_time_now_ns(), metadata.linkId, metadata.mountPosition,
-      metadata.mountRotation, metadata.sourceClockId, "robotkit.monotonic", image);
+    var frame = new SensorFrame(
+      metadata.sensorId,
+      metadata.kind,
+      metadata.frameId,
+      metadata.sequence,
+      metadata.sourceTimestampNs,
+      [],
+      NativeKit.nk_time_now_ns(),
+      metadata.linkId,
+      metadata.mountPosition,
+      metadata.mountRotation,
+      metadata.sourceClockId,
+      "robotkit.monotonic",
+      image
+    );
     updateSensor(frame, metadata.receivedTimestampNs);
   }
 
@@ -263,7 +312,7 @@ class RemoteRobot implements Robot {
       if (currentSensors[index].sensorId == frame.sensorId) {
         var old = currentSensors[index];
         if (old.sequence == frame.sequence && old.sourceTimestampNs == frame.sourceTimestampNs
-            && sensorSourceReceipts.get(frame.sensorId) == sourceReceipt) return;
+          && sensorSourceReceipts.get(frame.sensorId) == sourceReceipt) return;
         currentSensors[index] = frame;
         replaced = true;
         break;

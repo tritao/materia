@@ -7,15 +7,12 @@ class ForkConfig {
   public final spread:Null<ForkAxisConfig>;
   public final loadLimits:LoadLimits;
 
-  public function new(lift:ForkAxisConfig, loadLimits:LoadLimits,
-      ?tilt:ForkAxisConfig, ?spread:ForkAxisConfig) {
-    if (lift == null || loadLimits == null)
-      throw "Fork configuration requires lift axis and load limits";
+  public function new(lift:ForkAxisConfig, loadLimits:LoadLimits, ?tilt:ForkAxisConfig, ?spread:ForkAxisConfig) {
+    if (lift == null || loadLimits == null) throw "Fork configuration requires lift axis and load limits";
     var names = [lift.jointName];
     for (axis in [tilt, spread]) {
       if (axis != null) {
-        if (names.indexOf(axis.jointName) >= 0)
-          throw "Fork axes must map to distinct robot joints";
+        if (names.indexOf(axis.jointName) >= 0) throw "Fork axes must map to distinct robot joints";
         names.push(axis.jointName);
       }
     }

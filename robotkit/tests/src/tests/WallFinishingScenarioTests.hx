@@ -114,14 +114,17 @@ class WallFinishingScenarioTests {
     return assertions;
   }
 
-  static function testSimulatedWallFinishingScenario():Void
-    runScenario(0, 0.02, 1, true, 0.99);
+  static function testSimulatedWallFinishingScenario():Void runScenario(0, 0.02, 1, true, 0.99);
 
-  static function testSimulatedWallFinishingScenarioMuJoCo():Void
-    runScenario(1, 0.01, 2, false, 0.97);
+  static function testSimulatedWallFinishingScenarioMuJoCo():Void runScenario(1, 0.01, 2, false, 0.97);
 
-  static function runScenario(backend:Int, physicsTimestep:Float, physicsSubsteps:Int,
-      strictFkCrossCheck:Bool, minCoverage:Float):Void {
+  static function runScenario(
+    backend:Int,
+    physicsTimestep:Float,
+    physicsSubsteps:Int,
+    strictFkCrossCheck:Bool,
+    minCoverage:Float
+  ):Void {
     var fixture = buildWallFinishingRobotModel();
     var model = fixture.model;
     var manipulator = fixture.arm.withTool(fixture.flangeTTcp);
@@ -134,8 +137,7 @@ class WallFinishingScenarioTests {
     // Keep collisions with the wall/environment, but do not infer self-contact
     // from those placeholder boxes in this fixture.
     blueprint.selfCollision = false;
-    blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
-      ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new ProcessChannelDeclaration("surface.process", ProcessEventValue.Digital(false)));
 
     var simulationHarness = new SimulationHarness(physicsTimestep, physicsSubsteps, backend);
 
@@ -144,8 +146,7 @@ class WallFinishingScenarioTests {
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-wall-finishing-backend$backend.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var runtime = simulation.addRobot(blueprint);
-    var sourceRobot = new SimulatedRobot("wall-finishing-robot", runtime,
-      model.name, linkNames, jointNames);
+    var sourceRobot = new SimulatedRobot("wall-finishing-robot", runtime, model.name, linkNames, jointNames);
     var robot = new RecordingRobot(sourceRobot, writer);
 
     var base = MobileBase.fromBlueprint(robot, blueprint);
@@ -179,12 +180,22 @@ class WallFinishingScenarioTests {
     // robotkit.work) a small fraction of the total allowed area, so the
     // >= 99% coverage target is reachable without an enormous raster.
     var boundary = new Polygon2([
-      new Point2(-0.5, -0.15), new Point2(0.5, -0.15),
-      new Point2(0.5, 0.15), new Point2(-0.5, 0.15)
+      new Point2(-0.5, -0.15),
+      new Point2(0.5, -0.15),
+      new Point2(0.5, 0.15),
+      new Point2(
+        -0.5,
+        0.15
+      )
     ]);
     var exclusion = new Polygon2([
-      new Point2(0.08, -0.01), new Point2(0.1, -0.01),
-      new Point2(0.1, 0.01), new Point2(0.08, 0.01)
+      new Point2(0.08, -0.01),
+      new Point2(0.1, -0.01),
+      new Point2(0.1, 0.01),
+      new Point2(
+        0.08,
+        0.01
+      )
     ]);
     // Surface-local Y (vertical) maps to map Z. WorkPatchPlanner's own
     // candidate search has no notion of a separate wheeled-base height: the
@@ -199,21 +210,40 @@ class WallFinishingScenarioTests {
     // in the wall's local Y range spanning both sides of Z = 0.
     var mapTSurfaceRotation = Quat.fromRotationMatrix([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
     var mapTSurface = new Transform3(new Vec3(-0.47, 0.0, 0.0), mapTSurfaceRotation);
-    var design = new WorkSurface("finish-wall", "map", mapTSurface, boundary, [exclusion],
-      0.002, "gypsum", new Provenance("bim:wall-1", SourceKind.Design));
+    var design = new WorkSurface(
+      "finish-wall",
+      "map",
+      mapTSurface,
+      boundary,
+      [exclusion],
+      0.002,
+      "gypsum",
+      new Provenance(
+        "bim:wall-1",
+        SourceKind.Design
+      )
+    );
 
     // -- scan --
-    var trueOffset = new Transform3(new Vec3(0.0, 0.0, 0.004),
-      Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), 0.005));
-    var cloud = SimulatedSurfaceScanner.scan(design, trueOffset, 0.002, 0.02, 0.0005, 42,
-      latestSnapshot.sourceTimestampNs);
+    var trueOffset = new Transform3(new Vec3(0.0, 0.0, 0.004), Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), 0.005));
+    var cloud = SimulatedSurfaceScanner.scan(
+      design,
+      trueOffset,
+      0.002,
+      0.02,
+      0.0005,
+      42,
+      latestSnapshot.sourceTimestampNs
+    );
     check(cloud.size() > 100, 'Simulated scan samples the design surface (got ${cloud.size()} points)');
 
     // -- registration --
     var registration = SurfaceRegistration.register(design, cloud, 42, 500, 0.02);
     check(registration.accepted, 'Registration accepts the injected offset (${registration.rejectionReason})');
-    check(Math.abs(registration.translationCorrection - 0.004) < 0.001,
-      'Registration recovers the injected 4mm offset (got ${registration.translationCorrection})');
+    check(
+      Math.abs(registration.translationCorrection - 0.004) < 0.001,
+      'Registration recovers the injected 4mm offset (got ${registration.translationCorrection})'
+    );
     var registered:WorkSurface = registration.registered;
     // The registered surface's own frame_T_surface (design's transform
     // composed with the recovered correction) is the actual map_T_surface
@@ -223,8 +253,23 @@ class WallFinishingScenarioTests {
     var registeredMapTSurface = registered.frame_T_surface;
 
     // -- patch plan --
-    var plan = WorkPatchPlanner.plan(registered, registeredMapTSurface, manipulator,
-      0.35, 0.06, 0.2, 0.03, 0.05, 0.0, 0.4, 0.55, seed, 4, 5, 0.05);
+    var plan = WorkPatchPlanner.plan(
+      registered,
+      registeredMapTSurface,
+      manipulator,
+      0.35,
+      0.06,
+      0.2,
+      0.03,
+      0.05,
+      0.0,
+      0.4,
+      0.55,
+      seed,
+      4,
+      5,
+      0.05
+    );
     check(plan.patches.length >= 1, "Wall splits into at least one patch");
     check(plan.fullyPlanned, "Every patch is fully reachable from its chosen base pose");
 
@@ -232,12 +277,11 @@ class WallFinishingScenarioTests {
     var maxPositionTrackingError = 0.0;
     var trackingErrors:Array<Float> = [];
     var sprayer = new SimulatedSprayer();
-    var planRunner = SurfacePlanRunner.create(robot, manipulator,
-      function() {
-        var batch = runtime.pollEvents();
-        for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
-        return batch;
-      }, 0.03, PlanningLimits.ofGroup(manipulator, null, 0.3), 0.6, null, null, 0.02);
+    var planRunner = SurfacePlanRunner.create(robot, manipulator, function() {
+      var batch = runtime.pollEvents();
+      for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
+      return batch;
+    }, 0.03, PlanningLimits.ofGroup(manipulator, null, 0.3), 0.6, null, null, 0.02);
     var adapter = new ChannelToolAdapter();
     adapter.bindSprayerFlow("surface.process", sprayer, 0.3);
 
@@ -253,7 +297,8 @@ class WallFinishingScenarioTests {
         latestSnapshot = snapshot;
         localization.update(snapshot);
         return new PerceptionSnapshot();
-      });
+      }
+      );
       var status = runner.start(goTo);
       var navSteps = 0;
       // A fixed tick budget must scale with the timestep so every backend
@@ -276,10 +321,12 @@ class WallFinishingScenarioTests {
         latestSnapshot = plant.step(Int64.ofInt(tick++));
         localization.update(latestSnapshot);
         stopSteps++;
-      } while (latestSnapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_READY &&
-        stopSteps < Std.int(2.0 / timestep));
-      check(latestSnapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
-        "Base stop finishes before the patch plan");
+      } while (latestSnapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_READY
+        && stopSteps < Std.int(2.0 / timestep));
+      check(
+        latestSnapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "Base stop finishes before the patch plan"
+      );
 
       // -- execute --
       var localizationState = localization.state();
@@ -291,29 +338,35 @@ class WallFinishingScenarioTests {
       if (backend == 0 && !timingCompared) {
         var program = planRunner.programForPatch(patch, baseTWork, seed);
         var toppraCompiler = planRunner.motion.compiler;
-        var simpleCompiler = new ProgramCompiler(toppraCompiler.solver,
-          toppraCompiler.limits, toppraCompiler.frameId,
-          toppraCompiler.maxVelocity, toppraCompiler.maxAcceleration,
-          toppraCompiler.maxJerk, toppraCompiler.startTolerances,
+        var simpleCompiler = new ProgramCompiler(
+          toppraCompiler.solver,
+          toppraCompiler.limits,
+          toppraCompiler.frameId,
+          toppraCompiler.maxVelocity,
+          toppraCompiler.maxAcceleration,
+          toppraCompiler.maxJerk,
+          toppraCompiler.startTolerances,
           new SimplePathTiming(),
-          0.01, toppraCompiler.maxJointJump,
-          toppraCompiler.positionTolerance, toppraCompiler.orientationTolerance,
-          toppraCompiler.ikTolerance);
-        var initial = [for (index in planRunner.motion.jointIndices)
-          robot.snapshot().positions.get(index)];
+          0.01,
+          toppraCompiler.maxJointJump,
+          toppraCompiler.positionTolerance,
+          toppraCompiler.orientationTolerance,
+          toppraCompiler.ikTolerance
+        );
+        var initial = [for (index in planRunner.motion.jointIndices) robot.snapshot().positions.get(index)];
         var toppraProgram = toppraCompiler.compile(program, initial, Int64.ofInt(100000));
         var simpleProgram = simpleCompiler.compile(program, initial, Int64.ofInt(200000));
         var toppraSeconds = 0.0, simpleSeconds = 0.0;
-        for (block in toppraProgram.blocks) for (planned in block.plans)
-          toppraSeconds += planned.durationSeconds;
-        for (block in simpleProgram.blocks) for (planned in block.plans)
-          simpleSeconds += planned.durationSeconds;
+        for (block in toppraProgram.blocks) for (planned in block.plans) toppraSeconds += planned.durationSeconds;
+        for (block in simpleProgram.blocks) for (planned in block.plans) simpleSeconds += planned.durationSeconds;
         toppraProgram.dispose();
         simpleProgram.dispose();
         // The 1 ms task-space check can require a denser Cartesian path;
         // allow a small timing spread between the two validated profiles.
-        check(toppraSeconds <= simpleSeconds * 1.05,
-          'TOPP-RA patch cycle time $toppraSeconds exceeds simple timing $simpleSeconds');
+        check(
+          toppraSeconds <= simpleSeconds * 1.05,
+          'TOPP-RA patch cycle time $toppraSeconds exceeds simple timing $simpleSeconds'
+        );
         timingCompared = true;
       }
 
@@ -325,20 +378,26 @@ class WallFinishingScenarioTests {
         var planningStarted = Sys.time();
         var solvesBefore = planRunner.manipulator.numericSolveCount();
         var benchmarkProgram = planRunner.programForPatch(patch, baseTWork, seed);
-        var benchmarkInitial = [for (index in planRunner.motion.jointIndices)
-          robot.snapshot().setpointPositions.get(index)];
+        var benchmarkInitial =
+          [for (index in planRunner.motion.jointIndices) robot.snapshot().setpointPositions.get(index)];
         var compiled = planRunner.motion.compiler.compile(benchmarkProgram, benchmarkInitial, Int64.ofInt(300000));
         var cycle = 0.0;
         for (block in compiled.blocks) for (planned in block.plans) cycle += planned.durationSeconds;
-        Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({example: "wall-finishing", backend: backend,
+        Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({
+          example: "wall-finishing",
+          backend: backend,
           planningSeconds: Sys.time() - planningStarted,
           cycleSeconds: cycle,
-          numericIkSolves: planRunner.manipulator.numericSolveCount() - solvesBefore}));
+          numericIkSolves: planRunner.manipulator.numericSolveCount() - solvesBefore
+        }));
         compiled.dispose();
       }
       planRunner.runPatch(patch, baseTWork, seed);
       var planStartSnapshot = robot.snapshot();
-      check(planRunner.running(), 'Patch plan starts (${planRunner.failure()}, safety=${planStartSnapshot.safety}, active=${planStartSnapshot.trajectoryActive}, queue=${planStartSnapshot.trajectoryQueueDepth})');
+      check(
+        planRunner.running(),
+        'Patch plan starts (${planRunner.failure()}, safety=${planStartSnapshot.safety}, active=${planStartSnapshot.trajectoryActive}, queue=${planStartSnapshot.trajectoryQueueDepth})'
+      );
       var eventCursor = 0;
       var timedEventsChecked = 0;
       var executeTicks = 0;
@@ -352,48 +411,48 @@ class WallFinishingScenarioTests {
         while (eventCursor < fired.length) {
           var event = fired[eventCursor++];
           adapter.apply(event);
-          if (event.cause == RobotKitRuntimeConstants.RK_EVENT_SCHEDULED &&
-              Int64.compare(snapshot.activePlanId, event.planId) == 0) {
-            var offset = Int64.toFloat(Int64.sub(snapshot.trajectoryTimeNs,
-              event.scheduledTimeNs)) * 1e-9;
-            check(offset >= -1e-6 && offset <= timestep + 1e-6,
-              'Spray event follows path position within one owner cycle ($offset s)');
+          if (event.cause == RobotKitRuntimeConstants.RK_EVENT_SCHEDULED && Int64.compare(
+            snapshot.activePlanId,
+            event.planId
+          ) == 0) {
+            var offset = Int64.toFloat(Int64.sub(snapshot.trajectoryTimeNs, event.scheduledTimeNs)) * 1e-9;
+            check(
+              offset >= -1e-6 && offset <= timestep + 1e-6,
+              'Spray event follows path position within one owner cycle ($offset s)'
+            );
             timedEventsChecked++;
           }
         }
-        if (backend == 0 && !held && sprayer.flow() > 0.0 &&
-            planRunner.motion.progress().op == 2 &&
-            planRunner.motion.progress().pathDistance > 0.05) {
+        if (backend == 0 && !held && sprayer.flow() > 0.0
+          && planRunner.motion.progress().op == 2 && planRunner.motion.progress().pathDistance > 0.05) {
           planRunner.hold();
           held = true;
         } else if (held && !resumed) {
           holdTicks++;
           if (holdTicks > 1 && sprayer.flow() > 0.0) paintedWhileHeld = true;
-          if (holdTicks >= 30) { planRunner.resume(); resumed = true; }
+          if (holdTicks >= 30) {
+            planRunner.resume();
+            resumed = true;
+          }
         }
 
         var reportedQ = [for (i in 0...6) snapshot.positions.get(3 + i)];
         var wrist3FromSim = simulation.linkPose(0, WRIST3_LINK_INDEX);
-        var wrist3FromSimTransform = Transform3.fromArrays(
-          wrist3FromSim.position, wrist3FromSim.rotation);
-        var tcpFromSim = wrist3FromSimTransform.compose(fixture.linkTFlange)
-          .compose(fixture.flangeTTcp);
+        var wrist3FromSimTransform = Transform3.fromArrays(wrist3FromSim.position, wrist3FromSim.rotation);
+        var tcpFromSim = wrist3FromSimTransform.compose(fixture.linkTFlange).compose(fixture.flangeTTcp);
         var basePoseNow = simulation.robotPose(0);
-        var baseTransformNow = Transform3.fromArrays(basePoseNow.position,
-          basePoseNow.rotation);
+        var baseTransformNow = Transform3.fromArrays(basePoseNow.position, basePoseNow.rotation);
         var tcpFromFk = baseTransformNow.compose(manipulator.tcpPose(reportedQ));
         var positionError = tcpFromSim.translation.sub(tcpFromFk.translation).norm();
         trackingErrors.push(positionError);
         maxPositionTrackingError = Math.max(maxPositionTrackingError, positionError);
         if (sprayer.flow() > 0.0) {
           var surfacePoint = registeredMapTSurface.inverse().compose(tcpFromFk);
-          coverage.markFootprint(new Point2(surfacePoint.translation.x,
-            surfacePoint.translation.y), 0.03);
+          coverage.markFootprint(new Point2(surfacePoint.translation.x, surfacePoint.translation.y), 0.03);
         }
         executeTicks++;
       }
-      check(planRunner.completed(),
-        'Patch plans finish (${planRunner.failure()}, ticks=$executeTicks)');
+      check(planRunner.completed(), 'Patch plans finish (${planRunner.failure()}, ticks=$executeTicks)');
       check(timedEventsChecked > 0, "Patch checks scheduled spray timing");
       if (backend == 0) {
         check(held && resumed, "FollowPath holds and resumes mid-patch");
@@ -407,33 +466,47 @@ class WallFinishingScenarioTests {
       // simulator's own link pose must match RobotKit's FK to numerical
       // precision -- this is the cross-check the plan requires between
       // SimKit and robotkit.manipulation's forward kinematics.
-      check(maxPositionTrackingError < 1e-6,
-        'Simulator link pose matches base pose . FK(reported joints) . flange_T_tcp (max error $maxPositionTrackingError)');
+      check(
+        maxPositionTrackingError < 1e-6,
+        'Simulator link pose matches base pose . FK(reported joints) . flange_T_tcp (max error $maxPositionTrackingError)'
+      );
     } else {
       // MuJoCo has real per-joint computed-torque dynamics and finite
       // settling time (M8.5 F2), so commanded and observed joint positions
       // never match exactly; a loose sanity bound still catches an actuator
       // regression (e.g. a stalled or diverging joint) without asserting
       // simulator-vs-FK agreement to default-backend precision.
-      check(maxPositionTrackingError < 0.02,
-        'Simulator link pose stays within a loose sanity bound of base pose . FK(reported joints) . flange_T_tcp (max error $maxPositionTrackingError)');
+      check(
+        maxPositionTrackingError < 0.02,
+        'Simulator link pose stays within a loose sanity bound of base pose . FK(reported joints) . flange_T_tcp (max error $maxPositionTrackingError)'
+      );
     }
 
     var coverageFraction = coverage.coverageFraction();
     var exclusionCoverageFraction = coverage.exclusionCoverageFraction();
-    check(coverageFraction >= minCoverage, 'Observed coverage reaches the design target (got $coverageFraction, need >= $minCoverage)');
-    check(exclusionCoverageFraction < 0.01, 'No process-on footprint touches the excluded opening (got $exclusionCoverageFraction)');
+    check(
+      coverageFraction >= minCoverage,
+      'Observed coverage reaches the design target (got $coverageFraction, need >= $minCoverage)'
+    );
+    check(
+      exclusionCoverageFraction < 0.01,
+      'No process-on footprint touches the excluded opening (got $exclusionCoverageFraction)'
+    );
     var rms = 0.0;
     for (value in trackingErrors) rms += value * value;
     rms = trackingErrors.length == 0 ? 0.0 : Math.sqrt(rms / trackingErrors.length);
-    var report = 'coverage=$coverageFraction exclusionCoverage=$exclusionCoverageFraction ' +
-      'trackingMax=$maxPositionTrackingError trackingRms=$rms ' +
-      'registrationTranslation=${registration.translationCorrection} ' +
-      'registrationRotation=${registration.rotationCorrectionRadians}';
-    if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1")
-      Sys.println("PROCESS_PATH_QUALITY " + haxe.Json.stringify({example: "wall-finishing", backend: backend,
-        coverage: coverageFraction, exclusionCoverage: exclusionCoverageFraction,
-        trackingMaxMetres: maxPositionTrackingError, trackingRmsMetres: rms}));
+    var report = 'coverage=$coverageFraction exclusionCoverage=$exclusionCoverageFraction '
+      + 'trackingMax=$maxPositionTrackingError trackingRms=$rms '
+      + 'registrationTranslation=${registration.translationCorrection} '
+      + 'registrationRotation=${registration.rotationCorrectionRadians}';
+    if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1") Sys.println("PROCESS_PATH_QUALITY " + haxe.Json.stringify({
+      example: "wall-finishing",
+      backend: backend,
+      coverage: coverageFraction,
+      exclusionCoverage: exclusionCoverageFraction,
+      trackingMaxMetres: maxPositionTrackingError,
+      trackingRmsMetres: rms
+    }));
     if (backend == 0) {
       lastDefaultBackendReport = report;
       Sys.println('M9 default-backend scenario: $report');
@@ -445,42 +518,58 @@ class WallFinishingScenarioTests {
     check(robot.recordingError == null, "recording adapter preserves an error-free wall-finishing run");
     writer.close();
     var recording = McapRecordingReader.load(recordingPath);
-    check(recording.commands.length > 3 && recording.snapshots.length > 3,
-      "MCAP stores the wall-finishing command batches and observation stream");
+    check(
+      recording.commands.length > 3 && recording.snapshots.length > 3,
+      "MCAP stores the wall-finishing command batches and observation stream"
+    );
 
     // -- replay: re-run the same command stream against a ReplayRobot --
-    var replayDescription = new RobotDescription("wall-finishing-robot", "recorded wall-finishing robot",
-      linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("wall-finishing-robot",
+    var replayDescription = new RobotDescription(
+      "wall-finishing-robot",
+      "recorded wall-finishing robot",
+      linkNames,
+      jointNames
+    );
+    var replayCapabilities = new RobotCapabilities(
+      "wall-finishing-robot",
       jointNames.length,
-      [robotkit.core.JointTargetMode.Position, robotkit.core.JointTargetMode.Velocity, robotkit.core.JointTargetMode.Effort],
+      [
+        robotkit.core.JointTargetMode.Position,
+        robotkit.core.JointTargetMode.Velocity,
+        robotkit.core.JointTargetMode.Effort
+      ],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked));
+      new robotkit.core.TimingCapabilities(
+        false,
+        false,
+        trajectorykit.validation.ValidationGuarantee.Unchecked
+      )
+    );
     var replay = new ReplayRobot("wall-finishing-robot", recording, replayDescription, replayCapabilities);
     var replayed = 0;
     for (command in recording.commands) {
       replay.submit(command);
       if (replay.advance()) replayed++;
     }
-    check(replay.generatedCommands.commands.length == recording.commands.length,
-      "replay reproduces every recorded plan and mobile base command");
+    check(
+      replay.generatedCommands.commands.length == recording.commands.length,
+      "replay reproduces every recorded plan and mobile base command"
+    );
     var commandsMatch = true;
     for (index in 0...recording.commands.length) {
       switch [recording.commands[index], replay.generatedCommands.commands[index]] {
         case [JointTargets(sourceTargets, _), JointTargets(replayTargets, _)]:
           if (sourceTargets.length != replayTargets.length) commandsMatch = false;
-          else for (targetIndex in 0...sourceTargets.length)
-            if (sourceTargets[targetIndex].joint != replayTargets[targetIndex].joint ||
-                Math.abs(sourceTargets[targetIndex].target - replayTargets[targetIndex].target) > 1e-9)
-              commandsMatch = false;
+          else for (targetIndex in 0...sourceTargets.length) if (sourceTargets[targetIndex].joint
+            != replayTargets[targetIndex].joint || Math.abs(sourceTargets[targetIndex].target
+            - replayTargets[targetIndex].target) > 1e-9) commandsMatch = false;
         case [ExecutionPlan(source), ExecutionPlan(replayed)]:
-          if (Int64.compare(source.planId, replayed.planId) != 0 ||
-              source.segments.length != replayed.segments.length ||
-              source.events.length != replayed.events.length)
-            commandsMatch = false;
+          if (Int64.compare(source.planId, replayed.planId) != 0 || source.segments.length != replayed.segments.length
+            || source.events.length != replayed.events.length) commandsMatch = false;
         case [Hold, Hold] | [Resume, Resume] | [Abort, Abort]:
           commandsMatch = commandsMatch;
-        case _: commandsMatch = false;
+        case _:
+          commandsMatch = false;
       }
     }
     check(commandsMatch, "replayed command batches exactly match the recorded wall-finishing run");
@@ -489,8 +578,8 @@ class WallFinishingScenarioTests {
     robot.close();
     simulationHarness.dispose();
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
-    if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
-      sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
+    if (sys.FileSystem.exists(recordingPath
+      + ".incomplete.status")) sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
   // Link order fixed by buildWallFinishingRobotModel's addLink calls:
@@ -505,7 +594,13 @@ class WallFinishingScenarioTests {
    * fixture, attached directly to the base link) + sprayer flange offset +
    * a base-mounted lidar-kind "scanner" sensor.
    */
-  static function buildWallFinishingRobotModel():{model:RobotModel, profile:robotkit.profile.RobotProfile, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
+  static function buildWallFinishingRobotModel(): {
+    model: RobotModel,
+    profile: robotkit.profile.RobotProfile,
+    arm: Manipulator,
+    flangeTTcp: Transform3,
+    linkTFlange: Transform3
+  } {
     var profile = new robotkit.profile.RobotProfile();
     var model = new RobotModel("wall-finishing-robot");
     var base = model.addLink(new Link("base", "link/base"));
@@ -524,31 +619,60 @@ class WallFinishingScenarioTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
-      0.4, 0.6, 0.5, 1.0, 0.5, 0.5);
+      RobotDriveConfiguration.Holonomic(
+        wheelIds,
+        wheelRadius,
+        baseRadius
+      ),
+      0.4,
+      0.6,
+      0.5,
+      1.0,
+      0.5,
+      0.5
+    );
 
-    var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
-      a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
-    var linkNames = ["shoulder_link", "upper_arm_link", "forearm_link",
-      "wrist_1_link", "wrist_2_link", "wrist_3_link"];
+    var d1 = 0.089159, shoulderOffset = 0.13585,
+      elbowOffset = -0.1197, a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
+    var linkNames = ["shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"];
     var links = [base].concat([for (name in linkNames) model.addLink(new Link(name, 'link/$name'))]);
     var offsets = [
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(0.0, 0.0, a3),
-      new Vec3(0.0, d4, 0.0),
-      new Vec3(0.0, 0.0, d5)
+      new Vec3(
+        0.0,
+        0.0,
+        a3
+      ),
+      new Vec3(
+        0.0,
+        d4,
+        0.0
+      ),
+      new Vec3(
+        0.0,
+        0.0,
+        d5
+      )
     ];
-    var axes = [
-      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var jointNames = [
+      "shoulder_pan_joint",
+      "shoulder_lift_joint",
+      "elbow_joint",
+      "wrist_1_joint",
+      "wrist_2_joint",
+      "wrist_3_joint"
     ];
-    var jointNames = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"];
     for (i in 0...6) {
-      var joint = model.addJoint(new Joint(jointNames[i], JointType.Revolute, links[i], links[i + 1],
-        'joint/${jointNames[i]}'));
+      var joint = model.addJoint(new Joint(
+        jointNames[i],
+        JointType.Revolute,
+        links[i],
+        links[i + 1],
+        'joint/${jointNames[i]}'
+      ));
       joint.parentFramePosition = offsets[i].toArray();
       joint.axis = axes[i];
       joint.limits.lower = -2.0 * Math.PI;
@@ -571,7 +695,7 @@ class WallFinishingScenarioTests {
 
     var flangeTTcp = new Transform3(new Vec3(0.0, 0.0, 0.08), robotkit.spatial.Quat.identity());
     var linkTFlange = new Transform3(flangeOffset, robotkit.spatial.Quat.identity());
-    return { model: model, profile: profile, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
+    return {model: model, profile: profile, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange};
   }
 
   static function check(value:Bool, message:String):Void {

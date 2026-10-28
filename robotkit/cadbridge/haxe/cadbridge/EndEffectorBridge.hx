@@ -18,30 +18,55 @@ import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 
 /** Convert one end-effector working frame into a RobotKit tool. */
 class EndEffectorBridge {
-  public static function toTool(endEffector:EndEffector, frameName:String,
-      ?state:AssemblyState, ?id:String, ?collisionOptions:EndEffectorCollisionOptions,
-      boxCollision:Bool = false):Tool {
+  public static function toTool(
+    endEffector:EndEffector,
+    frameName:String,
+    ?state:AssemblyState,
+    ?id:String,
+    ?collisionOptions:EndEffectorCollisionOptions,
+    boxCollision:Bool = false
+  ):Tool {
     if (endEffector == null) throw "End effector is required";
     endEffector.validate();
     var solved = endEffector.solve(state);
     var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state, solved));
-    var transform = new Transform3(new Vec3(converted.position.x,
-      converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
-      converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
+    var transform = new Transform3(
+      new Vec3(converted.position.x, converted.position.y, converted.position.z),
+      new Quat(
+        converted.quaternion.x,
+        converted.quaternion.y,
+        converted.quaternion.z,
+        converted.quaternion.w
+      )
+    );
     var properties = endEffector.massPropertiesAtMount(state, solved);
-    if (properties.unaccounted.length != 0)
-      throw 'End effector has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
-    if (!Math.isFinite(properties.mass) || properties.mass <= 0)
-      throw "End effector requires positive mass";
-    var centre = EndEffectorFrames.pointYToZ(properties.centreOfMass.x,
-      properties.centreOfMass.y, properties.centreOfMass.z);
+    if (properties.unaccounted.length
+      != 0) throw 'End effector has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
+    if (!Math.isFinite(properties.mass) || properties.mass <= 0) throw "End effector requires positive mass";
+    var centre = EndEffectorFrames.pointYToZ(
+      properties.centreOfMass.x,
+      properties.centreOfMass.y,
+      properties.centreOfMass.z
+    );
     var tensor = properties.inertia;
-    var inertia = tensor == null ? null : new Inertia3(tensor.xx * 1e-6,
-      tensor.xy * 1e-6, tensor.xz * 1e-6, tensor.yy * 1e-6,
-      tensor.yz * 1e-6, tensor.zz * 1e-6)
-      .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
-    var mass = new MassProperties(properties.mass,
-      new Vec3(centre.x * 0.001, centre.y * 0.001, centre.z * 0.001), inertia);
+    var inertia = tensor == null ? null : new Inertia3(
+      tensor.xx * 1e-6,
+      tensor.xy * 1e-6,
+      tensor.xz * 1e-6,
+      tensor.yy * 1e-6,
+      tensor.yz * 1e-6,
+      tensor.zz * 1e-6
+    ).rotated(new Quat(
+      Math.sqrt(0.5),
+      0,
+      0,
+      Math.sqrt(0.5)
+    ));
+    var mass = new MassProperties(
+      properties.mass,
+      new Vec3(centre.x * 0.001, centre.y * 0.001, centre.z * 0.001),
+      inertia
+    );
     var collision:Array<CollisionShape>;
     if (boxCollision) {
       var bounds = envelopeBox(endEffector, solved);
@@ -50,13 +75,14 @@ class EndEffectorBridge {
       var result = EndEffectorCollision.pieces(endEffector, state, collisionOptions, solved);
       collision = ToolGeometry.convex([for (piece in result.pieces) piece.vertices], result.padding);
     }
-    return new Tool(id == null ? frameName : id, frameName, transform,
-      collision, properties.mass, mass);
+    return new Tool(id == null ? frameName : id, frameName, transform, collision, properties.mass, mass);
   }
 
   /** Axis-aligned bounds of all component envelopes in the robot flange frame. */
-  static function envelopeBox(endEffector:EndEffector,
-      solved:EndEffectorSolvedContext):{centre:Vec3, halfExtents:Vec3} {
+  static function envelopeBox(endEffector:EndEffector, solved:EndEffectorSolvedContext): {
+    centre: Vec3,
+    halfExtents: Vec3
+  } {
     var mountInverse = AssemblyFrames.inverse(solved.mountWorld);
     var minX = Math.POSITIVE_INFINITY, minY = Math.POSITIVE_INFINITY, minZ = Math.POSITIVE_INFINITY;
     var maxX = Math.NEGATIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY, maxZ = Math.NEGATIVE_INFINITY;
@@ -73,24 +99,30 @@ class EndEffectorBridge {
       var pose = solved.poses.get(member.id);
       if (pose == null) throw 'Missing solved pose for "${member.id}"';
       var relative = AssemblyFrames.compose(mountInverse, pose);
-      for (x in [min.get_x(), max.get_x()])
-        for (y in [min.get_y(), max.get_y()])
-          for (z in [min.get_z(), max.get_z()]) {
-            var point = AssemblyFrames.transformPoint(relative, x, y, z);
-            var robot = EndEffectorFrames.pointYToZ(point.x, point.y, point.z);
-            minX = Math.min(minX, robot.x);
-            minY = Math.min(minY, robot.y);
-            minZ = Math.min(minZ, robot.z);
-            maxX = Math.max(maxX, robot.x);
-            maxY = Math.max(maxY, robot.y);
-            maxZ = Math.max(maxZ, robot.z);
-          }
+      for (x in [min.get_x(),
+        max.get_x()]) for (y in [min.get_y(), max.get_y()]) for (z in [min.get_z(), max.get_z()]) {
+        var point = AssemblyFrames.transformPoint(relative, x, y, z);
+        var robot = EndEffectorFrames.pointYToZ(point.x, point.y, point.z);
+        minX = Math.min(minX, robot.x);
+        minY = Math.min(minY, robot.y);
+        minZ = Math.min(minZ, robot.z);
+        maxX = Math.max(maxX, robot.x);
+        maxY = Math.max(maxY, robot.y);
+        maxZ = Math.max(maxZ, robot.z);
+      }
     }
-    if (!Math.isFinite(minX) || !Math.isFinite(maxX))
-      throw "End effector needs envelope geometry for collision";
-    return {centre: new Vec3(((minX + maxX) * 0.5) * 0.001,
-      ((minY + maxY) * 0.5) * 0.001, ((minZ + maxZ) * 0.5) * 0.001),
-      halfExtents: new Vec3(((maxX - minX) * 0.5) * 0.001,
-        ((maxY - minY) * 0.5) * 0.001, ((maxZ - minZ) * 0.5) * 0.001)};
+    if (!Math.isFinite(minX) || !Math.isFinite(maxX)) throw "End effector needs envelope geometry for collision";
+    return {
+      centre: new Vec3(
+        ((minX + maxX) * 0.5) * 0.001,
+        ((minY + maxY) * 0.5) * 0.001,
+        ((minZ + maxZ) * 0.5) * 0.001
+      ),
+      halfExtents: new Vec3(
+        ((maxX - minX) * 0.5) * 0.001,
+        ((maxY - minY) * 0.5) * 0.001,
+        ((maxZ - minZ) * 0.5) * 0.001
+      )
+    };
   }
 }

@@ -6,8 +6,7 @@ class FootprintPoint {
   public final y:Float;
 
   public function new(x:Float, y:Float) {
-    if (!Math.isFinite(x) || !Math.isFinite(y))
-      throw "Footprint points must be finite";
+    if (!Math.isFinite(x) || !Math.isFinite(y)) throw "Footprint points must be finite";
     this.x = x;
     this.y = y;
   }

@@ -24,6 +24,6 @@ class SteadyLoads {
   public function copy():SteadyLoads return new SteadyLoads(railDrag, gravity);
 
   /** The friction a sliding joint's rails add, in N: its own dry friction, or the assumed rail drag. */
-  public function friction(joint:Joint):Float
-    return joint.frictionLoss > 0.0 ? joint.frictionLoss : joint.type == JointType.Prismatic ? railDrag : 0.0;
+  public function friction(joint:Joint):Float return joint.frictionLoss
+    > 0.0 ? joint.frictionLoss : joint.type == JointType.Prismatic ? railDrag : 0.0;
 }

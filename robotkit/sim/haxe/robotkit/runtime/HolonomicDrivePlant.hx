@@ -33,19 +33,16 @@ class HolonomicDrivePlant {
   /** Base height, preserved while the plant drives the planar pose. */
   public var baseHeight(get, never):Float;
 
-  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase,
-      ?initialPose:Pose2) {
-    if (harness == null || robotIndex < 0 || base == null)
-      throw "Holonomic-drive plant requires a simulation, robot index, and mobile base";
+  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase, ?initialPose:Pose2) {
+    if (harness == null || robotIndex < 0
+      || base == null) throw "Holonomic-drive plant requires a simulation, robot index, and mobile base";
     var drive:HolonomicDrive = cast(base.driveModel, HolonomicDrive);
-    if (drive == null)
-      throw "Holonomic-drive plant requires a holonomic drive model";
+    if (drive == null) throw "Holonomic-drive plant requires a holonomic drive model";
     this.harness = harness;
     this.simulation = harness.simulation;
     this.robotIndex = robotIndex;
     this.base = base;
-    simulation.setOmniDrive(robotIndex, drive.wheelJoints, drive.wheelAngles, drive.wheelRadius,
-      drive.baseRadius);
+    simulation.setOmniDrive(robotIndex, drive.wheelJoints, drive.wheelAngles, drive.wheelRadius, drive.baseRadius);
     if (initialPose != null) teleport(initialPose);
   }
 
@@ -67,14 +64,12 @@ class HolonomicDrivePlant {
   }
 
   /** Wheel rates, in rad/s, the robot applied during the latest step. */
-  public function appliedWheelRates():Array<Float>
-    return simulation.omniDriveState(robotIndex).wheelRates;
+  public function appliedWheelRates():Array<Float> return simulation.omniDriveState(robotIndex).wheelRates;
 
   function get_pose():Pose2 {
     var state = simulation.omniDriveState(robotIndex);
     return new Pose2(state.x, state.y, state.yaw);
   }
 
-  function get_baseHeight():Float
-    return simulation.omniDriveState(robotIndex).height;
+  function get_baseHeight():Float return simulation.omniDriveState(robotIndex).height;
 }

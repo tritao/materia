@@ -21,12 +21,15 @@ class LidarFreeSpace {
     return new LidarFreeSpace(sensor.maxRange, minRangeMeters, sensor.startAngleRadians, sensor.fieldOfViewRadians);
   }
 
-  public function new(maxRangeMeters:Float, ?minRangeMeters:Float = 0.05, ?startAngleRadians:Float = 0.0,
-      ?fieldOfViewRadians:Float = Math.PI * 2.0) {
-    if (!Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0 || !Math.isFinite(minRangeMeters) ||
-        minRangeMeters < 0.0 || !Math.isFinite(startAngleRadians) || !Math.isFinite(fieldOfViewRadians) ||
-        fieldOfViewRadians <= 0.0)
-      throw "LiDAR free space requires a finite scan layout";
+  public function new(
+    maxRangeMeters:Float,
+    ?minRangeMeters:Float = 0.05,
+    ?startAngleRadians:Float = 0.0,
+    ?fieldOfViewRadians:Float = Math.PI * 2.0
+  ) {
+    if (!Math.isFinite(maxRangeMeters) || maxRangeMeters <= 0.0 || !Math.isFinite(minRangeMeters)
+      || minRangeMeters < 0.0 || !Math.isFinite(startAngleRadians) || !Math.isFinite(fieldOfViewRadians)
+      || fieldOfViewRadians <= 0.0) throw "LiDAR free space requires a finite scan layout";
     this.maxRangeMeters = maxRangeMeters;
     this.minRangeMeters = minRangeMeters;
     this.startAngleRadians = startAngleRadians;
@@ -34,8 +37,11 @@ class LidarFreeSpace {
   }
 
   /** The free space one scan shows, its sensor standing at `referenceFromSensor`. */
-  public function viewing(frame:SensorFrame, referenceFromSensor:Pose2):FreeSpaceView
-    return new LidarScanView(this, frame.values.toArray(), referenceFromSensor);
+  public function viewing(frame:SensorFrame, referenceFromSensor:Pose2):FreeSpaceView return new LidarScanView(
+    this,
+    frame.values.toArray(),
+    referenceFromSensor
+  );
 }
 
 private class LidarScanView implements FreeSpaceView {
@@ -68,7 +74,8 @@ private class LidarScanView implements FreeSpaceView {
       var index = Std.int(first) + offset;
       if (full) index = index % rays;
       else if (index < 0 || index >= rays) return false;
-      var theta = LidarObstaclePerception.bearing(index, rays, layout.startAngleRadians, layout.fieldOfViewRadians) - bearing;
+      var theta = LidarObstaclePerception.bearing(index,
+        rays, layout.startAngleRadians, layout.fieldOfViewRadians) - bearing;
       var across = distance * Math.sin(theta);
       if (Math.abs(across) >= radiusMeters) continue;
       var exit = distance * Math.cos(theta) + Math.sqrt(radiusMeters * radiusMeters - across * across);

@@ -56,7 +56,8 @@ class Simulation {
     sessionObserverId = session.addStepObserver(afterStep);
     sessionResetObserverId = session.addResetObserver(function() {
       for (runtime in robots) SimulationEndpoints.beginEpoch(runtime.endpoint);
-    });
+    }
+    );
   }
 
   /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
@@ -69,8 +70,7 @@ class Simulation {
     return result;
   }
 
-  public static function inSession(session:SimSession):Simulation
-    return new Simulation(session);
+  public static function inSession(session:SimSession):Simulation return new Simulation(session);
 
   /** Robot poses from a frame captured from the session. */
   public function presentFrame(frame:SimFrame):SimulationPresentationSnapshot {
@@ -86,45 +86,93 @@ class Simulation {
   }
 
   /** Adds topology before the first start or step. */
-  public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2,
-      ?virtualDevice:VirtualDeviceOptions, ?tool:Array<CollisionShape>,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
-    return addRobotWithPose(blueprint, initialPose == null ? null :
-      makePose([initialPose.x, initialPose.y, 0.0],
-        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]),
-      virtualDevice, null, null, tool, toolLink, toolMargin, toolGap);
+  public function addRobot(
+    blueprint:RobotRuntimeBlueprint,
+    ?initialPose:Pose2,
+    ?virtualDevice:VirtualDeviceOptions,
+    ?tool:Array<CollisionShape>,
+    ?toolLink:Int,
+    ?toolMargin:Float,
+    ?toolGap:Float
+  ):RobotRuntime {
+    return addRobotWithPose(
+      blueprint,
+      initialPose == null ? null : makePose(
+        [initialPose.x, initialPose.y, 0.0],
+        [
+          0.0,
+          0.0,
+          Math.sin(initialPose.yaw * 0.5),
+          Math.cos(initialPose.yaw * 0.5)
+        ]
+      ),
+      virtualDevice,
+      null,
+      null,
+      tool,
+      toolLink,
+      toolMargin,
+      toolGap
+    );
   }
 
   /** Adds a robot with a resettable 3D pose. Tool padding defaults to a proximity
    * gap; pass toolMargin to make it physical.
    */
-  public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
-      rotation:Array<Float>, ?virtualDevice:VirtualDeviceOptions,
-      ?linkCollisionBoxes:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>, ?tool:Array<CollisionShape>,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float,
-      holdAtRest:Bool = false, ?linkExcludes:Array<Int>, ?restContactGroup:Int64):RobotRuntime {
-    if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
-      throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
-    return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice, linkCollisionBoxes,
-      closures, tool, toolLink, toolMargin, toolGap, holdAtRest,
-      linkExcludes, restContactGroup);
+  public function addRobotAtPose(
+    blueprint:RobotRuntimeBlueprint,
+    position:Array<Float>,
+    rotation:Array<Float>,
+    ?virtualDevice:VirtualDeviceOptions,
+    ?linkCollisionBoxes:Array<Null<Array<Float>>>,
+    ?closures:Array<SimulationClosure>,
+    ?tool:Array<CollisionShape>,
+    ?toolLink:Int,
+    ?toolMargin:Float,
+    ?toolGap:Float,
+    holdAtRest:Bool = false,
+    ?linkExcludes:Array<Int>,
+    ?restContactGroup:Int64
+  ):RobotRuntime {
+    if (position == null || position.length != 3 || rotation == null || rotation.length
+      != 4) throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
+    return addRobotWithPose(
+      blueprint,
+      makePose(position, rotation),
+      virtualDevice,
+      linkCollisionBoxes,
+      closures,
+      tool,
+      toolLink,
+      toolMargin,
+      toolGap,
+      holdAtRest,
+      linkExcludes,
+      restContactGroup
+    );
   }
 
-  function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
-      initialPose:Null<rk_simulation_pose>,
-      ?virtualDevice:VirtualDeviceOptions,
-      ?linkCollisionBoxes:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>, ?tool:Array<CollisionShape>,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float,
-      holdAtRest:Bool = false, ?linkExcludes:Array<Int>, ?restContactGroup:Int64):RobotRuntime {
+  function addRobotWithPose(
+    blueprint:RobotRuntimeBlueprint,
+    initialPose:Null<rk_simulation_pose>,
+    ?virtualDevice:VirtualDeviceOptions,
+    ?linkCollisionBoxes:Array<Null<Array<Float>>>,
+    ?closures:Array<SimulationClosure>,
+    ?tool:Array<CollisionShape>,
+    ?toolLink:Int,
+    ?toolMargin:Float,
+    ?toolGap:Float,
+    holdAtRest:Bool = false,
+    ?linkExcludes:Array<Int>,
+    ?restContactGroup:Int64
+  ):RobotRuntime {
     ensureLive();
     if (blueprint == null) throw "Simulation requires a robot blueprint";
-    if (virtualDevice == null && blueprint.switches.length > 0)
-      SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
+    if (virtualDevice == null && blueprint.switches.length > 0) SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
     if (space != null) {
       space.requireDrives(blueprint);
-      if (virtualDevice != null) for (actuator in virtualDevice.actuators) space.requireInterval(actuator.holdInterval());
+      if (virtualDevice
+        != null) for (actuator in virtualDevice.actuators) space.requireInterval(actuator.holdInterval());
       space.requireStops(blueprint);
       for (shape in blueprint.linkCollisionShapes) {
         var surface = shape.shape.surface;
@@ -133,21 +181,18 @@ class Simulation {
       for (pair in blueprint.contactPairs) space.requireContact(pair.surface);
     }
     var robotDesc:Null<rk_simulation_robot_desc> = null;
-    if (initialPose != null || virtualDevice != null || blueprint.cylinderDrives.length > 0 ||
-        blueprint.velocityDrives.length > 0 || blueprint.brakePhysics.length > 0 ||
-        restContactGroup != null || linkExcludes != null) {
+    if (initialPose != null
+      || virtualDevice != null || blueprint.cylinderDrives.length > 0 || blueprint.velocityDrives.length > 0
+      || blueprint.brakePhysics.length > 0 || restContactGroup != null || linkExcludes != null) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       if (restContactGroup != null) robotDesc.set_rest_contact_group(restContactGroup);
-      robotDesc.set_initial_pose(initialPose == null ?
-        makePose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]) : initialPose);
+      robotDesc.set_initial_pose(initialPose == null ? makePose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]) : initialPose);
       if (virtualDevice != null) {
-        if (blueprint.jointCount > 64 || virtualDevice.actuators.length > 64 ||
-            virtualDevice.controller.length != 32 ||
-            !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.controller) ||
-            (virtualDevice.stepsPerUnit.length != 0 &&
-             virtualDevice.stepsPerUnit.length != blueprint.jointCount))
-          throw "Simulation virtual device configuration is invalid";
+        if (blueprint.jointCount > 64 || virtualDevice.actuators.length > 64
+          || virtualDevice.controller.length != 32 || !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.controller)
+          || (virtualDevice.stepsPerUnit.length != 0 && virtualDevice.stepsPerUnit.length
+          != blueprint.jointCount)) throw "Simulation virtual device configuration is invalid";
         if (virtualDevice.peripheralParameters.length > 64) throw "Too many virtual peripheral parameters";
         var externalMask = 0;
         for (slot in virtualDevice.externalSensorSlots) {
@@ -157,8 +202,10 @@ class Simulation {
         robotDesc.set_virtual_external_sensor_mask(externalMask);
         robotDesc.set_virtual_peripheral_kind(virtualDevice.peripheralKind);
         robotDesc.set_virtual_peripheral_parameter_count(virtualDevice.peripheralParameters.length);
-        for (i in 0...virtualDevice.peripheralParameters.length)
-          robotDesc.set_virtual_peripheral_parameters(i, virtualDevice.peripheralParameters[i]);
+        for (i in 0...virtualDevice.peripheralParameters.length) robotDesc.set_virtual_peripheral_parameters(
+          i,
+          virtualDevice.peripheralParameters[i]
+        );
         robotDesc.set_virtual_device_enabled(1);
         robotDesc.set_virtual_device_profile(virtualDevice.profile);
         robotDesc.set_virtual_device_tick_hz(virtualDevice.tickHz);
@@ -171,55 +218,63 @@ class Simulation {
         robotDesc.set_virtual_device_drop_rate(virtualDevice.frameDropRate);
         robotDesc.set_virtual_device_corruption_rate(virtualDevice.corruptionRate);
         robotDesc.set_virtual_device_seed(virtualDevice.seed);
-        for (i in 0...blueprint.jointCount)
-          robotDesc.set_virtual_device_steps_per_unit(i,
-            virtualDevice.stepsPerUnit.length == 0 ? 1000.0 : virtualDevice.stepsPerUnit[i]);
-        for (i in 0...16)
-          robotDesc.set_virtual_device_controller(i,
-            Std.parseInt("0x" + virtualDevice.controller.substr(i * 2, 2)));
+        for (i in 0...blueprint.jointCount) robotDesc.set_virtual_device_steps_per_unit(
+          i,
+          virtualDevice.stepsPerUnit.length == 0 ? 1000.0 : virtualDevice.stepsPerUnit[i]
+        );
+        for (i in 0...16) robotDesc.set_virtual_device_controller(
+          i,
+          Std.parseInt("0x" + virtualDevice.controller.substr(
+            i * 2,
+            2
+          ))
+        );
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
         robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);
-        if (virtualDevice.inputs.length > 64 || (virtualDevice.inputs.length > 0 && virtualDevice.profile != 1))
-          throw "Physical virtual switches require the full device profile and at most 64 inputs";
+        if (virtualDevice.inputs.length > 64 || (virtualDevice.inputs.length > 0 && virtualDevice.profile
+          != 1)) throw "Physical virtual switches require the full device profile and at most 64 inputs";
         robotDesc.set_virtual_device_input_count(virtualDevice.inputs.length);
         var inputIds = new Map<String, Bool>();
         for (i in 0...virtualDevice.inputs.length) {
           var input = virtualDevice.inputs[i];
-          if (input.actuator < 0 || input.actuator >= virtualDevice.actuators.length ||
-              input.switchId.length == 0 || input.switchId.length > 63 || inputIds.exists(input.switchId))
-            throw "Virtual input requires a unique switch ID and a wired actuator";
+          if (input.actuator < 0 || input.actuator >= virtualDevice.actuators.length
+            || input.switchId.length == 0 || input.switchId.length > 63
+            || inputIds.exists(input.switchId)) throw "Virtual input requires a unique switch ID and a wired actuator";
           inputIds.set(input.switchId, true);
           robotDesc.set_virtual_device_input_actuator(i, input.actuator);
           robotDesc.set_virtual_device_input_active_high(i, input.activeHigh ? 1 : 0);
           robotDesc.set_virtual_device_input_active_above(i, input.activeAbove ? 1 : 0);
           robotDesc.set_virtual_device_input_threshold_steps(i, input.thresholdSteps);
-          for (byte in 0...input.switchId.length)
-            robotDesc.set_virtual_device_input_switch_ids(i * 64 + byte, input.switchId.charCodeAt(byte));
+          for (byte in 0...input.switchId.length) robotDesc.set_virtual_device_input_switch_ids(
+            i * 64 + byte,
+            input.switchId.charCodeAt(byte)
+          );
         }
         robotDesc.set_virtual_device_actuator_count(virtualDevice.actuators.length);
         robotDesc.set_virtual_device_feedback_count(virtualDevice.actuators.length);
         for (i in 0...virtualDevice.actuators.length) {
           var actuator = virtualDevice.actuators[i];
-          if (actuator.jointIndex >= blueprint.jointCount)
-            throw "Virtual actuator references an unknown joint";
+          if (actuator.jointIndex >= blueprint.jointCount) throw "Virtual actuator references an unknown joint";
           robotDesc.set_virtual_device_actuator_joint(i, actuator.jointIndex);
           robotDesc.set_virtual_device_actuator_ratio(i, actuator.ratio);
           robotDesc.set_virtual_device_actuator_offset(i, actuator.offset);
-          robotDesc.set_virtual_device_feedback_joint(i,
-            actuator.feedbackJointIndex < 0 ? 255 : actuator.feedbackJointIndex);
+          robotDesc.set_virtual_device_feedback_joint(
+            i,
+            actuator.feedbackJointIndex < 0 ? 255 : actuator.feedbackJointIndex
+          );
           robotDesc.set_virtual_device_feedback_ratio(i, actuator.feedbackRatio);
           robotDesc.set_virtual_device_feedback_offset(i, actuator.feedbackOffset);
           robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
           robotDesc.set_virtual_device_actuator_min_step_ticks(i, actuator.minStepTicks);
-          robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
-            actuator.directionSetupTicks);
+          robotDesc.set_virtual_device_actuator_direction_setup_ticks(i, actuator.directionSetupTicks);
           robotDesc.set_virtual_device_actuator_skew_bound(i, actuator.skewBound);
           robotDesc.set_virtual_device_actuator_hold_stiffness(i, actuator.holdStiffness);
           robotDesc.set_virtual_device_actuator_hold_damping(i, actuator.holdDamping());
-          for (byte in 0...actuator.id.length)
-            robotDesc.set_virtual_device_actuator_ids(i * 64 + byte,
-              actuator.id.charCodeAt(byte));
+          for (byte in 0...actuator.id.length) robotDesc.set_virtual_device_actuator_ids(
+            i * 64 + byte,
+            actuator.id.charCodeAt(byte)
+          );
         }
       }
     }
@@ -231,22 +286,30 @@ class Simulation {
         var channelA = -1, channelB = -1;
         for (channelIndex in 0...blueprint.channels.length) {
           var channel = blueprint.channels[channelIndex];
-          var isDigital = switch channel.safeValue {case Digital(_): true; case _: false;};
+          var isDigital = switch channel.safeValue {
+            case Digital(_):
+              true;
+            case _:
+              false;
+          };
           if (!isDigital) continue;
           if (channel.id == drive.channelA) channelA = channelIndex;
           if (drive.channelB != null && channel.id == drive.channelB) channelB = channelIndex;
         }
-        if (channelA < 0 || (drive.channelB != null && channelB < 0))
-          throw 'Cylinder drive on joint ${drive.joint} references an undeclared digital coil';
+        if (channelA < 0 || (drive.channelB != null
+          && channelB < 0)) throw 'Cylinder drive on joint ${drive.joint} references an undeclared digital coil';
         var native = new rk_simulation_cylinder_drive();
         native.set_joint(drive.joint);
         native.set_channel_a(channelA);
         native.set_channel_b(drive.channelB == null ? -1 : channelB);
         native.set_normally_to_a(drive.normallyToA ? 1 : 0);
         native.set_control(switch drive.control {
-          case PressureEffort: RkCylinderControl.PressureEffort;
-          case FlowLimited: RkCylinderControl.FlowLimited;
-        });
+          case PressureEffort:
+            RkCylinderControl.PressureEffort;
+          case FlowLimited:
+            RkCylinderControl.FlowLimited;
+        }
+        );
         native.set_extension_force(drive.extensionForce);
         native.set_retraction_force(drive.retractionForce);
         native.set_extend_sign(drive.extendSign);
@@ -268,13 +331,18 @@ class Simulation {
         var speedChannel = -1, directionChannel = -1;
         for (channelIndex in 0...blueprint.channels.length) {
           var channel = blueprint.channels[channelIndex];
-          var isAnalog = switch channel.safeValue {case Analog(_): true; case _: false;};
+          var isAnalog = switch channel.safeValue {
+            case Analog(_):
+              true;
+            case _:
+              false;
+          };
           if (!isAnalog) continue;
           if (channel.id == drive.speedChannel) speedChannel = channelIndex;
           if (channel.id == drive.directionChannel) directionChannel = channelIndex;
         }
-        if (speedChannel < 0 || directionChannel < 0)
-          throw 'Velocity drive on joint ${drive.joint} references undeclared analog channels';
+        if (speedChannel < 0
+          || directionChannel < 0) throw 'Velocity drive on joint ${drive.joint} references undeclared analog channels';
         var native = new rk_simulation_velocity_drive();
         native.set_joint(drive.joint);
         native.set_speed_channel(speedChannel);
@@ -285,8 +353,8 @@ class Simulation {
         desc.set_velocity_drives(index, native);
       }
     }
-    if (blueprint.brakePhysics.length != blueprint.brakes.length)
-      throw "Every brake interlock requires one physical brake";
+    if (blueprint.brakePhysics.length
+      != blueprint.brakes.length) throw "Every brake interlock requires one physical brake";
     if (blueprint.brakePhysics.length > 0) {
       var desc = requireRobotDescription(robotDesc);
       desc.set_brake_count(blueprint.brakePhysics.length);
@@ -295,8 +363,8 @@ class Simulation {
         var matched = false;
         for (control in blueprint.brakes) if (control.joint == brake.joint) matched = true;
         if (!matched) throw "Physical brake has no controller interlock";
-        for (earlier in 0...index) if (blueprint.brakePhysics[earlier].joint == brake.joint)
-          throw "Duplicate physical brake joint";
+        for (earlier in 0...index) if (blueprint.brakePhysics[earlier].joint
+          == brake.joint) throw "Duplicate physical brake joint";
         var native = new rk_simulation_brake();
         native.set_joint(brake.joint);
         native.set_holding_effort(brake.holdingEffort);
@@ -306,8 +374,8 @@ class Simulation {
       }
     }
     if (linkCollisionBoxes != null) {
-      if (linkCollisionBoxes.length != blueprint.linkCount)
-        throw "Simulation link collision boxes must match the link count";
+      if (linkCollisionBoxes.length
+        != blueprint.linkCount) throw "Simulation link collision boxes must match the link count";
       if (robotDesc == null) {
         robotDesc = new rk_simulation_robot_desc();
         robotDesc.set_struct_size(rk_simulation_robot_desc.size());
@@ -317,8 +385,8 @@ class Simulation {
         if (bounds == null) continue;
         if (bounds.length != 3) throw "Simulation link collision box needs three extents";
         for (axis in 0...3) {
-          if (!Math.isFinite(bounds[axis]) || bounds[axis] <= 0.0)
-            throw "Simulation link collision extents must be finite and positive";
+          if (!Math.isFinite(bounds[axis])
+            || bounds[axis] <= 0.0) throw "Simulation link collision extents must be finite and positive";
           robotDesc.set_collision_half_extents(link * 3 + axis, bounds[axis]);
         }
       }
@@ -332,10 +400,9 @@ class Simulation {
       robotDesc.set_closure_count(closures.length);
       for (index in 0...closures.length) {
         var source = closures[index];
-        if (source.parentLink < 0 || source.childLink < 0 ||
-            source.parentLink >= blueprint.linkCount || source.childLink >= blueprint.linkCount ||
-            source.anchorParent.length != 3 || source.axisParent.length != 3)
-          throw "Simulation closure has invalid links or geometry";
+        if (source.parentLink < 0 || source.childLink < 0 || source.parentLink >= blueprint.linkCount
+          || source.childLink >= blueprint.linkCount || source.anchorParent.length != 3
+          || source.axisParent.length != 3) throw "Simulation closure has invalid links or geometry";
         var native = new rk_simulation_closure_desc();
         native.set_parent_link(source.parentLink);
         native.set_child_link(source.childLink);
@@ -348,7 +415,8 @@ class Simulation {
       }
     }
     function nativeShape(shape:CollisionShape, link:Int):rk_simulation_link_shape {
-      var invalid = shape.validate(); if (invalid != null) throw invalid;
+      var invalid = shape.validate();
+      if (invalid != null) throw invalid;
       var native = new rk_simulation_link_shape();
       native.set_link(link);
       var size:Array<Float> = switch shape.geometry {
@@ -365,13 +433,14 @@ class Simulation {
           native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CYLINDER);
           [radius, half];
         case Convex(points):
-          if (points.length < 12 || points.length > 192 || points.length % 3 != 0)
-            throw "Simulation convex shape needs 4..64 vertices";
+          if (points.length < 12
+            || points.length > 192 || points.length % 3 != 0) throw "Simulation convex shape needs 4..64 vertices";
           native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CONVEX);
-          native.set_vertex_count(Std.int(points.length/3));
+          native.set_vertex_count(Std.int(points.length / 3));
           for (i in 0...points.length) native.set_vertices(i, points[i]);
           [];
-        case _: throw "Scene geometry is not accepted on a link";
+        case _:
+          throw "Scene geometry is not accepted on a link";
       };
       for (axis in 0...size.length) native.set_size(axis, size[axis]);
       for (axis in 0...3) native.set_position(axis, shape.position[axis]);
@@ -384,10 +453,14 @@ class Simulation {
         native.set_contact_damping_ratio(surface.contactDampingRatio);
       }
       native.set_contact_filter(switch shape.contact {
-        case Layers: 0;
-        case PairsOnly: 1;
-        case PairsAndEnvironment: 2;
-      });
+        case Layers:
+          0;
+        case PairsOnly:
+          1;
+        case PairsAndEnvironment:
+          2;
+      }
+      );
       return native;
     }
     if (tool != null && tool.length > 0) {
@@ -410,23 +483,30 @@ class Simulation {
         if (invalid != null) throw invalid;
         // Preserve the existing tool box's convex contact representation.
         var transported = switch shape.geometry {
-          case Box(x,y,z):
-            var points = [for (i in 0...8) for (a in 0...3)
-              ((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? x : a == 1 ? y : z)];
-            var convex = new CollisionShape(Convex(points),shape.position,shape.rotation);
-            convex.surface = shape.surface; convex.contact = shape.contact; convex;
-          case _: shape;
+          case Box(x, y, z):
+            var points = [for (i in 0...8) for (a in 0...3)((i & (1
+              << a)) == 0 ? -1 : 1) * (a == 0 ? x : a == 1 ? y : z)];
+            var convex = new CollisionShape(Convex(points), shape.position, shape.rotation);
+            convex.surface = shape.surface;
+            convex.contact = shape.contact;
+            convex;
+          case _:
+            shape;
         };
         var gap = toolGap == null ? shape.inflation : toolGap;
         if (!Math.isFinite(gap) || gap < 0) throw "Simulation tool gap is invalid";
-        robotDesc.set_tool_shape_gap(index,gap);
-        robotDesc.set_tool_shapes(index,nativeShape(transported,link));
+        robotDesc.set_tool_shape_gap(index, gap);
+        robotDesc.set_tool_shapes(index, nativeShape(transported, link));
       }
     }
     var shapes = blueprint.linkCollisionShapes;
     if (shapes.length > 0) {
-      var packed=SimulationCollisionPacking.pack(shapes,blueprint.contactPairs,
-        RobotKitSimKitConstants.RK_MAX_LINK_SHAPES,RobotKitSimKitConstants.RK_MAX_LINK_HULLS);
+      var packed = SimulationCollisionPacking.pack(
+        shapes,
+        blueprint.contactPairs,
+        RobotKitSimKitConstants.RK_MAX_LINK_SHAPES,
+        RobotKitSimKitConstants.RK_MAX_LINK_HULLS
+      );
       if (robotDesc == null) {
         robotDesc = new rk_simulation_robot_desc();
         robotDesc.set_struct_size(rk_simulation_robot_desc.size());
@@ -440,25 +520,35 @@ class Simulation {
         robotDesc.set_link_shapes(index, native);
       }
       robotDesc.set_link_hull_count(packed.hulls.length);
-      for(index in 0...packed.hulls.length) {
-        var source=shapes[packed.hulls[index]],shape=source.shape;
-        var invalid=shape.validate();if(invalid!=null)throw invalid;
-        var hull=new rk_simulation_link_hull(),vertices=shape.convexVertices();
-        hull.set_link(source.link);hull.set_vertex_count(Std.int(vertices.length/3));
-        for(coordinate in 0...vertices.length)hull.set_vertices(coordinate,vertices[coordinate]);
-        var surface=shape.surface;
-        if(surface!=null) {
-          for(axis in 0...3)hull.set_friction(axis,surface.friction[axis]);
+      for (index in 0...packed.hulls.length) {
+        var source = shapes[packed.hulls[index]], shape = source.shape;
+        var invalid = shape.validate();
+        if (invalid != null) throw invalid;
+        var hull = new rk_simulation_link_hull(), vertices = shape.convexVertices();
+        hull.set_link(source.link);
+        hull.set_vertex_count(Std.int(vertices.length / 3));
+        for (coordinate in 0...vertices.length) hull.set_vertices(coordinate, vertices[coordinate]);
+        var surface = shape.surface;
+        if (surface != null) {
+          for (axis in 0...3) hull.set_friction(axis, surface.friction[axis]);
           hull.set_friction_dimensions(surface.frictionDimensions);
           hull.set_contact_time_constant(surface.contactTimeConstant);
           hull.set_contact_damping_ratio(surface.contactDampingRatio);
         }
-        hull.set_contact_filter(switch shape.contact {case Layers:0;case PairsOnly:1;case PairsAndEnvironment:2;});
-        robotDesc.set_link_hulls(index,hull);
+        hull.set_contact_filter(switch shape.contact {
+          case Layers:
+            0;
+          case PairsOnly:
+            1;
+          case PairsAndEnvironment:
+            2;
+        }
+        );
+        robotDesc.set_link_hulls(index, hull);
       }
       var pairs = blueprint.contactPairs;
-      if (pairs.length > RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS)
-        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS} contact pairs';
+      if (pairs.length > RobotKitSimKitConstants
+        .RK_MAX_CONTACT_PAIRS) throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS} contact pairs';
       robotDesc.set_contact_pair_count(pairs.length);
       for (index in 0...pairs.length) {
         var pair = pairs[index];
@@ -484,25 +574,25 @@ class Simulation {
     // The links exclude exactly these pairs (link indices, two per pair) from each other: a collision
     // description's allowed pairs (collisionkit COLLISION.md CL3b).
     if (linkExcludes != null) {
-      if (linkExcludes.length % 2 != 0 || linkExcludes.length > 2 * RobotKitSimKitConstants.RK_MAX_LINK_EXCLUDES)
-        throw 'Simulation link excludes are pairs, at most ${RobotKitSimKitConstants.RK_MAX_LINK_EXCLUDES}';
+      if (linkExcludes.length % 2 != 0 || linkExcludes.length > 2 * RobotKitSimKitConstants
+        .RK_MAX_LINK_EXCLUDES) throw 'Simulation link excludes are pairs, at most ${RobotKitSimKitConstants.RK_MAX_LINK_EXCLUDES}';
       if (robotDesc == null) {
         robotDesc = new rk_simulation_robot_desc();
         robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       }
       var desc = requireRobotDescription(robotDesc);
-      for (link in linkExcludes) if (link < 0 || link >= blueprint.linkCount) throw "Simulation link exclude names an unknown link";
+      for (link in linkExcludes) if (link < 0
+        || link >= blueprint.linkCount) throw "Simulation link exclude names an unknown link";
       desc.set_link_exclude_count(Std.int(linkExcludes.length / 2));
       for (index in 0...linkExcludes.length) desc.set_link_excludes(index, linkExcludes[index]);
       desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES);
     }
     // Validate descriptor capacity before adding a robot, so a malformed law leaves no partial robot.
     for (coupling in blueprint.couplings) if (coupling.stiffnessLaw != null) {
-      if (coupling.stiffnessLaw.length > NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_SPRINGS)
-        throw "Simulation compliance has too many parallel springs";
-      for (spring in coupling.stiffnessLaw)
-        if (spring.coordinates.length > NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES)
-          throw "Simulation compliance has too many coordinates per spring";
+      if (coupling.stiffnessLaw.length > NativeKitSimConstants
+        .NKSIM_MAX_COMPLIANCE_SPRINGS) throw "Simulation compliance has too many parallel springs";
+      for (spring in coupling.stiffnessLaw) if (spring.coordinates.length > NativeKitSimConstants
+        .NKSIM_MAX_COMPLIANCE_COORDINATES) throw "Simulation compliance has too many coordinates per spring";
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
@@ -510,22 +600,36 @@ class Simulation {
       var springs = coupling.stiffnessLaw;
       var law = new rk_simulation_coupling_law_desc();
       law.set_struct_size(rk_simulation_coupling_law_desc.size());
-      law.set_leader(coupling.leader); law.set_follower(coupling.follower); law.set_spring_count(springs.length);
+      law.set_leader(coupling.leader);
+      law.set_follower(coupling.follower);
+      law.set_spring_count(springs.length);
       for (index in 0...springs.length) {
         var spring = springs[index];
-        law.set_compliance(index,spring.compliance); law.set_coordinate_count(index,spring.coordinates.length);
+        law.set_compliance(index, spring.compliance);
+        law.set_coordinate_count(index, spring.coordinates.length);
         for (c in 0...spring.coordinates.length) {
-          law.set_coordinate_joint(index*NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES+c,spring.coordinates[c].joint);
-          law.set_gradient(index*NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES+c,spring.coordinates[c].coefficient);
+          law.set_coordinate_joint(
+            index * NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES + c,
+            spring.coordinates[c].joint
+          );
+          law.set_gradient(
+            index * NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES + c,
+            spring.coordinates[c].coefficient
+          );
         }
       }
-      check(RobotKitSimKit.rk_simulation_set_coupling_law(owner.borrow(),robots.length,law),"simulation.setCouplingLaw");
+      check(
+        RobotKitSimKit.rk_simulation_set_coupling_law(owner.borrow(), robots.length, law),
+        "simulation.setCouplingLaw"
+      );
     }
     var runtime:RobotRuntime = null;
     var capture = () -> robotContacts(runtime);
-    var endpoint = virtualDevice == null
-      ? SimulationEndpoints.simulation(result.out_runtime, capture)
-      : SimulationEndpoints.virtualDevice(result.out_runtime, capture);
+    var endpoint = virtualDevice == null ? SimulationEndpoints.simulation(result.out_runtime,
+      capture) : SimulationEndpoints.virtualDevice(
+        result.out_runtime,
+        capture
+      );
     runtime = RobotRuntime.create(blueprint, endpoint);
     robots.push(runtime);
     robotBlueprints.push(blueprint);
@@ -533,8 +637,11 @@ class Simulation {
     // Virtual-device inputs are supplied by the device protocol rather than host synthesis.
     if (virtualDevice == null && blueprint.switches.length > 0) {
       var observedRuntime:RobotRuntime = runtime;
-      var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
-        positions -> observedRuntime.copyPhysicalPositionsInto(positions));
+      var switches = new SimulatedSwitchSensorAdapter(
+        blueprint,
+        observedRuntime,
+        positions -> observedRuntime.copyPhysicalPositionsInto(positions)
+      );
       addStepObserver(switches);
       switchObservers.set(robots.length - 1, switches);
     }
@@ -548,15 +655,15 @@ class Simulation {
   }
 
   /** MuJoCo provides solved contact wrenches; the deterministic backend does not model them. */
-  public function supportsContactWrenches():Bool
-    return space != null && space.backend == SimulationSpace.MUJOCO;
+  public function supportsContactWrenches():Bool return space != null && space.backend == SimulationSpace.MUJOCO;
 
   public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
     ensureLive();
-    if (runtime == null || robots.indexOf(runtime) < 0)
-      throw "Runtime does not belong to this simulation";
+    if (runtime == null || robots.indexOf(runtime) < 0) throw "Runtime does not belong to this simulation";
     var capture = RobotKitSimKit.rk_simulation_capture_robot_contacts(
-      owner.borrow(), (cast runtime.endpoint:NativeRuntimeEndpoint).nativeHandle());
+      owner.borrow(),
+      (cast runtime.endpoint:NativeRuntimeEndpoint).nativeHandle()
+    );
     check(capture.status, "simulation.robotContacts");
     var contacts:Array<RobotContact> = [];
     var list = capture.out_list;
@@ -571,22 +678,40 @@ class Simulation {
         var result = RobotKitSimKit.rk_robot_contact_list_get(list.borrow(), index, value);
         check(result.status, "simulation.robotContact");
         value = result.out_contact;
-        contacts.push({linkIndex: value.get_link_index(),
+        contacts.push({
+          linkIndex: value.get_link_index(),
           toolPieceIndex: value.get_tool_piece_index(),
           otherPieceIndex: value.get_other_piece_index(),
           otherObject: value.get_other_object().rawValue(),
           distance: value.get_distance(),
-          position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
-          normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
+          position: new Vec3(
+            value.get_position(0),
+            value.get_position(1),
+            value.get_position(2)
+          ),
+          normal: new Vec3(
+            value.get_normal(0),
+            value.get_normal(1),
+            value.get_normal(2)
+          ),
           wrenchValid: value.get_wrench_valid() != 0,
-          force: new Vec3(value.get_force_on_link(0), value.get_force_on_link(1), value.get_force_on_link(2)),
-          torque: new Vec3(value.get_torque_on_link(0), value.get_torque_on_link(1), value.get_torque_on_link(2)),
+          force: new Vec3(
+            value.get_force_on_link(0),
+            value.get_force_on_link(1),
+            value.get_force_on_link(2)
+          ),
+          torque: new Vec3(
+            value.get_torque_on_link(0),
+            value.get_torque_on_link(1),
+            value.get_torque_on_link(2)
+          ),
           carriedObject: value.get_carried_object().rawValue(),
           active: value.get_active() != 0,
           stepIndex: stepResult.out_step_index,
           otherKind: cast value.get_other_kind(),
           otherRobot: value.get_other_robot(),
-          otherLink: value.get_other_link()});
+          otherLink: value.get_other_link()
+        });
       }
     } catch (error:Dynamic) {
       list.close();
@@ -645,16 +770,20 @@ class Simulation {
   /** Supplies a board-defined numeric input; the explicit peripheral kind owns the input index. */
   public function setVirtualDeviceInput(robotIndex:Int, kind:Int, input:Int, value:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_set_virtual_device_input(owner.borrow(), robotIndex, kind, input, value),
-      "simulation.setVirtualDeviceInput");
+    check(
+      RobotKitSimKit.rk_simulation_set_virtual_device_input(owner.borrow(), robotIndex, kind, input, value),
+      "simulation.setVirtualDeviceInput"
+    );
   }
 
   /** Latest device sample; sequence zero means no observation has arrived yet. */
   public function virtualDeviceSensor(robotIndex:Int, slot:Int):rk_simulation_device_sensor {
     ensureLive();
     var value = new rk_simulation_device_sensor();
-    check(RobotKitSimKit.rk_simulation_get_virtual_device_sensor(owner.borrow(), robotIndex, slot, value).status,
-      "simulation.virtualDeviceSensor");
+    check(
+      RobotKitSimKit.rk_simulation_get_virtual_device_sensor(owner.borrow(), robotIndex, slot, value).status,
+      "simulation.virtualDeviceSensor"
+    );
     return value;
   }
 
@@ -662,34 +791,36 @@ class Simulation {
   public function jointSample(robotIndex:Int, joint:Int):rk_simulation_joint_sample {
     ensureLive();
     var value = new rk_simulation_joint_sample();
-    check(RobotKitSimKit.rk_simulation_get_joint_sample(owner.borrow(),robotIndex,joint,value).status,
-      "simulation.jointSample");
+    check(
+      RobotKitSimKit.rk_simulation_get_joint_sample(owner.borrow(), robotIndex, joint, value).status,
+      "simulation.jointSample"
+    );
     return value;
   }
 
   /** GPIO/analog output already executed by the virtual board. */
   public function virtualDeviceChannel(robotIndex:Int, channel:Int):Float {
     ensureLive();
-    var call = RobotKitSimKit.rk_simulation_get_virtual_device_channel(owner.borrow(),robotIndex,channel);
-    check(call.status,"simulation.virtualDeviceChannel");
+    var call = RobotKitSimKit.rk_simulation_get_virtual_device_channel(owner.borrow(), robotIndex, channel);
+    check(call.status, "simulation.virtualDeviceChannel");
     return call.out_value;
   }
 
   /** Injects a virtual RKD6 link loss or reconnects the link. */
   public function cutVirtualDeviceLink(robotIndex:Int, cut:Bool):Void {
     ensureLive();
-    if (robotIndex < 0 || robotIndex >= robots.length)
-      throw "Simulation virtual-device robot index is out of range";
-    check(RobotKitSimKit.rk_simulation_cut_virtual_device_link(owner.borrow(),
-      robotIndex, cut ? 1 : 0), "simulation.cutVirtualDeviceLink");
+    if (robotIndex < 0 || robotIndex >= robots.length) throw "Simulation virtual-device robot index is out of range";
+    check(
+      RobotKitSimKit.rk_simulation_cut_virtual_device_link(owner.borrow(), robotIndex, cut ? 1 : 0),
+      "simulation.cutVirtualDeviceLink"
+    );
   }
 
   /** Restores one robot's initial body pose and runtime state. The session
    * must be stopped. */
   public function resetRobot(robotIndex:Int):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
-      "simulation.resetRobot");
+    check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex), "simulation.resetRobot");
 
     SimulationEndpoints.beginEpoch(robots[robotIndex].endpoint);
 
@@ -715,8 +846,10 @@ class Simulation {
   public function setPowerUpOffsets(robotIndex:Int, offsets:Array<Float>):Void {
     ensureLive();
     if (offsets == null) throw "Power-up offsets require a full joint vector";
-    check(RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
-      "simulation.setPowerUpOffsets");
+    check(
+      RobotKitSimKit.rk_simulation_set_power_up_offsets(owner.borrow(), robotIndex, offsets),
+      "simulation.setPowerUpOffsets"
+    );
     powerUpOffsets.set(robotIndex, offsets.copy());
     powerUpSideDrives.remove(robotIndex);
   }
@@ -724,18 +857,22 @@ class Simulation {
   /** Cold placement including explicit motor-side racking; retain it across robot reset. */
   public function setPowerUpSides(robotIndex:Int, offsets:Array<Float>, drives:Array<Int>):Void {
     ensureLive();
-    if (offsets == null || drives == null || drives.length == 0)
-      throw "Side startup placement requires offsets and explicit motor followers";
-    check(RobotKitSimKit.rk_simulation_set_power_up_sides(owner.borrow(), robotIndex, offsets, drives),
-      "simulation.setPowerUpSides");
+    if (offsets == null || drives == null
+      || drives.length == 0) throw "Side startup placement requires offsets and explicit motor followers";
+    check(
+      RobotKitSimKit.rk_simulation_set_power_up_sides(owner.borrow(), robotIndex, offsets, drives),
+      "simulation.setPowerUpSides"
+    );
     powerUpOffsets.set(robotIndex, offsets.copy());
     powerUpSideDrives.set(robotIndex, drives.copy());
   }
 
   public function setJointSlip(robotIndex:Int, joint:Int, offset:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_set_joint_slip(owner.borrow(), robotIndex, joint, offset),
-      "simulation.setJointSlip");
+    check(
+      RobotKitSimKit.rk_simulation_set_joint_slip(owner.borrow(), robotIndex, joint, offset),
+      "simulation.setJointSlip"
+    );
   }
 
   /** Hold one motor-side shaft at a physical SI position while its leader continues.
@@ -743,8 +880,10 @@ class Simulation {
   public function setSquaringHold(robotIndex:Int, joint:Int, active:Bool, position:Float):Void {
     ensureLive();
     if (!Math.isFinite(position)) throw "Squaring hold requires a finite physical shaft position";
-    check(RobotKitSimKit.rk_simulation_set_squaring_hold(owner.borrow(), robotIndex, joint,
-      active ? 1 : 0, position), "simulation.setSquaringHold");
+    check(
+      RobotKitSimKit.rk_simulation_set_squaring_hold(owner.borrow(), robotIndex, joint, active ? 1 : 0, position),
+      "simulation.setSquaringHold"
+    );
   }
 
   /** Create a side controller tied to the runtime owned at this robot index. */
@@ -756,14 +895,11 @@ class Simulation {
 
   /** Teleports one robot base while leaving the shared clock untouched. The
    * session must be stopped. */
-  public function teleportRobot(robotIndex:Int, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
+  public function teleportRobot(robotIndex:Int, position:Array<Float>, ?rotation:Array<Float>):Void {
     ensureLive();
-    if (position == null || position.length != 3)
-      throw "Simulation.teleportRobot requires a three-component position";
+    if (position == null || position.length != 3) throw "Simulation.teleportRobot requires a three-component position";
     var pose = makePose(position, rotation);
-    check(RobotKitSimKit.rk_simulation_teleport_robot(owner.borrow(), robotIndex, pose),
-      "simulation.teleportRobot");
+    check(RobotKitSimKit.rk_simulation_teleport_robot(owner.borrow(), robotIndex, pose), "simulation.teleportRobot");
   }
 
   /**
@@ -774,14 +910,11 @@ class Simulation {
    * previous pose, so the IMU measures consecutive drives as continuous
    * motion. Use it to drive a base every tick; use placeRobotBase for a jump.
    */
-  public function driveRobotBase(robotIndex:Int, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
+  public function driveRobotBase(robotIndex:Int, position:Array<Float>, ?rotation:Array<Float>):Void {
     ensureLive();
-    if (position == null || position.length != 3)
-      throw "Simulation.driveRobotBase requires a three-component position";
+    if (position == null || position.length != 3) throw "Simulation.driveRobotBase requires a three-component position";
     var pose = makePose(position, rotation);
-    check(RobotKitSimKit.rk_simulation_drive_robot_base(owner.borrow(), robotIndex, pose),
-      "simulation.driveRobotBase");
+    check(RobotKitSimKit.rk_simulation_drive_robot_base(owner.borrow(), robotIndex, pose), "simulation.driveRobotBase");
   }
 
   /**
@@ -790,14 +923,11 @@ class Simulation {
    * keeps its body-frame velocity through the jump, so the IMU sees no spike,
    * and a differential-drive plant continues from the new pose.
    */
-  public function placeRobotBase(robotIndex:Int, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
+  public function placeRobotBase(robotIndex:Int, position:Array<Float>, ?rotation:Array<Float>):Void {
     ensureLive();
-    if (position == null || position.length != 3)
-      throw "Simulation.placeRobotBase requires a three-component position";
+    if (position == null || position.length != 3) throw "Simulation.placeRobotBase requires a three-component position";
     var pose = makePose(position, rotation);
-    check(RobotKitSimKit.rk_simulation_place_robot_base(owner.borrow(), robotIndex, pose),
-      "simulation.placeRobotBase");
+    check(RobotKitSimKit.rk_simulation_place_robot_base(owner.borrow(), robotIndex, pose), "simulation.placeRobotBase");
   }
 
   /**
@@ -808,31 +938,40 @@ class Simulation {
    * are metres. A wheel's direction is -1 when a positive joint rate rolls it
    * backward. The plant starts from the base's current pose.
    */
-  public function setDifferentialDrive(robotIndex:Int, leftWheelJoint:Int,
-      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float,
-      leftDirection:Int = 1, rightDirection:Int = 1):Void {
+  public function setDifferentialDrive(
+    robotIndex:Int,
+    leftWheelJoint:Int,
+    rightWheelJoint:Int,
+    wheelRadius:Float,
+    trackWidth:Float,
+    leftDirection:Int = 1,
+    rightDirection:Int = 1
+  ):Void {
     ensureLive();
-    if (leftWheelJoint < 0 || rightWheelJoint < 0)
-      throw "Simulation.setDifferentialDrive requires wheel joint indices";
+    if (leftWheelJoint < 0 || rightWheelJoint < 0) throw "Simulation.setDifferentialDrive requires wheel joint indices";
     var desc = new rk_simulation_differential_drive_desc();
     desc.set_struct_size(rk_simulation_differential_drive_desc.size());
     desc.set_left_wheel_joint(leftWheelJoint);
     desc.set_right_wheel_joint(rightWheelJoint);
     desc.set_wheel_radius(wheelRadius);
     desc.set_track_width(trackWidth);
-    if (Math.abs(leftDirection) != 1 || Math.abs(rightDirection) != 1)
-      throw "Simulation.setDifferentialDrive wheel directions must be 1 or -1";
-    desc.set_reversed_wheels((leftDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_LEFT : 0)
-      | (rightDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_RIGHT : 0));
-    check(RobotKitSimKit.rk_simulation_set_differential_drive(owner.borrow(), robotIndex, desc),
-      "simulation.setDifferentialDrive");
+    if (Math.abs(leftDirection) != 1
+      || Math.abs(rightDirection) != 1) throw "Simulation.setDifferentialDrive wheel directions must be 1 or -1";
+    desc.set_reversed_wheels((leftDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_LEFT
+      : 0) | (rightDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_RIGHT : 0));
+    check(
+      RobotKitSimKit.rk_simulation_set_differential_drive(owner.borrow(), robotIndex, desc),
+      "simulation.setDifferentialDrive"
+    );
   }
 
   /** Removes a robot's differential-drive coupling; the base stays in place. */
   public function clearDifferentialDrive(robotIndex:Int):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_clear_differential_drive(owner.borrow(), robotIndex),
-      "simulation.clearDifferentialDrive");
+    check(
+      RobotKitSimKit.rk_simulation_clear_differential_drive(owner.borrow(), robotIndex),
+      "simulation.clearDifferentialDrive"
+    );
   }
 
   /**
@@ -843,8 +982,7 @@ class Simulation {
     ensureLive();
     var state = new rk_simulation_differential_drive_state();
     state.set_struct_size(rk_simulation_differential_drive_state.size());
-    var result = RobotKitSimKit.rk_simulation_get_differential_drive_state(owner.borrow(),
-      robotIndex, state);
+    var result = RobotKitSimKit.rk_simulation_get_differential_drive_state(owner.borrow(), robotIndex, state);
     check(result.status, "simulation.differentialDriveState");
     return {
       enabled: state.get_enabled() != 0,
@@ -863,14 +1001,17 @@ class Simulation {
    * the base can strafe. `wheelAngles` are the wheels' mount angles about +Z
    * from the base's x axis; see rk_simulation_set_omni_drive.
    */
-  public function setOmniDrive(robotIndex:Int, wheelJoints:Array<Int>,
-      wheelAngles:Array<Float>, wheelRadius:Float, baseRadius:Float):Void {
+  public function setOmniDrive(
+    robotIndex:Int,
+    wheelJoints:Array<Int>,
+    wheelAngles:Array<Float>,
+    wheelRadius:Float,
+    baseRadius:Float
+  ):Void {
     ensureLive();
-    if (wheelJoints == null || wheelJoints.length != 3 || wheelAngles == null ||
-        wheelAngles.length != 3)
-      throw "Simulation.setOmniDrive requires three wheel joints and three wheel angles";
-    for (joint in wheelJoints)
-      if (joint < 0) throw "Simulation.setOmniDrive requires wheel joint indices";
+    if (wheelJoints == null || wheelJoints.length != 3 || wheelAngles == null
+      || wheelAngles.length != 3) throw "Simulation.setOmniDrive requires three wheel joints and three wheel angles";
+    for (joint in wheelJoints) if (joint < 0) throw "Simulation.setOmniDrive requires wheel joint indices";
     var desc = new rk_simulation_omni_drive_desc();
     desc.set_struct_size(rk_simulation_omni_drive_desc.size());
     for (index in 0...3) {
@@ -879,15 +1020,13 @@ class Simulation {
     }
     desc.set_wheel_radius(wheelRadius);
     desc.set_base_radius(baseRadius);
-    check(RobotKitSimKit.rk_simulation_set_omni_drive(owner.borrow(), robotIndex, desc),
-      "simulation.setOmniDrive");
+    check(RobotKitSimKit.rk_simulation_set_omni_drive(owner.borrow(), robotIndex, desc), "simulation.setOmniDrive");
   }
 
   /** Removes a robot's omni-wheel coupling; the base stays in place. */
   public function clearOmniDrive(robotIndex:Int):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_clear_omni_drive(owner.borrow(), robotIndex),
-      "simulation.clearOmniDrive");
+    check(RobotKitSimKit.rk_simulation_clear_omni_drive(owner.borrow(), robotIndex), "simulation.clearOmniDrive");
   }
 
   /**
@@ -898,8 +1037,7 @@ class Simulation {
     ensureLive();
     var state = new rk_simulation_omni_drive_state();
     state.set_struct_size(rk_simulation_omni_drive_state.size());
-    var result = RobotKitSimKit.rk_simulation_get_omni_drive_state(owner.borrow(), robotIndex,
-      state);
+    var result = RobotKitSimKit.rk_simulation_get_omni_drive_state(owner.borrow(), robotIndex, state);
     check(result.status, "simulation.omniDriveState");
     return {
       enabled: state.get_enabled() != 0,
@@ -918,8 +1056,10 @@ class Simulation {
    */
   public function setJointPositions(robotIndex:Int, positions:Array<Float>):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_set_joint_positions(owner.borrow(), robotIndex, positions),
-      "simulation.setJointPositions");
+    check(
+      RobotKitSimKit.rk_simulation_set_joint_positions(owner.borrow(), robotIndex, positions),
+      "simulation.setJointPositions"
+    );
   }
 
   /** Drives a process-owned tool coordinate between ticks, preserving other joint commands. */
@@ -927,23 +1067,46 @@ class Simulation {
    * Makes a process-owned tool joint a passive spring resting at `restPosition`, with `stiffness` and `damping` in the
    * joint's units (see `rk_simulation_spring_process_joint`).
    */
-  public function springProcessJoint(robotIndex:Int, joint:Int, restPosition:Float, stiffness:Float, damping:Float):Void {
+  public function springProcessJoint(robotIndex:Int,
+    joint:Int, restPosition:Float, stiffness:Float, damping:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_spring_process_joint(owner.borrow(), robotIndex, joint, restPosition, stiffness,
-      damping), "simulation.springProcessJoint");
+    check(
+      RobotKitSimKit.rk_simulation_spring_process_joint(
+        owner.borrow(),
+        robotIndex,
+        joint,
+        restPosition,
+        stiffness,
+        damping
+      ),
+      "simulation.springProcessJoint"
+    );
   }
 
   /** `maxEffort` is the controller's limit for this command, within the joint's rating; zero applies the rating. */
   /** Model-based bias for simulated position/trajectory servo control. Direct servo commands carry their own bias. */
   public function setServoFeedforward(robotIndex:Int, joint:Int, effort:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_set_servo_feedforward(owner.borrow(),robotIndex,joint,effort),"simulation.setServoFeedforward");
+    check(
+      RobotKitSimKit.rk_simulation_set_servo_feedforward(owner.borrow(), robotIndex, joint, effort),
+      "simulation.setServoFeedforward"
+    );
   }
 
-  public function driveProcessJoint(robotIndex:Int, joint:Int, position:Float, velocity:Float, maxEffort:Float = 0):Void {
+  public function driveProcessJoint(robotIndex:Int,
+    joint:Int, position:Float, velocity:Float, maxEffort:Float = 0):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(), robotIndex, joint, position, velocity,
-      maxEffort), "simulation.driveProcessJoint");
+    check(
+      RobotKitSimKit.rk_simulation_drive_process_joint(
+        owner.borrow(),
+        robotIndex,
+        joint,
+        position,
+        velocity,
+        maxEffort
+      ),
+      "simulation.driveProcessJoint"
+    );
   }
 
   /**
@@ -953,39 +1116,47 @@ class Simulation {
   public function applyRobotForce(robotIndex:Int, force:Array<Float>, ?torque:Array<Float>):Void {
     ensureLive();
     var moment = torque == null ? [0.0, 0.0, 0.0] : torque;
-    if (force == null || force.length != 3 || moment.length != 3)
-      throw "Simulation.applyRobotForce requires three-component force and torque";
+    if (force == null || force.length != 3
+      || moment.length != 3) throw "Simulation.applyRobotForce requires three-component force and torque";
     var wrench = new rk_simulation_wrench();
     wrench.set_struct_size(rk_simulation_wrench.size());
     for (axis in 0...3) {
       wrench.set_force(axis, force[axis]);
       wrench.set_torque(axis, moment[axis]);
     }
-    check(RobotKitSimKit.rk_simulation_apply_robot_force(owner.borrow(), robotIndex, wrench),
-      "simulation.applyRobotForce");
+    check(
+      RobotKitSimKit.rk_simulation_apply_robot_force(owner.borrow(), robotIndex, wrench),
+      "simulation.applyRobotForce"
+    );
   }
 
   /** Reads one robot base pose without mutating physics or the editable model. */
-  public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
-    ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
-    var result=RobotKitSimKit.rk_simulation_get_robot_pose(owner.borrow(),robotIndex,pose);
-    check(result.status,"simulation.getRobotPose");
-    return {position:[for(index in 0...3)pose.get_position(index)],
-      rotation:[for(index in 0...4)pose.get_rotation(index)]};
+  public function robotPose(robotIndex:Int): {position: Array<Float>, rotation: Array<Float>} {
+    ensureLive();
+    var pose = new rk_simulation_pose();
+    pose.set_struct_size(rk_simulation_pose.size());
+    var result = RobotKitSimKit.rk_simulation_get_robot_pose(owner.borrow(), robotIndex, pose);
+    check(result.status, "simulation.getRobotPose");
+    return {
+      position: [for (index in 0...3) pose.get_position(index)],
+      rotation: [for (index in 0...4) pose.get_rotation(index)]
+    };
   }
 
   /**
    * Reads one robot base's world-frame twist: linear in metres per second,
    * angular in radians per second. A floating base reports its free motion.
    */
-  public function robotBaseVelocity(robotIndex:Int):{linear:Array<Float>, angular:Array<Float>} {
+  public function robotBaseVelocity(robotIndex:Int): {linear: Array<Float>, angular: Array<Float>} {
     ensureLive();
     var twist = new rk_simulation_twist();
     twist.set_struct_size(rk_simulation_twist.size());
     var result = RobotKitSimKit.rk_simulation_get_robot_base_velocity(owner.borrow(), robotIndex, twist);
     check(result.status, "simulation.getRobotBaseVelocity");
-    return {linear: [for (index in 0...3) twist.get_linear(index)],
-      angular: [for (index in 0...3) twist.get_angular(index)]};
+    return {
+      linear: [for (index in 0...3) twist.get_linear(index)],
+      angular: [for (index in 0...3) twist.get_angular(index)]
+    };
   }
 
   /**
@@ -1010,14 +1181,24 @@ class Simulation {
    * revolute joint through a socket (see `rk_simulation_object_screw_desc`). World point and unit advance axis;
    * `lead` in metres per positive turn about it.
    */
-  public function createObjectScrewJoint(robotIndex:Int, spindleJointIndex:Int, member:nksim_body,
-      screw:nativekit.sim.SimObject, axisPoint:Array<Float>, axis:Array<Float>, lead:Float, lowerLimit:Float,
-      upperLimit:Float, socketRatio:Float, threadStiffness:Float, threadDampingRatio:Float,
-      advanceArmature:Float):nksim_joint {
+  public function createObjectScrewJoint(
+    robotIndex:Int,
+    spindleJointIndex:Int,
+    member:nksim_body,
+    screw:nativekit.sim.SimObject,
+    axisPoint:Array<Float>,
+    axis:Array<Float>,
+    lead:Float,
+    lowerLimit:Float,
+    upperLimit:Float,
+    socketRatio:Float,
+    threadStiffness:Float,
+    threadDampingRatio:Float,
+    advanceArmature:Float
+  ):nksim_joint {
     ensureLive();
-    if (screw == null || screw.motion != MotionType.Dynamic || axisPoint == null || axisPoint.length != 3 ||
-        axis == null || axis.length != 3)
-      throw "Screw joint needs a dynamic session screw and a world thread axis";
+    if (screw == null || screw.motion != MotionType.Dynamic || axisPoint == null || axisPoint.length != 3
+      || axis == null || axis.length != 3) throw "Screw joint needs a dynamic session screw and a world thread axis";
     var desc = new rk_simulation_object_screw_desc();
     desc.set_struct_size(rk_simulation_object_screw_desc.size());
     desc.set_robot_index(robotIndex);
@@ -1045,13 +1226,17 @@ class Simulation {
    * The physics host must be stopped between ticks; destroy the returned joint
    * at the next docked release to preserve the body's live pose and mass.
    */
-  public function createObjectFixedFollower(robotIndex:Int, parentLinkIndex:Int,
-      follower:nativekit.sim.SimObject):nksim_joint {
+  public function createObjectFixedFollower(robotIndex:Int,
+    parentLinkIndex:Int, follower:nativekit.sim.SimObject):nksim_joint {
     ensureLive();
-    if (follower == null || follower.motion != MotionType.Dynamic)
-      throw "Fixed object follower needs a dynamic session object";
-    var result = RobotKitSimKit.rk_simulation_create_object_fixed_follower(owner.borrow(),
-      robotIndex, parentLinkIndex, session.objectBody(follower));
+    if (follower == null
+      || follower.motion != MotionType.Dynamic) throw "Fixed object follower needs a dynamic session object";
+    var result = RobotKitSimKit.rk_simulation_create_object_fixed_follower(
+      owner.borrow(),
+      robotIndex,
+      parentLinkIndex,
+      session.objectBody(follower)
+    );
     check(result.status, "simulation.createObjectFixedFollower");
     return result.out_joint;
   }
@@ -1059,39 +1244,54 @@ class Simulation {
   /** Physically fastens two session objects at their measured pose while stopped.
    * The session owns the connection and removes it on reset. */
   public function createObjectMeasuredFixedJoint(parent:nativekit.sim.SimObject,
-      child:nativekit.sim.SimObject):nativekit.sim.SimFixedJoint {
+    child:nativekit.sim.SimObject):nativekit.sim.SimFixedJoint {
     ensureLive();
-    if (parent == null || child == null || child.motion != MotionType.Dynamic)
-      throw "Measured object fastening needs a parent and dynamic child";
-    return session.createMeasuredFixedJoint(parent,child);
+    if (parent == null || child == null
+      || child.motion != MotionType.Dynamic) throw "Measured object fastening needs a parent and dynamic child";
+    return session.createMeasuredFixedJoint(parent, child);
   }
 
   /** Removes one runtime-created object joint while the physics host is stopped. */
   public function destroyObjectJoint(joint:nksim_joint):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_destroy_object_joint(owner.borrow(), joint),
-      "simulation.destroyObjectJoint");
+    check(RobotKitSimKit.rk_simulation_destroy_object_joint(owner.borrow(), joint), "simulation.destroyObjectJoint");
   }
 
   /** Attach a floating articulated robot root to another robot link without snapping.
    * The host must be stopped between ticks; a child runtime can have only one mount.
    */
-  public function createRobotFixedFollower(parentRobotIndex:Int, parentLinkIndex:Int,
-      childRobotIndex:Int, childRootLinkIndex:Int):nksim_joint {
+  public function createRobotFixedFollower(
+    parentRobotIndex:Int,
+    parentLinkIndex:Int,
+    childRobotIndex:Int,
+    childRootLinkIndex:Int
+  ):nksim_joint {
     ensureLive();
-    var result = RobotKitSimKit.rk_simulation_create_robot_fixed_follower(owner.borrow(),
-      parentRobotIndex, parentLinkIndex, childRobotIndex, childRootLinkIndex);
+    var result = RobotKitSimKit.rk_simulation_create_robot_fixed_follower(
+      owner.borrow(),
+      parentRobotIndex,
+      parentLinkIndex,
+      childRobotIndex,
+      childRootLinkIndex
+    );
     check(result.status, "simulation.createRobotFixedFollower");
     return result.out_joint;
   }
 
   /** Attach a floating articulated tool root to a session body, such as its fixed CAD dock, at a stopped tick boundary. */
-  public function createRobotBodyFixedFollower(parent:nativekit.sim.SimObject,
-      childRobotIndex:Int, childRootLinkIndex:Int):nksim_joint {
+  public function createRobotBodyFixedFollower(
+    parent:nativekit.sim.SimObject,
+    childRobotIndex:Int,
+    childRootLinkIndex:Int
+  ):nksim_joint {
     ensureLive();
     if (parent == null) throw "Robot body follower needs a session object as its parent";
-    var result = RobotKitSimKit.rk_simulation_create_robot_body_fixed_follower(owner.borrow(),
-      session.objectBody(parent), childRobotIndex, childRootLinkIndex);
+    var result = RobotKitSimKit.rk_simulation_create_robot_body_fixed_follower(
+      owner.borrow(),
+      session.objectBody(parent),
+      childRobotIndex,
+      childRootLinkIndex
+    );
     check(result.status, "simulation.createRobotBodyFixedFollower");
     return result.out_joint;
   }
@@ -1099,8 +1299,7 @@ class Simulation {
   /** Release an articulated robot mount at a stopped tick boundary, preserving the child's live pose. */
   public function destroyRobotJoint(joint:nksim_joint):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_destroy_robot_joint(owner.borrow(), joint),
-      "simulation.destroyRobotJoint");
+    check(RobotKitSimKit.rk_simulation_destroy_robot_joint(owner.borrow(), joint), "simulation.destroyRobotJoint");
   }
 
   /** The native body carrying an environment object, or zero while free. */
@@ -1124,12 +1323,18 @@ class Simulation {
   }
 
   /** Carries a session object on a robot link at `relative`, its pose in the link's frame, until released. */
-  public function holdObjectOnLink(object:nativekit.sim.SimObject, robotIndex:Int, linkIndex:Int,
-      relative:nativekit.sim.SimPose):Void {
+  public function holdObjectOnLink(
+    object:nativekit.sim.SimObject,
+    robotIndex:Int,
+    linkIndex:Int,
+    relative:nativekit.sim.SimPose
+  ):Void {
     ensureLive();
     session.holdObject(object, linkBody(robotIndex, linkIndex), relative);
-    check(RobotKitSimKit.rk_simulation_bind_object_to_link(owner.borrow(), object.handle,
-      robotIndex, linkIndex), "simulation.bindObjectToLink");
+    check(
+      RobotKitSimKit.rk_simulation_bind_object_to_link(owner.borrow(), object.handle, robotIndex, linkIndex),
+      "simulation.bindObjectToLink"
+    );
   }
 
   /** Lets go of a session object some link carries. */
@@ -1143,15 +1348,17 @@ class Simulation {
   public function unbindObjectFromLink(object:nativekit.sim.SimObject):Void {
     ensureLive();
     if (object == null) throw "A carried-object binding needs an object";
-    check(RobotKitSimKit.rk_simulation_unbind_object(owner.borrow(), object.handle),
-      "simulation.unbindObjectFromLink");
+    check(RobotKitSimKit.rk_simulation_unbind_object(owner.borrow(), object.handle), "simulation.unbindObjectFromLink");
   }
 
   /** Retains a part in an identified environment object's body frame. */
-  public function holdObjectOnObject(object:nativekit.sim.SimObject, carrier:nativekit.sim.SimObject,
-      relative:nativekit.sim.SimPose):Void {
+  public function holdObjectOnObject(
+    object:nativekit.sim.SimObject,
+    carrier:nativekit.sim.SimObject,
+    relative:nativekit.sim.SimPose
+  ):Void {
     ensureLive();
-    session.holdObjectOnObject(object,carrier,relative);
+    session.holdObjectOnObject(object, carrier, relative);
   }
 
   /** The physics body belonging to an identified environment object. */
@@ -1161,17 +1368,17 @@ class Simulation {
   }
 
   /** Reads an articulated link pose without mutating the simulation. */
-  public function linkPose(robotIndex:Int, linkIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
+  public function linkPose(robotIndex:Int, linkIndex:Int): {position: Array<Float>, rotation: Array<Float>} {
     ensureLive();
-    var pose = new rk_simulation_pose(); pose.set_struct_size(rk_simulation_pose.size());
+    var pose = new rk_simulation_pose();
+    pose.set_struct_size(rk_simulation_pose.size());
     var result = RobotKitSimKit.rk_simulation_get_link_pose(owner.borrow(), robotIndex, linkIndex, pose);
     check(result.status, "simulation.getLinkPose");
     return poseValue(pose);
   }
 
   /** Excludes one robot link from one free scene object for this session's physics. */
-  public function excludeContactPair(robotIndex:Int, linkIndex:Int,
-      object:nativekit.sim.SimObject):Void {
+  public function excludeContactPair(robotIndex:Int, linkIndex:Int, object:nativekit.sim.SimObject):Void {
     ensureLive();
     if (object == null) throw "A contact exclusion needs a free object";
     var result = RobotKitSimKit.rk_simulation_get_link_body(owner.borrow(), robotIndex, linkIndex);
@@ -1192,9 +1399,10 @@ class Simulation {
     }
   }
 
-  static function poseValue(pose:rk_simulation_pose):{position:Array<Float>,rotation:Array<Float>}
-    return {position:[for(index in 0...3) pose.get_position(index)],
-      rotation:[for(index in 0...4) pose.get_rotation(index)]};
+  static function poseValue(pose:rk_simulation_pose): {position: Array<Float>, rotation: Array<Float>} return {
+    position: [for (index in 0...3) pose.get_position(index)],
+    rotation: [for (index in 0...4) pose.get_rotation(index)]
+  };
 
   static function requireRobotDescription(value:Null<rk_simulation_robot_desc>):rk_simulation_robot_desc {
     if (value == null) throw "Simulation robot description was not allocated";
@@ -1256,8 +1464,7 @@ class Simulation {
     pose.set_struct_size(rk_simulation_pose.size());
     for (index in 0...3) pose.set_position(index, position[index]);
     var chosen = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
-    if (chosen.length != 4)
-      throw "Simulation pose rotation requires four components";
+    if (chosen.length != 4) throw "Simulation pose rotation requires four components";
     for (index in 0...4) pose.set_rotation(index, chosen[index]);
     return pose;
   }
@@ -1268,14 +1475,7 @@ class Simulation {
 }
 
 /** Omni-wheel plant state; see Simulation.omniDriveState. */
-typedef SimulationOmniDriveState = {
-  enabled:Bool,
-  x:Float,
-  y:Float,
-  yaw:Float,
-  height:Float,
-  wheelRates:Array<Float>
-};
+typedef SimulationOmniDriveState = {enabled:Bool, x:Float, y:Float, yaw:Float, height:Float, wheelRates:Array<Float>};
 
 /** Differential-drive plant state; see Simulation.differentialDriveState. */
 typedef SimulationDifferentialDriveState = {

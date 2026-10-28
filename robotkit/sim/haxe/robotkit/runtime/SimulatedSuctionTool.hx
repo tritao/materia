@@ -42,11 +42,18 @@ class SimulatedSuctionTool implements SimulationStepObserver {
   var sequence:Int = 0;
   var scripted = false;
 
-  public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, linkIndex:Int, channel:Null<String>,
-      objects:Array<SimObject>, ?sensorId:String, sealedKpa:Float = 80.0) {
-    if (simulation == null || runtime == null || robotIndex < 0 || linkIndex < 0 || objects == null ||
-        !(sealedKpa > 0))
-      throw "Simulated suction tool needs a simulation, robot, link, channel, objects and a positive vacuum";
+  public function new(
+    simulation:Simulation,
+    runtime:RobotRuntime,
+    robotIndex:Int,
+    linkIndex:Int,
+    channel:Null<String>,
+    objects:Array<SimObject>,
+    ?sensorId:String,
+    sealedKpa:Float = 80.0
+  ) {
+    if (simulation == null || runtime == null || robotIndex < 0 || linkIndex < 0 || objects == null || !(sealedKpa
+      > 0)) throw "Simulated suction tool needs a simulation, robot, link, channel, objects and a positive vacuum";
     this.simulation = simulation;
     this.runtime = runtime;
     this.robotIndex = robotIndex;
@@ -66,15 +73,21 @@ class SimulatedSuctionTool implements SimulationStepObserver {
   public function afterSimulationStep(sourceTimestampNs:Int64):Void {
     var control = channel;
     var on = control == null ? scripted : switch runtime.channelValue(control) {
-      case Digital(value): value;
-      case _: throw 'Suction channel "$control" is not digital';
+      case Digital(value):
+        value;
+      case _:
+        throw 'Suction channel "$control" is not digital';
     };
     if (on && held == null) seal();
     else if (!on && held != null) release();
     var sensor = sensorId;
-    if (sensor != null)
-      runtime.publishSensorFrame(sensor, [held == null ? 0.0 : sealedKpa], Int64.ofInt(++sequence), sourceTimestampNs,
-        runtime.sourceClockId);
+    if (sensor != null) runtime.publishSensorFrame(
+      sensor,
+      [held == null ? 0.0 : sealedKpa],
+      Int64.ofInt(++ sequence),
+      sourceTimestampNs,
+      runtime.sourceClockId
+    );
   }
 
   /** The session reset restored every object and the robot's channels: forget what was held. */
@@ -95,15 +108,32 @@ class SimulatedSuctionTool implements SimulationStepObserver {
     var toObject = new Vec3(pose.x - link.position[0], pose.y - link.position[1], pose.z - link.position[2]);
     if (away.dot(toObject) < 0.0) away = new Vec3(-away.x, -away.y, -away.z);
     var shift = Math.max(0.0, CLEARANCE - touched.distance);
-    var seated = new SimPose(pose.x + away.x * shift, pose.y + away.y * shift, pose.z + away.z * shift,
-      pose.qx, pose.qy, pose.qz, pose.qw);
-    simulation.holdObjectOnLink(touched.object, robotIndex, linkIndex, relativePose(link.position, link.rotation, seated));
+    var seated = new SimPose(
+      pose.x + away.x * shift,
+      pose.y + away.y * shift,
+      pose.z + away.z * shift,
+      pose.qx,
+      pose.qy,
+      pose.qz,
+      pose.qw
+    );
+    simulation.holdObjectOnLink(
+      touched.object,
+      robotIndex,
+      linkIndex,
+      relativePose(
+        link.position,
+        link.rotation,
+        seated
+      )
+    );
     held = touched.object;
   }
 
   /** Attaches an explicitly identified screw or part using the same holding path as contact sealing. */
   public function attach(object:SimObject, worldPose:SimPose):Void {
-    if (object == null || worldPose == null || held != null) throw "Suction attach needs an unoccupied tool and a part pose";
+    if (object == null
+      || worldPose == null || held != null) throw "Suction attach needs an unoccupied tool and a part pose";
     var link = simulation.linkPose(robotIndex, linkIndex);
     simulation.holdObjectOnLink(object, robotIndex, linkIndex, relativePose(link.position, link.rotation, worldPose));
     held = object;
@@ -128,8 +158,8 @@ class SimulatedSuctionTool implements SimulationStepObserver {
     var best:Null<{object:SimObject, normal:Vec3, distance:Float}> = null;
     var bestDistance = REACH;
     for (contact in simulation.robotContacts(runtime)) {
-      if (contact.linkIndex != linkIndex || contact.otherKind != RobotContactOtherKind.Object ||
-          contact.distance > bestDistance) continue;
+      if (contact.linkIndex != linkIndex
+        || contact.otherKind != RobotContactOtherKind.Object || contact.distance > bestDistance) continue;
       for (object in objects) {
         if (object.handle.rawValue() != contact.otherObject || object.motion != MotionType.Dynamic) continue;
         best = {object: object, normal: contact.normal, distance: contact.distance};
@@ -144,10 +174,14 @@ class SimulatedSuctionTool implements SimulationStepObserver {
     var x = -linkRotation[0], y = -linkRotation[1], z = -linkRotation[2], w = linkRotation[3];
     var v = [object.x - linkPosition[0], object.y - linkPosition[1], object.z - linkPosition[2]];
     var tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]);
-    return new SimPose(v[0] + w * tx + y * tz - z * ty, v[1] + w * ty + z * tx - x * tz, v[2] + w * tz + x * ty - y * tx,
+    return new SimPose(
+      v[0] + w * tx + y * tz - z * ty,
+      v[1] + w * ty + z * tx - x * tz,
+      v[2] + w * tz + x * ty - y * tx,
       w * object.qx + x * object.qw + y * object.qz - z * object.qy,
       w * object.qy - x * object.qz + y * object.qw + z * object.qx,
       w * object.qz + x * object.qy - y * object.qx + z * object.qw,
-      w * object.qw - x * object.qx - y * object.qy - z * object.qz);
+      w * object.qw - x * object.qx - y * object.qy - z * object.qz
+    );
   }
 }

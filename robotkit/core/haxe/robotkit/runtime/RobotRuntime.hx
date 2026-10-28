@@ -45,7 +45,7 @@ class RobotRuntime {
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
   final sensorPollMutex = new Mutex();
-  var sensorPoller:Null<RobotSnapshot->Void> = null;
+  var sensorPoller:Null<RobotSnapshot -> Void> = null;
   final limitJoints:Map<String, Int> = new Map();
 
   /**
@@ -68,21 +68,29 @@ class RobotRuntime {
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
     channels = blueprint.channels.copy();
-    couplings = [for (coupling in blueprint.couplings)
-      new robotkit.core.CoupledJoint(coupling.follower, coupling.leader, coupling.ratio, coupling.offset)];
+    couplings = [for (coupling in blueprint.couplings) new robotkit.core.CoupledJoint(
+      coupling.follower,
+      coupling.leader,
+      coupling.ratio,
+      coupling.offset
+    )];
     externalSensorLayout = blueprint.externalSensorLayout();
     references = new JointReferenceState(blueprint);
     for (contact in blueprint.switches) if (contact.role == "limit") {
       var index = -1;
-      for (joint in 0...blueprint.jointCount)
-        if (blueprint.identity != null && blueprint.identity.jointId(joint) == contact.joint) index = joint;
+      for (joint in 0...blueprint.jointCount) if (blueprint.identity != null
+        && blueprint.identity.jointId(joint) == contact.joint) index = joint;
       if (index < 0) throw 'Limit switch "${contact.id}" monitors an unknown joint';
       limitJoints.set(contact.id, index);
     }
     // Configure before any worker or shared simulation tick can admit motion.
-    for (joint in 0...blueprint.jointCount)
-      if (references.requiresHome(joint))
-        check(endpoint.requireReference(joint, true), 'runtime.requireReference[$joint]');
+    for (joint in 0...blueprint.jointCount) if (references.requiresHome(joint)) check(
+      endpoint.requireReference(
+        joint,
+        true
+      ),
+      'runtime.requireReference[$joint]'
+    );
   }
 
   /** Contacts from the latest simulation tick. Standalone runtimes have none. */
@@ -92,12 +100,11 @@ class RobotRuntime {
   }
 
   /** Inactive proximity contacts on attached tool pieces. */
-  public function toolProximity():Array<RobotContact>
-    return contacts().filter(contact -> contact.toolPieceIndex >= 0 && !contact.active);
+  public function toolProximity():Array<RobotContact> return contacts().filter(contact -> contact.toolPieceIndex >= 0
+    && !contact.active);
 
   public function hasExternalSensor(id:String, kind:String):Bool {
-    for (sensor in externalSensorLayout)
-      if (sensor.id == id && sensor.kind == kind) return true;
+    for (sensor in externalSensorLayout) if (sensor.id == id && sensor.kind == kind) return true;
     return false;
   }
 
@@ -121,8 +128,7 @@ class RobotRuntime {
 
   /** Stops a standalone worker; it never advances a shared Simulation. */
   public function stop():Void {
-    if (disposed)
-      return;
+    if (disposed) return;
     check(endpoint.stop(), "runtime.stop");
   }
 
@@ -136,15 +142,28 @@ class RobotRuntime {
     if (value.get_supports_position_targets() != 0) modes.push(Position);
     if (value.get_supports_velocity_targets() != 0) modes.push(Velocity);
     if (value.get_supports_effort_targets() != 0) modes.push(Effort);
-    if (value.get_supports_position_targets() != 0 && value.get_supports_effort_targets() != 0)
-      modes.push(Servo);
-    var execution = value.get_supports_execution_plans() != 0
-      ? new robotkit.core.ExecutionCapabilities(true, TrajectoryCoreConstants.MK_MAX_DEGREE,
-          RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS,
-          RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS, true, true, true, Proven)
-      : robotkit.core.ExecutionCapabilities.unavailable();
-    return new robotkit.core.RobotCapabilities(id, value.get_joint_count(), modes,
-      execution, new robotkit.core.TimingCapabilities(true, true, Unchecked));
+    if (value.get_supports_position_targets() != 0 && value.get_supports_effort_targets() != 0) modes.push(Servo);
+    var execution = value.get_supports_execution_plans() != 0 ? new robotkit.core.ExecutionCapabilities(
+      true,
+      TrajectoryCoreConstants.MK_MAX_DEGREE,
+      RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS,
+      RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS,
+      true,
+      true,
+      true,
+      Proven
+    ) : robotkit.core.ExecutionCapabilities.unavailable();
+    return new robotkit.core.RobotCapabilities(
+      id,
+      value.get_joint_count(),
+      modes,
+      execution,
+      new robotkit.core.TimingCapabilities(
+        true,
+        true,
+        Unchecked
+      )
+    );
   }
 
   /**
@@ -152,13 +171,21 @@ class RobotRuntime {
    * `expiresAtNs` (robot source clock, as in snapshots) makes the batch's
    * velocity targets lapse then: the runtime brakes those joints to zero.
    */
-  public function submitTargets(targets:Array<robotkit.core.JointTarget>, sequence:Int,
-      ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
+  public function submitTargets(
+    targets:Array<robotkit.core.JointTarget>,
+    sequence:Int,
+    ?timestampNs:haxe.Int64,
+    ?expiresAtNs:haxe.Int64
+  ):Void {
     submitTargets64(targets, haxe.Int64.ofInt(sequence), timestampNs, expiresAtNs);
   }
 
-  public function submitTargets64(targets:Array<robotkit.core.JointTarget>, sequence:haxe.Int64,
-      ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
+  public function submitTargets64(
+    targets:Array<robotkit.core.JointTarget>,
+    sequence:haxe.Int64,
+    ?timestampNs:haxe.Int64,
+    ?expiresAtNs:haxe.Int64
+  ):Void {
     ensureLive();
     var batch = robotkit.core.JointTarget.copyBatch(targets);
     var command = new rk_robot_command();
@@ -173,11 +200,16 @@ class RobotRuntime {
       var target = new rk_joint_target();
       target.set_joint(targetValue.joint);
       target.set_mode(switch targetValue.mode {
-        case robotkit.core.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
-        case robotkit.core.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
-        case robotkit.core.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
-        case robotkit.core.JointTargetMode.Servo: RobotKitRuntimeConstants.RK_TARGET_SERVO;
-      });
+        case robotkit.core.JointTargetMode.Position:
+          RobotKitRuntimeConstants.RK_TARGET_POSITION;
+        case robotkit.core.JointTargetMode.Velocity:
+          RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
+        case robotkit.core.JointTargetMode.Effort:
+          RobotKitRuntimeConstants.RK_TARGET_EFFORT;
+        case robotkit.core.JointTargetMode.Servo:
+          RobotKitRuntimeConstants.RK_TARGET_SERVO;
+      }
+      );
       if (targetValue.mode == robotkit.core.JointTargetMode.Servo) {
         var servo = new rk_joint_servo();
         servo.set_velocity(targetValue.servoVelocity);
@@ -194,8 +226,7 @@ class RobotRuntime {
       if (effort != null) target.set_max_effort(effort);
       command.set_targets(index, target);
     }
-    check(endpoint.submit(command),
-      "runtime.submitTargets");
+    check(endpoint.submit(command), "runtime.submitTargets");
   }
 
   /**
@@ -216,16 +247,30 @@ class RobotRuntime {
       var status = if (arrays != null) {
         jointMapScratch.reset();
         var map:RawPtr<Int> = jointMapScratch.alloc(arrays.jointMap.length);
-        for (joint in 0...arrays.jointMap.length)
-          map.offset(joint).store(arrays.jointMap[joint]);
-        endpoint.submitPlanSpan(header, arrays.starts,
-          arrays.durations, arrays.degrees, arrays.coefficients,
-          new NativeSpan<Int>(map, arrays.jointMap.length), events);
+        for (joint in 0...arrays.jointMap.length) map.offset(joint).store(arrays.jointMap[joint]);
+        endpoint.submitPlanSpan(
+          header,
+          arrays.starts,
+          arrays.durations,
+          arrays.degrees,
+          arrays.coefficients,
+          new NativeSpan<Int>(
+            map,
+            arrays.jointMap.length
+          ),
+          events
+        );
       } else {
         var values = SegmentValues.of(plan.segments);
-        endpoint.submitPlanArrays(header, values.starts,
-          values.durations, values.degrees, values.coefficients,
-          [for (joint in 0...plan.startPosition.length) joint], events);
+        endpoint.submitPlanArrays(
+          header,
+          values.starts,
+          values.durations,
+          values.degrees,
+          values.coefficients,
+          [for (joint in 0...plan.startPosition.length) joint],
+          events
+        );
       }
       check(status, "runtime.submitPlan");
     } catch (error:Dynamic) {
@@ -248,17 +293,19 @@ class RobotRuntime {
     header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
     var flags = plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0;
     flags |= switch plan.purpose {
-      case Program: 0;
-      case Jog: RobotKitRuntimeConstants.RK_PLAN_JOG;
-      case Homing: RobotKitRuntimeConstants.RK_PLAN_HOMING;
+      case Program:
+        0;
+      case Jog:
+        RobotKitRuntimeConstants.RK_PLAN_JOG;
+      case Homing:
+        RobotKitRuntimeConstants.RK_PLAN_HOMING;
     };
     header.set_flags(flags);
     header.set_replace_after_plan_id(plan.replaceAfterPlanId);
     header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
-    var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
-      accelerations = plan.startAcceleration.toArray(),
-      positionTolerances = plan.positionTolerances.toArray(),
-      velocityTolerances = plan.velocityTolerances.toArray(),
+    var positions = plan.startPosition.toArray(),
+      velocities = plan.startVelocity.toArray(), accelerations = plan.startAcceleration.toArray(),
+      positionTolerances = plan.positionTolerances.toArray(), velocityTolerances = plan.velocityTolerances.toArray(),
       accelerationTolerances = plan.accelerationTolerances.toArray();
     for (joint in 0...RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS) {
       var used = joint < positions.length;
@@ -276,33 +323,39 @@ class RobotRuntime {
   static function nativeEvent(authored:ProcessTimedEvent):rk_timed_event {
     var event = new rk_timed_event();
     event.set_time_ns(authored.timeNs);
-    for (i in 0...authored.channel.length)
-      event.set_channel(i, authored.channel.charCodeAt(i));
+    for (i in 0...authored.channel.length) event.set_channel(i, authored.channel.charCodeAt(i));
     event.set_value(ProcessEventCodec.encode(authored.value));
     event.set_hold_policy(switch authored.holdPolicy {
-      case Keep: RobotKitRuntimeConstants.RK_EVENT_KEEP;
-      case SafeWhileHeld: RobotKitRuntimeConstants.RK_EVENT_SAFE_WHILE_HELD;
-      case RestoreOnResume: RobotKitRuntimeConstants.RK_EVENT_RESTORE_ON_RESUME;
-    });
+      case Keep:
+        RobotKitRuntimeConstants.RK_EVENT_KEEP;
+      case SafeWhileHeld:
+        RobotKitRuntimeConstants.RK_EVENT_SAFE_WHILE_HELD;
+      case RestoreOnResume:
+        RobotKitRuntimeConstants.RK_EVENT_RESTORE_ON_RESUME;
+    }
+    );
     return event;
   }
 
   /** Drains output changes produced by the runtime owner clock. */
-  public function pollEvents():{events:Array<FiredProcessEvent>, overflow:Bool} {
+  public function pollEvents(): {events: Array<FiredProcessEvent>, overflow: Bool} {
     ensureLive();
     var result:Array<FiredProcessEvent> = [];
     var overflow = false;
     scratchMutex.acquire();
     try {
       eventBatchScratch.set_struct_size(rk_event_record_batch.size());
-      check(endpoint.pollEvents(eventBatchScratch),
-        "runtime.pollEvents");
+      check(endpoint.pollEvents(eventBatchScratch), "runtime.pollEvents");
       for (index in 0...eventBatchScratch.get_count()) {
         var record = eventBatchScratch.get_records(index);
-        result.push(new FiredProcessEvent(record.get_plan_id(),
-          ProcessEventCodec.readChannel(record), ProcessEventCodec.decode(record.get_value()),
-          record.get_scheduled_time_ns(), record.get_applied_owner_time_ns(),
-          record.get_cause()));
+        result.push(new FiredProcessEvent(
+          record.get_plan_id(),
+          ProcessEventCodec.readChannel(record),
+          ProcessEventCodec.decode(record.get_value()),
+          record.get_scheduled_time_ns(),
+          record.get_applied_owner_time_ns(),
+          record.get_cause()
+        ));
       }
       overflow = eventBatchScratch.get_overflow() != 0;
     } catch (error:Dynamic) {
@@ -310,7 +363,7 @@ class RobotRuntime {
       throw error;
     }
     scratchMutex.release();
-    return {events:result, overflow:overflow};
+    return {events: result, overflow: overflow};
   }
 
   /**
@@ -320,8 +373,7 @@ class RobotRuntime {
   public function channelValue(channel:String):ProcessEventValue {
     ensureLive();
     var value = new rk_event_value();
-    check(endpoint.channelValue(channel, value),
-      'runtime.channelValue("$channel")');
+    check(endpoint.channelValue(channel, value), 'runtime.channelValue("$channel")');
     return ProcessEventCodec.decode(value);
   }
 
@@ -332,9 +384,22 @@ class RobotRuntime {
     for (candidate in channels) if (candidate.id == channel) declaration = candidate;
     if (declaration == null) throw 'runtime.writeOutput("$channel"): undeclared channel';
     var compatible = switch declaration.safeValue {
-      case Digital(_): switch value {case Digital(_): true; case _: false;}
-      case Analog(_): switch value {case Analog(number): Math.isFinite(number); case _: false;}
-      case _: false;
+      case Digital(_):
+        switch value {
+          case Digital(_):
+            true;
+          case _:
+            false;
+        }
+      case Analog(_):
+        switch value {
+          case Analog(number):
+            Math.isFinite(number);
+          case _:
+            false;
+        }
+      case _:
+        false;
     };
     if (!compatible) throw 'runtime.writeOutput("$channel"): output type does not match its declaration';
     var native = new rk_event_value();
@@ -345,33 +410,31 @@ class RobotRuntime {
       case Analog(number):
         native.set_kind(RobotKitRuntimeConstants.RK_EVENT_ANALOG);
         native.set_analog(number);
-      case Process(_, _): throw 'runtime.writeOutput("$channel"): process commands are plan events';
+      case Process(_, _):
+        throw 'runtime.writeOutput("$channel"): process commands are plan events';
     }
     check(endpoint.writeOutput(channel, native), 'runtime.writeOutput("$channel")');
   }
 
-  public function writeDigitalOutput(channel:String, value:Bool):Void
-    writeOutput(channel, ProcessEventValue.Digital(value));
+  public function writeDigitalOutput(channel:String, value:Bool):Void writeOutput(
+    channel,
+    ProcessEventValue.Digital(value)
+  );
 
   /** Submits all position targets in one native call. */
-  public function submitPositions(positions:Array<Float>, sequence:Int,
-      ?timestampNs:haxe.Int64):Void {
+  public function submitPositions(positions:Array<Float>, sequence:Int, ?timestampNs:haxe.Int64):Void {
     submitPositions64(positions, haxe.Int64.ofInt(sequence), timestampNs);
   }
 
-  public function submitPositions64(positions:Array<Float>, sequence:haxe.Int64,
-      ?timestampNs:haxe.Int64):Void {
+  public function submitPositions64(positions:Array<Float>, sequence:haxe.Int64, ?timestampNs:haxe.Int64):Void {
     var targets:Array<robotkit.core.JointTarget> = [];
-    for (index in 0...positions.length)
-      targets.push(robotkit.core.JointTarget.position(index, positions[index]));
+    for (index in 0...positions.length) targets.push(robotkit.core.JointTarget.position(index, positions[index]));
     submitTargets64(targets, sequence, timestampNs);
   }
 
   /** Submits one position target without implying ownership of a simulation tick. */
-  public function submitPosition(joint:Int, targetValue:Float, sequence:Int,
-      ?timestampNs:haxe.Int64):Void {
-    submitTargets([robotkit.core.JointTarget.position(joint, targetValue)], sequence,
-      timestampNs);
+  public function submitPosition(joint:Int, targetValue:Float, sequence:Int, ?timestampNs:haxe.Int64):Void {
+    submitTargets([robotkit.core.JointTarget.position(joint, targetValue)], sequence, timestampNs);
   }
 
   /** Submits a stop to the owner thread; it never steps synchronously. */
@@ -386,22 +449,17 @@ class RobotRuntime {
     command.set_sequence(sequence);
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(emergency
-      ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
-      : RobotKitRuntimeConstants.RK_COMMAND_STOP);
+      ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP : RobotKitRuntimeConstants.RK_COMMAND_STOP);
     command.set_target_count(0);
-    check(endpoint.submit(command),
-      "runtime.submitStop");
+    check(endpoint.submit(command), "runtime.submitStop");
   }
 
   /** Pauses, resumes, or aborts a native execution path. */
-  public function submitHold(sequence:Int):Void
-    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_HOLD);
+  public function submitHold(sequence:Int):Void submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_HOLD);
 
-  public function submitResume(sequence:Int):Void
-    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_RESUME);
+  public function submitResume(sequence:Int):Void submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_RESUME);
 
-  public function submitAbort(sequence:Int):Void
-    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_ABORT);
+  public function submitAbort(sequence:Int):Void submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_ABORT);
 
   function submitLifecycle(sequence:Int, kind:Int):Void {
     ensureLive();
@@ -409,8 +467,7 @@ class RobotRuntime {
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(haxe.Int64.ofInt(sequence));
     command.set_kind(kind);
-    check(endpoint.submit(command),
-      "runtime.submitLifecycle");
+    check(endpoint.submit(command), "runtime.submitLifecycle");
   }
 
   /** Clears a latched safety stop only after the application has acknowledged it. */
@@ -426,13 +483,11 @@ class RobotRuntime {
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
     command.set_target_count(0);
-    check(endpoint.submit(command),
-      "runtime.resetSafety");
+    check(endpoint.submit(command), "runtime.resetSafety");
   }
 
   /** Synchronize host reference metadata after the stopped simulation's native reset. */
-  @:allow(robotkit.runtime.Simulation)
-  function afterNativeReset():Void {
+  @:allow(robotkit.runtime.Simulation) function afterNativeReset():Void {
     referenceMutex.acquire();
     references.invalidate();
     referenceMutex.release();
@@ -476,7 +531,8 @@ class RobotRuntime {
         var joint = candidate.homeDriveJoint(id);
         if (joints.indexOf(joint) >= 0) throw "Motor calibration requires distinct side drives";
         if (!candidate.isReferenced(candidate.homeJoint(id))) throw "Motor calibration requires all side latches";
-        joints.push(joint); zeros.push(candidate.homeDriveOffset(id));
+        joints.push(joint);
+        zeros.push(candidate.homeDriveOffset(id));
       }
       candidate.markHomeDrivesCalibrated(switchIds);
       var status = endpoint.calibrateHomeDrives(joints, zeros);
@@ -542,8 +598,7 @@ class RobotRuntime {
     try {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
-      var positions = [for (index in 0...snapshotScratch.get_joint_count())
-        snapshotScratch.get_position(index)];
+      var positions = [for (index in 0...snapshotScratch.get_joint_count()) snapshotScratch.get_position(index)];
       scratchMutex.release();
       return positions;
     } catch (error:Dynamic) {
@@ -561,8 +616,7 @@ class RobotRuntime {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
       var count = snapshotScratch.get_joint_count();
-      if (target.length != count)
-        throw 'Physical-position target has ${target.length} entries; runtime has $count';
+      if (target.length != count) throw 'Physical-position target has ${target.length} entries; runtime has $count';
       for (index in 0...count) target[index] = snapshotScratch.get_position(index);
     } catch (error:Dynamic) {
       scratchMutex.release();
@@ -572,7 +626,7 @@ class RobotRuntime {
   }
 
   /** Install a device sensor source before exposing the runtime to consumers. */
-  public function installSensorPoller(poll:RobotSnapshot->Void):Void {
+  public function installSensorPoller(poll:RobotSnapshot -> Void):Void {
     ensureLive();
     if (poll == null || sensorPoller != null) throw "Runtime device sensor source is already installed or missing";
     sensorPoller = poll;
@@ -586,8 +640,8 @@ class RobotRuntime {
     try {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observe(snapshotScratch), "runtime.status");
-      result = snapshotScratch.get_endpoint() == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT ||
-        snapshotScratch.get_safety() == RobotKitRuntimeConstants.RK_SAFETY_FAULT ? Fault : Ready;
+      result = snapshotScratch.get_endpoint() == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT
+        || snapshotScratch.get_safety() == RobotKitRuntimeConstants.RK_SAFETY_FAULT ? Fault : Ready;
     } catch (error:Dynamic) {
       scratchMutex.release();
       throw error;
@@ -606,7 +660,8 @@ class RobotRuntime {
       check(endpoint.observe(snapshotScratch), "runtime.jointObservation");
       result = new RuntimeJointObservation(
         [for (index in 0...snapshotScratch.get_joint_count()) snapshotScratch.get_position(index)],
-        snapshotScratch.get_source_timestamp_ns());
+        snapshotScratch.get_source_timestamp_ns()
+      );
     } catch (error:Dynamic) {
       scratchMutex.release();
       throw error;
@@ -625,8 +680,7 @@ class RobotRuntime {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observe(snapshotScratch), "runtime.jointObservation");
       var count = snapshotScratch.get_joint_count();
-      if (target.length != count)
-        throw 'Joint-observation target has ${target.length} entries; runtime has $count';
+      if (target.length != count) throw 'Joint-observation target has ${target.length} entries; runtime has $count';
       for (index in 0...count) target[index] = snapshotScratch.get_position(index);
       sourceTimestampNs = snapshotScratch.get_source_timestamp_ns();
     } catch (error:Dynamic) {
@@ -649,8 +703,7 @@ class RobotRuntime {
     scratchMutex.acquire();
     try {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
-      check(endpoint.observe(snapshotScratch),
-        "runtime.snapshot");
+      check(endpoint.observe(snapshotScratch), "runtime.snapshot");
       native = RobotSnapshot.fromNative(snapshotScratch, sensorLayout, endpoint.sourceClockId());
     } catch (error:Dynamic) {
       scratchMutex.release();
@@ -660,7 +713,10 @@ class RobotRuntime {
     var poll = sensorPoller;
     if (poll != null) {
       sensorPollMutex.acquire();
-      try poll(native) catch (error:Dynamic) { sensorPollMutex.release(); throw error; }
+      try poll(native) catch (error:Dynamic) {
+        sensorPollMutex.release();
+        throw error;
+      }
       sensorPollMutex.release();
     }
     if (externalSensorLayout.length == 0) return native;
@@ -671,15 +727,33 @@ class RobotRuntime {
       if (frame != null) frames.push(frame);
     }
     externalMutex.release();
-    return new RobotSnapshot(native.robotId, native.sequence, native.sourceTimestampNs,
-      native.mode, native.safety, native.endpoint, native.faultCode, native.q.toArray(),
-      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames,
-      native.trajectoryQueueDepth, native.trajectoryActive,
-      native.trajectoryTimeNs, native.trajectoryDurationNs,
-      native.trajectoryTag, native.trajectoryTagTimeNs,
-      native.modelRevision, native.calibrationRevision,
-      native.sessionState, native.activePlanId,
-      native.committedUntilNs, native.queueEndTimeNs, native.setpoint.toArray());
+    return new RobotSnapshot(
+      native.robotId,
+      native.sequence,
+      native.sourceTimestampNs,
+      native.mode,
+      native.safety,
+      native.endpoint,
+      native.faultCode,
+      native.q.toArray(),
+      native.dq.toArray(),
+      native.effort.toArray(),
+      native.receivedTimestampNs,
+      frames,
+      native.trajectoryQueueDepth,
+      native.trajectoryActive,
+      native.trajectoryTimeNs,
+      native.trajectoryDurationNs,
+      native.trajectoryTag,
+      native.trajectoryTagTimeNs,
+      native.modelRevision,
+      native.calibrationRevision,
+      native.sessionState,
+      native.activePlanId,
+      native.committedUntilNs,
+      native.queueEndTimeNs,
+      native.setpoint.toArray()
+    );
   }
 
   /**
@@ -693,72 +767,97 @@ class RobotRuntime {
    * XYZ newton-metres in the mounted sensor frame; tool vacuum carries one
    * non-negative kPa value.
    */
-  public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
-      sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
-    publishSensorFrameAndGet(sensorId, values, sequence, sourceTimestampNs,
-      sourceClockId, image);
+  public function publishSensorFrame(
+    sensorId:String,
+    values:Array<Float>,
+    sequence:Int64,
+    sourceTimestampNs:Int64,
+    sourceClockId:String,
+    ?image:CameraImage
+  ):Void {
+    publishSensorFrameAndGet(sensorId, values, sequence, sourceTimestampNs, sourceClockId, image);
   }
 
   /** Publish and return the exact frame retained by the runtime snapshot. */
-  public function publishSensorFrameAndGet(sensorId:String, values:Array<Float>, sequence:Int64,
-      sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):SensorFrame {
+  public function publishSensorFrameAndGet(
+    sensorId:String,
+    values:Array<Float>,
+    sequence:Int64,
+    sourceTimestampNs:Int64,
+    sourceClockId:String,
+    ?image:CameraImage
+  ):SensorFrame {
     ensureLive();
-    if (sensorId == null || sensorId.length == 0 || values == null || sequence == null ||
-        Int64.compare(sequence, Int64.ofInt(0)) <= 0 || sourceTimestampNs == null ||
-        Int64.compare(sourceTimestampNs, Int64.ofInt(0)) < 0 || sourceClockId == null ||
-        sourceClockId.length == 0)
-      throw "Sensor publication requires a sensor ID, values, positive sequence, and source clock";
-    for (value in values) if (!Math.isFinite(value))
-      throw 'Sensor "$sensorId" publication has a non-finite value';
+    if (sensorId == null || sensorId.length == 0 || values == null || sequence == null || Int64.compare(
+      sequence,
+      Int64.ofInt(0)
+    ) <= 0 || sourceTimestampNs == null || Int64.compare(
+      sourceTimestampNs,
+      Int64.ofInt(0)
+    ) < 0 || sourceClockId == null || sourceClockId.length
+      == 0) throw "Sensor publication requires a sensor ID, values, positive sequence, and source clock";
+    for (value in values) if (!Math.isFinite(value)) throw 'Sensor "$sensorId" publication has a non-finite value';
     var config:Null<RobotRuntimeSensorBlueprint> = null;
-    for (candidate in externalSensorLayout)
-      if (candidate.id == sensorId) { config = candidate; break; }
-    if (config == null)
-      throw 'Robot model has no externally sourced sensor "$sensorId"';
+    for (candidate in externalSensorLayout) if (candidate.id == sensorId) {
+      config = candidate;
+      break;
+    }
+    if (config == null) throw 'Robot model has no externally sourced sensor "$sensorId"';
     var mounted:RobotRuntimeSensorBlueprint = cast config;
     switch mounted.kind {
       case "camera":
-        if (image == null || values.length != 0)
-          throw 'Camera "$sensorId" publication requires an image and no values';
+        if (image == null || values.length != 0) throw 'Camera "$sensorId" publication requires an image and no values';
       case "gnss_pose":
-        if (image != null || values.length != 3)
-          throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
+        if (image != null
+          || values.length != 3) throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
       case "trip_switch":
-        if (image != null || !JointSwitchFrame.valid(values))
-          throw 'Switch "$sensorId" publication requires digital state and optional closing-edge capture';
+        if (image != null || !JointSwitchFrame
+          .valid(values)) throw 'Switch "$sensorId" publication requires digital state and optional closing-edge capture';
       case "tool_contact":
-        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Contact "$sensorId" publication requires one digital value';
+        if (image != null || values.length != 1
+          || (values[0] != 0.0 && values[0] != 1.0)) throw 'Contact "$sensorId" publication requires one digital value';
       case "force_torque":
-        if (image != null || values.length != 6)
-          throw 'Force/torque "$sensorId" publication requires three newtons and three newton-metres';
+        if (image != null || values.length
+          != 6) throw 'Force/torque "$sensorId" publication requires three newtons and three newton-metres';
       case "digital_input":
-        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Digital input "$sensorId" publication requires one digital value';
+        if (image != null || values.length != 1 || (values[0] != 0.0
+          && values[0] != 1.0)) throw 'Digital input "$sensorId" publication requires one digital value';
       case "presence_input":
-        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Presence input "$sensorId" publication requires one digital value';
+        if (image != null || values.length != 1 || (values[0] != 0.0
+          && values[0] != 1.0)) throw 'Presence input "$sensorId" publication requires one digital value';
       case "zone_input":
-        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
-          throw 'Zone input "$sensorId" publication requires one digital value';
+        if (image != null || values.length != 1 || (values[0] != 0.0
+          && values[0] != 1.0)) throw 'Zone input "$sensorId" publication requires one digital value';
       case "tool_vacuum_kpa":
-        if (image != null || values.length != 1 || values[0] < 0.0)
-          throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
+        if (image != null || values.length != 1
+          || values[0] < 0.0) throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
       case "tool_screwdriver":
-        if (image != null || !robotkit.tool.ScrewdriverContract.valid(values))
-          throw 'Screwdriver sensor "$sensorId" publication requires torque, angle, speed, stroke, phase, result and vacuum';
+        if (image != null || !robotkit.tool.ScrewdriverContract
+          .valid(values)) throw 'Screwdriver sensor "$sensorId" publication requires torque, angle, speed, stroke, phase, result and vacuum';
       case "tool_weld":
-        if (image != null || !validExternalWeldFrame(values))
-          throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';
+        if (image != null
+          || !validExternalWeldFrame(values)) throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';
       case "tool_heater":
-        if (image != null || !robotkit.tool.HeaterSensor.valid(values))
-          throw 'Heater sensor "$sensorId" publication requires temperature, target, duty, at-target and fault values';
+        if (image != null || !robotkit.tool.HeaterSensor
+          .valid(values)) throw 'Heater sensor "$sensorId" publication requires temperature, target, duty, at-target and fault values';
       case _:
     }
-    var frame = new SensorFrame(mounted.id, mounted.kind, mounted.frameId, sequence,
-      sourceTimestampNs, values, NativeKit.nk_time_now_ns(), mounted.linkId,
-      null, null, sourceClockId,
-      "robotkit.monotonic", image, mounted.mount);
+    var frame = new SensorFrame(
+      mounted.id,
+      mounted.kind,
+      mounted.frameId,
+      sequence,
+      sourceTimestampNs,
+      values,
+      NativeKit.nk_time_now_ns(),
+      mounted.linkId,
+      null,
+      null,
+      sourceClockId,
+      "robotkit.monotonic",
+      image,
+      mounted.mount
+    );
     externalMutex.acquire();
     var previous = externalFrames.get(sensorId);
     if (previous != null && Int64.compare(sequence, previous.sequence) <= 0) {
@@ -785,14 +884,18 @@ class RobotRuntime {
   }
 
   /** Publishes one camera image; see `publishSensorFrame`. */
-  public function publishCameraFrame(sensorId:String, image:CameraImage, sequence:Int64,
-      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void {
+  public function publishCameraFrame(
+    sensorId:String,
+    image:CameraImage,
+    sequence:Int64,
+    sourceTimestampNs:Int64,
+    ?sourceClockId:String = "unspecified"
+  ):Void {
     publishSensorFrame(sensorId, [], sequence, sourceTimestampNs, sourceClockId, image);
   }
 
   public function dispose():Void {
-    if (disposed)
-      return;
+    if (disposed) return;
     stop();
     externalMutex.acquire();
     externalFrames.clear();
@@ -802,21 +905,18 @@ class RobotRuntime {
   }
 
   function ensureLive():Void {
-    if (disposed)
-      throw "RobotKit runtime has been disposed";
+    if (disposed) throw "RobotKit runtime has been disposed";
   }
 
   public static function check(status:Int, operation:String):Void {
-    if (status != RobotKitRuntimeConstants.RK_OK)
-      throw new RobotRuntimeError(status, operation);
+    if (status != RobotKitRuntimeConstants.RK_OK) throw new RobotRuntimeError(status, operation);
   }
   // Frozen external sensor frame contract; process behavior belongs to ProcessKit.
   static function validExternalWeldFrame(values:Array<Float>):Bool {
     if (values == null || values.length != 6) return false;
     for (value in values) if (!Math.isFinite(value)) return false;
-    return (values[0] == 0.0 || values[0] == 1.0) && (values[3] == 0.0 || values[3] == 1.0) &&
-      values[1] >= 0.0 && values[5] >= 0.0 && values[4] == Std.int(values[4]) &&
-      values[4] >= 0.0 && values[4] <= 3.0;
+    return (values[0] == 0.0 || values[0] == 1.0) && (values[3] == 0.0 || values[3] == 1.0) && values[1] >= 0.0
+      && values[5] >= 0.0 && values[4] == Std.int(values[4]) && values[4] >= 0.0 && values[4] <= 3.0;
   }
 
 }
@@ -828,7 +928,8 @@ private class SegmentValues {
   public final degrees:Array<Int> = [];
   public final coefficients:Array<Float> = [];
 
-  function new() {}
+  function new() {
+  }
 
   public static function of(segments:Array<TrajectorySegment>):SegmentValues {
     var values = new SegmentValues();
@@ -836,9 +937,9 @@ private class SegmentValues {
       values.starts.push(segment.timeFromStartNs);
       values.durations.push(segment.durationNs);
       values.degrees.push(segment.degree);
-      for (joint in 0...segment.jointCount)
-        for (power in 0...RobotKitRuntimeConstants.RK_TRAJECTORY_COEFFICIENT_STRIDE)
-          values.coefficients.push(power <= segment.degree ? segment.coefficients[joint][power] : 0.0);
+      for (joint in 0...segment.jointCount) for (power in 0
+        ...RobotKitRuntimeConstants.RK_TRAJECTORY_COEFFICIENT_STRIDE) values.coefficients.push(power
+        <= segment.degree ? segment.coefficients[joint][power] : 0.0);
     }
     return values;
   }

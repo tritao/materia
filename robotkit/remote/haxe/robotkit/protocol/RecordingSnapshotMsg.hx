@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Typed MessagePack payload for the recording channel. */
-@:wire
-class RecordingSnapshotMsg {
+@:wire class RecordingSnapshotMsg {
   @:id(1) public var id:String;
   @:id(2) public var sourceSequence:haxe.Int64;
   @:id(3) public var sourceTimestampNs:haxe.Int64;
@@ -29,5 +28,6 @@ class RecordingSnapshotMsg {
 
   @:id(24) public var streamSequences:Array<StreamSequenceMsg> = [];
 
-  public function new() {}
+  public function new() {
+  }
 }

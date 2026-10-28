@@ -37,10 +37,10 @@ class HydraulicRuntimeTests {
     ram.inertiaTensor = [0.01, 0, 0, 0, 0.01, 0, 0, 0, 0.01];
     var joint = model.addJoint(new Joint("ram", JointType.Prismatic, base, ram));
     joint.axis = [1, 0, 0];
-    joint.limits.lower = 0; joint.limits.upper = 0.1;
+    joint.limits.lower = 0;
+    joint.limits.upper = 0.1;
     var drive = new HydraulicDrive(0.16, 0.1, 0.1, 0, 0.08, 0.008, 0.07, 0.0685, "A", "B", 1);
-    var actuator = new Actuator("cylinder", 0, drive.ratedSpeed,
-      Transmission.SimpleTransmission(joint.id, 1, 0));
+    var actuator = new Actuator("cylinder", 0, drive.ratedSpeed, Transmission.SimpleTransmission(joint.id, 1, 0));
     actuator.drive = drive;
     model.addActuator(actuator);
     var blueprint = RobotRuntimeCompiler.compile(model, new RobotProfile());
@@ -48,12 +48,31 @@ class HydraulicRuntimeTests {
     try {
       var runtime = harness.simulation.addRobot(blueprint);
       var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[0.0]]);
-      runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1401), Int64.ofInt(blueprint.revision),
-        Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
-        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.0], [0.0], [0.0], [segment],
-        null, null, null, null, null, true, [
-          new ProcessTimedEvent(Int64.ofInt(1000000), "A", ProcessEventValue.Digital(true))
-        ]), 1);
+      runtime.submitPlan(
+        new ExecutionPlanSubmission(
+          Int64.ofInt(1401),
+          Int64.ofInt(blueprint.revision),
+          Int64.ofInt(blueprint.calibrationRevision),
+          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
+        | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
+        [0.0],
+        [0.0],
+        [0.0],
+        [segment],
+        null,
+        null,
+        null,
+        null,
+        null,
+        true,
+        [new ProcessTimedEvent(
+          Int64.ofInt(1000000),
+          "A",
+          ProcessEventValue.Digital(true)
+        )]
+      ),
+        1
+      );
       step(harness, 1, 1001);
       near(position(runtime), 0, 1e-6, 'zero pressure cannot drive the ram backend $backend');
       near(runtime.snapshot().effort.get(0), 0, 1e-6, 'zero pressure supplies no effort backend $backend');
@@ -74,10 +93,19 @@ class HydraulicRuntimeTests {
     ram.inertiaTensor = [0.01, 0, 0, 0, 0.01, 0, 0, 0, 0.01];
     var joint = model.addJoint(new Joint("ram", JointType.Prismatic, base, ram));
     joint.axis = [1, 0, 0];
-    joint.limits.lower = 0; joint.limits.upper = 0.1;
+    joint.limits.lower = 0;
+    joint.limits.upper = 0.1;
     var drive = new HydraulicDrive(0.16, 0.1, 0.1, 10e6, 0.08, 0.008, 0.07, 0.0685, "A", "B", 1);
-    var actuator = new Actuator("cylinder", drive.extensionForce(), drive.ratedSpeed,
-      Transmission.SimpleTransmission(joint.id, 1, 0));
+    var actuator = new Actuator(
+      "cylinder",
+      drive.extensionForce(),
+      drive.ratedSpeed,
+      Transmission.SimpleTransmission(
+        joint.id,
+        1,
+        0
+      )
+    );
     actuator.drive = drive;
     model.addActuator(actuator);
     var blueprint = RobotRuntimeCompiler.compile(model, new RobotProfile());
@@ -85,14 +113,43 @@ class HydraulicRuntimeTests {
     try {
       var runtime = harness.simulation.addRobot(blueprint);
       var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(2000000000), [[0.0]]);
-      runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1400), Int64.ofInt(blueprint.revision),
-        Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
-        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, [0.0], [0.0], [0.0], [segment],
-        null, null, null, null, null, true, [
-          new ProcessTimedEvent(Int64.ofInt(1000000), "A", ProcessEventValue.Digital(true)),
-          new ProcessTimedEvent(Int64.ofInt(1400000000), "A", ProcessEventValue.Digital(false)),
-          new ProcessTimedEvent(Int64.ofInt(1600000000), "B", ProcessEventValue.Digital(true))
-        ]), 1);
+      runtime.submitPlan(
+        new ExecutionPlanSubmission(
+          Int64.ofInt(1400),
+          Int64.ofInt(blueprint.revision),
+          Int64.ofInt(blueprint.calibrationRevision),
+          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
+        | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
+        [0.0],
+        [0.0],
+        [0.0],
+        [segment],
+        null,
+        null,
+        null,
+        null,
+        null,
+        true,
+        [
+          new ProcessTimedEvent(
+            Int64.ofInt(1000000),
+            "A",
+            ProcessEventValue.Digital(true)
+          ),
+          new ProcessTimedEvent(
+            Int64.ofInt(1400000000),
+            "A",
+            ProcessEventValue.Digital(false)
+          ),
+          new ProcessTimedEvent(
+            Int64.ofInt(1600000000),
+            "B",
+            ProcessEventValue.Digital(true)
+          )
+        ]
+      ),
+        1
+      );
       step(harness, 1, 251);
       var first = position(runtime);
       step(harness, 251, 501);
@@ -122,11 +179,11 @@ class HydraulicRuntimeTests {
     return assertions - firstAssertion;
   }
   static function position(runtime:RobotRuntime):Float return runtime.snapshot().q.get(0);
-  static function step(harness:SimulationHarness, begin:Int, end:Int):Void
-    for (tick in begin...end) harness.step(Int64.ofInt(tick * 1000000));
+  static function step(harness:SimulationHarness,
+    begin:Int, end:Int):Void for (tick in begin...end) harness.step(Int64.ofInt(tick * 1000000));
   static function near(actual:Float, expected:Float, tolerance:Float, message:String):Void {
     assertions++;
-    if (!Math.isFinite(actual) || Math.abs(actual - expected) > tolerance)
-      throw '$message: expected $expected, got $actual';
+    if (!Math.isFinite(actual)
+      || Math.abs(actual - expected) > tolerance) throw '$message: expected $expected, got $actual';
   }
 }

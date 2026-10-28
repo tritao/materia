@@ -1,6 +1,5 @@
 package robotkit.protocol;
-@:wire
-class ExecutionCapabilitiesMsg {
+@:wire class ExecutionCapabilitiesMsg {
   @:id(1) public var plans:Bool;
   @:id(2) public var maximumPolynomialDegree:Int;
   @:id(3) public var maximumJoints:Int;
@@ -10,5 +9,6 @@ class ExecutionCapabilitiesMsg {
   @:id(7) public var holdResume:Bool;
   @:id(8) public var polynomialLimits:String;
   @:id(9) public var samplingResolutionNs:haxe.Int64;
-  public function new() {}
+  public function new() {
+  }
 }

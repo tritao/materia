@@ -22,11 +22,17 @@ class ArmSwivel {
   public final wrist:Vec3;
   public final reference:Vec3;
 
-  public function new(shoulderLink:LinkId, shoulder:Vec3, elbowLink:LinkId, elbow:Vec3, wristLink:LinkId,
-      wrist:Vec3, ?reference:Vec3) {
-    if (shoulderLink == null || elbowLink == null || wristLink == null || shoulder == null || elbow == null ||
-        wrist == null)
-      throw "An arm swivel needs a shoulder, an elbow and a wrist point";
+  public function new(
+    shoulderLink:LinkId,
+    shoulder:Vec3,
+    elbowLink:LinkId,
+    elbow:Vec3,
+    wristLink:LinkId,
+    wrist:Vec3,
+    ?reference:Vec3
+  ) {
+    if (shoulderLink == null || elbowLink == null || wristLink == null || shoulder == null
+      || elbow == null || wrist == null) throw "An arm swivel needs a shoulder, an elbow and a wrist point";
     this.shoulderLink = shoulderLink;
     this.shoulder = shoulder;
     this.elbowLink = elbowLink;
@@ -41,9 +47,19 @@ class ArmSwivel {
    * child link): for a 7-axis arm, its 2nd, 4th and 6th joints.
    */
   public static function throughJoints(shoulder:Joint, elbow:Joint, wrist:Joint, ?reference:Vec3):ArmSwivel {
-    function pivot(joint:Joint):Vec3
-      return new Vec3(joint.childFramePosition[0], joint.childFramePosition[1], joint.childFramePosition[2]);
-    return new ArmSwivel(shoulder.child.id, pivot(shoulder), elbow.child.id, pivot(elbow), wrist.child.id,
-      pivot(wrist), reference);
+    function pivot(joint:Joint):Vec3 return new Vec3(
+      joint.childFramePosition[0],
+      joint.childFramePosition[1],
+      joint.childFramePosition[2]
+    );
+    return new ArmSwivel(
+      shoulder.child.id,
+      pivot(shoulder),
+      elbow.child.id,
+      pivot(elbow),
+      wrist.child.id,
+      pivot(wrist),
+      reference
+    );
   }
 }

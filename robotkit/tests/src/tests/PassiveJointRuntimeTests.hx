@@ -28,25 +28,36 @@ class PassiveJointRuntimeTests {
       var hinge = model.addJoint(new Joint("hinge", JointType.Revolute, base, finger));
       hinge.axis = [-1, 0, 0];
       hinge.parentFramePosition = [0, 0, 1];
-      hinge.limits.lower = -0.05; hinge.limits.upper = 0;
+      hinge.limits.lower = -0.05;
+      hinge.limits.upper = 0;
       hinge.damping = 0.01;
       hinge.passive = passive;
       var blueprint = RobotRuntimeCompiler.compile(model, new RobotProfile());
       var harness = new SimulationHarness(0.001, 1, backend);
       try {
-        var runtime = harness.simulation.addRobotAtPose(blueprint, [0, 0, 0], [0, 0, 0, 1],
-          null, null, null, null, null, null, null, true);
+        var runtime = harness.simulation.addRobotAtPose(
+          blueprint,
+          [0, 0, 0],
+          [0, 0, 0, 1],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          true
+        );
         if (passive) {
           var rejected = false;
-          try runtime.submitTargets([JointTarget.position(0, 0)], 1)
-          catch (_:Dynamic) rejected = true;
+          try runtime.submitTargets([JointTarget.position(0, 0)], 1) catch (_:Dynamic) rejected = true;
           if (!rejected) throw 'Passive hinge accepted a host target backend $backend';
           assertions++;
         }
         for (tick in 1...501) harness.step(Int64.ofInt(tick * 1000000));
         var measured = runtime.snapshot().q.get(0);
-        if (!Math.isFinite(measured) || (passive && backend == 1 ? measured > -0.04 : Math.abs(measured) > 0.001))
-          throw 'Gravity hinge passive=$passive backend=$backend measured=$measured';
+        if (!Math.isFinite(measured) || (passive && backend == 1 ? measured > -0.04
+          : Math.abs(measured) > 0.001)) throw 'Gravity hinge passive=$passive backend=$backend measured=$measured';
         assertions++;
         harness.dispose();
       } catch (error:Dynamic) {

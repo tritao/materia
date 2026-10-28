@@ -13,8 +13,12 @@ class WorldBehaviorContext {
   public final events:Array<RobotEvent>;
   final commands:Array<RobotCommand>;
 
-  @:allow(robotkit.behavior.WorldBehaviorRunner)
-  function new(snapshot:RobotSnapshot, events:Array<RobotEvent>, commands:Array<RobotCommand>, sensorFrames:Array<SensorFrame>) {
+  @:allow(robotkit.behavior.WorldBehaviorRunner) function new(
+    snapshot:RobotSnapshot,
+    events:Array<RobotEvent>,
+    commands:Array<RobotCommand>,
+    sensorFrames:Array<SensorFrame>
+  ) {
     this.snapshot = snapshot;
     this.sensors = sensorFrames.copy();
     this.events = events.copy();
@@ -25,8 +29,6 @@ class WorldBehaviorContext {
     // A world behavior cannot assume that source and endpoint clocks share an
     // epoch. A concrete adapter assigns its local default deadline; callers
     // may still provide an explicit endpoint-clock deadline.
-    commands.push(RobotCommand.JointTargets([
-      robotkit.core.JointTarget.position(joint, target)
-    ], expiryNs));
+    commands.push(RobotCommand.JointTargets([robotkit.core.JointTarget.position(joint, target)], expiryNs));
   }
 }

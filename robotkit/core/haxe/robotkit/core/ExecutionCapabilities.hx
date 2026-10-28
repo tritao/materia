@@ -14,14 +14,19 @@ class ExecutionCapabilities {
   /** Validation of declared position, velocity and acceleration limits.
       Jerk remains a separate plan claim, represented by jerkUnchecked. */
   public final polynomialLimits:ValidationGuarantee;
-  public function new(plans:Bool, maximumPolynomialDegree:Int, maximumJoints:Int,
-      maximumSegments:Int, timedEvents:Bool, replacementBoundaries:Bool,
-      holdResume:Bool, polynomialLimits:ValidationGuarantee) {
-    if (maximumPolynomialDegree < 0 || maximumJoints < 0 || maximumSegments < 0 ||
-        (plans && (maximumJoints == 0 || maximumSegments == 0)) ||
-        (!plans && (maximumPolynomialDegree != 0 || maximumJoints != 0 ||
-          maximumSegments != 0 || timedEvents || replacementBoundaries || holdResume)))
-      throw "Invalid execution capabilities";
+  public function new(
+    plans:Bool,
+    maximumPolynomialDegree:Int,
+    maximumJoints:Int,
+    maximumSegments:Int,
+    timedEvents:Bool,
+    replacementBoundaries:Bool,
+    holdResume:Bool,
+    polynomialLimits:ValidationGuarantee
+  ) {
+    if (maximumPolynomialDegree < 0 || maximumJoints < 0 || maximumSegments < 0 || (plans && (maximumJoints == 0
+      || maximumSegments == 0)) || (!plans && (maximumPolynomialDegree != 0 || maximumJoints != 0 || maximumSegments
+      != 0 || timedEvents || replacementBoundaries || holdResume))) throw "Invalid execution capabilities";
     this.plans = plans;
     this.maximumPolynomialDegree = maximumPolynomialDegree;
     this.maximumJoints = maximumJoints;
@@ -31,6 +36,14 @@ class ExecutionCapabilities {
     this.holdResume = holdResume;
     this.polynomialLimits = polynomialLimits;
   }
-  public static function unavailable():ExecutionCapabilities
-    return new ExecutionCapabilities(false, 0, 0, 0, false, false, false, Unchecked);
+  public static function unavailable():ExecutionCapabilities return new ExecutionCapabilities(
+    false,
+    0,
+    0,
+    0,
+    false,
+    false,
+    false,
+    Unchecked
+  );
 }

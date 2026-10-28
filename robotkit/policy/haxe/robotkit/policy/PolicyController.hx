@@ -60,7 +60,8 @@ class PolicyController {
   public static function prepareModel(model:RobotModel, spec:PolicySpec):Void {
     for (sensor in model.sensors) if (sensor.id == spec.imu.id) return;
     var link:Null<Link> = null;
-    for (candidate in model.links) if (candidate.id == spec.imu.link || candidate.name == spec.imu.link) link = candidate;
+    for (candidate in model.links) if (candidate.id == spec.imu.link
+      || candidate.name == spec.imu.link) link = candidate;
     if (link == null) throw 'policy spec "${spec.name}": the model has no link "${spec.imu.link}" for the IMU';
     var frame = new Frame(spec.imu.id + "_frame", link);
     frame.position = spec.imu.position.copy();
@@ -95,43 +96,42 @@ class PolicyController {
       upper.push(limited ? limits.upper : Math.POSITIVE_INFINITY);
     }
     var hold = spec.hold;
-    if (hold != null)
-      for (i in 0...model.joints.length)
-        if (policyJoints.indexOf(i) < 0 && model.joints[i].type != robotkit.model.JointType.Fixed) {
-          holdJoints.push(i);
-          var pose = hold.pose.get(model.joints[i].id);
-          if (pose == null) pose = hold.pose.get(model.joints[i].name);
-          holdPose.push(pose == null ? 0.0 : pose);
-        }
-    if (policyJoints.length + holdJoints.length > JointTarget.MAX_BATCH_SIZE)
-      throw 'policy spec "${spec.name}": more than ${JointTarget.MAX_BATCH_SIZE} joints to command';
+    if (hold != null) for (i in 0...model.joints.length) if (policyJoints.indexOf(i) < 0
+      && model.joints[i].type != robotkit.model.JointType.Fixed) {
+      holdJoints.push(i);
+      var pose = hold.pose.get(model.joints[i].id);
+      if (pose == null) pose = hold.pose.get(model.joints[i].name);
+      holdPose.push(pose == null ? 0.0 : pose);
+    }
+    if (policyJoints.length + holdJoints.length > JointTarget
+      .MAX_BATCH_SIZE) throw 'policy spec "${spec.name}": more than ${JointTarget.MAX_BATCH_SIZE} joints to command';
 
     var imuSensor:Null<Sensor> = null;
     for (sensor in model.sensors) if (sensor.id == spec.imu.id) imuSensor = sensor;
-    if (imuSensor == null || imuSensor.kind != "imu")
-      throw 'policy spec "${spec.name}": the model has no IMU "${spec.imu.id}" (see PolicyController.prepareModel)';
+    if (imuSensor == null || imuSensor.kind
+      != "imu") throw 'policy spec "${spec.name}": the model has no IMU "${spec.imu.id}" (see PolicyController.prepareModel)';
     var frame = imuSensor.frame;
     imuRotation = frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation.copy();
     var root = rootLink(model);
-    if (frame != null && frame.link.id != root)
-      throw 'policy spec "${spec.name}": the IMU must be mounted on the base link ($root), not ${frame.link.id}';
+    if (frame != null && frame.link.id
+      != root) throw 'policy spec "${spec.name}": the IMU must be mounted on the base link ($root), not ${frame.link.id}';
 
     // The network's tensors must match the spec.
     var input = policy.input(spec.observationInput);
-    if (input.elements != observation.inputSize())
-      throw 'policy spec "${spec.name}": the network takes ${input.elements} observation values, the spec builds ${observation.inputSize()}';
-    if (policy.output(spec.actionOutput).elements != spec.joints.length)
-      throw 'policy spec "${spec.name}": the network outputs ${policy.output(spec.actionOutput).elements} actions for ${spec.joints.length} joints';
+    if (input.elements != observation
+      .inputSize()) throw 'policy spec "${spec.name}": the network takes ${input.elements} observation values, the spec builds ${observation.inputSize()}';
+    if (policy.output(spec.actionOutput).elements != spec.joints
+      .length) throw 'policy spec "${spec.name}": the network outputs ${policy.output(spec.actionOutput).elements} actions for ${spec.joints.length} joints';
     for (state in spec.recurrent) {
       var stateIn = policy.input(state.input), stateOut = policy.output(state.output);
-      if (stateIn.elements != stateOut.elements)
-        throw 'policy spec "${spec.name}": recurrent ${state.input} and ${state.output} differ in size';
+      if (stateIn.elements != stateOut
+        .elements) throw 'policy spec "${spec.name}": recurrent ${state.input} and ${state.output} differ in size';
     }
     for (tensor in policy.inputs) {
       var carried = false;
       for (state in spec.recurrent) if (state.input == tensor.name) carried = true;
-      if (tensor.name != spec.observationInput && !carried)
-        throw 'policy spec "${spec.name}": the network input "${tensor.name}" is neither the observation nor recurrent state';
+      if (tensor.name != spec.observationInput
+        && !carried) throw 'policy spec "${spec.name}": the network input "${tensor.name}" is neither the observation nor recurrent state';
     }
     reset();
   }
@@ -147,7 +147,10 @@ class PolicyController {
     observation.reset();
     estimator.reset();
     for (i in 0...lastAction.length) lastAction[i] = 0.0;
-    for (state in spec.recurrent) recurrentState.set(state.input, [for (_ in 0...policy.input(state.input).elements) 0.0]);
+    for (state in spec.recurrent) recurrentState.set(
+      state.input,
+      [for (_ in 0...policy.input(state.input).elements) 0.0]
+    );
     evaluations = 0;
     imuReady = false;
     lastImuTimeNs = null;
@@ -162,21 +165,35 @@ class PolicyController {
 
   /** Servo targets that hold every joint at the default (and hold) pose. */
   public function standTargets():Array<JointTarget> {
-    var targets = [for (i in 0...policyJoints.length)
-      JointTarget.servo(policyJoints[i], spec.defaultPose[i], 0.0, spec.kp[i], spec.kd[i], 0.0)];
+    var targets = [for (i in 0...policyJoints.length) JointTarget.servo(
+      policyJoints[i],
+      spec.defaultPose[i],
+      0.0,
+      spec.kp[i],
+      spec.kd[i],
+      0.0
+    )];
     return targets.concat(holdTargets());
   }
 
   function holdTargets():Array<JointTarget> {
     var hold = spec.hold;
-    return hold == null ? [] : [for (i in 0...holdJoints.length) JointTarget.servo(holdJoints[i], holdPose[i], 0.0, hold.kp, hold.kd, 0.0)];
+    return hold == null ? [] : [for (i in 0...holdJoints.length) JointTarget.servo(
+      holdJoints[i],
+      holdPose[i],
+      0.0,
+      hold.kp,
+      hold.kd,
+      0.0
+    )];
   }
 
   /**
    * Evaluates the policy once. `q` and `dq` are the robot's joint positions and
    * velocities in model order and `sensors` its latest sensor frames.
    */
-  public function update(q:Array<Float>, dq:Array<Float>, sensors:Array<SensorFrame>, command:VelocityCommand):Array<JointTarget> {
+  public function update(q:Array<Float>,
+    dq:Array<Float>, sensors:Array<SensorFrame>, command:VelocityCommand):Array<JointTarget> {
     readImu(sensors);
     if (!imuReady) return standTargets();
     evaluations++;
@@ -202,7 +219,8 @@ class PolicyController {
       var clamped = Math.max(lower[i], Math.min(upper[i], wanted));
       if (clamped != wanted) clampedTargets++;
       JointTarget.servo(policyJoints[i], clamped, 0.0, spec.kp[i], spec.kd[i], 0.0);
-    }];
+    }
+    ];
     return targets.concat(holdTargets());
   }
 

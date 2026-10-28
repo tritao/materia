@@ -13,22 +13,17 @@ class Transform3 {
   public final rotation:Quat;
 
   public function new(translation:Vec3, rotation:Quat) {
-    if (translation == null || rotation == null)
-      throw "Transform3 requires a translation and rotation";
+    if (translation == null || rotation == null) throw "Transform3 requires a translation and rotation";
     this.translation = translation;
     this.rotation = rotation;
   }
 
-  public static function identity():Transform3
-    return new Transform3(Vec3.zero(), Quat.identity());
+  public static function identity():Transform3 return new Transform3(Vec3.zero(), Quat.identity());
 
   /** `this.compose(local)`: if this is `a_T_b` and local is `b_T_c`, returns `a_T_c`. */
   public function compose(local:Transform3):Transform3 {
     if (local == null) throw "Transform3 composition requires a transform";
-    return new Transform3(
-      translation.add(rotation.rotate(local.translation)),
-      rotation.multiply(local.rotation)
-    );
+    return new Transform3(translation.add(rotation.rotate(local.translation)), rotation.multiply(local.rotation));
   }
 
   public function inverse():Transform3 {
@@ -37,12 +32,10 @@ class Transform3 {
   }
 
   /** Maps a point expressed in this transform's local frame into its parent frame. */
-  public function transformPoint(point:Vec3):Vec3
-    return translation.add(rotation.rotate(point));
+  public function transformPoint(point:Vec3):Vec3 return translation.add(rotation.rotate(point));
 
   /** Maps a free vector (direction, no translation) into the parent frame. */
-  public function transformVector(vector:Vec3):Vec3
-    return rotation.rotate(vector);
+  public function transformVector(vector:Vec3):Vec3 return rotation.rotate(vector);
 
   /**
    * Adjoint action: moves a twist expressed in this transform's local frame
@@ -68,11 +61,9 @@ class Transform3 {
    * Exact for a static twist only in the limit dt -> 0.
    */
   public function integrate(twist:Twist3, dt:Float):Transform3 {
-    if (!Math.isFinite(dt) || dt < 0.0)
-      throw "Transform3 integration requires a finite non-negative duration";
+    if (!Math.isFinite(dt) || dt < 0.0) throw "Transform3 integration requires a finite non-negative duration";
     var angle = twist.angular.norm() * dt;
-    var deltaRotation = angle <= 1e-12 ? Quat.identity() :
-      Quat.fromAxisAngle(twist.angular.normalized(), angle);
+    var deltaRotation = angle <= 1e-12 ? Quat.identity() : Quat.fromAxisAngle(twist.angular.normalized(), angle);
     var delta = new Transform3(twist.linear.scale(dt), deltaRotation);
     return compose(delta);
   }
@@ -80,8 +71,7 @@ class Transform3 {
   /** Bridges to the planar stack: `Pose2` becomes a Transform3 at height `z`. */
   public static function fromPose2(pose:Pose2, z:Float = 0.0):Transform3 {
     if (pose == null) throw "Transform3.fromPose2 requires a pose";
-    return new Transform3(new Vec3(pose.x, pose.y, z),
-      Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), pose.yaw));
+    return new Transform3(new Vec3(pose.x, pose.y, z), Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), pose.yaw));
   }
 
   /** Lossy yaw projection for driving the planar stack from a 3D pose. */
@@ -92,17 +82,31 @@ class Transform3 {
   }
 
   /** Reads the raw `position`/`rotation` (xyzw) arrays used by Joint and Frame. */
-  public static function fromArrays(position:Array<Float>, rotation:Array<Float>):Transform3
-    return new Transform3(Vec3.fromArray(position), Quat.fromArray(rotation));
+  public static function fromArrays(position:Array<Float>, rotation:Array<Float>):Transform3 return new Transform3(
+    Vec3.fromArray(position),
+    Quat.fromArray(rotation)
+  );
 
   /** Column-major 4x4 matrix (16 values), matching ARCHITECTURE.md/SceneKit storage. */
   public function toColumnMajorArray():Array<Float> {
     var r = rotation.toRotationMatrix();
     return [
-      r[0], r[1], r[2], 0.0,
-      r[3], r[4], r[5], 0.0,
-      r[6], r[7], r[8], 0.0,
-      translation.x, translation.y, translation.z, 1.0
+      r[0],
+      r[1],
+      r[2],
+      0.0,
+      r[3],
+      r[4],
+      r[5],
+      0.0,
+      r[6],
+      r[7],
+      r[8],
+      0.0,
+      translation.x,
+      translation.y,
+      translation.z,
+      1.0
     ];
   }
 }

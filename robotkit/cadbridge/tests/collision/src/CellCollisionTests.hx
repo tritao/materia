@@ -1,4 +1,3 @@
-
 import robotkit.collision.CollisionClearance;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
@@ -64,9 +63,13 @@ class CellCollisionTests {
     var upper = model.addLink(new Link("upper"));
     var fore = model.addLink(new Link("fore"));
     var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, upper));
-    shoulder.axis = [0.0, 0, 1]; shoulder.limits.lower = -3; shoulder.limits.upper = 3;
+    shoulder.axis = [0.0, 0, 1];
+    shoulder.limits.lower = -3;
+    shoulder.limits.upper = 3;
     var elbow = model.addJoint(new Joint("elbow", JointType.Revolute, upper, fore));
-    elbow.axis = [0.0, 0, 1]; elbow.limits.lower = -3; elbow.limits.upper = 3;
+    elbow.axis = [0.0, 0, 1];
+    elbow.limits.lower = -3;
+    elbow.limits.upper = 3;
     elbow.parentFramePosition = [1.0, 0, 0];
     var flange = model.addFrame(new Frame("flange", fore));
     flange.position = [1.0, 0, 0];
@@ -87,8 +90,23 @@ class CellCollisionTests {
 
   static function armOptions(name:String):RobotCollisionOptions {
     var options = new RobotCollisionOptions(name);
-    options.tool = new Tool("probe", "probe", new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
-      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
+    options.tool = new Tool(
+      "probe",
+      "probe",
+      new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
+      ToolGeometry.box(
+        new Vec3(
+          0.05,
+          0.05,
+          0.05
+        ),
+        new Vec3(
+          0.05,
+          0,
+          0
+        )
+      )
+    );
     options.toolFrame = "flange";
     return options;
   }
@@ -100,20 +118,45 @@ class CellCollisionTests {
     assembly.add("slider");
     assembly.connector("base", "mount", AssemblyFrames.identity());
     assembly.connector("slider", "mount", AssemblyFrames.identity());
-    assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
-      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    assembly.mateOnAxis(
+      "slide",
+      "prismatic",
+      "base",
+      "mount",
+      "slider",
+      "mount",
+      {x: 0, y: 1, z: 0},
+      0,
+      {
+        lower: 0,
+        upper: 100,
+        velocity: 20,
+        effort: 50
+      }
+    );
     var points = cube(0, 0, 0, 50);
     var vertices = Bytes.alloc(points.length * 8);
     for (index in 0...points.length) vertices.setDouble(index * 8, points[index]);
     var parts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001,
       parts: [for (id in ["base", "slider"]) {
-        id: id, name: id, red: 0.5, green: 0.5, blue: 0.5,
-        materialId: "machined-steel", materialDensity: 7850.0,
-        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
-        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
-        vertexCount: 8, indexCount: 0, vertices: vertices,
-        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
-      }]});
+      id:id, name:id, red:0.5,
+        green:0.5, blue:0.5, materialId:"machined-steel", materialDensity:7850.0, volume:1000000.0, centerOfMass:[
+          0.0,
+          0.0,
+          0.0
+        ], inertia:[
+          10000000000.0,
+          0,
+          0,
+          0,
+          10000000000.0,
+          0,
+          0,
+          0,
+          10000000000.0
+        ], vertexCount:8, indexCount:0, vertices:vertices, normals:Bytes.alloc(0), indices:Bytes.alloc(0), faceRanges:[]
+    }
+    ]});
     return AssemblySimulationBridge.toRobotModel(assembly.definition("slider"), parts);
   }
 
@@ -125,7 +168,8 @@ class CellCollisionTests {
     mechanismOptions.rootPose = new Transform3(new Vec3(0, 3, 0), new Quat(0, 0, 0, 1));
     var mechanism = CadCollision.describeMechanism(description, slider(), mechanismOptions);
     var map = new HeightMap("cell", -2, -2, 0.5, 9, 9);
-    var terrain = HeightMapCollision.describe(description, "terrain", map, -3, CollisionPose.translation(0, 0, -0.5), 3);
+    var terrain = HeightMapCollision.describe(description,
+      "terrain", map, -3, CollisionPose.translation(0, 0, -0.5), 3);
     check(description.articulations.length == 2, "the robot and the mechanism are articulations");
     check(robot.toolBody >= 0 && robot.toolObjects.length == 1 && robot.hulls.length == 1, "tool and hull described");
     check(mechanism.hulls.length == 2, 'the mechanism carries its CAD hulls (${mechanism.hulls.length})');
@@ -136,13 +180,22 @@ class CellCollisionTests {
     var objectId = (described:Int) -> build.objects[described];
     var foreBox = objectId(robot.shapes[2][0]), toolBox = objectId(robot.toolObjects[0]);
     check(world.pairStatus(foreBox, toolBox) == CollisionPairStatus.Rigid, "the tool is rigid with its flange link");
-    check(world.pairStatus(objectId(robot.shapes[1][0]), toolBox) == CollisionPairStatus.Adjacent,
-      "the tool takes its link's adjacency");
-    check(world.pairStatus(objectId(robot.shapes[0][0]), objectId(mechanism.hulls[0])) == CollisionPairStatus.Static,
-      "two fixed bases are static");
-    check(world.pairStatus(toolBox, objectId(terrain)) == CollisionPairStatus.Checked, "the tool is checked against terrain");
-    check(world.pairStatus(toolBox, objectId(mechanism.hulls[1])) == CollisionPairStatus.Checked,
-      "the tool is checked against the mechanism's moving part");
+    check(
+      world.pairStatus(objectId(robot.shapes[1][0]), toolBox) == CollisionPairStatus.Adjacent,
+      "the tool takes its link's adjacency"
+    );
+    check(
+      world.pairStatus(objectId(robot.shapes[0][0]), objectId(mechanism.hulls[0])) == CollisionPairStatus.Static,
+      "two fixed bases are static"
+    );
+    check(
+      world.pairStatus(toolBox, objectId(terrain)) == CollisionPairStatus.Checked,
+      "the tool is checked against terrain"
+    );
+    check(
+      world.pairStatus(toolBox, objectId(mechanism.hulls[1])) == CollisionPairStatus.Checked,
+      "the tool is checked against the mechanism's moving part"
+    );
 
     // Turn the arm toward the mechanism (shoulder 90 degrees): its tool box reaches y = 2.1; the slider's
     // cube (50 mm half side) spans y 2.95..3.05 at rest.
@@ -166,13 +219,23 @@ class CellCollisionTests {
   static function testFixtureThroughTheRobotIsALayoutError():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var fixture = description.addFixed("fixture", CollisionPose.translation(1.5, 0, 0), CollisionGeometry.Box(0.1, 0.1, 0.1),
-      3, 0.0, "primitive");
+    var fixture = description.addFixed(
+      "fixture",
+      CollisionPose.translation(1.5, 0, 0),
+      CollisionGeometry.Box(
+        0.1,
+        0.1,
+        0.1
+      ),
+      3,
+      0.0,
+      "primitive"
+    );
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var foreBox = build.objects[robot.shapes[2][0]];
-    var errors = build.layoutErrors.filter(p -> (p.a == foreBox || p.b == foreBox)
-      && (p.a == build.objects[fixture] || p.b == build.objects[fixture]));
+    var errors = build.layoutErrors.filter(p -> (p.a == foreBox
+      || p.b == foreBox) && (p.a == build.objects[fixture] || p.b == build.objects[fixture]));
     check(errors.length == 1, 'the fixture through the forearm is a layout error (${build.layoutErrors.length})');
     check(world.pairStatus(foreBox, build.objects[fixture]) == CollisionPairStatus.Checked, "and stays checked");
     world.dispose();
@@ -182,24 +245,44 @@ class CellCollisionTests {
   static function testSimulationContactSettings():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var fixture = description.addFixed("fixture", CollisionPose.translation(1.95, 0.0, 0.3), CollisionGeometry.Box(0.05, 0.05, 0.05),
-      3, 0.0, "primitive");
+    var fixture = description.addFixed(
+      "fixture",
+      CollisionPose.translation(1.95, 0.0, 0.3),
+      CollisionGeometry.Box(
+        0.05,
+        0.05,
+        0.05
+      ),
+      3,
+      0.0,
+      "primitive"
+    );
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var left = build.objects[robot.shapes[2][1]], right = build.objects[robot.shapes[2][2]];
-    check(world.pairStatus(left, right) == CollisionPairStatus.DeclaredContact, "a contact pair is allowed as declared contact");
-    check(world.pairStatus(left, build.objects[fixture]) == CollisionPairStatus.Checked,
-      "a PairsOnly shape is still checked against a fixture");
+    check(
+      world.pairStatus(left, right) == CollisionPairStatus.DeclaredContact,
+      "a contact pair is allowed as declared contact"
+    );
+    check(
+      world.pairStatus(left, build.objects[fixture]) == CollisionPairStatus.Checked,
+      "a PairsOnly shape is still checked against a fixture"
+    );
     var pads = world.distances(1.0).filter(d -> d.b == build.objects[fixture] && (d.a == left || d.a == right));
-    check(pads.length == 2 && Math.abs(pads[0].distance - (0.25 - 0.12)) < 1e-6, 'the pads are measured (${pads.length})');
+    check(
+      pads.length == 2 && Math.abs(pads[0].distance - (0.25 - 0.12)) < 1e-6,
+      'the pads are measured (${pads.length})'
+    );
     var ignored = description.assumptions.filter(a -> a.indexOf("simulation-only") >= 0);
     check(ignored.length == 2, 'the ignored settings are recorded (${ignored.length})');
     var flagged = new RobotCollisionOptions("arm-2");
     flagged.selfCollision = false;
     flagged.rootPose = new Transform3(new Vec3(0, -5, 0), new Quat(0, 0, 0, 1));
     RobotCollision.describe(description, arm(), flagged);
-    check(description.assumptions.filter(a -> a.indexOf("self-collision") >= 0).length == 1,
-      "the self-collision opt-out is recorded as ignored");
+    check(
+      description.assumptions.filter(a -> a.indexOf("self-collision") >= 0).length == 1,
+      "the self-collision opt-out is recorded as ignored"
+    );
     world.dispose();
   }
 
@@ -210,8 +293,20 @@ class CellCollisionTests {
     var decomposer = new NativeConvexDecomposer(50000);
     var cache = new CadDecompositionCache();
     var description = new CollisionDescription();
-    var pieces = CadCollision.describePart(description, "bracket", AssemblyFrames.identity(), 0.001,
-      CadPartCollision.Decomposed(part, 0.1, 8), 3, decomposer, cache);
+    var pieces = CadCollision.describePart(
+      description,
+      "bracket",
+      AssemblyFrames.identity(),
+      0.001,
+      CadPartCollision.Decomposed(
+        part,
+        0.1,
+        8
+      ),
+      3,
+      decomposer,
+      cache
+    );
     check(pieces.length >= 2, 'the L needs several pieces (${pieces.length})');
     var inflation = description.objects[pieces[0]].inflation;
     check(inflation > 0 && inflation < 0.005, 'the inflation is small against the part ($inflation)');
@@ -219,8 +314,20 @@ class CellCollisionTests {
     check(recorded.length == 1, "the inflation is recorded");
     if (recorded.length == 1) Sys.println(recorded[0]);
     // Again: the cached pieces are reused.
-    CadCollision.describePart(description, "bracket", AssemblyFrames.identity(), 0.001,
-      CadPartCollision.Decomposed(part, 0.1, 8), 3, decomposer, cache);
+    CadCollision.describePart(
+      description,
+      "bracket",
+      AssemblyFrames.identity(),
+      0.001,
+      CadPartCollision.Decomposed(
+        part,
+        0.1,
+        8
+      ),
+      3,
+      decomposer,
+      cache
+    );
     check(cache.decompositions == 1, "a part is decomposed once");
 
     // Every tessellation vertex, and points across its triangles, lies inside the inflated pieces.
@@ -232,18 +339,22 @@ class CellCollisionTests {
       var id = world.add(-1, CollisionPose.identity(), object.geometry);
       world.setInflation(id, object.inflation);
       id;
-    }];
+    }
+    ];
     var probe = world.add(probeBody, CollisionPose.identity(), CollisionGeometry.Sphere(1e-7));
     var worst = Math.NEGATIVE_INFINITY;
     var t = 0;
     while (t + 2 < mesh.indices.length) {
       for (weights in [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0], [1 / 3, 1 / 3, 1 / 3], [0.5, 0.5, 0], [0.2, 0.1, 0.7]]) {
-        var p = [for (k in 0...3) weights[0] * mesh.vertices[3 * mesh.indices[t] + k]
-          + weights[1] * mesh.vertices[3 * mesh.indices[t + 1] + k] + weights[2] * mesh.vertices[3 * mesh.indices[t + 2] + k]];
+        var p = [for (k in 0...3) weights[0] * mesh.vertices[3 * mesh.indices[t] + k] + weights[1]
+          * mesh.vertices[3 * mesh.indices[t + 1] + k] + weights[2] * mesh.vertices[3 * mesh.indices[t + 2] + k]];
         world.setBodyPose(probeBody, CollisionPose.translation(p[0], p[1], p[2]));
         var nearest = Math.POSITIVE_INFINITY;
-        for (d in world.pairDistances([for (o in objects) new CollisionPair(probe, o, probeBody, -1)]))
-          nearest = Math.min(nearest, d.distance + 1e-7);
+        for (d in world.pairDistances([for (o in objects) new CollisionPair(probe,
+          o, probeBody, -1)])) nearest = Math.min(
+            nearest,
+            d.distance + 1e-7
+          );
         worst = Math.max(worst, nearest);
       }
       t += 3;
@@ -259,25 +370,62 @@ class CellCollisionTests {
   static function testClearanceBodies():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var objects = RobotCollision.addDescriptionShapes(description, robot, CollisionClearance.combine([
-      CollisionClearance.convex("upper-hull", "upper", cube(0.5, 0, 0, 0.05), false),
-      CollisionClearance.convex("torch", "fore", cube(1.05, 0, 0, 0.03), true),
-      CollisionClearance.convex("workpiece", "base", cube(1.5, 1.0, 0, 0.1), false)
-    ]));
+    var objects = RobotCollision.addDescriptionShapes(
+      description,
+      robot,
+      CollisionClearance.combine([
+        CollisionClearance.convex(
+          "upper-hull",
+          "upper",
+          cube(
+            0.5,
+            0,
+            0,
+            0.05
+          ),
+          false
+        ),
+        CollisionClearance.convex(
+          "torch",
+          "fore",
+          cube(
+            1.05,
+            0,
+            0,
+            0.03
+          ),
+          true
+        ),
+        CollisionClearance.convex(
+          "workpiece",
+          "base",
+          cube(
+            1.5,
+            1.0,
+            0,
+            0.1
+          ),
+          false
+        )
+      ])
+    );
     check(description.objects[objects[0]].body == robot.linkBody("upper"), "a link hull is on its link");
     check(description.objects[objects[1]].body == robot.toolBody, "a tool hull is on the tool body");
     check(description.objects[objects[2]].body == robot.linkBody("base"), "a part carried by the base is on the base");
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     check(build.layoutErrors.length == 0, "the clearance scene lays out cleanly");
-    check(world.pairStatus(build.objects[objects[1]], build.objects[objects[2]]) == CollisionPairStatus.Checked,
-      "the torch is checked against the workpiece");
+    check(
+      world.pairStatus(build.objects[objects[1]], build.objects[objects[2]]) == CollisionPairStatus.Checked,
+      "the torch is checked against the workpiece"
+    );
     world.dispose();
   }
 
   /** A cube's corners (x, y, z triples) centred at (x, y, z) with half side `half`. */
-  static function cube(x:Float, y:Float, z:Float, half:Float):Array<Float>
-    return [for (i in 0...8) for (axis in 0...3) (axis == 0 ? x : axis == 1 ? y : z) + (((i >> axis) & 1) == 1 ? half : -half)];
+  static function cube(x:Float,
+    y:Float, z:Float, half:Float):Array<Float> return [for (i in 0...8) for (axis in 0...3)(axis
+    == 0 ? x : axis == 1 ? y : z) + (((i >> axis) & 1) == 1 ? half : -half)];
 
   static function check(value:Bool, message:String):Void {
     assertions++;

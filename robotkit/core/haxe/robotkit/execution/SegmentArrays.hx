@@ -33,29 +33,33 @@ class SegmentArrays {
   /** For each robot joint no source joint drives, the couplings it sums (none when it follows nothing). */
   final followed:Array<Array<CoupledJoint>>;
 
-  public function new(starts:NativeSpan<Int64>, durations:NativeSpan<Int64>, degrees:NativeSpan<Int>,
-      coefficients:NativeSpan<Float>, jointMap:Array<Int>, heldPositions:Array<Float>,
-      ?couplings:Array<CoupledJoint>) {
+  public function new(
+    starts:NativeSpan<Int64>,
+    durations:NativeSpan<Int64>,
+    degrees:NativeSpan<Int>,
+    coefficients:NativeSpan<Float>,
+    jointMap:Array<Int>,
+    heldPositions:Array<Float>,
+    ?couplings:Array<CoupledJoint>
+  ) {
     var count = starts.length();
-    if (count < 1 || durations.length() != count || degrees.length() != count)
-      throw "Segment arrays need equal, nonempty start, duration and degree arrays";
-    if (jointMap == null || jointMap.length < 1 || heldPositions == null ||
-        jointMap.length > heldPositions.length || heldPositions.length > 64)
-      throw "Segment arrays need a joint map onto the robot's joints";
-    if (coefficients.length() != count * jointMap.length * STRIDE)
-      throw "Segment arrays need STRIDE coefficients per segment and source joint";
+    if (count < 1 || durations.length() != count
+      || degrees.length() != count) throw "Segment arrays need equal, nonempty start, duration and degree arrays";
+    if (jointMap == null || jointMap.length < 1 || heldPositions == null || jointMap.length > heldPositions.length
+      || heldPositions.length > 64) throw "Segment arrays need a joint map onto the robot's joints";
+    if (coefficients.length()
+      != count * jointMap.length * STRIDE) throw "Segment arrays need STRIDE coefficients per segment and source joint";
     var driven = [for (_ in heldPositions) false];
     for (joint in jointMap) {
-      if (joint < 0 || joint >= heldPositions.length || driven[joint])
-        throw "Segment arrays map each source joint to a distinct robot joint";
+      if (joint < 0 || joint >= heldPositions.length
+        || driven[joint]) throw "Segment arrays map each source joint to a distinct robot joint";
       driven[joint] = true;
     }
-    for (position in heldPositions)
-      if (!Math.isFinite(position)) throw "Segment arrays need finite held positions";
-    followed = [for (_ in heldPositions) []];
+    for (position in heldPositions) if (!Math.isFinite(position)) throw "Segment arrays need finite held positions";
+    followed = [for (_ in heldPositions)[]];
     if (couplings != null) for (coupling in couplings) {
-      if (coupling.follower >= heldPositions.length || coupling.leader >= heldPositions.length)
-        throw "Segment arrays couple a joint the robot does not have";
+      if (coupling.follower >= heldPositions.length
+        || coupling.leader >= heldPositions.length) throw "Segment arrays couple a joint the robot does not have";
       if (!driven[coupling.follower]) followed[coupling.follower].push(coupling);
     }
     for (start in 0...followed.length) {
@@ -97,9 +101,21 @@ class SegmentArrays {
   /** Segments `[first, last)`, reading the same memory. */
   public function slice(first:Int, last:Int):SegmentArrays {
     var joints = jointMap.length * STRIDE;
-    return new SegmentArrays(starts.slice(first, last - first), durations.slice(first, last - first),
-      degrees.slice(first, last - first), coefficients.slice(first * joints, (last - first) * joints),
-      jointMap, heldPositions, couplings);
+    return new SegmentArrays(
+      starts.slice(first, last - first),
+      durations.slice(first, last - first),
+      degrees.slice(
+        first,
+        last - first
+      ),
+      coefficients.slice(
+        first * joints,
+        (last - first) * joints
+      ),
+      jointMap,
+      heldPositions,
+      couplings
+    );
   }
 
   /** Robot joint `joint`'s coefficient of `power` in segment `index`. */
@@ -109,8 +125,8 @@ class SegmentArrays {
       var terms = followed[joint];
       if (terms.length == 0) return power == 0 ? heldPositions[joint] : 0.0;
       var sum = 0.0;
-      for (coupling in terms)
-        sum += coupling.ratio * coefficient(index, coupling.leader, power) + (power == 0 ? coupling.offset : 0.0);
+      for (coupling in terms) sum += coupling.ratio * coefficient(index,
+        coupling.leader, power) + (power == 0 ? coupling.offset : 0.0);
       return sum;
     }
     return coefficients.get((index * jointMap.length + source) * STRIDE + power);
@@ -122,8 +138,8 @@ class SegmentArrays {
     are `positions`, not their derivatives), and `rest` for every other joint.
   **/
   public function robotValues(values:Array<Float>, rest:Array<Float>, positions:Bool):Array<Float> {
-    if (values.length != jointMap.length || rest.length != heldPositions.length)
-      throw "Segment arrays map source values onto every robot joint";
+    if (values.length != jointMap.length
+      || rest.length != heldPositions.length) throw "Segment arrays map source values onto every robot joint";
     var result = rest.copy();
     for (source in 0...jointMap.length) result[jointMap[source]] = values[source];
     function value(joint:Int):Float {
@@ -142,8 +158,8 @@ class SegmentArrays {
     allows the same error, and `rest` for every other joint.
   **/
   public function robotTolerances(values:Array<Float>, rest:Array<Float>):Array<Float> {
-    if (values.length != jointMap.length || rest.length != heldPositions.length)
-      throw "Segment arrays map source tolerances onto every robot joint";
+    if (values.length != jointMap.length
+      || rest.length != heldPositions.length) throw "Segment arrays map source tolerances onto every robot joint";
     var result = rest.copy();
     for (source in 0...jointMap.length) result[jointMap[source]] = values[source];
     function tolerance(joint:Int):Float {
@@ -161,8 +177,15 @@ class SegmentArrays {
     var origin = starts.get(0), result:Array<TrajectorySegment> = [];
     for (index in 0...count()) {
       var degree = degrees.get(index);
-      result.push(new TrajectorySegment(Int64.sub(starts.get(index), origin), durations.get(index),
-        [for (joint in 0...heldPositions.length) [for (power in 0...degree + 1) coefficient(index, joint, power)]]));
+      result.push(new TrajectorySegment(
+        Int64.sub(starts.get(index), origin),
+        durations.get(index),
+        [for (joint in 0...heldPositions.length)[for (power in 0...degree + 1) coefficient(
+          index,
+          joint,
+          power
+        )]]
+      ));
     }
     return result;
   }

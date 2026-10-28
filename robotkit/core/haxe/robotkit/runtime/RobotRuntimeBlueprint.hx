@@ -30,8 +30,11 @@ class RobotRuntimeBlueprint {
   /** Conservative integration interval from servo gain and reflected inertia, seconds. */
   public function servoStabilityInterval(?onCompliantLoads:Bool = false):Float {
     var interval = Math.POSITIVE_INFINITY;
-    for (joint in joints) if (joint.servoStiffness > 0 && joint.reflectedInertia > 0 && (!onCompliantLoads || joint.compliantLoad))
-      interval = Math.min(interval, 0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness));
+    for (joint in joints) if (joint.servoStiffness > 0
+      && joint.reflectedInertia > 0 && (!onCompliantLoads || joint.compliantLoad)) interval = Math.min(
+        interval,
+        0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness)
+      );
     return interval;
   }
   /** Maximum physics interval for pressure-loaded cylinder end stops, seconds.
@@ -39,11 +42,11 @@ class RobotRuntimeBlueprint {
   public function pneumaticStabilityInterval():Float {
     var interval = Math.POSITIVE_INFINITY;
     for (drive in cylinderDrives) {
-      if (drive.joint < 0 || drive.joint >= joints.length)
-        throw 'Pneumatic stability references unknown joint ${drive.joint}';
+      if (drive.joint < 0
+        || drive.joint >= joints.length) throw 'Pneumatic stability references unknown joint ${drive.joint}';
       var joint = joints[drive.joint];
-      if (joint.childLink < 0 || joint.childLink >= links.length)
-        throw 'Pneumatic stability for joint ${drive.joint} references unknown child link';
+      if (joint.childLink < 0 || joint.childLink
+        >= links.length) throw 'Pneumatic stability for joint ${drive.joint} references unknown child link';
       var cushion = joint.overtravel;
       var mass = links[joint.childLink].mass;
       var force = Math.max(drive.extensionForce, drive.retractionForce);
@@ -52,8 +55,7 @@ class RobotRuntimeBlueprint {
       // MuJoCo clamps a time constant below twice the physics step. Keep that
       // floor at or below the pneumatic stop's force/mass response time.
       interval = Math.min(interval, stopTimeConstant / 2.0);
-      if (drive.ratedSpeed > 0.0)
-        interval = Math.min(interval, cushion / drive.ratedSpeed);
+      if (drive.ratedSpeed > 0.0) interval = Math.min(interval, cushion / drive.ratedSpeed);
     }
     return interval;
   }
@@ -87,9 +89,8 @@ class RobotRuntimeBlueprint {
       if (drive.joint < 0 || drive.joint >= joints.length) throw "Velocity drive joint is outside the blueprint";
       owned[drive.joint] = true;
     }
-    for (coupling in couplings)
-      if (coupling.leader < 0 || coupling.leader >= joints.length || coupling.follower < 0 || coupling.follower >= joints.length)
-        throw "Coupling joint is outside the blueprint";
+    for (coupling in couplings) if (coupling.leader < 0 || coupling.leader >= joints.length
+      || coupling.follower < 0 || coupling.follower >= joints.length) throw "Coupling joint is outside the blueprint";
     var changed = true;
     while (changed) {
       changed = false;
@@ -116,21 +117,25 @@ class RobotRuntimeBlueprint {
   public function addChannel(declaration:ProcessChannelDeclaration):Void {
     if (declaration == null) throw "A process channel declaration is required";
     for (channel in channels) if (channel.id == declaration.id) {
-      if (channel.keepOnStop != declaration.keepOnStop ||
-          !RobotRuntimeBlueprint.sameValue(channel.safeValue, declaration.safeValue))
-        throw 'Channel "${declaration.id}" has conflicting safe values or stop policies';
+      if (channel.keepOnStop != declaration.keepOnStop || !RobotRuntimeBlueprint.sameValue(
+        channel.safeValue,
+        declaration.safeValue
+      )) throw 'Channel "${declaration.id}" has conflicting safe values or stop policies';
       return;
     }
     channels.push(declaration);
   }
 
-  static function sameValue(a:ProcessEventValue, b:ProcessEventValue):Bool
-    return switch [a, b] {
-      case [Digital(x), Digital(y)]: x == y;
-      case [Analog(x), Analog(y)]: x == y;
-      case [Process(c, x), Process(d, y)]: c == d && x == y;
-      case _: false;
-    };
+  static function sameValue(a:ProcessEventValue, b:ProcessEventValue):Bool return switch [a, b] {
+    case [Digital(x), Digital(y)]:
+      x == y;
+    case [Analog(x), Analog(y)]:
+      x == y;
+    case [Process(c, x), Process(d, y)]:
+      c == d && x == y;
+    case _:
+      false;
+  };
 
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
@@ -162,7 +167,10 @@ class RobotRuntimeBlueprint {
     if (sensors.length > 0) return sensors.copy();
     var children = [for (joint in joints) joint.childLink];
     var root = 0;
-    for (i in 0...linkCount) if (children.indexOf(i) < 0) { root = i; break; }
+    for (i in 0...linkCount) if (children.indexOf(i) < 0) {
+      root = i;
+      break;
+    }
     return RobotRuntimeSensorBlueprint.defaults(root, "base_link");
   }
 
@@ -172,21 +180,29 @@ class RobotRuntimeBlueprint {
     if (native.length > 0) return native;
     var children = [for (joint in joints) joint.childLink];
     var root = 0;
-    for (i in 0...linkCount) if (children.indexOf(i) < 0) { root = i; break; }
+    for (i in 0...linkCount) if (children.indexOf(i) < 0) {
+      root = i;
+      break;
+    }
     return RobotRuntimeSensorBlueprint.defaults(root, "base_link");
   }
 
   /** Authored sensors whose observations are published from outside the native runtime. */
-  public function externalSensorLayout():Array<RobotRuntimeSensorBlueprint>
-    return [for (sensor in sensors) if (sensor.external) sensor];
+  public function externalSensorLayout():Array<RobotRuntimeSensorBlueprint
+    > return [for (sensor in sensors) if (sensor.external) sensor];
 
-  public function new(revision:Int, jointCount:Int, linkCount:Int,
-      ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity,
-      ?configuration:RobotRuntimeConfiguration, ?calibrationRevision:Int = 0) {
-    if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS ||
-        linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS || frameCount < 0 ||
-        calibrationRevision < 0)
-      throw "Invalid RobotKit runtime blueprint";
+  public function new(
+    revision:Int,
+    jointCount:Int,
+    linkCount:Int,
+    ?frameCount:Int = 0,
+    ?identity:RobotRuntimeIdentity,
+    ?configuration:RobotRuntimeConfiguration,
+    ?calibrationRevision:Int = 0
+  ) {
+    if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS
+      || linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS
+      || frameCount < 0 || calibrationRevision < 0) throw "Invalid RobotKit runtime blueprint";
     this.identity = identity;
     this.revision = revision;
     this.calibrationRevision = calibrationRevision;
@@ -194,15 +210,26 @@ class RobotRuntimeBlueprint {
     followingErrorBounds = [for (_ in 0...jointCount) 0.0];
     this.linkCount = linkCount;
     this.frameCount = frameCount;
-    for (_ in 0...linkCount)
-      links.push(new RobotRuntimeLinkBlueprint(1.0, [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]));
+    for (_ in 0...linkCount) links.push(new RobotRuntimeLinkBlueprint(
+      1.0,
+      [0.0, 0.0, 0.0],
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ));
     this.configuration = configuration;
   }
 
   public function addJoint(value:RobotRuntimeJointBlueprint):Void {
-    if (joints.length >= jointCount)
-      throw "RobotKit runtime blueprint has too many joints";
+    if (joints.length >= jointCount) throw "RobotKit runtime blueprint has too many joints";
     joints.push(value);
   }
 
@@ -211,101 +238,85 @@ class RobotRuntimeBlueprint {
     if (id == null || id.length == 0) return null;
     if (identity != null) {
       var index = identity.sensorIndex(id);
-      if (index >= 0 && index < sensors.length && sensors[index].id == id)
-        return sensors[index];
+      if (index >= 0 && index < sensors.length && sensors[index].id == id) return sensors[index];
     }
     for (sensor in sensors) if (sensor.id == id) return sensor;
     for (sensor in sensorLayout()) if (sensor.id == id) return sensor;
     return null;
   }
 
-  @:allow(RobotRuntime, Simulation)
-  function nativeValue():rk_robot_runtime_blueprint {
-    if (joints.length != jointCount)
-      throw "RobotKit runtime blueprint is missing joints";
+  @:allow(RobotRuntime, Simulation) function nativeValue():rk_robot_runtime_blueprint {
+    if (joints.length != jointCount) throw "RobotKit runtime blueprint is missing joints";
     var value = new rk_robot_runtime_blueprint();
     value.set_struct_size(rk_robot_runtime_blueprint.size());
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_calibration_revision(haxe.Int64.ofInt(calibrationRevision));
     value.set_commit_lead_ns(commitLeadNs);
-    if (haxe.Int64.compare(ownerPeriodNs, haxe.Int64.ofInt(0)) < 0)
-      throw "Invalid runtime owner period";
+    if (haxe.Int64.compare(ownerPeriodNs, haxe.Int64.ofInt(0)) < 0) throw "Invalid runtime owner period";
     value.set_owner_period_ns(ownerPeriodNs);
-    if (haxe.Int64.compare(serialProcessingAllowanceNs, haxe.Int64.ofInt(0)) < 0)
-      throw "Invalid serial processing allowance";
+    if (haxe.Int64.compare(serialProcessingAllowanceNs,
+      haxe.Int64.ofInt(0)) < 0) throw "Invalid serial processing allowance";
     value.set_serial_processing_allowance_ns(serialProcessingAllowanceNs);
-    if (channels.length > RobotKitRuntimeConstants.RK_MAX_PROCESS_CHANNELS)
-      throw "Too many runtime process channels";
+    if (channels.length > RobotKitRuntimeConstants.RK_MAX_PROCESS_CHANNELS) throw "Too many runtime process channels";
     value.set_channel_count(channels.length);
     for (index in 0...channels.length) {
       var channel = channels[index];
-      for (earlier in 0...index)
-        if (channels[earlier].id == channel.id) throw "Duplicate runtime process channel";
+      for (earlier in 0...index) if (channels[earlier].id == channel.id) throw "Duplicate runtime process channel";
       var nativeChannel = new rk_channel_declaration();
-      for (i in 0...channel.id.length)
-        nativeChannel.set_id(i, channel.id.charCodeAt(i));
+      for (i in 0...channel.id.length) nativeChannel.set_id(i, channel.id.charCodeAt(i));
       var safe = ProcessEventCodec.encode(channel.safeValue);
       nativeChannel.set_kind(safe.get_kind());
       nativeChannel.set_safe_value(safe);
-      nativeChannel.set_stop_policy(channel.keepOnStop ? RobotKitRuntimeConstants.RK_CHANNEL_KEEP_ON_STOP
-        : RobotKitRuntimeConstants.RK_CHANNEL_SAFE_ON_STOP);
+      nativeChannel.set_stop_policy(channel.keepOnStop
+        ? RobotKitRuntimeConstants.RK_CHANNEL_KEEP_ON_STOP : RobotKitRuntimeConstants.RK_CHANNEL_SAFE_ON_STOP);
       value.set_channels(index, nativeChannel);
     }
-    if (cylinderDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
-      throw "Too many process-driven joints";
+    if (cylinderDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS) throw "Too many process-driven joints";
     var processJointIds = new Map<Int, Bool>();
     for (joint in processModelJoints) {
-      if (joint < 0 || joint >= jointCount || processJointIds.exists(joint)) throw "Invalid or duplicate process model joint";
+      if (joint < 0
+        || joint >= jointCount || processJointIds.exists(joint)) throw "Invalid or duplicate process model joint";
       processJointIds.set(joint, true);
     }
     for (drive in cylinderDrives) {
-      if (drive.joint < 0 || drive.joint >= jointCount)
-        throw 'Cylinder process drive references unknown joint ${drive.joint}';
-      if (joints[drive.joint].passive)
-        throw 'Process drive cannot command passive joint ${drive.joint}';
-      if (processJointIds.exists(drive.joint))
-        throw 'Multiple process drives reference joint ${drive.joint}';
+      if (drive.joint < 0
+        || drive.joint >= jointCount) throw 'Cylinder process drive references unknown joint ${drive.joint}';
+      if (joints[drive.joint].passive) throw 'Process drive cannot command passive joint ${drive.joint}';
+      if (processJointIds.exists(drive.joint)) throw 'Multiple process drives reference joint ${drive.joint}';
       processJointIds.set(drive.joint, true);
       var channelA = false, channelB = drive.channelB == null;
       for (channel in channels) {
         if (channel.id == drive.channelA && channel.safeValue == Digital(false)) channelA = true;
-        if (drive.channelB != null && channel.id == drive.channelB && channel.safeValue == Digital(false)) channelB = true;
+        if (drive.channelB != null
+          && channel.id == drive.channelB && channel.safeValue == Digital(false)) channelB = true;
       }
-      if (!channelA || !channelB)
-        throw 'Cylinder drive on joint ${drive.joint} needs declared digital coil channels';
+      if (!channelA || !channelB) throw 'Cylinder drive on joint ${drive.joint} needs declared digital coil channels';
     }
-    if (velocityDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
-      throw "Too many process-driven joints";
+    if (velocityDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS) throw "Too many process-driven joints";
     for (drive in velocityDrives) {
-      if (drive.joint < 0 || drive.joint >= jointCount)
-        throw 'Velocity process drive references unknown joint ${drive.joint}';
-      if (joints[drive.joint].passive)
-        throw 'Process drive cannot command passive joint ${drive.joint}';
-      if (processJointIds.exists(drive.joint))
-        throw 'Multiple process drives reference joint ${drive.joint}';
+      if (drive.joint < 0
+        || drive.joint >= jointCount) throw 'Velocity process drive references unknown joint ${drive.joint}';
+      if (joints[drive.joint].passive) throw 'Process drive cannot command passive joint ${drive.joint}';
+      if (processJointIds.exists(drive.joint)) throw 'Multiple process drives reference joint ${drive.joint}';
       processJointIds.set(drive.joint, true);
-      if (!(drive.radiansPerSpeedUnit > 0.0) || !Math.isFinite(drive.radiansPerSpeedUnit) ||
-          !(drive.maxRate > 0.0) || !Math.isFinite(drive.maxRate) ||
-          !Math.isFinite(drive.maxEffort) || drive.maxEffort < 0.0)
-        throw 'Velocity process drive on joint ${drive.joint} has invalid ratings';
+      if (!(drive.radiansPerSpeedUnit > 0.0) || !Math.isFinite(drive.radiansPerSpeedUnit)
+        || !(drive.maxRate > 0.0) || !Math.isFinite(drive.maxRate) || !Math.isFinite(drive.maxEffort)
+        || drive.maxEffort < 0.0) throw 'Velocity process drive on joint ${drive.joint} has invalid ratings';
       var speedChannel = false, directionChannel = false;
       for (channel in channels) {
         if (channel.id == drive.speedChannel && channel.safeValue == Analog(0.0)) speedChannel = true;
         if (channel.id == drive.directionChannel && channel.safeValue == Analog(0.0)) directionChannel = true;
       }
-      if (!speedChannel || !directionChannel)
-        throw 'Velocity drive on joint ${drive.joint} needs declared analog speed and direction channels';
+      if (!speedChannel
+        || !directionChannel) throw 'Velocity drive on joint ${drive.joint} needs declared analog speed and direction channels';
     }
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
-      if (!Math.isFinite(bound) || bound < 0.0)
-        throw "Invalid runtime following-error bound";
-      if (joint < RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS)
-        value.set_following_error_bound(joint, bound);
+      if (!Math.isFinite(bound) || bound < 0.0) throw "Invalid runtime following-error bound";
+      if (joint < RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS) value.set_following_error_bound(joint, bound);
     }
     value.set_joint_count(jointCount);
-    if (couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
-      throw "Too many runtime joint couplings";
+    if (couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS) throw "Too many runtime joint couplings";
     value.set_coupling_count(couplings.length);
     for (index in 0...couplings.length) {
       value.set_couplings(index, couplings[index].nativeValue());
@@ -317,8 +328,8 @@ class RobotRuntimeBlueprint {
     value.set_collision_approximation(collisionApproximation);
     value.set_self_collision(selfCollision ? 1 : 2);
     value.set_floating_base(floatingBase ? 1 : 0);
-    if (!Math.isFinite(observedLimitTolerance) || observedLimitTolerance < 0.0)
-      throw "Observed limit tolerance must be finite and non-negative";
+    if (!Math.isFinite(observedLimitTolerance)
+      || observedLimitTolerance < 0.0) throw "Observed limit tolerance must be finite and non-negative";
     value.set_observed_limit_tolerance(observedLimitTolerance);
     var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
@@ -341,23 +352,34 @@ class RobotRuntimeBlueprint {
     value.set_brake_count(brakes.length);
     for (i in 0...brakes.length) {
       var brake = brakes[i];
-      if (brake.joint < 0 || brake.joint >= jointCount ||
-          haxe.Int64.compare(brake.releaseTimeoutNs, haxe.Int64.ofInt(0)) <= 0 ||
-          haxe.Int64.compare(brake.feedbackMaxAgeNs, haxe.Int64.ofInt(0)) <= 0 ||
-          haxe.Int64.compare(brake.feedbackMaxAgeNs, brake.releaseTimeoutNs) > 0)
-        throw "Invalid brake interlock limits";
-      for (j in 0...i) if (brakes[j].joint == brake.joint ||
-          brakes[j].releaseChannel == brake.releaseChannel || brakes[j].releasedSensor == brake.releasedSensor)
-        throw "Brake interlocks must have distinct joints, release outputs and feedback";
+      if (brake.joint < 0 || brake.joint >= jointCount || haxe.Int64.compare(
+        brake.releaseTimeoutNs,
+        haxe.Int64.ofInt(0)
+      ) <= 0 || haxe.Int64.compare(
+        brake.feedbackMaxAgeNs,
+        haxe.Int64.ofInt(0)
+      ) <= 0 || haxe.Int64.compare(
+        brake.feedbackMaxAgeNs,
+        brake.releaseTimeoutNs
+      ) > 0) throw "Invalid brake interlock limits";
+      for (j in 0...i) if (brakes[j].joint == brake.joint
+        || brakes[j].releaseChannel == brake.releaseChannel || brakes[j].releasedSensor
+        == brake.releasedSensor) throw "Brake interlocks must have distinct joints, release outputs and feedback";
       var channelIndex = -1, sensorIndex = -1;
       for (j in 0...channels.length) if (channels[j].id == brake.releaseChannel) {
-        var valid = switch channels[j].safeValue { case Digital(false): true; case _: false; };
-        if (!valid || !channels[j].keepOnStop) throw "Brake release needs a de-energized digital safe value and keep-on-stop policy";
+        var valid = switch channels[j].safeValue {
+          case Digital(false):
+            true;
+          case _:
+            false;
+        };
+        if (!valid || !channels[j]
+          .keepOnStop) throw "Brake release needs a de-energized digital safe value and keep-on-stop policy";
         channelIndex = j;
       }
       for (j in 0...layout.length) if (layout[j].id == brake.releasedSensor) {
-        if (layout[j].kind != "brake_released" || layout[j].joint != brake.joint)
-          throw "Brake feedback must read its mechanical joint";
+        if (layout[j].kind != "brake_released"
+          || layout[j].joint != brake.joint) throw "Brake feedback must read its mechanical joint";
         sensorIndex = j;
       }
       if (channelIndex < 0 || sensorIndex < 0) throw "Brake release output or feedback is undeclared";
@@ -373,8 +395,8 @@ class RobotRuntimeBlueprint {
       var joint = joints[index];
       value.set_joints(index, joint.nativeValue());
       if (joint.passive) value.set_external_joint(index, 1);
-      if (!Math.isFinite(joint.overtravel) || joint.overtravel < 0.0)
-        throw "Joint overtravel must be finite and non-negative";
+      if (!Math.isFinite(joint.overtravel)
+        || joint.overtravel < 0.0) throw "Joint overtravel must be finite and non-negative";
       value.set_joint_overtravel(index, joint.overtravel);
       var dynamics = new rk_robot_joint_dynamics();
       dynamics.set_armature(joint.armature);
@@ -384,9 +406,8 @@ class RobotRuntimeBlueprint {
       dynamics.set_limit_damping_ratio(joint.limitDampingRatio);
       for (term in 0...5) dynamics.set_limit_impedance(term, joint.limitImpedance[term]);
       value.set_joint_dynamics(index, dynamics);
-      if (!Math.isFinite(joint.servoStiffness) || joint.servoStiffness < 0.0 ||
-          !Math.isFinite(joint.servoDamping) || joint.servoDamping < 0.0)
-        throw "Joint servo gains must be finite and non-negative";
+      if (!Math.isFinite(joint.servoStiffness) || joint.servoStiffness < 0.0 || !Math.isFinite(joint.servoDamping)
+        || joint.servoDamping < 0.0) throw "Joint servo gains must be finite and non-negative";
       var servo = new rk_robot_joint_servo();
       servo.set_stiffness(joint.servoStiffness);
       servo.set_damping(joint.servoDamping);

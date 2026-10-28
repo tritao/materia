@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Typed MessagePack payload for the recording channel. */
-@:wire
-class RecordingProcessEventMsg {
+@:wire class RecordingProcessEventMsg {
   @:id(1) public var planId:haxe.Int64;
   @:id(2) public var channel:String;
   @:id(3) public var value:RecordingProcessValueMsg;
@@ -11,5 +10,6 @@ class RecordingProcessEventMsg {
   @:id(6) public var cause:Int;
   @:id(7) public var robotId:String;
 
-  public function new() {}
+  public function new() {
+  }
 }

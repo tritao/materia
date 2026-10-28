@@ -106,12 +106,18 @@ class RobotModel {
     var own = joint[0].mechanicalLimits;
     if (own == null) own = joint[0].limits;
     var limits = new JointLimits(own.lower, own.upper, own.velocity, own.effort, own.maxAcceleration);
-    limits.assumptions = [for (value in own.assumptions) {quantity: value.quantity, label: value.label}];
+    limits.assumptions = [for (value in own.assumptions) {
+      quantity:value.quantity, label:value.label
+    }
+    ];
     limits.overtravel = own.overtravel;
     limits.rackingTolerance = own.rackingTolerance;
     limits.velocityLimiter = own.velocityLimiter;
-    function tighten(current:Null<Float>, bound:Null<Float>):Null<Float>
-      return bound == null ? current : current == null ? bound : Math.min(current, bound);
+    function tighten(current:Null<Float>,
+      bound:Null<Float>):Null<Float> return bound == null ? current : current == null ? bound : Math.min(
+        current,
+        bound
+      );
     // Each joint reached so far, how far it moves per unit of joint `id`, and the efficiency of
     // the couplings between them.
     var reached:Array<String> = [id];
@@ -142,9 +148,13 @@ class RobotModel {
           if (mechanical == null) mechanical = follower.limits;
           var velocity = mechanical.velocity, acceleration = mechanical.maxAcceleration;
           if (velocity != null) {
-            if (limits.velocity == null || velocity / velocityScale <= limits.velocity)
-              for (value in mechanical.assumptions) if (value.quantity == "speed limit")
-                EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
+            if (limits.velocity == null
+              || velocity / velocityScale <= limits.velocity) for (value in mechanical.assumptions) if (value.quantity
+              == "speed limit") EngineeringAssumptions.add(
+                limits.assumptions,
+                value.quantity,
+                value.label
+              );
             limits.velocity = tighten(limits.velocity, velocity / velocityScale);
           }
           if (acceleration != null) limits.maxAcceleration = tighten(limits.maxAcceleration, acceleration / box);
@@ -162,8 +172,11 @@ class RobotModel {
         if (motorRate != null) {
           var rate = motorRate / (Math.abs(ratio) * (motorSpaceVelocity ? scales[index] : boxes[index]));
           if (limits.velocity == null || rate <= limits.velocity) {
-            for (value in actuator.assumptions) if (value.quantity == "speed limit")
-              EngineeringAssumptions.add(limits.assumptions, value.quantity, value.label);
+            for (value in actuator.assumptions) if (value.quantity == "speed limit") EngineeringAssumptions.add(
+              limits.assumptions,
+              value.quantity,
+              value.label
+            );
             var limiter = actuator.rateLimiter();
             if (limiter != "") limits.velocityLimiter = limiter;
           }
@@ -180,8 +193,8 @@ class RobotModel {
       // A drive that cannot carry the steady loads has nothing left to accelerate with.
       if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 0.0);
       var inertia = carriedMass(joint[0]) + joint[0].armature;
-      for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
-        inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
+      for (index in 1...reached.length) for (follower in joints) if (follower.id
+        == reached[index]) inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
       limits.maxAcceleration = tighten(limits.maxAcceleration, force / inertia);
     }
     // A turning joint with no acceleration of its own whose motor is behind a gear train (a filament drive gear: its
@@ -189,8 +202,8 @@ class RobotModel {
     // follows it. A joint its motor turns directly keeps the limits its model gives it.
     if (driven && joint[0].type != JointType.Prismatic && limits.maxAcceleration == null && reached.length > 1) {
       var inertia = turningInertia(joint[0]);
-      for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
-        inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
+      for (index in 1...reached.length) for (follower in joints) if (follower.id
+        == reached[index]) inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
       if (inertia > 0.0 && force > 0.0) limits.maxAcceleration = force / inertia;
     }
     return limits;
@@ -207,11 +220,14 @@ class RobotModel {
         any = true;
         var leader = [for (slot in 0...joints.length) if (joints[slot].id == coupling.leader) slot][0];
         var rate = effective[leader].velocity, accel = effective[leader].maxAcceleration;
-        if (rate == null) hasVelocity = false; else velocity += Math.abs(coupling.ratio) * rate;
-        if (accel == null) hasAcceleration = false; else acceleration += Math.abs(coupling.ratio) * accel;
+        if (rate == null) hasVelocity = false;
+        else velocity += Math.abs(coupling.ratio) * rate;
+        if (accel == null) hasAcceleration = false;
+        else acceleration += Math.abs(coupling.ratio) * accel;
       }
       if (any && hasVelocity && effective[index].velocity == null) effective[index].velocity = velocity;
-      if (any && hasAcceleration && effective[index].maxAcceleration == null) effective[index].maxAcceleration = acceleration;
+      if (any
+        && hasAcceleration && effective[index].maxAcceleration == null) effective[index].maxAcceleration = acceleration;
     }
     for (index in 0...joints.length) {
       joints[index].limits.velocity = effective[index].velocity;
@@ -246,16 +262,14 @@ class RobotModel {
     var load = DriveLoads.basicForAxis(this, joint.id, steady);
     var left = force;
     if (load != null) {
-      for (motor in load.motors)
-        left -= motor.efficiency * motor.drag * Math.abs(motor.ratio);
+      for (motor in load.motors) left -= motor.efficiency * motor.drag * Math.abs(motor.ratio);
       left -= Math.abs(load.gravityForce) + load.friction;
     }
     return left;
   }
 
   /** Mass of the link a joint moves and of everything mounted on it, in kg. */
-  @:allow(robotkit.model.DriveLoads)
-  function carriedMass(joint:Joint):Float {
+  @:allow(robotkit.model.DriveLoads) function carriedMass(joint:Joint):Float {
     var mass = 0.0, frontier = [joint.child], seen:Array<Link> = [];
     while (frontier.length > 0) {
       var link = frontier.pop();
@@ -270,9 +284,8 @@ class RobotModel {
   /** Neutral-configuration inertia of the whole carried subtree about this joint.
       Every descendant contributes its rotated tensor and parallel-axis term.
       Simulation uses the live articulated mass matrix for acceleration feedforward. */
-  @:allow(robotkit.model.DriveLoads)
-  @:allow(robotkit.device.DeviceBinding)
-  @:allow(robotkit.runtime.RobotRuntimeCompiler)
+  @:allow(robotkit
+    .model.DriveLoads) @:allow(robotkit.device.DeviceBinding) @:allow(robotkit.runtime.RobotRuntimeCompiler)
   /**
    * What accelerating `joint` moves, in its own units: for a revolute joint the moment of inertia of everything it
    * carries about its axis (kg m^2), for a prismatic joint the carried mass (kg); armature included.
@@ -280,7 +293,8 @@ class RobotModel {
   public function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
     var childFrame = jointFrame(joint.childFramePosition, joint.childFrameRotation);
-    var axis = childFrame.transformVector(new robotkit.spatial.Vec3(joint.axis[0], joint.axis[1], joint.axis[2])).normalized();
+    var axis = childFrame.transformVector(new robotkit.spatial.Vec3(joint.axis[0],
+      joint.axis[1], joint.axis[2])).normalized();
     var origin = childFrame.translation;
     var frontier = [{link: joint.child, pose: robotkit.spatial.Transform3.identity()}];
     var seen:Array<Link> = [], inertia = joint.armature;
@@ -295,16 +309,34 @@ class RobotModel {
       var offset = entry.pose.transformPoint(new robotkit.spatial.Vec3(center[0], center[1], center[2])).sub(origin);
       var along = offset.dot(axis);
       inertia += entry.link.mass * Math.max(0.0, offset.dot(offset) - along * along);
-      for (next in joints) if (next.parent == entry.link)
-        frontier.push({link: next.child, pose: entry.pose.compose(jointFrame(next.parentFramePosition, next.parentFrameRotation))
-          .compose(jointFrame(next.childFramePosition, next.childFrameRotation).inverse())});
+      for (next in joints) if (next.parent == entry.link) frontier.push({
+        link: next.child,
+        pose: entry.pose.compose(jointFrame(
+          next.parentFramePosition,
+          next.parentFrameRotation
+        )).compose(jointFrame(
+          next.childFramePosition,
+          next.childFrameRotation
+        ).inverse())
+      });
     }
     return inertia;
   }
 
-  static function jointFrame(position:Array<Float>, rotation:Array<Float>):robotkit.spatial.Transform3
-    return new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(position[0], position[1], position[2]),
-      new robotkit.spatial.Quat(rotation[0], rotation[1], rotation[2], rotation[3]));
+  static function jointFrame(position:Array<Float>,
+    rotation:Array<Float>):robotkit.spatial.Transform3 return new robotkit.spatial.Transform3(
+      new robotkit.spatial.Vec3(
+        position[0],
+        position[1],
+        position[2]
+      ),
+      new robotkit.spatial.Quat(
+        rotation[0],
+        rotation[1],
+        rotation[2],
+        rotation[3]
+      )
+    );
 
   public function addSensor(sensor:Sensor):Sensor {
     sensors.push(sensor);
@@ -336,9 +368,9 @@ class RobotModel {
       }
       if (ids.exists(actuator.id)) errors.push('duplicate actuator ID ${actuator.id}');
       ids.set(actuator.id, true);
-      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0)) ||
-          (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)))
-        errors.push('actuator ${actuator.id} has invalid limits');
+      if ((actuator.maxEffort != null && (!Math.isFinite(actuator.maxEffort)
+        || actuator.maxEffort < 0.0)) || (actuator.maxRate != null && (!Math.isFinite(actuator.maxRate)
+        || actuator.maxRate < 0.0))) errors.push('actuator ${actuator.id} has invalid limits');
       if (actuator.transmission == null) {
         errors.push('actuator ${actuator.id} has no transmission');
         continue;
@@ -348,13 +380,16 @@ class RobotModel {
           var found = false;
           for (joint in joints) if (joint.id == jointId) found = true;
           if (!found) errors.push('actuator ${actuator.id} references unknown joint $jointId');
-          if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
-            errors.push('actuator ${actuator.id} has an invalid transmission');
+          if (!Math.isFinite(ratio) || ratio == 0.0
+            || !Math.isFinite(offset)) errors.push('actuator ${actuator.id} has an invalid transmission');
       }
     }
     var switchIds = new Map<String, Bool>();
     for (contact in switches) {
-      if (contact == null) { errors.push("robot has a null switch"); continue; }
+      if (contact == null) {
+        errors.push("robot has a null switch");
+        continue;
+      }
       if (switchIds.exists(contact.id)) errors.push('duplicate switch ID ${contact.id}');
       switchIds.set(contact.id, true);
       var onJoint = false, mounted = false;
@@ -370,25 +405,29 @@ class RobotModel {
     }
     var encoderIds = new Map<String, Bool>();
     for (encoder in encoders) {
-      if (encoder == null) { errors.push("robot has a null encoder"); continue; }
+      if (encoder == null) {
+        errors.push("robot has a null encoder");
+        continue;
+      }
       if (encoderIds.exists(encoder.id)) errors.push('duplicate encoder ID ${encoder.id}');
       encoderIds.set(encoder.id, true);
       var onJoint = false;
       for (joint in joints) if (joint.id == encoder.joint) onJoint = true;
       if (!onJoint) errors.push('encoder ${encoder.id} references unknown joint ${encoder.joint}');
     }
-    for (actuator in actuators)
-      if (actuator != null && actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
-        errors.push('actuator ${actuator.id} references unknown encoder ${actuator.encoder}');
+    for (actuator in actuators) if (actuator != null && actuator.encoder != "" && !encoderIds
+      .exists(actuator.encoder)) errors.push('actuator ${actuator.id} references unknown encoder ${actuator.encoder}');
     var couplingIds = new Map<String, Bool>();
     var pairs = new Map<String, Bool>();
     for (coupling in couplings) {
-      if (coupling == null) { errors.push("robot has a null joint coupling"); continue; }
+      if (coupling == null) {
+        errors.push("robot has a null joint coupling");
+        continue;
+      }
       if (couplingIds.exists(coupling.id)) errors.push('duplicate joint coupling ID ${coupling.id}');
       couplingIds.set(coupling.id, true);
       var pair = coupling.follower + "\n" + coupling.leader;
-      if (pairs.exists(pair))
-        errors.push('joint ${coupling.follower} is coupled to ${coupling.leader} more than once');
+      if (pairs.exists(pair)) errors.push('joint ${coupling.follower} is coupled to ${coupling.leader} more than once');
       pairs.set(pair, true);
       var hasLeader = false, hasFollower = false;
       for (joint in joints) {
@@ -396,13 +435,15 @@ class RobotModel {
         if (joint.id == coupling.follower) hasFollower = true;
       }
       try coupling.validateStiffnessLaw(joints) catch (error:Dynamic) errors.push(Std.string(error));
-      if (!hasLeader || !hasFollower)
-        errors.push('joint coupling ${coupling.id} references an unknown joint');
+      if (!hasLeader || !hasFollower) errors.push('joint coupling ${coupling.id} references an unknown joint');
     }
     var networkIds = new Map<String, Bool>();
     var networkOwners = new Map<String, String>();
     for (network in elasticNetworks) {
-      if (network == null) { errors.push("robot has a null elastic network"); continue; }
+      if (network == null) {
+        errors.push("robot has a null elastic network");
+        continue;
+      }
       if (networkIds.exists(network.id)) errors.push('duplicate elastic network ID ${network.id}');
       networkIds.set(network.id, true);
       try {
@@ -417,8 +458,8 @@ class RobotModel {
     if (cycle != null) errors.push('joint $cycle depends on itself through its couplings');
     if (errors.length == 0) {
       var uncontrolled = DriveLoads.uncontrolledModelAxes(this);
-      if (uncontrolled.length > 0)
-        errors.push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
+      if (uncontrolled.length > 0) errors
+        .push('under-actuated coupled axes: ${uncontrolled.join(", ")}; bind independent motors before solving shared stiffness');
     }
     return errors;
   }

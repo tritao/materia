@@ -6,8 +6,7 @@ class Twist3 {
   public final angular:Vec3;
 
   public function new(linear:Vec3, angular:Vec3) {
-    if (linear == null || angular == null)
-      throw "Twist3 requires linear and angular components";
+    if (linear == null || angular == null) throw "Twist3 requires linear and angular components";
     this.linear = linear;
     this.angular = angular;
   }

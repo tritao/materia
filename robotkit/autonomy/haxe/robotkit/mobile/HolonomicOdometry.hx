@@ -28,17 +28,16 @@ class HolonomicOdometry {
   var previousClock:Null<String> = null;
 
   public function new(wheelJoints:Array<Int>, wheelRadius:Float, baseRadius:Float, ?initialPose:Pose2) {
-    if (wheelJoints == null || wheelJoints.length != 3)
-      throw "Holonomic odometry requires exactly three wheel joint indices";
+    if (wheelJoints == null
+      || wheelJoints.length != 3) throw "Holonomic odometry requires exactly three wheel joint indices";
     var seen = new Map<Int, Bool>();
     for (joint in wheelJoints) {
       if (joint < 0) throw "Holonomic odometry wheel joint indices must be non-negative";
       if (seen.exists(joint)) throw "Holonomic odometry requires three distinct wheel joint indices";
       seen.set(joint, true);
     }
-    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 ||
-        !Math.isFinite(baseRadius) || baseRadius <= 0.0)
-      throw "Holonomic odometry dimensions must be finite and positive";
+    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 || !Math.isFinite(baseRadius)
+      || baseRadius <= 0.0) throw "Holonomic odometry dimensions must be finite and positive";
     this.wheelJoints = wheelJoints.copy();
     this.wheelRadius = wheelRadius;
     this.baseRadius = baseRadius;
@@ -59,8 +58,8 @@ class HolonomicOdometry {
     lastLateralDistance = 0.0;
     lastHeadingChange = 0.0;
     var clockChanged = previousClock != null && previousClock != snapshot.sourceClockId;
-    var timestampRegressed = previousTimestamp != null &&
-      Int64.compare(snapshot.sourceTimestampNs, previousTimestamp) <= 0;
+    var timestampRegressed = previousTimestamp != null && Int64.compare(snapshot.sourceTimestampNs,
+      previousTimestamp) <= 0;
     if (timestampRegressed && !clockChanged) return pose;
     if (previousPositions == null || clockChanged) {
       setBaseline(snapshot, current);

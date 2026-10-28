@@ -9,14 +9,12 @@ class WorkpieceLoad {
   public final flangeTWorkpiece:Transform3;
 
   public function new(id:String, massProperties:MassProperties, flangeTWorkpiece:Transform3) {
-    if (id == null || id.length == 0 || massProperties == null ||
-        massProperties.massKg <= 0 || flangeTWorkpiece == null)
-      throw "Workpiece load requires an id, positive mass and flange pose";
+    if (id == null || id.length == 0 || massProperties == null || massProperties.massKg <= 0
+      || flangeTWorkpiece == null) throw "Workpiece load requires an id, positive mass and flange pose";
     this.id = id;
     this.massProperties = massProperties;
     this.flangeTWorkpiece = flangeTWorkpiece;
   }
 
-  public function atFlange():MassProperties
-    return massProperties.transformed(flangeTWorkpiece);
+  public function atFlange():MassProperties return massProperties.transformed(flangeTWorkpiece);
 }

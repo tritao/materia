@@ -25,11 +25,16 @@ class StandCheck {
     var model = RobotModelCodec.decode(sys.io.File.getBytes(args[0]));
     var pose = Pose.load(args[1], args[2]);
     var seconds = Std.parseFloat(args[3]), period = Std.parseFloat(args[4]);
-    var harness = new SimulationHarness(period, Std.parseInt(args[5]), SimulationSpace.MUJOCO, {
-      integrator: Std.parseInt(args[6]),
-      solverIterations: Std.parseInt(args[7]),
-      lineSearchIterations: Std.parseInt(args[8])
-    });
+    var harness = new SimulationHarness(
+      period,
+      Std.parseInt(args[5]),
+      SimulationSpace.MUJOCO,
+      {
+        integrator: Std.parseInt(args[6]),
+        solverIterations: Std.parseInt(args[7]),
+        lineSearchIterations: Std.parseInt(args[8])
+      }
+    );
     var simulation = harness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     blueprint.observedLimitTolerance = 0.05;
@@ -43,8 +48,14 @@ class StandCheck {
       var actuator = model.actuators[i];
       var gear = actuators.gears[i];
       if (actuator.servoStiffness <= 0.0) continue;
-      hold.push(JointTarget.servo(actuators.joints[i], pose.actuatorTarget(actuator.id) / gear, 0.0,
-        gear * gear * actuator.servoStiffness, gear * gear * actuator.servoDamping, 0.0));
+      hold.push(JointTarget.servo(
+        actuators.joints[i],
+        pose.actuatorTarget(actuator.id) / gear,
+        0.0,
+        gear * gear * actuator.servoStiffness,
+        gear * gear * actuator.servoDamping,
+        0.0
+      ));
     }
     if (hold.length == 0) throw "the model has no actuators with servo gains";
     runtime.submitTargets(hold, 1);
@@ -59,8 +70,8 @@ class StandCheck {
       var q = base.rotation;
       var upZ = 1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1]);
       worstTilt = Math.max(worstTilt, Math.acos(Math.max(-1.0, Math.min(1.0, upZ))));
-      if ((tick + 1) % Std.int(Math.round(1.0 / period)) == 0)
-        Sys.println('t=${(tick + 1) * period}: base height ${base.position[2]}, tilt so far $worstTilt rad');
+      if ((tick + 1) % Std.int(Math.round(1.0 / period))
+        == 0) Sys.println('t=${(tick + 1) * period}: base height ${base.position[2]}, tilt so far $worstTilt rad');
     }
     var finalHeight = simulation.robotPose(0).position[2];
     harness.dispose();

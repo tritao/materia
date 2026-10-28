@@ -32,8 +32,13 @@ class PerceptionTests {
     var design = buildWallSurface();
     var injectedOffset = 0.014;
     var injectedYaw = degToRad(0.3);
-    var trueTransform = new Transform3(new Vec3(0.0, 0.0, injectedOffset),
-      Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), injectedYaw));
+    var trueTransform = new Transform3(
+      new Vec3(0.0, 0.0, injectedOffset),
+      Quat.fromAxisAngle(
+        new Vec3(0.0, 1.0, 0.0),
+        injectedYaw
+      )
+    );
 
     // A modest bow (a much larger one is exercised in testDeviationMapReflectsBow)
     // keeps this test's 1mm/0.05deg recovery tolerance meaningful: the
@@ -44,16 +49,24 @@ class PerceptionTests {
     var result = SurfaceRegistration.register(design, cloud, 7, 500, 0.02);
 
     check(result.accepted, "Registration accepts a small, in-limit correction");
-    check(approx(result.translationCorrection, injectedOffset, 0.001),
-      'Registration recovers the injected offset within 1mm (got ${result.translationCorrection})');
-    check(approx(result.rotationCorrectionRadians, injectedYaw, degToRad(0.05)),
-      'Registration recovers the injected yaw within 0.05deg (got ${radToDeg(result.rotationCorrectionRadians)}deg)');
+    check(
+      approx(result.translationCorrection, injectedOffset, 0.001),
+      'Registration recovers the injected offset within 1mm (got ${result.translationCorrection})'
+    );
+    check(
+      approx(result.rotationCorrectionRadians, injectedYaw, degToRad(0.05)),
+      'Registration recovers the injected yaw within 0.05deg (got ${radToDeg(result.rotationCorrectionRadians)}deg)'
+    );
     check(result.registered != null, "An accepted registration returns a corrected work surface");
     var registered:WorkSurface = cast result.registered;
-    check(registered.provenance.sourceKind == processkit.work.SourceKind.Work,
-      "The registered work surface's provenance is 'work'");
-    check(registered.provenance.designElementId == design.provenance.designElementId,
-      "The registered work surface retains the design element id");
+    check(
+      registered.provenance.sourceKind == processkit.work.SourceKind.Work,
+      "The registered work surface's provenance is 'work'"
+    );
+    check(
+      registered.provenance.designElementId == design.provenance.designElementId,
+      "The registered work surface retains the design element id"
+    );
   }
 
   static function testRansacIgnoresOutliers():Void {
@@ -72,10 +85,14 @@ class PerceptionTests {
     }
 
     var estimate = PlaneFit.fitRansac(points, 5, 500, 0.01, new Vec3(0.0, 0.0, 1.0));
-    check(angleBetween(estimate.normal, new Vec3(0.0, 0.0, 1.0)) < 0.02,
-      "RANSAC recovers the inlier plane's normal despite 20% outliers");
-    check(approx(estimate.offset, trueOffset, 0.003),
-      'RANSAC recovers the inlier plane offset despite 20% outliers (got ${estimate.offset})');
+    check(
+      angleBetween(estimate.normal, new Vec3(0.0, 0.0, 1.0)) < 0.02,
+      "RANSAC recovers the inlier plane's normal despite 20% outliers"
+    );
+    check(
+      approx(estimate.offset, trueOffset, 0.003),
+      'RANSAC recovers the inlier plane offset despite 20% outliers (got ${estimate.offset})'
+    );
     check(estimate.inlierCount >= 76, "RANSAC consensus set covers nearly all 80 inliers, not the 20 outliers");
   }
 
@@ -103,17 +120,18 @@ class PerceptionTests {
     var edgeY = centerY;
 
     check(map.hasSample(centerX, centerY), "Deviation map has a sample near the bow's center");
-    check(map.deviationAt(centerX, centerY) > map.deviationAt(edgeX, edgeY),
-      "Deviation map shows a larger deviation at the bow's center than near the boundary edge");
+    check(
+      map.deviationAt(centerX, centerY) > map.deviationAt(edgeX, edgeY),
+      "Deviation map shows a larger deviation at the bow's center than near the boundary edge"
+    );
     check(map.maxAbsDeviation() > 0.002, "Deviation map's peak deviation reflects the injected bow amplitude");
   }
 
   // -- fixtures and helpers ---------------------------------------------
 
   static function buildWallSurface():WorkSurface {
-    var boundary = new Polygon2([
-      new Point2(0.0, 0.0), new Point2(2.0, 0.0), new Point2(2.0, 2.0), new Point2(0.0, 2.0)
-    ]);
+    var boundary = new Polygon2([new Point2(0.0,
+      0.0), new Point2(2.0, 0.0), new Point2(2.0, 2.0), new Point2(0.0, 2.0)]);
     return new WorkSurface("wall-face", "wall", Transform3.identity(), boundary);
   }
 

@@ -31,9 +31,9 @@ class ScrewdriverContract {
   public static function valid(values:Array<Float>):Bool {
     if (values == null || values.length != SENSOR_COUNT) return false;
     for (value in values) if (!Math.isFinite(value)) return false;
-    return values[TORQUE] >= 0 && values[ANGLE] >= 0 && values[STROKE] >= 0 &&
-      values[PHASE] == Math.floor(values[PHASE]) && values[PHASE] >= IDLE && values[PHASE] <= COMPLETE &&
-      values[RESULT] == Math.floor(values[RESULT]) && values[RESULT] >= NONE && values[RESULT] <= SCREW_LOST &&
-      (values[VACUUM] == 0 || values[VACUUM] == 1);
+    return values[TORQUE] >= 0
+      && values[ANGLE] >= 0 && values[STROKE] >= 0 && values[PHASE] == Math.floor(values[PHASE])
+      && values[PHASE] >= IDLE && values[PHASE] <= COMPLETE && values[RESULT] == Math.floor(values[RESULT])
+      && values[RESULT] >= NONE && values[RESULT] <= SCREW_LOST && (values[VACUUM] == 0 || values[VACUUM] == 1);
   }
 }

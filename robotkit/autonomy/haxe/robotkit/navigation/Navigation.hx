@@ -46,17 +46,21 @@ class Navigation {
   var trajectoryElapsedSeconds:Float = 0.0;
   var commandFilter:Null<Twist2 -> Twist2> = null;
 
-  public function new(base:MobileBase, localization:Localization,
-      ?lookaheadDistance:Float = 0.5, ?cruiseSpeed:Float = 0.5,
-      ?maxAngularSpeed:Float = 1.0, ?allowReverse:Bool = true,
-      ?lookaheadTime:Float = 0.0, ?maxLateralAcceleration:Float = 1.0) {
-    if (base == null || localization == null ||
-        !Math.isFinite(lookaheadDistance) || lookaheadDistance <= 0.0 ||
-        !Math.isFinite(cruiseSpeed) || cruiseSpeed <= 0.0 ||
-        !Math.isFinite(maxAngularSpeed) || maxAngularSpeed <= 0.0 ||
-        !Math.isFinite(lookaheadTime) || lookaheadTime < 0.0 ||
-        !Math.isFinite(maxLateralAcceleration) || maxLateralAcceleration <= 0.0)
-      throw "Navigation requires mobile and localization services with positive limits";
+  public function new(
+    base:MobileBase,
+    localization:Localization,
+    ?lookaheadDistance:Float = 0.5,
+    ?cruiseSpeed:Float = 0.5,
+    ?maxAngularSpeed:Float = 1.0,
+    ?allowReverse:Bool = true,
+    ?lookaheadTime:Float = 0.0,
+    ?maxLateralAcceleration:Float = 1.0
+  ) {
+    if (base == null || localization == null || !Math.isFinite(lookaheadDistance)
+      || lookaheadDistance <= 0.0 || !Math.isFinite(cruiseSpeed) || cruiseSpeed <= 0.0
+      || !Math.isFinite(maxAngularSpeed) || maxAngularSpeed <= 0.0 || !Math.isFinite(lookaheadTime)
+      || lookaheadTime < 0.0 || !Math.isFinite(maxLateralAcceleration) || maxLateralAcceleration
+      <= 0.0) throw "Navigation requires mobile and localization services with positive limits";
     this.base = base;
     this.localization = localization;
     this.lookaheadDistance = lookaheadDistance;
@@ -71,36 +75,29 @@ class Navigation {
    * Starts following a framed polyline; the final waypoint supplies the
    * default goal. Use startDistance to resume on a path after its first pose.
    */
-  public function follow(path:Path, ?goal:NavigationGoal,
-      ?speedLimits:Array<PathSpeedLimit>, ?startDistance:Float):Void {
+  public function follow(path:Path,
+    ?goal:NavigationGoal, ?speedLimits:Array<PathSpeedLimit>, ?startDistance:Float):Void {
     if (path == null) throw "Navigation.follow requires a path";
-    if (startDistance != null && (!Math.isFinite(startDistance) ||
-        startDistance < 0.0 || startDistance > path.length))
-      throw "Navigation start distance must be finite and lie on the path";
-    var target = goal == null
-      ? new NavigationGoal(path.goal(), path.frameId)
-      : goal;
-    if (target.frameId != path.frameId)
-      throw "Navigation goal and path frames must match";
-    var configuredSpeedLimits:Array<PathSpeedLimit> =
-      speedLimits == null ? [] : speedLimits.copy();
+    if (startDistance != null && (!Math.isFinite(startDistance) || startDistance < 0.0
+      || startDistance > path.length)) throw "Navigation start distance must be finite and lie on the path";
+    var target = goal == null ? new NavigationGoal(path.goal(), path.frameId) : goal;
+    if (target.frameId != path.frameId) throw "Navigation goal and path frames must match";
+    var configuredSpeedLimits:Array<PathSpeedLimit> = speedLimits == null ? [] : speedLimits.copy();
     var previousEnd = 0.0;
     for (limit in configuredSpeedLimits) {
-      if (limit == null || limit.startDistanceMeters < previousEnd - 1e-9 ||
-          limit.endDistanceMeters > path.length + 1e-9)
-        throw "Navigation path speed limits must be ordered and fit within the path";
+      if (limit == null || limit.startDistanceMeters < previousEnd - 1e-9 || limit.endDistanceMeters
+        > path.length + 1e-9) throw "Navigation path speed limits must be ordered and fit within the path";
       previousEnd = limit.endDistanceMeters;
     }
     var initialProgress = startDistance == null ? 0.0 : cast startDistance;
     var initialEstimate:Null<LocalizationState> = localization.state();
-    if (startDistance == null && initialEstimate != null &&
-        initialEstimate.referenceFrame == path.frameId) {
+    if (startDistance == null && initialEstimate != null && initialEstimate.referenceFrame == path.frameId) {
       var start = path.start();
       var offsetX = initialEstimate.pose.x - start.x;
       var offsetY = initialEstimate.pose.y - start.y;
       var distanceFromStart = Math.pow(offsetX * offsetX + offsetY * offsetY, 0.5);
-      if (distanceFromStart > lookaheadDistance)
-        initialProgress = path.project(initialEstimate.pose, 0.0).distanceAlongPath;
+      if (distanceFromStart > lookaheadDistance) initialProgress = path.project(initialEstimate.pose,
+        0.0).distanceAlongPath;
     }
     currentPath = path;
     currentSpeedLimits = configuredSpeedLimits;
@@ -108,25 +105,21 @@ class Navigation {
     currentGoal = target;
     progressDistance = initialProgress;
     positionReached = false;
-    lastProjectionPose = initialEstimate == null ||
-      initialEstimate.referenceFrame != path.frameId
-      ? null
-      : new Pose2(initialEstimate.pose.x, initialEstimate.pose.y,
-        initialEstimate.pose.yaw);
+    lastProjectionPose = initialEstimate == null || initialEstimate.referenceFrame != path.frameId ? null : new Pose2(
+      initialEstimate.pose.x,
+      initialEstimate.pose.y,
+      initialEstimate.pose.yaw
+    );
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
     status = Following;
   }
 
   /** Starts tracking a time-parameterized trajectory with pose feedback. */
-  public function followTrajectory(trajectory:Trajectory,
-      ?goal:NavigationGoal):Void {
+  public function followTrajectory(trajectory:Trajectory, ?goal:NavigationGoal):Void {
     if (trajectory == null) throw "Navigation.followTrajectory requires a trajectory";
-    var target = goal == null
-      ? new NavigationGoal(trajectory.goal(), trajectory.frameId)
-      : goal;
-    if (target.frameId != trajectory.frameId)
-      throw "Navigation goal and trajectory frames must match";
+    var target = goal == null ? new NavigationGoal(trajectory.goal(), trajectory.frameId) : goal;
+    if (target.frameId != trajectory.frameId) throw "Navigation goal and trajectory frames must match";
     currentPath = null;
     currentSpeedLimits = [];
     currentTrajectory = trajectory;
@@ -154,13 +147,18 @@ class Navigation {
   /** Runs one control iteration using the localization service's latest state. */
   public function update(durationSeconds:Float):NavigationStatus {
     if (!isFollowing()) return status;
-    if (!Math.isFinite(durationSeconds) || durationSeconds <= 0.0)
-      return fail("Navigation update duration must be finite and positive");
+    if (!Math.isFinite(durationSeconds)
+      || durationSeconds <= 0.0) return fail("Navigation update duration must be finite and positive");
     var estimate = localization.state();
     if (estimate == null) return fail("Navigation has no localization state");
     var state:LocalizationState = cast estimate;
-    if (switch state.quality { case LocalizationQuality.Invalid: true; case _: false; })
-      return fail("Localization quality is invalid");
+    if (switch state.quality {
+      case LocalizationQuality.Invalid:
+        true;
+      case _:
+        false;
+    }
+    ) return fail("Localization quality is invalid");
     var goal:NavigationGoal = cast currentGoal;
     var frameId:String;
     if (currentTrajectory != null) frameId = currentTrajectory.frameId;
@@ -168,8 +166,8 @@ class Navigation {
       var activePath:Path = cast currentPath;
       frameId = activePath.frameId;
     }
-    if (state.referenceFrame != frameId || state.referenceFrame != goal.frameId)
-      return fail('Navigation frame mismatch: state=${state.referenceFrame}, target=$frameId');
+    if (state.referenceFrame != frameId || state.referenceFrame
+      != goal.frameId) return fail('Navigation frame mismatch: state=${state.referenceFrame}, target=$frameId');
 
     var dx = goal.pose.x - state.pose.x;
     var dy = goal.pose.y - state.pose.y;
@@ -179,23 +177,23 @@ class Navigation {
     // travel, and latches once it is close (a quarter of the tolerance), has gone past, or has stopped:
     // braking can carry it on, but must not send it back along the path.
     if (currentTrajectory == null && goalDistance <= goal.positionTolerance && !positionReached) {
-      var ahead = (goal.pose.x - state.pose.x) * Math.cos(state.pose.yaw) + (goal.pose.y - state.pose.y) * Math.sin(state.pose.yaw);
+      var ahead = (goal.pose.x
+        - state.pose.x) * Math.cos(state.pose.yaw) + (goal.pose.y - state.pose.y) * Math.sin(state.pose.yaw);
       var travel = commandedLinearSpeed;
-      if (goalDistance <= 0.25 * goal.positionTolerance || Math.abs(travel) < 1e-3 || ahead * travel <= 0.0)
-        positionReached = true;
+      if (goalDistance <= 0.25 * goal.positionTolerance
+        || Math.abs(travel) < 1e-3 || ahead * travel <= 0.0) positionReached = true;
     }
-    if ((goalDistance <= goal.positionTolerance || positionReached) &&
-        Math.abs(headingError) <= goal.headingTolerance) {
+    if ((goalDistance <= goal.positionTolerance
+      || positionReached) && Math.abs(headingError) <= goal.headingTolerance) {
       base.stop(StopMode.Normal);
       status = Succeeded;
       return status;
     }
     if (currentTrajectory != null) {
       var trajectory:Trajectory = cast currentTrajectory;
-      if (goalDistance <= goal.positionTolerance &&
-          trajectoryElapsedSeconds >= trajectory.durationSeconds) {
-        if (!base.driveModel.supportsInPlaceRotation())
-          return fail("Drive model cannot align final heading in place; include a final approach in the path");
+      if (goalDistance <= goal.positionTolerance && trajectoryElapsedSeconds >= trajectory.durationSeconds) {
+        if (!base.driveModel
+          .supportsInPlaceRotation()) return fail("Drive model cannot align final heading in place; include a final approach in the path");
         var angular = headingError * 2.0;
         if (angular > maxAngularSpeed) angular = maxAngularSpeed;
         if (angular < -maxAngularSpeed) angular = -maxAngularSpeed;
@@ -205,8 +203,8 @@ class Navigation {
     }
 
     if (positionReached) {
-      if (!base.driveModel.supportsInPlaceRotation())
-        return fail("Drive model cannot align final heading in place; include a final approach in the path");
+      if (!base.driveModel
+        .supportsInPlaceRotation()) return fail("Drive model cannot align final heading in place; include a final approach in the path");
       var angular = headingError * 2.0;
       if (angular > maxAngularSpeed) angular = maxAngularSpeed;
       if (angular < -maxAngularSpeed) angular = -maxAngularSpeed;
@@ -218,8 +216,10 @@ class Navigation {
       var start = path.start();
       var startX = state.pose.x - start.x;
       var startY = state.pose.y - start.y;
-      if (Math.pow(startX * startX + startY * startY, 0.5) > lookaheadDistance)
-        progressDistance = path.project(state.pose, 0.0).distanceAlongPath;
+      if (Math.pow(startX * startX + startY * startY, 0.5) > lookaheadDistance) progressDistance = path.project(
+        state.pose,
+        0.0
+      ).distanceAlongPath;
     }
     var maxProgressAdvance = 0.05;
     if (lastProjectionPose != null) {
@@ -234,12 +234,12 @@ class Navigation {
     lastProjectionPose = new Pose2(state.pose.x, state.pose.y, state.pose.yaw);
     progressDistance = projection.distanceAlongPath;
     crossTrackError = projection.crossTrackError;
-    var lookahead = Math.max(lookaheadDistance,
-      Math.abs(commandedLinearSpeed) * lookaheadTime);
+    var lookahead = Math.max(lookaheadDistance, Math.abs(commandedLinearSpeed) * lookaheadTime);
     var atPathEnd = progressDistance >= path.length - 1e-9;
-    var target = atPathEnd && goalDistance > goal.positionTolerance
-      ? goal.pose
-      : path.poseAt(Math.min(path.length, progressDistance + lookahead));
+    var target = atPathEnd && goalDistance > goal.positionTolerance ? goal.pose : path.poseAt(Math.min(
+      path.length,
+      progressDistance + lookahead
+    ));
     var localTarget = target.relativeTo(state.pose);
     var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
     if (distanceSquared < 1e-9) return fail("Path lookahead collapsed at the robot pose");
@@ -252,8 +252,8 @@ class Navigation {
       // Off the final segment, a goal behind the body is a lateral tracking
       // error that a differential base can close by turning and driving
       // forward. Reserve the overshoot rejection for the final path corridor.
-      if (!allowReverse && (Math.abs(crossTrackError) <= goal.positionTolerance || !base.driveModel.supportsInPlaceRotation()))
-        return fail('Navigation passed the path end and reverse motion is disabled; pose=(${state.pose.x}, ${state.pose.y}, ${state.pose.yaw}), goalDistance=$goalDistance, localTarget=(${localTarget.x}, ${localTarget.y}), tangent=${projection.tangentYaw}, crossTrack=$crossTrackError, speed=$commandedLinearSpeed');
+      if (!allowReverse && (Math.abs(crossTrackError) <= goal.positionTolerance || !base.driveModel
+        .supportsInPlaceRotation())) return fail('Navigation passed the path end and reverse motion is disabled; pose=(${state.pose.x}, ${state.pose.y}, ${state.pose.yaw}), goalDistance=$goalDistance, localTarget=(${localTarget.x}, ${localTarget.y}), tangent=${projection.tangentYaw}, crossTrack=$crossTrackError, speed=$commandedLinearSpeed');
       if (allowReverse) direction = -1.0;
     }
     // Brake to stop at the goal itself, not at the edge of its tolerance: the base keeps rolling while
@@ -268,24 +268,29 @@ class Navigation {
       return command(new Twist2(0.0, turn), durationSeconds);
     }
     var remainingDistance = atPathEnd ? goalDistance : Math.min(path.length - progressDistance, goalDistance);
-    var speed = Math.min(Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
-      Math.pow(2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance, 0.5));
+    var speed = Math.min(
+      Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
+      Math.pow(
+        2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance,
+        0.5
+      )
+    );
     for (limit in currentSpeedLimits) {
-      if (progressDistance >= limit.startDistanceMeters - 1e-9 &&
-          progressDistance <= limit.endDistanceMeters + 1e-9) {
+      if (progressDistance >= limit.startDistanceMeters - 1e-9 && progressDistance <= limit.endDistanceMeters + 1e-9) {
         speed = Math.min(speed, limit.maximumSpeedMetersPerSecond);
       } else if (progressDistance < limit.startDistanceMeters) {
         var distanceToLimit = limit.startDistanceMeters - progressDistance;
-        var brakingSpeed = Math.pow(limit.maximumSpeedMetersPerSecond *
-          limit.maximumSpeedMetersPerSecond +
-          2.0 * base.motionLimits.maxLinearAcceleration * distanceToLimit, 0.5);
+        var brakingSpeed = Math.pow(
+          limit.maximumSpeedMetersPerSecond
+          * limit.maximumSpeedMetersPerSecond + 2.0 * base.motionLimits.maxLinearAcceleration * distanceToLimit,
+          0.5
+        );
         speed = Math.min(speed, brakingSpeed);
       }
     }
     if (Math.abs(curvature) > 1e-9) {
       speed = Math.min(speed, maxAngularSpeed / Math.abs(curvature));
-      speed = Math.min(speed,
-        Math.pow(maxLateralAcceleration / Math.abs(curvature), 0.5));
+      speed = Math.min(speed, Math.pow(maxLateralAcceleration / Math.abs(curvature), 0.5));
     }
     speed = Math.min(speed, base.pathSpeed(curvature));
     var linearSpeed = direction * speed;
@@ -326,21 +331,22 @@ class Navigation {
     status = Idle;
   }
 
-  function updateTrajectory(state:LocalizationState, trajectory:Trajectory,
-      durationSeconds:Float):NavigationStatus {
-    trajectoryElapsedSeconds = Math.min(trajectory.durationSeconds,
-      trajectoryElapsedSeconds + durationSeconds);
+  function updateTrajectory(state:LocalizationState, trajectory:Trajectory, durationSeconds:Float):NavigationStatus {
+    trajectoryElapsedSeconds = Math.min(trajectory.durationSeconds, trajectoryElapsedSeconds + durationSeconds);
     var target = trajectory.sampleAt(trajectoryElapsedSeconds);
     var localTarget = target.pose.relativeTo(state.pose);
     var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
     var linear = target.twist.linear + 1.5 * localTarget.x;
-    if (linear > Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed))
-      linear = Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed);
-    if (linear < -Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed))
-      linear = -Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed);
-    var angular = target.twist.angular +
-      2.0 * linear * localTarget.y / Math.max(distanceSquared, 1e-6) +
-      2.0 * Pose2.wrapAngle(target.pose.yaw - state.pose.yaw);
+    if (linear > Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed)) linear = Math.min(
+      cruiseSpeed,
+      base.motionLimits.maxLinearSpeed
+    );
+    if (linear < -Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed)) linear = -Math.min(
+      cruiseSpeed,
+      base.motionLimits.maxLinearSpeed
+    );
+    var angular = target.twist.angular + 2.0 * linear * localTarget.y / Math.max(distanceSquared,
+      1e-6) + 2.0 * Pose2.wrapAngle(target.pose.yaw - state.pose.yaw);
     if (angular > maxAngularSpeed) angular = maxAngularSpeed;
     if (angular < -maxAngularSpeed) angular = -maxAngularSpeed;
     return command(new Twist2(linear, angular), durationSeconds);
@@ -359,14 +365,17 @@ class Navigation {
   }
 
   function fail(message:String):NavigationStatus {
-    try base.stop(StopMode.Normal) catch (_:Dynamic) {}
+    try base.stop(StopMode.Normal) catch (_:Dynamic) {
+    }
     commandedLinearSpeed = 0.0;
     status = Failed(message == null || message.length == 0 ? "Navigation failed" : message);
     return status;
   }
 
   function isFollowing():Bool return switch status {
-    case Following: true;
-    case _: false;
+    case Following:
+      true;
+    case _:
+      false;
   };
 }

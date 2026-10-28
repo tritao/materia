@@ -8,8 +8,7 @@ class SimulationClosure {
   public final anchorParent:Array<Float>;
   public final axisParent:Array<Float>;
 
-  public function new(parentLink:Int, childLink:Int, type:Int,
-      anchorParent:Array<Float>, axisParent:Array<Float>) {
+  public function new(parentLink:Int, childLink:Int, type:Int, anchorParent:Array<Float>, axisParent:Array<Float>) {
     this.parentLink = parentLink;
     this.childLink = childLink;
     this.type = type;

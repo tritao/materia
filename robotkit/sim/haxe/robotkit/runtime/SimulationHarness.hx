@@ -21,8 +21,12 @@ class SimulationHarness {
   public final simulation:Simulation;
   var disposed:Bool = false;
 
-  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1,
-      ?backend:Int = SimulationSpace.DETERMINISTIC, ?solver:SimWorldOptions) {
+  public function new(
+    ?fixedTimestep:Float = 0.01,
+    ?physicsSubsteps:Int = 1,
+    ?backend:Int = SimulationSpace.DETERMINISTIC,
+    ?solver:SimWorldOptions
+  ) {
     space = SimulationSpace.create(backend, fixedTimestep, physicsSubsteps, solver);
     try {
       simulation = Simulation.inSpace(space);
@@ -41,18 +45,15 @@ class SimulationHarness {
       space.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
     } catch (error:Dynamic) {
       var rejected = simulation.rejection();
-      if (rejected != RobotKitRuntimeConstants.RK_OK)
-        throw 'simulation.step failed with RobotKit status $rejected';
+      if (rejected != RobotKitRuntimeConstants.RK_OK) throw 'simulation.step failed with RobotKit status $rejected';
       throw error;
     }
   }
 
-  public function start():Void
-    space.session.start();
+  public function start():Void space.session.start();
 
   /** Stops realtime stepping but leaves the harness available for disposal. */
-  public function stop():Void
-    if (!disposed) space.session.stop();
+  public function stop():Void if (!disposed) space.session.stop();
 
   /** Restores every body and the fixed-step clock to the editable-scene state. */
   public function reset():Void {
@@ -69,8 +70,7 @@ class SimulationHarness {
 
   /** Teleports one robot base while leaving the shared clock untouched.
    * Stops first: the session must be stopped for this edit. */
-  public function teleportRobot(robotIndex:Int, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
+  public function teleportRobot(robotIndex:Int, position:Array<Float>, ?rotation:Array<Float>):Void {
     stop();
     simulation.teleportRobot(robotIndex, position, rotation);
   }
@@ -82,22 +82,48 @@ class SimulationHarness {
   public function spawnPlane(?position:Array<Float>, ?rotation:Array<Float>):SimObject {
     var at = position == null ? [0.0, 0.0, 0.0] : position;
     var facing = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
-    if (at.length != 3 || facing.length != 4)
-      throw "SimulationHarness.spawnPlane requires a three-component position and four-component rotation";
+    if (at.length != 3 || facing.length
+      != 4) throw "SimulationHarness.spawnPlane requires a three-component position and four-component rotation";
     stop();
-    return space.session.createObject(MotionType.Static, SimShape.plane(),
-      new SimPose(at[0], at[1], at[2], facing[0], facing[1], facing[2], facing[3]));
+    return space.session.createObject(
+      MotionType.Static,
+      SimShape.plane(),
+      new SimPose(
+        at[0],
+        at[1],
+        at[2],
+        facing[0],
+        facing[1],
+        facing[2],
+        facing[3]
+      )
+    );
   }
 
   /** Adds a box to the shared physics world and returns its owned session object. */
-  public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
-      ?dynamicBody:Bool = false, ?mass:Float = 1.0, ?orientation:Array<Float>):SimObject {
-    if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)
-      throw "SimulationHarness.spawnBox requires three-component position and extents";
+  public function spawnBox(
+    position:Array<Float>,
+    halfExtents:Array<Float>,
+    ?dynamicBody:Bool = false,
+    ?mass:Float = 1.0,
+    ?orientation:Array<Float>
+  ):SimObject {
+    if (position == null || position.length != 3 || halfExtents == null
+      || halfExtents.length != 3) throw "SimulationHarness.spawnBox requires three-component position and extents";
     stop();
-    return space.session.createObject(dynamicBody ? MotionType.Dynamic : MotionType.Static,
-      SimShape.box(halfExtents[0], halfExtents[1], halfExtents[2]),
-      makePose(position, orientation), dynamicBody ? mass : 0.0);
+    return space.session.createObject(
+      dynamicBody ? MotionType.Dynamic : MotionType.Static,
+      SimShape.box(
+        halfExtents[0],
+        halfExtents[1],
+        halfExtents[2]
+      ),
+      makePose(
+        position,
+        orientation
+      ),
+      dynamicBody ? mass : 0.0
+    );
   }
 
   /** Removes an environment object from the shared scene and physics world. */
@@ -107,14 +133,13 @@ class SimulationHarness {
   }
 
   /** Teleports an environment object and clears its velocity. */
-  public function teleportObject(object:SimObject, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
+  public function teleportObject(object:SimObject, position:Array<Float>, ?rotation:Array<Float>):Void {
     stop();
     object.teleport(makePose(position, rotation));
   }
 
   /** Reads an environment body's latest physics pose. */
-  public function objectPose(object:SimObject):{position:Array<Float>,rotation:Array<Float>} {
+  public function objectPose(object:SimObject): {position: Array<Float>, rotation: Array<Float>} {
     var frame = space.session.capture();
     try {
       var pose = frame.objectPose(object);

@@ -20,9 +20,14 @@ class PointCloud {
   public final sourceClockId:String;
   public final receivedClockId:String;
 
-  public function new(frameId:String, points:Array<Vec3>, sourceTimestampNs:Int64,
-      ?receivedTimestampNs:Int64, ?sourceClockId:String = "unspecified",
-      ?receivedClockId:String = "robotkit.monotonic") {
+  public function new(
+    frameId:String,
+    points:Array<Vec3>,
+    sourceTimestampNs:Int64,
+    ?receivedTimestampNs:Int64,
+    ?sourceClockId:String = "unspecified",
+    ?receivedClockId:String = "robotkit.monotonic"
+  ) {
     if (frameId == null || frameId.length == 0) throw "PointCloud requires a non-empty frame id";
     if (points == null) throw "PointCloud requires a points array";
     this.frameId = frameId;

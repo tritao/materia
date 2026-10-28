@@ -19,13 +19,21 @@ class DeviceTransmission {
     var ratio:Float;
     var offset:Float;
     switch actuator.transmission {
-      case SimpleTransmission(joint, value, zero): target = joint; ratio = value; offset = zero;
+      case SimpleTransmission(joint, value, zero):
+        target = joint;
+        ratio = value;
+        offset = zero;
     }
     function indexOf(id:String):Int {
       for (index in 0...model.joints.length) if (model.joints[index].id == id) return index;
       throw 'Device actuator "${actuator.id}" follows missing joint "$id"';
     }
-    var original:DeviceTransmissionMapping = {jointIndex: indexOf(target), ratio: ratio, offset: offset, singleLeader: false};
+    var original:DeviceTransmissionMapping = {
+      jointIndex: indexOf(target),
+      ratio: ratio,
+      offset: offset,
+      singleLeader: false
+    };
     var visited = new Map<String, Bool>();
     while (true) {
       if (visited.exists(target)) throw 'Device transmission cycle at "$target"';
@@ -40,8 +48,8 @@ class DeviceTransmission {
       // stores a joint-coordinate zero, rather than an actuator-coordinate sum.
       offset = (offset - term.offset) / term.ratio;
       ratio *= term.ratio;
-      if (!Math.isFinite(ratio) || ratio == 0 || !Math.isFinite(offset))
-        throw 'Device transmission for "${actuator.id}" must be finite and nonzero';
+      if (!Math.isFinite(ratio) || ratio == 0
+        || !Math.isFinite(offset)) throw 'Device transmission for "${actuator.id}" must be finite and nonzero';
       target = term.leader;
     }
     return original;

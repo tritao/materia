@@ -22,10 +22,15 @@ class RobotRuntimeCylinderDriveBlueprint {
 
   public function new(joint:Int, cylinder:CylinderDrive) {
     if (cylinder == null) throw "A cylinder process binding needs a cylinder drive";
-    this.joint = joint; this.channelA = cylinder.channelA; this.channelB = cylinder.channelB;
-    this.normallyToA = cylinder.normallyToA; this.extensionForce = cylinder.extensionForce();
-    this.retractionForce = cylinder.retractionForce(); this.extendSign = cylinder.extendSign;
-    this.ratedSpeed = cylinder.ratedSpeed; this.stroke = cylinder.stroke;
+    this.joint = joint;
+    this.channelA = cylinder.channelA;
+    this.channelB = cylinder.channelB;
+    this.normallyToA = cylinder.normallyToA;
+    this.extensionForce = cylinder.extensionForce();
+    this.retractionForce = cylinder.retractionForce();
+    this.extendSign = cylinder.extendSign;
+    this.ratedSpeed = cylinder.ratedSpeed;
+    this.stroke = cylinder.stroke;
     var hydraulic = cylinder.hydraulic();
     this.control = hydraulic == null ? PressureEffort : FlowLimited;
     this.approachSpeed = hydraulic == null ? cylinder.ratedSpeed : hydraulic.approachSpeed;

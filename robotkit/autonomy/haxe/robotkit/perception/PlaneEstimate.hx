@@ -18,7 +18,8 @@ class PlaneEstimate {
     if (normal == null) throw "PlaneEstimate requires a normal";
     if (!Math.isFinite(offset)) throw "PlaneEstimate offset must be finite";
     if (inlierCount < 0) throw "PlaneEstimate inlier count must be non-negative";
-    if (!Math.isFinite(rmsResidual) || rmsResidual < 0.0) throw "PlaneEstimate RMS residual must be finite and non-negative";
+    if (!Math.isFinite(rmsResidual)
+      || rmsResidual < 0.0) throw "PlaneEstimate RMS residual must be finite and non-negative";
     this.normal = normal;
     this.offset = offset;
     this.inlierCount = inlierCount;

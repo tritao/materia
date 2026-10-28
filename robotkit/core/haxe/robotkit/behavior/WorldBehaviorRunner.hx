@@ -29,17 +29,21 @@ class WorldBehaviorRunner {
     return commands.length;
   }
 
-  public function reset():Void { hasObservation = false; lastObservationKey = ""; lastEventOrdinal = Int64.ofInt(0); }
+  public function reset():Void {
+    hasObservation = false;
+    lastObservationKey = "";
+    lastEventOrdinal = Int64.ofInt(0);
+  }
 
   static function observationKey(snapshot:robotkit.core.RobotSnapshot):String {
     var key = '${snapshot.sourceClockId}:${Int64.toStr(snapshot.sourceSequence)}:'
       + '${Int64.toStr(snapshot.sourceTimestampNs)}:${snapshot.receivedClockId}:'
       + Int64.toStr(snapshot.receivedTimestampNs);
-    for (sensor in snapshot.sensors.toArray())
-      key += '|${sensor.sensorId}:${sensor.sourceClockId}:${Int64.toStr(sensor.sequence)}:'
-        + '${Int64.toStr(sensor.sourceTimestampNs)}:${Int64.toStr(sensor.receivedTimestampNs)}';
-    for (stream in snapshot.streamSequences)
-      key += '|${stream.streamId}:${stream.sourceClockId}:${Int64.toStr(stream.sequence)}';
+    for (sensor in snapshot.sensors.toArray()) key +=
+      '|${sensor.sensorId}:${sensor.sourceClockId}:${Int64.toStr(sensor.sequence)}:'
+      + '${Int64.toStr(sensor.sourceTimestampNs)}:${Int64.toStr(sensor.receivedTimestampNs)}';
+    for (stream in snapshot.streamSequences) key +=
+      '|${stream.streamId}:${stream.sourceClockId}:${Int64.toStr(stream.sequence)}';
     return key;
   }
 }

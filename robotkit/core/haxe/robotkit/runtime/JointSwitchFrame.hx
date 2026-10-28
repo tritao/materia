@@ -12,8 +12,8 @@ class JointSwitchFrame {
   public final capturesEdges:Bool;
 
   public function new(frame:SensorFrame) {
-    if (frame == null || frame.kind != "trip_switch" || !valid(frame.values.toArray()))
-      throw "Invalid joint switch frame";
+    if (frame == null
+      || frame.kind != "trip_switch" || !valid(frame.values.toArray())) throw "Invalid joint switch frame";
     this.frame = frame;
     capturesEdges = frame.values.length == 4;
     active = frame.values.get(0) == 1.0;
@@ -27,8 +27,8 @@ class JointSwitchFrame {
     for (value in values) if (!Math.isFinite(value)) return false;
     if (values[0] != 0.0 && values[0] != 1.0) return false;
     if (values.length == 1) return true;
-    if ((values[1] != 0.0 && values[1] != 1.0) || values[3] < 0.0 ||
-        values[3] > 2147483647.0 || values[3] != Std.int(values[3])) return false;
+    if ((values[1] != 0.0 && values[1] != 1.0)
+      || values[3] < 0.0 || values[3] > 2147483647.0 || values[3] != Std.int(values[3])) return false;
     return values[1] == 1.0 ? values[3] > 0.0 : values[3] == 0.0 && values[2] == 0.0;
   }
 }

@@ -23,8 +23,8 @@ class Encoder {
   public final index:Bool;
 
   public function new(id:String, joint:JointId, kind:EncoderKind, countsPerUnit:Float, index:Bool = false) {
-    if (id == null || StringTools.trim(id).length == 0 || joint == null || StringTools.trim(joint).length == 0)
-      throw "An encoder needs an id and a joint";
+    if (id == null || StringTools.trim(id).length == 0
+      || joint == null || StringTools.trim(joint).length == 0) throw "An encoder needs an id and a joint";
     if (kind != EncoderKind.Incremental && kind != EncoderKind.Absolute) throw "An encoder is incremental or absolute";
     if (!(countsPerUnit > 0.0) || !Math.isFinite(countsPerUnit)) throw "An encoder needs a positive finite resolution";
     this.id = id;
@@ -35,12 +35,24 @@ class Encoder {
   }
 
   /** An encoder of `counts` per revolution (quadrature counts, so four times the line count) on a turning joint. */
-  public static function perRevolution(id:String, joint:JointId, kind:EncoderKind, counts:Float, index:Bool = false):Encoder
-    return new Encoder(id, joint, kind, counts / (2.0 * Math.PI), index);
+  public static function perRevolution(id:String,
+    joint:JointId, kind:EncoderKind, counts:Float, index:Bool = false):Encoder return new Encoder(
+      id,
+      joint,
+      kind,
+      counts / (2.0 * Math.PI),
+      index
+    );
 
   /** A linear scale of `counts` per millimetre on a sliding joint. */
-  public static function perMillimetre(id:String, joint:JointId, kind:EncoderKind, counts:Float, index:Bool = false):Encoder
-    return new Encoder(id, joint, kind, counts * 1000.0, index);
+  public static function perMillimetre(id:String,
+    joint:JointId, kind:EncoderKind, counts:Float, index:Bool = false):Encoder return new Encoder(
+      id,
+      joint,
+      kind,
+      counts * 1000.0,
+      index
+    );
 
   /** The size of one count, in joint units. */
   public function resolution():Float return 1.0 / countsPerUnit;

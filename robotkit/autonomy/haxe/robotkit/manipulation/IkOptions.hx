@@ -64,8 +64,12 @@ class IkOptions {
   public var held:Null<Array<Int>> = null;
   public var heldValues:Null<Array<Float>> = null;
 
-  public function new(?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3, ?maxIterations:Int = 100,
-      ?damping:Float = 0.02) {
+  public function new(
+    ?positionTolerance:Float = 1e-4,
+    ?orientationTolerance:Float = 1e-3,
+    ?maxIterations:Int = 100,
+    ?damping:Float = 0.02
+  ) {
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.maxIterations = maxIterations;
@@ -83,8 +87,8 @@ class IkOptions {
 
   /** Prefers an orientation without adding any hard orientation rows. */
   public function preferringOrientation(rotation:Quat, ?weight:Float = 0.05):IkOptions {
-    if (rotation == null || !Math.isFinite(weight) || weight <= 0)
-      throw "IK orientation preference needs a rotation and positive finite weight";
+    if (rotation == null || !Math.isFinite(weight)
+      || weight <= 0) throw "IK orientation preference needs a rotation and positive finite weight";
     orientationPreference = rotation;
     orientationPreferenceWeight = weight;
     return this;
@@ -126,8 +130,7 @@ class IkOptions {
 
   /** Holds the group DOFs `indices` (in `q` order) at `values` while the rest solve. Returns this. */
   public function holding(indices:Array<Int>, values:Array<Float>):IkOptions {
-    if (indices == null || values == null || indices.length != values.length)
-      throw "Held DOFs need one value each";
+    if (indices == null || values == null || indices.length != values.length) throw "Held DOFs need one value each";
     held = indices.copy();
     heldValues = values.copy();
     return this;

@@ -31,20 +31,24 @@ class DifferentialDrivePlant {
   /** Base height, preserved while the plant drives the planar pose. */
   public var baseHeight(get, never):Float;
 
-  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase,
-      ?initialPose:Pose2) {
-    if (harness == null || robotIndex < 0 || base == null)
-      throw "Differential-drive plant requires a simulation, robot index, and mobile base";
+  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase, ?initialPose:Pose2) {
+    if (harness == null || robotIndex < 0
+      || base == null) throw "Differential-drive plant requires a simulation, robot index, and mobile base";
     var odometry = base.driveModel.createOdometry();
-    if (odometry == null)
-      throw "Differential-drive plant requires a differential drive model";
+    if (odometry == null) throw "Differential-drive plant requires a differential drive model";
     this.harness = harness;
     this.simulation = harness.simulation;
     this.robotIndex = robotIndex;
     this.base = base;
-    simulation.setDifferentialDrive(robotIndex, odometry.leftWheelJoint,
-      odometry.rightWheelJoint, odometry.wheelRadius, odometry.trackWidth,
-      odometry.leftDirection, odometry.rightDirection);
+    simulation.setDifferentialDrive(
+      robotIndex,
+      odometry.leftWheelJoint,
+      odometry.rightWheelJoint,
+      odometry.wheelRadius,
+      odometry.trackWidth,
+      odometry.leftDirection,
+      odometry.rightDirection
+    );
     if (initialPose != null) teleport(initialPose);
   }
 
@@ -66,7 +70,7 @@ class DifferentialDrivePlant {
   }
 
   /** Wheel rates, in rad/s, the robot applied during the latest step. */
-  public function appliedWheelRates():{left:Float, right:Float} {
+  public function appliedWheelRates(): {left: Float, right: Float} {
     var state = simulation.differentialDriveState(robotIndex);
     return {left: state.leftWheelRate, right: state.rightWheelRate};
   }
@@ -76,6 +80,5 @@ class DifferentialDrivePlant {
     return new Pose2(state.x, state.y, state.yaw);
   }
 
-  function get_baseHeight():Float
-    return simulation.differentialDriveState(robotIndex).height;
+  function get_baseHeight():Float return simulation.differentialDriveState(robotIndex).height;
 }

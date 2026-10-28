@@ -1,8 +1,7 @@
 package robotkit.protocol;
 
 /** Logical reference to a RobotFrame attachment. */
-@:wire
-class BufferRef {
+@:wire class BufferRef {
   @:id(1) public var attachment:Int;
   @:id(2) public var offset:Int;
   @:id(3) public var length:Int;

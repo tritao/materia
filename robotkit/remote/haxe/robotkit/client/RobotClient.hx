@@ -46,13 +46,13 @@ class RobotClient {
   public var capabilities:Null<RobotCapabilities> = null;
   public var latestState:Null<RobotStateMsg> = null;
   public var lastFault:Null<Fault> = null;
-  public var stateListener:Null<RobotStateMsg->Void> = null;
-  public var faultListener:Null<Fault->Void> = null;
-  public var sensorListener:Null<SensorFrameMsg->Void> = null;
-  public var cameraListener:Null<CameraFrameData->Void> = null;
-  public var imageDetectionListener:Null<ImageDetectionObservationMsg->Void> = null;
+  public var stateListener:Null<RobotStateMsg -> Void> = null;
+  public var faultListener:Null<Fault -> Void> = null;
+  public var sensorListener:Null<SensorFrameMsg -> Void> = null;
+  public var cameraListener:Null<CameraFrameData -> Void> = null;
+  public var imageDetectionListener:Null<ImageDetectionObservationMsg -> Void> = null;
   public var subscribeObservations:Bool = false;
-  public var statusListener:Null<Void->Void> = null;
+  public var statusListener:Null<Void -> Void> = null;
   /** Add camera before connect when full images are needed. */
   public var subscribeCamera:Null<Bool> = null;
   public var sensorMaxRateHz:Float = 0.0;
@@ -74,7 +74,11 @@ class RobotClient {
   var failure:Null<String> = null;
   var closed:Bool = false;
 
-  public function new(?clientName:String = "materia", ?requestedRole:String = "controller", ?credentials:robotkit.auth.ClientCredentials) {
+  public function new(
+    ?clientName:String = "materia",
+    ?requestedRole:String = "controller",
+    ?credentials:robotkit.auth.ClientCredentials
+  ) {
     this.credentials = credentials;
     this.clientName = clientName;
     this.requestedRole = requestedRole;
@@ -85,14 +89,12 @@ class RobotClient {
     return credentials;
   }
 
-  public function subscriptionLocked():Bool
-    return subscription != null || nativeRuntime != null || owned != null;
+  public function subscriptionLocked():Bool return subscription != null || nativeRuntime != null || owned != null;
 
   /** Connects to robotd and starts the NativeKit event subscription. */
   public function connect(host:String, port:Int):Void {
     requireCredentials();
-    if (subscription != null || nativeRuntime != null || owned != null)
-      throw "RobotKit client is already connected";
+    if (subscription != null || nativeRuntime != null || owned != null) throw "RobotKit client is already connected";
     closed = false;
     failure = null;
     stream = new RobotFrameStream();
@@ -117,8 +119,7 @@ class RobotClient {
       transport = connectedTransport.borrow();
       subscription = runtime.events.listen(onEvent);
     } catch (error:Dynamic) {
-      if (connection != null)
-        connection.close();
+      if (connection != null) connection.close();
       nativeRuntime = null;
       eventPump = null;
       owned = null;
@@ -137,10 +138,8 @@ class RobotClient {
    */
   public function connectWithEvents(host:String, port:Int, events:NativeKitEvents):Void {
     requireCredentials();
-    if (events == null)
-      throw "RobotKit client requires a NativeKit event pump";
-    if (subscription != null || nativeRuntime != null || owned != null)
-      throw "RobotKit client is already connected";
+    if (events == null) throw "RobotKit client requires a NativeKit event pump";
+    if (subscription != null || nativeRuntime != null || owned != null) throw "RobotKit client is already connected";
     closed = false;
     failure = null;
     stream = new RobotFrameStream();
@@ -163,8 +162,7 @@ class RobotClient {
       transport = connectedTransport.borrow();
       subscription = events.listen(onEvent);
     } catch (error:Dynamic) {
-      if (connection != null)
-        connection.close();
+      if (connection != null) connection.close();
       eventPump = null;
       owned = null;
       transport = null;
@@ -176,11 +174,9 @@ class RobotClient {
   /** Pumps all currently queued NativeKit events and reports whether any ran. */
   public function poll():Bool {
     var events = eventPump;
-    if (events == null)
-      throw "RobotKit client is not connected";
+    if (events == null) throw "RobotKit client is not connected";
     var hadEvent = false;
-    while (events.poll())
-      hadEvent = true;
+    while (events.poll()) hadEvent = true;
     renewControlLeaseIfDue();
     raiseFailure();
     return hadEvent;
@@ -189,8 +185,7 @@ class RobotClient {
   /** Waits for transport activity; call poll() afterwards to dispatch it. */
   public function wait(timeoutSeconds:Float):Void {
     var events = eventPump;
-    if (events == null)
-      throw "RobotKit client is not connected";
+    if (events == null) throw "RobotKit client is not connected";
     renewControlLeaseIfDue();
     var effectiveTimeout = timeoutSeconds;
     if (Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) > 0) {
@@ -203,65 +198,68 @@ class RobotClient {
     renewControlLeaseIfDue();
   }
 
-  public function isConnected():Bool
-    return connected && !closed;
+  public function isConnected():Bool return connected && !closed;
 
-  public function isReady():Bool
-    return isConnected() && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
+  public function isReady():Bool return isConnected() && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
 
-  public function hasControlLease():Bool
-    return isReady() && welcome != null && welcome.controlGranted;
+  public function hasControlLease():Bool return isReady() && welcome != null && welcome.controlGranted;
 
   /** Sends one joint target through the batch command protocol. */
   /** Requires the authenticated deployment grant; the host must have no active controller. */
   public function requestDeployment(name:String):Void {
     if (!isReady()) throw "RobotKit client is not ready";
     var current = welcome;
-    if (current == null || current.permissions.indexOf("deployment") < 0)
-      throw "RobotKit identity cannot change deployment";
+    if (current == null
+      || current.permissions.indexOf("deployment") < 0) throw "RobotKit identity cannot change deployment";
     if (name == null || name.length == 0) throw "Deployment name is required";
     raiseFailure();
-    send(new RobotFrame(RobotMessageType.DeploymentChange,
-      MessagePack.encode(new robotkit.protocol.DeploymentChange(name)), 0, null,
-      sessionId, nextCommandSequence()));
+    send(new RobotFrame(
+      RobotMessageType.DeploymentChange,
+      MessagePack.encode(new robotkit.protocol.DeploymentChange(name)),
+      0,
+      null,
+      sessionId,
+      nextCommandSequence()
+    ));
   }
 
-  public function sendJointTarget(joint:Int, mode:Int, target:Float,
-      ?expiryNs:Int64):Int64 {
+  public function sendJointTarget(joint:Int, mode:Int, target:Float, ?expiryNs:Int64):Int64 {
     var targetMode = switch mode {
-      case 1: robotkit.core.JointTargetMode.Position;
-      case 2: robotkit.core.JointTargetMode.Velocity;
-      case 3: robotkit.core.JointTargetMode.Effort;
-      case _: throw 'Unsupported joint target mode $mode';
+      case 1:
+        robotkit.core.JointTargetMode.Position;
+      case 2:
+        robotkit.core.JointTargetMode.Velocity;
+      case 3:
+        robotkit.core.JointTargetMode.Effort;
+      case _:
+        throw 'Unsupported joint target mode $mode';
     };
-    return sendJointTargets([new robotkit.core.JointTarget(joint, targetMode, target)],
-      expiryNs);
+    return sendJointTargets([new robotkit.core.JointTarget(joint, targetMode, target)], expiryNs);
   }
 
   /** Sends a complete position/velocity/effort batch as one protocol frame. */
-  public function sendJointTargets(targets:Array<robotkit.core.JointTarget>,
-      ?expiryNs:Int64):Int64 {
+  public function sendJointTargets(targets:Array<robotkit.core.JointTarget>, ?expiryNs:Int64):Int64 {
     ensureReady();
     // Monotonic clocks on different hosts have no shared epoch.
-    if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
-      throw "Remote absolute deadlines require clock synchronization";
+    if (expiryNs != null && Int64.compare(expiryNs,
+      Int64.ofInt(0)) != 0) throw "Remote absolute deadlines require clock synchronization";
     var batch = robotkit.core.JointTarget.copyBatch(targets);
-    for (target in batch)
-      if (target.mode == robotkit.core.JointTargetMode.Servo)
-        throw "Servo joint targets are not carried by the robotd protocol yet";
+    for (target in batch) if (target.mode
+      == robotkit.core.JointTargetMode.Servo) throw "Servo joint targets are not carried by the robotd protocol yet";
     var sequence = nextCommandSequence();
     var wireTargets:Array<JointTargetValue> = [];
-    for (target in batch) wireTargets.push(new JointTargetValue(target.joint,
-      switch target.mode {
-        case robotkit.core.JointTargetMode.Position: 1;
-        case robotkit.core.JointTargetMode.Velocity: 2;
-        case robotkit.core.JointTargetMode.Effort: 3;
-        case robotkit.core.JointTargetMode.Servo: throw "unreachable";
-      }, target.target));
-    var value = new JointTargets(robotId(), wireTargets, sequence,
-      expiryNs == null ? Int64.ofInt(0) : expiryNs);
-    send(RobotProtocol.jointTargets(value, sessionId, sequence,
-      NativeKit.nk_time_now_ns()));
+    for (target in batch) wireTargets.push(new JointTargetValue(target.joint, switch target.mode {
+      case robotkit.core.JointTargetMode.Position:
+        1;
+      case robotkit.core.JointTargetMode.Velocity:
+        2;
+      case robotkit.core.JointTargetMode.Effort:
+        3;
+      case robotkit.core.JointTargetMode.Servo:
+        throw "unreachable";
+    }, target.target));
+    var value = new JointTargets(robotId(), wireTargets, sequence, expiryNs == null ? Int64.ofInt(0) : expiryNs);
+    send(RobotProtocol.jointTargets(value, sessionId, sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 
@@ -269,16 +267,19 @@ class RobotClient {
     ensureReady();
     var sequence = nextCommandSequence();
     var value = new Stop(robotId(), reason, emergency);
-    send(RobotProtocol.stop(value, sessionId, sequence,
-      NativeKit.nk_time_now_ns()));
+    send(RobotProtocol.stop(value, sessionId, sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 
   public function submitPlan(plan:robotkit.execution.ExecutionPlanSubmission):Int64 {
     ensureReady();
     var sequence = nextCommandSequence();
-    send(RobotProtocol.planSubmission(PlanSubmission.fromWorld(robotId(), plan),
-      sessionId, sequence, NativeKit.nk_time_now_ns()));
+    send(RobotProtocol.planSubmission(
+      PlanSubmission.fromWorld(robotId(), plan),
+      sessionId,
+      sequence,
+      NativeKit.nk_time_now_ns()
+    ));
     return sequence;
   }
 
@@ -289,8 +290,8 @@ class RobotClient {
   function sendPathControl(action:Int):Int64 {
     ensureReady();
     var sequence = nextCommandSequence();
-    send(RobotProtocol.pathControl(new PathControl(robotId(), action),
-      sessionId, sequence, NativeKit.nk_time_now_ns()));
+    send(RobotProtocol.pathControl(new PathControl(robotId(),
+      action), sessionId, sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 
@@ -298,33 +299,28 @@ class RobotClient {
   public function resetSafety(?reason:String = "application acknowledged safety stop"):Int64 {
     ensureReady();
     var sequence = nextCommandSequence();
-    send(RobotProtocol.safetyReset(new SafetyReset(robotId(), reason), sessionId,
-      sequence, NativeKit.nk_time_now_ns()));
+    send(RobotProtocol.safetyReset(new SafetyReset(robotId(),
+      reason), sessionId, sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 
   public function close():Void {
-    if (closed)
-      return;
+    if (closed) return;
     closed = true;
     connected = false;
     var statusChanged = statusListener;
-    if (statusChanged != null)
-      statusChanged();
+    if (statusChanged != null) statusChanged();
     var currentSubscription = subscription;
     subscription = null;
-    if (currentSubscription != null)
-      currentSubscription.dispose();
+    if (currentSubscription != null) currentSubscription.dispose();
     var currentOwned = owned;
     owned = null;
     transport = null;
-    if (currentOwned != null)
-      currentOwned.close();
+    if (currentOwned != null) currentOwned.close();
     var runtime = nativeRuntime;
     nativeRuntime = null;
     eventPump = null;
-    if (runtime != null)
-      runtime.dispose();
+    if (runtime != null) runtime.dispose();
   }
 
   function onEvent(value:NativeKitEventValue):Void {
@@ -335,17 +331,25 @@ class RobotClient {
           if (kind == EventKind.TransportConnected) {
             connected = true;
             var statusChanged = statusListener;
-            if (statusChanged != null)
-              statusChanged();
+            if (statusChanged != null) statusChanged();
             var requested = [new StreamSubscription("essential")];
             if (subscribeSensors) requested.push(new StreamSubscription("sensor", sensorMaxRateHz));
-            if (subscribeCamera == true || (subscribeCamera == null && cameraListener != null))
-              requested.push(new StreamSubscription("camera", cameraMaxRateHz));
-            if (subscribeObservations)
-              requested.push(new StreamSubscription("observation"));
+            if (subscribeCamera == true
+              || (subscribeCamera == null && cameraListener != null)) requested.push(new StreamSubscription(
+                "camera",
+                cameraMaxRateHz
+              ));
+            if (subscribeObservations) requested.push(new StreamSubscription("observation"));
             var authenticated = requireCredentials();
-            send(RobotProtocol.hello(new Hello(RobotFrame.VERSION, clientName, "robotkit-v3",
-              requestedRole, requested, authenticated.identity, authenticated.token)));
+            send(RobotProtocol.hello(new Hello(
+              RobotFrame.VERSION,
+              clientName,
+              "robotkit-v3",
+              requestedRole,
+              requested,
+              authenticated.identity,
+              authenticated.token
+            )));
           } else if (kind == EventKind.TransportData) {
             receive(currentTransport);
           } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
@@ -353,8 +357,7 @@ class RobotClient {
             failure = "robotd closed the TCP connection";
             resetLeaseRenewal();
             var statusChanged = statusListener;
-            if (statusChanged != null)
-              statusChanged();
+            if (statusChanged != null) statusChanged();
           }
         }
       case _:
@@ -371,25 +374,28 @@ class RobotClient {
 
   function renewControlLeaseIfDue():Void {
     var currentWelcome = welcome;
-    if (!connected || closed || currentWelcome == null || !currentWelcome.controlGranted ||
-        Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) <= 0 ||
-        Int64.compare(nextLeaseRenewalNs, Int64.ofInt(0)) <= 0)
-      return;
+    if (!connected || closed || currentWelcome == null || !currentWelcome.controlGranted || Int64.compare(
+      leaseRenewalIntervalNs,
+      Int64.ofInt(0)
+    ) <= 0 || Int64.compare(
+      nextLeaseRenewalNs,
+      Int64.ofInt(0)
+    ) <= 0) return;
     var now = NativeKit.nk_time_now_ns();
-    if (Int64.compare(now, nextLeaseRenewalNs) < 0)
-      return;
-    send(RobotProtocol.controlHeartbeat(new ControlHeartbeat(currentWelcome.robotId,
-      currentWelcome.leaseId), sessionId, now));
+    if (Int64.compare(now, nextLeaseRenewalNs) < 0) return;
+    send(RobotProtocol.controlHeartbeat(
+      new ControlHeartbeat(currentWelcome.robotId, currentWelcome.leaseId),
+      sessionId,
+      now
+    ));
     nextLeaseRenewalNs = Int64.add(now, leaseRenewalIntervalNs);
   }
 
   function receive(currentTransport:TransportHandle):Void {
     while (true) {
       var data = NativeTransport.receive(currentTransport);
-      if (data.length == 0)
-        return;
-      for (frame in stream.push(data))
-        handleFrame(frame);
+      if (data.length == 0) return;
+      for (frame in stream.push(data)) handleFrame(frame);
     }
   }
 
@@ -411,53 +417,40 @@ class RobotClient {
         var intervalMs = Std.int(value.leaseTimeoutMs / 3);
         if (intervalMs < 1) intervalMs = 1;
         leaseRenewalIntervalNs = Int64.fromFloat(intervalMs * 1000000.0);
-        nextLeaseRenewalNs = Int64.add(NativeKit.nk_time_now_ns(),
-          leaseRenewalIntervalNs);
+        nextLeaseRenewalNs = Int64.add(NativeKit.nk_time_now_ns(), leaseRenewalIntervalNs);
       }
     case RobotMessageType.RobotDescription:
-      if (!validSession(frame))
-        return;
+      if (!validSession(frame)) return;
       description = RobotProtocol.decodeDescription(frame);
     case RobotMessageType.RobotCapabilities:
-      if (!validSession(frame))
-        return;
+      if (!validSession(frame)) return;
       capabilities = RobotProtocol.decodeCapabilities(frame);
     case RobotMessageType.RobotState:
       var value = RobotProtocol.decodeState(frame);
-      if (Int64.compare(frame.sessionId, sessionId) != 0)
-        return;
-      if (hasState && Int64.compare(value.sequence, lastStateSequence) <= 0)
-        return;
+      if (Int64.compare(frame.sessionId, sessionId) != 0) return;
+      if (hasState && Int64.compare(value.sequence, lastStateSequence) <= 0) return;
       hasState = true;
       lastStateSequence = value.sequence;
       latestState = value;
       var listener = stateListener;
-      if (listener != null)
-        listener(value);
+      if (listener != null) listener(value);
     case RobotMessageType.Fault:
-      if (welcome != null && !validSession(frame))
-        return;
+      if (welcome != null && !validSession(frame)) return;
       var value = RobotProtocol.decodeFault(frame);
       lastFault = value;
       var listener = faultListener;
-      if (listener != null)
-        listener(value);
-      if (value.fatal)
-        failure = value.message;
+      if (listener != null) listener(value);
+      if (value.fatal) failure = value.message;
     case RobotMessageType.SensorFrame:
-      if (!validSession(frame))
-        return;
+      if (!validSession(frame)) return;
       var sensor = RobotProtocol.decodeSensorFrame(frame);
       var listener = sensorListener;
-      if (listener != null)
-        listener(sensor);
+      if (listener != null) listener(sensor);
     case RobotMessageType.CameraFrame:
-      if (!validSession(frame))
-        return;
+      if (!validSession(frame)) return;
       var camera = RobotProtocol.decodeCameraFrame(frame);
       var listener = cameraListener;
-      if (listener != null)
-        listener(camera);
+      if (listener != null) listener(camera);
     case RobotMessageType.ImageDetectionObservation:
       if (!validSession(frame)) return;
       var observation = RobotProtocol.decodeImageDetectionObservation(frame);
@@ -473,34 +466,30 @@ class RobotClient {
 
   function robotId():Int64 {
     var value = welcome;
-    if (value == null)
-      throw "RobotKit client has not received Welcome";
+    if (value == null) throw "RobotKit client has not received Welcome";
     return value.robotId;
   }
 
-  function validSession(frame:RobotFrame):Bool
-    return Int64.compare(frame.sessionId, sessionId) == 0
-      && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
+  function validSession(frame:RobotFrame):Bool return Int64.compare(frame.sessionId, sessionId) == 0 && Int64.compare(
+    sessionId,
+    Int64.ofInt(0)
+  ) != 0;
 
   function ensureReady():Void {
-    if (!isReady())
-      throw "RobotKit client is not ready; wait for Welcome first";
-    if (!hasControlLease())
-      throw "RobotKit client does not hold the control lease";
+    if (!isReady()) throw "RobotKit client is not ready; wait for Welcome first";
+    if (!hasControlLease()) throw "RobotKit client does not hold the control lease";
     raiseFailure();
     renewControlLeaseIfDue();
   }
 
   function raiseFailure():Void {
     var value = failure;
-    if (value != null)
-      throw value;
+    if (value != null) throw value;
   }
 
   function send(frame:RobotFrame):Void {
     var currentTransport = transport;
-    if (currentTransport == null)
-      throw "RobotKit client is not connected";
+    if (currentTransport == null) throw "RobotKit client is not connected";
     NativeTransport.send(currentTransport, frame.encode());
   }
 }

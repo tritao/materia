@@ -6,8 +6,7 @@ class SkillResult {
   public final message:String;
 
   public function new(status:SkillStatus, message:String) {
-    if (status == null || message == null)
-      throw "Skill result requires a status and message";
+    if (status == null || message == null) throw "Skill result requires a status and message";
     this.status = status;
     this.message = message;
   }

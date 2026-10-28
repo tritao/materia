@@ -7,16 +7,15 @@ class ForkAxisConfig {
   public final maximum:Float;
 
   public function new(jointName:String, minimum:Float, maximum:Float) {
-    if (jointName == null || jointName.length == 0 ||
-        !Math.isFinite(minimum) || !Math.isFinite(maximum) || minimum > maximum)
-      throw "Fork axis requires a joint name and finite ordered limits";
+    if (jointName == null || jointName.length == 0 || !Math.isFinite(minimum) || !Math.isFinite(maximum)
+      || minimum > maximum) throw "Fork axis requires a joint name and finite ordered limits";
     this.jointName = jointName;
     this.minimum = minimum;
     this.maximum = maximum;
   }
 
   public function validate(target:Float):Void {
-    if (!Math.isFinite(target) || target < minimum || target > maximum)
-      throw 'Fork target $target is outside [$minimum, $maximum] for $jointName';
+    if (!Math.isFinite(target) || target < minimum
+      || target > maximum) throw 'Fork target $target is outside [$minimum, $maximum] for $jointName';
   }
 }

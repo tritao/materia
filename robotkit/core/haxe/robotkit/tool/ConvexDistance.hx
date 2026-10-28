@@ -50,7 +50,8 @@ class ConvexDistance {
           bestB = i;
         }
       }
-      var wx = a[3 * bestA] - b[3 * bestB], wy = a[3 * bestA + 1] - b[3 * bestB + 1], wz = a[3 * bestA + 2] - b[3 * bestB + 2];
+      var wx = a[3 * bestA] - b[3 * bestB],
+        wy = a[3 * bestA + 1] - b[3 * bestB + 1], wz = a[3 * bestA + 2] - b[3 * bestB + 2];
       var vw = vx * wx + vy * wy + vz * wz;
       // v.w is the least v.p over the difference: when it is positive, the plane through w square to v separates the hulls.
       if (vw > 0.0) {
@@ -74,10 +75,14 @@ class ConvexDistance {
   /** The nearest point to the origin of the simplex of one to four points. */
   static function nearest(p:Array<Array<Float>>):Nearest {
     return switch p.length {
-      case 1: {x: p[0][0], y: p[0][1], z: p[0][2], keep: [0], inside: false};
-      case 2: segment(p[0], p[1], 0, 1);
-      case 3: triangle(p[0], p[1], p[2], 0, 1, 2);
-      case _: tetrahedron(p);
+      case 1:
+        {x: p[0][0], y: p[0][1], z: p[0][2], keep: [0], inside: false};
+      case 2:
+        segment(p[0], p[1], 0, 1);
+      case 3:
+        triangle(p[0], p[1], p[2], 0, 1, 2);
+      case _:
+        tetrahedron(p);
     };
   }
 
@@ -113,12 +118,24 @@ class ConvexDistance {
     var va = d3 * d6 - d5 * d4;
     if (va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0) {
       var w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-      return {x: b[0] + (c[0] - b[0]) * w, y: b[1] + (c[1] - b[1]) * w, z: b[2] + (c[2] - b[2]) * w, keep: [ib, ic], inside: false};
+      return {
+        x: b[0] + (c[0] - b[0]) * w,
+        y: b[1] + (c[1] - b[1]) * w,
+        z: b[2] + (c[2] - b[2]) * w,
+        keep: [ib, ic],
+        inside: false
+      };
     }
     var denominator = va + vb + vc;
     if (!(Math.abs(denominator) > 1e-30)) return {x: a[0], y: a[1], z: a[2], keep: [ia], inside: false};
     var v = vb / denominator, w = vc / denominator;
-    return {x: a[0] + abx * v + acx * w, y: a[1] + aby * v + acy * w, z: a[2] + abz * v + acz * w, keep: [ia, ib, ic], inside: false};
+    return {
+      x: a[0] + abx * v + acx * w,
+      y: a[1] + aby * v + acy * w,
+      z: a[2] + abz * v + acz * w,
+      keep: [ia, ib, ic],
+      inside: false
+    };
   }
 
   /** The nearest point of a tetrahedron to the origin: zero (inside) when no face has the origin outside it, else the nearest of those faces (of all four when it is flat). */

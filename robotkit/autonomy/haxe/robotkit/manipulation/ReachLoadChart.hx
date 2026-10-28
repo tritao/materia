@@ -11,8 +11,8 @@ class ReachLoadChart implements RobotLoadChart {
     if (bands == null || bands.length == 0) throw "Reach load chart requires bands";
     var previous = 0.0;
     for (band in bands) {
-      if (band == null || band.maxReachMeters <= previous)
-        throw "Reach load chart bands must have strictly increasing reaches";
+      if (band == null
+        || band.maxReachMeters <= previous) throw "Reach load chart bands must have strictly increasing reaches";
       previous = band.maxReachMeters;
     }
     this.bands = bands.copy();

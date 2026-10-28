@@ -19,10 +19,16 @@ class RobotRuntimeIdentity {
   final collisions:Array<Null<String>>;
   public final collisionApproximation:CollisionApproximation;
 
-  public function new(links:Array<LinkId>, joints:Array<JointId>, sensors:Array<SensorId>,
-      ?frames:Array<FrameId>, ?frameLinks:Array<LinkId>,
-      ?visuals:Array<Null<String>>, ?collisions:Array<Null<String>>,
-      ?collisionApproximation:CollisionApproximation) {
+  public function new(
+    links:Array<LinkId>,
+    joints:Array<JointId>,
+    sensors:Array<SensorId>,
+    ?frames:Array<FrameId>,
+    ?frameLinks:Array<LinkId>,
+    ?visuals:Array<Null<String>>,
+    ?collisions:Array<Null<String>>,
+    ?collisionApproximation:CollisionApproximation
+  ) {
     this.links = links.copy();
     this.joints = joints.copy();
     this.sensors = sensors.copy();
@@ -30,26 +36,24 @@ class RobotRuntimeIdentity {
     this.frameLinks = frameLinks == null ? [] : frameLinks.copy();
     this.visuals = visuals == null ? [] : visuals.copy();
     this.collisions = collisions == null ? [] : collisions.copy();
-    this.collisionApproximation = collisionApproximation == null ? CollisionApproximation.BoundsBox : collisionApproximation;
+    this.collisionApproximation = collisionApproximation
+      == null ? CollisionApproximation.BoundsBox : collisionApproximation;
   }
 
-  public function linkId(index:Int):Null<LinkId>
-    return index < 0 || index >= links.length ? null : links[index];
-  public function jointId(index:Int):Null<JointId>
-    return index < 0 || index >= joints.length ? null : joints[index];
-  public function sensorId(index:Int):Null<SensorId>
-    return index < 0 || index >= sensors.length ? null : sensors[index];
+  public function linkId(index:Int):Null<LinkId> return index < 0 || index >= links.length ? null : links[index];
+  public function jointId(index:Int):Null<JointId> return index < 0 || index >= joints.length ? null : joints[index];
+  public function sensorId(index:Int):Null<SensorId> return index < 0
+    || index >= sensors.length ? null : sensors[index];
 
   public function linkIndex(id:LinkId):Int return links.indexOf(id);
   public function jointIndex(id:JointId):Int return joints.indexOf(id);
   public function sensorIndex(id:SensorId):Int return sensors.indexOf(id);
   public function frameIndex(id:FrameId):Int return frames.indexOf(id);
-  public function frameId(index:Int):Null<FrameId>
-    return index < 0 || index >= frames.length ? null : frames[index];
-  public function frameLinkId(index:Int):Null<LinkId>
-    return index < 0 || index >= frameLinks.length ? null : frameLinks[index];
-  public function visualGeometry(index:Int):Null<String>
-    return index < 0 || index >= visuals.length ? null : visuals[index];
-  public function collisionGeometry(index:Int):Null<String>
-    return index < 0 || index >= collisions.length ? null : collisions[index];
+  public function frameId(index:Int):Null<FrameId> return index < 0 || index >= frames.length ? null : frames[index];
+  public function frameLinkId(index:Int):Null<LinkId> return index < 0
+    || index >= frameLinks.length ? null : frameLinks[index];
+  public function visualGeometry(index:Int):Null<String> return index < 0
+    || index >= visuals.length ? null : visuals[index];
+  public function collisionGeometry(index:Int):Null<String> return index < 0
+    || index >= collisions.length ? null : collisions[index];
 }

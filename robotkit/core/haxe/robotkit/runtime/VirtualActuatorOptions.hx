@@ -26,22 +26,30 @@ class VirtualActuatorOptions {
   public function holdDamping():Float return holdStiffness > 0.0 ? 2.0 * Math.sqrt(holdStiffness * holdInertia) : 0.0;
 
   /** The longest physics step the hold's spring is stable under (it is integrated explicitly), seconds; infinite without one. */
-  public function holdInterval():Float
-    return holdStiffness > 0.0 ? 0.5 * Math.sqrt(holdInertia / holdStiffness) : Math.POSITIVE_INFINITY;
+  public function holdInterval():Float return holdStiffness
+    > 0.0 ? 0.5 * Math.sqrt(holdInertia / holdStiffness) : Math.POSITIVE_INFINITY;
 
-  public function new(id:String, jointIndex:Int, ratio:Float, offset:Float,
-      stepsPerUnit:Float, minStepTicks:Int = 1, directionSetupTicks:Int = 0,
-      skewBound:Float = 0.0, feedbackJointIndex:Int = -1,
-      feedbackRatio:Float = 1.0, feedbackOffset:Float = 0.0, holdStiffness:Float = 0.0, holdInertia:Float = 0.0) {
-    if (id == null || id.length == 0 || id.length > 63 ||
-        jointIndex < 0 || jointIndex >= 64 || !Math.isFinite(ratio) || ratio == 0.0 ||
-        !Math.isFinite(offset) || !Math.isFinite(stepsPerUnit) || stepsPerUnit <= 0.0 ||
-        minStepTicks < 1 || directionSetupTicks < 0 ||
-        directionSetupTicks > 65535 || !Math.isFinite(skewBound) || skewBound < 0.0)
-      throw "Invalid virtual actuator configuration";
-    for (i in 0...id.length)
-      if (id.charCodeAt(i) < 33 || id.charCodeAt(i) > 126)
-        throw "Virtual actuator ID must be printable ASCII";
+  public function new(
+    id:String,
+    jointIndex:Int,
+    ratio:Float,
+    offset:Float,
+    stepsPerUnit:Float,
+    minStepTicks:Int = 1,
+    directionSetupTicks:Int = 0,
+    skewBound:Float = 0.0,
+    feedbackJointIndex:Int = -1,
+    feedbackRatio:Float = 1.0,
+    feedbackOffset:Float = 0.0,
+    holdStiffness:Float = 0.0,
+    holdInertia:Float = 0.0
+  ) {
+    if (id == null || id.length == 0 || id.length > 63 || jointIndex < 0 || jointIndex >= 64
+      || !Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset) || !Math.isFinite(stepsPerUnit)
+      || stepsPerUnit <= 0.0 || minStepTicks < 1 || directionSetupTicks < 0 || directionSetupTicks > 65535
+      || !Math.isFinite(skewBound) || skewBound < 0.0) throw "Invalid virtual actuator configuration";
+    for (i in 0...id.length) if (id.charCodeAt(i) < 33
+      || id.charCodeAt(i) > 126) throw "Virtual actuator ID must be printable ASCII";
     this.id = id;
     this.jointIndex = jointIndex;
     this.ratio = ratio;
@@ -50,13 +58,14 @@ class VirtualActuatorOptions {
     this.minStepTicks = minStepTicks;
     this.directionSetupTicks = directionSetupTicks;
     this.skewBound = skewBound;
-    if (feedbackJointIndex < -1 || feedbackJointIndex >= 64 || !Math.isFinite(feedbackRatio) ||
-        feedbackRatio == 0.0 || !Math.isFinite(feedbackOffset)) throw "Invalid physical feedback mapping";
+    if (feedbackJointIndex < -1 || feedbackJointIndex >= 64 || !Math.isFinite(feedbackRatio)
+      || feedbackRatio == 0.0 || !Math.isFinite(feedbackOffset)) throw "Invalid physical feedback mapping";
     this.feedbackJointIndex = feedbackJointIndex;
     this.feedbackRatio = feedbackRatio;
     this.feedbackOffset = feedbackOffset;
-    if (!Math.isFinite(holdStiffness) || holdStiffness < 0.0 || !Math.isFinite(holdInertia) || holdInertia < 0.0 ||
-        (holdStiffness > 0.0 && holdInertia <= 0.0)) throw "A hold needs a finite stiffness and the inertia it carries";
+    if (!Math.isFinite(holdStiffness)
+      || holdStiffness < 0.0 || !Math.isFinite(holdInertia) || holdInertia < 0.0 || (holdStiffness > 0.0
+      && holdInertia <= 0.0)) throw "A hold needs a finite stiffness and the inertia it carries";
     this.holdStiffness = holdStiffness;
     this.holdInertia = holdInertia;
   }

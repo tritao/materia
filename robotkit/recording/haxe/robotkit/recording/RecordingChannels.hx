@@ -25,10 +25,15 @@ class RegisteredChannel {
   public final name:String;
   public final wireClass:String;
   public final schemaData:String;
-  final encoder:RobotRecordingEntry->Bytes;
-  final decoder:Bytes->DecodedRecordingPayload;
-  public function new(name:String, wireClass:String, schemaData:String,
-      encoder:RobotRecordingEntry->Bytes, decoder:Bytes->DecodedRecordingPayload) {
+  final encoder:RobotRecordingEntry -> Bytes;
+  final decoder:Bytes -> DecodedRecordingPayload;
+  public function new(
+    name:String,
+    wireClass:String,
+    schemaData:String,
+    encoder:RobotRecordingEntry -> Bytes,
+    decoder:Bytes -> DecodedRecordingPayload
+  ) {
     this.name = name;
     this.wireClass = wireClass;
     this.schemaData = schemaData;
@@ -56,17 +61,15 @@ class RecordingChannels {
   }
 
   public function register<T>(channel:RecordingChannel<T>):Void {
-    if (channel == null || channel.name() == null || channel.name().length == 0 ||
-        channel.wireClass() == null || channel.wireClass().length == 0 ||
-        channel.schemaData() == null || channel.schemaData().length == 0 ||
-        byName.exists(channel.name()))
-      throw "Invalid or duplicate recording channel";
-    var entry = new RegisteredChannel(channel.name(), channel.wireClass(), channel.schemaData(),
-      function(value) return channel.encode(channel.toWire(value)),
-      function(bytes) {
-        var value = channel.decode(bytes);
-        return new DecodedRecordingPayload(channel.robotId(value), channel.fromWire(value));
-      });
+    if (channel == null || channel.name() == null || channel.name().length == 0 || channel.wireClass() == null
+      || channel.wireClass().length == 0 || channel.schemaData() == null || channel.schemaData().length == 0
+      || byName.exists(channel.name())) throw "Invalid or duplicate recording channel";
+    var entry = new RegisteredChannel(channel.name(), channel.wireClass(),
+      channel.schemaData(), function(value) return channel.encode(channel.toWire(value)), function(bytes) {
+      var value = channel.decode(bytes);
+      return new DecodedRecordingPayload(channel.robotId(value), channel.fromWire(value));
+    }
+    );
     byName.set(entry.name, entry);
     ordered.push(entry);
   }
@@ -75,13 +78,21 @@ class RecordingChannels {
   public function channels():Array<RegisteredChannel> return ordered.copy();
 
   public static function nameOf(event:RobotRecordingEvent):String return switch event {
-    case Command(_): "command";
-    case RobotSnapshot(_): "snapshot";
-    case Sensor(_, _): "sensor";
-    case Fault(_): "fault";
-    case World(_): "world";
-    case WorldEvent(_): "world_event";
-    case ProcessEvent(_): "process_event";
-    case Channel(_, name, _): name;
+    case Command(_):
+      "command";
+    case RobotSnapshot(_):
+      "snapshot";
+    case Sensor(_, _):
+      "sensor";
+    case Fault(_):
+      "fault";
+    case World(_):
+      "world";
+    case WorldEvent(_):
+      "world_event";
+    case ProcessEvent(_):
+      "process_event";
+    case Channel(_, name, _):
+      name;
   };
 }

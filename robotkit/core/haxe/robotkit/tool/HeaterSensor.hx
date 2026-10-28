@@ -37,8 +37,13 @@ class HeaterSensor {
   public static inline var COLD_EXTRUSION:Int = 6;
   public static inline var INVALID:Int = 7;
 
-  public static function values(reading:HeaterReading):Array<Float>
-    return [reading.celsius, reading.targetCelsius, reading.duty, reading.atTarget ? 1.0 : 0.0, reading.fault];
+  public static function values(reading:HeaterReading):Array<Float> return [
+    reading.celsius,
+    reading.targetCelsius,
+    reading.duty,
+    reading.atTarget ? 1.0 : 0.0,
+    reading.fault
+  ];
 
   /** The fault code in words, or null for none. */
   public static function faultMessage(code:Int):Null<String> {
@@ -46,25 +51,32 @@ class HeaterSensor {
     if (code == SENSOR_OPEN) return "heater: the thermistor reads open (unplugged or broken)";
     if (code == SENSOR_SHORT) return "heater: the thermistor reads shorted";
     if (code == OVER_TEMPERATURE) return "heater: over temperature";
-    if (code == NOT_HEATING) return "heater: thermal runaway, it is not heating (the heater or thermistor is disconnected, or a draught takes the heat)";
+    if (code
+      == NOT_HEATING) return "heater: thermal runaway, it is not heating (the heater or thermistor is disconnected, or a draught takes the heat)";
     if (code == LEFT_BAND) return "heater: thermal runaway, it left its target and did not come back";
-    if (code == COLD_EXTRUSION) return "heater: cold extrusion, the extruder pushed filament below the minimum temperature";
+    if (code
+      == COLD_EXTRUSION) return "heater: cold extrusion, the extruder pushed filament below the minimum temperature";
     if (code == INVALID) return "heater: invalid configuration or command";
     return 'heater: unknown fault $code';
   }
 
   public static function reading(values:Array<Float>):HeaterReading {
     if (values == null || values.length != COUNT) throw 'A tool_heater frame has $COUNT values';
-    return {celsius: values[TEMPERATURE], targetCelsius: values[TARGET], duty: values[DUTY],
-      atTarget: values[AT_TARGET] != 0.0, fault: Std.int(values[FAULT])};
+    return {
+      celsius: values[TEMPERATURE],
+      targetCelsius: values[TARGET],
+      duty: values[DUTY],
+      atTarget: values[AT_TARGET] != 0.0,
+      fault: Std.int(values[FAULT])
+    };
   }
 
   /** Whether `values` is a well-formed frame: five finite values, a duty from 0 to 1, a flag of 0 or 1, a known fault code. */
   public static function valid(values:Array<Float>):Bool {
     if (values == null || values.length != COUNT) return false;
     for (value in values) if (!Math.isFinite(value)) return false;
-    return values[TARGET] >= 0.0 && values[DUTY] >= 0.0 && values[DUTY] <= 1.0 &&
-      (values[AT_TARGET] == 0.0 || values[AT_TARGET] == 1.0) && values[FAULT] == Std.int(values[FAULT]) &&
-      values[FAULT] >= 0.0 && values[FAULT] <= INVALID;
+    return values[TARGET] >= 0.0
+      && values[DUTY] >= 0.0 && values[DUTY] <= 1.0 && (values[AT_TARGET] == 0.0 || values[AT_TARGET] == 1.0)
+      && values[FAULT] == Std.int(values[FAULT]) && values[FAULT] >= 0.0 && values[FAULT] <= INVALID;
   }
 }

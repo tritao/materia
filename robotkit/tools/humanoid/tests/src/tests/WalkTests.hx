@@ -28,13 +28,22 @@ class WalkTests {
     Sys.println("Walk tests passed");
   }
 
-  static function scenario(seconds:Float, vx:Float, vy:Float, wz:Float, ?record:String):WalkScenario
-    return {
-      model: Files.robotkit("tests/fixtures/humanoid/unitree-g1-12dof.robot.json"),
-      spec: Files.robotkit("tools/humanoid/policies/unitree-g1/policy.json"),
-      seconds: seconds, commands: [{from: 0.0, vx: vx, vy: vy, wz: wz}], pushes: [], record: record,
-      truthObservations: false, report: 0.0, warmup: 0.0
-    };
+  static function scenario(seconds:Float, vx:Float, vy:Float, wz:Float, ?record:String):WalkScenario return {
+    model: Files.robotkit("tests/fixtures/humanoid/unitree-g1-12dof.robot.json"),
+    spec: Files.robotkit("tools/humanoid/policies/unitree-g1/policy.json"),
+    seconds: seconds,
+    commands: [{
+      from: 0.0,
+      vx: vx,
+      vy: vy,
+      wz: wz
+    }],
+    pushes: [],
+    record: record,
+    truthObservations: false,
+    report: 0.0,
+    warmup: 0.0
+  };
 
   static function require(condition:Bool, what:String):Void if (!condition) throw what;
 
@@ -52,14 +61,19 @@ class WalkTests {
   }
 
   /** The IMU-based gravity estimate must track the true one closely: it is what the policy sees. */
-  static function estimateIsClose(result:WalkResult, what:String):Void
-    require(result.worstEstimateError < 0.02, '$what: the gravity estimate was ${result.worstEstimateError} rad off');
+  static function estimateIsClose(result:WalkResult, what:String):Void require(
+    result.worstEstimateError < 0.02,
+    '$what: the gravity estimate was ${result.worstEstimateError} rad off'
+  );
 
   static function stands():Void {
     var result = WalkRun.run(scenario(10.0, 0.0, 0.0, 0.0));
     uprightAtEnd(result, "stand");
     var last = result.samples[result.samples.length - 1];
-    require(result.worstTilt < 0.25 && Math.sqrt(last.x * last.x + last.y * last.y) < 1.0, 'stand drifted: ${summary(result)}');
+    require(
+      result.worstTilt < 0.25 && Math.sqrt(last.x * last.x + last.y * last.y) < 1.0,
+      'stand drifted: ${summary(result)}'
+    );
     estimateIsClose(result, "stand");
     Sys.println('stand: ${summary(result)}');
   }
@@ -83,12 +97,18 @@ class WalkTests {
       var walking = WalkRun.run(scenario(10.0, 0.5, 0.0, turn.wz));
       uprightAtEnd(walking, 'turn ${turn.wz} while walking');
       var yaw = walking.samples[walking.samples.length - 1].yaw;
-      require(yaw * turn.sign > 1.0 && yaw * turn.sign < 2.6, 'walking turn ${turn.wz}: heading changed by ${round(yaw)} rad');
+      require(
+        yaw * turn.sign > 1.0 && yaw * turn.sign < 2.6,
+        'walking turn ${turn.wz}: heading changed by ${round(yaw)} rad'
+      );
       estimateIsClose(walking, "walking turn");
       var inPlace = WalkRun.run(scenario(10.0, 0.0, 0.0, turn.wz));
       uprightAtEnd(inPlace, 'turn ${turn.wz} in place');
       var inPlaceYaw = inPlace.samples[inPlace.samples.length - 1].yaw;
-      require(inPlaceYaw * turn.sign > 0.8 && inPlaceYaw * turn.sign < 2.6, 'in-place turn ${turn.wz}: heading changed by ${round(inPlaceYaw)} rad');
+      require(
+        inPlaceYaw * turn.sign > 0.8 && inPlaceYaw * turn.sign < 2.6,
+        'in-place turn ${turn.wz}: heading changed by ${round(inPlaceYaw)} rad'
+      );
       Sys.println('turn ${turn.wz}: walking ${round(yaw)} rad, in place ${round(inPlaceYaw)} rad in 10 s');
     }
   }
@@ -129,25 +149,36 @@ class WalkTests {
     require(recording.commands.length == 301, 'recorded ${recording.commands.length} commands');
     var first:Array<JointTarget> = [], last:Array<JointTarget> = [];
     var seen = false;
-    for (command in recording.commands)
-      switch command {
-        case JointTargets(targets, _):
-          for (target in targets) require(target.mode == JointTargetMode.Servo, "a recorded joint target lost its servo mode");
-          if (!seen) first = targets;
-          seen = true;
-          last = targets;
-        case _: throw "unexpected command in a policy recording";
-      }
-    require(first.length == 12 && first[3].stiffness == 150.0 && first[3].damping == 4.0 && first[3].target == 0.3,
-      "the recorded stand command must carry the default pose and its gains");
-    require(last[0].target != first[0].target || last[3].target != first[3].target, "the policy's targets were not recorded");
+    for (command in recording.commands) switch command {
+      case JointTargets(targets, _):
+        for (target in targets) require(
+          target.mode == JointTargetMode.Servo,
+          "a recorded joint target lost its servo mode"
+        );
+        if (!seen) first = targets;
+        seen = true;
+        last = targets;
+      case _:
+        throw "unexpected command in a policy recording";
+    }
+    require(
+      first.length == 12 && first[3].stiffness == 150.0 && first[3].damping == 4.0 && first[3].target == 0.3,
+      "the recorded stand command must carry the default pose and its gains"
+    );
+    require(
+      last[0].target != first[0].target || last[3].target != first[3].target,
+      "the policy's targets were not recorded"
+    );
     // Replaying the recorded servo targets into a fresh simulation, with no policy, gives the same run.
     var replayed = WalkRun.replay(walk, recording);
     require(replayed.steps == 3000, 'replayed ${replayed.steps} steps');
-    require(replayed.worstJoint < 1e-9 && replayed.worstTime == 0.0,
-      'replay differs from the recording by ${replayed.worstJoint} rad');
-    Sys.println('recorded ${recording.snapshots.length} snapshots and ${recording.commands.length} servo batches; replay differs by ${replayed.worstJoint} rad');
-    for (leftover in [path, path + ".incomplete.status"])
-      if (sys.FileSystem.exists(leftover)) sys.FileSystem.deleteFile(leftover);
+    require(
+      replayed.worstJoint < 1e-9 && replayed.worstTime == 0.0,
+      'replay differs from the recording by ${replayed.worstJoint} rad'
+    );
+    Sys
+      .println('recorded ${recording.snapshots.length} snapshots and ${recording.commands.length} servo batches; replay differs by ${replayed.worstJoint} rad');
+    for (leftover in [path,
+      path + ".incomplete.status"]) if (sys.FileSystem.exists(leftover)) sys.FileSystem.deleteFile(leftover);
   }
 }

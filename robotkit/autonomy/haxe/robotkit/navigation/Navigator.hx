@@ -30,17 +30,20 @@ class Navigator {
    */
   var escapeDistance:Float = 0.0;
 
-  public function new(navigation:Navigation, planner:Planner, costmap:Costmap2,
-      ?replanRetryIntervalSeconds:Float = 0.5,
-      ?motionGuard:MotionGuard) {
-    if (navigation == null || planner == null || costmap == null ||
-        !Math.isFinite(replanRetryIntervalSeconds) ||
-        replanRetryIntervalSeconds <= 0.0)
-      throw "Navigator requires navigation, planner, costmap, and a positive retry interval";
-    if (motionGuard != null && motionGuard.navigation != navigation)
-      throw "Navigator MotionGuard must filter its Navigation instance";
-    if (motionGuard != null && motionGuard.costmap != null && motionGuard.costmap != costmap)
-      throw "Navigator MotionGuard must judge the costmap the Navigator plans on";
+  public function new(
+    navigation:Navigation,
+    planner:Planner,
+    costmap:Costmap2,
+    ?replanRetryIntervalSeconds:Float = 0.5,
+    ?motionGuard:MotionGuard
+  ) {
+    if (navigation == null
+      || planner == null || costmap == null || !Math.isFinite(replanRetryIntervalSeconds) || replanRetryIntervalSeconds
+      <= 0.0) throw "Navigator requires navigation, planner, costmap, and a positive retry interval";
+    if (motionGuard != null
+      && motionGuard.navigation != navigation) throw "Navigator MotionGuard must filter its Navigation instance";
+    if (motionGuard != null && motionGuard.costmap != null
+      && motionGuard.costmap != costmap) throw "Navigator MotionGuard must judge the costmap the Navigator plans on";
     this.navigation = navigation;
     this.planner = planner;
     this.costmap = costmap;
@@ -51,8 +54,8 @@ class Navigator {
   /** Plans from current localization and starts following the requested goal. */
   public function navigateTo(goal:NavigationGoal):NavigatorStatus {
     if (goal == null) throw "Navigator.navigateTo requires a goal";
-    if (goal.frameId != costmap.grid.frameId)
-      throw 'Navigator goal frame ${goal.frameId} does not match map frame ${costmap.grid.frameId}';
+    if (goal.frameId != costmap
+      .grid.frameId) throw 'Navigator goal frame ${goal.frameId} does not match map frame ${costmap.grid.frameId}';
     stopFollower();
     this.goal = goal;
     activePath = null;
@@ -67,14 +70,16 @@ class Navigator {
    * Updates dynamic obstacles and advances goal execution. Perception obstacles
    * must already be expressed in the costmap frame.
    */
-  public function update(perception:PerceptionSnapshot,
-      durationSeconds:Float):NavigatorStatus {
-    if (perception == null || !Math.isFinite(durationSeconds) || durationSeconds <= 0.0)
-      throw "Navigator update requires a perception snapshot and positive finite duration";
+  public function update(perception:PerceptionSnapshot, durationSeconds:Float):NavigatorStatus {
+    if (perception == null || !Math.isFinite(durationSeconds)
+      || durationSeconds <= 0.0) throw "Navigator update requires a perception snapshot and positive finite duration";
     if (switch status {
-      case Idle, Succeeded, Cancelled, Failed(_): true;
-      case _: false;
-    }) return status;
+      case Idle, Succeeded, Cancelled, Failed(_):
+        true;
+      case _:
+        false;
+    }
+    ) return status;
 
     try {
       costmap.senseObstacles(perception.obstacles(), perception.freeSpace(), durationSeconds);
@@ -121,14 +126,13 @@ class Navigator {
     }
     try {
       var estimate:Null<LocalizationState> = navigation.localization.state();
-      if (estimate == null || estimate.quality == LocalizationQuality.Invalid)
-        throw "Navigator has no valid localization state";
+      if (estimate == null
+        || estimate.quality == LocalizationQuality.Invalid) throw "Navigator has no valid localization state";
       var state:LocalizationState = cast estimate;
-      if (state.referenceFrame != activeGoal.frameId)
-        throw 'Navigator localization frame ${state.referenceFrame} does not match goal frame ${activeGoal.frameId}';
+      if (state.referenceFrame != activeGoal
+        .frameId) throw 'Navigator localization frame ${state.referenceFrame} does not match goal frame ${activeGoal.frameId}';
       var planned = planner.plan(state.pose, activeGoal.pose);
-      if (planned == null || planned.frameId != activeGoal.frameId)
-        throw "Planner returned a path in the wrong frame";
+      if (planned == null || planned.frameId != activeGoal.frameId) throw "Planner returned a path in the wrong frame";
       navigation.follow(planned, activeGoal);
       activePath = planned;
       escapeDistance = measureEscape(planned);
@@ -164,19 +168,16 @@ class Navigator {
    */
   function remainingRouteIsClear(path:Path):Bool {
     var estimate:Null<LocalizationState> = navigation.localization.state();
-    if (estimate == null || estimate.quality == LocalizationQuality.Invalid ||
-        estimate.referenceFrame != costmap.grid.frameId)
-      return false;
-    var startDistance = Math.max(0.0,
-      Math.min(path.length, navigation.progressDistance));
+    if (estimate == null || estimate.quality == LocalizationQuality.Invalid
+      || estimate.referenceFrame != costmap.grid.frameId) return false;
+    var startDistance = Math.max(0.0, Math.min(path.length, navigation.progressDistance));
     var remaining = path.length - startDistance;
     var sampleSpacing = costmap.grid.resolutionMeters * 0.5;
     var sampleCount = Std.int(Math.ceil(remaining / sampleSpacing));
     for (index in 0...sampleCount + 1) {
       var distance = Math.min(path.length, startDistance + index * sampleSpacing);
       var pose = path.poseAt(distance);
-      if (!(distance < escapeDistance ? poseIsNotLethal(pose) : poseIsTraversable(pose)))
-        return false;
+      if (!(distance < escapeDistance ? poseIsNotLethal(pose) : poseIsTraversable(pose))) return false;
     }
     return true;
   }
@@ -206,13 +207,16 @@ class Navigator {
     stopFollower();
     activePath = null;
     blockedElapsedSeconds = 0.0;
-    status = Blocked(reason == null || reason.length == 0
-      ? "Navigator could not plan a route"
-      : reason);
+    status = Blocked(reason == null || reason.length == 0 ? "Navigator could not plan a route" : reason);
   }
 
   function stopFollower():Void {
-    if (switch navigation.status { case Following: true; case _: false; })
-      navigation.cancel();
+    if (switch navigation.status {
+      case Following:
+        true;
+      case _:
+        false;
+    }
+    ) navigation.cancel();
   }
 }

@@ -10,6 +10,5 @@ class RobotRuntimeError {
     this.operation = operation;
   }
 
-  public function toString():String
-    return '$operation failed with RobotKit status $status';
+  public function toString():String return '$operation failed with RobotKit status $status';
 }

@@ -54,12 +54,16 @@ class KinematicsTests {
       var q1 = sample[0], q2 = sample[1];
       var expectedX = 1.0 * Math.cos(q1) + 0.7 * Math.cos(q1 + q2);
       var expectedY = 1.0 * Math.sin(q1) + 0.7 * Math.sin(q1 + q2);
-      check(approx(fk.translation.x, expectedX, 1e-9) && approx(fk.translation.y, expectedY, 1e-9) &&
-        approx(fk.translation.z, 0.0, 1e-9),
-        "2R planar arm FK matches the closed-form position");
+      check(
+        approx(fk.translation.x, expectedX, 1e-9) && approx(fk.translation.y, expectedY, 1e-9) && approx(
+          fk.translation.z,
+          0.0,
+          1e-9
+        ),
+        "2R planar arm FK matches the closed-form position"
+      );
       var rpy = fk.rotation.toRollPitchYaw();
-      check(approx(Pose2WrapDiff(rpy.yaw, q1 + q2), 0.0, 1e-9),
-        "2R planar arm FK yaw matches q1 + q2");
+      check(approx(Pose2WrapDiff(rpy.yaw, q1 + q2), 0.0, 1e-9), "2R planar arm FK yaw matches q1 + q2");
     }
   }
 
@@ -69,11 +73,15 @@ class KinematicsTests {
     var fk = fixture.arm.forwardKinematics(zero);
     var expected = Vec3.zero();
     for (offset in fixture.zeroPoseOffsets) expected = expected.add(offset);
-    check(approx(fk.translation.x, expected.x, 1e-9) && approx(fk.translation.y, expected.y, 1e-9) &&
-      approx(fk.translation.z, expected.z, 1e-9),
-      "UR5-style 6R arm FK at zero pose matches the summed published link offsets");
-    check(fk.rotation.angularDistance(Quat.identity()) < 1e-9,
-      "UR5-style 6R arm has no net rotation at zero pose");
+    check(
+      approx(fk.translation.x, expected.x, 1e-9) && approx(fk.translation.y, expected.y, 1e-9) && approx(
+        fk.translation.z,
+        expected.z,
+        1e-9
+      ),
+      "UR5-style 6R arm FK at zero pose matches the summed published link offsets"
+    );
+    check(fk.rotation.angularDistance(Quat.identity()) < 1e-9, "UR5-style 6R arm has no net rotation at zero pose");
     check(fixture.arm.dofCount() == 6, "UR5-style fixture exposes six degrees of freedom");
   }
 
@@ -83,18 +91,30 @@ class KinematicsTests {
     var analytic = fixture.arm.jacobian(q);
     var eps = 1e-6;
     for (i in 0...6) {
-      var plus = q.copy(); plus[i] += eps;
-      var minus = q.copy(); minus[i] -= eps;
+      var plus = q.copy();
+      plus[i] += eps;
+      var minus = q.copy();
+      minus[i] -= eps;
       var fkPlus = fixture.arm.forwardKinematics(plus);
       var fkMinus = fixture.arm.forwardKinematics(minus);
       var linear = fkPlus.translation.sub(fkMinus.translation).scale(1.0 / (2.0 * eps));
       var angular = logMap(fkMinus.rotation, fkPlus.rotation).scale(1.0 / (2.0 * eps));
-      check(approx(analytic[0][i], linear.x, 1e-6) && approx(analytic[1][i], linear.y, 1e-6) &&
-        approx(analytic[2][i], linear.z, 1e-6),
-        'Analytic Jacobian linear column $i matches the numeric central difference');
-      check(approx(analytic[3][i], angular.x, 1e-6) && approx(analytic[4][i], angular.y, 1e-6) &&
-        approx(analytic[5][i], angular.z, 1e-6),
-        'Analytic Jacobian angular column $i matches the numeric central difference');
+      check(
+        approx(analytic[0][i], linear.x, 1e-6) && approx(analytic[1][i], linear.y, 1e-6) && approx(
+          analytic[2][i],
+          linear.z,
+          1e-6
+        ),
+        'Analytic Jacobian linear column $i matches the numeric central difference'
+      );
+      check(
+        approx(analytic[3][i], angular.x, 1e-6) && approx(analytic[4][i], angular.y, 1e-6) && approx(
+          analytic[5][i],
+          angular.z,
+          1e-6
+        ),
+        'Analytic Jacobian angular column $i matches the numeric central difference'
+      );
     }
   }
 
@@ -103,7 +123,7 @@ class KinematicsTests {
     var group = fixture.arm.group;
     var rng = new Rng(2026);
     for (trial in 0...6) {
-      var qTrue = [for (_ in 0...6) (rng.next() - 0.5) * 2.0];
+      var qTrue = [for (_ in 0...6)(rng.next() - 0.5) * 2.0];
       var target = fixture.arm.forwardKinematics(qTrue);
       // Warm-started near the true configuration, like a real IK caller re-solving
       // from its last known joint state; a fixed cold-start seed can land in a
@@ -114,10 +134,18 @@ class KinematicsTests {
       check(result.positionError < 1e-4, 'IK position error is within tolerance for target $trial');
       check(result.orientationError < 1e-3, 'IK orientation error is within tolerance for target $trial');
       var achieved = fixture.arm.forwardKinematics(result.q);
-      check(approx(achieved.translation.x, target.translation.x, 1e-3) &&
-        approx(achieved.translation.y, target.translation.y, 1e-3) &&
-        approx(achieved.translation.z, target.translation.z, 1e-3),
-        'IK solution forward-kinematics matches the requested target position for trial $trial');
+      check(
+        approx(achieved.translation.x, target.translation.x, 1e-3) && approx(
+          achieved.translation.y,
+          target.translation.y,
+          1e-3
+        ) && approx(
+          achieved.translation.z,
+          target.translation.z,
+          1e-3
+        ),
+        'IK solution forward-kinematics matches the requested target position for trial $trial'
+      );
     }
   }
 
@@ -140,8 +168,13 @@ class KinematicsTests {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
-    var robot = new SimulatedRobot("ur5-fixture", runtime, fixture.model.name,
-      [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
+    var robot = new SimulatedRobot(
+      "ur5-fixture",
+      runtime,
+      fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]
+    );
 
     var q = [0.2, -0.3, 0.5, -0.1, 0.4, -0.2];
     var targets = manipulator.toJointTargets(q);
@@ -150,30 +183,35 @@ class KinematicsTests {
     simulationHarness.step(Int64.ofInt(0));
     simulationHarness.step(Int64.ofInt(1));
     var snapshot = robot.snapshot();
-    for (i in 0...6)
-      check(approx(snapshot.positions.get(i), q[i], 1e-6),
-        'Joint $i reaches its commanded target through RobotCommand and SimulatedRobot');
+    for (i in 0...6) check(
+      approx(snapshot.positions.get(i), q[i], 1e-6),
+      'Joint $i reaches its commanded target through RobotCommand and SimulatedRobot'
+    );
     simulationHarness.dispose();
   }
 
   static function testWholeModelMatchesChain():Void {
     var fixture = buildUR5Fixture();
     var model = RobotKinematics.compile(fixture.model);
-    check(model.dofCount() == 6 && model.dofId(0) == "shoulder_pan_joint",
-      "whole-model compile keeps authored joint order and IDs");
+    check(
+      model.dofCount() == 6 && model.dofId(0) == "shoulder_pan_joint",
+      "whole-model compile keeps authored joint order and IDs"
+    );
     var flange = model.frameIndex("flange");
     var state = new KinematicState(model);
     var snapshot = new KinematicSnapshot(model);
     var rng = new Rng(99);
     for (_ in 0...10) {
-      var q = [for (_ in 0...6) (rng.next() - 0.5) * 4.0];
+      var q = [for (_ in 0...6)(rng.next() - 0.5) * 4.0];
       for (i in 0...6) state.q[i] = q[i];
       snapshot.evaluate(state);
       var whole = RobotKinematics.toTransform3(snapshot.framePose(flange));
       var chain = fixture.arm.forwardKinematics(q);
-      check(whole.translation.sub(chain.translation).norm() < 1e-12 &&
-        whole.rotation.angularDistance(chain.rotation) < 1e-9,
-        "the compiled whole model and the Manipulator agree at the flange");
+      check(
+        whole.translation.sub(chain.translation).norm() < 1e-12
+        && whole.rotation.angularDistance(chain.rotation) < 1e-9,
+        "the compiled whole model and the Manipulator agree at the flange"
+      );
     }
   }
 
@@ -196,9 +234,14 @@ class KinematicsTests {
     var q = [0.3, 0.8];
     var pose = arm.forwardKinematics(q);
     var a1 = 0.3, a2 = 0.3 + 0.8, a3 = a2 - 0.4;
-    check(approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) &&
-      approx(pose.translation.y, 0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3), 1e-12),
-      "the follower turns by -0.5 x its leader in the arm's FK");
+    check(
+      approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) && approx(
+        pose.translation.y,
+        0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3),
+        1e-12
+      ),
+      "the follower turns by -0.5 x its leader in the arm's FK"
+    );
     var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
     check(result.converged && approx(result.q[1], 0.8, 1e-6), "IK through the coupling recovers the leader angle");
     check(arm.toJointTargets(q).length == 2, "joint targets go to the leaders; the runtime moves followers");
@@ -225,20 +268,33 @@ class KinematicsTests {
     var q = [0.3, 0.8];
     var pose = arm.forwardKinematics(q);
     var a1 = 0.3, a2 = 0.3 + 0.8, a3 = a2 + 0.5 * 0.3 - 0.25 * 0.8 + 0.1;
-    check(approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) &&
-      approx(pose.translation.y, 0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3), 1e-12),
-      "the follower turns by the sum of its terms in the arm's FK");
+    check(
+      approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) && approx(
+        pose.translation.y,
+        0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3),
+        1e-12
+      ),
+      "the follower turns by the sum of its terms in the arm's FK"
+    );
     var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
-    check(result.converged && approx(result.q[0], 0.3, 1e-6) && approx(result.q[1], 0.8, 1e-6), "IK through both couplings recovers the leaders");
+    check(
+      result.converged && approx(result.q[0], 0.3, 1e-6) && approx(result.q[1], 0.8, 1e-6),
+      "IK through both couplings recovers the leaders"
+    );
     var decoded = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
-    check(decoded.couplings.length == 2 && decoded.couplings[1].follower == "j2" && decoded.couplings[1].ratio == -0.25,
-      "both terms survive the model's saved form");
+    check(
+      decoded.couplings.length == 2 && decoded.couplings[1].follower == "j2" && decoded.couplings[1].ratio == -0.25,
+      "both terms survive the model's saved form"
+    );
     // The same leader twice for one follower is refused, and so is a cycle through the terms.
     model.addCoupling(new JointCoupling("again", "j0", "j2", 1.0, 0.0));
     check(model.validate().length == 1, "a leader twice for one follower is reported: " + model.validate());
     model.couplings.pop();
     model.addCoupling(new JointCoupling("loop", "j2", "j0", 1.0, 0.0));
-    check(model.validate().length == 1 && JointCoupling.cycleThrough(model.couplings) != null, "a cycle through the terms is reported: " + model.validate());
+    check(
+      model.validate().length == 1 && JointCoupling.cycleThrough(model.couplings) != null,
+      "a cycle through the terms is reported: " + model.validate()
+    );
   }
 
   /** A UR5-sized arm and a tool target 2.2 m away: out of reach from a fixed base, reachable once the base moves. */
@@ -250,34 +306,50 @@ class KinematicsTests {
     check(arm.baseMotion() == RootMotion.Fixed, "a robot without base flags has a fixed base");
     var fixed = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     var fixedBase:Null<Transform3> = fixed.rootPose;
-    check(!fixed.converged && fixedBase != null && (cast fixedBase:Transform3).translation.norm() == 0.0,
-      "from a fixed base the far target is out of reach and the base stays put");
+    check(
+      !fixed.converged && fixedBase != null && (cast fixedBase:Transform3).translation.norm() == 0.0,
+      "from a fixed base the far target is out of reach and the base stays put"
+    );
 
-    arm.profile.mobileBase = new RobotMobileConfiguration(RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
-      1.0, 1.0);
+    arm.profile.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential(
+        "left",
+        "right",
+        0.1,
+        0.5
+      ),
+      1.0,
+      1.0
+    );
     check(arm.baseMotion() == RootMotion.Planar, "a mobile-base robot moves on the floor");
     var driven = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     check(driven.converged && driven.rootPose != null, 'a mobile base drives so the arm reaches (${driven.status})');
     var base:Transform3 = cast driven.rootPose;
-    check(Math.abs(base.translation.z) < 1e-12 && Math.abs(base.rotation.x) < 1e-12 && Math.abs(base.rotation.y) < 1e-12,
-      "the mobile base stays on the floor and upright");
+    check(
+      Math.abs(base.translation.z) < 1e-12 && Math.abs(base.rotation.x) < 1e-12 && Math.abs(base.rotation.y) < 1e-12,
+      "the mobile base stays on the floor and upright"
+    );
     var tool = base.compose(arm.tcpPose(driven.q));
-    check(tool.translation.sub(target.translation).norm() < 1e-4 && tool.rotation.angularDistance(target.rotation) < 1e-3,
-      "base pose and joints together put the tool on the target");
+    check(
+      tool.translation.sub(target.translation).norm() < 1e-4 && tool.rotation.angularDistance(target.rotation) < 1e-3,
+      "base pose and joints together put the tool on the target"
+    );
 
     arm.profile.mobileBase = null;
     fixture.model.floatingBase = true;
     check(arm.baseMotion() == RootMotion.Floating, "a floating-base robot moves freely");
     var floating = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     var floatingBase = floating.rootPose;
-    check(floating.converged && floatingBase != null &&
-      floatingBase.compose(arm.tcpPose(floating.q)).translation.sub(target.translation).norm() < 1e-4,
-      'a floating base reaches it too (${floating.status})');
+    check(
+      floating.converged && floatingBase != null
+      && floatingBase.compose(arm.tcpPose(floating.q)).translation.sub(target.translation).norm() < 1e-4,
+      'a floating base reaches it too (${floating.status})'
+    );
   }
 
   // -- fixtures --------------------------------------------------------
 
-  static function build2RFixture(l1:Float, l2:Float):{model:RobotModel, arm:Manipulator} {
+  static function build2RFixture(l1:Float, l2:Float): {model: RobotModel, arm: Manipulator} {
     var model = new RobotModel("2r-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -290,31 +362,53 @@ class KinematicsTests {
     var tip = model.addFrame(new Frame("tip", link2));
     tip.position = [l2, 0.0, 0.0];
     var arm = new Manipulator(model, base.id, tip.id);
-    return { model: model, arm: arm };
+    return {model: model, arm: arm};
   }
 
   /** A 6R arm laid out with the axis pattern and published DH-equivalent offsets of a UR5. */
-  static function buildUR5Fixture():{model:RobotModel, arm:Manipulator, zeroPoseOffsets:Array<Vec3>} {
-    var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
-      a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
+  static function buildUR5Fixture(): {model: RobotModel, arm: Manipulator, zeroPoseOffsets: Array<Vec3>} {
+    var d1 = 0.089159, shoulderOffset = 0.13585,
+      elbowOffset = -0.1197, a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
     var model = new RobotModel("ur5-fixture");
-    var linkNames = ["base_link", "shoulder_link", "upper_arm_link", "forearm_link",
-      "wrist_1_link", "wrist_2_link", "wrist_3_link"];
+    var linkNames = [
+      "base_link",
+      "shoulder_link",
+      "upper_arm_link",
+      "forearm_link",
+      "wrist_1_link",
+      "wrist_2_link",
+      "wrist_3_link"
+    ];
     var links = [for (name in linkNames) model.addLink(new Link(name))];
     var offsets = [
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(0.0, 0.0, a3),
-      new Vec3(0.0, d4, 0.0),
-      new Vec3(0.0, 0.0, d5)
+      new Vec3(
+        0.0,
+        0.0,
+        a3
+      ),
+      new Vec3(
+        0.0,
+        d4,
+        0.0
+      ),
+      new Vec3(
+        0.0,
+        0.0,
+        d5
+      )
     ];
-    var axes = [
-      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    var jointNames = [
+      "shoulder_pan_joint",
+      "shoulder_lift_joint",
+      "elbow_joint",
+      "wrist_1_joint",
+      "wrist_2_joint",
+      "wrist_3_joint"
     ];
-    var jointNames = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"];
     for (i in 0...6) {
       var joint = model.addJoint(new Joint(jointNames[i], JointType.Revolute, links[i], links[i + 1]));
       joint.parentFramePosition = offsets[i].toArray();
@@ -327,7 +421,7 @@ class KinematicsTests {
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = flangeOffset.toArray();
     var arm = new Manipulator(model, links[0].id, flange.id);
-    return { model: model, arm: arm, zeroPoseOffsets: offsets.concat([flangeOffset]) };
+    return {model: model, arm: arm, zeroPoseOffsets: offsets.concat([flangeOffset])};
   }
 
   // -- small local helpers ---------------------------------------------

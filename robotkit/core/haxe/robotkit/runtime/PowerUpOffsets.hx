@@ -3,8 +3,8 @@ package robotkit.runtime;
 /** Project named home-axis displacements through compiled physical coupling terms. */
 class PowerUpOffsets {
   public static function resolve(blueprint:RobotRuntimeBlueprint, named:Map<String, Float>):Array<Float> {
-    if (blueprint == null || blueprint.identity == null || named == null)
-      throw "Power-up offsets require a compiled joint identity";
+    if (blueprint == null
+      || blueprint.identity == null || named == null) throw "Power-up offsets require a compiled joint identity";
     var values = [for (_ in 0...blueprint.jointCount) 0.0];
     var ready = [for (_ in values) true];
     for (term in blueprint.couplings) ready[term.follower] = false;
@@ -15,7 +15,8 @@ class PowerUpOffsets {
       var home = false;
       for (contact in blueprint.switches) if (contact.joint == id && contact.role == "home") home = true;
       var value = named.get(id);
-      if (!home || value == null || !Math.isFinite(value)) throw 'Power-up axis "$id" needs a home and finite displacement';
+      if (!home
+        || value == null || !Math.isFinite(value)) throw 'Power-up axis "$id" needs a home and finite displacement';
       values[joint] = value;
     }
     for (_ in values) {
@@ -28,7 +29,9 @@ class PowerUpOffsets {
         }
         if (complete) {
           if (!Math.isFinite(sum)) throw "Power-up follower displacement overflow";
-          values[joint] = sum; ready[joint] = true; changed = true;
+          values[joint] = sum;
+          ready[joint] = true;
+          changed = true;
         }
       }
       if (!changed) break;

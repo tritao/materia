@@ -18,8 +18,7 @@ class ExternalAxes {
     var index = path.length;
     while (true) {
       for (frame in robot.frames) if (frame.link.id == link && frame.flangeIncludePath != null) {
-        if (owner != null && owner != frame.flangeIncludePath)
-          throw 'Ambiguous flange ownership on link "$link"';
+        if (owner != null && owner != frame.flangeIncludePath) throw 'Ambiguous flange ownership on link "$link"';
         owner = frame.flangeIncludePath;
       }
       if (owner != null || index == 0) break;

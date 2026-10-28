@@ -8,7 +8,8 @@ class VirtualServoOptions {
   /** Reserve 2% of acceleration for clock fitting (up to 0.5% rate error) and float polynomial conversion. */
   public static inline var ACCELERATION_SCALE:Float = 0.98;
   public static function fromModel(model:RobotModel, tickHz:Int = 40000, baud:Int = 3000000):VirtualDeviceOptions {
-    if (model == null || tickHz <= 0 || baud <= 0 || model.actuators.length == 0) throw "Virtual servos need a model and tick rate";
+    if (model == null
+      || tickHz <= 0 || baud <= 0 || model.actuators.length == 0) throw "Virtual servos need a model and tick rate";
     var options = new VirtualDeviceOptions();
     options.stepTickHz = tickHz;
     // Full servo polynomials carry more coefficients than the stepper defaults;
@@ -17,7 +18,8 @@ class VirtualServoOptions {
     options.targetError = 0.0;
     for (actuator in model.actuators) {
       var drive = actuator.drive;
-      if (drive == null || !Std.isOfType(drive, ServoDrive)) throw 'Virtual servo "${actuator.id}" needs servo drive data';
+      if (drive == null || !Std.isOfType(drive,
+        ServoDrive)) throw 'Virtual servo "${actuator.id}" needs servo drive data';
       var servo = cast(drive, ServoDrive);
       var rate = actuator.planningRate();
       if (rate == null || rate <= 0.0) throw 'Virtual servo "${actuator.id}" needs a speed limit';
@@ -31,8 +33,8 @@ class VirtualServoOptions {
           var encoderCountsPerUnit = servo.encoderCounts / (2.0 * Math.PI);
           if (actuator.encoder != "") {
             encoderCountsPerUnit = 0.0;
-            for (encoder in model.encoders) if (encoder.id == actuator.encoder && encoder.joint == joint)
-              encoderCountsPerUnit = encoder.countsPerUnit / Math.abs(ratio);
+            for (encoder in model.encoders) if (encoder.id == actuator.encoder
+              && encoder.joint == joint) encoderCountsPerUnit = encoder.countsPerUnit / Math.abs(ratio);
           }
           if (encoderCountsPerUnit <= 0.0) throw 'Virtual servo "${actuator.id}" needs its authored encoder';
           // At most one count per tick at peak speed: either the grid is coarsened to exactly that (one

@@ -12,9 +12,21 @@ class McapRecordingStatus {
   public final queued:Int64;
   public final queuedBytes:Int64;
   public final error:String;
-  public function new(state:Int, accepted:Int64, written:Int64, dropped:Int64, queued:Int64,
-      queuedBytes:Int64, error:String) {
-    this.state=state;this.accepted=accepted;this.written=written;this.dropped=dropped;
-    this.queued=queued;this.queuedBytes=queuedBytes;this.error=error;
+  public function new(
+    state:Int,
+    accepted:Int64,
+    written:Int64,
+    dropped:Int64,
+    queued:Int64,
+    queuedBytes:Int64,
+    error:String
+  ) {
+    this.state = state;
+    this.accepted = accepted;
+    this.written = written;
+    this.dropped = dropped;
+    this.queued = queued;
+    this.queuedBytes = queuedBytes;
+    this.error = error;
   }
 }

@@ -13,15 +13,13 @@ class RobotBehaviorRunner {
   final pendingEvents:Array<RobotEvent> = [];
 
   public function new(behavior:RobotBehavior) {
-    if (behavior == null)
-      throw "RobotKit behavior runner requires a behavior";
+    if (behavior == null) throw "RobotKit behavior runner requires a behavior";
     this.behavior = behavior;
     intents = new IntentBuffer();
   }
 
   public function update(snapshot:RobotSnapshot, nowNs:Int64):Null<JointTargetIntent> {
-    if (snapshot == null)
-      return null;
+    if (snapshot == null) return null;
     if (!hasSnapshot || Int64.compare(snapshot.sequence, lastSequence) != 0 || pendingEvents.length > 0) {
       hasSnapshot = true;
       lastSequence = snapshot.sequence;

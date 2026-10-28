@@ -14,8 +14,7 @@ class RobotRuntimeLinkBlueprint {
     this.inertiaTensor = inertiaTensor.copy();
   }
 
-  @:allow(RobotRuntimeBlueprint)
-  function nativeValue():rk_robot_runtime_link {
+  @:allow(RobotRuntimeBlueprint) function nativeValue():rk_robot_runtime_link {
     var value = new rk_robot_runtime_link();
     value.set_mass(mass);
     for (i in 0...3) value.set_center_of_mass(i, centerOfMass[i]);

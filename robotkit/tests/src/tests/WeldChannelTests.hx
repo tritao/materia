@@ -42,7 +42,7 @@ class WeldChannelTests {
   }
 
   /** A one-joint robot with the welder's channels and a suction tool's, and a plan that switches all of them on. */
-  static function rig(plan:Int):{harness:SimulationHarness, runtime:RobotRuntime} {
+  static function rig(plan:Int): {harness: SimulationHarness, runtime: RobotRuntime} {
     var model = new RobotModel("welder-channels");
     var base = model.addLink(new Link("base"));
     var tool = model.addLink(new Link("tool"));
@@ -58,40 +58,94 @@ class WeldChannelTests {
     var runtime = harness.simulation.addRobot(blueprint);
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000), [[0.0, 0.0]]);
     var at = Int64.ofInt(50000000);
-    runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(plan), Int64.ofInt(blueprint.revision),
-      Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-      [0.0], [0.0], [0.0], [segment], null, null, null, null, null, true,
-      [new ProcessTimedEvent(at, VOLTAGE, ProcessEventValue.Analog(24.0)),
-       new ProcessTimedEvent(at, WIRE, ProcessEventValue.Analog(8.0)),
-       new ProcessTimedEvent(at, ARC, ProcessEventValue.Digital(true)),
-       new ProcessTimedEvent(at, GRIPPER, ProcessEventValue.Digital(true)),
-       new ProcessTimedEvent(at, SUCTION, ProcessEventValue.Digital(true))]), 1);
+    runtime.submitPlan(
+      new ExecutionPlanSubmission(
+        Int64.ofInt(plan),
+        Int64.ofInt(blueprint.revision),
+        Int64.ofInt(blueprint.calibrationRevision),
+        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+        [0.0],
+        [0.0],
+        [0.0],
+        [segment],
+        null,
+        null,
+        null,
+        null,
+        null,
+        true,
+        [
+          new ProcessTimedEvent(
+            at,
+            VOLTAGE,
+            ProcessEventValue.Analog(24.0)
+          ),
+          new ProcessTimedEvent(
+            at,
+            WIRE,
+            ProcessEventValue.Analog(8.0)
+          ),
+          new ProcessTimedEvent(
+            at,
+            ARC,
+            ProcessEventValue.Digital(true)
+          ),
+          new ProcessTimedEvent(
+            at,
+            GRIPPER,
+            ProcessEventValue.Digital(true)
+          ),
+          new ProcessTimedEvent(
+            at,
+            SUCTION,
+            ProcessEventValue.Digital(true)
+          )
+        ]
+      ),
+      1
+    );
     for (tick in 1...11) harness.step(Int64.ofInt(tick * TICK));
     return {harness: harness, runtime: runtime};
   }
 
-  static function digital(runtime:RobotRuntime, channel:String):Bool
-    return switch runtime.channelValue(channel) {
-      case Digital(on): on;
-      case _: throw 'Channel "$channel" is not digital';
-    };
+  static function digital(runtime:RobotRuntime, channel:String):Bool return switch runtime.channelValue(channel) {
+    case Digital(on):
+      on;
+    case _:
+      throw 'Channel "$channel" is not digital';
+  };
 
-  static function analog(runtime:RobotRuntime, channel:String):Float
-    return switch runtime.channelValue(channel) {
-      case Analog(value): value;
-      case _: throw 'Channel "$channel" is not analog';
-    };
+  static function analog(runtime:RobotRuntime, channel:String):Float return switch runtime.channelValue(channel) {
+    case Analog(value):
+      value;
+    case _:
+      throw 'Channel "$channel" is not analog';
+  };
 
   /** Whether the arc, wire, voltage and vacuum are all up, as the plan set them. */
-  static function running(runtime:RobotRuntime):Bool
-    return digital(runtime, ARC) && analog(runtime, WIRE) == 8.0 && analog(runtime, VOLTAGE) == 24.0 &&
-      digital(runtime, GRIPPER) && digital(runtime, SUCTION);
+  static function running(runtime:RobotRuntime):Bool return digital(runtime,
+    ARC) && analog(runtime, WIRE) == 8.0 && analog(
+      runtime,
+      VOLTAGE
+    ) == 24.0 && digital(
+      runtime,
+      GRIPPER
+    ) && digital(
+      runtime,
+      SUCTION
+    );
 
   static function testStopsTakeTheArcOff():Void {
     // A commanded stop and an abort end the welding motion: the arc goes off and the wire stops. The voltage setpoint and
     // the suction tool keep what they had.
-    for (case_ in [{label: "a commanded stop", abort: false, emergency: false},
-        {label: "an abort", abort: true, emergency: false}]) {
+    for (case_ in [
+      {label: "a commanded stop", abort: false, emergency: false},
+      {
+        label: "an abort",
+        abort: true,
+        emergency: false
+      }
+    ]) {
       var rig = rig(900);
       check(running(rig.runtime), 'before ${case_.label} the arc burns, the wire feeds and the vacuum is on');
       if (case_.abort) rig.runtime.submitAbort(2);
@@ -108,18 +162,37 @@ class WeldChannelTests {
     var emergency = rig(901);
     emergency.runtime.submitStop(2, true);
     for (tick in 11...20) emergency.harness.step(Int64.ofInt(tick * TICK));
-    check(!digital(emergency.runtime, ARC) && analog(emergency.runtime, WIRE) == 0.0, "an emergency stop takes the arc off and stops the wire");
-    check(analog(emergency.runtime, VOLTAGE) == 0.0 && !digital(emergency.runtime, GRIPPER) && !digital(emergency.runtime, SUCTION),
-      "an emergency stop takes every tool channel to its safe value");
+    check(
+      !digital(emergency.runtime, ARC) && analog(emergency.runtime, WIRE) == 0.0,
+      "an emergency stop takes the arc off and stops the wire"
+    );
+    check(
+      analog(emergency.runtime, VOLTAGE) == 0.0 && !digital(emergency.runtime, GRIPPER) && !digital(
+        emergency.runtime,
+        SUCTION
+      ),
+      "an emergency stop takes every tool channel to its safe value"
+    );
     emergency.harness.dispose();
     // A robot fault does the same: here a position target beyond the joint's limit, which the runtime refuses and latches.
     var faulted = rig(902);
     faulted.runtime.submitPositions([5.0], 2);
     for (tick in 11...20) faulted.harness.step(Int64.ofInt(tick * TICK));
-    check(faulted.runtime.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT, "the refused target faults the robot");
-    check(!digital(faulted.runtime, ARC) && analog(faulted.runtime, WIRE) == 0.0, "a robot fault takes the arc off and stops the wire");
-    check(analog(faulted.runtime, VOLTAGE) == 0.0 && !digital(faulted.runtime, GRIPPER) && !digital(faulted.runtime, SUCTION),
-      "a robot fault takes every tool channel to its safe value");
+    check(
+      faulted.runtime.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT,
+      "the refused target faults the robot"
+    );
+    check(
+      !digital(faulted.runtime, ARC) && analog(faulted.runtime, WIRE) == 0.0,
+      "a robot fault takes the arc off and stops the wire"
+    );
+    check(
+      analog(faulted.runtime, VOLTAGE) == 0.0 && !digital(faulted.runtime, GRIPPER) && !digital(
+        faulted.runtime,
+        SUCTION
+      ),
+      "a robot fault takes every tool channel to its safe value"
+    );
     faulted.harness.dispose();
   }
 
@@ -148,20 +221,27 @@ class WeldChannelTests {
     try wrong.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
     check(refused, "an arc declared to keep its output on a stop is refused by the torch that needs it off");
     var wrongSafe = blueprint();
-    wrongSafe.channels.push(new robotkit.execution.ProcessChannelDeclaration(WIRE, ProcessEventValue.Analog(4.0), false));
+    wrongSafe.channels.push(new robotkit.execution.ProcessChannelDeclaration(WIRE,
+      ProcessEventValue.Analog(4.0), false));
     refused = false;
     try wrongSafe.addTool(new WeldChannels(ARC, WIRE, VOLTAGE)) catch (_:Dynamic) refused = true;
     check(refused, "a wire speed declared with another safe value is refused");
     var agreeing = blueprint();
-    agreeing.channels.push(new robotkit.execution.ProcessChannelDeclaration(ARC, ProcessEventValue.Digital(false), false));
+    agreeing.channels.push(new robotkit.execution.ProcessChannelDeclaration(
+      ARC,
+      ProcessEventValue.Digital(false),
+      false
+    ));
     agreeing.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
     check(agreeing.channels.length == 3, "a declaration that agrees with the tool is not doubled");
     var plain = blueprint();
     plain.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
     plain.addTool(new GripperChannels(GRIPPER));
     var kept = [for (channel in plain.channels) if (channel.keepOnStop) channel.id];
-    check(kept.indexOf(VOLTAGE) >= 0 && kept.indexOf(GRIPPER) >= 0 && kept.length == 2,
-      'only the voltage setpoint and gripper command keep their outputs on a normal stop, got ${kept.join(",")}');
+    check(
+      kept.indexOf(VOLTAGE) >= 0 && kept.indexOf(GRIPPER) >= 0 && kept.length == 2,
+      'only the voltage setpoint and gripper command keep their outputs on a normal stop, got ${kept.join(",")}'
+    );
   }
 
   static function check(value:Bool, message:String):Void {

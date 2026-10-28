@@ -17,6 +17,9 @@ class SuctionChannels implements ToolChannels {
     this.channel = channel;
   }
 
-  public function declarations():Array<ProcessChannelDeclaration>
-    return [new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false), KEEPS_ON_STOP)];
+  public function declarations():Array<ProcessChannelDeclaration> return [new ProcessChannelDeclaration(
+    channel,
+    ProcessEventValue.Digital(false),
+    KEEPS_ON_STOP
+  )];
 }

@@ -16,15 +16,20 @@ class DifferentialDrive implements DriveModel {
   public final leftDirection:Int;
   public final rightDirection:Int;
 
-  public function new(leftWheelJoint:Int, rightWheelJoint:Int,
-      wheelRadius:Float, trackWidth:Float, leftDirection:Int = 1, rightDirection:Int = 1) {
-    if (leftWheelJoint < 0 || rightWheelJoint < 0 || leftWheelJoint == rightWheelJoint)
-      throw "Differential drive requires two distinct non-negative wheel joint indices";
-    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 ||
-        !Math.isFinite(trackWidth) || trackWidth <= 0.0)
-      throw "Differential drive dimensions must be finite and positive";
-    if (Math.abs(leftDirection) != 1 || Math.abs(rightDirection) != 1)
-      throw "Differential drive wheel directions must be 1 or -1";
+  public function new(
+    leftWheelJoint:Int,
+    rightWheelJoint:Int,
+    wheelRadius:Float,
+    trackWidth:Float,
+    leftDirection:Int = 1,
+    rightDirection:Int = 1
+  ) {
+    if (leftWheelJoint < 0 || rightWheelJoint < 0 || leftWheelJoint
+      == rightWheelJoint) throw "Differential drive requires two distinct non-negative wheel joint indices";
+    if (!Math.isFinite(wheelRadius) || wheelRadius <= 0.0 || !Math.isFinite(trackWidth)
+      || trackWidth <= 0.0) throw "Differential drive dimensions must be finite and positive";
+    if (Math.abs(leftDirection) != 1
+      || Math.abs(rightDirection) != 1) throw "Differential drive wheel directions must be 1 or -1";
     this.leftDirection = leftDirection;
     this.rightDirection = rightDirection;
     this.leftWheelJoint = leftWheelJoint;
@@ -40,9 +45,15 @@ class DifferentialDrive implements DriveModel {
 
   public function maxCurvature():Float return 1.0e300;
 
-  public function createOdometry():Null<DifferentialOdometry>
-    return new DifferentialOdometry(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth, null,
-      leftDirection, rightDirection);
+  public function createOdometry():Null<DifferentialOdometry> return new DifferentialOdometry(
+    leftWheelJoint,
+    rightWheelJoint,
+    wheelRadius,
+    trackWidth,
+    null,
+    leftDirection,
+    rightDirection
+  );
 
   public function supportsInPlaceRotation():Bool return true;
 
@@ -52,13 +63,15 @@ class DifferentialDrive implements DriveModel {
     var halfTurnSpeed = twist.angular * trackWidth * 0.5;
     return [
       JointTarget.velocity(leftWheelJoint, leftDirection * (twist.linear - halfTurnSpeed) / wheelRadius),
-      JointTarget.velocity(rightWheelJoint, rightDirection * (twist.linear + halfTurnSpeed) / wheelRadius)
+      JointTarget.velocity(
+        rightWheelJoint,
+        rightDirection * (twist.linear + halfTurnSpeed) / wheelRadius
+      )
     ];
   }
 
   static function rejectLateral(twist:Twist2):Void {
     if (twist == null) throw "Differential drive requires a twist";
-    if (Math.abs(twist.lateral) > 1e-9)
-      throw "Differential drive cannot execute a lateral command";
+    if (Math.abs(twist.lateral) > 1e-9) throw "Differential drive cannot execute a lateral command";
   }
 }

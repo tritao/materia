@@ -13,11 +13,16 @@ import robotkit.tool.SuctionGrip;
 
 /** Turn a connected MachineKit cup into a RobotKit holding-force check. */
 class SuctionCapacityBridge {
-  public static function toGrip(effector:EndEffector, cupInstanceId:String,
-      minimumCupVacuumKpa:Float, frictionCoefficient:Float, safetyFactor:Float,
-      ?state:AssemblyState):SuctionGrip {
-    if (effector == null || cupInstanceId == null || cupInstanceId.length == 0)
-      throw "Suction bridge requires an end effector and cup instance";
+  public static function toGrip(
+    effector:EndEffector,
+    cupInstanceId:String,
+    minimumCupVacuumKpa:Float,
+    frictionCoefficient:Float,
+    safetyFactor:Float,
+    ?state:AssemblyState
+  ):SuctionGrip {
+    if (effector == null || cupInstanceId == null
+      || cupInstanceId.length == 0) throw "Suction bridge requires an end effector and cup instance";
     effector.validate();
     var found = false;
     var suction = false;
@@ -45,20 +50,39 @@ class SuctionCapacityBridge {
       if (source != null && chain.indexOf('${member.id}/${source.outputPort}') >= 0) {
         var rating = source.ratedVacuumKpa;
         if (rating == null) throw 'Vacuum generator "${member.id}" has no pressure rating';
-        if (minimumCupVacuumKpa > rating + 1e-9)
-          throw 'Cup vacuum exceeds generator "${member.id}" rating';
+        if (minimumCupVacuumKpa > rating + 1e-9) throw 'Cup vacuum exceeds generator "${member.id}" rating';
       }
     }
     var solved = effector.solve(state);
     var memberPose = solved.poses.get(cupInstanceId);
     if (memberPose == null) throw 'Missing solved pose for "$cupInstanceId"';
-    var mountTContact = AssemblyFrames.compose(AssemblyFrames.inverse(solved.mountWorld),
-      AssemblyFrames.compose(memberPose, effector.memberConnectorFrame(cupInstanceId, contactConnector)));
+    var mountTContact = AssemblyFrames.compose(
+      AssemblyFrames.inverse(solved.mountWorld),
+      AssemblyFrames.compose(
+        memberPose,
+        effector.memberConnectorFrame(
+          cupInstanceId,
+          contactConnector
+        )
+      )
+    );
     var converted = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(mountTContact));
-    var flangeTCup = new Transform3(new Vec3(converted.position.x,
-      converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
-      converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
-    return new SuctionGrip(flangeTCup, (cast effectiveArea : Float) * 1e-6,
-      minimumCupVacuumKpa, frictionCoefficient, safetyFactor, ratedMoment);
+    var flangeTCup = new Transform3(
+      new Vec3(converted.position.x, converted.position.y, converted.position.z),
+      new Quat(
+        converted.quaternion.x,
+        converted.quaternion.y,
+        converted.quaternion.z,
+        converted.quaternion.w
+      )
+    );
+    return new SuctionGrip(
+      flangeTCup,
+      (cast effectiveArea:Float) * 1e-6,
+      minimumCupVacuumKpa,
+      frictionCoefficient,
+      safetyFactor,
+      ratedMoment
+    );
   }
 }

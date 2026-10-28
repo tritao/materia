@@ -29,7 +29,7 @@ class JointCoupling {
   public var stiffness:Float = 0.0;
   public var calibration:Null<materia.assembly.BeltCalibration> = null;
   /** Physical-pose constitutive law; stiffness is its certified minimum over travel for planning. */
-  public var stiffnessLaw(default,null):Null<PositionStiffness> = null;
+  public var stiffnessLaw(default, null):Null<PositionStiffness> = null;
   /**
    * How damped the coupling's response is, as a ratio of critical damping: a timing belt's is small (about 0.1), so a
    * carriage on it rings after a push, a steel screw's smaller (about 0.03). It comes from the part (an assumption
@@ -38,7 +38,7 @@ class JointCoupling {
   public var dampingRatio:Float = 0.0;
 
   public function setStiffnessLaw(law:PositionStiffness, joints:Array<Joint>):Void {
-    var envelope = stiffnessRange(law,joints);
+    var envelope = stiffnessRange(law, joints);
     stiffnessLaw = law;
     stiffness = envelope.minimum;
   }
@@ -46,16 +46,17 @@ class JointCoupling {
   /** Re-evaluate after joint-limit edits; a cached planning stiffness must remain conservative. */
   public function validateStiffnessLaw(joints:Array<Joint>):Void {
     if (stiffnessLaw == null) return;
-    var envelope = stiffnessRange(stiffnessLaw,joints);
-    if (!(stiffness > 0.0) || stiffness > envelope.minimum)
-      throw 'Coupling "$id" stiffness exceeds its travel envelope; reattach its stiffness law after editing joint limits';
+    var envelope = stiffnessRange(stiffnessLaw, joints);
+    if (!(stiffness > 0.0) || stiffness > envelope
+      .minimum) throw 'Coupling "$id" stiffness exceeds its travel envelope; reattach its stiffness law after editing joint limits';
   }
 
-  static function stiffnessRange(law:PositionStiffness,joints:Array<Joint>):{minimum:Float,maximum:Float} {
-    return law.range(id -> {
-      for (joint in joints) if (joint.id == id) return {lower:joint.limits.lower-joint.limits.overtravel,
-        upper:joint.limits.upper+joint.limits.overtravel};
-      throw 'Coupling "$id" has an unknown stiffness coordinate';
+  static function stiffnessRange(law:PositionStiffness, joints:Array<Joint>): {minimum: Float, maximum: Float} {
+    return law.range(id -> {for (joint in joints) if (joint.id == id) return {
+      lower: joint.limits.lower - joint.limits.overtravel,
+      upper: joint.limits.upper + joint.limits.overtravel
+    };
+    throw 'Coupling "$id" has an unknown stiffness coordinate';
     });
   }
 
@@ -69,14 +70,11 @@ class JointCoupling {
    */
   public var drag:Float = 0.0;
 
-  public function new(id:String, leader:JointId, follower:JointId,
-      ratio:Float, offset:Float) {
-    if (id == null || StringTools.trim(id).length == 0 ||
-        leader == null || StringTools.trim(leader).length == 0 ||
-        follower == null || StringTools.trim(follower).length == 0 ||
-        leader == follower || !Math.isFinite(ratio) || ratio == 0.0 ||
-        !Math.isFinite(offset))
-      throw "Joint coupling needs distinct joints, nonzero finite ratio and finite offset";
+  public function new(id:String, leader:JointId, follower:JointId, ratio:Float, offset:Float) {
+    if (id == null
+      || StringTools.trim(id).length == 0 || leader == null || StringTools.trim(leader).length == 0 || follower == null
+      || StringTools.trim(follower).length == 0 || leader == follower || !Math.isFinite(ratio) || ratio == 0.0
+      || !Math.isFinite(offset)) throw "Joint coupling needs distinct joints, nonzero finite ratio and finite offset";
     this.id = id;
     this.leader = leader;
     this.follower = follower;

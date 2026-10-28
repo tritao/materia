@@ -46,9 +46,8 @@ class VelocityReference {
    */
   public function new(limit:Array<Float>, acceleration:Array<Float>) {
     if (limit.length != 3 || acceleration.length != 3) throw "velocity limits are per axis: forward, lateral, yaw";
-    for (i in 0...3)
-      if (!(limit[i] >= 0.0) || !(acceleration[i] > 0.0) || !Math.isFinite(limit[i]) || !Math.isFinite(acceleration[i]))
-        throw "velocity limits must be finite and non-negative, accelerations positive";
+    for (i in 0...3) if (!(limit[i] >= 0.0) || !(acceleration[i] > 0.0) || !Math.isFinite(limit[i]) || !Math
+      .isFinite(acceleration[i])) throw "velocity limits must be finite and non-negative, accelerations positive";
     this.limit = limit.copy();
     this.acceleration = acceleration.copy();
   }

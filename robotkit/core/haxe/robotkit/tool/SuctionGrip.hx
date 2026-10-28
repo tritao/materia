@@ -13,16 +13,20 @@ class SuctionGrip {
   public final safetyFactor:Float;
   public final ratedMomentNm:Null<Float>;
 
-  public function new(flangeTCup:Transform3, effectiveAreaM2:Float,
-      minimumVacuumKpa:Float, frictionCoefficient:Float, safetyFactor:Float,
-      ?ratedMomentNm:Float) {
-    if (flangeTCup == null || !Math.isFinite(effectiveAreaM2) || effectiveAreaM2 <= 0 ||
-        !Math.isFinite(minimumVacuumKpa) || minimumVacuumKpa <= 0 ||
-        minimumVacuumKpa > 101.325 || !Math.isFinite(frictionCoefficient) ||
-        frictionCoefficient <= 0 || !Math.isFinite(safetyFactor) || safetyFactor < 1.5)
-      throw "Suction grip requires contact pose, sealed area, cup vacuum, friction and safety factor >= 1.5";
-    if (ratedMomentNm != null && (!Math.isFinite(ratedMomentNm) || ratedMomentNm <= 0))
-      throw "Suction grip moment rating must be positive and finite";
+  public function new(
+    flangeTCup:Transform3,
+    effectiveAreaM2:Float,
+    minimumVacuumKpa:Float,
+    frictionCoefficient:Float,
+    safetyFactor:Float,
+    ?ratedMomentNm:Float
+  ) {
+    if (flangeTCup == null || !Math.isFinite(effectiveAreaM2)
+      || effectiveAreaM2 <= 0 || !Math.isFinite(minimumVacuumKpa) || minimumVacuumKpa <= 0 || minimumVacuumKpa > 101.325
+      || !Math.isFinite(frictionCoefficient) || frictionCoefficient <= 0 || !Math.isFinite(safetyFactor) || safetyFactor
+      < 1.5) throw "Suction grip requires contact pose, sealed area, cup vacuum, friction and safety factor >= 1.5";
+    if (ratedMomentNm != null && (!Math.isFinite(ratedMomentNm)
+      || ratedMomentNm <= 0)) throw "Suction grip moment rating must be positive and finite";
     this.flangeTCup = flangeTCup;
     this.effectiveAreaM2 = effectiveAreaM2;
     this.minimumVacuumKpa = minimumVacuumKpa;

@@ -9,12 +9,17 @@ class PoseCovariance2 {
   public final yYaw:Float;
   public final yawYaw:Float;
 
-  public function new(xx:Float = 0.0, xy:Float = 0.0, xYaw:Float = 0.0,
-      yy:Float = 0.0, yYaw:Float = 0.0, yawYaw:Float = 0.0) {
-    for (value in [xx, xy, xYaw, yy, yYaw, yawYaw])
-      if (!Math.isFinite(value)) throw "Pose covariance values must be finite";
-    if (xx < 0.0 || yy < 0.0 || yawYaw < 0.0)
-      throw "Pose covariance variances must be non-negative";
+  public function new(
+    xx:Float = 0.0,
+    xy:Float = 0.0,
+    xYaw:Float = 0.0,
+    yy:Float = 0.0,
+    yYaw:Float = 0.0,
+    yawYaw:Float = 0.0
+  ) {
+    for (value in [xx,
+      xy, xYaw, yy, yYaw, yawYaw]) if (!Math.isFinite(value)) throw "Pose covariance values must be finite";
+    if (xx < 0.0 || yy < 0.0 || yawYaw < 0.0) throw "Pose covariance variances must be non-negative";
     this.xx = xx;
     this.xy = xy;
     this.xYaw = xYaw;

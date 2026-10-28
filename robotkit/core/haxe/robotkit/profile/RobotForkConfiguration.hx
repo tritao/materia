@@ -16,8 +16,8 @@ class RobotForkConfiguration {
     maxMassKg:Float,
     maxLoadMomentKgMeters:Float,
     maxLiftHeightMeters:Float,
-    ? tiltJointId:JointId,
-    ? spreadJointId:JointId
+    ?tiltJointId:JointId,
+    ?spreadJointId:JointId
   ) {
     this.liftJointId = liftJointId;
     this.tiltJointId = tiltJointId;

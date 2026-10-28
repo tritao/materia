@@ -9,7 +9,8 @@ class SimulatedSurfaceTool implements SurfaceTool {
   var enabledState = false;
   var standoffState = 0.0;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function enable(timestampNs:Int64):Void {
     enabledState = true;
@@ -24,16 +25,15 @@ class SimulatedSurfaceTool implements SurfaceTool {
   public function isEnabled():Bool return enabledState;
 
   public function setStandoff(standoffMeters:Float, timestampNs:Int64):Void {
-    if (!Math.isFinite(standoffMeters) || standoffMeters < 0.0)
-      throw "Surface tool standoff must be finite and non-negative";
+    if (!Math.isFinite(standoffMeters)
+      || standoffMeters < 0.0) throw "Surface tool standoff must be finite and non-negative";
     standoffState = standoffMeters;
     record(timestampNs);
   }
 
   public function standoff():Float return standoffState;
 
-  function record(timestampNs:Int64):Void
-    history.push(new SurfaceToolEvent(enabledState, standoffState, timestampNs));
+  function record(timestampNs:Int64):Void history.push(new SurfaceToolEvent(enabledState, standoffState, timestampNs));
 }
 
 /** One recorded `SimulatedSurfaceTool` state change. */

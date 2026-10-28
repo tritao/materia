@@ -53,7 +53,10 @@ class HeaterSetup {
   public final tuning:HeaterTuning;
 
   public function new(name:String, sensorId:String, sensorSlot:Int, targetChannel:String, tuning:HeaterTuning) {
-    this.name = name; this.sensorId = sensorId; this.sensorSlot = sensorSlot; this.targetChannel = targetChannel;
+    this.name = name;
+    this.sensorId = sensorId;
+    this.sensorSlot = sensorSlot;
+    this.targetChannel = targetChannel;
     this.tuning = tuning;
   }
 }
@@ -67,7 +70,8 @@ class HeaterExtruder {
   public function new(actuator:Int, feed:Int) {
     if (actuator < 0) throw "An extruder's actuator is a deployment index";
     if (feed != 1 && feed != -1) throw "An extruder's feed direction is +1 or -1";
-    this.actuator = actuator; this.feed = feed;
+    this.actuator = actuator;
+    this.feed = feed;
   }
 
   /** The extruder on a device channel whose actuator is `ratio` times the extruder joint (pushing filament turns the joint forward). */
@@ -102,14 +106,24 @@ class VirtualHeaters {
   final latest:Array<HeaterReading>;
 
   public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, setups:Array<HeaterSetup>) {
-    this.simulation = simulation; this.runtime = runtime; this.robotIndex = robotIndex; this.setups = setups.copy();
+    this.simulation = simulation;
+    this.runtime = runtime;
+    this.robotIndex = robotIndex;
+    this.setups = setups.copy();
     sequences = [for (_ in setups) Int64.ofInt(0)];
     publications = [for (_ in setups) Int64.ofInt(0)];
-    latest = [for (_ in setups) {celsius: 0.0, targetCelsius: 0.0, duty: 0.0, atTarget: false, fault: 0}];
+    latest = [for (_ in setups) {
+      celsius:0.0, targetCelsius:0.0, duty:0.0, atTarget:false, fault:0
+    }
+    ];
   }
 
   /** Sets up the board's heater profile (peripheral 2) and the sensor slots it feeds; before the robot is added. */
-  public static function configure(options:VirtualDeviceOptions, blueprint:RobotRuntimeBlueprint, setups:Array<HeaterSetup>):Void {
+  public static function configure(
+    options:VirtualDeviceOptions,
+    blueprint:RobotRuntimeBlueprint,
+    setups:Array<HeaterSetup>
+  ):Void {
     if (setups.length < 1 || setups.length > 2) throw "A virtual device has one or two heaters";
     function channelIndex(name:String):Int {
       for (i in 0...blueprint.channels.length) if (blueprint.channels[i].id == name) return i;
@@ -120,13 +134,35 @@ class VirtualHeaters {
     for (setup in setups) {
       var tuning = setup.tuning;
       slots.push(setup.sensorSlot);
-      parameters = parameters.concat([setup.sensorSlot, channelIndex(setup.targetChannel),
+      parameters = parameters.concat([
+        setup.sensorSlot,
+        channelIndex(setup.targetChannel),
         setup.fanChannel == null ? -1 : channelIndex(setup.fanChannel),
-        setup.extruder == null ? -1 : setup.extruder.actuator, setup.extruder == null ? 0 : setup.extruder.feed,
-        tuning.r0Ohm, tuning.t0Celsius, tuning.beta, tuning.pullupOhm, tuning.vRef, tuning.kp, tuning.ki, tuning.kd, tuning.maxDuty,
-        tuning.maxTemperature, setup.minExtrusionTemperature, tuning.bandCelsius, tuning.pidRangeCelsius,
-        tuning.gainWindowSeconds, tuning.gainMinCelsius, tuning.hysteresisCelsius, tuning.hysteresisWindowSeconds,
-        tuning.heatCapacity, tuning.power, tuning.loss, tuning.fanLoss, tuning.ambient]);
+        setup.extruder == null ? -1 : setup.extruder.actuator,
+        setup.extruder == null ? 0 : setup.extruder.feed,
+        tuning.r0Ohm,
+        tuning.t0Celsius,
+        tuning.beta,
+        tuning.pullupOhm,
+        tuning.vRef,
+        tuning.kp,
+        tuning.ki,
+        tuning.kd,
+        tuning.maxDuty,
+        tuning.maxTemperature,
+        setup.minExtrusionTemperature,
+        tuning.bandCelsius,
+        tuning.pidRangeCelsius,
+        tuning.gainWindowSeconds,
+        tuning.gainMinCelsius,
+        tuning.hysteresisCelsius,
+        tuning.hysteresisWindowSeconds,
+        tuning.heatCapacity,
+        tuning.power,
+        tuning.loss,
+        tuning.fanLoss,
+        tuning.ambient
+      ]);
     }
     options.peripheralKind = 2;
     options.externalSensorSlots = slots;
@@ -144,8 +180,13 @@ class VirtualHeaters {
       publications[index] = Int64.add(publications[index], Int64.ofInt(1));
       // The board and the runtime share one oscillator; observe the runtime first so a reset has advanced its clock epoch.
       runtime.snapshot();
-      runtime.publishSensorFrame(setups[index].sensorId, values, publications[index], sample.get_source_timestamp_ns(),
-        runtime.endpoint.sourceClockId());
+      runtime.publishSensorFrame(
+        setups[index].sensorId,
+        values,
+        publications[index],
+        sample.get_source_timestamp_ns(),
+        runtime.endpoint.sourceClockId()
+      );
       sequences[index] = sample.get_sequence();
       latest[index] = HeaterSensor.reading(values);
     }
@@ -163,8 +204,12 @@ class VirtualHeaters {
   }
 
   /** Reaches the plant of heater `name`: see the kinds above. */
-  public function setInput(name:String, kind:Int, value:Float):Void
-    simulation.setVirtualDeviceInput(robotIndex, 2, indexOf(name) * INPUTS_PER_HEATER + kind, value);
+  public function setInput(name:String, kind:Int, value:Float):Void simulation.setVirtualDeviceInput(
+    robotIndex,
+    2,
+    indexOf(name) * INPUTS_PER_HEATER + kind,
+    value
+  );
 
   function indexOf(name:String):Int {
     for (i in 0...setups.length) if (setups[i].name == name) return i;

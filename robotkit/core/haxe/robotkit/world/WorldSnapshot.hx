@@ -17,14 +17,17 @@ class WorldSnapshot {
   /** Compatibility alias for callers that used the old single timestamp. */
   public var timestampNs(get, never):Int64;
 
-  public function new(sequence:Int, topologyRevision:Int, sourceTimestampNs:Int64,
-      source:Map<RobotId, RobotSnapshot>, ?receivedTimestampNs:Int64) {
+  public function new(
+    sequence:Int,
+    topologyRevision:Int,
+    sourceTimestampNs:Int64,
+    source:Map<RobotId, RobotSnapshot>,
+    ?receivedTimestampNs:Int64
+  ) {
     this.sequence = sequence;
     this.topologyRevision = topologyRevision;
     this.sourceTimestampNs = sourceTimestampNs;
-    this.receivedTimestampNs = receivedTimestampNs == null
-      ? Int64.ofInt(0)
-      : receivedTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null ? Int64.ofInt(0) : receivedTimestampNs;
     robotMap = new Map<RobotId, RobotSnapshot>();
     for (id in source.keys()) {
       var value = source.get(id);
@@ -50,8 +53,12 @@ class WorldSnapshot {
           value.trajectoryDurationNs,
           value.trajectoryTag,
           value.trajectoryTagTimeNs,
-          value.sessionState, value.activePlanId, value.committedUntilNs,
-          value.queueEndTimeNs, value.setpointPositions.toArray(), value.streamSequences
+          value.sessionState,
+          value.activePlanId,
+          value.committedUntilNs,
+          value.queueEndTimeNs,
+          value.setpointPositions.toArray(),
+          value.streamSequences
         )
       );
     }
@@ -60,7 +67,7 @@ class WorldSnapshot {
   /** Looks up one immutable robot observation by logical ID. */
   public function robot(id:RobotId):Null<RobotSnapshot> return robotMap.get(id);
 
-  public function robotIds():Array < RobotId > {
+  public function robotIds():Array<RobotId> {
     var result:Array<RobotId> = [];
     for (id in robotMap.keys()) result.push(id);
     result.sort(function(left, right) return Reflect.compare(left, right));
