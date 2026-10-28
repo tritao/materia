@@ -5,7 +5,6 @@ import TrajectoryCore;
 import motionkit.kinematics.Twist6;
 import motionkit.path.PoseDerivatives;
 import robotkit.model.JointCoupling;
-import motionkit.MotionOptions;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;

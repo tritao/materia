@@ -11,8 +11,6 @@ import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StructuredJointPathPlanner;
 import motionkit.robot.TrajectoryClearanceProof.ClearanceEvent;
 import motionkit.trajectory.ValidationReport;
-import robotkit.collision.CollisionClearance;
-import robotkit.collision.CollisionClearance;
 import ClearanceBodyData;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceWorld;

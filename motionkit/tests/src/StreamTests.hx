@@ -1,38 +1,15 @@
 import haxe.Int64;
 import haxe.io.Bytes;
 import machinekit.assembly.LinearAxis;
-import cadbridge.AssemblySimulationBridge;
-import machinekit.motion.LeadScrewThread;
-import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import motionkit.AxisTarget;
 import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
-import motionkit.event.ChannelKind;
-import motionkit.event.EventValue;
-import motionkit.event.HoldPolicy;
-import motionkit.robot.ProgramCompiler;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
-import motionkit.robot.SessionState;
-import motionkit.robot.StopDisposition;
-import motionkit.path.CornerBlender;
-import motionkit.path.PathTimeLaw;
-import motionkit.path.PathTimeLaw.PathTimeStage;
-import motionkit.path.OrientationPolicy;
-import processkit.path.Toolpath;
-import robotkit.spatial.Quat;
-import motionkit.planner.SimplePathTiming;
-import motionkit.planner.BindingConstraint.BindingConstraintKind;
-import motionkit.program.Blend;
-import motionkit.program.InputPredicate;
-import motionkit.program.MotionOp;
-import motionkit.program.MoveTarget;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
 import trajectorykit.validation.ValidationGuarantee;
 import robotkit.model.JointType;
-import robotkit.model.Transmission;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import RobotKitRuntime;
 import robotkit.recording.RecordingRobot;
@@ -43,15 +20,7 @@ import robotkit.core.RobotCommand;
 import robotkit.core.RobotCapabilities;
 import robotkit.core.RobotDescription;
 import robotkit.core.RobotSnapshot;
-import robotkit.core.RobotStatus;
-import robotkit.core.StopMode;
-import robotkit.execution.ProcessEventValue;
 
-import MotionKitTestSupport.WristBranchSolver;
-import MotionKitTestSupport.PlanarSolver;
-import MotionKitTestSupport.SessionTransitionRig;
-import MotionKitTestSupport.LaggingRobot;
-import MotionKitTestSupport.TrialRig;
 
 class StreamTests extends MotionKitTestSupport {
   public function new() {
