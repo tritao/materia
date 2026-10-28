@@ -16,7 +16,7 @@ and the cabinet controller about that device. The spec of the pendant itself is
 | `src/host_link.rs` | What the host allows (`OperatorState`); stale means not allowed. |
 | `src/profile.rs` | The compiled machine profile and its digest. |
 | `src/operator_frame.rs` | The `OPR1` frame for host to controller messages (CRC from the RKD6 core). |
-| `../haxe/src/machinekit/operator/` | `OperatorProfile` (the model and its codec), `PendantCompiler`, `OperatorFrame`. |
+| `../haxe/src/machinekit/operator/` | `OperatorProfile` (the model and its codec), `PendantCompiler`, `OperatorFrame`, and the host side: `PendantJogDriver` turns `PendantEvent`s into jog distances for a `JogSink`, tracks pendant authority for HMI arbitration, and builds `OperatorState` frames. |
 | `../cabinet_node/` | `OperatorService`: runs the above on the cabinet node and gates executing jogs through the core's `JogGate`. |
 | `vectors/` | Byte vectors made by the Haxe compiler; the Rust tests decode them. |
 
@@ -41,4 +41,11 @@ PENDANT_VECTORS=write ...                  # refresh vectors/ after reviewing a 
 ```
 
 `scripts/test-haxeon` runs the first script before the Haxe suites. The Haxe side of the link is
-`OperatorProfileTests` and `PendantCompilerTests` in the smoke suite.
+`OperatorProfileTests`, `PendantCompilerTests` and `PendantJogDriverTests` in the smoke suite.
+
+## Not done yet
+
+A `JogSink` that drives the host runtime. Pendant distances are per-count position increments, which
+need live retargeting (OM5 in `motionkit/plans/ONLINE_MOTION.md`); the existing velocity
+`MotionSystem.jog` fits a wheel badly. The adapter belongs where `MotionSystem` is available (the HMI
+runtime), since `machinekit` does not depend on `motionkit`.

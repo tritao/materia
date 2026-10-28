@@ -78,7 +78,7 @@ class PendantCompiler {
       fill(entry.text, p.keys[i].label);
       labels.push(entry.encode());
     }
-    return new CompiledPendant(record.encode(), texts, labels);
+    return new CompiledPendant(record.encode(), texts, reasons, labels);
   }
 
   /** The bit in the controller's active-condition mask; matches OperatorCondition in operator.wire.idl. */

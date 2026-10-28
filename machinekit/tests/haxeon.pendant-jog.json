@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-pendant-jog-tests"},
+  "entry": "PendantJogDriverTests",
+  "sourceRoots": ["src"],
+  "dependencies": {"machinekit": {"path": ".."}},
+  "target": "host",
+  "outputDir": "build/pendant-jog"
+}
