@@ -42,6 +42,20 @@ state would have to reset on power-up and lease changes. Eleven axes is more tha
 CNC needs (the hobber has six). A machine with more than that, such as a seven-joint arm, uses
 its own pendant. If the OLED proves troublesome, the switch and the HMI still work without it.
 
+### Physical switches or membrane keys
+
+Physical for v1. The E-stop, the enabling switch and the axis and step selectors have to be real devices whatever the keys
+are. For the other seven keys (Start, Hold, Stop, F1 to F3, wheel enable), discrete 16 mm metal buttons win on a handheld:
+raised, travelling keys can be found and pressed with a glove and do not fire when the face is held against the palm, they carry
+their own LED, the OLED supplies the function-key legends so a printed overlay adds little, and for one printed unit they
+are standard, swappable parts already in the model.
+
+A membrane keypad is a later option, not a v1 choice. It gives one sealed thin face (IP65 without gland and nut seals), no
+plate cut-outs, a board that can sit close behind the face, custom graphics and a lower cost at volume. It costs custom
+tooling and a layout that is frozen, and it is worse with gloves and for accidental presses. The natural place for it is a
+block of secondary keys (jog increments, axis keys) beside the physical safety and cycle keys, as on commercial pendants,
+once the layout has been proven on the bench.
+
 ## MPG hand wheel (from the vendor drawing)
 
 Read from the Vallder dimension drawing and the rear photos; the page itself gives no numbers.
