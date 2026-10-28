@@ -51,7 +51,6 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
 import robotkit.skill.FollowPath;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.core.Robot;
 import robotkit.core.RobotCapabilities;
