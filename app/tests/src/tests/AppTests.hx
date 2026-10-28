@@ -4,24 +4,24 @@ import app.MachineKitRecipeProjectTests;
 
 /** Default app regression entry point. */
 class AppTests {
-	static function main():Int {
-		ProjectProcessTests.run();
+  static function main():Int {
+    ProjectProcessTests.run();
     SceneVisibilityTests.run();
     SceneTreeSelectionTests.run();
     MoldSourceLinkTests.run();
     ViewportSelectionTests.run();
     if (StartPageTests.main() != 0) return 1;
     if (MissionJobsTests.main() != 0) return 1;
-		SheetMaterialIntegrationTests.run();
-		if (AppPreferencesTests.main() != 0) return 1;
-		if (EditorSettingsDialogTests.main() != 0) return 1;
-		if (SceneAtomicityTests.main() != 0) return 1;
-		if (ProjectDocumentTests.main() != 0) return 1;
-		if (EditorToolbarLayoutTests.main() != 0) return 1;
-		if (EditorWorkspaceLayoutTests.main() != 0) return 1;
-		if (DocumentPathTests.main() != 0) return 1;
-		if (BimEditorProjectionTests.main() != 0) return 1;
-		if (MachineKitRecipeProjectTests.main() != 0) return 1;
+    SheetMaterialIntegrationTests.run();
+    if (AppPreferencesTests.main() != 0) return 1;
+    if (EditorSettingsDialogTests.main() != 0) return 1;
+    if (SceneAtomicityTests.main() != 0) return 1;
+    if (ProjectDocumentTests.main() != 0) return 1;
+    if (EditorToolbarLayoutTests.main() != 0) return 1;
+    if (EditorWorkspaceLayoutTests.main() != 0) return 1;
+    if (DocumentPathTests.main() != 0) return 1;
+    if (BimEditorProjectionTests.main() != 0) return 1;
+    if (MachineKitRecipeProjectTests.main() != 0) return 1;
     if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;
     if (CameraClipRangeTests.main() != 0) return 1;

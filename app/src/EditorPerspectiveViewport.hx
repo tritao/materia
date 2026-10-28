@@ -77,305 +77,487 @@ class EditorPerspectiveViewport implements View {
   var lastRenderSeconds:Float = 0.0;
   var totalRenderSeconds:Float = 0.0;
   final camera:PerspectiveCamera = new PerspectiveCamera();
-  public var presentation(default,null):Null<PresentationController>;
-  var presentationCenters:Null<Map<String,Array<Float>>>;
-  var presentationScale=1.0;
+  public var presentation(default, null):Null<PresentationController>;
+  var presentationCenters:Null<Map<String, Array<Float>>>;
+  var presentationScale = 1.0;
   var presentationResult:Null<PresentationFrame>;
-  var presentationRevision="";
+  var presentationRevision = "";
   var presentationPoses:Array<SimulationPoseVisual> = [];
-  var presentationPoseById:Map<String,SimulationPoseVisual> = [];
-  var presentationCameraDirty=true;
+  var presentationPoseById:Map<String, SimulationPoseVisual> = [];
+  var presentationCameraDirty = true;
   var presentationTarget:Null<Array<Float>>;
   var presentationCameraView:Null<String>;
-  var readOnly=false;
-  var inspectionZoom:Float=1;
-  public var onInspectionZoom:Null<Float->Void> = null;
+  var readOnly = false;
+  var inspectionZoom:Float = 1;
+  public var onInspectionZoom:Null<Float -> Void> = null;
   /** Section edits go through the document owner so a general plane can survive save/reopen. */
-  public var onSectionEdit:Null<Array<SectionPlane>->Void> = null;
+  public var onSectionEdit:Null<Array<SectionPlane> -> Void> = null;
 
   var offsetOriginal:Null<PresentationController>;
   var offsetDraft:Null<ExplodeOffset>;
-  var offsetSaved:Null<ExplodeOffset->Void>;
+  var offsetSaved:Null<ExplodeOffset -> Void>;
   var offsetAxis:Array<Float> = [];
   var offsetDragAxis:Array<Float> = [];
-  var offsetDragDistance=0.0;
-  var offsetHandleLength=0.0;
+  var offsetDragDistance = 0.0;
+  var offsetHandleLength = 0.0;
 
   /** Drag an occurrence along its existing parent-frame direction; new offsets start along parent Z. */
-  public function beginPresentationOffsetEdit(id:Null<String>,save:ExplodeOffset->Void):Bool {
+  public function beginPresentationOffsetEdit(id:Null<String>, save:ExplodeOffset -> Void):Bool {
     cancelPresentationOffsetEdit();
-    var controller=presentation;
-    if(!editingEnabled()||controller==null||id==null||!StringTools.startsWith(id,"project:"))return false;
-    var item=scene.object(id);if(item==null)return false;
-    var occurrence=id.substr(8);
-    var draft:ExplodeOffset={select:{occurrence:occurrence,subtree:false},direction:{x:0,y:0,z:1},
-      distance:Math.max(item.width,Math.max(item.height,item.depth))*2/presentationScale,stage:1,source:Authored};
-    for(offset in controller.record.explode)if(offset.select.occurrence==occurrence&&!offset.select.subtree)
-      draft=haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(offset));
-    draft.source=Authored;offsetOriginal=controller;offsetDraft=draft;offsetSaved=save;
+    var controller = presentation;
+    if (!editingEnabled() || controller == null || id == null || !StringTools.startsWith(id, "project:")) return false;
+    var item = scene.object(id);
+    if (item == null) return false;
+    var occurrence = id.substr(8);
+    var draft:ExplodeOffset = {
+      select: {occurrence: occurrence, subtree: false},
+      direction: {x: 0, y: 0, z: 1},
+      distance: Math.max(item.width, Math.max(item.height, item.depth)) * 2 / presentationScale,
+      stage: 1,
+      source: Authored
+    };
+    for (offset in controller.record.explode) if (offset.select.occurrence == occurrence
+      && !offset.select.subtree) draft = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(offset));
+    draft.source = Authored;
+    offsetOriginal = controller;
+    offsetDraft = draft;
+    offsetSaved = save;
     previewPresentationOffset(draft.distance);
-    var initial=presentationFrame();if(initial==null){cancelPresentationOffsetEdit();return false;}
-    var first=initial.poses.get(occurrence);
-    if(first==null){cancelPresentationOffsetEdit();return false;}
-    var before=[first.x,first.y,first.z],distance=draft.distance;
-    previewPresentationOffset(distance+1);
-    var extended=presentationFrame();if(extended==null){cancelPresentationOffsetEdit();return false;}
-    var second=extended.poses.get(occurrence);
-    if(second==null){cancelPresentationOffsetEdit();return false;}
-    offsetAxis=[second.x-before[0],second.y-before[1],second.z-before[2]];
+    var initial = presentationFrame();
+    if (initial == null) {
+      cancelPresentationOffsetEdit();
+      return false;
+    }
+    var first = initial.poses.get(occurrence);
+    if (first == null) {
+      cancelPresentationOffsetEdit();
+      return false;
+    }
+    var before = [first.x, first.y, first.z], distance = draft.distance;
+    previewPresentationOffset(distance + 1);
+    var extended = presentationFrame();
+    if (extended == null) {
+      cancelPresentationOffsetEdit();
+      return false;
+    }
+    var second = extended.poses.get(occurrence);
+    if (second == null) {
+      cancelPresentationOffsetEdit();
+      return false;
+    }
+    offsetAxis = [second.x - before[0], second.y - before[1], second.z - before[2]];
     previewPresentationOffset(distance);
-    offsetHandleLength=Math.max(camera.distance*0.12,Math.max(item.width,Math.max(item.height,item.depth)));
-    host.requestFrame();return true;
+    offsetHandleLength = Math.max(camera.distance * 0.12, Math.max(item.width, Math.max(item.height, item.depth)));
+    host.requestFrame();
+    return true;
   }
   function previewPresentationOffset(distance:Float):Void {
-    var original=offsetOriginal,draft=offsetDraft;if(original==null||draft==null)return;
-    draft.distance=distance;
-    var record:AssemblyPresentation=haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(original.record));
-    record.explode=[for(offset in record.explode)if(offset.select.occurrence!=draft.select.occurrence||offset.select.subtree!=draft.select.subtree)offset];
+    var original = offsetOriginal, draft = offsetDraft;
+    if (original == null || draft == null) return;
+    draft.distance = distance;
+    var record:AssemblyPresentation = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(original.record));
+    record.explode = [for (offset in record.explode) if (offset.select.occurrence != draft.select.occurrence
+      || offset.select.subtree != draft.select.subtree) offset];
     record.explode.push(haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(draft)));
-    var next=new PresentationController(original.definition,record);next.retainCursor(original);
-    next.selectProcedure(null);next.setExplode(1);presentation=next;presentationRevision="";presentationResult=null;
-    lightingRevision++;host.requestFrame();
+    var next = new PresentationController(original.definition, record);
+    next.retainCursor(original);
+    next.selectProcedure(null);
+    next.setExplode(1);
+    presentation = next;
+    presentationRevision = "";
+    presentationResult = null;
+    lightingRevision++;
+    host.requestFrame();
   }
-  public function presentationOffsetEditing():Bool return offsetOriginal!=null;
+  public function presentationOffsetEditing():Bool return offsetOriginal != null;
   public function cancelPresentationOffsetEdit():Void {
-    if(offsetOriginal!=null)presentation=offsetOriginal;
-    offsetOriginal=null;offsetDraft=null;offsetSaved=null;offsetAxis=[];
-    presentationRevision="";presentationResult=null;lightingRevision++;host.requestFrame();
+    if (offsetOriginal != null) presentation = offsetOriginal;
+    offsetOriginal = null;
+    offsetDraft = null;
+    offsetSaved = null;
+    offsetAxis = [];
+    presentationRevision = "";
+    presentationResult = null;
+    lightingRevision++;
+    host.requestFrame();
   }
   function finishPresentationOffsetEdit(keep:Bool):Void {
-    var draft=offsetDraft,save=offsetSaved;
+    var draft = offsetDraft, save = offsetSaved;
     cancelPresentationOffsetEdit();
-    if(keep&&draft!=null&&save!=null) {
-      if(presentation!=null){presentation.selectProcedure(null);presentation.setExplode(1);}
+    if (keep && draft != null && save != null) {
+      if (presentation != null) {
+        presentation.selectProcedure(null);
+        presentation.setExplode(1);
+      }
       save(draft);
     }
   }
-  function offsetHandle(width:Float,height:Float):Null<Array<Float>> {
-    var draft=offsetDraft;if(draft==null||offsetAxis.length!=3)return null;
-    updatePresentation();var item=scene.object("project:"+draft.select.occurrence);if(item==null)return null;
-    var pose=presentationPoseById.get(item.id),at=pose==null?[item.x,item.y,item.z]:pose.position;
-    var start=camera.project(at[0],at[1],at[2],width,height);
-    var end=camera.project(at[0]+offsetAxis[0]*offsetHandleLength,at[1]+offsetAxis[1]*offsetHandleLength,at[2]+offsetAxis[2]*offsetHandleLength,width,height);
-    return start==null||end==null?null:[start.x,start.y,end.x,end.y];
+  function offsetHandle(width:Float, height:Float):Null<Array<Float>> {
+    var draft = offsetDraft;
+    if (draft == null || offsetAxis.length != 3) return null;
+    updatePresentation();
+    var item = scene.object("project:" + draft.select.occurrence);
+    if (item == null) return null;
+    var pose = presentationPoseById.get(item.id), at = pose == null ? [item.x, item.y, item.z] : pose.position;
+    var start = camera.project(at[0], at[1], at[2], width, height);
+    var end = camera.project(
+      at[0] + offsetAxis[0] * offsetHandleLength,
+      at[1] + offsetAxis[1] * offsetHandleLength,
+      at[2] + offsetAxis[2] * offsetHandleLength,
+      width,
+      height
+    );
+    return start == null || end == null ? null : [start.x, start.y, end.x, end.y];
   }
-  function paintPresentationOffset(canvas:Canvas,width:Float,height:Float):Void {
-    if(!editingEnabled())return;
-    var handle=offsetHandle(width,height);if(handle==null)return;
-    var path=new PathBuilder();path.moveTo(handle[0],handle[1]).lineTo(handle[2],handle[3]);
-    var color=Color.rgba(1,0.55,0.1,1);canvas.strokeTransient(path.build(),color,3);
-    canvas.fillRect(new Rect(handle[2]-6,handle[3]-6,12,12),color);
+  function paintPresentationOffset(canvas:Canvas, width:Float, height:Float):Void {
+    if (!editingEnabled()) return;
+    var handle = offsetHandle(width, height);
+    if (handle == null) return;
+    var path = new PathBuilder();
+    path.moveTo(handle[0], handle[1]).lineTo(handle[2], handle[3]);
+    var color = Color.rgba(1, 0.55, 0.1, 1);
+    canvas.strokeTransient(path.build(), color, 3);
+    canvas.fillRect(new Rect(handle[2] - 6, handle[3] - 6, 12, 12), color);
   }
 
-  public function setPresentation(record:Null<AssemblyPresentation>,definition:Null<AssemblyDefinition>,
-      centers:Null<Map<String,Array<Float>>>,scale:Float,readOnly:Bool=false):Void {
+  public function setPresentation(
+    record:Null<AssemblyPresentation>,
+    definition:Null<AssemblyDefinition>,
+    centers:Null<Map<String, Array<Float>>>,
+    scale:Float,
+    readOnly:Bool = false
+  ):Void {
     // Ordinary editor refreshes rebind the same generated record while the preview owns a temporary controller.
-    if(offsetOriginal!=null&&record==offsetOriginal.record&&definition==offsetOriginal.definition&&!readOnly)return;
-    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
-    this.readOnly=readOnly;
-    var current=presentation;
-    if(current==null&&(record==null||definition==null))return;
-    if(current!=null&&current.record==record&&current.definition==definition)return;
-    var next=record==null||definition==null?null:new PresentationController(definition,record);
-    if(next!=null&&current!=null&&current.definition==definition)next.retainCursor(current);
-    presentation=next;
-    presentationCenters=centers;presentationScale=scale;presentationRevision="";
-    presentationResult=null;presentationCameraDirty=true;presentationTarget=null;
-    lightingRevision++;host.requestFrame();
+    if (offsetOriginal != null
+      && record == offsetOriginal.record && definition == offsetOriginal.definition && !readOnly) return;
+    if (offsetOriginal != null) cancelPresentationOffsetEdit();
+    this.readOnly = readOnly;
+    var current = presentation;
+    if (current == null && (record == null || definition == null)) return;
+    if (current != null && current.record == record && current.definition == definition) return;
+    var next = record == null || definition == null ? null : new PresentationController(definition, record);
+    if (next != null && current != null && current.definition == definition) next.retainCursor(current);
+    presentation = next;
+    presentationCenters = centers;
+    presentationScale = scale;
+    presentationRevision = "";
+    presentationResult = null;
+    presentationCameraDirty = true;
+    presentationTarget = null;
+    lightingRevision++;
+    host.requestFrame();
   }
   public function selectPresentationView(id:String):Void {
-    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
-    var controller=presentation;if(controller==null)return;
-    controller.selectView(id);presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;
-    clearHover();lightingRevision++;host.requestFrame();
+    if (offsetOriginal != null) cancelPresentationOffsetEdit();
+    var controller = presentation;
+    if (controller == null) return;
+    controller.selectView(id);
+    presentationCameraDirty = true;
+    presentationTarget = null;
+    inspectionZoom = 1;
+    clearHover();
+    lightingRevision++;
+    host.requestFrame();
   }
   public function resetPresentation():Void {
-    if(offsetOriginal!=null)cancelPresentationOffsetEdit();
-    var controller=presentation;
-    if(controller==null){resetView();return;}
-    controller.reset();presentationCameraDirty=true;presentationTarget=null;inspectionZoom=1;orbitPivot=null;
-    clearHover();lightingRevision++;host.requestFrame();
+    if (offsetOriginal != null) cancelPresentationOffsetEdit();
+    var controller = presentation;
+    if (controller == null) {
+      resetView();
+      return;
+    }
+    controller.reset();
+    presentationCameraDirty = true;
+    presentationTarget = null;
+    inspectionZoom = 1;
+    orbitPivot = null;
+    clearHover();
+    lightingRevision++;
+    host.requestFrame();
   }
   public var presentationGeometryFingerprint:String = "";
-  public var solvePresentationJoints:Null<Map<String,Float>->Map<String,AssemblyFrame>> = null;
+  public var solvePresentationJoints:Null<Map<String, Float> -> Map<String, AssemblyFrame>> = null;
   public function selectPresentationProcedure(id:Null<String>):Void {
-    if(presentation==null||simulationActive)return;
+    if (presentation == null || simulationActive) return;
     presentation.selectProcedure(id);
-    if(id!=null)presentationControlsExpanded=true;
+    if (id != null) presentationControlsExpanded = true;
     presentationProcedureChanged();
   }
   public function nextPresentationStep():Void {
-    if(presentation==null||simulationActive)return;
-    presentation.next();presentationProcedureChanged();
+    if (presentation == null || simulationActive) return;
+    presentation.next();
+    presentationProcedureChanged();
   }
   public function previousPresentationStep():Void {
-    if(presentation==null||simulationActive)return;
-    presentation.previous();presentationProcedureChanged();
+    if (presentation == null || simulationActive) return;
+    presentation.previous();
+    presentationProcedureChanged();
   }
   public function restartPresentationProcedure():Void {
-    if(presentation==null||simulationActive)return;
-    presentation.restart();presentationProcedureChanged();
+    if (presentation == null || simulationActive) return;
+    presentation.restart();
+    presentationProcedureChanged();
   }
   function presentationProcedureChanged():Void {
-    clearHover();host.requestFrame();
+    clearHover();
+    host.requestFrame();
   }
   public function advancePresentation(seconds:Float):Bool {
-    var controller=presentation;if(controller==null||simulationActive)return false;
-    var changed=controller.advance(seconds);
-    if(changed){clearHover();host.requestFrame();}return changed;
+    var controller = presentation;
+    if (controller == null || simulationActive) return false;
+    var changed = controller.advance(seconds);
+    if (changed) {
+      clearHover();
+      host.requestFrame();
+    }
+    return changed;
   }
   /** Session-only disclosure; keep the default viewport clear for inspecting the assembly. */
   public var presentationControlsExpanded:Bool = false;
   public function presentationControlsEnabled():Bool return !simulationActive;
   public function setPresentationExplode(value:Float):Void {
-    if(presentation==null||simulationActive)return;
-    presentation.setExplode(value);clearHover();host.requestFrame();
+    if (presentation == null || simulationActive) return;
+    presentation.setExplode(value);
+    clearHover();
+    host.requestFrame();
   }
   public function presentationZoom():Float return inspectionZoom;
   public function setPresentationZoom(zoom:Float):Void {
-    var next=Math.max(0.2,Math.min(8,zoom));
-    if(next!=inspectionZoom){inspectionZoom=next;lightingRevision++;host.requestFrame();}
+    var next = Math.max(0.2, Math.min(8, zoom));
+    if (next != inspectionZoom) {
+      inspectionZoom = next;
+      lightingRevision++;
+      host.requestFrame();
+    }
   }
-  public function capturePresentationView(id:String,label:String):PresentationView {
+  public function capturePresentationView(id:String, label:String):PresentationView {
     updatePresentationCamera();
-    var controller=presentation,frame=presentationResult;
-    if(controller==null||frame==null)throw "No assembly presentation to save";
-    var selected=controller.record.views.filter(v->v.id==frame.view)[0];
-    var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);var anchor=flat.occurrences[0].id;
-    var item=scene.object("project:"+anchor);if(item==null)item=scene.object(anchor);if(item==null)throw "Missing view anchor";
-    var pose=presentationPoseById.get(item.id);var center=pose==null?[item.x,item.y,item.z]:pose.position;
-    var factor=0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect());
-    var value:PresentationView={id:id,label:label,source:Authored,explode:controller.cursor.explode,
-      camera:Anchored({occurrence:anchor,subtree:false},{x:(camera.targetX-center[0])/presentationScale,
-        y:(camera.targetY-center[1])/presentationScale,z:(camera.targetZ-center[2])/presentationScale},
-        camera.distance/factor/presentationScale,camera.yaw,camera.pitch),
-      visibility:selected.visibility,sections:sourceSections(frame.sections)};
+    var controller = presentation, frame = presentationResult;
+    if (controller == null || frame == null) throw "No assembly presentation to save";
+    var selected = controller.record.views.filter(v -> v.id == frame.view)[0];
+    var flat = AssemblyDefinitionFlattener.flattenView(controller.definition);
+    var anchor = flat.occurrences[0].id;
+    var item = scene.object("project:" + anchor);
+    if (item == null) item = scene.object(anchor);
+    if (item == null) throw "Missing view anchor";
+    var pose = presentationPoseById.get(item.id);
+    var center = pose == null ? [item.x, item.y, item.z] : pose.position;
+    var factor = 0.5 / Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360) * 1.15 * Math.max(1, 1 / aspect());
+    var value:PresentationView = {
+      id: id,
+      label: label,
+      source: Authored,
+      explode: controller.cursor.explode,
+      camera: Anchored(
+        {occurrence: anchor, subtree: false},
+        {
+          x: (camera.targetX - center[0]) / presentationScale,
+          y: (camera.targetY - center[1]) / presentationScale,
+          z: (camera.targetZ - center[2]) / presentationScale
+        },
+        camera.distance / factor / presentationScale,
+        camera.yaw,
+        camera.pitch
+      ),
+      visibility: selected.visibility,
+      sections: sourceSections(frame.sections)
+    };
     if (selected.displayTransform != null) value.displayTransform = selected.displayTransform;
     return haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(value));
   }
   public function presentationFrame():Null<PresentationFrame> {
-    updatePresentation();return presentationResult;
+    updatePresentation();
+    return presentationResult;
   }
-  function occurrenceId(id:String):String return StringTools.startsWith(id,"project:")?id.substr(8):id;
+  function occurrenceId(id:String):String return StringTools.startsWith(id, "project:") ? id.substr(8) : id;
   function updatePresentation():Void {
-    var controller=presentation;
-    if(controller==null){presentationResult=null;presentationPoses=[];presentationPoseById.clear();return;}
-    var key=scene.visualRevision+":"+runtimeRevision+":"+simulationActive+":"+controller.revision+":"+presentationGeometryFingerprint;
-    if(key==presentationRevision)return;
-    var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);
-    var solved=new Map<String,AssemblyFrame>();
-    for(part in flat.occurrences) {
-      var item=scene.object("project:"+part.id);if(item==null)item=scene.object(part.id);
-      if(item==null)throw 'Missing presentation scene occurrence "${part.id}"';
-      var runtime=simulationActive?simulationPoseById.get(item.id):null;
-      var position=runtime==null?[item.x,item.y,item.z]:runtime.position;
-      var rotation=runtime==null?item.rotation:runtime.rotation;
-      if(rotation==null)rotation=[0,0,0,1];
-      var pose:AssemblyFrame={x:0,y:0,z:0,qx:rotation[0],qy:rotation[1],qz:rotation[2],qw:rotation[3]};
-      var center=presentationCenters==null?null:presentationCenters.get(part.definition);
-      if(center==null)center=[0,0,0];
-      var delta=AssemblyFrames.transformPoint(pose,center[0],center[1],center[2]);
-      pose.x=position[0]/presentationScale-delta.x;pose.y=position[1]/presentationScale-delta.y;pose.z=position[2]/presentationScale-delta.z;
-      solved.set(part.id,pose);
+    var controller = presentation;
+    if (controller == null) {
+      presentationResult = null;
+      presentationPoses = [];
+      presentationPoseById.clear();
+      return;
     }
-    var result=controller.evaluate(solved,presentationGeometryFingerprint,simulationActive);
-    if(result.jointOverrides.keys().hasNext()) {
-      var solve=solvePresentationJoints;if(solve==null)throw "Procedure joint motions require an engineering pose provider";
-      result=controller.evaluate(solve(result.jointOverrides),presentationGeometryFingerprint,simulationActive);
+    var key = scene.visualRevision + ":"
+      + runtimeRevision + ":" + simulationActive + ":" + controller.revision + ":" + presentationGeometryFingerprint;
+    if (key == presentationRevision) return;
+    var flat = AssemblyDefinitionFlattener.flattenView(controller.definition);
+    var solved = new Map<String, AssemblyFrame>();
+    for (part in flat.occurrences) {
+      var item = scene.object("project:" + part.id);
+      if (item == null) item = scene.object(part.id);
+      if (item == null) throw 'Missing presentation scene occurrence "${part.id}"';
+      var runtime = simulationActive ? simulationPoseById.get(item.id) : null;
+      var position = runtime == null ? [item.x, item.y, item.z] : runtime.position;
+      var rotation = runtime == null ? item.rotation : runtime.rotation;
+      if (rotation == null) rotation = [0, 0, 0, 1];
+      var pose:AssemblyFrame = {x: 0, y: 0, z: 0, qx: rotation[0], qy: rotation[1], qz: rotation[2], qw: rotation[3]};
+      var center = presentationCenters == null ? null : presentationCenters.get(part.definition);
+      if (center == null) center = [0, 0, 0];
+      var delta = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
+      pose.x = position[0] / presentationScale - delta.x;
+      pose.y = position[1] / presentationScale - delta.y;
+      pose.z = position[2] / presentationScale - delta.z;
+      solved.set(part.id, pose);
     }
-    presentationResult=result;presentationPoses=[];
+    var result = controller.evaluate(solved, presentationGeometryFingerprint, simulationActive);
+    if (result.jointOverrides.keys().hasNext()) {
+      var solve = solvePresentationJoints;
+      if (solve == null) throw "Procedure joint motions require an engineering pose provider";
+      result = controller.evaluate(solve(result.jointOverrides), presentationGeometryFingerprint, simulationActive);
+    }
+    presentationResult = result;
+    presentationPoses = [];
     presentationPoseById.clear();
-    for(part in flat.occurrences) {
-      var pose=result.poses.get(part.id);if(pose==null)continue;
-      var center=presentationCenters==null?null:presentationCenters.get(part.definition);if(center==null)center=[0,0,0];
-      var world=AssemblyFrames.transformPoint(pose,center[0],center[1],center[2]);
-      var item=scene.object("project:"+part.id);if(item==null)item=scene.object(part.id);if(item==null)continue;
-      var visual:SimulationPoseVisual={id:item.id,position:[world.x*presentationScale,world.y*presentationScale,world.z*presentationScale],rotation:[pose.qx,pose.qy,pose.qz,pose.qw]};
-      presentationPoseById.set(item.id,visual);
+    for (part in flat.occurrences) {
+      var pose = result.poses.get(part.id);
+      if (pose == null) continue;
+      var center = presentationCenters == null ? null : presentationCenters.get(part.definition);
+      if (center == null) center = [0, 0, 0];
+      var world = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
+      var item = scene.object("project:" + part.id);
+      if (item == null) item = scene.object(part.id);
+      if (item == null) continue;
+      var visual:SimulationPoseVisual = {
+        id: item.id,
+        position: [world.x * presentationScale, world.y * presentationScale, world.z * presentationScale],
+        rotation: [pose.qx, pose.qy, pose.qz, pose.qw]
+      };
+      presentationPoseById.set(item.id, visual);
       // Presentation owns the generated occurrence's final transform in this view.
       presentationPoses.push(visual);
     }
-    if(simulationActive)for(live in simulationPoses)if(!presentationPoseById.exists(live.id)) {
-      presentationPoseById.set(live.id,live);presentationPoses.push(live);
+    if (simulationActive) for (live in simulationPoses) if (!presentationPoseById.exists(live.id)) {
+      presentationPoseById.set(live.id, live);
+      presentationPoses.push(live);
     }
-    simulationTransforms.clear();simulationTransformCount=0;presentationRevision=key;
+    simulationTransforms.clear();
+    simulationTransformCount = 0;
+    presentationRevision = key;
   }
   function displayPoses():Null<Array<SimulationPoseVisual>> {
-    updatePresentation();return presentation==null?(simulationActive?simulationPoses:null):presentationPoses;
+    updatePresentation();
+    return presentation == null ? (simulationActive ? simulationPoses : null) : presentationPoses;
   }
   function presentationHidden(id:String):Bool {
-    var frame=presentationResult;
-    return frame!=null&&frame.visibility.get(occurrenceId(id))==Hidden;
+    var frame = presentationResult;
+    return frame != null && frame.visibility.get(occurrenceId(id)) == Hidden;
   }
   function applyPresentation(view:SceneView):Void {
-    updatePresentation();var frame=presentationResult;if(frame==null)return;
-    if(readOnly){view.clearSelectionOverrides();view.clearHoverOverrides();}
-    for(id in frame.highlight) {
-      var item=scene.object("project:"+id);if(item==null)item=scene.object(id);if(item==null)continue;
-      for(node in [scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id)))
-        view.setDiagnosticTint(node,scene.presentationHighlightMaterial());
+    updatePresentation();
+    var frame = presentationResult;
+    if (frame == null) return;
+    if (readOnly) {
+      view.clearSelectionOverrides();
+      view.clearHoverOverrides();
     }
-    for(item in scene.items()) {
-      var mode=frame.visibility.get(occurrenceId(item.id));
-      if(mode==null||mode==Shown)continue;
-      var nodes=[scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id));
-      for(node in nodes)if(mode==Hidden)view.setVisibility(node,false);else view.setMaterial(node,scene.translucentViewMaterial());
+    for (id in frame.highlight) {
+      var item = scene.object("project:" + id);
+      if (item == null) item = scene.object(id);
+      if (item == null) continue;
+      for (node in [scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id))) view.setDiagnosticTint(
+        node,
+        scene.presentationHighlightMaterial()
+      );
+    }
+    for (item in scene.items()) {
+      var mode = frame.visibility.get(occurrenceId(item.id));
+      if (mode == null || mode == Shown) continue;
+      var nodes = [scene.info(item.id).node()].concat(scene.runtimePartNodes(item.id));
+      for (node in nodes) if (mode == Hidden) view.setVisibility(node, false);
+      else view.setMaterial(node, scene.translucentViewMaterial());
     }
   }
   function updatePresentationCamera():Void {
-    updatePresentation();var frame=presentationResult;if(frame==null)return;
+    updatePresentation();
+    var frame = presentationResult;
+    if (frame == null) return;
     // Step transport changes geometry, not camera intent. Reframe only on an explicit
     // view change/reset; framing moving or disappearing parts causes camera jumps.
-    var reframe=presentationCameraDirty||presentationTarget==null||presentationCameraView!=frame.view;
-    if(!reframe)switch frame.camera {
-      case Frame(_,_,_,_):return;
-      case Anchored(_,_,_,_,_):
+    var reframe = presentationCameraDirty || presentationTarget == null || presentationCameraView != frame.view;
+    if (!reframe) switch frame.camera {
+      case Frame(_, _, _, _):
+        return;
+      case Anchored(_, _, _, _, _):
     }
-    var point:Array<Float>,span=0.0,yaw:Float,pitch:Float;
+    var point:Array<Float>, span = 0.0, yaw:Float, pitch:Float;
     switch frame.camera {
-      case Anchored(anchor,offset,size,y,p):
-        var item=scene.object("project:"+anchor.occurrence);if(item==null)item=scene.object(anchor.occurrence);if(item==null)return;
-        var pose=presentationPoseById.get(item.id);
-        var center=pose==null?[item.x,item.y,item.z]:pose.position;
-        point=[center[0]+offset.x*presentationScale,center[1]+offset.y*presentationScale,center[2]+offset.z*presentationScale];
-        span=size*presentationScale;yaw=y;pitch=p;
-      case Frame(select,y,p,margin):
+      case Anchored(anchor, offset, size, y, p):
+        var item = scene.object("project:" + anchor.occurrence);
+        if (item == null) item = scene.object(anchor.occurrence);
+        if (item == null) return;
+        var pose = presentationPoseById.get(item.id);
+        var center = pose == null ? [item.x, item.y, item.z] : pose.position;
+        point = [
+          center[0] + offset.x * presentationScale,
+          center[1] + offset.y * presentationScale,
+          center[2] + offset.z * presentationScale
+        ];
+        span = size * presentationScale;
+        yaw = y;
+        pitch = p;
+      case Frame(select, y, p, margin):
         var bounds:Null<Array<Float>> = null;
-        var controller=presentation;if(controller==null)return;
-        var flat=AssemblyDefinitionFlattener.flattenView(controller.definition);
-        for(selector in select)for(id in materia.presentation.PresentationCodec.resolve(flat,selector)) {
-          var item=scene.object("project:"+id);if(item==null)item=scene.object(id);
-          if(item==null||!scene.isVisible(item.id)||presentationHidden(item.id))continue;
-          var next=transformedBounds(displayTransform(item),item.width,item.height,item.depth);
-          if(bounds==null)bounds=next;else for(axis in 0...3){bounds[axis]=Math.min(bounds[axis],next[axis]);bounds[axis+3]=Math.max(bounds[axis+3],next[axis+3]);}
+        var controller = presentation;
+        if (controller == null) return;
+        var flat = AssemblyDefinitionFlattener.flattenView(controller.definition);
+        for (selector in select) for (id in materia.presentation.PresentationCodec.resolve(flat, selector)) {
+          var item = scene.object("project:" + id);
+          if (item == null) item = scene.object(id);
+          if (item == null || !scene.isVisible(item.id) || presentationHidden(item.id)) continue;
+          var next = transformedBounds(displayTransform(item), item.width, item.height, item.depth);
+          if (bounds == null) bounds = next;
+          else for (axis in 0...3) {
+            bounds[axis] = Math.min(bounds[axis], next[axis]);
+            bounds[axis + 3] = Math.max(bounds[axis + 3], next[axis + 3]);
+          }
         }
-        if(bounds==null)return;
-        point=[(bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2];
-        span=Math.max(bounds[3]-bounds[0],Math.max(bounds[4]-bounds[1],bounds[5]-bounds[2]))*margin;yaw=y;pitch=p;
+        if (bounds == null) return;
+        point = [(bounds[0] + bounds[3]) / 2, (bounds[1] + bounds[4]) / 2, (bounds[2] + bounds[5]) / 2];
+        span = Math.max(bounds[3] - bounds[0], Math.max(bounds[4] - bounds[1], bounds[5] - bounds[2])) * margin;
+        yaw = y;
+        pitch = p;
     }
-    var previous=presentationTarget;
-    if(reframe) {
-      camera.setAngle(yaw,pitch);
-      camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect())));
-      presentationCameraDirty=false;
+    var previous = presentationTarget;
+    if (reframe) {
+      camera.setAngle(yaw, pitch);
+      camera.setTarget(
+        point[0],
+        point[1],
+        point[2],
+        Math.max(
+          0.0001,
+          span * 0.5 / Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360) * 1.15 * Math.max(1, 1 / aspect())
+        )
+      );
+      presentationCameraDirty = false;
     } else {
-      var dx=point[0]-previous[0],dy=point[1]-previous[1],dz=point[2]-previous[2];
-      camera.setTarget(camera.targetX+dx,camera.targetY+dy,camera.targetZ+dz,camera.distance);
-      if(orbitPivot!=null){orbitPivot[0]+=dx;orbitPivot[1]+=dy;orbitPivot[2]+=dz;}
+      var dx = point[0] - previous[0], dy = point[1] - previous[1], dz = point[2] - previous[2];
+      camera.setTarget(camera.targetX + dx, camera.targetY + dy, camera.targetZ + dz, camera.distance);
+      if (orbitPivot != null) {
+        orbitPivot[0] += dx;
+        orbitPivot[1] += dy;
+        orbitPivot[2] += dz;
+      }
     }
-    presentationTarget=point;presentationCameraView=frame.view;
+    presentationTarget = point;
+    presentationCameraView = frame.view;
   }
   function inspectionLensScale():Float {
-    if(!readOnly)return 1;
-    var fov=Math.max(5,Math.min(110,PerspectiveCamera.FOV_Y*inspectionZoom));
-    return Math.tan(fov*Math.PI/360)/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360);
+    if (!readOnly) return 1;
+    var fov = Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom));
+    return Math.tan(fov * Math.PI / 360) / Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360);
   }
   function inspectionScroll(event:UiEvent):Void {
-    if(Math.isFinite(event.deltaY)&&event.deltaY!=0) {
-      var next=Math.max(0.2,Math.min(8,inspectionZoom*Math.pow(2,event.deltaY*0.002)));
-      if(next!=inspectionZoom){setPresentationZoom(next);if(onInspectionZoom!=null)onInspectionZoom(next);}
+    if (Math.isFinite(event.deltaY) && event.deltaY != 0) {
+      var next = Math.max(0.2, Math.min(8, inspectionZoom * Math.pow(2, event.deltaY * 0.002)));
+      if (next != inspectionZoom) {
+        setPresentationZoom(next);
+        if (onInspectionZoom != null) onInspectionZoom(next);
+      }
     }
-    event.preventDefault();event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
   }
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
@@ -406,13 +588,13 @@ class EditorPerspectiveViewport implements View {
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = app.editor.EditorGrid.STEP;
   var gridVisible:Bool = true;
-  var simulationActive:Bool=false;
+  var simulationActive:Bool = false;
   /** Samples per pixel the editor asked for, and what the renderer was last given. */
   var sampleCountRequested:Int = 1;
   var sampleCountApplied:Int = 0;
   var sampleCountEffective:Int = 1;
   var renderedSampleCount:Int = 0;
-  var runtimeRevision:Int=0;
+  var runtimeRevision:Int = 0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
   // Resolve each displayed pose once per simulation presentation, shared by clipping and framing.
   var simulationPoseById:Map<String, SimulationPoseVisual> = new Map();
@@ -466,10 +648,10 @@ class EditorPerspectiveViewport implements View {
   }
 
   /** Revision key for state that changes the retained viewport presentation. */
-  public function presentationKey():String
-    return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
-      assemblyDragRevision + ":" + matePickRevision + ":" +
-      (presentation==null?0:presentation.revision) + ":" + hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
+  public function presentationKey():String return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision
+    + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":" + matePickRevision + ":" + (presentation
+    == null ? 0 : presentation.revision) + ":" + hoverRevision + ":orbit:"
+    + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -480,21 +662,26 @@ class EditorPerspectiveViewport implements View {
   public function build(context:BuildContext):RenderNode {
     return context.withScope(new Key(key), function() {
       var node = new RenderNode(context.id("perspective"), LayoutVisualKind.Custom, style);
-      node.onResolved(function(geometry) { updateViewportSize(geometry.width, geometry.height); });
+      node.onResolved(function(geometry) {
+        updateViewportSize(geometry.width, geometry.height);
+      }
+      );
       node.hitTestSelf = true;
       node.focusable = true;
-      node.semantics = new Semantics(AccessibilityRole.Image,
-        "Scene perspective GPU view");
+      node.semantics = new Semantics(AccessibilityRole.Image, "Scene perspective GPU view");
       updatePresentation();
-      node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + (presentation==null?0:presentation.revision) + ":" +
-        sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
-        ":orbit:" + orbiting() +
-        ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
-        renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep +
-        ":collisions:" + collisionRevision);
+      node.onPaint(
+        paint,
+        "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" + (presentation
+        == null ? 0 : presentation.revision)
+        + ":" + sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision
+        + ":orbit:" + orbiting() + ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" + renderedWidth
+        + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep + ":collisions:" + collisionRevision
+      );
       installNavigation(node);
       return node;
-    });
+    }
+    );
   }
 
   function updateViewportSize(width:Float, height:Float):Void {
@@ -508,36 +695,50 @@ class EditorPerspectiveViewport implements View {
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    var displayRevision=scene.visualRevision+":"+runtimeRevision+":"+presentationRevision;
-    if (renderer != null && (surface == null || renderedRevision != displayRevision ||
-        renderedCameraRevision != camera.revision ||
-        renderedLightingRevision != lightingRevision ||
-        renderedSampleCount != sampleCountRequested ||
-        renderedHoverRevision != hoverRevision ||
-        renderedCollisionRevision != collisionRevision ||
-        width != renderedWidth || height != renderedHeight ||
-        viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
+    var displayRevision = scene.visualRevision + ":" + runtimeRevision + ":" + presentationRevision;
+    if (renderer != null && (surface == null || renderedRevision != displayRevision
+      || renderedCameraRevision != camera.revision || renderedLightingRevision != lightingRevision
+      || renderedSampleCount != sampleCountRequested || renderedHoverRevision != hoverRevision
+      || renderedCollisionRevision != collisionRevision || width != renderedWidth || height != renderedHeight
+      || viewportWidth != renderedViewportWidth || viewportHeight != renderedViewportHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
-      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect(), -1, -1,
-        !readOnly ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))),
-        displayPoses(), hoveredObjectId, hoveredFaceIndex,
-        collisionPairs, cosmeticThreadsVisible));
+      var view = sectionView(scene.configureRenderView(
+        new SceneView(),
+        camera.viewProjection(
+          aspect(),
+          -1,
+          -1,
+          !readOnly ? 0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))
+        ),
+        displayPoses(),
+        hoveredObjectId,
+        hoveredFaceIndex,
+        collisionPairs,
+        cosmeticThreadsVisible
+      ));
 
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
-        view.setWorkplaneGrid(camera.eyePosition(), camera.studioDirection(0.0, 0.0, -1.0),
+        view.setWorkplaneGrid(
+          camera.eyePosition(),
+          camera.studioDirection(0.0, 0.0, -1.0),
           camera.studioDirection(scale * aspect(), 0.0, 0.0),
-          camera.studioDirection(0.0, scale, 0.0), gridStep, camera.distance);
+          camera.studioDirection(0.0, scale, 0.0),
+          gridStep,
+          camera.distance
+        );
       }
       var look = ViewportLook.preset(lightingPreset);
       var directions:Array<Float> = [], colors:Array<Float> = [];
       for (light in look.lights) {
         // Look directions point from each light into the scene; the shader needs the reverse.
         var direction = camera.studioDirection(-light.direction[0], -light.direction[1], -light.direction[2]);
-        directions.push(direction[0]); directions.push(direction[1]);
-        directions.push(direction[2]); directions.push(light.intensity);
+        directions.push(direction[0]);
+        directions.push(direction[1]);
+        directions.push(direction[2]);
+        directions.push(light.intensity);
         for (channel in light.color) colors.push(channel);
         colors.push(0.0);
       }
@@ -553,9 +754,8 @@ class EditorPerspectiveViewport implements View {
       }
       var changes = scene.takeRenderChanges();
       var rendered:GraphicsImageRef;
-      try rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
-        0.0, 0.0, 0.0, 0.0, changes)
-      catch (error:Dynamic) {
+      try rendered = renderer.renderImage(scene.renderSnapshot(),
+        view, width, height, 0.0, 0.0, 0.0, 0.0, changes) catch (error:Dynamic) {
         if (changes != null) changes.dispose();
         throw error;
       }
@@ -578,17 +778,21 @@ class EditorPerspectiveViewport implements View {
       totalRenderSeconds += lastRenderSeconds;
       renderCount++;
     }
-    canvas.fillLinearGradientRect(new Rect(0, 0, geometry.width, geometry.height),
-      0.0, 0.0, 0.0, geometry.height,
-      [new GradientStop(0.0, ViewportBackground.top()),
-        new GradientStop(1.0, ViewportBackground.bottom())]);
+    canvas.fillLinearGradientRect(
+      new Rect(0, 0, geometry.width, geometry.height),
+      0.0,
+      0.0,
+      0.0,
+      geometry.height,
+      [new GradientStop(0.0, ViewportBackground.top()), new GradientStop(1.0, ViewportBackground.bottom())]
+    );
     paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
-    paintSensors(canvas,geometry.width,geometry.height);
-    if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
+    paintSensors(canvas, geometry.width, geometry.height);
+    if (simulationActive) missionOverlay.paint(canvas, camera, geometry.width, geometry.height);
     paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
-    paintPresentationOffset(canvas,geometry.width,geometry.height);
+    paintPresentationOffset(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
     paintSheetBends(canvas, geometry.width, geometry.height);
     paintOrbitPivot(canvas, geometry.width, geometry.height);
@@ -608,8 +812,8 @@ class EditorPerspectiveViewport implements View {
     host.requestFrame();
   }
 
-  function flyAxis(positive:Int, negative:Int):Int
-    return (flyKeys.exists(positive) ? 1 : 0) - (flyKeys.exists(negative) ? 1 : 0);
+  function flyAxis(positive:Int,
+    negative:Int):Int return (flyKeys.exists(positive) ? 1 : 0) - (flyKeys.exists(negative) ? 1 : 0);
 
   function clearFlyKeys():Void {
     flyKeys.clear();
@@ -624,10 +828,12 @@ class EditorPerspectiveViewport implements View {
     var movement = key == UiKey.W || key == UiKey.A || key == UiKey.S || key == UiKey.D || key == 81 || key == 69;
     if (!movement && key != 340 && key != 344) return false;
     if (movement) {
-      if (down) flyKeys.set(key, true); else flyKeys.remove(key);
+      if (down) flyKeys.set(key, true);
+      else flyKeys.remove(key);
     }
     host.requestFrame();
-    event.preventDefault(); event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
     return true;
   }
 
@@ -637,8 +843,14 @@ class EditorPerspectiveViewport implements View {
   function paintOrbitPivot(canvas:Canvas, width:Float, height:Float):Void {
     if (!orbiting()) return;
     var pivot = orbitPivot;
-    var point = pivot == null ? camera.project(camera.targetX, camera.targetY, camera.targetZ, width, height) :
-      camera.project(pivot[0], pivot[1], pivot[2], width, height);
+    var point = pivot == null ? camera.project(camera.targetX,
+      camera.targetY, camera.targetZ, width, height) : camera.project(
+        pivot[0],
+        pivot[1],
+        pivot[2],
+        width,
+        height
+      );
     if (point == null) return;
     var path = new PathBuilder().roundRect(point.x - 6, point.y - 6, 12, 12, 6);
     canvas.strokeTransient(path.build(), Color.rgba(0.05, 0.06, 0.08, 0.85), 3.5);
@@ -656,55 +868,84 @@ class EditorPerspectiveViewport implements View {
     cpuTransferBytes: 0,
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
-    orbitPivot: orbitPivot,
-    sections: presentationResult==null?[]:presentationResult.sections,
-    camera: {targetX: camera.targetX, targetY: camera.targetY, targetZ: camera.targetZ,
-      yaw: camera.yaw, pitch: camera.pitch, distance: camera.distance}
+    orbitPivot : orbitPivot,
+    sections : presentationResult == null ? [] : presentationResult.sections,
+    camera : {
+      targetX : camera.targetX,
+      targetY : camera.targetY,
+      targetZ : camera.targetZ,
+      yaw : camera.yaw,
+      pitch : camera.pitch,
+      distance : camera.distance
+    }
   };
 
   public function sectionActive():Bool {
-    var frame=presentationFrame();return frame!=null&&frame.sections.length>0;
+    var frame = presentationFrame();
+    return frame != null && frame.sections.length > 0;
   }
   public function inspectObject(id:String):Void {
     updatePresentationCamera();
-    var item=scene.object(id);if(item==null)throw "No displayed part for this axis";
-    var bounds=transformedBounds(displayTransform(item),item.width,item.height,item.depth);
-    var x=(bounds[0]+bounds[3])/2,y=(bounds[1]+bounds[4])/2,z=(bounds[2]+bounds[5])/2;
-    var normal=camera.viewDirection();
-    camera.frame(x,y,z,Math.max(0.08,bounds[3]-bounds[0]),Math.max(0.08,bounds[4]-bounds[1]),Math.max(0.08,bounds[5]-bounds[2]),aspect());
-    if(onSectionEdit==null)throw "Section authoring requires a project document";
-    onSectionEdit(sourceSections([{occurrence:null,point:{x:x/presentationScale,y:y/presentationScale,z:z/presentationScale},
-      normal:{x:-normal[0],y:-normal[1],z:-normal[2]}}]));
+    var item = scene.object(id);
+    if (item == null) throw "No displayed part for this axis";
+    var bounds = transformedBounds(displayTransform(item), item.width, item.height, item.depth);
+    var x = (bounds[0] + bounds[3]) / 2, y = (bounds[1] + bounds[4]) / 2, z = (bounds[2] + bounds[5]) / 2;
+    var normal = camera.viewDirection();
+    camera.frame(
+      x,
+      y,
+      z,
+      Math.max(0.08, bounds[3] - bounds[0]),
+      Math.max(0.08, bounds[4] - bounds[1]),
+      Math.max(0.08, bounds[5] - bounds[2]),
+      aspect()
+    );
+    if (onSectionEdit == null) throw "Section authoring requires a project document";
+    onSectionEdit(sourceSections([{
+      occurrence: null,
+      point: {x: x / presentationScale, y: y / presentationScale, z: z / presentationScale},
+      normal: {x: -normal[0], y: -normal[1], z: -normal[2]}
+    }]));
     host.requestFrame();
   }
   /** Store authored planes in assembly coordinates, not the view's display frame. */
   function sourceSections(planes:Array<SectionPlane>):Array<SectionPlane> {
-    var controller=presentation;
-    if(controller==null)return planes;
-    var frame=presentationFrame();
-    if(frame==null)return planes;
-    var view=controller.record.views.filter(candidate->candidate.id==frame.view)[0];
-    var display=view.displayTransform;
-    if(display==null)return planes;
-    var inverse=AssemblyFrames.inverse(display);
-    return [for(plane in planes) {
-      occurrence:null,
-      point:AssemblyFrames.transformPoint(inverse,plane.point.x,plane.point.y,plane.point.z),
-      normal:AssemblyFrames.transformVector(inverse,plane.normal.x,plane.normal.y,plane.normal.z)
-    }];
+    var controller = presentation;
+    if (controller == null) return planes;
+    var frame = presentationFrame();
+    if (frame == null) return planes;
+    var view = controller.record.views.filter(candidate -> candidate.id == frame.view)[0];
+    var display = view.displayTransform;
+    if (display == null) return planes;
+    var inverse = AssemblyFrames.inverse(display);
+    return [for (plane in planes) {
+      occurrence:null, point:AssemblyFrames.transformPoint(inverse,
+        plane.point.x, plane.point.y, plane.point.z), normal:AssemblyFrames.transformVector(
+          inverse,
+          plane.normal.x,
+          plane.normal.y,
+          plane.normal.z
+        )
+    }
+    ];
   }
-  public function clearSection():Void {if(onSectionEdit!=null)onSectionEdit([]);}
+  public function clearSection():Void {
+    if (onSectionEdit != null) onSectionEdit([]);
+  }
   public function flipSection():Void {
-    var frame=presentationFrame();if(frame==null||onSectionEdit==null)return;
-    onSectionEdit(sourceSections([for(plane in frame.sections){occurrence:null,point:plane.point,
-      normal:{x:-plane.normal.x,y:-plane.normal.y,z:-plane.normal.z}}]));
+    var frame = presentationFrame();
+    if (frame == null || onSectionEdit == null) return;
+    onSectionEdit(sourceSections([for (plane in frame.sections) {
+      occurrence:null, point:plane.point, normal: {x: -plane.normal.x, y: -plane.normal.y, z: -plane.normal.z}
+    }
+    ]));
   }
   function sectionView(view:SceneView):SceneView {
     applyPresentation(view);
-    var frame=presentationResult;
-    if(frame!=null)for(plane in frame.sections) {
-      var n=plane.normal,p=plane.point;
-      view.addClipPlane(n.x,n.y,n.z,-presentationScale*(n.x*p.x+n.y*p.y+n.z*p.z));
+    var frame = presentationResult;
+    if (frame != null) for (plane in frame.sections) {
+      var n = plane.normal, p = plane.point;
+      view.addClipPlane(n.x, n.y, n.z, -presentationScale * (n.x * p.x + n.y * p.y + n.z * p.z));
     }
     return view;
   }
@@ -716,16 +957,23 @@ class EditorPerspectiveViewport implements View {
     for (id in ids) {
       var item = scene.object(id);
       if (item == null) continue;
-      var next = transformedBounds(displayTransform(item),item.width,item.height,item.depth);
+      var next = transformedBounds(displayTransform(item), item.width, item.height, item.depth);
       if (bounds == null) bounds = next;
       else for (axis in 0...3) {
-        bounds[axis] = Math.min(bounds[axis],next[axis]);
-        bounds[axis+3] = Math.max(bounds[axis+3],next[axis+3]);
+        bounds[axis] = Math.min(bounds[axis], next[axis]);
+        bounds[axis + 3] = Math.max(bounds[axis + 3], next[axis + 3]);
       }
     }
     if (bounds != null) {
-      camera.frame((bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2,
-        bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2],aspect());
+      camera.frame(
+        (bounds[0] + bounds[3]) / 2,
+        (bounds[1] + bounds[4]) / 2,
+        (bounds[2] + bounds[5]) / 2,
+        bounds[3] - bounds[0],
+        bounds[4] - bounds[1],
+        bounds[5] - bounds[2],
+        aspect()
+      );
       host.requestFrame();
       return;
     }
@@ -735,24 +983,44 @@ class EditorPerspectiveViewport implements View {
   public function fitAll():Void {
     orbitPivot = null;
     var items = scene.items();
-    if (items.length == 0) { resetView(); return; }
+    if (items.length == 0) {
+      resetView();
+      return;
+    }
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!scene.isVisible(item.id)||presentationHidden(item.id)) continue;
+      if (!scene.isVisible(item.id) || presentationHidden(item.id)) continue;
       var transform = displayTransform(item);
-      var bounds=transformedBounds(transform,item.width,item.height,item.depth);
-      minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
-      maxX=Math.max(maxX,bounds[3]);maxY=Math.max(maxY,bounds[4]);maxZ=Math.max(maxZ,bounds[5]);
+      var bounds = transformedBounds(transform, item.width, item.height, item.depth);
+      minX = Math.min(minX, bounds[0]);
+      minY = Math.min(minY, bounds[1]);
+      minZ = Math.min(minZ, bounds[2]);
+      maxX = Math.max(maxX, bounds[3]);
+      maxY = Math.max(maxY, bounds[4]);
+      maxZ = Math.max(maxZ, bounds[5]);
     }
-    if (minX == 1000000000.0) { resetView(); return; }
-    camera.frame((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2,
-      maxX - minX, maxY - minY, maxZ - minZ, aspect());
+    if (minX == 1000000000.0) {
+      resetView();
+      return;
+    }
+    camera.frame(
+      (minX + maxX) / 2,
+      (minY + maxY) / 2,
+      (minZ + maxZ) / 2,
+      maxX - minX,
+      maxY - minY,
+      maxZ - minZ,
+      aspect()
+    );
     host.requestFrame();
   }
 
   public function resetView():Void {
-    if(presentation!=null){resetPresentation();return;}
+    if (presentation != null) {
+      resetPresentation();
+      return;
+    }
     orbitPivot = null;
     camera.reset();
     host.requestFrame();
@@ -771,16 +1039,24 @@ class EditorPerspectiveViewport implements View {
     gridStep = step;
     gridVisible = visible;
   }
-  public function setSimulationState(active:Bool,poses:Array<SimulationPoseVisual>,revision:Int,
-      ?robots:Array<SimulationRobotVisual>):Void {
-    if(active&&offsetOriginal!=null)cancelPresentationOffsetEdit();
-    simulationActive=active;simulationPoses=poses==null?[]:poses.copy();runtimeRevision=revision;
+  public function setSimulationState(
+    active:Bool,
+    poses:Array<SimulationPoseVisual>,
+    revision:Int,
+    ?robots:Array<SimulationRobotVisual>
+  ):Void {
+    if (active && offsetOriginal != null) cancelPresentationOffsetEdit();
+    simulationActive = active;
+    simulationPoses = poses == null ? [] : poses.copy();
+    runtimeRevision = revision;
     simulationPoseById.clear();
     simulationTransforms.clear();
     simulationTransformCount = 0;
-    if (active) for (pose in simulationPoses)
-      if (!simulationPoseById.exists(pose.id)) simulationPoseById.set(pose.id, pose);
-    robotVisuals=robots==null?[]:robots.copy();
+    if (active) for (pose in simulationPoses) if (!simulationPoseById.exists(pose.id)) simulationPoseById.set(
+      pose.id,
+      pose
+    );
+    robotVisuals = robots == null ? [] : robots.copy();
   }
   /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
   /** Whether sensor rays (and, through `setMissionOverlay`, the mission's overlays) are drawn. */
@@ -793,16 +1069,18 @@ class EditorPerspectiveViewport implements View {
     collisionRevision++;
   }
 
-  static function sameCollisionPairs(a:Array<SceneCollision.SceneCollisionPair>,
-      b:Array<SceneCollision.SceneCollisionPair>):Bool {
+  static function sameCollisionPairs(
+    a:Array<SceneCollision.SceneCollisionPair>,
+    b:Array<SceneCollision.SceneCollisionPair>
+  ):Bool {
     if (a == b) return true;
     if (a == null || b == null || a.length != b.length) return false;
     for (index in 0...a.length) {
       var left = a[index], right = b[index];
-      if (left.a != right.a || left.b != right.b || left.distance != right.distance ||
-          left.colliding() != right.colliding()) return false;
-      for (axis in 0...3)
-        if (left.pointA[axis] != right.pointA[axis] || left.pointB[axis] != right.pointB[axis]) return false;
+      if (left.a != right.a
+        || left.b != right.b || left.distance != right.distance || left.colliding() != right.colliding()) return false;
+      for (axis in 0...3) if (left.pointA[axis] != right.pointA[axis]
+        || left.pointB[axis] != right.pointB[axis]) return false;
     }
     return true;
   }
@@ -826,10 +1104,10 @@ class EditorPerspectiveViewport implements View {
     }
   }
   public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
-  public function editingEnabled():Bool return !readOnly&&!simulationActive;
+  public function editingEnabled():Bool return !readOnly && !simulationActive;
 
-  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
-    matePick != null || sketchPointDragging || offsetOriginal!=null;
+  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null
+    || assemblyDrag != null || matePick != null || sketchPointDragging || offsetOriginal != null;
 
   /** Starts picking two faces for a mate: the next clicks on faces go to `tool` until it finishes or is cancelled. */
   public function beginMatePick(tool:MatePickTool):Void {
@@ -863,9 +1141,12 @@ class EditorPerspectiveViewport implements View {
       return releaseNavigation();
     }
     if (objectDrag != null) {
-      objectDrag.commit(); objectDrag = null;
+      objectDrag.commit();
+      objectDrag = null;
     } else if (assemblyDrag != null) {
-      assemblyDrag.commit(); assemblyDrag = null; assemblyDragRevision++;
+      assemblyDrag.commit();
+      assemblyDrag = null;
+      assemblyDragRevision++;
     } else if (sketchRectangleDrag != null) {
       var active = sketchRectangleDrag;
       scene.addSketchDraftRectangleBetween(active.startX, active.startY, active.currentX, active.currentY);
@@ -876,7 +1157,10 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function cancelDrag():Null<PerspectivePointer> {
-    if(offsetOriginal!=null){finishPresentationOffsetEdit(false);return navigationPointer==null?null:releaseNavigation();}
+    if (offsetOriginal != null) {
+      finishPresentationOffsetEdit(false);
+      return navigationPointer == null ? null : releaseNavigation();
+    }
     if (sketchPointDragging) {
       endSketchPointDrag(false);
       return releaseNavigation();
@@ -887,9 +1171,12 @@ class EditorPerspectiveViewport implements View {
       return null;
     }
     if (objectDrag != null) {
-      objectDrag.cancel(); objectDrag = null;
+      objectDrag.cancel();
+      objectDrag = null;
     } else if (assemblyDrag != null) {
-      assemblyDrag.cancel(); assemblyDrag = null; assemblyDragRevision++;
+      assemblyDrag.cancel();
+      assemblyDrag = null;
+      assemblyDragRevision++;
     } else if (sketchRectangleDrag != null) {
       sketchRectangleDrag = null;
       sketchDragRevision++;
@@ -901,9 +1188,24 @@ class EditorPerspectiveViewport implements View {
   function beginAssemblyDrag(localX:Float, localY:Float):Bool {
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
-    var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null, null, -1, null, cosmeticThreadsVisible));
-    var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
-      ray.directionX, ray.directionY, ray.directionZ);
+    var view = sectionView(scene.configureRenderView(
+      new SceneView(),
+      camera.viewProjection(aspect()),
+      null,
+      null,
+      -1,
+      null,
+      cosmeticThreadsVisible
+    ));
+    var hit = scene.pickHitRayWithView(
+      view,
+      ray.originX,
+      ray.originY,
+      ray.originZ,
+      ray.directionX,
+      ray.directionY,
+      ray.directionZ
+    );
     if (hit.id == "scene" || !Math.isFinite(hit.x) || !Math.isFinite(hit.y) || !Math.isFinite(hit.z)) return false;
     var drag = scene.beginAssemblyDrag(hit.id, [hit.x, hit.y, hit.z]);
     if (drag == null) return false;
@@ -921,10 +1223,14 @@ class EditorPerspectiveViewport implements View {
     var p = assemblyDragPlane;
     var denominator = ray.directionX * p[3] + ray.directionY * p[4] + ray.directionZ * p[5];
     if (Math.abs(denominator) < 1e-9) return;
-    var distance = ((p[0] - ray.originX) * p[3] + (p[1] - ray.originY) * p[4] + (p[2] - ray.originZ) * p[5]) / denominator;
+    var distance = ((p[0]
+      - ray.originX) * p[3] + (p[1] - ray.originY) * p[4] + (p[2] - ray.originZ) * p[5]) / denominator;
     if (distance < 0.0) return;
-    drag.update(ray.originX + ray.directionX * distance, ray.originY + ray.directionY * distance,
-      ray.originZ + ray.directionZ * distance);
+    drag.update(
+      ray.originX + ray.directionX * distance,
+      ray.originY + ray.directionY * distance,
+      ray.originZ + ray.directionZ * distance
+    );
     assemblyDragRevision++;
     host.requestFrame();
   }
@@ -947,7 +1253,8 @@ class EditorPerspectiveViewport implements View {
   function releaseNavigation():Null<PerspectivePointer> {
     var pointer = navigationPointer;
     var wasOrbiting = orbiting();
-    navigationPointer = null; navigationMode = 0;
+    navigationPointer = null;
+    navigationMode = 0;
     clearFlyKeys();
     if (wasOrbiting) host.requestFrame();
     return pointer == null ? null : new PerspectivePointer(pointer, pointerX, pointerY);
@@ -955,11 +1262,26 @@ class EditorPerspectiveViewport implements View {
 
   public function pick(localX:Float, localY:Float):String {
     fitCameraClipRange();
-    var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
-    var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
-      displayPoses(), null, -1, null, cosmeticThreadsVisible));
-    return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
+    var view = sectionView(scene.configureRenderView(
+      new SceneView(),
+      camera.viewProjection(aspect()),
+      displayPoses(),
+      null,
+      -1,
+      null,
+      cosmeticThreadsVisible
+    ));
+    return scene.pickRayWithView(
+      view,
+      ray.originX,
+      ray.originY,
+      ray.originZ,
+      ray.directionX,
+      ray.directionY,
+      ray.directionZ,
+      edgeAngularTolerance(localX, localY)
+    );
   }
 
   public function hoveredId():Null<String> return hoveredObjectId;
@@ -967,17 +1289,34 @@ class EditorPerspectiveViewport implements View {
   public function hoveredFace():Int return hoveredFaceIndex;
 
   function updateHover(localX:Float, localY:Float):Void {
-    if(readOnly)return;
+    if (readOnly) return;
     fitCameraClipRange();
-    var ray = camera.screenRay(localX, localY, viewportWidth,
-      viewportHeight);
+    var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
     // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
-    var hit = simulationActive || presentation != null
-      ? scene.hoverHitRayWithView(sectionView(scene.configureRenderView(new SceneView(),
-          camera.viewProjection(aspect()), displayPoses(), null, -1, null, cosmeticThreadsVisible)),
-          ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ)
-      : scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
-          ray.directionX, ray.directionY, ray.directionZ);
+    var hit = simulationActive || presentation != null ? scene.hoverHitRayWithView(
+      sectionView(scene.configureRenderView(
+        new SceneView(),
+        camera.viewProjection(aspect()),
+        displayPoses(),
+        null,
+        -1,
+        null,
+        cosmeticThreadsVisible
+      )),
+      ray.originX,
+      ray.originY,
+      ray.originZ,
+      ray.directionX,
+      ray.directionY,
+      ray.directionZ
+    ) : scene.hoverHitRay(
+      ray.originX,
+      ray.originY,
+      ray.originZ,
+      ray.directionX,
+      ray.directionY,
+      ray.directionZ
+    );
     var next:Null<String> = hit.id;
     var nextFace = hit.faceIndex;
     if (next == "scene") next = null;
@@ -996,53 +1335,81 @@ class EditorPerspectiveViewport implements View {
     host.requestFrame();
   }
 
-  function edgeAngularTolerance(localX:Float,localY:Float):Float {
-    var width=viewportWidth,height=viewportHeight;
-    var center=camera.screenRay(localX,localY,width,height);
-    var offset=camera.screenRay(localX+3.0,localY,width,height);
-    var dot=center.directionX*offset.directionX+center.directionY*offset.directionY+
-      center.directionZ*offset.directionZ;
-    return Math.acos(Math.max(-1.0,Math.min(1.0,dot)));
+  function edgeAngularTolerance(localX:Float, localY:Float):Float {
+    var width = viewportWidth, height = viewportHeight;
+    var center = camera.screenRay(localX, localY, width, height);
+    var offset = camera.screenRay(localX + 3.0, localY, width, height);
+    var dot = center.directionX
+      * offset.directionX + center.directionY * offset.directionY + center.directionZ * offset.directionZ;
+    return Math.acos(Math.max(-1.0, Math.min(1.0, dot)));
   }
 
-  function selectAt(localX:Float,localY:Float):String {
+  function selectAt(localX:Float, localY:Float):String {
     var id:String;
     if (!editingEnabled()) {
-      id=pick(localX,localY);
+      id = pick(localX, localY);
       scene.select(id);
     } else {
       fitCameraClipRange();
-      var ray=camera.screenRay(localX,localY,viewportWidth,viewportHeight);
-      var view=sectionView(scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible));
-      id=scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
-        ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
+      var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
+      var view = sectionView(scene.configureRenderView(
+        new SceneView(),
+        camera.viewProjection(aspect()),
+        null,
+        null,
+        -1,
+        null,
+        cosmeticThreadsVisible
+      ));
+      id = scene.selectRayWithView(
+        view,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ,
+        edgeAngularTolerance(localX, localY)
+      );
     }
     // A tree-only assembly selection already has scene.selectedId == "scene".
     // Clear it explicitly when an empty-space click leaves that object id unchanged.
-    var tree=selectionTree;
-    if (id=="scene" && tree!=null) tree.selectKey("scene");
+    var tree = selectionTree;
+    if (id == "scene" && tree != null) tree.selectKey("scene");
     return id;
   }
 
-  public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,
-      width:Float, height:Float, localX:Float, localY:Float):String {
+  public static function pickScene(
+    scene:EditorScene,
+    camera:PerspectiveCamera,
+    width:Float,
+    height:Float,
+    localX:Float,
+    localY:Float
+  ):String {
     var ray = camera.screenRay(localX, localY, width, height);
-    return scene.pickRay(ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ);
+    return scene.pickRay(ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ);
   }
 
-  static function transformedBounds(transform:Transform,width:Float,height:Float,depth:Float,
-      ?target:Array<Float>):Array<Float>{
+  static function transformedBounds(transform:Transform,
+    width:Float, height:Float, depth:Float, ?target:Array<Float>):Array<Float> {
     // An affine transform maps a centred box to a box whose half extents are |M| * h.
     // This is the same bound as transforming eight corners, without their temporary arrays.
     var x = transform.element(12), y = transform.element(13), z = transform.element(14);
     var hx = Math.abs(width) / 2, hy = Math.abs(height) / 2, hz = Math.abs(depth) / 2;
-    var ex = Math.abs(transform.element(0)) * hx + Math.abs(transform.element(4)) * hy + Math.abs(transform.element(8)) * hz;
-    var ey = Math.abs(transform.element(1)) * hx + Math.abs(transform.element(5)) * hy + Math.abs(transform.element(9)) * hz;
-    var ez = Math.abs(transform.element(2)) * hx + Math.abs(transform.element(6)) * hy + Math.abs(transform.element(10)) * hz;
+    var ex = Math.abs(transform.element(0))
+      * hx + Math.abs(transform.element(4)) * hy + Math.abs(transform.element(8)) * hz;
+    var ey = Math.abs(transform.element(1))
+      * hx + Math.abs(transform.element(5)) * hy + Math.abs(transform.element(9)) * hz;
+    var ez = Math.abs(transform.element(2))
+      * hx + Math.abs(transform.element(6)) * hy + Math.abs(transform.element(10)) * hz;
     var result = target == null ? [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] : target;
-    result[0] = x - ex; result[1] = y - ey; result[2] = z - ez;
-    result[3] = x + ex; result[4] = y + ey; result[5] = z + ez;
+    result[0] = x - ex;
+    result[1] = y - ey;
+    result[2] = z - ez;
+    result[3] = x + ex;
+    result[4] = y + ey;
+    result[5] = z + ez;
     return result;
   }
 
@@ -1050,33 +1417,41 @@ class EditorPerspectiveViewport implements View {
     updatePresentation();
     clipBounds.resize(0);
     for (item in scene.items()) {
-      if (!scene.isVisible(item.id)||presentationHidden(item.id)) continue;
+      if (!scene.isVisible(item.id) || presentationHidden(item.id)) continue;
       if (simulationActive || presentation != null) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
         // Bounds only need the pose's numbers. Building a native transform and
         // reading its matrix back for every object adds thousands of FFI calls per frame.
-        var pose = presentation==null?simulationPoseById.get(item.id):presentationPoseById.get(item.id);
+        var pose = presentation == null ? simulationPoseById.get(item.id) : presentationPoseById.get(item.id);
         var position = pose == null ? [item.x, item.y, item.z] : pose.position;
-        var rotation = pose == null ? (item.rotation==null?[0.0,0.0,0.0,1.0]:item.rotation) : pose.rotation;
+        var rotation = pose == null ? (item.rotation == null ? [0.0, 0.0, 0.0, 1.0] : item.rotation) : pose.rotation;
         var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
         var hx = Math.abs(item.width) / 2, hy = Math.abs(item.height) / 2, hz = Math.abs(item.depth) / 2;
-        var ex = Math.abs(1 - 2 * (y*y + z*z)) * hx + Math.abs(2 * (x*y - z*w)) * hy + Math.abs(2 * (x*z + y*w)) * hz;
-        var ey = Math.abs(2 * (x*y + z*w)) * hx + Math.abs(1 - 2 * (x*x + z*z)) * hy + Math.abs(2 * (y*z - x*w)) * hz;
-        var ez = Math.abs(2 * (x*z - y*w)) * hx + Math.abs(2 * (y*z + x*w)) * hy + Math.abs(1 - 2 * (x*x + y*y)) * hz;
+        var ex = Math.abs(1
+          - 2 * (y * y + z * z)) * hx + Math.abs(2 * (x * y - z * w)) * hy + Math.abs(2 * (x * z + y * w)) * hz;
+        var ey = Math.abs(2
+          * (x * y + z * w)) * hx + Math.abs(1 - 2 * (x * x + z * z)) * hy + Math.abs(2 * (y * z - x * w)) * hz;
+        var ez = Math.abs(2
+          * (x * z - y * w)) * hx + Math.abs(2 * (y * z + x * w)) * hy + Math.abs(1 - 2 * (x * x + y * y)) * hz;
         var bounds = clipBoundsScratch[index];
-        bounds[0] = position[0] - ex; bounds[1] = position[1] - ey; bounds[2] = position[2] - ez;
-        bounds[3] = position[0] + ex; bounds[4] = position[1] + ey; bounds[5] = position[2] + ez;
+        bounds[0] = position[0] - ex;
+        bounds[1] = position[1] - ey;
+        bounds[2] = position[2] - ez;
+        bounds[3] = position[0] + ex;
+        bounds[4] = position[1] + ey;
+        bounds[5] = position[2] + ez;
         clipBounds.push(bounds);
       } else {
         var world = scene.info(item.id).bounds();
-        if (world.valid)
-          clipBounds.push([world.minX, world.minY, world.minZ,
-            world.maxX, world.maxY, world.maxZ]);
+        if (world.valid) clipBounds.push([world.minX, world.minY, world.minZ, world.maxX, world.maxY, world.maxZ]);
       }
     }
-    camera.fitClipRange(clipBounds, aspect(),
-      !readOnly ? 0.0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom)));
+    camera.fitClipRange(
+      clipBounds,
+      aspect(),
+      !readOnly ? 0.0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom))
+    );
   }
 
   function displayTransform(item:EditorSceneObject):Transform {
@@ -1084,26 +1459,51 @@ class EditorPerspectiveViewport implements View {
     if (simulationActive || presentation != null) {
       var cached = simulationTransforms.get(item.id);
       if (cached != null) return cached;
-      var pose = presentation==null?simulationPoseById.get(item.id):presentationPoseById.get(item.id);
+      var pose = presentation == null ? simulationPoseById.get(item.id) : presentationPoseById.get(item.id);
       if (pose != null) {
-        if (simulationTransformCount == simulationTransformScratch.length)
-          simulationTransformScratch.push(Transform.identity());
-        var transform = poseTransform(pose.position, pose.rotation,
-          simulationTransformScratch[simulationTransformCount++]);
+        if (simulationTransformCount
+          == simulationTransformScratch.length) simulationTransformScratch.push(Transform.identity());
+        var transform = poseTransform(
+          pose.position,
+          pose.rotation,
+          simulationTransformScratch[simulationTransformCount++]
+        );
         simulationTransforms.set(item.id, transform);
         return transform;
       }
     }
-    return poseTransform([item.x,item.y,item.z],item.rotation==null?[0,0,0,1]:item.rotation);
+    return poseTransform([item.x, item.y, item.z], item.rotation == null ? [0, 0, 0, 1] : item.rotation);
   }
 
-  static function poseTransform(position:Array<Float>,rotation:Array<Float>, ?target:Transform):Transform {
-    var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
-    return (target == null ? Transform.identity() : target)
-      .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
-      .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
-      .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
-      .translated(position[0],position[1],position[2]);
+  static function poseTransform(position:Array<Float>, rotation:Array<Float>, ?target:Transform):Transform {
+    var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+    return (target == null ? Transform.identity() : target).set(0,
+      1 - 2 * (y * y + z * z)).set(1, 2 * (x * y + z * w)).set(
+        2,
+        2 * (x * z - y * w)
+      ).set(
+        4,
+        2 * (x * y - z * w)
+      ).set(
+        5,
+        1 - 2 * (x * x + z * z)
+      ).set(
+        6,
+        2 * (y * z + x * w)
+      ).set(
+        8,
+        2 * (x * z + y * w)
+      ).set(
+        9,
+        2 * (y * z - x * w)
+      ).set(
+        10,
+        1 - 2 * (x * x + y * y)
+      ).translated(
+        position[0],
+        position[1],
+        position[2]
+      );
   }
 
   public function dispose():Void {
@@ -1127,14 +1527,25 @@ class EditorPerspectiveViewport implements View {
       for (line in bend.lines()) {
         var a = flat.plane.toWorld(new Vector(line.start.x, line.start.y, 0));
         var b = flat.plane.toWorld(new Vector(line.end.x, line.end.y, 0));
-        var projected = camera.projectSegment(item.x + a.x * 0.001, item.y + a.y * 0.001, item.z + a.z * 0.001,
-          item.x + b.x * 0.001, item.y + b.y * 0.001, item.z + b.z * 0.001, width, height);
+        var projected = camera.projectSegment(
+          item.x + a.x * 0.001,
+          item.y + a.y * 0.001,
+          item.z + a.z * 0.001,
+          item.x + b.x * 0.001,
+          item.y + b.y * 0.001,
+          item.z + b.z * 0.001,
+          width,
+          height
+        );
         if (projected == null) continue;
         path.moveTo(projected[0].x, projected[0].y).lineTo(projected[1].x, projected[1].y);
         visible = true;
       }
-      if (visible) canvas.strokeTransient(path.build(), bend.up() ? Color.rgba(0.2, 0.65, 1, 1)
-        : Color.rgba(1, 0.55, 0.15, 1), 1.5);
+      if (visible) canvas.strokeTransient(
+        path.build(),
+        bend.up() ? Color.rgba(0.2, 0.65, 1, 1) : Color.rgba(1, 0.55, 0.15, 1),
+        1.5
+      );
     }
   }
 
@@ -1142,9 +1553,11 @@ class EditorPerspectiveViewport implements View {
     if (!gridVisible || gridStep <= 0.0) return;
     // The workplane is a UI overlay that extends beyond scene geometry. Its
     // projection must not inherit the scene's tightly fitted depth range.
-    var projection = camera.viewProjection(width / Math.max(1.0, height),
+    var projection = camera.viewProjection(
+      width / Math.max(1.0, height),
       Math.max(0.001, camera.distance / 10000.0),
-      Math.max(100.0, camera.distance * 100.0));
+      Math.max(100.0, camera.distance * 100.0)
+    );
     var extent = visibleAxisExtent(width, height);
     var xAxis = new PathBuilder();
     if (appendWorldSegment(xAxis, projection, -extent, 0.0, 0.0, extent, 0.0, 0.0, width, height)) {
@@ -1155,8 +1568,18 @@ class EditorPerspectiveViewport implements View {
       canvas.strokeTransient(yAxis.build(), Color.rgba(0.18, 0.52, 0.35, 0.72), 1.5);
     }
     var zAxis = new PathBuilder();
-    if (appendWorldSegment(zAxis, projection, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Math.min(extent, Math.max(1.0, camera.distance)), width, height)) {
+    if (appendWorldSegment(
+      zAxis,
+      projection,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      Math.min(extent, Math.max(1.0, camera.distance)),
+      width,
+      height
+    )) {
       canvas.strokeTransient(zAxis.build(), Color.rgba(0.22, 0.39, 0.78, 0.82), 1.5);
     }
   }
@@ -1167,24 +1590,37 @@ class EditorPerspectiveViewport implements View {
     var hasIntersection = false, hasHorizon = false;
     for (screenX in [0.0, width]) for (screenY in [0.0, height]) {
       var ray = camera.screenRay(screenX, screenY, width, height);
-      if (Math.abs(ray.directionZ) < 0.000001) { hasHorizon = true; continue; }
+      if (Math.abs(ray.directionZ) < 0.000001) {
+        hasHorizon = true;
+        continue;
+      }
       var distance = -eye[2] / ray.directionZ;
-      if (distance <= 0.0) { hasHorizon = true; continue; }
+      if (distance <= 0.0) {
+        hasHorizon = true;
+        continue;
+      }
       hasIntersection = true;
       var x = eye[0] + ray.directionX * distance;
       var y = eye[1] + ray.directionY * distance;
-      extent = Math.max(extent, Math.max(Math.abs(x - camera.targetX),
-        Math.abs(y - camera.targetY)) * 1.2);
+      extent = Math.max(extent, Math.max(Math.abs(x - camera.targetX), Math.abs(y - camera.targetY)) * 1.2);
     }
-    if (hasIntersection && hasHorizon)
-      extent = Math.max(extent, camera.distance * 80.0);
+    if (hasIntersection && hasHorizon) extent = Math.max(extent, camera.distance * 80.0);
     return Math.min(5000.0, extent);
   }
 
-  function appendWorldSegment(path:PathBuilder, projection:Transform, x0:Float, y0:Float, z0:Float,
-      x1:Float, y1:Float, z1:Float, width:Float, height:Float):Bool {
-    var projected = camera.projectSegmentWithMatrix(projection,
-      x0, y0, z0, x1, y1, z1, width, height);
+  function appendWorldSegment(
+    path:PathBuilder,
+    projection:Transform,
+    x0:Float,
+    y0:Float,
+    z0:Float,
+    x1:Float,
+    y1:Float,
+    z1:Float,
+    width:Float,
+    height:Float
+  ):Bool {
+    var projected = camera.projectSegmentWithMatrix(projection, x0, y0, z0, x1, y1, z1, width, height);
     if (projected == null) return false;
     path.moveTo(projected[0].x, projected[0].y).lineTo(projected[1].x, projected[1].y);
     return true;
@@ -1199,8 +1635,14 @@ class EditorPerspectiveViewport implements View {
       sensorRayPath.clear();
       var hasLinkMarkers = false, hasSensorMarkers = false, visibleRays = 0;
       for (link in robot.links) {
-        var point = camera.projectWithMatrix(projection, link.position[0], link.position[1],
-          link.position[2], width, height);
+        var point = camera.projectWithMatrix(
+          projection,
+          link.position[0],
+          link.position[1],
+          link.position[2],
+          width,
+          height
+        );
         if (point != null) {
           appendMarker(linkMarkerPath, point.x, point.y, 4.0);
           hasLinkMarkers = true;
@@ -1227,10 +1669,14 @@ class EditorPerspectiveViewport implements View {
         if (!overlaysVisible || sensor.kind != "lidar" || sensor.values.length == 0) continue;
 
         var mountRotation = sensor.mountRotation;
-        var rx = qw * mountRotation.get(0) + qx * mountRotation.get(3) + qy * mountRotation.get(2) - qz * mountRotation.get(1);
-        var ry = qw * mountRotation.get(1) - qx * mountRotation.get(2) + qy * mountRotation.get(3) + qz * mountRotation.get(0);
-        var rz = qw * mountRotation.get(2) + qx * mountRotation.get(1) - qy * mountRotation.get(0) + qz * mountRotation.get(3);
-        var rw = qw * mountRotation.get(3) - qx * mountRotation.get(0) - qy * mountRotation.get(1) - qz * mountRotation.get(2);
+        var rx = qw
+          * mountRotation.get(0) + qx * mountRotation.get(3) + qy * mountRotation.get(2) - qz * mountRotation.get(1);
+        var ry = qw
+          * mountRotation.get(1) - qx * mountRotation.get(2) + qy * mountRotation.get(3) + qz * mountRotation.get(0);
+        var rz = qw
+          * mountRotation.get(2) + qx * mountRotation.get(1) - qy * mountRotation.get(0) + qz * mountRotation.get(3);
+        var rw = qw
+          * mountRotation.get(3) - qx * mountRotation.get(0) - qy * mountRotation.get(1) - qz * mountRotation.get(2);
         var values = sensor.values;
         for (index in 0...values.length) {
           var angle = index * 6.283185307179586 / values.length;
@@ -1240,9 +1686,14 @@ class EditorPerspectiveViewport implements View {
           var directionY = vy + rw * dy + rz * dx - rx * dz;
           var directionZ = rw * dz + rx * dy - ry * dx;
           var distance = values.get(index);
-          var hit = camera.projectWithMatrix(projection,
-            originX + directionX * distance, originY + directionY * distance,
-            originZ + directionZ * distance, width, height);
+          var hit = camera.projectWithMatrix(
+            projection,
+            originX + directionX * distance,
+            originY + directionY * distance,
+            originZ + directionZ * distance,
+            width,
+            height
+          );
           if (hit != null && (hit.x != mount.x || hit.y != mount.y)) {
             sensorRayPath.moveTo(mount.x, mount.y).lineTo(hit.x, hit.y);
             visibleRays++;
@@ -1256,22 +1707,25 @@ class EditorPerspectiveViewport implements View {
     }
   }
 
-  static inline function appendMarker(path:PathBuilder,x:Float,y:Float,halfSize:Float):Void {
-    path.moveTo(x-halfSize,y-halfSize).lineTo(x+halfSize,y-halfSize)
-      .lineTo(x+halfSize,y+halfSize).lineTo(x-halfSize,y+halfSize).close();
+  static inline function appendMarker(path:PathBuilder, x:Float, y:Float, halfSize:Float):Void {
+    path.moveTo(x - halfSize,
+      y - halfSize).lineTo(x + halfSize, y - halfSize).lineTo(x + halfSize, y + halfSize).lineTo(
+        x - halfSize,
+        y + halfSize
+      ).close();
   }
 
   function paintSketchDraft(canvas:Canvas, width:Float, height:Float):Void {
     var sketch = scene.sketchDraftSnapshot();
     var plane = scene.sketchDraftPlane();
-    if (sketch == null || plane == null)
-      return;
+    if (sketch == null || plane == null) return;
     var solution = scene.sketchDraftSolution();
     var pointValues:Map<String, Array<Float>> = new Map();
     for (point in sketch.points()) {
       var value = [point.x, point.y];
       if (solution != null) {
-        try value = solution.point(point.id) catch (_:Dynamic) {}
+        try value = solution.point(point.id) catch (_:Dynamic) {
+        }
       }
       pointValues.set(point.id, value);
     }
@@ -1283,24 +1737,22 @@ class EditorPerspectiveViewport implements View {
       var path = free ? freePath : fixedPath;
       var center = pointValues.get(entity.first);
       if (entity.kind == "line") {
-        if (entity.second == null || center == null)
-          continue;
+        if (entity.second == null || center == null) continue;
         var end = pointValues.get(entity.second);
-        if (end == null)
-          continue;
+        if (end == null) continue;
         var a = projectSketchPoint(plane, center[0], center[1], width, height);
         var b = projectSketchPoint(plane, end[0], end[1], width, height);
-        if (a == null || b == null)
-          continue;
+        if (a == null || b == null) continue;
         path.moveTo(a.x, a.y).lineTo(b.x, b.y);
-        if (free) hasFree = true; else hasLine = true;
+        if (free) hasFree = true;
+        else hasLine = true;
       } else if ((entity.kind == "circle" || entity.kind == "arc") && center != null) {
         var radius = entity.radius;
         if (solution != null) {
-          try radius = solution.radius(entity.id) catch (_:Dynamic) {}
+          try radius = solution.radius(entity.id) catch (_:Dynamic) {
+          }
         }
-        if (!Math.isFinite(radius) || radius <= 0)
-          continue;
+        if (!Math.isFinite(radius) || radius <= 0) continue;
         var startAngle = entity.kind == "circle" ? 0.0 : entity.startAngle;
         var sweep = entity.kind == "circle" ? Math.PI * 2 : entity.endAngle - entity.startAngle;
         if (entity.kind == "arc") {
@@ -1316,10 +1768,14 @@ class EditorPerspectiveViewport implements View {
         var prior:Null<PerspectiveScreenPoint> = null;
         for (index in 0...(steps + 1)) {
           var angle = startAngle + sweep * index / steps;
-          var point = projectSketchPoint(plane, center[0] + Math.cos(angle) * radius,
-            center[1] + Math.sin(angle) * radius, width, height);
-          if (point == null)
-            continue;
+          var point = projectSketchPoint(
+            plane,
+            center[0] + Math.cos(angle) * radius,
+            center[1] + Math.sin(angle) * radius,
+            width,
+            height
+          );
+          if (point == null) continue;
           if (!started) {
             path.moveTo(point.x, point.y);
             started = true;
@@ -1329,7 +1785,8 @@ class EditorPerspectiveViewport implements View {
           prior = point;
         }
         if (started) {
-          if (free) hasFree = true; else hasLine = true;
+          if (free) hasFree = true;
+          else hasLine = true;
         }
       }
     }
@@ -1345,8 +1802,7 @@ class EditorPerspectiveViewport implements View {
       var prior:Null<PerspectiveScreenPoint> = null;
       for (corner in corners) {
         var projected = projectSketchPoint(plane, corner[0], corner[1], width, height);
-        if (projected == null)
-          continue;
+        if (projected == null) continue;
         if (first == null) first = projected;
         if (prior != null) path.moveTo(prior.x, prior.y).lineTo(projected.x, projected.y);
         prior = projected;
@@ -1354,16 +1810,15 @@ class EditorPerspectiveViewport implements View {
       if (first != null && prior != null) path.moveTo(prior.x, prior.y).lineTo(first.x, first.y);
       hasLine = true;
     }
-    if (hasLine)
-      canvas.strokeTransient(fixedPath.build(), Color.rgba(1.0, 0.82, 0.22, 0.98), 2.0);
-    if (hasFree)
-      canvas.strokeTransient(freePath.build(), FREE_SKETCH_COLOR, 2.0);
+    if (hasLine) canvas.strokeTransient(fixedPath.build(), Color.rgba(1.0, 0.82, 0.22, 0.98), 2.0);
+    if (hasFree) canvas.strokeTransient(freePath.build(), FREE_SKETCH_COLOR, 2.0);
     for (id => point in pointValues) {
       var projected = projectSketchPoint(plane, point[0], point[1], width, height);
       var free = solution != null && solution.freePoints.indexOf(id) >= 0;
-      if (projected != null)
-        canvas.fillRect(new Rect(projected.x - 3, projected.y - 3, 6, 6),
-          free ? FREE_SKETCH_COLOR : Color.rgba(1.0, 0.88, 0.42, 1.0));
+      if (projected != null) canvas.fillRect(
+        new Rect(projected.x - 3, projected.y - 3, 6, 6),
+        free ? FREE_SKETCH_COLOR : Color.rgba(1.0, 0.88, 0.42, 1.0)
+      );
     }
   }
 
@@ -1379,8 +1834,7 @@ class EditorPerspectiveViewport implements View {
   /** Sketch geometry its constraints still leave free to move. */
   static final FREE_SKETCH_COLOR = Color.rgba(0.36, 0.72, 1.0, 0.98);
 
-  function projectSketchPoint(plane:Plane, x:Float, y:Float,
-      width:Float, height:Float):Null<PerspectiveScreenPoint> {
+  function projectSketchPoint(plane:Plane, x:Float, y:Float, width:Float, height:Float):Null<PerspectiveScreenPoint> {
     var world = plane.toWorld(new Vector(x, y, 0));
     return camera.project(world.x, world.y, world.z, width, height);
   }
@@ -1393,36 +1847,67 @@ class EditorPerspectiveViewport implements View {
   function aspect():Float return viewportWidth / viewportHeight;
 
   function chooseOrbitPivot(localX:Float, localY:Float):Void {
-    if(readOnly){orbitPivot=[camera.targetX,camera.targetY,camera.targetZ];return;}
+    if (readOnly) {
+      orbitPivot = [camera.targetX, camera.targetY, camera.targetZ];
+      return;
+    }
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
-    var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-      displayPoses(), null, -1, null, cosmeticThreadsVisible));
-    var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
-      ray.directionX, ray.directionY, ray.directionZ);
-    if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z))
-      orbitPivot = [hit.x, hit.y, hit.z];
+    var view = sectionView(scene.configureRenderView(
+      new SceneView(),
+      camera.viewProjection(aspect()),
+      displayPoses(),
+      null,
+      -1,
+      null,
+      cosmeticThreadsVisible
+    ));
+    var hit = scene.pickHitRayWithView(
+      view,
+      ray.originX,
+      ray.originY,
+      ray.originZ,
+      ray.directionX,
+      ray.directionY,
+      ray.directionZ
+    );
+    if (hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)) orbitPivot = [
+      hit.x,
+      hit.y,
+      hit.z
+    ];
     else if (orbitPivot == null) orbitPivot = [camera.targetX, camera.targetY, camera.targetZ];
   }
 
   function installNavigation(node:RenderNode):Void {
-    node.on(UiEventKind.KeyDown,function(event) {
-      if(event.key==UiKey.Escape&&offsetOriginal!=null) {
-        cancelDrag();event.releasePointer();event.preventDefault();event.stopPropagation();
+    node.on(UiEventKind.KeyDown, function(event) {
+      if (event.key == UiKey.Escape && offsetOriginal != null) {
+        cancelDrag();
+        event.releasePointer();
+        event.preventDefault();
+        event.stopPropagation();
       }
-    });
+    }
+    );
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (navigationPointer != null) return;
       if (event.button == 1) {
-        if(readOnly){event.preventDefault();event.stopPropagation();return;}
+        if (readOnly) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         clearFlyKeys();
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         navigationPointer = event.pointerId;
         navigationMode = 8;
-        pointerX = pointerStartX = event.x; pointerY = pointerStartY = event.y;
+        pointerX = pointerStartX = event.x;
+        pointerY = pointerStartY = event.y;
         pointerMoved = false;
         clearHover();
-        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        event.capturePointer();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (event.button != 0 && event.button != 2) return;
@@ -1430,31 +1915,54 @@ class EditorPerspectiveViewport implements View {
       if (navigate) {
         navigationPointer = event.pointerId;
         navigationMode = (event.modifiers & UiModifier.Shift) != 0 ? 2 : 1;
-        pointerX = pointerStartX = event.x; pointerY = pointerStartY = event.y;
+        pointerX = pointerStartX = event.x;
+        pointerY = pointerStartY = event.y;
         pointerMoved = false;
-        if (orbiting()) {chooseOrbitPivot(event.localX, event.localY);host.requestFrame();}
-        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        if (orbiting()) {
+          chooseOrbitPivot(event.localX, event.localY);
+          host.requestFrame();
+        }
+        event.capturePointer();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
-      if(readOnly){event.preventDefault();event.stopPropagation();return;}
-      var handle=offsetHandle(viewportWidth,viewportHeight);
-      if(event.button==0&&offsetOriginal!=null&&editingEnabled()) {
-        if(handle==null||offsetDraft==null){event.preventDefault();event.stopPropagation();return;}
-        var dx=event.localX-handle[2],dy=event.localY-handle[3];
-        var ax=handle[2]-handle[0],ay=handle[3]-handle[1];
-        if(dx*dx+dy*dy<=144&&ax*ax+ay*ay>4) {
-          offsetDragAxis=[ax,ay];offsetDragDistance=offsetDraft.distance;
-          navigationPointer=event.pointerId;navigationMode=9;
-          pointerStartX=event.x;pointerStartY=event.y;
-          event.capturePointer();event.preventDefault();event.stopPropagation();return;
+      if (readOnly) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      var handle = offsetHandle(viewportWidth, viewportHeight);
+      if (event.button == 0 && offsetOriginal != null && editingEnabled()) {
+        if (handle == null || offsetDraft == null) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        var dx = event.localX - handle[2], dy = event.localY - handle[3];
+        var ax = handle[2] - handle[0], ay = handle[3] - handle[1];
+        if (dx * dx + dy * dy <= 144 && ax * ax + ay * ay > 4) {
+          offsetDragAxis = [ax, ay];
+          offsetDragDistance = offsetDraft.distance;
+          navigationPointer = event.pointerId;
+          navigationMode = 9;
+          pointerStartX = event.x;
+          pointerStartY = event.y;
+          event.capturePointer();
+          event.preventDefault();
+          event.stopPropagation();
+          return;
         }
         // Offset editing never falls through into engineering dragging.
-        event.preventDefault();event.stopPropagation();return;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
       }
       updateHover(event.localX, event.localY);
       if (event.button == 0 && matePick != null) {
         pickMateFace(hoveredObjectId, hoveredFaceIndex);
-        event.preventDefault(); event.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (event.button == 0 && editingEnabled() && scene.hasActiveSketchEdit()) {
@@ -1462,72 +1970,107 @@ class EditorPerspectiveViewport implements View {
         if (point == null) return;
         // A press on a sketch point drags it (its constraints hold); elsewhere it draws a rectangle.
         var aside = sketchPlanePoint(event.localX + SKETCH_GRAB_PIXELS, event.localY);
-        var radius = aside == null ? 0.0 : Math.sqrt((aside.x - point.x) * (aside.x - point.x) + (aside.y - point.y) * (aside.y - point.y));
+        var radius = aside == null
+          ? 0.0 : Math.sqrt((aside.x - point.x) * (aside.x - point.x) + (aside.y - point.y) * (aside.y - point.y));
         var grabbed = scene.sketchDraftPointNear(point.x, point.y, radius);
         if (grabbed != null && scene.beginSketchDraftPointDrag(grabbed)) {
           sketchPointDragging = true;
           sketchDragRevision++;
           navigationPointer = event.pointerId;
           navigationMode = 6;
-          pointerX = event.x; pointerY = event.y;
-          event.capturePointer(); event.preventDefault(); event.stopPropagation();
+          pointerX = event.x;
+          pointerY = event.y;
+          event.capturePointer();
+          event.preventDefault();
+          event.stopPropagation();
           return;
         }
         sketchRectangleDrag = new PerspectiveSketchRectangleDrag(point.x, point.y);
         sketchDragRevision++;
         navigationPointer = event.pointerId;
         navigationMode = 4;
-        pointerX = event.x; pointerY = event.y;
-        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        pointerX = event.x;
+        pointerY = event.y;
+        event.capturePointer();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       navigationPointer = event.pointerId;
       navigationMode = 7; // Selection without camera movement.
-      pressLocalX=event.localX;pressLocalY=event.localY;pressButton=event.button;
-      pressObjectId=event.button==0 ? pick(event.localX,event.localY) : "scene";
-      dragAttempted=false;
-      pointerX = event.x; pointerY = event.y;
-      pointerStartX = event.x; pointerStartY = event.y; pointerMoved = false;
-      event.capturePointer(); event.preventDefault(); event.stopPropagation();
-    });
+      pressLocalX = event.localX;
+      pressLocalY = event.localY;
+      pressButton = event.button;
+      pressObjectId = event.button == 0 ? pick(event.localX, event.localY) : "scene";
+      dragAttempted = false;
+      pointerX = event.x;
+      pointerY = event.y;
+      pointerStartX = event.x;
+      pointerStartY = event.y;
+      pointerMoved = false;
+      event.capturePointer();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    );
     node.on(UiEventKind.PointerMove, function(event:UiEvent) {
       if (navigationPointer == null) {
         updateHover(event.localX, event.localY);
         return;
       }
       if (event.pointerId != navigationPointer) return;
-      if(navigationMode==9) {
-        if(!editingEnabled()){finishPresentationOffsetEdit(false);navigationPointer=null;navigationMode=0;event.releasePointer();return;}
-        var ax=offsetDragAxis[0],ay=offsetDragAxis[1];
-        var distance=offsetDragDistance+((event.x-pointerStartX)*ax+(event.y-pointerStartY)*ay)/(ax*ax+ay*ay)*offsetHandleLength/presentationScale;
-        previewPresentationOffset(Math.max(0,Math.min(1e9,distance)));
-        event.preventDefault();event.stopPropagation();return;
+      if (navigationMode == 9) {
+        if (!editingEnabled()) {
+          finishPresentationOffsetEdit(false);
+          navigationPointer = null;
+          navigationMode = 0;
+          event.releasePointer();
+          return;
+        }
+        var ax = offsetDragAxis[0], ay = offsetDragAxis[1];
+        var distance = offsetDragDistance + ((event.x - pointerStartX)
+          * ax + (event.y - pointerStartY) * ay) / (ax * ax + ay * ay) * offsetHandleLength / presentationScale;
+        previewPresentationOffset(Math.max(0, Math.min(1e9, distance)));
+        event.preventDefault();
+        event.stopPropagation();
+        return;
       }
       var deltaX = event.x - pointerX, deltaY = event.y - pointerY;
-      pointerX = event.x; pointerY = event.y;
-      if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
-        pointerMoved = true;
-      if(navigationMode==7 && pointerMoved && !dragAttempted && pressButton==0 && editingEnabled() && pressObjectId!="scene") {
-        dragAttempted=true;
-        selectAt(pressLocalX,pressLocalY);
-        objectDrag=PerspectiveSceneDrag.begin(scene,camera,pressObjectId,pressLocalX,pressLocalY,
-          viewportWidth,viewportHeight,gridSnapEnabled,gridStep);
-        if(objectDrag!=null)navigationMode=3;
-        else if(beginAssemblyDrag(pressLocalX,pressLocalY))navigationMode=5;
+      pointerX = event.x;
+      pointerY = event.y;
+      if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0) pointerMoved = true;
+      if (navigationMode == 7
+        && pointerMoved && !dragAttempted && pressButton == 0 && editingEnabled() && pressObjectId != "scene") {
+        dragAttempted = true;
+        selectAt(pressLocalX, pressLocalY);
+        objectDrag = PerspectiveSceneDrag.begin(
+          scene,
+          camera,
+          pressObjectId,
+          pressLocalX,
+          pressLocalY,
+          viewportWidth,
+          viewportHeight,
+          gridSnapEnabled,
+          gridStep
+        );
+        if (objectDrag != null) navigationMode = 3;
+        else if (beginAssemblyDrag(pressLocalX, pressLocalY)) navigationMode = 5;
       }
       var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 1) {
         var pivot = orbitPivot;
         if (pivot == null) camera.orbit(deltaX, deltaY);
         else camera.orbitAround(deltaX, deltaY, pivot[0], pivot[1], pivot[2]);
-      }
-      else if (navigationMode == 8) {
+      } else if (navigationMode == 8) {
         flyFast = (event.modifiers & UiModifier.Shift) != 0;
         camera.look(deltaX, deltaY);
-      }
-      else if (navigationMode == 2) camera.pan(deltaX*inspectionLensScale(), deltaY*inspectionLensScale(), viewportHeight);
-      else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
-        viewportWidth, viewportHeight);
+      } else if (navigationMode == 2) camera.pan(
+        deltaX * inspectionLensScale(),
+        deltaY * inspectionLensScale(),
+        viewportHeight
+      );
+      else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY, viewportWidth, viewportHeight);
       else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
       else if (navigationMode == 6 && sketchPointDragging) {
         var point = sketchPlanePoint(event.localX, event.localY);
@@ -1535,8 +2078,7 @@ class EditorPerspectiveViewport implements View {
           sketchDragRevision++;
           host.requestFrame();
         }
-      }
-      else if (navigationMode == 4 && sketchDrag != null) {
+      } else if (navigationMode == 4 && sketchDrag != null) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point != null) {
           if (sketchDrag.currentX != point.x || sketchDrag.currentY != point.y) {
@@ -1549,28 +2091,35 @@ class EditorPerspectiveViewport implements View {
       if (navigationMode == 1 || navigationMode == 2 || navigationMode == 8) host.requestFrame();
       // Hover follows the cursor only when nothing is being dragged: under a drag the part being moved is the subject, and
       // whatever slides beneath the cursor must not flicker or cost a pick per move.
-      if (navigationMode == 3 || navigationMode == 4 || navigationMode == 5 || navigationMode == 6 || navigationMode == 8 || navigationMode == 9) clearHover();
+      if (navigationMode == 3 || navigationMode == 4
+        || navigationMode == 5 || navigationMode == 6 || navigationMode == 8 || navigationMode == 9) clearHover();
       else updateHover(event.localX, event.localY);
-      event.preventDefault(); event.stopPropagation();
-    });
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    );
     node.on(UiEventKind.HoverEnter, function(event:UiEvent) {
       if (navigationPointer == null) updateHover(event.localX, event.localY);
-    });
+    }
+    );
     node.on(UiEventKind.HoverLeave, function(_) {
       if (navigationPointer == null) clearHover();
-    });
+    }
+    );
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
       var wasOrbiting = orbiting();
       var sketchDrag = sketchRectangleDrag;
-      if(navigationMode==9)finishPresentationOffsetEdit(event.kind==UiEventKind.PointerUp);
+      if (navigationMode == 9) finishPresentationOffsetEdit(event.kind == UiEventKind.PointerUp);
       else if (navigationMode == 3 && objectDrag != null) {
-        if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
+        if (event.kind == UiEventKind.PointerUp) objectDrag.commit();
+        else objectDrag.cancel();
         objectDrag = null;
       } else if (navigationMode == 6 && sketchPointDragging) {
         endSketchPointDrag(event.kind == UiEventKind.PointerUp);
       } else if (navigationMode == 5 && assemblyDrag != null) {
-        if (event.kind == UiEventKind.PointerUp) assemblyDrag.commit(); else assemblyDrag.cancel();
+        if (event.kind == UiEventKind.PointerUp) assemblyDrag.commit();
+        else assemblyDrag.cancel();
         assemblyDrag = null;
         assemblyDragRevision++;
       } else if (navigationMode == 4 && sketchDrag != null) {
@@ -1580,116 +2129,201 @@ class EditorPerspectiveViewport implements View {
             sketchDrag.currentX = point.x;
             sketchDrag.currentY = point.y;
           }
-          scene.addSketchDraftRectangleBetween(sketchDrag.startX, sketchDrag.startY,
-            sketchDrag.currentX, sketchDrag.currentY);
+          scene.addSketchDraftRectangleBetween(
+            sketchDrag.startX,
+            sketchDrag.startY,
+            sketchDrag.currentX,
+            sketchDrag.currentY
+          );
         }
         sketchRectangleDrag = null;
         sketchDragRevision++;
-      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 7 && !pointerMoved && pressButton==0)
-        selectAt(event.localX,event.localY);
-      navigationPointer = null; navigationMode = 0;
+      } else if (event.kind == UiEventKind.PointerUp
+        && navigationMode == 7 && !pointerMoved && pressButton == 0) selectAt(
+          event.localX,
+          event.localY
+        );
+      navigationPointer = null;
+      navigationMode = 0;
       clearFlyKeys();
       if (wasOrbiting) host.requestFrame();
       if (event.kind == UiEventKind.PointerUp) updateHover(event.localX, event.localY);
       else clearHover();
-      event.releasePointer(); event.preventDefault(); event.stopPropagation();
+      event.releasePointer();
+      event.preventDefault();
+      event.stopPropagation();
     };
     node.on(UiEventKind.PointerUp, finish);
     node.on(UiEventKind.PointerCancel, finish);
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
-      if(readOnly){if(navigationPointer==null)inspectionScroll(event);else{event.preventDefault();event.stopPropagation();}return;}
-      if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
+      if (readOnly) {
+        if (navigationPointer == null) inspectionScroll(event);
+        else {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (navigationPointer != null) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       var ray = camera.screenRay(event.localX, event.localY, viewportWidth, viewportHeight);
-      var view = sectionView(scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-        displayPoses(), null, -1, null, cosmeticThreadsVisible));
-      var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
-        ray.directionX, ray.directionY, ray.directionZ);
-      var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)
-        ? [hit.x, hit.y, hit.z]
-        : camera.cursorAnchor(event.localX, event.localY, viewportWidth, viewportHeight);
+      var view = sectionView(scene.configureRenderView(
+        new SceneView(),
+        camera.viewProjection(aspect()),
+        displayPoses(),
+        null,
+        -1,
+        null,
+        cosmeticThreadsVisible
+      ));
+      var hit = scene.pickHitRayWithView(
+        view,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ
+      );
+      var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z) ? [
+        hit.x,
+        hit.y,
+        hit.z
+      ] : camera.cursorAnchor(
+        event.localX,
+        event.localY,
+        viewportWidth,
+        viewportHeight
+      );
       camera.zoomAt(event.deltaY, anchor[0], anchor[1], anchor[2]);
       host.requestFrame();
-      event.preventDefault(); event.stopPropagation();
-    });
-    node.on(UiEventKind.KeyUp, function(event:UiEvent) { if(!visibilityKey(event))flyKey(event, false); });
-    node.on(UiEventKind.KeyRepeat, function(event:UiEvent) { if(!visibilityKey(event))flyKey(event, true); });
-    node.on(UiEventKind.Blur, function(_) { clearFlyKeys(); });
-    node.on(UiEventKind.FocusLost, function(_) { clearFlyKeys(); });
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    );
+    node.on(UiEventKind.KeyUp, function(event:UiEvent) {
+      if (!visibilityKey(event)) flyKey(event, false);
+    }
+    );
+    node.on(UiEventKind.KeyRepeat, function(event:UiEvent) {
+      if (!visibilityKey(event)) flyKey(event, true);
+    }
+    );
+    node.on(UiEventKind.Blur, function(_) {
+      clearFlyKeys();
+    }
+    );
+    node.on(UiEventKind.FocusLost, function(_) {
+      clearFlyKeys();
+    }
+    );
     node.on(UiEventKind.KeyDown, function(event:UiEvent) {
-      if(visibilityKey(event))return;
+      if (visibilityKey(event)) return;
       if (flying() && event.key == UiKey.Escape) {
         clearFlyKeys();
-        event.cancelPointerCapture(); event.preventDefault(); event.stopPropagation();
+        event.cancelPointerCapture();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (flyKey(event, true)) return;
       if (event.key == UiKey.Escape && sketchRectangleDrag != null) {
         sketchRectangleDrag = null;
         sketchDragRevision++;
-        navigationPointer = null; navigationMode = 0;
-        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        navigationPointer = null;
+        navigationMode = 0;
+        event.releasePointer();
+        event.preventDefault();
+        event.stopPropagation();
         return;
       }
       if (event.key == UiKey.Escape && sketchPointDragging) {
         endSketchPointDrag(false);
-        navigationPointer = null; navigationMode = 0;
-        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        navigationPointer = null;
+        navigationMode = 0;
+        event.releasePointer();
+        event.preventDefault();
+        event.stopPropagation();
         host.requestFrame();
         return;
       }
       if (event.key == UiKey.Escape && matePick != null && navigationPointer == null) {
         matePick = null;
         matePickRevision++;
-        event.preventDefault(); event.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
         host.requestFrame();
         return;
       }
       if (event.key == UiKey.Escape && assemblyDrag != null) {
-        assemblyDrag.cancel(); assemblyDrag = null; assemblyDragRevision++;
-        navigationPointer = null; navigationMode = 0;
-        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        assemblyDrag.cancel();
+        assemblyDrag = null;
+        assemblyDragRevision++;
+        navigationPointer = null;
+        navigationMode = 0;
+        event.releasePointer();
+        event.preventDefault();
+        event.stopPropagation();
         host.requestFrame();
         return;
       }
       if (event.key != UiKey.Escape || objectDrag == null) return;
-      objectDrag.cancel(); objectDrag = null;
-      navigationPointer = null; navigationMode = 0;
-      event.releasePointer(); event.preventDefault(); event.stopPropagation();
-    });
+      objectDrag.cancel();
+      objectDrag = null;
+      navigationPointer = null;
+      navigationMode = 0;
+      event.releasePointer();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    );
   }
 
   function visibilityKey(event:UiEvent):Bool {
-    if(event.key!=UiKey.Space || event.modifiers!=0 || flying() || scene.hasActiveSketchEdit())return false;
-    event.preventDefault();event.stopPropagation();
-    if(event.kind==UiEventKind.KeyDown && navigationPointer==null && matePick==null && editingEnabled()) {
-      var tree=selectionTree;
-      if(tree!=null) {if(tree.selectionKey()!="scene")tree.toggleVisibility(tree.selectionKey());}
-      else if(scene.selectedId!="scene")app.editor.SceneVisibility.toggle(scene,scene.selectedId,[scene.selectedId],false);
-      clearHover();host.requestFrame();
+    if (event.key != UiKey.Space || event.modifiers != 0 || flying() || scene.hasActiveSketchEdit()) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.kind == UiEventKind.KeyDown && navigationPointer == null && matePick == null && editingEnabled()) {
+      var tree = selectionTree;
+      if (tree != null) {
+        if (tree.selectionKey() != "scene") tree.toggleVisibility(tree.selectionKey());
+      } else if (scene.selectedId != "scene") app.editor.SceneVisibility.toggle(
+        scene,
+        scene.selectedId,
+        [scene.selectedId],
+        false
+      );
+      clearHover();
+      host.requestFrame();
     }
     return true;
   }
 
   function sketchPlanePoint(localX:Float, localY:Float):Null<Vector> {
     var plane = scene.sketchDraftPlane();
-    if (plane == null)
-      return null;
+    if (plane == null) return null;
     var ray = camera.screenRay(localX, localY, viewportWidth, viewportHeight);
-    var denominator = plane.normal.x * ray.directionX + plane.normal.y * ray.directionY +
-      plane.normal.z * ray.directionZ;
-    if (Math.abs(denominator) < 0.000001)
-      return null;
-    var distance = (plane.origin.x - ray.originX) * plane.normal.x +
-      (plane.origin.y - ray.originY) * plane.normal.y + (plane.origin.z - ray.originZ) * plane.normal.z;
+    var denominator = plane.normal.x
+      * ray.directionX + plane.normal.y * ray.directionY + plane.normal.z * ray.directionZ;
+    if (Math.abs(denominator) < 0.000001) return null;
+    var distance = (plane.origin.x - ray.originX) * plane.normal.x
+      + (plane.origin.y - ray.originY) * plane.normal.y + (plane.origin.z - ray.originZ) * plane.normal.z;
     distance /= denominator;
-    if (distance < 0)
-      return null;
-    var world = new Vector(ray.originX + ray.directionX * distance,
-      ray.originY + ray.directionY * distance, ray.originZ + ray.directionZ * distance);
+    if (distance < 0) return null;
+    var world = new Vector(
+      ray.originX + ray.directionX * distance,
+      ray.originY + ray.directionY * distance,
+      ray.originZ + ray.directionZ * distance
+    );
     var local = plane.toLocal(world);
-    if (gridSnapEnabled)
-      local = new Vector(Math.round(local.x / gridStep) * gridStep,
-        Math.round(local.y / gridStep) * gridStep, 0);
+    if (gridSnapEnabled) local = new Vector(
+      Math.round(local.x / gridStep) * gridStep,
+      Math.round(local.y / gridStep) * gridStep,
+      0
+    );
     return local;
   }
 
@@ -1718,6 +2352,8 @@ class PerspectivePointer {
   public final x:Float;
   public final y:Float;
   public function new(id:Int, x:Float, y:Float) {
-    this.id = id; this.x = x; this.y = y;
+    this.id = id;
+    this.x = x;
+    this.y = y;
   }
 }
