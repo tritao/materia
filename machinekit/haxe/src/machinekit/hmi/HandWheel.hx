@@ -39,6 +39,7 @@ class HandWheel extends HmiPart {
     require(!flag("handle") || n("handleRadius") + n("handleDiameter") / 2 <= n("dialDiameter") / 2 + 1e-9, "the handle sits inside the dial");
     require(count("studCount") >= 1 && count("studCount") <= 6, "one to six studs");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    mount(panelCutout(), panelKeepOut(), panelHoles(), aboveFace(), behindFace(), rearBody(), n("maxPanelThickness"));
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
@@ -50,9 +51,9 @@ class HandWheel extends HmiPart {
 
   function bodyHeight():Float return n("flangeThickness") + n("coneHeight") + n("ringHeight");
 
-  override public function panelCutout():Footprint return Circle(n("bossDiameter") + n("panelClearance"));
-  override public function panelKeepOut():Footprint return Circle(n("outerDiameter"));
-  override public function panelHoles():Array<{x:Float, y:Float, diameter:Float}> {
+  function panelCutout():Footprint return Circle(n("bossDiameter") + n("panelClearance"));
+  function panelKeepOut():Footprint return Circle(n("outerDiameter"));
+  function panelHoles():Array<{x:Float, y:Float, diameter:Float}> {
     var studs = count("studCount"), result = [];
     for (i in 0...studs) {
       var angle = Math.PI / 2 + i * 2 * Math.PI / studs;
@@ -60,11 +61,9 @@ class HandWheel extends HmiPart {
     }
     return result;
   }
-  override public function aboveFace():Float return bodyHeight() + (flag("handle") ? n("handleProtrusion") : 0.0);
-  override public function behindFace():Float return Math.max(n("studLength"), n("terminalDepth"));
-  override public function rearBody():Footprint return Circle(n("studCircleDiameter") + 8.0);
-  override public function massGrams():Float return n("massGrams");
-  override public function maxPanelThickness():Float return n("maxPanelThickness");
+  function aboveFace():Float return bodyHeight() + (flag("handle") ? n("handleProtrusion") : 0.0);
+  function behindFace():Float return Math.max(n("studLength"), n("terminalDepth"));
+  function rearBody():Footprint return Circle(n("studCircleDiameter") + 8.0);
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var top = bodyHeight();

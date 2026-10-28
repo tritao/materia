@@ -33,6 +33,7 @@ class OledModule extends HmiPart {
     require(n("glassWidth") <= n("pcbWidth") && n("glassHeight") <= n("pcbHeight"), "the carrier is larger than the glass");
     require(n("behindDepth") > n("panelThickness") + n("glassThickness") + n("standoffGap") + n("pcbThickness"), "the header has room behind the carrier");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, -behindFace() / 2));
   }
 
@@ -42,12 +43,11 @@ class OledModule extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  override public function panelCutout():Footprint return Rect(n("windowWidth"), n("windowHeight"));
-  override public function panelKeepOut():Footprint return Rect(n("windowWidth") + 2 * n("bezelMargin"), n("windowHeight") + 2 * n("bezelMargin"));
-  override public function aboveFace():Float return 0.0;
-  override public function behindFace():Float return n("behindDepth");
-  override public function rearBody():Footprint return Rect(n("pcbWidth"), n("pcbHeight"));
-  override public function massGrams():Float return n("massGrams");
+  function panelCutout():Footprint return Rect(n("windowWidth"), n("windowHeight"));
+  function panelKeepOut():Footprint return Rect(n("windowWidth") + 2 * n("bezelMargin"), n("windowHeight") + 2 * n("bezelMargin"));
+  function aboveFace():Float return 0.0;
+  function behindFace():Float return n("behindDepth");
+  function rearBody():Footprint return Rect(n("pcbWidth"), n("pcbHeight"));
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var t = n("panelThickness"), g = n("glassThickness"), gap = n("standoffGap"), p = n("pcbThickness");

@@ -31,6 +31,7 @@ class RotarySwitch extends HmiPart {
     require(n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"), "the nut is wider than the bush and narrower than the knob");
     require(n("behindDepth") > n("panelThickness") + n("nutThickness"), "the body has room behind the nut");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
@@ -40,12 +41,11 @@ class RotarySwitch extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  override public function panelCutout():Footprint return Circle(n("bushDiameter") + 0.2);
-  override public function panelKeepOut():Footprint return Circle(n("knobDiameter"));
-  override public function aboveFace():Float return n("knobHeight");
-  override public function behindFace():Float return n("behindDepth");
-  override public function rearBody():Footprint return Circle(n("bodyDiameter"));
-  override public function massGrams():Float return n("massGrams");
+  function panelCutout():Footprint return Circle(n("bushDiameter") + 0.2);
+  function panelKeepOut():Footprint return Circle(n("knobDiameter"));
+  function aboveFace():Float return n("knobHeight");
+  function behindFace():Float return n("behindDepth");
+  function rearBody():Footprint return Circle(n("bodyDiameter"));
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var r = n("knobDiameter") / 2, k = n("knobHeight");

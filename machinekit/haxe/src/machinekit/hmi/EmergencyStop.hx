@@ -35,6 +35,7 @@ class EmergencyStop extends HmiPart {
     require(count("blocks") >= 1 && count("blocks") <= 3, "one to three contact blocks");
     require(n("blockThickness") * count("blocks") <= n("baseDepth") + 1e-9 && n("blockWidth") <= n("baseWidth"), "the blocks fit the base");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     // One NC dry contact per block, to be wired into the safety chain.
     for (i in 1...count("blocks") + 1) addPort({name: "nc" + i, kind: Signal, role: Passive, iface: Plug("dry-contact", 2), required: true});
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
@@ -46,12 +47,11 @@ class EmergencyStop extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  override public function panelCutout():Footprint return Circle(n("panelHole"));
-  override public function panelKeepOut():Footprint return Circle(n("headDiameter"));
-  override public function aboveFace():Float return n("collarHeight") + n("headHeight");
-  override public function behindFace():Float return n("panelThickness") + n("nutThickness") + n("baseLength") + n("blockLength");
-  override public function rearBody():Footprint return Rect(n("baseWidth"), n("baseDepth"));
-  override public function massGrams():Float return n("massGrams");
+  function panelCutout():Footprint return Circle(n("panelHole"));
+  function panelKeepOut():Footprint return Circle(n("headDiameter"));
+  function aboveFace():Float return n("collarHeight") + n("headHeight");
+  function behindFace():Float return n("panelThickness") + n("nutThickness") + n("baseLength") + n("blockLength");
+  function rearBody():Footprint return Rect(n("baseWidth"), n("baseDepth"));
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;

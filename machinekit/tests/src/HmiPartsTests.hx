@@ -5,11 +5,17 @@ import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
+import machinekit.component.PanelMountFacet;
 import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import machinekit.hmi.*;
 
 class HmiPartsTests {
+  static function m(part:MachineComponent):PanelMountFacet {
+    var facet = PanelMountFacet.of(part);
+    if (facet == null) throw part.designation + " states no panel mount";
+    return facet;
+  }
   static function check(ok:Bool, message:String):Void if (!ok) throw message;
   static function near(a:Float, b:Float, message:String, tolerance:Float = 1e-6):Void check(Math.abs(a - b) <= tolerance, '$message: $a vs $b');
   static function rejects(message:String, body:() -> Void):Void {
@@ -23,14 +29,14 @@ class HmiPartsTests {
     var solid = part.geometry(Preview);
     check(solid.solidCount() == 1 && solid.volume() > 0, '$name is one solid');
     var b = solid.shape.bounds();
-    if (part.aboveFace() > 0) near(b.get_max().get_z(), part.aboveFace(), '$name height above the face');
+    if (m(part).above > 0) near(b.get_max().get_z(), m(part).above, '$name height above the face');
     else check(b.get_max().get_z() <= 1e-9, '$name stays behind the face');
-    near(b.get_min().get_z(), -part.behindFace(), '$name depth behind the face');
-    var keep = FootprintGeometry.halfExtent(part.panelKeepOut()), body = FootprintGeometry.halfExtent(part.rearBody()), cut = FootprintGeometry.halfExtent(part.panelCutout());
+    near(b.get_min().get_z(), -m(part).behind, '$name depth behind the face');
+    var keep = FootprintGeometry.halfExtent(m(part).keepOut), body = FootprintGeometry.halfExtent(m(part).body), cut = FootprintGeometry.halfExtent(m(part).cutout);
     var hx = Math.max(keep.x, Math.max(body.x, cut.x)), hy = Math.max(keep.y, Math.max(body.y, cut.y));
     check(Math.max(Math.abs(b.get_min().get_x()), Math.abs(b.get_max().get_x())) <= hx + 1e-6, '$name plan width inside its footprints');
     check(Math.max(Math.abs(b.get_min().get_y()), Math.abs(b.get_max().get_y())) <= hy + 1e-6, '$name plan depth inside its footprints');
-    near(part.massProperties().mass, part.massGrams() / 1000.0, '$name declared mass', 1e-9);
+    near(part.massProperties().mass, part.n("massGrams") / 1000.0, '$name declared mass', 1e-9);
     solid.close();
   }
 
@@ -85,13 +91,13 @@ class HmiPartsTests {
     for (entry in entries) checkPart(entry.p, entry.n);
 
     // The drawings' numbers come out of the recipes.
-    near(yumo.aboveFace(), 38.0, "YUMO above"); near(yumo.behindFace(), 10.0, "YUMO behind");
-    check(yumo.dataSource() == "vendor-drawing" && estop.dataSource() == "listing" && axis.dataSource() == "assumed", "Provenance");
-    near(vallder.aboveFace(), 41.0, "Vallder above"); near(vallder.behindFace(), 12.0, "Vallder behind");
-    near(yumo.maxPanelThickness(), 6.0, "YUMO panel limit"); near(vallder.maxPanelThickness(), 3.0, "Vallder panel limit");
-    check(estop.maxPanelThickness() > 1e6, "A part with no stated limit allows any panel");
-    near(estop.aboveFace(), 31.0, "E-stop above"); near(estop.behindFace(), 43.0, "E-stop behind");
-    near(yumo.panelHoles()[0].diameter, 3.2, "YUMO stud holes"); near(vallder.panelHoles()[0].diameter, 4.8, "Vallder stud holes");
+    near(m(yumo).above, 38.0, "YUMO above"); near(m(yumo).behind, 10.0, "YUMO behind");
+    check(m(yumo).source == "vendor-drawing" && m(estop).source == "listing" && m(axis).source == "assumed", "Provenance");
+    near(m(vallder).above, 41.0, "Vallder above"); near(m(vallder).behind, 12.0, "Vallder behind");
+    near(m(yumo).maxPanelThickness, 6.0, "YUMO panel limit"); near(m(vallder).maxPanelThickness, 3.0, "Vallder panel limit");
+    check(m(estop).maxPanelThickness > 1e6, "A part with no stated limit allows any panel");
+    near(m(estop).above, 31.0, "E-stop above"); near(m(estop).behind, 43.0, "E-stop behind");
+    near(m(yumo).holes[0].diameter, 3.2, "YUMO stud holes"); near(m(vallder).holes[0].diameter, 4.8, "Vallder stud holes");
     check(estop2.designation != estop.designation && estop2.bom.description.indexOf("2 NC") >= 0, "A second block is a different part");
     check(axis.designation != step.designation && axis.bom.description.indexOf("12 positions") >= 0 && step.bom.description.indexOf("3 positions") >= 0, "Positions are in the part");
     // The contacts are ports to wire into a safety chain: one NC dry contact per block.

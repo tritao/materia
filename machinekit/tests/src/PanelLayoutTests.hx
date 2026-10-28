@@ -48,6 +48,7 @@ class PanelLayoutTests {
     check(PanelLayout.gapBetween(wheel, layout.control("estop")) > 5.0, "Wheel and E-stop gap");
     rejects("duplicate ids", () -> new PanelLayout(160.0, 100.0, 3.0, 3.0, 48.0, [wheel, wheel]));
     rejects("no part", () -> new PlacedPart("x", null, 0.0, 0.0));
+    rejects("a part that states no panel mount", () -> new PlacedPart("x", new machinekit.control.SafetyRelay(), 0.0, 0.0));
 
     // The wheel's panel template: a 44 mm opening and three 3.2 mm holes on a 50.8 mm circle at 120 degrees.
     check(wheel.holes().length == 3, "Three stud holes");

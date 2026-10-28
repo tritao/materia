@@ -106,8 +106,8 @@ class PanelLayout {
       for (c in controls) if (c.behind() > deepest.behind()) deepest = c;
       found.push('${deepest.id} reaches ${fmt(deepest.behind())} mm behind the face but the case has ${fmt(caseInnerDepth)}');
     }
-    for (c in controls) if (thickness > c.part.maxPanelThickness() + 1e-9)
-      found.push('the panel is ${fmt(thickness)} mm thick but ${c.id} allows ${fmt(c.part.maxPanelThickness())}');
+    for (c in controls) if (thickness > c.maxPanelThickness() + 1e-9)
+      found.push('the panel is ${fmt(thickness)} mm thick but ${c.id} allows ${fmt(c.maxPanelThickness())}');
     return found;
   }
 

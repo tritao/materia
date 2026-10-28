@@ -33,6 +33,7 @@ class PushButton extends HmiPart {
     require(n("barrelDiameter") < n("bezelDiameter") && n("barrelDiameter") < n("nutDiameter"), "the barrel passes through bezel and nut");
     require(n("behindDepth") > n("panelThickness") + n("nutThickness"), "the body has room behind the nut");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
@@ -42,12 +43,11 @@ class PushButton extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  override public function panelCutout():Footprint return Circle(n("barrelDiameter"));
-  override public function panelKeepOut():Footprint return Circle(n("keepOutDiameter"));
-  override public function aboveFace():Float return n("capHeight");
-  override public function behindFace():Float return n("behindDepth");
-  override public function rearBody():Footprint return Circle(n("bodyDiameter"));
-  override public function massGrams():Float return n("massGrams");
+  function panelCutout():Footprint return Circle(n("barrelDiameter"));
+  function panelKeepOut():Footprint return Circle(n("keepOutDiameter"));
+  function aboveFace():Float return n("capHeight");
+  function behindFace():Float return n("behindDepth");
+  function rearBody():Footprint return Circle(n("bodyDiameter"));
 
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var b = n("bezelDiameter") / 2, c = n("capDiameter") / 2, bh = n("bezelHeight"), top = n("capHeight");

@@ -2,8 +2,8 @@ package machinekit.hmi;
 
 import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
-import machinekit.component.AssumedCatalogComponent;
 import machinekit.component.ComponentParameter;
+import machinekit.component.PanelMountFacet;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
@@ -14,7 +14,7 @@ import machinekit.transmission.ValueBasis;
  * measurement; the recipe's `basis` input says which, and travels in its designation and BOM line. Parts
  * are in their own frame: origin at the centre of the panel's front face, +z toward the operator.
  */
-class HmiPart extends MachineComponent implements PanelPart {
+class HmiPart extends MachineComponent {
   /** How trustworthy the part's numbers are. */
   public final basis:ValueBasis;
   final stored:ComponentValues;
@@ -62,13 +62,8 @@ class HmiPart extends MachineComponent implements PanelPart {
     case _: "assumed";
   };
 
-  // The layout interface; each part states its own.
-  public function panelCutout():Footprint throw "not defined";
-  public function panelKeepOut():Footprint throw "not defined";
-  public function panelHoles():Array<{x:Float, y:Float, diameter:Float}> return [];
-  public function aboveFace():Float throw "not defined";
-  public function behindFace():Float throw "not defined";
-  public function rearBody():Footprint return panelCutout();
-  public function massGrams():Float throw "not defined";
-  public function maxPanelThickness():Float return 1e9;
+  /** States how the part is fixed to a panel (see PanelMountFacet), from the part's own numbers. */
+  function mount(cutout:Footprint, keepOut:Footprint, holes:Array<{x:Float, y:Float, diameter:Float}>, above:Float, behind:Float, body:Footprint,
+      maxPanelThickness:Float = 1e9):Void
+    addFacet(new PanelMountFacet(cutout, keepOut, holes, above, behind, body, maxPanelThickness, dataSource()));
 }
