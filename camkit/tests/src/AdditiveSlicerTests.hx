@@ -2,7 +2,6 @@ import camkit.additive.PrinterProfile;
 import camkit.additive.Slicer;
 import camkit.additive.SlicerSettings;
 import camkit.additive.TestParts;
-import cadkit.modeling.Part;
 import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.printer.PrinterFlavour;

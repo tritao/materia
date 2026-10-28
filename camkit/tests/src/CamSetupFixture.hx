@@ -2,7 +2,6 @@ import camkit.CamContour;
 
 import toolpathkit.path.MoveKind;
 import toolpathkit.setup.Fixture;
-import cnckit.CncWriter;
 import camkit.CamJob;
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.path.ToolpathOp;

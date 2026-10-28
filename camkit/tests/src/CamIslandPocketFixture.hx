@@ -1,4 +1,3 @@
-import cnckit.CncWriter;
 import camkit.CamJob;
 import camkit.CamCastingContours;
 import materia.casting.CastingProfiles;
@@ -6,7 +5,6 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import cnckit.CncCompiler;
 import stockkit.CutMoves;
 import stockkit.Stock;
 import stockkit.StockLattice;

@@ -1,7 +1,5 @@
 import camkit.CamContour;
-import cnckit.CncWriter;
 import camkit.CamJob;
-import cnckit.CncCompiler;
 import toolpathkit.tool.Tool;
 import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;

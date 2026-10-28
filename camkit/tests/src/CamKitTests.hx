@@ -1,7 +1,6 @@
 import camkit.CamContour;
 
 import toolpathkit.path.MoveKind;
-import cnckit.CncWriter;
 import camkit.CamJob;
 import camkit.CamSheetProfiles;
 import cadkit.modeling.Sketch;
@@ -10,7 +9,6 @@ import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
-import cnckit.CncCompiler;
 import toolpathkit.tool.Tool;
 import toolpathkit.geometry.PathGeometry;
 import toolpathkit.geometry.GeometryTools;

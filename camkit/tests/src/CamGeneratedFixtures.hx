@@ -1,11 +1,9 @@
 import camkit.CamContour;
-import cnckit.CncWriter;
 import camkit.CamJob;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import cnckit.CncCompiler;
 import toolpathkit.tool.Tool;
 import toolpathkit.geometry.GeometryTools;
 import toolpathkit.path.ToolpathOp;
