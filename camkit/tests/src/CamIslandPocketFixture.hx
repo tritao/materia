@@ -17,67 +17,56 @@ import toolpathkit.path.Point3;
 
 /** Generated plate pocket with a central raised boss. */
 class CamIslandPocketFixture {
-  public static function run(check:Bool->String->Void):Void {
+  public static function run(check:Bool -> String -> Void):Void {
     var outer = rectangle(0, 0, 40, 30);
     var boss = rectangle(15, 11, 25, 19);
     var sketch = Sketch.face(outer, [boss]);
     var face = sketch.shape.faces().at(0);
     var tool = new Tool(10, 0, 0.002);
-    var program = new CamJob(0.005, 10000)
-      .pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001,
-        "mm", 0.00005, 0.001).finish();
+    var program = new CamJob(0.005,
+      10000).pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001, "mm", 0.00005, 0.001).finish();
     var hasFaceRef = false;
     for (op in program.ops) switch op {
       case Move(_, _, _, _, provenance):
-        if (provenance.featureRef == 'face:${face.index}' &&
-            provenance.operationId != null) hasFaceRef = true;
+        if (provenance.featureRef == 'face:${face.index}' && provenance.operationId != null) hasFaceRef = true;
       case _:
     }
     check(hasFaceRef, "face pocket preserves CAD face reference");
     var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     var lowered = CamTestLowering.lower(program, machine);
-    check(lowered.program != null && lowered.diagnostics.length == 0,
-      "island pocket lowers through MotionKit");
+    check(lowered.program != null && lowered.diagnostics.length == 0, "island pocket lowers through MotionKit");
     var hasPocketSpan = false;
-    for (entry in lowered.sourceMap.entries)
-      if (entry.provenance.line == 1) hasPocketSpan = true;
+    for (entry in lowered.sourceMap.entries) if (entry.provenance.line == 1) hasPocketSpan = true;
     check(hasPocketSpan, "island pocket keeps its operation source span");
 
     var left = -1, right = -1, bossFinishing = 0;
     var ramps = 0, plunges = 0;
     for (index in 0...program.ops.length) switch program.ops[index] {
       case Move(kind, Line(a, b), speed, _, _) if ((kind == Plunge || kind == Ramp) && b.z < a.z - 1e-9):
-        var xy = Math.sqrt(Math.pow(b.x - a.x, 2) +
-          Math.pow(b.y - a.y, 2));
+        var xy = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
         if (xy > 1e-9) {
           ramps++;
-          check(Math.abs(speed - 0.005) < 1e-10 &&
-            (a.z - b.z) / xy <= 0.1 + 1e-9 &&
-            outsideBoss(a) && outsideBoss(b),
-            "island pocket ramps within the allowed clearing region");
+          check(
+            Math.abs(speed - 0.005) < 1e-10 && (a.z - b.z) / xy <= 0.1 + 1e-9 && outsideBoss(a) && outsideBoss(b),
+            "island pocket ramps within the allowed clearing region"
+          );
         } else {
           plunges++;
-          check(Math.abs(speed - 0.001) < 1e-10,
-            "island pocket vertical entry uses configured plunge feed");
+          check(Math.abs(speed - 0.001) < 1e-10, "island pocket vertical entry uses configured plunge feed");
         }
-      case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z + 0.002) < 1e-9 &&
-          Math.abs(b.z + 0.002) < 1e-9 && Math.abs(a.y - 0.015) < 1e-9 &&
-          Math.abs(b.y - 0.015) < 1e-9):
+      case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z + 0.002) < 1e-9
+        && Math.abs(b.z + 0.002) < 1e-9 && Math.abs(a.y - 0.015) < 1e-9 && Math.abs(b.y - 0.015) < 1e-9):
         if (a.x < 0.015 && b.x < 0.015) left = index;
         if (a.x > 0.025 && b.x > 0.025) right = index;
-      case Move(Cut, Arc(center, _, _, _), _, _, _) if (Math.abs(center.z + 0.002) < 1e-9 &&
-          center.x >= 0.015 && center.x <= 0.025 &&
-          center.y >= 0.011 && center.y <= 0.019):
+      case Move(Cut, Arc(center, _, _, _), _, _, _) if (Math.abs(center.z + 0.002) < 1e-9
+        && center.x >= 0.015 && center.x <= 0.025 && center.y >= 0.011 && center.y <= 0.019):
         bossFinishing++;
       case _:
     }
-    check(left >= 0 && right > left,
-      "boss splits the middle clearing row into two passes");
-    check(bossFinishing == 4,
-      "island boundary gets four rounded outside finishing corners");
-    check(ramps > 0 && plunges > 0,
-      "island pocket uses ramps where possible and slow plunges in short spans");
+    check(left >= 0 && right > left, "boss splits the middle clearing row into two passes");
+    check(bossFinishing == 4, "island boundary gets four rounded outside finishing corners");
+    check(ramps > 0 && plunges > 0, "island pocket uses ramps where possible and slow plunges in short spans");
     var retracted = false;
     for (index in (left + 1)...right) switch program.ops[index] {
       case Move(Retract, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
@@ -92,121 +81,124 @@ class CamIslandPocketFixture {
     for (op in program.ops) switch op {
       case Move(Cut, geometry, _, _, _):
         var start = GeometryTools.pointAt(geometry, 0);
-        var end = GeometryTools.pointAt(geometry,
-          GeometryTools.length(geometry));
+        var end = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
         for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
-          var point = GeometryTools.pointAt(geometry,
-            GeometryTools.length(geometry) * fraction);
-          check(outsideBoss(point) &&
-            bossDistance(point) >= cutterRadius - 1e-8,
-            "island pocket keeps the full cutter outside the boss");
+          var point = GeometryTools.pointAt(geometry, GeometryTools.length(geometry) * fraction);
+          check(
+            outsideBoss(point) && bossDistance(point) >= cutterRadius - 1e-8,
+            "island pocket keeps the full cutter outside the boss"
+          );
         }
       case _:
     }
     for (ix in 0...40) for (iy in 0...30) {
-      var point = new Point3((ix + 0.5) * 0.001,
-        (iy + 0.5) * 0.001, -0.002);
+      var point = new Point3((ix + 0.5) * 0.001, (iy + 0.5) * 0.001, -0.002);
       if (!outsideBoss(point)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
         case Move(Cut, geometry, _, _, _):
           var start = GeometryTools.pointAt(geometry, 0);
-          var end = GeometryTools.pointAt(geometry,
-            GeometryTools.length(geometry));
-          if (Math.abs(start.z + 0.002) > 1e-9 ||
-              Math.abs(end.z + 0.002) > 1e-9) continue;
+          var end = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
+          if (Math.abs(start.z + 0.002) > 1e-9 || Math.abs(end.z + 0.002) > 1e-9) continue;
           switch geometry {
-            case Line(a, b): best = Math.min(best, segmentDistance(point, a, b));
+            case Line(a, b):
+              best = Math.min(best, segmentDistance(point, a, b));
             case Arc(_, _, _, _):
               for (sample in 0...65) {
-                var position = GeometryTools.pointAt(geometry,
-                  GeometryTools.length(geometry) * sample / 64);
+                var position = GeometryTools.pointAt(geometry, GeometryTools.length(geometry) * sample / 64);
                 best = Math.min(best, point.distanceTo(position));
               }
             case _:
           }
         case _:
       }
-      check(best <= cutterRadius + 0.00001,
-        'island pocket covers the plate grid point ${point.x},${point.y}: $best');
+      check(best <= cutterRadius + 0.00001, 'island pocket covers the plate grid point ${point.x},${point.y}: $best');
     }
 
-    var imported = machine.compileDetailed(
-      machine.export(program, CamTestSetup.standard()));
-    check(imported.diagnostics.length == 0 &&
-      imported.program.ops.length == program.ops.length,
-      "island pocket G-code recompiles with the same operation count");
+    var imported = machine.compileDetailed(machine.export(program, CamTestSetup.standard()));
+    check(
+      imported.diagnostics.length == 0 && imported.program.ops.length == program.ops.length,
+      "island pocket G-code recompiles with the same operation count"
+    );
     for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(Cut, a, feedA, _, _), Move(Cut, b, feedB, _, _)]:
-        check(Math.abs(feedA - feedB) < 1e-8,
-          "island pocket G-code preserves ramp and plunge feeds");
+        check(Math.abs(feedA - feedB) < 1e-8, "island pocket G-code preserves ramp and plunge feeds");
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = GeometryTools.pointAt(a,
-            GeometryTools.length(a) * fraction);
-          var reparsed = GeometryTools.pointAt(b,
-            GeometryTools.length(b) * fraction);
-          check(original.distanceTo(reparsed) < 1e-8,
-            "island pocket G-code preserves geometry");
+          var original = GeometryTools.pointAt(a, GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b, GeometryTools.length(b) * fraction);
+          check(original.distanceTo(reparsed) < 1e-8, "island pocket G-code preserves geometry");
         }
       case [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = GeometryTools.pointAt(a,
-            GeometryTools.length(a) * fraction);
-          var reparsed = GeometryTools.pointAt(b,
-            GeometryTools.length(b) * fraction);
-          check(original.distanceTo(reparsed) < 1e-8,
-            "island pocket G-code preserves geometry");
+          var original = GeometryTools.pointAt(a, GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b, GeometryTools.length(b) * fraction);
+          check(original.distanceTo(reparsed) < 1e-8, "island pocket G-code preserves geometry");
         }
       case _:
     }
     var secondBoss = rectangle(5, 5, 9, 9);
     var twoBossSketch = Sketch.face(outer, [boss, secondBoss]);
     var twoBossFace = twoBossSketch.shape.faces().at(0);
-    var twoBossProgram = new CamJob(0.005, 10000)
-      .pocketFace(twoBossFace, tool, -0.001, 0.005, 0.001).finish();
-    check(CamTestLowering.lower(twoBossProgram, machine).diagnostics.length == 0,
-      "face pocket supports two separate islands");
+    var twoBossProgram = new CamJob(0.005, 10000).pocketFace(twoBossFace, tool, -0.001, 0.005, 0.001).finish();
+    check(
+      CamTestLowering.lower(twoBossProgram, machine).diagnostics.length == 0,
+      "face pocket supports two separate islands"
+    );
     for (op in twoBossProgram.ops) switch op {
       case Move(Cut, geometry, _, _, _):
         var a = GeometryTools.pointAt(geometry, 0);
-        var b = GeometryTools.pointAt(geometry,
-          GeometryTools.length(geometry));
+        var b = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
         if (Math.abs(a.z - b.z) > 1e-9) continue;
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = GeometryTools.pointAt(geometry,
-            GeometryTools.length(geometry) * fraction);
+          var point = GeometryTools.pointAt(geometry, GeometryTools.length(geometry) * fraction);
           var x = Math.max(0.005, Math.min(0.009, point.x));
           var y = Math.max(0.005, Math.min(0.009, point.y));
-          check(Math.sqrt(Math.pow(point.x - x, 2) +
-            Math.pow(point.y - y, 2)) >= cutterRadius - 1e-8,
-            "second island retains cutter-radius clearance");
+          check(
+            Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)) >= cutterRadius - 1e-8,
+            "second island retains cutter-radius clearance"
+          );
         }
       case _:
     }
-    twoBossFace.close(); twoBossSketch.close(); secondBoss.close();
+    twoBossFace.close();
+    twoBossSketch.close();
+    secondBoss.close();
 
     var tightBoss = rectangle(1, 11, 10, 19);
     var tightSketch = Sketch.face(outer, [tightBoss]);
     var tightFace = tightSketch.shape.faces().at(0);
     var rejectedJob = new CamJob(0.005, 10000), rejected = false;
     try rejectedJob.pocketFace(tightFace,
-      new Tool(11, 0, 0.004), -0.001, 0.005, 0.001)
-    catch (_:Dynamic) rejected = true;
+      new Tool(11, 0, 0.004), -0.001, 0.005, 0.001) catch (_:Dynamic) rejected = true;
     check(rejected, "pocket rejects an island closer than the cutter radius to the wall");
     rejected = false;
     try rejectedJob.finish() catch (_:Dynamic) rejected = true;
     check(rejected, "rejected island pocket leaves no partial CAM operation");
-    tightFace.close(); tightSketch.close(); tightBoss.close();
-    face.close(); sketch.close(); outer.close(); boss.close();
+    tightFace.close();
+    tightSketch.close();
+    tightBoss.close();
+    face.close();
+    sketch.close();
+    outer.close();
+    boss.close();
   }
 
-  static function neutralContours(tool:Tool, machine:CamTestRig, check:Bool->String->Void):Void {
+  static function neutralContours(tool:Tool, machine:CamTestRig, check:Bool -> String -> Void):Void {
     var outer = CamCastingContours.fromProfile(CastingProfiles.rectangle(0, 0, 40, 30), 0.00005);
     var island = CamCastingContours.fromProfile(CastingProfiles.rectangle(15, 11, 10, 8), 0.00005);
     var before = haxe.Json.stringify([outer.vertices, island.vertices]);
-    var program = new CamJob(0.005, 10000)
-      .pocketContours(outer, [island], tool, -0.002, 0.005, 0.001, 0.001, 0.001, "neutral-pocket").finish();
+    var program = new CamJob(0.005, 10000).pocketContours(
+      outer,
+      [island],
+      tool,
+      -0.002,
+      0.005,
+      0.001,
+      0.001,
+      0.001,
+      "neutral-pocket"
+    ).finish();
     var source = true, moves = 0;
     for (operation in program.ops) switch operation {
       case Move(_, _, _, _, span):
@@ -215,57 +207,93 @@ class CamIslandPocketFixture {
       case _:
     }
     check(moves > 0 && source, "neutral island clearing retains its source identity on every move");
-    check(haxe.Json.stringify([outer.vertices, island.vertices]) == before,
-      "island clearing leaves its caller's neutral contour vertices intact");
+    check(
+      haxe.Json.stringify([outer.vertices, island.vertices]) == before,
+      "island clearing leaves its caller's neutral contour vertices intact"
+    );
     var lowered = CamTestLowering.lower(program, machine);
-    check(lowered.program != null && lowered.diagnostics.length == 0,
-      "neutral contour clearing lowers through the existing motion pipeline");
+    check(
+      lowered.program != null && lowered.diagnostics.length == 0,
+      "neutral contour clearing lowers through the existing motion pipeline"
+    );
     var exactArcs = 0;
     for (operation in program.ops) switch operation {
       case Move(Cut, Arc(_, radius, _, _), _, _, _):
         exactArcs++;
-        check(Math.abs(radius - tool.diameter / 2) < 1e-10,
-          "neutral island finishing retains the exact compensated corner radius");
+        check(
+          Math.abs(radius - tool.diameter / 2) < 1e-10,
+          "neutral island finishing retains the exact compensated corner radius"
+        );
       case _:
     }
-    check(exactArcs == 8,
-      "both depth levels retain four exact island-corner arcs with arc fitting disabled");
+    check(exactArcs == 8, "both depth levels retain four exact island-corner arcs with arc fitting disabled");
     simulate(program, tool, (ok, message) -> check(ok, "neutral contours: " + message));
     var roundIsland = CamCastingContours.fromProfile(CastingProfiles.circle(20, 15, 6), 0.00005);
-    var roundProgram = new CamJob(0.005, 10000)
-      .pocketContours(outer, [roundIsland], tool, -0.002, 0.005, 0.001, 0.001, 0.001, "round-island").finish();
+    var roundProgram = new CamJob(0.005, 10000).pocketContours(
+      outer,
+      [roundIsland],
+      tool,
+      -0.002,
+      0.005,
+      0.001,
+      0.001,
+      0.001,
+      "round-island"
+    ).finish();
     simulate(roundProgram, tool, (ok, message) -> check(ok, "round neutral island: " + message), true);
-    var plain = new CamJob(0.005, 10000)
-      .pocket(outer, tool, -0.001, 0.005, 0.001, 0.001, 0.001, "neutral-plain").finish();
-    var empty = new CamJob(0.005, 10000)
-      .pocketContours(outer, [], tool, -0.001, 0.005, 0.001, 0.001, 0.001, "neutral-plain").finish();
-    check(machine.export(plain, CamTestSetup.standard()) == machine.export(empty, CamTestSetup.standard()),
-      "an empty island list preserves the existing pocket's complete CNC program");
-    var raised = CamCastingContours.fromProfile(CastingProfiles.rectangle(15, 11, 10, 8),
-      0.00005, false, 0, 0, 0, 0, 0.001);
+    var plain = new CamJob(0.005,
+      10000).pocket(outer, tool, -0.001, 0.005, 0.001, 0.001, 0.001, "neutral-plain").finish();
+    var empty = new CamJob(0.005, 10000).pocketContours(
+      outer,
+      [],
+      tool,
+      -0.001,
+      0.005,
+      0.001,
+      0.001,
+      0.001,
+      "neutral-plain"
+    ).finish();
+    check(
+      machine.export(plain, CamTestSetup.standard()) == machine.export(empty, CamTestSetup.standard()),
+      "an empty island list preserves the existing pocket's complete CNC program"
+    );
+    var raised = CamCastingContours.fromProfile(
+      CastingProfiles.rectangle(15, 11, 10, 8),
+      0.00005,
+      false,
+      0,
+      0,
+      0,
+      0,
+      0.001
+    );
     var wrongPlane = new CamJob(0.005, 10000), message = "";
-    try wrongPlane.pocketContours(outer, [raised], tool, -0.001, 0.005, 0.001)
-    catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf("must share a work plane") >= 0,
-      "neutral pocket rejects islands in a different work plane");
+    try wrongPlane.pocketContours(outer,
+      [raised], tool, -0.001, 0.005, 0.001) catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("must share a work plane") >= 0, "neutral pocket rejects islands in a different work plane");
     message = "";
     try wrongPlane.finish() catch (error:Dynamic) message = Std.string(error);
     check(message.indexOf("CAM job has no operations") >= 0, "plane rejection leaves no partial CAM operation");
     var outside = CamCastingContours.fromProfile(CastingProfiles.rectangle(45, 11, 10, 8), 0.00005);
     var invalid = new CamJob(0.005, 10000);
     message = "";
-    try invalid.pocketContours(outer, [outside], tool, -0.001, 0.005, 0.001)
-    catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf("crosses its source contour") >= 0,
-      "neutral pocket rejects an island outside its removal boundary");
+    try invalid.pocketContours(outer,
+      [outside], tool, -0.001, 0.005, 0.001) catch (error:Dynamic) message = Std.string(error);
+    check(
+      message.indexOf("crosses its source contour") >= 0,
+      "neutral pocket rejects an island outside its removal boundary"
+    );
     message = "";
     try invalid.finish() catch (error:Dynamic) message = Std.string(error);
     check(message.indexOf("CAM job has no operations") >= 0, "containment rejection leaves no partial CAM operation");
     message = "";
-    try new CamJob(0.005, 10000).pocketContours(outer, null, tool, -0.001, 0.005, 0.001)
-    catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf("needs an island contour list") >= 0,
-      "a missing island list is not silently treated as empty");
+    try new CamJob(0.005,
+      10000).pocketContours(outer, null, tool, -0.001, 0.005, 0.001) catch (error:Dynamic) message = Std.string(error);
+    check(
+      message.indexOf("needs an island contour list") >= 0,
+      "a missing island list is not silently treated as empty"
+    );
   }
 
   /**
@@ -273,8 +301,12 @@ class CamIslandPocketFixture {
     finished part: nothing gouged, no rapid through stock, no shank contact,
     and leftover only in the pocket's four inside corners.
   **/
-  static function simulate(program:toolpathkit.path.ToolpathProgram, tool:Tool,
-      check:Bool->String->Void, roundBoss:Bool = false):Void {
+  static function simulate(
+    program:toolpathkit.path.ToolpathProgram,
+    tool:Tool,
+    check:Bool -> String -> Void,
+    roundBoss:Bool = false
+  ):Void {
     var solids:Array<Part> = [];
     function box(width:Float, depth:Float, height:Float, x:Float, y:Float, z:Float):Part {
       var local = Part.box(width, depth, height, Min, Min, Min);
@@ -305,43 +337,56 @@ class CamIslandPocketFixture {
     check(report.rapidContacts().length == 0, "island pocket never rapids through stock");
     check(report.collisions().length == 0, "island pocket keeps the shank out of the stock");
     // Walls gouged sideways show only on the X and Y grids.
-    for (along in stock.compareAll(target))
-      check(along.deepestGouge() < 1e-9,
-        'island pocket does not gouge its part along ${along.grid.axis} (deepest ${along.deepestGouge()})');
+    for (along in stock.compareAll(target)) check(
+      along.deepestGouge() < 1e-9,
+      'island pocket does not gouge its part along ${along.grid.axis} (deepest ${along.deepestGouge()})'
+    );
     var comparison = stock.compare(target);
-    check(comparison.thickestLeftover() <= 0.002 + 1e-12,
-      "island pocket leaves nothing thicker than its depth");
+    check(comparison.thickestLeftover() <= 0.002 + 1e-12, "island pocket leaves nothing thicker than its depth");
     // A round cutter leaves a fillet of its radius in each inside corner of
     // the outer wall, (1 - pi / 4) r^2 each; the boss's corners are outside
     // corners. At 0.25 mm rays each fillet is about three rays.
     var r = tool.diameter / 2;
     var fillets = (4 - Math.PI) * r * r * 0.002;
-    check(Math.abs(comparison.leftoverVolume() - fillets) <= 0.25 * fillets,
-      'island pocket leftover is the corner fillets: ${comparison.leftoverVolume()} vs $fillets');
+    check(
+      Math.abs(comparison.leftoverVolume() - fillets) <= 0.25 * fillets,
+      'island pocket leftover is the corner fillets: ${comparison.leftoverVolume()} vs $fillets'
+    );
     target.dispose();
     stock.dispose();
   }
 
-  static function rectangle(x0:Float, y0:Float, x1:Float, y1:Float):Curve
-    return Curve.polyline([new Vector(x0, y0), new Vector(x1, y0),
-      new Vector(x1, y1), new Vector(x0, y1)], true);
+  static function rectangle(x0:Float, y0:Float, x1:Float, y1:Float):Curve return Curve.polyline(
+    [
+      new Vector(x0, y0),
+      new Vector(
+        x1,
+        y0
+      ),
+      new Vector(
+        x1,
+        y1
+      ),
+      new Vector(
+        x0,
+        y1
+      )
+    ],
+    true
+  );
 
-  static function outsideBoss(point:Point3):Bool
-    return point.x <= 0.015 || point.x >= 0.025 ||
-      point.y <= 0.011 || point.y >= 0.019;
+  static function outsideBoss(point:Point3):Bool return point.x <= 0.015
+    || point.x >= 0.025 || point.y <= 0.011 || point.y >= 0.019;
 
   static function bossDistance(point:Point3):Float {
     var x = Math.max(0.015, Math.min(0.025, point.x));
     var y = Math.max(0.011, Math.min(0.019, point.y));
-    return Math.sqrt(Math.pow(point.x - x, 2) +
-      Math.pow(point.y - y, 2));
+    return Math.sqrt(Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2));
   }
 
   static function segmentDistance(point:Point3, a:Point3, b:Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
-    var t = Math.max(0.0, Math.min(1.0,
-      ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
-    return Math.sqrt(Math.pow(point.x - a.x - t * dx, 2) +
-      Math.pow(point.y - a.y - t * dy, 2));
+    var t = Math.max(0.0, Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+    return Math.sqrt(Math.pow(point.x - a.x - t * dx, 2) + Math.pow(point.y - a.y - t * dy, 2));
   }
 }

@@ -27,15 +27,31 @@ class HobbingSettings {
   /** Startup witness: hob encoder datum B=0, released EGB, and machine ready to accept this job. */
   public var readySignal:String = "hob.job_ready";
   public var stoppedSignal:String = "hob.stopped";
-  public function new() {}
+  public function new() {
+  }
   public function copy():HobbingSettings {
-    var r=new HobbingSettings();
-    r.cuttingSpeed=cuttingSpeed;r.feedPerRevolution=feedPerRevolution;r.climb=climb;
-    r.depths=depths.copy();r.shifts=shifts.copy();r.blankOuterRadius=blankOuterRadius;
-    r.faceBottom=faceBottom;r.clearance=clearance;r.crown=crown;r.crownChordTolerance=crownChordTolerance;
-    r.rapidFeed=rapidFeed;r.infeed=infeed;r.signalTimeout=signalTimeout;
-    r.xAxis=xAxis;r.yAxis=yAxis;r.zAxis=zAxis;r.tiltJoint=tiltJoint;r.hobJoint=hobJoint;r.tableJoint=tableJoint;
-    r.readySignal=readySignal;r.stoppedSignal=stoppedSignal;
+    var r = new HobbingSettings();
+    r.cuttingSpeed = cuttingSpeed;
+    r.feedPerRevolution = feedPerRevolution;
+    r.climb = climb;
+    r.depths = depths.copy();
+    r.shifts = shifts.copy();
+    r.blankOuterRadius = blankOuterRadius;
+    r.faceBottom = faceBottom;
+    r.clearance = clearance;
+    r.crown = crown;
+    r.crownChordTolerance = crownChordTolerance;
+    r.rapidFeed = rapidFeed;
+    r.infeed = infeed;
+    r.signalTimeout = signalTimeout;
+    r.xAxis = xAxis;
+    r.yAxis = yAxis;
+    r.zAxis = zAxis;
+    r.tiltJoint = tiltJoint;
+    r.hobJoint = hobJoint;
+    r.tableJoint = tableJoint;
+    r.readySignal = readySignal;
+    r.stoppedSignal = stoppedSignal;
     return r;
   }
 }

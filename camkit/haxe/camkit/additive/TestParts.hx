@@ -16,7 +16,8 @@ class TestParts {
     var cube = Part.box(20, 20, height);
     var hole = Part.cylinderSpan(3, -1, height + 1, 2, -1);
     var part = cube.subtract(hole);
-    cube.close(); hole.close();
+    cube.close();
+    hole.close();
     return part;
   }
 
@@ -39,6 +40,5 @@ class TestParts {
   }
 
   /** 10 x 10 x 1.2 mm, six layers at 0.2 mm: the fast test. */
-  public static function smallTab():Part
-    return Part.box(10, 10, 1.2);
+  public static function smallTab():Part return Part.box(10, 10, 1.2);
 }

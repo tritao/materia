@@ -11,9 +11,25 @@ class HobbingPass {
   public final revolutions:Float;
   public final seconds:Float;
   public final tablePhase:Float;
-  public function new(depth:Float,shift:Float,centreDistance:Float,engagement:HobbingEngagement,
-      zStart:Float,zEnd:Float,revolutions:Float,seconds:Float,tablePhase:Float) {
-    this.depth=depth;this.shift=shift;this.centreDistance=centreDistance;this.engagement=engagement;
-    this.zStart=zStart;this.zEnd=zEnd;this.revolutions=revolutions;this.seconds=seconds;this.tablePhase=tablePhase;
+  public function new(
+    depth:Float,
+    shift:Float,
+    centreDistance:Float,
+    engagement:HobbingEngagement,
+    zStart:Float,
+    zEnd:Float,
+    revolutions:Float,
+    seconds:Float,
+    tablePhase:Float
+  ) {
+    this.depth = depth;
+    this.shift = shift;
+    this.centreDistance = centreDistance;
+    this.engagement = engagement;
+    this.zStart = zStart;
+    this.zEnd = zEnd;
+    this.revolutions = revolutions;
+    this.seconds = seconds;
+    this.tablePhase = tablePhase;
   }
 }

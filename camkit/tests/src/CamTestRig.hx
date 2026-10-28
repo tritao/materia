@@ -21,12 +21,25 @@ class CamTestRig {
 
   function get_toolLibrary():ToolLibrary return controller.toolLibrary;
 
-  public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void
-    binding.setTravel(new TravelEnvelope(new Point3(lower[0], lower[1], lower[2]),
-      new Point3(upper[0], upper[1], upper[2])));
+  public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void binding.setTravel(new TravelEnvelope(
+    new Point3(
+      lower[0],
+      lower[1],
+      lower[2]
+    ),
+    new Point3(
+      upper[0],
+      upper[1],
+      upper[2]
+    )
+  ));
 
-  public function compileDetailed(source:String, ?start:Point3):CncCompileResult
-    return CncCompiler.compileDetailed(source, controller, start, binding.travel);
+  public function compileDetailed(source:String, ?start:Point3):CncCompileResult return CncCompiler.compileDetailed(
+    source,
+    controller,
+    start,
+    binding.travel
+  );
 
   public function export(program:ToolpathProgram, setup:Setup):String {
     var setups = [setup];
@@ -41,7 +54,6 @@ class CamTestRig {
         }
       case _:
     }
-    return CncWriter.write(new ToolpathProgram(program.ops, program.tools, setups),
-      controller, binding.travel);
+    return CncWriter.write(new ToolpathProgram(program.ops, program.tools, setups), controller, binding.travel);
   }
 }

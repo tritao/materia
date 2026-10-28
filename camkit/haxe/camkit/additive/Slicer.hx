@@ -28,7 +28,8 @@ class SliceReport {
   public var seconds:Float = 0.0;
   public var depositedVolume:Float = 0.0;
 
-  public function new() {}
+  public function new() {
+  }
 }
 
 class SliceResult {
@@ -50,7 +51,8 @@ class SliceResult {
  * part's millimetres; the program is in metres.
  */
 class Slicer {
-  public static function slice(part:Part, settings:SlicerSettings, ?profile:PrinterProfile, ?objectName:String = "part"):SliceResult {
+  public static function slice(part:Part,
+    settings:SlicerSettings, ?profile:PrinterProfile, ?objectName:String = "part"):SliceResult {
     if (part == null || settings == null) throw "slicing needs a part and settings";
     settings.validate();
     var began = Sys.time();
@@ -102,7 +104,9 @@ private class SliceRun {
     this.settings = settings;
     this.profile = profile;
     this.objectName = objectName;
-    x = profile.home.x; y = profile.home.y; z = profile.home.z;
+    x = profile.home.x;
+    y = profile.home.y;
+    z = profile.home.z;
   }
 
   public function close():Void {
@@ -123,8 +127,11 @@ private class SliceRun {
     var bounds = part.shape.bounds();
     var low = bounds.get_min(), high = bounds.get_max();
     var millimetres = 1000.0;
-    placed = part.shape.translate(Geometry.vec3(profile.bedCenterX * millimetres - (low.get_x() + high.get_x()) * 0.5,
-      profile.bedCenterY * millimetres - (low.get_y() + high.get_y()) * 0.5, -low.get_z()));
+    placed = part.shape.translate(Geometry.vec3(
+      profile.bedCenterX * millimetres - (low.get_x() + high.get_x()) * 0.5,
+      profile.bedCenterY * millimetres - (low.get_y() + high.get_y()) * 0.5,
+      -low.get_z()
+    ));
     var height = (high.get_z() - low.get_z()) / millimetres;
     var layers = Std.int(Math.max(1, Math.round((height - settings.firstLayerHeight) / settings.layerHeight) + 1));
     report.layers = layers;
@@ -166,32 +173,45 @@ private class SliceRun {
     var from = profile.purgeStart, to = profile.purgeEnd;
     travelTo(from.x, from.y, from.z, start);
     unretract(start);
-    if (profile.purgePrimeLength > 0.0)
-      ops.push(ToolpathOp.FilamentMove(profile.purgePrimeLength, settings.retractSpeed, start));
+    if (profile.purgePrimeLength > 0.0) ops.push(ToolpathOp.FilamentMove(
+      profile.purgePrimeLength,
+      settings.retractSpeed,
+      start
+    ));
     var purgeWidth = profile.purgeWidth, purgeHeight = profile.purgeHeight;
-    var area = toolpathkit.path.BeadSection.area(purgeWidth,purgeHeight);
+    var area = toolpathkit.path.BeadSection.area(purgeWidth, purgeHeight);
     ops.push(ToolpathOp.Deposit(area, purgeWidth, purgeHeight, start));
     ops.push(ToolpathOp.Feature(Skirt, start));
     ops.push(ToolpathOp.Move(Cut, PathGeometry.Line(from, to), profile.purgeSpeed, settings.pathTolerance, start));
     hasDeposited = true;
     report.moves += 1;
     report.extrudedLength += from.distanceTo(to);
-    x = to.x; y = to.y; z = to.z;
-    beadWidth = 0.0; beadHeight = 0.0;
+    x = to.x;
+    y = to.y;
+    z = to.z;
+    beadWidth = 0.0;
+    beadHeight = 0.0;
     retract(start);
   }
 
   function endSequence():Void {
     var end = Provenance.cam(report.layers, "end");
     ops.push(ToolpathOp.DepositOff(end));
-    beadWidth = 0.0; beadHeight = 0.0;
+    beadWidth = 0.0;
+    beadHeight = 0.0;
     retract(end);
     ops.push(ToolpathOp.Fan("part", 0.0, end));
     ops.push(ToolpathOp.Heat("hotend", 0.0, false, end));
     ops.push(ToolpathOp.Heat("bed", 0.0, false, end));
     var lifted = new Point3(x, y, z + profile.parkLift);
     ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(new Point3(x, y, z), lifted), settings.travelSpeed, 0.0, end));
-    ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(lifted, new Point3(profile.home.x, profile.home.y, lifted.z)), settings.travelSpeed, 0.0, end));
+    ops.push(ToolpathOp.Move(
+      Rapid,
+      PathGeometry.Line(lifted, new Point3(profile.home.x, profile.home.y, lifted.z)),
+      settings.travelSpeed,
+      0.0,
+      end
+    ));
     ops.push(ToolpathOp.End(end));
     report.moves += 2;
   }
@@ -233,8 +253,15 @@ private class SliceRun {
       var offset = s.lineWidth / 2.0 + k * spacing;
       var ring = keep(section.offset(-offset * millimetres));
       if (ring.isEmpty()) break;
-      printLoops(ring.loops(), top, thickness, k == 0 ? PrintFeature.ExternalPerimeter : PrintFeature.Perimeter, layer,
-        k == 0 ? "external-perimeter" : "perimeter", layer == 0 ? s.firstLayerSpeed : (k == 0 ? s.externalPerimeterSpeed : s.perimeterSpeed));
+      printLoops(
+        ring.loops(),
+        top,
+        thickness,
+        k == 0 ? PrintFeature.ExternalPerimeter : PrintFeature.Perimeter,
+        layer,
+        k == 0 ? "external-perimeter" : "perimeter",
+        layer == 0 ? s.firstLayerSpeed : (k == 0 ? s.externalPerimeterSpeed : s.perimeterSpeed)
+      );
     }
 
     // What is inside the perimeters: solid where the layers above or below do not cover it, sparse elsewhere.
@@ -249,16 +276,34 @@ private class SliceRun {
     var angle = s.infillAngles[layer % s.infillAngles.length];
     if (!solid.isEmpty()) {
       var topmost = isTop(layer, cores);
-      printFill(solid, angle, spacing, top, thickness, topmost ? PrintFeature.TopSolidInfill : PrintFeature.SolidInfill,
-        layer, "solid-infill", layer == 0 ? s.firstLayerSpeed : (topmost ? s.topSolidInfillSpeed : s.solidInfillSpeed));
+      printFill(
+        solid,
+        angle,
+        spacing,
+        top,
+        thickness,
+        topmost ? PrintFeature.TopSolidInfill : PrintFeature.SolidInfill,
+        layer,
+        "solid-infill",
+        layer == 0 ? s.firstLayerSpeed : (topmost ? s.topSolidInfillSpeed : s.solidInfillSpeed)
+      );
     }
-    if (sparse != null && !sparse.isEmpty())
-      printFill(sparse, angle, s.lineWidth / s.infillDensity, top, thickness, PrintFeature.Infill, layer, "infill",
-        layer == 0 ? s.firstLayerSpeed : s.infillSpeed);
+    if (sparse != null && !sparse.isEmpty()) printFill(
+      sparse,
+      angle,
+      s.lineWidth / s.infillDensity,
+      top,
+      thickness,
+      PrintFeature.Infill,
+      layer,
+      "infill",
+      layer == 0 ? s.firstLayerSpeed : s.infillSpeed
+    );
   }
 
   /** Is layer `layer` the last of its stack, with nothing above it? */
-  function isTop(layer:Int, cores:Array<PlanarRegion>):Bool return layer + 1 >= cores.length || cores[layer + 1].isEmpty();
+  function isTop(layer:Int,
+    cores:Array<PlanarRegion>):Bool return layer + 1 >= cores.length || cores[layer + 1].isEmpty();
 
   /** The part of the core that the `topLayers` above and the `bottomLayers` below all cover; null when none of it is. */
   function coveredByNeighbours(layer:Int, cores:Array<PlanarRegion>):Null<PlanarRegion> {
@@ -276,8 +321,15 @@ private class SliceRun {
 
   // ---- printing paths --------------------------------------------------------------------------
 
-  function printLoops(loops:Array<PlanarLoop>, top:Float, thickness:Float, feature:PrintFeature, layer:Int,
-      name:String, speed:Float):Void {
+  function printLoops(
+    loops:Array<PlanarLoop>,
+    top:Float,
+    thickness:Float,
+    feature:PrintFeature,
+    layer:Int,
+    name:String,
+    speed:Float
+  ):Void {
     if (loops.length == 0) return;
     var pending = loops.copy();
     var scale = 0.001;
@@ -290,7 +342,11 @@ private class SliceRun {
         var loop = pending[index];
         for (at in 0...loop.segments.length) {
           var d = distance2(loop.segments[at].x0 * scale, loop.segments[at].y0 * scale);
-          if (d < bestDistance) { bestDistance = d; best = index; bestIndex = at; }
+          if (d < bestDistance) {
+            bestDistance = d;
+            best = index;
+            bestIndex = at;
+          }
         }
       }
       var loop = pending.splice(best, 1)[0].startingAt(bestIndex);
@@ -301,8 +357,17 @@ private class SliceRun {
     }
   }
 
-  function printFill(region:PlanarRegion, angle:Float, spacing:Float, top:Float, thickness:Float, feature:PrintFeature,
-      layer:Int, name:String, speed:Float):Void {
+  function printFill(
+    region:PlanarRegion,
+    angle:Float,
+    spacing:Float,
+    top:Float,
+    thickness:Float,
+    feature:PrintFeature,
+    layer:Int,
+    name:String,
+    speed:Float
+  ):Void {
     var scale = 0.001;
     var tag = Provenance.cam(layer + 1, name);
     var lines = fillLines(region, angle, spacing, top);
@@ -314,8 +379,16 @@ private class SliceRun {
       for (index in 0...pending.length) {
         var line = pending[index];
         var d0 = distance2(line[0], line[1]), d1 = distance2(line[2], line[3]);
-        if (d0 < bestDistance) { bestDistance = d0; best = index; bestEnd = false; }
-        if (d1 < bestDistance) { bestDistance = d1; best = index; bestEnd = true; }
+        if (d0 < bestDistance) {
+          bestDistance = d0;
+          best = index;
+          bestEnd = false;
+        }
+        if (d1 < bestDistance) {
+          bestDistance = d1;
+          best = index;
+          bestEnd = true;
+        }
       }
       var line = pending.splice(best, 1)[0];
       var a = bestEnd ? [line[2], line[3]] : [line[0], line[1]], b = bestEnd ? [line[0], line[1]] : [line[2], line[3]];
@@ -331,7 +404,10 @@ private class SliceRun {
     var faces = new Map<Int, Array<PlanarLoop>>();
     var order:Array<Int> = [];
     for (loop in region.loops(0.01)) {
-      if (!faces.exists(loop.face)) { faces.set(loop.face, []); order.push(loop.face); }
+      if (!faces.exists(loop.face)) {
+        faces.set(loop.face, []);
+        order.push(loop.face);
+      }
       faces.get(loop.face).push(loop);
     }
     var lines:Array<Array<Float>> = [];
@@ -340,16 +416,25 @@ private class SliceRun {
       var outer:Null<CamContour> = null, holes:Array<CamContour> = [];
       for (loop in faces.get(face)) {
         // Rotate so the scanlines run along x: x' = x cos + y sin, y' = -x sin + y cos.
-        var points = [for (point in sample(loop, 0.00001)) new Point3(point[0] * cosine + point[1] * sine, -point[0] * sine + point[1] * cosine, 0.0)];
+        var points = [for (point in sample(loop, 0.00001)) new Point3(
+          point[0] * cosine + point[1] * sine,
+          -point[0] * sine + point[1] * cosine,
+          0.0
+        )];
         var contour = new CamContour(points, true);
-        if (loop.outer) outer = contour; else holes.push(contour);
+        if (loop.outer) outer = contour;
+        else holes.push(contour);
       }
       if (outer == null) continue;
       for (pass in CamPocketPlanner.fill(outer, spacing, holes)) {
         if (pass.right - pass.left < minimum) continue;
         // Back to the bed's frame, in metres.
-        lines.push([pass.left * cosine - pass.y * sine, pass.left * sine + pass.y * cosine,
-          pass.right * cosine - pass.y * sine, pass.right * sine + pass.y * cosine]);
+        lines.push([
+          pass.left * cosine - pass.y * sine,
+          pass.left * sine + pass.y * cosine,
+          pass.right * cosine - pass.y * sine,
+          pass.right * sine + pass.y * cosine
+        ]);
       }
     }
     return lines;
@@ -362,10 +447,19 @@ private class SliceRun {
     for (segment in loop.segments) {
       points.push([segment.x0 * scale, segment.y0 * scale]);
       if (!segment.arc) continue;
-      var steps = Std.int(Math.max(2, Math.ceil(Math.abs(segment.sweep) / (2.0 * Math.acos(Math.max(0.0, 1.0 - tolerance / (segment.radius * scale)))))));
+      var steps = Std.int(Math.max(
+        2,
+        Math.ceil(Math.abs(segment.sweep) / (2.0 * Math.acos(Math.max(
+          0.0,
+          1.0 - tolerance / (segment.radius * scale)
+        ))))
+      ));
       for (step in 1...steps) {
         var angle = segment.startAngle + segment.sweep * step / steps;
-        points.push([(segment.cx + segment.radius * Math.cos(angle)) * scale, (segment.cy + segment.radius * Math.sin(angle)) * scale]);
+        points.push([
+          (segment.cx + segment.radius * Math.cos(angle)) * scale,
+          (segment.cy + segment.radius * Math.sin(angle)) * scale
+        ]);
       }
     }
     return points;
@@ -375,7 +469,10 @@ private class SliceRun {
     var result:Array<Array<Float>> = [];
     for (loop in loops) {
       var flat:Array<Float> = [];
-      for (point in sample(loop, tolerance)) { flat.push(point[0]); flat.push(point[1]); }
+      for (point in sample(loop, tolerance)) {
+        flat.push(point[0]);
+        flat.push(point[1]);
+      }
       result.push(flat);
     }
     return result;
@@ -410,15 +507,25 @@ private class SliceRun {
     if (lift > 0.0) {
       var up = new Point3(x, y, z + lift), across = new Point3(tx, ty, tz + lift);
       ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(from, up), settings.travelSpeed, 0.0, tag));
-      ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(up, across), settings.travelSpeed, settings.pathTolerance, tag));
-      ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(across, new Point3(tx, ty, tz)), settings.travelSpeed, 0.0, tag));
+      ops.push(ToolpathOp.Move(Rapid,
+        PathGeometry.Line(up, across), settings.travelSpeed, settings.pathTolerance, tag));
+      ops.push(ToolpathOp.Move(Rapid,
+        PathGeometry.Line(across, new Point3(tx, ty, tz)), settings.travelSpeed, 0.0, tag));
       report.moves += 3;
     } else {
-      ops.push(ToolpathOp.Move(Rapid, PathGeometry.Line(from, new Point3(tx, ty, tz)), settings.travelSpeed, settings.pathTolerance, tag));
+      ops.push(ToolpathOp.Move(
+        Rapid,
+        PathGeometry.Line(from, new Point3(tx, ty, tz)),
+        settings.travelSpeed,
+        settings.pathTolerance,
+        tag
+      ));
       report.moves += 1;
     }
     report.travelLength += length;
-    x = tx; y = ty; z = tz;
+    x = tx;
+    y = ty;
+    z = tz;
   }
 
   /** Does the straight travel from the nozzle to (tx, ty) leave the printed section? */
@@ -447,26 +554,36 @@ private class SliceRun {
     }
   }
 
-  function extrude(segments:Array<PlanarSegment>, top:Float, thickness:Float, speed:Float, tag:Provenance, scale:Float):Void {
+  function extrude(segments:Array<PlanarSegment>,
+    top:Float, thickness:Float, speed:Float, tag:Provenance, scale:Float):Void {
     unretract(tag);
     var width = settings.lineWidth;
     if (beadWidth != width || beadHeight != thickness) {
       ops.push(ToolpathOp.Deposit(settings.beadArea(thickness), width, thickness, tag));
-      beadWidth = width; beadHeight = thickness;
+      beadWidth = width;
+      beadHeight = thickness;
     }
     for (segment in segments) {
       var a = new Point3(segment.x0 * scale, segment.y0 * scale, top);
       var b = new Point3(segment.x1 * scale, segment.y1 * scale, top);
-      var geometry = segment.arc ?
-        PathGeometry.Arc(new Point3(segment.cx * scale, segment.cy * scale, top), segment.radius * scale, segment.startAngle, segment.sweep) :
-        PathGeometry.Line(a, b);
+      var geometry = segment.arc ? PathGeometry.Arc(
+        new Point3(segment.cx * scale, segment.cy * scale, top),
+        segment.radius * scale,
+        segment.startAngle,
+        segment.sweep
+      ) : PathGeometry.Line(
+        a,
+        b
+      );
       var length = segment.length() * scale;
       if (length < 1e-9) continue;
       ops.push(ToolpathOp.Move(Cut, geometry, speed, settings.pathTolerance, tag));
       hasDeposited = true;
       report.moves += 1;
       report.extrudedLength += length;
-      x = b.x; y = b.y; z = top;
+      x = b.x;
+      y = b.y;
+      z = top;
     }
   }
 }

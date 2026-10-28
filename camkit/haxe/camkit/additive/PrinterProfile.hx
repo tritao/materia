@@ -22,14 +22,25 @@ class PrinterProfile {
   public final home:Point3;
   public final parkLift:Float;
 
-  public function new(bedCenterX:Float, bedCenterY:Float, purgeStart:Point3, purgeEnd:Point3,
-      ?purgeHeight:Float = 0.0003, ?purgeWidth:Float = 0.00045, ?purgeSpeed:Float = 0.02, ?home:Point3, ?parkLift:Float = 0.02, ?purgePrimeLength:Float = 0.0015) {
+  public function new(
+    bedCenterX:Float,
+    bedCenterY:Float,
+    purgeStart:Point3,
+    purgeEnd:Point3,
+    ?purgeHeight:Float = 0.0003,
+    ?purgeWidth:Float = 0.00045,
+    ?purgeSpeed:Float = 0.02,
+    ?home:Point3,
+    ?parkLift:Float = 0.02,
+    ?purgePrimeLength:Float = 0.0015
+  ) {
     if (!Math.isFinite(bedCenterX) || !Math.isFinite(bedCenterY)) throw "the bed centre must be finite";
-    if (purgeStart == null || purgeEnd == null || purgeStart.distanceTo(purgeEnd) < 0.001)
-      throw "the purge line needs two distinct ends";
-    for (value in [purgeHeight, purgeWidth, purgeSpeed, parkLift])
-      if (!Math.isFinite(value) || value <= 0.0) throw "profile heights, widths and speeds must be positive";
-    if (!Math.isFinite(purgePrimeLength) || purgePrimeLength < 0.0) throw "purge prime must be a non-negative finite filament length";
+    if (purgeStart == null
+      || purgeEnd == null || purgeStart.distanceTo(purgeEnd) < 0.001) throw "the purge line needs two distinct ends";
+    for (value in [purgeHeight, purgeWidth, purgeSpeed,
+      parkLift]) if (!Math.isFinite(value) || value <= 0.0) throw "profile heights, widths and speeds must be positive";
+    if (!Math.isFinite(purgePrimeLength)
+      || purgePrimeLength < 0.0) throw "purge prime must be a non-negative finite filament length";
     this.purgePrimeLength = purgePrimeLength;
     this.bedCenterX = bedCenterX;
     this.bedCenterY = bedCenterY;
@@ -43,6 +54,14 @@ class PrinterProfile {
   }
 
   /** A 220 x 220 mm bed with the purge line 5 mm from its front edge. */
-  public static function bed220():PrinterProfile
-    return new PrinterProfile(0.11, 0.11, new Point3(0.03, 0.005, 0.0003), new Point3(0.11, 0.005, 0.0003));
+  public static function bed220():PrinterProfile return new PrinterProfile(
+    0.11,
+    0.11,
+    new Point3(0.03, 0.005, 0.0003),
+    new Point3(
+      0.11,
+      0.005,
+      0.0003
+    )
+  );
 }

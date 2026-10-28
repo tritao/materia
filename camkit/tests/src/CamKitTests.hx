@@ -1,6 +1,7 @@
 import camkit.CamContour;
 
-import toolpathkit.path.MoveKind;import cnckit.CncWriter;
+import toolpathkit.path.MoveKind;
+import cnckit.CncWriter;
 import camkit.CamJob;
 import camkit.CamSheetProfiles;
 import cadkit.modeling.Sketch;
@@ -27,10 +28,10 @@ class CamKitTests {
     assertions++;
     if (!ok) throw message;
   }
-  static function near(actual:Float, expected:Float, message:String,
-      ?tolerance:Float = 1e-8):Void
-    check(Math.abs(actual - expected) <= tolerance,
-      '$message: expected $expected, got $actual');
+  static function near(actual:Float, expected:Float, message:String, ?tolerance:Float = 1e-8):Void check(
+    Math.abs(actual - expected) <= tolerance,
+    '$message: expected $expected, got $actual'
+  );
 
   public static function main():Void {
     if (Sys.getEnv("CAM_ONLY") == "island-pocket") {
@@ -49,48 +50,59 @@ class CamKitTests {
     CamToolingPanelTests.run();
     assertions += CamCastingContourTests.run();
     var placement:materia.sheet.SheetPartPlacement = {
-      id: "gantry-bracket", requirementId: "bracket", x: 10.0, y: 10.0,
-      width: 20.0, height: 10.0, rotation: 0, regionId: "sheet-a"
+      id: "gantry-bracket",
+      requirementId: "bracket",
+      x: 10.0,
+      y: 10.0,
+      width: 20.0,
+      height: 10.0,
+      rotation: 0,
+      regionId: "sheet-a"
     };
     var contour = CamSheetProfiles.placement(placement, "mm");
     var sheetPlan:materia.sheet.SheetCutPlan = {
-      schemaVersion: 1, id: "gantry-sheet", revision: 1,
-      stockSpecId: "aluminium", stockSpecRevision: 1,
-      stockSpecFingerprint: "fixture", lengthUnit: "mm", kerf: 2.0,
-      edgeMargin: 0.0, requirements: [], placements: [placement],
-      cuts: [], retainedRegionIds: []
+      schemaVersion: 1,
+      id: "gantry-sheet",
+      revision: 1,
+      stockSpecId: "aluminium",
+      stockSpecRevision: 1,
+      stockSpecFingerprint: "fixture",
+      lengthUnit: "mm",
+      kerf: 2.0,
+      edgeMargin: 0.0,
+      requirements: [],
+      placements: [placement],
+      cuts: [],
+      retainedRegionIds: []
     };
-    near(CamSheetProfiles.fromPlan(sheetPlan, "gantry-bracket").signedArea,
-      contour.signedArea, "manufacturingkit sheet plan feeds CAM directly");
+    near(
+      CamSheetProfiles.fromPlan(sheetPlan, "gantry-bracket").signedArea,
+      contour.signedArea,
+      "manufacturingkit sheet plan feeds CAM directly"
+    );
     near(contour.vertices[0].x, 0.01, "sheet placement X becomes metres");
     near(contour.signedArea, 0.0002, "sheet rectangle area");
     var sketch = new ConstrainedSketch();
-    var coordinates = [[10.0, 10.0], [30.0, 10.0],
-      [30.0, 20.0], [10.0, 20.0]];
+    var coordinates = [[10.0, 10.0], [30.0, 10.0], [30.0, 20.0], [10.0, 20.0]];
     for (index in 0...4) {
-      sketch.addPoint(new SketchPoint('p$index', coordinates[index][0],
-        coordinates[index][1]));
+      sketch.addPoint(new SketchPoint('p$index', coordinates[index][0], coordinates[index][1]));
       sketch.addConstraint(SketchConstraint.fixed('fixed$index', 'p$index'));
-      sketch.addEntity(SketchEntity.line('edge$index', 'p$index',
-        'p${(index + 1) % 4}'));
+      sketch.addEntity(SketchEntity.line('edge$index', 'p$index', 'p${(index + 1) % 4}'));
     }
     var fromSketch = CamContour.fromSketch(sketch, sketch.solve());
-    near(fromSketch.signedArea, contour.signedArea,
-      "solved cadkit sketch becomes a CAM contour");
-    var cadFace = Sketch.polygon([new Vector(10, 10), new Vector(30, 10),
-      new Vector(30, 20), new Vector(10, 20)]);
+    near(fromSketch.signedArea, contour.signedArea, "solved cadkit sketch becomes a CAM contour");
+    var cadFace = Sketch.polygon([new Vector(10, 10), new Vector(30, 10), new Vector(30, 20), new Vector(10, 20)]);
     var face = cadFace.shape.faces().at(0);
     var fromFace = CamContour.fromFace(face);
-    near(Math.abs(fromFace.signedArea), Math.abs(contour.signedArea),
-      "cadkit face edges become a CAM contour");
-    face.close(); cadFace.close();
+    near(Math.abs(fromFace.signedArea), Math.abs(contour.signedArea), "cadkit face edges become a CAM contour");
+    face.close();
+    cadFace.close();
 
     var tool = new Tool(2, 0.0, 0.002);
     var job = new CamJob(0.005, 12000.0);
     job.profile(contour, tool, -0.002, 0.01);
     job.pocket(contour, tool, -0.001, 0.01, 0.001);
-    job.drill([new Point3(0.015, 0.015, 0.0),
-      new Point3(0.025, 0.015, 0.0)], tool, -0.003, 0.001, 0.005);
+    job.drill([new Point3(0.015, 0.015, 0.0), new Point3(0.025, 0.015, 0.0)], tool, -0.003, 0.001, 0.005);
     var program = job.finish();
     var moveKinds = new Map<String, Bool>();
     for (op in program.ops) switch op {
@@ -98,10 +110,8 @@ class CamKitTests {
         moveKinds.set(Std.string(kind), true);
       case _:
     }
-    for (kind in ["Cut", "Plunge", "Ramp", "Link", "Retract"])
-      check(moveKinds.exists(kind), 'CAM emits $kind moves');
-    check(program.ops.length > 30,
-      "profile, pocket rings, and drills create ordered CNC geometry");
+    for (kind in ["Cut", "Plunge", "Ramp", "Link", "Retract"]) check(moveKinds.exists(kind), 'CAM emits $kind moves');
+    check(program.ops.length > 30, "profile, pocket rings, and drills create ordered CNC geometry");
     var outsideArcs = 0;
     for (op in program.ops) switch op {
       case ToolpathOp.Move(Cut, PathGeometry.Arc(_, radius, _, sweep), _, _, span):
@@ -112,15 +122,12 @@ class CamKitTests {
         }
       case _:
     }
-    check(outsideArcs == 4,
-      "rectangular outside profile has one round join per corner");
-    var stepped = new CamJob(0.005, 12000.0)
-      .profile(contour, tool, -0.005, 0.01, "outside", 0.002).finish();
+    check(outsideArcs == 4, "rectangular outside profile has one round join per corner");
+    var stepped = new CamJob(0.005, 12000.0).profile(contour, tool, -0.005, 0.01, "outside", 0.002).finish();
     var levels:Array<Float> = [];
     for (op in stepped.ops) switch op {
       case ToolpathOp.Move(Cut, PathGeometry.Arc(center, _, _, _), _, _, _):
-        if (levels.length == 0 || Math.abs(center.z - levels[levels.length - 1]) > 1e-9)
-          levels.push(center.z);
+        if (levels.length == 0 || Math.abs(center.z - levels[levels.length - 1]) > 1e-9) levels.push(center.z);
       case _:
     }
     check(levels.length == 3, "5 mm profile uses three depth levels");
@@ -132,109 +139,201 @@ class CamKitTests {
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
         case ToolpathOp.Move(Cut, PathGeometry.Line(a, b), _, _, span):
-          if (span.line == 2 && Math.abs(a.z + 0.001) < 1e-9 &&
-              Math.abs(b.z + 0.001) < 1e-9)
-            best = Math.min(best, distanceToLine(sample, a, b));
+          if (span.line == 2 && Math.abs(a.z + 0.001) < 1e-9 && Math.abs(b.z + 0.001) < 1e-9) best = Math.min(
+            best,
+            distanceToLine(
+              sample,
+              a,
+              b
+            )
+          );
         case _:
       }
-      check(best <= tool.diameter * 0.5 + 1e-8,
-        'pocket clears grid point $x,$y within cutter radius');
+      check(best <= tool.diameter * 0.5 + 1e-8, 'pocket clears grid point $x,$y within cutter radius');
     }
-    var concave = new CamContour([new Point3(0, 0, 0),
-      new Point3(0.02, 0, 0), new Point3(0.02, 0.01, 0),
-      new Point3(0.01, 0.005, 0), new Point3(0, 0.01, 0)]);
-    check(new CamJob(0.005, 12000.0)
-      .pocket(concave, tool, -0.001, 0.01, 0.001)
-      .finish().ops.length > 0,
-      "concave pocket clearing generates cutter passes");
+    var concave = new CamContour([
+      new Point3(0, 0, 0),
+      new Point3(0.02, 0, 0),
+      new Point3(0.02, 0.01, 0),
+      new Point3(
+        0.01,
+        0.005,
+        0
+      ),
+      new Point3(
+        0,
+        0.01,
+        0
+      )
+    ]);
+    check(
+      new CamJob(0.005, 12000.0).pocket(concave, tool, -0.001, 0.01, 0.001).finish().ops.length > 0,
+      "concave pocket clearing generates cutter passes"
+    );
     var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     var lowered = CamTestLowering.lower(program, machine);
-    check(lowered.diagnostics.length == 0 && lowered.program != null,
-      "CAM IR lowers directly to executable MotionKit paths");
+    check(
+      lowered.diagnostics.length == 0 && lowered.program != null,
+      "CAM IR lowers directly to executable MotionKit paths"
+    );
     var tight = new CamTestRig();
     tight.setTravelEnvelope([0.0, 0.0, -0.01], [0.02, 0.02, 0.01]);
     var travelMessage = "";
-    try CamTestLowering.lower(program, tight)
-    catch (error:Dynamic) travelMessage = Std.string(error);
-    check(travelMessage.indexOf("X travel") >= 0 &&
-      travelMessage.indexOf("cam:1") >= 0,
-      "direct CAM lowering checks machine travel with operation source span");
+    try CamTestLowering.lower(program, tight) catch (error:Dynamic) travelMessage = Std.string(error);
+    check(
+      travelMessage.indexOf("X travel") >= 0 && travelMessage.indexOf("cam:1") >= 0,
+      "direct CAM lowering checks machine travel with operation source span"
+    );
     var hasProfileSpan = false, hasPocketSpan = false, hasDrillSpan = false;
     for (entry in lowered.sourceMap.entries) {
       if (entry.provenance.line == 1) hasProfileSpan = true;
       if (entry.provenance.line == 2) hasPocketSpan = true;
       if (entry.provenance.line == 3) hasDrillSpan = true;
     }
-    check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
-      "CAM source map identifies each authored operation");
+    check(hasProfileSpan && hasPocketSpan && hasDrillSpan, "CAM source map identifies each authored operation");
     // A fitted open arc must retain the authored endpoint even when samples only
     // approximately lie on a circle. Otherwise the next arc's relative I/J is wrong.
-    var samples = [for (index in 0...13) new Point3(0.04 + 0.002 * Math.cos(index * Math.PI / 24),
-      0.02 + 0.002 * Math.sin(index * Math.PI / 24), -0.001)];
+    var samples = [for (index in 0...13) new Point3(
+      0.04 + 0.002 * Math.cos(index * Math.PI / 24),
+      0.02 + 0.002 * Math.sin(index * Math.PI / 24),
+      -0.001
+    )];
     samples[12] = new Point3(samples[12].x + 0.000005, samples[12].y, samples[12].z);
     var sampleSpan = Provenance.cam(99);
-    var sampled:Array<ToolpathOp> = [for (index in 1...samples.length)
-      ToolpathOp.Move(Cut, PathGeometry.Line(samples[index - 1], samples[index]), 0.01, 0.0, sampleSpan)];
+    var sampled:Array<ToolpathOp> = [for (index in 1...samples.length) ToolpathOp.Move(
+      Cut,
+      PathGeometry.Line(
+        samples[index - 1],
+        samples[index]
+      ),
+      0.01,
+      0.0,
+      sampleSpan
+    )];
     var fitted = toolpathkit.path.ArcFitting.fit(sampled, 0.00002);
     check(fitted.length == 1, "an approximate open circle still fits one arc");
     switch fitted[0] {
       case Move(_, geometry, _, _, _):
         near(GeometryTools.pointAt(geometry, 0).distanceTo(samples[0]), 0, "fitted arc retains its start", 1e-12);
-        near(GeometryTools.pointAt(geometry, GeometryTools.length(geometry)).distanceTo(samples[12]), 0,
-          "fitted arc retains its end", 1e-12);
-      case _: throw "expected a fitted cutting move";
+        near(
+          GeometryTools.pointAt(geometry, GeometryTools.length(geometry)).distanceTo(samples[12]),
+          0,
+          "fitted arc retains its end",
+          1e-12
+        );
+      case _:
+        throw "expected a fitted cutting move";
     }
     var gcode = machine.export(program, CamTestSetup.standard());
     var parsed = machine.compileDetailed(gcode);
-    check(parsed.diagnostics.length == 0,
-      'CAM G-code recompiles: ${parsed.diagnostics}');
-    check(parsed.program.ops.length == program.ops.length,
-      "CAM round trip keeps the operation count");
-    for (index in 0...program.ops.length)
-      equalOp(program.ops[index], parsed.program.ops[index], index);
-    var cadProgram = new CamJob(0.005, 12000.0)
-      .profile(fromFace, tool, -0.002, 0.01).finish();
+    check(parsed.diagnostics.length == 0, 'CAM G-code recompiles: ${parsed.diagnostics}');
+    check(parsed.program.ops.length == program.ops.length, "CAM round trip keeps the operation count");
+    for (index in 0...program.ops.length) equalOp(program.ops[index], parsed.program.ops[index], index);
+    var cadProgram = new CamJob(0.005, 12000.0).profile(fromFace, tool, -0.002, 0.01).finish();
     var cadCode = machine.export(cadProgram, CamTestSetup.standard());
     var cadBack = machine.compileDetailed(cadCode);
-    check(cadBack.diagnostics.length == 0,
-      'CAD-to-CAM round trip recompiles: ${cadBack.diagnostics}');
-    check(cadBack.program.ops.length == cadProgram.ops.length,
-      "CAD-to-CAM round trip keeps operation count");
-    for (index in 0...cadProgram.ops.length)
-      equalOp(cadProgram.ops[index], cadBack.program.ops[index], index);
-    check(gcode.indexOf("T2 M6") >= 0 &&
-      gcode.indexOf("S12000 M3") >= 0 && gcode.indexOf("M5") >= 0 &&
-      gcode.indexOf("M2") >= 0,
-      "LinuxCNC export includes tool, spindle, and program commands");
+    check(cadBack.diagnostics.length == 0, 'CAD-to-CAM round trip recompiles: ${cadBack.diagnostics}');
+    check(cadBack.program.ops.length == cadProgram.ops.length, "CAD-to-CAM round trip keeps operation count");
+    for (index in 0...cadProgram.ops.length) equalOp(cadProgram.ops[index], cadBack.program.ops[index], index);
+    check(
+      gcode.indexOf("T2 M6") >= 0
+      && gcode.indexOf("S12000 M3") >= 0 && gcode.indexOf("M5") >= 0 && gcode.indexOf("M2") >= 0,
+      "LinuxCNC export includes tool, spindle, and program commands"
+    );
     var switchMachine = new CamTestRig();
     switchMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
     switchMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
     var source = Provenance.cam(99);
-    var switchedProgram = new ToolpathProgram([
-      ToolpathOp.SetSetup("1", source),
-      ToolpathOp.Move(Rapid, PathGeometry.Line(
-        new Point3(0.0, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
-        0.0, 0.0, source),
-      ToolpathOp.SetSetup("2", source),
-      ToolpathOp.Move(Rapid, PathGeometry.Line(
-        new Point3(-0.09, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
-        0.0, 0.0, source),
-      ToolpathOp.End(source)
-    ], new ToolLibrary(), [new Setup("1", new Point3(0.1, 0, 0)),
-      new Setup("2", new Point3(0.2, 0, 0))]);
-    var switchCode = switchMachine.export(switchedProgram,
-      new Setup("1", new Point3(0.1, 0, 0),
-      new SetupStock(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005)));
-    check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0,
-      "setup switches write G54 and G55");
+    var switchedProgram = new ToolpathProgram(
+      [
+        ToolpathOp.SetSetup("1", source),
+        ToolpathOp.Move(
+          Rapid,
+          PathGeometry.Line(
+            new Point3(
+              0.0,
+              0.0,
+              0.01
+            ),
+            new Point3(
+              0.01,
+              0.0,
+              0.01
+            )
+          ),
+          0.0,
+          0.0,
+          source
+        ),
+        ToolpathOp.SetSetup(
+          "2",
+          source
+        ),
+        ToolpathOp.Move(
+          Rapid,
+          PathGeometry.Line(
+            new Point3(
+              -0.09,
+              0.0,
+              0.01
+            ),
+            new Point3(
+              0.01,
+              0.0,
+              0.01
+            )
+          ),
+          0.0,
+          0.0,
+          source
+        ),
+        ToolpathOp.End(source)
+      ],
+      new ToolLibrary(),
+      [
+        new Setup(
+          "1",
+          new Point3(
+            0.1,
+            0,
+            0
+          )
+        ),
+        new Setup(
+          "2",
+          new Point3(
+            0.2,
+            0,
+            0
+          )
+        )
+      ]
+    );
+    var switchCode = switchMachine.export(
+      switchedProgram,
+      new Setup(
+        "1",
+        new Point3(0.1, 0, 0),
+        new SetupStock(
+          -0.2,
+          0.2,
+          -0.1,
+          0.1,
+          0.0,
+          -0.01,
+          0.005
+        )
+      )
+    );
+    check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0, "setup switches write G54 and G55");
     var switchedBack = switchMachine.compileDetailed(switchCode);
-    check(switchedBack.diagnostics.length == 0,
-      'G54/G55 round trip recompiles: ${switchedBack.diagnostics}');
+    check(switchedBack.diagnostics.length == 0, 'G54/G55 round trip recompiles: ${switchedBack.diagnostics}');
     var setupIds:Array<String> = [];
     var lastWorkX = 0.0;
     for (op in switchedBack.program.ops) switch op {
-      case ToolpathOp.SetSetup(id, _): setupIds.push(id);
+      case ToolpathOp.SetSetup(id, _):
+        setupIds.push(id);
       case ToolpathOp.Move(_, PathGeometry.Line(_, end), _, _, _):
         lastWorkX = end.x;
       case _:
@@ -254,8 +353,7 @@ class CamKitTests {
 
   static function equalOp(left:ToolpathOp, right:ToolpathOp, index:Int):Void {
     switch [left, right] {
-      case [ToolpathOp.Move(kindA, a, speedA, blendA, _),
-            ToolpathOp.Move(kindB, b, speedB, blendB, _)]:
+      case [ToolpathOp.Move(kindA, a, speedA, blendA, _), ToolpathOp.Move(kindB, b, speedB, blendB, _)]:
         var travelA = kindA == Rapid || kindA == Link || kindA == Retract;
         var travelB = kindB == Rapid || kindB == Link || kindB == Retract;
         check(travelA == travelB, 'move class $index');
@@ -266,32 +364,35 @@ class CamKitTests {
         }
       case [ToolpathOp.ToolChange(a, _), ToolpathOp.ToolChange(b, _)]:
         check(a == b, 'tool change $index');
-      case [ToolpathOp.Spindle(channelA, valueA, _),
-            ToolpathOp.Spindle(channelB, valueB, _)]:
+      case [ToolpathOp.Spindle(channelA, valueA, _), ToolpathOp.Spindle(channelB, valueB, _)]:
         check(channelA == channelB, 'spindle channel $index');
         near(valueA, valueB, 'spindle value $index');
-      case [ToolpathOp.End(_), ToolpathOp.End(_)]: check(true, 'end $index');
-      case _: throw 'CAM round trip changed operation $index';
+      case [ToolpathOp.End(_), ToolpathOp.End(_)]:
+        check(true, 'end $index');
+      case _:
+        throw 'CAM round trip changed operation $index';
     }
   }
 
   static function equalGeometry(a:PathGeometry, b:PathGeometry, index:Int):Void {
-    near(GeometryTools.length(a), GeometryTools.length(b),
-      'geometry length $index', 1e-8);
+    near(GeometryTools.length(a), GeometryTools.length(b), 'geometry length $index', 1e-8);
     for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
       var first = GeometryTools.pointAt(a, GeometryTools.length(a) * fraction);
       var second = GeometryTools.pointAt(b, GeometryTools.length(b) * fraction);
-      near(first.distanceTo(second), 0.0,
-        'geometry sample $index/$fraction', 1e-8);
+      near(first.distanceTo(second), 0.0, 'geometry sample $index/$fraction', 1e-8);
     }
   }
 
   static function distanceToLine(point:Point3, a:Point3, b:Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var denominator = dx * dx + dy * dy;
-    var fraction = denominator == 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
-      ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator));
-    return point.distanceTo(new Point3(a.x + fraction * dx,
-      a.y + fraction * dy, point.z));
+    var fraction = denominator == 0.0 ? 0.0 : Math.max(
+      0.0,
+      Math.min(
+        1.0,
+        ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator
+      )
+    );
+    return point.distanceTo(new Point3(a.x + fraction * dx, a.y + fraction * dy, point.z));
   }
 }

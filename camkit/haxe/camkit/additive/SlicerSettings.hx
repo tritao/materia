@@ -41,22 +41,38 @@ class SlicerSettings {
   /** Corner rounding allowed to deposited moves. */
   public var pathTolerance:Float = 0.0001;
 
-  public function new() {}
+  public function new() {
+  }
 
   /** The distance between neighbouring beads that fills a layer exactly: a rounded bead of this width and height holds `height * spacing`. */
-  public function beadSpacing(height:Float):Float return toolpathkit.path.BeadSection.spacing(lineWidth,height);
+  public function beadSpacing(height:Float):Float return toolpathkit.path.BeadSection.spacing(lineWidth, height);
 
   /** Cross-section of a bead `height` tall: a rectangle with semicircular sides, `lineWidth` wide over all. */
-  public function beadArea(height:Float):Float return toolpathkit.path.BeadSection.area(lineWidth,height);
+  public function beadArea(height:Float):Float return toolpathkit.path.BeadSection.area(lineWidth, height);
 
   public function validate():Void {
-    for (value in [nozzleDiameter, layerHeight, firstLayerHeight, lineWidth, externalPerimeterSpeed, perimeterSpeed, infillSpeed,
-        solidInfillSpeed, topSolidInfillSpeed, skirtSpeed, firstLayerSpeed, travelSpeed, retractSpeed, hotendTemperature])
-      if (!Math.isFinite(value) || value <= 0.0) throw "slicer settings need positive finite sizes, speeds and temperatures";
-    for (value in [retractLength, retractMinTravel, zHop, bedTemperature, skirtDistance, pathTolerance])
-      if (!Math.isFinite(value) || value < 0.0) throw "slicer settings need non-negative finite lengths and temperatures";
-    if (perimeters < 0 || topLayers < 0 || bottomLayers < 0 || skirtLoops < 0 || fanFromLayer < 0)
-      throw "slicer settings need non-negative counts";
+    for (value in [
+      nozzleDiameter,
+      layerHeight,
+      firstLayerHeight,
+      lineWidth,
+      externalPerimeterSpeed,
+      perimeterSpeed,
+      infillSpeed,
+      solidInfillSpeed,
+      topSolidInfillSpeed,
+      skirtSpeed,
+      firstLayerSpeed,
+      travelSpeed,
+      retractSpeed,
+      hotendTemperature
+    ]) if (!Math.isFinite(value)
+      || value <= 0.0) throw "slicer settings need positive finite sizes, speeds and temperatures";
+    for (value in [retractLength,
+      retractMinTravel, zHop, bedTemperature, skirtDistance, pathTolerance]) if (!Math.isFinite(value)
+      || value < 0.0) throw "slicer settings need non-negative finite lengths and temperatures";
+    if (perimeters < 0 || topLayers < 0
+      || bottomLayers < 0 || skirtLoops < 0 || fanFromLayer < 0) throw "slicer settings need non-negative counts";
     if (!(infillDensity >= 0.0 && infillDensity <= 1.0)) throw "infill density is from 0 to 1";
     if (!(fanDuty >= 0.0 && fanDuty <= 1.0)) throw "fan duty is from 0 to 1";
     if (infillAngles.length == 0) throw "infill needs at least one angle";

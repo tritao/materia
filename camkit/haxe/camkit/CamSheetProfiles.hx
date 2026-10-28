@@ -8,65 +8,99 @@ import cadkit.units.LengthUnits;
 /** Rectangular MachineKit sheet blanks as CNC profile inputs. */
 class CamSheetProfiles {
   /** SR10 exact part boundaries are mm; CAM placement and cutting coordinates are metres. */
-  public static function fromDxf(part:cadkit.drawing.DxfContours.DxfPart,surfaceZMetres:Float=0.0,
-      chordToleranceMetres:Float=0.00005):{outer:CamContour,holes:Array<CamContour>} {
-    if(part==null||!Math.isFinite(surfaceZMetres)||!Math.isFinite(chordToleranceMetres)||chordToleranceMetres<=0)
-      throw "DXF CAM needs a part, finite surface and positive chord tolerance";
+  public static function fromDxf(
+    part:cadkit.drawing.DxfContours.DxfPart,
+    surfaceZMetres:Float = 0.0,
+    chordToleranceMetres:Float = 0.00005
+  ): {
+    outer: CamContour,
+    holes: Array<CamContour>
+  } {
+    if (part == null || !Math.isFinite(surfaceZMetres) || !Math.isFinite(chordToleranceMetres)
+      || chordToleranceMetres <= 0) throw "DXF CAM needs a part, finite surface and positive chord tolerance";
     function contour(loop:Array<cadkit.sheetmetal.Segment>):CamContour {
-      var boundary:Array<cadkit.sheetmetal.Segment> = [],points:Array<Point3> = [];
-      for(s in loop) {
-        var count=s.isLine()?1:Std.int(Math.max(1,Math.ceil(Math.abs(s.sweep)/Math.PI)));
-        for(i in 0...count) {
-          var segment=s.isLine()?cadkit.sheetmetal.Segment.line(new cadkit.sheetmetal.Point2(s.start.x*0.001,s.start.y*0.001),
-            new cadkit.sheetmetal.Point2(s.end.x*0.001,s.end.y*0.001)):
-            cadkit.sheetmetal.Segment.arc(new cadkit.sheetmetal.Point2(s.arcCenter().x*0.001,s.arcCenter().y*0.001),
-              s.radius*0.001,s.startAngle+s.sweep*i/count,s.sweep/count);
+      var boundary:Array<cadkit.sheetmetal.Segment> = [], points:Array<Point3> = [];
+      for (s in loop) {
+        var count = s.isLine() ? 1 : Std.int(Math.max(1, Math.ceil(Math.abs(s.sweep) / Math.PI)));
+        for (i in 0...count) {
+          var segment = s.isLine() ? cadkit.sheetmetal.Segment.line(
+            new cadkit.sheetmetal.Point2(
+              s.start.x * 0.001,
+              s.start.y * 0.001
+            ),
+            new cadkit.sheetmetal.Point2(
+              s.end.x * 0.001,
+              s.end.y * 0.001
+            )
+          ) : cadkit.sheetmetal.Segment.arc(
+            new cadkit.sheetmetal.Point2(
+              s.arcCenter().x * 0.001,
+              s.arcCenter().y * 0.001
+            ),
+            s.radius * 0.001,
+            s.startAngle + s.sweep * i / count,
+            s.sweep / count
+          );
           boundary.push(segment);
-          var steps=1;
-          if(!segment.isLine()) {
-            var angle=2*Math.acos(Math.max(-1,Math.min(1,1-chordToleranceMetres/segment.radius)));
-            steps=Std.int(Math.max(2,Math.ceil(Math.abs(segment.sweep)/angle)));
+          var steps = 1;
+          if (!segment.isLine()) {
+            var angle = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - chordToleranceMetres / segment.radius)));
+            steps = Std.int(Math.max(2, Math.ceil(Math.abs(segment.sweep) / angle)));
           }
-          if(steps>1000000||points.length+steps>1000000)throw "DXF CAM contour exceeds sampling limit";
-          for(j in 0...steps){var p=segment.point(j/steps);points.push(new Point3(p.x,p.y,surfaceZMetres));}
+          if (steps > 1000000 || points.length + steps > 1000000) throw "DXF CAM contour exceeds sampling limit";
+          for (j in 0...steps) {
+            var p = segment.point(j / steps);
+            points.push(new Point3(p.x, p.y, surfaceZMetres));
+          }
         }
       }
-      var result=new CamContour(points,true);result.exactBoundary=boundary;result.chordTolerance=chordToleranceMetres;return result;
+      var result = new CamContour(points, true);
+      result.exactBoundary = boundary;
+      result.chordTolerance = chordToleranceMetres;
+      return result;
     }
-    return {outer:contour(part.outer.segments),holes:[for(hole in part.holes)contour(hole.segments)]};
+    return {outer: contour(part.outer.segments), holes: [for (hole in part.holes) contour(hole.segments)]};
   }
 
   /** Free-form layout polygons are already placed in global plan mm; retain holes for inside-first CAM. */
-  public static function freePart(plan:SheetCutPlan,placementId:String,surfaceZMetres:Float=0.0):{outer:CamContour,holes:Array<CamContour>} {
-    if(plan==null||plan.schemaVersion!=2||plan.freePlacements==null||plan.lengthUnit!="mm")throw "Expected a free-form mm layout";
-    for(p in plan.freePlacements)if(p.id==placementId) {
+  public static function freePart(plan:SheetCutPlan, placementId:String, surfaceZMetres:Float = 0.0): {
+    outer: CamContour,
+    holes: Array<CamContour>
+  } {
+    if (plan == null || plan.schemaVersion != 2
+      || plan.freePlacements == null || plan.lengthUnit != "mm") throw "Expected a free-form mm layout";
+    for (p in plan.freePlacements) if (p.id == placementId) {
       var contours:Array<CamContour> = [];
-      for(loop in p.loops) {
-        var points=[for(v in loop)new Point3(v.x*0.001,v.y*0.001,surfaceZMetres)],contour=new CamContour(points);
-        contour.exactBoundary=[for(i in 0...loop.length)cadkit.sheetmetal.Segment.line(
-          new cadkit.sheetmetal.Point2(points[i].x,points[i].y),new cadkit.sheetmetal.Point2(points[(i+1)%points.length].x,points[(i+1)%points.length].y))];
+      for (loop in p.loops) {
+        var points = [for (v in loop) new Point3(v.x * 0.001,
+          v.y * 0.001, surfaceZMetres)], contour = new CamContour(points);
+        contour.exactBoundary = [for (i in 0...loop.length) cadkit.sheetmetal.Segment.line(
+          new cadkit.sheetmetal.Point2(
+            points[i].x,
+            points[i].y
+          ),
+          new cadkit.sheetmetal.Point2(
+            points[(i + 1) % points.length].x,
+            points[(i + 1) % points.length].y
+          )
+        )];
         contours.push(contour);
       }
-      return {outer:contours[0],holes:[for(i in 1...contours.length)contours[i]]};
+      return {outer: contours[0], holes: [for (i in 1...contours.length) contours[i]]};
     }
     throw 'Unknown free-form placement "$placementId"';
   }
 
-  public static function fromPlan(plan:SheetCutPlan, placementId:String,
-      ?surfaceZMetres:Float = 0.0):CamContour {
+  public static function fromPlan(plan:SheetCutPlan, placementId:String, ?surfaceZMetres:Float = 0.0):CamContour {
     if (plan == null) throw "CAM needs a sheet cut plan";
-    if(plan.schemaVersion==2)return freePart(plan,placementId,surfaceZMetres).outer;
-    for (item in plan.placements)
-      if (item.id == placementId)
-        return placement(item, plan.lengthUnit, surfaceZMetres);
+    if (plan.schemaVersion == 2) return freePart(plan, placementId, surfaceZMetres).outer;
+    for (item in plan.placements) if (item.id == placementId) return placement(item, plan.lengthUnit, surfaceZMetres);
     throw 'Unknown CAM sheet placement "$placementId"';
   }
 
-  public static function placement(value:SheetPartPlacement,
-      unit:String, ?surfaceZMetres:Float = 0.0):CamContour {
-    if (value == null || value.width <= 0.0 || value.height <= 0.0 ||
-        !Math.isFinite(surfaceZMetres))
-      throw "CAM sheet placement needs positive dimensions and a finite surface";
+  public static function placement(value:SheetPartPlacement, unit:String, ?surfaceZMetres:Float = 0.0):CamContour {
+    if (value == null || value.width <= 0.0 || value.height <= 0.0
+      || !Math.isFinite(surfaceZMetres)) throw "CAM sheet placement needs positive dimensions and a finite surface";
     var factor = LengthUnits.factorToMillimetres(unit);
     if (factor == null) throw 'Unsupported sheet unit "$unit"';
     var scale = factor * 0.001;
@@ -75,8 +109,16 @@ class CamSheetProfiles {
     return new CamContour([
       new Point3(x, y, surfaceZMetres),
       new Point3(x + width, y, surfaceZMetres),
-      new Point3(x + width, y + height, surfaceZMetres),
-      new Point3(x, y + height, surfaceZMetres)
+      new Point3(
+        x + width,
+        y + height,
+        surfaceZMetres
+      ),
+      new Point3(
+        x,
+        y + height,
+        surfaceZMetres
+      )
     ]);
   }
 }
