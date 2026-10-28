@@ -82,10 +82,7 @@ class SensorWireCodec {
     if (Int64.compare(value.frame, Int64.ofInt(0)) < 0) throw "LidarScanMessage.frame is out of range";
     if (Int64.compare(value.horizontalCount, Int64.ofInt(0)) < 0 || Int64.compare(
       value.horizontalCount,
-      Int64.make(
-        0,
-        -1
-      )
+      Int64.make(0, -1)
     ) > 0) throw "LidarScanMessage.horizontal_count is out of range";
     if (Int64.compare(value.verticalCount, Int64.ofInt(0)) < 0 || Int64.compare(value.verticalCount,
       Int64.make(0, -1)) > 0) throw "LidarScanMessage.vertical_count is out of range";
