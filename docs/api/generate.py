@@ -31,6 +31,8 @@ SOURCE = os.path.abspath(os.environ.get("MATERIA_API_SOURCE", REPO))
 
 # Packages the editor depends on that are not a public API.
 EXCLUDED = {"app"}
+# Within a kit, a package with an `internal` segment (stockkit.internal) is implementation detail.
+INTERNAL_SEGMENT = "internal"
 
 
 def packages():
@@ -152,6 +154,8 @@ def convert(xml_text, kit):
         if kind == "class" and node.get("module"):
             kind = "module"
         package, _, name = path.rpartition(".")
+        if INTERNAL_SEGMENT in package.split("."):
+            continue
         entry = {"name": name, "kind": kind}
         if node.get("params"):
             entry["params"] = node.get("params").split(":")

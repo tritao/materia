@@ -2093,40 +2093,6 @@
    ]
   },
   {
-   "name": "stockkit.internal",
-   "types": [
-    {
-     "name": "NativeTool",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/internal/NativeTool.hx",
-     "doc": "A tool registered with the core: its flutes cut, its shank and holder are checked for contact.",
-     "fields": [
-      {
-       "name": "tool",
-       "kind": "var",
-       "signature": ":Tool",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(tool:Tool):Void"
-      },
-      {
-       "name": "borrow",
-       "kind": "method",
-       "signature": "():sk_tool_handle"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
-      }
-     ]
-    }
-   ]
-  },
-  {
    "name": "stockkit.ring",
    "types": [
     {
