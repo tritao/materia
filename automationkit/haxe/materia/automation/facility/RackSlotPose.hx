@@ -8,8 +8,8 @@ class RackSlotPose {
   public final yaw:Float;
 
   public function new(x:Float, y:Float, z:Float, yaw:Float = 0.0) {
-    if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z) || !Math.isFinite(yaw))
-      throw "Rack slot pose must be finite";
+    if (!Math.isFinite(x)
+      || !Math.isFinite(y) || !Math.isFinite(z) || !Math.isFinite(yaw)) throw "Rack slot pose must be finite";
     this.x = x;
     this.y = y;
     this.z = z;

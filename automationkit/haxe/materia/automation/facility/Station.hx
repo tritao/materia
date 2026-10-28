@@ -16,9 +16,8 @@ class Station {
   public final surface:Null<Surface>;
 
   public function new(id:String, name:String, zoneId:String, frameId:String, pose:Pose2, ?surface:Surface) {
-    if (id == null || id.length == 0 || name == null || name.length == 0 || zoneId == null ||
-        zoneId.length == 0 || frameId == null || frameId.length == 0 || pose == null)
-      throw "Station requires an ID, zone, frame, and pose";
+    if (id == null || id.length == 0 || name == null || name.length == 0 || zoneId == null || zoneId.length == 0
+      || frameId == null || frameId.length == 0 || pose == null) throw "Station requires an ID, zone, frame, and pose";
     this.id = id;
     this.name = name;
     this.zoneId = zoneId;

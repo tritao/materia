@@ -19,11 +19,18 @@ class Surface {
   public final offsetY:Float;
   public final yaw:Float;
 
-  public function new(halfWidth:Float, halfDepth:Float, top:Float, offsetX:Float = 0.0, offsetY:Float = 0.0, yaw:Float = 0.0) {
-    if (!(halfWidth > 0.0) || !(halfDepth > 0.0) || !Math.isFinite(halfWidth) || !Math.isFinite(halfDepth))
-      throw "A surface needs a positive width and depth";
-    if (!Math.isFinite(top) || !Math.isFinite(offsetX) || !Math.isFinite(offsetY) || !Math.isFinite(yaw))
-      throw "A surface needs a finite height, position, and turn";
+  public function new(
+    halfWidth:Float,
+    halfDepth:Float,
+    top:Float,
+    offsetX:Float = 0.0,
+    offsetY:Float = 0.0,
+    yaw:Float = 0.0
+  ) {
+    if (!(halfWidth > 0.0) || !(halfDepth > 0.0)
+      || !Math.isFinite(halfWidth) || !Math.isFinite(halfDepth)) throw "A surface needs a positive width and depth";
+    if (!Math.isFinite(top) || !Math.isFinite(offsetX)
+      || !Math.isFinite(offsetY) || !Math.isFinite(yaw)) throw "A surface needs a finite height, position, and turn";
     this.halfWidth = halfWidth;
     this.halfDepth = halfDepth;
     this.top = top;
@@ -33,9 +40,12 @@ class Surface {
   }
 
   /** The top's centre in the owner's frame, given the owner's pose there, with its turn including the owner's. */
-  public function centerIn(owner:Pose2):{x:Float, y:Float, yaw:Float} {
+  public function centerIn(owner:Pose2): {x: Float, y: Float, yaw: Float} {
     var c = Math.cos(owner.yaw), s = Math.sin(owner.yaw);
-    return {x: owner.x + c * offsetX - s * offsetY, y: owner.y + s * offsetX + c * offsetY,
-      yaw: Pose2.wrapAngle(owner.yaw + yaw)};
+    return {
+      x: owner.x + c * offsetX - s * offsetY,
+      y: owner.y + s * offsetX + c * offsetY,
+      yaw: Pose2.wrapAngle(owner.yaw + yaw)
+    };
   }
 }

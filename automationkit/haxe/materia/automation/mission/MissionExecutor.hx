@@ -28,16 +28,20 @@ class MissionExecutor {
   var currentSkillStarted = false;
   var currentTrafficRoute:Null<FacilityRoute> = null;
 
-  public function new(fleet:Fleet, assignment:FleetAssignment,
-      facility:Facility, skillFactory:TaskSkillFactory,
-      ?trafficManager:TrafficManager, ?trafficPriority:Int = 0) {
-    if (fleet == null || assignment == null || facility == null || skillFactory == null)
-      throw "MissionExecutor requires a fleet assignment, facility, and task skill factory";
-    if (fleet.assignmentForMission(assignment.mission.id) != assignment)
-      throw "MissionExecutor assignment is not active in the supplied fleet";
-    if (trafficManager != null && (trafficManager.fleet != fleet ||
-        trafficManager.facility != facility))
-      throw "MissionExecutor traffic manager must use the same fleet and facility";
+  public function new(
+    fleet:Fleet,
+    assignment:FleetAssignment,
+    facility:Facility,
+    skillFactory:TaskSkillFactory,
+    ?trafficManager:TrafficManager,
+    ?trafficPriority:Int = 0
+  ) {
+    if (fleet == null || assignment == null || facility == null
+      || skillFactory == null) throw "MissionExecutor requires a fleet assignment, facility, and task skill factory";
+    if (fleet.assignmentForMission(assignment.mission.id)
+      != assignment) throw "MissionExecutor assignment is not active in the supplied fleet";
+    if (trafficManager != null && (trafficManager.fleet != fleet || trafficManager.facility
+      != facility)) throw "MissionExecutor traffic manager must use the same fleet and facility";
     this.fleet = fleet;
     this.assignment = assignment;
     this.facility = facility;
@@ -60,8 +64,8 @@ class MissionExecutor {
   /** Advances the current skill with the latest snapshot from its assigned robot. */
   public function update(durationSeconds:Float):MissionExecutionStatus {
     if (status != Running) return status;
-    if (!Math.isFinite(durationSeconds) || durationSeconds <= 0.0)
-      return fail("mission update duration must be finite and positive");
+    if (!Math.isFinite(durationSeconds)
+      || durationSeconds <= 0.0) return fail("mission update duration must be finite and positive");
     var robotValue = assignedRobot();
     if (robotValue == null) return fail("assigned robot is no longer attached to RobotWorld");
     if (currentSkill == null) return fail("mission has no skill for its current task");
@@ -74,15 +78,14 @@ class MissionExecutor {
     }
     var skill:Skill = cast currentSkill;
     var skillStatus:SkillStatus;
-    try skillStatus = skill.update(robot.snapshot(), durationSeconds)
-    catch (error:Dynamic) return fail(Std.string(error));
+    try skillStatus = skill.update(robot.snapshot(),
+      durationSeconds) catch (error:Dynamic) return fail(Std.string(error));
 
     switch skillStatus {
       case Running:
       case Succeeded:
         releaseCurrentTrafficRoute();
-        try assignment.mission.completeCurrentTask()
-        catch (error:Dynamic) return fail(Std.string(error));
+        try assignment.mission.completeCurrentTask() catch (error:Dynamic) return fail(Std.string(error));
         if (assignment.mission.isTerminal()) {
           status = Succeeded;
           fleet.release(assignment.mission.id);
@@ -90,7 +93,8 @@ class MissionExecutor {
           currentSkill = null;
           startCurrentTask();
         }
-      case Failed(message): fail(message);
+      case Failed(message):
+        fail(message);
       case Cancelled:
         releaseCurrentTrafficRoute();
         assignment.mission.cancel();
@@ -98,7 +102,8 @@ class MissionExecutor {
         currentSkillStarted = false;
         status = Cancelled;
         fleet.release(assignment.mission.id);
-      case Idle: fail("task skill returned to idle");
+      case Idle:
+        fail("task skill returned to idle");
     }
     return status;
   }
@@ -106,7 +111,8 @@ class MissionExecutor {
   public function cancel():Void {
     if (status != Running) return;
     if (currentSkill != null) {
-      try currentSkill.cancel() catch (_:Dynamic) {}
+      try currentSkill.cancel() catch (_:Dynamic) {
+      }
     }
     releaseCurrentTrafficRoute();
     if (!assignment.mission.isTerminal()) assignment.mission.cancel();
@@ -150,9 +156,9 @@ class MissionExecutor {
     return switch task.kind {
       case TaskKind.Transport:
         var transport:Transport = cast task;
-        new FacilityRouter(facility).route(transport.pickupStationId,
-          transport.destinationStationId);
-      case _: null;
+        new FacilityRouter(facility).route(transport.pickupStationId, transport.destinationStationId);
+      case _:
+        null;
     };
   }
 
@@ -163,8 +169,7 @@ class MissionExecutor {
       var manager:TrafficManager = cast trafficManager;
       var route:FacilityRoute = cast currentTrafficRoute;
       try {
-        if (!manager.reserveRoute(route, assignment.robotId, trafficPriority))
-          return false;
+        if (!manager.reserveRoute(route, assignment.robotId, trafficPriority)) return false;
       } catch (error:Dynamic) {
         fail('could not reserve facility route: ${Std.string(error)}');
         return false;
@@ -194,14 +199,18 @@ class MissionExecutor {
 
   function fail(message:String):MissionExecutionStatus {
     if (currentSkill != null) {
-      try currentSkill.cancel() catch (_:Dynamic) {}
+      try currentSkill.cancel() catch (_:Dynamic) {
+      }
     }
     releaseCurrentTrafficRoute();
     if (!assignment.mission.isTerminal()) {
       switch assignment.mission.status {
-        case MissionStatus.Running: assignment.mission.fail(message);
-        case MissionStatus.Pending: assignment.mission.cancel();
-        case _: // The mission reached a terminal state outside this executor.
+        case MissionStatus.Running:
+          assignment.mission.fail(message);
+        case MissionStatus.Pending:
+          assignment.mission.cancel();
+        case _:
+          // The mission reached a terminal state outside this executor.
       }
     }
     currentSkill = null;

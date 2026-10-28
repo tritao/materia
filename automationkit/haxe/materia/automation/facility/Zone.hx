@@ -10,9 +10,8 @@ class Zone {
   public final boundary:Footprint;
 
   public function new(id:String, name:String, frameId:String, boundary:Footprint) {
-    if (id == null || id.length == 0 || name == null || name.length == 0 || frameId == null ||
-        frameId.length == 0 || boundary == null)
-      throw "Zone requires an ID, frame, and boundary";
+    if (id == null || id.length == 0 || name == null || name.length == 0
+      || frameId == null || frameId.length == 0 || boundary == null) throw "Zone requires an ID, frame, and boundary";
     this.id = id;
     this.name = name;
     this.frameId = frameId;

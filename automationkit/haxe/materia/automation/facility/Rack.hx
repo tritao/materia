@@ -7,15 +7,21 @@ class Rack extends Station {
   final slotValues:Array<RackSlot>;
 
   /** The rack's pose is the rack itself; its optional surface is the top its slots sit on, usually centred on it. */
-  public function new(id:String, name:String, zoneId:String, frameId:String, pose:Pose2,
-      slots:Array<RackSlot>, ?surface:Surface) {
+  public function new(
+    id:String,
+    name:String,
+    zoneId:String,
+    frameId:String,
+    pose:Pose2,
+    slots:Array<RackSlot>,
+    ?surface:Surface
+  ) {
     super(id, name, zoneId, frameId, pose, surface);
     if (slots == null || slots.length == 0) throw "Rack requires at least one slot";
     slotValues = [];
-    var seen = new Map<String,Bool>();
+    var seen = new Map<String, Bool>();
     for (slot in slots) {
-      if (slot == null || seen.exists(slot.id))
-        throw "Rack slot IDs must be non-empty and unique";
+      if (slot == null || seen.exists(slot.id)) throw "Rack slot IDs must be non-empty and unique";
       seen.set(slot.id, true);
       slotValues.push(new RackSlot(slot.id, slot.pose, slot.itemHalfExtents));
     }
@@ -36,8 +42,11 @@ class Rack extends Station {
     if (found == null) throw 'Rack has no slot "$slotId"';
     var relative = found.pose;
     var c = Math.cos(pose.yaw), s = Math.sin(pose.yaw);
-    return new RackSlotPose(pose.x + c * relative.x - s * relative.y,
-      pose.y + s * relative.x + c * relative.y, relative.z,
-      Pose2.wrapAngle(pose.yaw + relative.yaw));
+    return new RackSlotPose(
+      pose.x + c * relative.x - s * relative.y,
+      pose.y + s * relative.x + c * relative.y,
+      relative.z,
+      Pose2.wrapAngle(pose.yaw + relative.yaw)
+    );
   }
 }

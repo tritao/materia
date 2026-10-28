@@ -8,9 +8,9 @@ import robotkit.world.RobotWorld;
 class Fleet {
   public final id:String;
   public final world:RobotWorld;
-  final memberIds = new Map<String,Bool>();
-  final assignmentsByMission = new Map<String,FleetAssignment>();
-  final missionByRobot = new Map<String,String>();
+  final memberIds = new Map<String, Bool>();
+  final assignmentsByMission = new Map<String, FleetAssignment>();
+  final missionByRobot = new Map<String, String>();
 
   public function new(id:String, world:RobotWorld) {
     if (id == null || id.length == 0 || world == null) throw "Fleet requires an ID and RobotWorld";
@@ -53,8 +53,8 @@ class Fleet {
     return missionId == null ? null : assignmentsByMission.get(missionId);
   }
 
-  public function assignmentForMission(missionId:String):Null<FleetAssignment>
-    return assignmentsByMission.get(missionId);
+  public function assignmentForMission(missionId:String):Null<FleetAssignment
+    > return assignmentsByMission.get(missionId);
 
   public function assign(robotId:String, mission:Mission):FleetAssignment {
     if (mission == null || mission.status != Pending) throw "Only a pending mission can be assigned";
@@ -62,8 +62,7 @@ class Fleet {
     if (assignmentsByMission.exists(mission.id)) throw "Mission already has a fleet assignment";
     if (missionByRobot.exists(robotId)) throw 'Robot "$robotId" already has an active mission';
     var robot = world.robot(robotId);
-    if (robot == null || robot.status() != RobotStatus.Ready)
-      throw 'Robot "$robotId" is not ready';
+    if (robot == null || robot.status() != RobotStatus.Ready) throw 'Robot "$robotId" is not ready';
     var assignment = new FleetAssignment(robotId, mission);
     assignmentsByMission.set(mission.id, assignment);
     missionByRobot.set(robotId, mission.id);

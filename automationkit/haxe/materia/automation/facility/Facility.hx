@@ -4,16 +4,15 @@ package materia.automation.facility;
 class Facility {
   public final id:String;
   public final name:String;
-  final zonesById = new Map<String,Zone>();
-  final stationsById = new Map<String,Station>();
-  final lanesById = new Map<String,Lane>();
-  final intersectionsById = new Map<String,Intersection>();
-  final racksById = new Map<String,Rack>();
-  final chargersById = new Map<String,Charger>();
+  final zonesById = new Map<String, Zone>();
+  final stationsById = new Map<String, Station>();
+  final lanesById = new Map<String, Lane>();
+  final intersectionsById = new Map<String, Intersection>();
+  final racksById = new Map<String, Rack>();
+  final chargersById = new Map<String, Charger>();
 
   public function new(id:String, name:String) {
-    if (id == null || id.length == 0 || name == null || name.length == 0)
-      throw "Facility requires an ID and name";
+    if (id == null || id.length == 0 || name == null || name.length == 0) throw "Facility requires an ID and name";
     this.id = id;
     this.name = name;
   }
@@ -43,21 +42,21 @@ class Facility {
     var from = stationsById.get(lane.fromStationId);
     var to = stationsById.get(lane.toStationId);
     if (from == null || to == null) throw "Lane endpoints must exist in the facility";
-    if (from.frameId != to.frameId || lane.centerline.frameId != from.frameId)
-      throw "Lane and endpoint station frames must match";
+    if (from.frameId != to.frameId
+      || lane.centerline.frameId != from.frameId) throw "Lane and endpoint station frames must match";
     lanesById.set(lane.id, lane);
   }
 
   public function addIntersection(intersection:Intersection):Void {
-    if (intersection == null || intersectionsById.exists(intersection.id))
-      throw "Facility intersection ID is missing or duplicated";
+    if (intersection == null
+      || intersectionsById.exists(intersection.id)) throw "Facility intersection ID is missing or duplicated";
     var zone = zonesById.get(intersection.zoneId);
-    if (zone == null || zone.frameId != intersection.frameId)
-      throw "Intersection must reference an existing zone in the same frame";
+    if (zone == null
+      || zone.frameId != intersection.frameId) throw "Intersection must reference an existing zone in the same frame";
     for (laneId in intersection.lanes()) {
       var lane = lanesById.get(laneId);
-      if (lane == null || lane.centerline.frameId != intersection.frameId)
-        throw 'Intersection references an unknown or mismatched lane "$laneId"';
+      if (lane == null || lane.centerline.frameId
+        != intersection.frameId) throw 'Intersection references an unknown or mismatched lane "$laneId"';
     }
     intersectionsById.set(intersection.id, intersection);
   }
@@ -75,15 +74,14 @@ class Facility {
   public function intersections():Array<Intersection> return sortedValues(intersectionsById);
 
   function requireStation(station:Station):Void {
-    if (station == null || stationsById.exists(station.id))
-      throw "Facility station ID is missing or duplicated";
+    if (station == null || stationsById.exists(station.id)) throw "Facility station ID is missing or duplicated";
     if (!zonesById.exists(station.zoneId)) throw "Station zone must exist in the facility";
     var zone = zonesById.get(station.zoneId);
     if (zone.frameId != station.frameId) throw "Station and zone frames must match";
     stationsById.set(station.id, station);
   }
 
-  static function sortedValues<T>(values:Map<String,T>):Array<T> {
+  static function sortedValues<T>(values:Map<String, T>):Array<T> {
     var keys = [for (key in values.keys()) key];
     keys.sort(Reflect.compare);
     return [for (key in keys) values.get(key)];

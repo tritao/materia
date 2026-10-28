@@ -10,8 +10,8 @@ class Place extends Task {
 
   public function new(id:String, rackId:String, slotId:String, payload:Payload) {
     super(id, TaskKind.Place);
-    if (rackId == null || rackId.length == 0 || slotId == null || slotId.length == 0 || payload == null)
-      throw "Place requires a rack, slot, and payload";
+    if (rackId == null || rackId.length == 0
+      || slotId == null || slotId.length == 0 || payload == null) throw "Place requires a rack, slot, and payload";
     this.rackId = rackId;
     this.slotId = slotId;
     this.payload = payload;

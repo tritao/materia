@@ -11,13 +11,12 @@ class Mission {
   var taskIndex:Int = 0;
 
   public function new(id:String, name:String, tasks:Array<Task>) {
-    if (id == null || id.length == 0 || name == null || name.length == 0 ||
-        tasks == null || tasks.length == 0)
-      throw "Mission requires an ID, name, and at least one task";
+    if (id == null || id.length == 0 || name == null || name.length == 0
+      || tasks == null || tasks.length == 0) throw "Mission requires an ID, name, and at least one task";
     this.id = id;
     this.name = name;
     work = [];
-    var taskIds = new Map<String,Bool>();
+    var taskIds = new Map<String, Bool>();
     for (task in tasks) {
       if (task == null || taskIds.exists(task.id)) throw "Mission task IDs must be unique";
       taskIds.set(task.id, true);
@@ -52,7 +51,9 @@ class Mission {
   }
 
   public function isTerminal():Bool return switch status {
-    case Succeeded | Failed(_) | Cancelled: true;
-    case _: false;
+    case Succeeded | Failed(_) | Cancelled:
+      true;
+    case _:
+      false;
   };
 }

@@ -12,14 +12,19 @@ class Lane {
   public final maximumSpeedMetersPerSecond:Float;
   public final bidirectional:Bool;
 
-  public function new(id:String, fromStationId:String, toStationId:String,
-      centerline:Path, widthMeters:Float, maximumSpeedMetersPerSecond:Float,
-      ?bidirectional:Bool = true) {
-    if (id == null || id.length == 0 || fromStationId == null || fromStationId.length == 0 ||
-        toStationId == null || toStationId.length == 0 || fromStationId == toStationId ||
-        centerline == null || !Math.isFinite(widthMeters) || widthMeters <= 0.0 ||
-        !Math.isFinite(maximumSpeedMetersPerSecond) || maximumSpeedMetersPerSecond <= 0.0)
-      throw "Lane requires endpoints, a centerline, and positive width and speed";
+  public function new(
+    id:String,
+    fromStationId:String,
+    toStationId:String,
+    centerline:Path,
+    widthMeters:Float,
+    maximumSpeedMetersPerSecond:Float,
+    ?bidirectional:Bool = true
+  ) {
+    if (id == null || id.length == 0 || fromStationId == null || fromStationId.length == 0 || toStationId == null
+      || toStationId.length == 0 || fromStationId == toStationId || centerline == null || !Math.isFinite(widthMeters)
+      || widthMeters <= 0.0 || !Math.isFinite(maximumSpeedMetersPerSecond) || maximumSpeedMetersPerSecond
+      <= 0.0) throw "Lane requires endpoints, a centerline, and positive width and speed";
     this.id = id;
     this.fromStationId = fromStationId;
     this.toStationId = toStationId;
