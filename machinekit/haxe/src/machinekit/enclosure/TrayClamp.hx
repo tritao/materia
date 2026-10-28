@@ -18,10 +18,7 @@ class TrayClamp extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.enclosure.tray-toe-clamp",
-      [ComponentRecipeSupport.length(
-        "height",
-        TraySeat.TOP
-      )],
+      [ComponentRecipeSupport.length("height", TraySeat.TOP)],
       v -> new TrayClamp(v.number("height")),
       true
     );

@@ -35,42 +35,12 @@ class HexNut extends MachineComponent {
 
   static function rows():Array<HexNutSpec> return [
     {size: "M3", diameter: 3, acrossFlats: 5.5, height: 2.4},
-    {
-      size: "M4",
-      diameter: 4,
-      acrossFlats: 7,
-      height: 3.2
-    },
-    {
-      size: "M5",
-      diameter: 5,
-      acrossFlats: 8,
-      height: 4.7
-    },
-    {
-      size: "M6",
-      diameter: 6,
-      acrossFlats: 10,
-      height: 5.2
-    },
-    {
-      size: "M8",
-      diameter: 8,
-      acrossFlats: 13,
-      height: 6.8
-    },
-    {
-      size: "M10",
-      diameter: 10,
-      acrossFlats: 16,
-      height: 8.4
-    },
-    {
-      size: "M12",
-      diameter: 12,
-      acrossFlats: 18,
-      height: 10.8
-    },
+    {size: "M4", diameter: 4, acrossFlats: 7, height: 3.2},
+    {size: "M5", diameter: 5, acrossFlats: 8, height: 4.7},
+    {size: "M6", diameter: 6, acrossFlats: 10, height: 5.2},
+    {size: "M8", diameter: 8, acrossFlats: 13, height: 6.8},
+    {size: "M10", diameter: 10, acrossFlats: 16, height: 8.4},
+    {size: "M12", diameter: 12, acrossFlats: 18, height: 10.8},
   ];
 
   public static function catalog():Catalog<HexNutSpec> {
@@ -85,10 +55,7 @@ class HexNut extends MachineComponent {
         dimensionKind: Unverified,
         conformance: NominalEnvelope,
         sources: ["https://www.scribd.com/document/816804171/M-FHN-4032-8-Z-3U-03"],
-        verifiedFields: [
-          "acrossFlats",
-          "height"
-        ]
+        verifiedFields: ["acrossFlats", "height"]
       })
     );
     return table;
@@ -157,11 +124,7 @@ class HexNut extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.hex-nut",
-      [ComponentRecipeSupport.catalog(
-        "size",
-        HexNut.catalog(),
-        "M5"
-      )],
+      [ComponentRecipeSupport.catalog("size", HexNut.catalog(), "M5")],
       v -> HexNut.metric(v.token("size")),
       true
     );

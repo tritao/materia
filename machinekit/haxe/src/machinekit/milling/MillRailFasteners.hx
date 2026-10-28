@@ -43,11 +43,7 @@ class MillRailFasteners {
         if (geometry == null) throw "Rail counterbore geometry is unsupported: " + requirement.componentPath;
         var localSeat = F.compose(
           rail.connector(requirement.connectorId).frame,
-          F.translation(
-            0,
-            -geometry.counterboreDepth,
-            0
-          )
+          F.translation(0, -geometry.counterboreDepth, 0)
         );
         var seat = F.compose(poses.get(requirement.componentPath), localSeat);
         var targetPart = members.get(target), facet = targetPart == null ? null : DesignInterfaces.of(targetPart);
@@ -62,19 +58,13 @@ class MillRailFasteners {
         assembly.addDesignRequirement(Coaxial(
           "seat-" + id,
           {member: id, feature: "head"},
-          {
-            member: target,
-            feature: hole.id
-          },
+          {member: target, feature: hole.id},
           1e-6
         ));
         assembly.addDesignRequirement(Coaxial(
           "rail-" + id,
           {member: id, feature: "head"},
-          {
-            member: requirement.componentPath,
-            feature: requirement.connectorId
-          },
+          {member: requirement.componentPath, feature: requirement.connectorId},
           1e-6
         ));
       }

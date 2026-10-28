@@ -18,16 +18,8 @@ class DinRailDevice {
 
   /** Seen as fitted: up the panel, its front window (+Y) towards the viewer. */
   public static function view():machinekit.component.ComponentView return new machinekit.component.ComponentView(
-    [
-      0,
-      0,
-      1
-    ],
-    [
-      0,
-      1,
-      0
-    ]
+    [0, 0, 1],
+    [0, 1, 0]
   );
 
   public static function part(width:Float, depth:Float, height:Float):Part {
@@ -45,20 +37,8 @@ class DinRailDevice {
     }
     var body = Solids.union([
       box(rear, height, back, 0, "rear-body"),
-      box(
-        shoulder,
-        shoulderHigh - shoulderLow,
-        back + rear,
-        shoulderLow,
-        "terminal-shoulder"
-      ),
-      box(
-        depth - rear - shoulder,
-        window,
-        back + rear + shoulder,
-        middle - window / 2,
-        "front"
-      )
+      box(shoulder, shoulderHigh - shoulderLow, back + rear, shoulderLow, "terminal-shoulder"),
+      box(depth - rear - shoulder, window, back + rear + shoulder, middle - window / 2, "front")
     ]);
     var tools:Array<Part> = [];
     function tool(part:Part):Void {

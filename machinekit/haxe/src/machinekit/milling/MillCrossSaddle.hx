@@ -17,74 +17,23 @@ class MillCrossSaddle extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 450),
     P.length("depth", 174),
-    P.length(
-      "height",
-      80
-    ),
-    P.flag(
-      "ribbed",
-      false
-    ),
-    P.flag(
-      "blockAccess",
-      false
-    ),
-    P.flag(
-      "nutBoss",
-      false
-    ),
-    P.flag(
-      "nutServiceAccess",
-      false
-    ),
-    P.length(
-      "guideSpacing",
-      220
-    ),
-    P.length(
-      "blockSpan",
-      50.7
-    ),
-    P.length(
-      "blockHolePitchB",
-      26
-    ),
-    P.length(
-      "blockHolePitchC",
-      26
-    ),
-    P.length(
-      "blockClearance",
-      4.5
-    ),
-    P.length(
-      "crossRailSpacing",
-      160
-    ),
-    P.length(
-      "crossRailLength",
-      450
-    ),
-    P.length(
-      "crossRailWidth",
-      15
-    ),
-    P.length(
-      "bore",
-      54
-    ),
-    P.length(
-      "boreZ",
-      40
-    ),
-    P.flag(
-      "motorPocket",
-      true
-    ),
-    P.flag(
-      "sidePockets",
-      false
-    )
+    P.length("height", 80),
+    P.flag("ribbed", false),
+    P.flag("blockAccess", false),
+    P.flag("nutBoss", false),
+    P.flag("nutServiceAccess", false),
+    P.length("guideSpacing", 220),
+    P.length("blockSpan", 50.7),
+    P.length("blockHolePitchB", 26),
+    P.length("blockHolePitchC", 26),
+    P.length("blockClearance", 4.5),
+    P.length("crossRailSpacing", 160),
+    P.length("crossRailLength", 450),
+    P.length("crossRailWidth", 15),
+    P.length("bore", 54),
+    P.length("boreZ", 40),
+    P.flag("motorPocket", true),
+    P.flag("sidePockets", false)
   ];
 
   public static function recipeType():ComponentType {
@@ -126,22 +75,7 @@ class MillCrossSaddle extends MachineComponent {
       d = parameterNumber("depth"), h = parameterNumber("height");
     for (p in MillYNutMount.anchors()) holes.push({
       id: 'anchor${p.x}-${p.y}',
-      frame: F.fromRotationMatrix(
-        p.x,
-        -d / 2,
-        p.y,
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          -1,
-          0
-        ]
-      ),
+      frame: F.fromRotationMatrix(p.x, -d / 2, p.y, [1, 0, 0, 0, 0, 1, 0, -1, 0]),
       radius: 2.5,
       depth: 24.5,
       minWall: 5,
@@ -164,24 +98,12 @@ class MillCrossSaddle extends MachineComponent {
     for (x in [-16.0, 16.0]) material.push({
       id: 'notch-cheek$x',
       frame: F.translation(x, -d / 2 + 8, 36),
-      volume: BoxVolume(
-        10,
-        16,
-        h - 40
-      )
+      volume: BoxVolume(10, 16, h - 40)
     });
     for (side in [-1, 1]) material.push({
       id: 'cross-rail-land$side',
-      frame: F.translation(
-        0,
-        side * parameterNumber("crossRailSpacing") / 2,
-        h - 3
-      ),
-      volume: BoxVolume(
-        parameterNumber("crossRailLength"),
-        parameterNumber("crossRailWidth"),
-        3
-      )
+      frame: F.translation(0, side * parameterNumber("crossRailSpacing") / 2, h - 3),
+      volume: BoxVolume(parameterNumber("crossRailLength"), parameterNumber("crossRailWidth"), 3)
     });
     return new machinekit.design.DesignInterfaces(holes, [], material);
   }
@@ -228,14 +150,8 @@ class MillCrossSaddle extends MachineComponent {
     if (values().boolean("sidePockets")) for (side in [-1, 1]) for (interval in [
       [-205.0, -115.0],
       [-105.0, -55.0],
-      [
-        55.0,
-        130.0
-      ],
-      [
-        140.0,
-        205.0
-      ]
+      [55.0, 130.0],
+      [140.0, 205.0]
     ]) tools.push(Part.box(
       interval[1] - interval[0],
       13,
@@ -260,18 +176,9 @@ class MillCrossSaddle extends MachineComponent {
         // Separate lightening cells leave full-height webs beside each guide pad.
         for (side in [-1, 1]) for (interval in [
           [-w / 2 + 40, -guide - pocketWidth / 2 - 12],
-          [
-            -guide + pocketWidth / 2 + 12,
-            -45.0
-          ],
-          [
-            45.0,
-            guide - pocketWidth / 2 - 12
-          ],
-          [
-            guide + pocketWidth / 2 + 12,
-            w / 2 - 20
-          ]
+          [-guide + pocketWidth / 2 + 12, -45.0],
+          [45.0, guide - pocketWidth / 2 - 12],
+          [guide + pocketWidth / 2 + 12, w / 2 - 20]
         ]) if (interval[1] > interval[0]) tools.push(Part.box(
           interval[1] - interval[0],
           d / 2 - 28,
@@ -287,14 +194,8 @@ class MillCrossSaddle extends MachineComponent {
       for (side in [-1, 1]) for (interval in [
         [-w / 2 + 40, -guide - padHalf],
         [-guide + padHalf, -45.0],
-        [
-          45.0,
-          guide - padHalf
-        ],
-        [
-          guide + padHalf,
-          w / 2 - 20
-        ]
+        [45.0, guide - padHalf],
+        [guide + padHalf, w / 2 - 20]
       ]) tools.push(Part.box(
         interval[1] - interval[0],
         d / 2 - 28,
@@ -308,10 +209,7 @@ class MillCrossSaddle extends MachineComponent {
         [-w / 2 - 1, -guide - padHalf],
         [-guide + padHalf, -45.0],
         [45.0, guide - padHalf],
-        [
-          guide + padHalf,
-          w / 2 + 1
-        ]
+        [guide + padHalf, w / 2 + 1]
       ]) tools.push(Part.box(
         interval[1] - interval[0],
         d + 2,
@@ -353,18 +251,9 @@ class MillCrossSaddle extends MachineComponent {
       for (sx in [-1, 1]) for (sy in [-1, 1]) pieces.push(Part.prism(
         [
           new Vector(sx * 46, sy * d / 2),
-          new Vector(
-            sx * 58,
-            sy * d / 2
-          ),
-          new Vector(
-            sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2),
-            sy * 40
-          ),
-          new Vector(
-            sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2 - 12),
-            sy * 40
-          )
+          new Vector(sx * 58, sy * d / 2),
+          new Vector(sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2), sy * 40),
+          new Vector(sx * (guide - (parameterNumber("blockHolePitchC") + 20) / 2 - 12), sy * 40)
         ],
         BLOCK_SEAT,
         h - 14
@@ -382,22 +271,8 @@ class MillCrossSaddle extends MachineComponent {
         if (p.x < 0) tools.push(Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x, p.y));
         else tools.push(Solids.union([
           Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x - 0.2, p.y),
-          Part.cylinderAlongY(
-            3.05,
-            -d / 2 - 1,
-            -d / 2 + 10,
-            p.x + 0.2,
-            p.y
-          ),
-          Part.box(
-            0.4,
-            11,
-            6.1
-          ).translated(new Vector(
-            p.x,
-            -d / 2 + 4.5,
-            p.y - 3.05
-          ))
+          Part.cylinderAlongY(3.05, -d / 2 - 1, -d / 2 + 10, p.x + 0.2, p.y),
+          Part.box(0.4, 11, 6.1).translated(new Vector(p.x, -d / 2 + 4.5, p.y - 3.05))
         ]));
       }
       if (values().boolean("nutServiceAccess")) {
@@ -421,15 +296,7 @@ class MillCrossSaddle extends MachineComponent {
     var floor = BLOCK_SEAT, top = height - 14, radius = 4.0, depth = y1 - y0;
     var parts = [
       Part.box(width - 2 * radius, depth, top - floor).translated(new Vector(x, (y0 + y1) / 2, floor)),
-      Part.box(
-        width,
-        depth,
-        top - floor - 2 * radius
-      ).translated(new Vector(
-        x,
-        (y0 + y1) / 2,
-        floor + radius
-      ))
+      Part.box(width, depth, top - floor - 2 * radius).translated(new Vector(x, (y0 + y1) / 2, floor + radius))
     ];
     for (sx in [-1, 1]) for (z in [floor + radius, top - radius]) parts.push(Part.cylinderAlongY(
       radius,

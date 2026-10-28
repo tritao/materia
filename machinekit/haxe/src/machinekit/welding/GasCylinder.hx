@@ -38,21 +38,7 @@ class GasCylinder extends MachineComponent {
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([
-    Solids.named(
-      Part.cylinderSpan(
-        DIAMETER / 2,
-        0,
-        BOTTLE_HEIGHT
-      ),
-      "bottle"
-    ),
-    Solids.named(
-      Part.cylinderSpan(
-        REGULATOR_DIAMETER / 2,
-        BOTTLE_HEIGHT,
-        HEIGHT
-      ),
-      "regulator"
-    )
+    Solids.named(Part.cylinderSpan(DIAMETER / 2, 0, BOTTLE_HEIGHT), "bottle"),
+    Solids.named(Part.cylinderSpan(REGULATOR_DIAMETER / 2, BOTTLE_HEIGHT, HEIGHT), "regulator")
   ]);
 }

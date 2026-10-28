@@ -32,22 +32,7 @@ class CobotToolServiceMount extends MachineComponent {
     addConnector(
       "socketMount",
       Mount,
-      AssemblyFrames.fromRotationMatrix(
-        0,
-        radius + 8,
-        centre,
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          -1,
-          0
-        ]
-      )
+      AssemblyFrames.fromRotationMatrix(0, radius + 8, centre, [1, 0, 0, 0, 0, 1, 0, -1, 0])
     );
   }
   function box(x:Float, y:Float, z:Float, dx:Float, dy:Float, dz:Float):Part {
@@ -89,11 +74,7 @@ class CobotToolServiceMount extends MachineComponent {
     for (x in [-radius - 5, radius + 5]) tools.push(Part.cylinderAlong(1.7, new Vector(x, -8, centre), Vector.Y(), 16));
     if (cap) for (x in [-10.0, 10.0]) for (z in [-9.0, 9.0]) tools.push(Part.cylinderAlong(
       1.25,
-      new Vector(
-        x,
-        radius + 3,
-        centre + z
-      ),
+      new Vector(x, radius + 3, centre + z),
       Vector.Y(),
       6
     ));

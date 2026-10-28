@@ -71,12 +71,7 @@ class CobotArm extends MachineAssembly {
         "start",
         {x: 0, y: 1, z: 0},
         0,
-        {
-          lower: -2 * Math.PI,
-          upper: 2 * Math.PI,
-          velocity: null,
-          effort: null
-        }
+        {lower: -2 * Math.PI, upper: 2 * Math.PI, velocity: null, effort: null}
       );
       if (i < 5) {
         addComponent('joint${i + 2}', modules[i + 1]);
@@ -118,31 +113,15 @@ class CobotArm extends MachineAssembly {
     var serviceX = reference.reach + 2 * baseFlange.flangeDiameter;
     addComponent(
       "powerSupply",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(48),
-        new machinekit.power.DcCurrent(150),
-        6,
-        240,
-        120,
-        100,
-        6000
-      ),
-      AssemblyFrames.translation(
-        serviceX,
-        -180,
-        0
-      )
+      new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(150), 6, 240, 120, 100, 6000),
+      AssemblyFrames.translation(serviceX, -180, 0)
     );
     for (i in 0...6) {
       var driverId = 'driver${i + 1}', moduleId = 'joint${i + 1}', jointId = 'j${i + 1}';
       addComponent(
         driverId,
         new MotorDriver("GENERIC-LV-SERVO-AMP", modules[i].driverCurrent),
-        AssemblyFrames.translation(
-          serviceX,
-          i * 80,
-          0
-        )
+        AssemblyFrames.translation(serviceX, i * 80, 0)
       );
       connectPorts('$driverId-power', "powerSupply", 'power${i + 1}', driverId, "power");
       addMotor('drive_$jointId', jointId, moduleId, driverId, 0.5, 'gearbox${i + 1}');

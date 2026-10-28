@@ -102,13 +102,7 @@ class LinearRailSystem {
         railBore: mgnr12,
         blockMassKg: 0.030,
         railMassKgPerMetre: 0.65,
-        ratings: [hiwinMg(
-          2840,
-          3920,
-          25.5,
-          13.7,
-          13.7
-        )]
+        ratings: [hiwinMg(2840, 3920, 25.5, 13.7, 13.7)]
       },
       {
         designation: "MGN12H",
@@ -129,13 +123,7 @@ class LinearRailSystem {
         railBore: mgnr12,
         blockMassKg: 0.050,
         railMassKgPerMetre: 0.65,
-        ratings: [hiwinMg(
-          3720,
-          5880,
-          38.2,
-          36.3,
-          36.3
-        )]
+        ratings: [hiwinMg(3720, 5880, 38.2, 36.3, 36.3)]
       },
       {
         designation: "MGN9C",
@@ -156,13 +144,7 @@ class LinearRailSystem {
         railBore: mgnr9,
         blockMassKg: 0.020,
         railMassKgPerMetre: 0.38,
-        ratings: [hiwinMg(
-          1860,
-          2550,
-          11.8,
-          7.4,
-          7.4
-        )]
+        ratings: [hiwinMg(1860, 2550, 11.8, 7.4, 7.4)]
       }
     ];
   }
@@ -181,18 +163,8 @@ class LinearRailSystem {
       original: true
     };
     function both(c2008:Float, c02008:Float, c2024:Float, c02024:Float):Array<LinearRailRating> return [
-      edition(
-        "HIWIN G99TE13-0809",
-        HIWIN_2008,
-        c2008,
-        c02008
-      ),
-      edition(
-        "HIWIN G99TE24-2410",
-        HIWIN_2024,
-        c2024,
-        c02024
-      )
+      edition("HIWIN G99TE13-0809", HIWIN_2008, c2008, c02008),
+      edition("HIWIN G99TE24-2410", HIWIN_2024, c2024, c02024)
     ];
     return switch designation {
       case "HGH15CA", "HGW15CC":
@@ -282,12 +254,7 @@ class LinearRailSystem {
         "rail",
         {x: 0, y: 1, z: 0},
         initialTravel(i),
-        {
-          lower: travelMin,
-          upper: travelMax,
-          velocity: null,
-          effort: null
-        }
+        {lower: travelMin, upper: travelMax, velocity: null, effort: null}
       );
     }
     return model;

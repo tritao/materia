@@ -15,12 +15,10 @@ class TendingDoorSweepAudit {
     placement:AssemblyFrame,
     tool:SceneArtifactData,
     ts:AssemblyState,
-    hulls:Map<
-      String,
-      Array<Array<Float>>>,
-      park:Array<Float>,
-      stroke:Float
-    ):Dynamic {
+    hulls:Map<String, Array<Array<Float>>>,
+    park:Array<Float>,
+    stroke:Float
+  ):Dynamic {
     var world = new NativeCollisionWorld(),
       fixed = world.addBody(0), moving = world.addBody(0), names:Map<Int, String> = [];
     world.setBodyStatic(fixed, true);
@@ -62,12 +60,7 @@ class TendingDoorSweepAudit {
       var id = world.add(
         fixed,
         CollisionPose.identity(),
-        Convex(cadkit.ConvexHullVertices.enclosingFromMesh(
-          vertices,
-          part.vertexCount * 2,
-          0.001,
-          0.151
-        ).vertices)
+        Convex(cadkit.ConvexHullVertices.enclosingFromMesh(vertices, part.vertexCount * 2, 0.001, 0.151).vertices)
       );
       names.set(id, "tool/" + o.id);
     }

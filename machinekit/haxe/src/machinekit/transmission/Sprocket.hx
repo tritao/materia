@@ -55,26 +55,10 @@ class Sprocket extends MachineComponent {
       "roller chain",
       spec -> spec.designation,
       [
-        {
-          designation: "ANSI25",
-          pitch: 6.35,
-          rollerDiameter: 3.30
-        },
-        {
-          designation: "ANSI35",
-          pitch: 9.525,
-          rollerDiameter: 5.08
-        },
-        {
-          designation: "ANSI40",
-          pitch: 12.7,
-          rollerDiameter: 7.92
-        },
-        {
-          designation: "ANSI50",
-          pitch: 15.875,
-          rollerDiameter: 10.16
-        },
+        {designation: "ANSI25", pitch: 6.35, rollerDiameter: 3.30},
+        {designation: "ANSI35", pitch: 9.525, rollerDiameter: 5.08},
+        {designation: "ANSI40", pitch: 12.7, rollerDiameter: 7.92},
+        {designation: "ANSI50", pitch: 15.875, rollerDiameter: 10.16},
       ],
       _ -> ({
         source: "https://www.renold.com/media/4131298/renold-as-roller-chain-uk.pdf",
@@ -167,10 +151,7 @@ class Sprocket extends MachineComponent {
       );
       result.line(rootStart, tipStart).arc(tipStart, polar(ra, center), tipEnd).line(tipEnd, rootEnd).arc(
         rootEnd,
-        polar(
-          rf,
-          center + angleStep / 2
-        ),
+        polar(rf, center + angleStep / 2),
         next
       );
     }
@@ -183,30 +164,12 @@ class Sprocket extends MachineComponent {
     if (chainRecipeTypeCache == null) chainRecipeTypeCache = new ComponentType(
       "machinekit.transmission.sprocket",
       [
-        ComponentRecipeSupport.count(
-          "teeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          5
-        ),
-        ComponentRecipeSupport.catalog(
-          "chain",
-          Sprocket.chainCatalog(),
-          "ANSI25"
-        )
+        ComponentRecipeSupport.count("teeth", 20),
+        ComponentRecipeSupport.length("boreDiameter", 8),
+        ComponentRecipeSupport.length("thickness", 5),
+        ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")
       ],
-      v -> Sprocket.forChain(
-        v.token("chain"),
-        v.integer("teeth"),
-        v.number("boreDiameter"),
-        v.number("thickness")
-      )
+      v -> Sprocket.forChain(v.token("chain"), v.integer("teeth"), v.number("boreDiameter"), v.number("thickness"))
     );
     return chainRecipeTypeCache;
   }
@@ -217,26 +180,11 @@ class Sprocket extends MachineComponent {
     if (genericRecipeTypeCache == null) genericRecipeTypeCache = new ComponentType(
       "machinekit.transmission.generic-sprocket",
       [
-        ComponentRecipeSupport.length(
-          "pitch",
-          6.35
-        ),
-        ComponentRecipeSupport.count(
-          "teeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          5
-        ),
-        ComponentRecipeSupport.length(
-          "rollerDiameter",
-          3.96875
-        )
+        ComponentRecipeSupport.length("pitch", 6.35),
+        ComponentRecipeSupport.count("teeth", 20),
+        ComponentRecipeSupport.length("boreDiameter", 8),
+        ComponentRecipeSupport.length("thickness", 5),
+        ComponentRecipeSupport.length("rollerDiameter", 3.96875)
       ],
       v -> new Sprocket(
         v.number("pitch"),

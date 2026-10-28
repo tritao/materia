@@ -182,10 +182,7 @@ class FoundationDesignTests {
         openings: [materia.casting.CastingPatterns.face("body.z-max")],
         part: new machinekit.structural.CastInsert(insertValues.setToken(
           "holes",
-          machinekit.structural.InsertHoles.tappedThrough(
-            choice,
-            25
-          )
+          machinekit.structural.InsertHoles.tappedThrough(choice, 25)
         ))
       }]
     ) catch (error:Dynamic) failed =
@@ -196,18 +193,11 @@ class FoundationDesignTests {
       dimensions,
       [{
         id: "anchor",
-        pose: F.translation(
-          0,
-          0,
-          35
-        ),
+        pose: F.translation(0, 0, 35),
         openings: [materia.casting.CastingPatterns.face("body.z-max")],
         part: new machinekit.structural.CastInsert(insertValues.setToken(
           "holes",
-          machinekit.structural.InsertHoles.tappedBlind(
-            choice,
-            25
-          )
+          machinekit.structural.InsertHoles.tappedBlind(choice, 25)
         ))
       }]
     );
@@ -230,27 +220,17 @@ class FoundationDesignTests {
       );
       var accepted = true;
       try new machinekit.structural.MineralFoundation(
-        dimensions.setToken(
-          "features",
-          materia.casting.CastingPatterns.encode([opening])
-        ),
+        dimensions.setToken("features", materia.casting.CastingPatterns.encode([opening])),
         [{
           id: "anchor",
-          pose: F.translation(
-            0,
-            0,
-            35
-          ),
+          pose: F.translation(0, 0, 35),
           openings: [
             materia.casting.CastingPatterns.face("body.z-max"),
             materia.casting.CastingPatterns.feature("service")
           ],
           part: new machinekit.structural.CastInsert(insertValues.setToken(
             "holes",
-            machinekit.structural.InsertHoles.tappedThrough(
-              choice,
-              25
-            )
+            machinekit.structural.InsertHoles.tappedThrough(choice, 25)
           ))
         }]
       ) catch (error:Dynamic) {
@@ -379,10 +359,7 @@ class FoundationDesignTests {
       "generic-mount"
     ).setToken(
       "holes",
-      machinekit.structural.InsertHoles.through(
-        14,
-        5
-      )
+      machinekit.structural.InsertHoles.through(14, 5)
     ));
     var screw = machinekit.standard.SocketHeadCapScrew.metric("M12", 30, machinekit.standard.PropertyClass.Steel88);
     var head = materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 25, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
@@ -392,33 +369,20 @@ class FoundationDesignTests {
     joint.addComponent(
       "screw",
       screw,
-      materia.assembly.AssemblyFrames.compose(
-        head,
-        materia.assembly.AssemblyFrames.inverse(screw.bearingFrame())
-      )
+      materia.assembly.AssemblyFrames.compose(head, materia.assembly.AssemblyFrames.inverse(screw.bearingFrame()))
     );
     joint.addDesignRequirement(machinekit.design.DesignRequirement.FastenerJoint(
       "through-fixing",
       "screw",
-      {
-        member: "target",
-        feature: "fixing"
-      },
-      [{
-        member: "clamp",
-        feature: "fixing"
-      }]
+      {member: "target", feature: "fixing"},
+      [{member: "clamp", feature: "fixing"}]
     ));
     var throughAudit = machinekit.design.AssemblyDesignChecks.check(joint);
     throughAudit.throwIfErrors();
     assertions++;
     joint.replaceComponent(
       "screw",
-      machinekit.standard.SocketHeadCapScrew.metric(
-        "M12",
-        10,
-        machinekit.standard.PropertyClass.Steel88
-      )
+      machinekit.standard.SocketHeadCapScrew.metric("M12", 10, machinekit.standard.PropertyClass.Steel88)
     );
     var shortAudit = machinekit.design.AssemblyDesignChecks.check(joint);
     assertions++;
@@ -446,14 +410,8 @@ class FoundationDesignTests {
     }
     if (Sys.args().indexOf("--export-approved-hobber") >= 0) {
       var sources:Array<{id:String, part:machinekit.structural.MineralFoundation}> = [
-        {
-          id: "hobber-bed",
-          part: new machinekit.hobbing.MineralCastBed()
-        },
-        {
-          id: "hobber-column",
-          part: new machinekit.hobbing.MineralCastColumn()
-        }
+        {id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()},
+        {id: "hobber-column", part: new machinekit.hobbing.MineralCastColumn()}
       ];
       for (row in sources) {
         var part = row.part.body.geometry();
@@ -486,14 +444,8 @@ class FoundationDesignTests {
     if (millOnly && Sys.args().indexOf("--write-baseline-current")
       >= 0) throw "A focused mill check cannot overwrite the four-foundation baseline";
     var foundations:Array<{id:String, part:machinekit.structural.MineralFoundation}> = [
-      {
-        id: "mill-base",
-        part: frame.base
-      },
-      {
-        id: "mill-column",
-        part: frame.column
-      }
+      {id: "mill-base", part: frame.base},
+      {id: "mill-column", part: frame.column}
     ];
     if (!millOnly) {
       foundations.push({id: "hobber-bed", part: new machinekit.hobbing.MineralCastBed()});
@@ -544,11 +496,7 @@ class FoundationDesignTests {
         boxStatus: boxSupported ? "pass" : "unsupported",
         boxReason : row.part.body.collisionHullQualification.reason,
         unsupportedFeatures : [for (cavity in unsupported) cavity.featureId],
-        minimumIyMm4 : boxes == null ? null : materia.casting.BoxAlgebra.minimumIy(
-          boxes,
-          -half,
-          half
-        )
+        minimumIyMm4 : boxes == null ? null : materia.casting.BoxAlgebra.minimumIy(boxes, -half, half)
       });
       previous.close();
       actual.close();
@@ -639,11 +587,7 @@ class FoundationDesignTests {
       );
       sys.io.File.saveContent(
         root + "/../../../../examples/flexspline-hobber/BASELINE_FOUNDATIONS.json",
-        haxe.Json.stringify(
-          baseline,
-          null,
-          "  "
-        ) + "\n"
+        haxe.Json.stringify(baseline, null, "  ") + "\n"
       );
     }
     Sys.println("FoundationDesignTests: " + assertions + " assertions passed");

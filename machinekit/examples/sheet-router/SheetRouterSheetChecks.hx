@@ -14,26 +14,10 @@ class SheetRouterSheetChecks {
     if (!ok) throw label;
   }
   static function rectangle(x:Float, y:Float, w:Float, h:Float):CamContour return new CamContour([
-    new Point3(
-      x,
-      y,
-      0.018
-    ),
-    new Point3(
-      x + w,
-      y,
-      0.018
-    ),
-    new Point3(
-      x + w,
-      y + h,
-      0.018
-    ),
-    new Point3(
-      x,
-      y + h,
-      0.018
-    )
+    new Point3(x, y, 0.018),
+    new Point3(x + w, y, 0.018),
+    new Point3(x + w, y + h, 0.018),
+    new Point3(x, y + h, 0.018)
   ]);
   static function main():Void {
     var reports:Array<Dynamic> = [];

@@ -117,10 +117,7 @@ class BenchMillChecks {
         axis: "y",
         rail: "railYRight",
         carriage: "saddle",
-        blocks: [
-          "blockYRight",
-          "blockYRightRear"
-        ],
+        blocks: ["blockYRight", "blockYRightRear"],
         dx: 0.0,
         dy: 0.0,
         dz: 0.05
@@ -129,10 +126,7 @@ class BenchMillChecks {
         axis: "x",
         rail: "railXFront",
         carriage: "table",
-        blocks: [
-          "blockXFront",
-          "blockXFrontRear"
-        ],
+        blocks: ["blockXFront", "blockXFrontRear"],
         dx: 0.0,
         dy: 0.0,
         dz: 0.05
@@ -141,10 +135,7 @@ class BenchMillChecks {
         axis: "x",
         rail: "railXBack",
         carriage: "table",
-        blocks: [
-          "blockXBack",
-          "blockXBackRear"
-        ],
+        blocks: ["blockXBack", "blockXBackRear"],
         dx: 0.0,
         dy: 0.0,
         dz: 0.05
@@ -153,10 +144,7 @@ class BenchMillChecks {
         axis: "z",
         rail: "railZLeft",
         carriage: "head",
-        blocks: [
-          "blockZLeft",
-          "blockZLeftTop"
-        ],
+        blocks: ["blockZLeft", "blockZLeftTop"],
         dx: 0.0,
         dy: -0.05,
         dz: 0.0
@@ -165,10 +153,7 @@ class BenchMillChecks {
         axis: "z",
         rail: "railZRight",
         carriage: "head",
-        blocks: [
-          "blockZRight",
-          "blockZRightTop"
-        ],
+        blocks: ["blockZRight", "blockZRightTop"],
         dx: 0.0,
         dy: -0.05,
         dz: 0.0
@@ -211,106 +196,31 @@ class BenchMillChecks {
         ["table", "column"],
         ["head", "column"],
         ["table", "screwXFixed"],
-        [
-          "table",
-          "screwXFloating"
-        ],
-        [
-          "saddle",
-          "screwYFixed"
-        ],
-        [
-          "saddle",
-          "screwYFloating"
-        ],
-        [
-          "head",
-          "screwZFixed"
-        ],
-        [
-          "head",
-          "screwZFloating"
-        ],
-        [
-          "screwXNut",
-          "saddle"
-        ],
-        [
-          "screwXNut",
-          "table"
-        ],
-        [
-          "screwYNut",
-          "saddle"
-        ],
-        [
-          "screwZNut",
-          "column"
-        ],
-        [
-          "screwXNutBracket",
-          "saddle"
-        ],
-        [
-          "screwXNutBracket",
-          "table"
-        ],
-        [
-          "screwYNutBracket",
-          "saddle"
-        ],
-        [
-          "screwZNutBracket",
-          "head"
-        ],
-        [
-          "screwZNutBracket",
-          "column"
-        ],
-        [
-          "motorXPlate",
-          "screwXNearBridge"
-        ],
-        [
-          "motorYPlate",
-          "motorYBridge"
-        ],
-        [
-          "motorZPlate",
-          "motorZPost"
-        ],
-        [
-          "screwXCoupling",
-          "motorXPlate"
-        ],
-        [
-          "screwYCoupling",
-          "motorYPlate"
-        ],
-        [
-          "screwZCoupling",
-          "motorZPlate"
-        ],
-        [
-          "spindleMotor",
-          "spindleMotorPulley"
-        ],
-        [
-          "spindleMotorShelf",
-          "spindleMotorPulley"
-        ],
-        [
-          "spindle",
-          "stock"
-        ],
-        [
-          "holder",
-          "clampLeft"
-        ],
-        [
-          "holder",
-          "clampRight"
-        ]
+        ["table", "screwXFloating"],
+        ["saddle", "screwYFixed"],
+        ["saddle", "screwYFloating"],
+        ["head", "screwZFixed"],
+        ["head", "screwZFloating"],
+        ["screwXNut", "saddle"],
+        ["screwXNut", "table"],
+        ["screwYNut", "saddle"],
+        ["screwZNut", "column"],
+        ["screwXNutBracket", "saddle"],
+        ["screwXNutBracket", "table"],
+        ["screwYNutBracket", "saddle"],
+        ["screwZNutBracket", "head"],
+        ["screwZNutBracket", "column"],
+        ["motorXPlate", "screwXNearBridge"],
+        ["motorYPlate", "motorYBridge"],
+        ["motorZPlate", "motorZPost"],
+        ["screwXCoupling", "motorXPlate"],
+        ["screwYCoupling", "motorYPlate"],
+        ["screwZCoupling", "motorZPlate"],
+        ["spindleMotor", "spindleMotorPulley"],
+        ["spindleMotorShelf", "spindleMotorPulley"],
+        ["spindle", "stock"],
+        ["holder", "clampLeft"],
+        ["holder", "clampRight"]
       ]) {
         var a = posed(mill, state, pair[0]), b = posed(mill, state, pair[1]);
         var common = a.intersect(b), volume = common.volume();
@@ -453,11 +363,7 @@ class BenchMillChecks {
       var part = local.placed(new Location(new Plane(
         new Vector(pose.x, pose.y, pose.z),
         new Vector(x.x, x.y, x.z),
-        new Vector(
-          z.x,
-          z.y,
-          z.z
-        )
+        new Vector(z.x, z.y, z.z)
       )));
       local.close();
       return part;
@@ -666,11 +572,7 @@ class EnclosedMillChecks {
     var probe = cnckit.CncCompiler.compileDetailed(
       "G21 G90 G54\nG0 X0 Y0 Z0\nM2",
       probeController,
-      new toolpathkit.geometry.Point3(
-        0,
-        0,
-        0
-      )
+      new toolpathkit.geometry.Point3(0, 0, 0)
     );
     if (probe.diagnostics.length != 0) throw "G54 datum probe does not compile";
     var commanded:Null<toolpathkit.geometry.Point3> = null;
@@ -685,7 +587,10 @@ class EnclosedMillChecks {
             toolpathkit.geometry.GeometryTools.length(machineGeometry)
           );
         case MachineMove(_, geometry, _, _, _):
-          commanded = toolpathkit.geometry.GeometryTools.pointAt(geometry, toolpathkit.geometry.GeometryTools.length(geometry));
+          commanded = toolpathkit.geometry.GeometryTools.pointAt(
+            geometry,
+            toolpathkit.geometry.GeometryTools.length(geometry)
+          );
         case _:
       }
     }

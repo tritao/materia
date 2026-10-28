@@ -45,18 +45,8 @@ class ThreadPreview {
       lengthUnit: "mm",
       metresPerUnit: 0.001,
       parts: [
-        AssemblyPreview.part(
-          "plate",
-          "M6 taps: RH 20 mm / LH 12 mm / plain",
-          plate,
-          "aluminium"
-        ),
-        AssemblyPreview.part(
-          "screw",
-          screw.designation,
-          placed,
-          screw.materialId
-        )
+        AssemblyPreview.part("plate", "M6 taps: RH 20 mm / LH 12 mm / plain", plate, "aluminium"),
+        AssemblyPreview.part("screw", screw.designation, placed, screw.materialId)
       ]
     });
   }

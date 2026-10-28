@@ -68,28 +68,14 @@ class FlexsplineHobber extends MachineAssembly {
         nut,
         F.translation(x, y, plateBottom - 19),
         "footSeat" + i,
-        F.alongY(
-          x,
-          y,
-          plateBottom,
-          0,
-          0,
-          1
-        )
+        F.alongY(x, y, plateBottom, 0, 0, 1)
       );
       fixAt(
         "footLocknut" + i,
         nut,
         F.translation(x, y, plateBottom - 38),
         "footNut" + i,
-        F.alongY(
-          x,
-          y,
-          plateBottom - 19,
-          0,
-          0,
-          1
-        )
+        F.alongY(x, y, plateBottom - 19, 0, 0, 1)
       );
       var foot = machinekit.structural.LevelingFoot.of(Foot(
         100,
@@ -114,21 +100,14 @@ class FlexsplineHobber extends MachineAssembly {
     if (tableBase > seat) {
       fixAt(
         "tableAdapter",
-        new machinekit.motion.PurchasedRotaryPart(new ComponentValues().setToken(
-          "variant",
-          "adapter"
-        ).setNumber(
+        new machinekit.motion.PurchasedRotaryPart(new ComponentValues().setToken("variant", "adapter").setNumber(
           "adapterHeight",
           tableBase - seat
         ).setNumber(
           "adapterOutside",
           tableSpec.number("housingDiameter")
         )),
-        F.translation(
-          0,
-          0,
-          seat
-        ),
+        F.translation(0, 0, seat),
         tableParent
       );
       precisionMounts.push({name: "tableAdapter-mount", parent: tableParent});
@@ -147,19 +126,13 @@ class FlexsplineHobber extends MachineAssembly {
       workSeat
     ).setNumber(
       "height",
-      workSeat + Math.max(
-        16,
-        this.spec.faceWidth + 8
-      ) + 2
+      workSeat + Math.max(16, this.spec.faceWidth + 8) + 2
     ).setNumber(
       "sleeveStart",
       workSeat
     ).setNumber(
       "sleeveLength",
-      Math.max(
-        16,
-        this.spec.faceWidth + 8
-      )
+      Math.max(16, this.spec.faceWidth + 8)
     ).setNumber(
       "stopDiameter",
       diameter + 0.6
@@ -168,10 +141,7 @@ class FlexsplineHobber extends MachineAssembly {
       true
     ).setNumber(
       "baseDiameter",
-      Math.max(
-        tableSpec.number("facePcd") + 30,
-        diameter + 10
-      )
+      Math.max(tableSpec.number("facePcd") + 30, diameter + 10)
     ).setNumber(
       "baseHeight",
       25
@@ -196,14 +166,7 @@ class FlexsplineHobber extends MachineAssembly {
       mandrel,
       F.translation(0, 0, FoundationLayout.TABLE_FACE),
       "table/" + tableSpec.workPart,
-      F.alongY(
-        0,
-        20,
-        FoundationLayout.TABLE_FACE,
-        0,
-        0,
-        1
-      )
+      F.alongY(0, 20, FoundationLayout.TABLE_FACE, 0, 0, 1)
     );
     fixAt(
       "mandrelSleeve",
@@ -214,11 +177,7 @@ class FlexsplineHobber extends MachineAssembly {
         "height",
         mandrel.parameterNumber("sleeveLength")
       )),
-      F.translation(
-        0,
-        0,
-        FoundationLayout.TABLE_FACE + mandrel.parameterNumber("sleeveStart")
-      ),
+      F.translation(0, 0, FoundationLayout.TABLE_FACE + mandrel.parameterNumber("sleeveStart")),
       "mandrel"
     );
     workOrigin = F.compose(MACHINE_FROM_WORK, F.translation(0, 0, 363));
@@ -242,18 +201,8 @@ class FlexsplineHobber extends MachineAssembly {
       || cutDistance > 100 || this.spec.faceWidth > 20) throw "gear/fixture exceeds hobber capacity";
     travel = [
       {id: "X", lower: minX, upper: HobberXLayout.RETRACT, initial: cutDistance},
-      {
-        id: "Y",
-        lower: -10,
-        upper: 10,
-        initial: 0
-      },
-      {
-        id: "Z",
-        lower: -10,
-        upper: 190,
-        initial: 0
-      }
+      {id: "Y", lower: -10, upper: 10, initial: 0},
+      {id: "Z", lower: -10, upper: 190, initial: 0}
     ];
     for (placed in HobberRailPlacement.placements("bed", FoundationLayout.placements("bed"))) {
       var insert = "bed/" + placed.insertId;
@@ -275,34 +224,10 @@ class FlexsplineHobber extends MachineAssembly {
     );
     for (side in [-1, 1]) for (row in [HobberXLayout.BLOCK_FRONT, HobberXLayout.BLOCK_REAR]) fixAt(
       "blockX" + (side < 0 ? "Left" : "Right") + (row == HobberXLayout.BLOCK_FRONT ? "" : "Front"),
-      LinearRailBlock.metric(
-        "HGH25CA",
-        LinearRailBlock.SUPPLIER
-      ),
-      AxisBuilder.orient(
-        centre + row,
-        side * FoundationLayout.BED_RAIL_CENTRE,
-        242,
-        [
-          0.0,
-          0,
-          1
-        ],
-        [
-          1.0,
-          0,
-          0
-        ]
-      ),
+      LinearRailBlock.metric("HGH25CA", LinearRailBlock.SUPPLIER),
+      AxisBuilder.orient(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 242, [0.0, 0, 1], [1.0, 0, 0]),
       "Xbridge",
-      F.alongY(
-        centre + row,
-        side * FoundationLayout.BED_RAIL_CENTRE,
-        260,
-        0,
-        0,
-        1
-      )
+      F.alongY(centre + row, side * FoundationLayout.BED_RAIL_CENTRE, 260, 0, 0, 1)
     );
     includeAt("column", column, FoundationLayout.worldPose("column"));
     fixExisting("column-mount", "Xbridge", "column/basePlate", F.alongY(centre + 326, 0, 280, 0, 0, 1));
@@ -316,34 +241,10 @@ class FlexsplineHobber extends MachineAssembly {
     moving("Z", Prismatic, "railZLeft", "Zplate", F.translation(centre + 161, 0, 363), [0.0, 0, 1], 0, -10, 190);
     for (side in [-1, 1]) for (row in [0, 110]) fixAt(
       "blockZ" + (side < 0 ? "Left" : "Right") + (row == 0 ? "" : "Upper"),
-      LinearRailBlock.metric(
-        "HGH15CA",
-        LinearRailBlock.SUPPLIER
-      ),
-      AxisBuilder.orient(
-        centre + 161,
-        side * 145,
-        363 + row,
-        [
-          -1.0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          0,
-          1
-        ]
-      ),
+      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
+      AxisBuilder.orient(centre + 161, side * 145, 363 + row, [-1.0, 0, 0], [0.0, 0, 1]),
       "Zplate",
-      F.alongY(
-        centre + 148,
-        side * 145,
-        363 + row,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + 148, side * 145, 363 + row, -1, 0, 0)
     );
     var swivelMotor = new TorqueMotor(new ComponentValues().setNumber("height", 20).setNumber(
       "ratedSpeed",
@@ -367,76 +268,24 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-swivel-plate"),
       F.translation(centre, 0, 363),
       "swivel/head",
-      F.alongY(
-        centre + 100,
-        0,
-        363,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + 100, 0, 363, -1, 0, 0)
     );
     for (side in [-1, 1]) fixAt(
       side < 0 ? "railYLeft" : "railYRight",
       LinearRail.metric("HGH15CA", 220),
-      AxisBuilder.orient(
-        centre + 70,
-        110,
-        363 + side * 60,
-        [
-          -1.0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          -1,
-          0
-        ]
-      ),
+      AxisBuilder.orient(centre + 70, 110, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
       "swivelPlate",
-      F.alongY(
-        centre + 85,
-        110,
-        363 + side * 60,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + 85, 110, 363 + side * 60, -1, 0, 0)
     );
     addComponent("Yplate", new HobberSaddle("GE-Y-saddle"));
     zero.set("Yplate", F.translation(centre, 0, 363));
     moving("Y", Prismatic, "railYLeft", "Yplate", F.translation(centre + 70, 0, 363), [0.0, -1, 0], 0, -10, 10);
     for (side in [-1, 1]) for (row in [-40, 40]) fixAt(
       "blockY" + (side < 0 ? "Left" : "Right") + (row < 0 ? "" : "Front"),
-      LinearRailBlock.metric(
-        "HGH15CA",
-        LinearRailBlock.SUPPLIER
-      ),
-      AxisBuilder.orient(
-        centre + 70,
-        row,
-        363 + side * 60,
-        [
-          -1.0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          -1,
-          0
-        ]
-      ),
+      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
+      AxisBuilder.orient(centre + 70, row, 363 + side * 60, [-1.0, 0, 0], [0.0, -1, 0]),
       "Yplate",
-      F.alongY(
-        centre + 57,
-        row,
-        363 + side * 60,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + 57, row, 363 + side * 60, -1, 0, 0)
     );
     var rated = 4000 * 2 * Math.PI / 60;
     var spindleMotor = new TorqueMotor(new ComponentValues().setNumber("outside", 62).setNumber("bore", 25).setNumber(
@@ -478,10 +327,7 @@ class FlexsplineHobber extends MachineAssembly {
     ));
     spindle = new HobSpindle(
       spindleMotor,
-      new HobArbor(new ComponentValues().setNumber("height", 175).setNumber(
-        "hobCentreOffset",
-        60
-      ).setNumber(
+      new HobArbor(new ComponentValues().setNumber("height", 175).setNumber("hobCentreOffset", 60).setNumber(
         "supportDiameter",
         15
       ).setNumber(
@@ -495,21 +341,9 @@ class FlexsplineHobber extends MachineAssembly {
     fixAt(
       "outboard",
       new OutboardSupport(new ComponentValues().setNumber("height", 30).setNumber("seatLength", 9)),
-      F.fromRotationMatrix(
-        centre,
-        -85,
-        363,
-        e0
-      ),
+      F.fromRotationMatrix(centre, -85, 363, e0),
       "Yplate",
-      F.alongY(
-        centre + 30,
-        -100,
-        363,
-        1,
-        0,
-        0
-      )
+      F.alongY(centre + 30, -100, 363, 1, 0, 0)
     );
     fixAt("outboardBearing", new FloatingRadialBearing(), F.fromRotationMatrix(centre, -95.5, 363, e0), "outboard");
     mountContacts.push({parent: "outboard", child: "outboardBearing"});
@@ -531,14 +365,7 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-X-drive"),
       F.translation(centre, 0, 0),
       "bed/driveSeat",
-      F.alongY(
-        (HobberXLayout.front().motorFace + HobberXLayout.front().deckStart) / 2,
-        0,
-        140,
-        0,
-        0,
-        1
-      )
+      F.alongY((HobberXLayout.front().motorFace + HobberXLayout.front().deckStart) / 2, 0, 140, 0, 0, 1)
     );
     precisionMounts.push({name: "XdriveFrame-mount", parent: "bed/driveSeat"});
     fixAt(
@@ -546,14 +373,7 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-Z-drive"),
       F.translation(centre, 0, 0),
       "column/driveSeat",
-      F.alongY(
-        centre + HobberZLayout.SEAT_FACE_X,
-        0,
-        540,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + HobberZLayout.SEAT_FACE_X, 0, 540, -1, 0, 0)
     );
     precisionMounts.push({name: "ZdriveFrame-mount", parent: "column/driveSeat"});
     fixAt(
@@ -561,14 +381,7 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-Y-drive"),
       F.translation(centre, 0, 363),
       "swivelPlate",
-      F.alongY(
-        centre + 85,
-        -105,
-        458,
-        -1,
-        0,
-        0
-      )
+      F.alongY(centre + 85, -105, 458, -1, 0, 0)
     );
     drive(
       "X",
@@ -584,11 +397,7 @@ class FlexsplineHobber extends MachineAssembly {
       "ZdriveFrame",
       "Zplate",
       [0.0, 0, -1],
-      F.translation(
-        centre + HobberZLayout.AXIS_X,
-        0,
-        363 + HobberZLayout.NUT_OFFSET_Z
-      ),
+      F.translation(centre + HobberZLayout.AXIS_X, 0, 363 + HobberZLayout.NUT_OFFSET_Z),
       HobberZLayout.SHAFT_LENGTH,
       HobberZLayout.NUT_STATION
     );
@@ -597,10 +406,7 @@ class FlexsplineHobber extends MachineAssembly {
       "chipTray",
       new HobberSaddle(
         "GE-chip-tray",
-        new ComponentValues().setNumber(
-          "tableFaceDiameter",
-          tableSpec.number("faceDiameter")
-        ).setNumber(
+        new ComponentValues().setNumber("tableFaceDiameter", tableSpec.number("faceDiameter")).setNumber(
           "tableHousingDiameter",
           tableSpec.number("housingDiameter")
         ).setNumber(
@@ -619,14 +425,7 @@ class FlexsplineHobber extends MachineAssembly {
       new HobberSaddle("GE-coolant"),
       F.translation(centre, 0, 363),
       "Yplate",
-      F.alongY(
-        centre + 45,
-        40,
-        435,
-        1,
-        0,
-        0
-      )
+      F.alongY(centre + 45, 40, 435, 1, 0, 0)
     );
     // Enclosure envelope reserved; panels omitted for the current open inspection layout.
     bind("table-drive", C, "table/" + tableSpec.drivePart);
@@ -703,14 +502,7 @@ class FlexsplineHobber extends MachineAssembly {
       id + "Child",
       {x: 0, y: 1, z: 0},
       initial,
-      {
-        lower: lower,
-        upper: upper,
-        velocity: null,
-        effort: null,
-        acceleration: 500,
-        overtravel: 5
-      }
+      {lower: lower, upper: upper, velocity: null, effort: null, acceleration: 500, overtravel: 5}
     );
   }
   function drive(
@@ -753,14 +545,7 @@ class FlexsplineHobber extends MachineAssembly {
         d
       ),
       carriage,
-      F.alongY(
-        nutOrigin.x + d[0] * 27.5,
-        nutOrigin.y + d[1] * 27.5,
-        nutOrigin.z + d[2] * 27.5,
-        d[0],
-        d[1],
-        d[2]
-      )
+      F.alongY(nutOrigin.x + d[0] * 27.5, nutOrigin.y + d[1] * 27.5, nutOrigin.z + d[2] * 27.5, d[0], d[1], d[2])
     );
     var ratio = addTransmission(
       id + "lead",

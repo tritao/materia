@@ -99,10 +99,7 @@ class LinearMountTests {
       "rail",
       haxe.crypto.Sha256.encode("fixture"),
       pose,
-      [
-        "mount1",
-        "mount1"
-      ],
+      ["mount1", "mount1"],
       rail.mountingThread(),
       7,
       "fixture",
@@ -112,10 +109,7 @@ class LinearMountTests {
     }, "duplicate connector fails");
     for (pair in [
       {element: machinekit.structural.MountedElement.of(rail), holes: result},
-      {
-        element: machinekit.structural.MountedElement.of(rack),
-        holes: holes
-      }
+      {element: machinekit.structural.MountedElement.of(rack), holes: holes}
     ]) {
       var element = pair.element, placed = element.component == rail ? pose : rackPose;
       var h = pair.holes.holes[0];
@@ -128,14 +122,7 @@ class LinearMountTests {
         seat,
         facet.holes[0],
         h.frame,
-        [
-          12,
-          16,
-          20,
-          25,
-          30,
-          35
-        ]
+        [12, 16, 20, 25, 30, 35]
       );
       check(screw.length > 0, "shared fastener selector finds positive grip and policy engagement");
       if (element.component == rack) check(
@@ -189,13 +176,7 @@ class LinearMountTests {
     assembly.addComponent("layer", plate("replication fixture", "plastic"));
     assembly.addComponent(
       "push",
-      machinekit.standard.SocketSetScrew.forThread(
-        machinekit.standard.FastenerThreads.metric(
-          4,
-          0.7
-        ),
-        16
-      )
+      machinekit.standard.SocketSetScrew.forThread(machinekit.standard.FastenerThreads.metric(4, 0.7), 16)
     );
     assembly.addComponent("lock", machinekit.standard.SocketHeadCapScrew.metric("M6", 20, Steel88));
     var datum = new machinekit.structural.LinearMountDatum(
@@ -331,10 +312,7 @@ class LinearMountTests {
       ["push"],
       ["lock"],
       inputs,
-      [
-        "washer",
-        "receiver"
-      ]
+      ["washer", "receiver"]
     );
     check(
       Math.abs(ownedDatum.addedMassKg(assembly)

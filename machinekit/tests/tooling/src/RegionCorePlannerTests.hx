@@ -39,10 +39,7 @@ class RegionCorePlannerTests {
     var service = materia.casting.CastingPatterns.box(
       "side-service",
       materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
-      [
-        materia.casting.CastingPatterns.face("body.x-min"),
-        materia.casting.CastingPatterns.feature("pocket")
-      ],
+      [materia.casting.CastingPatterns.face("body.x-min"), materia.casting.CastingPatterns.feature("pocket")],
       100,
       20,
       30,
@@ -278,17 +275,11 @@ class RegionCorePlannerTests {
     );
     var ring = materia.casting.CastingRegion.Difference(
       materia.casting.CastingRegion.Placed({
-        solid: Cut(materia.casting.CastingSolid.Cylinder(
-          40,
-          40
-        )),
+        solid: Cut(materia.casting.CastingSolid.Cylinder(40, 40)),
         pose: F.identity()
       }),
       [materia.casting.CastingRegion.Placed({
-        solid: Cut(materia.casting.CastingSolid.Cylinder(
-          20,
-          40
-        )),
+        solid: Cut(materia.casting.CastingSolid.Cylinder(20, 40)),
         pose: F.identity()
       })]
     );

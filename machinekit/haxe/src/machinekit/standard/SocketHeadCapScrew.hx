@@ -41,166 +41,16 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
   public var threadLength(get, never):Float;
 
   static function rows():Array<MetricScrewSpec> return [
-    row(
-      "M3",
-      3,
-      0.5,
-      5.5,
-      3,
-      2.5,
-      1.3,
-      18,
-      2.5,
-      3.2,
-      3.4,
-      3.6,
-      6.5,
-      3.4
-    ),
-    row(
-      "M4",
-      4,
-      0.7,
-      7,
-      4,
-      3,
-      2,
-      20,
-      3.3,
-      4.3,
-      4.5,
-      4.8,
-      8,
-      4.4
-    ),
-    row(
-      "M5",
-      5,
-      0.8,
-      8.5,
-      5,
-      4,
-      2.5,
-      22,
-      4.2,
-      5.3,
-      5.5,
-      5.8,
-      10,
-      5.4
-    ),
-    row(
-      "M6",
-      6,
-      1.0,
-      10,
-      6,
-      5,
-      3,
-      24,
-      5.0,
-      6.4,
-      6.6,
-      7,
-      11,
-      6.4
-    ),
-    row(
-      "M8",
-      8,
-      1.25,
-      13,
-      8,
-      6,
-      4,
-      28,
-      6.8,
-      8.4,
-      9,
-      10,
-      15,
-      8.6
-    ),
-    row(
-      "M10",
-      10,
-      1.5,
-      16,
-      10,
-      8,
-      5,
-      32,
-      8.5,
-      10.5,
-      11,
-      12,
-      18,
-      10.6
-    ),
-    row(
-      "M12",
-      12,
-      1.75,
-      18,
-      12,
-      10,
-      6,
-      36,
-      10.2,
-      13,
-      13.5,
-      14.5,
-      20,
-      12.6
-    ),
-    row(
-      "M14",
-      14,
-      2.0,
-      21,
-      14,
-      12,
-      7,
-      40,
-      12.0,
-      15,
-      15.5,
-      16.5,
-      24,
-      14.6
-    ),
-    row(
-      "M16",
-      16,
-      2.0,
-      24,
-      16,
-      14,
-      8,
-      44,
-      14.0,
-      17,
-      17.5,
-      18.5,
-      26,
-      16.6
-    ),
-    row(
-      "M20",
-      20,
-      2.5,
-      30,
-      20,
-      17,
-      10,
-      52,
-      17.5,
-      21,
-      22,
-      24,
-      33,
-      20.6
-    ),
+    row("M3", 3, 0.5, 5.5, 3, 2.5, 1.3, 18, 2.5, 3.2, 3.4, 3.6, 6.5, 3.4),
+    row("M4", 4, 0.7, 7, 4, 3, 2, 20, 3.3, 4.3, 4.5, 4.8, 8, 4.4),
+    row("M5", 5, 0.8, 8.5, 5, 4, 2.5, 22, 4.2, 5.3, 5.5, 5.8, 10, 5.4),
+    row("M6", 6, 1.0, 10, 6, 5, 3, 24, 5.0, 6.4, 6.6, 7, 11, 6.4),
+    row("M8", 8, 1.25, 13, 8, 6, 4, 28, 6.8, 8.4, 9, 10, 15, 8.6),
+    row("M10", 10, 1.5, 16, 10, 8, 5, 32, 8.5, 10.5, 11, 12, 18, 10.6),
+    row("M12", 12, 1.75, 18, 12, 10, 6, 36, 10.2, 13, 13.5, 14.5, 20, 12.6),
+    row("M14", 14, 2.0, 21, 14, 12, 7, 40, 12.0, 15, 15.5, 16.5, 24, 14.6),
+    row("M16", 16, 2.0, 24, 16, 14, 8, 44, 14.0, 17, 17.5, 18.5, 26, 16.6),
+    row("M20", 20, 2.5, 30, 20, 17, 10, 52, 17.5, 21, 22, 24, 33, 20.6),
   ];
 
   public static function catalog():Catalog<MetricScrewSpec> {
@@ -459,11 +309,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       > spec.counterboreDepth)) throw 'Counterbore for ${spec.size} needs depth over ${spec.counterboreDepth}';
     return Solids.union([
       Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0),
-      Part.cylinderSpan(
-        spec.counterboreDiameter / 2,
-        -spec.counterboreDepth,
-        0
-      ),
+      Part.cylinderSpan(spec.counterboreDiameter / 2, -spec.counterboreDepth, 0),
     ]);
   }
 
@@ -476,37 +322,15 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
       "clearanceHole",
       [
         ComponentRecipeSupport.toolDepth(length),
-        ComponentRecipeSupport.choice(
-          "fit",
-          [
-            "Fine",
-            "Medium",
-            "Coarse"
-          ],
-          "Medium"
-        )
+        ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
       ]
     ),
-    new ToolSpec(
-      "tapHole",
-      [ComponentRecipeSupport.toolDepth(length)]
-    ),
+    new ToolSpec("tapHole", [ComponentRecipeSupport.toolDepth(length)]),
     new ToolSpec(
       "counterboreHole",
       [
-        ComponentRecipeSupport.toolDepth(Math.max(
-          length,
-          spec.counterboreDepth + 1
-        )),
-        ComponentRecipeSupport.choice(
-          "fit",
-          [
-            "Fine",
-            "Medium",
-            "Coarse"
-          ],
-          "Medium"
-        )
+        ComponentRecipeSupport.toolDepth(Math.max(length, spec.counterboreDepth + 1)),
+        ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
       ]
     )
   ];
@@ -565,20 +389,9 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.socket-head-cap-screw",
       [
-        ComponentRecipeSupport.catalog(
-          "size",
-          SocketHeadCapScrew.catalog(),
-          "M5"
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          20
-        ),
-        ComponentRecipeSupport.choice(
-          "propertyClass",
-          PropertyClasses.tokens(),
-          "12.9"
-        )
+        ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"),
+        ComponentRecipeSupport.length("length", 20),
+        ComponentRecipeSupport.choice("propertyClass", PropertyClasses.tokens(), "12.9")
       ],
       v -> SocketHeadCapScrew.metric(
         v.token("size"),

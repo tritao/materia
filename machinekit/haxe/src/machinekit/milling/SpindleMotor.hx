@@ -26,10 +26,7 @@ class SpindleMotor extends ServoMotor {
         bodyLength : 160,
         shaftDiameter : 20,
         shaftLength : 30,
-        electrical : highVoltage ? ServoMotor.acWinding(
-          torque,
-          speed * 0.8
-        ) : {
+        electrical : highVoltage ? ServoMotor.acWinding(torque, speed * 0.8) : {
           torqueConstant : 0.1 * Math.sqrt(3.0),
           backEmfConstant : 0.1,
           phaseResistance : 0.4,
@@ -44,10 +41,7 @@ class SpindleMotor extends ServoMotor {
   public static function recipeType():ComponentType {
     if (spindleMotorRecipe == null) spindleMotorRecipe = new ComponentType(
       "machinekit.milling.spindle-motor",
-      [machinekit.component.ComponentRecipeSupport.flag(
-        "highVoltage",
-        false
-      )],
+      [machinekit.component.ComponentRecipeSupport.flag("highVoltage", false)],
       v -> new SpindleMotor(v.boolean("highVoltage"))
     );
     return spindleMotorRecipe;

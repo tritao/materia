@@ -7,51 +7,15 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Hob arbor, assumed taper-and-face interface. Reference row is Assumed; dimensions are simplified envelopes. */
 class HobArbor extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      16,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      0,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      80,
-      "mm"
-    ),
-    P.quantity(
-      "hobSeatLength",
-      40,
-      "mm"
-    ),
-    P.quantity(
-      "hobCentreOffset",
-      0,
-      "mm"
-    ),
-    P.quantity(
-      "supportDiameter",
-      16,
-      "mm"
-    ),
-    P.quantity(
-      "supportLength",
-      0,
-      "mm"
-    ),
-    P.quantity(
-      "radialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "axialRunout",
-      0.002,
-      "mm"
-    )
+    P.quantity("outside", 16, "mm"),
+    P.quantity("bore", 0, "mm"),
+    P.quantity("height", 80, "mm"),
+    P.quantity("hobSeatLength", 40, "mm"),
+    P.quantity("hobCentreOffset", 0, "mm"),
+    P.quantity("supportDiameter", 16, "mm"),
+    P.quantity("supportLength", 0, "mm"),
+    P.quantity("radialRunout", 0.002, "mm"),
+    P.quantity("axialRunout", 0.002, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -102,24 +66,11 @@ class HobArbor extends MachineComponent {
         {r: 0.0, z: -20.0},
         {r: 8.0, z: -20.0},
         {r: 10.0, z: 0.0},
-        {
-          r: 20.0,
-          z: 0.0
-        },
-        {
-          r: 20.0,
-          z: 4.0
-        },
-        {
-          r: 0.0,
-          z: 4.0
-        }
+        {r: 20.0, z: 0.0},
+        {r: 20.0, z: 4.0},
+        {r: 0.0, z: 4.0}
       ]),
-      cadkit.modeling.Part.cylinderSpan(
-        parameterNumber("outside") / 2,
-        0,
-        height - length
-      )
+      cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, 0, height - length)
     ];
     if (length > 0) sections.push(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("supportDiameter") / 2,
@@ -130,13 +81,7 @@ class HobArbor extends MachineComponent {
     var tools = [
       cadkit.modeling.Part.cylinderSpan(3, -20.1, -8),
       cadkit.modeling.Part.cylinderSpan(2, 0, 4.1, 14, 0),
-      cadkit.modeling.Part.cylinderSpan(
-        2,
-        0,
-        4.1,
-        -14,
-        0
-      )
+      cadkit.modeling.Part.cylinderSpan(2, 0, 4.1, -14, 0)
     ];
     if (parameterNumber("bore") > 0) tools.push(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("bore") / 2,

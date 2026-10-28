@@ -46,11 +46,7 @@ class DhDualToolPreview {
     return new Location(new Plane(
       new Vector(frame.x, frame.y, frame.z),
       new Vector(m[0], m[3], m[6]),
-      new Vector(
-        m[2],
-        m[5],
-        m[8]
-      )
+      new Vector(m[2], m[5], m[8])
     ));
   }
   static function seat(side:Int):AssemblyFrame {
@@ -60,17 +56,7 @@ class DhDualToolPreview {
         75,
         0,
         60,
-        [
-          0,
-          1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          -1
-        ]
+        [0, 1, 0, 1, 0, 0, 0, 0, -1]
       );
   }
   static function adapter():Part {
@@ -122,49 +108,14 @@ class DhDualToolPreview {
     // Final cable centres: A (-143,0,37), tangent -X; B (96,143,60), tangent +Y.
     if (side == 0) result = cap ? box(-148, -138, -8, 8, 33.2, 41) : fuse([
       box(-52, -40, -44, -24, 12, 27),
-      box(
-        -148,
-        -40,
-        -44,
-        -26,
-        20,
-        25
-      ),
-      box(
-        -148,
-        -138,
-        -44,
-        8,
-        20,
-        25
-      ),
-      box(
-        -148,
-        -138,
-        -8,
-        8,
-        25,
-        33
-      )
+      box(-148, -40, -44, -26, 20, 25),
+      box(-148, -138, -44, 8, 20, 25),
+      box(-148, -138, -8, 8, 25, 33)
     ]);
     else result = cap ? box(88, 104, 138, 148, 60.2, 68) : fuse([
       box(75, 104, 40, 50, 30, 50),
-      box(
-        88,
-        104,
-        40,
-        148,
-        43,
-        50
-      ),
-      box(
-        88,
-        104,
-        138,
-        148,
-        50,
-        60
-      )
+      box(88, 104, 40, 148, 43, 50),
+      box(88, 104, 138, 148, 50, 60)
     ]);
     if (!cap) {
       var rear = returnSupport(side, false);
@@ -220,22 +171,8 @@ class DhDualToolPreview {
     // before those tips, leaving clearance for the supplier connector backshell.
     var result = side == 0 ? (cap ? box(-128, -118, -8, 8, -72.8, -65) : fuse([
       box(-128, -118, -44, -26, -81, 25),
-      box(
-        -128,
-        -118,
-        -44,
-        8,
-        -81,
-        -76
-      ),
-      box(
-        -128,
-        -118,
-        -8,
-        8,
-        -81,
-        -73
-      )
+      box(-128, -118, -44, 8, -81, -76),
+      box(-128, -118, -8, 8, -81, -73)
     ])) : (cap ? box(
       -22,
       -6,
@@ -244,22 +181,8 @@ class DhDualToolPreview {
       60.2,
       68
     ) : fuse([
-      box(
-        -22,
-        96,
-        118,
-        128,
-        43,
-        50
-      ),
-      box(
-        -22,
-        -6,
-        118,
-        128,
-        50,
-        60
-      )
+      box(-22, 96, 118, 128, 43, 50),
+      box(-22, -6, 118, 128, 50, 60)
     ]));
     var tools:Array<Part> = [side == 0 ? Part.cylinderAlong(3.3,
       new Vector(-129, 0, -73), Vector.X(), 12) : Part.cylinderAlongY(
@@ -324,11 +247,7 @@ class DhDualToolPreview {
     function addMass(id:String, mass:Float, centre:Vector, basis:String):Void masses.push({
       id: id,
       massKg: mass,
-      centreMm: [
-        centre.x,
-        centre.y,
-        centre.z
-      ],
+      centreMm: [centre.x, centre.y, centre.z],
       basis: basis
     });
     function addMetal(id:String, name:String, part:Part, colour:Array<Float>):Void {
@@ -353,25 +272,14 @@ class DhDualToolPreview {
       for (side in 0...2) for (cap in [false, true]) addMetal(
         'support-$side-' + (cap ? "cap" : "base"),
         'Cable ${side==0 ? "A" : "B"} ' + (cap ? "split-clamp cap" : "support and lower clamp"),
-        support(
-          side,
-          cap
-        ),
-        [
-          0.58,
-          0.6,
-          0.63
-        ]
+        support(side, cap),
+        [0.58, 0.6, 0.63]
       );
       for (side in 0...2) addMetal(
         'return-$side-cap',
         'Cable return saddle cap ' + side,
         returnSupport(side, true),
-        [
-          0.58,
-          0.6,
-          0.63
-        ]
+        [0.58, 0.6, 0.63]
       );
       var metalCount = owned.length;
       var definition = source.assemblyDefinition;
@@ -431,11 +339,7 @@ class DhDualToolPreview {
         model.connector(
           prefix + "pgc-140-50",
           "grasp",
-          AssemblyFrames.translation(
-            frame.grasp[0],
-            frame.grasp[1],
-            frame.grasp[2]
-          )
+          AssemblyFrames.translation(frame.grasp[0], frame.grasp[1], frame.grasp[2])
         );
         // Supplier CoG is unavailable: centre of housing envelope is an explicit planning estimate.
         var centre = AssemblyFrames.transformPoint(placement, frame.flange[0], frame.flange[1] + 70, frame.flange[2]);
@@ -471,16 +375,8 @@ class DhDualToolPreview {
       var dual = model.definition("dh-dual-electric-reference");
       dual.exposedConnectors = [
         {name: "mount", occurrence: "adapter", connector: "wrist-mount"},
-        {
-          name: "grasp-a",
-          occurrence: "a-pgc-140-50",
-          connector: "grasp"
-        },
-        {
-          name: "grasp-b",
-          occurrence: "b-pgc-140-50",
-          connector: "grasp"
-        }
+        {name: "grasp-a", occurrence: "a-pgc-140-50", connector: "grasp"},
+        {name: "grasp-b", occurrence: "b-pgc-140-50", connector: "grasp"}
       ];
       for (d in dual.definitions) d.collisionHulls = [];
       var state = new AssemblyState(dual);
@@ -614,11 +510,7 @@ class DhDualToolPreview {
       machinekit.robotics.DhDualGripperServices.addPurchases(servicePurchases);
       sys.io.File.saveContent(
         directory + "/service-bom.json",
-        haxe.Json.stringify(
-          servicePurchases.billOfMaterials().lines(),
-          null,
-          "  "
-        )
+        haxe.Json.stringify(servicePurchases.billOfMaterials().lines(), null, "  ")
       );
       var report = {
         selectedServiceAdapter: {
@@ -641,29 +533,13 @@ class DhDualToolPreview {
           connectorStatus: "Supplier connector supported by adjacent return saddle; Expert adapter selected; mating compatibility and installed flexible harness unverified"
         },
         sampledEnvelopeMm: {
-          min: [
-            low.x,
-            low.y,
-            low.z
-          ],
-          max: [
-            high.x,
-            high.y,
-            high.z
-          ],
-          size: [
-            high.x - low.x,
-            high.y - low.y,
-            high.z - low.z
-          ]
+          min: [low.x, low.y, low.z],
+          max: [high.x, high.y, high.z],
+          size: [high.x - low.x, high.y - low.y, high.z - low.z]
         },
         minimumSampledCrossToolClearanceMm: minimum,
         loadedMassKg: mass,
-        centreOfGravityMm: [
-          cog.x,
-          cog.y,
-          cog.z
-        ],
+        centreOfGravityMm: [cog.x, cog.y, cog.z],
         gravityMomentUpperBoundNm: moment,
         reach1300NominalPayloadKg: 12.5,
         withinNominalMassLimit: mass < 12.5,

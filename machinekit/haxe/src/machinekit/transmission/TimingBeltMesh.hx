@@ -34,16 +34,8 @@ class TimingBeltMesh {
       return [
         [p.x + nx * back, p.y + ny * back, 0.0],
         [p.x + nx * front, p.y + ny * front, 0.0],
-        [
-          p.x + nx * front,
-          p.y + ny * front,
-          belt.width
-        ],
-        [
-          p.x + nx * back,
-          p.y + ny * back,
-          belt.width
-        ]
+        [p.x + nx * front, p.y + ny * front, belt.width],
+        [p.x + nx * back, p.y + ny * back, belt.width]
       ];
     }
     // Material teeth travel with phase. Sample each tooth's flanks and land, plus the closing seam.

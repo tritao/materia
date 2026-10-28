@@ -97,14 +97,8 @@ class FixtureExport {
       stock: state.worldPose("mill/stock"),
       toolMount: mount,
       toolMountZ: mountZ,
-      toolA: toolState.worldConnector(
-        "tool/gripperA/body",
-        "tcp"
-      ),
-      toolB: toolState.worldConnector(
-        "tool/gripperB/body",
-        "tcp"
-      )
+      toolA: toolState.worldConnector("tool/gripperA/body", "tcp"),
+      toolB: toolState.worldConnector("tool/gripperB/body", "tcp")
     };
     var stock = new RouterPlate(
       BenchMill.STOCK_WIDTH,
@@ -152,11 +146,7 @@ class FixtureExport {
     trays.include(
       "table",
       new TendingCellTable(bank.width, bank.depth, top, offset),
-      AssemblyFrames.translation(
-        centre[0],
-        centre[1],
-        centre[2]
-      )
+      AssemblyFrames.translation(centre[0], centre[1], centre[2])
     );
     for (index in 0...2) {
       var name = index == 0 ? "infeed" : "outfeed";
@@ -168,13 +158,7 @@ class FixtureExport {
       );
       for (row in 0...rows) for (column in 0...columns) seats.push({
         name: '$name-$row-$column',
-        frame: AssemblyFrames.compose(
-          placement,
-          bank.seat(
-            row,
-            column
-          )
-        )
+        frame: AssemblyFrames.compose(placement, bank.seat(row, column))
       });
     }
     var trayBytes = SceneArtifact.encode(AssemblyPreview.scene(trays, "candidate-tending-trays"));
@@ -204,11 +188,7 @@ class FixtureExport {
           loadPosition: mill.loadPosition,
           doorStroke: mill.doorStroke,
           toolMountBasis: "Existing tending dual gripper with generic 50-4-M6 plate; ZeroErr adapter fit is unverified",
-          stockDimensionsMm: [
-            BenchMill.STOCK_WIDTH,
-            BenchMill.STOCK_DEPTH,
-            BenchMill.STOCK_HEIGHT
-          ],
+          stockDimensionsMm: [BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH, BenchMill.STOCK_HEIGHT],
           exportBytecodeSha256: digest(sys.io.File.getBytes(Sys.programPath())),
           configSha256: haxe.crypto.Sha256.encode(sys.io.File.getContent(configPath)),
           toolStates: toolStates,
@@ -217,21 +197,14 @@ class FixtureExport {
           graspLocal: graspLocal,
           transfers: transfers,
           toolMassEstimate: {
-            massKg: mass
-      .mass,
-      centerOfMassAtMountZMm: [
-        centreZ.x,
-        centreZ.y,
-        centreZ.z
-      ],
+            massKg: mass.mass,
+            centerOfMassAtMountZMm: [centreZ.x,
+      centreZ.y, centreZ.z],
       unaccounted: mass.unaccounted,
       unaccountedInertia: mass.unaccountedInertia,
       scope: "Existing tool component declared/CAD mass estimates; external air supply excluded; not measured delivered hardware"
     },
-      checks: [
-        "Saved fixture/tool frame positions",
-        "MachineKit +Y to URDF +Z tool mount normal"
-      ],
+      checks: ["Saved fixture/tool frame positions", "MachineKit +Y to URDF +Z tool mount normal"],
       scope: "Current CAD mill loading state and tool; proposed native tray layout; open and held jaw states; source production transfers. No arm mission or reach certificate reused."
     },
       null,

@@ -24,10 +24,7 @@ class MillZAxis extends AxisBuilder {
     var upper = new MillZDriveAdapter(new ComponentValues().setNumber("motorOffset",
       l.motorFace - l.upperBottom).setNumber(
         "stemHeight",
-        Math.max(
-          60,
-          114 - (l.motorFace - l.upperBottom)
-        )
+        Math.max(60, 114 - (l.motorFace - l.upperBottom))
       ).setNumber(
         "width",
         width
@@ -104,17 +101,7 @@ class MillZAxis extends AxisBuilder {
           side * l.drive.floatingBoltX,
           f.columnFront + l.drive.floatingBoltSeat,
           l.floatingZ,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1, 0, 0, 0, 0, 1, 0, -1, 0]
         ),
         "floatingMount"
       );
@@ -125,11 +112,7 @@ class MillZAxis extends AxisBuilder {
     for (p in mounting.holes) attach(
       'motorBolt${p.x}-${p.y}',
       SocketHeadCapScrew.metric("M6", 16),
-      F.translation(
-        -p.x,
-        l.screwY + p.y,
-        l.motorFace + mounting.flangeThickness
-      ),
+      F.translation(-p.x, l.screwY + p.y, l.motorFace + mounting.flangeThickness),
       "motorMount"
     );
     for (i in 0...l.fixed.spec.baseHoles.length) {
@@ -141,17 +124,7 @@ class MillZAxis extends AxisBuilder {
           -h.x,
           f.columnFront + l.drive.fixedBoltSeat,
           l.motorFace - h.z,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1, 0, 0, 0, 0, 1, 0, -1, 0]
         ),
         "motorMount"
       );
@@ -200,11 +173,7 @@ class MillZAxis extends AxisBuilder {
     ));
     var blockPoses:Array<AssemblyFrame> = [];
     for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) blockPoses.push(F.compose(
-      F.translation(
-        side * f.zRailSpacing / 2,
-        f.columnFront - l.block.spec.railHeight,
-        l.headCentre + span
-      ),
+      F.translation(side * f.zRailSpacing / 2, f.columnFront - l.block.spec.railHeight, l.headCentre + span),
       railPose
     ));
     slide(
@@ -213,11 +182,7 @@ class MillZAxis extends AxisBuilder {
       "blockLeftLower",
       l.block,
       blockPoses[0],
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      },
+      {x: 0, y: 0, z: 1},
       blockPoses.slice(1),
       l.overtravel
     );
@@ -234,25 +199,12 @@ class MillZAxis extends AxisBuilder {
     attach("head", head, F.translation(0, l.headBack, l.headBottom), "carriage");
     for (side in [-1, 1]) for (row in [-1, 1]) attach(
       'headBolt$side$row',
-      SocketHeadCapScrew.metric(
-        "M6",
-        l.headBoltLength
-      ),
+      SocketHeadCapScrew.metric("M6", l.headBoltLength),
       F.fromRotationMatrix(
         side * head.parameterNumber("boltX"),
         l.headBack - head.parameterNumber("rearPlate") + MillZHead.COUNTERBORE_DEPTH,
         l.headCentre + row * head.parameterNumber("boltZ"),
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          1,
-          0
-        ]
+        [1, 0, 0, 0, 0, -1, 0, 1, 0]
       ),
       "head"
     );
@@ -276,16 +228,6 @@ class MillZAxis extends AxisBuilder {
     x,
     y,
     z,
-    [
-      -1,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      -1
-    ]
+    [-1, 0, 0, 0, 1, 0, 0, 0, -1]
   );
 }

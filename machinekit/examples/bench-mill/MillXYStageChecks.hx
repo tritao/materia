@@ -131,66 +131,21 @@ class MillXYStageChecks {
     var pairs = [
       ["fixedBearingY", "fixedPedestalY"],
       ["floatingBearingY", "floatingPedestalY"],
-      [
-        "motorMountY",
-        "fixedPedestalY"
-      ],
-      [
-        "motorY",
-        "motorMountY"
-      ],
-      [
-        "fixedBearingX",
-        "fixedPedestalX"
-      ],
-      [
-        "floatingBearingX",
-        "floatingPedestalX"
-      ],
-      [
-        "motorMountX",
-        "saddle"
-      ],
-      [
-        "motorX",
-        "motorMountX"
-      ],
-      [
-        "nutY",
-        "nutBracketY"
-      ],
-      [
-        "nutBracketY",
-        "saddle"
-      ],
-      [
-        "nutX",
-        "nutBracketX"
-      ],
-      [
-        "nutBracketX",
-        "table"
-      ],
-      [
-        "saddle",
-        "blockY0"
-      ],
-      [
-        "table",
-        "blockX0"
-      ],
-      [
-        "fixedPedestalX",
-        "saddle"
-      ],
-      [
-        "floatingPedestalX",
-        "saddle"
-      ],
-      [
-        "motorCoverX",
-        "motorMountX"
-      ]
+      ["motorMountY", "fixedPedestalY"],
+      ["motorY", "motorMountY"],
+      ["fixedBearingX", "fixedPedestalX"],
+      ["floatingBearingX", "floatingPedestalX"],
+      ["motorMountX", "saddle"],
+      ["motorX", "motorMountX"],
+      ["nutY", "nutBracketY"],
+      ["nutBracketY", "saddle"],
+      ["nutX", "nutBracketX"],
+      ["nutBracketX", "table"],
+      ["saddle", "blockY0"],
+      ["table", "blockX0"],
+      ["fixedPedestalX", "saddle"],
+      ["floatingPedestalX", "saddle"],
+      ["motorCoverX", "motorMountX"]
     ];
     for (i in 1...4) {
       pairs.push(["saddle", "blockY" + i]);
@@ -252,16 +207,8 @@ class MillXYStageChecks {
       );
       var handle = cadkit.modeling.Part.cylinderAlong(
         2.5,
-        new cadkit.modeling.Vector(
-          point.x,
-          point.y,
-          l.saddleBottom + MillCrossSaddle.WRENCH_HEIGHT
-        ),
-        new cadkit.modeling.Vector(
-          0,
-          sy,
-          0
-        ),
+        new cadkit.modeling.Vector(point.x, point.y, l.saddleBottom + MillCrossSaddle.WRENCH_HEIGHT),
+        new cadkit.modeling.Vector(0, sy, 0),
         l.saddleDepth / 2 - Math.abs(point.y - l.centreY) + 40
       );
       for (tool in [stem, handle]) {
@@ -297,10 +244,7 @@ class MillXYStageChecks {
     var nutBody = cache.posed(axis.component("nutY"), poses.get("nutY"));
     var nutSaddle = cache.posed(axis.saddle, poses.get("saddle"));
     var legacyAdapter = cache.posed(
-      new MillYNutMount(new machinekit.component.ComponentValues().setBoolean(
-        "reinforced",
-        true
-      )),
+      new MillYNutMount(new machinekit.component.ComponentValues().setBoolean("reinforced", true)),
       poses.get("nutBracketY")
     );
     // Isolate the old grease-bore defect from the current motor-pocket redesign.
@@ -308,13 +252,7 @@ class MillXYStageChecks {
     var oldHost = new MillCrossSaddle(legacySaddle).geometry();
     var ring = machinekit.component.Solids.cut(
       cadkit.modeling.Part.cylinderSpan(8, 36, 76, 0, -l.saddleDepth / 2 + 5),
-      [cadkit.modeling.Part.cylinderSpan(
-        5,
-        35,
-        77,
-        0,
-        -l.saddleDepth / 2 + 5
-      )]
+      [cadkit.modeling.Part.cylinderSpan(5, 35, 77, 0, -l.saddleDepth / 2 + 5)]
     );
     var rejected = new machinekit.assembly.Diagnostics();
     machinekit.design.DesignChecks.material(rejected, "old grease bore minimum 3 mm wall", ring, oldHost);
@@ -323,13 +261,7 @@ class MillXYStageChecks {
     oldHost.close();
     var badNotch = machinekit.component.Solids.cut(
       axis.saddle.geometry(),
-      [cadkit.modeling.Part.cylinderSpan(
-        10,
-        24,
-        81,
-        0,
-        -l.saddleDepth / 2 + 6
-      )]
+      [cadkit.modeling.Part.cylinderSpan(10, 24, 81, 0, -l.saddleDepth / 2 + 6)]
     );
     var railLand = cadkit.modeling.Part.box(l.xRailLength,
       l.block.spec.railWidth, 3).translated(new cadkit.modeling.Vector(
@@ -353,10 +285,7 @@ class MillXYStageChecks {
       blockedAccess,
       "front grease approach",
       blockedGrease,
-      [{
-        id: "old adapter",
-        part: legacyAdapter
-      }]
+      [{id: "old adapter", part: legacyAdapter}]
     );
     check(blockedAccess.hasErrors(), "old closed adapter rejects front grease tool approach");
     blockedGrease.close();
@@ -447,11 +376,7 @@ class MillXYStageChecks {
     blockedService.addComponent(
       "greaseHandlingObstruction",
       new MillPanel(10, 10, 10),
-      F.translation(
-        0,
-        l.centreY - l.saddleDepth / 2 - 50,
-        l.saddleBottom + 90
-      )
+      F.translation(0, l.centreY - l.saddleDepth / 2 - 50, l.saddleBottom + 90)
     );
     var serviceAudit = MillYNutDesignChecks.check(blockedService, frame);
     check(
@@ -486,11 +411,7 @@ class MillXYStageChecks {
     extractionBlocked.addComponent(
       "extractionObstruction",
       new MillPanel(20, 20, 20),
-      F.translation(
-        0,
-        l.yServiceRear + 20,
-        l.yScrewZ - 10
-      )
+      F.translation(0, l.yServiceRear + 20, l.yScrewZ - 10)
     );
     var extractionAudit = MillXYStageIntegrity.check(axis, extractionBlocked);
     check(

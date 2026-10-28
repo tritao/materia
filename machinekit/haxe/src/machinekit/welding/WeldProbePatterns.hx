@@ -129,13 +129,7 @@ class WeldProbePatterns {
         score = area;
         travel = Math.max(
           uncertainty.region(face, first).normalTravel,
-          Math.max(
-            uncertainty.region(face, second).normalTravel,
-            uncertainty.region(
-              face,
-              third
-            ).normalTravel
-          )
+          Math.max(uncertainty.region(face, second).normalTravel, uncertainty.region(face, third).normalTravel)
         ) + clearance;
       } else if (count == 2) {
         // Separation along the planes' intersection observes rotation about the first plane's normal.
@@ -191,10 +185,7 @@ class WeldProbePatterns {
           if (pairCount >= ALTERNATE_PAIR_COUNT) break;
           var approach = Math.max(
             uncertainty.region(face, pair.first).normalTravel,
-            uncertainty.region(
-              face,
-              pair.second
-            ).normalTravel
+            uncertainty.region(face, pair.second).normalTravel
           ) + clearance;
           stages.push(new WeldProbeStage(face, [pair.first, pair.second], approach, pair.span * pair.span));
           pairCount++;

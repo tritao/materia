@@ -87,26 +87,11 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
       {r : 0.0, z : 0.0},
       {r : r, z : 0.0},
       {r : r, z : capLength},
-      {
-        r : r - wall / 2,
-        z : capLength
-      },
-      {
-        r : r - wall / 2,
-        z : bodyLength - capLength
-      },
-      {
-        r : r,
-        z : bodyLength - capLength
-      },
-      {
-        r : r,
-        z : bodyLength
-      },
-      {
-        r : 0.0,
-        z : bodyLength
-      }
+      {r : r - wall / 2, z : capLength},
+      {r : r - wall / 2, z : bodyLength - capLength},
+      {r : r, z : bodyLength - capLength},
+      {r : r, z : bodyLength},
+      {r : 0.0, z : bodyLength}
     ]) : Part.cylinderSpan(
       r,
       0,
@@ -122,30 +107,12 @@ class HydraulicCylinder extends MachineComponent implements CylinderSpec {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.pressbrake.hydraulic-cylinder",
       [
-        ComponentRecipeSupport.length(
-          "bore",
-          160
-        ),
-        ComponentRecipeSupport.length(
-          "rod",
-          100
-        ),
-        ComponentRecipeSupport.length(
-          "stroke",
-          100
-        ),
-        ComponentRecipeSupport.length(
-          "wall",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "capLength",
-          40
-        ),
-        ComponentRecipeSupport.length(
-          "stemLength",
-          50
-        )
+        ComponentRecipeSupport.length("bore", 160),
+        ComponentRecipeSupport.length("rod", 100),
+        ComponentRecipeSupport.length("stroke", 100),
+        ComponentRecipeSupport.length("wall", 20),
+        ComponentRecipeSupport.length("capLength", 40),
+        ComponentRecipeSupport.length("stemLength", 50)
       ],
       v -> new HydraulicCylinder(
         v.number("bore"),

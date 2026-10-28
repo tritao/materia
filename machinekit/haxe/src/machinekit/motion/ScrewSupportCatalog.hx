@@ -145,10 +145,7 @@ class ScrewSupportCatalog {
       pitch: v.pitch,
       longitudinalPitch: v.longitudinalPitch,
       counterbore: v.counterbore,
-      bearing: hzmotion != null ? HzMotionCatalog.get(model).bearing : bearing(
-        fixed,
-        v.bore
-      ),
+      bearing: hzmotion != null ? HzMotionCatalog.get(model).bearing : bearing(fixed, v.bore),
       sources : sources
     };
   }
@@ -172,12 +169,7 @@ class ScrewSupportCatalog {
       source.cadLibrary = "hzmotion";
       source.cadPose = AssemblyFrames.compose(
         toSupport,
-        AssemblyFrames.fromRotationMatrix(
-          t[0],
-          t[1],
-          t[2],
-          asset.rotation
-        )
+        AssemblyFrames.fromRotationMatrix(t[0], t[1], t[2], asset.rotation)
       );
       if (asset.interfaces != null && asset.interfaces.boltSeatY != null) source.boltSeat = asset.interfaces.boltSeatY;
       // The DIN 471 ring's groove, measured on the pinned BF STEP files (foot frame z 14 and 14.5). The STEP also

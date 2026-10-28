@@ -44,10 +44,7 @@ class HobberPartTests {
     new SpindleHousing(),
     new SwivelHousing(),
     new MineralCasting(),
-    new CastInsert(new ComponentValues().setToken(
-      "role",
-      "generic-mount"
-    ))
+    new CastInsert(new ComponentValues().setToken("role", "generic-mount"))
   ];
   public static function run():Void {
     var registry = MachineKitComponents.standard(), parts = members();
@@ -301,14 +298,7 @@ class HobberPartTests {
       if (pose == null) throw "missing rail insert";
       poses.set(
         "railLeft",
-        materia.assembly.AssemblyFrames.compose(
-          materia.assembly.AssemblyFrames.translation(
-            0,
-            0,
-            0.03
-          ),
-          pose
-        )
+        materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.translation(0, 0, 0.03), pose)
       );
       check(FoundationIntegrity.check(foundation, poses).hasErrors(), "insert out of position tolerance rejected");
       var rebuilt = MachineAssembly.decode(foundation.encode(), registry);
@@ -352,23 +342,13 @@ class HobberPartTests {
       var housing = members.filter(m -> m.id == "housing")[0];
       try {
         for (m in members) if (m.id != "housing") near(
-          cache.overlap(
-            housing.component,
-            poses.get("housing"),
-            m.component,
-            poses.get(m.id)
-          ),
+          cache.overlap(housing.component, poses.get("housing"), m.component, poses.get(m.id)),
           0,
           1e-6,
           'housing seat clears ${m.id}'
         );
         if (Std.isOfType(assembly, HobSpindle)) for (i in 0...members.length) for (j in i + 1...members.length) near(
-          cache.overlap(
-            members[i].component,
-            poses.get(members[i].id),
-            members[j].component,
-            poses.get(members[j].id)
-          ),
+          cache.overlap(members[i].component, poses.get(members[i].id), members[j].component, poses.get(members[j].id)),
           0,
           1e-6,
           "cartridge parts do not penetrate: " + members[i].id + " / " + members[j].id

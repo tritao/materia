@@ -96,15 +96,13 @@ class MachineAssemblyCodec {
   static function describeLevel(
     assembly:MachineAssembly,
     path:String,
-    extraConnectors:Map<
-      String,
-      Array<MemberConnectorRecord>>,
-      table:Array<AssemblySubdefinition>,
-      records:Array<SubassemblyRecord>
-    ): {
-      mechanical: LevelMechanical,
-      machine: MachineLevelRecord
-    } {
+    extraConnectors:Map<String, Array<MemberConnectorRecord>>,
+    table:Array<AssemblySubdefinition>,
+    records:Array<SubassemblyRecord>
+  ): {
+    mechanical: LevelMechanical,
+    machine: MachineLevelRecord
+  } {
     var mechanical = assembly.mechanical;
     var flat = assembly.derived();
     var level:LevelMechanical = {definitions: [], occurrences: [], joints: [], couplings: [], exposedConnectors: []};
@@ -229,10 +227,7 @@ class MachineAssemblyCodec {
     }
     MechanicalAssembly.groundPlaced(level.occurrences, level.joints);
     for (coupling in mechanical.couplings) level.couplings.push(MechanicalAssembly.copyCoupling(
-      derivedCoupling(
-        flat,
-        coupling
-      ),
+      derivedCoupling(flat, coupling),
       id -> id
     ));
     for (exposure in mechanical.connectorExposures) {
@@ -431,14 +426,8 @@ class MachineAssemblyCodec {
     path:String,
     level:LevelMechanical,
     machine:MachineLevelRecord,
-    table:Map<
-      String,
-      AssemblySubdefinition
-  >,
-    records:Map<
-      String,
-      SubassemblyRecord
-  >,
+    table:Map<String, AssemblySubdefinition>,
+    records:Map<String, SubassemblyRecord>,
     registry:ComponentRegistry
   ):Void {
     if (machine == null || machine.designRequirements == null) throw "Missing machine design requirements: " + path;
@@ -595,10 +584,7 @@ class MachineAssemblyCodec {
       contact.id,
       contact.joint,
       contact.part,
-      {
-        instanceId: contact.trigger,
-        connectorName: contact.triggerConnector
-      },
+      {instanceId: contact.trigger, connectorName: contact.triggerConnector},
       contact.side,
       contact.role,
       contact.seed,

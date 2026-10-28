@@ -43,13 +43,7 @@ class ScrewStretch {
       == null) throw new TransmissionDesignError("Ball screw stiffness needs bounded nut travel");
     var edge = joint[0];
     var axis = AssemblyFrames.transformVector(
-      AssemblyFrames.compose(
-        inverse,
-        state.worldConnector(
-          edge.parent,
-          edge.parentConnector
-        )
-      ),
+      AssemblyFrames.compose(inverse, state.worldConnector(edge.parent, edge.parentConnector)),
       edge.axis.x,
       edge.axis.y,
       edge.axis.z
@@ -72,10 +66,7 @@ class ScrewStretch {
     if (nutStiffness == null) throw new TransmissionDesignError("Ball screw nut needs its axial rigidity");
     return [{
       compliance: shaft + 1.0 / bearingStiffness + 1.0 / nutStiffness - gradient * edge.defaultValue,
-      coordinates: [{
-        joint: leader,
-        coefficient: gradient
-      }]
+      coordinates: [{joint: leader, coefficient: gradient}]
     }];
   }
 }

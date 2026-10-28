@@ -11,58 +11,19 @@ class MillZBearingPlate extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
     P.length("bearingTapDepth", 0),
-    P.length(
-      "bearingPitch",
-      46
-    ),
-    P.length(
-      "bearingHole",
-      5.5
-    ),
-    P.flag(
-      "guideRelief",
-      false
-    ),
-    P.length(
-      "guideSpacing",
-      220
-    ),
-    P.length(
-      "guideWidth",
-      15
-    ),
-    P.flag(
-      "topAnchors",
-      false
-    ),
-    P.length(
-      "width",
-      220
-    ),
-    P.length(
-      "height",
-      80
-    ),
-    P.length(
-      "thickness",
-      20
-    ),
-    P.length(
-      "crossShaftZ",
-      0
-    ),
-    P.length(
-      "bearingZ",
-      40
-    ),
-    P.length(
-      "anchorZ",
-      10
-    ),
-    P.length(
-      "anchorSpacing",
-      180
-    )
+    P.length("bearingPitch", 46),
+    P.length("bearingHole", 5.5),
+    P.flag("guideRelief", false),
+    P.length("guideSpacing", 220),
+    P.length("guideWidth", 15),
+    P.flag("topAnchors", false),
+    P.length("width", 220),
+    P.length("height", 80),
+    P.length("thickness", 20),
+    P.length("crossShaftZ", 0),
+    P.length("bearingZ", 40),
+    P.length("anchorZ", 10),
+    P.length("anchorSpacing", 180)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

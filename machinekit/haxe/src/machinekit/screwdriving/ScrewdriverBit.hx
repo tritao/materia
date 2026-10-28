@@ -55,11 +55,7 @@ class ScrewdriverBit extends MachineComponent {
     addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: ScrewdrivingInterfaces.vacuum(), required: true});
     var pieces = [
       machinekit.component.CollisionHullFacet.cylinder(STEM_RADIUS, 0, length - TIP_LENGTH),
-      machinekit.component.CollisionHullFacet.cylinder(
-        sleeveRadius,
-        0,
-        SLEEVE_FLOOR
-      )
+      machinekit.component.CollisionHullFacet.cylinder(sleeveRadius, 0, SLEEVE_FLOOR)
     ];
     var sleeve = sleeveGeometry(), tip = tipGeometry();
     try {
@@ -135,14 +131,8 @@ class ScrewdriverBit extends MachineComponent {
     // an envelope until their manufacturing profiles are specified.
     return Solids.union([
       Solids.named(Part.cylinderSpan(STEM_RADIUS, 0, length - TIP_LENGTH), "shank"),
-      Solids.named(
-        tipGeometry(),
-        "bit"
-      ),
-      Solids.named(
-        sleeveGeometry(),
-        "vacuum-sleeve"
-      )
+      Solids.named(tipGeometry(), "bit"),
+      Solids.named(sleeveGeometry(), "vacuum-sleeve")
     ]);
   }
   function tipGeometry():Part return switch drive {
@@ -154,10 +144,6 @@ class ScrewdriverBit extends MachineComponent {
   };
   function sleeveGeometry():Part return Solids.cut(
     Part.cylinderSpan(sleeveRadius, 0, length - TIP_LENGTH),
-    [Part.cylinderSpan(
-      SLEEVE_BORE,
-      SLEEVE_FLOOR,
-      length - TIP_LENGTH + 0.1
-    )]
+    [Part.cylinderSpan(SLEEVE_BORE, SLEEVE_FLOOR, length - TIP_LENGTH + 0.1)]
   );
 }

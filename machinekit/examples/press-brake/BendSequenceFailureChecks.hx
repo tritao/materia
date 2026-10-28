@@ -25,24 +25,12 @@ class BendSequenceFailureChecks {
       "straight-raised-V12",
       new ToolRow(
         [
-          new ToolSegment(
-            Punch(ToolingCatalogue.straight()),
-            100
-          ),
-          new ToolSegment(
-            Punch(ToolingCatalogue.straight()),
-            50
-          )
+          new ToolSegment(Punch(ToolingCatalogue.straight()), 100),
+          new ToolSegment(Punch(ToolingCatalogue.straight()), 50)
         ],
         [0]
       ),
-      new ToolRow(
-        [new ToolSegment(
-          SingleV(ToolingCatalogue.raisedV12()),
-          200
-        )],
-        []
-      ),
+      new ToolRow([new ToolSegment(SingleV(ToolingCatalogue.raisedV12()), 200)], []),
       700
     );
     var press = new PressBrake(true, new ToolLayout(1600, [station]), null, 30);
@@ -50,11 +38,7 @@ class BendSequenceFailureChecks {
       "sequence-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(station.processTooling())),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(15, 120));
     var radius = stock.defaultRadius(Math.PI / 2);

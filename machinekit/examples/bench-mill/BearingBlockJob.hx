@@ -61,16 +61,7 @@ class BearingBlockJob {
     var setup = new Setup(
       "1",
       new Point3(0, 0, 0),
-      new SetupStock(
-        0.0,
-        width / 1000,
-        0.0,
-        depth / 1000,
-        0.0,
-        -height / 1000,
-        0.02,
-        binding.fixtures
-      )
+      new SetupStock(0.0, width / 1000, 0.0, depth / 1000, 0.0, -height / 1000, 0.02, binding.fixtures)
     );
     // The machine starts at its initial pose, which in work coordinates is above the stock's middle.
     var offset = binding.workOffset;
@@ -78,11 +69,7 @@ class BearingBlockJob {
     var job = new CamJob(
       0.02,
       8000,
-      new Point3(
-        (start[0] - offset[0]) / 1000,
-        (start[1] - offset[1]) / 1000,
-        (start[2] - offset[2]) / 1000
-      ),
+      new Point3((start[0] - offset[0]) / 1000, (start[1] - offset[1]) / 1000, (start[2] - offset[2]) / 1000),
       BLEND,
       CHORD
     );
@@ -106,7 +93,10 @@ class BearingBlockJob {
         frame.advance(op);
         switch op {
           case Move(_, geometry, _, _, _):
-            var p = toolpathkit.geometry.GeometryTools.pointAt(geometry, toolpathkit.geometry.GeometryTools.length(geometry));
+            var p = toolpathkit.geometry.GeometryTools.pointAt(
+              geometry,
+              toolpathkit.geometry.GeometryTools.length(geometry)
+            );
             var shift = frame.toMachine();
             // Scene G54 is external to the CAM setup's work-coordinate origin.
             last = new Point3(

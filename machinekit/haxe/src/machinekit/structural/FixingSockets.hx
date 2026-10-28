@@ -68,16 +68,10 @@ class FixingSockets {
       threadDepth: THREAD_LENGTH,
       clearanceDiameter: choice.clearanceDiameter,
       counterbore: null,
-      relief: {
-        diameter: exterior.reliefDiameter,
-        start: THREAD_LENGTH
-      },
+      relief: {diameter: exterior.reliefDiameter, start: THREAD_LENGTH},
       limits: {
         policyId: POLICY,
-        threaded: {
-          minEngagement: THREAD_LENGTH,
-          minTipGap: thread.pitch * TIP_GAP_PITCHES
-        },
+        threaded: {minEngagement: THREAD_LENGTH, minTipGap: thread.pitch * TIP_GAP_PITCHES},
         minBack: MINIMUM_CLOSED_END,
         minWall: MINIMUM_SLEEVE_WALL,
         minClearance: thread.majorDiameter * FEATURE_SEPARATION_DIAMETERS,

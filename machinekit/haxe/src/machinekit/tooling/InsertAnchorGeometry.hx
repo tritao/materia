@@ -96,14 +96,7 @@ class InsertAnchorGeometry {
         kind: InsertRecess,
         geometry: ownGeometry,
         openings: candidate.openings,
-        draft: {
-          degrees: 0,
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
-        },
+        draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
         cornerRadius: 0,
         owner: candidate.id,
         adjustable: []
@@ -121,10 +114,7 @@ class InsertAnchorGeometry {
               var hole = spec.holes.filter(hole -> hole.id == anchor.holeId)[0];
               var frame = F.compose(
                 other.pose,
-                materia.casting.InsertAnchorage.InsertAnchorageCodec.bearingFrame(
-                  hole,
-                  anchor
-                )
+                materia.casting.InsertAnchorage.InsertAnchorageCodec.bearingFrame(hole, anchor)
               );
               var screw = anchor.screw, axis = F.transformVector(frame, 0, 0, 1);
               var origin = F.transformPoint(frame, 0, 0, 0), flange = F.transformPoint(
@@ -322,10 +312,7 @@ class InsertAnchorGeometry {
                 bolt = placed;
                 bearingPose = F.compose(
                   insert.pose,
-                  C.bearingFrame(
-                    spec.holes.filter(h -> h.id == anchor.holeId)[0],
-                    anchor
-                  )
+                  C.bearingFrame(spec.holes.filter(h -> h.id == anchor.holeId)[0], anchor)
                 );
               }
             }
@@ -547,20 +534,12 @@ class InsertAnchorGeometry {
           var failures = materia.casting.ThreadedFastenerFit.checkIntervals(
             service,
             service.frame,
-            {
-              shankLength: anchor.screw.lengthMm,
-              threadedLength: anchor.screw.threadedLengthMm,
-              bearingFrame: bearing
-            },
+            {shankLength: anchor.screw.lengthMm, threadedLength: anchor.screw.threadedLengthMm, bearingFrame: bearing},
             anchor.id
           ).concat(materia.casting.ThreadedFastenerFit.checkIntervals(
             hole,
             hole.frame,
-            {
-              shankLength: anchor.screw.lengthMm,
-              threadedLength: anchor.screw.threadedLengthMm,
-              bearingFrame: bearing
-            },
+            {shankLength: anchor.screw.lengthMm, threadedLength: anchor.screw.threadedLengthMm, bearingFrame: bearing},
             anchor.id
           )).filter(finding -> !finding.passed);
           if (failures.length > 0) throw "Anchor source thread fit fails: "
@@ -569,10 +548,7 @@ class InsertAnchorGeometry {
             anchorId: anchor.id,
             kind: InsertAnchorComponentKind.Bolt,
             part: screw,
-            pose: F.compose(
-              bearing,
-              F.inverse(screw.bearingFrame())
-            )
+            pose: F.compose(bearing, F.inverse(screw.bearingFrame()))
           });
         }
     }
@@ -601,11 +577,7 @@ class InsertAnchorGeometry {
         from: Float, to: Float): Void owned.push(machinekit.design.DesignGeometry.envelope({
           id: hole.id,
           frame: hole.frame,
-          volume: CylinderVolume(
-            radius,
-            from,
-            to
-          )
+          volume: CylinderVolume(radius, from, to)
         }));
       add((hole.thread == null ? hole.diameter : hole.thread.majorDiameter) / 2, 0, hole.depth);
       if (hole.counterbore != null) add(hole.counterbore.diameter / 2, 0, hole.counterbore.depth);
@@ -759,17 +731,11 @@ class InsertAnchorGeometry {
           var margin = anchor.screw.flangeDiameterMm / 2 + rules.minimumCoverMm;
           land.x = Math.max(
             land.x,
-            Math.max(
-              stock.x - hole.frame.x + margin,
-              hole.frame.x + margin - stock.x - stock.width
-            )
+            Math.max(stock.x - hole.frame.x + margin, hole.frame.x + margin - stock.x - stock.width)
           );
           land.y = Math.max(
             land.y,
-            Math.max(
-              stock.y - hole.frame.y + margin,
-              hole.frame.y + margin - stock.y - stock.depth
-            )
+            Math.max(stock.y - hole.frame.y + margin, hole.frame.y + margin - stock.y - stock.depth)
           );
         }
       default:
@@ -881,11 +847,7 @@ class InsertAnchorGeometry {
         var screwKey = item.size + ":" + item.lengthMm;
         if (!screws.exists(screwKey)) screws.set(
           screwKey,
-          screwRecord(HexFlangeBolt.metric(
-            item.size,
-            item.lengthMm,
-            Steel88
-          ))
+          screwRecord(HexFlangeBolt.metric(item.size, item.lengthMm, Steel88))
         );
         var accepted = switch context {
           case FootprintOnly:
@@ -949,14 +911,7 @@ class InsertAnchorGeometry {
       var local = scope.own(Part.box(stock.width + 2 * margin, stock.depth + 2 * margin, high - low));
       var window = scope.own(PosedParts.moved(
         local,
-        F.compose(
-          pose,
-          F.translation(
-            stock.x + stock.width / 2,
-            stock.y + stock.depth / 2,
-            low
-          )
-        )
+        F.compose(pose, F.translation(stock.x + stock.width / 2, stock.y + stock.depth / 2, low))
       ));
       var region = scope.own(body.intersect(window));
       var result = planarBoundary(region);
@@ -1034,10 +989,7 @@ class InsertAnchorGeometry {
           for (component in InsertAnchorGeometry.components(spec)) {
             var shape = keep(machinekit.assembly.PosedParts.moved(
               keep(component.part.geometry()),
-              F.compose(
-                pose,
-                component.pose
-              )
+              F.compose(pose, component.pose)
             ));
             shape.shape.setThreadedFaces([]);
             hardware.push(shape);

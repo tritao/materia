@@ -26,11 +26,7 @@ class ToothOutline {
   public function arc(start:Vector, middle:Vector, end:Vector):ToothOutline return add(
     start,
     end,
-    Curve.arc(
-      start,
-      middle,
-      end
-    )
+    Curve.arc(start, middle, end)
   );
 
   /** An interpolating spline through `points`, in order. */
@@ -78,16 +74,8 @@ class ToothOutline {
   /** The placement of a section at height `z`, turned by `angle` radians about +Z. */
   public static function at(z:Float, angle:Float):Location return new Location(new Plane(
     new Vector(0, 0, z),
-    new Vector(
-      Math.cos(angle),
-      Math.sin(angle),
-      0
-    ),
-    new Vector(
-      0,
-      0,
-      1
-    )
+    new Vector(Math.cos(angle), Math.sin(angle), 0),
+    new Vector(0, 0, 1)
   ));
 
   function add(start:Vector, end:Vector, curve:Curve):ToothOutline {

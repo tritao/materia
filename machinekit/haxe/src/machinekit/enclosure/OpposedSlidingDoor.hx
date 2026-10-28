@@ -22,62 +22,11 @@ class OpposedSlidingDoor extends MachineAssembly {
       new BlockBracket(
         "door captured roller track",
         [
-          {
-            min: [-half, -22, height + 10],
-            max: [
-              half,
-              -20,
-              height + 44
-            ]
-          },
-          {
-            min: [
-              -half,
-              20,
-              height + 10
-            ],
-            max: [
-              half,
-              22,
-              height + 44
-            ]
-          },
-          {
-            min: [
-              -half,
-              -20,
-              height + 40
-            ],
-            max: [
-              half,
-              20,
-              height + 44
-            ]
-          },
-          {
-            min: [
-              -half,
-              -20,
-              height + 10
-            ],
-            max: [
-              half,
-              -4,
-              height + 14
-            ]
-          },
-          {
-            min: [
-              -half,
-              4,
-              height + 10
-            ],
-            max: [
-              half,
-              20,
-              height + 14
-            ]
-          }
+          {min: [-half, -22, height + 10], max: [half, -20, height + 44]},
+          {min: [-half, 20, height + 10], max: [half, 22, height + 44]},
+          {min: [-half, -20, height + 40], max: [half, 20, height + 44]},
+          {min: [-half, -20, height + 10], max: [half, -4, height + 14]},
+          {min: [-half, 4, height + 10], max: [half, 20, height + 14]}
         ],
         "steel"
       )
@@ -94,14 +43,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         'trackMount$side',
         new BlockBracket(
           "door track frame standoff",
-          [{
-            min: [mount - 10, 22, height + 16],
-            max: [
-              mount + 10,
-              40,
-              height + 36
-            ]
-          }],
+          [{min: [mount - 10, 22, height + 16], max: [mount + 10, 40, height + 36]}],
           "steel"
         ),
         "rail",
@@ -112,14 +54,7 @@ class OpposedSlidingDoor extends MachineAssembly {
         'stop$side',
         new BlockBracket(
           "door end stop",
-          [{
-            min: [side < 0 ? end - 10 : end, -18, height + 14],
-            max : [
-              side < 0 ? end : end + 10,
-              18,
-              height + 40
-            ]
-          }],
+          [{min: [side < 0 ? end - 10 : end, -18, height + 14], max : [side < 0 ? end : end + 10, 18, height + 40]}],
           "steel"
         ),
         "rail",
@@ -131,42 +66,9 @@ class OpposedSlidingDoor extends MachineAssembly {
         new BlockBracket(
           "door lower guide shoe",
           [
-            {
-              min: [
-                x - 8,
-                -5,
-                -24
-              ],
-              max: [
-                x + 8,
-                40,
-                -20
-              ]
-            },
-            {
-              min: [
-                x - 3,
-                -3,
-                -20
-              ],
-              max: [
-                x + 3,
-                3,
-                -5
-              ]
-            },
-            {
-              min: [
-                x - 8,
-                40,
-                -50
-              ],
-              max: [
-                x + 8,
-                44,
-                -20
-              ]
-            }
+            {min: [x - 8, -5, -24], max: [x + 8, 40, -20]},
+            {min: [x - 3, -3, -20], max: [x + 3, 3, -5]},
+            {min: [x - 8, 40, -50], max: [x + 8, 44, -20]}
           ],
           "UHMW polyethylene"
         ),
@@ -179,26 +81,8 @@ class OpposedSlidingDoor extends MachineAssembly {
       new BlockBracket(
         "door removable splash hood",
         [
-          {
-            min: [-half - 5, -26, height - 5],
-            max: [
-              half + 5,
-              -24,
-              height + 52
-            ]
-          },
-          {
-            min: [
-              -half - 5,
-              -24,
-              height + 50
-            ],
-            max: [
-              half + 5,
-              24,
-              height + 52
-            ]
-          }
+          {min: [-half - 5, -26, height - 5], max: [half + 5, -24, height + 52]},
+          {min: [-half - 5, -24, height + 50], max: [half + 5, 24, height + 52]}
         ],
         "steel"
       ),
@@ -238,38 +122,9 @@ class OpposedSlidingDoor extends MachineAssembly {
         new BlockBracket(
           "door lower anti sway channel",
           [
-            {
-              min: [-width / 4, -8, -12],
-              max: [
-                width / 4,
-                -5,
-                0
-              ]
-            },
-            {
-              min: [
-                -width / 4,
-                5,
-                -12
-              ],
-              max: [
-                width / 4,
-                8,
-                0
-              ]
-            },
-            {
-              min: [
-                -width / 4,
-                -5,
-                -3
-              ],
-              max: [
-                width / 4,
-                5,
-                0
-              ]
-            }
+            {min: [-width / 4, -8, -12], max: [width / 4, -5, 0]},
+            {min: [-width / 4, 5, -12], max: [width / 4, 8, 0]},
+            {min: [-width / 4, -5, -3], max: [width / 4, 5, 0]}
           ],
           "steel"
         ),
@@ -283,34 +138,9 @@ class OpposedSlidingDoor extends MachineAssembly {
           new BlockBracket(
             "door roller hanger",
             [
-              {
-                min: [x - 12, 3, height - 30],
-                max: [x + 12, 7, height + 4]
-              },
-              {
-                min: [
-                  x - 4,
-                  -3,
-                  height
-                ],
-                max: [
-                  x + 4,
-                  3,
-                  height + 29
-                ]
-              },
-              {
-                min: [
-                  x - 4,
-                  -3,
-                  height
-                ],
-                max: [
-                  x + 4,
-                  7,
-                  height + 4
-                ]
-              }
+              {min: [x - 12, 3, height - 30], max: [x + 12, 7, height + 4]},
+              {min: [x - 4, -3, height], max: [x + 4, 3, height + 29]},
+              {min: [x - 4, -3, height], max: [x + 4, 7, height + 4]}
             ],
             "steel"
           ),
@@ -324,50 +154,16 @@ class OpposedSlidingDoor extends MachineAssembly {
             null,
             null,
             null,
-            {outputThread: {
-              diameter: 6,
-              pitch: 1,
-              length: 7
-            }}
+            {outputThread: {diameter: 6, pitch: 1, length: 7}}
           ),
           id,
-          F.fromRotationMatrix(
-            x,
-            -13.6,
-            height + 25,
-            [
-              1,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-              -1,
-              0
-            ]
-          )
+          F.fromRotationMatrix(x, -13.6, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
         for (y in [-4.6, 3.0]) fixed(
           name + 'Spacer$y',
           machinekit.standard.FlatWasher.metric("M8"),
           id,
-          F.fromRotationMatrix(
-            x,
-            y,
-            height + 25,
-            [
-              1,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-              -1,
-              0
-            ]
-          )
+          F.fromRotationMatrix(x, y, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
         var washer = machinekit.standard.FlatWasher.metric("M6");
         fixed(name + "Washer", washer, id, F.fromRotationMatrix(x, 11.6, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0]));
@@ -375,22 +171,7 @@ class OpposedSlidingDoor extends MachineAssembly {
           name + "Nut",
           machinekit.standard.HexNut.metric("M6"),
           id,
-          F.fromRotationMatrix(
-            x,
-            11.6 + washer.spec.thickness,
-            height + 25,
-            [
-              1,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-              -1,
-              0
-            ]
-          )
+          F.fromRotationMatrix(x, 11.6 + washer.spec.thickness, height + 25, [1, 0, 0, 0, 0, 1, 0, -1, 0])
         );
         for (y in [-11.6, 4.6]) {
           var wheel = DeepGrooveBearing.metric("608");
@@ -403,12 +184,7 @@ class OpposedSlidingDoor extends MachineAssembly {
     addSwitch(
       "closed",
       "slide",
-      {
-        lower: -SlidingDoor.SWITCH_TOLERANCE_MM,
-        upper: SlidingDoor.SWITCH_TOLERANCE_MM,
-        velocity: null,
-        effort: null
-      }
+      {lower: -SlidingDoor.SWITCH_TOLERANCE_MM, upper: SlidingDoor.SWITCH_TOLERANCE_MM, velocity: null, effort: null}
     );
     addSwitch(
       "open",

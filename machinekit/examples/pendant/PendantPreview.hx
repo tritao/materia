@@ -13,10 +13,7 @@ class PendantPreview {
       ReferencePendant.layout(),
       () -> pendantCase.plate(),
       () -> pendantCase.shell(),
-      [{
-        id: "board",
-        solid: () -> pendantCase.board()
-      }],
+      [{id: "board", solid: () -> pendantCase.board()}],
       "FR4 PCB",
       ReferencePendant.groups(),
       pendantCase.hardware()

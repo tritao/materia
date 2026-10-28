@@ -108,17 +108,8 @@ class TendingElectricSimCell {
     );
     runtime = harness.simulation.addRobotAtPose(
       scene.blueprint,
-      [
-        placement.x * 0.001,
-        placement.y * 0.001,
-        placement.z * 0.001
-      ],
-      [
-        placement.qx,
-        placement.qy,
-        placement.qz,
-        placement.qw
-      ]
+      [placement.x * 0.001, placement.y * 0.001, placement.z * 0.001],
+      [placement.qx, placement.qy, placement.qz, placement.qw]
     );
     harness.space.session.beginTopologyUpdate();
     var physical = AssemblyPhysicalPartView.fromSceneArtifact(fixturesScene);
@@ -190,20 +181,11 @@ class TendingElectricSimCell {
           0,
           leader,
           cast scene.jawLinks.get(side),
-          scene.jawTarget(
-            side,
-            25
-          ),
-          scene.jawTarget(
-            side,
-            0
-          ),
+          scene.jawTarget(side, 25),
+          scene.jawTarget(side, 0),
           70,
           0.005,
-          scene.jawTarget(
-            side,
-            side == initialOpenSide ? 25 : 17
-          )
+          scene.jawTarget(side, side == initialOpenSide ? 25 : 17)
         )
       );
     }
@@ -484,10 +466,7 @@ class TendingElectricSimCell {
     );
     var guard = {
       expectedContacts: contacts,
-      approach: {
-        maxTravelMm: slowCount * step + 0.12,
-        requireContactAtArrival: false
-      },
+      approach: {maxTravelMm: slowCount * step + 0.12, requireContactAtArrival: false},
       withdrawal: {maxTravelMm: slowCount * step + 0.12},
       timeoutSeconds: policy.timeoutSeconds,
       forceLimitN: policy.forceLimitN,
@@ -877,12 +856,7 @@ class TendingElectricSimCell {
     var dx = observed.x * 1000 - target.x, dy = observed.y * 1000 - target.y, dz = observed.z * 1000 - target.z;
     var angle = TendingSeatPolicy.orientationError(
       [observed.qx, observed.qy, observed.qz, observed.qw],
-      [
-        target.qx,
-        target.qy,
-        target.qz,
-        target.qw
-      ],
+      [target.qx, target.qy, target.qz, target.qw],
       TendingSeatOrientation.FullPose
     );
     if (Math.sqrt(dx * dx + dy * dy + dz * dz) > policy.positionToleranceMm || angle
@@ -933,10 +907,7 @@ class TendingElectricSimCell {
           slot: slot,
           simulationSeconds: harness.simulation.simulationTime(),
           commandComplete: grip.commandComplete(),
-          openingMm: scene.jawOpeningMm(
-            side,
-            grip.opening()
-          ),
+          openingMm: scene.jawOpeningMm(side, grip.opening()),
           objectPose: harness.simulation.objectPose(object)
         })
       );
@@ -953,10 +924,7 @@ class TendingElectricSimCell {
           slot: slot,
           time: harness.simulation.simulationTime(),
           commandComplete: grip.commandComplete(),
-          openingMm: scene.jawOpeningMm(
-            side,
-            grip.opening()
-          ),
+          openingMm: scene.jawOpeningMm(side, grip.opening()),
           wristFrame: wristFrame(),
           pose: harness.simulation.objectPose(object)
         });
@@ -1003,22 +971,10 @@ class TendingElectricSimCell {
         request == 5,
         zone.clear(held),
         false,
-        at(
-          "mill/doorSlider",
-          doorOpenFrame
-        ),
-        at(
-          "mill/doorSlider",
-          doorClosedFrame
-        ),
-        at(
-          "mill/mill/vise/movingJaw",
-          viseClosedFrame
-        ),
-        at(
-          "mill/mill/vise/movingJaw",
-          viseOpenFrame
-        ),
+        at("mill/doorSlider", doorOpenFrame),
+        at("mill/doorSlider", doorClosedFrame),
+        at("mill/mill/vise/movingJaw", viseClosedFrame),
+        at("mill/mill/vise/movingJaw", viseOpenFrame),
         present,
         !running,
         !running,
@@ -1120,12 +1076,7 @@ class TendingElectricSimCell {
       var error = Math.sqrt(dx * dx + dy * dy + dz * dz);
       var angle = TendingSeatPolicy.orientationError(
         [measured.qx, measured.qy, measured.qz, measured.qw],
-        [
-          target.qx,
-          target.qy,
-          target.qz,
-          target.qw
-        ],
+        [target.qx, target.qy, target.qz, target.qw],
         orientation
       );
       if (error > positionTolerance) {

@@ -89,11 +89,7 @@ class GantryPlate extends MachineComponent {
     var tool = cutout.placed(new Location(new Plane(
       new Vector(face.x, face.y, face.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     )));
     owned.push(tool);
     cutout.close();
@@ -278,16 +274,8 @@ class GantryBoredBracket extends GantryPlate {
     var x = AssemblyFrames.transformVector(boreFace, 1, 0, 0), z = AssemblyFrames.transformVector(boreFace, 0, 0, 1);
     var tool = bore.placed(new Location(new Plane(
       new Vector(boreFace.x, boreFace.y, boreFace.z),
-      new Vector(
-        x.x,
-        x.y,
-        x.z
-      ),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(x.x, x.y, x.z),
+      new Vector(z.x, z.y, z.z)
     )));
     owned.push(tool);
     bore.close();

@@ -18,77 +18,24 @@ class EmergencyStop extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    R.catalog(
-      "model",
-      ControlCatalogs.eStops(),
-      ControlCatalogs.XB2
-    ),
+    R.catalog("model", ControlCatalogs.eStops(), ControlCatalogs.XB2),
     HmiPart.basisParameter("stated"),
-    R.length(
-      "headDiameter",
-      40
-    ),
-    R.length(
-      "collarDiameter",
-      30
-    ),
-    R.length(
-      "collarHeight",
-      9
-    ),
-    R.length(
-      "headHeight",
-      22
-    ),
-    R.length(
-      "panelHole",
-      22.3
-    ),
-    R.length(
-      "panelThickness",
-      3
-    ),
-    R.length(
-      "nutDiameter",
-      30
-    ),
-    R.length(
-      "nutThickness",
-      5
-    ),
-    R.length(
-      "baseWidth",
-      42
-    ),
-    R.length(
-      "baseDepth",
-      30
-    ),
-    R.length(
-      "baseLength",
-      11
-    ),
-    R.length(
-      "blockWidth",
-      29
-    ),
-    R.length(
-      "blockThickness",
-      14.8
-    ),
-    R.length(
-      "blockLength",
-      24
-    ),
-    R.count(
-      "blocks",
-      1
-    ),
-    R.scalar(
-      "massGrams",
-      52.4,
-      1
-    )
+    R.length("headDiameter", 40),
+    R.length("collarDiameter", 30),
+    R.length("collarHeight", 9),
+    R.length("headHeight", 22),
+    R.length("panelHole", 22.3),
+    R.length("panelThickness", 3),
+    R.length("nutDiameter", 30),
+    R.length("nutThickness", 5),
+    R.length("baseWidth", 42),
+    R.length("baseDepth", 30),
+    R.length("baseLength", 11),
+    R.length("blockWidth", 29),
+    R.length("blockThickness", 14.8),
+    R.length("blockLength", 24),
+    R.count("blocks", 1),
+    R.scalar("massGrams", 52.4, 1)
   ];
 
   public function new(?v:ComponentValues) {
@@ -98,11 +45,7 @@ class EmergencyStop extends HmiPart {
       || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)",
       "ABS red",
       inputs(),
-      ControlCatalogs.withModel(
-        ControlCatalogs.eStops(),
-        ControlCatalogs.XB2,
-        v
-      )
+      ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v)
     );
     positive([
       "headDiameter",
@@ -137,10 +80,7 @@ class EmergencyStop extends HmiPart {
       name: "nc" + i,
       kind: Signal,
       role: Passive,
-      iface: Plug(
-        "dry-contact",
-        2
-      ),
+      iface: Plug("dry-contact", 2),
       required: true
     });
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
@@ -184,34 +124,13 @@ class EmergencyStop extends HmiPart {
         Part.revolve([
           {r: 0.0, z: 0.0},
           {r: n("collarDiameter") / 2, z: 0.0},
-          {
-            r: n("collarDiameter") / 2,
-            z: c
-          },
-          {
-            r: h - 1.5,
-            z: c + 1.5
-          },
-          {
-            r: h,
-            z: c + 4.0
-          },
-          {
-            r: h,
-            z: above - 3.0
-          },
-          {
-            r: h - 3.0,
-            z: above - 0.6
-          },
-          {
-            r: h - 8.0,
-            z: above
-          },
-          {
-            r: 0.0,
-            z: above
-          }
+          {r: n("collarDiameter") / 2, z: c},
+          {r: h - 1.5, z: c + 1.5},
+          {r: h, z: c + 4.0},
+          {r: h, z: above - 3.0},
+          {r: h - 3.0, z: above - 0.6},
+          {r: h - 8.0, z: above},
+          {r: 0.0, z: above}
         ]),
         "head"
       );

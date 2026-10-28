@@ -38,12 +38,7 @@ class ScrewdrivingAssemblyPreview {
   ):ScrewdrivingDesign {
     var bitLength = forceSearch ? 85 : 45;
     var cell = equipment == null ? new ScrewdrivingCell(
-      new machinekit.screwdriving.ScrewdriverBit(
-        HexSocket(5),
-        bitLength,
-        6,
-        0.05
-      ),
+      new machinekit.screwdriving.ScrewdriverBit(HexSocket(5), bitLength, 6, 0.05),
       0,
       machinekit.standard.DeepGrooveBearing.metric("6003"),
       bowlFed,
@@ -60,58 +55,22 @@ class ScrewdrivingAssemblyPreview {
       [-140.0, -360.0],
       [-60.0, -360.0],
       [60.0, -360.0],
-      [
-        140.0,
-        -360.0
-      ],
-      [
-        220.0,
-        -360.0
-      ]
+      [140.0, -360.0],
+      [220.0, -360.0]
     ] : [
-      [
-        250.0,
-        -450.0
-      ],
-      [
-        180.0,
-        -380.0
-      ],
-      [
-        250.0,
-        -380.0
-      ],
-      [
-        100.0,
-        -450.0
-      ],
-      [
-        110.0,
-        -380.0
-      ],
-      [
-        320.0,
-        -450.0
-      ],
-      [
-        320.0,
-        -380.0
-      ]
+      [250.0, -450.0],
+      [180.0, -380.0],
+      [250.0, -380.0],
+      [100.0, -450.0],
+      [110.0, -380.0],
+      [320.0, -450.0],
+      [320.0, -380.0]
     ];
     var reservePositions = registered ? [positions[3], positions[4], positions[5], positions[6]] : [
       [320.0, -520.0],
-      [
-        320.0,
-        -450.0
-      ],
-      [
-        320.0,
-        -380.0
-      ],
-      [
-        320.0,
-        -340.0
-      ]
+      [320.0, -450.0],
+      [320.0, -380.0],
+      [320.0, -340.0]
     ];
     var supplyNames = bowlFed || blowFed ? ["presenter", "presenter", "presenter", "presenter"] : [
       "presenter",
@@ -125,11 +84,7 @@ class ScrewdrivingAssemblyPreview {
       cell.include(
         "feeder",
         new machinekit.screwdriving.ScrewBowlFeeder(cell.presenter.screw),
-        AssemblyFrames.translation(
-          180,
-          -650,
-          RobotArm.TABLE_TOP
-        )
+        AssemblyFrames.translation(180, -650, RobotArm.TABLE_TOP)
       );
       cell.exposePort("feederControl", "feeder/drive", "control");
     }
@@ -148,11 +103,7 @@ class ScrewdrivingAssemblyPreview {
       cell.include(
         name,
         new ScrewPresenter(cell.presenter.screw, cell.fieldHeads),
-        AssemblyFrames.translation(
-          position[0],
-          position[1],
-          RobotArm.TABLE_TOP
-        )
+        AssemblyFrames.translation(position[0], position[1], RobotArm.TABLE_TOP)
       );
       cell.exposePort(name + "Control", name + "/escapement", "control");
     }
@@ -199,20 +150,11 @@ class ScrewdrivingAssemblyPreview {
           minimumStroke: 2,
           maximumStroke: 18
         },
-        {
-          leadInMm: 0.5,
-          maximumAxisAngle: 0.1,
-          prevailingTorque: 0.2,
-          stiffnessNmPerRad: 40,
-          stripTorque: 22
-        }
+        {leadInMm: 0.5, maximumAxisAngle: 0.1, prevailingTorque: 0.2, stiffnessNmPerRad: 40, stripTorque: 22}
       );
       var pickup = AssemblyFrames.compose(
         AssemblyFrames.inverse(state.worldPose(reserve + "/nest")),
-        AssemblyFrames.compose(
-          state.worldPose(reserve + "/screw"),
-          cell.presenter.screw.driveFrame()
-        )
+        AssemblyFrames.compose(state.worldPose(reserve + "/screw"), cell.presenter.screw.driveFrame())
       );
       pickup.x *= scene.metresPerUnit;
       pickup.y *= scene.metresPerUnit;
@@ -226,15 +168,7 @@ class ScrewdrivingAssemblyPreview {
           pickup: pickup
         },
         rejectMember: "reject/floor",
-        reject: {
-          x: 0,
-          y: 0,
-          z: 0.1,
-          qx: 1,
-          qy: 0,
-          qz: 0,
-          qw: 0
-        }
+        reject: {x: 0, y: 0, z: 0.1, qx: 1, qy: 0, qz: 0, qw: 0}
       };
       if (blowFed) {
         job.delivery = BlowFeed("blow");
@@ -342,15 +276,7 @@ class ScrewdrivingAssemblyPreview {
         || scene.missions == null) throw "Registered screw cell needs its one mounted screwdriver and mission";
       scene.missions[0].steps.insert(
         0,
-        {
-          kind: "findWork",
-          at: probeTools[0].contact,
-          contactWork: contactWork(
-            cell,
-            state,
-            scene
-          )
-        }
+        {kind: "findWork", at: probeTools[0].contact, contactWork: contactWork(cell, state, scene)}
       );
     }
     var controllers = scene.controllers;
@@ -403,22 +329,8 @@ class ScrewdrivingAssemblyPreview {
       contactForceN: 5,
       contactThresholdN: 2,
       confirmationSamples: 2,
-      virtualMass: [
-        lateral * relaxationSeconds,
-        lateral * relaxationSeconds,
-        axial * relaxationSeconds,
-        1,
-        1,
-        1
-      ],
-      damping: [
-        lateral,
-        lateral,
-        axial,
-        20,
-        20,
-        20
-      ],
+      virtualMass: [lateral * relaxationSeconds, lateral * relaxationSeconds, axial * relaxationSeconds, 1, 1, 1],
+      damping: [lateral, lateral, axial, 20, 20, 20],
       maximumLinearSpeed: 0.004,
       maximumAngularSpeed: 0.0002,
       maximumStepSeconds: 0.01,
@@ -459,16 +371,8 @@ class ScrewdrivingAssemblyPreview {
       var placed:Part;
       try placed = local.placed(new Location(new Plane(
         new Vector(relative.x, relative.y, relative.z),
-        new Vector(
-          x.x,
-          x.y,
-          x.z
-        ),
-        new Vector(
-          z.x,
-          z.y,
-          z.z
-        )
+        new Vector(x.x, x.y, x.z),
+        new Vector(z.x, z.y, z.z)
       ))) catch (error:Dynamic) {
         local.close();
         for (part in parts) part.close();
@@ -497,16 +401,8 @@ class ScrewdrivingAssemblyPreview {
         qz: pose.qz,
         qw: pose.qw
       },
-      translation: [
-        0.02,
-        0.02,
-        measurementError
-      ],
-      rotation: [
-        0,
-        0,
-        2 * Math.PI / 180
-      ],
+      translation: [0.02, 0.02, measurementError],
+      rotation: [0, 0, 2 * Math.PI / 180],
       measurementError: measurementError,
       calibratedError: 0.0,
       contactOffset: 0.0,
@@ -545,11 +441,7 @@ private class ScrewRejectBin extends MachineAssembly {
         addMemberConnector(
           "floor",
           name,
-          AssemblyFrames.translation(
-            axis == "x" ? side * 38 : 0,
-            axis == "y" ? side * 38 : 0,
-            4
-          )
+          AssemblyFrames.translation(axis == "x" ? side * 38 : 0, axis == "y" ? side * 38 : 0, 4)
         );
         addMate(name + "-fixed", "fixed", "floor", name, name, "base");
       }

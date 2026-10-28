@@ -29,13 +29,7 @@ class EndEffectorExample {
       "coupling",
       "master",
       "tool",
-      [
-        {robot: "coupledAir", tool: "air"},
-        {
-          robot: "coupledSignal",
-          tool: "signal"
-        }
-      ]
+      [{robot: "coupledAir", tool: "air"}, {robot: "coupledSignal", tool: "signal"}]
     );
     set.addTool("short", tool(90, 25));
     set.addTool("long", tool(140, 35));

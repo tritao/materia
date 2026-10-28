@@ -71,14 +71,8 @@ class MotorAdapterPlate extends MachineComponent {
     [
       new Vector(-face / 2, -face / 2),
       new Vector(face / 2, -face / 2),
-      new Vector(
-        face / 2,
-        face / 2
-      ),
-      new Vector(
-        -face / 2,
-        face / 2
-      )
+      new Vector(face / 2, face / 2),
+      new Vector(-face / 2, face / 2)
     ],
     0,
     thickness
@@ -96,11 +90,7 @@ class MotorAdapterPlate extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.motor-adapter-plate",
-      [P.choice(
-        "model",
-        models(),
-        "KK86-80EP-adapter"
-      )],
+      [P.choice("model", models(), "KK86-80EP-adapter")],
       v -> new MotorAdapterPlate(v.token("model")),
       true
     );

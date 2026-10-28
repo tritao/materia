@@ -25,11 +25,7 @@ class Bt30Cartridge extends MachineComponent {
       z: 0.0}, {id: "mount", z: SEAT}, {id: "reaction", z: REAR}, {id: "pulley", z: 250.0}]) addConnector(
         row.id,
         Mount,
-        Solids.axial(
-          0,
-          0,
-          row.z
-        )
+        Solids.axial(0, 0, row.z)
       );
   }
   override public function componentType():Null<ComponentType> return recipeType();

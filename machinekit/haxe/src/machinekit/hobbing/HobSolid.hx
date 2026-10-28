@@ -93,17 +93,7 @@ class HobSolid {
             0,
             0,
             d.lead * g / d.gashes,
-            [
-              Math.cos(phase),
-              -Math.sin(phase),
-              0.0,
-              Math.sin(phase),
-              Math.cos(phase),
-              0.0,
-              0,
-              0,
-              1
-            ]
+            [Math.cos(phase), -Math.sin(phase), 0.0, Math.sin(phase), Math.cos(phase), 0.0, 0, 0, 1]
           )
         );
         try {

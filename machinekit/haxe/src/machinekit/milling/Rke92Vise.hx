@@ -53,22 +53,12 @@ class Rke92Vise extends MachineAssembly {
       "guide",
       {x: 0, y: 1, z: 0},
       stockDepth,
-      {
-        lower: 0,
-        upper: OPENING,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0, upper: OPENING, velocity: null, effort: null}
     );
     fixed(
       "movingPlate",
       new Rke92VisePart("jaw-plate"),
-      F.fromRotationMatrix(
-        0,
-        FIXED_FACE + stockDepth,
-        BED_HEIGHT,
-        reverse
-      ),
+      F.fromRotationMatrix(0, FIXED_FACE + stockDepth, BED_HEIGHT, reverse),
       "slide"
     );
     for (jaw in ["fixedPlate", "movingPlate"]) for (x in [-31.5, 31.5]) {
@@ -78,11 +68,7 @@ class Rke92Vise extends MachineAssembly {
     for (side in [-1, 1]) fixed(
       "parallel" + side,
       new MillPanel(80, 5, PARALLEL_HEIGHT),
-      F.translation(
-        0,
-        FIXED_FACE + (side < 0 ? 4 : stockDepth - 4),
-        BED_HEIGHT
-      ),
+      F.translation(0, FIXED_FACE + (side < 0 ? 4 : stockDepth - 4), BED_HEIGHT),
       "body"
     );
     fixed("stop", new Rke92VisePart("stop"), F.translation(-stockWidth / 2 - 3, seat.y, BED_HEIGHT), "body");

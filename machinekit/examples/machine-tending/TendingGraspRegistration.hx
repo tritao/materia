@@ -49,14 +49,8 @@ class TendingGraspRegistration {
     sim:Simulation,
     object:SimObject,
     side:String,
-    fixed:Array<{
-      name:String,
-      object:SimObject
-    }>,
-    carried:Array<{
-      side:String,
-      object:SimObject
-    }>,
+    fixed:Array<{name:String, object:SimObject}>,
+    carried:Array<{side:String, object:SimObject}>,
     maximumPointMotionMm:Float
   ):Dynamic {
     var wrist = physical(sim, scene.flangeLink), stock = objectFrame(sim, object);
@@ -85,11 +79,7 @@ class TendingGraspRegistration {
       proof: proof,
       observedStock: stock,
       targetWrist: target,
-      translationMm: [
-        (stock.x - nominal.x) * 1000,
-        (stock.y - nominal.y) * 1000,
-        (stock.z - nominal.z) * 1000
-      ],
+      translationMm: [(stock.x - nominal.x) * 1000, (stock.y - nominal.y) * 1000, (stock.z - nominal.z) * 1000],
       poseSource: "simulation observation; hardware sensing uncommissioned",
       hardwareQualified: false
     };
@@ -126,24 +116,11 @@ class TendingGraspRegistration {
     var relative = AssemblyFrames.compose(AssemblyFrames.inverse(physical(sim, base.link)), target);
     var answer = scene.graspManipulator.solve(
       new robotkit.spatial.Transform3(
-        new robotkit.spatial.Vec3(
-          relative.x,
-          relative.y,
-          relative.z
-        ),
-        new robotkit.spatial.Quat(
-          relative.qx,
-          relative.qy,
-          relative.qz,
-          relative.qw
-        )
+        new robotkit.spatial.Vec3(relative.x, relative.y, relative.z),
+        new robotkit.spatial.Quat(relative.qx, relative.qy, relative.qz, relative.qw)
       ),
       from,
-      new robotkit.manipulation.IkOptions(
-        1e-9,
-        1e-8,
-        200
-      ).reaching()
+      new robotkit.manipulation.IkOptions(1e-9, 1e-8, 200).reaching()
     );
     if (!answer.converged || answer.q.length != 6) throw "Observed grasp/extraction IK failed";
     return [for (i in 0...6) answer.q[i] + 2 * Math.PI * Math.round((from[i] - answer.q[i]) / (2 * Math.PI))];
@@ -190,14 +167,8 @@ class TendingGraspRegistration {
   public static function checkPath(
     scene:TendingElectricSimScene,
     sim:Simulation,
-    fixed:Array<{
-      name:String,
-      object:SimObject
-    }>,
-    carried:Array<{
-      side:String,
-      object:SimObject
-    }>,
+    fixed:Array<{name:String, object:SimObject}>,
+    carried:Array<{side:String, object:SimObject}>,
     path:Array<Array<Float>>,
     activeObject:Int,
     fixtureCommandContacts:Array<String>
@@ -221,14 +192,8 @@ class TendingGraspRegistration {
   public static function check(
     scene:TendingElectricSimScene,
     sim:Simulation,
-    fixed:Array<{
-      name:String,
-      object:SimObject
-    }>,
-    carried:Array<{
-      side:String,
-      object:SimObject
-    }>,
+    fixed:Array<{name:String, object:SimObject}>,
+    carried:Array<{side:String, object:SimObject}>,
     from:Array<Float>,
     to:Array<Float>,
     maximumPointMotionMm:Float,
@@ -260,15 +225,7 @@ class TendingGraspRegistration {
     var root = physical(sim, 0);
     reference.setRootPose(
       kinematic.bodyIndex(model.links[0].id),
-      new Transform(
-        root.x,
-        root.y,
-        root.z,
-        root.qx,
-        root.qy,
-        root.qz,
-        root.qw
-      )
+      new Transform(root.x, root.y, root.z, root.qx, root.qy, root.qz, root.qw)
     );
     var snapshot = new KinematicSnapshot(kinematic);
     snapshot.evaluate(reference);
@@ -426,20 +383,8 @@ class TendingGraspRegistration {
         var at = AssemblyFrames.transformPoint(physical(sim, piece.link), centre[0], centre[1], centre[2]);
         description.addFixed(
           "synthetic query-only overlapping obstacle",
-          new CollisionPose(
-            at.x,
-            at.y,
-            at.z,
-            0,
-            0,
-            0,
-            1
-          ),
-          Box(
-            0.001,
-            0.001,
-            0.001
-          ),
+          new CollisionPose(at.x, at.y, at.z, 0, 0, 0, 1),
+          Box(0.001, 0.001, 0.001),
           0
         );
         added = true;
@@ -482,14 +427,8 @@ class TendingGraspRegistration {
   public static function controls(
     scene:TendingElectricSimScene,
     sim:Simulation,
-    fixed:Array<{
-      name:String,
-      object:SimObject
-    }>,
-    carried:Array<{
-      side:String,
-      object:SimObject
-    }>
+    fixed:Array<{name:String, object:SimObject}>,
+    carried:Array<{side:String, object:SimObject}>
   ):Dynamic {
     var time = sim.simulationTime(), q = [for (j in scene.armJoints) sim.jointSample(0, j).get_position()];
     var positive = check(scene, sim, fixed, carried, q, q, 0.12, -1, []), rejected = false;

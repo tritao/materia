@@ -181,12 +181,7 @@ class MobileBaseChecks {
     // about +Y rolls a wheel forward, so a positive speed drives the left wheel forward and the right one back.
     for (side in [
       {joint: "wheel_l", wheel: "wheelLeft", motor: "motorLeft", forward: 1},
-      {
-        joint: "wheel_r",
-        wheel: "wheelRight",
-        motor: "motorRight",
-        forward: -1
-      }
+      {joint: "wheel_r", wheel: "wheelRight", motor: "motorRight", forward: -1}
     ]) {
       var shaft = AssemblyFrames.transformVector(state.worldConnector(side.motor, "shaftAxis"), 0, 1, 0);
       near(shaft.y, side.forward, '${side.joint} shaft points outward', 1e-9);

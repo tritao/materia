@@ -18,15 +18,7 @@ class MotorBrakeTests {
     assembly.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)));
     assembly.addComponent(
       "supply",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(310),
-        new machinekit.power.DcCurrent(20),
-        1,
-        120,
-        60,
-        30,
-        4000
-      )
+      new PowerSupply(new machinekit.power.DcVoltage(310), new machinekit.power.DcCurrent(20), 1, 120, 60, 30, 4000)
     );
     assembly.addComponent("brake", new ShaftBrakePart(19, "shell"));
     assembly.connectPorts("power", "supply", "power1", "driver", "power");

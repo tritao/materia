@@ -52,14 +52,7 @@ class PickPlaceFastenPreview {
     ];
     fastening.steps.insert(
       0,
-      {
-        kind: "waitFor",
-        waitFor: {
-          name: PickPlaceFastenCell.PART_READY,
-          value: true,
-          timeout: 180
-        }
-      }
+      {kind: "waitFor", waitFor: {name: PickPlaceFastenCell.PART_READY, value: true, timeout: 180}}
     );
     // Park the six arm axes independently of the tool's passive feed and process spindle.
     fastening.steps.push({
@@ -75,22 +68,13 @@ class PickPlaceFastenPreview {
     scene.missions.push({
       controllerId: PickPlaceFastenCell.HANDLING_CONTROLLER,
       loop: false,
-      steps: PickPlaceFastenMission.handling(
-        equipment,
-        housingOnly
-      )
+      steps: PickPlaceFastenMission.handling(equipment, housingOnly)
     });
     var freed = ["work/flange/housing"];
     if (!housingOnly) freed.push("work/plate");
     var poses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [
-      "work/flange/housing" => state.worldConnector(
-        "housingTray/seat-r0-c0-x-1-y-1",
-        "seat"
-      ),
-      "work/plate" => state.worldConnector(
-        "plateTray/seat-r0-c0-x-1-y-1",
-        "seat"
-      )
+      "work/flange/housing" => state.worldConnector("housingTray/seat-r0-c0-x-1-y-1", "seat"),
+      "work/plate" => state.worldConnector("plateTray/seat-r0-c0-x-1-y-1", "seat")
     ];
     definition.joints = [for (joint in definition.joints) if (freed.indexOf(joint.parent) < 0
       && freed.indexOf(joint.child) < 0) joint];

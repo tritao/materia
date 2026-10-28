@@ -55,20 +55,14 @@ class MillFrameChecks {
       {
         yRailSpacing: layout.yRailSpacing,
         yRailStart: largerStart,
-        yRailLength: largerTravel.railEnd(
-          largerCentre,
-          guide
-        ) - largerStart,
+        yRailLength: largerTravel.railEnd(largerCentre, guide) - largerStart,
         columnFront: layout.columnFront,
         columnHeight: layout.columnHeight,
         zRailSpacing: layout.zRailSpacing,
         zRailStart: layout.zRailStart,
         zRailLength: layout.zRailLength
       },
-      {
-        yTravel: largerTravel,
-        frontExtension: largerTravel.frontExtension
-      }
+      {yTravel: largerTravel, frontExtension: largerTravel.frontExtension}
     );
     var largerStage = new machinekit.milling.MillXYStageLayout(largerFrame, largerCentre, BenchMill.RAIL);
     near(largerStage.yHalfTravel * 2, 240, "larger travel fits with deliberately increased spindle reach");
@@ -256,16 +250,8 @@ class MillFrameChecks {
       var bit = cadkit.modeling.Part.cylinderSpan(6, bolt.z + 6, layout.columnMountPlane + 68, bolt.x, bolt.y);
       var handle = cadkit.modeling.Part.cylinderAlong(
         6,
-        new cadkit.modeling.Vector(
-          bolt.x,
-          bolt.y,
-          layout.columnMountPlane + 68
-        ),
-        new cadkit.modeling.Vector(
-          side,
-          0,
-          0
-        ),
+        new cadkit.modeling.Vector(bolt.x, bolt.y, layout.columnMountPlane + 68),
+        new cadkit.modeling.Vector(side, 0, 0),
         layout.columnFootWidth / 2 - Math.abs(bolt.x) + 60
       );
       for (access in [bit, handle]) {
@@ -330,12 +316,7 @@ class MillFrameChecks {
     };
     var variant = BenchMillFrame.create(new MillFrameLayout(
       interfaces,
-      {
-        baseWidth: 620,
-        baseHeight: 260,
-        columnWidth: 360,
-        columnDepth: 300
-      }
+      {baseWidth: 620, baseHeight: 260, columnWidth: 360, columnDepth: 300}
     ));
     variant.validate();
     var variantPoses:Map<String, AssemblyFrame> = variant.solvedPoses();

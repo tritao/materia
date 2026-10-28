@@ -63,11 +63,7 @@ class MillZAxisIntegrity {
         l.screwY,
         l.headCentre + l.nut.bodyLength / 2 - l.nut.overallLength + lower
       ),
-      headSweep(
-        axis,
-        owned,
-        margin
-      )
+      headSweep(axis, owned, margin)
     ];
     for (side in [-1, 1]) for (span in [-l.blockSpan, l.blockSpan]) swept.push(box(
       owned,

@@ -22,37 +22,16 @@ class HobberDriveSupportChecks {
     var probes:Array<{label:String, bounds:Array<Float>}> = [];
     for (side in [-1, 1]) probes.push({
       label: 'longitudinal web ' + side,
-      bounds: [
-        start,
-        side * 112.5 - 17.5,
-        85,
-        end,
-        side * 112.5 + 17.5,
-        660
-      ]
+      bounds: [start, side * 112.5 - 17.5, 85, end, side * 112.5 + 17.5, 660]
     });
     for (station in [l.floatingCentre, l.screwStart]) probes.push({
       label: 'bearing cross-rib ' + station,
-      bounds: [
-        station - c - 15,
-        -275,
-        230,
-        station - c + 15,
-        275,
-        660
-      ]
+      bounds: [station - c - 15, -275, 230, station - c + 15, 275, 660]
     });
     var rear = Layout.feet()[2];
     for (side in [-1, 1]) probes.push({
       label: 'rear foot boss/web junction ' + side,
-      bounds: [
-        rear.x - 40,
-        side < 0 ? -95.0 : 90.0,
-        160,
-        rear.x + 40,
-        side < 0 ? -90.0 : 95.0,
-        230
-      ]
+      bounds: [rear.x - 40, side < 0 ? -95.0 : 90.0, 160, rear.x + 40, side < 0 ? -90.0 : 95.0, 230]
     });
     return [for (p in probes) {
       var solid = box(p.bounds), gap = solid.subtract(body), v = gap.volume();
@@ -101,14 +80,7 @@ class HobberDriveSupportChecks {
     var row = machine.bed.insertLocations().filter(p -> p.id == "driveSeat")[0], size = row.part.boxDimensions(row.id);
     var raw = Part.box(size.width, size.depth, 50), backing = PosedParts.moved(
       raw,
-      F.compose(
-        row.pose,
-        F.translation(
-          0,
-          0,
-          -50
-        )
-      )
+      F.compose(row.pose, F.translation(0, 0, -50))
     );
     raw.close();
     var missing = backing.subtract(composite), missingVolume = missing.volume(), required = backing.volume();
@@ -194,20 +166,13 @@ class HobberDriveSupportChecks {
       }
       var result = {
         assertions: n,
-        boxIntermediate: {
-          before: cells.length,
-          after: compact.length,
-          volumeMm3: intermediate.volume()
-        },
+        boxIntermediate: {before: cells.length, after: compact.length, volumeMm3: intermediate.volume()},
         finalBoxHull: {
           status: "unsupported",
           features: [for (cavity in nonbox) cavity.featureId],
           anchorOwners: [for (anchor in source.embeddedAnchors()) anchor.owner]
         },
-        finalSection: {
-          status: "unsupported",
-          message: unsupported
-        },
+        finalSection: {status: "unsupported", message: unsupported},
         exactFinalReconstruction: true,
         driveSeatRequiredBackingMm3: required,
         driveSeatMissingBackingMm3: missingVolume,

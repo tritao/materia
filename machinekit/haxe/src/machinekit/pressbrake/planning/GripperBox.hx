@@ -27,14 +27,8 @@ class GripperBox {
     return WallOutline.polygon([
       new Point2(x - width / 2, y - length / 2),
       new Point2(x + width / 2, y - length / 2),
-      new Point2(
-        x + width / 2,
-        y + length / 2
-      ),
-      new Point2(
-        x - width / 2,
-        y + length / 2
-      )
+      new Point2(x + width / 2, y + length / 2),
+      new Point2(x - width / 2, y + length / 2)
     ]);
   }
   /** The complete patch must be supported; checking its center would miss holes and notches. */

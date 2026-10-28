@@ -15,16 +15,8 @@ class HgReferenceAudit {
       var row:Dynamic = {
         model: model,
         sha256: machinekit.catalog.PinnedCad.sha256(path),
-        min: [
-          b.get_min().get_x(),
-          b.get_min().get_y(),
-          b.get_min().get_z()
-        ],
-        max: [
-          b.get_max().get_x(),
-          b.get_max().get_y(),
-          b.get_max().get_z()
-        ],
+        min: [b.get_min().get_x(), b.get_min().get_y(), b.get_min().get_z()],
+        max: [b.get_max().get_x(), b.get_max().get_y(), b.get_max().get_z()],
         volume: raw.volume(),
         valid: CadKit.shapeValidChecked(raw.borrowHandle()) != 0
       };

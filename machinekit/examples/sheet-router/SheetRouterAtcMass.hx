@@ -48,12 +48,7 @@ class SheetRouterAtcMass {
             poseMm: pose,
             massKg: mass.mass,
             massSource: "CAD/declared",
-            centreOfMassMm: F.transformPoint(
-              pose,
-              c.x,
-              c.y,
-              c.z
-            ),
+            centreOfMassMm: F.transformPoint(pose, c.x, c.y, c.z),
             volumeMm3: physical.volume,
             centroidalInertiaKgMm2World: inertia,
             inertiaSource: "CAD distribution scaled to component mass",
@@ -71,15 +66,7 @@ class SheetRouterAtcMass {
       }
       File.saveContent(
         'build/sheet-router-work/sr7/mass-y${Std.int(bed)}.json',
-        haxe.Json.stringify(
-          {
-            workY: bed,
-            parts: rows,
-            guideAllowanceKg: 3
-          },
-          null,
-          "  "
-        ) + "\n"
+        haxe.Json.stringify({workY: bed, parts: rows, guideAllowanceKg: 3}, null, "  ") + "\n"
       );
       fixture.close();
       Sys.println('SR7 mass Y=$bed: ' + rows.length + ' parts');

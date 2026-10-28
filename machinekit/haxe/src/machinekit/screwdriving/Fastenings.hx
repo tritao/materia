@@ -215,10 +215,7 @@ class Fastenings {
             axis,
             clearance.maximum,
             Math.min(tip, target.bore.minimum),
-            Math.min(
-              clearance.radius,
-              target.bore.radius
-            )
+            Math.min(clearance.radius, target.bore.radius)
           )) {
             diagnostics.error(
               "fastening.blocked-path",
@@ -266,19 +263,9 @@ class Fastenings {
         }
         if (valid) fastenings.push(new Fastening(
           {member: id, faceName: external.attribute.faceName},
-          {
-            member: clamp,
-            faceName: clearance.name
-          },
-          {
-            member: target.member,
-            faceName: target.thread.attribute.faceName
-          },
-          new Plane(
-            origin.add(axis.scale(target.bore.minimum)),
-            external.frame.xDirection,
-            axis
-          ),
+          {member: clamp, faceName: clearance.name},
+          {member: target.member, faceName: target.thread.attribute.faceName},
+          new Plane(origin.add(axis.scale(target.bore.minimum)), external.frame.xDirection, axis),
           origin.add(axis.scale(tip)),
           engagement,
           minimum,
@@ -371,14 +358,8 @@ class Fastenings {
         index: index,
         name: shape.elementName(CadKit.ShapeKind.Face, index),
         radius: radius,
-        minimum: Math.min(
-          first,
-          last
-        ),
-        maximum: Math.max(
-          first,
-          last
-        )
+        minimum: Math.min(first, last),
+        maximum: Math.max(first, last)
       };
     } catch (error:Dynamic) {
       face.close();
@@ -448,11 +429,7 @@ class Fastenings {
       var result = local.placed(new Location(new Plane(
         new Vector(pose.x, pose.y, pose.z),
         new Vector(x.x, x.y, x.z),
-        new Vector(
-          z.x,
-          z.y,
-          z.z
-        )
+        new Vector(z.x, z.y, z.z)
       )));
       local.close();
       return result;

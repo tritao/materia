@@ -66,11 +66,7 @@ class AssemblyPreview {
       };
       var massKey = haxe.Json.stringify({
         mass: mass.mass,
-        centre: [
-          mass.centreOfMass.x,
-          mass.centreOfMass.y,
-          mass.centreOfMass.z
-        ],
+        centre: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
         inertia: inertiaKey,
         declared: declared
       });
@@ -215,10 +211,7 @@ class AssemblyPreview {
       chains.push({
         occurrence: entry.id,
         fixed: {occurrence: prefix + routed.fixedHost, connector: routed.endConnector},
-        moving: {
-          occurrence: prefix + routed.movingHost,
-          connector: routed.endConnector
-        },
+        moving: {occurrence: prefix + routed.movingHost, connector: routed.endConnector},
         axisJoint: prefix + routed.axis,
         bendRadius: chain.n("bendRadius"),
         innerWidth: chain.n("innerWidth"),

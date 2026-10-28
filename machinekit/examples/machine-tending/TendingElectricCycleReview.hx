@@ -313,11 +313,7 @@ class TendingElectricCycleReview {
     };
     sys.io.File.saveContent(
       root + (clearanceFirst ? "electric-cycle-review-clearance-first.json" : "electric-cycle-review.json"),
-      haxe.Json.stringify(
-        report,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(report, null, "  ")
     );
     Sys
       .println('Reviewed ${steps.length} production operations, $cuts cuts, ${blocked.length} access/withdrawal blockers; model simulation passed=${simulation.passed}; programReady=false');

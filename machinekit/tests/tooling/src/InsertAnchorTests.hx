@@ -46,16 +46,7 @@ class InsertAnchorTests {
     );
     var base = new CastInsert(values), spec = base.insertSpec();
     var anchorage = InsertAnchorGeometry.choose(spec, {
-      demand: InsertAnchorGeometry.demand(
-        spec,
-        "fixture-demand-v1",
-        1.5,
-        0,
-        [
-          "back-left",
-          "back-right"
-        ]
-      ),
+      demand: InsertAnchorGeometry.demand(spec, "fixture-demand-v1", 1.5, 0, ["back-left", "back-right"]),
       minimumEmbedmentMm: 10,
       minimumBearingAreaMm2: 20,
       minimumSpacingMm: 5,
@@ -72,24 +63,12 @@ class InsertAnchorTests {
   }
   static function foundationGeometry(source:CastInsert):Void {
     var foundation = new machinekit.structural.MineralFoundation(
-      new machinekit.component.ComponentValues().setNumber(
-        "width",
-        120
-      ).setNumber(
-        "depth",
-        100
-      ).setNumber(
-        "height",
-        80
-      ),
+      new machinekit.component.ComponentValues().setNumber("width",
+      120).setNumber("depth", 100).setNumber("height", 80),
       [{
         id: "seat",
         part: source,
-        pose: F.translation(
-          0,
-          0,
-          60
-        ),
+        pose: F.translation(0, 0, 60),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       }]
     );
@@ -98,10 +77,7 @@ class InsertAnchorTests {
     var context = machinekit.tooling.FoundationAssemblyContext.snapshot(
       foundation,
       "casting",
-      [{
-        id: "seat",
-        member: "seat"
-      }]
+      [{id: "seat", member: "seat"}]
     );
     var input = machinekit.tooling.FoundationToolingAdapter.snapshot(foundation, "anchored-foundation", 1, context);
     check(
@@ -126,10 +102,8 @@ class InsertAnchorTests {
     };
     sourceRules.minimumCoverMm = 50;
     check(
-      machinekit.tooling.InsertAnchorGeometry.review(input).filter(record -> StringTools.endsWith(
-        record.rule,
-        ".cover"
-      ) && record.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail
+      machinekit.tooling.InsertAnchorGeometry.review(input).filter(record -> StringTools.endsWith(record.rule,
+      ".cover") && record.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail
       && record.affectedIds[0] == "seat").length == 2,
       "casting cover is checked against native boundary faces and reports the insert owner"
     );
@@ -256,10 +230,8 @@ class InsertAnchorTests {
     var anchorFill:materia.tooling.process.FillAnalysis.FillReport = cast nativeProcess.fill;
     check(anchorFill.trappedPockets.length == 0, "continuous flanges and external hexes create no washer/socket trap");
     check(
-      nativeProcess.castability.proposals.filter(proposal -> StringTools.startsWith(
-        proposal.rule,
-        "process.fill.trap."
-      )).length == 0,
+      nativeProcess.castability.proposals.filter(proposal -> StringTools.startsWith(proposal.rule,
+      "process.fill.trap.")).length == 0,
       "a genuinely trap-free anchor layout needs no vent or pre-pour seal workaround"
     );
     check(
@@ -442,13 +414,7 @@ class InsertAnchorTests {
         0
       );
       var hollow = new machinekit.structural.MineralFoundation(
-        new machinekit.component.ComponentValues().setNumber(
-          "width",
-          120
-        ).setNumber(
-          "depth",
-          100
-        ).setNumber(
+        new machinekit.component.ComponentValues().setNumber("width", 120).setNumber("depth", 100).setNumber(
           "height",
           80
         ).setToken(
@@ -518,10 +484,7 @@ class InsertAnchorTests {
     var values = CastInsert.boxValues(60,
       50, 20).setToken("role", materia.casting.InsertSpec.InsertRole.GenericMount).setToken(
         "holes",
-        InsertHoles.tappedBlind(
-          InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()),
-          20
-        )
+        InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()), 20)
       );
     var source = new CastInsert(values), origin = source.insertSpec().origin;
     switch origin {
@@ -536,13 +499,7 @@ class InsertAnchorTests {
     values.setToken("origin", haxe.Json.stringify(materia.casting.InsertOrigin.InsertOriginCodec.record(origin)));
     source = new CastInsert(values);
     var rules:materia.casting.InsertAnchorage.InsertAnchorRules = {
-      demand: InsertAnchorGeometry.demand(
-        source.insertSpec(),
-        "source-pattern-demand-v1",
-        1.5,
-        0,
-        []
-      ),
+      demand: InsertAnchorGeometry.demand(source.insertSpec(), "source-pattern-demand-v1", 1.5, 0, []),
       minimumEmbedmentMm: 10,
       minimumBearingAreaMm2: 20,
       minimumSpacingMm: 5,
@@ -612,119 +569,35 @@ class InsertAnchorTests {
     }> = [
       {
         points: [
-          {
-            x: -5.0,
-            y: -5.0,
-            z: 3.0
-          },
-          {
-            x: 5.0,
-            y: -5.0,
-            z: 3.0
-          },
-          {
-            x: 5.0,
-            y: 5.0,
-            z: 3.0
-          },
-          {
-            x: -5.0,
-            y: 5.0,
-            z: 3.0
-          }
+          {x: -5.0, y: -5.0, z: 3.0},
+          {x: 5.0, y: -5.0, z: 3.0},
+          {x: 5.0, y: 5.0, z: 3.0},
+          {x: -5.0, y: 5.0, z: 3.0}
         ],
-        normal: {
-          x: 0.0,
-          y: 0.0,
-          z: 1.0
-        }
+        normal: {x: 0.0, y: 0.0, z: 1.0}
+      },
+      {
+        points: [{x: 2.0,
+      y: 2.0, z: 0.5}, {x: 3.0, y: 2.0, z: 0.5}, {x: 3.0, y: 3.0, z: 0.5}, {x: 2.0, y: 3.0, z: 0.5}],
+      normal: {x: 0.0, y: 0.0, z: 1.0}
+    },
+      {
+        points: [
+          {x: 3.0, y: -0.2, z: 0.3},
+          {x: 3.0, y: 0.2, z: 0.3},
+          {x: 3.0, y: 0.2, z: 0.7},
+          {x: 3.0, y: -0.2, z: 0.7}
+        ],
+        normal: {x: 1.0, y: 0.0, z: 0.0}
       },
       {
         points: [
-          {
-            x: 2.0,
-            y: 2.0,
-            z: 0.5
-          },
-          {
-            x: 3.0,
-            y: 2.0,
-            z: 0.5
-          },
-          {
-            x: 3.0,
-            y: 3.0,
-            z: 0.5
-          },
-          {
-            x: 2.0,
-            y: 3.0,
-            z: 0.5
-          }
+          {x: -5.0, y: -5.0, z: 10.0},
+          {x: 10.0, y: -5.0, z: -5.0},
+          {x: 10.0, y: 5.0, z: -5.0},
+          {x: -5.0, y: 5.0, z: 10.0}
         ],
-        normal: {
-          x: 0.0,
-          y: 0.0,
-          z: 1.0
-        }
-      },
-      {
-        points: [
-          {
-            x: 3.0,
-            y: -0.2,
-            z: 0.3
-          },
-          {
-            x: 3.0,
-            y: 0.2,
-            z: 0.3
-          },
-          {
-            x: 3.0,
-            y: 0.2,
-            z: 0.7
-          },
-          {
-            x: 3.0,
-            y: -0.2,
-            z: 0.7
-          }
-        ],
-        normal: {
-          x: 1.0,
-          y: 0.0,
-          z: 0.0
-        }
-      },
-      {
-        points: [
-          {
-            x: -5.0,
-            y: -5.0,
-            z: 10.0
-          },
-          {
-            x: 10.0,
-            y: -5.0,
-            z: -5.0
-          },
-          {
-            x: 10.0,
-            y: 5.0,
-            z: -5.0
-          },
-          {
-            x: -5.0,
-            y: 5.0,
-            z: 10.0
-          }
-        ],
-        normal: {
-          x: Math.sqrt(0.5),
-          y: 0.0,
-          z: Math.sqrt(0.5)
-        }
+        normal: {x: Math.sqrt(0.5), y: 0.0, z: Math.sqrt(0.5)}
       }
     ];
     for (target in targets) {
@@ -745,16 +618,8 @@ class InsertAnchorTests {
         }
         ]};
         var actual = cylinder.shape.distance(sketch.shape), screen = InsertAnchorScreen.cylinderFace(
-          {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0
-          },
-          {
-            x: 0.0,
-            y: 0.0,
-            z: 1.0
-          },
+          {x: 0.0, y: 0.0, z: 0.0},
+          {x: 0.0, y: 0.0, z: 1.0},
           1,
           1,
           face
@@ -820,11 +685,7 @@ class InsertAnchorTests {
     var rows:Array<machinekit.structural.MineralFoundation.CastInsertPlacement> = [];
     for (diameter in [4, 12]) {
       var part = new machinekit.structural.CastInsert(machinekit.structural.CastInsert.precastHoles(
-        machinekit.structural.CastInsert.boxValues(
-          100,
-          80,
-          30
-        ),
+        machinekit.structural.CastInsert.boxValues(100, 80, 30),
         machinekit.structural.InsertHoles.tappedBlind(
           machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(diameter).mating()),
           30
@@ -836,11 +697,7 @@ class InsertAnchorTests {
       rows.push({
         id: "seat-" + diameter,
         part: part,
-        pose: materia.assembly.AssemblyFrames.translation(
-          diameter == 4 ? -100 : 100,
-          0,
-          70
-        ),
+        pose: materia.assembly.AssemblyFrames.translation(diameter == 4 ? -100 : 100, 0, 70),
         openings : [materia.casting.CastingPatterns.face("body.z-max")]
       });
     }
@@ -884,24 +741,14 @@ class InsertAnchorTests {
     var collisionValues = source.values().copy().setToken("holes", InsertHoles.fromNeutral(colliding.holes));
     rejects(
       () -> new machinekit.structural.MineralFoundation(
-        new machinekit.component.ComponentValues().setNumber(
-          "width",
-          120
-        ).setNumber(
-          "depth",
-          100
-        ).setNumber(
+        new machinekit.component.ComponentValues().setNumber("width", 120).setNumber("depth", 100).setNumber(
           "height",
           80
         ),
         [{
           id: "seat",
           part: new CastInsert(collisionValues),
-          pose: F.translation(
-            0,
-            0,
-            60
-          ),
+          pose: F.translation(0, 0, 60),
           openings: [materia.casting.CastingPatterns.face("body.z-max")]
         }]
       ),
@@ -959,17 +806,7 @@ class InsertAnchorTests {
         0,
         0,
         1,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
+        [1, 0, 0, 0, -1, 0, 0, 0, -1]
       )),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
       allowanceMm: 1,
@@ -1011,20 +848,12 @@ class InsertAnchorTests {
     var fit = materia.casting.ThreadedFastenerFit.checkIntervals(
       serviceHole,
       serviceHole.frame,
-      {
-        shankLength: occupied.screw.lengthMm,
-        threadedLength: occupied.screw.threadedLengthMm,
-        bearingFrame: bearing
-      },
+      {shankLength: occupied.screw.lengthMm, threadedLength: occupied.screw.threadedLengthMm, bearingFrame: bearing},
       occupied.id
     ).concat(materia.casting.ThreadedFastenerFit.checkIntervals(
       rawHole,
       rawHole.frame,
-      {
-        shankLength: occupied.screw.lengthMm,
-        threadedLength: occupied.screw.threadedLengthMm,
-        bearingFrame: bearing
-      },
+      {shankLength: occupied.screw.lengthMm, threadedLength: occupied.screw.threadedLengthMm, bearingFrame: bearing},
       occupied.id
     ));
     check(

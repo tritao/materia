@@ -37,10 +37,7 @@ class MillFramePreview {
         yRailLength: railEnd - railStart,
         columnFront: column.y - reference.column.depth / 2,
         columnHeight: reference.column.height + rise + 40 + spindleStackRise(reference),
-        zRailSpacing: Math.max(
-          180,
-          reference.column.railSpacing
-        ),
+        zRailSpacing: Math.max(180, reference.column.railSpacing),
         zRailStart: z.z - reference.base.height + 100,
         zRailLength: zRail.length + rise - 60 + spindleStackRise(reference)
       },
@@ -94,10 +91,7 @@ class MillFramePreview {
     result.addMemberConnector(
       "frame/column/railZLeft",
       "axisSeat",
-      F.compose(
-        F.inverse(framePoses.get("column/railZLeft")),
-        plate
-      )
+      F.compose(F.inverse(framePoses.get("column/railZLeft")), plate)
     );
     result.addMemberConnector("zAxis/fixedMount", "frameSeat", F.identity());
     result.addMate("z-on-column", "fixed", "frame/column/railZLeft", "axisSeat", "zAxis/fixedMount", "frameSeat");
@@ -134,10 +128,7 @@ class MillFramePreview {
     result.addMemberConnector(
       "frame/base/casting",
       "stageSeat",
-      F.compose(
-        F.inverse(poses.get("base/casting")),
-        xy.zeroPose("railYLeft")
-      )
+      F.compose(F.inverse(poses.get("base/casting")), xy.zeroPose("railYLeft"))
     );
     result.addMemberConnector("xyStage/railYLeft", "frameSeat", F.identity());
     result.addMate("xy-on-base", "fixed", "frame/base/casting", "stageSeat", "xyStage/railYLeft", "frameSeat");
@@ -173,11 +164,7 @@ class MillFramePreview {
     spindleParts.addComponent(
       "tool",
       tool,
-      F.translation(
-        0,
-        spindleLayout.spindleY,
-        spindleOrigin.z - 35 - reference.tool.stickout
-      )
+      F.translation(0, spindleLayout.spindleY, spindleOrigin.z - 35 - reference.tool.stickout)
     );
     spindleParts.addMemberConnector("holder", "toolSeat", F.translation(0, 0, -35 - reference.tool.stickout));
     spindleParts.addMemberConnector("tool", "seat", F.identity());
@@ -205,10 +192,7 @@ class MillFramePreview {
       )) parts.push(AssemblyPreview.part(
         member.id,
         member.component.description,
-        cache.posed(
-          member.component,
-          poses.get(member.id)
-        ),
+        cache.posed(member.component, poses.get(member.id)),
         member.component.materialId
       ));
     catch (e:Dynamic) {
@@ -240,41 +224,19 @@ class MillFramePreview {
     frame:BenchMillFrame,
     directory:String,
     clearancesVerified:Bool,
-    ?extraPose: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    ?extraPose: {x: Float, y: Float, z: Float}
   ):Dynamic {
     var l = frame.layout, z:MillZAxisLayout = frame.zAxis, xy:MillXYStageLayout = frame.xyAxis;
     var report = {
       status: "mechanical XYZ concept; not qualified for manufacture",
       units: "mm",
-      analysisReference: MillFemReference.capture(
-        assembly,
-        frame,
-        extraPose
-      ),
+      analysisReference: MillFemReference.capture(assembly, frame, extraPose),
       travel: [
-        {
-          axis: "x",
-          travel: 2 * xy.xHalfTravel
-        },
-        {
-          axis: "y",
-          travel: 2 * xy.yHalfTravel
-        },
-        {
-          axis: "z",
-          travel: -z.lower
-        }
+        {axis: "x", travel: 2 * xy.xHalfTravel},
+        {axis: "y", travel: 2 * xy.yHalfTravel},
+        {axis: "z", travel: -z.lower}
       ],
-      base: {
-        width: l.baseWidth,
-        depth: l.baseDepth,
-        height: l.baseHeight,
-        railPlane: l.railPlane
-      },
+      base: {width: l.baseWidth, depth: l.baseDepth, height: l.baseHeight, railPlane: l.railPlane},
       column: {
         width: l.columnWidth,
         depth: l.columnDepth,
@@ -300,17 +262,8 @@ class MillFramePreview {
         yBayLocation : "lower column",
         yServiceRear : xy.yServiceRear
       },
-      z : {
-        screwX : 0,
-        screwY : z.screwY,
-        guideSpacing : l.zRailSpacing,
-        lower : z.lower,
-        upper : 0
-      },
-      castingMassKg : {
-        base : frame.base.castingByWeight().kg,
-        column : frame.column.castingByWeight().kg
-      },
+      z : {screwX : 0, screwY : z.screwY, guideSpacing : l.zRailSpacing, lower : z.lower, upper : 0},
+      castingMassKg : {base : frame.base.castingByWeight().kg, column : frame.column.castingByWeight().kg},
       pending : [
         "BT30 study axial interfaces, release force/stroke and supplier selection",
         "guide/block drilling, vendor mounting patterns and installed fasteners",
@@ -340,24 +293,9 @@ class MillFramePreview {
     if (!sys.FileSystem.exists(directory)) sys.FileSystem.createDirectory(directory);
     for (entry in [
       {name: "mill-frame", assembly: cast(frame, MachineAssembly)},
-      {
-        name: "mill-z-axis",
-        assembly: structure(frame)
-      },
-      {
-        name: "mill-xy-stage",
-        assembly: cast(
-          new MillXYStage(xy),
-          MachineAssembly
-        )
-      },
-      {
-        name: "mill-frame-concept",
-        assembly: concept(
-          reference,
-          frame
-        )
-      }
+      {name: "mill-z-axis", assembly: structure(frame)},
+      {name: "mill-xy-stage", assembly: cast(new MillXYStage(xy), MachineAssembly)},
+      {name: "mill-frame-concept", assembly: concept(reference, frame)}
     ]) {
       var path = directory + "/" + entry.name + ".mtrg";
       sys.io.File.saveBytes(

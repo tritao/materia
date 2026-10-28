@@ -74,11 +74,7 @@ class HeaterCartridge extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.heater-cartridge",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "CARTRIDGE-6x20-24V-40W"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "CARTRIDGE-6x20-24V-40W")],
       v -> new HeaterCartridge(v.token("designation"))
     );
     return recipe;
@@ -92,11 +88,7 @@ class HeaterCartridge extends MachineComponent {
     );
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.cylinderSpan(
-      spec.diameter / 2,
-      0,
-      spec.length
-    ),
+    Part.cylinderSpan(spec.diameter / 2, 0, spec.length),
     "body"
   );
 }

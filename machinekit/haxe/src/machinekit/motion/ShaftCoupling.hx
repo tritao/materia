@@ -73,14 +73,7 @@ class ShaftCoupling extends MachineComponent {
       addConnector(
         'setScrew${i++}',
         Mount,
-        AssemblyFrames.alongY(
-          x,
-          y,
-          hole.z,
-          Math.cos(hole.angle),
-          Math.sin(hole.angle),
-          0
-        )
+        AssemblyFrames.alongY(x, y, hole.z, Math.cos(hole.angle), Math.sin(hole.angle), 0)
       );
     }
   }
@@ -91,26 +84,11 @@ class ShaftCoupling extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.shaft-coupling",
       [
-        ComponentRecipeSupport.length(
-          "boreA",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "boreB",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "outerDiameter",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          30
-        ),
-        ComponentRecipeSupport.text(
-          "setScrews",
-          '[{"z":7.5,"angle":0},{"z":22.5,"angle":0}]'
-        )
+        ComponentRecipeSupport.length("boreA", 8),
+        ComponentRecipeSupport.length("boreB", 8),
+        ComponentRecipeSupport.length("outerDiameter", 20),
+        ComponentRecipeSupport.length("length", 30),
+        ComponentRecipeSupport.text("setScrews", '[{"z":7.5,"angle":0},{"z":22.5,"angle":0}]')
       ],
       v -> new ShaftCoupling(
         v.number("boreA"),
@@ -162,15 +140,7 @@ class ShaftCoupling extends MachineComponent {
       var radial = new Vector(Math.cos(hole.angle), Math.sin(hole.angle), 0);
       var start = radial.scale(outerDiameter / 2 + 0.1).add(new Vector(0, 0, hole.z));
       tools.push(Solids.named(
-        Part.cylinderAlong(
-          screwRadius,
-          start,
-          radial.scale(-1),
-          (outerDiameter - Math.min(
-            boreA,
-            boreB
-          )) / 2 + 0.2
-        ),
+        Part.cylinderAlong(screwRadius, start, radial.scale(-1), (outerDiameter - Math.min(boreA, boreB)) / 2 + 0.2),
         "setscrew" + (setScrews.indexOf(hole) + 1)
       ));
     }
@@ -190,10 +160,7 @@ class ShaftCoupling extends MachineComponent {
 
   static function defaultSetScrews(length:Float):Array<ShaftCouplingSetScrew> return [
     {z: length * 0.25, angle: 0},
-    {
-      z: length * 0.75,
-      angle: 0
-    }
+    {z: length * 0.75, angle: 0}
   ];
 
   function validateSetScrews(holes:Array<ShaftCouplingSetScrew>):Void {

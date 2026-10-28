@@ -285,10 +285,7 @@ class FormerShopExport {
               profiles: [],
               cuts: [],
               pieces: [],
-              regions: [MoldRegions.moved(
-                board.region,
-                F.inverse(member.pose)
-              )]
+              regions: [MoldRegions.moved(board.region, F.inverse(member.pose))]
             })
           );
         }
@@ -300,10 +297,7 @@ class FormerShopExport {
             profiles: [],
             cuts: [],
             pieces: [],
-            regions: [MoldRegions.moved(
-              attachment.region,
-              F.inverse(attachment.pose)
-            )]
+            regions: [MoldRegions.moved(attachment.region, F.inverse(attachment.pose))]
           });
           assembly.addComponent(attachment.id, component, attachment.pose);
           var fixed = panels.members[0];
@@ -343,11 +337,7 @@ class FormerShopExport {
         part,
         board.id,
         machining.stockToMold,
-        [
-          0,
-          machining.heightMm / 2,
-          machining.heightMm
-        ]
+        [0, machining.heightMm / 2, machining.heightMm]
       ) catch (error:Dynamic) {
         part.close();
         throw error;

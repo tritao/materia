@@ -24,11 +24,7 @@ class SheetGrip {
   /** The grip frame follows wall FK; its normal always points away from stock material. */
   public function frame(sheet:Sheet,
     pose:PressSheetPose):Location return pose.wall(wall).compose(new Location(new Plane(
-      new Vector(
-        center.x,
-        center.y,
-        faceA ? 0 : -sheet.thickness()
-      ),
+      new Vector(center.x, center.y, faceA ? 0 : -sheet.thickness()),
       Vector.X(),
       faceA ? Vector.Z() : Vector.Z().scale(-1)
     )));

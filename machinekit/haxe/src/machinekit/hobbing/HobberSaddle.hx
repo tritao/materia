@@ -30,35 +30,16 @@ class HobberSaddle extends MachineComponent {
       ],
       "GE-Z-saddle"
     ),
-    P.quantity(
-      "tableFaceDiameter",
-      200,
-      "mm"
-    ),
-    P.quantity(
-      "tableHousingDiameter",
-      260,
-      "mm"
-    ),
-    P.quantity(
-      "tableFaceHeight",
-      228,
-      "mm"
-    ),
-    P.quantity(
-      "tableSeatHeight",
-      18,
-      "mm"
-    )
+    P.quantity("tableFaceDiameter", 200, "mm"),
+    P.quantity("tableHousingDiameter", 260, "mm"),
+    P.quantity("tableFaceHeight", 228, "mm"),
+    P.quantity("tableSeatHeight", 18, "mm")
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.hobbing.saddle",
       parameters(),
-      v -> new HobberSaddle(
-        v.token("design"),
-        v
-      )
+      v -> new HobberSaddle(v.token("design"), v)
     );
     return recipe;
   }
@@ -98,17 +79,7 @@ class HobberSaddle extends MachineComponent {
     var p = Part.cylinderSpan(radius, x0, x1);
     var q = machinekit.assembly.PosedParts.moved(
       p,
-      machinekit.assembly.AxisBuilder.orient(
-        0,
-        y,
-        z,
-        [0.0, 0, 1],
-        [
-          1.0,
-          0,
-          0
-        ]
-      )
+      machinekit.assembly.AxisBuilder.orient(0, y, z, [0.0, 0, 1], [1.0, 0, 0])
     );
     p.close();
     return q;
@@ -142,45 +113,13 @@ class HobberSaddle extends MachineComponent {
           box(240, 386, -245, 245, 260, 280),
           box(60, 386, -245, -195, 260, 280),
           box(60, 386, 195, 245, 260, 280),
-          Solids.cut(
-            box(
-              202.5,
-              222.5,
-              -35,
-              35,
-              155,
-              280
-            ),
-            [boreX(
-              8.2,
-              202.4,
-              222.6,
-              0,
-              180
-            )]
-          ),
-          box(
-            202.5,
-            260,
-            -35,
-            35,
-            260,
-            280
-          )
+          Solids.cut(box(202.5, 222.5, -35, 35, 155, 280), [boreX(8.2, 202.4, 222.6, 0, 180)]),
+          box(202.5, 260, -35, 35, 260, 280)
         ];
       case "GE-Z-saddle":
         [
           box(135, 148, -175, 175, -65, 170),
-          Solids.cut(
-            box(148, 215, -40, 40, 7.5, 27.5),
-            [Part.cylinderSpan(
-              8.2,
-              7.4,
-              27.6,
-              HobberZLayout.AXIS_X,
-              0
-            )]
-          )
+          Solids.cut(box(148, 215, -40, 40, 7.5, 27.5), [Part.cylinderSpan(8.2, 7.4, 27.6, HobberZLayout.AXIS_X, 0)])
         ];
       case "GE-swivel-plate":
         [box(85, 100, -115, 115, -95, 95)];
@@ -194,152 +133,31 @@ class HobberSaddle extends MachineComponent {
               {y: -65.0, z: -75.0},
               {y: 65.0, z: -75.0},
               {y: 90.0, z: -55.0},
-              {
-                y: 90.0,
-                z: 95.0
-              },
-              {
-                y: -130.0,
-                z: 95.0
-              }
+              {y: 90.0, z: 95.0},
+              {y: -130.0, z: 95.0}
             ]
           ),
-          box(
-            45,
-            57,
-            90,
-            240,
-            55,
-            95
-          ),
-          Solids.cut(
-            box(
-              -55,
-              57,
-              80,
-              100,
-              -55,
-              55
-            ),
-            [boreY(
-              45,
-              79.9,
-              100.1,
-              0,
-              0
-            )]
-          ),
-          Solids.cut(
-            box(
-              -55,
-              40,
-              200,
-              220,
-              -55,
-              55
-            ),
-            [boreY(
-              45,
-              199.9,
-              220.1,
-              0,
-              0
-            )]
-          ),
-          box(
-            40,
-            57,
-            200,
-            220,
-            45,
-            55
-          ),
-          Solids.cut(
-            box(
-              -45,
-              57,
-              -115,
-              -85,
-              -45,
-              45
-            ),
-            [box(
-              -30,
-              30,
-              -115.1,
-              -84.9,
-              -30,
-              30
-            )]
-          ),
-          Solids.cut(
-            box(
-              45,
-              95,
-              -45,
-              -27.5,
-              95,
-              170
-            ),
-            [boreY(
-              8.2,
-              -45.1,
-              -27.4,
-              70,
-              145
-            )]
-          )
+          box(45, 57, 90, 240, 55, 95),
+          Solids.cut(box(-55, 57, 80, 100, -55, 55), [boreY(45, 79.9, 100.1, 0, 0)]),
+          Solids.cut(box(-55, 40, 200, 220, -55, 55), [boreY(45, 199.9, 220.1, 0, 0)]),
+          box(40, 57, 200, 220, 45, 55),
+          Solids.cut(box(-45, 57, -115, -85, -45, 45), [box(-30, 30, -115.1, -84.9, -30, 30)]),
+          Solids.cut(box(45, 95, -45, -27.5, 95, 170), [boreY(8.2, -45.1, -27.4, 70, 145)])
         ];
       case "GE-Y-drive":
         [
           box(35, 45, -160, 130, 115, 190),
           box(35, 100, -115, -95, 95, 115),
           box(35, 115, 100, 130, 185, 190),
-          Solids.cut(
-            box(
-              35,
-              115,
-              125,
-              130,
-              110,
-              190
-            ),
-            [boreY(
-              7.1,
-              124.9,
-              130.1,
-              70,
-              145
-            )]
-          )
+          Solids.cut(box(35, 115, 125, 130, 110, 190), [boreY(7.1, 124.9, 130.1, 70, 145)])
         ];
       case "GE-X-drive":
         [
           box(HobberXLayout.front().deckStart, HobberXLayout.front().motorFace, -45, 45, 140, 155),
-          box(
-            HobberXLayout.front().deckStart,
-            HobberXLayout.front().motorFace - 10,
-            40,
-            45,
-            155,
-            190
-          ),
+          box(HobberXLayout.front().deckStart, HobberXLayout.front().motorFace - 10, 40, 45, 155, 190),
           Solids.cut(
-            box(
-              HobberXLayout.front().motorFace - 5,
-              HobberXLayout.front().motorFace,
-              -45,
-              45,
-              150,
-              220
-            ),
-            [boreX(
-              7.1,
-              HobberXLayout.front().motorFace - 5.1,
-              HobberXLayout.front().motorFace + 0.1,
-              0,
-              180
-            )]
+            box(HobberXLayout.front().motorFace - 5, HobberXLayout.front().motorFace, -45, 45, 150, 220),
+            [boreX(7.1, HobberXLayout.front().motorFace - 5.1, HobberXLayout.front().motorFace + 0.1, 0, 180)]
           )
         ];
       case "GE-Z-drive":
@@ -347,29 +165,8 @@ class HobberSaddle extends MachineComponent {
           box(226, 241, -50, 50, 300, 780),
           box(205, 226, -35, 35, 670, 695),
           box(205, 226, -35, 35, 312.5, 332.5),
-          Solids.cut(
-            box(
-              125,
-              241,
-              -55,
-              55,
-              750,
-              765
-            ),
-            [couplingWindow(
-              HobberZLayout.AXIS_X,
-              749.9,
-              765.1
-            )]
-          ),
-          box(
-            226,
-            231,
-            50,
-            85,
-            310,
-            730
-          )
+          Solids.cut(box(125, 241, -55, 55, 750, 765), [couplingWindow(HobberZLayout.AXIS_X, 749.9, 765.1)]),
+          box(226, 231, 50, 85, 310, 730)
         ];
       case "GE-chip-tray":
         // Removable stationary skirt: 5 mm radial face clearance, 15 mm housing
@@ -383,54 +180,17 @@ class HobberSaddle extends MachineComponent {
             {r: lip + 2, z: top},
             {r: skirt + 2, z: shoulder},
             {r: skirt + 2, z: bottom},
-            {
-              r: skirt,
-              z: bottom
-            },
-            {
-              r: skirt,
-              z: shoulder
-            },
-            {
-              r: lip,
-              z: top - 2
-            }
+            {r: skirt, z: bottom},
+            {r: skirt, z: shoulder},
+            {r: lip, z: top - 2}
           ]),
           Solids.cut(
             Solids.union([
-              box(
-                -245,
-                90,
-                -170,
-                170,
-                135,
-                139
-              ),
-              box(
-                -245,
-                90,
-                -174,
-                -170,
-                135,
-                164
-              ),
-              box(
-                -245,
-                90,
-                170,
-                174,
-                135,
-                164
-              )
+              box(-245, 90, -170, 170, 135, 139),
+              box(-245, 90, -174, -170, 135, 164),
+              box(-245, 90, 170, 174, 135, 164)
             ]),
-            [box(
-              -skirt,
-              skirt,
-              -skirt,
-              skirt,
-              134,
-              165
-            )]
+            [box(-skirt, skirt, -skirt, skirt, 134, 165)]
           )
         ];
       case "GE-coolant":

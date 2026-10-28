@@ -21,12 +21,7 @@ class ToolingPanel extends MachineComponent {
   final record:PanelPlan;
   static function parameters():Array<machinekit.component.ComponentParameter> return [P.text(
     "plan",
-    PanelCodec.encode(PanelJoints.blank(
-      "panel",
-      100,
-      100,
-      PanelJoints.stock()
-    ))
+    PanelCodec.encode(PanelJoints.blank("panel", 100, 100, PanelJoints.stock()))
   )];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.tooling.panel", parameters(), v -> new ToolingPanel(v));

@@ -13,11 +13,7 @@ class MachineKitDocumentAssembly {
     for (name in instance.connectorNames()) model.connector(
       id,
       name,
-      PlacementFrames.toAssemblyFrame(DefinitionEvaluatorRegistry.connector(
-        definition,
-        instance,
-        name
-      ))
+      PlacementFrames.toAssemblyFrame(DefinitionEvaluatorRegistry.connector(definition, instance, name))
     );
   }
 }

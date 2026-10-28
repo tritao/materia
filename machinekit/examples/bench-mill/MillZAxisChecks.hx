@@ -45,11 +45,7 @@ class MillZAxisChecks {
     var l = MillFramePreview.zLayout(reference, f), frame = BenchMillFrame.create(
       f,
       l,
-      new MillXYStageLayout(
-        f,
-        l.spindleY,
-        BenchMill.RAIL
-      )
+      new MillXYStageLayout(f, l.spindleY, BenchMill.RAIL)
     ), axis = new MillZAxis(l);
     axis.validate();
     frame.validate();
@@ -117,12 +113,7 @@ class MillZAxisChecks {
       member.id,
       "brake-"
     )) near(
-      mountCache.overlap(
-        member.component,
-        poses.get(member.id),
-        l.fixed,
-        poses.get("motorMount")
-      ),
+      mountCache.overlap(member.component, poses.get(member.id), l.fixed, poses.get("motorMount")),
       0,
       "Z drive internals clear purchased housing: " + member.id
     );
@@ -246,30 +237,12 @@ class MillZAxisChecks {
       ["carriage", "blockLeftLower"],
       ["carriage", "blockLeftUpper"],
       ["carriage", "blockRightLower"],
-      [
-        "carriage",
-        "blockRightUpper"
-      ],
-      [
-        "motor",
-        "motorMount"
-      ],
-      [
-        "motorMount",
-        "fixedMount"
-      ],
-      [
-        "floatingBearing",
-        "floatingMount"
-      ],
-      [
-        "nut",
-        "carriage"
-      ],
-      [
-        "head",
-        "carriage"
-      ]
+      ["carriage", "blockRightUpper"],
+      ["motor", "motorMount"],
+      ["motorMount", "fixedMount"],
+      ["floatingBearing", "floatingMount"],
+      ["nut", "carriage"],
+      ["head", "carriage"]
     ]) {
       var first = axis.components().filter(member -> member.id == pair[0])[0].component.geometry();
       var second = axis.components().filter(member -> member.id == pair[1])[0].component.geometry();
@@ -288,14 +261,8 @@ class MillZAxisChecks {
     for (pair in [
       ["zAxis/head", "spindle/motorCarrier"],
       ["spindle/motorCarrier", "spindle/motor"],
-      [
-        "spindle/spindle",
-        "spindle/reactionFrame"
-      ],
-      [
-        "spindle/reactionFrame",
-        "spindle/cylinder"
-      ]
+      ["spindle/spindle", "spindle/reactionFrame"],
+      ["spindle/reactionFrame", "spindle/cylinder"]
     ]) {
       var first = study.components().filter(member -> member.id == pair[0])[0].component.geometry();
       var second = study.components().filter(member -> member.id == pair[1])[0].component.geometry();
@@ -317,20 +284,12 @@ class MillZAxisChecks {
     obstruction.addComponent(
       "releaseObstruction",
       new MillPanel(20, 20, 20),
-      F.translation(
-        0,
-        l.spindleY,
-        (l.headBottom + l.headHeight + 80) + 20
-      )
+      F.translation(0, l.spindleY, (l.headBottom + l.headHeight + 80) + 20)
     );
     obstruction.addComponent(
       "releaseCylinder",
       new MillPanel(20, 20, 20),
-      F.translation(
-        0,
-        l.spindleY,
-        (l.headBottom + l.headHeight + 80) + 20
-      )
+      F.translation(0, l.spindleY, (l.headBottom + l.headHeight + 80) + 20)
     );
     obstructed.include("spindle", obstruction);
     check(
@@ -359,11 +318,7 @@ class MillZAxisChecks {
       400,
       300,
       380,
-      {
-        spindle: new MillBeltSpindle(),
-        fixtureHeight: 100,
-        noseMin: 150
-      }
+      {spindle: new MillBeltSpindle(), fixtureHeight: 100, noseMin: 150}
     );
     near(explicit.zLayout().screwTop, compactZ.screwTop, "explicit default inputs give the same Z datums");
     var turret = new MillCapacityLayout(400, 300, 380, {toolChangeHeight: 120}), turretZ = turret.zLayout();

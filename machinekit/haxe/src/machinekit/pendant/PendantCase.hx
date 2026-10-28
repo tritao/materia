@@ -109,24 +109,10 @@ class PendantCase {
     connectorX:Float,
     connectorZ:Float,
     boardTop:Float,
-    standoffs:Array<{
-      x:Float,
-      y:Float
-    }>,
-    strapSlots:Array<{
-      x:Float,
-      y:Float
-    }>,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
-    ribs:Array<{
-      x:Float,
-      y:Float,
-      w:Float,
-      h:Float
-    }>,
+    standoffs:Array<{x:Float, y:Float}>,
+    strapSlots:Array<{x:Float, y:Float}>,
+    enabling:Null<{x:Float, y:Float}>,
+    ribs:Array<{x:Float, y:Float, w:Float, h:Float}>,
     notes:Array<String>
   ) {
     this.face = face;
@@ -369,10 +355,7 @@ class PendantCase {
     posts:Array<{x:Float, y:Float}>,
     connectorX:Float,
     wallY:Float,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>
+    enabling:Null<{x:Float, y:Float}>
   ):Array<{
     x:Float,
     y:Float
@@ -382,10 +365,7 @@ class PendantCase {
       [-half.x + 6, half.y - 6],
       [half.x - 6, half.y - 6],
       [-half.x + 6, -half.y + 6],
-      [
-        half.x - 6,
-        -half.y + 6
-      ]
+      [half.x - 6, -half.y + 6]
     ];
     var result:Array<{x:Float, y:Float}> = [];
     for (target in wanted) {
@@ -416,14 +396,8 @@ class PendantCase {
     posts:Array<{x:Float, y:Float}>,
     connectorX:Float,
     wallY:Float,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
-    taken:Array<{
-      x:Float,
-      y:Float
-    }>
+    enabling:Null<{x:Float, y:Float}>,
+    taken:Array<{x:Float, y:Float}>
   ):Bool {
     var need = STANDOFF_DIAMETER / 2 + 3.0;
     for (c in face.controls) if (c.behind() > PASS_THROUGH && FootprintGeometry.distanceTo(c.body(),
@@ -451,10 +425,7 @@ class PendantCase {
     standoffs:Array<{x:Float, y:Float}>,
     connectorX:Float,
     wallY:Float,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
+    enabling:Null<{x:Float, y:Float}>,
     boardTop:Float
   ):Array<{
     x:Float,
@@ -530,22 +501,11 @@ class PendantCase {
   static function ribFree(
     face:PanelLayout,
     rib: {x: Float, y: Float, w: Float, h: Float},
-    own: {
-      x: Float,
-      y: Float,
-      r: Float
-    },
-    towers:Array<{
-      x:Float,
-      y:Float,
-      r:Float
-    }>,
+    own: {x: Float, y: Float, r: Float},
+    towers:Array<{x:Float, y:Float, r:Float}>,
     connectorX:Float,
     wallY:Float,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
+    enabling:Null<{x:Float, y:Float}>,
     boardTop:Float
   ):Bool {
     var footprint = Rect(rib.w, rib.h);
@@ -571,16 +531,8 @@ class PendantCase {
     face:PanelLayout,
     posts:Array<{x:Float, y:Float}>,
     standoffs:Array<{x:Float, y:Float}>,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
-    ribs:Array<{
-      x:Float,
-      y:Float,
-      w:Float,
-      h:Float
-    }>
+    enabling:Null<{x:Float, y:Float}>,
+    ribs:Array<{x:Float, y:Float, w:Float, h:Float}>
   ):Array<{
     x:Float,
     y:Float
@@ -613,24 +565,10 @@ class PendantCase {
     x:Float,
     y:Float,
     posts:Array<{x:Float, y:Float}>,
-    standoffs:Array<{
-      x:Float,
-      y:Float
-    }>,
-    enabling:Null<{
-      x:Float,
-      y:Float
-    }>,
-    ribs:Array<{
-      x:Float,
-      y:Float,
-      w:Float,
-      h:Float
-    }>,
-    taken:Array<{
-      x:Float,
-      y:Float
-    }>
+    standoffs:Array<{x:Float, y:Float}>,
+    enabling:Null<{x:Float, y:Float}>,
+    ribs:Array<{x:Float, y:Float, w:Float, h:Float}>,
+    taken:Array<{x:Float, y:Float}>
   ):Bool {
     var slot = Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT);
     // A strap passes behind the parts: keep clear of any that leave less than 8 mm to the back wall.
@@ -750,16 +688,8 @@ class PendantCase {
       var side = enabling.x < 0 ? -1.0 : 1.0;
       tools.push(Part.cylinderAlong(
         ENABLING_HOLE / 2,
-        new Vector(
-          side * (face.width / 2 + 1.0),
-          enabling.y,
-          enablingZ(face)
-        ),
-        new Vector(
-          -side,
-          0.0,
-          0.0
-        ),
+        new Vector(side * (face.width / 2 + 1.0), enabling.y, enablingZ(face)),
+        new Vector(-side, 0.0, 0.0),
         face.wall + 2.0
       ));
     }
@@ -841,10 +771,7 @@ class PendantCase {
     var inner = RoundedRectangle.box(
       face.width - 2 * (inset + TONGUE_WIDTH),
       face.height - 2 * (inset + TONGUE_WIDTH),
-      Math.max(
-        radius - TONGUE_WIDTH,
-        0.5
-      ),
+      Math.max(radius - TONGUE_WIDTH, 0.5),
       -TONGUE_HEIGHT - 1.0,
       1.0
     );

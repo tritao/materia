@@ -37,24 +37,8 @@ class Fan extends MachineComponent {
       "fan",
       s -> s.designation,
       [
-        {
-          designation: "FAN-4010-24V",
-          blower: false,
-          width: 40.0,
-          depth: 40.0,
-          height: 10.0,
-          volts: 24.0,
-          watts: 1.5
-        },
-        {
-          designation: "BLOWER-5015-24V",
-          blower: true,
-          width: 50.0,
-          depth: 50.0,
-          height: 15.0,
-          volts: 24.0,
-          watts: 2.4
-        }
+        {designation: "FAN-4010-24V", blower: false, width: 40.0, depth: 40.0, height: 10.0, volts: 24.0, watts: 1.5},
+        {designation: "BLOWER-5015-24V", blower: true, width: 50.0, depth: 50.0, height: 15.0, volts: 24.0, watts: 2.4}
       ],
       _ -> ({
         source: "Assumed common axial fan and blower sizes; no vendor verification",
@@ -84,11 +68,7 @@ class Fan extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.fan",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "FAN-4010-24V"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "FAN-4010-24V")],
       v -> new Fan(v.token("designation"))
     );
     return recipe;
@@ -106,14 +86,8 @@ class Fan extends MachineComponent {
       // The square frame around the rotor, its hub, and the four corner screw holes.
       var pitch = 0.8 * spec.width, frame = Solids.cut(
         envelope(),
-        [Solids.named(
-          Part.cylinderSpan(
-            0.47 * spec.width,
-            -0.1,
-            spec.height + 0.1
-          ),
-          "rotor-bore"
-        )].concat([for (i in 0...4) Solids.named(
+        [Solids.named(Part.cylinderSpan(0.47 * spec.width,
+        -0.1, spec.height + 0.1), "rotor-bore")].concat([for (i in 0...4) Solids.named(
           Part.cylinderSpan(
             1.6,
             -0.1,
@@ -128,16 +102,8 @@ class Fan extends MachineComponent {
       var struts = [for (i in 0...4) Solids.named(
         Part.cylinderAlong(
           0.08 * spec.height,
-          new Vector(
-            0,
-            0,
-            0.3 * spec.height
-          ),
-          new Vector(
-            Math.cos(i * Math.PI / 2),
-            Math.sin(i * Math.PI / 2),
-            0
-          ),
+          new Vector(0, 0, 0.3 * spec.height),
+          new Vector(Math.cos(i * Math.PI / 2), Math.sin(i * Math.PI / 2), 0),
           0.49 * spec.width
         ),
         "strut"
@@ -147,11 +113,7 @@ class Fan extends MachineComponent {
     // The volute is a cylinder with a duct leaving it towards +X.
     var wheel = Solids.named(Part.cylinderSpan(spec.width / 2 - 1, 0, spec.height), "volute");
     var duct = Solids.named(
-      Part.box(spec.width / 2, spec.depth * 0.4, spec.height).translated(new Vector(
-        spec.width / 4,
-        0,
-        0
-      )),
+      Part.box(spec.width / 2, spec.depth * 0.4, spec.height).translated(new Vector(spec.width / 4, 0, 0)),
       "duct"
     );
     return Solids.union([wheel, duct]);

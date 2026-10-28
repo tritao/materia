@@ -43,160 +43,28 @@ class DeepGrooveBearing extends MachineComponent {
   public var width(get, never):Float;
 
   static function rows():Array<DeepGrooveBearingSpec> return [
-    {
-      designation: "625",
-      bore: 5,
-      outside: 16,
-      width: 5,
-      chamfer: 0.3
-    },
-    {
-      designation: "626",
-      bore: 6,
-      outside: 19,
-      width: 6,
-      chamfer: 0.3
-    },
-    {
-      designation: "608",
-      bore: 8,
-      outside: 22,
-      width: 7,
-      chamfer: 0.3
-    },
-    {
-      designation: "6000",
-      bore: 10,
-      outside: 26,
-      width: 8,
-      chamfer: 0.3
-    },
-    {
-      designation: "6001",
-      bore: 12,
-      outside: 28,
-      width: 8,
-      chamfer: 0.3
-    },
-    {
-      designation: "6002",
-      bore: 15,
-      outside: 32,
-      width: 9,
-      chamfer: 0.3
-    },
-    {
-      designation: "6003",
-      bore: 17,
-      outside: 35,
-      width: 10,
-      chamfer: 0.3
-    },
-    {
-      designation: "6004",
-      bore: 20,
-      outside: 42,
-      width: 12,
-      chamfer: 0.6
-    },
-    {
-      designation: "6200",
-      bore: 10,
-      outside: 30,
-      width: 9,
-      chamfer: 0.6
-    },
-    {
-      designation: "6201",
-      bore: 12,
-      outside: 32,
-      width: 10,
-      chamfer: 0.6
-    },
-    {
-      designation: "6202",
-      bore: 15,
-      outside: 35,
-      width: 11,
-      chamfer: 0.6
-    },
-    {
-      designation: "6203",
-      bore: 17,
-      outside: 40,
-      width: 12,
-      chamfer: 0.6
-    },
-    {
-      designation: "6204",
-      bore: 20,
-      outside: 47,
-      width: 14,
-      chamfer: 1.0
-    },
-    {
-      designation: "6205",
-      bore: 25,
-      outside: 52,
-      width: 15,
-      chamfer: 1.0
-    },
-    {
-      designation: "6206",
-      bore: 30,
-      outside: 62,
-      width: 16,
-      chamfer: 1.0
-    },
-    {
-      designation: "6207",
-      bore: 35,
-      outside: 72,
-      width: 17,
-      chamfer: 1.1
-    },
-    {
-      designation: "6208",
-      bore: 40,
-      outside: 80,
-      width: 18,
-      chamfer: 1.1
-    },
-    {
-      designation: "6209",
-      bore: 45,
-      outside: 85,
-      width: 19,
-      chamfer: 1.1
-    },
-    {
-      designation: "6210",
-      bore: 50,
-      outside: 90,
-      width: 20,
-      chamfer: 1.1
-    },
-    {
-      designation: "6211",
-      bore: 55,
-      outside: 100,
-      width: 21,
-      chamfer: 1.5
-    },
-    {
-      designation: "6212",
-      bore: 60,
-      outside: 110,
-      width: 22,
-      chamfer: 1.5
-    },
-    {
-      designation: "6213",
-      bore: 65,
-      outside: 120,
-      width: 23,
-      chamfer: 1.5
-    },
+    {designation: "625", bore: 5, outside: 16, width: 5, chamfer: 0.3},
+    {designation: "626", bore: 6, outside: 19, width: 6, chamfer: 0.3},
+    {designation: "608", bore: 8, outside: 22, width: 7, chamfer: 0.3},
+    {designation: "6000", bore: 10, outside: 26, width: 8, chamfer: 0.3},
+    {designation: "6001", bore: 12, outside: 28, width: 8, chamfer: 0.3},
+    {designation: "6002", bore: 15, outside: 32, width: 9, chamfer: 0.3},
+    {designation: "6003", bore: 17, outside: 35, width: 10, chamfer: 0.3},
+    {designation: "6004", bore: 20, outside: 42, width: 12, chamfer: 0.6},
+    {designation: "6200", bore: 10, outside: 30, width: 9, chamfer: 0.6},
+    {designation: "6201", bore: 12, outside: 32, width: 10, chamfer: 0.6},
+    {designation: "6202", bore: 15, outside: 35, width: 11, chamfer: 0.6},
+    {designation: "6203", bore: 17, outside: 40, width: 12, chamfer: 0.6},
+    {designation: "6204", bore: 20, outside: 47, width: 14, chamfer: 1.0},
+    {designation: "6205", bore: 25, outside: 52, width: 15, chamfer: 1.0},
+    {designation: "6206", bore: 30, outside: 62, width: 16, chamfer: 1.0},
+    {designation: "6207", bore: 35, outside: 72, width: 17, chamfer: 1.1},
+    {designation: "6208", bore: 40, outside: 80, width: 18, chamfer: 1.1},
+    {designation: "6209", bore: 45, outside: 85, width: 19, chamfer: 1.1},
+    {designation: "6210", bore: 50, outside: 90, width: 20, chamfer: 1.1},
+    {designation: "6211", bore: 55, outside: 100, width: 21, chamfer: 1.5},
+    {designation: "6212", bore: 60, outside: 110, width: 22, chamfer: 1.5},
+    {designation: "6213", bore: 65, outside: 120, width: 23, chamfer: 1.5},
   ];
 
   public static function catalog():Catalog<DeepGrooveBearingSpec> {
@@ -210,12 +78,7 @@ class DeepGrooveBearing extends MachineComponent {
         standardEdition: "2017",
         dimensionKind: Nominal,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "bore",
-          "outside",
-          "width",
-          "chamfer"
-        ]
+        verifiedFields: ["bore", "outside", "width", "chamfer"]
       })
     );
     return table;
@@ -281,50 +144,17 @@ class DeepGrooveBearing extends MachineComponent {
         {r: a, z: e},
         {r: o, z: e},
         {r: o, z: 0},
-        {
-          r: ro - c,
-          z: 0
-        },
-        {
-          r: ro,
-          z: c
-        },
-        {
-          r: ro,
-          z: b - c
-        },
-        {
-          r: ro - c,
-          z: b
-        },
-        {
-          r: o,
-          z: b
-        },
-        {
-          r: o,
-          z: b - e
-        },
-        {
-          r: a,
-          z: b - e
-        },
-        {
-          r: a,
-          z: b
-        },
-        {
-          r: ri + c,
-          z: b
-        },
-        {
-          r: ri,
-          z: b - c
-        },
-        {
-          r: ri,
-          z: c
-        },
+        {r: ro - c, z: 0},
+        {r: ro, z: c},
+        {r: ro, z: b - c},
+        {r: ro - c, z: b},
+        {r: o, z: b},
+        {r: o, z: b - e},
+        {r: a, z: b - e},
+        {r: a, z: b},
+        {r: ri + c, z: b},
+        {r: ri, z: b - c},
+        {r: ri, z: c},
       ]),
       "rings"
     );
@@ -333,15 +163,7 @@ class DeepGrooveBearing extends MachineComponent {
     // retaining one connected solid for preview and downstream shape consumers.
     var start = Math.max(e + 0.1, 0.15 * b);
     var cavity = Solids.named(
-      Part.revolve([
-        {r: a, z: start},
-        {r: o, z: start},
-        {r: o, z: b - start},
-        {
-          r: a,
-          z: b - start
-        }
-      ]),
+      Part.revolve([{r: a, z: start}, {r: o, z: start}, {r: o, z: b - start}, {r: a, z: b - start}]),
       "cavity"
     );
     return Solids.cut(rings, [cavity]);
@@ -360,22 +182,13 @@ class DeepGrooveBearing extends MachineComponent {
       {r: inner, z: recess * 0.25},
       {r: outer, z: recess * 0.25},
       {r: outer, z: recess * 0.7},
-      {
-        r: inner,
-        z: recess * 0.7
-      }
+      {r: inner, z: recess * 0.7}
     ]);
     var back = Part.revolve([
       {r: inner, z: width - recess * 0.7},
       {r: outer, z: width - recess * 0.7},
-      {
-        r: outer,
-        z: width - recess * 0.25
-      },
-      {
-        r: inner,
-        z: width - recess * 0.25
-      }
+      {r: outer, z: width - recess * 0.25},
+      {r: inner, z: width - recess * 0.25}
     ]);
     return Solids.union([front, back]);
   }
@@ -415,15 +228,7 @@ class DeepGrooveBearing extends MachineComponent {
     "bearingSeat",
     [
       ComponentRecipeSupport.toolDepth(width),
-      ComponentRecipeSupport.choice(
-        "fit",
-        [
-          "Slip",
-          "Transition",
-          "Interference"
-        ],
-        "Slip"
-      )
+      ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")
     ]
   )];
 
@@ -441,20 +246,10 @@ class DeepGrooveBearing extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.deep-groove-bearing",
       [
-        ComponentRecipeSupport.catalog(
-          "designation",
-          DeepGrooveBearing.catalog(),
-          "608"
-        ),
-        ComponentRecipeSupport.flag(
-          "shielded",
-          true
-        )
+        ComponentRecipeSupport.catalog("designation", DeepGrooveBearing.catalog(), "608"),
+        ComponentRecipeSupport.flag("shielded", true)
       ],
-      v -> DeepGrooveBearing.metric(
-        v.token("designation"),
-        v.boolean("shielded")
-      ),
+      v -> DeepGrooveBearing.metric(v.token("designation"), v.boolean("shielded")),
       true
     );
     return recipeTypeCache;

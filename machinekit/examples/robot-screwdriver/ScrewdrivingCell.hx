@@ -63,11 +63,7 @@ class ScrewdrivingCell extends MachineAssembly {
     addComponent(
       "vacuum",
       new VacuumGenerator(60, null, machinekit.screwdriving.ScrewdrivingInterfaces.vacuum()),
-      AssemblyFrames.translation(
-        -800,
-        350,
-        0
-      )
+      AssemblyFrames.translation(-800, 350, 0)
     );
     include("work", work);
     // The table constrains the tapped plate, not any screw or housing inferred from radius.
@@ -138,11 +134,7 @@ private class ScrewdrivingDatumStop extends ArmBlock {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var block = Part.box(width, depth, height);
     var plane = innerX ? new Plane(new Vector(0, depth / 2, 0), Vector.X(), new Vector(0, -1, 0)) : new Plane(
-      new Vector(
-        -width / 2,
-        0,
-        0
-      ),
+      new Vector(-width / 2, 0, 0),
       Vector.Y(),
       Vector.X()
     );
@@ -150,23 +142,11 @@ private class ScrewdrivingDatumStop extends ArmBlock {
     var points = innerX ? [
       new Vector(width / 2, height),
       new Vector(width / 2, height - drop),
-      new Vector(
-        width / 2 - run,
-        height
-      )
+      new Vector(width / 2 - run, height)
     ] : [
-      new Vector(
-        depth / 2,
-        height
-      ),
-      new Vector(
-        depth / 2,
-        height - drop
-      ),
-      new Vector(
-        depth / 2 - run,
-        height
-      )
+      new Vector(depth / 2, height),
+      new Vector(depth / 2, height - drop),
+      new Vector(depth / 2 - run, height)
     ];
     var sketch:Null<Sketch> = null, wedge:Null<Part> = null;
     try {

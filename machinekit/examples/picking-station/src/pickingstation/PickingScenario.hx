@@ -68,20 +68,8 @@ class PickingScenario {
     var third = storage.length > 3 ? storage[3] : storage[2];
     orderLines = [
       new PickingOrderLine("order-01", "line-01", storage[0].id, contentsAt(storage[0].id).sku, 2),
-      new PickingOrderLine(
-        "order-01",
-        "line-02",
-        storage[1].id,
-        contentsAt(storage[1].id).sku,
-        3
-      ),
-      new PickingOrderLine(
-        "order-01",
-        "line-03",
-        third.id,
-        contentsAt(third.id).sku,
-        1
-      )
+      new PickingOrderLine("order-01", "line-02", storage[1].id, contentsAt(storage[1].id).sku, 3),
+      new PickingOrderLine("order-01", "line-03", third.id, contentsAt(third.id).sku, 1)
     ];
   }
 

@@ -38,16 +38,8 @@ class ProfileRecipeChecks {
     var cases = [
       {system: "TSLOT-30-SLOT8", w: 30.0, h: 30.0},
       {system: "TSLOT-40-SLOT8", w: 40.0, h: 40.0},
-      {
-        system: "TSLOT-40-SLOT8",
-        w: 40.0,
-        h: 80.0
-      },
-      {
-        system: "TSLOT-40-SLOT8",
-        w: 80.0,
-        h: 80.0
-      }
+      {system: "TSLOT-40-SLOT8", w: 40.0, h: 80.0},
+      {system: "TSLOT-40-SLOT8", w: 80.0, h: 80.0}
     ];
     for (i in 0...cases.length) {
       var c = cases[i], member = new ProfileMember(TSlotExtrusion.forSystem(c.system, c.w, c.h), 125, "aluminium 6061");
@@ -155,23 +147,14 @@ class ProfileRecipeChecks {
       area_mm2: 1600
     };
     var configured = new ProfileMember(
-      TSlotExtrusion.forSystem(
-        "TSLOT-40-SLOT8",
-        40,
-        40,
-        new DrawingExtrusionProfile(section)
-      ),
+      TSlotExtrusion.forSystem("TSLOT-40-SLOT8", 40, 40, new DrawingExtrusionProfile(section)),
       250,
       "aluminium 6061"
     );
     var document = new Document();
     var instance = document.createInstance(
       "Profile",
-      MachineKitDocuments.define(
-        document,
-        ProfileMember.tslotRecipeType(),
-        configured.values()
-      )
+      MachineKitDocuments.define(document, ProfileMember.tslotRecipeType(), configured.values())
     );
     var partNumber = MachineKitDocuments.partNumber(instance), volume = instance.shape().volume();
     var loaded = DocumentCodec.decode(DocumentCodec.encode(document));

@@ -13,10 +13,7 @@ class Collet extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 33),
     P.length("length", 40),
-    P.length(
-      "toolDiameter",
-      8
-    )
+    P.length("toolDiameter", 8)
   ];
   public function new(?v:ComponentValues) {
     super("collet", "ER32 collet", "steel", inputs(), v);
@@ -38,22 +35,8 @@ class Collet extends AssumedCatalogComponent {
     if (detail == Envelope) return envelope();
     var r = n("diameter") / 2, l = n("length"), bore = n("toolDiameter") / 2;
     return Solids.building([], owned -> {var body = Solids.named(
-      Part.revolve([
-        {r: bore, z: 0.0},
-        {r: 0.9 * r, z: 0.0},
-        {
-          r: r,
-          z: 0.22 * l
-        },
-        {
-          r: 0.62 * r,
-          z: l
-        },
-        {
-          r: bore,
-          z: l
-        }
-      ]),
+      Part.revolve([{r: bore,
+      z: 0.0}, {r: 0.9 * r, z: 0.0}, {r: r, z: 0.22 * l}, {r: 0.62 * r, z: l}, {r: bore, z: l}]),
       "collet"
     );
     owned.push(body);
@@ -69,16 +52,8 @@ class Collet extends AssumedCatalogComponent {
         cadkit.modeling.Align.Min
       );
       var slot = raw.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(
-        new Vector(
-          0,
-          0,
-          front ? -0.01 : 0.25 * l + 0.01
-        ),
-        new Vector(
-          Math.cos(angle),
-          Math.sin(angle),
-          0
-        ),
+        new Vector(0, 0, front ? -0.01 : 0.25 * l + 0.01),
+        new Vector(Math.cos(angle), Math.sin(angle), 0),
         Vector.Z()
       )));
       raw.close();
@@ -94,14 +69,7 @@ class Collet extends AssumedCatalogComponent {
   function envelope():Part {
     return Solids.cut(
       Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "collet-envelope"),
-      [Solids.named(
-        Part.cylinderSpan(
-          n("toolDiameter") / 2,
-          -1,
-          n("length") + 1
-        ),
-        "tool-bore"
-      )]
+      [Solids.named(Part.cylinderSpan(n("toolDiameter") / 2, -1, n("length") + 1), "tool-bore")]
     );
   }
 

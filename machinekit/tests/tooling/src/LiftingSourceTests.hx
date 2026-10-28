@@ -10,16 +10,8 @@ class LiftingSourceTests {
   }
   public static function main():Void {
     var witness = new machinekit.structural.MineralFoundation(
-      new machinekit.component.ComponentValues().setNumber(
-        "width",
-        100
-      ).setNumber(
-        "depth",
-        100
-      ).setNumber(
-        "height",
-        50
-      ),
+      new machinekit.component.ComponentValues().setNumber("width",
+      100).setNumber("depth", 100).setNumber("height", 50),
       []
     );
     var poured = machinekit.structural.FoundationSizing.asCastMass(witness);

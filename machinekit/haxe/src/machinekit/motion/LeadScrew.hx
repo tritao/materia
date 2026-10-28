@@ -171,14 +171,8 @@ class LeadScrew extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.lead-screw",
-      ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length(
-        "length",
-        100
-      )]),
-      v -> new LeadScrew(
-        ComponentRecipeSupport.thread(v),
-        v.number("length")
-      )
+      ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length("length", 100)]),
+      v -> new LeadScrew(ComponentRecipeSupport.thread(v), v.number("length"))
     );
     return recipeTypeCache;
   }

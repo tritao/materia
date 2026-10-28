@@ -36,11 +36,7 @@ class MillPanel extends MachineComponent {
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.box(
-      width,
-      depth,
-      height
-    ),
+    Part.box(width, depth, height),
     "panel"
   );
 
@@ -48,24 +44,11 @@ class MillPanel extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.milling.panel",
       [
-        ComponentRecipeSupport.length(
-          "width",
-          100
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          2
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          100
-        )
+        ComponentRecipeSupport.length("width", 100),
+        ComponentRecipeSupport.length("depth", 2),
+        ComponentRecipeSupport.length("height", 100)
       ],
-      v -> new MillPanel(
-        v.number("width"),
-        v.number("depth"),
-        v.number("height")
-      )
+      v -> new MillPanel(v.number("width"), v.number("depth"), v.number("height"))
     );
     return recipe;
   }

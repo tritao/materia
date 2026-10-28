@@ -44,14 +44,7 @@ class OffsetFingerGeometry {
         left ? CENTRE_Z - (sls ? 22.2 : 20.2) : CENTRE_Z - 10,
         left ? CENTRE_Z + 10 : CENTRE_Z + (sls ? 22.2 : 20.2)
       ],
-      [
-        left ? rootX : rootX - r,
-        left ? rootX + r : rootX,
-        20,
-        20 + r,
-        z - halfHeight,
-        z + halfHeight
-      ]
+      [left ? rootX : rootX - r, left ? rootX + r : rootX, 20, 20 + r, z - halfHeight, z + halfHeight]
     ];
   }
   public static function make(left:Bool, variant:String = "cnc-aluminium"):Part {

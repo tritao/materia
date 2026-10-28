@@ -18,15 +18,7 @@ class WristRightAngleCandidate {
     box.close();
     var normalized = WristPlugCandidate.pose(
       cropped,
-      {
-        x: 0,
-        y: 0,
-        z: 0,
-        qx: 0,
-        qy: -Math.sqrt(0.5),
-        qz: 0,
-        qw: Math.sqrt(0.5)
-      }
+      {x: 0, y: 0, z: 0, qx: 0, qy: -Math.sqrt(0.5), qz: 0, qw: Math.sqrt(0.5)}
     );
     cropped.close();
     var check = new cadkit.modeling.Part(normalized.cloneShape());
@@ -45,17 +37,8 @@ class WristRightAngleCandidate {
         description: "Rockwell right-angle M12 candidate",
         externalBodyStartZMm: 16.002,
         preferredClockDeg: 180,
-        offsetsMm: [
-          -8.0,
-          0.0,
-          8.0
-        ],
-        clocksDeg: [
-          0.0,
-          90.0,
-          180.0,
-          270.0
-        ],
+        offsetsMm: [-8.0, 0.0, 8.0],
+        clocksDeg: [0.0, 90.0, 180.0, 270.0],
         separationBoundMm: 5,
         inspectMatingZone: false
       }

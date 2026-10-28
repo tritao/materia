@@ -28,10 +28,7 @@ class MillYNutMount extends MachineComponent {
   public static function pilots():Array<{x:Float, y:Float}> return [{x: -32, y: 32}, {x: 32, y: 32}];
   public static function parameters():Array<ComponentParameter> return [
     P.flag("reinforced", false),
-    P.flag(
-      "serviceAccess",
-      false
-    )
+    P.flag("serviceAccess", false)
   ];
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -59,11 +56,7 @@ class MillYNutMount extends MachineComponent {
     var holes:Array<machinekit.design.DesignInterfaces.HoleInterface> = [], i = 0;
     for (p in new BallNut().boltPattern()) holes.push({
       id: 'flange${i++}',
-      frame: materia.assembly.AssemblyFrames.translation(
-        p.x,
-        p.y,
-        0
-      ),
+      frame: materia.assembly.AssemblyFrames.translation(p.x, p.y, 0),
       radius: 2.1,
       depth: NUT_DRILL_DEPTH,
       minWall: 3,
@@ -80,38 +73,16 @@ class MillYNutMount extends MachineComponent {
         minTipGap: 1,
         minBack: 2
       },
-      approach: {
-        radius: 3,
-        length: 40
-      }
+      approach: {radius: 3, length: 40}
     });
     for (p in anchors()) holes.push({
       id: 'anchor${p.x}-${p.y}',
-      frame: materia.assembly.AssemblyFrames.fromRotationMatrix(
-        p.x,
-        p.y,
-        THICKNESS,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      frame: materia.assembly.AssemblyFrames.fromRotationMatrix(p.x, p.y, THICKNESS, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       radius: 3.3,
       depth: THICKNESS,
       minWall: 4,
       minClearance: 0.4,
-      counterbore: {
-        radius: 5.5,
-        depth: THICKNESS - ANCHOR_SEAT,
-        bearingDepth: 1
-      },
+      counterbore: {radius: 5.5, depth: THICKNESS - ANCHOR_SEAT, bearingDepth: 1},
       thread: null,
       approach: null
     });
@@ -136,20 +107,8 @@ class MillYNutMount extends MachineComponent {
       pieces.push(Solids.cut(
         Part.cylinderSpan(nut.flangeDiameter / 2 + 3.5, -1.5, 1),
         [
-          Part.cylinderSpan(
-            nut.flangeDiameter / 2 + 0.05,
-            -2,
-            2
-          ),
-          Part.box(
-            values().boolean("serviceAccess") ? SERVICE_WIDTH : 10,
-            12,
-            3
-          ).translated(new Vector(
-            0,
-            28,
-            -2
-          ))
+          Part.cylinderSpan(nut.flangeDiameter / 2 + 0.05, -2, 2),
+          Part.box(values().boolean("serviceAccess") ? SERVICE_WIDTH : 10, 12, 3).translated(new Vector(0, 28, -2))
         ]
       ));
       for (p in pilots()) pieces.push(Part.cylinderSpan(3, -8, 1, p.x, p.y));

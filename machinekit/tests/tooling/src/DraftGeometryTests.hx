@@ -17,18 +17,7 @@ class DraftGeometryTests {
   public static function run():Void {
     var body:Array<materia.casting.CastingPrism> = [{
       id: "body",
-      profile: [
-        {x: -60.0, y: -50.0},
-        {x: 60.0, y: -50.0},
-        {
-          x: 60.0,
-          y: 50.0
-        },
-        {
-          x: -60.0,
-          y: 50.0
-        }
-      ],
+      profile: [{x: -60.0, y: -50.0}, {x: 60.0, y: -50.0}, {x: 60.0, y: 50.0}, {x: -60.0, y: 50.0}],
       height: 80,
       pose: F.identity()
     }];
@@ -126,20 +115,7 @@ class DraftGeometryTests {
         30
       )));
     var upper = scope.own(cadkit.modeling.Curve.polyline(
-      [
-        new Vector(-19, -15, 60),
-        new Vector(20, -15, 60),
-        new Vector(
-          20,
-          15,
-          60
-        ),
-        new Vector(
-          -20,
-          15,
-          60
-        )
-      ],
+      [new Vector(-19, -15, 60), new Vector(20, -15, 60), new Vector(20, 15, 60), new Vector(-20, 15, 60)],
       true
     ));
     var twisted = scope.own(Part.loft([lower, upper], true)), nonplanar = 0;
@@ -162,24 +138,12 @@ class DraftGeometryTests {
     return twisted;
     }).close();
     Scope.run(scope -> {var a = materia.casting.CastingRegion.Placed({
-      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-        20,
-        20,
-        20
-      )),
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(20, 20, 20)),
       pose: F.identity()
     });
     var b = materia.casting.CastingRegion.Placed({
-      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-        20,
-        20,
-        20
-      )),
-      pose: F.translation(
-        0,
-        0,
-        20
-      )
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(20, 20, 20)),
+      pose: F.translation(0, 0, 20)
     });
     var contact = scope.own(machinekit.structural.CastingRegionCad.part(materia.casting.CastingRegion.Intersection([
       a,
@@ -187,10 +151,7 @@ class DraftGeometryTests {
     ])));
     check(contact.isEmpty() && contact.volume() == 0, "face-only region intersection is empty solid material");
     var remainder = scope.own(machinekit.structural.CastingRegionCad.part(materia.casting.CastingRegion.Union([
-      materia.casting.CastingRegion.Difference(
-        a,
-        [a]
-      ),
+      materia.casting.CastingRegion.Difference(a, [a]),
       b
     ])));
     check(

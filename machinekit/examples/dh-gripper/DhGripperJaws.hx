@@ -20,18 +20,9 @@ class DhGripperJaws {
         id,
         id,
         "slide",
-        {
-          x : id == "jaw-left" ? -1.0 : 1.0,
-          y : 0,
-          z : 0
-        },
+        {x : id == "jaw-left" ? -1.0 : 1.0, y : 0, z : 0},
         TOTAL_STROKE_MM / 2,
-        {
-          lower : 0,
-          upper : TOTAL_STROKE_MM / 2,
-          velocity : null,
-          effort : null
-        }
+        {lower : 0, upper : TOTAL_STROKE_MM / 2, velocity : null, effort : null}
       );
     }
     model.couple("jaw-synchronization", MASTER, "jaw-opening-follower", 1);

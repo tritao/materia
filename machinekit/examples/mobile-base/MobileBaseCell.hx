@@ -68,19 +68,10 @@ class MobileBaseCell extends MachineAssembly {
     GoTo(AT_NORTH),
     Pick("workpiece", "top"),
     GoTo(AT_EAST),
-    Place(
-      "tableEast",
-      "placeSeat"
-    ),
-    Pick(
-      "workpiece",
-      "top"
-    ),
+    Place("tableEast", "placeSeat"),
+    Pick("workpiece", "top"),
     GoTo(AT_NORTH),
-    Place(
-      "tableNorth",
-      "placeSeat"
-    ),
+    Place("tableNorth", "placeSeat"),
     GoTo(AT_DOCK)
   ];
   /** The tables stand as tall as the arm's own cell, raised by the deck the arm stands on. */
@@ -100,11 +91,7 @@ class MobileBaseCell extends MachineAssembly {
     addComponent(
       "floor",
       new RoomBlock(ROOM_LENGTH + 2 * WALL, ROOM_WIDTH + 2 * WALL, FLOOR, "painted steel", "Floor"),
-      AssemblyFrames.translation(
-        0,
-        0,
-        -FLOOR
-      )
+      AssemblyFrames.translation(0, 0, -FLOOR)
     );
     addComponent("wallNorth", wallX, AssemblyFrames.translation(0, hy + WALL / 2, 0));
     addComponent("wallSouth", wallX, AssemblyFrames.translation(0, -hy - WALL / 2, 0));
@@ -122,11 +109,7 @@ class MobileBaseCell extends MachineAssembly {
         "birch plywood",
         "Workpiece"
       ),
-      AssemblyFrames.translation(
-        seat.x,
-        seat.y,
-        TABLE_TOP
-      )
+      AssemblyFrames.translation(seat.x, seat.y, TABLE_TOP)
     );
     addComponent(
       "pillar",

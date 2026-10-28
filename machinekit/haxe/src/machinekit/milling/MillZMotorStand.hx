@@ -13,42 +13,15 @@ class MillZMotorStand extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
     P.flag("anchored", false),
-    P.length(
-      "registerDiameter",
-      0
-    ),
-    P.length(
-      "registerDepth",
-      2
-    ),
-    P.length(
-      "width",
-      100
-    ),
-    P.length(
-      "depth",
-      100
-    ),
-    P.length(
-      "height",
-      32.5
-    ),
-    P.length(
-      "plate",
-      8
-    ),
-    P.length(
-      "leg",
-      12
-    ),
-    P.length(
-      "shaftBore",
-      22
-    ),
-    P.length(
-      "boltPitch",
-      40
-    )
+    P.length("registerDiameter", 0),
+    P.length("registerDepth", 2),
+    P.length("width", 100),
+    P.length("depth", 100),
+    P.length("height", 32.5),
+    P.length("plate", 8),
+    P.length("leg", 12),
+    P.length("shaftBore", 22),
+    P.length("boltPitch", 40)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

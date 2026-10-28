@@ -70,11 +70,7 @@ class OverheadArm extends Gantry {
     addComponent(
       "table",
       new ArmTable(TRAVEL_X + 200, TRAVEL_Y + 200, TABLE_TOP),
-      AssemblyFrames.translation(
-        TRAVEL_X / 2,
-        workY + TRAVEL_Y / 2,
-        0
-      )
+      AssemblyFrames.translation(TRAVEL_X / 2, workY + TRAVEL_Y / 2, 0)
     );
     var pad = new ArmBlock(80, 80, RobotArm.PAD_HEIGHT, "rubber", "overhead station");
     addComponent("padPick", pad, AssemblyFrames.translation(200, workY, TABLE_TOP));
@@ -88,11 +84,7 @@ class OverheadArm extends Gantry {
         "birch plywood",
         "overhead workpiece"
       ),
-      AssemblyFrames.translation(
-        200,
-        workY,
-        TABLE_TOP + RobotArm.PAD_HEIGHT
-      )
+      AssemblyFrames.translation(200, workY, TABLE_TOP + RobotArm.PAD_HEIGHT)
     );
   }
 }

@@ -26,10 +26,7 @@ class HousingFeature {
     setup:String,
     entry:Vector,
     approach:Vector,
-    section:Array<{
-      r:Float,
-      z:Float
-    }>,
+    section:Array<{r:Float, z:Float}>,
     tolerance:String,
     source:String
   ) {
@@ -146,17 +143,9 @@ class ReferenceHousing extends MachineComponent {
       new HousingSetup(
         "op2",
         "Op 2: front register on an angle bracket, A along the stem",
-        new Vector(
-          0,
-          -1,
-          0
-        ),
+        new Vector(0, -1, 0),
         Vector.X(),
-        new Vector(
-          0,
-          0,
-          0
-        )
+        new Vector(0, 0, 0)
       )
     ];
     features = [];
@@ -204,10 +193,7 @@ class ReferenceHousing extends MachineComponent {
         "op1",
         new Vector(29 * Math.cos(a), 29 * Math.sin(a), 26.5),
         front,
-        bore(
-          1.4,
-          8
-        ),
+        bore(1.4, 8),
         "M3 6H, 6 full threads",
         ASSUMED + "; axial bolt circle replaces rim screws"
       );
@@ -269,10 +255,7 @@ class ReferenceHousing extends MachineComponent {
         "op1",
         new Vector(31.75 * Math.cos(a), 31.75 * Math.sin(a), REAR),
         rear,
-        bore(
-          1.4,
-          8
-        ),
+        bore(1.4, 8),
         "M3 6H, 5.0 engagement (manual)",
         ASSUMED
       );
@@ -286,38 +269,9 @@ class ReferenceHousing extends MachineComponent {
         'link-cbore-$degrees',
         "counterbored hole",
         "op2",
-        new Vector(
-          BOSS_RADIUS * out.x,
-          LINK_ROW,
-          BOSS_RADIUS * out.z
-        ),
+        new Vector(BOSS_RADIUS * out.x, LINK_ROW, BOSS_RADIUS * out.z),
         out,
-        [
-          {
-            r: 0.0,
-            z: 0.0
-          },
-          {
-            r: 2.9,
-            z: 0.0
-          },
-          {
-            r: 2.9,
-            z: 3.4
-          },
-          {
-            r: 1.65,
-            z: 3.4
-          },
-          {
-            r: 1.65,
-            z: 7
-          },
-          {
-            r: 0.0,
-            z: 7
-          }
-        ],
+        [{r: 0.0, z: 0.0}, {r: 2.9, z: 0.0}, {r: 2.9, z: 3.4}, {r: 1.65, z: 3.4}, {r: 1.65, z: 7}, {r: 0.0, z: 7}],
         "Ø3.3 thru, ⌴Ø5.8 × 3.4",
         DRAWING
       );
@@ -330,28 +284,7 @@ class ReferenceHousing extends MachineComponent {
         "op2",
         new Vector(BOSS_RADIUS * out.x, LINK_ROW, BOSS_RADIUS * out.z),
         out,
-        [
-          {
-            r: 0.0,
-            z: 0.0
-          },
-          {
-            r: 3.3,
-            z: 0.0
-          },
-          {
-            r: 1.7,
-            z: 1.6
-          },
-          {
-            r: 1.7,
-            z: 7
-          },
-          {
-            r: 0.0,
-            z: 7
-          }
-        ],
+        [{r: 0.0, z: 0.0}, {r: 3.3, z: 0.0}, {r: 1.7, z: 1.6}, {r: 1.7, z: 7}, {r: 0.0, z: 7}],
         "Ø3.4 thru, ⌵Ø6.6 × 90°",
         DRAWING
       );
@@ -361,11 +294,7 @@ class ReferenceHousing extends MachineComponent {
       "tab removal",
       "op2",
       new Vector(side * RADIUS, c.y, c.z),
-      new Vector(
-        side,
-        0,
-        0
-      ),
+      new Vector(side, 0, 0),
       [],
       "blend to Ø73, ±0.1",
       "stock holding"
@@ -374,18 +303,9 @@ class ReferenceHousing extends MachineComponent {
 
   static function bore(radius:Float, depth:Float):Array<{r:Float, z:Float}> return [
     {r: 0.0, z: 0.0},
-    {
-      r: radius,
-      z: 0.0
-    },
-    {
-      r: radius,
-      z: depth
-    },
-    {
-      r: 0.0,
-      z: depth
-    }
+    {r: radius, z: 0.0},
+    {r: radius, z: depth},
+    {r: 0.0, z: depth}
   ];
 
   function add(
@@ -419,14 +339,8 @@ class ReferenceHousing extends MachineComponent {
     var pilotRing = Part.revolve([
       {r: PILOT_RADIUS, z: REAR - 1},
       {r: RADIUS + 1, z: REAR - 1},
-      {
-        r: RADIUS + 1,
-        z: REAR + PILOT_LENGTH
-      },
-      {
-        r: PILOT_RADIUS,
-        z: REAR + PILOT_LENGTH
-      }
+      {r: RADIUS + 1, z: REAR + PILOT_LENGTH},
+      {r: PILOT_RADIUS, z: REAR + PILOT_LENGTH}
     ]);
     return Solids.cut(body, [pilotRing]);
   }
@@ -451,11 +365,7 @@ class ReferenceHousing extends MachineComponent {
     return Solids.union([for (side in [1, -1]) Part.cylinderAlong(
       TAB_RADIUS,
       new Vector(side * (RADIUS - 2), c.y, c.z),
-      new Vector(
-        side,
-        0,
-        0
-      ),
+      new Vector(side, 0, 0),
       reach - RADIUS + 2
     )]);
   }

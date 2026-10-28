@@ -58,30 +58,12 @@ class DeviceHousing {
       keep(
         Part.prism(
           [
-            new Vector(
-              -w / 2,
-              plate
-            ),
-            new Vector(
-              w / 2,
-              plate
-            ),
-            new Vector(
-              w / 2,
-              front - c
-            ),
-            new Vector(
-              w / 2 - c,
-              front
-            ),
-            new Vector(
-              -w / 2 + c,
-              front
-            ),
-            new Vector(
-              -w / 2,
-              front - c
-            )
+            new Vector(-w / 2, plate),
+            new Vector(w / 2, plate),
+            new Vector(w / 2, front - c),
+            new Vector(w / 2 - c, front),
+            new Vector(-w / 2 + c, front),
+            new Vector(-w / 2, front - c)
           ],
           -top,
           height / 2 - inset
@@ -90,24 +72,13 @@ class DeviceHousing {
       )
     ];
     if (terminals > 0) pieces.push(keep(
-      Part.box(w, strip - inset, depth - step, Center, Min, Min).translated(new Vector(
-        0,
-        top,
-        0
-      )),
+      Part.box(w, strip - inset, depth - step, Center, Min, Min).translated(new Vector(0, top, 0)),
       "terminal-strip"
     ));
     if (fins > 0) {
       var pitch = w / fins, rib = Math.max(0.8, pitch * 0.35);
       for (index in 0...fins) pieces.push(keep(
-        Part.box(
-          rib,
-          top - (-height / 2 + inset),
-          depth - front + 0.01,
-          Center,
-          Min,
-          Min
-        ).translated(new Vector(
+        Part.box(rib, top - (-height / 2 + inset), depth - front + 0.01, Center, Min, Min).translated(new Vector(
           -w / 2 + pitch * (index + 0.5),
           -height / 2 + inset,
           front - 0.01
@@ -120,13 +91,7 @@ class DeviceHousing {
     if (terminals > 0) {
       var pitch = w / terminals, screw = Math.min(pitch * 0.32, 2.5), face = depth - step;
       for (index in 0...terminals) tools.push(keep(
-        Part.cylinderSpan(
-          screw,
-          face - 2,
-          face + 0.1,
-          -w / 2 + pitch * (index + 0.5),
-          top + (strip - inset) / 2
-        ),
+        Part.cylinderSpan(screw, face - 2, face + 0.1, -w / 2 + pitch * (index + 0.5), top + (strip - inset) / 2),
         "terminal"
       ));
     }
@@ -165,22 +130,10 @@ class DeviceHousing {
         [
           new Vector(-width / 2 + c, face),
           new Vector(width / 2 - c, face),
-          new Vector(
-            width / 2,
-            face + c
-          ),
-          new Vector(
-            width / 2,
-            back
-          ),
-          new Vector(
-            -width / 2,
-            back
-          ),
-          new Vector(
-            -width / 2,
-            face + c
-          )
+          new Vector(width / 2, face + c),
+          new Vector(width / 2, back),
+          new Vector(-width / 2, back),
+          new Vector(-width / 2, face + c)
         ],
         foot,
         height
@@ -228,31 +181,11 @@ class DeviceHousing {
       for (strip in [
         {x: 0.0, z: z0, w: dw, h: 1.0},
         {x: 0.0, z: z0 + dh - 1, w: dw, h: 1.0},
-        {
-          x: -dw / 2 + 0.5,
-          z: z0,
-          w: 1.0,
-          h: dh
-        },
-        {
-          x: dw / 2 - 0.5,
-          z: z0,
-          w: 1.0,
-          h: dh
-        }
+        {x: -dw / 2 + 0.5, z: z0, w: 1.0, h: dh},
+        {x: dw / 2 - 0.5, z: z0, w: 1.0, h: dh}
       ]) tools.push(keep(
-        Part.box(
-          strip.w,
-          depthIn + 0.1,
-          strip.h,
-          Center,
-          Min,
-          Min
-        ).translated(new Vector(
-          strip.x,
-          face - 0.1,
-          strip.z
-        )),
+        Part.box(strip.w,
+        depthIn + 0.1, strip.h, Center, Min, Min).translated(new Vector(strip.x, face - 0.1, strip.z)),
         "door-seam"
       ));
     }
@@ -261,11 +194,7 @@ class DeviceHousing {
         70.0), kh = Math.min((height - foot) * 0.22, 90.0), kz = foot + (height - foot) * 0.62;
       tools.push(keep(Part.box(kw, 2.0, kh, Center, Min, Min).translated(new Vector(0, front - 0.1, kz)), "keypad"));
       tools.push(keep(
-        Part.box(kw * 0.8, 1.0, kh * 0.3, Center, Min, Min).translated(new Vector(
-          0,
-          front + 1.8,
-          kz + kh * 0.62
-        )),
+        Part.box(kw * 0.8, 1.0, kh * 0.3, Center, Min, Min).translated(new Vector(0, front + 1.8, kz + kh * 0.62)),
         "display"
       ));
     }
@@ -302,17 +231,7 @@ class DeviceHousing {
     }
     var pieces = [
       keep(Part.box(width, length, base, Center, Center, Min), "base"),
-      keep(
-        Part.box(
-          core,
-          body,
-          height * 0.75,
-          Center,
-          Center,
-          Min
-        ),
-        "core"
-      )
+      keep(Part.box(core, body, height * 0.75, Center, Center, Min), "core")
     ];
     var pitch = width / fins, rib = Math.max(0.8, pitch * 0.3);
     for (index in 0...fins) pieces.push(keep(
@@ -325,14 +244,7 @@ class DeviceHousing {
     ));
     var housing = Solids.union(pieces);
     var tools = [for (end in [-1.0, 1.0]) keep(
-      Part.box(
-        Math.min(width * 0.2, 6.0),
-        tab * 0.6,
-        base + 0.2,
-        Center,
-        Center,
-        Min
-      ).translated(new Vector(
+      Part.box(Math.min(width * 0.2, 6.0), tab * 0.6, base + 0.2, Center, Center, Min).translated(new Vector(
         0,
         end * (length / 2 - tab / 2),
         -0.1
@@ -345,16 +257,8 @@ class DeviceHousing {
 
   /** Places a prism drawn in (x, depth) and extruded along z so that depth runs along +z and the extrusion along -y. */
   static function yzSwap():cadkit.modeling.Location return new cadkit.modeling.Location(new cadkit.modeling.Plane(
-    new Vector(
-      0,
-      0,
-      0
-    ),
+    new Vector(0, 0, 0),
     Vector.X(),
-    new Vector(
-      0,
-      -1,
-      0
-    )
+    new Vector(0, -1, 0)
   ));
 }

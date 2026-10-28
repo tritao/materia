@@ -37,14 +37,7 @@ class HzMotionAxis extends MachineAssembly {
     attach(
       "floatingRing",
       machinekit.standard.RetainingRing.forShaft(support.boreDiameter),
-      F.compose(
-        supportPose,
-        F.translation(
-          0,
-          0,
-          seat
-        )
-      ),
+      F.compose(supportPose, F.translation(0, 0, seat)),
       "floating"
     );
     addComponent("nut", nut, F.translation(0, 25, 120));
@@ -59,34 +52,14 @@ class HzMotionAxis extends MachineAssembly {
       "travelSeat",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: 0,
-        upper: 200,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0, upper: 200, velocity: null, effort: null}
     );
     addCoupling("screw-lead", "travel", "screw-turn", 2 * Math.PI / screw.thread.signedLead());
     var i = 0;
     for (p in motor.boltPattern()) attach(
       'motorBolt${++i}',
       SocketHeadCapScrew.metric("M5", 12),
-      F.fromRotationMatrix(
-        p.x,
-        25 + p.y,
-        -motor.spec.flangeThickness,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      F.fromRotationMatrix(p.x, 25 + p.y, -motor.spec.flangeThickness, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       "mount"
     );
   }
@@ -111,26 +84,11 @@ class HzMotionAxis extends MachineAssembly {
       ["mount", "motorShaft"],
       ["mount", "coupling"],
       ["mount", "screw"],
-      [
-        "screw",
-        "coupling"
-      ],
-      [
-        "motorShaft",
-        "coupling"
-      ],
-      [
-        "motor",
-        "motorShaft"
-      ],
-      [
-        "floating",
-        "screw"
-      ],
-      [
-        "floatingRing",
-        "screw"
-      ]
+      ["screw", "coupling"],
+      ["motorShaft", "coupling"],
+      ["motor", "motorShaft"],
+      ["floating", "screw"],
+      ["floatingRing", "screw"]
     ];
     for (pair in pairs) {
       var a = axis.components().filter(m -> m.id == pair[0])[0], b = axis.components().filter(m -> m.id == pair[1])[0];
@@ -203,41 +161,38 @@ class HzMotionAxis extends MachineAssembly {
           status: "nominal drawing-based geometry checks only; procurement and manufacturing not qualified",
           catalog: catalogRows,
           driveClearances: report,
-          travelChecksMm: [
-            0,
-            100,
-            200
-          ],
-          shaftEndGapMm: 4,
-          motorEngagementMm: 14,
-          screwEngagementMm: 14,
-          screwRequiredProfile: {
-            source: "Motor_Bracket.pdf p10",
-            fixedEndMm: 51,
-            bearingJournalMm: 12,
-            couplingSeatMm: 10,
-            couplingSeatLengthMm: 15,
-            lockThread: "M12x1",
-            threadLengthMm: 12
-          },
-          vallderCompatibility: {
-            dropIn: false,
-            fixedEndMm: 54,
-            reason: "Different prescribed end stack; no Vallder model was changed"
-          },
-          unresolved: [
-            "Supplier BK12-C/BF12 geometry; BF12 housing and bearing from the STEP, its DIN 471 ring a separate installed part",
-            "Webs, bearing internals, pilot recess and external fillets are simplified",
-            "M5 engagement is nominal 5.4 mm; bracket effective thread depth is unpublished",
-            "Coupling D25 L32 14/10 is a custom reference geometry, not a selected supplier SKU",
-            "Supplier locknut/collars and bearing preload are included metadata, not independently articulated parts",
-            "First Y stack has no mill frame attachment or guide/carriage structure",
-            "BF12 mass and adapter masses are unknown; no axis sizing result uses guessed masses"
-          ]
-        },
-        null,
-        "  "
-      )
+          travelChecksMm: [0,
+      100, 200],
+      shaftEndGapMm: 4,
+      motorEngagementMm: 14,
+      screwEngagementMm: 14,
+      screwRequiredProfile: {
+        source: "Motor_Bracket.pdf p10",
+        fixedEndMm: 51,
+        bearingJournalMm: 12,
+        couplingSeatMm: 10,
+        couplingSeatLengthMm: 15,
+        lockThread: "M12x1",
+        threadLengthMm: 12
+      },
+      vallderCompatibility: {
+        dropIn: false,
+        fixedEndMm: 54,
+        reason: "Different prescribed end stack; no Vallder model was changed"
+      },
+      unresolved: [
+        "Supplier BK12-C/BF12 geometry; BF12 housing and bearing from the STEP, its DIN 471 ring a separate installed part",
+        "Webs, bearing internals, pilot recess and external fillets are simplified",
+        "M5 engagement is nominal 5.4 mm; bracket effective thread depth is unpublished",
+        "Coupling D25 L32 14/10 is a custom reference geometry, not a selected supplier SKU",
+        "Supplier locknut/collars and bearing preload are included metadata, not independently articulated parts",
+        "First Y stack has no mill frame attachment or guide/carriage structure",
+        "BF12 mass and adapter masses are unknown; no axis sizing result uses guessed masses"
+      ]
+    },
+      null,
+      "  "
+    )
     );
   }
 }

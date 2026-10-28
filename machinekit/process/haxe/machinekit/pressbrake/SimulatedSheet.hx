@@ -126,11 +126,7 @@ class SimulatedSheet {
     for (body in bodies) if (body.geometry.wall == id) {
       var center = body.geometry.properties.centerOfMass;
       return observed(body.object).compose(new Transform3(
-        new Vec3(
-          -center.x * 0.001,
-          -center.y * 0.001,
-          -center.z * 0.001
-        ),
+        new Vec3(-center.x * 0.001, -center.y * 0.001, -center.z * 0.001),
         Quat.identity()
       ));
     }
@@ -278,17 +274,7 @@ class SimulatedSheet {
     var tensor = geometry.properties.inertia.scaled(density * 1e-15);
     var inertial = new SimInertialProperties(
       [0, 0, 0],
-      [
-        tensor.xx,
-        tensor.xy,
-        tensor.xz,
-        tensor.xy,
-        tensor.yy,
-        tensor.yz,
-        tensor.xz,
-        tensor.yz,
-        tensor.zz
-      ]
+      [tensor.xx, tensor.xy, tensor.xz, tensor.xy, tensor.yy, tensor.yz, tensor.xz, tensor.yz, tensor.zz]
     );
     return session.createObject(
       MotionType.Dynamic,
@@ -308,17 +294,7 @@ class SimulatedSheet {
     var p = location.plane, x = p.xDirection, y = p.yDirection, z = p.normal;
     return new Transform3(
       new Vec3(p.origin.x * 0.001, p.origin.y * 0.001, p.origin.z * 0.001),
-      Quat.fromRotationMatrix([
-        x.x,
-        x.y,
-        x.z,
-        y.x,
-        y.y,
-        y.z,
-        z.x,
-        z.y,
-        z.z
-      ])
+      Quat.fromRotationMatrix([x.x, x.y, x.z, y.x, y.y, y.z, z.x, z.y, z.z])
     );
   }
   static function toPose(value:Transform3):SimPose {
@@ -327,12 +303,7 @@ class SimulatedSheet {
   }
   static function fromPose(value:SimPose):Transform3 return new Transform3(
     new Vec3(value.x, value.y, value.z),
-    new Quat(
-      value.qx,
-      value.qy,
-      value.qz,
-      value.qw
-    )
+    new Quat(value.qx, value.qy, value.qz, value.qw)
   );
 }
 

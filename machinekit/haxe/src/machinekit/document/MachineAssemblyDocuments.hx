@@ -65,11 +65,7 @@ class MachineAssemblyDocuments {
       var description = set.describeSet();
       return {
         assembly: description.base.assembly,
-        kind: MachineDocumentKind.EffectorSet(
-          description.base.endEffector,
-          description.changer,
-          description.tools
-        )
+        kind: MachineDocumentKind.EffectorSet(description.base.endEffector, description.changer, description.tools)
       };
     }
     if (Std.isOfType(assembly, EndEffector)) {
@@ -168,10 +164,7 @@ class MachineAssemblyDocuments {
     connection:PortConnectionRecord,
     level:String,
     tool:Null<String>,
-    endpoints:Map<
-      String,
-      Element
-  >
+    endpoints:Map<String, Element>
   ):Void {
     var source = endpoints.get(join(level, connection.fromInstance));
     var target = endpoints.get(join(level, connection.toInstance));
@@ -181,10 +174,7 @@ class MachineAssemblyDocuments {
     var relationship = document.createRelationship(
       PORT_CONNECTION,
       new ElementReference(document.id, source.id),
-      new ElementReference(
-        document.id,
-        target.id
-      )
+      new ElementReference(document.id, target.id)
     );
     if (tool != null) put(relationship, "tool", tool);
     if (level.length > 0) put(relationship, "level", level);
@@ -219,10 +209,7 @@ class MachineAssemblyDocuments {
   static function membersByPath(description:MachineAssemblyDescription):Map<String, MemberRecord> {
     var result = new Map<String, MemberRecord>();
     for (level in levels(description)) for (member in level.machine.members) result.set(
-      join(
-        level.path,
-        member.occurrence
-      ),
+      join(level.path, member.occurrence),
       member
     );
     return result;
@@ -241,17 +228,8 @@ class MachineAssemblyDocuments {
   static function walkMembers(
     occurrences:Array<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence>,
     level:String,
-    table:Map<
-      String,
-      materia.assembly.AssemblyDefinition.AssemblySubdefinition
-  >,
-    result:Map<
-      String,
-      {
-        level:String,
-        local:String
-      }
-  >
+    table:Map<String, materia.assembly.AssemblyDefinition.AssemblySubdefinition>,
+    result:Map<String, {level:String, local:String}>
   ):Void for (occurrence in occurrences) {
     var path = join(level, occurrence.id);
     if (occurrence.assembly == null) result.set(path, {level: level, local: occurrence.id});
@@ -393,15 +371,9 @@ class MachineAssemblyDocuments {
       target.portConnections.push({
         id: read(relationship, "id"),
         fromInstance: from.substr(prefix.length),
-        fromPort: read(
-          relationship,
-          "fromPort"
-        ),
+        fromPort: read(relationship, "fromPort"),
         toInstance: to.substr(prefix.length),
-        toPort: read(
-          relationship,
-          "toPort"
-        )
+        toPort: read(relationship, "toPort")
       });
     }
     for (tool in tools) sortLevels(tool);
@@ -433,11 +405,7 @@ class MachineAssemblyDocuments {
       machinekit.robotics.EndEffector.fromDescription({assembly: record.assembly, endEffector: effector}, registry);
     case EffectorSet(effector, changer, tools):
       machinekit.robotics.EndEffectorSet.fromDescription(
-        {
-          base: {assembly: record.assembly, endEffector: effector},
-          changer: changer,
-          tools: tools
-        },
+        {base: {assembly: record.assembly, endEffector: effector}, changer: changer, tools: tools},
         registry
       );
   };

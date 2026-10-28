@@ -62,14 +62,7 @@ class MillCasting extends MachineComponent {
       if (kind == Column) addConnector(
         'rail$name',
         Mount,
-        AssemblyFrames.alongY(
-          side * railSpacing / 2,
-          -depth / 2,
-          0,
-          0,
-          -1,
-          0
-        )
+        AssemblyFrames.alongY(side * railSpacing / 2, -depth / 2, 0, 0, -1, 0)
       );
       else if (kind == Saddle) addConnector('rail$name', Mount, Solids.axial(0, side * railSpacing / 2, height));
       else addConnector('rail$name', Mount, Solids.axial(side * railSpacing / 2, 0, height));
@@ -104,11 +97,8 @@ class MillCasting extends MachineComponent {
       if (kind == Base) {
         var column = new MillColumn();
         pieces.push(Solids.named(
-          Part.box(column.width, column.depth, pad).translated(new Vector(
-            0,
-            depth / 2 - column.depth / 2,
-            height - pad
-          )),
+          Part.box(column.width,
+          column.depth, pad).translated(new Vector(0, depth / 2 - column.depth / 2, height - pad)),
           "column-pad"
         ));
         pieces.push(Solids.named(
@@ -125,11 +115,7 @@ class MillCasting extends MachineComponent {
       var pieces = [Solids.named(Part.box(width,
         depth - pad, height).translated(new Vector(0, pad / 2, 0)), "casting")];
       for (side in [-1, 1]) pieces.push(Solids.named(
-        Part.box(30, pad, height).translated(new Vector(
-          side * railSpacing / 2,
-          -depth / 2 + pad / 2,
-          0
-        )),
+        Part.box(30, pad, height).translated(new Vector(side * railSpacing / 2, -depth / 2 + pad / 2, 0)),
         side < 0 ? "rail-pad-left" : "rail-pad-right"
       ));
       body = Solids.union(pieces);
@@ -137,19 +123,11 @@ class MillCasting extends MachineComponent {
     if (detail == Envelope) return body;
     var tools:Array<Part> = [];
     if (kind == Base) tools.push(Solids.named(
-      Part.box(width - 50, depth - 50, height - 20).translated(new Vector(
-        0,
-        0,
-        -1
-      )),
+      Part.box(width - 50, depth - 50, height - 20).translated(new Vector(0, 0, -1)),
       "underside-core"
     ));
     if (kind == Column) tools.push(Solids.named(
-      Part.box(width - 40, depth - 40, height - 50).translated(new Vector(
-        0,
-        0,
-        25
-      )),
+      Part.box(width - 40, depth - 40, height - 50).translated(new Vector(0, 0, 25)),
       "column-core"
     ));
     // Clearance for the screw along the body; the rail pads remain above it.
@@ -197,13 +175,7 @@ class MillCasting extends MachineComponent {
         18, 6).translated(new Vector(0, y, height - 14)), 'slot${i + 1}-foot'));
     }
     for (sx in [-1, 1]) for (sy in [-1, 1]) tools.push(Solids.named(
-      Part.cylinderSpan(
-        4.5,
-        -1,
-        height + 1,
-        sx * (width / 2 - 20),
-        sy * (depth / 2 - 20)
-      ),
+      Part.cylinderSpan(4.5, -1, height + 1, sx * (width / 2 - 20), sy * (depth / 2 - 20)),
       'mount-${sx < 0 ? "left" : "right"}-${sy < 0 ? "front" : "back"}'
     ));
     return Solids.cut(body, tools);
@@ -227,17 +199,7 @@ class MillCasting extends MachineComponent {
   public static function recipeType():ComponentType {
     if (castingRecipe == null) castingRecipe = new ComponentType(
       "machinekit.milling.casting",
-      [ComponentRecipeSupport.choice(
-        "kind",
-        [
-          "Base",
-          "Column",
-          "Saddle",
-          "Table",
-          "Head"
-        ],
-        "Base"
-      )],
+      [ComponentRecipeSupport.choice("kind", ["Base", "Column", "Saddle", "Table", "Head"], "Base")],
       v -> new MillCasting(parse(v.token("kind")))
     );
     return castingRecipe;

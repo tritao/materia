@@ -76,11 +76,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.proximity-switch",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "GENERIC-INDUCTIVE-M8"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-INDUCTIVE-M8")],
       v -> new ProximitySwitch(v.token("designation"))
     );
     return recipe;
@@ -111,10 +107,7 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
     var threaded = new Part(cadkit.threads.Threads.attach(
       barrel.shape,
       "barrel:cyl.side",
-      machinekit.standard.FastenerThreads.metric(
-        d,
-        1
-      ),
+      machinekit.standard.FastenerThreads.metric(d, 1),
       cadkit.threads.ThreadedFace.ThreadStart.AxisMinimum,
       l - cap - connector
     ));

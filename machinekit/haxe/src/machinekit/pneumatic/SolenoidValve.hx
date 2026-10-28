@@ -64,11 +64,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
   override public function hasGeometry():Bool return true;
   /** Spool body, solenoid coils and its P, A and B ports at their connectors (`PneumaticBodies.valve`). The envelope box is also the mass model. */
   override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? Solids.named(
-    Part.box(
-      bodyWidth,
-      bodyDepth,
-      bodyHeight
-    ),
+    Part.box(bodyWidth, bodyDepth, bodyHeight),
     "valve"
   ) : PneumaticBodies.valve(
     bodyWidth,
@@ -76,11 +72,7 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
     bodyHeight,
     60,
     bodyWidth > 80 ? 2 : 1,
-    [
-      -25.0,
-      0.0,
-      25.0
-    ]
+    [-25.0, 0.0, 25.0]
   );
 
   override public function massGeometry():Null<Part> return Solids.named(
@@ -91,27 +83,10 @@ class SolenoidValve extends MachineComponent implements ValveSpec {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.pneumatic.solenoid-valve",
       [
-        ComponentRecipeSupport.choice(
-          "solenoids",
-          [
-            "single",
-            "double"
-          ],
-          "single"
-        ),
-        ComponentRecipeSupport.choice(
-          "normalOutlet",
-          [
-            "A",
-            "B"
-          ],
-          "B"
-        )
+        ComponentRecipeSupport.choice("solenoids", ["single", "double"], "single"),
+        ComponentRecipeSupport.choice("normalOutlet", ["A", "B"], "B")
       ],
-      v -> new SolenoidValve(
-        v.token("solenoids") == "double",
-        v.token("normalOutlet") == "A"
-      )
+      v -> new SolenoidValve(v.token("solenoids") == "double", v.token("normalOutlet") == "A")
     );
     return recipe;
   }

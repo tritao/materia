@@ -26,15 +26,7 @@ class TendingElectricGravity {
   public function mount(frame:materia.assembly.AssemblyRecord.AssemblyFrame):Void {
     state.setRootPose(
       model.bodyIndex(robot.links[0].id),
-      new Transform(
-        frame.x * 0.001,
-        frame.y * 0.001,
-        frame.z * 0.001,
-        frame.qx,
-        frame.qy,
-        frame.qz,
-        frame.qw
-      )
+      new Transform(frame.x * 0.001, frame.y * 0.001, frame.z * 0.001, frame.qx, frame.qy, frame.qz, frame.qw)
     );
   }
   public function torques(q:Array<Float>, ?payloads:Array<{link:Int, point:Array<Float>, mass:Float}>):Array<Float> {

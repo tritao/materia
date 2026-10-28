@@ -204,29 +204,11 @@ class MotorDriver extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.motor-driver",
       [
-        ComponentRecipeSupport.catalog(
-          "designation",
-          catalog(),
-          "GENERIC-TMC2209"
-        ),
-        ComponentRecipeSupport.scalar(
-          "current",
-          1.68,
-          0.001
-        ),
-        ComponentRecipeSupport.count(
-          "microsteps",
-          1
-        ),
-        ComponentRecipeSupport.flag(
-          "wiredSupply",
-          true
-        ),
-        ComponentRecipeSupport.scalar(
-          "voltage",
-          24,
-          0.001
-        )
+        ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-TMC2209"),
+        ComponentRecipeSupport.scalar("current", 1.68, 0.001),
+        ComponentRecipeSupport.count("microsteps", 1),
+        ComponentRecipeSupport.flag("wiredSupply", true),
+        ComponentRecipeSupport.scalar("voltage", 24, 0.001)
       ],
       v -> new MotorDriver(
         v.token("designation"),
@@ -266,10 +248,7 @@ class MotorDriver extends MachineComponent {
       rating.width,
       rating.height,
       rating.depth,
-      {
-        fins : 7,
-        terminals : 6
-      }
+      {fins : 7, terminals : 6}
     );
 
   override public function massGeometry():Null<Part> return envelope();

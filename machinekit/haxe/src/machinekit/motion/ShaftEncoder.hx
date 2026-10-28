@@ -57,26 +57,11 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.shaft-encoder",
       [
-        ComponentRecipeSupport.scalar(
-          "countsPerRevolution",
-          4096
-        ),
-        ComponentRecipeSupport.flag(
-          "absolute",
-          false
-        ),
-        ComponentRecipeSupport.flag(
-          "index",
-          true
-        ),
-        ComponentRecipeSupport.length(
-          "bodyDiameter",
-          38
-        ),
-        ComponentRecipeSupport.length(
-          "bodyLength",
-          22
-        )
+        ComponentRecipeSupport.scalar("countsPerRevolution", 4096),
+        ComponentRecipeSupport.flag("absolute", false),
+        ComponentRecipeSupport.flag("index", true),
+        ComponentRecipeSupport.length("bodyDiameter", 38),
+        ComponentRecipeSupport.length("bodyLength", 22)
       ],
       v -> new ShaftEncoder(
         v.number("countsPerRevolution"),
@@ -138,25 +123,14 @@ class ShaftEncoder extends MachineComponent implements EncoderPart {
       RoundHousing.part(
         [
           {z0: 0, z1: flange, diameter: d},
-          {
-            z0: flange,
-            z1: l - cover,
-            diameter: d * 0.94
-          },
-          {
-            z0: l - cover,
-            z1: l,
-            diameter: d * 0.88
-          }
+          {z0: flange, z1: l - cover, diameter: d * 0.94},
+          {z0: l - cover, z1: l, diameter: d * 0.88}
         ],
         d * 0.16,
         0,
         3,
         d * 0.82,
-        Math.max(
-          2,
-          d * 0.07
-        )
+        Math.max(2, d * 0.07)
       ),
       "body"
     );

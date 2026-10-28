@@ -61,51 +61,25 @@ class RotaryHead extends AxisBuilder {
     )) : Math.sqrt(50 * 50 + 40 * 40);
     axialEnvelopeMm = hasTilt ? A_AXIS + Math.max(
       Math.sqrt(A_REACH * A_REACH + Math.pow(flange.flangeDiameter / 2, 2)),
-      Math.sqrt(Math.pow(
-        A_REACH + flange.pilotHeight,
-        2
-      ) + Math.pow(
-        flange.pilotDiameter / 2,
-        2
-      ))
+      Math.sqrt(Math.pow(A_REACH + flange.pilotHeight, 2) + Math.pow(flange.pilotDiameter / 2, 2))
     ) : C_OUTPUT + flange.thickness + flange.pilotHeight;
     place(
       "mount",
-      new GantryBoredBracket(
-        "rotary head mount",
-        100,
-        80,
-        8,
-        AssemblyFrames.identity(),
-        flange.pilotDiameter + 0.5
-      ),
+      new GantryBoredBracket("rotary head mount", 100, 80, 8, AssemblyFrames.identity(), flange.pilotDiameter + 0.5),
       AssemblyFrames.identity()
     );
     addMemberConnector("mount", "mount", machinekit.component.Solids.axial(0, 0, 0));
     exposeConnector("mount", "mount", "mount");
     for (side in [-1, 1]) attach(
       side < 0 ? "supportLeft" : "supportRight",
-      new GantryPlate(
-        "head motor support",
-        20,
-        80,
-        77
-      ),
-      AssemblyFrames.translation(
-        side * 40,
-        0,
-        8
-      ),
+      new GantryPlate("head motor support", 20, 80, 77),
+      AssemblyFrames.translation(side * 40, 0, 8),
       "mount"
     );
     attach(
       "motorPlate",
       new GantryBoredBracket("head motor plate", 100, 80, 8, AssemblyFrames.identity(), 10.5),
-      AssemblyFrames.translation(
-        0,
-        0,
-        85
-      ),
+      AssemblyFrames.translation(0, 0, 85),
       "supportLeft"
     );
     attach("cMotor", ServoMotor.model(SERVO_DESIGNATION), AssemblyFrames.translation(0, 0, 85), "motorPlate");
@@ -116,11 +90,7 @@ class RotaryHead extends AxisBuilder {
       "cShaft",
       new GantryIdlerPin(10, 18),
       AssemblyFrames.translation(0, 0, C_OUTPUT),
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      },
+      {x: 0, y: 0, z: 1},
       cCableWrap,
       null,
       "cMotor",
@@ -149,19 +119,8 @@ class RotaryHead extends AxisBuilder {
     var bearing = DeepGrooveBearing.metric("6000");
     for (side in [-1, 1]) attach(
       side < 0 ? "forkLeft" : "forkRight",
-      new GantryBoredBracket(
-        "rotary fork arm",
-        12,
-        180,
-        149,
-        axisFrame,
-        side < 0 ? 10.5 : bearing.outside
-      ),
-      AssemblyFrames.translation(
-        side * 120,
-        0,
-        C_OUTPUT + 8
-      ),
+      new GantryBoredBracket("rotary fork arm", 12, 180, 149, axisFrame, side < 0 ? 10.5 : bearing.outside),
+      AssemblyFrames.translation(side * 120, 0, C_OUTPUT + 8),
       "forkBase"
     );
     attach("aMotor",
@@ -181,17 +140,8 @@ class RotaryHead extends AxisBuilder {
     );
     for (side in [-1, 1]) attach(
       side < 0 ? "aStopNegative" : "aStopPositive",
-      new GantryPlate(
-        "A hard stop",
-        252,
-        40,
-        10
-      ),
-      AssemblyFrames.translation(
-        0,
-        side * 70,
-        A_STOP_TOP - 10
-      ),
+      new GantryPlate("A hard stop", 252, 40, 10),
+      AssemblyFrames.translation(0, side * 70, A_STOP_TOP - 10),
       "forkBase"
     );
     turn(
@@ -200,11 +150,7 @@ class RotaryHead extends AxisBuilder {
       "aShaft",
       new GantryIdlerPin(10, 208),
       orient(-74, 0, A_AXIS, [0.0, 0, 1], [1.0, 0, 0]),
-      {
-        x: 1,
-        y: 0,
-        z: 0
-      },
+      {x: 1, y: 0, z: 0},
       cableWrap,
       hardStop,
       "aMotor",
@@ -217,28 +163,10 @@ class RotaryHead extends AxisBuilder {
         40,
         20,
         A_REACH - flange.thickness + 6,
-        orient(
-          0,
-          0,
-          6,
-          [
-            0.0,
-            0,
-            1
-          ],
-          [
-            1.0,
-            0,
-            0
-          ]
-        ),
+        orient(0, 0, 6, [0.0, 0, 1], [1.0, 0, 0]),
         10.2
       ),
-      AssemblyFrames.translation(
-        0,
-        0,
-        A_AXIS - 6
-      ),
+      AssemblyFrames.translation(0, 0, A_AXIS - 6),
       "aShaft"
     );
   }
@@ -249,11 +177,7 @@ class RotaryHead extends AxisBuilder {
     shaft:String,
     part:machinekit.component.MachineComponent,
     pose:AssemblyFrame,
-    axis: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
+    axis: {x: Float, y: Float, z: Float},
     cableWrap:Float,
     hardStop:Null<Float>,
     motor:String,
@@ -275,10 +199,7 @@ class RotaryHead extends AxisBuilder {
         upper: bound,
         velocity: null,
         effort: null,
-        assumptions: [{
-          quantity: "position limit",
-          label: "stated rotary head cable allowance"
-        }]
+        assumptions: [{quantity: "position limit", label: "stated rotary head cable allowance"}]
       }
     );
     rotaryJoints.push({

@@ -86,10 +86,7 @@ class ServiceNetwork {
   public static function trace(
     flat:FlatAssembly,
     start:PortRef,
-    ?stopAt:(
-      machinekit.component.MachineComponent,
-      ComponentPort
-    ) -> Bool
+    ?stopAt:(machinekit.component.MachineComponent, ComponentPort) -> Bool
   ):ServiceTrace {
     var current = start;
     var seen:Map<String, Bool> = [];

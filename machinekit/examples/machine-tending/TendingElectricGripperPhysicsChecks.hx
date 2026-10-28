@@ -57,32 +57,11 @@ class TendingElectricGripperPhysicsChecks {
       var stock = harness.space.session.createObject(
         MotionType.Dynamic,
         SimShape.box(0.03, 0.03, 0.03),
-        new SimPose(
-          0,
-          0,
-          0.03
-        ),
+        new SimPose(0, 0, 0.03),
         0.1944,
         null,
         SimulatedContactSurfaces.environmentPart(),
-        new SimInertialProperties(
-          [
-            0,
-            0,
-            0
-          ],
-          [
-            0.00011664,
-            0,
-            0,
-            0,
-            0.00011664,
-            0,
-            0,
-            0,
-            0.00011664
-          ]
-        )
+        new SimInertialProperties([0, 0, 0], [0.00011664, 0, 0, 0, 0.00011664, 0, 0, 0, 0.00011664])
       );
       var floor = harness.spawnPlane();
       harness.simulation.setJointPositions(0, [0, -0.025, -0.025]);
@@ -145,14 +124,7 @@ class TendingElectricGripperPhysicsChecks {
         var t = i * 0.005, angle = 0.25 * (1 - Math.cos(2 * Math.PI * t / 10)),
           rate = 0.25 * (2 * Math.PI / 10) * Math.sin(2 * Math.PI * t / 10);
         runtime.submitTargets(
-          [JointTarget.servo(
-            0,
-            angle,
-            rate,
-            1000,
-            20,
-            -(0.2 + 0.1944) * 9.81 * 0.03 * Math.sin(angle)
-          )],
+          [JointTarget.servo(0, angle, rate, 1000, 20, -(0.2 + 0.1944) * 9.81 * 0.03 * Math.sin(angle))],
           1000 + i
         );
         harness.step();

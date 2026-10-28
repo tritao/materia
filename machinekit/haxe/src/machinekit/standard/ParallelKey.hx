@@ -30,62 +30,13 @@ class ParallelKey extends MachineComponent {
   public final length:Float;
 
   static function rows():Array<ParallelKeySpec> return [
-    {
-      minShaft: 6,
-      maxShaft: 8,
-      width: 2,
-      height: 2,
-      shaftDepth: 1.2,
-      hubDepth: 1.0
-    },
-    {
-      minShaft: 8,
-      maxShaft: 10,
-      width: 3,
-      height: 3,
-      shaftDepth: 1.8,
-      hubDepth: 1.4
-    },
-    {
-      minShaft: 10,
-      maxShaft: 12,
-      width: 4,
-      height: 4,
-      shaftDepth: 2.5,
-      hubDepth: 1.8
-    },
-    {
-      minShaft: 12,
-      maxShaft: 17,
-      width: 5,
-      height: 5,
-      shaftDepth: 3.0,
-      hubDepth: 2.3
-    },
-    {
-      minShaft: 17,
-      maxShaft: 22,
-      width: 6,
-      height: 6,
-      shaftDepth: 3.5,
-      hubDepth: 2.8
-    },
-    {
-      minShaft: 22,
-      maxShaft: 30,
-      width: 8,
-      height: 7,
-      shaftDepth: 4.0,
-      hubDepth: 3.3
-    },
-    {
-      minShaft: 30,
-      maxShaft: 38,
-      width: 10,
-      height: 8,
-      shaftDepth: 5.0,
-      hubDepth: 3.3
-    },
+    {minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 1.2, hubDepth: 1.0},
+    {minShaft: 8, maxShaft: 10, width: 3, height: 3, shaftDepth: 1.8, hubDepth: 1.4},
+    {minShaft: 10, maxShaft: 12, width: 4, height: 4, shaftDepth: 2.5, hubDepth: 1.8},
+    {minShaft: 12, maxShaft: 17, width: 5, height: 5, shaftDepth: 3.0, hubDepth: 2.3},
+    {minShaft: 17, maxShaft: 22, width: 6, height: 6, shaftDepth: 3.5, hubDepth: 2.8},
+    {minShaft: 22, maxShaft: 30, width: 8, height: 7, shaftDepth: 4.0, hubDepth: 3.3},
+    {minShaft: 30, maxShaft: 38, width: 10, height: 8, shaftDepth: 5.0, hubDepth: 3.3},
   ];
 
   public static function catalog():Catalog<ParallelKeySpec> {
@@ -155,22 +106,10 @@ class ParallelKey extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Part.prism(
     [
-      new Vector(
-        -spec.width / 2,
-        0
-      ),
-      new Vector(
-        spec.width / 2,
-        0
-      ),
-      new Vector(
-        spec.width / 2,
-        spec.height
-      ),
-      new Vector(
-        -spec.width / 2,
-        spec.height
-      ),
+      new Vector(-spec.width / 2, 0),
+      new Vector(spec.width / 2, 0),
+      new Vector(spec.width / 2, spec.height),
+      new Vector(-spec.width / 2, spec.height),
     ],
     0,
     length
@@ -182,20 +121,10 @@ class ParallelKey extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.parallel-key",
       [
-        ComponentRecipeSupport.catalog(
-          "size",
-          ParallelKey.catalog(),
-          "2x2"
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          10
-        )
+        ComponentRecipeSupport.catalog("size", ParallelKey.catalog(), "2x2"),
+        ComponentRecipeSupport.length("length", 10)
       ],
-      v -> ParallelKey.metric(
-        v.token("size"),
-        v.number("length")
-      ),
+      v -> ParallelKey.metric(v.token("size"), v.number("length")),
       true
     );
     return recipeTypeCache;

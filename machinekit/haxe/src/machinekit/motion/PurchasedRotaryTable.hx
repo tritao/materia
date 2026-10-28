@@ -15,11 +15,7 @@ class PurchasedRotaryTable extends MachineAssembly implements PrecisionRotaryAxi
     addMemberConnector(
       "housing",
       "rotation",
-      Solids.axial(
-        0,
-        0,
-        body.axis.number("height") - body.axis.number("faceThickness")
-      )
+      Solids.axial(0, 0, body.axis.number("height") - body.axis.number("faceThickness"))
     );
     addMateOnAxis(
       "C",
@@ -36,10 +32,7 @@ class PurchasedRotaryTable extends MachineAssembly implements PrecisionRotaryAxi
         velocity: body.axis.number("maxSpeed"),
         effort: body.axis.number("peakTorque"),
         acceleration: 10,
-        assumptions: [{
-          quantity: "acceleration limit",
-          label: "assumed positioning acceleration 10 rad/s²"
-        }]
+        assumptions: [{quantity: "acceleration limit", label: "assumed positioning acceleration 10 rad/s²"}]
       }
     );
     exposeConnector("mount", "housing", "mount");

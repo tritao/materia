@@ -19,11 +19,7 @@ class ScrewdriverProcessTests {
   public static function program():TighteningProgram return new TighteningProgram({
     runDownSpeed: 20,
     finalSpeed: 2,
-    targetTorque: SocketHeadCapScrew.metric(
-      "M6",
-      20,
-      Steel88
-    ).tightening().torqueNm,
+    targetTorque: SocketHeadCapScrew.metric("M6", 20, Steel88).tightening().torqueNm,
     minimumAngle: 0.4,
     maximumAngle: 0.6,
     runDownTorqueLimit: 1,
@@ -242,10 +238,7 @@ class ScrewdriverProcessTests {
       fastening.minimumEngagement,
       fastening.thread,
       fastening.tightening,
-      {
-        minimum: 0.4,
-        maximum: 0.6
-      }
+      {minimum: 0.4, maximum: 0.6}
     );
     var derived = machinekit.screwdriving.TighteningPrograms.fromFastening(
       qualified,

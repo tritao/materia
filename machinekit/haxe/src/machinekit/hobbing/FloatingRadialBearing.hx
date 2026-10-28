@@ -6,32 +6,12 @@ import machinekit.component.ComponentRecipeSupport as P;
 class FloatingRadialBearing extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.length(
-      "outside",
-      32
-    ),
-    P.length(
-      "bore",
-      15
-    ),
-    P.length(
-      "height",
-      9
-    ),
-    P.length(
-      "axialFloat",
-      1
-    ),
-    P.quantity(
-      "radialStiffness",
-      100000,
-      "N/mm"
-    ),
-    P.quantity(
-      "radialClearance",
-      0,
-      "mm"
-    )
+    P.length("outside", 32),
+    P.length("bore", 15),
+    P.length("height", 9),
+    P.length("axialFloat", 1),
+    P.quantity("radialStiffness", 100000, "N/mm"),
+    P.quantity("radialClearance", 0, "mm")
   ]);
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

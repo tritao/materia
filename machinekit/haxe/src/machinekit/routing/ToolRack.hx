@@ -13,30 +13,12 @@ class ToolRack extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.count("pockets", 8),
     P.length("pitch", 110),
-    P.length(
-      "depth",
-      140
-    ),
-    P.length(
-      "height",
-      80
-    ),
-    P.length(
-      "forkHeight",
-      100
-    ),
-    P.length(
-      "coverStroke",
-      180
-    ),
-    P.length(
-      "coverBore",
-      25
-    ),
-    P.length(
-      "wall",
-      4
-    )
+    P.length("depth", 140),
+    P.length("height", 80),
+    P.length("forkHeight", 100),
+    P.length("coverStroke", 180),
+    P.length("coverBore", 25),
+    P.length("wall", 4)
   ];
   public function new(?v:ComponentValues) {
     super("tool-rack", "linear covered tool rack", "steel", inputs(), v);

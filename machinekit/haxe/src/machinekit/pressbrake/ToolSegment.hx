@@ -69,32 +69,11 @@ class ToolSegment extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.tool-segment", [
-      ComponentRecipeSupport.choice(
-        "profile",
-        ToolProfiles.catalogueIds(),
-        ToolingCatalogue.straight().id
-      ),
-      ComponentRecipeSupport.length(
-        "length",
-        100
-      ),
-      ComponentRecipeSupport.choice(
-        "horn",
-        [
-          "None",
-          "Left",
-          "Right"
-        ],
-        "None"
-      ),
-      ComponentRecipeSupport.length(
-        "reliefLength",
-        20
-      ),
-      ComponentRecipeSupport.length(
-        "remainingHeight",
-        25
-      )
+      ComponentRecipeSupport.choice("profile", ToolProfiles.catalogueIds(), ToolingCatalogue.straight().id),
+      ComponentRecipeSupport.length("length", 100),
+      ComponentRecipeSupport.choice("horn", ["None", "Left", "Right"], "None"),
+      ComponentRecipeSupport.length("reliefLength", 20),
+      ComponentRecipeSupport.length("remainingHeight", 25)
     ], values -> {var horn = switch values.token("horn") {
       case "None":
         null;
@@ -150,18 +129,9 @@ class ToolSegment extends MachineComponent {
       var start = horn.end == Left ? 0 : length - horn.reliefLength;
       var rectangle = new ToolProfilePolygon([
         new ToolProfilePoint(minimum - 1, horn.remainingHeight),
-        new ToolProfilePoint(
-          maximum + 1,
-          horn.remainingHeight
-        ),
-        new ToolProfilePoint(
-          maximum + 1,
-          ToolProfiles.height(profile) + 1
-        ),
-        new ToolProfilePoint(
-          minimum - 1,
-          ToolProfiles.height(profile) + 1
-        )
+        new ToolProfilePoint(maximum + 1, horn.remainingHeight),
+        new ToolProfilePoint(maximum + 1, ToolProfiles.height(profile) + 1),
+        new ToolProfilePoint(minimum - 1, ToolProfiles.height(profile) + 1)
       ]);
       cutter = new ToolProfilePrism(rectangle, start, start + horn.reliefLength).geometry();
       var result = part.subtract(cutter);
@@ -213,14 +183,8 @@ class ToolSegment extends MachineComponent {
     var clip = WallOutline.polygon([
       new Point2(minY - 1, minZ - 1),
       new Point2(maxY + 1, minZ - 1),
-      new Point2(
-        maxY + 1,
-        horn.remainingHeight
-      ),
-      new Point2(
-        minY - 1,
-        horn.remainingHeight
-      )
+      new Point2(maxY + 1, horn.remainingHeight),
+      new Point2(minY - 1, horn.remainingHeight)
     ]);
     for (part in OutlineBoolean.intersection(section, clip, "tool-horn")) result.push(new ToolContactPrism(
       part,

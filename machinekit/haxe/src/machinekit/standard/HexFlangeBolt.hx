@@ -42,90 +42,13 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
       "ISO 4162 flange bolt",
       row -> row.size,
       [
-        row(
-          "M5",
-          5,
-          0.8,
-          7,
-          5.6,
-          11.4,
-          1,
-          5.7,
-          9.4,
-          16
-        ),
-        row(
-          "M6",
-          6,
-          1,
-          8,
-          6.8,
-          13.6,
-          1.1,
-          6.8,
-          11.6,
-          18
-        ),
-        row(
-          "M8",
-          8,
-          1.25,
-          10,
-          8.5,
-          17,
-          1.2,
-          9.2,
-          14.9,
-          22
-        ),
-        row(
-          "M10",
-          10,
-          1.5,
-          13,
-          9.7,
-          20.8,
-          1.5,
-          11.2,
-          18.7,
-          26
-        ),
-        row(
-          "M12",
-          12,
-          1.75,
-          15,
-          11.9,
-          24.7,
-          1.8,
-          13.7,
-          22.5,
-          30
-        ),
-        row(
-          "M14",
-          14,
-          2,
-          18,
-          12.9,
-          28.6,
-          2.1,
-          15.7,
-          26.4,
-          34
-        ),
-        row(
-          "M16",
-          16,
-          2,
-          21,
-          15.1,
-          32.8,
-          2.4,
-          17.7,
-          30.6,
-          38
-        )
+        row("M5", 5, 0.8, 7, 5.6, 11.4, 1, 5.7, 9.4, 16),
+        row("M6", 6, 1, 8, 6.8, 13.6, 1.1, 6.8, 11.6, 18),
+        row("M8", 8, 1.25, 10, 8.5, 17, 1.2, 9.2, 14.9, 22),
+        row("M10", 10, 1.5, 13, 9.7, 20.8, 1.5, 11.2, 18.7, 26),
+        row("M12", 12, 1.75, 15, 11.9, 24.7, 1.8, 13.7, 22.5, 30),
+        row("M14", 14, 2, 18, 12.9, 28.6, 2.1, 15.7, 26.4, 34),
+        row("M16", 16, 2, 21, 15.1, 32.8, 2.4, 17.7, 30.6, 38)
       ],
       s -> ({
         source: DIMENSION_SOURCE,
@@ -188,21 +111,10 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
     addConnector("head", Face, Solids.axial(0, 0, 0));
     addConnector("tip", Face, Solids.axial(0, 0, -length));
     addFacet(new machinekit.component.CollisionHullFacet([
-      machinekit.component.CollisionHullFacet.cylinder(
-        spec.diameter / 2,
-        -length,
-        0
-      ),
-      machinekit.component.CollisionHullFacet.cylinder(
-        spec.flangeDiameter / 2,
-        0,
-        spec.flangeThickness
-      ),
+      machinekit.component.CollisionHullFacet.cylinder(spec.diameter / 2, -length, 0),
+      machinekit.component.CollisionHullFacet.cylinder(spec.flangeDiameter / 2, 0, spec.flangeThickness),
       machinekit.component.CollisionHullFacet.prism(
-        Polygon.regular(
-          6,
-          spec.acrossFlats
-        ),
+        Polygon.regular(6, spec.acrossFlats),
         spec.flangeThickness,
         spec.headHeight
       )
@@ -225,14 +137,7 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
     return Solids.union([
       threaded,
       Part.cylinderSpan(spec.flangeDiameter / 2, 0, spec.flangeThickness),
-      Part.prism(
-        Polygon.regular(
-          6,
-          spec.acrossFlats
-        ),
-        spec.flangeThickness,
-        spec.headHeight
-      )
+      Part.prism(Polygon.regular(6, spec.acrossFlats), spec.flangeThickness, spec.headHeight)
     ]);
   }
   public function bearingFrame():materia.assembly.AssemblyRecord.AssemblyFrame return {
@@ -272,30 +177,8 @@ class HexFlangeBolt extends MachineComponent implements ScrewFastener {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.standard.hex-flange-bolt",
-      [
-        P.catalog(
-          "size",
-          catalog(),
-          "M6"
-        ),
-        P.length(
-          "length",
-          20
-        ),
-        P.choice(
-          "propertyClass",
-          [
-            "8.8",
-            "10.9"
-          ],
-          "8.8"
-        )
-      ],
-      v -> metric(
-        v.token("size"),
-        v.number("length"),
-        PropertyClasses.parse(v.token("propertyClass"))
-      ),
+      [P.catalog("size", catalog(), "M6"), P.length("length", 20), P.choice("propertyClass", ["8.8", "10.9"], "8.8")],
+      v -> metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
       true,
       true,
       null,

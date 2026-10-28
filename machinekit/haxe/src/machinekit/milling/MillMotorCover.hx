@@ -13,10 +13,7 @@ class MillMotorCover extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 118),
     P.length("depth", 220),
-    P.length(
-      "height",
-      110
-    )
+    P.length("height", 110)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -39,29 +36,9 @@ class MillMotorCover extends MachineComponent {
     var w = parameterNumber("width"), d = parameterNumber("depth"), h = parameterNumber("height");
     return Solids.union([
       Part.box(w, d, 2).translated(new Vector(0, 0, h - 2)),
-      Part.box(w, 2, h).translated(new Vector(
-        0,
-        -d / 2 + 1,
-        0
-      )),
-      Part.box(
-        2,
-        d,
-        h
-      ).translated(new Vector(
-        -w / 2 + 1,
-        0,
-        0
-      )),
-      Part.box(
-        2,
-        d,
-        h
-      ).translated(new Vector(
-        w / 2 - 1,
-        0,
-        0
-      ))
+      Part.box(w, 2, h).translated(new Vector(0, -d / 2 + 1, 0)),
+      Part.box(2, d, h).translated(new Vector(-w / 2 + 1, 0, 0)),
+      Part.box(2, d, h).translated(new Vector(w / 2 - 1, 0, 0))
     ]);
   }
 }

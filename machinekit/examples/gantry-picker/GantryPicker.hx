@@ -68,11 +68,7 @@ class GantryPicker extends Gantry {
       addComponent(
         "box" + index,
         box,
-        AssemblyFrames.translation(
-          150 + 100 * column,
-          150 + 100 * row,
-          TABLE_TOP + PAD_HEIGHT
-        )
+        AssemblyFrames.translation(150 + 100 * column, 150 + 100 * row, TABLE_TOP + PAD_HEIGHT)
       );
       addComponent(
         "infeedSeat" + index,

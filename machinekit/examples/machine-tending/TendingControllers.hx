@@ -69,11 +69,7 @@ class TendingControllers extends MachineAssembly {
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(infeed.frame), slot.frame);
       infeedBlanks.addComponent(
         'blank-${slot.name.substr(5)}',
-        new TendingBlank(
-          BenchMill.STOCK_WIDTH,
-          BenchMill.STOCK_DEPTH,
-          BenchMill.STOCK_HEIGHT
-        ),
+        new TendingBlank(BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH, BenchMill.STOCK_HEIGHT),
         local
       );
       infeedBlanks.addComponent(
@@ -112,11 +108,7 @@ class TendingControllers extends MachineAssembly {
         robotNames.length,
         DualArmGripperTool.VALVE_COIL_OUTPUTS
       ),
-      AssemblyFrames.translation(
-        baseX + 350,
-        baseY,
-        0
-      )
+      AssemblyFrames.translation(baseX + 350, baseY, 0)
     );
     include(infeed.id, infeedTray, infeed.frame);
     include("infeed", infeedBlanks, infeed.frame);

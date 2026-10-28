@@ -23,12 +23,7 @@ class TendingCell {
       presentation.views.push({
         id: id,
         label: label,
-        camera: Frame(
-          [{occurrence: occurrence, subtree: true}],
-          yaw,
-          0.35,
-          1.3
-        ),
+        camera: Frame([{occurrence: occurrence, subtree: true}], yaw, 0.35, 1.3),
         visibility: [],
         sections: [],
         explode: 0,

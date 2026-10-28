@@ -20,31 +20,11 @@ class PassiveDynamicsReview {
     var reports:Array<Dynamic> = [];
     for (test in [
       {id: "zero_joint_losses", damping: 0.0, dt: 0.01},
-      {
-        id: "diagnostic_damping_1",
-        damping: 1.0,
-        dt: 0.01
-      },
-      {
-        id: "diagnostic_damping_5",
-        damping: 5.0,
-        dt: 0.01
-      },
-      {
-        id: "zero_joint_losses_half_timestep",
-        damping: 0.0,
-        dt: 0.005
-      },
-      {
-        id: "zero_joint_losses_1ms",
-        damping: 0.0,
-        dt: 0.001
-      },
-      {
-        id: "zero_joint_losses_half_ms",
-        damping: 0.0,
-        dt: 0.0005
-      }
+      {id: "diagnostic_damping_1", damping: 1.0, dt: 0.01},
+      {id: "diagnostic_damping_5", damping: 5.0, dt: 0.01},
+      {id: "zero_joint_losses_half_timestep", damping: 0.0, dt: 0.005},
+      {id: "zero_joint_losses_1ms", damping: 0.0, dt: 0.001},
+      {id: "zero_joint_losses_half_ms", damping: 0.0, dt: 0.0005}
     ]) {
       var scene = SceneArtifact.decode(sys.io.File.getBytes(path));
       var converted = AssemblySimulationBridge.toRobotModel(

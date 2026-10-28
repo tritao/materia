@@ -58,11 +58,7 @@ class FastenerTightening {
           standardEdition : null,
           dimensionKind : Maximum,
           conformance : GenericApproximation,
-          verifiedFields : [
-            "torqueNm",
-            "preloadN",
-            "friction"
-          ]
+          verifiedFields : ["torqueNm", "preloadN", "friction"]
         })
       );
     }

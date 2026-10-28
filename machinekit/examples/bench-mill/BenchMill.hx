@@ -75,18 +75,8 @@ class BenchMill extends MachineAssembly {
   public final guideBlock:LinearRailBlock = LinearRailBlock.metric(RAIL);
   public final specs:Array<MillAxisSpec> = [
     {id: "x", lower: 0, upper: 250, initial: 125},
-    {
-      id: "y",
-      lower: 0,
-      upper: 150,
-      initial: 75
-    },
-    {
-      id: "z",
-      lower: -250,
-      upper: 0,
-      initial: 0
-    }
+    {id: "y", lower: 0, upper: 150, initial: 75},
+    {id: "z", lower: -250, upper: 0, initial: 0}
   ];
   public final axisDrives:Array<MillAxisDrive> = [];
   public final tableTop:Float;
@@ -126,13 +116,7 @@ class BenchMill extends MachineAssembly {
       attach(
         'railY$name',
         guide,
-        orient(
-          side * base.railSpacing / 2,
-          yRailStart,
-          baseTop + railSpec.railHeight,
-          up,
-          alongY
-        ),
+        orient(side * base.railSpacing / 2, yRailStart, baseTop + railSpec.railHeight, up, alongY),
         "base"
       );
     }
@@ -158,13 +142,7 @@ class BenchMill extends MachineAssembly {
       attach(
         'railX$name',
         guide,
-        orient(
-          -xRailLength / 2,
-          saddleY + side * saddle.railSpacing / 2,
-          saddleTop + railSpec.railHeight,
-          up,
-          alongX
-        ),
+        orient(-xRailLength / 2, saddleY + side * saddle.railSpacing / 2, saddleTop + railSpec.railHeight, up, alongX),
         "saddle"
       );
     }
@@ -193,21 +171,7 @@ class BenchMill extends MachineAssembly {
       attach(
         'railZ$name',
         guide,
-        orient(
-          side * column.railSpacing / 2,
-          columnFront - railSpec.railHeight,
-          zRailStart,
-          [
-            0.0,
-            -1,
-            0
-          ],
-          [
-            0.0,
-            0,
-            1
-          ]
-        ),
+        orient(side * column.railSpacing / 2, columnFront - railSpec.railHeight, zRailStart, [0.0, -1, 0], [0.0, 0, 1]),
         "column"
       );
     }
@@ -215,16 +179,8 @@ class BenchMill extends MachineAssembly {
       side * column.railSpacing / 2,
       columnFront - railSpec.railHeight,
       zBlock + span,
-      [
-        0.0,
-        -1,
-        0
-      ],
-      [
-        0.0,
-        0,
-        1
-      ]
+      [0.0, -1, 0],
+      [0.0, 0, 1]
     )];
     slide(specs[2], "railZLeft", zRails[0], "blockZLeft", guideBlock, zBlocks[0], [0.0, 0, 1], zBlocks);
     attach("head", head, AssemblyFrames.translation(0, headY, headZ), "blockZLeft");
@@ -244,12 +200,7 @@ class BenchMill extends MachineAssembly {
       "attach-spindle",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: null,
-        upper: null,
-        velocity: SpindleCartridge.MAX_RPM * 2 * Math.PI / 60,
-        effort: null
-      }
+      {lower: null, upper: null, velocity: SpindleCartridge.MAX_RPM * 2 * Math.PI / 60, effort: null}
     );
     addAtSpeed("spindle-at-speed", "spindle-turn");
     attach("holder", holder, gaugeZero, "spindle");
@@ -260,11 +211,7 @@ class BenchMill extends MachineAssembly {
         attach(
           "stock",
           new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
-          AssemblyFrames.translation(
-            tableX,
-            saddleY,
-            tableTop
-          ),
+          AssemblyFrames.translation(tableX, saddleY, tableTop),
           "table"
         );
         // Both clamps hold the back corners, clear of the bearing seat and fastening recesses.
@@ -275,17 +222,7 @@ class BenchMill extends MachineAssembly {
             tableX + side * (STOCK_WIDTH / 2 - 8),
             saddleY + STOCK_DEPTH / 2,
             tableTop,
-            [
-              0.0,
-              -1,
-              0,
-              1.0,
-              0,
-              0,
-              0.0,
-              0,
-              1
-            ]
+            [0.0, -1, 0, 1.0, 0, 0, 0.0, 0, 1]
           ),
           "table"
         );
@@ -306,17 +243,8 @@ class BenchMill extends MachineAssembly {
       addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
       if (includeWorkpiece) attach(
         "stock",
-        new RouterPlate(
-          STOCK_WIDTH,
-          STOCK_DEPTH,
-          STOCK_HEIGHT,
-          "aluminium 6061",
-          "Bearing block blank"
-        ),
-        AssemblyFrames.compose(
-          zeroPose("vise/body"),
-          installedVise.seat
-        ),
+        new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+        AssemblyFrames.compose(zeroPose("vise/body"), installedVise.seat),
         "vise/body"
       );
     }
@@ -326,11 +254,7 @@ class BenchMill extends MachineAssembly {
     attach(
       "powerSupply",
       new ThreePhaseRectifier(
-        new machinekit.power.AcMains(
-          ThreePhase,
-          new machinekit.power.AcRmsVoltage(400),
-          50
-        ),
+        new machinekit.power.AcMains(ThreePhase, new machinekit.power.AcRmsVoltage(400), 50),
         new machinekit.power.DcCurrent(20),
         4,
         240,
@@ -338,11 +262,7 @@ class BenchMill extends MachineAssembly {
         100,
         8000
       ),
-      AssemblyFrames.translation(
-        -190,
-        columnPose.y,
-        0
-      ),
+      AssemblyFrames.translation(-190, columnPose.y, 0),
       "base"
     );
     exposePort("mains", "powerSupply", "mains");
@@ -353,22 +273,10 @@ class BenchMill extends MachineAssembly {
       "saddle",
       "table",
       [-xScrewLength / 2, saddleY, tableBottom - railSpec.blockHeight / 2],
-      [
-        1.0,
-        0,
-        0
-      ],
-      [
-        0.0,
-        0,
-        1
-      ],
+      [1.0, 0, 0],
+      [0.0, 0, 1],
       xScrewLength,
-      [
-        tableX,
-        saddleY,
-        tableBottom - railSpec.blockHeight / 2
-      ]
+      [tableX, saddleY, tableBottom - railSpec.blockHeight / 2]
     );
     var yNut = new BallNut();
     var yNutFace = yNut.bodyLength / 2 + yNut.flangeThickness;
@@ -378,17 +286,9 @@ class BenchMill extends MachineAssembly {
       "saddle",
       [0.0, yRailStart, saddleBottom + saddle.screwHeight],
       [0.0, 1, 0],
-      [
-        0.0,
-        0,
-        1
-      ],
+      [0.0, 0, 1],
       yRailLength,
-      [
-        0.0,
-        saddleY + saddle.depth / 2 - yNutFace,
-        saddleBottom + saddle.screwHeight
-      ]
+      [0.0, saddleY + saddle.depth / 2 - yNutFace, saddleBottom + saddle.screwHeight]
     );
     var zScrewTop = columnPose.z + column.height + railSpec.railEndMargin;
     var zScrewX = column.width / 2 + new BallNut().flangeDiameter / 2 + 2;
@@ -400,11 +300,7 @@ class BenchMill extends MachineAssembly {
       [0.0, 0, -1],
       [1.0, 0, 0],
       column.height,
-      [
-        zScrewX,
-        (headBack + columnFront) / 2,
-        headZ + head.height / 2
-      ]
+      [zScrewX, (headBack + columnFront) / 2, headZ + head.height / 2]
     );
     var pulley = new TimingPulley(HTD5M, 20, 20, 15);
     var motorPulley = new TimingPulley(HTD5M, 20, 20, 15);
@@ -418,26 +314,14 @@ class BenchMill extends MachineAssembly {
     var shelfBottom = motorFaceZ - 8;
     attach(
       "spindleMotorShelf",
-      new MillMotorPlate(
-        spindleDrive.rating.bodyDiameter + 20,
-        8,
-        motorPulley.outsideDiameter + 2
-      ),
-      AssemblyFrames.translation(
-        150,
-        spindleY,
-        shelfBottom
-      ),
+      new MillMotorPlate(spindleDrive.rating.bodyDiameter + 20, 8, motorPulley.outsideDiameter + 2),
+      AssemblyFrames.translation(150, spindleY, shelfBottom),
       "head"
     );
     attach(
       "spindleMotorRiser",
       new MillDriveBox(20, 100, shelfBottom - headZ - head.height),
-      AssemblyFrames.translation(
-        head.width / 2,
-        spindleY + 5,
-        headZ + head.height
-      ),
+      AssemblyFrames.translation(head.width / 2, spindleY + 5, headZ + head.height),
       "head"
     );
     addComponent("spindleMotorPulley", motorPulley);
@@ -450,11 +334,7 @@ class BenchMill extends MachineAssembly {
       "to-spindleMotorPulley",
       "spindleMotorPulley",
       "attach-spindleMotorPulley",
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      {x: 0, y: 0, z: 1}
     );
     attach(
       "spindleMotorShaft",
@@ -467,32 +347,21 @@ class BenchMill extends MachineAssembly {
       belt: "spindleBelt",
       wraps: [
         {instanceId: "spindlePulley", connectorName: "axis"},
-        {
-          instanceId: "spindleMotorPulley",
-          connectorName: "axis"
-        }
+        {instanceId: "spindleMotorPulley", connectorName: "axis"}
       ]
     });
     var motorRatio = addTransmission(
       "spindle-belt",
       "spindle-turn",
       "spindle-motor-turn",
-      Transmission.BeltReduction(
-        "spindleBelt",
-        "spindlePulley",
-        "spindleMotorPulley"
-      ),
+      Transmission.BeltReduction("spindleBelt", "spindlePulley", "spindleMotorPulley"),
       machinekit.assembly.Sense.Same
     );
     var spindleDriver = "spindleMotorDriver";
     attach(
       spindleDriver,
       new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)),
-      AssemblyFrames.translation(
-        -190,
-        base.depth / 2 - 30,
-        0
-      ),
+      AssemblyFrames.translation(-190, base.depth / 2 - 30, 0),
       "base"
     );
     connectPorts("spindle-power", "powerSupply", "power4", spindleDriver, "power");
@@ -590,11 +459,7 @@ class BenchMill extends MachineAssembly {
     var faceDistance = nut.bodyLength / 2 + nut.flangeThickness;
     attach(
       id + "NutBracket",
-      new MillNutBracket(
-        nut,
-        spec.id,
-        spec.id == "x" ? tableTop - table.height - nutCenter[2] : 0
-      ),
+      new MillNutBracket(nut, spec.id, spec.id == "x" ? tableTop - table.height - nutCenter[2] : 0),
       orient(
         nutCenter[0] + along[0] * faceDistance,
         nutCenter[1] + along[1] * faceDistance,
@@ -611,13 +476,7 @@ class BenchMill extends MachineAssembly {
       attach(
         id + (end == 0 ? "Fixed" : "Floating"),
         support,
-        orient(
-          start[0] + along[0] * offset,
-          start[1] + along[1] * offset,
-          start[2] + along[2] * offset,
-          up,
-          along
-        ),
+        orient(start[0] + along[0] * offset, start[1] + along[1] * offset, start[2] + along[2] * offset, up, along),
         parent
       );
     }
@@ -633,11 +492,7 @@ class BenchMill extends MachineAssembly {
         attach(
           id + 'Stand$end',
           new MillDriveBox(unit.width, unit.length, footZ - base.height),
-          AssemblyFrames.translation(
-            start[0],
-            start[1] + offset,
-            base.height
-          ),
+          AssemblyFrames.translation(start[0], start[1] + offset, base.height),
           parent
         );
       }
@@ -646,11 +501,7 @@ class BenchMill extends MachineAssembly {
       attach(
         motorId + "Bridge",
         new MillDriveBox(motorPlate.width, front - motorPose.y, plateBottom - base.height + 10),
-        AssemblyFrames.translation(
-          0,
-          (front + motorPose.y) / 2,
-          base.height - 10
-        ),
+        AssemblyFrames.translation(0, (front + motorPose.y) / 2, base.height - 10),
         parent
       );
     } else if (spec.id == "x") {
@@ -661,11 +512,7 @@ class BenchMill extends MachineAssembly {
         attach(
           id + (side < 0 ? "NearBridge" : "FarBridge"),
           new MillDriveBox(reach, 80, 10, slot, motorPlate.thickness),
-          AssemblyFrames.translation(
-            side * (saddle.width / 2 + reach / 2),
-            start[1],
-            footZ - 10
-          ),
+          AssemblyFrames.translation(side * (saddle.width / 2 + reach / 2), start[1], footZ - 10),
           parent
         );
       }
@@ -678,11 +525,7 @@ class BenchMill extends MachineAssembly {
         attach(
           id + 'Stand$end',
           new MillDriveBox(footX - column.width / 2, unit.width, unit.length),
-          AssemblyFrames.translation(
-            (footX + column.width / 2) / 2,
-            start[1],
-            start[2] - offset - unit.length / 2
-          ),
+          AssemblyFrames.translation((footX + column.width / 2) / 2, start[1], start[2] - offset - unit.length / 2),
           parent
         );
       }
@@ -692,11 +535,7 @@ class BenchMill extends MachineAssembly {
       attach(
         motorId + "Post",
         new MillDriveBox(20, 20, motorPose.z - motorPlate.thickness - top),
-        AssemblyFrames.translation(
-          column.width / 2 - 10,
-          start[1] + motorPlate.width / 2 - 10,
-          top
-        ),
+        AssemblyFrames.translation(column.width / 2 - 10, start[1] + motorPlate.width / 2 - 10, top),
         parent
       );
     }
@@ -710,11 +549,7 @@ class BenchMill extends MachineAssembly {
       'to-$id',
       id,
       'attach-$id',
-      {
-        x: along[0],
-        y: along[1],
-        z: along[2]
-      },
+      {x: along[0], y: along[1], z: along[2]},
       ratio * spec.initial
     );
     supportScrew(id + "-lead", near.support, far.support);
@@ -723,11 +558,7 @@ class BenchMill extends MachineAssembly {
     attach(
       driver,
       new MotorDriver("GENERIC-400V-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(20)),
-      AssemblyFrames.translation(
-        -190 + index * 65,
-        base.depth / 2 - 30,
-        0
-      ),
+      AssemblyFrames.translation(-190 + index * 65, base.depth / 2 - 30, 0),
       "base"
     );
     connectPorts(driver + "-power", "powerSupply", 'power$index', driver, "power");
@@ -742,11 +573,7 @@ class BenchMill extends MachineAssembly {
         motorPose.y - along[1] * motor.rating.bodyLength,
         motorPose.z - along[2] * motor.rating.bodyLength,
         up,
-        [
-          -along[0],
-          -along[1],
-          -along[2]
-        ]
+        [-along[0], -along[1], -along[2]]
       ),
       motorId
     );
@@ -815,10 +642,7 @@ class BenchMill extends MachineAssembly {
   public function tools():Array<Tool> return [Tool.shaped(
     1,
     tool.stickout / 1000,
-    tool.cutter().withHolder(
-      Er20Holder.DIAMETER / 1000,
-      Er20Holder.LENGTH / 1000
-    )
+    tool.cutter().withHolder(Er20Holder.DIAMETER / 1000, Er20Holder.LENGTH / 1000)
   )];
   public function axisOvertravel(id:String):Float {
     var room = overtravel.get(id);
@@ -868,13 +692,7 @@ class BenchMill extends MachineAssembly {
       'attach-$id',
       {x: axis[0], y: axis[1], z: axis[2]},
       spec.initial,
-      {
-        lower: spec.lower,
-        upper: spec.upper,
-        velocity: null,
-        effort: null,
-        overtravel: room
-      }
+      {lower: spec.lower, upper: spec.upper, velocity: null, effort: null, overtravel: room}
     );
   }
 
@@ -945,10 +763,7 @@ private class MillDriveBox extends MachineComponent {
     if (slot == null) return body;
     return Solids.cut(
       body,
-      [Solids.named(
-        Part.box(slotWidth, depth + 2, height + 2).translated(new Vector(slot, 0, -1)),
-        "motor-plate-seat"
-      )]
+      [Solids.named(Part.box(slotWidth, depth + 2, height + 2).translated(new Vector(slot, 0, -1)), "motor-plate-seat")]
     );
   }
 }
@@ -995,23 +810,12 @@ private class MillNutBracket extends MachineComponent {
     var plate = Solids.named(Part.cylinderSpan(radius, 0, 8), "flange-seat");
     if (axis == "z") plate = Solids.union([
       plate,
-      Solids.named(
-        Part.box(10, 10, 8).translated(new Vector(
-          -radius + 6,
-          -radius + 4,
-          0
-        )),
-        "head-seat"
-      )
+      Solids.named(Part.box(10, 10, 8).translated(new Vector(-radius + 6, -radius + 4, 0)), "head-seat")
     ]);
     if (axis == "x") for (side in [-1, 1]) plate = Solids.union([
       plate,
       Solids.named(
-        Part.box(16, mountRise, 8).translated(new Vector(
-          side * (radius + 4),
-          mountRise / 2,
-          0
-        )),
+        Part.box(16, mountRise, 8).translated(new Vector(side * (radius + 4), mountRise / 2, 0)),
         side < 0 ? "table-seat-front" : "table-seat-back"
       )
     ]);

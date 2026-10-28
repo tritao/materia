@@ -27,26 +27,7 @@ class CoreXyPlotterPreview {
       positionTolerance: 2.5e-5,
       axes: ["x", "y"],
       loop: true,
-      waypoints: [
-        [0.03, 0.0],
-        [0.03, 0.03],
-        [
-          0.0,
-          0.03
-        ],
-        [
-          0.0,
-          0.0
-        ],
-        [
-          0.03,
-          0.03
-        ],
-        [
-          0.0,
-          0.0
-        ]
-      ]
+      waypoints: [[0.03, 0.0], [0.03, 0.03], [0.0, 0.03], [0.0, 0.0], [0.03, 0.03], [0.0, 0.0]]
     };
     return SceneArtifact.encode(scene);
   }
@@ -75,46 +56,14 @@ class CoreXyPlotterChecks {
   static final TERMS:Array<PulleyTerm> = [
     new PulleyTerm("pulleyA", 1, -1),
     new PulleyTerm("idlerAFront", 1, -1),
-    new PulleyTerm(
-      "idlerARear",
-      1,
-      -1
-    ),
-    new PulleyTerm(
-      "pulleyB",
-      1,
-      1
-    ),
-    new PulleyTerm(
-      "idlerBFront",
-      1,
-      1
-    ),
-    new PulleyTerm(
-      "idlerBRear",
-      1,
-      1
-    ),
-    new PulleyTerm(
-      "idlerAStart",
-      1,
-      0
-    ),
-    new PulleyTerm(
-      "idlerAEnd",
-      -1,
-      0
-    ),
-    new PulleyTerm(
-      "idlerBStart",
-      1,
-      0
-    ),
-    new PulleyTerm(
-      "idlerBEnd",
-      -1,
-      0
-    )
+    new PulleyTerm("idlerARear", 1, -1),
+    new PulleyTerm("pulleyB", 1, 1),
+    new PulleyTerm("idlerBFront", 1, 1),
+    new PulleyTerm("idlerBRear", 1, 1),
+    new PulleyTerm("idlerAStart", 1, 0),
+    new PulleyTerm("idlerAEnd", -1, 0),
+    new PulleyTerm("idlerBStart", 1, 0),
+    new PulleyTerm("idlerBEnd", -1, 0)
   ];
 
   public static function run():Void {
@@ -347,10 +296,7 @@ class CoreXyPlotterChecks {
       ]) if (overlap(
         plotter,
         state,
-        [
-          0,
-          0
-        ],
+        [0, 0],
         "belt" + letter,
         other
       ) > 1e-3) throw 'belt $letter runs through $other';

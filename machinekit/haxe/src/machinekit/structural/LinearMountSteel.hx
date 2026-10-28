@@ -25,48 +25,14 @@ class LinearMountSteel extends MachineComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 28),
     P.length("length", 500),
-    P.choice(
-      "stock",
-      [
-        "C45",
-        "weldable-mild-steel"
-      ],
-      "C45"
-    ),
-    P.length(
-      "thickness",
-      20
-    ),
-    P.length(
-      "flangeWidth",
-      0
-    ),
-    P.length(
-      "flangeThickness",
-      0
-    ),
-    P.choice(
-      "role",
-      [
-        "receiver",
-        "adjustment-bar",
-        "carrier",
-        "host-pad"
-      ],
-      "receiver"
-    ),
-    P.text(
-      "holes",
-      InsertHoles.fromNeutral([])
-    ),
-    P.text(
-      "mountingRequirements",
-      "[]"
-    ),
-    P.text(
-      "compliance",
-      "null"
-    )
+    P.choice("stock", ["C45", "weldable-mild-steel"], "C45"),
+    P.length("thickness", 20),
+    P.length("flangeWidth", 0),
+    P.length("flangeThickness", 0),
+    P.choice("role", ["receiver", "adjustment-bar", "carrier", "host-pad"], "receiver"),
+    P.text("holes", InsertHoles.fromNeutral([])),
+    P.text("mountingRequirements", "[]"),
+    P.text("compliance", "null")
   ];
 
   public static function recipeType():ComponentType {
@@ -137,22 +103,7 @@ class LinearMountSteel extends MachineComponent {
       Mount,
       materia.assembly.AssemblyFrames.compose(
         hole.frame,
-        materia.assembly.AssemblyFrames.fromRotationMatrix(
-          0,
-          0,
-          0,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
-        )
+        materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, 0, 1, 0, -1, 0])
       )
     );
   }

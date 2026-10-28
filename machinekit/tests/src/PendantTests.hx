@@ -96,13 +96,8 @@ class PendantTests {
       check(tied, "A free-standing " + t.name + " at " + t.x + ", " + t.y);
     }
     for (p in pendantCase.posts) check(
-      Math.min(
-        Math.min(p.x + innerX, innerX - p.x),
-        Math.min(
-          p.y + innerY,
-          innerY - p.y
-        )
-      ) - PendantCase.POST_DIAMETER / 2 <= 0.25,
+      Math.min(Math.min(p.x + innerX,
+      innerX - p.x), Math.min(p.y + innerY, innerY - p.y)) - PendantCase.POST_DIAMETER / 2 <= 0.25,
       "A post stands off its wall at " + p.x + ", " + p.y + " and relies on a rib"
     );
 
@@ -114,10 +109,7 @@ class PendantTests {
         c.body(),
         c.x,
         c.y,
-        Rect(
-          PendantCase.STRAP_SLOT_WIDTH,
-          PendantCase.STRAP_SLOT_HEIGHT
-        ),
+        Rect(PendantCase.STRAP_SLOT_WIDTH, PendantCase.STRAP_SLOT_HEIGHT),
         slot.x,
         slot.y
       ) >= 1.5 - 1e-9,
@@ -151,10 +143,7 @@ class PendantTests {
       layout,
       () -> pendantCase.plate(),
       () -> pendantCase.shell(),
-      [{
-        id: "board",
-        solid: () -> pendantCase.board()
-      }],
+      [{id: "board", solid: () -> pendantCase.board()}],
       "FR4 PCB",
       ReferencePendant.groups(),
       pendantCase.hardware()
@@ -251,11 +240,7 @@ class PendantTests {
     var drawing = Sys.getEnv("PENDANT_SVG");
     if (drawing != null && drawing != "") File.saveContent(
       drawing,
-      PanelLayoutSvg.render(
-        layout,
-        4.0,
-        pendantCase.marks()
-      )
+      PanelLayoutSvg.render(layout, 4.0, pendantCase.marks())
     );
 
     rejects(
@@ -267,24 +252,9 @@ class PendantTests {
         3.0,
         30.0,
         [
-          new PlacedPart(
-            "a",
-            PartPresets.pushButton16(),
-            0.0,
-            0.0
-          ),
-          new PlacedPart(
-            "b",
-            PartPresets.pushButton16(),
-            18.0,
-            0.0
-          ),
-          new PlacedPart(
-            "c",
-            PartPresets.pushButton16(),
-            -18.0,
-            0.0
-          )
+          new PlacedPart("a", PartPresets.pushButton16(), 0.0, 0.0),
+          new PlacedPart("b", PartPresets.pushButton16(), 18.0, 0.0),
+          new PlacedPart("c", PartPresets.pushButton16(), -18.0, 0.0)
         ]
       ))
     );

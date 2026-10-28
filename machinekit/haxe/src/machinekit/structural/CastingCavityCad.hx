@@ -30,10 +30,7 @@ class CastingCavityCad {
 
   public static function prism(prism:CastingPrism):Part {
     return Scope.run(scope -> {var local = scope.own(Part.prism(
-      [for (point in prism.profile) new Vector(
-        point.x,
-        point.y
-      )],
+      [for (point in prism.profile) new Vector(point.x, point.y)],
       0,
       prism.height
     ));

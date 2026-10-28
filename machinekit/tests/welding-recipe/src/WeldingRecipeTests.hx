@@ -57,26 +57,10 @@ class WeldingRecipeTests {
       {member: "plate", face: "top"},
       {member: "wall", face: "front"},
       machinekit.welding.WeldSeam.JointType.Fillet,
-      new cadkit.modeling.Vector(
-        0,
-        0,
-        0
-      ),
-      new cadkit.modeling.Vector(
-        180,
-        0,
-        0
-      ),
-      new cadkit.modeling.Vector(
-        0,
-        0,
-        1
-      ),
-      new cadkit.modeling.Vector(
-        0,
-        1,
-        0
-      ),
+      new cadkit.modeling.Vector(0, 0, 0),
+      new cadkit.modeling.Vector(180, 0, 0),
+      new cadkit.modeling.Vector(0, 0, 1),
+      new cadkit.modeling.Vector(0, 1, 0),
       7,
       1,
       0,

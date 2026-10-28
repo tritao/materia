@@ -33,18 +33,9 @@ class Angle implements StructuralProfile {
         new Vector(0, 0),
         new Vector(legA, 0),
         new Vector(legA, thickness),
-        new Vector(
-          thickness,
-          thickness
-        ),
-        new Vector(
-          thickness,
-          legB
-        ),
-        new Vector(
-          0,
-          legB
-        ),
+        new Vector(thickness, thickness),
+        new Vector(thickness, legB),
+        new Vector(0, legB),
       ],
       0,
       length

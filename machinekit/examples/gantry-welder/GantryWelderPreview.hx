@@ -26,11 +26,7 @@ class GantryWelderPreview {
     var wire = AssemblyFrames.transformVector(AssemblyFrames.compose(work, tip), 0, 0, 1);
     var home:machinekit.welding.WeldingMission.TorchPlace = {
       position: new Vector(at.x, at.y, at.z),
-      wire: new Vector(
-        wire.x,
-        wire.y,
-        wire.z
-      )
+      wire: new Vector(wire.x, wire.y, wire.z)
     };
     var feeder = cell.feeder;
     var mission = WeldingMission.generate(
@@ -41,10 +37,7 @@ class GantryWelderPreview {
         depositionEfficiency: feeder.depositionEfficiency,
         maxSpeedMPerMin: feeder.maxSpeedMPerMin
       },
-      WeldMetal.carrierOf(
-        cell,
-        weldment
-      ),
+      WeldMetal.carrierOf(cell, weldment),
       scene.metresPerUnit,
       home
     );

@@ -29,10 +29,7 @@ class ToolLayoutTests {
     }
     var row = new ToolRow(
       [new ToolSegment(punch, 100), new ToolSegment(punch, 50), new ToolSegment(punch, 20)],
-      [
-        10,
-        15
-      ]
+      [10, 15]
     );
     if (row.length != 170 || row.span != 195) throw "Segment sum and gap span";
     var positions = row.placements(200);

@@ -12,28 +12,11 @@ class VacuumBlower extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("power", 5500, "W"),
-    P.quantity(
-      "freeFlow",
-      300,
-      "m3/h"
-    ),
-    P.quantity(
-      "shutoffPressure",
-      25000,
-      "Pa"
-    ),
-    P.length(
-      "diameter",
-      400
-    ),
-    P.length(
-      "length",
-      500
-    ),
-    P.length(
-      "portDiameter",
-      75
-    )
+    P.quantity("freeFlow", 300, "m3/h"),
+    P.quantity("shutoffPressure", 25000, "Pa"),
+    P.length("diameter", 400),
+    P.length("length", 500),
+    P.length("portDiameter", 75)
   ];
   public function new(?v:ComponentValues) {
     super("vacuum-blower", "side-channel vacuum blower", "aluminium 6061", inputs(), v);
@@ -68,28 +51,19 @@ class VacuumBlower extends AssumedCatalogComponent {
         {r: 0.62 * r, z: z},
         {r: 0.72 * r, z: z},
         {r: 0.72 * r, z: z + pitch * 0.4},
-        {
-          r: 0.62 * r,
-          z: z + pitch * 0.4
-        }
+        {r: 0.62 * r, z: z + pitch * 0.4}
       ]);
     }
     profile = profile.concat([
       {r: 0.62 * r, z: 0.94 * l},
       {r: 0.66 * r, z: 0.94 * l},
       {r: 0.66 * r, z: l},
-      {
-        r: 0.0,
-        z: l
-      }
+      {r: 0.0, z: l}
     ]);
     var body = Solids.named(Part.revolve(profile), "blower");
     return Solids.cut(
       body,
-      [for (x in [-0.5 * r, 0.5 * r]) Solids.named(
-        Part.cylinderSpan(port, -0.1, 0.12 * l, x, 0),
-        "port"
-      )]
+      [for (x in [-0.5 * r, 0.5 * r]) Solids.named(Part.cylinderSpan(port, -0.1, 0.12 * l, x, 0), "port")]
     );
   }
 

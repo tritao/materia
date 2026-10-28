@@ -49,10 +49,7 @@ class FoundationAssemblyContext {
         var source:InterfaceContextSource = Precision(
           partId,
           requirement,
-          F.compose(
-            worldToFoundation,
-            state.worldPose(partId)
-          )
+          F.compose(worldToFoundation, state.worldPose(partId))
         );
         sources.set(CastingInterfaceContexts.sourceKey(source), source);
       }
@@ -78,21 +75,14 @@ class FoundationAssemblyContext {
               Precision(
                 part,
                 InterfaceSourceSupport.precision(parts, part, face, copy.id),
-                F.compose(
-                  worldToFoundation,
-                  state.worldPose(part)
-                )
+                F.compose(worldToFoundation, state.worldPose(part))
               );
             case MachineAxis(axis):
               var joint = InterfaceSourceSupport.axis(definition, axis);
               Axis(
                 axis,
                 F.compose(worldToFoundation, state.worldConnector(joint.parent, joint.parentConnector)),
-                {
-                  x: joint.axis.x,
-                  y: joint.axis.y,
-                  z: joint.axis.z
-                }
+                {x: joint.axis.x, y: joint.axis.y, z: joint.axis.z}
               );
           };
           sources.set(CastingInterfaceContexts.sourceKey(source), source);

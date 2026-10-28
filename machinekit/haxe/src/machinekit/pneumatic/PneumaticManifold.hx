@@ -31,10 +31,7 @@ class PneumaticManifold extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.pneumatic.manifold",
-      [ComponentRecipeSupport.count(
-        "outlets",
-        2
-      )],
+      [ComponentRecipeSupport.count("outlets", 2)],
       v -> new PneumaticManifold(v.integer("outlets")),
       true
     );

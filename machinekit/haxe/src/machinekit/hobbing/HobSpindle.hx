@@ -92,14 +92,8 @@ class HobSpindle extends MachineAssembly {
         velocity: this.motor.maxSpeed,
         effort: this.motor.peakTorque,
         assumptions: this.motor.ratingsBasis == Assumed ? [
-          {
-            quantity : "speed limit",
-            label : "assumed direct motor rating"
-          },
-          {
-            quantity : "effort limit",
-            label : "assumed peak motor torque"
-          }
+          {quantity : "speed limit", label : "assumed direct motor rating"},
+          {quantity : "effort limit", label : "assumed peak motor torque"}
         ] : null
       }
     );

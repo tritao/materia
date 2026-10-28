@@ -133,17 +133,7 @@ class ZppComponent extends MachineComponent {
         0,
         0,
         role == "stud" ? -24.638 : -29.083,
-        [
-          0,
-          0,
-          1,
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0
-        ]
+        [0, 0, 1, 0, -1, 0, 1, 0, 0]
       ) : StringTools.startsWith(
         role,
         "ar-"
@@ -151,32 +141,12 @@ class ZppComponent extends MachineComponent {
         0,
         0,
         0,
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          1,
-          0
-        ]
+        [1, 0, 0, 0, 0, -1, 0, 1, 0]
       ) : F.fromRotationMatrix(
         0,
         0,
         (role == "plate" || role == "plate96") ? 0 : VISE_BOTTOM,
-        [
-          0,
-          0,
-          1,
-          1,
-          0,
-          0,
-          0,
-          1,
-          0
-        ]
+        [0, 0, 1, 1, 0, 0, 0, 1, 0]
       );
       try {
         var result = machinekit.assembly.PosedParts.moved(group, pose);
@@ -194,11 +164,7 @@ class ZppComponent extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.milling.zpp-supplier-member",
-      [P.choice(
-        "role",
-        roles(),
-        "body"
-      )],
+      [P.choice("role", roles(), "body")],
       v -> new ZppComponent(v.token("role")),
       true,
       false,

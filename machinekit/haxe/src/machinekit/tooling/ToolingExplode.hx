@@ -11,10 +11,7 @@ class ToolingExplode {
   public static function presentation(
     definition:AssemblyDefinition,
     producer:String,
-    displacements:Map<
-      String,
-      materia.assembly.AssemblyDefinition.AssemblyVector
-  >
+    displacements:Map<String, materia.assembly.AssemblyDefinition.AssemblyVector>
   ):AssemblyPresentation {
     var result = Presentations.assembled(definition, -1.1, 0.35, producer);
     var flat = AssemblyDefinitionFlattener.flattenView(definition);
@@ -48,11 +45,7 @@ class ToolingExplode {
       var length = Math.sqrt(local.x * local.x + local.y * local.y + local.z * local.z);
       if (length > 0) result.explode.push({
         select: {occurrence: part.id, subtree: false},
-        direction: {
-          x: local.x / length,
-          y: local.y / length,
-          z: local.z / length
-        },
+        direction: {x: local.x / length, y: local.y / length, z: local.z / length},
         distance: length,
         stage: 1,
         source: Generated(producer)

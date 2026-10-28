@@ -24,35 +24,13 @@ class RingParts {
     }
     var body = Solids.union([
       keep(ring(outer - wall, outer, 0, height, c, false), "outer-ring"),
-      keep(
-        ring(
-          inner,
-          inner + wall,
-          0,
-          height,
-          c,
-          true
-        ),
-        "inner-ring"
-      ),
+      keep(ring(inner, inner + wall, 0, height, c, true), "inner-ring"),
       keep(
         Part.revolve([
-          {
-            r: inner + wall,
-            z: recess
-          },
-          {
-            r: outer - wall,
-            z: recess
-          },
-          {
-            r: outer - wall,
-            z: height - recess
-          },
-          {
-            r: inner + wall,
-            z: height - recess
-          }
+          {r: inner + wall, z: recess},
+          {r: outer - wall, z: recess},
+          {r: outer - wall, z: height - recess},
+          {r: inner + wall, z: height - recess}
         ]),
         "shield"
       )
@@ -63,13 +41,7 @@ class RingParts {
     for (circle in [outer - wall / 2, inner + wall / 2]) for (index in 0...holes) {
       var angle = Math.PI / holes + 2 * Math.PI * index / holes;
       tools.push(keep(
-        Part.cylinderSpan(
-          diameter / 2,
-          -0.1,
-          height + 0.1,
-          circle * Math.cos(angle),
-          circle * Math.sin(angle)
-        ),
+        Part.cylinderSpan(diameter / 2, -0.1, height + 0.1, circle * Math.cos(angle), circle * Math.sin(angle)),
         "bolt-hole"
       ));
     }
@@ -87,30 +59,12 @@ class RingParts {
       Part.revolve([
         {r: inner, z: 0},
         {r: hub, z: 0},
-        {
-          r: hub,
-          z: band
-        },
-        {
-          r: outer,
-          z: band
-        },
-        {
-          r: outer,
-          z: height - band
-        },
-        {
-          r: hub,
-          z: height - band
-        },
-        {
-          r: hub,
-          z: height
-        },
-        {
-          r: inner,
-          z: height
-        }
+        {r: hub, z: band},
+        {r: outer, z: band},
+        {r: outer, z: height - band},
+        {r: hub, z: height - band},
+        {r: hub, z: height},
+        {r: inner, z: height}
       ]),
       "hub"
     );
@@ -150,22 +104,10 @@ class RingParts {
       keep(ring(stator, outer, 0, height, c, false), "stator"),
       keep(
         Part.revolve([
-          {
-            r: rotor + gap,
-            z: turns
-          },
-          {
-            r: stator,
-            z: turns
-          },
-          {
-            r: stator,
-            z: height - turns
-          },
-          {
-            r: rotor + gap,
-            z: height - turns
-          }
+          {r: rotor + gap, z: turns},
+          {r: stator, z: turns},
+          {r: stator, z: height - turns},
+          {r: rotor + gap, z: height - turns}
         ]),
         "stator-teeth"
       )
@@ -174,22 +116,10 @@ class RingParts {
       Part.revolve([
         {r: inner, z: 0},
         {r: inner + (rotor - inner) * 0.5, z: 0},
-        {
-          r: inner + (rotor - inner) * 0.5,
-          z: step
-        },
-        {
-          r: rotor,
-          z: step
-        },
-        {
-          r: rotor,
-          z: height - step
-        },
-        {
-          r: inner,
-          z: height - step
-        }
+        {r: inner + (rotor - inner) * 0.5, z: step},
+        {r: rotor, z: step},
+        {r: rotor, z: height - step},
+        {r: inner, z: height - step}
       ]),
       "rotor"
     );
@@ -197,14 +127,8 @@ class RingParts {
       Part.revolve([
         {r: rotor - 0.01, z: step},
         {r: rotor + gap + 0.01, z: step},
-        {
-          r: rotor + gap + 0.01,
-          z: turns
-        },
-        {
-          r: rotor - 0.01,
-          z: turns
-        }
+        {r: rotor + gap + 0.01, z: turns},
+        {r: rotor - 0.01, z: turns}
       ]),
       "shipping-sleeve"
     );
@@ -214,54 +138,18 @@ class RingParts {
 
   /** A ring from radius `r0` to `r1` and z from `z0` to `z1`, chamfered by `c` on its outer (or, `inside`, inner) edges. */
   static function ring(r0:Float, r1:Float, z0:Float, z1:Float, c:Float, inside:Bool):Part return Part.revolve(inside ? [
-    {
-      r : r0 + c,
-      z : z0
-    },
-    {
-      r : r1,
-      z : z0
-    },
-    {
-      r : r1,
-      z : z1
-    },
-    {
-      r : r0 + c,
-      z : z1
-    },
-    {
-      r : r0,
-      z : z1 - c
-    },
-    {
-      r : r0,
-      z : z0 + c
-    }
+    {r : r0 + c, z : z0},
+    {r : r1, z : z0},
+    {r : r1, z : z1},
+    {r : r0 + c, z : z1},
+    {r : r0, z : z1 - c},
+    {r : r0, z : z0 + c}
   ] : [
-    {
-      r : r0,
-      z : z0
-    },
-    {
-      r : r1 - c,
-      z : z0
-    },
-    {
-      r : r1,
-      z : z0 + c
-    },
-    {
-      r : r1,
-      z : z1 - c
-    },
-    {
-      r : r1 - c,
-      z : z1
-    },
-    {
-      r : r0,
-      z : z1
-    }
+    {r : r0, z : z0},
+    {r : r1 - c, z : z0},
+    {r : r1, z : z0 + c},
+    {r : r1, z : z1 - c},
+    {r : r1 - c, z : z1},
+    {r : r0, z : z1}
   ]);
 }

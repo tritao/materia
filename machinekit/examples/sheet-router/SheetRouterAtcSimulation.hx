@@ -266,16 +266,7 @@ class SheetRouterAtcSimulation {
       atc.tick(now, observation);
       if (oldLoaded != atc.loaded) for (t in atc.tools) maximumTransferJumpMm = Math.max(
         maximumTransferJumpMm,
-        distance(
-          root(
-            t.number,
-            oldLoaded
-          ),
-          root(
-            t.number,
-            atc.loaded
-          )
-        )
+        distance(root(t.number, oldLoaded), root(t.number, atc.loaded))
       );
       if (maximumTransferJumpMm > 1e-5) throw "Tool body jumped during ownership transfer";
       if (atc.release && (!observation.vfdZeroSpeed || !observation.spindleStopped
@@ -300,12 +291,7 @@ class SheetRouterAtcSimulation {
       maximumGeometrySpacingMm: maximumGeometrySpacingMm,
       fault: atc.fault,
       loaded: atc.loaded,
-      ack: atc.acknowledge(
-        'cnc.tool_change.$number',
-        atc.requestSerial,
-        now,
-        signals()
-      ),
+      ack: atc.acknowledge('cnc.tool_change.$number', atc.requestSerial, now, signals()),
       releaseCommand: atc.release,
       spindleRunCommand: atc.spindleRun,
       motionAborted: atc.motionAbort,

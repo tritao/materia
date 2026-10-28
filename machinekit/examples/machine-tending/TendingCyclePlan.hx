@@ -32,36 +32,12 @@ class TendingCyclePlanChecks {
     var expected = [
       {station: "infeed-0-0", tool: a, fromTool: a},
       {station: "infeed-0-1", tool: b, fromTool: a},
-      {
-        station: "outfeed-0-0",
-        tool: a,
-        fromTool: b
-      },
-      {
-        station: "infeed-0-2",
-        tool: a,
-        fromTool: b
-      },
-      {
-        station: "outfeed-0-1",
-        tool: b,
-        fromTool: a
-      },
-      {
-        station: "infeed-1-0",
-        tool: b,
-        fromTool: a
-      },
-      {
-        station: "outfeed-0-2",
-        tool: a,
-        fromTool: b
-      },
-      {
-        station: "outfeed-1-0",
-        tool: b,
-        fromTool: b
-      }
+      {station: "outfeed-0-0", tool: a, fromTool: b},
+      {station: "infeed-0-2", tool: a, fromTool: b},
+      {station: "outfeed-0-1", tool: b, fromTool: a},
+      {station: "infeed-1-0", tool: b, fromTool: a},
+      {station: "outfeed-0-2", tool: a, fromTool: b},
+      {station: "outfeed-1-0", tool: b, fromTool: b}
     ];
     if (requests.length != 23 || closed.length
       != expected.length) throw "Four-part production needs inventory, tray approach, startup and vise routes";

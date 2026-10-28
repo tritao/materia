@@ -7,35 +7,12 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Rotary ring encoder. Reference row is Assumed: its outside, bore and height are not a product's. */
 class RotaryEncoderRing extends MachineComponent implements machinekit.motion.EncoderPart {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      130,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      100,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      8,
-      "mm"
-    ),
-    P.count(
-      "countsPerRevolution",
-      8388608
-    ),
-    P.quantity(
-      "angularAccuracy",
-      2 * Math.PI / (180 * 3600),
-      "rad"
-    ),
-    P.quantity(
-      "eccentricity",
-      0.001,
-      "mm"
-    )
+    P.quantity("outside", 130, "mm"),
+    P.quantity("bore", 100, "mm"),
+    P.quantity("height", 8, "mm"),
+    P.count("countsPerRevolution", 8388608),
+    P.quantity("angularAccuracy", 2 * Math.PI / (180 * 3600), "rad"),
+    P.quantity("eccentricity", 0.001, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

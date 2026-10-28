@@ -81,10 +81,7 @@ class EnclosedBenchMill extends MachineAssembly {
       "castingSeat",
       AssemblyFrames.compose(
         AssemblyFrames.inverse(poses.get("chipTray")),
-        AssemblyFrames.compose(
-          poses.get("stand/casting"),
-          pedestal.body.connector("mount").frame
-        )
+        AssemblyFrames.compose(poses.get("stand/casting"), pedestal.body.connector("mount").frame)
       )
     );
     addMate("stand-on-tray", "fixed", "chipTray", "castingSeat", "stand/casting", "mount");
@@ -95,11 +92,7 @@ class EnclosedBenchMill extends MachineAssembly {
       "millSeat",
       AssemblyFrames.compose(
         AssemblyFrames.inverse(poses.get("stand/cap")),
-        AssemblyFrames.translation(
-          0,
-          0,
-          floorOffset
-        )
+        AssemblyFrames.translation(0, 0, floorOffset)
       )
     );
     addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());
@@ -119,11 +112,7 @@ class EnclosedBenchMill extends MachineAssembly {
     fixed(
       "standServicePanel",
       new MillPanel(400, 4, 420, "painted steel"),
-      AssemblyFrames.translation(
-        centreX,
-        front - 2,
-        footHeight + 130
-      ),
+      AssemblyFrames.translation(centreX, front - 2, footHeight + 130),
       "stand/casting"
     );
     standIds.push("standServicePanel");
@@ -132,11 +121,7 @@ class EnclosedBenchMill extends MachineAssembly {
       fixed(
         id,
         new MillPanel(100, 100, footHeight),
-        AssemblyFrames.translation(
-          centreX + xi * (width / 2 - 100),
-          centreY + yi * (depth / 2 - 100),
-          0
-        ),
+        AssemblyFrames.translation(centreX + xi * (width / 2 - 100), centreY + yi * (depth / 2 - 100), 0),
         "stand/casting"
       );
       standIds.push(id);
@@ -192,13 +177,7 @@ class EnclosedBenchMill extends MachineAssembly {
       "slide",
       {x: 1, y: 0, z: 0},
       0,
-      {
-        lower: 0,
-        upper: doorStroke,
-        velocity: null,
-        effort: null,
-        overtravel: doorCylinder.endStopCompliance
-      }
+      {lower: 0, upper: doorStroke, velocity: null, effort: null, overtravel: doorCylinder.endStopCompliance}
     );
     var frameWidth = 25.0, leafDepth = 4.0, leafY = front - 10;
     doorPanel("doorLeft", frameWidth, leafDepth, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
@@ -234,27 +213,14 @@ class EnclosedBenchMill extends MachineAssembly {
     // The cabinet has its own floor-supported welded tube legs.
     for (x in [-1, 1]) for (y in [-1, 1]) fixed(
       'cabinetLeg${x + 1}${y + 1}',
-      new machinekit.structural.RectTubeMember(
-        30,
-        30,
-        2,
-        cabinetZ
-      ),
-      AssemblyFrames.translation(
-        cabinetX + x * 80,
-        cabinetY + y * 80,
-        0
-      ),
+      new machinekit.structural.RectTubeMember(30, 30, 2, cabinetZ),
+      AssemblyFrames.translation(cabinetX + x * 80, cabinetY + y * 80, 0),
       "cabinetBottom"
     );
     fixed(
       "cncController",
       new machinekit.control.CncController(4, 16, 16, 4),
-      AssemblyFrames.translation(
-        cabinetX,
-        cabinetY,
-        cabinetZ + 10
-      ),
+      AssemblyFrames.translation(cabinetX, cabinetY, cabinetZ + 10),
       "chipTray"
     );
     for (axis in ["X", "Y", "Z"]) connectPorts(
@@ -268,10 +234,7 @@ class EnclosedBenchMill extends MachineAssembly {
     addMemberConnector(
       "chipTray",
       "doorOpening",
-      AssemblyFrames.compose(
-        AssemblyFrames.inverse(poses.get("chipTray")),
-        opening
-      )
+      AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")), opening)
     );
     exposeConnector("doorOpening", "chipTray", "doorOpening");
     // The door cylinder uses the real guided-member connector as its piston endpoint.
@@ -293,15 +256,7 @@ class EnclosedBenchMill extends MachineAssembly {
     fixed(
       "doorCylinderRod",
       doorCylinder.movingRod(),
-      {
-        x: doorTip.x,
-        y: doorTip.y,
-        z: doorTip.z,
-        qx: doorAxis.qx,
-        qy: doorAxis.qy,
-        qz: doorAxis.qz,
-        qw: doorAxis.qw
-      },
+      {x: doorTip.x, y: doorTip.y, z: doorTip.z, qx: doorAxis.qx, qy: doorAxis.qy, qz: doorAxis.qz, qw: doorAxis.qw},
       "doorSlider"
     );
     var vise = mill.vise;
@@ -317,20 +272,12 @@ class EnclosedBenchMill extends MachineAssembly {
     addComponent(
       "doorValve",
       new SolenoidValve(true, false),
-      AssemblyFrames.translation(
-        serviceX - 48,
-        serviceY,
-        cabinetZ + 180
-      )
+      AssemblyFrames.translation(serviceX - 48, serviceY, cabinetZ + 180)
     );
     addComponent(
       "viseValve",
       new SolenoidValve(true, true),
-      AssemblyFrames.translation(
-        serviceX + 48,
-        serviceY,
-        cabinetZ + 180
-      )
+      AssemblyFrames.translation(serviceX + 48, serviceY, cabinetZ + 180)
     );
     var hose:BomItem = {
       partNumber: "REF-PNEU-HOSE-6MM",
@@ -364,12 +311,7 @@ class EnclosedBenchMill extends MachineAssembly {
     addSwitch(
       "vise-clamped",
       "mill/vise/jaw",
-      {
-        lower: vise.grippedPosition - 0.5,
-        upper: vise.grippedPosition + 0.5,
-        velocity: null,
-        effort: null
-      },
+      {lower: vise.grippedPosition - 0.5, upper: vise.grippedPosition + 0.5, velocity: null, effort: null},
       0.25
     );
     addPresence("stock-present", "mill/vise/datum", 25);
@@ -386,19 +328,11 @@ class EnclosedBenchMill extends MachineAssembly {
     };
     var enclosed = box(
       [left - panelThickness, leafY - leafDepth / 2, bottom],
-      [
-        right + panelThickness,
-        back + panelThickness,
-        top + panelThickness
-      ]
+      [right + panelThickness, back + panelThickness, top + panelThickness]
     );
     var carriage = box(
       [-slider.width / 2, sliderPose.y - slider.depth / 2, sliderPose.z],
-      [
-        doorStroke + slider.width / 2,
-        sliderPose.y + slider.depth / 2,
-        sliderPose.z + slider.height
-      ]
+      [doorStroke + slider.width / 2, sliderPose.y + slider.depth / 2, sliderPose.z + slider.height]
     );
     addMemberConnector("chipTray", "robotZone", AssemblyFrames.inverse(poses.get("chipTray")));
     addRobotZone("robot-zone", "chipTray/robotZone", [enclosed, carriage]);
@@ -554,11 +488,7 @@ class EnclosedBenchMill extends MachineAssembly {
     ];
     var result:MillBounds = {
       low: [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY],
-      high: [
-        Math.NEGATIVE_INFINITY,
-        Math.NEGATIVE_INFINITY,
-        Math.NEGATIVE_INFINITY
-      ]
+      high: [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY]
     };
     for (x in [mill.specs[0].lower,
       mill.specs[0].upper]) for (y in [mill.specs[1].lower, mill.specs[1].upper]) for (z in [

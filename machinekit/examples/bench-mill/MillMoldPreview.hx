@@ -50,11 +50,7 @@ class MillMoldPreview {
       sys.io.File.saveContent(
         reportDir + "/review.json",
         Json.stringify(
-          {
-            validation: plan.validation,
-            diagnostics: assessment.diagnostics.items,
-            fabrication: plan.fabrication
-          },
+          {validation: plan.validation, diagnostics: assessment.diagnostics.items, fabrication: plan.fabrication},
           null,
           "\t"
         )

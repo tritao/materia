@@ -52,14 +52,7 @@ class SheetRouter extends Gantry {
     attach(
       "longestTool",
       new SheetRouterTool(chosen.longestTool - holder.n("gaugeLength")),
-      F.compose(
-        gaugeZero,
-        F.translation(
-          0,
-          0,
-          -holder.n("gaugeLength")
-        )
-      ),
+      F.compose(gaugeZero, F.translation(0, 0, -holder.n("gaugeLength"))),
       "holder"
     );
     exposeConnector("toolTip", "longestTool", "tip");
@@ -87,11 +80,7 @@ class SheetRouter extends Gantry {
     attach(
       "spoilboard",
       board,
-      F.translation(
-        chosen.workX / 2,
-        gaugeZero.y + chosen.workY / 2,
-        boardTop - board.n("thickness")
-      ),
+      F.translation(chosen.workX / 2, gaugeZero.y + chosen.workY / 2, boardTop - board.n("thickness")),
       "vacuumTable"
     );
     for (i in 0...table.zoneCount()) {
@@ -100,11 +89,7 @@ class SheetRouter extends Gantry {
       attach(
         'zoneValve${i+1}',
         valve,
-        F.translation(
-          i % 2 == 0 ? left - 300 : right + 300,
-          serviceY,
-          bedBottom - valve.n("length")
-        ),
+        F.translation(i % 2 == 0 ? left - 300 : right + 300, serviceY, bedBottom - valve.n("length")),
         "base"
       );
       connectPorts('zone${i+1}', 'zoneValve${i+1}', "outlet", "vacuumTable", 'zone${i+1}');
@@ -144,11 +129,7 @@ class SheetRouter extends Gantry {
     attach(
       "rackSupport",
       new GantryPlate("rack support", 880, 180, rackPose.z - bedBottom),
-      F.translation(
-        rackPose.x,
-        rackPose.y,
-        bedBottom
-      ),
+      F.translation(rackPose.x, rackPose.y, bedBottom),
       "base"
     );
     for (i in 0...rack.parameterCount("pockets")) {
@@ -166,22 +147,14 @@ class SheetRouter extends Gantry {
       attach(
         'forkRiser${i+1}',
         new GantryPlate("fork riser", 80, 12, pose.z - rackPose.z - rack.n("height")),
-        F.translation(
-          pose.x,
-          rackPose.y - rack.n("depth") / 2 + 6,
-          rackPose.z + rack.n("height")
-        ),
+        F.translation(pose.x, rackPose.y - rack.n("depth") / 2 + 6, rackPose.z + rack.n("height")),
         "toolRack"
       );
     }
     attach(
       "setterPad",
       new GantryPlate("setter pedestal", 100, 100, boardTop - bedBottom),
-      F.translation(
-        100,
-        rackPose.y - 220,
-        bedBottom
-      ),
+      F.translation(100, rackPose.y - 220, bedBottom),
       "base"
     );
     attach("setter", new ToolLengthSetter(), F.translation(100, rackPose.y - 220, boardTop), "setterPad");
@@ -241,14 +214,7 @@ class SheetRouter extends Gantry {
     attach(
       "emergencyStop",
       new machinekit.hmi.EmergencyStop(new ComponentValues().setInteger("blocks", 2)),
-      F.compose(
-        cabinetPose,
-        F.translation(
-          0,
-          200,
-          900
-        )
-      ),
+      F.compose(cabinetPose, F.translation(0, 200, 900)),
       "base"
     );
     connectPorts("spindleMotor", "vfd", "motor", "spindle", "motor");
@@ -293,18 +259,9 @@ class SheetRouter extends Gantry {
       joint + "Axis",
       id,
       joint + "Axis",
-      {
-        x: along[0],
-        y: along[1],
-        z: along[2]
-      },
+      {x: along[0], y: along[1], z: along[2]},
       initial,
-      {
-        lower: 0.0,
-        upper: stroke,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0.0, upper: stroke, velocity: null, effort: null}
     );
     var c = joint + "Cylinder", v = joint + "Valve";
     // Cylinder and guided tip share the same axis and default extension.
@@ -321,23 +278,13 @@ class SheetRouter extends Gantry {
     else attach(
       joint + "Bracket",
       new GantryPlate("lift rod bracket", 80, 20, anchorZ),
-      F.translation(
-        pose.x + anchorX,
-        pose.y,
-        pose.z
-      ),
+      F.translation(pose.x + anchorX, pose.y, pose.z),
       id
     );
     attach(
       joint + "Rod",
       cylinder.movingRod(),
-      AxisBuilder.orient(
-        pose.x + anchorX,
-        pose.y,
-        pose.z + anchorZ,
-        up,
-        along
-      ),
+      AxisBuilder.orient(pose.x + anchorX, pose.y, pose.z + anchorZ, up, along),
       id
     );
     attach(
@@ -371,12 +318,7 @@ class SheetRouter extends Gantry {
       ?cuts:Array<SheetChainBox>
     ):Void attach(
       id,
-      new SheetChainSupport(
-        id,
-        boxes,
-        end,
-        cuts
-      ),
+      new SheetChainSupport(id, boxes, end, cuts),
       F.identity(),
       parent
     );
@@ -387,40 +329,12 @@ class SheetRouter extends Gantry {
           "chainYMovingBracket",
           "beam",
           [
-            box(
-              beam.x - 100,
-              beam.y - 40,
-              beam.z + 100,
-              beam.x + 60,
-              beam.y + 40,
-              beam.z + 112
-            ),
-            box(
-              end.x - 20,
-              end.y - 30,
-              beam.z + 112,
-              end.x + 20,
-              end.y,
-              end.z - 15.5
-            ),
-            box(
-              end.x - 25,
-              end.y - 10,
-              end.z - 17.5,
-              end.x + 25,
-              end.y,
-              end.z + 17.5
-            )
+            box(beam.x - 100, beam.y - 40, beam.z + 100, beam.x + 60, beam.y + 40, beam.z + 112),
+            box(end.x - 20, end.y - 30, beam.z + 112, end.x + 20, end.y, end.z - 15.5),
+            box(end.x - 25, end.y - 10, end.z - 17.5, end.x + 25, end.y, end.z + 17.5)
           ],
           end,
-          [box(
-            end.x - 20,
-            end.y - 11,
-            end.z - 12.5,
-            end.x + 20,
-            end.y + 1,
-            end.z + 12.5
-          )]
+          [box(end.x - 20, end.y - 11, end.z - 12.5, end.x + 20, end.y + 1, end.z + 12.5)]
         );
         var post = frame.x - 400;
         support("chainYFixedBracket", "frameLeft", [
@@ -447,78 +361,22 @@ class SheetRouter extends Gantry {
           "chainXMovingBracket",
           "xCarriage",
           [
-            box(
-              carriage.x - 40,
-              carriage.y - 40,
-              carriageTop - 12,
-              carriage.x + 40,
-              carriage.y + 40,
-              carriageTop
-            ),
-            box(
-              carriage.x - 35,
-              carriage.y - 15,
-              carriageTop,
-              carriage.x - 5,
-              carriage.y + 15,
-              end.z - 15.5
-            ),
-            box(
-              end.x - 40,
-              carriage.y - 20,
-              end.z - 27.5,
-              end.x,
-              end.y + 25,
-              end.z - 15.5
-            ),
-            box(
-              end.x - 10,
-              end.y - 25,
-              end.z - 17.5,
-              end.x,
-              end.y + 25,
-              end.z + 17.5
-            )
+            box(carriage.x - 40, carriage.y - 40, carriageTop - 12, carriage.x + 40, carriage.y + 40, carriageTop),
+            box(carriage.x - 35, carriage.y - 15, carriageTop, carriage.x - 5, carriage.y + 15, end.z - 15.5),
+            box(end.x - 40, carriage.y - 20, end.z - 27.5, end.x, end.y + 25, end.z - 15.5),
+            box(end.x - 10, end.y - 25, end.z - 17.5, end.x, end.y + 25, end.z + 17.5)
           ],
           end,
-          [box(
-            end.x - 11,
-            end.y - 20,
-            end.z - 12.5,
-            end.x + 1,
-            end.y + 20,
-            end.z + 12.5
-          )]
+          [box(end.x - 11, end.y - 20, end.z - 12.5, end.x + 1, end.y + 20, end.z + 12.5)]
         );
         var post = beam.y + 420;
         support(
           "chainXFixedBracket",
           "beam",
           [
-            box(
-              fixed.x - 20,
-              beam.y + 50,
-              beam.z,
-              fixed.x + 20,
-              post + 20,
-              beam.z + 12
-            ),
-            box(
-              fixed.x - 20,
-              post - 20,
-              beam.z + 12,
-              fixed.x + 20,
-              post + 20,
-              fixed.z - 15.5
-            ),
-            box(
-              fixed.x - 20,
-              fixed.y - 25,
-              fixed.z - 27.5,
-              fixed.x + 20,
-              post + 20,
-              fixed.z - 15.5
-            )
+            box(fixed.x - 20, beam.y + 50, beam.z, fixed.x + 20, post + 20, beam.z + 12),
+            box(fixed.x - 20, post - 20, beam.z + 12, fixed.x + 20, post + 20, fixed.z - 15.5),
+            box(fixed.x - 20, fixed.y - 25, fixed.z - 27.5, fixed.x + 20, post + 20, fixed.z - 15.5)
           ],
           fixed
         );
@@ -552,11 +410,7 @@ class SheetRouter extends Gantry {
     member(
       "rackCross",
       [left, workOrigin.y + routerSpec.workY + 260, bed - 40],
-      [
-        right,
-        workOrigin.y + routerSpec.workY + 260,
-        bed - 40
-      ],
+      [right, workOrigin.y + routerSpec.workY + 260, bed - 40],
       cross
     );
     for (side in 0...2) {
@@ -632,24 +486,9 @@ class SheetShoeLiftBracket extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
     parts -> {for (b in [
-      {
-        x: -120.0,
-        z: -20.0,
-        w: 110.0,
-        h: 6.0
-      },
-      {
-        x: -150.0,
-        z: -20.0,
-        w: 20.0,
-        h: 60.0
-      },
-      {
-        x: -150.0,
-        z: 34.0,
-        w: 40.0,
-        h: 6.0
-      }
+      {x: -120.0, z: -20.0, w: 110.0, h: 6.0},
+      {x: -150.0, z: -20.0, w: 20.0, h: 60.0},
+      {x: -150.0, z: 34.0, w: 40.0, h: 6.0}
     ]) {
     var blank = Part.box(b.w, 20, b.h), placed = blank.translated(new Vector(b.x, 0, b.z));
     blank.close();
@@ -698,11 +537,7 @@ class SheetSpindleSaddle extends MachineComponent {
   for (x in [-50.0, 50.0]) for (z in [110.0, 230.0]) tools.push(Part.cylinderAlong(
     3.3,
     new Vector(x, reach + 1, z),
-    new Vector(
-      0,
-      -1,
-      0
-    ),
+    new Vector(0, -1, 0),
     18
   ));
   // Trim the ring flats to the actual plate mounting plane.
@@ -744,11 +579,7 @@ class SheetFootCap extends MachineComponent {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.box(100, 100, 12),
-    [Part.cylinderSpan(
-      10,
-      -1,
-      13
-    )]
+    [Part.cylinderSpan(10, -1, 13)]
   );
 }
 

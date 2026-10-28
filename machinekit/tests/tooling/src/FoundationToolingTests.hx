@@ -130,20 +130,8 @@ class FoundationToolingTests {
       )))
     ));
     var foundation = new MineralFoundation(
-      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber(
-        "height",
-        100
-      ),
-      [{
-        id: "round",
-        part: insert,
-        pose: F.translation(
-          0,
-          0,
-          60
-        ),
-        openings: [CastingPatterns.face("body.z-max")]
-      }]
+      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
+      [{id: "round", part: insert, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
     );
     var input = FoundationToolingAdapter.snapshot(foundation, "round-foundation", 1);
     check(switch materia.casting.InsertSpec.InsertBodyCodec.mouth(input.inserts[0].body) {
@@ -173,14 +161,7 @@ class FoundationToolingTests {
 
   static function sourcedSocket():Void {
     var socket = machinekit.structural.FixingSockets.pfeiferStudy(
-      {
-        outsideDiameter: 8,
-        reliefDiameter: 6.2,
-        tailWidth: 11,
-        tailThickness: 2.2,
-        tailWave: 1.4,
-        tailBlend: 0.5
-      },
+      {outsideDiameter: 8, reliefDiameter: 6.2, tailWidth: 11, tailThickness: 2.2, tailWave: 1.4, tailBlend: 0.5},
       0.5
     );
     var type = socket.componentType();
@@ -238,20 +219,8 @@ class FoundationToolingTests {
       "socket roundtrips through the shared component recipe"
     );
     var foundation = new MineralFoundation(
-      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber(
-        "height",
-        100
-      ),
-      [{
-        id: "socket",
-        part: socket,
-        pose: F.translation(
-          0,
-          0,
-          60
-        ),
-        openings: [CastingPatterns.face("body.z-max")]
-      }]
+      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
+      [{id: "socket", part: socket, pose: F.translation(0, 0, 60), openings: [CastingPatterns.face("body.z-max")]}]
     );
     var input = FoundationToolingAdapter.snapshot(foundation, "socket-source", 1);
     var qualification = materia.tooling.casting.InsertQualifications.check(input.inserts);
@@ -275,20 +244,10 @@ class FoundationToolingTests {
     var sourceToMold = F.fromRotationMatrix(0, 0, 100, [1, 0, 0, 0, -1, 0, 0, 0, -1]);
     var selected = materia.tooling.casting.InsertFixturePlanner.select(
       input.inserts[0].holes[0],
+      F.compose(sourceToMold, input.inserts[0].pose),
       F.compose(
-        sourceToMold,
-        input.inserts[0].pose
-      ),
-      F.compose(
-        F.compose(
-          sourceToMold,
-          input.inserts[0].pose
-        ),
-        F.translation(
-          0,
-          0,
-          materia.casting.InsertSpec.InsertBodyCodec.height(input.inserts[0].body)
-        )
+        F.compose(sourceToMold, input.inserts[0].pose),
+        F.translation(0, 0, materia.casting.InsertSpec.InsertBodyCodec.height(input.inserts[0].body))
       ),
       SinglePocketSetup.document().recipe.hardware
     );
@@ -314,11 +273,7 @@ class FoundationToolingTests {
         locatorSideInset: 20,
         screwStock: [{
           thread: cast hole.thread,
-          lengths: [
-            25,
-            30,
-            35
-          ],
+          lengths: [25, 30, 35],
           threadedLength: machinekit.standard.SocketHeadCapScrew
       .catalog().get(machinekit.structural.InsertHoles.threadSpec(cast hole.thread).designation).threadLength,
       washerThickness: 1.6,
@@ -494,13 +449,7 @@ class FoundationToolingTests {
   static function formedSocketGeometry():Void {
     var neutral = materia.casting.InsertSpec.InsertBody.CrimpedSocket(
       materia.casting.CastingSolid.Cylinder(8, 25),
-      {
-        length: 15,
-        width: 11,
-        thickness: 2.2,
-        wave: 1.4,
-        blend: 0.5
-      }
+      {length: 15, width: 11, thickness: 2.2, wave: 1.4, blend: 0.5}
     );
     var exterior = machinekit.structural.InsertBodies.part(neutral);
     var cwd = Sys.getCwd();
@@ -559,10 +508,7 @@ class FoundationToolingTests {
       width: 2440,
       height: 1220,
       coatedFace: CoatedFace.Both,
-      allowedRotations: [
-        0,
-        90
-      ],
+      allowedRotations: [0, 90],
       directionConstraint: StockDirection.Free
     };
     var formerStocks = [stock];
@@ -584,31 +530,13 @@ class FoundationToolingTests {
       },
       recipe: {
         former: {
-          pocketScrew: {
-            diameterMm: 4,
-            lengthMm: 30,
-            jigAngleDegrees: 15,
-            edgeDistanceMm: 20,
-            maximumPitchMm: 100
-          },
+          pocketScrew: {diameterMm: 4, lengthMm: 30, jigAngleDegrees: 15, edgeDistanceMm: 20, maximumPitchMm: 100},
           stocks: formerStocks,
           finishingStockMm: 0.5,
           toleranceMm: 0.1,
           cutters: [
-            {
-              id: "former-straight-6",
-              tipDiameterMm: 6,
-              taperDegrees: 0,
-              fluteLengthMm: 30,
-              stickOutMm: 35
-            },
-            {
-              id: "former-taper-3deg-6",
-              tipDiameterMm: 6,
-              taperDegrees: 3,
-              fluteLengthMm: 30,
-              stickOutMm: 35
-            }
+            {id: "former-straight-6", tipDiameterMm: 6, taperDegrees: 0, fluteLengthMm: 30, stickOutMm: 35},
+            {id: "former-taper-3deg-6", tipDiameterMm: 6, taperDegrees: 3, fluteLengthMm: 30, stickOutMm: 35}
           ]
         },
         featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
@@ -769,10 +697,7 @@ class FoundationToolingTests {
       );
     var seat = new CastInsert(CastInsert.boxValues(40, 30, 20).setToken("role", "generic-mount").setToken(
       "holes",
-      machinekit.structural.InsertHoles.through(
-        8,
-        20
-      )
+      machinekit.structural.InsertHoles.through(8, 20)
     ));
     var specification = seat.insertSpec();
     check(switch materia.casting.InsertSpec.InsertBodyCodec.mouth(specification.body) {
@@ -786,36 +711,12 @@ class FoundationToolingTests {
       "source insert publishes the authoritative interface holes"
     );
     var placements:Array<CastInsertPlacement> = [
-      {
-        id: "topSeat",
-        part: seat,
-        openings: [CastingPatterns.face("body.z-max")],
-        pose: F.translation(
-          80,
-          0,
-          170
-        )
-      },
+      {id: "topSeat", part: seat, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 170)},
       {
         id: "sideSeat",
         openings: [CastingPatterns.face("body.y-min")],
         part: seat,
-        pose: F.fromRotationMatrix(
-          0,
-          -90,
-          80,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        pose: F.fromRotationMatrix(0, -90, 80, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       }
     ];
     var foundation = new MineralFoundation(values, placements);
@@ -847,13 +748,7 @@ class FoundationToolingTests {
     chamfered.setNumber("cornerChamfer", 12);
     var chamferedInput = equivalent(
       new MineralFoundation(
-        declareFixtureOpenings(
-          chamfered,
-          [
-            "underside" => ["body.z-min"],
-            "side-opening" => ["body.x-min"]
-          ]
-        ),
+        declareFixtureOpenings(chamfered, ["underside" => ["body.z-min"], "side-opening" => ["body.x-min"]]),
         placements
       ),
       "chamfered-foundation"

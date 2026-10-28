@@ -22,12 +22,7 @@ class ControllerWiringTests {
       "base",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 10,
-        velocity: 10,
-        effort: 10
-      }
+      {lower: 0, upper: 10, velocity: 10, effort: 10}
     );
     function definition():materia.assembly.AssemblyDefinition {
       var model = new cadkit.modeling.AssemblyModel("mm");
@@ -51,12 +46,7 @@ class ControllerWiringTests {
       "base",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 10,
-        velocity: 10,
-        effort: 10
-      }
+      {lower: 0, upper: 10, velocity: 10, effort: 10}
     );
     var refused = false;
     try {

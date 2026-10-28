@@ -15,30 +15,12 @@ class MillCrossTable extends MachineComponent {
       "machinekit.milling.cross-table",
       [
         P.length("depth", 200),
-        P.length(
-          "ribSpacing",
-          124
-        ),
-        P.length(
-          "width",
-          400
-        ),
-        P.length(
-          "thickness",
-          40
-        ),
-        P.length(
-          "ribHeight",
-          48
-        ),
-        P.length(
-          "ribWidth",
-          34
-        ),
-        P.flag(
-          "nutSeat",
-          true
-        )
+        P.length("ribSpacing", 124),
+        P.length("width", 400),
+        P.length("thickness", 40),
+        P.length("ribHeight", 48),
+        P.length("ribWidth", 34),
+        P.flag("nutSeat", true)
       ],
       v -> new MillCrossTable(
         v.number("depth"),
@@ -73,13 +55,8 @@ class MillCrossTable extends MachineComponent {
       "Ribbed T-slot table",
       "cast iron",
       false,
-      new ComponentValues().setNumber("depth", depth).setNumber(
-        "ribSpacing",
-        ribSpacing
-      ).setNumber(
-        "width",
-        width
-      ).setNumber(
+      new ComponentValues().setNumber("depth",
+      depth).setNumber("ribSpacing", ribSpacing).setNumber("width", width).setNumber(
         "thickness",
         thickness
       ).setNumber(

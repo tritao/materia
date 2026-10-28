@@ -40,10 +40,7 @@ class PowerSupplyTests {
   static function supply(machine:MachineAssembly, voltage:Float):Void {
     machine.addComponent(
       "supply",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(voltage),
-        new machinekit.power.DcCurrent(10)
-      )
+      new PowerSupply(new machinekit.power.DcVoltage(voltage), new machinekit.power.DcCurrent(10))
     );
     machine.addMate("supply-mount", "fixed", "base", "face", "supply", "mount");
     machine.connectPorts("driver-power", "supply", "power1", "driver", "power");
@@ -85,10 +82,7 @@ class PowerSupplyTests {
       case Typed(id, values):
         Typed(
           id,
-          [for (entry in values) entry.name != "voltage" ? entry : {
-            name : "voltage",
-            value : SavedValue.Number(48)
-          }]
+          [for (entry in values) entry.name != "voltage" ? entry : {name : "voltage", value : SavedValue.Number(48)}]
         );
       case other:
         other;
@@ -128,12 +122,7 @@ class PowerSupplyTests {
     servo.addComponent("base", new RobotFlange(50));
     servo.addComponent(
       "motor",
-      new machinekit.robotics.ArmJoint(
-        80,
-        80,
-        null,
-        machinekit.motion.ServoMotor.model("GENERIC-SERVO-50W")
-      )
+      new machinekit.robotics.ArmJoint(80, 80, null, machinekit.motion.ServoMotor.model("GENERIC-SERVO-50W"))
     );
     servo.addComponent("driver", new MotorDriver("GENERIC-AC-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(5)));
     servo.addComponent(

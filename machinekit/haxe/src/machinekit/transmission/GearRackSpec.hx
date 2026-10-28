@@ -63,42 +63,10 @@ class GearRackCatalog {
       "ATLANTA HPR helical rack",
       r -> r.designation,
       [
-        row(
-          "29-15-055",
-          1.5,
-          500,
-          100,
-          19,
-          17.5,
-          1.30
-        ),
-        row(
-          "29-15-105",
-          1.5,
-          1000,
-          200,
-          19,
-          17.5,
-          2.60
-        ),
-        row(
-          "29-20-055",
-          2,
-          500,
-          75,
-          24,
-          22,
-          2.10
-        ),
-        row(
-          "29-20-105",
-          2,
-          1000,
-          150,
-          24,
-          22,
-          4.10
-        )
+        row("29-15-055", 1.5, 500, 100, 19, 17.5, 1.30),
+        row("29-15-105", 1.5, 1000, 200, 19, 17.5, 2.60),
+        row("29-20-055", 2, 500, 75, 24, 22, 2.10),
+        row("29-20-105", 2, 1000, 150, 24, 22, 4.10)
       ],
       r -> ({
         source: SOURCE + "#page=76",
@@ -106,12 +74,7 @@ class GearRackCatalog {
         standardEdition: "manufacturer catalogue retrieved 2026-10-22; PDF SHA256 " + PDF_SHA256,
         dimensionKind: Mixed,
         conformance: NominalEnvelope,
-        sources: [
-          SOURCE + "#page=101",
-          SOURCE + "#page=102",
-          SOURCE + "#page=148",
-          SOURCE + "#page=150"
-        ],
+        sources: [SOURCE + "#page=101", SOURCE + "#page=102", SOURCE + "#page=148", SOURCE + "#page=150"],
         verifiedFields: [
           "designation",
           "normalModule",

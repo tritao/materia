@@ -68,12 +68,7 @@ class WeldContactSelection {
     var savedStart = positions().copy();
     return new ContactRegistrationSequence(
       envelope,
-      (count, normals, current) -> selectFromEntries(
-        count,
-        normals,
-        current,
-        savedStart
-      )
+      (count, normals, current) -> selectFromEntries(count, normals, current, savedStart)
     );
   }
 
@@ -194,11 +189,7 @@ class WeldContactSelection {
           var orders:Array<Array<Int>> = [[0, 2, 1], [1, 2, 0], [2, 1, 0]];
           for (order in orders) stages.push(new WeldProbeStage(
             candidate.face,
-            [
-              points[order[0]],
-              points[order[1]],
-              points[order[2]]
-            ],
+            [points[order[0]], points[order[1]], points[order[2]]],
             candidate.approach,
             candidate.score
           ));
@@ -213,12 +204,7 @@ class WeldContactSelection {
             provider,
             PROBE_PATCH_CLEARANCE_MM,
             divisions,
-            screen(
-              estimate,
-              start,
-              discover,
-              screenedLifts
-            ),
+            screen(estimate, start, discover, screenedLifts),
             candidate.face,
             toolRadiusMm
           );

@@ -76,12 +76,7 @@ class TendingElectricAccess {
   static function cp(f:AssemblyFrame):CollisionPose return new CollisionPose(f.x, f.y, f.z, f.qx, f.qy, f.qz, f.qw);
   static function metric(f:AssemblyFrame):Transform3 return new Transform3(
     new Vec3(f.x / 1000, f.y / 1000, f.z / 1000),
-    new Quat(
-      f.qx,
-      f.qy,
-      f.qz,
-      f.qw
-    )
+    new Quat(f.qx, f.qy, f.qz, f.qw)
   );
   static function yaw(a:Float):AssemblyFrame return {
     x: 0,
@@ -93,11 +88,7 @@ class TendingElectricAccess {
     qw: Math.cos(a / 2)
   };
   static function shift(f:AssemblyFrame, x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.compose(
-    AssemblyFrames.translation(
-      x,
-      y,
-      z
-    ),
+    AssemblyFrames.translation(x, y, z),
     f
   );
   static function find(scene:SceneArtifactData, id:String):SceneArtifactPart {
@@ -411,30 +402,18 @@ class TendingElectricAccess {
     }
     fixtures.include(
       "cellTable",
-      new TendingCellTable(
-        layout.tableWidth,
-        layout.tableDepth,
-        layout.tableTop,
-        layout.tableOffset
-      ),
+      new TendingCellTable(layout.tableWidth, layout.tableDepth, layout.tableTop, layout.tableOffset),
       layout.tableFrame
     );
     fixtures.addComponent(
       "armRiser",
       new TendingCellRiser(layout.riser),
-      AssemblyFrames.translation(
-        layout.armPlacement.x,
-        layout.armPlacement.y,
-        0
-      )
+      AssemblyFrames.translation(layout.armPlacement.x, layout.armPlacement.y, 0)
     );
     var fixtureScene = clearanceFirst ? SceneArtifact.decode(sys.io.File.getBytes(snapshotRoot
       + "electric-simulation-inputs/fixtures.mtrg")) : geometryCache.scene(
         "electric-access-fixtures-setback-" + setback + "-inventory-" + fillOutfeed,
-        () -> AssemblyPreview.scene(
-          fixtures,
-          "electric-access-fixtures"
-        )
+        () -> AssemblyPreview.scene(fixtures, "electric-access-fixtures")
       ).data;
     var fs = new AssemblyState(fixtureScene.assemblyDefinition);
     for (i in 0...3) fs.setJoint("mill/mill/" + cell.mill.specs[i].id, cell.loadPosition[i]);
@@ -454,10 +433,7 @@ class TendingElectricAccess {
       armScene = clearanceFirst ? SceneArtifact.decode(sys.io.File.getBytes(snapshotRoot
       + "electric-simulation-inputs/arm.mtrg")) : geometryCache.scene(
         "electric-access-bare-arm",
-        () -> AssemblyPreview.scene(
-          arm,
-          "electric-access-bare-arm"
-        )
+        () -> AssemblyPreview.scene(arm, "electric-access-bare-arm")
       ).data;
     if (clearanceFirst) {
       var reviewed:Dynamic = haxe.Json.parse(sys.io.File.getContent(snapshotRoot + "electric-cycle-review.json"));
@@ -636,13 +612,7 @@ class TendingElectricAccess {
             && (station.vise ? [for (member in vise.stockContacts()) "cell/mill/mill/vise/" + member].indexOf(other)
             >= 0 : StringTools.startsWith(
               other,
-              "cell/" + station.id.substr(
-                0,
-                station.id.lastIndexOf(
-                  "-",
-                  station.id.lastIndexOf("-") - 1
-                )
-              ) + "/seat-"
+              "cell/" + station.id.substr(0, station.id.lastIndexOf("-", station.id.lastIndexOf("-") - 1)) + "/seat-"
             ));
           if (intentional && distance.distance >= -0.02) continue;
           var member = StringTools.startsWith(a,
@@ -719,11 +689,7 @@ class TendingElectricAccess {
               var answer = manipulator.solve(
                 metric(layout.armPlacement).inverse().compose(metric(row.path[i])),
                 row.routeQ[i],
-                new IkOptions(
-                  0.000000001,
-                  0.00000001,
-                  200
-                ).reaching()
+                new IkOptions(0.000000001, 0.00000001, 200).reaching()
               );
               if (!answer.converged) throw "Clearance insertion IK failed";
               row.routeQ[i] = answer.q;
@@ -736,11 +702,7 @@ class TendingElectricAccess {
               var answer = manipulator.solve(
                 metric(layout.armPlacement).inverse().compose(metric(at)),
                 seed,
-                new IkOptions(
-                  0.000000001,
-                  0.00000001,
-                  200
-                ).reaching()
+                new IkOptions(0.000000001, 0.00000001, 200).reaching()
               );
               if (!answer.converged) throw "Locating envelope IK failed";
               seed = answer.q;
@@ -777,14 +739,8 @@ class TendingElectricAccess {
           // compiled-model FK and the live target before fresh collision checks.
           var localBlank = TendingStockDatum.local(reference, profile);
           var desiredWrist = AssemblyFrames.compose(
-            AssemblyFrames.compose(
-              station.pose,
-              yaw(Std.parseFloat(Std.string(raw.yawDegrees)) * Math.PI / 180)
-            ),
-            AssemblyFrames.inverse(AssemblyFrames.compose(
-              ts.worldPose(row.side + "-blank-60"),
-              localBlank
-            ))
+            AssemblyFrames.compose(station.pose, yaw(Std.parseFloat(Std.string(raw.yawDegrees)) * Math.PI / 180)),
+            AssemblyFrames.inverse(AssemblyFrames.compose(ts.worldPose(row.side + "-blank-60"), localBlank))
           );
           requirePose(row.wrist, desiredWrist, row.station + " target changed");
           for (i in 0...row.routeQ.length) {
@@ -1362,14 +1318,11 @@ class TendingElectricAccess {
         sys.io.File.saveContent(
           directory + "/geometry-report.json",
           haxe.Json.stringify(
-            {
-              status: "Tool/fixture screen only; no IK or arm motion approval",
-              traySetbackMm: setback,
-              results: results
-            },
-            null,
-            "  "
-          )
+            {status: "Tool/fixture screen only; no IK or arm motion approval",
+          traySetbackMm: setback, results: results},
+          null,
+          "  "
+        )
         );
         if (exact != null) exact.close();
         world.dispose();
@@ -1421,10 +1374,7 @@ class TendingElectricAccess {
             -Math.PI / 2,
             Math.PI / 2
           ]) seeds.push([
-            Math.atan2(
-              Math.sin(base),
-              Math.cos(base)
-            ),
+            Math.atan2(Math.sin(base), Math.cos(base)),
             shoulder,
             elbow,
             roll,
@@ -1446,10 +1396,7 @@ class TendingElectricAccess {
             var mounted = AssemblyFrames.compose(layout.armPlacement, armState.worldPose("toolFlange"));
             for (body in armBodies) world.setBodyPose(
               body.body,
-              cp(AssemblyFrames.compose(
-                layout.armPlacement,
-                armState.worldPose(body.id)
-              ))
+              cp(AssemblyFrames.compose(layout.armPlacement, armState.worldPose(body.id)))
             );
             toolPose(mounted, 17);
             var count = hits(station, side, true).length;
@@ -1493,10 +1440,7 @@ class TendingElectricAccess {
             dot)) > 0.0003) throw "IK/assembly flange position or orientation disagree";
           for (body in armBodies) world.setBodyPose(
             body.body,
-            cp(AssemblyFrames.compose(
-              layout.armPlacement,
-              armState.worldPose(body.id)
-            ))
+            cp(AssemblyFrames.compose(layout.armPlacement, armState.worldPose(body.id)))
           );
           toolPose(actual, 17);
           var checked = hits(station, side, true);
@@ -1524,11 +1468,7 @@ class TendingElectricAccess {
                 var solution = manipulator.solve(
                   metric(layout.armPlacement).inverse().compose(metric(selected.wrist)),
                   initial,
-                  new IkOptions(
-                    0.0000001,
-                    0.000001,
-                    200
-                  ).reaching()
+                  new IkOptions(0.0000001, 0.000001, 200).reaching()
                 );
                 if (!solution.converged) continue;
                 var duplicate = false;
@@ -1536,10 +1476,7 @@ class TendingElectricAccess {
                   var difference = 0.0;
                   for (j in 0...6) difference = Math.max(
                     difference,
-                    Math.abs(Math.atan2(
-                      Math.sin(existing[j] - solution.q[j]),
-                      Math.cos(existing[j] - solution.q[j])
-                    ))
+                    Math.abs(Math.atan2(Math.sin(existing[j] - solution.q[j]), Math.cos(existing[j] - solution.q[j])))
                   );
                   if (difference < 0.01) duplicate = true;
                 }
@@ -1586,10 +1523,7 @@ class TendingElectricAccess {
                 var mounted = AssemblyFrames.compose(layout.armPlacement, armState.worldPose("toolFlange"));
                 for (body in armBodies) world.setBodyPose(
                   body.body,
-                  cp(AssemblyFrames.compose(
-                    layout.armPlacement,
-                    armState.worldPose(body.id)
-                  ))
+                  cp(AssemblyFrames.compose(layout.armPlacement, armState.worldPose(body.id)))
                 );
                 for (opening in [17.0, 25.0]) {
                   toolPose(mounted, opening);
@@ -1651,11 +1585,7 @@ class TendingElectricAccess {
         sys.io.File.saveContent(
           directory + "/progress.json",
           haxe.Json.stringify(
-            {
-              status: "partial sampled study; proposals only",
-              traySetbackMm: setback,
-              results: results
-            },
+            {status: "partial sampled study; proposals only", traySetbackMm: setback, results: results},
             null,
             "  "
           )
@@ -1665,15 +1595,7 @@ class TendingElectricAccess {
       if (exact != null) {
         sys.io.File.saveContent(
           directory + "/exact-vise-checks.json",
-          haxe.Json.stringify(
-            {
-              toolSha256: digest(toolBytes),
-              sources: exact.sources,
-              checks: exact.checks
-            },
-            null,
-            "  "
-          )
+          haxe.Json.stringify({toolSha256: digest(toolBytes), sources: exact.sources, checks: exact.checks}, null, "  ")
         );
         exact.close();
       }
@@ -1686,11 +1608,7 @@ class TendingElectricAccess {
       marginMm: MARGIN,
       workingContactMarginMm: CONTACT_MARGIN,
       maximumSampleStepMm: STEP,
-      stockMm: [
-        60,
-        60,
-        20
-      ],
+      stockMm: [60, 60, 20],
       traySetbackMm: setback,
       inventoryPolicy: fillOutfeed ? "all non-target pockets occupied" : "input pockets occupied",
       millLoadPosition : cell.loadPosition,

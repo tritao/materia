@@ -40,32 +40,12 @@ class GripChecks {
     y:Float, z:Float, width:Float, length:Float, height:Float):ConvexPrism return new ConvexPrism(
       "wall-probe",
       [
-        new Vector(
-          x,
-          y,
-          z
-        ),
-        new Vector(
-          x + width,
-          y,
-          z
-        ),
-        new Vector(
-          x + width,
-          y + length,
-          z
-        ),
-        new Vector(
-          x,
-          y + length,
-          z
-        )
+        new Vector(x, y, z),
+        new Vector(x + width, y, z),
+        new Vector(x + width, y + length, z),
+        new Vector(x, y + length, z)
       ],
-      new Vector(
-        0,
-        0,
-        height
-      )
+      new Vector(0, 0, height)
     );
   static function diagnosis(code:String, action:Void -> Void):SheetDiagnosis {
     checks++;
@@ -80,12 +60,7 @@ class GripChecks {
     var wallQuery = new PressWallPrismQuery();
     var ring = new WallOutline(
       [Segment.arc(new Point2(0, 0), 5, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(0, 0),
-        2,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(0, 0), 2, 0, -2 * Math.PI)]]
     );
     var material = box(2.5, -0.1, -1, 0.2, 0.2, 0.5), cavity = box(-0.1, -0.1, -1, 0.2, 0.2, 0.5);
     var tangent = box(5, -0.1, -1, 1, 0.2, 0.5), penetrating = box(4.999, -0.01, -1, 1, 0.02, 0.5);
@@ -93,14 +68,7 @@ class GripChecks {
     var transforms = [
       Location.identity(),
       Location.translation(new Vector(31, 17, 23)).compose(Location.rotation(
-        new Axis(
-          new Vector(),
-          new Vector(
-            1,
-            2,
-            3
-          )
-        ),
+        new Axis(new Vector(), new Vector(1, 2, 3)),
         0.7
       ))
     ];
@@ -133,11 +101,7 @@ class GripChecks {
       "grip-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(station.processTooling())),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(60, 100));
     var child = SheetDemoParts.flange(sheet, root, 1, 40, Math.PI / 2, stock.defaultRadius(Math.PI / 2));
@@ -146,15 +110,8 @@ class GripChecks {
       sheet.flat(),
       bend.id,
       station,
-      new BendOrientation(
-        true,
-        false,
-        -10
-      ),
-      new GaugeEdge(
-        bend.wallB,
-        new WallEdge(1)
-      ),
+      new BendOrientation(true, false, -10),
+      new GaugeEdge(bend.wallB, new WallEdge(1)),
       new AirBending()
     );
     var withdrawal = new BackgaugeStroke(setup.registration, 20), envelope = new GripperBox(10, 10, 15);
@@ -228,10 +185,7 @@ class GripChecks {
       bend.id,
       station,
       new BendOrientation(true, false, -10),
-      new GaugeEdge(
-        bend.wallB,
-        new WallEdge(1)
-      ),
+      new GaugeEdge(bend.wallB, new WallEdge(1)),
       new AirBending()
     );
     checker.check(sheet, curvedSetup, grip, new BackgaugeStroke(curvedSetup.registration, 20));

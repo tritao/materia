@@ -227,12 +227,7 @@ class TendingElectricPhysicsPlayback {
           );
           var freeAngle = TendingSeatPolicy.orientationError(
             [freePose.qx, freePose.qy, freePose.qz, freePose.qw],
-            [
-              seat.qx,
-              seat.qy,
-              seat.qz,
-              seat.qw
-            ],
+            [seat.qx, seat.qy, seat.qz, seat.qw],
             TendingSeatOrientation.FullPose
           );
           if (freeAngle <= 0.002) throw "Yaw regression did not exercise an unaligned, level blank";
@@ -247,11 +242,7 @@ class TendingElectricPhysicsPlayback {
           });
           events.push({
             operation: "measured-stock return query positive/negative controls",
-            checks: TendingReleasedStockReturnCheck.controls(
-              scene,
-              cell.harness.simulation,
-              object
-            )
+            checks: TendingReleasedStockReturnCheck.controls(scene, cell.harness.simulation, object)
           });
         }
         passed = true;
@@ -320,23 +311,11 @@ class TendingElectricPhysicsPlayback {
         object.teleport(TendingElectricSimCell.pose(setup));
         var under = materia.assembly.AssemblyFrames.compose(
           setup,
-          {
-            x: 0.0,
-            y: 0.0,
-            z: -0.5,
-            qx: 0.0,
-            qy: 0.0,
-            qz: 0.0,
-            qw: 1.0
-          }
+          {x: 0.0, y: 0.0, z: -0.5, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
         );
         var pedestal = cell.harness.space.session.createObject(
           nativekit.sim.MotionType.Static,
-          nativekit.sim.SimShape.box(
-            0.025,
-            0.025,
-            0.0005
-          ),
+          nativekit.sim.SimShape.box(0.025, 0.025, 0.0005),
           TendingElectricSimCell.pose(under),
           0,
           null,
@@ -353,12 +332,7 @@ class TendingElectricPhysicsPlayback {
           height = target.z + profile.placing.limits.sampleTravelMm - captured.z * 1000;
         var angle = TendingSeatPolicy.orientationError(
           [captured.qx, captured.qy, captured.qz, captured.qw],
-          [
-            target.qx,
-            target.qy,
-            target.qz,
-            target.qw
-          ],
+          [target.qx, target.qy, target.qz, target.qw],
           TendingSeatOrientation.FullPose
         );
         if (height < 0.5 || angle < 0.001) throw "Tray regression lost its nonideal grasp";
@@ -378,10 +352,7 @@ class TendingElectricPhysicsPlayback {
         var slot = locatingSide == "a" ? 0 : 1, profile : Dynamic = profiles.get("vise-load/" + locatingSide);
         var load = cell.fixtureState.worldConnector("mill/mill/vise/body", "load");
         var axis = materia.assembly.AssemblyFrames.transformVector(
-          cell.fixtureState.worldConnector(
-            "mill/mill/vise/body",
-            "seat"
-          ),
+          cell.fixtureState.worldConnector("mill/mill/vise/body", "seat"),
           1,
           0,
           0
@@ -403,15 +374,7 @@ class TendingElectricPhysicsPlayback {
           var rx = -Math.sin(0.00183 / 2), ry = 0.000009, rz = Math.sin(0.00056 / 2);
           setup = materia.assembly.AssemblyFrames.compose(
             setup,
-            {
-              x: 0.0,
-              y: 0.0,
-              z: -0.82,
-              qx: rx,
-              qy: ry,
-              qz: rz,
-              qw: Math.sqrt(1 - rx * rx - ry * ry - rz * rz)
-            }
+            {x: 0.0, y: 0.0, z: -0.82, qx: rx, qy: ry, qz: rz, qw: Math.sqrt(1 - rx * rx - ry * ry - rz * rz)}
           );
           if (locatingSide == "a") setup = materia.assembly.AssemblyFrames.compose(
             {
@@ -439,23 +402,11 @@ class TendingElectricPhysicsPlayback {
         object.teleport(TendingElectricSimCell.pose(setup));
         var under = materia.assembly.AssemblyFrames.compose(
           setup,
-          {
-            x: 0.0,
-            y: 0.0,
-            z: -0.5,
-            qx: 0.0,
-            qy: 0.0,
-            qz: 0.0,
-            qw: 1.0
-          }
+          {x: 0.0, y: 0.0, z: -0.5, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
         );
         var pedestal = cell.harness.space.session.createObject(
           nativekit.sim.MotionType.Static,
-          nativekit.sim.SimShape.box(
-            0.025,
-            0.025,
-            0.0005
-          ),
+          nativekit.sim.SimShape.box(0.025, 0.025, 0.0005),
           TendingElectricSimCell.pose(under),
           0,
           null,
@@ -472,12 +423,7 @@ class TendingElectricPhysicsPlayback {
           var captured = cell.harness.simulation.objectPose(object);
           var angle = TendingSeatPolicy.orientationError(
             [captured.qx, captured.qy, captured.qz, captured.qw],
-            [
-              load.qx,
-              load.qy,
-              load.qz,
-              load.qw
-            ],
+            [load.qx, load.qy, load.qz, load.qw],
             TendingSeatOrientation.FullPose
           );
           var height = load.z - captured.z * 1000;

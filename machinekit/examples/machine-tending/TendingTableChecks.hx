@@ -40,11 +40,7 @@ class TendingTableChecks {
     var result = part.placed(new Location(new Plane(
       new Vector(f.x, f.y, f.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     )));
     part.close();
     return result;
@@ -181,10 +177,7 @@ class TendingTableChecks {
       }
       if (Std.isOfType(entry.component, TableSlotNut)) near(
         volume,
-        (h.nutLength * h.nutWidth - Math.PI * Math.pow(
-          h.screwSpec().diameter / 2,
-          2
-        )) * h.nutThickness,
+        (h.nutLength * h.nutWidth - Math.PI * Math.pow(h.screwSpec().diameter / 2, 2)) * h.nutThickness,
         "Slot nut is threaded through"
       );
       part.close();
@@ -245,38 +238,9 @@ class TendingTableChecks {
     near(TSlotExtrusion.forProfile("HFS5-4040").modeledSlotDepth(), 6, "4040 modeled slot");
     var tables = [
       new TSlotTable(320, 240, 650, "HFS5-2020", 10, 0, 25, 150),
-      new TSlotTable(
-        540,
-        330,
-        1020,
-        "HFS5-4040",
-        10,
-        100
-      ),
-      new TSlotTable(
-        1200,
-        700,
-        900,
-        "HFS5-4040",
-        18,
-        0,
-        40,
-        200,
-        null,
-        true
-      ),
-      new TSlotTable(
-        600,
-        400,
-        750,
-        "HFS5-2020",
-        12,
-        40,
-        35,
-        180,
-        null,
-        true
-      ),
+      new TSlotTable(540, 330, 1020, "HFS5-4040", 10, 100),
+      new TSlotTable(1200, 700, 900, "HFS5-4040", 18, 0, 40, 200, null, true),
+      new TSlotTable(600, 400, 750, "HFS5-2020", 12, 40, 35, 180, null, true),
       new TSlotTable(
         540,
         330,
@@ -288,29 +252,9 @@ class TendingTableChecks {
         220,
         null,
         true,
-        {
-          width: 720,
-          depth: 670,
-          offsetX: 90,
-          offsetY: -170
-        }
+        {width: 720, depth: 670, offsetX: 90, offsetY: -170}
       ),
-      new TSlotTable(
-        320,
-        240,
-        650,
-        "HFS5-2020",
-        10,
-        0,
-        25,
-        150,
-        null,
-        true,
-        {
-          width: 500,
-          depth: 450
-        }
-      )
+      new TSlotTable(320, 240, 650, "HFS5-2020", 10, 0, 25, 150, null, true, {width: 500, depth: 450})
     ];
     for (table in tables) verify(table);
     // A supplied hardware specification follows the same fitting rules as a preset.
@@ -348,11 +292,7 @@ class TendingTableChecks {
       220,
       null,
       true,
-      {
-        width: 720,
-        depth: 670,
-        offsetX: 200
-      }
+      {width: 720, depth: 670, offsetX: 200}
     );
     }, "Reject offset that leaves a post outside base");
     var layout = TendingReachLayout.decode(TendingReachCertificate.JSON).result;
@@ -390,19 +330,13 @@ class TendingTableChecks {
     var output = root + "/machinekit/examples/machine-tending/build/";
     sys.io.File.saveBytes(
       output + "tslot-tables.mtrg",
-      SceneArtifact.encode(AssemblyPreview.scene(
-        banks,
-        "tslot-tray-tables"
-      ))
+      SceneArtifact.encode(AssemblyPreview.scene(banks, "tslot-tray-tables"))
     );
     var sizing = new MachineAssembly();
     for (i in 0...tables.length) sizing.include('size-$i', tables[i], AssemblyFrames.translation(i * 2000, 0, 0));
     sys.io.File.saveBytes(
       output + "tslot-table-sizing.mtrg",
-      SceneArtifact.encode(AssemblyPreview.scene(
-        sizing,
-        "tslot-table-sizing"
-      ))
+      SceneArtifact.encode(AssemblyPreview.scene(sizing, "tslot-table-sizing"))
     );
     sys.io.File.saveContent(output + "tslot-table-manufacturing.json", haxe.Json.stringify([for (table in tables) {
       profile:table.profile.designation, width:table.width, depth:table.depth, height:table.height, base: {

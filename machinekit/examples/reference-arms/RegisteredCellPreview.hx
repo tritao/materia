@@ -96,10 +96,7 @@ class RegisteredCellPreview {
       [-width / 2, -width / 2],
       [width / 2, -width / 2],
       [width / 2, width / 2],
-      [
-        -width / 2,
-        width / 2
-      ]
+      [-width / 2, width / 2]
     ]) {
       points.push(p[0]);
       points.push(p[1]);
@@ -124,11 +121,7 @@ class RegisteredCellPreview {
         materialDensity: 7850,
         materialSpec: "Solid clearance envelope; pedestal fabrication and anchoring pending",
         volume: volume,
-        centerOfMass: [
-          0.0,
-          0.0,
-          height / 2
-        ],
+        centerOfMass: [0.0, 0.0, height / 2],
         inertia: [
           volume * (width * width + height * height) / 12,
           0.0,
@@ -145,33 +138,18 @@ class RegisteredCellPreview {
         vertices: vertices,
         normals: normals,
         indices: indices,
-        faceRanges: [{
-          faceIndex: 0,
-          firstIndex: 0,
-          indexCount: 36
-        }]
+        faceRanges: [{faceIndex: 0, firstIndex: 0, indexCount: 36}]
       }],
       assemblyDefinition: {
         schemaVersion: AssemblyDefinitionCodec.VERSION,
         id: "candidate-pedestal",
         lengthUnit: "m",
-        definitions: [{
-          id: "pedestal",
-          connectors: []
-        }],
+        definitions: [{id: "pedestal", connectors: []}],
         occurrences: [{
           id: "pedestal",
           definition: "pedestal",
           grounded: true,
-          initialPose: {
-            x: base.x,
-            y: base.y,
-            z: 0.0,
-            qx: 0.0,
-            qy: 0.0,
-            qz: 0.0,
-            qw: 1.0
-          }
+          initialPose: {x: base.x, y: base.y, z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
         }],
         joints: []
       }
@@ -213,10 +191,7 @@ class RegisteredCellPreview {
       id: "inventory/" + Std.string(seat.name),
       definition: stock.definition,
       grounded: true,
-      initialPose: scaled(
-        CellRegistration.readFrame(seat.frame),
-        0.001
-      )
+      initialPose: scaled(CellRegistration.readFrame(seat.frame), 0.001)
     });
     var moving = [for (j in definition.joints) if (j.type != "fixed") j];
     var state = new cadkit.modeling.AssemblyState(definition);
@@ -245,17 +220,8 @@ class RegisteredCellPreview {
         parentConnector: name,
         child: entry.id,
         childConnector: "registrationOrigin",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        },
-        limits: {
-          lower: null,
-          upper: null,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 0, y: 0, z: 1},
+        limits: {lower: null, upper: null, velocity: null, effort: null},
         defaultValue: 0
       });
     }
@@ -283,11 +249,7 @@ class RegisteredCellPreview {
         id: o.id,
         stem: part.id.split("/").join("_"),
         pose: actual.worldPose(o.id),
-        color: [
-          part.red,
-          part.green,
-          part.blue
-        ]
+        color: [part.red, part.green, part.blue]
       });
     }
     sys.io.File.saveContent(meshDirectory + "/meshes.json", haxe.Json.stringify(entries));

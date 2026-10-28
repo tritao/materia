@@ -9,10 +9,7 @@ import machinekit.transmission.PackedTimingBeltMesh;
 class PackedTimingBeltMeshTests {
   static function check(value:Bool, message:String):Void if (!value) throw message;
   static function near(actual:Float, expected:Float, message:String):Void check(
-    Math.abs(actual - expected) < 1e-5 * Math.max(
-      1.0,
-      Math.abs(expected)
-    ),
+    Math.abs(actual - expected) < 1e-5 * Math.max(1.0, Math.abs(expected)),
     '$message: $actual != $expected'
   );
 
@@ -21,46 +18,13 @@ class PackedTimingBeltMeshTests {
     var center = [0.1, -0.2, 0.3];
     for (route in [
       [new BeltWrap(0, 0, 10), new BeltWrap(200, 0, 10)],
+      [new BeltWrap(0, 0, 10), new BeltWrap(200, 0, 15), new BeltWrap(100, 150, 8)],
       [
-        new BeltWrap(0, 0, 10),
-        new BeltWrap(200, 0, 15),
-        new BeltWrap(
-          100,
-          150,
-          8
-        )
-      ],
-      [
-        new BeltWrap(
-          -66,
-          0,
-          6,
-          1
-        ),
-        new BeltWrap(
-          88,
-          -12,
-          6,
-          -1
-        ),
-        new BeltWrap(
-          100,
-          -90,
-          6,
-          1
-        ),
-        new BeltWrap(
-          100,
-          90,
-          6,
-          1
-        ),
-        new BeltWrap(
-          -66,
-          90,
-          6,
-          1
-        )
+        new BeltWrap(-66, 0, 6, 1),
+        new BeltWrap(88, -12, 6, -1),
+        new BeltWrap(100, -90, 6, 1),
+        new BeltWrap(100, 90, 6, 1),
+        new BeltWrap(-66, 90, 6, 1)
       ]
     ]) for (width in [
       9.0,

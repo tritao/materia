@@ -21,10 +21,7 @@ class EnclosureKitPreview {
         id,
         AssemblyFrames.compose(
           AssemblyFrames.inverse(root),
-          AssemblyFrames.compose(
-            pose,
-            part.connector("mount").frame
-          )
+          AssemblyFrames.compose(pose, part.connector("mount").frame)
         )
       );
       result.addMate(id + "-mount", "fixed", "frame/post00", id, id, "mount");

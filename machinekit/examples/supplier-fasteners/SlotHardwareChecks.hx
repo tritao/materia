@@ -66,11 +66,7 @@ class SlotHardwareChecks {
     sys.io.File.saveContent(dir + "slot-nuts.assembly.json", saved);
     sys.io.File.saveContent(
       dir + "slot-nuts.bom.json",
-      haxe.Json.stringify(
-        plan.lines(assembly.billOfMaterials()),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(plan.lines(assembly.billOfMaterials()), null, "  ")
     );
     if (Sys.args().indexOf("--recipes-only") >= 0) {
       trace('Slot nut geometry and assembly checks passed: ${recipes.length} recipes');

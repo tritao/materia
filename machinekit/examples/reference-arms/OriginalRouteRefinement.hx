@@ -81,10 +81,7 @@ class OriginalRouteRefinement {
     for (a in fromStart) for (b in toEnd) bridges.push({
       a: a,
       b: b,
-      cost: distance(start, a) + distance(a, b) + distance(
-        b,
-        end
-      )
+      cost: distance(start, a) + distance(a, b) + distance(b, end)
     });
     bridges.sort((a, b) -> a.cost < b.cost ? -1 : a.cost > b.cost ? 1 : 0);
     for (pair in bridges.slice(0, 64)) {

@@ -27,11 +27,7 @@ class MillCapacityStudy {
       a.addComponent(
         "fixture-envelope",
         new MillPanel(200, 150, l.fixtureHeight),
-        F.translation(
-          0,
-          l.spindleY,
-          l.tableTop
-        )
+        F.translation(0, l.spindleY, l.tableTop)
       );
       a.addMemberConnector("xyStage/table", "fixtureSeat", F.translation(0, 0, l.tableThickness));
       a.addMemberConnector("fixture-envelope", "seat", F.identity());
@@ -370,17 +366,8 @@ class MillCapacityStudy {
     var report = {
       status: "packaging study; drives and structural performance not qualified",
       units: "mm",
-      travel: {
-        x: l.xTravel,
-        y: l.yTravel,
-        z: l.zTravel
-      },
-      table: {
-        width: l.tableWidth,
-        depth: l.tableDepth,
-        top: l.tableTop,
-        payloadTargetKg: l.payloadTargetKg
-      },
+      travel: {x: l.xTravel, y: l.yTravel, z: l.zTravel},
+      table: {width: l.tableWidth, depth: l.tableDepth, top: l.tableTop, payloadTargetKg: l.payloadTargetKg},
       spindle: {
         columnReach: l.spindleReach,
         gaugeToTableMin: l.noseMin,
@@ -394,11 +381,7 @@ class MillCapacityStudy {
         front: l.frame.front,
         rear: l.frame.rear
       },
-      column: {
-        width: l.frame.columnWidth,
-        depth: l.frame.columnDepth,
-        height: l.frame.columnHeight
-      },
+      column: {width: l.frame.columnWidth, depth: l.frame.columnDepth, height: l.frame.columnHeight},
       guides: {
         rail: "HGR25R",
         block: "HGH25CA",
@@ -421,10 +404,7 @@ class MillCapacityStudy {
         continuousEnvelopePairs: audited,
         overtravel: l.overtravel,
         poses: 27,
-        service: [
-          "straight head bolt access",
-          "150 mm vertical motor-body extraction after unbolting"
-        ]
+        service: ["straight head bolt access", "150 mm vertical motor-body extraction after unbolting"]
       },
       pending: [
         "Saddle/table detail and XY drive integration; Z drive sizing remains provisional",

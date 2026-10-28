@@ -7,46 +7,14 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Hob outboard support housing. Reference row is Assumed; dimensions are simplified envelopes. */
 class OutboardSupport extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "width",
-      60,
-      "mm"
-    ),
-    P.quantity(
-      "depth",
-      60,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      75,
-      "mm"
-    ),
-    P.quantity(
-      "seatDiameter",
-      32,
-      "mm"
-    ),
-    P.quantity(
-      "shaftDiameter",
-      16,
-      "mm"
-    ),
-    P.quantity(
-      "seatLength",
-      0,
-      "mm"
-    ),
-    P.quantity(
-      "radialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "radialStiffness",
-      100000000,
-      "N/m"
-    )
+    P.quantity("width", 60, "mm"),
+    P.quantity("depth", 60, "mm"),
+    P.quantity("height", 75, "mm"),
+    P.quantity("seatDiameter", 32, "mm"),
+    P.quantity("shaftDiameter", 16, "mm"),
+    P.quantity("seatLength", 0, "mm"),
+    P.quantity("radialRunout", 0.002, "mm"),
+    P.quantity("radialStiffness", 100000000, "N/m")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -88,11 +56,7 @@ class OutboardSupport extends MachineComponent {
   override public function geometry(detail:ComponentDetail =
     Preview):cadkit.modeling.Part return parameterNumber("seatLength") == 0 ? Solids.cut(
       ComponentEnvelopes.block(values()),
-      [cadkit.modeling.Part.cylinderSpan(
-        parameterNumber("seatDiameter") / 2,
-        -0.1,
-        parameterNumber("height") + 0.1
-      )]
+      [cadkit.modeling.Part.cylinderSpan(parameterNumber("seatDiameter") / 2, -0.1, parameterNumber("height") + 0.1)]
     ) : Solids.cut(
       ComponentEnvelopes.block(values()),
       [

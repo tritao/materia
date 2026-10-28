@@ -13,14 +13,8 @@ class FlatEndMill extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
     P.length("diameter", 6),
-    P.length(
-      "fluteLength",
-      22
-    ),
-    P.length(
-      "stickout",
-      35
-    )
+    P.length("fluteLength", 22),
+    P.length("stickout", 35)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -43,16 +37,8 @@ class FlatEndMill extends MachineComponent {
     var radius = parameterNumber("diameter") / 2,
       flute = parameterNumber("fluteLength"), stickout = parameterNumber("stickout");
     var blank = stickout == flute ? Part.cylinderSpan(radius, 0, flute) : Solids.union([
-      Part.cylinderSpan(
-        radius,
-        0,
-        flute
-      ),
-      Part.cylinderSpan(
-        radius * 0.9333333333,
-        flute,
-        stickout
-      )
+      Part.cylinderSpan(radius, 0, flute),
+      Part.cylinderSpan(radius * 0.9333333333, flute, stickout)
     ]);
     if (detail == Envelope) return blank;
     // Two assumed 30-degree helical gullets make orientation readable at preview fidelity.
@@ -68,15 +54,7 @@ class FlatEndMill extends MachineComponent {
             var z = -0.02 + (flute + 0.04) * i / steps, a = phase + z * Math.tan(Math.PI / 6) / radius;
             sections.push(Curve.circle(
               radius * 0.48,
-              new Plane(
-                new Vector(
-                  radius * 0.88 * Math.cos(a),
-                  radius * 0.88 * Math.sin(a),
-                  z
-                ),
-                Vector.X(),
-                Vector.Z()
-              )
+              new Plane(new Vector(radius * 0.88 * Math.cos(a), radius * 0.88 * Math.sin(a), z), Vector.X(), Vector.Z())
             ));
           }
           cuts.push(Part.loft(sections));

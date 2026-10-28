@@ -150,12 +150,7 @@ class TSlotExtrusion implements StructuralProfile {
         boreDiameter : pitch == 30 ? 6.8 : 8.5,
         systemId : system,
         gridPitch : pitch,
-        slots : [
-          ys,
-          xs,
-          ys,
-          xs
-        ],
+        slots : [ys, xs, ys, xs],
         bores : bores
       },
       section
@@ -246,14 +241,7 @@ class TSlotExtrusion implements StructuralProfile {
         standardEdition: null,
         dimensionKind: Nominal,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "width",
-          "height",
-          "slotWidth",
-          "slotDepth",
-          "tWidth",
-          "boreDiameter"
-        ]
+        verifiedFields: ["width", "height", "slotWidth", "slotDepth", "tWidth", "boreDiameter"]
       })
     );
     return table;
@@ -292,10 +280,7 @@ class TSlotExtrusion implements StructuralProfile {
         new Vector(-half, -halfHeight),
         new Vector(half, -halfHeight),
         new Vector(half, halfHeight),
-        new Vector(
-          -half,
-          halfHeight
-        ),
+        new Vector(-half, halfHeight),
       ],
       0,
       length
@@ -349,30 +334,12 @@ class TSlotExtrusion implements StructuralProfile {
     var points = [
       new Vector(outer, -slotWidth / 2),
       new Vector(outer - 1 - effectiveThroatDepth, -slotWidth / 2),
-      new Vector(
-        outer - 1 - effectiveThroatDepth,
-        -tWidth / 2
-      ),
-      new Vector(
-        outer - 1 - effectiveThroatDepth - effectiveHeadDepth,
-        -tWidth / 2
-      ),
-      new Vector(
-        outer - 1 - effectiveThroatDepth - effectiveHeadDepth,
-        tWidth / 2
-      ),
-      new Vector(
-        outer - 1 - effectiveThroatDepth,
-        tWidth / 2
-      ),
-      new Vector(
-        outer - 1 - effectiveThroatDepth,
-        slotWidth / 2
-      ),
-      new Vector(
-        outer,
-        slotWidth / 2
-      ),
+      new Vector(outer - 1 - effectiveThroatDepth, -tWidth / 2),
+      new Vector(outer - 1 - effectiveThroatDepth - effectiveHeadDepth, -tWidth / 2),
+      new Vector(outer - 1 - effectiveThroatDepth - effectiveHeadDepth, tWidth / 2),
+      new Vector(outer - 1 - effectiveThroatDepth, tWidth / 2),
+      new Vector(outer - 1 - effectiveThroatDepth, slotWidth / 2),
+      new Vector(outer, slotWidth / 2),
     ];
     if (tWidth > 2 * faceHalf) throw 'T-slot profile slot is wider than face ${Dimension.format(faceHalf * 2)}';
     return [for (p in points) rotate90(new Vector(p.x, p.y + offset), face)];

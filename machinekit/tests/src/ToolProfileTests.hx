@@ -16,18 +16,9 @@ class ToolProfileTests {
       new ToolProfilePoint(0, 0),
       new ToolProfilePoint(4, 0),
       new ToolProfilePoint(4, 1),
-      new ToolProfilePoint(
-        1,
-        1
-      ),
-      new ToolProfilePoint(
-        1,
-        4
-      ),
-      new ToolProfilePoint(
-        0,
-        4
-      )
+      new ToolProfilePoint(1, 1),
+      new ToolProfilePoint(1, 4),
+      new ToolProfilePoint(0, 4)
     ];
     for (reverse in [false, true]) {
       var input = points.copy();
@@ -52,45 +43,20 @@ class ToolProfileTests {
       if (Math.abs(sum - 7) > 1e-9) throw "Convex pieces conserve section area";
     }
     reject(
-      [
-        new ToolProfilePoint(0, 0),
-        new ToolProfilePoint(4, 4),
-        new ToolProfilePoint(0, 4),
-        new ToolProfilePoint(
-          3,
-          0
-        )
-      ],
+      [new ToolProfilePoint(0, 0), new ToolProfilePoint(4, 4), new ToolProfilePoint(0, 4), new ToolProfilePoint(3, 0)],
       "crossed outline"
     );
     reject([new ToolProfilePoint(0, 0), new ToolProfilePoint(1, 0), new ToolProfilePoint(2, 0)], "zero area");
     reject(
-      [
-        new ToolProfilePoint(0, 0),
-        new ToolProfilePoint(1, 0),
-        new ToolProfilePoint(1, 0),
-        new ToolProfilePoint(
-          0,
-          1
-        )
-      ],
+      [new ToolProfilePoint(0, 0), new ToolProfilePoint(1, 0), new ToolProfilePoint(1, 0), new ToolProfilePoint(0, 1)],
       "duplicate point"
     );
     var collinear = new ToolProfilePolygon([
       new ToolProfilePoint(0, 0),
       new ToolProfilePoint(2, 0),
-      new ToolProfilePoint(
-        4,
-        0
-      ),
-      new ToolProfilePoint(
-        4,
-        4
-      ),
-      new ToolProfilePoint(
-        0,
-        4
-      )
+      new ToolProfilePoint(4, 0),
+      new ToolProfilePoint(4, 4),
+      new ToolProfilePoint(0, 4)
     ]);
     var covered = 0.0;
     for (piece in collinear.convexPieces()) {
@@ -103,14 +69,8 @@ class ToolProfileTests {
         new ToolProfilePoint(0, 0),
         new ToolProfilePoint(4, 0),
         new ToolProfilePoint(4, 4),
-        new ToolProfilePoint(
-          2,
-          0
-        ),
-        new ToolProfilePoint(
-          0,
-          4
-        )
+        new ToolProfilePoint(2, 0),
+        new ToolProfilePoint(0, 4)
       ],
       "boundary touches another edge"
     );
@@ -136,18 +96,9 @@ class ToolProfileTests {
     var upperY = tangentY + 10 - tangentZ;
     var upper = new ToolProfilePolygon([
       new ToolProfilePoint(-tangentY, tangentZ),
-      new ToolProfilePoint(
-        tangentY,
-        tangentZ
-      ),
-      new ToolProfilePoint(
-        upperY,
-        10
-      ),
-      new ToolProfilePoint(
-        -upperY,
-        10
-      )
+      new ToolProfilePoint(tangentY, tangentZ),
+      new ToolProfilePoint(upperY, 10),
+      new ToolProfilePoint(-upperY, 10)
     ]);
     var punch = new PunchProfile("test-r1-90", Straight, 1, Math.PI / 2, 10, upper);
     if (Math.abs(punch.tangentHeight() - tangentZ) > 1e-9
@@ -170,22 +121,10 @@ class ToolProfileTests {
         Math.PI / 2,
         10,
         new ToolProfilePolygon([
-          new ToolProfilePoint(
-            -tangentY,
-            tangentZ
-          ),
-          new ToolProfilePoint(
-            tangentY,
-            tangentZ
-          ),
-          new ToolProfilePoint(
-            1,
-            10
-          ),
-          new ToolProfilePoint(
-            -1,
-            10
-          )
+          new ToolProfilePoint(-tangentY, tangentZ),
+          new ToolProfilePoint(tangentY, tangentZ),
+          new ToolProfilePoint(1, 10),
+          new ToolProfilePoint(-1, 10)
         ])
       );
     } catch (_:Dynamic) badTangents = true;
@@ -200,22 +139,10 @@ class ToolProfileTests {
         angle,
         10,
         new ToolProfilePolygon([
-          new ToolProfilePoint(
-            -y,
-            z
-          ),
-          new ToolProfilePoint(
-            y,
-            z
-          ),
-          new ToolProfilePoint(
-            top,
-            10
-          ),
-          new ToolProfilePoint(
-            -top,
-            10
-          )
+          new ToolProfilePoint(-y, z),
+          new ToolProfilePoint(y, z),
+          new ToolProfilePoint(top, 10),
+          new ToolProfilePoint(-top, 10)
         ])
       );
       for (error in [0.1, 0.01, 0.001]) {

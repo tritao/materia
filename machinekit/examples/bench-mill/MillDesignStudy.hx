@@ -45,12 +45,7 @@ class MillDesignStudy {
         rail: "xyStage/railXFront",
         screw: "xyStage/screwX",
         root: "xyStage/blockX0",
-        blocks: [
-          "xyStage/blockX0",
-          "xyStage/blockX1",
-          "xyStage/blockX2",
-          "xyStage/blockX3"
-        ]
+        blocks: ["xyStage/blockX0", "xyStage/blockX1", "xyStage/blockX2", "xyStage/blockX3"]
       },
       {
         id: "y",
@@ -58,12 +53,7 @@ class MillDesignStudy {
         rail: "xyStage/railYLeft",
         screw: "xyStage/screwY",
         root: "xyStage/blockY0",
-        blocks: [
-          "xyStage/blockY0",
-          "xyStage/blockY1",
-          "xyStage/blockY2",
-          "xyStage/blockY3"
-        ]
+        blocks: ["xyStage/blockY0", "xyStage/blockY1", "xyStage/blockY2", "xyStage/blockY3"]
       },
       {
         id: "z",
@@ -71,12 +61,7 @@ class MillDesignStudy {
         rail: "zAxis/railLeft",
         screw: "zAxis/screw",
         root: "zAxis/blockLeftLower",
-        blocks: [
-          "zAxis/blockLeftLower",
-          "zAxis/blockLeftUpper",
-          "zAxis/blockRightLower",
-          "zAxis/blockRightUpper"
-        ]
+        blocks: ["zAxis/blockLeftLower", "zAxis/blockLeftUpper", "zAxis/blockRightLower", "zAxis/blockRightUpper"]
       }
     ];
     var results:Array<Dynamic> = [];
@@ -223,10 +208,7 @@ class MillDesignStudy {
         guideStaticSafetyFactor: 2,
         beltCordRigidityPerWidthNPerMm: 5000
       },
-      guideLoads: guideLoads(
-        assembly,
-        frame
-      ),
+      guideLoads: guideLoads(assembly, frame),
       xyStructure: {
         yGuideSpacingMm: frame.layout.yRailSpacing,
         yBlockCentersMm: 2 * xy.yBlockSpan,
@@ -242,11 +224,7 @@ class MillDesignStudy {
         noseWidthMm: 120,
         headFasteners: "4 x M6 x 16; nominal blind taps",
         releaseMechanism: {
-          cylinderEnvelopeMm: [
-            MillDrawbarLayout.WIDTH,
-            MillDrawbarLayout.WIDTH,
-            MillDrawbarLayout.HEIGHT
-          ],
+          cylinderEnvelopeMm: [MillDrawbarLayout.WIDTH, MillDrawbarLayout.WIDTH, MillDrawbarLayout.HEIGHT],
           boreMm: MillDrawbarLayout.BORE,
           studyStrokeMm: MillDrawbarLayout.STUDY_STROKE,
           pressureBar: MillDrawbarLayout.PRESSURE_BAR,

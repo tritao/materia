@@ -90,10 +90,7 @@ class MillSpindleIntegrity {
       xyEnvelope = {
         xHalfTravel: xyLayout.xHalfTravel,
         yHalfTravel: xyLayout.yHalfTravel,
-        member: id -> StringTools.startsWith(
-          id,
-          "xyStage/"
-        ),
+        member: id -> StringTools.startsWith(id, "xyStage/"),
         table: id -> MillXYStageIntegrity.tableMember(id.substr(8)),
         fixed: id -> MillXYStageIntegrity.yFixed(id.substr(8)),
         cuttingTarget: null
@@ -110,10 +107,7 @@ class MillSpindleIntegrity {
       var id = member.id;
       if (StringTools.startsWith(id, "spindle/")) payload.push(keep(
         id.substr(8),
-        cache.posed(
-          member.component,
-          poses.get(id)
-        )
+        cache.posed(member.component, poses.get(id))
       ));
       else if (StringTools.startsWith(id, "frame/")) fixed.push(keep(id, cache.posed(member.component, poses.get(id))));
       else if (StringTools.startsWith(id, "zAxis/")) {

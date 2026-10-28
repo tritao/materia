@@ -31,13 +31,7 @@ class PickingStationDesign {
     var value = config == null ? PickingStationConfig.defaults() : config;
     return [
       requirement("bench-worktop", "operator-bench/worktop", 1, value.benchWidth, value.benchDepth),
-      requirement(
-        "rack-shelf",
-        "rack-01/shelf/panel",
-        value.shelfCount,
-        value.shelfWidth,
-        value.shelfDepth
-      ),
+      requirement("rack-shelf", "rack-01/shelf/panel", value.shelfCount, value.shelfWidth, value.shelfDepth),
       requirement(
         "rack-lip",
         "rack-01/shelf/front-lip",
@@ -66,10 +60,7 @@ class PickingStationDesign {
       widthTolerancePlus: 0.5,
       heightToleranceMinus: 0.5,
       heightTolerancePlus: 0.5,
-      allowedRotations: [
-        0,
-        90
-      ],
+      allowedRotations: [0, 90],
       directionConstraint: "free"
     };
 
@@ -94,124 +85,23 @@ class PickingStationDesign {
       edgeMargin: 10,
       requirements: SheetPlanValidator.captureRequirements(requirements),
       placements: [
-        placement(
-          "worktop",
-          "bench-worktop",
-          10,
-          10,
-          900,
-          600,
-          "worktop"
-        ),
-        placement(
-          "shelf-01",
-          "rack-shelf",
-          913,
-          10,
-          740,
-          340,
-          "shelf-01"
-        ),
-        placement(
-          "shelf-02",
-          "rack-shelf",
-          913,
-          353,
-          740,
-          340,
-          "shelf-02"
-        ),
-        placement(
-          "lip-01",
-          "rack-lip",
-          1656,
-          10,
-          740,
-          55,
-          "lip-01"
-        ),
-        placement(
-          "lip-02",
-          "rack-lip",
-          1656,
-          68,
-          740,
-          55,
-          "lip-02"
-        )
+        placement("worktop", "bench-worktop", 10, 10, 900, 600, "worktop"),
+        placement("shelf-01", "rack-shelf", 913, 10, 740, 340, "shelf-01"),
+        placement("shelf-02", "rack-shelf", 913, 353, 740, 340, "shelf-02"),
+        placement("lip-01", "rack-lip", 1656, 10, 740, 55, "lip-01"),
+        placement("lip-02", "rack-lip", 1656, 68, 740, 55, "lip-02")
       ],
       cuts: [
-        cut(
-          "cut-01",
-          "stock",
-          "vertical",
-          900,
-          "worktop-column",
-          "right"
-        ),
-        cut(
-          "cut-02",
-          "worktop-column",
-          "horizontal",
-          600,
-          "worktop",
-          "worktop-remnant"
-        ),
-        cut(
-          "cut-03",
-          "right",
-          "vertical",
-          740,
-          "shelf-column",
-          "lip-right"
-        ),
-        cut(
-          "cut-04",
-          "shelf-column",
-          "horizontal",
-          340,
-          "shelf-01",
-          "shelf-rest"
-        ),
-        cut(
-          "cut-05",
-          "shelf-rest",
-          "horizontal",
-          340,
-          "shelf-02",
-          "shelf-remnant"
-        ),
-        cut(
-          "cut-06",
-          "lip-right",
-          "vertical",
-          740,
-          "lip-column",
-          "lip-strip"
-        ),
-        cut(
-          "cut-07",
-          "lip-column",
-          "horizontal",
-          55,
-          "lip-01",
-          "lip-rest"
-        ),
-        cut(
-          "cut-08",
-          "lip-rest",
-          "horizontal",
-          55,
-          "lip-02",
-          "lip-remnant"
-        )
+        cut("cut-01", "stock", "vertical", 900, "worktop-column", "right"),
+        cut("cut-02", "worktop-column", "horizontal", 600, "worktop", "worktop-remnant"),
+        cut("cut-03", "right", "vertical", 740, "shelf-column", "lip-right"),
+        cut("cut-04", "shelf-column", "horizontal", 340, "shelf-01", "shelf-rest"),
+        cut("cut-05", "shelf-rest", "horizontal", 340, "shelf-02", "shelf-remnant"),
+        cut("cut-06", "lip-right", "vertical", 740, "lip-column", "lip-strip"),
+        cut("cut-07", "lip-column", "horizontal", 55, "lip-01", "lip-rest"),
+        cut("cut-08", "lip-rest", "horizontal", 55, "lip-02", "lip-remnant")
       ],
-      retainedRegionIds: [
-        "worktop-remnant",
-        "shelf-remnant",
-        "lip-remnant",
-        "lip-strip"
-      ]
+      retainedRegionIds: ["worktop-remnant", "shelf-remnant", "lip-remnant", "lip-strip"]
     }];
   }
 

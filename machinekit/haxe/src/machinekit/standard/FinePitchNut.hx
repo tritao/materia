@@ -47,27 +47,8 @@ class FinePitchNut extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.standard.fine-pitch-nut",
-      [
-        P.length("diameter", 15),
-        P.length(
-          "pitch",
-          1
-        ),
-        P.length(
-          "acrossFlats",
-          22
-        ),
-        P.length(
-          "height",
-          6
-        )
-      ],
-      v -> new FinePitchNut(
-        v.number("diameter"),
-        v.number("pitch"),
-        v.number("acrossFlats"),
-        v.number("height")
-      ),
+      [P.length("diameter", 15), P.length("pitch", 1), P.length("acrossFlats", 22), P.length("height", 6)],
+      v -> new FinePitchNut(v.number("diameter"), v.number("pitch"), v.number("acrossFlats"), v.number("height")),
       true
     );
     return recipe;

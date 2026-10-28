@@ -11,22 +11,8 @@ class GuideSupportTests {
     var support = new GuideSupport(0.14, 0.0654, 0.02, -0.03);
     var cases:Array<GuideSupportWrench> = [
       {fx: 0, fy: 1000, fz: 0, mx: 0, my: 0, mz: 0},
-      {
-        fx: 170,
-        fy: -2300,
-        fz: 480,
-        mx: 63,
-        my: -37,
-        mz: 121
-      },
-      {
-        fx: -170,
-        fy: 2300,
-        fz: -480,
-        mx: -63,
-        my: 37,
-        mz: -121
-      }
+      {fx: 170, fy: -2300, fz: 480, mx: 63, my: -37, mz: 121},
+      {fx: -170, fy: 2300, fz: -480, mx: -63, my: 37, mz: -121}
     ];
     for (wrench in cases) {
       var fx = 0.0, fy = 0.0, fz = wrench.fz;

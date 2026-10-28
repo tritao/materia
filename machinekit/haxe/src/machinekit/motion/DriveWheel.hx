@@ -58,26 +58,11 @@ class DriveWheel extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.drive-wheel",
       [
-        ComponentRecipeSupport.length(
-          "diameter",
-          150
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          40
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "hubDiameter",
-          40
-        ),
-        ComponentRecipeSupport.length(
-          "hubLength",
-          10
-        )
+        ComponentRecipeSupport.length("diameter", 150),
+        ComponentRecipeSupport.length("width", 40),
+        ComponentRecipeSupport.length("boreDiameter", 8),
+        ComponentRecipeSupport.length("hubDiameter", 40),
+        ComponentRecipeSupport.length("hubLength", 10)
       ],
       v -> new DriveWheel(
         v.number("diameter"),
@@ -122,18 +107,8 @@ class DriveWheel extends MachineComponent {
     if (detail == Envelope) return body;
     // The dish's two walls are named apart, so the faces it leaves stay distinguishable.
     var dish = Solids.cut(
-      Solids.named(
-        Part.cylinderSpan(diameter / 2 - TREAD_RING, outer - DISH_DEPTH, outer + 0.1),
-        "dish"
-      ),
-      [Solids.named(
-        Part.cylinderSpan(
-          hubDiameter / 2,
-          outer - DISH_DEPTH - 0.1,
-          outer + 0.2
-        ),
-        "hubFace"
-      )]
+      Solids.named(Part.cylinderSpan(diameter / 2 - TREAD_RING, outer - DISH_DEPTH, outer + 0.1), "dish"),
+      [Solids.named(Part.cylinderSpan(hubDiameter / 2, outer - DISH_DEPTH - 0.1, outer + 0.2), "hubFace")]
     );
     return Solids.cut(body, [dish, Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, outer + 0.1), "bore")]);
   }

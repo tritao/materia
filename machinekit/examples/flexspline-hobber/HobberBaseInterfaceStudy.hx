@@ -41,33 +41,9 @@ class HobberBaseInterfaceStudy {
       l)) throw "Invalid interface study stack";
     var ledges = [
       Geometry.region("front-ledge", LEDGE, l, depth, -w / 2 + LEDGE / 2, 0, h - depth),
-      Geometry.region(
-        "rear-ledge",
-        LEDGE,
-        l,
-        depth,
-        w / 2 - LEDGE / 2,
-        0,
-        h - depth
-      ),
-      Geometry.region(
-        "left-ledge",
-        w - 2 * LEDGE,
-        LEDGE,
-        depth,
-        0,
-        -l / 2 + LEDGE / 2,
-        h - depth
-      ),
-      Geometry.region(
-        "right-ledge",
-        w - 2 * LEDGE,
-        LEDGE,
-        depth,
-        0,
-        l / 2 - LEDGE / 2,
-        h - depth
-      )
+      Geometry.region("rear-ledge", LEDGE, l, depth, w / 2 - LEDGE / 2, 0, h - depth),
+      Geometry.region("left-ledge", w - 2 * LEDGE, LEDGE, depth, 0, -l / 2 + LEDGE / 2, h - depth),
+      Geometry.region("right-ledge", w - 2 * LEDGE, LEDGE, depth, 0, l / 2 - LEDGE / 2, h - depth)
     ];
     var interruptions:Array<{ledge:String, feature:String, boundsMm:Array<Float>}> = [];
     for (ledge in ledges) for (core in cores) {
@@ -131,10 +107,7 @@ class HobberBaseInterfaceStudy {
       fastening: "Local threaded inserts with reserved solid bosses; size, edge cover and pitch require design",
       frameSupport: "Dedicated mounting pads carry frame and door loads; panel requires perimeter and intermediate support"
     },
-      cases: [
-        raised,
-        flush
-      ],
+      cases: [raised, flush],
       roofMetric: "Seat level minus the highest general lightening-core roof. A conservative datum comparison, not remaining wall thickness or structural qualification.",
       requiredNextDetails: [
         "Check the raised panel and supports against the full moving-machine envelope",

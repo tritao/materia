@@ -192,10 +192,7 @@ class CastingShopExport {
         for (setup in setups) {
           var name = setup.id + ".ngc", code = CncWriter.write(
             setup.program,
-            new CncController(
-              cnckit.CncDialect.LinuxCnc,
-              setup.program.tools
-            ),
+            new CncController(cnckit.CncDialect.LinuxCnc, setup.program.tools),
             settings.travelSpace == MachineCoordinates ? settings.travel : null
           );
           if (Sys.args().indexOf("--checks") >= 0 && settings.singleToolPrograms) {

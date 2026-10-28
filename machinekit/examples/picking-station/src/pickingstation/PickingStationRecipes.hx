@@ -22,22 +22,10 @@ class PickingStationRecipes {
           [
             length("width", 900),
             length("depth", 600),
-            length(
-              "height",
-              1800
-            ),
-            length(
-              "footHeight",
-              25
-            ),
-            ComponentRecipeSupport.count(
-              "shelfCount",
-              2
-            ),
-            length(
-              "shelfSpacing",
-              300
-            )
+            length("height", 1800),
+            length("footHeight", 25),
+            ComponentRecipeSupport.count("shelfCount", 2),
+            length("shelfSpacing", 300)
           ],
           v -> new RackFrame(
             v.number("width"),
@@ -52,24 +40,10 @@ class PickingStationRecipes {
         new ComponentType(
           "pickingstation.shelf",
           [
-            length(
-              "width",
-              800
-            ),
-            length(
-              "depth",
-              400
-            ),
-            length(
-              "thickness",
-              18
-            ),
-            ComponentRecipeSupport.scalar(
-              "inclinationDegrees",
-              0,
-              -30,
-              30
-            )
+            length("width", 800),
+            length("depth", 400),
+            length("thickness", 18),
+            ComponentRecipeSupport.scalar("inclinationDegrees", 0, -30, 30)
           ],
           v -> new ShelfAssembly(
             v.number("width"),
@@ -81,52 +55,13 @@ class PickingStationRecipes {
         ),
         new ComponentType(
           "pickingstation.bin",
-          [
-            length(
-              "width",
-              220
-            ),
-            length(
-              "depth",
-              300
-            ),
-            length(
-              "height",
-              180
-            ),
-            length(
-              "wallThickness",
-              3
-            )
-          ],
-          v -> new StorageBin(
-            v.number("width"),
-            v.number("depth"),
-            v.number("height"),
-            v.number("wallThickness")
-          ),
+          [length("width", 220), length("depth", 300), length("height", 180), length("wallThickness", 3)],
+          v -> new StorageBin(v.number("width"), v.number("depth"), v.number("height"), v.number("wallThickness")),
           true
         ),
         new ComponentType(
           "pickingstation.indicator",
-          [
-            length(
-              "width",
-              70
-            ),
-            length(
-              "depth",
-              24
-            ),
-            length(
-              "height",
-              48
-            ),
-            length(
-              "confirmationDiameter",
-              18
-            )
-          ],
+          [length("width", 70), length("depth", 24), length("height", 48), length("confirmationDiameter", 18)],
           v -> new PickIndicator(
             v.number("width"),
             v.number("depth"),
@@ -137,20 +72,8 @@ class PickingStationRecipes {
         ),
         new ComponentType(
           "pickingstation.adjustable-foot",
-          [
-            length(
-              "diameter",
-              35
-            ),
-            length(
-              "height",
-              25
-            )
-          ],
-          v -> new AdjustableFoot(
-            v.number("diameter"),
-            v.number("height")
-          ),
+          [length("diameter", 35), length("height", 25)],
+          v -> new AdjustableFoot(v.number("diameter"), v.number("height")),
           true
         )
       ];

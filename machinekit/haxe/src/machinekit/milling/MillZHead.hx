@@ -13,62 +13,20 @@ class MillZHead extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
     P.length("spindleDiameter", 70),
-    P.flag(
-      "bt30Mounts",
-      false
-    ),
-    P.flag(
-      "centeredMotor",
-      false
-    ),
-    P.length(
-      "width",
-      180
-    ),
-    P.length(
-      "reach",
-      204
-    ),
-    P.length(
-      "height",
-      130
-    ),
-    P.length(
-      "noseWidth",
-      120
-    ),
-    P.length(
-      "rearWidth",
-      180
-    ),
-    P.length(
-      "rootExtension",
-      0
-    ),
-    P.length(
-      "rearPlate",
-      12
-    ),
-    P.length(
-      "boltX",
-      65
-    ),
-    P.length(
-      "boltZ",
-      42
-    ),
-    P.length(
-      "spindleReach",
-      159
-    ),
-    P.length(
-      "plate",
-      14
-    ),
-    P.length(
-      "wall",
-      12
-    )
+    P.flag("bt30Mounts", false),
+    P.flag("centeredMotor", false),
+    P.length("width", 180),
+    P.length("reach", 204),
+    P.length("height", 130),
+    P.length("noseWidth", 120),
+    P.length("rearWidth", 180),
+    P.length("rootExtension", 0),
+    P.length("rearPlate", 12),
+    P.length("boltX", 65),
+    P.length("boltZ", 42),
+    P.length("spindleReach", 159),
+    P.length("plate", 14),
+    P.length("wall", 12)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.milling.z-head", parameters(), v -> new MillZHead(v));
@@ -106,18 +64,9 @@ class MillZHead extends MachineComponent {
     for (side in [-1, 1]) pieces.push(Part.prism(
       [
         new Vector(side * w / 2, 0),
-        new Vector(
-          side * parameterNumber("noseWidth") / 2,
-          collarRear
-        ),
-        new Vector(
-          side * (parameterNumber("noseWidth") / 2 - wall),
-          collarRear
-        ),
-        new Vector(
-          side * (w / 2 - wall),
-          0
-        )
+        new Vector(side * parameterNumber("noseWidth") / 2, collarRear),
+        new Vector(side * (parameterNumber("noseWidth") / 2 - wall), collarRear),
+        new Vector(side * (w / 2 - wall), 0)
       ],
       0,
       h
@@ -172,18 +121,9 @@ class MillZHead extends MachineComponent {
         new Vector(-w / 2, 0),
         new Vector(w / 2, 0),
         new Vector(nose / 2, collarRear),
-        new Vector(
-          nose / 2,
-          -d
-        ),
-        new Vector(
-          -nose / 2,
-          -d
-        ),
-        new Vector(
-          -nose / 2,
-          collarRear
-        )
+        new Vector(nose / 2, -d),
+        new Vector(-nose / 2, -d),
+        new Vector(-nose / 2, collarRear)
       ],
       0,
       h
@@ -208,17 +148,7 @@ class MillZHead extends MachineComponent {
           side * (upper && values().boolean("centeredMotor") ? 50 : w / 2 - 2 * wall),
           0,
           0,
-          [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            1,
-            0
-          ]
+          [0, 0, 1, 1, 0, 0, 0, 1, 0]
         )
       ));
       rib.close();

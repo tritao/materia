@@ -180,11 +180,7 @@ class ComparisonProject {
       materialDensity: 1 / volume,
       materialSpec: "1 kg uniform comparison envelope; mounting hardware unspecified",
       volume: volume,
-      centerOfMass: [
-        0.0,
-        0.0,
-        0.075
-      ],
+      centerOfMass: [0.0, 0.0, 0.075],
       inertia: [for (v in inertia) v * volume],
       physicalMassKg: 1,
       physicalMassDeclared: true,
@@ -194,11 +190,7 @@ class ComparisonProject {
       vertices: vertices,
       normals: normals,
       indices: indices,
-      faceRanges: [{
-        faceIndex: 0,
-        firstIndex: 0,
-        indexCount: 36
-      }]
+      faceRanges: [{faceIndex: 0, firstIndex: 0, indexCount: 36}]
     };
   }
   public static function withTool(scene:SceneArtifactData):SceneArtifactData {
@@ -221,30 +213,13 @@ class ComparisonProject {
       id: part.id,
       connectors: [
         {name: "origin", frame: AssemblyFrames.identity()},
-        {
-          name: "tcp",
-          frame: scaled(
-            {
-              x: 0,
-              y: 0,
-              z: 0.15,
-              qx: 0,
-              qy: 0,
-              qz: 0,
-              qw: 1
-            },
-            factor
-          )
-        }
+        {name: "tcp", frame: scaled({x: 0, y: 0, z: 0.15, qx: 0, qy: 0, qz: 0, qw: 1}, factor)}
       ]
     });
     definition.occurrences.push({
       id: part.id,
       definition: part.id,
-      initialPose: AssemblyFrames.compose(
-        flange.initialPose,
-        connector.frame
-      )
+      initialPose: AssemblyFrames.compose(flange.initialPose, connector.frame)
     });
     definition.joints.push({
       id: "comparison-tool-mount",
@@ -254,17 +229,8 @@ class ComparisonProject {
       parentConnector: component.robotFlangeConnector,
       child: part.id,
       childConnector: "origin",
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      },
-      limits: {
-        lower: null,
-        upper: null,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0, y: 0, z: 1},
+      limits: {lower: null, upper: null, velocity: null, effort: null},
       defaultValue: 0
     });
     return scene;

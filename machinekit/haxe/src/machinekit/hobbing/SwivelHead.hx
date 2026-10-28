@@ -35,10 +35,7 @@ class SwivelHead extends MachineAssembly {
     attach("clamp", this.clamp, 15);
     addComponent(
       "head",
-      new TablePlaten(new ComponentValues().setNumber("outside", 200).setNumber("bore", 100).setNumber(
-        "height",
-        10
-      ))
+      new TablePlaten(new ComponentValues().setNumber("outside", 200).setNumber("bore", 100).setNumber("height", 10))
     );
     addMemberConnector("housing", "swivel", Solids.axial(0, 0, 25));
     addMateOnAxis(
@@ -57,14 +54,8 @@ class SwivelHead extends MachineAssembly {
         effort: this.motor.peakTorque,
         acceleration: Math.PI / 2,
         assumptions: (this.motor.ratingsBasis == Assumed ? [
-          {
-            quantity : "speed limit",
-            label : "assumed direct motor rating"
-          },
-          {
-            quantity : "effort limit",
-            label : "assumed peak motor torque"
-          }
+          {quantity : "speed limit", label : "assumed direct motor rating"},
+          {quantity : "effort limit", label : "assumed peak motor torque"}
         ] : []).concat([{
           quantity : "acceleration limit",
           label : "assumed swivel positioning limit pi/2 rad/s²"

@@ -57,11 +57,7 @@ class BallScrew extends LeadScrew {
   override public function geometry(detail:machinekit.component.ComponentDetail = Preview):cadkit.modeling.Part {
     var shaft = machinekit.component.Solids.union([
       machinekit.component.Solids.named(
-        detail == Envelope ? cadkit.modeling.Part.cylinderSpan(
-          JOURNAL_DIAMETER / 2,
-          0,
-          inputJournalLength
-        ) : journal(
+        detail == Envelope ? cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, inputJournalLength) : journal(
           0,
           inputJournalLength,
           false
@@ -69,11 +65,7 @@ class BallScrew extends LeadScrew {
         "input-journal"
       ),
       machinekit.component.Solids.named(
-        cadkit.modeling.Part.cylinderSpan(
-          thread.screwDiameter / 2,
-          inputJournalLength,
-          totalLength - JOURNAL_LENGTH
-        ),
+        cadkit.modeling.Part.cylinderSpan(thread.screwDiameter / 2, inputJournalLength, totalLength - JOURNAL_LENGTH),
         "race"
       ),
       machinekit.component.Solids.named(
@@ -111,67 +103,22 @@ class BallScrew extends LeadScrew {
       {r : 0.0, z : start},
       {r : 5.7, z : start},
       {r : 5.7, z : start + 0.8},
-      {
-        r : 6.0,
-        z : start + 1.2
-      },
-      {
-        r : 6.0,
-        z : end - 4.2
-      },
-      {
-        r : 5.6,
-        z : end - 4.2
-      },
-      {
-        r : 5.6,
-        z : end - 3.2
-      },
-      {
-        r : 6.0,
-        z : end - 3.2
-      },
-      {
-        r : 6.0,
-        z : end - 0.6
-      },
-      {
-        r : 5.4,
-        z : end
-      },
-      {
-        r : 0.0,
-        z : end
-      }
+      {r : 6.0, z : start + 1.2},
+      {r : 6.0, z : end - 4.2},
+      {r : 5.6, z : end - 4.2},
+      {r : 5.6, z : end - 3.2},
+      {r : 6.0, z : end - 3.2},
+      {r : 6.0, z : end - 0.6},
+      {r : 5.4, z : end},
+      {r : 0.0, z : end}
     ] : [
-      {
-        r : 0.0,
-        z : start
-      },
-      {
-        r : 5.4,
-        z : start
-      },
-      {
-        r : 6.0,
-        z : start + 0.6
-      },
-      {
-        r : 6.0,
-        z : end - 1.2
-      },
-      {
-        r : 5.7,
-        z : end - 0.8
-      },
-      {
-        r : 5.7,
-        z : end
-      },
-      {
-        r : 0.0,
-        z : end
-      }
+      {r : 0.0, z : start},
+      {r : 5.4, z : start},
+      {r : 6.0, z : start + 0.6},
+      {r : 6.0, z : end - 1.2},
+      {r : 5.7, z : end - 0.8},
+      {r : 5.7, z : end},
+      {r : 0.0, z : end}
     ];
     return cadkit.modeling.Part.revolve(section);
   }
@@ -185,24 +132,11 @@ class BallScrew extends LeadScrew {
     if (ballRecipe == null) ballRecipe = new ComponentType(
       "machinekit.motion.ball-screw",
       [
-        ComponentRecipeSupport.length(
-          "length",
-          400
-        ),
-        ComponentRecipeSupport.length(
-          "inputJournalLength",
-          INPUT_JOURNAL_LENGTH
-        ),
-        ComponentRecipeSupport.flag(
-          "ground",
-          false
-        )
+        ComponentRecipeSupport.length("length", 400),
+        ComponentRecipeSupport.length("inputJournalLength", INPUT_JOURNAL_LENGTH),
+        ComponentRecipeSupport.flag("ground", false)
       ],
-      v -> new BallScrew(
-        v.number("length"),
-        v.number("inputJournalLength"),
-        v.boolean("ground")
-      )
+      v -> new BallScrew(v.number("length"), v.number("inputJournalLength"), v.boolean("ground"))
     );
     return ballRecipe;
   }

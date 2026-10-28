@@ -32,10 +32,7 @@ class ToolingSectionReview {
     for (fixture in plan.fixtures) for (volume in MoldFixtures.volumes(fixture)) items.push({
       volume: volume,
       direction: MoldFixtures.withdrawal(fixture),
-      ids: [
-        volume.id,
-        fixture.insertId
-      ]
+      ids: [volume.id, fixture.insertId]
     });
     var cuttingFiles = new Map<String, String>();
     for (core in plan.cores) for (index in 0...core.layers.length) {
@@ -43,11 +40,7 @@ class ToolingSectionReview {
       items.push({
         volume: ToolingVolume.fromCoreCutting(id, cutting).volume,
         direction: cutting.wireDirection,
-        ids: [
-          id,
-          core.id,
-          core.featureId
-        ]
+        ids: [id, core.id, core.featureId]
       });
       cuttingFiles.set(id, id + ".cutting.json");
     }

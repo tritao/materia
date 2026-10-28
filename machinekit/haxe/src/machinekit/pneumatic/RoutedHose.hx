@@ -49,11 +49,7 @@ class RoutedHose extends MachineComponent {
         standardEdition: null,
         dimensionKind: Nominal,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "outerDiameterMm",
-          "innerDiameterMm",
-          "massPerMetreKg"
-        ]
+        verifiedFields: ["outerDiameterMm", "innerDiameterMm", "massPerMetreKg"]
       })
     );
     return table;
@@ -219,40 +215,13 @@ class RoutedHose extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [
-      ComponentRecipeSupport.choice(
-        "stock",
-        [CUSTOM].concat(catalog().designations()),
-        CUSTOM
-      ),
-      ComponentRecipeSupport.text(
-        "designation",
-        "HOSE"
-      ),
-      ComponentRecipeSupport.text(
-        "route",
-        ComponentRecipeSupport.defaultRoute()
-      ),
-      ComponentRecipeSupport.length(
-        "outerDiameterMm",
-        4
-      ),
-      ComponentRecipeSupport.length(
-        "innerDiameterMm",
-        2
-      ),
-      ComponentRecipeSupport.scalar(
-        "massPerMetreKg",
-        0.01
-      ),
-      ComponentRecipeSupport.choice(
-        "service",
-        [
-          "Vacuum",
-          "Pneumatic",
-          "ScrewFeed"
-        ],
-        "Vacuum"
-      )
+      ComponentRecipeSupport.choice("stock", [CUSTOM].concat(catalog().designations()), CUSTOM),
+      ComponentRecipeSupport.text("designation", "HOSE"),
+      ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
+      ComponentRecipeSupport.length("outerDiameterMm", 4),
+      ComponentRecipeSupport.length("innerDiameterMm", 2),
+      ComponentRecipeSupport.scalar("massPerMetreKg", 0.01),
+      ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic", "ScrewFeed"], "Vacuum")
     ], v -> {var service = v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service")
       == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed;
     // Stock sets the tube and part number; only the route and service are the cut's own.

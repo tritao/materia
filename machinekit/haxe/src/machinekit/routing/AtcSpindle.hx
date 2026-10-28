@@ -13,47 +13,15 @@ class AtcSpindle extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 125),
     P.length("length", 320),
-    P.length(
-      "taperDiameter",
-      31.75
-    ),
-    P.length(
-      "taperLength",
-      45
-    ),
-    P.quantity(
-      "power",
-      6000,
-      "W"
-    ),
-    P.quantity(
-      "minRpm",
-      6000,
-      "rpm"
-    ),
-    P.quantity(
-      "maxRpm",
-      24000,
-      "rpm"
-    ),
-    P.length(
-      "releaseBore",
-      80
-    ),
-    P.length(
-      "releaseStroke",
-      6
-    ),
-    P.quantity(
-      "airPressure",
-      600000,
-      "Pa"
-    ),
-    P.quantity(
-      "clampForce",
-      2200,
-      "N"
-    )
+    P.length("taperDiameter", 31.75),
+    P.length("taperLength", 45),
+    P.quantity("power", 6000, "W"),
+    P.quantity("minRpm", 6000, "rpm"),
+    P.quantity("maxRpm", 24000, "rpm"),
+    P.length("releaseBore", 80),
+    P.length("releaseStroke", 6),
+    P.quantity("airPressure", 600000, "Pa"),
+    P.quantity("clampForce", 2200, "N")
   ];
   public function new(?v:ComponentValues) {
     super("atc-spindle", "ISO30 ATC spindle", "aluminium 6061", inputs(), v);
@@ -106,51 +74,19 @@ class AtcSpindle extends AssumedCatalogComponent {
         {r: 0.0, z: 0.0},
         {r: 0.72 * r, z: 0.0},
         {r: 0.72 * r, z: 0.05 * l},
-        {
-          r: 0.9 * r,
-          z: 0.07 * l
-        },
-        {
-          r: r,
-          z: 0.09 * l
-        },
-        {
-          r: r,
-          z: 0.8 * l
-        },
-        {
-          r: 0.92 * r,
-          z: 0.82 * l
-        },
-        {
-          r: 0.92 * r,
-          z: 0.95 * l
-        },
-        {
-          r: 0.6 * r,
-          z: l
-        },
-        {
-          r: 0.0,
-          z: l
-        }
+        {r: 0.9 * r, z: 0.07 * l},
+        {r: r, z: 0.09 * l},
+        {r: r, z: 0.8 * l},
+        {r: 0.92 * r, z: 0.82 * l},
+        {r: 0.92 * r, z: 0.95 * l},
+        {r: 0.6 * r, z: l},
+        {r: 0.0, z: l}
       ]),
       "spindle-body"
     );
     var tools = [taper()];
     for (z in [0.35 * l, 0.6 * l]) tools.push(Solids.named(
-      Part.revolve([
-        {r: r - 1.5, z: z},
-        {r: r + 1, z: z},
-        {
-          r: r + 1,
-          z: z + 3
-        },
-        {
-          r: r - 1.5,
-          z: z + 3
-        }
-      ]),
+      Part.revolve([{r: r - 1.5, z: z}, {r: r + 1, z: z}, {r: r + 1, z: z + 3}, {r: r - 1.5, z: z + 3}]),
       "coolant-groove"
     ));
     return Solids.cut(body, tools);
@@ -168,18 +104,9 @@ class AtcSpindle extends AssumedCatalogComponent {
       Part.revolve([
         {r: 0, z: -1},
         {r: n("taperDiameter") / 2, z: -1},
-        {
-          r: n("taperDiameter") / 2,
-          z: 0
-        },
-        {
-          r: (n("taperDiameter") - n("taperLength") * 7 / 24) / 2,
-          z: n("taperLength")
-        },
-        {
-          r: 0,
-          z: n("taperLength")
-        }
+        {r: n("taperDiameter") / 2, z: 0},
+        {r: (n("taperDiameter") - n("taperLength") * 7 / 24) / 2, z: n("taperLength")},
+        {r: 0, z: n("taperLength")}
       ]),
       "iso30-taper"
     );
@@ -196,10 +123,7 @@ class AtcSpindle extends AssumedCatalogComponent {
   /** Motor speed/drive feedback belong to the VFD; this spindle owns clamp I/O. */
   override public function io():MachineIo return {
     inputs: ["clamped", "released", "tool_present"],
-    outputs: [
-      "release",
-      "purge"
-    ],
+    outputs: ["release", "purge"],
     analogOutputs: []
   };
 }

@@ -20,12 +20,7 @@ class EndEffectorFrames {
   public static function toMetres(frame:AssemblyFrame):RobotFrame {
     return {
       position: {x: frame.x * 0.001, y: frame.y * 0.001, z: frame.z * 0.001},
-      quaternion: {
-        x: frame.qx,
-        y: frame.qy,
-        z: frame.qz,
-        w: frame.qw
-      }
+      quaternion: {x: frame.qx, y: frame.qy, z: frame.qz, w: frame.qw}
     };
   }
 

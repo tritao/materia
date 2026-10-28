@@ -11,14 +11,8 @@ class HobSpindlePart extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.hobbing.spindle-part",
-      EngineeringMetadata.parameters().concat([P.text(
-        "role",
-        "shaft"
-      )]),
-      v -> new HobSpindlePart(
-        v.token("role"),
-        v
-      )
+      EngineeringMetadata.parameters().concat([P.text("role", "shaft")]),
+      v -> new HobSpindlePart(v.token("role"), v)
     );
     return recipe;
   }
@@ -39,25 +33,9 @@ class HobSpindlePart extends MachineComponent {
         var body = Solids.union([
           Part.cylinderSpan(12.5, 0, 163),
           Part.cylinderSpan(15, 163, 170),
-          Part.cylinderSpan(
-            20,
-            170,
-            180
-          ),
-          Part.cylinderSpan(
-            2,
-            178,
-            182,
-            14,
-            0
-          ),
-          Part.cylinderSpan(
-            2,
-            178,
-            182,
-            -14,
-            0
-          )
+          Part.cylinderSpan(20, 170, 180),
+          Part.cylinderSpan(2, 178, 182, 14, 0),
+          Part.cylinderSpan(2, 178, 182, -14, 0)
         ]);
         Solids.cut(
           body,
@@ -66,18 +44,9 @@ class HobSpindlePart extends MachineComponent {
             Part.revolve([
               {r: 0.0, z: 160.0},
               {r: 8.0, z: 160.0},
-              {
-                r: 10.0,
-                z: 180.0
-              },
-              {
-                r: 10.0,
-                z: 180.1
-              },
-              {
-                r: 0.0,
-                z: 180.1
-              }
+              {r: 10.0, z: 180.0},
+              {r: 10.0, z: 180.1},
+              {r: 0.0, z: 180.1}
             ])
           ]
         );

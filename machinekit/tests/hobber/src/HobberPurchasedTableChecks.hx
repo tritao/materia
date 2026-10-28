@@ -16,26 +16,11 @@ class HobberPurchasedTableChecks {
   static function near(a:Float, b:Float, tol:Float, label:String):Void check(Math.abs(a - b) <= tol, '$label: $a / $b');
   public static function screen(axis:PrecisionRotaryAxis, s:gearkit.GearSpec):Dynamic {
     var data = axis.specification(), r = s.pitchRadius(), angular:Array<{id:String, amplitude:Float, order:Float}> = [
-      {
-        id: "absoluteAccuracy",
-        amplitude: data.number("absoluteAccuracy"),
-        order: 4
-      },
-      {
-        id: "interpolationError",
-        amplitude: data.number("interpolationError"),
-        order: 4096
-      },
-      {
-        id: "speedRipple",
-        amplitude: data.number("speedRipple"),
-        order: 1
-      },
-      {
-        id: "coggingTorque",
-        amplitude: data.number("coggingTorque") / data.number("servoTorsionalStiffness"),
-        order: 48
-      },
+      {id: "absoluteAccuracy", amplitude: data.number("absoluteAccuracy"), order: 4},
+      {id: "interpolationError", amplitude: data.number("interpolationError"), order: 4096},
+      {id: "speedRipple", amplitude: data.number("speedRipple"), order: 1},
+      {id: "coggingTorque",
+      amplitude: data.number("coggingTorque") / data.number("servoTorsionalStiffness"), order: 48},
       {
         id: "sealDragRipple",
         amplitude: data.number("sealDragRipple") / data.number("servoTorsionalStiffness"),
@@ -51,14 +36,8 @@ class HobberPurchasedTableChecks {
     var rows:Array<Dynamic> = [], worst = 1;
     for (pair in [
       {key: "Fp", value: 2 * r * sum * 1000 + radial * 1000},
-      {
-        key: "fp",
-        value: pitch + radial * 1000 * Math.sin(Math.PI / s.teeth)
-      },
-      {
-        key: "Fr",
-        value: radial * 1000
-      }
+      {key: "fp", value: pitch + radial * 1000 * Math.sin(Math.PI / s.teeth)},
+      {key: "Fr", value: radial * 1000}
     ]) {
       var grade = gearkit.Iso1328.grade(s, pair.key, pair.value);
       if (grade == null) worst = 12;
@@ -67,11 +46,7 @@ class HobberPurchasedTableChecks {
         parameter: pair.key,
         boundUm: pair.value,
         extrapolatedGrade: grade,
-        class6LimitUm: gearkit.Iso1328.tolerance(
-          s,
-          pair.key,
-          6
-        )
+        class6LimitUm: gearkit.Iso1328.tolerance(s, pair.key, 6)
       });
     }
     var available = gearkit.Iso1328.tolerance(s,
@@ -84,30 +59,18 @@ class HobberPurchasedTableChecks {
       rows : rows,
       harmonicPhaseBounds : angular,
       sealMeanPhaseOffsetRad : data.number("sealDrag") / data.number("servoTorsionalStiffness"),
-      maximumOncePerTurnSpeedRippleFractionForClass6Fp : Math.max(
-        0,
-        available
-      ),
+      maximumOncePerTurnSpeedRippleFractionForClass6Fp : Math.max(0, available),
       forceBasis : "HB10 measured radial gash-window peak 16.989670571 N; not tangential force or instantaneous peaks",
       fields : data.report()
     };
   }
   public static function run():Void {
     var bought = new PurchasedRotaryTable(), built = new RotaryTable(
-      new TorqueMotor(new ComponentValues().setNumber(
-        "torqueConstant",
-        2
-      ).setNumber(
+      new TorqueMotor(new ComponentValues().setNumber("torqueConstant", 2).setNumber(
         "backEmfConstant",
         2 / Math.sqrt(3)
       )),
-      new CrossedRollerBearing(new ComponentValues().setNumber(
-        "outside",
-        220
-      ).setNumber(
-        "bore",
-        180
-      ).setNumber(
+      new CrossedRollerBearing(new ComponentValues().setNumber("outside", 220).setNumber("bore", 180).setNumber(
         "height",
         20
       ))
@@ -197,10 +160,7 @@ class HobberPurchasedTableChecks {
       "sync",
       "test",
       "zero test sync",
-      (
-        t,
-        a
-      ) -> a
+      (t, a) -> a
     );
     var errors = FlexsplineHobberErrors.sources(m,
       t -> 16.989670571, ring, sync), seal = errors.filter(e -> e.id == "table-seal-drag")[0];

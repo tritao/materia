@@ -44,17 +44,8 @@ class RectTube implements StructuralProfile {
 
   static function rectangle(width:Float, height:Float):Array<Vector> return [
     new Vector(-width / 2, -height / 2),
-    new Vector(
-      width / 2,
-      -height / 2
-    ),
-    new Vector(
-      width / 2,
-      height / 2
-    ),
-    new Vector(
-      -width / 2,
-      height / 2
-    )
+    new Vector(width / 2, -height / 2),
+    new Vector(width / 2, height / 2),
+    new Vector(-width / 2, height / 2)
   ];
 }

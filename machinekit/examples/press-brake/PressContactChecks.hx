@@ -41,24 +41,12 @@ class PressContactChecks {
   }
   static function rect(x:Float, y:Float, w:Float, h:Float):WallOutline return WallOutline.polygon([
     new Point2(x, y),
-    new Point2(
-      x + w,
-      y
-    ),
-    new Point2(
-      x + w,
-      y + h
-    ),
-    new Point2(
-      x,
-      y + h
-    )
+    new Point2(x + w, y),
+    new Point2(x + w, y + h),
+    new Point2(x, y + h)
   ]);
   static function circle(x:Float, y:Float, radius:Float):WallOutline return new WallOutline([Segment.arc(
-    new Point2(
-      x,
-      y
-    ),
+    new Point2(x, y),
     radius,
     0,
     2 * Math.PI
@@ -69,27 +57,11 @@ class PressContactChecks {
       "material-probe",
       [
         new Vector(point.x - r, point.y - r, point.z - r),
-        new Vector(
-          point.x + r,
-          point.y - r,
-          point.z - r
-        ),
-        new Vector(
-          point.x + r,
-          point.y + r,
-          point.z - r
-        ),
-        new Vector(
-          point.x - r,
-          point.y + r,
-          point.z - r
-        )
+        new Vector(point.x + r, point.y - r, point.z - r),
+        new Vector(point.x + r, point.y + r, point.z - r),
+        new Vector(point.x - r, point.y + r, point.z - r)
       ],
-      new Vector(
-        0,
-        0,
-        2 * r
-      )
+      new Vector(0, 0, 2 * r)
     );
   }
   static function polygon(points:Array<machinekit.pressbrake.ToolProfilePoint
@@ -123,12 +95,7 @@ class PressContactChecks {
     check(query.overlap(disk, circle(5.999, 0, 3)), "Thin circle/circle material lens is detected");
     var ring = new WallOutline(
       [Segment.arc(new Point2(0, 0), 5, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(0, 0),
-        2,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(0, 0), 2, 0, -2 * Math.PI)]]
     );
     check(!query.overlap(ring, circle(0, 0, 0.5)), "A section hole stays empty");
     check(query.overlap(ring, rect(2.5, -0.1, 0.1, 0.2)), "Material beside a section hole remains");
@@ -147,11 +114,7 @@ class PressContactChecks {
     for (end in [ToolHornEnd.Left, ToolHornEnd.Right]) nativeVolume(new ToolSegment(
       Punch(ToolingCatalogue.straight()),
       50,
-      new ToolHorn(
-        end,
-        25,
-        1
-      )
+      new ToolHorn(end, 25, 1)
     ));
     var punch = ToolingCatalogue.straight(), flat = rect(-1, -1, 2, 1);
     check(!query.overlap(punch.contactSection(), flat), "Exact punch nose merely touches flat stock");
@@ -164,18 +127,9 @@ class PressContactChecks {
     var tangent = new Point2(Math.cos(beta), Math.sin(beta)), normal = new Point2(-Math.sin(beta), Math.cos(beta));
     var wall = WallOutline.polygon([
       new Point2(center.x - 3 * tangent.x, center.y - 3 * tangent.y),
-      new Point2(
-        center.x + 3 * tangent.x,
-        center.y + 3 * tangent.y
-      ),
-      new Point2(
-        center.x + 3 * tangent.x + 1.5 * normal.x,
-        center.y + 3 * tangent.y + 1.5 * normal.y
-      ),
-      new Point2(
-        center.x - 3 * tangent.x + 1.5 * normal.x,
-        center.y - 3 * tangent.y + 1.5 * normal.y
-      )
+      new Point2(center.x + 3 * tangent.x, center.y + 3 * tangent.y),
+      new Point2(center.x + 3 * tangent.x + 1.5 * normal.x, center.y + 3 * tangent.y + 1.5 * normal.y),
+      new Point2(center.x - 3 * tangent.x + 1.5 * normal.x, center.y - 3 * tangent.y + 1.5 * normal.y)
     ]);
     check(!query.overlap(die.contactSection(), wall), "Exact rounded shoulder merely touches its tangent stock plane");
     check(
@@ -185,21 +139,8 @@ class PressContactChecks {
 
     var rod = new ConvexPrism(
       "skew-rod",
-      [
-        new Vector(0, 0, 0),
-        new Vector(10, 10, 0),
-        new Vector(10, 11, 0),
-        new Vector(
-          0,
-          1,
-          0
-        )
-      ],
-      new Vector(
-        0,
-        0,
-        1
-      )
+      [new Vector(0, 0, 0), new Vector(10, 10, 0), new Vector(10, 11, 0), new Vector(0, 1, 0)],
+      new Vector(0, 0, 1)
     );
     var section = PressPrismSection.of(rod, 0, 1);
     check(
@@ -222,11 +163,7 @@ class PressContactChecks {
       "exact-contact-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(tooling)),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     for (sign in [1.0, -1.0]) {
       var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(60, 100));
@@ -242,11 +179,7 @@ class PressContactChecks {
           prediction,
           tooling,
           physical,
-          new BendOrientation(
-            sign > 0,
-            sign < 0,
-            -10
-          )
+          new BendOrientation(sign > 0, sign < 0, -10)
         );
         endpoint = pose;
         var travel = physical.openTipHeight - physical.dieTopHeight + pose.depth;
@@ -347,12 +280,8 @@ class PressContactChecks {
       var allowance = sheet.bendAllowance(bend);
       var changed = sheet.cutBend(bend.id, rect(allowance * 0.4, 40, allowance * 0.2, 20), "exact-contact-hole");
       check(
-        bendQuery.overlap(
-          sheet.bend(bend.id),
-          loaded.evaluation.bend(bend.id),
-          loaded.placement,
-          probe(new Vector())
-        ) == null,
+        bendQuery.overlap(sheet.bend(bend.id),
+        loaded.evaluation.bend(bend.id), loaded.placement, probe(new Vector())) == null,
         "Cut bends explicitly require the query retaining along-axis variation"
       );
       var cutBodies = PressCollisionGeometry.sheet(sheet,
@@ -364,28 +293,14 @@ class PressContactChecks {
       var holeProbe = new PressToolContact(
         Punch("probe", 0),
         [new ToolContactPrism(
-          rect(
-            materialPoint.y - 0.001,
-            materialPoint.z - 0.001,
-            0.002,
-            0.002
-          ),
+          rect(materialPoint.y - 0.001, materialPoint.z - 0.001, 0.002, 0.002),
           materialPoint.x - 0.01,
           materialPoint.x + 0.01
         )]
       );
       var wideProbe = new PressToolContact(
         Punch("probe", 0),
-        [new ToolContactPrism(
-          rect(
-            materialPoint.y - 0.001,
-            materialPoint.z - 0.001,
-            0.002,
-            0.002
-          ),
-          -100,
-          100
-        )]
+        [new ToolContactPrism(rect(materialPoint.y - 0.001, materialPoint.z - 0.001, 0.002, 0.002), -100, 100)]
       );
       for (body in cutBodies) switch body.owner {
         case SheetBend(_):

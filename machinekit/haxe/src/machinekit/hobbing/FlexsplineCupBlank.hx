@@ -8,36 +8,12 @@ import cadkit.modeling.Part;
     Tooth band and bore use the existing work datum; dimensions are assumed. */
 class FlexsplineCupBlank extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      62,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      58.05,
-      "mm"
-    ),
-    P.quantity(
-      "bodyOutside",
-      59.25,
-      "mm"
-    ),
-    P.quantity(
-      "bandWidth",
-      8,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      40,
-      "mm"
-    ),
-    P.quantity(
-      "endThickness",
-      2,
-      "mm"
-    )
+    P.quantity("outside", 62, "mm"),
+    P.quantity("bore", 58.05, "mm"),
+    P.quantity("bodyOutside", 59.25, "mm"),
+    P.quantity("bandWidth", 8, "mm"),
+    P.quantity("height", 40, "mm"),
+    P.quantity("endThickness", 2, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -71,22 +47,10 @@ class FlexsplineCupBlank extends MachineComponent {
       {r: tip, z: 0.0},
       {r: tip, z: band},
       {r: body, z: band},
-      {
-        r: body,
-        z: height
-      },
-      {
-        r: 0.0,
-        z: height
-      },
-      {
-        r: 0.0,
-        z: height - end
-      },
-      {
-        r: inner,
-        z: height - end
-      }
+      {r: body, z: height},
+      {r: 0.0, z: height},
+      {r: 0.0, z: height - end},
+      {r: inner, z: height - end}
     ]);
   }
 }

@@ -24,11 +24,7 @@ class EnclosureFrame extends MachineAssembly {
     for (x in [-1, 1]) for (y in [-1, 1]) member(
       'post${x+1}${y+1}',
       height + 2 * s,
-      AssemblyFrames.translation(
-        x * (width + s) / 2,
-        y * (depth + s) / 2,
-        -s
-      )
+      AssemblyFrames.translation(x * (width + s) / 2, y * (depth + s) / 2, -s)
     );
     for (z in [0, 1]) {
       for (y in [-1, 1]) member(
@@ -38,17 +34,7 @@ class EnclosureFrame extends MachineAssembly {
           -width / 2,
           y * (depth + s) / 2,
           z * (height + s) - s / 2,
-          [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            1,
-            0
-          ]
+          [0, 0, 1, 1, 0, 0, 0, 1, 0]
         )
       );
       for (x in [-1, 1]) member(
@@ -58,17 +44,7 @@ class EnclosureFrame extends MachineAssembly {
           x * (width + s) / 2,
           -depth / 2,
           z * (height + s) - s / 2,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1, 0, 0, 0, 0, 1, 0, -1, 0]
         )
       );
     }
@@ -84,10 +60,7 @@ class EnclosureFrame extends MachineAssembly {
         id,
         AssemblyFrames.compose(
           AssemblyFrames.inverse(root),
-          AssemblyFrames.compose(
-            pose,
-            stock.connector("start").frame
-          )
+          AssemblyFrames.compose(pose, stock.connector("start").frame)
         )
       );
       addMate(id + "-mount", "fixed", "post00", id, id, "start");

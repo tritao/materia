@@ -136,10 +136,7 @@ class PowerComponentTests {
     );
     rejects(() -> {motor.replaceComponent(
       "missing",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(24),
-        new machinekit.power.DcCurrent(10)
-      )
+      new PowerSupply(new machinekit.power.DcVoltage(24), new machinekit.power.DcCurrent(10))
     );
     }, "Replacing an unknown member fails");
     PowerSupplyTests.run();

@@ -198,37 +198,10 @@ class RobotArm extends MachineAssembly {
     joints = [j1, j2, j3, j4, j5, j6];
     links = [
       new ArmLink(reference.turret, 90, 5, 100, PlusZ, PlusX, j2.length),
-      new ArmLink(
-        reference.upperArm,
-        80,
-        5,
-        100,
-        PlusX,
-        MinusX,
-        j3.length
-      ),
-      new ArmLink(
-        reference.forearm,
-        70,
-        4,
-        80,
-        MinusX,
-        PlusZ,
-        j4.length
-      ),
-      new ArmLink(
-        reference.wristBody,
-        60,
-        4,
-        70,
-        PlusZ,
-        PlusX,
-        j5.length
-      ),
-      new ArmWristFork(
-        reference.hand,
-        j5.length
-      )
+      new ArmLink(reference.upperArm, 80, 5, 100, PlusX, MinusX, j3.length),
+      new ArmLink(reference.forearm, 70, 4, 80, MinusX, PlusZ, j4.length),
+      new ArmLink(reference.wristBody, 60, 4, 70, PlusZ, PlusX, j5.length),
+      new ArmWristFork(reference.hand, j5.length)
     ];
     addComponent("pedestal", pedestal);
     addComponent("baseFlange", flange);
@@ -247,10 +220,7 @@ class RobotArm extends MachineAssembly {
         addMemberConnector(
           linkNames[i],
           start,
-          AssemblyFrames.compose(
-            links[i].connector("start").frame,
-            AssemblyFrames.turnY(pi / 2)
-          )
+          AssemblyFrames.compose(links[i].connector("start").frame, AssemblyFrames.turnY(pi / 2))
         );
       }
       revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], start);
@@ -261,15 +231,7 @@ class RobotArm extends MachineAssembly {
     revolute(specs[5], "joint6", "tool", "toolFlange", "face");
     addComponent(
       "powerSupply",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(48),
-        new machinekit.power.DcCurrent(75),
-        6,
-        180,
-        80,
-        60,
-        2500
-      )
+      new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(75), 6, 180, 80, 60, 2500)
     );
     addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
     addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
@@ -306,18 +268,8 @@ class RobotArm extends MachineAssembly {
     addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
     addComponent(
       "workpiece",
-      new ArmBlock(
-        WORKPIECE_WIDTH,
-        WORKPIECE_WIDTH,
-        WORKPIECE_HEIGHT,
-        "birch plywood",
-        "Workpiece"
-      ),
-      at(
-        PICK_X,
-        WORK_Y,
-        TABLE_TOP + PAD_HEIGHT
-      )
+      new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood", "Workpiece"),
+      at(PICK_X, WORK_Y, TABLE_TOP + PAD_HEIGHT)
     );
   }
 
@@ -332,12 +284,7 @@ class RobotArm extends MachineAssembly {
       childConnector,
       {x: 0, y: 1, z: 0},
       spec.initial,
-      {
-        lower: spec.lower,
-        upper: spec.upper,
-        velocity: null,
-        effort: null
-      }
+      {lower: spec.lower, upper: spec.upper, velocity: null, effort: null}
     );
   }
 }

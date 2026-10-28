@@ -36,24 +36,11 @@ class FrameBar extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.frame-bar",
       [
-        ComponentRecipeSupport.length(
-          "width",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          100
-        )
+        ComponentRecipeSupport.length("width", 20),
+        ComponentRecipeSupport.length("depth", 20),
+        ComponentRecipeSupport.length("length", 100)
       ],
-      v -> new FrameBar(
-        v.number("width"),
-        v.number("depth"),
-        v.number("length")
-      ),
+      v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")),
       true
     );
     return recipeTypeCache;

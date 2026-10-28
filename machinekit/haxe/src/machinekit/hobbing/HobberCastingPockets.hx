@@ -72,10 +72,7 @@ class HobberCastingPockets {
         yLeftDeckRibInside,
         zCapTop,
         zRoof,
-        [
-          "X-drive-channel",
-          "pocket-frontDeckRibLeft-leftCap-capTop"
-        ]
+        ["X-drive-channel", "pocket-frontDeckRibLeft-leftCap-capTop"]
       ),
       pocket(
         "pocket-centreWebRight-rightDeckRibInside-capTop",
@@ -85,10 +82,7 @@ class HobberCastingPockets {
         yRightWebOutside,
         zCapTop,
         zRoof,
-        [
-          "X-drive-channel",
-          "pocket-frontDeckRibLeft-rightDeckRibInside-capTop"
-        ]
+        ["X-drive-channel", "pocket-frontDeckRibLeft-rightDeckRibInside-capTop"]
       ),
       pocket(
         "pocket-driveRibRear-leftWebInside-floor",
@@ -127,10 +121,7 @@ class HobberCastingPockets {
         yLeftDeckRibOutside,
         zCapTop,
         zRoof,
-        [
-          "pocket-centreWebRight-leftCap-capTop",
-          "pocket-frontDeckRibRight-leftCap-capTop"
-        ]
+        ["pocket-centreWebRight-leftCap-capTop", "pocket-frontDeckRibRight-leftCap-capTop"]
       ),
       pocket(
         "pocket-frontDeckRibLeft-rightDeckRibInside-capTop",
@@ -154,11 +145,7 @@ class HobberCastingPockets {
         yLeftDeckRibInside,
         zCapTop,
         zRoof,
-        [
-          "X-drive-channel",
-          "pocket-frontDeckRibLeft-leftCap-capTop",
-          "pocket-middleDeckRibLeft-leftCap-capTop"
-        ]
+        ["X-drive-channel", "pocket-frontDeckRibLeft-leftCap-capTop", "pocket-middleDeckRibLeft-leftCap-capTop"]
       ),
       pocket(
         "pocket-frontDeckRibRight-rightDeckRibInside-capTop",
@@ -182,11 +169,7 @@ class HobberCastingPockets {
         yLeftWebOutside,
         zFloor,
         zSocketSole,
-        [
-          "pocket-frontWall-leftWebOutside-floor",
-          "pocket-wellFront-leftRailInside-floor",
-          "work-well"
-        ]
+        ["pocket-frontWall-leftWebOutside-floor", "pocket-wellFront-leftRailInside-floor", "work-well"]
       ),
       pocket(
         "pocket-frontWall-leftWebOutside-floor",
@@ -212,11 +195,7 @@ class HobberCastingPockets {
         yRightRailInside,
         zFloor,
         zSocketSole,
-        [
-          "pocket-frontWall-leftWebOutside-floor",
-          "pocket-wellFront-rightWebOutside-floor",
-          "work-well"
-        ]
+        ["pocket-frontWall-leftWebOutside-floor", "pocket-wellFront-rightWebOutside-floor", "work-well"]
       ),
       pocket(
         "pocket-middleDeckRibLeft-leftCap-capTop",
@@ -226,11 +205,7 @@ class HobberCastingPockets {
         yLeftDeckRibInside,
         zCapTop,
         zRoof,
-        [
-          "X-drive-channel",
-          "pocket-frontDeckRibRight-leftCap-capTop",
-          "pocket-middleDeckRibRight-leftCap-capTop"
-        ]
+        ["X-drive-channel", "pocket-frontDeckRibRight-leftCap-capTop", "pocket-middleDeckRibRight-leftCap-capTop"]
       ),
       pocket(
         "pocket-middleDeckRibLeft-rightDeckRibOutside-capTop",
@@ -240,10 +215,7 @@ class HobberCastingPockets {
         yRightWebOutside,
         zCapTop,
         zRoof,
-        [
-          "pocket-frontDeckRibRight-rightDeckRibInside-capTop",
-          "pocket-middleDeckRibRight-rightDeckRibInside-capTop"
-        ]
+        ["pocket-frontDeckRibRight-rightDeckRibInside-capTop", "pocket-middleDeckRibRight-rightDeckRibInside-capTop"]
       ),
       pocket(
         "pocket-middleDeckRibRight-leftCap-capTop",
@@ -253,11 +225,7 @@ class HobberCastingPockets {
         yLeftDeckRibInside,
         zCapTop,
         zRoof,
-        [
-          "X-drive-channel",
-          "pocket-middleDeckRibLeft-leftCap-capTop",
-          "pocket-rearDeckRibLeft-leftCap-capTop"
-        ]
+        ["X-drive-channel", "pocket-middleDeckRibLeft-leftCap-capTop", "pocket-rearDeckRibLeft-leftCap-capTop"]
       ),
       pocket(
         "pocket-middleDeckRibRight-rightDeckRibInside-capTop",
@@ -301,11 +269,7 @@ class HobberCastingPockets {
         yLeftDeckRibInside,
         zCapTop,
         zSocketSole,
-        [
-          "X-drive-channel",
-          "pocket-rearSocketStart-leftWebOutside-capTop",
-          "pocket-rearDeckRibRight-leftCap-capTop"
-        ]
+        ["X-drive-channel", "pocket-rearSocketStart-leftWebOutside-capTop", "pocket-rearDeckRibRight-leftCap-capTop"]
       ),
       pocket(
         "pocket-rearSocketStart-leftWebOutside-capTop",
@@ -315,10 +279,7 @@ class HobberCastingPockets {
         yLeftWebInside,
         zCapTop,
         zRoof,
-        [
-          "pocket-rearSocketStart-leftWebInside-capTop",
-          "pocket-rearDeckRibRight-leftCap-capTop"
-        ]
+        ["pocket-rearSocketStart-leftWebInside-capTop", "pocket-rearDeckRibRight-leftCap-capTop"]
       ),
       pocket(
         "pocket-rearSocketStart-rightDeckRibInside-capTop",
@@ -342,10 +303,7 @@ class HobberCastingPockets {
         yRightWebOutside,
         zCapTop,
         zRoof,
-        [
-          "pocket-rearSocketStart-rightDeckRibInside-capTop",
-          "pocket-rearDeckRibRight-rightDeckRibInside-capTop"
-        ]
+        ["pocket-rearSocketStart-rightDeckRibInside-capTop", "pocket-rearDeckRibRight-rightDeckRibInside-capTop"]
       ),
       pocket(
         "pocket-rearDeckRibLeft-leftCap-capTop",
@@ -355,10 +313,7 @@ class HobberCastingPockets {
         yLeftDeckRibOutside,
         zCapTop,
         zRoof,
-        [
-          "pocket-middleDeckRibRight-leftCap-capTop",
-          "pocket-rearDeckRibRight-leftCap-capTop"
-        ]
+        ["pocket-middleDeckRibRight-leftCap-capTop", "pocket-rearDeckRibRight-leftCap-capTop"]
       ),
       pocket(
         "pocket-rearDeckRibLeft-rightDeckRibInside-capTop",
@@ -442,11 +397,7 @@ class HobberCastingPockets {
         yLeftWebOutside,
         zFloor,
         zWellFloor,
-        [
-          "pocket-tableFront-leftRailInside-floor",
-          "pocket-tableRear-leftRailInside-floor",
-          "work-well"
-        ]
+        ["pocket-tableFront-leftRailInside-floor", "pocket-tableRear-leftRailInside-floor", "work-well"]
       ),
       pocket(
         "pocket-tableRear-leftRailInside-floor",
@@ -456,11 +407,7 @@ class HobberCastingPockets {
         yLeftCap,
         zFloor,
         zWellFloor,
-        [
-          "pocket-tableFront-leftRailInside-floor",
-          "pocket-tableRear-leftCap-floor",
-          "work-well"
-        ]
+        ["pocket-tableFront-leftRailInside-floor", "pocket-tableRear-leftCap-floor", "work-well"]
       ),
       pocket(
         "pocket-tableRear-leftWebInside-floor",
@@ -480,11 +427,7 @@ class HobberCastingPockets {
         yRightRailInside,
         zFloor,
         zWellFloor,
-        [
-          "pocket-tableFront-rightTable-floor",
-          "pocket-tableRear-rightWebOutside-floor",
-          "work-well"
-        ]
+        ["pocket-tableFront-rightTable-floor", "pocket-tableRear-rightWebOutside-floor", "work-well"]
       ),
       pocket(
         "pocket-tableRear-rightWebOutside-floor",
@@ -494,11 +437,7 @@ class HobberCastingPockets {
         yRightCap,
         zFloor,
         zWellFloor,
-        [
-          "pocket-tableFront-rightTable-floor",
-          "pocket-tableRear-rightCap-floor",
-          "work-well"
-        ]
+        ["pocket-tableFront-rightTable-floor", "pocket-tableRear-rightCap-floor", "work-well"]
       ),
       pocket(
         "pocket-wellFront-leftRailInside-floor",

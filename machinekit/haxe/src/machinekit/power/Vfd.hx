@@ -12,37 +12,13 @@ class Vfd extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("power", 7500, "W"),
-    P.quantity(
-      "inputVoltage",
-      400,
-      "V"
-    ),
-    P.quantity(
-      "outputCurrent",
-      18,
-      "A"
-    ),
-    P.quantity(
-      "maxFrequency",
-      400,
-      "Hz"
-    ),
-    P.length(
-      "width",
-      180
-    ),
-    P.length(
-      "depth",
-      180
-    ),
-    P.length(
-      "height",
-      300
-    ),
-    P.flag(
-      "sto",
-      true
-    )
+    P.quantity("inputVoltage", 400, "V"),
+    P.quantity("outputCurrent", 18, "A"),
+    P.quantity("maxFrequency", 400, "Hz"),
+    P.length("width", 180),
+    P.length("depth", 180),
+    P.length("height", 300),
+    P.flag("sto", true)
   ];
   public function new(?v:ComponentValues) {
     super("vfd", "three-phase spindle VFD with STO terminals", "device housing dark", inputs(), v);
@@ -74,11 +50,7 @@ class Vfd extends AssumedCatalogComponent {
         n("width"),
         n("depth"),
         n("height"),
-        {
-          keypad : true,
-          louvres : true,
-          fins : 9
-        }
+        {keypad : true, louvres : true, fins : 9}
       );
   }
   override public function io():MachineIo return {

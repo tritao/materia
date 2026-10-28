@@ -97,11 +97,7 @@ class Hotend extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.hotend",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "GENERIC-V6-STYLE"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-V6-STYLE")],
       v -> new Hotend(v.token("designation"))
     );
     return recipe;
@@ -117,11 +113,7 @@ class Hotend extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var block = Solids.named(Part.box(spec.blockWidth, spec.blockDepth, spec.blockHeight), "block");
     var sink = Solids.named(
-      Part.cylinderSpan(
-        spec.heatsinkDiameter / 2,
-        spec.blockHeight,
-        spec.blockHeight + spec.heatsinkLength
-      ),
+      Part.cylinderSpan(spec.heatsinkDiameter / 2, spec.blockHeight, spec.blockHeight + spec.heatsinkLength),
       "heatsink"
     );
     if (detail == Envelope) return Solids.union([block, sink]);
@@ -148,19 +140,12 @@ class Hotend extends MachineComponent {
   override public function massGeometry():Null<Part> {
     var block = Solids.named(Part.box(spec.blockWidth, spec.blockDepth, spec.blockHeight), "block");
     var sink = Solids.named(
-      Part.cylinderSpan(
-        spec.heatsinkDiameter / 2,
-        spec.blockHeight,
-        spec.blockHeight + spec.heatsinkLength
-      ),
+      Part.cylinderSpan(spec.heatsinkDiameter / 2, spec.blockHeight, spec.blockHeight + spec.heatsinkLength),
       "heatsink"
     );
     return Solids.union([
       block,
-      Solids.named(
-        Part.cylinderSpan(3.5, spec.blockHeight - 0.5, spec.blockHeight + 3),
-        "neck"
-      ),
+      Solids.named(Part.cylinderSpan(3.5, spec.blockHeight - 0.5, spec.blockHeight + 3), "neck"),
       sink
     ]);
   }

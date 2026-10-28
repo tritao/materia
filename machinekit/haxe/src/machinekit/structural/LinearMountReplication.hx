@@ -15,18 +15,9 @@ class LinearMountReplication extends MachineComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 140),
     P.length("length", 540),
-    P.length(
-      "thickness",
-      4
-    ),
-    P.text(
-      "holes",
-      InsertHoles.fromNeutral([])
-    ),
-    P.text(
-      "reference",
-      "Engineering sensitivity: E=4 GPa, density=1800 kg/m3; product/creep unqualified"
-    )
+    P.length("thickness", 4),
+    P.text("holes", InsertHoles.fromNeutral([])),
+    P.text("reference", "Engineering sensitivity: E=4 GPa, density=1800 kg/m3; product/creep unqualified")
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -52,14 +43,7 @@ class LinearMountReplication extends MachineComponent {
       if (hole.thread != null || hole.extent != Through) throw "Replication is not a threaded clamp member";
       materia.casting.InsertStages.validateServiceHole(
         hole,
-        {
-          x: -width / 2,
-          y: -length / 2,
-          z: 0.0,
-          width: width,
-          depth: length,
-          height: thickness
-        }
+        {x: -width / 2, y: -length / 2, z: 0.0, width: width, depth: length, height: thickness}
       );
     }
     super("LINEAR-MOUNT-REPLICATION",
@@ -71,16 +55,7 @@ class LinearMountReplication extends MachineComponent {
   override public function componentType():Null<ComponentType> return recipeType();
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Part.box(
-      width,
-      length,
-      thickness
-    ),
-    InsertHoles.facet(
-      holes,
-      width,
-      length,
-      thickness
-    ).drillingTools()
+    Part.box(width, length, thickness),
+    InsertHoles.facet(holes, width, length, thickness).drillingTools()
   );
 }

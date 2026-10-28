@@ -45,13 +45,7 @@ class ToolProfilePrism {
       for (i in 0...points.length) {
         var next = points[(i + 1) % points.length];
         edges.push(Curve.named(
-          Curve.line(
-            plane.toWorld(new Vector(points[i].y, points[i].z)),
-            plane.toWorld(new Vector(
-              next.y,
-              next.z
-            ))
-          ),
+          Curve.line(plane.toWorld(new Vector(points[i].y, points[i].z)), plane.toWorld(new Vector(next.y, next.z))),
           'tool-section.edge.$i'
         ));
       }

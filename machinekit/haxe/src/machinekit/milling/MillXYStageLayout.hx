@@ -175,14 +175,8 @@ class MillXYStageLayout {
     yRailSpacing: frame.yRailSpacing,
     yRailStart: frame.yRailStart,
     yRailPlane: frame.railPlane,
-    yRail: LinearRail.metric(
-      profile,
-      frame.yRailLength
-    ),
-    xRail: LinearRail.metric(
-      profile,
-      xRailLength
-    ),
+    yRail: LinearRail.metric(profile, frame.yRailLength),
+    xRail: LinearRail.metric(profile, xRailLength),
     block: block,
     xHalfTravel: xHalfTravel,
     yHalfTravel: yHalfTravel,

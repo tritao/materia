@@ -92,16 +92,8 @@ class HobMeshTests {
     var reference = Sys.args().indexOf("reference") >= 0;
     var cases = reference ? [{gashes : 12, rake : 0.0, starts : 1}] : [
       {gashes : 4, rake : 0.0, starts : 2},
-      {
-        gashes : 4,
-        rake : 0.12,
-        starts : 2
-      },
-      {
-        gashes : 4,
-        rake : -0.12,
-        starts : 2
-      }
+      {gashes : 4, rake : 0.12, starts : 2},
+      {gashes : 4, rake : -0.12, starts : 2}
     ];
     for (item in cases) {
       var spec = new GearSpec(reference ? 0.3 : 1, reference ? 200 : 40, 8, 20 * Math.PI / 180);

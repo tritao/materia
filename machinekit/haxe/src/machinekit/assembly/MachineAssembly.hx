@@ -291,11 +291,7 @@ typedef MachineAssemblyMassProperties = {
     parentConnector,
     child,
     childConnector,
-    {
-      x: 0,
-      y: 1,
-      z: 0
-    },
+    {x: 0, y: 1, z: 0},
     value
   );
 
@@ -337,11 +333,7 @@ typedef MachineAssemblyMassProperties = {
     parentConnector,
     child,
     childConnector,
-    {
-      x: 0,
-      y: 1,
-      z: 0
-    },
+    {x: 0, y: 1, z: 0},
     tolerance
   );
 
@@ -492,10 +484,7 @@ typedef MachineAssemblyMassProperties = {
   /** The member connector behind exposed connector `name`, its member path under `prefix`. */
   public function connector(name:String, prefix:String = ""):MachineAssemblyConnector {
     for (entry in mechanical.connectorExposures) if (entry.name == name) return {
-      instanceId: join(
-        prefix,
-        entry.instanceId
-      ),
+      instanceId: join(prefix, entry.instanceId),
       connectorName: entry.connectorName
     };
     var slash = name.indexOf("/");
@@ -558,10 +547,7 @@ typedef MachineAssemblyMassProperties = {
 
   public function port(name:String, prefix:String = ""):PortRef {
     for (entry in services.exposures) if (entry.name == name) return ServiceNetwork.portRef(
-      join(
-        prefix,
-        entry.instanceId
-      ),
+      join(prefix, entry.instanceId),
       entry.portName
     );
     throw 'Missing assembly port "$name"';
@@ -907,10 +893,7 @@ typedef MachineAssemblyMassProperties = {
     id:String,
     joint:String,
     part:String,
-    trigger: {
-      instanceId: String,
-      connectorName: String
-    },
+    trigger: {instanceId: String, connectorName: String},
     side:Int,
     role:String = "home",
     seed:Int = 1,
@@ -1116,15 +1099,9 @@ typedef MachineAssemblyMassProperties = {
       if (joint.role == AssemblyJointRole.Tree) model.mateOnAxis(
         join(prefix, joint.id),
         joint.type,
-        join(
-          prefix,
-          joint.parent
-        ),
+        join(prefix, joint.parent),
         joint.parentConnector,
-        join(
-          prefix,
-          joint.child
-        ),
+        join(prefix, joint.child),
         joint.childConnector,
         joint.axis,
         joint.defaultValue,
@@ -1135,10 +1112,7 @@ typedef MachineAssemblyMassProperties = {
         joint.type,
         join(prefix, joint.parent),
         joint.parentConnector,
-        join(
-          prefix,
-          joint.child
-        ),
+        join(prefix, joint.child),
         joint.childConnector,
         joint.axis,
         joint.closureTolerance,
@@ -1151,14 +1125,8 @@ typedef MachineAssemblyMassProperties = {
       occurrence.id));
     if (mechanical.couplings != null) for (coupling in mechanical.couplings) model.couple(
       join(prefix, coupling.id),
-      join(
-        prefix,
-        coupling.source
-      ),
-      join(
-        prefix,
-        coupling.target
-      ),
+      join(prefix, coupling.source),
+      join(prefix, coupling.target),
       coupling.ratio,
       coupling.offset,
       coupling.efficiency,
@@ -1170,43 +1138,28 @@ typedef MachineAssemblyMassProperties = {
       coupling.dampingRatio,
       coupling.stiffnessLaw == null ? null : materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(
         coupling.stiffnessLaw,
-        id -> join(
-          prefix,
-          id
-        )
+        id -> join(prefix, id)
       ),
       coupling.calibration == null ? null : materia.assembly.BeltCalibration.BeltCalibrations.copy(
         coupling.calibration,
-        id -> join(
-          prefix,
-          id
-        )
+        id -> join(prefix, id)
       )
     );
     if (mechanical.elasticNetworks != null) for (network in mechanical
       .elasticNetworks) model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(
         network,
-        id -> join(
-          prefix,
-          id
-        )
+        id -> join(prefix, id)
       ));
     if (mechanical.switches != null) for (contact in mechanical.switches) model.addSwitch(DriveSystem.copySwitch(
       contact,
-      id -> join(
-        prefix,
-        id
-      )
+      id -> join(prefix, id)
     ));
     var compiled = DriveSystem.compileMotors(flat);
     for (actuator in compiled.actuators) {
       var copy = materia.assembly.AssemblyDefinitionFlattener.copyActuator(
         actuator,
         join(prefix, actuator.id),
-        join(
-          prefix,
-          actuator.joint
-        ),
+        join(prefix, actuator.joint),
         prefix.length == 0 ? "" : prefix + "/"
       );
       if (actuator.encoder != null) copy.encoder = join(prefix, actuator.encoder);
@@ -1214,14 +1167,8 @@ typedef MachineAssemblyMassProperties = {
     }
     for (encoder in compiled.encoders) model.addEncoder(materia.assembly.AssemblyDefinitionFlattener.copyEncoder(
       encoder,
-      join(
-        prefix,
-        encoder.id
-      ),
-      join(
-        prefix,
-        encoder.joint
-      )
+      join(prefix, encoder.id),
+      join(prefix, encoder.joint)
     ));
     for (sensor in compiled.sensors) model.addSensor(materia.assembly.AssemblyDefinitionFlattener.copySensor(
       sensor,
@@ -1315,10 +1262,7 @@ typedef MachineAssemblyMassProperties = {
         flat.addMember(
           map(id),
           member.component,
-          pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(
-            pose,
-            member.pose
-          ),
+          pose == null ? copyFrame(member.pose) : AssemblyFrames.compose(pose, member.pose),
           prefix
         );
         continue;

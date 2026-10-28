@@ -23,40 +23,21 @@ class SheetRouterVacuumChecks {
           Path(Line(new Point3(0.047, 0.103, bottom), new Point3(0.047, 0.084, bottom))),
           Cut,
           3,
-          new Provenance(
-            43,
-            1,
-            1
-          )
+          new Provenance(43, 1, 1)
         ));
         moves.push(new CutMove(
           tool,
           Path(Line(new Point3(0.047, 0.066, bottom), new Point3(0.047, 0.047, bottom))),
           Cut,
           4,
-          new Provenance(
-            43,
-            1,
-            1
-          )
+          new Provenance(43, 1, 1)
         ));
       } else moves.push(new CutMove(
         tool,
-        Path(Line(
-          new Point3(xy[i][0], xy[i][1], bottom),
-          new Point3(
-            xy[i + 1][0],
-            xy[i + 1][1],
-            bottom
-          )
-        )),
+        Path(Line(new Point3(xy[i][0], xy[i][1], bottom), new Point3(xy[i + 1][0], xy[i + 1][1], bottom))),
         Cut,
         i,
-        new Provenance(
-          40 + i,
-          1,
-          1
-        )
+        new Provenance(40 + i, 1, 1)
       ));
     }
     stock.cut(moves);
@@ -167,15 +148,7 @@ class SheetRouterVacuumChecks {
     }
     File.saveContent(
       "build/sheet-router-work/sr13/vacuum.json",
-      haxe.Json.stringify(
-        {
-          status: "PASS",
-          assertions: assertions,
-          reports: reports
-        },
-        null,
-        "  "
-      ) + "\n"
+      haxe.Json.stringify({status: "PASS", assertions: assertions, reports: reports}, null, "  ") + "\n"
     );
     Sys.println('SR8: $assertions assertions passed');
   }

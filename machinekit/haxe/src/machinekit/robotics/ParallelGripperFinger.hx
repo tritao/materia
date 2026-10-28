@@ -37,22 +37,8 @@ class ParallelGripperFinger extends MachineComponent {
       var zMin = spec.fingerLength;
       var zMax = spec.fingerLength + projection;
       addFacet(CollisionHullFacet.fromBoxes([
-        [
-          -halfWidth,
-          -spec.fingerDepth / 2.0,
-          0,
-          halfWidth,
-          spec.fingerDepth / 2.0,
-          spec.fingerLength
-        ],
-        [
-          xMin,
-          -spec.fingerDepth / 2.0,
-          zMin,
-          xMax,
-          spec.fingerDepth / 2.0,
-          zMax
-        ]
+        [-halfWidth, -spec.fingerDepth / 2.0, 0, halfWidth, spec.fingerDepth / 2.0, spec.fingerLength],
+        [xMin, -spec.fingerDepth / 2.0, zMin, xMax, spec.fingerDepth / 2.0, zMax]
       ]));
     }
   }
@@ -61,34 +47,12 @@ class ParallelGripperFinger extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.parallel-gripper-finger",
       [
-        ComponentRecipeSupport.count(
-          "size",
-          32
-        ),
-        ComponentRecipeSupport.length(
-          "expectedPartWidth",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "fingerLength",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "openingTravel",
-          16
-        ),
-        ComponentRecipeSupport.choice(
-          "side",
-          [
-            "left",
-            "right"
-          ],
-          "left"
-        ),
-        ComponentRecipeSupport.flag(
-          "supportStep",
-          false
-        ),
+        ComponentRecipeSupport.count("size", 32),
+        ComponentRecipeSupport.length("expectedPartWidth", 60),
+        ComponentRecipeSupport.length("fingerLength", 60),
+        ComponentRecipeSupport.length("openingTravel", 16),
+        ComponentRecipeSupport.choice("side", ["left", "right"], "left"),
+        ComponentRecipeSupport.flag("supportStep", false),
         ComponentRecipeSupport.optionalLength("fingerDepth"),
         ComponentRecipeSupport.optionalLength("fingerWidth")
       ],

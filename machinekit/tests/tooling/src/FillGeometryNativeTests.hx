@@ -25,17 +25,9 @@ class FillGeometryNativeTests {
     gravityMps2: 9.80665,
     pourRateMm3PerSecond: 100,
     maximumAirEscapeWidthMm: null,
-    extraLevels: [
-      1,
-      3,
-      5,
-      9
-    ],
+    extraLevels: [1, 3, 5, 9],
     fillObstructions: [],
-    panels: [{
-      id: "wall",
-      bottomMm: 2
-    }]
+    panels: [{id: "wall", bottomMm: 2}]
   };
   static function box(x:Float, z:Float, width:Float, height:Float):MoldBox return {
     x: x,
@@ -60,41 +52,16 @@ class FillGeometryNativeTests {
       var bolt = scope.own(boltLocal.translated(new Vector(0, 0, 8)));
       var washerPart = scope.own(machinekit.assembly.PosedParts.moved(
         washerLocal,
-        {
-          x: 0,
-          y: 0,
-          z: 8,
-          qx: 1,
-          qy: 0,
-          qz: 0,
-          qw: 0
-        }
+        {x: 0, y: 0, z: 8, qx: 1, qy: 0, qz: 0, qw: 0}
       ));
       bolt.shape.setThreadedFaces([]);
       var body = scope.own(Part.box(20, 20, 14));
       var resin = scope.own(body.subtractAll([bolt, washerPart]));
       var nearMiss = scope.own(Part.cylinderSpan(1.49, 7.5, 8));
       var boundaries:Array<machinekit.tooling.CastingFillAnalysis.NativeFillPart> = [
-        {
-          id: "anchor-A-bolt",
-          sourceIds: [
-            "seat-A",
-            "back-anchor"
-          ],
-          part: bolt
-        },
-        {
-          id: "anchor-A-washer",
-          sourceIds: [
-            "seat-A",
-            "back-anchor"
-          ],
-          part: washerPart
-        },
-        {
-          id: "near-miss",
-          part: nearMiss
-        }
+        {id: "anchor-A-bolt", sourceIds: ["seat-A", "back-anchor"], part: bolt},
+        {id: "anchor-A-washer", sourceIds: ["seat-A", "back-anchor"], part: washerPart},
+        {id: "near-miss", part: nearMiss}
       ];
       var s = settings(), report = CastingFillAnalysis.analyze("washer-fixture", resin, 14, s, boundaries);
       check(report.trappedPockets.length == 1, "a resin-accessible under-head washer clearance remains a real trap");
@@ -151,15 +118,7 @@ class FillGeometryNativeTests {
       );
       var flipped = scope.own(machinekit.assembly.PosedParts.moved(
         resin,
-        {
-          x: 0,
-          y: 0,
-          z: 14,
-          qx: 1,
-          qy: 0,
-          qz: 0,
-          qw: 0
-        }
+        {x: 0, y: 0, z: 14, qx: 1, qy: 0, qz: 0, qw: 0}
       ));
       var inverted = CastingFillAnalysis.analyze("washer-fixture", flipped, 14, s);
       check(
@@ -268,26 +227,14 @@ class FillGeometryNativeTests {
     for (level in denseReport.levels) {
       var h = level.heightMm, expected = 4 * Math.min(h, 10) + 4 * Math.min(h, 2) + 8 * Math.min(h, 6) - 8 * Math.max(
         0,
-        Math.min(
-          h,
-          6
-        ) - 2
+        Math.min(h, 6) - 2
       );
       near(level.mixVolumeMm3, expected, "dense native liquid curve excludes only the sealed air region");
     }
     geometry.close();
     part.close();
     var local = Part.prism(
-      [
-        new Vector(0, 0),
-        new Vector(40, 0),
-        new Vector(40, 20),
-        new Vector(10, 40),
-        new Vector(
-          0,
-          40
-        )
-      ],
+      [new Vector(0, 0), new Vector(40, 0), new Vector(40, 20), new Vector(10, 40), new Vector(0, 40)],
       0,
       30
     );

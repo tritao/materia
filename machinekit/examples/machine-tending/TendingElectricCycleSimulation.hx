@@ -77,10 +77,8 @@ class TendingElectricCycleSimulation {
       90,
       null,
       null,
-      !Reflect.hasField(
-        row.guardLimits.approach,
-        "requireContactAtArrival"
-      ) || row.guardLimits.approach.requireContactAtArrival == true
+      !Reflect.hasField(row.guardLimits.approach,
+      "requireContactAtArrival") || row.guardLimits.approach.requireContactAtArrival == true
     );
     action.observe(
       0.01,

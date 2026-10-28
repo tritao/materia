@@ -176,11 +176,7 @@ class SpurGear extends MachineComponent {
     var body = outline().extrude(0, faceWidth);
     if (boreDiameter == 0) return body;
     return Solids.building([body], owned -> {var bore = Solids.named(
-      Part.cylinderSpan(
-        boreDiameter / 2,
-        -0.1,
-        faceWidth + 0.1
-      ),
+      Part.cylinderSpan(boreDiameter / 2, -0.1, faceWidth + 0.1),
       "bore"
     );
     owned.push(bore);
@@ -194,18 +190,9 @@ class SpurGear extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.transmission.spur-gear",
       [
-        ComponentRecipeSupport.length(
-          "moduleSize",
-          2
-        ),
-        ComponentRecipeSupport.count(
-          "teeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "faceWidth",
-          10
-        ),
+        ComponentRecipeSupport.length("moduleSize", 2),
+        ComponentRecipeSupport.count("teeth", 20),
+        ComponentRecipeSupport.length("faceWidth", 10),
         new ComponentParameter(
           "pressureAngle",
           Angle,
@@ -214,20 +201,9 @@ class SpurGear extends MachineComponent {
           MIN_PRESSURE_ANGLE,
           MAX_PRESSURE_ANGLE
         ),
-        ComponentRecipeSupport.scalar(
-          "profileShift",
-          0,
-          -0.999,
-          1.249
-        ),
-        ComponentRecipeSupport.length(
-          "backlash",
-          0
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          0
-        )
+        ComponentRecipeSupport.scalar("profileShift", 0, -0.999, 1.249),
+        ComponentRecipeSupport.length("backlash", 0),
+        ComponentRecipeSupport.length("boreDiameter", 0)
       ],
       v -> new SpurGear(
         v.number("moduleSize"),

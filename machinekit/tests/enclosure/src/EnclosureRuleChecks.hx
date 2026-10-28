@@ -60,11 +60,7 @@ class EnclosureRuleChecks {
       {
         coolantRecord: "fixture: coolant-A",
         impactRecord: "fixture: demand-A/mount-A",
-        heatLimitC: {
-          value: 80,
-          basis: Catalog,
-          source: "fixture"
-        },
+        heatLimitC: {value: 80, basis: Catalog, source: "fixture"},
         fireClass: "fixture",
         fireRecord: "fixture"
       }

@@ -31,10 +31,7 @@ class CoalPrismQuery implements SheetCollisionQuery {
     if (!Math.isFinite(length) || length <= 0) throw new SheetDiagnosis(
       "press.collision-query",
       "CollisionKit returned no separating direction",
-      [
-        a.id,
-        b.id
-      ]
+      [a.id, b.id]
     );
     var normal = direction.scale(1 / length), pointsA = a.vertices(), pointsB = b.vertices(), origin = pointsA[0];
     var lowA = Math.POSITIVE_INFINITY, highA = Math.NEGATIVE_INFINITY;
@@ -77,10 +74,7 @@ class CoalPrismQuery implements SheetCollisionQuery {
       throw new SheetDiagnosis(
         "press.collision-query",
         "CollisionKit convex query failed: " + Std.string(failure),
-        [
-          a.id,
-          b.id
-        ]
+        [a.id, b.id]
       );
     }
     world.dispose();

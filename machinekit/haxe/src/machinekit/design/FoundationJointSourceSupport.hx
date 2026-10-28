@@ -65,10 +65,7 @@ class FoundationJointSourceSupport {
           thread: machinekit.structural.InsertHoles.threadRecord(fastener.threadSpec()),
           shankLength: fastener.shankLength(),
           threadedLength: fastener.threadedLength(),
-          bearingFrame: F.compose(
-            pose(member),
-            fastener.bearingFrame()
-          )
+          bearingFrame: F.compose(pose(member), fastener.bearingFrame())
         });
       } else if (Std.isOfType(part, machinekit.standard.SocketSetScrew)) {
         var fastener:machinekit.standard.SocketSetScrew = cast part;
@@ -79,10 +76,7 @@ class FoundationJointSourceSupport {
           thread: machinekit.structural.InsertHoles.threadRecord(fastener.thread),
           shankLength: fastener.length,
           threadedLength: fastener.length,
-          bearingFrame: F.compose(
-            pose(member),
-            machinekit.standard.SocketSetScrew.boreSeat()
-          )
+          bearingFrame: F.compose(pose(member), machinekit.standard.SocketSetScrew.boreSeat())
         });
       } else throw "Foundation joint screw is not an actual fastener: " + member;
       seen.set(member, true);

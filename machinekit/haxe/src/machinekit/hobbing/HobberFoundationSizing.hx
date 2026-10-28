@@ -53,10 +53,7 @@ class HobberFoundationSizing {
     var choice = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(LIFT_THREAD_MM).mating());
     return new CastInsert(CastInsert.precastHoles(
       CastInsert.boxValues(width, depth, LIFT_THICKNESS_MM),
-      InsertHoles.tappedBlind(
-        choice,
-        LIFT_THICKNESS_MM
-      )
+      InsertHoles.tappedBlind(choice, LIFT_THICKNESS_MM)
     ).setToken(
       "role",
       LiftingMount
@@ -85,11 +82,7 @@ class HobberFoundationSizing {
     var massRows = result.concat([for (row in existing) {
       id:row.id, part:blank(LIFT_MAXIMUM_WIDTH_MM, LIFT_DEPTH_MM), openings:row.openings, pose:F.compose(
         row.pose,
-        F.translation(
-          0,
-          0,
-          row.part.boxDimensions(row.id).height - LIFT_THICKNESS_MM
-        )
+        F.translation(0, 0, row.part.boxDimensions(row.id).height - LIFT_THICKNESS_MM)
       )
     }
     ]);
@@ -110,11 +103,7 @@ class HobberFoundationSizing {
           depth: dimensions[1],
           height: dimensions[2]
         },
-        {
-          x: mass.centreOfMass.x,
-          y: mass.centreOfMass.y,
-          z: mass.centreOfMass.z
-        },
+        {x: mass.centreOfMass.x, y: mass.centreOfMass.y, z: mass.centreOfMass.z},
         LIFT_POINT_COUNT
       );
       var centreX = 0.0, centreY = 0.0;
@@ -141,18 +130,11 @@ class HobberFoundationSizing {
         Sys.println("Hobber source lifting proposal " + kind + ": " + point.x + ", " + point.y + ", " + point.z);
         sites.push({
           id: "liftAdditional" + (index + 1),
-          part: kind == "column" ? blank(
-            COLUMN_LIFT_START_SIDE_MM,
-            COLUMN_LIFT_START_SIDE_MM
-          ) : blank(
+          part: kind == "column" ? blank(COLUMN_LIFT_START_SIDE_MM, COLUMN_LIFT_START_SIDE_MM) : blank(
             LIFT_MAXIMUM_WIDTH_MM,
             LIFT_DEPTH_MM
           ),
-          pose : F.translation(
-            point.x,
-            point.y,
-            point.z - LIFT_THICKNESS_MM
-          ),
+          pose : F.translation(point.x, point.y, point.z - LIFT_THICKNESS_MM),
           openings : [materia.casting.CastingPatterns.face("body.z-max")]
         });
       }
@@ -191,10 +173,7 @@ class HobberFoundationSizing {
                   prototype,
                   rule,
                   FootprintOnly,
-                  mass.mass * rule.gravityMps2 / Math.min(
-                    rule.liftingLoadPaths,
-                    LIFT_POINT_COUNT
-                  )
+                  mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, LIFT_POINT_COUNT)
                 );
                 additionalOptions.push({width: width, depth: depth});
               } catch (error:Dynamic) {
@@ -224,22 +203,7 @@ class HobberFoundationSizing {
               var shifted = F.compose(site.pose, F.translation(0, -shift, 0));
               var pose = turn == 0 ? shifted : F.compose(
                 shifted,
-                F.fromRotationMatrix(
-                  0,
-                  0,
-                  0,
-                  [
-                    0.0,
-                    -1,
-                    0,
-                    1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                )
+                F.fromRotationMatrix(0, 0, 0, [0.0, -1, 0, 1, 0, 0, 0, 0, 1])
               );
               var candidate:CastInsertPlacement = {
                 id: site.id,
@@ -259,14 +223,8 @@ class HobberFoundationSizing {
                   candidate.id,
                   candidate.part,
                   rule,
-                  Casting(
-                    resin,
-                    pose
-                  ),
-                  mass.mass * rule.gravityMps2 / Math.min(
-                    rule.liftingLoadPaths,
-                    LIFT_POINT_COUNT
-                  )
+                  Casting(resin, pose),
+                  mass.mass * rule.gravityMps2 / Math.min(rule.liftingLoadPaths, LIFT_POINT_COUNT)
                 );
                 chosen = candidate;
                 chosenHardware = {id: site.id, part: anchored, pose: pose, openings: site.openings};

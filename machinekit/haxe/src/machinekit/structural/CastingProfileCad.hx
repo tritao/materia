@@ -17,23 +17,11 @@ class CastingProfileCad {
     var center = record.center;
     return center == null ? Segment.line(
       new Point2(record.start.x, record.start.y),
-      new Point2(
-        record.end.x,
-        record.end.y
-      )
+      new Point2(record.end.x, record.end.y)
     ) : Segment.arc(
-      new Point2(
-        center.x,
-        center.y
-      ),
-      CastingProfiles.distance(
-        center,
-        record.start
-      ),
-      Math.atan2(
-        record.start.y - center.y,
-        record.start.x - center.x
-      ),
+      new Point2(center.x, center.y),
+      CastingProfiles.distance(center, record.start),
+      Math.atan2(record.start.y - center.y, record.start.x - center.x),
       record.sweep
     );
   }

@@ -27,10 +27,7 @@ class MillBeltMotorPlate extends MachineComponent {
       'Recessed X motor plate for $motor',
       "steel",
       false,
-      new ComponentValues().setToken(
-        "motor",
-        motor
-      )
+      new ComponentValues().setToken("motor", motor)
     );
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }

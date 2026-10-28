@@ -77,17 +77,8 @@ class WristPlugCandidate {
       description: "Binder straight M12 candidate",
       externalBodyStartZMm: 15.8,
       preferredClockDeg: 0,
-      offsetsMm: [
-        -8.0,
-        0.0,
-        8.0
-      ],
-      clocksDeg: [
-        0.0,
-        90.0,
-        180.0,
-        270.0
-      ],
+      offsetsMm: [-8.0, 0.0, 8.0],
+      clocksDeg: [0.0, 90.0, 180.0, 270.0],
       separationBoundMm: 0,
       inspectMatingZone: true
     };
@@ -166,15 +157,7 @@ class WristPlugCandidate {
       var angle = config.preferredClockDeg * Math.PI / 180;
       var at = AssemblyFrames.compose(
         nominal,
-        {
-          x: 0,
-          y: 0,
-          z: offset,
-          qx: 0,
-          qy: 0,
-          qz: Math.sin(angle / 2),
-          qw: Math.cos(angle / 2)
-        }
+        {x: 0, y: 0, z: offset, qx: 0, qy: 0, qz: Math.sin(angle / 2), qw: Math.cos(angle / 2)}
       );
       var exterior = pose(body, at), complete = pose(plug, at), checks:Array<Dynamic> = [];
       for (i in 0...step.subshapeCount(CadKit.ShapeKind.Solid)) {
@@ -222,25 +205,12 @@ class WristPlugCandidate {
       writeScene(
         directory + "/fr5-candidate-offset-" + Std.int(offset) + ".mtrg",
         [
-          rendered(
-            "fr5-wrist",
-            "Supplier FR5 terminal wrist",
-            wrist,
-            [
-              0.55,
-              0.57,
-              0.6
-            ]
-          ),
+          rendered("fr5-wrist", "Supplier FR5 terminal wrist", wrist, [0.55, 0.57, 0.6]),
           rendered(
             "binder-candidate",
             "UNQUALIFIED " + config.description + "; assumed offset " + offset + " mm",
             complete,
-            [
-              0.15,
-              0.5,
-              0.8
-            ]
+            [0.15, 0.5, 0.8]
           )
         ]
       );
@@ -266,10 +236,7 @@ class WristPlugCandidate {
     var candidateBody = world.addBody(objects.length), candidateObject = world.add(
       candidateBody,
       CollisionPose.identity(),
-      collisionMesh(
-        body.tessellate(0.1),
-        0.001
-      )
+      collisionMesh(body.tessellate(0.1), 0.001)
     );
     var definition:materia.assembly.AssemblyDefinition = robot.scene.assemblyDefinition;
     var state = new AssemblyState(definition), joints = [for (j in robot.manifest.joints) if (j.type != "fixed") j];
@@ -282,15 +249,7 @@ class WristPlugCandidate {
         var angle = clock * Math.PI / 180;
         var local = AssemblyFrames.compose(
           frame,
-          {
-            x: 0,
-            y: 0,
-            z: offset * 0.001,
-            qx: 0,
-            qy: 0,
-            qz: Math.sin(angle / 2),
-            qw: Math.cos(angle / 2)
-          }
+          {x: 0, y: 0, z: offset * 0.001, qx: 0, qy: 0, qz: Math.sin(angle / 2), qw: Math.cos(angle / 2)}
         );
         world.setBodyPose(candidateBody, cp(AssemblyFrames.compose(robot.linkPose(state, binding.parentLink), local)));
         var pairs = [for (o in objects) new CollisionPair(candidateObject, o.object, candidateBody, o.body)];

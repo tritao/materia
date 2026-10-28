@@ -49,10 +49,7 @@ class TendingElectricRuntimeChecks {
     }
     var placementPolicy = {
       expectedContacts: ["fixture/seat"],
-      approach: {
-        maxTravelMm: 1.0,
-        requireContactAtArrival: false
-      },
+      approach: {maxTravelMm: 1.0, requireContactAtArrival: false},
       withdrawal: {maxTravelMm: 1.0},
       timeoutSeconds: 1.0,
       forceLimitN: null,
@@ -71,20 +68,8 @@ class TendingElectricRuntimeChecks {
     if (!positioned.complete || positioned.stopped
       || unloadedSupport.stops != 0) throw "Placement position incorrectly requires support load before release";
     var grouped:Array<Dynamic> = [
-      {
-        kind: "guardedJointEdge",
-        from: start,
-        to: end,
-        contactPolicy: policy,
-        separating: true
-      },
-      {
-        kind: "guardedJointEdge",
-        from: end,
-        to: start,
-        contactPolicy: policy,
-        separating: true
-      }
+      {kind: "guardedJointEdge", from: start, to: end, contactPolicy: policy, separating: true},
+      {kind: "guardedJointEdge", from: end, to: start, contactPolicy: policy, separating: true}
     ];
     var cumulativeDriver = new ElectricContractDriver(grouped, "cumulative travel");
     var cumulative = new TendingElectricEdgeExecutor(grouped, cumulativeDriver);

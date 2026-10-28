@@ -71,29 +71,10 @@ class HzMotionDrawingScrew extends LeadScrew {
       Part.cylinderSpan(6, 0, 20),
       Part.cylinderSpan(6.9, 20, 32),
       Part.cylinderSpan(7.5, 32, 64),
-      Solids.named(
-        Part.cylinderSpan(
-          10,
-          64,
-          totalLength - 13
-        ),
-        "race"
-      ),
-      Part.cylinderSpan(
-        7.5,
-        totalLength - 13,
-        totalLength - 4
-      ),
-      Part.cylinderSpan(
-        7.15,
-        totalLength - 4,
-        totalLength - 2.85
-      ),
-      Part.cylinderSpan(
-        7.5,
-        totalLength - 2.85,
-        totalLength
-      )
+      Solids.named(Part.cylinderSpan(10, 64, totalLength - 13), "race"),
+      Part.cylinderSpan(7.5, totalLength - 13, totalLength - 4),
+      Part.cylinderSpan(7.15, totalLength - 4, totalLength - 2.85),
+      Part.cylinderSpan(7.5, totalLength - 2.85, totalLength)
     ]);
     if (detail == Envelope) return body;
     try {
@@ -148,24 +129,8 @@ class HzMotionDrawingScrew extends LeadScrew {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.hzmotion-bk12-screw-end-study",
-      [
-        P.length(
-          "length",
-          400
-        ),
-        P.choice(
-          "endProfile",
-          [
-            "BK12",
-            "BK15"
-          ],
-          "BK12"
-        )
-      ],
-      v -> new HzMotionDrawingScrew(
-        v.number("length"),
-        v.token("endProfile")
-      )
+      [P.length("length", 400), P.choice("endProfile", ["BK12", "BK15"], "BK12")],
+      v -> new HzMotionDrawingScrew(v.number("length"), v.token("endProfile"))
     );
     return recipe;
   }

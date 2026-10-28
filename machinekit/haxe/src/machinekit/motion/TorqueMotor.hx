@@ -7,74 +7,20 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Frameless direct-drive torque motor. Reference row is Assumed: its outside, bore and height are not a product's. */
 class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDrive {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      150,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      80,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      45,
-      "mm"
-    ),
-    P.quantity(
-      "continuousTorque",
-      10,
-      "N m"
-    ),
-    P.quantity(
-      "peakTorque",
-      30,
-      "N m"
-    ),
-    P.quantity(
-      "ratedSpeed",
-      60 * 2 * Math.PI / 60,
-      "rad/s"
-    ),
-    P.quantity(
-      "maxSpeed",
-      120 * 2 * Math.PI / 60,
-      "rad/s"
-    ),
-    P.quantity(
-      "rotorInertia",
-      0.003,
-      "kg m2"
-    ),
-    P.quantity(
-      "coggingTorque",
-      0.03,
-      "N m"
-    ),
-    P.count(
-      "poleCount",
-      24
-    ),
-    P.count(
-      "coggingOrder",
-      48
-    ),
-    P.quantity(
-      "torqueConstant",
-      1.2,
-      "N m/A rms"
-    ),
-    P.quantity(
-      "backEmfConstant",
-      0.6928203230275509,
-      "V/(rad/s)"
-    ),
-    P.quantity(
-      "phaseResistance",
-      0.3,
-      "ohm"
-    )
+    P.quantity("outside", 150, "mm"),
+    P.quantity("bore", 80, "mm"),
+    P.quantity("height", 45, "mm"),
+    P.quantity("continuousTorque", 10, "N m"),
+    P.quantity("peakTorque", 30, "N m"),
+    P.quantity("ratedSpeed", 60 * 2 * Math.PI / 60, "rad/s"),
+    P.quantity("maxSpeed", 120 * 2 * Math.PI / 60, "rad/s"),
+    P.quantity("rotorInertia", 0.003, "kg m2"),
+    P.quantity("coggingTorque", 0.03, "N m"),
+    P.count("poleCount", 24),
+    P.count("coggingOrder", 48),
+    P.quantity("torqueConstant", 1.2, "N m/A rms"),
+    P.quantity("backEmfConstant", 0.6928203230275509, "V/(rad/s)"),
+    P.quantity("phaseResistance", 0.3, "ohm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -152,14 +98,7 @@ class TorqueMotor extends MachineComponent implements machinekit.motion.MotorDri
       peakTorque: peakTorque,
       ratedSpeed: ratedSpeed,
       maxSpeed: maxSpeed,
-      torqueSpeed: [
-        0,
-        peakTorque,
-        ratedSpeed,
-        peakTorque,
-        maxSpeed,
-        continuousTorque
-      ],
+      torqueSpeed: [0, peakTorque, ratedSpeed, peakTorque, maxSpeed, continuousTorque],
       assumed: ratingsBasis == Assumed ? ["torque motor ratings"] : null
     };
   }

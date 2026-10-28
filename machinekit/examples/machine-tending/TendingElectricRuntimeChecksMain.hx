@@ -82,12 +82,7 @@ class TendingElectricRuntimeChecksMain {
     sys.io.File.saveContent(
       haxe.io.Path.directory(file) + "/electric-runtime-checks.json",
       haxe.Json.stringify(
-        {
-          checks: checks,
-          reviewSha256: haxe.crypto.Sha256.encode(text),
-          hardwareReady: false,
-          physicsPlayback: false
-        },
+        {checks: checks, reviewSha256: haxe.crypto.Sha256.encode(text), hardwareReady: false, physicsPlayback: false},
         null,
         "  "
       )

@@ -22,11 +22,7 @@ class OffsetGripperFinger extends MachineComponent {
       "aluminium 6061",
       "prototype",
       [],
-      [
-        "CAM and workholding",
-        "tolerances and bolt preload",
-        "stiffness and gripping-force derating"
-      ]
+      ["CAM and workholding", "tolerances and bolt preload", "stiffness and gripping-force derating"]
     ),
     new ManufacturingVariant(
       "sls-pa12",
@@ -63,11 +59,7 @@ class OffsetGripperFinger extends MachineComponent {
     addConnector(
       "contact",
       Mount,
-      AssemblyFrames.translation(
-        OffsetFingerSpec.CENTRE_X + (left ? -13 : 13),
-        40,
-        OffsetFingerSpec.CENTRE_Z
-      )
+      AssemblyFrames.translation(OffsetFingerSpec.CENTRE_X + (left ? -13 : 13), 40, OffsetFingerSpec.CENTRE_Z)
     );
   }
   public static function family():ComponentFamily {
@@ -75,27 +67,10 @@ class OffsetGripperFinger extends MachineComponent {
       var recipe = new ComponentType(
         "machinekit.robotics.offset-gripper-finger",
         [
-          ComponentRecipeSupport.choice(
-            "side",
-            [
-              "left",
-              "right"
-            ],
-            "left"
-          ),
-          ComponentRecipeSupport.choice(
-            "variant",
-            [
-              "cnc-aluminium",
-              "sls-pa12"
-            ],
-            "cnc-aluminium"
-          )
+          ComponentRecipeSupport.choice("side", ["left", "right"], "left"),
+          ComponentRecipeSupport.choice("variant", ["cnc-aluminium", "sls-pa12"], "cnc-aluminium")
         ],
-        v -> new OffsetGripperFinger(
-          v.token("side") == "left",
-          v.token("variant")
-        ),
+        v -> new OffsetGripperFinger(v.token("side") == "left", v.token("variant")),
         true,
         false,
         null,

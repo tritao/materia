@@ -11,114 +11,32 @@ class Hob extends MachineComponent {
   public final design:HobDesign;
   public final target:GearSpec;
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.length(
-      "outside",
-      32
-    ),
-    P.length(
-      "bore",
-      16
-    ),
-    P.length(
-      "height",
-      40
-    ),
-    P.scalar(
-      "module",
-      0.3,
-      0.000001
-    ),
-    P.count(
-      "teeth",
-      200
-    ),
-    P.length(
-      "faceWidth",
-      8
-    ),
-    P.scalar(
-      "pressureAngle",
-      20 * Math.PI / 180,
-      0.000001
-    ),
-    P.scalar(
-      "profileShift",
-      0
-    ),
-    P.length(
-      "cutterTipRadius",
-      0.114
-    ),
-    P.length(
-      "tipFilletRadius",
-      0.015
-    ),
-    P.count(
-      "starts",
-      1
-    ),
-    P.count(
-      "gashes",
-      12
-    ),
-    P.scalar(
-      "rake",
-      0
-    ),
-    P.scalar(
-      "rootHeight",
-      0.3
-    ),
-    P.flag(
-      "detailed",
-      false
-    ),
-    P.flag(
-      "renderTeeth",
-      false
-    ),
-    P.scalar(
-      "landFraction",
-      0.6,
-      0.05
-    ),
-    P.scalar(
-      "reliefAngle",
-      3 * Math.PI / 180,
-      0
-    ),
-    P.length(
-      "fluteExtraDepth",
-      0.5
-    ),
-    P.length(
-      "edgeTolerance",
-      0.0005
-    ),
-    P.length(
-      "surfaceTolerance",
-      0.01
-    ),
-    P.length(
-      "keywayWidth",
-      0
-    ),
-    P.length(
-      "keywayDepth",
-      2.3
-    ),
-    P.length(
-      "radialRunout",
-      0.002
-    ),
-    P.length(
-      "axialRunout",
-      0.002
-    ),
-    P.length(
-      "profileError",
-      0.001
-    )
+    P.length("outside", 32),
+    P.length("bore", 16),
+    P.length("height", 40),
+    P.scalar("module", 0.3, 0.000001),
+    P.count("teeth", 200),
+    P.length("faceWidth", 8),
+    P.scalar("pressureAngle", 20 * Math.PI / 180, 0.000001),
+    P.scalar("profileShift", 0),
+    P.length("cutterTipRadius", 0.114),
+    P.length("tipFilletRadius", 0.015),
+    P.count("starts", 1),
+    P.count("gashes", 12),
+    P.scalar("rake", 0),
+    P.scalar("rootHeight", 0.3),
+    P.flag("detailed", false),
+    P.flag("renderTeeth", false),
+    P.scalar("landFraction", 0.6, 0.05),
+    P.scalar("reliefAngle", 3 * Math.PI / 180, 0),
+    P.length("fluteExtraDepth", 0.5),
+    P.length("edgeTolerance", 0.0005),
+    P.length("surfaceTolerance", 0.01),
+    P.length("keywayWidth", 0),
+    P.length("keywayDepth", 2.3),
+    P.length("radialRunout", 0.002),
+    P.length("axialRunout", 0.002),
+    P.length("profileError", 0.001)
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -142,14 +60,7 @@ class Hob extends MachineComponent {
     addFacet(new EngineeringMetadata(v));
     addFacet(PrecisionErrors.fromValues(
       v,
-      [
-        {name: "radialRunout", unit: "mm"},
-        {name: "axialRunout", unit: "mm"},
-        {
-          name: "profileError",
-          unit: "mm"
-        }
-      ]
+      [{name: "radialRunout", unit: "mm"}, {name: "axialRunout", unit: "mm"}, {name: "profileError", unit: "mm"}]
     ));
     target = new GearSpec(
       parameterNumber("module"),

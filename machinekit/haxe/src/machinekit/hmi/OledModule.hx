@@ -18,67 +18,21 @@ class OledModule extends HmiPart {
 
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
-    R.length(
-      "windowWidth",
-      56
-    ),
-    R.length(
-      "windowHeight",
-      28
-    ),
-    R.length(
-      "bezelMargin",
-      3
-    ),
-    R.length(
-      "glassWidth",
-      62
-    ),
-    R.length(
-      "glassHeight",
-      34
-    ),
-    R.length(
-      "glassThickness",
-      1.5
-    ),
-    R.length(
-      "pcbWidth",
-      70
-    ),
-    R.length(
-      "pcbHeight",
-      40
-    ),
-    R.length(
-      "pcbThickness",
-      1.6
-    ),
-    R.length(
-      "panelThickness",
-      3
-    ),
-    R.length(
-      "standoffGap",
-      2
-    ),
-    R.length(
-      "behindDepth",
-      12
-    ),
-    R.length(
-      "headerWidth",
-      10.5
-    ),
-    R.length(
-      "headerHeight",
-      2.5
-    ),
-    R.scalar(
-      "massGrams",
-      30,
-      1
-    )
+    R.length("windowWidth", 56),
+    R.length("windowHeight", 28),
+    R.length("bezelMargin", 3),
+    R.length("glassWidth", 62),
+    R.length("glassHeight", 34),
+    R.length("glassThickness", 1.5),
+    R.length("pcbWidth", 70),
+    R.length("pcbHeight", 40),
+    R.length("pcbThickness", 1.6),
+    R.length("panelThickness", 3),
+    R.length("standoffGap", 2),
+    R.length("behindDepth", 12),
+    R.length("headerWidth", 10.5),
+    R.length("headerHeight", 2.5),
+    R.scalar("massGrams", 30, 1)
   ];
 
   public function new(?v:ComponentValues) {
@@ -148,14 +102,7 @@ class OledModule extends HmiPart {
     var headerTop = pcbTop - p;
     var headerDepth = headerTop + n("behindDepth");
     parts.push(Solids.named(
-      box(
-        n("headerWidth"),
-        n("headerHeight"),
-        headerDepth,
-        0.0,
-        -n("pcbHeight") / 2 + 4.0,
-        -n("behindDepth")
-      ),
+      box(n("headerWidth"), n("headerHeight"), headerDepth, 0.0, -n("pcbHeight") / 2 + 4.0, -n("behindDepth")),
       "header"
     ));
     return Solids.union(parts);

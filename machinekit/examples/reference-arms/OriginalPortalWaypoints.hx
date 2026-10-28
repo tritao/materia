@@ -17,15 +17,7 @@ class OriginalPortalWaypoints {
       var solver = solvers.get(channel), q = goals.get(channel), goal = solver.forward(q);
       var world = AssemblyFrames.compose(
         base,
-        {
-          x: goal.x,
-          y: goal.y,
-          z: goal.z,
-          qx: goal.qx,
-          qy: goal.qy,
-          qz: goal.qz,
-          qw: goal.qw
-        }
+        {x: goal.x, y: goal.y, z: goal.z, qx: goal.qx, qy: goal.qy, qz: goal.qz, qw: goal.qw}
       );
       for (y in [-0.35, -0.5, -0.65]) for (lift in [-0.1, 0.0, 0.1]) {
         var frame = {x: world.x, y: y, z: world.z + lift, qx: world.qx, qy: world.qy, qz: world.qz, qw: world.qw};

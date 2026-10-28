@@ -52,20 +52,8 @@ private class ScriptedScrewIo implements ScrewdriverIo {
       acquiredAt: timestamp,
       clockId: "commissioned-host-clock",
       selectedProgramCode: (outputs[0] ? 1 : 0) + (outputs[1] ? 2 : 0),
-      inputs : [
-        true,
-        result == 1,
-        result > 1
-      ],
-      values : [
-        0.2,
-        4 * Math.PI,
-        2,
-        5,
-        result == 0 ? 2 : 5,
-        result,
-        1
-      ]
+      inputs : [true, result == 1, result > 1],
+      values : [0.2, 4 * Math.PI, 2, 5, result == 0 ? 2 : 5, result, 1]
     };
   }
 }
@@ -274,13 +262,7 @@ class ScrewControllerTests {
   }
   static function profile():ScrewdriverIoProfile return new ScrewdriverIoProfile(
     [0, 1],
-    [
-      {slot: 1, code: 2},
-      {
-        slot: 2,
-        code: 1
-      }
-    ],
+    [{slot: 1, code: 2}, {slot: 2, code: 1}],
     2,
     3,
     4,
@@ -342,12 +324,7 @@ class ScrewControllerTests {
     var process = new ScrewdriverProcessDevice(
       bad,
       bad,
-      {
-        start: "start",
-        direction: "reverse",
-        program: "program",
-        vacuum: "vacuum"
-      },
+      {start: "start", direction: "reverse", program: "program", vacuum: "vacuum"},
       1,
       bad
     );

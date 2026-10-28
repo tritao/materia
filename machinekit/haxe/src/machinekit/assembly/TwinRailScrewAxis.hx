@@ -87,12 +87,7 @@ class TwinRailScrewAxis extends MachineAssembly {
       "slide",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: layout.travel,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0, upper: layout.travel, velocity: null, effort: null}
     );
     addComponent("carriage", fabricate("carriage"));
     addMate("plate-bracket", "fixed", "bracket", "plate", "carriage", "base");
@@ -130,14 +125,7 @@ class TwinRailScrewAxis extends MachineAssembly {
       "M6",
       40,
       "base",
-      F.alongY(
-        i == 0 ? -23 : 23,
-        31,
-        layout.floatingZ(),
-        0,
-        1,
-        0
-      ),
+      F.alongY(i == 0 ? -23 : 23, 31, layout.floatingZ(), 0, 1, 0),
       31,
       12,
       "bf12/base"
@@ -171,14 +159,7 @@ class TwinRailScrewAxis extends MachineAssembly {
         id + "-washer",
         FlatWasher.metric("M4"),
         "base",
-        F.alongY(
-          p.x,
-          25 + p.y,
-          -grip,
-          0,
-          0,
-          1
-        )
+        F.alongY(p.x, 25 + p.y, -grip, 0, 0, 1)
       );
     }
     var points = nut.boltPattern();
@@ -191,14 +172,7 @@ class TwinRailScrewAxis extends MachineAssembly {
       "M6",
       20,
       "carriage",
-      F.alongY(
-        x,
-        10,
-        z,
-        0,
-        1,
-        0
-      ),
+      F.alongY(x, 10, z, 0, 1, 0),
       10,
       10,
       "carriage/bracket"
@@ -208,14 +182,7 @@ class TwinRailScrewAxis extends MachineAssembly {
       "M4",
       12,
       "carriage",
-      F.alongY(
-        side + x,
-        7.5,
-        z,
-        0,
-        1,
-        0
-      ),
+      F.alongY(side + x, 7.5, z, 0, 1, 0),
       7.5,
       selected.blockThreadDepth,
       "carriage/block",
@@ -291,74 +258,23 @@ class TwinRailScrewAxis extends MachineAssembly {
       ["rbk", "base"],
       ["bf12", "screw"],
       ["bf12", "base"],
-      [
-        "coupling",
-        "motor"
-      ],
-      [
-        "coupling",
-        "screw"
-      ],
-      [
-        "ballNut",
-        "screw"
-      ],
-      [
-        "ballNut",
-        "bracket"
-      ],
-      [
-        "bracket",
-        "base"
-      ],
-      [
-        "bracket",
-        "riserLeft"
-      ],
-      [
-        "bracket",
-        "riserRight"
-      ],
-      [
-        "carriage",
-        "rbk"
-      ],
-      [
-        "carriage",
-        "bf12"
-      ],
-      [
-        "blockLeft",
-        "railLeft"
-      ],
-      [
-        "blockRight",
-        "railRight"
-      ],
-      [
-        "blockLeft",
-        "riserLeft"
-      ],
-      [
-        "blockRight",
-        "riserRight"
-      ],
-      [
-        "blockLeft",
-        "carriage"
-      ],
-      [
-        "blockRight",
-        "carriage"
-      ],
-      [
-        "blockLeft",
-        "bracket"
-      ],
-      [
-        "blockRight",
-        "bracket"
-      ]
+      ["coupling", "motor"],
+      ["coupling", "screw"],
+      ["ballNut", "screw"],
+      ["ballNut", "bracket"],
+      ["bracket", "base"],
+      ["bracket", "riserLeft"],
+      ["bracket", "riserRight"],
+      ["carriage", "rbk"],
+      ["carriage", "bf12"],
+      ["blockLeft", "railLeft"],
+      ["blockRight", "railRight"],
+      ["blockLeft", "riserLeft"],
+      ["blockRight", "riserRight"],
+      ["blockLeft", "carriage"],
+      ["blockRight", "carriage"],
+      ["blockLeft", "bracket"],
+      ["blockRight", "bracket"]
     ];
     for (h in hardware) {
       if (h.interfacePair == "motor/rbk") {

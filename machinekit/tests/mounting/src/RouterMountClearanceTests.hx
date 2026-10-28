@@ -28,13 +28,7 @@ class RouterMountClearanceTests {
           var key = flag.side + "/" + flag.candidate;
           if (!candidates.exists(key)) candidates.set(
             key,
-            blank(Reflect.field(
-              Reflect.field(
-                bed.candidateBoxes,
-                flag.side
-              ),
-              flag.candidate
-            ))
+            blank(Reflect.field(Reflect.field(bed.candidateBoxes, flag.side), flag.candidate))
           );
           if (!members.exists(flag.existingMember)) {
             var body = router.component(flag.existingMember).geometry();

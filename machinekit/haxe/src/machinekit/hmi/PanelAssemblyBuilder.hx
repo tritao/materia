@@ -20,10 +20,7 @@ class PanelAssemblyBuilder {
     layout:PanelLayout,
     plate:() -> Part,
     ?shell:() -> Part,
-    ?extras:Array<{
-      id:String,
-      solid:() -> Part
-    }>,
+    ?extras:Array<{id:String, solid:() -> Part}>,
     extrasMaterial:String = "plastic",
     ?groups:Array<PanelGroup>,
     ?hardware:Array<PanelHardware>
@@ -34,12 +31,7 @@ class PanelAssemblyBuilder {
     if (shell != null) housing.addComponent("shell", new PanelSolid("PANEL-SHELL", "case shell", shell, "PA12 nylon"));
     if (extras != null) for (e in extras) housing.addComponent(
       e.id,
-      new PanelSolid(
-        "PANEL-" + e.id.toUpperCase(),
-        e.id,
-        e.solid,
-        extrasMaterial
-      )
+      new PanelSolid("PANEL-" + e.id.toUpperCase(), e.id, e.solid, extrasMaterial)
     );
     if (housing != assembly) assembly.include("case", housing);
     // An included assembly is copied when it is included, so fill each group before including it.

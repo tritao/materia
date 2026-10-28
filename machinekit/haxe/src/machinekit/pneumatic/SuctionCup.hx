@@ -181,14 +181,7 @@ class SuctionCup extends MachineComponent {
       declareMass(
         row.massKg,
         new Vector(0, 0, row.heightMm / 2),
-        new InertiaTensor(
-          transverse,
-          0,
-          0,
-          transverse,
-          0,
-          row.massKg * radius * radius / 2
-        )
+        new InertiaTensor(transverse, 0, 0, transverse, 0, row.massKg * radius * radius / 2)
       );
     }
   }
@@ -200,19 +193,9 @@ class SuctionCup extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.suction-cup", [
-      ComponentRecipeSupport.choice(
-        "model",
-        [CUSTOM].concat(catalog().designations()),
-        CUSTOM
-      ),
-      ComponentRecipeSupport.length(
-        "diameter",
-        40
-      ),
-      ComponentRecipeSupport.length(
-        "height",
-        18
-      ),
+      ComponentRecipeSupport.choice("model", [CUSTOM].concat(catalog().designations()), CUSTOM),
+      ComponentRecipeSupport.length("diameter", 40),
+      ComponentRecipeSupport.length("height", 18),
       ComponentRecipeSupport.optionalScalar("effectiveAreaMm2"),
       ComponentRecipeSupport.optionalScalar("ratedMomentNm")
     ].concat(ComponentRecipeSupport.interfaceParameters("vacuumInterface")),
@@ -222,10 +205,7 @@ class SuctionCup extends MachineComponent {
       v.number("height"),
       v.optionalNumber("effectiveAreaMm2"),
       v.optionalNumber("ratedMomentNm"),
-      ComponentRecipeSupport.interfaceFrom(
-        v,
-        "vacuumInterface"
-      )
+      ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")
     ), true);
     return recipeTypeCache;
   }

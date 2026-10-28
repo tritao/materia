@@ -130,14 +130,8 @@ class LevelingFootCodec {
           number(p, "height"),
           readThread(p.thread),
           number(p, "stemBottom"),
-          number(
-            p,
-            "stemTop"
-          ),
-          number(
-            p,
-            "mountHeight"
-          ),
+          number(p, "stemTop"),
+          number(p, "mountHeight"),
           readEnvelope(p),
           collar
         );

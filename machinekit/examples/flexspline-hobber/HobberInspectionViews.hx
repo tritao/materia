@@ -51,15 +51,8 @@ class HobberInspectionViews {
       id: id,
       label: label,
       camera: Anchored(
-        {
-          occurrence: prefix + anchor,
-          subtree: false
-        },
-        {
-          x: offset[0] / scale,
-          y: offset[1] / scale,
-          z: offset[2] / scale
-        },
+        {occurrence: prefix + anchor, subtree: false},
+        {x: offset[0] / scale, y: offset[1] / scale, z: offset[2] / scale},
         span / scale,
         yaw,
         pitch
@@ -73,28 +66,18 @@ class HobberInspectionViews {
       "cutting",
       "Tool contact (cutaway)",
       "blank",
-      [
-        0,
-        machine.spec.tipRadius() * 0.001,
-        (machine.spec.faceWidth - 40) * 0.0005
-      ],
+      [0, machine.spec.tipRadius() * 0.001, (machine.spec.faceWidth - 40) * 0.0005],
       0.04,
       0.3,
       -0.4,
-      rules(
-        cutaway,
-        Hidden
-      )
+      rules(cutaway, Hidden)
     ));
     presentation.views.push(view(
       "workpiece",
       "Workpiece",
       "blank",
       [0, 0, 0],
-      Math.max(
-        0.085,
-        machine.spec.tipRadius() * 0.003
-      ),
+      Math.max(0.085, machine.spec.tipRadius() * 0.003),
       -1.0,
       0.4,
       enclosure
@@ -102,19 +85,12 @@ class HobberInspectionViews {
     presentation.views.push(view("loading", "Loading", "mandrel", [0, 0, 0.02], 0.4, -1.0, 0.5, enclosure));
     for (choice in [
       {id: "enclosure-transparent", label: "Enclosure transparent", mode: Transparent},
-      {
-        id: "enclosure-hidden",
-        label: "Enclosure hidden",
-        mode: Hidden
-      }
+      {id: "enclosure-hidden", label: "Enclosure hidden", mode: Hidden}
     ]) presentation.views.push({
       id: choice.id,
       label: choice.label,
       camera: presentation.views[0].camera,
-      visibility: rules(
-        ["enclosure/"],
-        choice.mode
-      ),
+      visibility: rules(["enclosure/"], choice.mode),
       sections: [],
       explode: 0,
       source: Generated("hobber")

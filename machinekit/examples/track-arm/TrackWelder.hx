@@ -56,10 +56,7 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
       "weldPositive",
       "feeder",
       "power",
-      line(
-        "CABLE-WELD-35-6M",
-        "Weld cable 35 mm², 6 m"
-      )
+      line("CABLE-WELD-35-6M", "Weld cable 35 mm², 6 m")
     );
     connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", line("HOSE-GAS-6M", "Shielding gas hose, 6 m"));
     connectPorts(
@@ -68,10 +65,7 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
       "feederControl",
       "feeder",
       "control",
-      line(
-        "CABLE-CONTROL-12-6M",
-        "Welder control cable, 12 core, 6 m"
-      )
+      line("CABLE-CONTROL-12-6M", "Welder control cable, 12 core, 6 m")
     );
     connectPorts(
       "work-lead",
@@ -79,10 +73,7 @@ class TrackWelder extends machinekit.gantry.LinearTrack {
       "weldNegative",
       "clamp",
       "lead",
-      line(
-        "CABLE-WORK-35-6M",
-        "Work lead 35 mm², 6 m"
-      )
+      line("CABLE-WORK-35-6M", "Work lead 35 mm², 6 m")
     );
     connectPorts("torch-power", "feeder", "torchPower", "arm/tool/torch", "power");
     connectPorts("torch-gas", "feeder", "torchGas", "arm/tool/torch", "gas");

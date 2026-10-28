@@ -77,19 +77,10 @@ class WeldProbeParkingBounds implements WeldProbeUncertainty {
     var depth = projected(p, normal) / Math.cos(yaw);
     return new WeldProbeRegionBounds(
       projected(p, u) + depth * yawProjection(normal, u),
-      projected(p, v) + depth * yawProjection(
-        normal,
-        v
-      ),
+      projected(p, v) + depth * yawProjection(normal, v),
       depth,
-      yawProjection(
-        normal,
-        u
-      ),
-      yawProjection(
-        normal,
-        v
-      )
+      yawProjection(normal, u),
+      yawProjection(normal, v)
     );
   }
 

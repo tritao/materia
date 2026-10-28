@@ -92,16 +92,8 @@ class PressSheetPose {
     var upperDepth = orientation.faceAUp ? 0.0 : sheet.thickness();
     var source = new Location(new Plane(
       zone.point(0.5, zone.width / 2, upperDepth),
-      zone.frame.direction(new Vector(
-        Math.cos(halfAngle),
-        0,
-        Math.sin(halfAngle)
-      )),
-      zone.frame.direction(new Vector(
-        -Math.sin(halfAngle),
-        0,
-        Math.cos(halfAngle)
-      ))
+      zone.frame.direction(new Vector(Math.cos(halfAngle), 0, Math.sin(halfAngle))),
+      zone.frame.direction(new Vector(-Math.sin(halfAngle), 0, Math.cos(halfAngle)))
     ));
     var depth = -sheet.thickness();
     if (zone.angle != 0) {
@@ -126,21 +118,9 @@ class PressSheetPose {
       ["bend:" + bend]
     );
     var destination = new Location(new Plane(
-      new Vector(
-        orientation.bedCenter,
-        station.punchLineY,
-        station.dieTopHeight - depth
-      ),
-      new Vector(
-        0,
-        orientation.reverse ? -1 : 1,
-        0
-      ),
-      new Vector(
-        0,
-        0,
-        orientation.faceAUp ? 1 : -1
-      )
+      new Vector(orientation.bedCenter, station.punchLineY, station.dieTopHeight - depth),
+      new Vector(0, orientation.reverse ? -1 : 1, 0),
+      new Vector(0, 0, orientation.faceAUp ? 1 : -1)
     ));
     return new PressSheetPose(evaluation, destination.compose(source.inverse()), depth);
   }

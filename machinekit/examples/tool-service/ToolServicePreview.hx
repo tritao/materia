@@ -32,11 +32,7 @@ class ToolServicePreview {
     return new Part(new Location(new Plane(
       new Vector(f.x, f.y, f.z),
       new Vector(m[0], m[3], m[6]),
-      new Vector(
-        m[2],
-        m[5],
-        m[8]
-      )
+      new Vector(m[2], m[5], m[8])
     )).apply(part.shape));
   }
   static function noOverlap(a:Part, b:Part, label:String):Void {
@@ -135,24 +131,9 @@ class ToolServicePreview {
     );
     for (rating in [
       {voltage: 24.0, current: 5.0, harness: 5.0, ok: true},
-      {
-        voltage: 48.0,
-        current: 5.0,
-        harness: 5.0,
-        ok: false
-      },
-      {
-        voltage: 24.0,
-        current: 2.0,
-        harness: 5.0,
-        ok: false
-      },
-      {
-        voltage: 24.0,
-        current: 5.0,
-        harness: 2.0,
-        ok: false
-      }
+      {voltage: 48.0, current: 5.0, harness: 5.0, ok: false},
+      {voltage: 24.0, current: 2.0, harness: 5.0, ok: false},
+      {voltage: 24.0, current: 5.0, harness: 2.0, ok: false}
     ]) {
       var circuit = new MachineAssembly(), wrist = new ToolServiceModule(new ToolServiceSpec(24, rating.harness, 2));
       circuit.addComponent(

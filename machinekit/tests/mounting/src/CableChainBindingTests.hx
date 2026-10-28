@@ -31,17 +31,11 @@ class CableChainBindingTests {
             == v.occurrence) c.component][0];
           var fixed = F.compose(
             state.worldPose(v.fixed.occurrence),
-            restored.memberConnectorFrame(
-              v.fixed.occurrence,
-              v.fixed.connector
-            )
+            restored.memberConnectorFrame(v.fixed.occurrence, v.fixed.connector)
           );
           var moving = F.compose(
             state.worldPose(v.moving.occurrence),
-            restored.memberConnectorFrame(
-              v.moving.occurrence,
-              v.moving.connector
-            )
+            restored.memberConnectorFrame(v.moving.occurrence, v.moving.connector)
           );
           var position = v.axisJoint == "x" ? x : y;
           var part = state.worldPose(v.occurrence), expected = F.compose(part, source.chain.movingFrame(position));

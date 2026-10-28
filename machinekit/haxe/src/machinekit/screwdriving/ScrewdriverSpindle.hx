@@ -42,13 +42,7 @@ class ScrewdriverSpindle extends MachineAssembly {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: -strokeMm,
-        upper: 0,
-        velocity: 100,
-        effort: springRate * strokeMm,
-        overtravel: 1.1
-      }
+      {lower: -strokeMm, upper: 0, velocity: 100, effort: springRate * strokeMm, overtravel: 1.1}
     );
     // The extended stop is steel. A critically damped stop overshoots by about v * tau / e; a light slide released
     // from full stroke reaches it near 2 m/s, so a 1 ms response holds it inside the 1.1 mm overtravel.
@@ -62,12 +56,7 @@ class ScrewdriverSpindle extends MachineAssembly {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: null,
-        upper: null,
-        velocity: maxSpeed,
-        effort: maxTorque
-      }
+      {lower: null, upper: null, velocity: maxSpeed, effort: maxTorque}
     );
     addMate("bit-mount", "fixed", "carrier", "bit", "bit", "mount");
     addComponent("scale", new LinearScale(strokeMm, 100, true), AssemblyFrames.translation(28, 0, 100));

@@ -36,14 +36,7 @@ class WeldingTorchNeck extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.union([
       Solids.named(Part.sphere(WeldingTorch.NECK_R), "elbow"),
-      Solids.named(
-        Part.cylinderSpan(
-          WeldingTorch.NECK_R,
-          0,
-          WeldingTorch.NECK_LENGTH
-        ),
-        "neck"
-      )
+      Solids.named(Part.cylinderSpan(WeldingTorch.NECK_R, 0, WeldingTorch.NECK_LENGTH), "neck")
     ]);
   }
 }

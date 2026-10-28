@@ -65,11 +65,7 @@ class WeldingTorch extends MachineComponent {
       "tcp",
       Mount,
       AssemblyFrames.compose(
-        AssemblyFrames.translation(
-          reach * Math.sin(bend),
-          0,
-          BEND_Z + reach * Math.cos(bend)
-        ),
+        AssemblyFrames.translation(reach * Math.sin(bend), 0, BEND_Z + reach * Math.cos(bend)),
         AssemblyFrames.turnY(bend)
       )
     );
@@ -95,14 +91,7 @@ class WeldingTorch extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     return Solids.union([
       Solids.named(Part.cylinderSpan(MOUNT_RADIUS, 0, MOUNT_LENGTH), "breakaway"),
-      Solids.named(
-        Part.cylinderSpan(
-          HANDLE_RADIUS,
-          MOUNT_LENGTH,
-          BEND_Z
-        ),
-        "handle"
-      )
+      Solids.named(Part.cylinderSpan(HANDLE_RADIUS, MOUNT_LENGTH, BEND_Z), "handle")
     ]);
   }
 

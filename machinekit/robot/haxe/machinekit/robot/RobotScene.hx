@@ -50,10 +50,7 @@ class RobotScene {
         var entry:SceneArtifactRobotTool = {
           kind: "gripper",
           members: members.copy(),
-          contact: {
-            occurrence: prefix + "/" + grip.member,
-            connector: grip.connector
-          },
+          contact: {occurrence: prefix + "/" + grip.member, connector: grip.connector},
           channel: channel,
           sensor: grip.sensor,
           gripper: {
@@ -76,10 +73,7 @@ class RobotScene {
       var entry:SceneArtifactRobotTool = {
         kind: "suction",
         members: members.copy(),
-        contact: {
-          occurrence: prefix + "/" + suction.member,
-          connector: suction.connector
-        },
+        contact: {occurrence: prefix + "/" + suction.member, connector: suction.connector},
         channel: channel
       };
       if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
@@ -130,10 +124,7 @@ class RobotScene {
       if (scanner != null) result.push({
         kind: "lidar",
         id: prefix + entry.id,
-        mount: {
-          occurrence: prefix + entry.id,
-          connector: scanner.scanConnector
-        },
+        mount: {occurrence: prefix + entry.id, connector: scanner.scanConnector},
         rayCount: scanner.rayCount,
         maxRange: scanner.maxRangeMeters,
         updateRate: scanner.rateHz
@@ -142,10 +133,7 @@ class RobotScene {
       if (driver != null) result.push({
         kind: "tool_contact",
         id: prefix + entry.id + "/contact",
-        mount: {
-          occurrence: prefix + entry.id,
-          connector: driver.tcpConnector
-        }
+        mount: {occurrence: prefix + entry.id, connector: driver.tcpConnector}
       });
     }
     return result;

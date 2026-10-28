@@ -70,15 +70,7 @@ class LinearMountCompliance implements ComponentFacet {
       schema: value.schema,
       host: value.host,
       element: value.element,
-      frame: {
-        x: frame.x,
-        y: frame.y,
-        z: frame.z,
-        qx: frame.qx,
-        qy: frame.qy,
-        qz: frame.qz,
-        qw: frame.qw
-      },
+      frame: {x: frame.x, y: frame.y, z: frame.z, qx: frame.qx, qy: frame.qy, qz: frame.qz, qw: frame.qw},
       terms: terms
     };
   }

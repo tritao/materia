@@ -44,42 +44,17 @@ class GearedArmJoint extends ArmJoint {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.geared-arm-joint",
       [
-        ComponentRecipeSupport.length(
-          "diameter",
-          100
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          70
-        ),
-        ComponentRecipeSupport.length(
-          "pocketDiameter",
-          61
-        ),
-        ComponentRecipeSupport.length(
-          "pocketLength",
-          36
-        ),
-        ComponentRecipeSupport.scalar(
-          "flangePitchCircle",
-          0
-        ),
+        ComponentRecipeSupport.length("diameter", 100),
+        ComponentRecipeSupport.length("length", 70),
+        ComponentRecipeSupport.length("pocketDiameter", 61),
+        ComponentRecipeSupport.length("pocketLength", 36),
+        ComponentRecipeSupport.scalar("flangePitchCircle", 0),
         ComponentRecipeSupport.choice(
           "servo",
           ["none"].concat([for (rating in ServoMotor.ratings()) rating.designation]),
           "GENERIC-SERVO-200W"
         ),
-        ComponentRecipeSupport.choice(
-          "servoBasis",
-          [
-            "derived",
-            "catalog",
-            "stated",
-            "assumed",
-            "measured"
-          ],
-          "assumed"
-        )
+        ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed", "measured"], "assumed")
       ],
       v -> new GearedArmJoint(
         v.number("diameter"),
@@ -103,17 +78,7 @@ class GearedArmJoint extends ArmJoint {
       pocketLength
     );
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Solids.named(
-      super.geometry(detail),
-      "body"
-    ),
-    [Solids.named(
-      Part.cylinderSpan(
-        pocketDiameter / 2,
-        -1,
-        pocketLength
-      ),
-      "pocket"
-    )]
+    Solids.named(super.geometry(detail), "body"),
+    [Solids.named(Part.cylinderSpan(pocketDiameter / 2, -1, pocketLength), "pocket")]
   );
 }

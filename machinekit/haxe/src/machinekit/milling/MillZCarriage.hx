@@ -14,55 +14,18 @@ class MillZCarriage extends MachineComponent {
   public static inline var SHELF_MARGIN:Float = 6;
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
-    P.choice(
-      "nutModel",
-      ["generic1605", "SFU2005"],
-      "generic1605"
-    ),
-    P.length(
-      "width",
-      234
-    ),
-    P.length(
-      "height",
-      160
-    ),
-    P.length(
-      "thickness",
-      16
-    ),
-    P.length(
-      "nutReach",
-      53
-    ),
-    P.length(
-      "nutCentreZ",
-      80
-    ),
-    P.length(
-      "nutPlate",
-      10
-    ),
-    P.length(
-      "headBoltX",
-      65
-    ),
-    P.length(
-      "headBoltZ",
-      42
-    ),
-    P.length(
-      "railSpacing",
-      180
-    ),
-    P.length(
-      "blockSpan",
-      32.7
-    ),
-    P.text(
-      "profile",
-      "HGH15CA"
-    )
+    P.choice("nutModel", ["generic1605", "SFU2005"], "generic1605"),
+    P.length("width", 234),
+    P.length("height", 160),
+    P.length("thickness", 16),
+    P.length("nutReach", 53),
+    P.length("nutCentreZ", 80),
+    P.length("nutPlate", 10),
+    P.length("headBoltX", 65),
+    P.length("headBoltZ", 42),
+    P.length("railSpacing", 180),
+    P.length("blockSpan", 32.7),
+    P.text("profile", "HGH15CA")
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -106,11 +69,7 @@ class MillZCarriage extends MachineComponent {
     var shelfWidth = nut.flangeDiameter + 2 * SHELF_MARGIN;
     var pieces = [
       Part.box(w, t, h).translated(new Vector(0, -t / 2, 0)),
-      Part.box(
-        shelfWidth,
-        reach + shelfWidth / 2,
-        shelf
-      ).translated(new Vector(
+      Part.box(shelfWidth, reach + shelfWidth / 2, shelf).translated(new Vector(
         0,
         (reach + shelfWidth / 2) / 2,
         face - shelf
@@ -118,10 +77,7 @@ class MillZCarriage extends MachineComponent {
     ];
     for (side in [-1, 1]) pieces.push(Part.box(6, Math.min(reach / 2, 25), GUSSET_HEIGHT).translated(new Vector(
       side * (shelfWidth / 2 - 3),
-      Math.min(
-        reach / 2,
-        25
-      ) / 2,
+      Math.min(reach / 2, 25) / 2,
       face - shelf - GUSSET_HEIGHT
     )));
     var body = Solids.union(pieces);

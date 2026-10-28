@@ -41,40 +41,18 @@ class MillSpindleDrivePart extends MachineComponent {
   static var recipe:Null<ComponentType>;
   static var guardRecipe:Null<ComponentType>;
   public static function parameters(role:String = "carrier"):Array<ComponentParameter> return [
-    P.choice(
-      "role",
-      [role],
-      role
-    ),
+    P.choice("role", [role], role),
     P.choice(
       "motor",
       ["ASSUMED-BT30-MOTOR-2200W"].concat(LeadshineServo.catalog().designations()),
       "ELM2M-2900LD180FT-H"
     ),
-    P.count(
-      "motorTeeth",
-      96
-    ),
-    P.count(
-      "spindleTeeth",
-      18
-    ),
-    P.length(
-      "centres",
-      180
-    ),
-    P.length(
-      "faceZ",
-      330
-    ),
-    P.length(
-      "mountBottom",
-      140
-    ),
-    P.length(
-      "guardRearLimit",
-      0
-    )
+    P.count("motorTeeth", 96),
+    P.count("spindleTeeth", 18),
+    P.length("centres", 180),
+    P.length("faceZ", 330),
+    P.length("mountBottom", 140),
+    P.length("guardRearLimit", 0)
   ];
   public static function recipeType(role:String = "carrier"):ComponentType {
     if (role == "guard") {
@@ -163,22 +141,10 @@ class MillSpindleDrivePart extends MachineComponent {
   public function plateRear():Float return Math.max(180, parameterNumber("centres") + motorFace() / 2 + 10);
   static function box(w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part return Part.prism(
     [
-      new Vector(
-        x - w / 2,
-        y - d / 2
-      ),
-      new Vector(
-        x + w / 2,
-        y - d / 2
-      ),
-      new Vector(
-        x + w / 2,
-        y + d / 2
-      ),
-      new Vector(
-        x - w / 2,
-        y + d / 2
-      )
+      new Vector(x - w / 2, y - d / 2),
+      new Vector(x + w / 2, y - d / 2),
+      new Vector(x + w / 2, y + d / 2),
+      new Vector(x - w / 2, y + d / 2)
     ],
     z0,
     z1

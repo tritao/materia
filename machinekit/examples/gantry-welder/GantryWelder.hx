@@ -113,10 +113,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
       "weldPositive",
       "feeder",
       "power",
-      line(
-        "CABLE-WELD-35-3M",
-        "Weld cable 35 mm², 3 m"
-      )
+      line("CABLE-WELD-35-3M", "Weld cable 35 mm², 3 m")
     );
     connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", line("HOSE-GAS-3M", "Shielding gas hose, 3 m"));
     connectPorts(
@@ -125,10 +122,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
       "feederControl",
       "feeder",
       "control",
-      line(
-        "CABLE-CONTROL-12-3M",
-        "Welder control cable, 12 core, 3 m"
-      )
+      line("CABLE-CONTROL-12-3M", "Welder control cable, 12 core, 3 m")
     );
     connectPorts(
       "work-lead",
@@ -136,10 +130,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
       "weldNegative",
       "clamp",
       "lead",
-      line(
-        "CABLE-WORK-35-3M",
-        "Work lead 35 mm², 3 m"
-      )
+      line("CABLE-WORK-35-3M", "Work lead 35 mm², 3 m")
     );
     connectPorts("torch-power", "feeder", "torchPower", "tool/torch", "power");
     connectPorts("torch-gas", "feeder", "torchGas", "tool/torch", "gas");

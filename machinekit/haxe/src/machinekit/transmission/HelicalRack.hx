@@ -17,47 +17,14 @@ class HelicalRack extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("normalModule", 1.5),
     P.count("teeth", 20),
-    P.length(
-      "faceWidth",
-      20
-    ),
-    P.quantity(
-      "helixAngle",
-      Math.acos(3 * Math.PI / 10),
-      "rad"
-    ),
-    P.quantity(
-      "pressureAngle",
-      0.3490658504,
-      "rad"
-    ),
-    P.choice(
-      "hand",
-      [
-        "right",
-        "left"
-      ],
-      "left"
-    ),
-    P.length(
-      "barHeight",
-      12
-    ),
-    P.length(
-      "backlash",
-      0.02
-    ),
-    P.quantity(
-      "meshStiffness",
-      50000,
-      "N/mm"
-    ),
-    P.scalar(
-      "efficiency",
-      0.95,
-      0,
-      1
-    )
+    P.length("faceWidth", 20),
+    P.quantity("helixAngle", Math.acos(3 * Math.PI / 10), "rad"),
+    P.quantity("pressureAngle", 0.3490658504, "rad"),
+    P.choice("hand", ["right", "left"], "left"),
+    P.length("barHeight", 12),
+    P.length("backlash", 0.02),
+    P.quantity("meshStiffness", 50000, "N/mm"),
+    P.scalar("efficiency", 0.95, 0, 1)
   ];
   public function new(?v:ComponentValues) {
     super("helical-rack", "normal-module helical rack", "steel", inputs(), v);

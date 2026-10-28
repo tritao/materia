@@ -134,13 +134,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
         dimensionKind : Unverified,
         conformance : NominalEnvelope,
         sources : ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf"],
-        verifiedFields : [
-          "acrossFlats",
-          "headHeight",
-          "tapDrill",
-          "clearanceFine",
-          "clearanceMedium"
-        ]
+        verifiedFields : ["acrossFlats", "headHeight", "tapDrill", "clearanceFine", "clearanceMedium"]
       }) : ({
         source : "MachineKit embedded nominal table; source verification pending",
         standard : "ISO 4017",
@@ -194,16 +188,9 @@ class HexBolt extends MachineComponent implements ScrewFastener {
     addConnector("head", Face, Solids.axial(0, 0, 0));
     addConnector("tip", Face, Solids.axial(0, 0, -length));
     addFacet(new machinekit.component.CollisionHullFacet([
-      machinekit.component.CollisionHullFacet.cylinder(
-        diameter / 2,
-        -length,
-        0
-      ),
+      machinekit.component.CollisionHullFacet.cylinder(diameter / 2, -length, 0),
       machinekit.component.CollisionHullFacet.prism(
-        cadkit.modeling.Polygon.regular(
-          6,
-          spec.acrossFlats
-        ),
+        cadkit.modeling.Polygon.regular(6, spec.acrossFlats),
         0,
         spec.headHeight
       )
@@ -252,10 +239,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
     var head = detail == Envelope ? Part.cylinderSpan(acrossCorners / 2, 0, spec.headHeight) : Part.prism(
-      cadkit.modeling.Polygon.regular(
-        6,
-        spec.acrossFlats
-      ),
+      cadkit.modeling.Polygon.regular(6, spec.acrossFlats),
       0,
       spec.headHeight
     );
@@ -293,11 +277,7 @@ class HexBolt extends MachineComponent implements ScrewFastener {
     if (!(depth > seatDepth)) throw 'Counterbore for ${spec.size} needs depth over $seatDepth';
     return Solids.union([
       Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0),
-      Part.cylinderSpan(
-        (acrossCorners + 0.5) / 2,
-        -seatDepth,
-        0
-      ),
+      Part.cylinderSpan((acrossCorners + 0.5) / 2, -seatDepth, 0),
     ]);
   }
 
@@ -311,37 +291,15 @@ class HexBolt extends MachineComponent implements ScrewFastener {
       "clearanceHole",
       [
         ComponentRecipeSupport.toolDepth(length),
-        ComponentRecipeSupport.choice(
-          "fit",
-          [
-            "Fine",
-            "Medium",
-            "Coarse"
-          ],
-          "Medium"
-        )
+        ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
       ]
     ),
-    new ToolSpec(
-      "tapHole",
-      [ComponentRecipeSupport.toolDepth(length)]
-    ),
+    new ToolSpec("tapHole", [ComponentRecipeSupport.toolDepth(length)]),
     new ToolSpec(
       "counterboreHole",
       [
-        ComponentRecipeSupport.toolDepth(Math.max(
-          length,
-          spec.headHeight + 1
-        )),
-        ComponentRecipeSupport.choice(
-          "fit",
-          [
-            "Fine",
-            "Medium",
-            "Coarse"
-          ],
-          "Medium"
-        )
+        ComponentRecipeSupport.toolDepth(Math.max(length, spec.headHeight + 1)),
+        ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
       ]
     )
   ];
@@ -366,26 +324,11 @@ class HexBolt extends MachineComponent implements ScrewFastener {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.hex-bolt",
       [
-        ComponentRecipeSupport.catalog(
-          "size",
-          HexBolt.catalog(),
-          "M5"
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          20
-        ),
-        ComponentRecipeSupport.choice(
-          "propertyClass",
-          PropertyClasses.tokens(),
-          "8.8"
-        )
+        ComponentRecipeSupport.catalog("size", HexBolt.catalog(), "M5"),
+        ComponentRecipeSupport.length("length", 20),
+        ComponentRecipeSupport.choice("propertyClass", PropertyClasses.tokens(), "8.8")
       ],
-      v -> HexBolt.metric(
-        v.token("size"),
-        v.number("length"),
-        PropertyClasses.parse(v.token("propertyClass"))
-      ),
+      v -> HexBolt.metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
       true,
       true,
       null,

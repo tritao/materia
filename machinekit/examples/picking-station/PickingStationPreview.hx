@@ -60,28 +60,14 @@ class PickingStationPreview {
     parts.push(AssemblyPreview.part(
       "physical-sheet",
       "Selected sheet · 2440 × 1220 × 18 mm",
-      Part.box(
-        stock.width,
-        stock.height,
-        stock.thickness,
-        Align.Min,
-        Align.Min,
-        Align.Min
-      ),
+      Part.box(stock.width, stock.height, stock.thickness, Align.Min, Align.Min, Align.Min),
       stock.materialId
     ));
     for (placement in plan.placements) addPlacement(parts, placement, stock.thickness, stock.materialId);
     for (region in validation.regions) if (region.retained) parts.push(AssemblyPreview.part(
       "remnant-" + region.id,
       'Reusable remnant ${region.id} · ${fmt(region.widthMm)} × ${fmt(region.heightMm)} mm',
-      Part.box(
-        region.widthMm,
-        region.heightMm,
-        2,
-        Align.Min,
-        Align.Min,
-        Align.Min
-      ).translated(new Vector(
+      Part.box(region.widthMm, region.heightMm, 2, Align.Min, Align.Min, Align.Min).translated(new Vector(
         region.xMm,
         region.yMm,
         stock.thickness + 1

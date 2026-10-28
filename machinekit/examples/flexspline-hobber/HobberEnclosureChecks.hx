@@ -99,11 +99,7 @@ class HobberEnclosureChecks {
         var contact = false;
         for (tile in panels) if (tray.indexOf(tile) >= 0 || tile.id == "enclosure/trayRearServiceBridge") {
           var pose = state.worldPose(tile.id), lift = materia.assembly.AssemblyFrames.compose(
-            materia.assembly.AssemblyFrames.translation(
-              0,
-              0,
-              -0.1
-            ),
+            materia.assembly.AssemblyFrames.translation(0, 0, -0.1),
             state.worldPose(p.id)
           );
           if (cache.overlap(p.component, lift, tile.component, pose) > 1) contact = true;
@@ -289,12 +285,7 @@ class HobberEnclosureChecks {
             trayClamps: 12,
             trayLiftClearanceMm: 25,
             trayConstructionClear: true,
-            trayStackMm: [
-              4,
-              2,
-              13,
-              11
-            ],
+            trayStackMm: [4, 2, 13, 11],
             frameSupportContacts: true,
             traySupportContacts: true,
             loadingCorridorClear: true,

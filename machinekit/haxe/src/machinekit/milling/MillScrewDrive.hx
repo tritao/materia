@@ -84,15 +84,8 @@ class MillScrewDrive {
 
   /** Mill Z: M80E-BK15-C / BF15, braked ELM2H-0750 servo, 48 mm coupling. */
   public static function m80eBk15():MillScrewDrive return new MillScrewDrive(
-    MotorMount.of(
-      "M80E-BK15-C",
-      null,
-      "hzmotion"
-    ),
-    ScrewSupportUnit.model(
-      "BF15",
-      "hzmotion"
-    ),
+    MotorMount.of("M80E-BK15-C", null, "hzmotion"),
+    ScrewSupportUnit.model("BF15", "hzmotion"),
     LeadshineServo.model("ELM2H-0750LA80E"),
     48,
     17
@@ -100,28 +93,12 @@ class MillScrewDrive {
 
   /** Small mill Y: M60D-BK12-C / BF12, ELM2H-0400 servo, 25 × 32 clamp coupling. */
   public static function m60dBk12():MillScrewDrive return new MillScrewDrive(
-    MotorMount.of(
-      "M60D-BK12-C",
-      null,
-      "hzmotion"
-    ),
-    ScrewSupportUnit.model(
-      "BF12",
-      "hzmotion"
-    ),
+    MotorMount.of("M60D-BK12-C", null, "hzmotion"),
+    ScrewSupportUnit.model("BF12", "hzmotion"),
     LeadshineServo.model("ELM2H-0400LA60F"),
     32,
     16,
     25,
-    [
-      {
-        z: 8,
-        angle: Math.PI / 2
-      },
-      {
-        z: 24,
-        angle: Math.PI / 2
-      }
-    ]
+    [{z: 8, angle: Math.PI / 2}, {z: 24, angle: Math.PI / 2}]
   );
 }

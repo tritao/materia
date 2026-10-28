@@ -49,13 +49,7 @@ class CastingShopRecipe {
     }
     return {
       former: {
-        pocketScrew: {
-          diameterMm: 4,
-          lengthMm: 30,
-          jigAngleDegrees: 15,
-          edgeDistanceMm: 20,
-          maximumPitchMm: 100
-        },
+        pocketScrew: {diameterMm: 4, lengthMm: 30, jigAngleDegrees: 15, edgeDistanceMm: 20, maximumPitchMm: 100},
         stocks: formerStocks,
         finishingStockMm: 0.5,
         toleranceMm: 0.1,
@@ -171,11 +165,7 @@ class CastingShopRecipe {
     rigidRestraints: [],
     blankMarginMm: 12,
     blankKerfMm: 3.2,
-    couponClearancesMm: [
-      0.1,
-      0.2,
-      0.3
-    ]
+    couponClearancesMm: [0.1, 0.2, 0.3]
   };
 
   /** Production compound and workshop equipment are unresolved inputs. */
@@ -233,16 +223,8 @@ class CastingShopRecipe {
         0.03,
         diameters[i] * 0.001
       )], fixtures:[], travel:new TravelEnvelope(
-        new Point3(
-          -0.1,
-          -0.1,
-          -0.1
-        ),
-        new Point3(
-          3,
-          3,
-          0.3
-        )
+        new Point3(-0.1, -0.1, -0.1),
+        new Point3(3, 3, 0.3)
       ), workOrigin:new Point3(
         0,
         0,

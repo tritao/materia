@@ -98,17 +98,7 @@ class CobotArmLink extends MachineComponent {
     for (p in CobotWristMount.points(next)) addConnector(
       'outputBolt${index++}',
       Mount,
-      AssemblyFrames.compose(
-        seat,
-        AssemblyFrames.alongY(
-          p.x,
-          p.y,
-          -CAP,
-          0,
-          0,
-          -1
-        )
-      )
+      AssemblyFrames.compose(seat, AssemblyFrames.alongY(p.x, p.y, -CAP, 0, 0, -1))
     );
     for (i in 0...2) {
       var t = i == 0 ? 0.15 : 0.85;
@@ -143,16 +133,8 @@ class CobotArmLink extends MachineComponent {
     try {
       var out = part.placed(new Location(new Plane(
         new Vector(serviceFrame.x, serviceFrame.y, serviceFrame.z),
-        new Vector(
-          m[0],
-          m[3],
-          m[6]
-        ),
-        new Vector(
-          m[2],
-          m[5],
-          m[8]
-        )
+        new Vector(m[0], m[3], m[6]),
+        new Vector(m[2], m[5], m[8])
       )));
       part.close();
       return out;
@@ -178,14 +160,8 @@ class CobotArmLink extends MachineComponent {
     var taper = Part.revolve([
       {r: 0.0, z: 0.0},
       {r: inputRadius - 0.5 - inset - slope * overlap, z: 0.0},
-      {
-        r: outputRadius - 0.5 - inset + slope * overlap,
-        z: bridgeLength + 2 * overlap
-      },
-      {
-        r: 0.0,
-        z: bridgeLength + 2 * overlap
-      }
+      {r: outputRadius - 0.5 - inset + slope * overlap, z: bridgeLength + 2 * overlap},
+      {r: 0.0, z: bridgeLength + 2 * overlap}
     ]);
     try {
       var result = taper.placed(new Location(new Plane(
@@ -205,12 +181,7 @@ class CobotArmLink extends MachineComponent {
     var r0 = inputRadius - inset, r1 = outputRadius - inset;
     var parts = [
       Part.cylinderSpan(r0, inset == 0 ? 0 : CAP, CAP + inputRadius),
-      Part.cylinderSpan(
-        r1,
-        end.z,
-        inset == 0 ? seat.z : seat.z - CAP,
-        end.x
-      )
+      Part.cylinderSpan(r1, end.z, inset == 0 ? seat.z : seat.z - CAP, end.x)
     ];
     parts.push(Part.cylinderAlong(r0, new Vector(0, 0, CAP + inputRadius), Vector.X().scale(-1), -bridgeStart.x));
     parts.push(Part.cylinderAlong(r1, end, Vector.X(), bridgeEnd.x - end.x));
@@ -221,10 +192,7 @@ class CobotArmLink extends MachineComponent {
       {p: bridgeStart, r: r0},
       {p: bridgeEnd, r: r1},
       {p: new Vector(0, 0, CAP + inputRadius), r: r0},
-      {
-        p: end,
-        r: r1
-      }
+      {p: end, r: r1}
     ]) {
       var ball = Part.sphere(pair.r);
       parts.push(ball.translated(pair.p));

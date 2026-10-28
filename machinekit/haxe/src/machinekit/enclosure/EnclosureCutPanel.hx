@@ -44,11 +44,7 @@ class EnclosureCutPanel extends EnclosurePanel {
     var base = massProperties(), ratio = removed / (width * height), mass = base.mass * (1 - ratio);
     declareMass(
       mass,
-      new Vector(
-        -ox * ratio / (1 - ratio),
-        base.centreOfMass.y,
-        (height / 2 - oz * ratio) / (1 - ratio)
-      )
+      new Vector(-ox * ratio / (1 - ratio), base.centreOfMass.y, (height / 2 - oz * ratio) / (1 - ratio))
     );
   }
   override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -70,22 +66,8 @@ class EnclosureCutPanel extends EnclosurePanel {
     result.push(CollisionHullFacet.fromBoxes([
       [-width / 2, -t, 0, x0, t, height],
       [x1, -t, 0, width / 2, t, height],
-      [
-        x0,
-        -t,
-        0,
-        x1,
-        t,
-        z0
-      ],
-      [
-        x0,
-        -t,
-        z1,
-        x1,
-        t,
-        height
-      ]
+      [x0, -t, 0, x1, t, z0],
+      [x0, -t, z1, x1, t, height]
     ]));
     return result;
   }
@@ -101,37 +83,13 @@ class EnclosureCutPanel extends EnclosurePanel {
       "machinekit.enclosure.cut-panel",
       [
         R.length("width", 600),
-        R.length(
-          "height",
-          800
-        ),
-        R.choice(
-          "construction",
-          [for (p in PanelCatalogue.all()) p.id],
-          "steel-2"
-        ),
-        R.length(
-          "openingWidth",
-          100
-        ),
-        R.length(
-          "openingHeight",
-          100
-        ),
-        R.quantity(
-          "openingX",
-          0,
-          "mm",
-          null
-        ),
-        R.length(
-          "openingZ",
-          400
-        ),
-        R.length(
-          "diameter",
-          0
-        )
+        R.length("height", 800),
+        R.choice("construction", [for (p in PanelCatalogue.all()) p.id], "steel-2"),
+        R.length("openingWidth", 100),
+        R.length("openingHeight", 100),
+        R.quantity("openingX", 0, "mm", null),
+        R.length("openingZ", 400),
+        R.length("diameter", 0)
       ],
       v -> new EnclosureCutPanel(
         v.number("width"),

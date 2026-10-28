@@ -129,14 +129,7 @@ class CobotArmChecks {
       arm.ready(),
       [0.2, -1, 0.8, -0.5, -0.7, 0.3],
       [-0.4, -0.8, 0.5, 0.6, -1.2, -0.2],
-      [
-        0.6,
-        -1.4,
-        1.2,
-        -0.4,
-        -0.9,
-        0.1
-      ]
+      [0.6, -1.4, 1.2, -0.4, -0.9, 0.1]
     ];
     var oppositeWrist = arm.ready();
     oppositeWrist[4] = Math.PI / 2;
@@ -236,10 +229,7 @@ class CobotArmChecks {
         * oldInertia)) throw '${arm.reference.designation} wrist elbow ${i + 1} section stiffness $minimum mm^4 must exceed twice the old neck $oldInertia mm^4';
       for (pair in [
         [i == 0 ? "shoulderRotor" : "wristRotor" + (i + 1), "link" + (i + 1)],
-        [
-          "link" + (i + 1),
-          "joint" + (i + 2)
-        ]
+        ["link" + (i + 1), "joint" + (i + 2)]
       ]) {
         checkContact(arm, state, parts, pair[0], pair[1]);
       }
@@ -376,22 +366,7 @@ class CobotArmChecks {
       var a = arm.reference.a[i], d = arm.reference.d[i];
       result = AssemblyFrames.compose(
         result,
-        AssemblyFrames.fromRotationMatrix(
-          a * c,
-          a * s,
-          d,
-          [
-            c,
-            -s * ca,
-            s * sa,
-            s,
-            c * ca,
-            -c * sa,
-            0,
-            sa,
-            ca
-          ]
-        )
+        AssemblyFrames.fromRotationMatrix(a * c, a * s, d, [c, -s * ca, s * sa, s, c * ca, -c * sa, 0, sa, ca])
       );
     }
     return result;

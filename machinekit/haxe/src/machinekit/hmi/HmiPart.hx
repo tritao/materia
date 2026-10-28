@@ -48,12 +48,7 @@ class HmiPart extends MachineComponent {
   public static function basisParameter(value:String =
     "assumed"):ComponentParameter return ComponentRecipeSupport.choice(
       "basis",
-      [
-        "catalog",
-        "stated",
-        "assumed",
-        "measured"
-      ],
+      ["catalog", "stated", "assumed", "measured"],
       value
     );
 
@@ -130,11 +125,7 @@ class HmiPart extends MachineComponent {
         joint.id + "-fixed",
         joint.child,
         joint.id + "-turning",
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        {x: 0, y: 0, z: 1},
         0
       );
     }

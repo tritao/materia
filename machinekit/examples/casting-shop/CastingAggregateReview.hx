@@ -28,10 +28,7 @@ class CastingAggregateReview {
           CastingShopRecipe.BOARD_THICKNESS_MM,
           MillMoldSetup.MillMoldCasting.Column
         ),
-        options: MillMoldSetup.options(
-          frame,
-          MillMoldSetup.MillMoldCasting.Column
-        )
+        options: MillMoldSetup.options(frame, MillMoldSetup.MillMoldCasting.Column)
       }
     ];
     if (only == null || only == "plinth") {
@@ -112,14 +109,7 @@ class CastingAggregateReview {
           b.width,
           b.depth,
           b.height,
-          F.compose(
-            inverse,
-            F.translation(
-              b.x + b.width / 2,
-              b.y + b.depth / 2,
-              b.z
-            )
-          )
+          F.compose(inverse, F.translation(b.x + b.width / 2, b.y + b.depth / 2, b.z))
         ));
       }
       // Obstacle bounds only propose a conservative inner certificate. A native

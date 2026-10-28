@@ -128,17 +128,8 @@ class SheetSimulationChecks {
         actual,
         bend.id,
         tooling,
-        new PressStationGeometry(
-          "v12",
-          400,
-          0,
-          480
-        ),
-        new BendOrientation(
-          true,
-          false,
-          0
-        )
+        new PressStationGeometry("v12", 400, 0, 480),
+        new BendOrientation(true, false, 0)
       );
       part.driveAtDepth(pose.depth);
       var time = session.step();

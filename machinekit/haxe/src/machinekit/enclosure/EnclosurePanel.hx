@@ -57,11 +57,7 @@ class EnclosurePanel extends MachineComponent {
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.box(
-      width,
-      construction.thicknessMm(),
-      height
-    ),
+    Part.box(width, construction.thicknessMm(), height),
     "panel"
   );
 
@@ -81,25 +77,11 @@ class EnclosurePanel extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.enclosure.panel",
       [
-        ComponentRecipeSupport.length(
-          "width",
-          600
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          800
-        ),
-        ComponentRecipeSupport.choice(
-          "construction",
-          [for (panel in PanelCatalogue.all()) panel.id],
-          "fr-acm-4"
-        )
+        ComponentRecipeSupport.length("width", 600),
+        ComponentRecipeSupport.length("height", 800),
+        ComponentRecipeSupport.choice("construction", [for (panel in PanelCatalogue.all()) panel.id], "fr-acm-4")
       ],
-      v -> new EnclosurePanel(
-        v.number("width"),
-        v.number("height"),
-        v.token("construction")
-      ),
+      v -> new EnclosurePanel(v.number("width"), v.number("height"), v.token("construction")),
       false,
       false,
       null,

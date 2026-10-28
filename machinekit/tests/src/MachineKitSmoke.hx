@@ -226,14 +226,7 @@ class MachineKitSmoke {
     assembly.addBomItem(
       {partNumber: "TUBE-MASS", description: "Tube", quantity: 1, material: "polyurethane"},
       2,
-      Point(
-        0.001,
-        new Vector(
-          10,
-          0,
-          5
-        )
-      )
+      Point(0.001, new Vector(10, 0, 5))
     );
     var withTube = assembly.massProperties();
     near(withTube.mass, combined.mass + 0.002, "BOM extra mass uses quantity");
@@ -276,14 +269,7 @@ class MachineKitSmoke {
     moving.addBomItem(
       {partNumber: "FIXED-TUBE", description: "Fixed tube", quantity: 1, material: "polyurethane"},
       1,
-      Point(
-        0.001,
-        new Vector(
-          0,
-          0,
-          0
-        )
-      )
+      Point(0.001, new Vector(0, 0, 0))
     );
     var at30 = moving.massProperties(state);
     state.setJoint("slide", 40);
@@ -317,15 +303,7 @@ class MachineKitSmoke {
     rotated.addComponent(
       "declared",
       new MassTestBlock(1, true),
-      {
-        x: 0,
-        y: 0,
-        z: 0,
-        qx: 0,
-        qy: 0,
-        qz: Math.sqrt(0.5),
-        qw: Math.sqrt(0.5)
-      }
+      {x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: Math.sqrt(0.5), qw: Math.sqrt(0.5)}
     );
     var rotatedInertia:InertiaTensor = cast rotated.massProperties().inertia;
     near(rotatedInertia.xx, 3, "declared tensor rotates into assembly frame");
@@ -344,23 +322,11 @@ class MachineKitSmoke {
     check(
       PortInterfaces.compatible(PushIn(6),
       PushIn(6)) && !PortInterfaces.compatible(PushIn(6), PushIn(8)) && PortInterfaces.compatible(
-        Plug(
-          "M12",
-          4
-        ),
-        Plug(
-          "M12",
-          4
-        )
+        Plug("M12", 4),
+        Plug("M12", 4)
       ) && !PortInterfaces.compatible(
-        Plug(
-          "M12",
-          4
-        ),
-        Plug(
-          "M12",
-          5
-        )
+        Plug("M12", 4),
+        Plug("M12", 5)
       ) && PortInterfaces.compatible(
         Thread("G1/8-M"),
         Thread("G1/8-F")
@@ -412,21 +378,8 @@ class MachineKitSmoke {
       "toolAir",
       "manifold",
       "in",
-      {
-        partNumber: "TUBE-6",
-        description: "6 mm tube",
-        quantity: 1,
-        material: "polyurethane"
-      },
-      Attached(
-        0.001,
-        "changer",
-        new Vector(
-          0,
-          0,
-          0
-        )
-      )
+      {partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"},
+      Attached(0.001, "changer", new Vector(0, 0, 0))
     );
     tool.connectPorts("air", "manifold", "out", "generator", "air");
     tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
@@ -621,21 +574,13 @@ class MachineKitSmoke {
     throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
     var angleType = new ComponentType(
       "test.angle",
-      [new ComponentParameter(
-        "angle",
-        ComponentParameterType.Angle,
-        ComponentValue.Number(3)
-      )],
+      [new ComponentParameter("angle", ComponentParameterType.Angle, ComponentValue.Number(3))],
       function(_:ComponentValues) return DeepGrooveBearing.metric("608")
     );
     check(angleType.key(null).indexOf("angle:1:3") >= 0, "angle keys round above the signed 32-bit integer range");
     var scalarType = new ComponentType(
       "test.scalar",
-      [new ComponentParameter(
-        "scalar",
-        ComponentParameterType.Scalar,
-        ComponentValue.Number(3)
-      )],
+      [new ComponentParameter("scalar", ComponentParameterType.Scalar, ComponentValue.Number(3))],
       function(_:ComponentValues) return DeepGrooveBearing.metric("608")
     );
     check(scalarType.key(null).indexOf("scalar:1:3") >= 0, "scalar keys round above the signed 32-bit integer range");
@@ -658,13 +603,7 @@ class MachineKitSmoke {
       "custom catalog dimensions produce a code-only, prefixed component"
     );
     var customBearingVariant = DeepGrooveBearing.custom(
-      {
-        designation: "608",
-        bore: 8.2,
-        outside: 22,
-        width: 7,
-        chamfer: 0.3
-      },
+      {designation: "608", bore: 8.2, outside: 22, width: 7, chamfer: 0.3},
       false
     );
     check(
@@ -687,10 +626,7 @@ class MachineKitSmoke {
       }
     );
     check(
-      customMotor.componentType() == null && StringTools.startsWith(
-        customMotor.designation,
-        "CUSTOM-17HS19-custom-IF"
-      ),
+      customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-17HS19-custom-IF"),
       "custom NEMA variants are code-only and prefixed"
     );
     customCodeOnly(HexBolt.custom(HexBolt.catalog().get("M5"), 20), "hex bolt");
@@ -769,10 +705,7 @@ class MachineKitSmoke {
     var routeDefinition = MachineKitDocuments.define(
       routeDocument,
       routeType,
-      routeType.defaults().setToken(
-        "route",
-        '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":80},{"x":30,"y":0,"z":80}]'
-      )
+      routeType.defaults().setToken("route", '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":80},{"x":30,"y":0,"z":80}]')
     );
     var routeInstance = routeDocument.createInstance("Hose", routeDefinition);
     check(
@@ -951,10 +884,7 @@ class MachineKitSmoke {
   }
 
   static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-6):Void check(
-    Math.abs(actual - expected) <= tolerance * Math.max(
-      1,
-      Math.abs(expected)
-    ),
+    Math.abs(actual - expected) <= tolerance * Math.max(1, Math.abs(expected)),
     '$message: $actual != $expected'
   );
 
@@ -1075,18 +1005,8 @@ class MachineKitSmoke {
     }
     for (reference in [
       {name: "M14", coarse: 16.5, bore: 24.0, depth: 14.6},
-      {
-        name: "M16",
-        coarse: 18.5,
-        bore: 26.0,
-        depth: 16.6
-      },
-      {
-        name: "M20",
-        coarse: 24.0,
-        bore: 33.0,
-        depth: 20.6
-      }
+      {name: "M16", coarse: 18.5, bore: 26.0, depth: 16.6},
+      {name: "M20", coarse: 24.0, bore: 33.0, depth: 20.6}
     ]) {
       var standard = SocketHeadCapScrew.metric(reference.name, 40);
       near(standard.clearanceDiameter(Coarse), reference.coarse, reference.name + " ISO 273 coarse clearance");
@@ -1221,24 +1141,9 @@ class MachineKitSmoke {
 
     var shaft = new SteppedShaft(
       [{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
-      [
-        {name: "bearingA", z: 10},
-        {
-          name: "bearingB",
-          z: 43
-        }
-      ],
-      [{
-        name: "outputKey",
-        z0: 52,
-        key: key
-      }],
-      [{
-        name: "ring",
-        z0: 50,
-        width: 1.2,
-        diameter: 7.6
-      }]
+      [{name: "bearingA", z: 10}, {name: "bearingB", z: 43}],
+      [{name: "outputKey", z0: 52, key: key}],
+      [{name: "ring", z0: 50, width: 1.2, diameter: 7.6}]
     );
     near(shaft.totalLength, 60, "shaft total length");
     near(shaft.diameterAt(0), 8, "shaft start diameter");
@@ -1293,22 +1198,9 @@ class MachineKitSmoke {
       {
         inputChamfer: 1,
         outputChamfer: 0.5,
-        inputThread: {
-          diameter: 10,
-          pitch: 1.5,
-          length: 6
-        },
-        outputThread: {
-          diameter: 6,
-          pitch: 1,
-          length: 5
-        },
-        shoulders: [{
-          z: 20,
-          fillet: 0.5,
-          reliefWidth: 2,
-          reliefDiameter: 7.5
-        }]
+        inputThread: {diameter: 10, pitch: 1.5, length: 6},
+        outputThread: {diameter: 6, pitch: 1, length: 5},
+        shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]
       }
     );
     check(
@@ -1323,22 +1215,9 @@ class MachineKitSmoke {
       {
         inputChamfer: 2,
         outputChamfer: 0.5,
-        inputThread: {
-          diameter: 10,
-          pitch: 1.5,
-          length: 6
-        },
-        outputThread: {
-          diameter: 6,
-          pitch: 1,
-          length: 5
-        },
-        shoulders: [{
-          z: 20,
-          fillet: 0.5,
-          reliefWidth: 2,
-          reliefDiameter: 7.5
-        }]
+        inputThread: {diameter: 10, pitch: 1.5, length: 6},
+        outputThread: {diameter: 6, pitch: 1, length: 5},
+        shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]
       }
     );
     check(
@@ -1364,42 +1243,19 @@ class MachineKitSmoke {
     throws(() -> new SteppedShaft([{diameter: 8,
       length: 10}], [{name: "x", z: 20}]), 'Face "x" lies outside the shaft');
     throws(
-      () -> new SteppedShaft(
-        [{diameter: 8, length: 10}],
-        null,
-        [{
-          name: "k",
-          z0: 5,
-          key: ParallelKey.forShaft(6, 8)
-        }]
-      ),
+      () -> new SteppedShaft([{diameter: 8, length: 10}], null, [{name: "k", z0: 5, key: ParallelKey.forShaft(6, 8)}]),
       'Keyway "k" lies outside the shaft'
     );
     throws(
       () -> new SteppedShaft(
         [{diameter: 8, length: 10}, {diameter: 6, length: 10}],
         null,
-        [{
-          name: "k",
-          z0: 8,
-          key: ParallelKey.forShaft(
-            6,
-            4
-          )
-        }]
+        [{name: "k", z0: 8, key: ParallelKey.forShaft(6, 4)}]
       ),
       'Keyway "k" must lie within one shaft section'
     );
     throws(
-      () -> new SteppedShaft(
-        [{diameter: 2, length: 10}],
-        null,
-        [{
-          name: "k",
-          z0: 0,
-          key: ParallelKey.forShaft(6, 4)
-        }]
-      ),
+      () -> new SteppedShaft([{diameter: 2, length: 10}], null, [{name: "k", z0: 0, key: ParallelKey.forShaft(6, 4)}]),
       'Keyway "k" is deeper than the shaft radius'
     );
     throws(
@@ -1411,11 +1267,7 @@ class MachineKitSmoke {
         [{diameter: 8, length: 10}, {diameter: 6, length: 10}],
         null,
         null,
-        [{
-          z0: 8,
-          width: 4,
-          diameter: 5
-        }]
+        [{z0: 8, width: 4, diameter: 5}]
       ),
       "Retaining ring groove must lie within one shaft section"
     );
@@ -1427,14 +1279,7 @@ class MachineKitSmoke {
       () -> new SteppedShaft(
         [{diameter: 10, length: 10}, {diameter: 12, length: 2}, {diameter: 10, length: 10}],
         null,
-        [{
-          name: "k",
-          z0: 8,
-          key: ParallelKey.forShaft(
-            10,
-            6
-          )
-        }]
+        [{name: "k", z0: 8, key: ParallelKey.forShaft(10, 6)}]
       ),
       'Keyway "k" must lie within one shaft section'
     );
@@ -1443,11 +1288,7 @@ class MachineKitSmoke {
         [{diameter: 10, length: 10}, {diameter: 12, length: 2}, {diameter: 10, length: 10}],
         null,
         null,
-        [{
-          z0: 9,
-          width: 4,
-          diameter: 9
-        }]
+        [{z0: 9, width: 4, diameter: 9}]
       ),
       "Retaining ring groove must lie within one shaft section"
     );
@@ -1455,14 +1296,7 @@ class MachineKitSmoke {
       () -> new SteppedShaft(
         [{diameter: 12, length: 40}],
         null,
-        [{
-          name: "k",
-          z0: 0,
-          key: ParallelKey.metric(
-            "10x8",
-            20
-          )
-        }]
+        [{name: "k", z0: 0, key: ParallelKey.metric("10x8", 20)}]
       ),
       'Keyway "k" is too wide for the shaft'
     );
@@ -1476,11 +1310,7 @@ class MachineKitSmoke {
         null,
         null,
         null,
-        {inputThread: {
-          diameter: 8,
-          pitch: 1,
-          length: 4
-        }}
+        {inputThread: {diameter: 8, pitch: 1, length: 4}}
       ),
       "below the shaft diameter"
     );
@@ -1490,10 +1320,7 @@ class MachineKitSmoke {
         null,
         null,
         null,
-        {shoulders: [{
-          z: 20,
-          fillet: 2
-        }]}
+        {shoulders: [{z: 20, fillet: 2}]}
       ),
       "fillet at z=20 is too large"
     );
@@ -1503,11 +1330,7 @@ class MachineKitSmoke {
         null,
         null,
         null,
-        {shoulders: [{
-          z: 5,
-          reliefWidth: 1,
-          reliefDiameter: 4
-        }]}
+        {shoulders: [{z: 5, reliefWidth: 1, reliefDiameter: 4}]}
       ),
       "not a section boundary"
     );
@@ -1819,14 +1642,7 @@ class MachineKitSmoke {
     );
     var shiftedPair = GearPair.mesh(
       new SpurGear(2, 17, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.1, 0.1),
-      new SpurGear(
-        2,
-        20,
-        12,
-        SpurGear.STANDARD_PRESSURE_ANGLE,
-        0.2,
-        0.05
-      )
+      new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.2, 0.05)
     );
     near(shiftedPair.profileShiftSum, 0.3, "shifted gear pair profile shift");
     near(shiftedPair.backlash, 0.15, "shifted gear pair backlash");
@@ -1844,13 +1660,7 @@ class MachineKitSmoke {
     near(shiftedPair.pose().x, shiftedPair.centerDistance, "shifted gear pair pose offset");
     var shiftedTwenty = GearPair.mesh(
       new SpurGear(1, 20, 10, SpurGear.STANDARD_PRESSURE_ANGLE, 0.5),
-      new SpurGear(
-        1,
-        20,
-        10,
-        SpurGear.STANDARD_PRESSURE_ANGLE,
-        0.5
-      )
+      new SpurGear(1, 20, 10, SpurGear.STANDARD_PRESSURE_ANGLE, 0.5)
     );
     near(shiftedTwenty.centerDistance, 20.88, "20+20 shifted gear centre distance", 0.02);
     near(shiftedTwenty.operatingPressureAngle, 25.8 * Math.PI / 180, "20+20 shifted gear operating angle", 0.001);
@@ -1860,13 +1670,7 @@ class MachineKitSmoke {
     throws(
       () -> GearPair.mesh(
         new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9),
-        new SpurGear(
-          2,
-          40,
-          12,
-          SpurGear.STANDARD_PRESSURE_ANGLE,
-          -0.9
-        )
+        new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9)
       ),
       "compatible profile shifts"
     );
@@ -1877,20 +1681,12 @@ class MachineKitSmoke {
       var bAngle = shiftedPair.bRotation - aAngle * shiftedPair.a.teeth / shiftedPair.b.teeth;
       var aPlaced = shiftedASolid.placed(new Location(new Plane(
         new Vector(0, 0, 0),
-        new Vector(
-          Math.cos(aAngle),
-          Math.sin(aAngle),
-          0
-        ),
+        new Vector(Math.cos(aAngle), Math.sin(aAngle), 0),
         Vector.Z()
       )));
       var bPlaced = shiftedBSolid.placed(new Location(new Plane(
         new Vector(shiftedPair.centerDistance, 0, 0),
-        new Vector(
-          Math.cos(bAngle),
-          Math.sin(bAngle),
-          0
-        ),
+        new Vector(Math.cos(bAngle), Math.sin(bAngle), 0),
         Vector.Z()
       )));
       var overlap = aPlaced.intersect(bPlaced);
@@ -1912,20 +1708,12 @@ class MachineKitSmoke {
       var bAngle = pair.bRotation - aAngle * pinion.teeth / gear.teeth;
       var aPlaced = aSolid.placed(new Location(new Plane(
         new Vector(0, 0, 0),
-        new Vector(
-          Math.cos(aAngle),
-          Math.sin(aAngle),
-          0
-        ),
+        new Vector(Math.cos(aAngle), Math.sin(aAngle), 0),
         Vector.Z()
       )));
       var bPlaced = bSolid.placed(new Location(new Plane(
         new Vector(pair.centerDistance, 0, 0),
-        new Vector(
-          Math.cos(bAngle),
-          Math.sin(bAngle),
-          0
-        ),
+        new Vector(Math.cos(bAngle), Math.sin(bAngle), 0),
         Vector.Z()
       )));
       var overlap = aPlaced.intersect(bPlaced);
@@ -1942,11 +1730,7 @@ class MachineKitSmoke {
     var badBBase = gear.geometry();
     var badB = badBBase.placed(new Location(new Plane(
       new Vector(pair.centerDistance, 0, 0),
-      new Vector(
-        Math.cos(pair.bRotation + Math.PI / gear.teeth),
-        Math.sin(pair.bRotation + Math.PI / gear.teeth),
-        0
-      ),
+      new Vector(Math.cos(pair.bRotation + Math.PI / gear.teeth), Math.sin(pair.bRotation + Math.PI / gear.teeth), 0),
       Vector.Z()
     )));
     var badOverlap = badA.intersect(badB);
@@ -2176,70 +1960,14 @@ class MachineKitSmoke {
     check(mountingBom.quantity("ISO4762-M10x20") == 2, "UCP mounting BOM screws");
     for (reference in [
       {name: "UCP205", bore: 25, length: 140, height: 36.5, boltSpacing: 105, screw: "M10"},
-      {
-        name: "UCP206",
-        bore: 30,
-        length: 165,
-        height: 42.9,
-        boltSpacing: 121,
-        screw: "M14"
-      },
-      {
-        name: "UCP207",
-        bore: 35,
-        length: 167,
-        height: 47.6,
-        boltSpacing: 127,
-        screw: "M14"
-      },
-      {
-        name: "UCP208",
-        bore: 40,
-        length: 184,
-        height: 49.2,
-        boltSpacing: 137,
-        screw: "M14"
-      },
-      {
-        name: "UCP209",
-        bore: 45,
-        length: 190,
-        height: 54,
-        boltSpacing: 146,
-        screw: "M14"
-      },
-      {
-        name: "UCP210",
-        bore: 50,
-        length: 206,
-        height: 57.2,
-        boltSpacing: 159,
-        screw: "M16"
-      },
-      {
-        name: "UCP211",
-        bore: 55,
-        length: 219,
-        height: 63.5,
-        boltSpacing: 171,
-        screw: "M16"
-      },
-      {
-        name: "UCP212",
-        bore: 60,
-        length: 241,
-        height: 69.8,
-        boltSpacing: 184,
-        screw: "M16"
-      },
-      {
-        name: "UCP213",
-        bore: 65,
-        length: 265,
-        height: 76.2,
-        boltSpacing: 203,
-        screw: "M20"
-      }
+      {name: "UCP206", bore: 30, length: 165, height: 42.9, boltSpacing: 121, screw: "M14"},
+      {name: "UCP207", bore: 35, length: 167, height: 47.6, boltSpacing: 127, screw: "M14"},
+      {name: "UCP208", bore: 40, length: 184, height: 49.2, boltSpacing: 137, screw: "M14"},
+      {name: "UCP209", bore: 45, length: 190, height: 54, boltSpacing: 146, screw: "M14"},
+      {name: "UCP210", bore: 50, length: 206, height: 57.2, boltSpacing: 159, screw: "M16"},
+      {name: "UCP211", bore: 55, length: 219, height: 63.5, boltSpacing: 171, screw: "M16"},
+      {name: "UCP212", bore: 60, length: 241, height: 69.8, boltSpacing: 184, screw: "M16"},
+      {name: "UCP213", bore: 65, length: 265, height: 76.2, boltSpacing: 203, screw: "M20"}
     ]) {
       var candidate = PillowBlock.metric(reference.name);
       near(candidate.boreDiameter, reference.bore, reference.name + " bore");
@@ -2914,11 +2642,7 @@ class MachineKitSmoke {
       var result = part.placed(new Location(new Plane(
         new Vector(frame.x, frame.y, frame.z),
         new Vector(x.x, x.y, x.z),
-        new Vector(
-          z.x,
-          z.y,
-          z.z
-        )
+        new Vector(z.x, z.y, z.z)
       )));
       part.close();
       return result;
@@ -3502,11 +3226,7 @@ class MachineKitSmoke {
       weight: 1.0
     }, {
       name: "BenchMillGuideLoads.bare",
-      run: () -> BenchMillGuideLoads.run(
-        new BenchMill(),
-        SceneArtifact.decode(BenchMillPreview.mill()),
-        ""
-      ),
+      run: () -> BenchMillGuideLoads.run(new BenchMill(), SceneArtifact.decode(BenchMillPreview.mill()), ""),
       weight: 1.0
     }, {
       name: "BenchMillPreview.EnclosedMillChecks.run",

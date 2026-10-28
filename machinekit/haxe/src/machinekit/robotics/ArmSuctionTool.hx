@@ -40,21 +40,9 @@ class ArmSuctionTool implements ArmTool {
         [
           new Vector(20, 0, 40),
           new Vector(35, 0, 60),
-          new Vector(
-            35,
-            0,
-            100
-          ),
-          new Vector(
-            -30,
-            0,
-            100
-          ),
-          new Vector(
-            0,
-            0,
-            90
-          )
+          new Vector(35, 0, 100),
+          new Vector(-30, 0, 100),
+          new Vector(0, 0, 90)
         ]
       )
     );

@@ -67,26 +67,11 @@ class CasterWheel extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.caster-wheel",
       [
-        ComponentRecipeSupport.length(
-          "wheelDiameter",
-          75
-        ),
-        ComponentRecipeSupport.length(
-          "wheelWidth",
-          25
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          110
-        ),
-        ComponentRecipeSupport.length(
-          "trail",
-          30
-        ),
-        ComponentRecipeSupport.length(
-          "plateSize",
-          60
-        )
+        ComponentRecipeSupport.length("wheelDiameter", 75),
+        ComponentRecipeSupport.length("wheelWidth", 25),
+        ComponentRecipeSupport.length("height", 110),
+        ComponentRecipeSupport.length("trail", 30),
+        ComponentRecipeSupport.length("plateSize", 60)
       ],
       v -> new CasterWheel(
         v.number("wheelDiameter"),
@@ -131,43 +116,17 @@ class CasterWheel extends MachineComponent {
     var halfFork = wheelWidth / 2 + LEG_GAP + LEG_THICKNESS;
     var legLength = trail + 16;
     var pieces = [
+      Solids.named(Part.box(plateSize, plateSize, PLATE_THICKNESS, Align.Center, Align.Center, Align.Max), "plate"),
+      Solids.named(Part.cylinderSpan(plateSize * 0.3, crownTop, -PLATE_THICKNESS), "swivel"),
       Solids.named(
-        Part.box(plateSize, plateSize, PLATE_THICKNESS, Align.Center, Align.Center, Align.Max),
-        "plate"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          plateSize * 0.3,
-          crownTop,
-          -PLATE_THICKNESS
-        ),
-        "swivel"
-      ),
-      Solids.named(
-        Part.box(
-          legLength,
-          2 * halfFork,
-          4,
-          Align.Max,
-          Align.Center,
-          Align.Min
-        ).translated(new Vector(
+        Part.box(legLength, 2 * halfFork, 4, Align.Max, Align.Center, Align.Min).translated(new Vector(
           8,
           0,
           crownBottom
         )),
         "crown"
       ),
-      Solids.named(
-        Part.cylinderAlongY(
-          wheelDiameter / 2,
-          -wheelWidth / 2,
-          wheelWidth / 2,
-          -trail,
-          axleZ
-        ),
-        "wheel"
-      )
+      Solids.named(Part.cylinderAlongY(wheelDiameter / 2, -wheelWidth / 2, wheelWidth / 2, -trail, axleZ), "wheel")
     ];
     for (side in [-1, 1]) {
       var y = side * (halfFork - LEG_THICKNESS / 2);

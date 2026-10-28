@@ -272,18 +272,12 @@ class ZeroErrReferenceArm extends MachineAssembly {
     addMemberConnector(
       parent,
       id + "-parent",
-      AssemblyFrames.compose(
-        AssemblyFrames.inverse(referencePoses.get(parent)),
-        world
-      )
+      AssemblyFrames.compose(AssemblyFrames.inverse(referencePoses.get(parent)), world)
     );
     addMemberConnector(
       child,
       id + "-child",
-      AssemblyFrames.compose(
-        AssemblyFrames.inverse(referencePoses.get(child)),
-        world
-      )
+      AssemblyFrames.compose(AssemblyFrames.inverse(referencePoses.get(child)), world)
     );
     // No hardware joint limits are known from these exterior reference files.
     addMateOnAxis(id, kind, parent, id + "-parent", child, id + "-child", {x: 0, y: 1, z: 0}, 0);

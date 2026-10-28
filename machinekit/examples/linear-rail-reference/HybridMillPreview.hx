@@ -24,10 +24,7 @@ class HybridMillPreview {
     if (count != 12) throw 'Expected twelve supplier carriages, got $count';
     sys.io.File.saveBytes(
       output + "mill-hybrid.mtrg",
-      SceneArtifact.encode(AssemblyPreview.scene(
-        assembly,
-        "mill-hybrid-rail-reference"
-      ))
+      SceneArtifact.encode(AssemblyPreview.scene(assembly, "mill-hybrid-rail-reference"))
     );
     Sys.println('Exported hybrid mill with $count supplier carriages: ' + output + "mill-hybrid.mtrg");
   }

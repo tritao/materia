@@ -48,24 +48,14 @@ class MobileWeldingRobot extends MobileBase {
     addComponent(
       "cylinder",
       cylinder,
-      AssemblyFrames.translation(
-        equipmentX - source.width / 2 - EQUIPMENT_GAP - GasCylinder.DIAMETER / 2,
-        0,
-        top
-      )
+      AssemblyFrames.translation(equipmentX - source.width / 2 - EQUIPMENT_GAP - GasCylinder.DIAMETER / 2, 0, top)
     );
     // All carried equipment is attached to the deck in the robot's mate tree.
     for (name in ["source", "inverter", "cylinder"]) {
       var poses = solvedPoses();
       var local = AssemblyFrames.compose(
         AssemblyFrames.inverse(poses.get("deck")),
-        AssemblyFrames.compose(
-          poses.get(name),
-          memberConnectorFrame(
-            name,
-            "base"
-          )
-        )
+        AssemblyFrames.compose(poses.get(name), memberConnectorFrame(name, "base"))
       );
       addMemberConnector("deck", name, local);
       addMate('$name-mount', "fixed", "deck", name, name, "base");
@@ -112,12 +102,7 @@ class MobileWeldingRobot extends MobileBase {
       payloadX: halfLength - 300,
       batteryX: equipmentX,
       battery: pack,
-      driveSupply: new IsolatedDcConverter(
-        pack.nominalVolts,
-        48,
-        30,
-        2
-      )
+      driveSupply: new IsolatedDcConverter(pack.nominalVolts, 48, 30, 2)
     };
   }
 }

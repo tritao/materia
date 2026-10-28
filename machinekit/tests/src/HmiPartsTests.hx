@@ -122,34 +122,13 @@ class HmiPartsTests {
     var entries:Array<{p:HmiPart, n:String}> = [
       {p: yumo, n: "YUMO wheel"},
       {p: vallder, n: "Vallder wheel"},
-      {
-        p: estop,
-        n: "E-stop"
-      },
-      {
-        p: estop2,
-        n: "two-block E-stop"
-      },
-      {
-        p: compact,
-        n: "compact E-stop"
-      },
-      {
-        p: axis,
-        n: "axis switch"
-      },
-      {
-        p: step,
-        n: "step switch"
-      },
-      {
-        p: button,
-        n: "button"
-      },
-      {
-        p: oled,
-        n: "OLED"
-      }
+      {p: estop, n: "E-stop"},
+      {p: estop2, n: "two-block E-stop"},
+      {p: compact, n: "compact E-stop"},
+      {p: axis, n: "axis switch"},
+      {p: step, n: "step switch"},
+      {p: button, n: "button"},
+      {p: oled, n: "OLED"}
     ];
     for (entry in entries) checkPart(entry.p, entry.n);
 
@@ -209,24 +188,12 @@ class HmiPartsTests {
     );
     rejects(
       "a ring wider than the flange",
-      () -> new HandWheel(new ComponentValues().setToken(
-        "model",
-        ControlCatalogs.CUSTOM
-      ).setNumber(
-        "ringDiameter",
-        70
-      ))
+      () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("ringDiameter", 70))
     );
     rejects("too many contact blocks", () -> new EmergencyStop(new ComponentValues().setInteger("blocks", 4)));
     rejects(
       "a handle outside the dial",
-      () -> new HandWheel(new ComponentValues().setToken(
-        "model",
-        ControlCatalogs.CUSTOM
-      ).setNumber(
-        "handleRadius",
-        30
-      ))
+      () -> new HandWheel(new ComponentValues().setToken("model", ControlCatalogs.CUSTOM).setNumber("handleRadius", 30))
     );
     rejects("an unknown model", () -> new HandWheel(new ComponentValues().setToken("model", "NOT-A-WHEEL")));
     trace("hmi parts tests passed");

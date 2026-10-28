@@ -23,11 +23,7 @@ class PneumaticCylinderRod extends MachineComponent {
   override public function hasGeometry():Bool return true;
   /** Chamfered rod with its threaded tip (`PneumaticBodies.rod`). The envelope box is also the mass model. */
   override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? Solids.named(
-    Part.cylinderSpan(
-      diameter / 2,
-      -length,
-      0
-    ),
+    Part.cylinderSpan(diameter / 2, -length, 0),
     "rod"
   ) : PneumaticBodies.rod(
     diameter,
@@ -41,20 +37,8 @@ class PneumaticCylinderRod extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.pneumatic.cylinder-rod",
-      [
-        ComponentRecipeSupport.length(
-          "diameter",
-          10
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          115
-        )
-      ],
-      v -> new PneumaticCylinderRod(
-        v.number("diameter"),
-        v.number("length")
-      )
+      [ComponentRecipeSupport.length("diameter", 10), ComponentRecipeSupport.length("length", 115)],
+      v -> new PneumaticCylinderRod(v.number("diameter"), v.number("length"))
     );
     return recipe;
   }

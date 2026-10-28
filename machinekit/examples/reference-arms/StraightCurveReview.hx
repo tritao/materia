@@ -43,10 +43,7 @@ class StraightCurveReview {
       for (j in 0...6) delta = Math.max(delta, Math.abs(rows[i][j] - rows[i - 1][j]));
       knots.push(knots[i - 1] + Math.max(
         1.0,
-        Math.max(
-          1.875 * delta / speed,
-          Math.sqrt(5.773502691896258 * delta / acceleration)
-        )
+        Math.max(1.875 * delta / speed, Math.sqrt(5.773502691896258 * delta / acceleration))
       ));
     }
     var zeros = [for (_ in rows)[for (_ in 0...6) 0.0]];

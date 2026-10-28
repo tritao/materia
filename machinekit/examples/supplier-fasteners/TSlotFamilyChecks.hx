@@ -10,27 +10,9 @@ class TSlotFamilyChecks {
   public static function run():Void {
     var cases = [
       {system: "TSLOT-30-SLOT8", width: 30.0, height: 30.0, slots: 4, bores: 1},
-      {
-        system: "TSLOT-40-SLOT8",
-        width: 40.0,
-        height: 40.0,
-        slots: 4,
-        bores: 1
-      },
-      {
-        system: "TSLOT-40-SLOT8",
-        width: 40.0,
-        height: 80.0,
-        slots: 6,
-        bores: 2
-      },
-      {
-        system: "TSLOT-40-SLOT8",
-        width: 80.0,
-        height: 80.0,
-        slots: 8,
-        bores: 4
-      }
+      {system: "TSLOT-40-SLOT8", width: 40.0, height: 40.0, slots: 4, bores: 1},
+      {system: "TSLOT-40-SLOT8", width: 40.0, height: 80.0, slots: 6, bores: 2},
+      {system: "TSLOT-40-SLOT8", width: 80.0, height: 80.0, slots: 8, bores: 4}
     ];
     for (c in cases) {
       var profile = TSlotExtrusion.forSystem(c.system, c.width, c.height), count = 0;

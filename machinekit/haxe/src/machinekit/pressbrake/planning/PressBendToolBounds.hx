@@ -26,11 +26,7 @@ class PressBendToolBounds {
     return projectionAlong(
       zone,
       placement,
-      axis == 0 ? new Vector(1, 0, 0) : axis == 1 ? new Vector(0, 1, 0) : new Vector(
-        0,
-        0,
-        1
-      )
+      axis == 0 ? new Vector(1, 0, 0) : axis == 1 ? new Vector(0, 1, 0) : new Vector(0, 0, 1)
     );
   }
   public static function projectionAlong(zone:BendZone, placement:Location, axis:Vector):Array<Float> {

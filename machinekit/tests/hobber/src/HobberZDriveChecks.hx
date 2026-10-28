@@ -33,14 +33,7 @@ class HobberZDriveChecks {
     var raw = Part.box(flange.part.boxDimensions(flange.id).width,
       flange.part.boxDimensions(flange.id).depth, 125), back = PosedParts.moved(
         raw,
-        F.compose(
-          flange.pose,
-          F.translation(
-            0,
-            0,
-            -125
-          )
-        )
+        F.compose(flange.pose, F.translation(0, 0, -125))
       );
     raw.close();
     var missing = back.subtract(body), missingMm3 = missing.volume();
@@ -74,10 +67,7 @@ class HobberZDriveChecks {
           var component = members.filter(p -> p.id == id)[0].component;
           var p = cache.posed(component, state.worldPose(id)), saddle = cache.posed(
             members.filter(p -> p.id == "Zplate")[0].component,
-            F.compose(
-              delta,
-              state.worldPose("Zplate")
-            )
+            F.compose(delta, state.worldPose("Zplate"))
           );
           var gap = p.distance(saddle);
           p.close();

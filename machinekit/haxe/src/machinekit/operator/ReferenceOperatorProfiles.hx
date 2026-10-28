@@ -9,54 +9,10 @@ class ReferenceOperatorProfiles {
 
   public static function drillTap():OperatorProfile return new OperatorProfile(
     "drill-tap",
-    axes([
-      ["x", "X"],
-      ["y", "Y"],
-      [
-        "z",
-        "Z"
-      ],
-      [
-        "a",
-        "A"
-      ],
-      [
-        "spindle",
-        "Spindle"
-      ]
-    ]),
-    [
-      "x",
-      "y",
-      "z",
-      "a",
-      "spindle",
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-    [
-      new OperatorKey(
-        DoorToggle,
-        "Door"
-      ),
-      new OperatorKey(
-        SpindleJog,
-        "Spin"
-      ),
-      new OperatorKey(
-        Mist,
-        "MQL"
-      )
-    ],
-    [
-      Auto,
-      Mdi,
-      Jog
-    ],
+    axes([["x", "X"], ["y", "Y"], ["z", "Z"], ["a", "A"], ["spindle", "Spindle"]]),
+    ["x", "y", "z", "a", "spindle", null, null, null, null, null, null],
+    [new OperatorKey(DoorToggle, "Door"), new OperatorKey(SpindleJog, "Spin"), new OperatorKey(Mist, "MQL")],
+    [Auto, Mdi, Jog],
     true,
     true,
     []
@@ -64,74 +20,12 @@ class ReferenceOperatorProfiles {
 
   public static function hobber():OperatorProfile return new OperatorProfile(
     "hobber",
-    axes([
-      ["c", "C table"],
-      [
-        "b",
-        "B hob"
-      ],
-      [
-        "x",
-        "X"
-      ],
-      [
-        "y",
-        "Y"
-      ],
-      [
-        "z",
-        "Z"
-      ],
-      [
-        "a",
-        "A"
-      ]
-    ]),
-    [
-      "x",
-      "y",
-      "z",
-      "a",
-      "b",
-      "c",
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-    [
-      new OperatorKey(
-        DoorToggle,
-        "Door"
-      ),
-      new OperatorKey(
-        SpindleJog,
-        "Hob"
-      ),
-      new OperatorKey(
-        WorkLight,
-        "Light"
-      )
-    ],
-    [
-      Auto,
-      Mdi,
-      Jog
-    ],
+    axes([["c", "C table"], ["b", "B hob"], ["x", "X"], ["y", "Y"], ["z", "Z"], ["a", "A"]]),
+    ["x", "y", "z", "a", "b", "c", null, null, null, null, null],
+    [new OperatorKey(DoorToggle, "Door"), new OperatorKey(SpindleJog, "Hob"), new OperatorKey(WorkLight, "Light")],
+    [Auto, Mdi, Jog],
     true,
     true,
-    [
-      new JogRule(
-        "b",
-        GearboxEngaged,
-        "Gearbox engaged"
-      ),
-      new JogRule(
-        "c",
-        GearboxEngaged,
-        "Gearbox engaged"
-      )
-    ]
+    [new JogRule("b", GearboxEngaged, "Gearbox engaged"), new JogRule("c", GearboxEngaged, "Gearbox engaged")]
   );
 }

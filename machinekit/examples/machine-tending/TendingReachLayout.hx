@@ -121,64 +121,25 @@ class TendingReachLayout {
         root,
         "poses"
       ))({
-        name: field(
-          pose,
-          "name"
-        ),
-        tool: field(
-          pose,
-          "tool"
-        ),
-        position: numbers(field(
-          pose,
-          "position"
-        )),
-        target: frameOf(field(
-          pose,
-          "target"
-        )),
-        toolYaw: number(
-          pose,
-          "toolYaw"
-        )
+        name: field(pose, "name"),
+        tool: field(pose, "tool"),
+        position: numbers(field(pose, "position")),
+        target: frameOf(field(pose, "target")),
+        toolYaw: number(pose, "toolYaw")
       }: TendingReachPose)], transfers: [for (transfer in list(
         root,
         "transfers"
       ))({
         request: {
-          station: field(
-            transfer,
-            "station"
-          ),
-          tool: field(
-            transfer,
-            "tool"
-          ),
-          fromTool: field(
-            transfer,
-            "fromTool"
-          ),
-          fromPose: field(
-            transfer,
-            "fromPose"
-          ),
-          toPose: field(
-            transfer,
-            "toPose"
-          ),
-          door: door(field(
-            transfer,
-            "door"
-          )),
-          role: role(field(
-            transfer,
-            "role"
-          ))
+          station: field(transfer, "station"),
+          tool: field(transfer, "tool"),
+          fromTool: field(transfer, "fromTool"),
+          fromPose: field(transfer, "fromPose"),
+          toPose: field(transfer, "toPose"),
+          door: door(field(transfer, "door")),
+          role: role(field(transfer, "role"))
         },
-        positions: [for (position in (field(
-          transfer,
-          "positions"
-        ): Array<Dynamic>)) numbers(position)]
+        positions: [for (position in (field(transfer, "positions"): Array<Dynamic>)) numbers(position)]
       }: TendingReachTransfer)], trays: [for (tray in list(
         root,
         "trays"

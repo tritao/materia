@@ -45,22 +45,8 @@ class Bushing extends MachineComponent {
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Solids.named(
-      Part.cylinderSpan(
-        outerDiameter / 2,
-        0,
-        length
-      ),
-      "body"
-    ),
-    [Solids.named(
-      Part.cylinderSpan(
-        boreDiameter / 2,
-        -0.1,
-        length + 0.1
-      ),
-      "bore"
-    )]
+    Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, length), "body"),
+    [Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore")]
   );
 
   private static var recipeTypeCache:Null<ComponentType>;
@@ -69,24 +55,11 @@ class Bushing extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.bushing",
       [
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "outerDiameter",
-          12
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          10
-        )
+        ComponentRecipeSupport.length("boreDiameter", 8),
+        ComponentRecipeSupport.length("outerDiameter", 12),
+        ComponentRecipeSupport.length("length", 10)
       ],
-      v -> new Bushing(
-        v.number("boreDiameter"),
-        v.number("outerDiameter"),
-        v.number("length")
-      )
+      v -> new Bushing(v.number("boreDiameter"), v.number("outerDiameter"), v.number("length"))
     );
     return recipeTypeCache;
   }

@@ -72,11 +72,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.limit-switch",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "GENERIC-ROLLER-MICROSWITCH"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-ROLLER-MICROSWITCH")],
       v -> new LimitSwitch(v.token("designation"))
     );
     return recipe;
@@ -114,13 +110,7 @@ class LimitSwitch extends MachineComponent implements SwitchPart {
     leverBase.close();
     parts.push(lever);
     var roller = Solids.named(
-      Part.cylinderAlongY(
-        spec.rollerDiameter / 2,
-        -3,
-        3,
-        spec.width * 0.4,
-        spec.depth + spec.rollerDiameter / 2
-      ),
+      Part.cylinderAlongY(spec.rollerDiameter / 2, -3, 3, spec.width * 0.4, spec.depth + spec.rollerDiameter / 2),
       "roller"
     );
     parts.push(roller);

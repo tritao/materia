@@ -26,12 +26,7 @@ class ScrewPresenter extends MachineAssembly {
       "mount",
       {x: 1, y: 0, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 15,
-        velocity: 50,
-        effort: 10
-      }
+      {lower: 0, upper: 15, velocity: 50, effort: 10}
     );
     addComponent("screw", screw);
     addMate("presented-screw", "fixed", "nest", "seat", "screw", "head");
@@ -42,11 +37,7 @@ class ScrewPresenter extends MachineAssembly {
       addComponent(
         "part-present",
         new machinekit.control.DigitalSensor("presence"),
-        AssemblyFrames.translation(
-          35,
-          0,
-          screw.length + 5
-        )
+        AssemblyFrames.translation(35, 0, screw.length + 5)
       );
       exposePort("presence", "part-present", "signal");
     }
@@ -76,48 +67,16 @@ private class PresenterNest extends MachineComponent {
     // boxes also retain the opening on the deterministic OBB backend.
     addFacet(machinekit.component.CollisionHullFacet.fromBoxes([
       [-25.0, -25.0, 0.0, 25.0, 25.0, BORE_FLOOR],
-      [
-        -25.0,
-        -25.0,
-        BORE_FLOOR,
-        -radius,
-        25.0,
-        height
-      ],
-      [
-        radius,
-        -25.0,
-        BORE_FLOOR,
-        25.0,
-        25.0,
-        height
-      ],
-      [
-        -radius,
-        -25.0,
-        BORE_FLOOR,
-        radius,
-        -radius,
-        height
-      ],
-      [
-        -radius,
-        radius,
-        BORE_FLOOR,
-        radius,
-        25.0,
-        height
-      ]
+      [-25.0, -25.0, BORE_FLOOR, -radius, 25.0, height],
+      [radius, -25.0, BORE_FLOOR, 25.0, 25.0, height],
+      [-radius, -25.0, BORE_FLOOR, radius, -radius, height],
+      [-radius, radius, BORE_FLOOR, radius, 25.0, height]
     ]));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
     Part.box(50, 50, height),
-    [Part.cylinderSpan(
-      boreRadius(),
-      BORE_FLOOR,
-      height + 0.1
-    )]
+    [Part.cylinderSpan(boreRadius(), BORE_FLOOR, height + 0.1)]
   );
   function boreRadius():Float return screw.diameter / 2 + 0.3;
 }

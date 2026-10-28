@@ -60,12 +60,7 @@ class FrozenReferenceControl {
       }
       sys.io.File.saveContent(
         build + "/replay.json",
-        haxe.Json.stringify({
-          commands: total,
-          runs: feedbacks,
-          hardwareConnected: false,
-          stubOnly: true
-        })
+        haxe.Json.stringify({commands: total, runs: feedbacks, hardwareConnected: false, stubOnly: true})
       );
       Sys.println('Replayed $total approved timed SI commands through eRob stub in four independent runs');
       return;

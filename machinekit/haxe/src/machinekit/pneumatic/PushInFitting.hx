@@ -52,13 +52,7 @@ class PushInFitting extends MachineComponent {
         standardEdition: null,
         dimensionKind: Mixed,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "envelopeDiameterMm",
-          "envelopeLengthMm",
-          "tubeOdMm",
-          "thread",
-          "massKg"
-        ]
+        verifiedFields: ["envelopeDiameterMm", "envelopeLengthMm", "tubeOdMm", "thread", "massKg"]
       })
     );
     return table;
@@ -82,11 +76,7 @@ class PushInFitting extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.pneumatic.push-in-fitting",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        PushInFitting.catalog(),
-        "10.08.02.00203"
-      )],
+      [ComponentRecipeSupport.catalog("designation", PushInFitting.catalog(), "10.08.02.00203")],
       v -> new PushInFitting(v.token("designation")),
       true
     );

@@ -22,22 +22,10 @@ class TendingElectricCollisionAudit {
     x: field(v, "x"),
     y: field(v, "y"),
     z: field(v, "z"),
-    qx: field(
-      v,
-      "qx"
-    ),
-    qy: field(
-      v,
-      "qy"
-    ),
-    qz: field(
-      v,
-      "qz"
-    ),
-    qw: field(
-      v,
-      "qw"
-    )
+    qx: field(v, "qx"),
+    qy: field(v, "qy"),
+    qz: field(v, "qz"),
+    qw: field(v, "qw")
   };
   static function place(shape:Shape, f:AssemblyFrame):Shape {
     var m = AssemblyFrames.toRotationMatrix(f);
@@ -156,13 +144,7 @@ class TendingElectricCollisionAudit {
       var component = entry.component.geometry();
       armSolids.push({
         id: entry.id,
-        shape: place(
-          component.shape,
-          AssemblyFrames.compose(
-            placement,
-            state.worldPose(entry.id)
-          )
-        )
+        shape: place(component.shape, AssemblyFrames.compose(placement, state.worldPose(entry.id)))
       });
       component.close();
     }
@@ -190,18 +172,9 @@ class TendingElectricCollisionAudit {
       haxe.Json.stringify(
         {
           scope: "One solved robot pose; actual static service cable/support CAD. No flexible harness or motion clearance certification.",
-          profile: Reflect.field(
-            chosen,
-            "profile"
-          ),
-          station: Reflect.field(
-            chosen,
-            "station"
-          ),
-          side: Reflect.field(
-            chosen,
-            "side"
-          ),
+          profile: Reflect.field(chosen, "profile"),
+          station: Reflect.field(chosen, "station"),
+          side: Reflect.field(chosen, "side"),
           sourceReportSha256: haxe.crypto.Sha256.encode(reportText),
           pairs: serviceChecks
         },
@@ -238,18 +211,9 @@ class TendingElectricCollisionAudit {
           calibration: calibrated,
           sourceReport: reportFile,
           sourceReportSha256: haxe.crypto.Sha256.encode(reportText),
-          profile: Reflect.field(
-            chosen,
-            "profile"
-          ),
-          station: Reflect.field(
-            chosen,
-            "station"
-          ),
-          side: Reflect.field(
-            chosen,
-            "side"
-          ),
+          profile: Reflect.field(chosen, "profile"),
+          station: Reflect.field(chosen, "station"),
+          side: Reflect.field(chosen, "side"),
           tool: toolName,
           arm: armName,
           reportedMeshHullDistanceMm: reportedDistance,

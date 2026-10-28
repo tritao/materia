@@ -7,45 +7,14 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Angular-contact precision bearing. Reference row is Assumed: its outside, bore and height are not a product's. */
 class AngularContactBearing extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      62,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      25,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      17,
-      "mm"
-    ),
-    P.text(
-      "precisionClass",
-      "P4"
-    ),
-    P.quantity(
-      "contactAngle",
-      25 * Math.PI / 180,
-      "rad"
-    ),
-    P.quantity(
-      "radialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "axialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "momentStiffness",
-      150000,
-      "N m/rad"
-    )
+    P.quantity("outside", 62, "mm"),
+    P.quantity("bore", 25, "mm"),
+    P.quantity("height", 17, "mm"),
+    P.text("precisionClass", "P4"),
+    P.quantity("contactAngle", 25 * Math.PI / 180, "rad"),
+    P.quantity("radialRunout", 0.002, "mm"),
+    P.quantity("axialRunout", 0.002, "mm"),
+    P.quantity("momentStiffness", 150000, "N m/rad")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

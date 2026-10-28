@@ -12,26 +12,11 @@ import materia.project.SceneArtifact;
 class HobberEnclosurePreview {
   static function union(a:PartBox, b:PartBox):PartBox return {
     minX: Math.min(a.minX, b.minX),
-    minY: Math.min(
-      a.minY,
-      b.minY
-    ),
-    minZ: Math.min(
-      a.minZ,
-      b.minZ
-    ),
-    maxX: Math.max(
-      a.maxX,
-      b.maxX
-    ),
-    maxY: Math.max(
-      a.maxY,
-      b.maxY
-    ),
-    maxZ: Math.max(
-      a.maxZ,
-      b.maxZ
-    )
+    minY: Math.min(a.minY, b.minY),
+    minZ: Math.min(a.minZ, b.minZ),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY),
+    maxZ: Math.max(a.maxZ, b.maxZ)
   };
   static function grow(b:PartBox, p:Float):PartBox return {
     minX: b.minX - p,
@@ -123,10 +108,7 @@ class HobberEnclosurePreview {
       var loading:PartBox = {
         minX: origin.x - r - 25,
         maxX: origin.x + r + 25,
-        minY: Math.min(
-          origin.y - machinekit.hobbing.HobberXLayout.FRONT_APPROACH - r - 80,
-          swept.minY - 225
-        ),
+        minY: Math.min(origin.y - machinekit.hobbing.HobberXLayout.FRONT_APPROACH - r - 80, swept.minY - 225),
         maxY: origin.y + 15,
         minZ: origin.z - 60,
         maxZ: origin.z + 80 + machinekit.hobbing.HobberXLayout.FRONT_LIFT
@@ -207,16 +189,12 @@ class HobberEnclosurePreview {
       shell: shell,
       machine: machine,
       report: {
-        samples: fit
-      .samples,
-      angularPaddingMm: fit.paddingMm,
-      excludedElectricalRack: fit.excluded,
-      input: fit.layout.input,
-      dimensionsMm: [
-        fit.layout.width(),
-        fit.layout.depth(),
-        fit.layout.height()
-      ],
+        samples: fit.samples,
+        angularPaddingMm: fit.paddingMm,
+        excludedElectricalRack: fit.excluded,
+        input: fit.layout.input,
+        dimensionsMm: [fit.layout.width(),
+      fit.layout.depth(), fit.layout.height()],
       doorStrokeMm: fit.layout.stroke,
       doorLeaves: 2,
       doorDrive: "Proposed bought rod-style electric actuator, at least 210 mm usable stroke, plus passive opposite-run belt; ideal coupling only, hardware not sized",
@@ -295,14 +273,8 @@ class HobberEnclosurePreview {
       doorJoint: "enclosure/door/slide",
       closedSensor: "enclosure/door/closed",
       openSensor: "enclosure/door/open",
-      spindleJoints: [
-        axes[4],
-        axes[5]
-      ],
-      axisJoints: axes.slice(
-        0,
-        4
-      ),
+      spindleJoints: [axes[4], axes[5]],
+      axisJoints: axes.slice(0, 4),
       stroke: stroke * 0.001,
       setupSpeedLimit: 0.025,
       timeoutSeconds: 10,

@@ -81,11 +81,7 @@ class SupportFamilyChecks {
     }
     sys.io.File.saveContent(
       machinekit.catalog.SupplierLibraries.vallder() + "/support-bore-checks.json",
-      haxe.Json.stringify(
-        rows,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(rows, null, "  ")
     );
     trace("Support bore probe report written");
   }

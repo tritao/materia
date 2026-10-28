@@ -31,34 +31,19 @@ class BenchMillGuideLoads {
         axis: "x",
         root: "blockXFront",
         rail: "railXFront",
-        blocks: [
-          "blockXFront",
-          "blockXFrontRear",
-          "blockXBack",
-          "blockXBackRear"
-        ]
+        blocks: ["blockXFront", "blockXFrontRear", "blockXBack", "blockXBackRear"]
       },
       {
         axis: "y",
         root: "blockYLeft",
         rail: "railYLeft",
-        blocks: [
-          "blockYLeft",
-          "blockYLeftRear",
-          "blockYRight",
-          "blockYRightRear"
-        ]
+        blocks: ["blockYLeft", "blockYLeftRear", "blockYRight", "blockYRightRear"]
       },
       {
         axis: "z",
         root: "blockZLeft",
         rail: "railZLeft",
-        blocks: [
-          "blockZLeft",
-          "blockZLeftTop",
-          "blockZRight",
-          "blockZRightTop"
-        ]
+        blocks: ["blockZLeft", "blockZLeftTop", "blockZRight", "blockZRightTop"]
       }
     ];
     var accelerations:Array<{x:Float, y:Float, z:Float}> = [];

@@ -11,10 +11,7 @@ class MillSpindleMotorMount extends MachineComponent {
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return [
     P.length("height", 80),
-    P.flag(
-      "centered",
-      false
-    )
+    P.flag("centered", false)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -37,33 +34,14 @@ class MillSpindleMotorMount extends MachineComponent {
     var h = parameterNumber("height");
     var rows = [
       Part.box(188, 100, 12).translated(new Vector(139, 78, h)),
-      Part.box(30, 70, 10).translated(new Vector(
-        60,
-        68,
-        0
-      ))
+      Part.box(30, 70, 10).translated(new Vector(60, 68, 0))
     ];
     for (y in [44.0, 92.0]) {
       rows.push(Part.box(12, 12, h + 1).translated(new Vector(75, y, 0)));
       var rib = Part.prism([new Vector(75, 8), new Vector(75, h + 1), new Vector(85, h + 1)], -6, 6);
       rows.push(machinekit.assembly.PosedParts.moved(
         rib,
-        materia.assembly.AssemblyFrames.fromRotationMatrix(
-          0,
-          y,
-          0,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        materia.assembly.AssemblyFrames.fromRotationMatrix(0, y, 0, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       ));
       rib.close();
     }
@@ -74,36 +52,13 @@ class MillSpindleMotorMount extends MachineComponent {
       tools.push(Solids.union([
         Part.cylinderSpan(r, z, h + 13, 142, 78),
         Part.cylinderSpan(r, z, h + 13, 158, 78),
-        Part.box(
-          16,
-          2 * r,
-          h + 13 - z
-        ).translated(new Vector(
-          150,
-          78,
-          z
-        ))
+        Part.box(16, 2 * r, h + 13 - z).translated(new Vector(150, 78, z))
       ]));
     }
     var tap = Part.cylinderSpan(2.5, 218, 233);
     tools.push(machinekit.assembly.PosedParts.moved(
       tap,
-      materia.assembly.AssemblyFrames.fromRotationMatrix(
-        0,
-        78,
-        h + 18,
-        [
-          0,
-          0,
-          1,
-          1,
-          0,
-          0,
-          0,
-          1,
-          0
-        ]
-      )
+      materia.assembly.AssemblyFrames.fromRotationMatrix(0, 78, h + 18, [0, 0, 1, 1, 0, 0, 0, 1, 0])
     ));
     tap.close();
     for (x in [120.0, 180.0]) for (y in [48.0, 108.0]) tools.push(Part.box(21, 5.5, 14).translated(new Vector(
@@ -134,55 +89,19 @@ class MillSpindleMotorMount extends MachineComponent {
       tools.push(Solids.union([
         Part.cylinderSpan(r, z, h + 13, 0, 115),
         Part.cylinderSpan(r, z, h + 13, 0, 125),
-        Part.box(
-          2 * r,
-          10,
-          h + 13 - z
-        ).translated(new Vector(
-          0,
-          120,
-          z
-        ))
+        Part.box(2 * r, 10, h + 13 - z).translated(new Vector(0, 120, z))
       ]));
     }
     for (x in [-30.0, 30.0]) for (y in [90.0, 150.0]) {
       tools.push(Solids.union([
         Part.cylinderSpan(2.75, h - 1, h + 13, x, y - 5),
-        Part.cylinderSpan(
-          2.75,
-          h - 1,
-          h + 13,
-          x,
-          y + 5
-        ),
-        Part.box(
-          5.5,
-          10,
-          14
-        ).translated(new Vector(
-          x,
-          y,
-          h - 1
-        ))
+        Part.cylinderSpan(2.75, h - 1, h + 13, x, y + 5),
+        Part.box(5.5, 10, 14).translated(new Vector(x, y, h - 1))
       ]));
       tools.push(Solids.union([
         Part.cylinderSpan(4.75, h - 1, h + 6, x, y - 5),
-        Part.cylinderSpan(
-          4.75,
-          h - 1,
-          h + 6,
-          x,
-          y + 5
-        ),
-        Part.box(
-          9.5,
-          10,
-          7
-        ).translated(new Vector(
-          x,
-          y,
-          h - 1
-        ))
+        Part.cylinderSpan(4.75, h - 1, h + 6, x, y + 5),
+        Part.box(9.5, 10, 7).translated(new Vector(x, y, h - 1))
       ]));
     }
     pieces.push(Part.box(20, 12, 16).translated(new Vector(MillSpindleMotorLayout.TENSION_X, 42, h + 12)));

@@ -147,11 +147,7 @@ class WeldProbeGeometry {
       face.member,
       face.face,
       face.target,
-      new Vector(
-        face.normal[0],
-        face.normal[1],
-        face.normal[2]
-      ),
+      new Vector(face.normal[0], face.normal[1], face.normal[2]),
       point(face.centre),
       [for (edge in face.chords)[for (vertex in edge) point(vertex)]]
     )]);
@@ -205,16 +201,8 @@ class WeldProbeGeometry {
         var placed:Part;
         try placed = local.placed(new Location(new Plane(
           new Vector(relative.x, relative.y, relative.z),
-          new Vector(
-            x.x,
-            x.y,
-            x.z
-          ),
-          new Vector(
-            z.x,
-            z.y,
-            z.z
-          )
+          new Vector(x.x, x.y, x.z),
+          new Vector(z.x, z.y, z.z)
         ))) catch (error:Dynamic) {
           local.close();
           throw error;

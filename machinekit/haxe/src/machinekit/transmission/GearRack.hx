@@ -40,16 +40,8 @@ class GearRack extends MachineComponent {
         0,
         -spec.pitchHeightMm + spec.holeHeightMm,
         spec.holeEndMm + i * spec.holePitchMm,
-        [
-          -1.0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          0,
-          1
-        ]
+        [-1.0, 0, 0],
+        [0.0, 0, 1]
       )
     );
     for (i in 0...2) addConnector(
@@ -59,16 +51,8 @@ class GearRack extends MachineComponent {
         0,
         -spec.pitchHeightMm + spec.holeHeightMm,
         i == 0 ? spec.pinEndMm : spec.lengthMm - spec.pinEndMm,
-        [
-          -1.0,
-          0,
-          0
-        ],
-        [
-          0.0,
-          0,
-          1
-        ]
+        [-1.0, 0, 0],
+        [0.0, 0, 1]
       )
     );
     addConnector("back", Mount, F.translation(0, -spec.pitchHeightMm, 0));
@@ -80,14 +64,7 @@ class GearRack extends MachineComponent {
     declareMass(
       m,
       new Vector(b / 2, -spec.pitchHeightMm + h / 2, l / 2),
-      new InertiaTensor(
-        m * (h * h + l * l) / 12,
-        0,
-        0,
-        m * (b * b + l * l) / 12,
-        0,
-        m * (b * b + h * h) / 12
-      )
+      new InertiaTensor(m * (h * h + l * l) / 12, 0, 0, m * (b * b + l * l) / 12, 0, m * (b * b + h * h) / 12)
     );
   }
   public static function recipeType():ComponentType {

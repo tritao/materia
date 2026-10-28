@@ -40,13 +40,7 @@ class PneumaticBodies {
   /** A manifold bar along z with `outlets` ports drilled into its front and the inlet into its base. */
   public static function manifold(width:Float, depth:Float, height:Float, outlets:Int):Part {
     return build(keep -> {var pieces = [keep(
-      chamferedBox(
-        width,
-        depth,
-        height,
-        Math.min(width, depth) * 0.08,
-        -width / 2
-      ),
+      chamferedBox(width, depth, height, Math.min(width, depth) * 0.08, -width / 2),
       "bar"
     )];
     var pitch = (height - 12) / outlets, r = Math.min(width, height / outlets) * 0.2;
@@ -64,14 +58,7 @@ class PneumaticBodies {
     return build(keep -> {var body = height * 0.62, r = Math.min(width, depth) * 0.42;
     var pieces = [
       keep(chamferedBox(width, depth, body, Math.min(width, depth) * 0.08, -width / 2), "venturi-body"),
-      keep(
-        Part.cylinderSpan(
-          r,
-          body - 0.01,
-          height
-        ),
-        "silencer"
-      )
+      keep(Part.cylinderSpan(r, body - 0.01, height), "silencer")
     ];
     var port = Math.min(width, body) * 0.14;
     var tools = [for (z in [body * 0.3,
@@ -86,16 +73,7 @@ class PneumaticBodies {
     var pieces = [
       keep(Part.cylinderSpan(Math.min(width, depth) * 0.25, 0, boss + 0.01), "port-boss"),
       keep(
-        chamferedBox(
-          width,
-          depth,
-          height - boss,
-          Math.min(
-            width,
-            depth
-          ) * 0.08,
-          -width / 2
-        ).translated(new Vector(
+        chamferedBox(width, depth, height - boss, Math.min(width, depth) * 0.08, -width / 2).translated(new Vector(
           0,
           0,
           boss
@@ -129,37 +107,15 @@ class PneumaticBodies {
       ),
       keep(
         Part.revolve([
-          {
-            r: bowl * 0.35,
-            z: drain
-          },
-          {
-            r: bowl,
-            z: drain + bowl * 0.4
-          },
-          {
-            r: bowl,
-            z: height - head + 0.01
-          },
-          {
-            r: 0,
-            z: height - head + 0.01
-          },
-          {
-            r: 0,
-            z: drain
-          }
+          {r: bowl * 0.35, z: drain},
+          {r: bowl, z: drain + bowl * 0.4},
+          {r: bowl, z: height - head + 0.01},
+          {r: 0, z: height - head + 0.01},
+          {r: 0, z: drain}
         ]),
         "bowl"
       ),
-      keep(
-        Part.cylinderSpan(
-          bowl * 0.2,
-          0,
-          drain + 0.01
-        ),
-        "drain"
-      )
+      keep(Part.cylinderSpan(bowl * 0.2, 0, drain + 0.01), "drain")
     ];
     var gauge = Math.min(width, head) * 0.3;
     var tools = [keep(Part.cylinderAlongY(gauge, -depth / 2 - 0.1, -depth / 2 + 1.2, 0, height - head / 2), "gauge")];
@@ -176,22 +132,10 @@ class PneumaticBodies {
         {r: stem, z: 0},
         {r: stem, z: neck},
         {r: r * 0.9, z: height * 0.85},
-        {
-          r: r,
-          z: height
-        },
-        {
-          r: r * 0.8,
-          z: height
-        },
-        {
-          r: stem * 0.6,
-          z: neck + height * 0.12
-        },
-        {
-          r: 0,
-          z: neck + height * 0.12
-        }
+        {r: r, z: height},
+        {r: r * 0.8, z: height},
+        {r: stem * 0.6, z: neck + height * 0.12},
+        {r: 0, z: neck + height * 0.12}
       ]),
       "cup"
     );
@@ -205,26 +149,11 @@ class PneumaticBodies {
         {r: 0, z: tip},
         {r: r * 0.7 - c, z: tip},
         {r: r * 0.7, z: tip + c},
-        {
-          r: r * 0.7,
-          z: tip + flats
-        },
-        {
-          r: r,
-          z: tip + flats + c
-        },
-        {
-          r: r,
-          z: -c
-        },
-        {
-          r: r - c,
-          z: 0
-        },
-        {
-          r: 0,
-          z: 0
-        }
+        {r: r * 0.7, z: tip + flats},
+        {r: r, z: tip + flats + c},
+        {r: r, z: -c},
+        {r: r - c, z: 0},
+        {r: 0, z: 0}
       ]),
       "rod"
     );
@@ -232,30 +161,12 @@ class PneumaticBodies {
 
   static function chamferedBox(dx:Float, dy:Float, dz:Float, c:Float, x0:Float):Part return Part.prism(
     [
-      new Vector(
-        -dy / 2,
-        0
-      ),
-      new Vector(
-        dy / 2,
-        0
-      ),
-      new Vector(
-        dy / 2,
-        dz - c
-      ),
-      new Vector(
-        dy / 2 - c,
-        dz
-      ),
-      new Vector(
-        -dy / 2 + c,
-        dz
-      ),
-      new Vector(
-        -dy / 2,
-        dz - c
-      )
+      new Vector(-dy / 2, 0),
+      new Vector(dy / 2, 0),
+      new Vector(dy / 2, dz - c),
+      new Vector(dy / 2 - c, dz),
+      new Vector(-dy / 2 + c, dz),
+      new Vector(-dy / 2, dz - c)
     ],
     x0,
     x0 + dx
@@ -263,11 +174,7 @@ class PneumaticBodies {
 
   /** Places a prism drawn in (y, z) and extruded along its z so that the extrusion runs along +x. */
   static function alongX():cadkit.modeling.Location return new cadkit.modeling.Location(new cadkit.modeling.Plane(
-    new Vector(
-      0,
-      0,
-      0
-    ),
+    new Vector(0, 0, 0),
     Vector.Y(),
     Vector.X()
   ));

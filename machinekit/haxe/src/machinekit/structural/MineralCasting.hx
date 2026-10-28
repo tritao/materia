@@ -22,39 +22,14 @@ class MineralCasting extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 650),
     P.length("depth", 550),
-    P.length(
-      "height",
-      120
-    ),
-    P.length(
-      "cornerChamfer",
-      0
-    ),
-    P.text(
-      "features",
-      CastingPatterns.encode([])
-    ),
-    P.choice(
-      "buildStage",
-      materia.casting.InsertStages.tokens(),
-      materia.casting.InsertStages.InsertStage.Service
-    ),
-    P.text(
-      "postCureBonds",
-      "[]"
-    ),
-    P.text(
-      "embeddedAnchors",
-      "[]"
-    ),
-    P.text(
-      "datumScheme",
-      "null"
-    ),
-    P.text(
-      "interfaces",
-      "[]"
-    )
+    P.length("height", 120),
+    P.length("cornerChamfer", 0),
+    P.text("features", CastingPatterns.encode([])),
+    P.choice("buildStage", materia.casting.InsertStages.tokens(), materia.casting.InsertStages.InsertStage.Service),
+    P.text("postCureBonds", "[]"),
+    P.text("embeddedAnchors", "[]"),
+    P.text("datumScheme", "null"),
+    P.text("interfaces", "[]")
   ];
 
   public static function recipeType():ComponentType {

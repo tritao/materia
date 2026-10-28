@@ -17,11 +17,7 @@ class NativeMoldKernelTests {
     var kernel = new machinekit.tooling.NativeCastingMoldKernel();
     var block = CastingRegion.Placed({
       solid: Cut(materia.casting.CastingSolid.Box(20, 30, 40)),
-      pose: F.translation(
-        10,
-        20,
-        30
-      )
+      pose: F.translation(10, 20, 30)
     });
     var properties = kernel.moments(block);
     near(properties.volumeMm3, 24000, "native region volume");
@@ -43,17 +39,8 @@ class NativeMoldKernelTests {
     if (section == null) throw "Missing proven box prism";
     near(section.depth, 40, "prism depth comes from exact material extrema");
     var ring = CastingRegion.Difference(
-      CastingRegion.Placed({
-        solid: Cut(materia.casting.CastingSolid.Cylinder(40, 40)),
-        pose: F.identity()
-      }),
-      [CastingRegion.Placed({
-        solid: Cut(materia.casting.CastingSolid.Cylinder(
-          20,
-          40
-        )),
-        pose: F.identity()
-      })]
+      CastingRegion.Placed({solid: Cut(materia.casting.CastingSolid.Cylinder(40, 40)), pose: F.identity()}),
+      [CastingRegion.Placed({solid: Cut(materia.casting.CastingSolid.Cylinder(20, 40)), pose: F.identity()})]
     );
     var annulus = kernel.prismaticSection(ring, {x: 0, y: 0, z: 1}, 1e-7, "annular-prism");
     check(
@@ -62,13 +49,7 @@ class NativeMoldKernelTests {
     );
     var nested = CastingRegion.Union([
       ring,
-      CastingRegion.Placed({
-        solid: Cut(materia.casting.CastingSolid.Cylinder(
-          10,
-          40
-        )),
-        pose: F.identity()
-      })
+      CastingRegion.Placed({solid: Cut(materia.casting.CastingSolid.Cylinder(10, 40)), pose: F.identity()})
     ]);
     var island = kernel.prismaticSection(nested, {x: 0, y: 0, z: 1}, 1e-7, "nested-material");
     check(
@@ -77,19 +58,11 @@ class NativeMoldKernelTests {
     );
     var removed = CastingRegion.Placed({
       solid: Cut(materia.casting.CastingSolid.Box(4, 5, 10)),
-      pose: F.translation(
-        18,
-        20,
-        35
-      )
+      pose: F.translation(18, 20, 35)
     });
     var added = CastingRegion.Placed({
       solid: Cut(materia.casting.CastingSolid.Box(4, 5, 10)),
-      pose: F.translation(
-        22,
-        20,
-        55
-      )
+      pose: F.translation(22, 20, 55)
     });
     var deceptive = CastingRegion.Union([CastingRegion.Difference(block, [removed]), added]);
     near(kernel.moments(deceptive).volumeMm3, 24000, "counterexample preserves volume and both end/middle sections");
@@ -99,20 +72,7 @@ class NativeMoldKernelTests {
     );
     var obliquePose = F.fromRotationMatrix(5, 7, 11, [0, 0, 1, 1, 0, 0, 0, 1, 0]);
     var obliquePrism = CastingRegion.Placed({
-      solid: Prism(
-        materia.casting.CastingProfiles.polygon([
-          {x: 0, y: 0},
-          {
-            x: 20,
-            y: 0
-          },
-          {
-            x: 0,
-            y: 20
-          }
-        ]),
-        40
-      ),
+      solid: Prism(materia.casting.CastingProfiles.polygon([{x: 0, y: 0}, {x: 20, y: 0}, {x: 0, y: 20}]), 40),
       pose: obliquePose
     });
     var transverse = kernel.prismaticSection(obliquePrism, {x: 1, y: 0, z: 0}, 1e-7, "posed-triangle");
@@ -123,15 +83,7 @@ class NativeMoldKernelTests {
     document.input.inserts = [];
     document.input.envelope = [{
       id: "body",
-      profile: [
-        {x: -60.0, y: -50.0},
-        {x: 60.0, y: -50.0},
-        {x: 60.0, y: 50.0},
-        {
-          x: -60.0,
-          y: 50.0
-        }
-      ],
+      profile: [{x: -60.0, y: -50.0}, {x: 60.0, y: -50.0}, {x: 60.0, y: 50.0}, {x: -60.0, y: 50.0}],
       height: 80,
       pose: F.identity()
     }];
@@ -191,20 +143,7 @@ class NativeMoldKernelTests {
         "datum/resin intersection stops at the declared fill height"
       );
       var triangle = CastingRegion.Placed({
-        solid: Prism(
-          materia.casting.CastingProfiles.polygon([
-            {x: 0, y: 0},
-            {
-              x: 20,
-              y: 0
-            },
-            {
-              x: 0,
-              y: 20
-            }
-          ]),
-          40
-        ),
+        solid: Prism(materia.casting.CastingProfiles.polygon([{x: 0, y: 0}, {x: 20, y: 0}, {x: 0, y: 20}]), 40),
         pose: F.identity()
       });
       near(

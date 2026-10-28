@@ -90,14 +90,12 @@ class TendingJawStrokeAudit {
     arm:AssemblyState,
     placement:AssemblyFrame,
     fixtures:AssemblyState,
-    hulls:Map<
-      String,
-      Array<Array<Float>>>,
-      hidden:Null<String>,
-      side:String,
-      prefix:String,
-      offset:Array<Float>
-    ):Dynamic {
+    hulls:Map<String, Array<Array<Float>>>,
+    hidden:Null<String>,
+    side:String,
+    prefix:String,
+    offset:Array<Float>
+  ):Dynamic {
     var world = new NativeCollisionWorld(), fixed = world.addBody(0);
     world.setBodyStatic(fixed, true);
     var names:Map<Int, String> = [], obstacles:Array<{object:Int, id:String, kind:String}> = [];
@@ -208,10 +206,7 @@ class TendingJawStrokeAudit {
             var box = bounds(sweep), separation = Math.NEGATIVE_INFINITY;
             for (a in 0...3) separation = Math.max(
               separation,
-              Math.max(
-                stockBox[a * 2] - box[a * 2 + 1],
-                box[a * 2] - stockBox[a * 2 + 1]
-              )
+              Math.max(stockBox[a * 2] - box[a * 2 + 1], box[a * 2] - stockBox[a * 2 + 1])
             );
             if (separation < -1e-6) throw "Finger stroke has no separating plane from stock";
             world.setObjectRule(id, o.object, Allow, DeclaredContact);

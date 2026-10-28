@@ -44,38 +44,10 @@ class SocketFixtureCad {
       plan,
       assembly(plan, true),
       [
-        {
-          id: "south-wall",
-          direction: new cadkit.modeling.Vector(
-            0,
-            -1,
-            0
-          )
-        },
-        {
-          id: "north-wall",
-          direction: new cadkit.modeling.Vector(
-            0,
-            1,
-            0
-          )
-        },
-        {
-          id: "west-wall",
-          direction: new cadkit.modeling.Vector(
-            -1,
-            0,
-            0
-          )
-        },
-        {
-          id: "east-wall",
-          direction: new cadkit.modeling.Vector(
-            1,
-            0,
-            0
-          )
-        }
+        {id: "south-wall", direction: new cadkit.modeling.Vector(0, -1, 0)},
+        {id: "north-wall", direction: new cadkit.modeling.Vector(0, 1, 0)},
+        {id: "west-wall", direction: new cadkit.modeling.Vector(-1, 0, 0)},
+        {id: "east-wall", direction: new cadkit.modeling.Vector(1, 0, 0)}
       ]
     );
   }
@@ -107,18 +79,11 @@ class SocketFixtureCad {
       select:select, mode:Transparent
     }
     ].concat(definition.occurrences.filter(part -> part.id == "cured-casting").map(part -> ({
-      select: {
-        occurrence: part.id,
-        subtree: false
-      },
+      select: {occurrence: part.id, subtree: false},
       mode: Transparent
     }))), sections:[{
       occurrence: null,
-      point: {
-        x: first.x,
-        y: first.y,
-        z: first.z
-      },
+      point: {x: first.x, y: first.y, z: first.z},
       normal: normal
     }], explode:0, source:Generated("socket-fixture")});
     var mounting:Array<PartSelector> = [];
@@ -130,10 +95,7 @@ class SocketFixtureCad {
       id: "socket-mounting",
       label: "Socket mounting",
       camera: Frame(mounting, 0.6, -0.65, 2),
-      visibility: [{
-        select: plates[0],
-        mode: Hidden
-      }],
+      visibility: [{select: plates[0], mode: Hidden}],
       sections: [],
       explode: 0,
       source: Generated("socket-fixture")
@@ -174,85 +136,25 @@ class SocketFixtureCad {
         id: "south-wall",
         width: c.width + 2 * t,
         height: c.height,
-        pose: F.fromRotationMatrix(
-          c.x - t,
-          c.y,
-          c.z,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        pose: F.fromRotationMatrix(c.x - t, c.y, c.z, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       },
       {
         id: "north-wall",
         width: c.width + 2 * t,
         height: c.height,
-        pose: F.fromRotationMatrix(
-          c.x - t,
-          c.y + c.depth + t,
-          c.z,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        pose: F.fromRotationMatrix(c.x - t, c.y + c.depth + t, c.z, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       },
       {
         id: "west-wall",
         width: c.depth,
         height: c.height,
-        pose: F.fromRotationMatrix(
-          c.x - t,
-          c.y,
-          c.z,
-          [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            1,
-            0
-          ]
-        )
+        pose: F.fromRotationMatrix(c.x - t, c.y, c.z, [0, 0, 1, 1, 0, 0, 0, 1, 0])
       },
       {
         id: "east-wall",
         width: c.depth,
         height: c.height,
-        pose: F.fromRotationMatrix(
-          c.x + c.width,
-          c.y,
-          c.z,
-          [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            1,
-            0
-          ]
-        )
+        pose: F.fromRotationMatrix(c.x + c.width, c.y, c.z, [0, 0, 1, 1, 0, 0, 0, 1, 0])
       }
     ];
     for (wall in walls) add(

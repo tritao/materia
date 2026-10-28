@@ -91,16 +91,8 @@ class OperatorBench extends MachineComponent {
     for (corner in [
       {name: "front-left", x: -x, y: -y},
       {name: "front-right", x: x, y: -y},
-      {
-        name: "back-left",
-        x: -x,
-        y: y
-      },
-      {
-        name: "back-right",
-        x: x,
-        y: y
-      }
+      {name: "back-left", x: -x, y: y},
+      {name: "back-right", x: x, y: y}
     ]) {
       frameAssembly.point(corner.name + "-floor", corner.x, corner.y, 0);
       frameAssembly.point(corner.name + "-top", corner.x, corner.y, height - worktopThickness);

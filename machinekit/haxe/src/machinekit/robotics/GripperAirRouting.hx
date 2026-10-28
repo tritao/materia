@@ -55,14 +55,7 @@ class GripperAirRouting {
     ];
     result.addComponent(
       id,
-      new RoutedHose(
-        'GRIPPER-6MM-$valve-$outlet',
-        route,
-        OUTER_DIAMETER_MM,
-        4,
-        0.03,
-        PortKind.Pneumatic
-      )
+      new RoutedHose('GRIPPER-6MM-$valve-$outlet', route, OUTER_DIAMETER_MM, 4, 0.03, PortKind.Pneumatic)
     );
     result.addMate('$id-valve', "fixed", valve, "port" + outlet, id, "start");
     result.connectPorts('$id-in', valve, outlet, id, "input");

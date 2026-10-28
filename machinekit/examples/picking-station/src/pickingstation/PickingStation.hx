@@ -26,11 +26,7 @@ class PickingStation {
       id: "operator-bench",
       label: "Operator bench",
       component: bench,
-      pose: AssemblyFrames.translation(
-        benchX,
-        0,
-        0
-      )
+      pose: AssemblyFrames.translation(benchX, 0, 0)
     });
     return result;
   }

@@ -220,13 +220,7 @@ class EndEffector extends MachineAssembly {
     if (pose == null) throw 'Missing solved pose for "${mount.instanceId}"';
     return {
       poses: poses,
-      mountWorld: AssemblyFrames.compose(
-        pose,
-        memberConnectorFrame(
-          mount.instanceId,
-          mount.connectorName
-        )
-      )
+      mountWorld: AssemblyFrames.compose(pose, memberConnectorFrame(mount.instanceId, mount.connectorName))
     };
   }
 

@@ -116,11 +116,7 @@ class LeadScrewNut extends MachineComponent {
     for (point in boltPattern()) addConnector(
       'mount${i++}',
       Mount,
-      Solids.axial(
-        point.x,
-        point.y,
-        flangeOffset + flangeThickness
-      )
+      Solids.axial(point.x, point.y, flangeOffset + flangeThickness)
     );
   }
 
@@ -245,22 +241,11 @@ class LeadScrewNut extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.lead-screw-nut",
       ComponentRecipeSupport.threadParameters().concat([
-        ComponentRecipeSupport.count(
-          "boltCount",
-          4
-        ),
-        ComponentRecipeSupport.flag(
-          "flanged",
-          true
-        ),
+        ComponentRecipeSupport.count("boltCount", 4),
+        ComponentRecipeSupport.flag("flanged", true),
         ComponentRecipeSupport.choice(
           "kind",
-          [
-            "PlainBronze",
-            "AntiBacklash",
-            "BallNut",
-            "PreloadedBallNut"
-          ],
+          ["PlainBronze", "AntiBacklash", "BallNut", "PreloadedBallNut"],
           "AntiBacklash"
         )
       ]),

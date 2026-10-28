@@ -21,10 +21,7 @@ class HobberSocketFixtureSetup {
     }
     ];
     var foundation = new MineralFoundation(
-      new ComponentValues().setNumber("width", 400).setNumber("depth", 240).setNumber(
-        "height",
-        70
-      ),
+      new ComponentValues().setNumber("width", 400).setNumber("depth", 240).setNumber("height", 70),
       placements
     );
     var input = FoundationToolingAdapter.snapshot(foundation, "socket-coupon", 1);
@@ -46,52 +43,19 @@ class HobberSocketFixtureSetup {
         sourceFingerprint: ToolingCodec.inputFingerprint(input),
         fillHeightMm: 106,
         freeboardMm: 0,
-        sourceToMold: F.fromRotationMatrix(
-          250,
-          170,
-          106,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        )
+        sourceToMold: F.fromRotationMatrix(250, 170, 106, [1, 0, 0, 0, -1, 0, 0, 0, -1])
       },
       recipe: {
         id: "socket-coupon-study",
         revision: 1,
         former: {
-          pocketScrew: {
-            diameterMm: 4,
-            lengthMm: 30,
-            jigAngleDegrees: 15,
-            edgeDistanceMm: 20,
-            maximumPitchMm: 100
-          },
+          pocketScrew: {diameterMm: 4, lengthMm: 30, jigAngleDegrees: 15, edgeDistanceMm: 20, maximumPitchMm: 100},
           stocks: formerStocks,
           finishingStockMm: 0.5,
           toleranceMm: 0.1,
           cutters: [
-            {
-              id: "former-straight-6",
-              tipDiameterMm: 6,
-              taperDegrees: 0,
-              fluteLengthMm: 30,
-              stickOutMm: 35
-            },
-            {
-              id: "former-taper-3deg-6",
-              tipDiameterMm: 6,
-              taperDegrees: 3,
-              fluteLengthMm: 30,
-              stickOutMm: 35
-            }
+            {id: "former-straight-6", tipDiameterMm: 6, taperDegrees: 0, fluteLengthMm: 30, stickOutMm: 35},
+            {id: "former-taper-3deg-6", tipDiameterMm: 6, taperDegrees: 3, fluteLengthMm: 30, stickOutMm: 35}
           ]
         },
         featureRules: materia.tooling.casting.CastingStrategies.standardRules(),

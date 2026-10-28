@@ -59,62 +59,16 @@ class SfuDrawingScrew extends LeadScrew {
     var d = journalDiameter, race = thread.screwDiameter / 2, l = totalLength;
     var body = Solids.union([
       Solids.named(Part.cylinderSpan(couplingDiameter / 2, 0, couplingLength), "coupling-end"),
+      Solids.named(Part.cylinderSpan((d - 1.2) / 2, couplingLength, journalStart - 2), "lock-thread-root"),
+      Solids.named(Part.cylinderSpan((d - 2) / 2, journalStart - 2, journalStart), "relief"),
+      Solids.named(Part.cylinderSpan(d / 2, journalStart, fixedEnd), "fixed-journal"),
+      Solids.named(Part.cylinderSpan(race, fixedEnd, l - floatingEnd), "race"),
+      Solids.named(Part.cylinderSpan(floatingJournalDiameter / 2, l - floatingEnd, grooveStart), "floating-journal"),
       Solids.named(
-        Part.cylinderSpan(
-          (d - 1.2) / 2,
-          couplingLength,
-          journalStart - 2
-        ),
-        "lock-thread-root"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          (d - 2) / 2,
-          journalStart - 2,
-          journalStart
-        ),
-        "relief"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          d / 2,
-          journalStart,
-          fixedEnd
-        ),
-        "fixed-journal"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          race,
-          fixedEnd,
-          l - floatingEnd
-        ),
-        "race"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          floatingJournalDiameter / 2,
-          l - floatingEnd,
-          grooveStart
-        ),
-        "floating-journal"
-      ),
-      Solids.named(
-        Part.cylinderSpan(
-          floatingJournalDiameter / 2 - grooveDepth,
-          grooveStart,
-          grooveStart + 1.15
-        ),
+        Part.cylinderSpan(floatingJournalDiameter / 2 - grooveDepth, grooveStart, grooveStart + 1.15),
         "ring-groove"
       ),
-      Solids.named(
-        Part.cylinderSpan(
-          floatingJournalDiameter / 2,
-          grooveStart + 1.15,
-          l
-        ),
-        "tip"
-      )
+      Solids.named(Part.cylinderSpan(floatingJournalDiameter / 2, grooveStart + 1.15, l), "tip")
     ]);
     try {
       var result = new Part(cadkit.threads.Threads.attach(body.shape,
@@ -158,26 +112,8 @@ class SfuDrawingScrew extends LeadScrew {
   public static function drawingRecipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.sfu-drawing-screw",
-      [
-        P.choice(
-          "model",
-          models(),
-          "SFU2005"
-        ),
-        P.length(
-          "length",
-          500
-        ),
-        P.length(
-          "raceRootDiameter",
-          16
-        )
-      ],
-      v -> new SfuDrawingScrew(
-        v.token("model"),
-        v.number("length"),
-        v.number("raceRootDiameter")
-      )
+      [P.choice("model", models(), "SFU2005"), P.length("length", 500), P.length("raceRootDiameter", 16)],
+      v -> new SfuDrawingScrew(v.token("model"), v.number("length"), v.number("raceRootDiameter"))
     );
     return recipe;
   }

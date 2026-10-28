@@ -74,11 +74,7 @@ class OriginalArmReview {
     };
     sys.io.File.saveContent(
       root + "/build/original-evaluation/hull-comparison.json",
-      haxe.Json.stringify(
-        result,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(result, null, "  ")
     );
     for (r in reports) Sys.println(r.model + ": " + r.clearPoses + "/" + r.poses + " hull-clear poses");
   }

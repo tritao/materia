@@ -32,14 +32,7 @@ class Nozzle extends MachineComponent {
     if (table == null) table = new Catalog(
       "nozzle",
       s -> s.designation,
-      [{
-        designation: "BRASS-M6-0.4",
-        orifice: 0.4,
-        hexSize: 6.0,
-        hexHeight: 3.0,
-        coneHeight: 4.0,
-        tipDiameter: 2.0
-      }],
+      [{designation: "BRASS-M6-0.4", orifice: 0.4, hexSize: 6.0, hexHeight: 3.0, coneHeight: 4.0, tipDiameter: 2.0}],
       _ -> ({
         source: "Assumed brass M6 nozzle; no vendor verification",
         standard: null,
@@ -66,11 +59,7 @@ class Nozzle extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.nozzle",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "BRASS-M6-0.4"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "BRASS-M6-0.4")],
       v -> new Nozzle(v.token("designation"))
     );
     return recipe;
@@ -89,23 +78,12 @@ class Nozzle extends MachineComponent {
     var tip = spec.tipDiameter / 2, top = spec.hexSize / 2;
     return Solids.union([
       Solids.named(
-        Part.revolve([
-          {r: 0, z: 0},
-          {r: tip, z: 0},
-          {r: top * 0.9, z: spec.coneHeight},
-          {
-            r: 0,
-            z: spec.coneHeight
-          }
-        ]),
+        Part.revolve([{r: 0, z: 0}, {r: tip, z: 0}, {r: top * 0.9, z: spec.coneHeight}, {r: 0, z: spec.coneHeight}]),
         "cone"
       ),
       Solids.named(
         Part.prism(
-          cadkit.modeling.Polygon.regular(
-            6,
-            spec.hexSize
-          ),
+          cadkit.modeling.Polygon.regular(6, spec.hexSize),
           spec.coneHeight - 0.01,
           spec.coneHeight + spec.hexHeight
         ),
@@ -125,14 +103,8 @@ class Nozzle extends MachineComponent {
         {r: 0, z: 0},
         {r: tip, z: 0},
         {r: top, z: spec.coneHeight},
-        {
-          r: top,
-          z: spec.coneHeight + spec.hexHeight
-        },
-        {
-          r: 0,
-          z: spec.coneHeight + spec.hexHeight
-        }
+        {r: top, z: spec.coneHeight + spec.hexHeight},
+        {r: 0, z: spec.coneHeight + spec.hexHeight}
       ]),
       "body"
     );

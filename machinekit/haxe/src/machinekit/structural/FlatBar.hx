@@ -29,14 +29,8 @@ class FlatBar implements StructuralProfile {
       [
         new Vector(-width / 2, -thickness / 2),
         new Vector(width / 2, -thickness / 2),
-        new Vector(
-          width / 2,
-          thickness / 2
-        ),
-        new Vector(
-          -width / 2,
-          thickness / 2
-        ),
+        new Vector(width / 2, thickness / 2),
+        new Vector(-width / 2, thickness / 2),
       ],
       0,
       length

@@ -14,10 +14,7 @@ class FoundationJointDesignChecks {
     out:Diagnostics,
     id:String,
     authored:FoundationJoint,
-    members:Map<
-      String,
-      MachineComponent
-  >,
+    members:Map<String, MachineComponent>,
     state:AssemblyState
   ):Void {
     var joint = FoundationJoints.snapshot(authored);

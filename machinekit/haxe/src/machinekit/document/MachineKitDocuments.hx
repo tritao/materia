@@ -82,11 +82,7 @@ class MachineKitDocuments {
     return new Placement(new Plane(
       new Vector(frame.x, frame.y, frame.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     ));
   }
 

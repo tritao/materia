@@ -247,38 +247,10 @@ class ZeroErrArmPreview {
         [0.2, -0.8, 1.0, 0.1, -0.6, 0.2],
         [0.5, -0.9, 1.2, 0.2, -0.5, 0.1],
         [0.5, -1.0, 1.3, 0.2, -0.6, 0.1],
-        [
-          0.5,
-          -0.9,
-          1.2,
-          0.2,
-          -0.5,
-          0.1
-        ],
-        [
-          -0.4,
-          -0.7,
-          0.8,
-          -0.1,
-          -0.7,
-          0.2
-        ],
-        [
-          -0.4,
-          -0.8,
-          0.9,
-          -0.1,
-          -0.8,
-          0.2
-        ],
-        [
-          -0.4,
-          -0.7,
-          0.8,
-          -0.1,
-          -0.7,
-          0.2
-        ]
+        [0.5, -0.9, 1.2, 0.2, -0.5, 0.1],
+        [-0.4, -0.7, 0.8, -0.1, -0.7, 0.2],
+        [-0.4, -0.8, 0.9, -0.1, -0.8, 0.2],
+        [-0.4, -0.7, 0.8, -0.1, -0.7, 0.2]
       ]) samples.push(q);
     }
     var shard = 0, shards = 1;
@@ -420,19 +392,7 @@ class ZeroErrArmPreview {
         id: entry.id,
         volumeMm3: props.volume,
         centroidMm: [c.x, c.y, c.z],
-        inertiaMm5: [
-          [t.xx, t.xy, t.xz],
-          [
-            t.xy,
-            t.yy,
-            t.yz
-          ],
-          [
-            t.xz,
-            t.yz,
-            t.zz
-          ]
-        ]
+        inertiaMm5: [[t.xx, t.xy, t.xz], [t.xy, t.yy, t.yz], [t.xz, t.yz, t.zz]]
       });
       p.close();
     }
@@ -453,16 +413,8 @@ class ZeroErrArmPreview {
           solids: records,
           joints: definition.joints,
           axes: axes,
-          toolFaceMm: [
-            tool.x,
-            tool.y,
-            tool.z
-          ],
-          toolNormal: [
-            normal.x,
-            normal.y,
-            normal.z
-          ]
+          toolFaceMm: [tool.x, tool.y, tool.z],
+          toolNormal: [normal.x, normal.y, normal.z]
         },
         null,
         "  "
@@ -497,22 +449,7 @@ class ZeroErrArmPreview {
     for (component in definition.definitions) if (component.id == terminal.definition) {
       component.connectors.push({
         name: "flangeZ",
-        frame: AssemblyFrames.fromRotationMatrix(
-          0,
-          0,
-          0,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            1,
-            0
-          ]
-        )
+        frame: AssemblyFrames.fromRotationMatrix(0, 0, 0, [1, 0, 0, 0, 0, -1, 0, 1, 0])
       });
       component.robotFlangeConnector = "flangeZ";
     }

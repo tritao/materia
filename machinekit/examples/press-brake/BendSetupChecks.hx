@@ -85,11 +85,7 @@ class BendSetupChecks {
           process,
           tooling,
           station,
-          new BendOrientation(
-            !orientation.faceAUp,
-            reverse,
-            -10
-          )
+          new BendOrientation(!orientation.faceAUp, reverse, -10)
         );
       } catch (failure:SheetDiagnosis) {
         rejected = failure.code == "press.bend-face";

@@ -74,37 +74,12 @@ class SlideInSlotNut extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.structural.slide-in-slot-nut",
       [
-        ComponentRecipeSupport.length(
-          "width",
-          15.9
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          15.5
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          5.9
-        ),
-        ComponentRecipeSupport.length(
-          "ridgeWidth",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "ridgeHeight",
-          1.9
-        ),
-        ComponentRecipeSupport.choice(
-          "size",
-          [
-            "M3",
-            "M4",
-            "M5",
-            "M6",
-            "M8"
-          ],
-          "M6"
-        )
+        ComponentRecipeSupport.length("width", 15.9),
+        ComponentRecipeSupport.length("length", 15.5),
+        ComponentRecipeSupport.length("height", 5.9),
+        ComponentRecipeSupport.length("ridgeWidth", 8),
+        ComponentRecipeSupport.length("ridgeHeight", 1.9),
+        ComponentRecipeSupport.choice("size", ["M3", "M4", "M5", "M6", "M8"], "M6")
       ],
       v -> new SlideInSlotNut(
         v.number("width"),

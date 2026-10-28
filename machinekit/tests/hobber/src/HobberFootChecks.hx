@@ -91,11 +91,7 @@ class HobberFootChecks {
         for (j in 0...11) {
           var placed = PosedParts.moved(
             plateShape,
-            F.translation(
-              p.x,
-              p.y,
-              Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 2 * j
-            )
+            F.translation(p.x, p.y, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 2 * j)
           );
           check(volumeInBody(placed) < 0.001, "plate lowering clear " + i + ":" + j);
           placed.close();
@@ -104,22 +100,14 @@ class HobberFootChecks {
           var dx = i == 2 ? 15.0 * j : 0.0, dy = i == 2 ? 0.0 : (i == 0 ? -15.0 * j : 15.0 * j);
           var placed = PosedParts.moved(
             plateShape,
-            F.translation(
-              p.x + dx,
-              p.y + dy,
-              Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 20
-            )
+            F.translation(p.x + dx, p.y + dy, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS - 20)
           );
           check(volumeInBody(placed) < 0.001, "plate side extraction clear " + i + ":" + j);
           placed.close();
         }
         var loaded = PosedParts.moved(
           plateShape,
-          F.translation(
-            p.x,
-            p.y,
-            Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS
-          )
+          F.translation(p.x, p.y, Pocket.FOOT_ROOF - Pocket.FOOT_PLATE_THICKNESS)
         );
         check(volumeInBody(loaded) < 0.001, "installed plate fits registered roof recess " + i);
         loaded.close();
@@ -171,11 +159,7 @@ class HobberFootChecks {
       pocketRoofMm: Pocket.FOOT_ROOF,
       pocketFloorMm: Pocket.FOOT_FLOOR,
       roofThicknessMm: Pocket.FOOT_SUPPORT_TOP - Pocket.FOOT_ROOF,
-      plateMm: [
-        110,
-        110,
-        15
-      ],
+      plateMm: [110, 110, 15],
       stemClearanceMm: 28,
       thread: "M24x3 nominal, semantic threads",
       worstFootReactionN: reaction,

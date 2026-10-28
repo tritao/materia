@@ -20,11 +20,7 @@ class RbkSfuAxisChecks {
     return part.placed(new Location(new Plane(
       new Vector(f.x, f.y, f.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     )));
   }
   static function overlap(a:Part, b:Part):Float {
@@ -78,78 +74,24 @@ class RbkSfuAxisChecks {
       ["rbk", "coupling"],
       ["rbk", "base"],
       ["bf12", "screw"],
-      [
-        "bf12",
-        "base"
-      ],
-      [
-        "coupling",
-        "motor"
-      ],
-      [
-        "coupling",
-        "screw"
-      ],
-      [
-        "ballNut",
-        "screw"
-      ],
-      [
-        "ballNut",
-        "bracket"
-      ],
-      [
-        "bracket",
-        "base"
-      ],
-      [
-        "bracket",
-        "riserLeft"
-      ],
-      [
-        "bracket",
-        "riserRight"
-      ],
-      [
-        "carriage",
-        "rbk"
-      ],
-      [
-        "carriage",
-        "bf12"
-      ],
-      [
-        "blockLeft",
-        "railLeft"
-      ],
-      [
-        "blockRight",
-        "railRight"
-      ],
-      [
-        "blockLeft",
-        "riserLeft"
-      ],
-      [
-        "blockRight",
-        "riserRight"
-      ],
-      [
-        "blockLeft",
-        "carriage"
-      ],
-      [
-        "blockRight",
-        "carriage"
-      ],
-      [
-        "blockLeft",
-        "bracket"
-      ],
-      [
-        "blockRight",
-        "bracket"
-      ]
+      ["bf12", "base"],
+      ["coupling", "motor"],
+      ["coupling", "screw"],
+      ["ballNut", "screw"],
+      ["ballNut", "bracket"],
+      ["bracket", "base"],
+      ["bracket", "riserLeft"],
+      ["bracket", "riserRight"],
+      ["carriage", "rbk"],
+      ["carriage", "bf12"],
+      ["blockLeft", "railLeft"],
+      ["blockRight", "railRight"],
+      ["blockLeft", "riserLeft"],
+      ["blockRight", "riserRight"],
+      ["blockLeft", "carriage"],
+      ["blockRight", "carriage"],
+      ["blockLeft", "bracket"],
+      ["blockRight", "bracket"]
     ];
     for (h in axis.hardware) if (h.interfacePair == "motor/rbk") {
       comparisons.push(["motor", h.id]);
@@ -178,10 +120,7 @@ class RbkSfuAxisChecks {
         "5 mm lead drives screw rotation");
       for (entry in entries) world.set(
         entry.id,
-        pose(
-          prototypes.get(entry.component.geometryKey()),
-          poses.get(entry.id)
-        )
+        pose(prototypes.get(entry.component.geometryKey()), poses.get(entry.id))
       );
       for (pair in comparisons) {
         var v = overlap(world.get(pair[0]), world.get(pair[1]));

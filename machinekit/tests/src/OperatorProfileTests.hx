@@ -15,47 +15,10 @@ class OperatorProfileTests {
     spindle = true
   ):OperatorProfile return new OperatorProfile(
     "test",
-    [
-      new OperatorAxis(
-        "x",
-        "X"
-      ),
-      new OperatorAxis(
-        "z",
-        "Z"
-      )
-    ],
-    pendant != null ? pendant : [
-      "x",
-      "z",
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-    keys != null ? keys : [
-      new OperatorKey(
-        Unused,
-        ""
-      ),
-      new OperatorKey(
-        Unused,
-        ""
-      ),
-      new OperatorKey(
-        Unused,
-        ""
-      )
-    ],
-    [
-      Auto,
-      Jog
-    ],
+    [new OperatorAxis("x", "X"), new OperatorAxis("z", "Z")],
+    pendant != null ? pendant : ["x", "z", null, null, null, null, null, null, null, null, null],
+    keys != null ? keys : [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
+    [Auto, Jog],
     spindle,
     hasDoor,
     rules != null ? rules : []
@@ -81,34 +44,14 @@ class OperatorProfileTests {
       "door key without a door",
       () -> profile(
         null,
-        [
-          new OperatorKey(DoorToggle, "Door"),
-          new OperatorKey(
-            Unused,
-            ""
-          ),
-          new OperatorKey(
-            Unused,
-            ""
-          )
-        ]
+        [new OperatorKey(DoorToggle, "Door"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")]
       )
     );
     rejects(
       "spindle key without spindle",
       () -> profile(
         null,
-        [
-          new OperatorKey(SpindleJog, "Spin"),
-          new OperatorKey(
-            Unused,
-            ""
-          ),
-          new OperatorKey(
-            Unused,
-            ""
-          )
-        ],
+        [new OperatorKey(SpindleJog, "Spin"), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
         null,
         false,
         false
@@ -124,33 +67,8 @@ class OperatorProfileTests {
       () -> new OperatorProfile(
         "t",
         [new OperatorAxis("x", "X")],
-        [
-          "x",
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null
-        ],
-        [
-          new OperatorKey(
-            Unused,
-            ""
-          ),
-          new OperatorKey(
-            Unused,
-            ""
-          ),
-          new OperatorKey(
-            Unused,
-            ""
-          )
-        ],
+        ["x", null, null, null, null, null, null, null, null, null, null],
+        [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
         [Auto],
         false,
         false,

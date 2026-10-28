@@ -21,14 +21,7 @@ class ComponentEnvelopes {
     var body = Solids.named(Part.cylinderSpan(v.number("outside") / 2, 0, v.number("height")), "body");
     return v.number("bore") == 0 ? body : Solids.cut(
       body,
-      [Solids.named(
-        Part.cylinderSpan(
-          v.number("bore") / 2,
-          -0.1,
-          v.number("height") + 0.1
-        ),
-        "bore"
-      )]
+      [Solids.named(Part.cylinderSpan(v.number("bore") / 2, -0.1, v.number("height") + 0.1), "bore")]
     );
   }
 }

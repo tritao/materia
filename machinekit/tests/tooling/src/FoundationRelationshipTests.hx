@@ -16,16 +16,7 @@ class FoundationRelationshipTests {
   static function relationship():InterfaceRelationship return {
     id: "pair-plane",
     kind: Coplanar,
-    members: [
-      ComponentInterface(
-        "left",
-        "mounting-plane"
-      ),
-      ComponentInterface(
-        "right",
-        "mounting-plane"
-      )
-    ],
+    members: [ComponentInterface("left", "mounting-plane"), ComponentInterface("right", "mounting-plane")],
     tolerance: Linear(0.005),
     metrology: {
       method: IndicatorReversal,
@@ -142,11 +133,7 @@ class FoundationRelationshipTests {
       "mount",
       "right",
       "mount",
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      {x: 0, y: 0, z: 1}
     );
     check(
       !AssemblyDesignChecks.check(rotating).hasErrors(),

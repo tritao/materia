@@ -99,11 +99,7 @@ class PressStrokeCollision {
     return new SheetDiagnosis(
       code,
       a + reason + b + " at " + angle * 180 / Math.PI + " degrees (sample " + sample + ")",
-      [
-        a,
-        b,
-        "sample:" + sample
-      ]
+      [a, b, "sample:" + sample]
     );
   }
   public static function ownerName(owner:PressCollisionOwner):String return switch owner {

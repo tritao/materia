@@ -54,14 +54,7 @@ class TendingCellTable extends MachineAssembly {
       var bank = i == 0 ? -1 : 1;
       result.push({
         id: (bank < 0 ? "left-table/" : "right-table/") + piece.id,
-        frame : AssemblyFrames.compose(
-          AssemblyFrames.translation(
-            bank * bankOffsetX,
-            0,
-            0
-          ),
-          piece.frame
-        ),
+        frame : AssemblyFrames.compose(AssemblyFrames.translation(bank * bankOffsetX, 0, 0), piece.frame),
         vertices : piece.vertices
       });
     }

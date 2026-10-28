@@ -38,11 +38,7 @@ class MotorMountChecks {
       assembly.addComponent(
         "frame-" + frame,
         plate,
-        AssemblyFrames.translation(
-          frame == 17 ? 0 : frame == 23 ? 160 : 320,
-          0,
-          0
-        )
+        AssemblyFrames.translation(frame == 17 ? 0 : frame == 23 ? 160 : 320, 0, 0)
       );
     }
     var motor = NemaStepper.frame(23);
@@ -52,12 +48,7 @@ class MotorMountChecks {
         motor,
         8,
         30,
-        {
-          systemId: system,
-          railSpacing: spacing,
-          alongPitch: 40,
-          holeDiameter: 6.6
-        }
+        {systemId: system, railSpacing: spacing, alongPitch: 40, holeDiameter: 6.6}
       );
       var part = plate.geometry(), plain = new MotorPlate(motor, 8, 30).geometry();
       check(part.valid() && part.solidCount() == 1, "Profile plate is one valid solid");
@@ -102,12 +93,7 @@ class MotorMountChecks {
         motor,
         8,
         30,
-        {
-          systemId: "TSLOT-40-SLOT8",
-          railSpacing: 81,
-          alongPitch: 40,
-          holeDiameter: 6.6
-        }
+        {systemId: "TSLOT-40-SLOT8", railSpacing: 81, alongPitch: 40, holeDiameter: 6.6}
       )),
       "Off-grid rail spacing rejected"
     );
@@ -116,12 +102,7 @@ class MotorMountChecks {
         motor,
         8,
         10,
-        {
-          systemId: "TSLOT-40-SLOT8",
-          railSpacing: 80,
-          alongPitch: 40,
-          holeDiameter: 6.6
-        }
+        {systemId: "TSLOT-40-SLOT8", railSpacing: 80, alongPitch: 40, holeDiameter: 6.6}
       )),
       "Insufficient plate edge rejected"
     );
@@ -130,12 +111,7 @@ class MotorMountChecks {
         motor,
         8,
         30,
-        {
-          systemId: "TSLOT-40-SLOT8",
-          railSpacing: 40,
-          alongPitch: 40,
-          holeDiameter: 6.6
-        }
+        {systemId: "TSLOT-40-SLOT8", railSpacing: 40, alongPitch: 40, holeDiameter: 6.6}
       )),
       "Obstructed pilot passage rejected"
     );
@@ -171,11 +147,7 @@ class MotorMountChecks {
       sys.io.File.saveContent(root + "/build/suppliers/vallder/motor-mounts.assembly.json", saved);
       sys.io.File.saveContent(
         root + "/build/suppliers/vallder/motor-mounts.bom.json",
-        haxe.Json.stringify(
-          assembly.billOfMaterials().lines(),
-          null,
-          "  "
-        )
+        haxe.Json.stringify(assembly.billOfMaterials().lines(), null, "  ")
       );
       if (Sys.args().indexOf("--supplier-cad") >= 0) supplierCad(root + "/build/suppliers/vallder/");
     }

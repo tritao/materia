@@ -7,40 +7,13 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Crossed-roller precision bearing. Reference row is Assumed: its outside, bore and height are not a product's. */
 class CrossedRollerBearing extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      120,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      80,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      16,
-      "mm"
-    ),
-    P.text(
-      "precisionClass",
-      "P4"
-    ),
-    P.quantity(
-      "radialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "axialRunout",
-      0.002,
-      "mm"
-    ),
-    P.quantity(
-      "momentStiffness",
-      1000000,
-      "N m/rad"
-    )
+    P.quantity("outside", 120, "mm"),
+    P.quantity("bore", 80, "mm"),
+    P.quantity("height", 16, "mm"),
+    P.text("precisionClass", "P4"),
+    P.quantity("radialRunout", 0.002, "mm"),
+    P.quantity("axialRunout", 0.002, "mm"),
+    P.quantity("momentStiffness", 1000000, "N m/rad")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

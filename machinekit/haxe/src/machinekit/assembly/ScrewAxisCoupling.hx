@@ -20,10 +20,7 @@ class ScrewAxisCoupling extends ShaftCoupling {
   public static function axisRecipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.assembly.screw-axis-coupling",
-      [ComponentRecipeSupport.length(
-        "motorShaftLength",
-        20.6
-      )],
+      [ComponentRecipeSupport.length("motorShaftLength", 20.6)],
       v -> new ScrewAxisCoupling(v.number("motorShaftLength")),
       true
     );

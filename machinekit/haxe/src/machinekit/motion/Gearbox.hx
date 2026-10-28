@@ -65,14 +65,7 @@ class Gearbox extends MachineComponent {
     declareMass(
       this.massKg,
       new cadkit.modeling.Vector(0, 0, length / 2),
-      new cadkit.InertiaTensor(
-        transverse,
-        0,
-        0,
-        transverse,
-        0,
-        this.massKg * radial / 2
-      )
+      new cadkit.InertiaTensor(transverse, 0, 0, transverse, 0, this.massKg * radial / 2)
     );
     addConnector("input", Mount, Solids.axial(0, 0, 0));
     addConnector("output", Mount, Solids.axial(0, 0, length));
@@ -94,46 +87,14 @@ class Gearbox extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.gearbox",
       [
-        ComponentRecipeSupport.scalar(
-          "ratio",
-          10
-        ),
-        ComponentRecipeSupport.scalar(
-          "efficiency",
-          0.9
-        ),
-        ComponentRecipeSupport.length(
-          "diameter",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          40
-        ),
-        ComponentRecipeSupport.length(
-          "bore",
-          8
-        ),
-        ComponentRecipeSupport.choice(
-          "basis",
-          [
-            "stated",
-            "assumed"
-          ],
-          "stated"
-        ),
-        ComponentRecipeSupport.scalar(
-          "inputInertia",
-          0.000005
-        ),
-        ComponentRecipeSupport.choice(
-          "inertiaBasis",
-          [
-            "stated",
-            "assumed"
-          ],
-          "assumed"
-        )
+        ComponentRecipeSupport.scalar("ratio", 10),
+        ComponentRecipeSupport.scalar("efficiency", 0.9),
+        ComponentRecipeSupport.length("diameter", 60),
+        ComponentRecipeSupport.length("length", 40),
+        ComponentRecipeSupport.length("bore", 8),
+        ComponentRecipeSupport.choice("basis", ["stated", "assumed"], "stated"),
+        ComponentRecipeSupport.scalar("inputInertia", 0.000005),
+        ComponentRecipeSupport.choice("inertiaBasis", ["stated", "assumed"], "assumed")
       ],
       v -> new Gearbox(
         v.number("ratio"),
@@ -187,25 +148,14 @@ class Gearbox extends MachineComponent {
       RoundHousing.part(
         [
           {z0: 0, z1: flange, diameter: diameter},
-          {
-            z0: flange,
-            z1: length - adapter,
-            diameter: diameter * 0.88
-          },
-          {
-            z0: length - adapter,
-            z1: length,
-            diameter: diameter * 0.95
-          }
+          {z0: flange, z1: length - adapter, diameter: diameter * 0.88},
+          {z0: length - adapter, z1: length, diameter: diameter * 0.95}
         ],
         bore,
         0,
         4,
         diameter * 0.8,
-        Math.max(
-          2.5,
-          diameter * 0.06
-        )
+        Math.max(2.5, diameter * 0.06)
       ),
       "body"
     );
@@ -216,13 +166,6 @@ class Gearbox extends MachineComponent {
 
   function envelope():Part return Solids.cut(
     Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "body"),
-    [Solids.named(
-      Part.cylinderSpan(
-        bore / 2,
-        -1,
-        length + 1
-      ),
-      "bore"
-    )]
+    [Solids.named(Part.cylinderSpan(bore / 2, -1, length + 1), "bore")]
   );
 }

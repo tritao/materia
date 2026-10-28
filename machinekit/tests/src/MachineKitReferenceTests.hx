@@ -47,153 +47,27 @@ class MachineKitReferenceTests {
     // SKF bearing catalog: ISO 15 boundary dimensions and minimum rs, in mm.
     for (reference in [
       {name: "625", bore: 5.0, outside: 16.0, width: 5.0, rs: 0.3},
-      {
-        name: "626",
-        bore: 6.0,
-        outside: 19.0,
-        width: 6.0,
-        rs: 0.3
-      },
-      {
-        name: "608",
-        bore: 8.0,
-        outside: 22.0,
-        width: 7.0,
-        rs: 0.3
-      },
-      {
-        name: "6000",
-        bore: 10.0,
-        outside: 26.0,
-        width: 8.0,
-        rs: 0.3
-      },
-      {
-        name: "6001",
-        bore: 12.0,
-        outside: 28.0,
-        width: 8.0,
-        rs: 0.3
-      },
-      {
-        name: "6002",
-        bore: 15.0,
-        outside: 32.0,
-        width: 9.0,
-        rs: 0.3
-      },
-      {
-        name: "6003",
-        bore: 17.0,
-        outside: 35.0,
-        width: 10.0,
-        rs: 0.3
-      },
-      {
-        name: "6004",
-        bore: 20.0,
-        outside: 42.0,
-        width: 12.0,
-        rs: 0.6
-      },
-      {
-        name: "6200",
-        bore: 10.0,
-        outside: 30.0,
-        width: 9.0,
-        rs: 0.6
-      },
-      {
-        name: "6201",
-        bore: 12.0,
-        outside: 32.0,
-        width: 10.0,
-        rs: 0.6
-      },
-      {
-        name: "6202",
-        bore: 15.0,
-        outside: 35.0,
-        width: 11.0,
-        rs: 0.6
-      },
-      {
-        name: "6203",
-        bore: 17.0,
-        outside: 40.0,
-        width: 12.0,
-        rs: 0.6
-      },
-      {
-        name: "6204",
-        bore: 20.0,
-        outside: 47.0,
-        width: 14.0,
-        rs: 1.0
-      },
-      {
-        name: "6205",
-        bore: 25.0,
-        outside: 52.0,
-        width: 15.0,
-        rs: 1.0
-      },
-      {
-        name: "6206",
-        bore: 30.0,
-        outside: 62.0,
-        width: 16.0,
-        rs: 1.0
-      },
-      {
-        name: "6207",
-        bore: 35.0,
-        outside: 72.0,
-        width: 17.0,
-        rs: 1.1
-      },
-      {
-        name: "6208",
-        bore: 40.0,
-        outside: 80.0,
-        width: 18.0,
-        rs: 1.1
-      },
-      {
-        name: "6209",
-        bore: 45.0,
-        outside: 85.0,
-        width: 19.0,
-        rs: 1.1
-      },
-      {
-        name: "6210",
-        bore: 50.0,
-        outside: 90.0,
-        width: 20.0,
-        rs: 1.1
-      },
-      {
-        name: "6211",
-        bore: 55.0,
-        outside: 100.0,
-        width: 21.0,
-        rs: 1.5
-      },
-      {
-        name: "6212",
-        bore: 60.0,
-        outside: 110.0,
-        width: 22.0,
-        rs: 1.5
-      },
-      {
-        name: "6213",
-        bore: 65.0,
-        outside: 120.0,
-        width: 23.0,
-        rs: 1.5
-      }
+      {name: "626", bore: 6.0, outside: 19.0, width: 6.0, rs: 0.3},
+      {name: "608", bore: 8.0, outside: 22.0, width: 7.0, rs: 0.3},
+      {name: "6000", bore: 10.0, outside: 26.0, width: 8.0, rs: 0.3},
+      {name: "6001", bore: 12.0, outside: 28.0, width: 8.0, rs: 0.3},
+      {name: "6002", bore: 15.0, outside: 32.0, width: 9.0, rs: 0.3},
+      {name: "6003", bore: 17.0, outside: 35.0, width: 10.0, rs: 0.3},
+      {name: "6004", bore: 20.0, outside: 42.0, width: 12.0, rs: 0.6},
+      {name: "6200", bore: 10.0, outside: 30.0, width: 9.0, rs: 0.6},
+      {name: "6201", bore: 12.0, outside: 32.0, width: 10.0, rs: 0.6},
+      {name: "6202", bore: 15.0, outside: 35.0, width: 11.0, rs: 0.6},
+      {name: "6203", bore: 17.0, outside: 40.0, width: 12.0, rs: 0.6},
+      {name: "6204", bore: 20.0, outside: 47.0, width: 14.0, rs: 1.0},
+      {name: "6205", bore: 25.0, outside: 52.0, width: 15.0, rs: 1.0},
+      {name: "6206", bore: 30.0, outside: 62.0, width: 16.0, rs: 1.0},
+      {name: "6207", bore: 35.0, outside: 72.0, width: 17.0, rs: 1.1},
+      {name: "6208", bore: 40.0, outside: 80.0, width: 18.0, rs: 1.1},
+      {name: "6209", bore: 45.0, outside: 85.0, width: 19.0, rs: 1.1},
+      {name: "6210", bore: 50.0, outside: 90.0, width: 20.0, rs: 1.1},
+      {name: "6211", bore: 55.0, outside: 100.0, width: 21.0, rs: 1.5},
+      {name: "6212", bore: 60.0, outside: 110.0, width: 22.0, rs: 1.5},
+      {name: "6213", bore: 65.0, outside: 120.0, width: 23.0, rs: 1.5}
     ]) {
       var row = DeepGrooveBearing.catalog().get(reference.name);
       equal(row.bore, reference.bore, reference.name + " bore");
@@ -208,30 +82,10 @@ class MachineKitReferenceTests {
     // Tuli LM/LME catalog: nominal d, D and L dimensions, in mm.
     for (reference in [
       {name: "LM8UU", bore: 8.0, outside: 15.0, length: 24.0},
-      {
-        name: "LM10UU",
-        bore: 10.0,
-        outside: 19.0,
-        length: 29.0
-      },
-      {
-        name: "LM12UU",
-        bore: 12.0,
-        outside: 21.0,
-        length: 30.0
-      },
-      {
-        name: "LM16UU",
-        bore: 16.0,
-        outside: 28.0,
-        length: 37.0
-      },
-      {
-        name: "LM20UU",
-        bore: 20.0,
-        outside: 32.0,
-        length: 42.0
-      }
+      {name: "LM10UU", bore: 10.0, outside: 19.0, length: 29.0},
+      {name: "LM12UU", bore: 12.0, outside: 21.0, length: 30.0},
+      {name: "LM16UU", bore: 16.0, outside: 28.0, length: 37.0},
+      {name: "LM20UU", bore: 20.0, outside: 32.0, length: 42.0}
     ]) {
       var linear = LinearBearing.catalog().get(reference.name);
       equal(linear.boreDiameter, reference.bore, reference.name + " bore");
@@ -244,55 +98,13 @@ class MachineKitReferenceTests {
     // ISO 9409-1:2004 Table 1 pattern values; geometry remains a raised-pilot preview.
     for (reference in [
       {name: "31.5", count: 4, screw: "M5", pilot: 20.0, pin: 5.0},
-      {
-        name: "40",
-        count: 4,
-        screw: "M6",
-        pilot: 25.0,
-        pin: 6.0
-      },
-      {
-        name: "50",
-        count: 4,
-        screw: "M6",
-        pilot: 31.5,
-        pin: 6.0
-      },
-      {
-        name: "63",
-        count: 4,
-        screw: "M6",
-        pilot: 40.0,
-        pin: 6.0
-      },
-      {
-        name: "80",
-        count: 6,
-        screw: "M8",
-        pilot: 50.0,
-        pin: 8.0
-      },
-      {
-        name: "100",
-        count: 6,
-        screw: "M8",
-        pilot: 63.0,
-        pin: 8.0
-      },
-      {
-        name: "125",
-        count: 6,
-        screw: "M10",
-        pilot: 80.0,
-        pin: 10.0
-      },
-      {
-        name: "160",
-        count: 6,
-        screw: "M10",
-        pilot: 100.0,
-        pin: 10.0
-      }
+      {name: "40", count: 4, screw: "M6", pilot: 25.0, pin: 6.0},
+      {name: "50", count: 4, screw: "M6", pilot: 31.5, pin: 6.0},
+      {name: "63", count: 4, screw: "M6", pilot: 40.0, pin: 6.0},
+      {name: "80", count: 6, screw: "M8", pilot: 50.0, pin: 8.0},
+      {name: "100", count: 6, screw: "M8", pilot: 63.0, pin: 8.0},
+      {name: "125", count: 6, screw: "M10", pilot: 80.0, pin: 10.0},
+      {name: "160", count: 6, screw: "M10", pilot: 100.0, pin: 10.0}
     ]) {
       var flange = RobotFlange.catalog().get(reference.name);
       if (flange.boltCount != reference.count
@@ -308,16 +120,8 @@ class MachineKitReferenceTests {
     for (reference in [
       {name: "HFS5-2020", width: 20.0, height: 20.0},
       {name: "HFS5-2040", width: 20.0, height: 40.0},
-      {
-        name: "HFS5-2060",
-        width: 20.0,
-        height: 60.0
-      },
-      {
-        name: "HFS5-4040",
-        width: 40.0,
-        height: 40.0
-      }
+      {name: "HFS5-2060", width: 20.0, height: 60.0},
+      {name: "HFS5-4040", width: 40.0, height: 40.0}
     ]) {
       var profile = TSlotExtrusion.catalog().get(reference.name);
       equal(profile.width, reference.width, reference.name + " width");
@@ -577,20 +381,8 @@ class MachineKitReferenceTests {
     // Nanotec manufacturer drawings: frame interface values, with source tolerances.
     for (reference in [
       {name: "17", face: 42.3, spacing: 31.0, pilot: 22.0, tolerance: 0.1},
-      {
-        name: "23",
-        face: 56.4,
-        spacing: 47.14,
-        pilot: 38.1,
-        tolerance: 0.1
-      },
-      {
-        name: "34",
-        face: 85.85,
-        spacing: 69.5,
-        pilot: 73.025,
-        tolerance: 0.2
-      }
+      {name: "23", face: 56.4, spacing: 47.14, pilot: 38.1, tolerance: 0.1},
+      {name: "34", face: 85.85, spacing: 69.5, pilot: 73.025, tolerance: 0.2}
     ]) {
       var frame = NemaStepper.catalog().get(reference.name);
       near(frame.face, reference.face, reference.tolerance, reference.name + " frame face");
@@ -602,20 +394,8 @@ class MachineKitReferenceTests {
     // StepperOnline model pages: body face/length and shaft diameter/length.
     for (reference in [
       {name: "17HS19-1684S1", face: 42.0, length: 48.0, shaft: 5.0, shaftLength: 24.0},
-      {
-        name: "23HS22-2804S",
-        face: 57.3,
-        length: 56.0,
-        shaft: 6.35,
-        shaftLength: 21.0
-      },
-      {
-        name: "34HS31-5504S",
-        face: 86.0,
-        length: 80.0,
-        shaft: 14.0,
-        shaftLength: 35.0
-      }
+      {name: "23HS22-2804S", face: 57.3, length: 56.0, shaft: 6.35, shaftLength: 21.0},
+      {name: "34HS31-5504S", face: 86.0, length: 80.0, shaft: 14.0, shaftLength: 35.0}
     ]) {
       var variant = NemaStepper.variantCatalog().get(reference.name);
       equal(variant.bodyFace, reference.face, reference.name + " face");

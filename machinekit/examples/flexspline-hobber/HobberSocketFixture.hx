@@ -54,13 +54,7 @@ class HobberSocketFixture {
       "Every insert-sealed carrier penetration traces to its source hole and sealing face"
     );
     for (length in [20.0, 50.0]) rejects(
-      () -> InsertFixturePlanner.plate(
-        document,
-        HobberSocketFixtureSetup.options(
-          document,
-          [length]
-        )
-      ),
+      () -> InsertFixturePlanner.plate(document, HobberSocketFixtureSetup.options(document, [length])),
       "No stock fixture screw satisfies"
     );
     check(
@@ -75,10 +69,7 @@ class HobberSocketFixture {
       ),
       ToolingReadiness.pending(
         "tooling.fixture.process-retention",
-        [
-          "socket0",
-          "socket1"
-        ],
+        ["socket0", "socket1"],
         "Trial cure, release and mineral-cast anchorage with actual materials"
       )
     ]);
@@ -191,11 +182,7 @@ class HobberSocketFixture {
       var upper = plan.assembly.members[1], row = parts.filter(part -> part.id == upper.panel.id)[0];
       var plate = cache.posed(row.component, poses.get(row.id)), sweep = SweptRemoval.sweep(
         plate,
-        new Vector(
-          0,
-          0,
-          -removal.removal.travelMm
-        )
+        new Vector(0, 0, -removal.removal.travelMm)
       );
       plate.close();
       var heldVolume = 0.0;
@@ -240,18 +227,8 @@ class HobberSocketFixture {
     }
     var mix = ToolingSourceCasting.fromInput(plan.document.input).massProperties().mass;
     var steps:Array<{id:String, kind:String, members:Array<String>, after:Array<String>}> = [
-      {
-        id: "cure",
-        kind: "process-evidence-pending",
-        members: ["cured-casting"],
-        after: []
-      },
-      {
-        id: "release-threads",
-        kind: "unscrew",
-        members: removal.releaseBeforeTranslation,
-        after: ["cure"]
-      }
+      {id: "cure", kind: "process-evidence-pending", members: ["cured-casting"], after: []},
+      {id: "release-threads", kind: "unscrew", members: removal.releaseBeforeTranslation, after: ["cure"]}
     ];
     var previous = "release-threads";
     for (id in removal.removal.removalOrder) {
@@ -261,20 +238,12 @@ class HobberSocketFixture {
     sys.io.File.saveContent(out + "/fixture-plan.json", ToolingCodec.canonical(plan) + "\n");
     sys.io.File.saveContent(
       out + "/demolding-steps.json",
-      haxe.Json.stringify(
-        {steps: steps, geometry: removal.removal},
-        null,
-        "  "
-      )
+      haxe.Json.stringify({steps: steps, geometry: removal.removal}, null, "  ")
     );
     sys.io.File.saveContent(
       out + "/bom.json",
       haxe.Json.stringify(
-        {
-          permanentSockets: permanent.lines(),
-          mixKg: mix,
-          reusableTooling: reusable.lines()
-        },
+        {permanentSockets: permanent.lines(), mixKg: mix, reusableTooling: reusable.lines()},
         null,
         "  "
       )

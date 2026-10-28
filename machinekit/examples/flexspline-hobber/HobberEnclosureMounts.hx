@@ -19,36 +19,12 @@ class HobberEnclosureMounts {
         face.x,
         face.y,
         face.z,
-        [
-          side,
-          0,
-          0,
-          0,
-          side,
-          0,
-          0,
-          0,
-          1
-        ]
+        [side, 0, 0, 0, side, 0, 0, 0, 1]
       );
       var id = "enclosureBaseMount" + index;
       var part = new BlockBracket(
         "enclosure dry-side outrigger",
-        [
-          {min: [0.0, -40, -40], max: [10.0, 40, top]},
-          {
-            min: [
-              10.0,
-              -40,
-              top - 10
-            ],
-            max: [
-              reach,
-              40,
-              top
-            ]
-          }
-        ],
+        [{min: [0.0, -40, -40], max: [10.0, 40, top]}, {min: [10.0, -40, top - 10], max: [reach, 40, top]}],
         "steel"
       );
       assembly.addComponent(id, part, pose);

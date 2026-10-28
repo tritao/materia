@@ -90,10 +90,7 @@ class HobberTrayAnchorStudy {
         Geometry.bounds(r))) throw 'Backing ${p.id} conflicts with insert ${r.id}';
       for (j in i + 1...points.length) minSpacing = Math.min(
         minSpacing,
-        Math.sqrt(Math.pow(p.x - points[j].x, 2) + Math.pow(
-          p.y - points[j].y,
-          2
-        ))
+        Math.sqrt(Math.pow(p.x - points[j].x, 2) + Math.pow(p.y - points[j].y, 2))
       );
     }
     if (minEdge < 50 || minSpacing < 100 || minServiceEdge < 50) throw "Candidate fails catalogue layout screening";
@@ -116,11 +113,7 @@ class HobberTrayAnchorStudy {
       anchors: points,
       count: points.length,
       socketFaceZMm: z,
-      bodyEnvelopeMm: [
-        24,
-        24,
-        50
-      ],
+      bodyEnvelopeMm: [24, 24, 50],
       envelopeNote: "Conservative square screening volume; supplied DXF is a 2D side view, not a 3D solid or thread model",
       catalogueConcreteScreen: {
         minimumEdgeMm: 50,

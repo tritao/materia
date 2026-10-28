@@ -56,10 +56,7 @@ class BendSetup {
     if (prediction.force * 1000 > press.capacityN) throw new SheetDiagnosis(
       "press.tonnage",
       "Bend " + bend + " needs " + prediction.force + " kN, above frame capacity " + press.capacityN / 1000 + " kN",
-      [
-        "bend:" + bend,
-        station.id
-      ]
+      ["bend:" + bend, station.id]
     );
     for (side in 0...2) {
       var wall = sheet.wall(side == 0 ? record.wallA : record.wallB);
@@ -69,11 +66,7 @@ class BendSetup {
         "press.short-flange",
         "Wall " + wall.id + " at bend "
         + bend + " has " + leg + " mm straight flange, below " + prediction.minimumFlange + " mm at " + station.id,
-        [
-          "wall:" + wall.id,
-          "bend:" + bend,
-          station.id
-        ]
+        ["wall:" + wall.id, "bend:" + bend, station.id]
       );
     }
     var initial = PressSheetPose.at(sheet, state, bend, prediction, tooling, contact, orientation);
@@ -95,10 +88,7 @@ class BendSetup {
       )) throw new SheetDiagnosis(
         "press.tool-support",
         "Installed punch and die do not support the material-bearing bend interval",
-        [
-          "bend:" + bend,
-          station.id
-        ]
+        ["bend:" + bend, station.id]
       );
     }
     var registration = BendRegistration.plan(sheet, initial, gaugeEdge, orientation, press);
@@ -114,10 +104,7 @@ class BendSetup {
       if (travel < press.ramTravel.lower - 1e-8 || travel > press.ramTravel.upper + 1e-8) throw new SheetDiagnosis(
         "press.ram-travel",
         "Stroke sample needs ram travel " + travel + " mm outside nominal travel",
-        [
-          "bend:" + bend,
-          station.id
-        ]
+        ["bend:" + bend, station.id]
       );
       stroke.push(pose);
       var source = pose.evaluation.bounds();
@@ -136,14 +123,7 @@ class BendSetup {
       registration,
       prediction,
       finalTravel,
-      new PressEnvelope(
-        bounds.minX,
-        bounds.minY,
-        bounds.minZ,
-        bounds.maxX,
-        bounds.maxY,
-        bounds.maxZ
-      ),
+      new PressEnvelope(bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ),
       stroke
     );
   }

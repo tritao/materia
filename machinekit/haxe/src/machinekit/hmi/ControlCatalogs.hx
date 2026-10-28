@@ -38,13 +38,7 @@ class ControlCatalogs {
         custom(),
         {
           designation: YUMO,
-          values: new ComponentValues().setToken(
-            "basis",
-            "catalog"
-          ).setNumber(
-            "outerDiameter",
-            60
-          ).setNumber(
+          values: new ComponentValues().setToken("basis", "catalog").setNumber("outerDiameter", 60).setNumber(
             "flangeThickness",
             6
           ).setNumber(
@@ -129,13 +123,7 @@ class ControlCatalogs {
         },
         {
           designation: VALLDER,
-          values: new ComponentValues().setToken(
-            "basis",
-            "catalog"
-          ).setNumber(
-            "outerDiameter",
-            80
-          ).setNumber(
+          values: new ComponentValues().setToken("basis", "catalog").setNumber("outerDiameter", 80).setNumber(
             "flangeThickness",
             7
           ).setNumber(
@@ -196,13 +184,7 @@ class ControlCatalogs {
             standardEdition: null,
             dimensionKind: Nominal,
             conformance: NominalEnvelope,
-            verifiedFields: [
-              "outerDiameter",
-              "ringDiameter",
-              "studCircleDiameter",
-              "bossDiameter",
-              "studCount"
-            ]
+            verifiedFields: ["outerDiameter", "ringDiameter", "studCircleDiameter", "bossDiameter", "studCount"]
           }
         }
       ],
@@ -219,13 +201,7 @@ class ControlCatalogs {
         custom(),
         {
           designation: XB2,
-          values: new ComponentValues().setToken(
-            "basis",
-            "stated"
-          ).setNumber(
-            "headDiameter",
-            40
-          ).setNumber(
+          values: new ComponentValues().setToken("basis", "stated").setNumber("headDiameter", 40).setNumber(
             "collarDiameter",
             30
           ).setNumber(
@@ -274,21 +250,12 @@ class ControlCatalogs {
             standardEdition: null,
             dimensionKind: Nominal,
             conformance: NominalEnvelope,
-            verifiedFields: [
-              "headDiameter",
-              "massGrams"
-            ]
+            verifiedFields: ["headDiameter", "massGrams"]
           }
         },
         {
           designation: EAO,
-          values: new ComponentValues().setToken(
-            "basis",
-            "assumed"
-          ).setNumber(
-            "headHeight",
-            16
-          ).setNumber(
+          values: new ComponentValues().setToken("basis", "assumed").setNumber("headHeight", 16).setNumber(
             "nutThickness",
             3
           ).setNumber(

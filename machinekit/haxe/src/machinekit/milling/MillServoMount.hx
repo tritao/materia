@@ -14,14 +14,8 @@ class MillServoMount extends MachineComponent {
 
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 100),
-    P.length(
-      "shaftHeight",
-      68
-    ),
-    P.length(
-      "pedestalHeight",
-      43
-    )
+    P.length("shaftHeight", 68),
+    P.length("pedestalHeight", 43)
   ];
 
   public static function recipeType():ComponentType {

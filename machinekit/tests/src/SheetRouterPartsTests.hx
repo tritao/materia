@@ -192,22 +192,10 @@ class SheetRouterPartsTests {
     check(vacuum.zoneValve(0).port('outlet').kind == Vacuum, 'zone isolation valve');
     var parts:Array<{id:String, part:AssumedCatalogComponent}> = [
       {id: 'spindle', part: spindle},
-      {
-        id: 'vfd',
-        part: new Vfd()
-      },
-      {
-        id: 'rack',
-        part: toolRack
-      },
-      {
-        id: 'vacuum',
-        part: vacuum
-      },
-      {
-        id: 'setter',
-        part: setter
-      }
+      {id: 'vfd', part: new Vfd()},
+      {id: 'rack', part: toolRack},
+      {id: 'vacuum', part: vacuum},
+      {id: 'setter', part: setter}
     ];
     for (i in 0...vacuum.zoneCount()) parts.push({id: 'zone' + i, part: vacuum.zoneValve(i)});
     var cabinet = ControlCabinet.forParts(parts);

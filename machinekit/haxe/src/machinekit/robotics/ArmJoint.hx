@@ -62,34 +62,15 @@ class ArmJoint extends MachineComponent implements MotorDrive {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.arm-joint",
       [
-        ComponentRecipeSupport.length(
-          "diameter",
-          100
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          70
-        ),
-        ComponentRecipeSupport.length(
-          "flangePitchCircle",
-          0
-        ),
+        ComponentRecipeSupport.length("diameter", 100),
+        ComponentRecipeSupport.length("length", 70),
+        ComponentRecipeSupport.length("flangePitchCircle", 0),
         ComponentRecipeSupport.choice(
           "servo",
           ["none"].concat([for (rating in machinekit.motion.ServoMotor.ratings()) rating.designation]),
           "none"
         ),
-        ComponentRecipeSupport.choice(
-          "servoBasis",
-          [
-            "derived",
-            "catalog",
-            "stated",
-            "assumed",
-            "measured"
-          ],
-          "assumed"
-        )
+        ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed", "measured"], "assumed")
       ],
       v -> new ArmJoint(
         v.number("diameter"),
@@ -153,30 +134,12 @@ class ArmJoint extends MachineComponent implements MotorDrive {
         {r: r, z: 0.0},
         {r: r, z: 6.0},
         {r: 0.94 * r, z: 7.0},
-        {
-          r: 0.94 * r,
-          z: length - 8
-        },
-        {
-          r: 0.6 * r,
-          z: length - 8
-        },
-        {
-          r: 0.6 * r,
-          z: length - 7
-        },
-        {
-          r: 0.85 * r,
-          z: length - 7
-        },
-        {
-          r: 0.85 * r,
-          z: length
-        },
-        {
-          r: 0.0,
-          z: length
-        }
+        {r: 0.94 * r, z: length - 8},
+        {r: 0.6 * r, z: length - 8},
+        {r: 0.6 * r, z: length - 7},
+        {r: 0.85 * r, z: length - 7},
+        {r: 0.85 * r, z: length},
+        {r: 0.0, z: length}
       ]),
       "housing"
     );

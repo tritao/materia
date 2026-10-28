@@ -13,36 +13,12 @@ class HelicalPinion extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("normalModule", 1.5),
     P.count("teeth", 20),
-    P.length(
-      "faceWidth",
-      20
-    ),
-    P.quantity(
-      "helixAngle",
-      Math.acos(3 * Math.PI / 10),
-      "rad"
-    ),
-    P.quantity(
-      "pressureAngle",
-      0.3490658504,
-      "rad"
-    ),
-    P.choice(
-      "hand",
-      [
-        "right",
-        "left"
-      ],
-      "right"
-    ),
-    P.length(
-      "bore",
-      14
-    ),
-    P.length(
-      "backlash",
-      0.02
-    )
+    P.length("faceWidth", 20),
+    P.quantity("helixAngle", Math.acos(3 * Math.PI / 10), "rad"),
+    P.quantity("pressureAngle", 0.3490658504, "rad"),
+    P.choice("hand", ["right", "left"], "right"),
+    P.length("bore", 14),
+    P.length("backlash", 0.02)
   ];
   public function new(?v:ComponentValues) {
     super("helical-pinion", "normal-module helical pinion", "steel", inputs(), v);
@@ -101,10 +77,7 @@ class HelicalPinion extends AssumedCatalogComponent {
       for (section in sections) section.close();
       sections = [];
       var body = Solids.building([tooth], owned -> {var pieces: Array<Part> = [Solids.named(
-        Part.cylinder(
-          rootDiameter() / 2,
-          n("faceWidth")
-        ),
+        Part.cylinder(rootDiameter() / 2, n("faceWidth")),
         "pinion-core"
       )];
       owned.push(pieces[0]);
@@ -112,16 +85,8 @@ class HelicalPinion extends AssumedCatalogComponent {
         var angle = 2 * Math.PI * i / parameterCount("teeth");
         var placed = tooth.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(
           new Vector(0, 0, 0),
-          new Vector(
-            Math.cos(angle),
-            Math.sin(angle),
-            0
-          ),
-          new Vector(
-            0,
-            0,
-            1
-          )
+          new Vector(Math.cos(angle), Math.sin(angle), 0),
+          new Vector(0, 0, 1)
         )));
         placed = Solids.named(placed, "tooth-" + i);
         pieces.push(placed);
@@ -131,14 +96,7 @@ class HelicalPinion extends AssumedCatalogComponent {
       });
       return n("bore") == 0 ? body : Solids.cut(
         body,
-        [Solids.named(
-          Part.cylinderSpan(
-            n("bore") / 2,
-            -1,
-            n("faceWidth") + 1
-          ),
-          "shaft-bore"
-        )]
+        [Solids.named(Part.cylinderSpan(n("bore") / 2, -1, n("faceWidth") + 1), "shaft-bore")]
       );
     } catch (error:Dynamic) {
       for (section in sections) section.close();

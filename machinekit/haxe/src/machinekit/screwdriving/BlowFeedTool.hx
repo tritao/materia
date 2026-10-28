@@ -50,10 +50,7 @@ class BlowFeedTool extends ArmScrewdrivingTool {
     var tcp = AssemblyFrames.compose(carrier, spindle.memberConnectorFrame("carrier", "tcp"));
     var receiverMount = AssemblyFrames.compose(
       AssemblyFrames.inverse(slide),
-      AssemblyFrames.compose(
-        tcp,
-        AssemblyFrames.inverse(nose.connector("receipt").frame)
-      )
+      AssemblyFrames.compose(tcp, AssemblyFrames.inverse(nose.connector("receipt").frame))
     );
     // The named receipt datum meets the fitted bit TCP, including the slide's end connector offset.
     result.addMemberConnector("driver/slide", "receiverMount", receiverMount);
@@ -63,18 +60,7 @@ class BlowFeedTool extends ArmScrewdrivingTool {
       "feedTube",
       new machinekit.pneumatic.RoutedHose(
         "CUSTOM-SCREW-FEED-TUBE",
-        [
-          new Vector(
-            50,
-            0,
-            -100
-          ),
-          new Vector(
-            50,
-            0,
-            10
-          )
-        ],
+        [new Vector(50, 0, -100), new Vector(50, 0, 10)],
         outerDiameter,
         innerDiameter,
         0.08,
@@ -107,47 +93,14 @@ private class ReceivingNose extends MachineComponent {
     addFacet(machinekit.component.CollisionHullFacet.fromBoxes([
       [-o, -o, 0.0, -r, o, 12.0],
       [r, -o, 0.0, o, o, 12.0],
-      [
-        -r,
-        -o,
-        0.0,
-        r,
-        -r,
-        12.0
-      ],
-      [
-        -r,
-        r,
-        0.0,
-        r,
-        o,
-        12.0
-      ],
-      [
-        o,
-        -o,
-        0.0,
-        58.0,
-        o,
-        12.0
-      ]
+      [-r, -o, 0.0, r, -r, 12.0],
+      [-r, r, 0.0, r, o, 12.0],
+      [o, -o, 0.0, 58.0, o, 12.0]
     ]));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Part.box(
-      58 + outer / 2,
-      outer,
-      12
-    ).translated(new Vector(
-      29 - outer / 4,
-      0,
-      0
-    )),
-    [Part.cylinderSpan(
-      inner / 2,
-      -0.1,
-      12.1
-    )]
+    Part.box(58 + outer / 2, outer, 12).translated(new Vector(29 - outer / 4, 0, 0)),
+    [Part.cylinderSpan(inner / 2, -0.1, 12.1)]
   );
 }

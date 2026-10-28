@@ -120,10 +120,7 @@ class AssemblyDesignChecks {
     out:Diagnostics,
     id:String,
     authored:materia.casting.InterfaceRelationship,
-    members:Map<
-      String,
-      MachineComponent
-  >,
+    members:Map<String, MachineComponent>,
     definition:materia.assembly.AssemblyDefinition
   ):Void {
     var relationship = materia.casting.InterfaceRelationship.InterfaceRelationships.copy([authored])[0];
@@ -188,10 +185,7 @@ class AssemblyDesignChecks {
   static function featurePose(ref:DesignReference,
     members:Map<String, MachineComponent>, state:AssemblyState):AssemblyFrame return F.compose(
       state.worldPose(ref.member),
-      facet(
-        ref,
-        members
-      ).frame(ref.feature)
+      facet(ref, members).frame(ref.feature)
     );
   static function material(out:Diagnostics, id:String, e:DesignEnvelope, host:Part):Void {
     var shape = DesignGeometry.envelope(e);
@@ -219,16 +213,7 @@ class AssemblyDesignChecks {
       material(
         out,
         id + " counterbore minimum wall " + h.minWall,
-        {
-          id: id,
-          frame: h.frame,
-          volume: RingVolume(
-            c.radius + h.minWall,
-            c.radius,
-            0,
-            c.depth
-          )
-        },
+        {id: id, frame: h.frame, volume: RingVolume(c.radius + h.minWall, c.radius, 0, c.depth)},
         host
       );
       start = c.depth;
@@ -239,12 +224,7 @@ class AssemblyDesignChecks {
       {
         id: id,
         frame: h.frame,
-        volume: RingVolume(
-          h.radius + h.minWall,
-          h.radius,
-          start,
-          h.relief == null ? h.depth : h.relief.start
-        )
+        volume: RingVolume(h.radius + h.minWall, h.radius, start, h.relief == null ? h.depth : h.relief.start)
       },
       host
     );
@@ -259,16 +239,7 @@ class AssemblyDesignChecks {
       material(
         out,
         id + " relief minimum wall " + h.minWall,
-        {
-          id: id,
-          frame: h.frame,
-          volume: RingVolume(
-            radius + h.minWall,
-            radius,
-            r.start,
-            h.depth
-          )
-        },
+        {id: id, frame: h.frame, volume: RingVolume(radius + h.minWall, radius, r.start, h.depth)},
         host
       );
     }
@@ -288,11 +259,7 @@ class AssemblyDesignChecks {
           {
             id: id,
             frame: h.frame,
-            volume: CylinderVolume(
-              h.relief == null ? h.radius : h.relief.diameter / 2,
-              h.depth,
-              h.depth + t.minBack
-            )
+            volume: CylinderVolume(h.relief == null ? h.radius : h.relief.diameter / 2, h.depth, h.depth + t.minBack)
           },
           host
         );
@@ -301,15 +268,7 @@ class AssemblyDesignChecks {
     if (h.approach != null) clear(
       out,
       id + " drill/tap approach",
-      {
-        id: id,
-        frame: h.frame,
-        volume: CylinderVolume(
-          h.approach.radius,
-          -h.approach.length,
-          0
-        )
-      },
+      {id: id, frame: h.frame, volume: CylinderVolume(h.approach.radius, -h.approach.length, 0)},
       host
     );
   }
@@ -319,10 +278,7 @@ class AssemblyDesignChecks {
     screwId:String,
     target:DesignReference,
     through:Array<DesignReference>,
-    members:Map<
-      String,
-      MachineComponent
-  >,
+    members:Map<String, MachineComponent>,
     state:AssemblyState,
     cache:PosedParts
   ):Void {
@@ -350,10 +306,7 @@ class AssemblyDesignChecks {
     if (h.through == true) DesignChecks.minimum(
       out,
       id + " thread engagement",
-      Math.min(
-        screw.shankLength() - threadedGrip,
-        usable
-      ),
+      Math.min(screw.shankLength() - threadedGrip, usable),
       t.minEngagement
     );
     else DesignChecks.blindFastener(
@@ -384,10 +337,7 @@ class AssemblyDesignChecks {
       var end = faceDistance + sign * clearance.depth;
       intervals.push({
         start: Math.min(faceDistance, end) + (clearance.counterbore == null ? 0 : clearance.counterbore.depth),
-        end : Math.max(
-          faceDistance,
-          end
-        )
+        end : Math.max(faceDistance, end)
       });
       DesignChecks.minimum(
         out,
@@ -407,12 +357,7 @@ class AssemblyDesignChecks {
         var e:DesignEnvelope = {
           id: id,
           frame: clearance.frame,
-          volume: RingVolume(
-            screw.headBearingRadius(),
-            clearance.radius,
-            c.depth,
-            c.depth + c.bearingDepth
-          )
+          volume: RingVolume(screw.headBearingRadius(), clearance.radius, c.depth, c.depth + c.bearingDepth)
         };
         material(out, id + " head bearing", e, cache.local(members.get(ref.member)));
       }

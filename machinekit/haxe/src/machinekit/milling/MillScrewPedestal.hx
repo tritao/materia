@@ -11,14 +11,8 @@ class MillScrewPedestal extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 100),
     P.length("depth", 25),
-    P.length(
-      "height",
-      43
-    ),
-    P.flag(
-      "motorAnchors",
-      true
-    )
+    P.length("height", 43),
+    P.flag("motorAnchors", true)
   ];
 
   public static function recipeType():ComponentType {

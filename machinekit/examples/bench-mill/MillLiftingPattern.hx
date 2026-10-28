@@ -15,10 +15,7 @@ class MillLiftingPattern {
     body:ComponentValues,
     existing:Array<CastInsertPlacement>,
     details:MillCastingDetails,
-    topFace: {
-      width: Float,
-      depth: Float
-    },
+    topFace: {width: Float, depth: Float},
     rule:materia.casting.InsertAnchorage.InsertAnchorPatternRule
   ):Array<CastInsertPlacement> {
     var fixed = machinekit.structural.FoundationSizing.anchors(existing, rule, body);
@@ -105,11 +102,7 @@ class MillLiftingPattern {
                 candidate,
                 neighbours,
                 resin,
-                [
-                  body.number("width"),
-                  body.number("depth"),
-                  body.number("height")
-                ],
+                [body.number("width"), body.number("depth"), body.number("height")],
                 CastingShopRecipe.minimumSteelSpacingMm()
               );
               // Use the source contract to reject a new side breakout as
@@ -179,15 +172,8 @@ class MillLiftingPattern {
     sx:Int,
     sy:Int,
     share:Float,
-    seed: {
-      x: Float,
-      y: Float,
-      turn: Int
-    },
-    topFace: {
-      width: Float,
-      depth: Float
-    }
+    seed: {x: Float, y: Float, turn: Int},
+    topFace: {width: Float, depth: Float}
   ):CastInsertPlacement {
     var height = details.liftingPlateThicknessMm;
     if (!Math.isFinite(height) || height <= 0) throw "Invalid source lifting plate thickness";
@@ -222,17 +208,7 @@ class MillLiftingPattern {
         sx * x,
         sy * y,
         z,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
+        [0, -1, 0, 1, 0, 0, 0, 0, 1]
       ),
       openings : [CastingPatterns.face("body.z-max")]
     };

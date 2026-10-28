@@ -115,10 +115,7 @@ class MillCapacityLayout {
         zRailLength: zEnd - zStart
       },
       {
-        baseWidth: Math.max(
-          800,
-          saddleWidth + 100
-        ),
+        baseWidth: Math.max(800, saddleWidth + 100),
         baseHeight: baseHeight,
         columnWidth: 460,
         columnDepth: 400,
@@ -127,12 +124,7 @@ class MillCapacityLayout {
         roof: 80,
         frontExtension: 40,
         footPockets: true,
-        yTravel: new MillYTravel(
-          yTravel,
-          50,
-          saddleDepth,
-          overtravel
-        )
+        yTravel: new MillYTravel(yTravel, 50, saddleDepth, overtravel)
       }
     );
     if (tableDepth / 2 - yTravel / 2 < 50 || xRailSpacing < guide.blockWidth + clearance
@@ -186,32 +178,24 @@ class MillCapacityLayout {
       rail: rail(frame.zRailLength),
       headBoltLength: 25,
       overtravelLimit: overtravel,
-      head: new machinekit.component.ComponentValues().setNumber(
-        "width",
-        headWidth
-      ).setNumber(
-        "noseWidth",
-        180
-      ).setNumber(
-        "reach",
-        headDepth
-      ).setNumber(
-        "plate",
-        20
-      ).setNumber(
-        "wall",
-        16
-      ).setNumber(
-        "rearPlate",
-        20
-      ).setNumber(
-        "boltZ",
-        Math.min(
-          80,
-          headHeight / 2 - 20
-        )
-      )
-    }
+      head: new machinekit.component.ComponentValues().setNumber("width",
+    headWidth).setNumber("noseWidth", 180).setNumber(
+      "reach",
+      headDepth
+    ).setNumber(
+      "plate",
+      20
+    ).setNumber(
+      "wall",
+      16
+    ).setNumber(
+      "rearPlate",
+      20
+    ).setNumber(
+      "boltZ",
+      Math.min(80, headHeight / 2 - 20)
+    )
+  }
   );
 
   static function rail(length:Float):machinekit.motion.LinearRail return machinekit.motion.LinearRail.metric(

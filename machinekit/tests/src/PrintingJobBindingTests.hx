@@ -43,10 +43,7 @@ class PrintingJobBindingTests {
       initialPositions: [for (id in job.axes) placement.joint(id)],
       metresPerUnit: physical.metresPerUnit,
       model: model,
-      runtime: RobotRuntimeCompiler.compile(
-        model,
-        new robotkit.profile.RobotProfile()
-      ),
+      runtime: RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()),
       fixedTimestepSeconds: 0.01,
       channels: new ToolpathChannels(""),
       steady: new SteadyLoads()

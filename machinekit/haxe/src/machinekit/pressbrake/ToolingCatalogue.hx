@@ -9,11 +9,7 @@ class ToolingCatalogue {
 
   public static function dies():Array<DieProfile> return [for (opening in [8, 12, 16, 22]) new DieProfile(
     'reference-v$opening-88-r1',
-    new DieGroove(
-      opening,
-      88 * Math.PI / 180,
-      1
-    ),
+    new DieGroove(opening, 88 * Math.PI / 180, 1),
     40,
     30
   )];
@@ -21,26 +17,13 @@ class ToolingCatalogue {
   public static function fourV():MultiVDieProfile return new MultiVDieProfile(
     "reference-four-v-8-12-16-22",
     60,
-    [for (opening in [
-      8,
-      12,
-      16,
-      22
-    ]) new DieGroove(
-      opening,
-      88 * Math.PI / 180,
-      1
-    )]
+    [for (opening in [8, 12, 16, 22]) new DieGroove(opening, 88 * Math.PI / 180, 1)]
   );
 
   /** Taller reference block provides clearance below downward folded flanges. */
   public static function raisedV12():DieProfile return new DieProfile(
     "reference-v12-raised-88-r1",
-    new DieGroove(
-      12,
-      88 * Math.PI / 180,
-      1
-    ),
+    new DieGroove(12, 88 * Math.PI / 180, 1),
     40,
     50
   );
@@ -66,34 +49,13 @@ class ToolingCatalogue {
       height,
       new ToolProfilePolygon([
         new ToolProfilePoint(-y, z),
-        new ToolProfilePoint(
-          y,
-          z
-        ),
-        new ToolProfilePoint(
-          shoulderY,
-          15
-        ),
-        new ToolProfilePoint(
-          8,
-          30
-        ),
-        new ToolProfilePoint(
-          8,
-          height
-        ),
-        new ToolProfilePoint(
-          -8,
-          height
-        ),
-        new ToolProfilePoint(
-          -8,
-          30
-        ),
-        new ToolProfilePoint(
-          -shoulderY,
-          15
-        )
+        new ToolProfilePoint(y, z),
+        new ToolProfilePoint(shoulderY, 15),
+        new ToolProfilePoint(8, 30),
+        new ToolProfilePoint(8, height),
+        new ToolProfilePoint(-8, height),
+        new ToolProfilePoint(-8, 30),
+        new ToolProfilePoint(-shoulderY, 15)
       ])
     );
   }
@@ -109,54 +71,18 @@ class ToolingCatalogue {
       angle,
       120,
       new ToolProfilePolygon([
-        new ToolProfilePoint(
-          -y,
-          z
-        ),
-        new ToolProfilePoint(
-          y,
-          z
-        ),
-        new ToolProfilePoint(
-          shoulderY,
-          15
-        ),
-        new ToolProfilePoint(
-          20,
-          25
-        ),
-        new ToolProfilePoint(
-          -5,
-          35
-        ),
-        new ToolProfilePoint(
-          -5,
-          65
-        ),
-        new ToolProfilePoint(
-          8,
-          80
-        ),
-        new ToolProfilePoint(
-          8,
-          120
-        ),
-        new ToolProfilePoint(
-          -8,
-          120
-        ),
-        new ToolProfilePoint(
-          -20,
-          80
-        ),
-        new ToolProfilePoint(
-          -20,
-          25
-        ),
-        new ToolProfilePoint(
-          -shoulderY,
-          15
-        )
+        new ToolProfilePoint(-y, z),
+        new ToolProfilePoint(y, z),
+        new ToolProfilePoint(shoulderY, 15),
+        new ToolProfilePoint(20, 25),
+        new ToolProfilePoint(-5, 35),
+        new ToolProfilePoint(-5, 65),
+        new ToolProfilePoint(8, 80),
+        new ToolProfilePoint(8, 120),
+        new ToolProfilePoint(-8, 120),
+        new ToolProfilePoint(-20, 80),
+        new ToolProfilePoint(-20, 25),
+        new ToolProfilePoint(-shoulderY, 15)
       ])
     );
   }

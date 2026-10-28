@@ -27,68 +27,27 @@ class MillXYStage extends MillGuidedXYStage {
     var nutMountPose = F.compose(y, F.translation(0, 0, l.yScrewStart - yFace));
     attach(
       "nutBracketY",
-      new MillYNutMount(new ComponentValues().setBoolean("reinforced", true).setBoolean(
-        "serviceAccess",
-        true
-      )),
+      new MillYNutMount(new ComponentValues().setBoolean("reinforced", true).setBoolean("serviceAccess", true)),
       nutMountPose,
       "saddle"
     );
     for (p in MillYNutMount.anchors()) attach(
       'nutBracketYBolt${p.x}-${p.y}',
-      SocketHeadCapScrew.metric(
-        "M6",
-        MillYNutMount.ANCHOR_LENGTH
-      ),
-      F.compose(
-        nutMountPose,
-        F.translation(
-          p.x,
-          p.y,
-          MillYNutMount.ANCHOR_SEAT
-        )
-      ),
+      SocketHeadCapScrew.metric("M6", MillYNutMount.ANCHOR_LENGTH),
+      F.compose(nutMountPose, F.translation(p.x, p.y, MillYNutMount.ANCHOR_SEAT)),
       "nutBracketY"
     );
     var nutBolt = 0;
     for (p in l.nut.boltPattern()) attach(
       'nutYBolt${nutBolt++}',
-      SocketHeadCapScrew.metric(
-        l.nut.mountScrew,
-        MillYNutMount.FLANGE_BOLT_LENGTH
-      ),
-      F.compose(
-        nutMountPose,
-        F.fromRotationMatrix(
-          p.x,
-          p.y,
-          -l.nut.flangeThickness,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        )
-      ),
+      SocketHeadCapScrew.metric(l.nut.mountScrew, MillYNutMount.FLANGE_BOLT_LENGTH),
+      F.compose(nutMountPose, F.fromRotationMatrix(p.x, p.y, -l.nut.flangeThickness, [1, 0, 0, 0, -1, 0, 0, 0, -1])),
       "nutBracketY"
     );
     attach(
       "nutY",
       l.nut,
-      F.compose(
-        y,
-        F.translation(
-          0,
-          0,
-          l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness
-        )
-      ),
+      F.compose(y, F.translation(0, 0, l.yScrewStart - yFace - l.nut.bodyLength - l.nut.flangeThickness)),
       "nutBracketY"
     );
     var x = orient(l.xScrewStart, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]);
@@ -106,10 +65,7 @@ class MillXYStage extends MillGuidedXYStage {
           id,
           'screw$a-turn',
           Transmission.LeadScrew('screw$a', 'nut$a'),
-          screwSense(
-            id,
-            along
-          )
+          screwSense(id, along)
         );
         supportScrew('$id-lead', l.fixed.support, l.floating.support);
       }
@@ -127,85 +83,27 @@ class MillXYStage extends MillGuidedXYStage {
     }
     for (side in [-1, 1]) for (height in [10, 70]) attach(
       'motorPlateBoltX$side$height',
-      SocketHeadCapScrew.metric(
-        "M6",
-        25
-      ),
-      orient(
-        MillXYStageLayout.X_MOTOR_FACE - 12,
-        l.centreY + side * 32,
-        l.saddleBottom + height,
-        [
-          0,
-          0,
-          1
-        ],
-        [
-          -1,
-          0,
-          0
-        ]
-      ),
+      SocketHeadCapScrew.metric("M6", 25),
+      orient(MillXYStageLayout.X_MOTOR_FACE - 12,
+      l.centreY + side * 32, l.saddleBottom + height, [0, 0, 1], [-1, 0, 0]),
       "motorMountX"
     );
     attach(
       "motorCoverY",
-      new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber(
-        "upperZ",
-        l.yHatchUpperZ
-      )),
-      F.translation(
-        0,
-        l.yServiceRear + 2,
-        0
-      ),
+      new MillDriveHatch(new ComponentValues().setNumber("lowerZ", l.yHatchLowerZ).setNumber("upperZ", l.yHatchUpperZ)),
+      F.translation(0, l.yServiceRear + 2, 0),
       "fixedPedestalY"
     );
     for (side in [-1, 1]) for (row in [{name: "Lower", z: l.yHatchLowerZ}, {name: "Upper", z: l.yHatchUpperZ}]) attach(
       'rearCoverBoltY$side${row.name}',
-      SocketHeadCapScrew.metric(
-        "M4",
-        10
-      ),
-      orient(
-        side * 75,
-        l.yServiceRear + 4,
-        row.z,
-        [
-          0,
-          0,
-          1
-        ],
-        [
-          0,
-          1,
-          0
-        ]
-      ),
+      SocketHeadCapScrew.metric("M4", 10),
+      orient(side * 75, l.yServiceRear + 4, row.z, [0, 0, 1], [0, 1, 0]),
       "motorCoverY"
     );
     attach(
       "motorCoverX",
-      new MillMotorCover(new ComponentValues().setNumber("width", 90).setNumber("depth", 38).setNumber(
-        "height",
-        142
-      )),
-      F.fromRotationMatrix(
-        MillXYStageLayout.X_BELT_PLANE - 1,
-        l.centreY,
-        l.saddleBottom,
-        [
-          0,
-          1,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      ),
+      new MillMotorCover(new ComponentValues().setNumber("width", 90).setNumber("depth", 38).setNumber("height", 142)),
+      F.fromRotationMatrix(MillXYStageLayout.X_BELT_PLANE - 1, l.centreY, l.saddleBottom, [0, 1, 0, -1, 0, 0, 0, 0, 1]),
       "motorMountX"
     );
     exposeConnector("mount", "fixedPedestalY", "mount");
@@ -241,66 +139,33 @@ class MillXYStage extends MillGuidedXYStage {
       "to-screwY",
       "screwY",
       "attach-screwY",
-      {
-        x: 0,
-        y: -1,
-        z: 0
-      }
+      {x: 0, y: -1, z: 0}
     );
     attach("motorShaftY", l.yMotor.shaft(), motorPose, "screwY");
     attach("couplingY", d.coupling, F.compose(motorPose, F.translation(0, 0, d.couplingSeat)), "screwY");
     var floatingPose = F.compose(
-      orient(
-        0,
-        l.yFloatingY + d.floatingBoltZ,
-        l.yScrewZ - support.spec.shaftHeight,
-        [
-          0,
-          0,
-          1
-        ],
-        [
-          0,
-          -1,
-          0
-        ]
-      ),
+      orient(0, l.yFloatingY + d.floatingBoltZ, l.yScrewZ - support.spec.shaftHeight, [0, 0, 1], [0, -1, 0]),
       support.supportInFootFrame()
     );
     attach("floatingBearingY", support, floatingPose, "floatingPedestalY");
     attach("floatingRingY", d.ring, F.compose(floatingPose, F.translation(0, 0, d.ringSeatZ)), "floatingBearingY");
     for (floating in [false, true]) for (x in [-42.0, 42]) attach(
       'seatYAnchor${floating}$x',
-      SocketHeadCapScrew.metric(
-        "M6",
-        25
-      ),
-      F.translation(
-        x,
-        (floating ? l.yFloatingY : l.yFixedY) + (floating ? 0 : -10),
-        l.yMountPlane + 15
-      ),
+      SocketHeadCapScrew.metric("M6", 25),
+      F.translation(x, (floating ? l.yFloatingY : l.yFixedY) + (floating ? 0 : -10), l.yMountPlane + 15),
       floating ? "floatingPedestalY" : "fixedPedestalY"
     );
     var i = 0;
     for (hole in mount.spec.baseHoles) attach(
       'mountYBolt${++i}',
       SocketHeadCapScrew.metric("M6", 35),
-      F.translation(
-        hole.x,
-        l.yMotorFace - hole.z,
-        l.yScrewZ + (d.fixedBoltSeat - mount.spec.shaftHeight)
-      ),
+      F.translation(hole.x, l.yMotorFace - hole.z, l.yScrewZ + (d.fixedBoltSeat - mount.spec.shaftHeight)),
       "motorMountY"
     );
     for (x in [-d.floatingBoltX, d.floatingBoltX]) attach(
       'bearingBoltYfloating$x',
       SocketHeadCapScrew.metric("M6", 40),
-      F.translation(
-        x,
-        l.yFloatingY,
-        l.yScrewZ + (d.floatingBoltSeat - support.spec.shaftHeight)
-      ),
+      F.translation(x, l.yFloatingY, l.yScrewZ + (d.floatingBoltSeat - support.spec.shaftHeight)),
       "floatingBearingY"
     );
     i = 0;
@@ -310,22 +175,7 @@ class MillXYStage extends MillGuidedXYStage {
       SocketHeadCapScrew.metric("M5", 12),
       F.compose(
         motorPose,
-        F.fromRotationMatrix(
-          hole.x,
-          hole.y,
-          -mounting.flangeThickness,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        )
+        F.fromRotationMatrix(hole.x, hole.y, -mounting.flangeThickness, [1, 0, 0, 0, -1, 0, 0, 0, -1])
       ),
       "motorMountY"
     );
@@ -338,32 +188,14 @@ class MillXYStage extends MillGuidedXYStage {
       var fixed = end == "fixed", bearing = fixed ? l.fixed : l.floating, x = fixed ? l.xFixedX : l.xFloatingX;
       attach(
         '${end}PedestalX',
-        new MillScrewPedestal(new ComponentValues().setNumber("width", 84).setNumber(
-          "depth",
-          bearing.length
-        ).setNumber(
+        new MillScrewPedestal(new ComponentValues().setNumber("width", 84).setNumber("depth", bearing.length).setNumber(
           "height",
           15
         ).setBoolean(
           "motorAnchors",
           false
         )),
-        F.fromRotationMatrix(
-          x,
-          l.centreY,
-          l.xRailPlane,
-          [
-            0,
-            -1,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0,
-            1
-          ]
-        ),
+        F.fromRotationMatrix(x, l.centreY, l.xRailPlane, [0, -1, 0, 1, 0, 0, 0, 0, 1]),
         "saddle"
       );
       attach('${end}BearingX', bearing, orient(x, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]), '${end}PedestalX');
@@ -371,22 +203,7 @@ class MillXYStage extends MillGuidedXYStage {
     attach(
       "motorMountX",
       new MillBeltMotorPlate(l.motor.rating.designation),
-      F.fromRotationMatrix(
-        MillXYStageLayout.X_MOTOR_FACE - 6,
-        l.centreY,
-        l.saddleBottom,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      ),
+      F.fromRotationMatrix(MillXYStageLayout.X_MOTOR_FACE - 6, l.centreY, l.saddleBottom, [0, -1, 0, 1, 0, 0, 0, 0, 1]),
       "saddle"
     );
     var motor = orient(MillXYStageLayout.X_MOTOR_FACE, l.centreY, l.xMotorZ, [0, -1, 0], [-1, 0, 0]);
@@ -397,21 +214,7 @@ class MillXYStage extends MillGuidedXYStage {
       attach(
         'motorBoltX${p.x}-${p.y}',
         SocketHeadCapScrew.metric("M5", 25),
-        orient(
-          MillXYStageLayout.X_MOTOR_FACE - 12,
-          l.centreY + p.x,
-          l.xMotorZ + p.y,
-          [
-            0,
-            0,
-            1
-          ],
-          [
-            -1,
-            0,
-            0
-          ]
-        ),
+        orient(MillXYStageLayout.X_MOTOR_FACE - 12, l.centreY + p.x, l.xMotorZ + p.y, [0, 0, 1], [-1, 0, 0]),
         "motorMountX"
       );
       attach(
@@ -421,16 +224,8 @@ class MillXYStage extends MillGuidedXYStage {
           MillXYStageLayout.X_MOTOR_FACE + mounting.flangeThickness,
           l.centreY + p.x,
           l.xMotorZ + p.y,
-          [
-            0,
-            0,
-            1
-          ],
-          [
-            1,
-            0,
-            0
-          ]
+          [0, 0, 1],
+          [1, 0, 0]
         ),
         "motorX"
       );
@@ -439,14 +234,7 @@ class MillXYStage extends MillGuidedXYStage {
     attach(
       "screwRetainerX",
       l.xScrew.retainer(),
-      F.compose(
-        shaft,
-        F.translation(
-          0,
-          0,
-          machinekit.motion.BallScrewRetainer.STATION
-        )
-      ),
+      F.compose(shaft, F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)),
       "screwX"
     );
     addMateOnAxis(
@@ -456,27 +244,13 @@ class MillXYStage extends MillGuidedXYStage {
       "to-screwX",
       "screwX",
       "attach-screwX",
-      {
-        x: 1,
-        y: 0,
-        z: 0
-      }
+      {x: 1, y: 0, z: 0}
     );
     var screwPulley = new TimingPulley(HTD5M, 20, 12, 15), motorPulley = new TimingPulley(HTD5M, 20, 14, 15);
     attach(
       "screwPulleyX",
       screwPulley,
-      orient(
-        MillXYStageLayout.X_BELT_PLANE,
-        l.centreY,
-        l.xScrewZ,
-        [0, 0, 1],
-        [
-          1,
-          0,
-          0
-        ]
-      ),
+      orient(MillXYStageLayout.X_BELT_PLANE, l.centreY, l.xScrewZ, [0, 0, 1], [1, 0, 0]),
       "screwX"
     );
     hang(
@@ -492,54 +266,28 @@ class MillXYStage extends MillGuidedXYStage {
       "to-motorPulleyX",
       "motorPulleyX",
       "attach-motorPulleyX",
-      {
-        x: -1,
-        y: 0,
-        z: 0
-      }
+      {x: -1, y: 0, z: 0}
     );
     attach("motorShaftX", l.motor.shaft(), motor, "motorPulleyX");
     var belt = TimingBelt.twoPulley(HTD5M, 20, 20, l.xScrewZ - l.xMotorZ, 15, 5000);
     attach(
       "beltX",
       belt,
-      F.fromRotationMatrix(
-        MillXYStageLayout.X_BELT_PLANE,
-        l.centreY,
-        l.xMotorZ,
-        [
-          0,
-          0,
-          1,
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0
-        ]
-      ),
+      F.fromRotationMatrix(MillXYStageLayout.X_BELT_PLANE, l.centreY, l.xMotorZ, [0, 0, 1, 0, -1, 0, 1, 0, 0]),
       "saddle"
     );
     addBeltPath({
       belt: "beltX",
       wraps: [
         {instanceId: "motorPulleyX", connectorName: "front"},
-        {
-          instanceId: "screwPulleyX",
-          connectorName: "front"
-        }
+        {instanceId: "screwPulleyX", connectorName: "front"}
       ]
     });
     addTransmission(
       "x-return-belt",
       "screwX-turn",
       "motorX-turn",
-      Transmission.BeltReduction(
-        "beltX",
-        "screwPulleyX",
-        "motorPulleyX"
-      ),
+      Transmission.BeltReduction("beltX", "screwPulleyX", "motorPulleyX"),
       Same
     );
   }
@@ -548,27 +296,13 @@ class MillXYStage extends MillGuidedXYStage {
     attach(
       'nutBracket$a',
       new MillBallNutBracket(new ComponentValues().setBoolean("tableFoot", foot)),
-      F.compose(
-        axis,
-        F.translation(
-          0,
-          0,
-          face
-        )
-      ),
+      F.compose(axis, F.translation(0, 0, face)),
       parent
     );
     attach(
       'nut$a',
       layout.nut,
-      F.compose(
-        axis,
-        F.translation(
-          0,
-          0,
-          face - layout.nut.bodyLength - layout.nut.flangeThickness
-        )
-      ),
+      F.compose(axis, F.translation(0, 0, face - layout.nut.bodyLength - layout.nut.flangeThickness)),
       'nutBracket$a'
     );
   }
@@ -605,24 +339,12 @@ class MillXYStage extends MillGuidedXYStage {
     var mountRotation = F.fromRotationMatrix(0, 0, 0, [-1, 0, 0, 0, 1, 0, 0, 0, -1]);
     attach(
       'motorMount$a',
-      new MillServoMount(new ComponentValues().setNumber("width", width).setNumber(
-        "shaftHeight",
-        shaftHeight
-      ).setNumber(
+      new MillServoMount(new ComponentValues().setNumber("width",
+      width).setNumber("shaftHeight", shaftHeight).setNumber(
         "pedestalHeight",
         h
       )),
-      F.compose(
-        axis,
-        F.compose(
-          F.translation(
-            0,
-            0,
-            fixedAt - l.fixed.length / 2
-          ),
-          mountRotation
-        )
-      ),
+      F.compose(axis, F.compose(F.translation(0, 0, fixedAt - l.fixed.length / 2), mountRotation)),
       'fixedPedestal$a'
     );
     attach('motor$a', l.motor, F.compose(axis, F.translation(0, 0, -l.motor.rating.shaftLength)), 'motorMount$a');
@@ -638,14 +360,7 @@ class MillXYStage extends MillGuidedXYStage {
     attach(
       'screwRetainer$a',
       screw.retainer(),
-      F.compose(
-        axis,
-        F.translation(
-          0,
-          0,
-          machinekit.motion.BallScrewRetainer.STATION
-        )
-      ),
+      F.compose(axis, F.translation(0, 0, machinekit.motion.BallScrewRetainer.STATION)),
       'screw$a'
     );
     attach('coupling$a', l.coupling, F.compose(axis, F.translation(0, 0, -l.coupling.length / 2)), 'screw$a');

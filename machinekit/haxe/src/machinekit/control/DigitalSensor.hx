@@ -27,15 +27,7 @@ class DigitalSensor extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.control.digital-sensor",
-      [ComponentRecipeSupport.choice(
-        "kind",
-        [
-          "reed",
-          "presence",
-          "scanner"
-        ],
-        "reed"
-      )],
+      [ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")],
       v -> new DigitalSensor(v.token("kind"))
     );
     return recipe;

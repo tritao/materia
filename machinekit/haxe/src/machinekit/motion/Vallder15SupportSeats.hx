@@ -17,14 +17,8 @@ class Vallder15SupportSeats {
         [
           {name: "raceShoulder", z: FIXED_SHOULDER_Z},
           {name: "retainingNutSeat", z: 20.0},
-          {
-            name: "bearingRear",
-            z: -7.5
-          },
-          {
-            name: "bearingFront",
-            z: 10.5
-          }
+          {name: "bearingRear", z: -7.5},
+          {name: "bearingFront", z: 10.5}
         ];
       case "BF15":
         if (hash != BF_HASH) throw "BF15 seating needs a fresh CAD audit";

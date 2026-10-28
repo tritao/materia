@@ -30,14 +30,7 @@ class HobberDesignChecks {
       }
       var face = F.compose(
         canonical,
-        F.compose(
-          poses.get("swivel/bearing"),
-          F.translation(
-            0,
-            0,
-            machine.swivel.bearing.parameterNumber("height")
-          )
-        )
+        F.compose(poses.get("swivel/bearing"), F.translation(0, 0, machine.swivel.bearing.parameterNumber("height")))
       );
       var mount = F.compose(canonical, poses.get("swivel/housing"));
       count++;
@@ -120,11 +113,7 @@ class HobberDesignChecks {
         var relative = F.compose(F.inverse(poses.get("Xscrew")), nutPose);
         var n0 = F.compose(relative, F.translation(0, 0, 0)), n1 = F.compose(
           relative,
-          F.translation(
-            0,
-            0,
-            nutPart.bodyLength + nutPart.flangeThickness
-          )
+          F.translation(0, 0, nutPart.bodyLength + nutPart.flangeThickness)
         );
         count++;
         if (Math.min(n0.z, n1.z) < screwPart.inputJournalLength + 10 - 1e-7 || Math.max(n0.z,
@@ -149,14 +138,8 @@ class HobberDesignChecks {
       }
       // A point contact can pass while a rail seat overhangs a well. Check its full backing volume.
       var foundations:Array<{kind:String, foundation:machinekit.structural.MineralFoundation}> = [
-        {
-          kind: "bed",
-          foundation: machine.bed
-        },
-        {
-          kind: "column",
-          foundation: machine.column
-        }
+        {kind: "bed", foundation: machine.bed},
+        {kind: "column", foundation: machine.column}
       ];
       for (item in foundations) {
         var foundation = item.foundation;

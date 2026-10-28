@@ -227,10 +227,7 @@ class MillXYStageIntegrity {
       frame,
       [
         {name: "Y fixed bearing pedestal", parent: "base/driveYFixed"},
-        {
-          name: "Y floating bearing pedestal",
-          parent: "base/driveYFloating"
-        }
+        {name: "Y floating bearing pedestal", parent: "base/driveYFloating"}
       ]
     );
     for (item in mounts.items) out.add(item.severity, item.code, item.subject, item.message);
@@ -272,11 +269,7 @@ class MillXYStageIntegrity {
       raw,
       materia.assembly.AssemblyFrames.compose(
         railPose,
-        materia.assembly.AssemblyFrames.translation(
-          0,
-          0,
-          relative.z - 100
-        )
+        materia.assembly.AssemblyFrames.translation(0, 0, relative.z - 100)
       )
     );
     raw.close();

@@ -54,11 +54,7 @@ class StorageRack extends MachineAssembly {
       id: MachineAssembly.join(prefix, "frame"),
       label: "Rack extrusion frame",
       component: frame,
-      pose: AssemblyFrames.translation(
-        0,
-        0,
-        0
-      )
+      pose: AssemblyFrames.translation(0, 0, 0)
     }];
     for (shelfIndex in 1...config.shelfCount + 1) {
       var shelfId = MachineAssembly.join(prefix, 'shelf-${twoDigits(shelfIndex)}');
@@ -66,11 +62,7 @@ class StorageRack extends MachineAssembly {
         id: shelfId,
         label: 'Shelf ${twoDigits(shelfIndex)}',
         component: shelf,
-        pose: AssemblyFrames.translation(
-          0,
-          0,
-          config.shelfZ(shelfIndex)
-        )
+        pose: AssemblyFrames.translation(0, 0, config.shelfZ(shelfIndex))
       });
     }
     for (position in positionsList) {
@@ -89,28 +81,13 @@ class StorageRack extends MachineAssembly {
     for (corner in [
       {name: "front-left", x: -x, y: -y},
       {name: "front-right", x: x, y: -y},
-      {
-        name: "back-left",
-        x: -x,
-        y: y
-      },
-      {
-        name: "back-right",
-        x: x,
-        y: y
-      }
+      {name: "back-left", x: -x, y: y},
+      {name: "back-right", x: x, y: y}
     ]) result.push({
-      id: MachineAssembly.join(
-        prefix,
-        'feet/${corner.name}'
-      ),
+      id: MachineAssembly.join(prefix, 'feet/${corner.name}'),
       label: 'Adjustable foot ${corner.name}',
       component: foot,
-      pose: AssemblyFrames.translation(
-        corner.x,
-        corner.y,
-        0
-      )
+      pose: AssemblyFrames.translation(corner.x, corner.y, 0)
     });
     return result;
   }
@@ -120,11 +97,7 @@ class StorageRack extends MachineAssembly {
     for (shelfIndex in 1...config.shelfCount + 1) addComponent(
       'shelf-${twoDigits(shelfIndex)}',
       shelf,
-      AssemblyFrames.translation(
-        0,
-        0,
-        config.shelfZ(shelfIndex)
-      )
+      AssemblyFrames.translation(0, 0, config.shelfZ(shelfIndex))
     );
     for (position in positionsList) {
       var id = positionLocalId(position);
@@ -136,24 +109,12 @@ class StorageRack extends MachineAssembly {
     for (corner in [
       {name: "front-left", x: -x, y: -y},
       {name: "front-right", x: x, y: -y},
-      {
-        name: "back-left",
-        x: -x,
-        y: y
-      },
-      {
-        name: "back-right",
-        x: x,
-        y: y
-      }
+      {name: "back-left", x: -x, y: y},
+      {name: "back-right", x: x, y: y}
     ]) addComponentAt(
       InstancePath.of('feet/${corner.name}'),
       foot,
-      AssemblyFrames.translation(
-        corner.x,
-        corner.y,
-        0
-      )
+      AssemblyFrames.translation(corner.x, corner.y, 0)
     );
     addBomItem(SocketHeadCapScrew.metric("M5", 12).bom, config.shelfCount * 4);
   }

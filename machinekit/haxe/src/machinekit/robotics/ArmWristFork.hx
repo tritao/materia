@@ -45,29 +45,12 @@ class ArmWristFork extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.arm-wrist-fork",
       [
-        ComponentRecipeSupport.length(
-          "length",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "span",
-          70
-        ),
-        ComponentRecipeSupport.length(
-          "wall",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          24
-        )
+        ComponentRecipeSupport.length("length", 60),
+        ComponentRecipeSupport.length("span", 70),
+        ComponentRecipeSupport.length("wall", 8),
+        ComponentRecipeSupport.length("depth", 24)
       ],
-      v -> new ArmWristFork(
-        v.number("length"),
-        v.number("span"),
-        v.number("wall"),
-        v.number("depth")
-      )
+      v -> new ArmWristFork(v.number("length"), v.number("span"), v.number("wall"), v.number("depth"))
     );
     return recipe;
   }
@@ -92,11 +75,7 @@ class ArmWristFork extends MachineComponent {
       "crossbar"
     )];
     for (side in [-1, 1]) pieces.push(Solids.named(
-      Part.box(wall, depth, length).translated(new Vector(
-        side * (span + wall) / 2,
-        0,
-        0
-      )),
+      Part.box(wall, depth, length).translated(new Vector(side * (span + wall) / 2, 0, 0)),
       side < 0 ? "left-cheek" : "right-cheek"
     ));
     return Solids.union(pieces);

@@ -54,16 +54,8 @@ class HobberTrayMountingStudy {
       conflicts : conflicts,
       revision : proposal.revision,
       anchorCount : points.length,
-      screeningEnvelopeMm : [
-        24,
-        24,
-        40
-      ],
-      reservedBackingMm : [
-        50,
-        50,
-        65
-      ],
+      screeningEnvelopeMm : [24, 24, 40],
+      reservedBackingMm : [50, 50, 65],
       socketFaceCastingLocalZMm : z,
       actualSupplierRetentionGeometry : false,
       fullMachineTravel : false,

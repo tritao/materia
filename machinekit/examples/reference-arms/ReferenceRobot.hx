@@ -149,13 +149,7 @@ class ReferenceRobot {
       var parent = [for (candidate in visible) if (candidate.id == cursor) candidate][0];
       linkAnchors.set(
         link.id,
-        {
-          id: cursor,
-          offset: AssemblyFrames.compose(
-            AssemblyFrames.inverse(parent.pose),
-            link.pose
-          )
-        }
+        {id: cursor, offset: AssemblyFrames.compose(AssemblyFrames.inverse(parent.pose), link.pose)}
       );
       if (link.visuals.length == 0
         && link.massKg != null) throw "Mass-bearing invisible links need explicit geometry support";
@@ -166,10 +160,7 @@ class ReferenceRobot {
     for (link in visible) {
       var component:AssemblyComponentDefinition = {
         id: link.id,
-        connectors: [{
-          name: "origin",
-          frame: AssemblyFrames.identity()
-        }]
+        connectors: [{name: "origin", frame: AssemblyFrames.identity()}]
       };
       var hulls:Array<Array<Float>> = [];
       if (link.id == tipOccurrence) {
@@ -180,10 +171,7 @@ class ReferenceRobot {
       for (joint in manifest.joints) if (joint.type != "fixed" && anchorOf(joint.parent).id == link.id) {
         component.connectors.push({
           name: joint.id,
-          frame: AssemblyFrames.compose(
-            anchorOf(joint.parent).offset,
-            joint.origin
-          )
+          frame: AssemblyFrames.compose(anchorOf(joint.parent).offset, joint.origin)
         });
       }
       for (mesh in link.collisions) {
@@ -218,17 +206,8 @@ class ReferenceRobot {
             parentConnector: "origin",
             child: id,
             childConnector: "origin",
-            axis: {
-              x: 0,
-              y: 0,
-              z: 1
-            },
-            limits: {
-              lower: null,
-              upper: null,
-              velocity: null,
-              effort: null
-            },
+            axis: {x: 0, y: 0, z: 1},
+            limits: {lower: null, upper: null, velocity: null, effort: null},
             defaultValue: 0
           });
         }
@@ -269,11 +248,7 @@ class ReferenceRobot {
           vertices : vertices,
           normals : normals,
           indices : indices,
-          faceRanges : [{
-            faceIndex : 0,
-            firstIndex : 0,
-            indexCount : mesh.indexCount
-          }]
+          faceRanges : [{faceIndex : 0, firstIndex : 0, indexCount : mesh.indexCount}]
         });
       }
     }
@@ -285,11 +260,7 @@ class ReferenceRobot {
       parentConnector: joint.id,
       child: joint.child,
       childConnector: "origin",
-      axis: {
-        x: joint.axis[0],
-        y: joint.axis[1],
-        z: joint.axis[2]
-      },
+      axis: {x: joint.axis[0], y: joint.axis[1], z: joint.axis[2]},
       limits: {
         lower: joint.limits.lower,
         upper: joint.limits.upper,

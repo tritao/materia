@@ -127,31 +127,11 @@ class PressBrakePreview {
       loop: true,
       events: [
         {timeSec: 0, channel: "ramValve/coilA", value: false},
-        {
-          timeSec: 0,
-          channel: "ramValve/coilB",
-          value: false
-        },
-        {
-          timeSec: start,
-          channel: "ramValve/coilA",
-          value: true
-        },
-        {
-          timeSec: extended,
-          channel: "ramValve/coilA",
-          value: false
-        },
-        {
-          timeSec: retract,
-          channel: "ramValve/coilB",
-          value: true
-        },
-        {
-          timeSec: returned,
-          channel: "ramValve/coilB",
-          value: false
-        }
+        {timeSec: 0, channel: "ramValve/coilB", value: false},
+        {timeSec: start, channel: "ramValve/coilA", value: true},
+        {timeSec: extended, channel: "ramValve/coilA", value: false},
+        {timeSec: retract, channel: "ramValve/coilB", value: true},
+        {timeSec: returned, channel: "ramValve/coilB", value: false}
       ]
     };
   }

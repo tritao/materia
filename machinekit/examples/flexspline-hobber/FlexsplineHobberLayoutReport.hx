@@ -126,14 +126,8 @@ class FlexsplineHobberLayoutReport {
     var dimensions = [
       {x: 70.0, label: "Y guide axis plane: 70 mm"},
       {x: 114.0, label: "A bearing front face: 114 mm"},
-      {
-        x: 135.0,
-        label: "Z saddle front / A mounting face: 135 mm"
-      },
-      {
-        x: 161.0,
-        label: "Z guide axis plane: 161 mm"
-      }
+      {x: 135.0, label: "Z saddle front / A mounting face: 135 mm"},
+      {x: 161.0, label: "Z guide axis plane: 161 mm"}
     ];
     for (i in 0...dimensions.length) {
       var d = dimensions[i], y = 730 + i * 36;
@@ -247,16 +241,8 @@ class FlexsplineHobberLayoutReport {
         machine.bed.body.parameterNumber("width"),
         machine.bed.body.parameterNumber("depth")
       ],
-      guideToHobMm: {
-        X: offsets.get("X"),
-        Y: offsets.get("Y"),
-        Z: offsets.get("Z")
-      },
-      movingMassKg: {
-        X: moving.get("X"),
-        Y: moving.get("Y"),
-        Z: moving.get("Z")
-      },
+      guideToHobMm: {X: offsets.get("X"), Y: offsets.get("Y"), Z: offsets.get("Z")},
+      movingMassKg: {X: moving.get("X"), Y: moving.get("Y"), Z: moving.get("Z")},
       machineMassKg: total,
       members: members.length
     };

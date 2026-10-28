@@ -9,22 +9,10 @@ import cadkit.modeling.Vector;
 /** Assumed steel carriage/support envelope; structural adequacy awaits Phase D. */
 class HobberBracket extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.length(
-      "width",
-      160
-    ),
-    P.length(
-      "depth",
-      50
-    ),
-    P.length(
-      "height",
-      100
-    ),
-    P.flag(
-      "cantilever",
-      false
-    )
+    P.length("width", 160),
+    P.length("depth", 50),
+    P.length("height", 100),
+    P.flag("cantilever", false)
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

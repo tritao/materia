@@ -100,10 +100,7 @@ class DrawingExtrusionProfile implements StructuralProfile {
         var start = new Vector(a[0], a[1]), end = new Vector(b[0], b[1]);
         edges.push(Math.abs(a[2]) < 1e-12 ? Curve.line(start, end) : Curve.arc(
           start,
-          new Vector(
-            (a[0] + b[0]) / 2 + (b[1] - a[1]) * a[2] / 2,
-            (a[1] + b[1]) / 2 - (b[0] - a[0]) * a[2] / 2
-          ),
+          new Vector((a[0] + b[0]) / 2 + (b[1] - a[1]) * a[2] / 2, (a[1] + b[1]) / 2 - (b[0] - a[0]) * a[2] / 2),
           end
         ));
       }
@@ -124,11 +121,7 @@ class DrawingExtrusionProfile implements StructuralProfile {
       for (vertices in loops) wires.push(loop(vertices));
       for (circle in circles) wires.push(Curve.circle(
         circle.radius,
-        new Plane(
-          new Vector(circle.x, circle.y),
-          Vector.X(),
-          Vector.Z().scale(-1)
-        )
+        new Plane(new Vector(circle.x, circle.y), Vector.X(), Vector.Z().scale(-1))
       ));
       var face = Sketch.face(wires[0], wires.slice(1));
       var part:Part;

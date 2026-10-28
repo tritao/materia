@@ -12,32 +12,12 @@ class Contactor extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("ratedCurrent", 32, "A"),
-    P.quantity(
-      "ratedVoltage",
-      400,
-      "V"
-    ),
-    P.quantity(
-      "coilVoltage",
-      24,
-      "V"
-    ),
-    P.count(
-      "poles",
-      3
-    ),
-    P.length(
-      "width",
-      55
-    ),
-    P.length(
-      "depth",
-      80
-    ),
-    P.length(
-      "height",
-      90
-    )
+    P.quantity("ratedVoltage", 400, "V"),
+    P.quantity("coilVoltage", 24, "V"),
+    P.count("poles", 3),
+    P.length("width", 55),
+    P.length("depth", 80),
+    P.length("height", 90)
   ];
   public function new(?v:ComponentValues) {
     super("contactor", "power contactor with auxiliary feedback", "device housing", inputs(), v);
@@ -48,10 +28,7 @@ class Contactor extends AssumedCatalogComponent {
       name: name,
       kind: ElectricalPower,
       role: name == "line" ? Consumer : Supply,
-      iface : Plug(
-        "power",
-        parameterCount("poles")
-      ),
+      iface : Plug("power", parameterCount("poles")),
       required : true
     });
     addPort({name: "coil", kind: ElectricalPower, role: Consumer, iface: Plug("24V", 2), required: true});

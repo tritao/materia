@@ -42,14 +42,7 @@ class ComparisonReview {
       converted.model,
       converted.model.links[0].id,
       frames[0].id,
-      new Transform3(
-        new Vec3(
-          0,
-          0,
-          0.15
-        ),
-        Quat.identity()
-      )
+      new Transform3(new Vec3(0, 0, 0.15), Quat.identity())
     );
     check(arm.group.count() == 6, "Six joints per comparison arm");
     var solver = new ReferenceKinematics(arm), tolerance = new IkTolerance(1e-6, 1e-6, 500, 0.005);
@@ -59,14 +52,7 @@ class ComparisonReview {
       [0.2, -0.8, 1.0, 0.1, -0.6, 0.2],
       [0.0, -1.0, 1.3, -1.5, -1.0, 0.0],
       [1.0, 1.0, -1.0, 0.0, 1.0, 0.0],
-      [
-        -1.0,
-        -1.0,
-        1.0,
-        0.0,
-        -1.0,
-        0.0
-      ]
+      [-1.0, -1.0, 1.0, 0.0, -1.0, 0.0]
     ]) {
       initial = solver.solvePose(target, seed, tolerance);
       if (initial != null) break;
@@ -119,26 +105,13 @@ class ComparisonReview {
       maxJointJump: maxJump,
       numericFallbacks: solver.numericFallbacks,
       collisionViolations: violations,
-      tool: {
-        lengthMetres: 0.15,
-        widthMetres: 0.04,
-        massKg: 1.0,
-        centerOfMassLocalMetres: [
-          0.0,
-          0.0,
-          0.075
-        ]
-      },
+      tool: {lengthMetres: 0.15, widthMetres: 0.04, massKg: 1.0, centerOfMassLocalMetres: [0.0, 0.0, 0.075]},
       task: "Common base-relative TCP (0.45 to 0.47, 0.15, 0.45)m, downward orientation",
       scope: "Sampled source collision hulls plus physical tool envelope; standard articulation exclusions; no fixture or hardware qualification"
     };
     sys.io.File.saveContent(
       ComparisonProject.ROOT + "/comparison/" + id + "-task.json",
-      haxe.Json.stringify(
-        output,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(output, null, "  ")
     );
     Sys.println(id
       + " common-tool task: " + samples.length + " samples, " + violations.length + " sampled hull violations");
@@ -290,26 +263,23 @@ class ComparisonReview {
       haxe.Json.stringify(
         {
           status: "passed",
-          mountings: [
-            "floor",
-            "wall",
-            "ceiling"
-          ],
-          models: IDS,
-          geometries: 82,
-          occurrences: 137,
-          movingJoints: 18,
-          checks: [
-            "Saved binary reconstruction",
-            "All occurrence positions and rotations versus separate source scenes at both task endpoints",
-            "Independent mounting transforms and common TCP placement",
-            "Mesh metre scaling and declared SI masses"
-          ],
-          scope: "Static geometry and common-task kinematics; sampled hull checks include the tool envelope; no cell or dynamic qualification"
-        },
-        null,
-        "  "
-      )
+          mountings: ["floor",
+      "wall", "ceiling"],
+      models: IDS,
+      geometries: 82,
+      occurrences: 137,
+      movingJoints: 18,
+      checks: [
+        "Saved binary reconstruction",
+        "All occurrence positions and rotations versus separate source scenes at both task endpoints",
+        "Independent mounting transforms and common TCP placement",
+        "Mesh metre scaling and declared SI masses"
+      ],
+      scope: "Static geometry and common-task kinematics; sampled hull checks include the tool envelope; no cell or dynamic qualification"
+    },
+      null,
+      "  "
+    )
     );
   }
 }

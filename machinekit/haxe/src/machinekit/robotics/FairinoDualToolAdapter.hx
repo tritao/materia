@@ -44,26 +44,12 @@ class FairinoDualToolAdapter extends MachineComponent {
     addConnector(
       "robot",
       Mount,
-      AssemblyFrames.alongY(
-        0,
-        expert ? -110 : -24,
-        expert ? 34 : 10,
-        0,
-        expert ? 0 : -1,
-        expert ? 1 : 0
-      )
+      AssemblyFrames.alongY(0, expert ? -110 : -24, expert ? 34 : 10, 0, expert ? 0 : -1, expert ? 1 : 0)
     );
     for (i in 1...3) addConnector(
       'tool$i',
       Mount,
-      AssemblyFrames.alongY(
-        i == 1 ? -12 : 12,
-        expert ? 140 : 26,
-        10,
-        0,
-        1,
-        0
-      )
+      AssemblyFrames.alongY(i == 1 ? -12 : 12, expert ? 140 : 26, 10, 0, 1, 0)
     );
     if (expert) addConnector("externalPower", Mount, AssemblyFrames.alongY(24, 180, 10, 0, 1, 0));
     // Unqualified keys deliberately cannot silently mate with an OEM-qualified port.
@@ -99,14 +85,7 @@ class FairinoDualToolAdapter extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.fairino-dual-tool-adapter",
-      [ComponentRecipeSupport.choice(
-        "variant",
-        [
-          "Standard",
-          "Expert"
-        ],
-        "Standard"
-      )],
+      [ComponentRecipeSupport.choice("variant", ["Standard", "Expert"], "Standard")],
       v -> new FairinoDualToolAdapter(v.token("variant")),
       true,
       false,
@@ -121,16 +100,8 @@ class FairinoDualToolAdapter extends MachineComponent {
   static function tube(r:Float,
     x:Float, y:Float, z:Float, dx:Float, dy:Float, dz:Float, length:Float):Part return Part.cylinderAlong(
       r,
-      new Vector(
-        x,
-        y,
-        z
-      ),
-      new Vector(
-        dx,
-        dy,
-        dz
-      ),
+      new Vector(x, y, z),
+      new Vector(dx, dy, dz),
       length
     );
   override public function geometry(detail:ComponentDetail = Preview):Part {

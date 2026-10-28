@@ -12,31 +12,12 @@ class SafetyRelay extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("supplyVoltage", 24, "V"),
-    P.quantity(
-      "stopDelay",
-      2,
-      "s"
-    ),
-    P.count(
-      "immediateContacts",
-      2
-    ),
-    P.count(
-      "delayedContacts",
-      2
-    ),
-    P.length(
-      "width",
-      45
-    ),
-    P.length(
-      "depth",
-      120
-    ),
-    P.length(
-      "height",
-      100
-    )
+    P.quantity("stopDelay", 2, "s"),
+    P.count("immediateContacts", 2),
+    P.count("delayedContacts", 2),
+    P.length("width", 45),
+    P.length("depth", 120),
+    P.length("height", 100)
   ];
   public function new(?v:ComponentValues) {
     super("safety-relay", "dual-channel safety relay with delayed contacts", "device housing", inputs(), v);
@@ -57,20 +38,14 @@ class SafetyRelay extends AssumedCatalogComponent {
       name: "immediate" + (i + 1),
       kind: Signal,
       role: Supply,
-      iface: Plug(
-        "dry-contact",
-        2
-      ),
+      iface: Plug("dry-contact", 2),
       required: true
     });
     for (i in 0...parameterCount("delayedContacts")) addPort({
       name: "delayed" + (i + 1),
       kind: Signal,
       role: Supply,
-      iface: Plug(
-        "dry-contact",
-        2
-      ),
+      iface: Plug("dry-contact", 2),
       required: true
     });
     addPort({name: "feedback_loop", kind: Signal, role: Consumer, iface: Plug("dry-contact", 2), required: true});

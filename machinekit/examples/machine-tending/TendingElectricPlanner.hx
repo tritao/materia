@@ -48,17 +48,15 @@ class TendingElectricPlanner implements motionkit.planner.PlannerSpace {
     fixtures:AssemblyState,
     tool:SceneArtifactData,
     ts:AssemblyState,
-    hulls:Map<
-      String,
-      Array<Array<Float>>>,
-      hidden:Null<String>,
-      side:String,
-      working:Bool,
-      stockContacts:Array<String>,
-      workingPrefix:String,
-      work:TendingElectricApproach,
-      ?commandContactPair:String
-    ) {
+    hulls:Map<String, Array<Array<Float>>>,
+    hidden:Null<String>,
+    side:String,
+    working:Bool,
+    stockContacts:Array<String>,
+    workingPrefix:String,
+    work:TendingElectricApproach,
+    ?commandContactPair:String
+  ) {
     manipulator = arm;
     if (commandContactPair != null
       && (!working || work.station != "vise-load" || work.stockFixed() || commandContactPair
@@ -170,13 +168,7 @@ class TendingElectricPlanner implements motionkit.planner.PlannerSpace {
         "stock/vise-envelope",
         0,
         true,
-        pose(
-          fixtures.worldConnector(
-            "mill/mill/vise/body",
-            "seat"
-          ),
-          0.001
-        )
+        pose(fixtures.worldConnector("mill/mill/vise/body", "seat"), 0.001)
       );
       description.addObject("stock/vise-envelope", stock, CollisionPose.translation(0, 0, 0.01), Box(0.03, 0.03, 0.01));
     }
@@ -229,25 +221,14 @@ class TendingElectricPlanner implements motionkit.planner.PlannerSpace {
         var at = openState.worldPose(o.id);
         var opened = AssemblyFrames.compose(
           flange.offset,
-          {
-            x: at.x / 1000,
-            y: at.y / 1000,
-            z: at.z / 1000,
-            qx: at.qx,
-            qy: at.qy,
-            qz: at.qz,
-            qw: at.qw
-          }
+          {x: at.x / 1000, y: at.y / 1000, z: at.z / 1000, qx: at.qx, qy: at.qy, qz: at.qz, qw: at.qw}
         );
         toolObjects.set(
           o.id + "/open-envelope",
           description.addObject(
             "tool/" + o.id + "/open-envelope",
             toolBody,
-            pose(
-              opened,
-              1
-            ),
+            pose(opened, 1),
             geometry,
             0,
             "Open-jaw transport envelope",

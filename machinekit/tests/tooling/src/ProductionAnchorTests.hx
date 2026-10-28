@@ -145,10 +145,8 @@ class ProductionAnchorTests {
     var error = "";
     try InsertAnchorGeometry.derive(
       "too-small",
-      new CastInsert(CastInsert.boxValues(8, 8, 2).setToken(
-        "role",
-        materia.casting.InsertSpec.InsertRole.GenericMount
-      )),
+      new CastInsert(CastInsert.boxValues(8,
+      8, 2).setToken("role", materia.casting.InsertSpec.InsertRole.GenericMount)),
       rule,
       FootprintOnly,
       0
@@ -158,10 +156,7 @@ class ProductionAnchorTests {
       machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
     var smallHatch = new CastInsert(CastInsert.precastHoles(
       CastInsert.boxValues(20, 20, 10),
-      machinekit.structural.InsertHoles.tappedBlind(
-        hatchThread,
-        10
-      )
+      machinekit.structural.InsertHoles.tappedBlind(hatchThread, 10)
     ).setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.GenericMount
@@ -175,10 +170,7 @@ class ProductionAnchorTests {
     );
     var hatch = new CastInsert(CastInsert.precastHoles(
       CastInsert.boxValues(30, 20, 12),
-      machinekit.structural.InsertHoles.tappedBlind(
-        hatchThread,
-        12
-      )
+      machinekit.structural.InsertHoles.tappedBlind(hatchThread, 12)
     ).setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.GenericMount
@@ -192,10 +184,7 @@ class ProductionAnchorTests {
     );
     var largerHatch = new CastInsert(CastInsert.precastHoles(
       CastInsert.boxValues(44, 20, 12),
-      machinekit.structural.InsertHoles.tappedBlind(
-        hatchThread,
-        12
-      )
+      machinekit.structural.InsertHoles.tappedBlind(hatchThread, 12)
     ).setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.GenericMount

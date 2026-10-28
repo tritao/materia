@@ -33,11 +33,7 @@ class FastenerThreadTests {
     near(Threads.of(nut)[0].length, 5.2);
     nut.close();
     var lead = new LeadScrew(
-      new LeadScrewThread(
-        machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.MetricTrapezoidal,
-        8,
-        2
-      ),
+      new LeadScrewThread(machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.MetricTrapezoidal, 8, 2),
       100
     );
     var shaft = lead.geometry();

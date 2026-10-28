@@ -83,60 +83,18 @@ class BoxMoldPreview {
       sys.io.File.saveContent(dir + "/" + c.id + ".cutting.json", Json.stringify(cutting, null, "\t") + "\n");
       var lines = [
         Curve(Outline, Segment.line(new Point2(0, 0), new Point2(b.width, 0))),
-        Curve(
-          Outline,
-          Segment.line(
-            new Point2(
-              b.width,
-              0
-            ),
-            new Point2(
-              b.width,
-              b.height
-            )
-          )
-        ),
-        Curve(
-          Outline,
-          Segment.line(
-            new Point2(
-              b.width,
-              b.height
-            ),
-            new Point2(
-              0,
-              b.height
-            )
-          )
-        ),
-        Curve(
-          Outline,
-          Segment.line(
-            new Point2(
-              0,
-              b.height
-            ),
-            new Point2(
-              0,
-              0
-            )
-          )
-        ),
+        Curve(Outline, Segment.line(new Point2(b.width, 0), new Point2(b.width, b.height))),
+        Curve(Outline, Segment.line(new Point2(b.width, b.height), new Point2(0, b.height))),
+        Curve(Outline, Segment.line(new Point2(0, b.height), new Point2(0, 0))),
         Label(
           Text,
-          new Point2(
-            0,
-            b.height + 8
-          ),
+          new Point2(0, b.height + 8),
           3,
           c.id + " finished EPS profile; wire +Y, span " + b.depth + " mm; no kerf allowance"
         ),
         Label(
           Text,
-          new Point2(
-            0,
-            -8
-          ),
+          new Point2(0, -8),
           3,
           "REVIEW ONLY; support " + c.support.kind + "; adhesive and thermal process pending"
         )
@@ -149,60 +107,18 @@ class BoxMoldPreview {
         sys.io.File.saveContent(dir + "/" + c.id + "-foot.cutting.json", Json.stringify(foot, null, "\t") + "\n");
         var fd = new Drawing2D([
           Curve(Outline, Segment.line(new Point2(0, 0), new Point2(fb.width, 0))),
-          Curve(
-            Outline,
-            Segment.line(
-              new Point2(
-                fb.width,
-                0
-              ),
-              new Point2(
-                fb.width,
-                fb.height
-              )
-            )
-          ),
-          Curve(
-            Outline,
-            Segment.line(
-              new Point2(
-                fb.width,
-                fb.height
-              ),
-              new Point2(
-                0,
-                fb.height
-              )
-            )
-          ),
-          Curve(
-            Outline,
-            Segment.line(
-              new Point2(
-                0,
-                fb.height
-              ),
-              new Point2(
-                0,
-                0
-              )
-            )
-          ),
+          Curve(Outline, Segment.line(new Point2(fb.width, 0), new Point2(fb.width, fb.height))),
+          Curve(Outline, Segment.line(new Point2(fb.width, fb.height), new Point2(0, fb.height))),
+          Curve(Outline, Segment.line(new Point2(0, fb.height), new Point2(0, 0))),
           Label(
             Text,
-            new Point2(
-              0,
-              fb.height + 8
-            ),
+            new Point2(0, fb.height + 8),
             3,
             c.id + " locating foot; wire +Y; span " + fb.depth + " mm; no kerf allowance"
           ),
           Label(
             Text,
-            new Point2(
-              0,
-              -8
-            ),
+            new Point2(0, -8),
             3,
             "Glue lines above/below foot: " + c.support.adhesiveThickness + " mm each; qualification pending"
           )

@@ -22,10 +22,7 @@ class SlidingDoor extends MachineAssembly {
     addMemberConnector(
       "rail",
       "slide",
-      AssemblyFrames.compose(
-        AssemblyFrames.inverse(railPose),
-        leaf.connector("mount").frame
-      )
+      AssemblyFrames.compose(AssemblyFrames.inverse(railPose), leaf.connector("mount").frame)
     );
     addMateOnAxis(
       "slide",
@@ -53,12 +50,7 @@ class SlidingDoor extends MachineAssembly {
     addSwitch(
       "open",
       "slide",
-      {
-        lower: stroke - SWITCH_TOLERANCE_MM,
-        upper: stroke + SWITCH_TOLERANCE_MM,
-        velocity: null,
-        effort: null
-      }
+      {lower: stroke - SWITCH_TOLERANCE_MM, upper: stroke + SWITCH_TOLERANCE_MM, velocity: null, effort: null}
     );
     addMemberConnector("rail", "mount", AssemblyFrames.inverse(railPose));
     exposeConnector("mount", "rail", "mount");

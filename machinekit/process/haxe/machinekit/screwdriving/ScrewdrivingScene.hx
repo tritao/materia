@@ -30,17 +30,7 @@ class ScrewdrivingScene {
       thread.origin[0] * metres,
       thread.origin[1] * metres,
       thread.origin[2] * metres,
-      [
-        x[0],
-        y[0],
-        z[0],
-        x[1],
-        y[1],
-        z[1],
-        x[2],
-        y[2],
-        z[2]
-      ]
+      [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]]
     );
   }
   public static function fromFastening(
@@ -80,13 +70,7 @@ class ScrewdrivingScene {
     var metres = scene.metresPerUnit, thread = packets[0];
     var socket = screw.driveFrame(), target = state.worldPose(frameId);
     var seat = scaled(
-      AssemblyFrames.compose(
-        AssemblyFrames.inverse(target),
-        AssemblyFrames.compose(
-          state.worldPose(screwId),
-          socket
-        )
-      ),
+      AssemblyFrames.compose(AssemblyFrames.inverse(target), AssemblyFrames.compose(state.worldPose(screwId), socket)),
       metres
     );
     var lead = hole(thread, metres), axis = AssemblyFrames.transformVector(lead, 0, 0, 1);
@@ -112,10 +96,7 @@ class ScrewdrivingScene {
     var pickup = scaled(
       AssemblyFrames.compose(
         AssemblyFrames.inverse(state.worldPose(presenter)),
-        AssemblyFrames.compose(
-          state.worldPose(presentedScrew),
-          socket
-        )
+        AssemblyFrames.compose(state.worldPose(presentedScrew), socket)
       ),
       metres
     );

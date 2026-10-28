@@ -149,11 +149,7 @@ class RegionMoldPlannerTests {
       feature.id,
       materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
       0,
-      {
-        x: 0,
-        y: 0,
-        z: -1
-      }
+      {x: 0, y: 0, z: -1}
     );
     d.setup.sourceFingerprint = ToolingCodec.inputFingerprint(d.input);
     var options:CastingMoldOptions = {
@@ -250,10 +246,7 @@ class RegionMoldPlannerTests {
         {x: -200.0, y: -90.0},
         {x: 200.0, y: -90.0},
         {x: 200.0, y: 90.0},
-        {
-          x: -200.0,
-          y: 90.0
-        }
+        {x: -200.0, y: 90.0}
       ];
       mixed.input.features.filter(value -> value.id == "pocket")[0].draft.degrees = 2;
       mixed.input.features.filter(value -> value.id

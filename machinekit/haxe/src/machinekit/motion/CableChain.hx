@@ -13,29 +13,11 @@ class CableChain extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("bendRadius", 75),
     P.length("innerWidth", 40),
-    P.length(
-      "innerHeight",
-      25
-    ),
-    P.length(
-      "wall",
-      3
-    ),
-    P.length(
-      "travel",
-      2800
-    ),
-    P.quantity(
-      "fillArea",
-      400,
-      "mm2"
-    ),
-    P.scalar(
-      "maxFill",
-      0.6,
-      0,
-      1
-    )
+    P.length("innerHeight", 25),
+    P.length("wall", 3),
+    P.length("travel", 2800),
+    P.quantity("fillArea", 400, "mm2"),
+    P.scalar("maxFill", 0.6, 0, 1)
   ];
   public function new(?v:ComponentValues) {
     super("cable-chain", "cable chain", "PA12 nylon", inputs(), v);
@@ -67,15 +49,7 @@ class CableChain extends AssumedCatalogComponent {
     function section(y:Float, z:Float, a:Float):Void {
       function rectangle(width:Float, height:Float):cadkit.modeling.Curve {
         return cadkit.modeling.Curve.polyline(
-          [for (corner in [
-            {x: -1, y: -1},
-            {x: 1, y: -1},
-            {x: 1, y: 1},
-            {
-              x: -1,
-              y: 1
-            }
-          ]) new Vector(
+          [for (corner in [{x: -1, y: -1}, {x: 1, y: -1}, {x: 1, y: 1}, {x: -1, y: 1}]) new Vector(
             corner.x * width / 2,
             y - corner.y * height / 2 * Math.sin(a),
             z + corner.y * height / 2 * Math.cos(a)

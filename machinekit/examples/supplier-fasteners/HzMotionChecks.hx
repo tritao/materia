@@ -88,11 +88,7 @@ class HzMotionChecks {
       for (c in support.connectors()) if (StringTools.startsWith(c.name, "mount") && c.name != "mount") {
         var probe = Part.cylinderAlong(
           support.footHoles()[0].diameter / 2 - 0.1,
-          new cadkit.modeling.Vector(
-            c.frame.x,
-            -s.shaftHeight - 1,
-            c.frame.z
-          ),
+          new cadkit.modeling.Vector(c.frame.x, -s.shaftHeight - 1, c.frame.z),
           cadkit.modeling.Vector.Y(),
           s.height + 2
         );

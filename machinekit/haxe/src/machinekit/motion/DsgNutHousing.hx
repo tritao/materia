@@ -36,14 +36,7 @@ class DsgNutHousing extends MachineComponent {
     for (x in [-s.holePitchX / 2, s.holePitchX / 2]) for (z in [s.firstHole, s.firstHole + s.holePitchZ]) addConnector(
       "baseBolt" + i++,
       Mount,
-      F.alongY(
-        x,
-        0,
-        z,
-        0,
-        -1,
-        0
-      )
+      F.alongY(x, 0, z, 0, -1, 0)
     );
     i = 1;
     for (p in flangePattern()) addConnector("nutBolt" + i++, Mount, Solids.axial(p.x, s.shaftHeight + p.y, 0));
@@ -61,14 +54,8 @@ class DsgNutHousing extends MachineComponent {
         new Vector(w, 0),
         new Vector(w, h - e),
         new Vector(w - e, h),
-        new Vector(
-          -w + e,
-          h
-        ),
-        new Vector(
-          -w,
-          h - e
-        )
+        new Vector(-w + e, h),
+        new Vector(-w, h - e)
       ],
       0,
       s.length
@@ -111,25 +98,11 @@ class DsgNutHousing extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.dsg-nut-housing",
       [
-        P.choice(
-          "model",
-          SfuFamilyData.housingModels(),
-          "DSG16H"
-        ),
-        P.length(
-          "baseThreadDepth",
-          10
-        ),
-        P.length(
-          "flangeThreadDepth",
-          10
-        )
+        P.choice("model", SfuFamilyData.housingModels(), "DSG16H"),
+        P.length("baseThreadDepth", 10),
+        P.length("flangeThreadDepth", 10)
       ],
-      v -> new DsgNutHousing(
-        v.token("model"),
-        v.number("baseThreadDepth"),
-        v.number("flangeThreadDepth")
-      ),
+      v -> new DsgNutHousing(v.token("model"), v.number("baseThreadDepth"), v.number("flangeThreadDepth")),
       true,
       false,
       null,

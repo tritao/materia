@@ -74,16 +74,8 @@ class SheetBodyGeometry {
     var angle = zone.angle * fraction;
     return new Location(new Plane(
       zone.point(fraction, center.y, -center.z),
-      zone.frame.direction(new Vector(
-        Math.cos(angle),
-        0,
-        Math.sin(angle)
-      )),
-      zone.frame.direction(new Vector(
-        -Math.sin(angle),
-        0,
-        Math.cos(angle)
-      ))
+      zone.frame.direction(new Vector(Math.cos(angle), 0, Math.sin(angle))),
+      zone.frame.direction(new Vector(-Math.sin(angle), 0, Math.cos(angle)))
     ));
   }
 
@@ -129,10 +121,7 @@ class SheetBodyGeometry {
           new Point2(left, 0),
           new Point2(right, 0),
           new Point2(right, width),
-          new Point2(
-            left,
-            width
-          )
+          new Point2(left, width)
         ]);
         for (region in regions) for (patch in OutlineBoolean.intersection(
           region,

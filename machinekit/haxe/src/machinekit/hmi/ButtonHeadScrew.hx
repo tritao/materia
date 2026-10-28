@@ -79,22 +79,10 @@ class ButtonHeadScrew extends MachineComponent {
         {r: 0.0, z: 0.0},
         {r: h, z: 0.0},
         {r: h, z: k * 0.45},
-        {
-          r: h * 0.88,
-          z: k * 0.8
-        },
-        {
-          r: h * 0.6,
-          z: k * 0.97
-        },
-        {
-          r: h * 0.3,
-          z: k
-        },
-        {
-          r: 0.0,
-          z: k
-        }
+        {r: h * 0.88, z: k * 0.8},
+        {r: h * 0.6, z: k * 0.97},
+        {r: h * 0.3, z: k},
+        {r: 0.0, z: k}
       ]),
       "head"
     );

@@ -18,10 +18,7 @@ class ToolingVolume extends MachineComponent {
   final volume:MoldVolume;
 
   static function parameters():Array<machinekit.component.ComponentParameter> return [
-    P.text(
-      "stockMaterial",
-      "coated particleboard"
-    ),
+    P.text("stockMaterial", "coated particleboard"),
     P.text(
       "volume",
       ToolingCodec.canonical(MoldVolumeRecords.record({
@@ -30,14 +27,7 @@ class ToolingVolume extends MachineComponent {
         cuts: [],
         regions: [],
         profiles: [],
-        pieces: [{
-          x: 0,
-          y: 0,
-          z: 0,
-          width: 20,
-          depth: 20,
-          height: 20
-        }]
+        pieces: [{x: 0, y: 0, z: 0, width: 20, depth: 20, height: 20}]
       }))
     )
   ];

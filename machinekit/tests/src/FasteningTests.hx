@@ -274,10 +274,7 @@ class FasteningTests {
     var shortened = new FlangeBearingAssembly(DeepGrooveBearing.metric("608"));
     shortened.replaceComponent(
       "screw1",
-      SocketHeadCapScrew.metric(
-        shortened.screw.spec.size,
-        shortened.housing.depth + 0.5 * shortened.screw.diameter
-      )
+      SocketHeadCapScrew.metric(shortened.screw.spec.size, shortened.housing.depth + 0.5 * shortened.screw.diameter)
     );
     shortened.addMemberConnector("housing", "mount", Solids.axial(0, 0, 0));
     shortened.exposeConnector("mount", "housing", "mount");
@@ -312,22 +309,7 @@ class FasteningTests {
     rotated.include(
       "work",
       basic,
-      AssemblyFrames.fromRotationMatrix(
-        40,
-        30,
-        20,
-        [
-          0.0,
-          0.0,
-          1.0,
-          0.0,
-          1.0,
-          0.0,
-          -1.0,
-          0.0,
-          0.0
-        ]
-      )
+      AssemblyFrames.fromRotationMatrix(40, 30, 20, [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0])
     );
     var turned = rotated.fastenings().require()[0];
     near(turned.engagementLength, 7);

@@ -76,16 +76,8 @@ class RackFrame extends MachineComponent {
     for (corner in [
       {name: "front-left", x: -x, y: -y},
       {name: "front-right", x: x, y: -y},
-      {
-        name: "back-left",
-        x: -x,
-        y: y
-      },
-      {
-        name: "back-right",
-        x: x,
-        y: y
-      }
+      {name: "back-left", x: -x, y: y},
+      {name: "back-right", x: x, y: y}
     ]) {
       assembly.point(corner.name + "-bottom", corner.x, corner.y, footHeight);
       assembly.point(corner.name + "-top", corner.x, corner.y, height);

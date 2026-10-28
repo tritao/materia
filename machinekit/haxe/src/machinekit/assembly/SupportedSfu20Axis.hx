@@ -44,19 +44,9 @@ class SupportedSfu20Axis extends MachineAssembly {
     addMate("screwTurn", "continuous", "base", "screwSeat", "screw", "installation");
     attach(
       "coupling",
-      new ShaftCoupling(
-        6.35,
-        12,
-        25,
-        40,
-        [{z: 6.0, angle: Math.PI / 2}, {z: 34.0, angle: Math.PI / 2}]
-      ),
+      new ShaftCoupling(6.35, 12, 25, 40, [{z: 6.0, angle: Math.PI / 2}, {z: 34.0, angle: Math.PI / 2}]),
       "screw",
-      F.translation(
-        0,
-        0,
-        -31
-      )
+      F.translation(0, 0, -31)
     );
     attach("retainingNut", new FinePitchNut(), "screw", F.translation(0, 0, 20));
     attach("outputRing", RetainingRing.forShaft(15), "screw", F.translation(0, 0, screw.grooveStart + 0.075));
@@ -77,12 +67,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "slide",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: l.travel,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0, upper: l.travel, velocity: null, effort: null}
     );
     attach("housing", housing, "carriage", {x: 0, y: 0, z: -20, qx: 0, qy: 0, qz: 1, qw: 0});
     attach("nut", nut, "carriage", {x: 0, y: -22, z: -40, qx: 0, qy: 0, qz: -Math.sqrt(0.5), qw: Math.sqrt(0.5)});
@@ -97,14 +82,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "M6",
       45,
       "base",
-      F.alongY(
-        x,
-        31.5,
-        l.fixedCentreZ() + z,
-        0,
-        1,
-        0
-      ),
+      F.alongY(x, 31.5, l.fixedCentreZ() + z, 0, 1, 0),
       "base",
       31.5,
       14
@@ -125,14 +103,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "M6",
       25,
       "base",
-      F.alongY(
-        side * (l.railSpacing / 2 + 16),
-        13.5,
-        z,
-        0,
-        1,
-        0
-      ),
+      F.alongY(side * (l.railSpacing / 2 + 16), 13.5, z, 0, 1, 0),
       "base",
       13.5,
       14
@@ -154,14 +125,7 @@ class SupportedSfu20Axis extends MachineAssembly {
         "M5",
         12,
         "carriage",
-        F.alongY(
-          x + dx,
-          6,
-          z,
-          0,
-          1,
-          0
-        ),
+        F.alongY(x + dx, 6, z, 0, 1, 0),
         "block" + side,
         6,
         6
@@ -172,14 +136,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "M6",
       25,
       "carriage",
-      F.alongY(
-        x,
-        14,
-        z,
-        0,
-        1,
-        0
-      ),
+      F.alongY(x, 14, z, 0, 1, 0),
       "housing",
       14,
       12
@@ -189,14 +146,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "M6",
       20,
       "carriage",
-      F.alongY(
-        -p.x,
-        -22 - p.y,
-        -30,
-        0,
-        0,
-        -1
-      ),
+      F.alongY(-p.x, -22 - p.y, -30, 0, 0, -1),
       "housing",
       10,
       10
@@ -206,14 +156,7 @@ class SupportedSfu20Axis extends MachineAssembly {
       "M4",
       10,
       "base",
-      F.alongY(
-        x,
-        28 + y,
-        -5,
-        0,
-        0,
-        -1
-      ),
+      F.alongY(x, 28 + y, -5, 0, 0, -1),
       "motorBracket",
       5,
       6

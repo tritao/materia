@@ -83,47 +83,15 @@ class Carriage extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.assembly.carriage",
       [
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          8
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          70
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          50
-        ),
-        ComponentRecipeSupport.length(
-          "guideSpacing",
-          25
-        ),
-        ComponentRecipeSupport.length(
-          "guideSeatDiameter",
-          12
-        ),
-        ComponentRecipeSupport.choice(
-          "guideSeatFit",
-          [
-            "Slip",
-            "Transition",
-            "Interference"
-          ],
-          "Slip"
-        ),
-        ComponentRecipeSupport.flag(
-          "hasRailMount",
-          false
-        ),
-        ComponentRecipeSupport.scalar(
-          "railMountY",
-          0
-        ),
-        ComponentRecipeSupport.count(
-          "nutBoltCount",
-          4
-        )
+        ComponentRecipeSupport.length("boreDiameter", 8),
+        ComponentRecipeSupport.length("width", 70),
+        ComponentRecipeSupport.length("length", 50),
+        ComponentRecipeSupport.length("guideSpacing", 25),
+        ComponentRecipeSupport.length("guideSeatDiameter", 12),
+        ComponentRecipeSupport.choice("guideSeatFit", ["Slip", "Transition", "Interference"], "Slip"),
+        ComponentRecipeSupport.flag("hasRailMount", false),
+        ComponentRecipeSupport.scalar("railMountY", 0),
+        ComponentRecipeSupport.count("nutBoltCount", 4)
       ].concat(ComponentRecipeSupport.threadParameters()),
       v -> new Carriage(
         v.number("boreDiameter"),
@@ -131,10 +99,7 @@ class Carriage extends MachineComponent {
         v.number("length"),
         v.number("guideSpacing"),
         v.number("guideSeatDiameter"),
-        new machinekit.motion.LeadScrewNut(
-          ComponentRecipeSupport.thread(v),
-          v.integer("nutBoltCount")
-        ),
+        new machinekit.motion.LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("nutBoltCount")),
         ComponentRecipeSupport.fit(v.token("guideSeatFit")),
         v.boolean("hasRailMount") ? v.number("railMountY") : null
       ),
@@ -186,13 +151,7 @@ class Carriage extends MachineComponent {
     var mountHoleRadius = nut.mountScrewPart(10).clearanceDiameter(Medium) / 2;
     var bolt = 1;
     for (point in nut.boltPattern()) tools.push(Solids.named(
-      Part.cylinderSpan(
-        mountHoleRadius,
-        -0.1,
-        length + 0.1,
-        point.x,
-        point.y
-      ),
+      Part.cylinderSpan(mountHoleRadius, -0.1, length + 0.1, point.x, point.y),
       "nutbolt" + bolt++
     ));
     return Solids.cut(body, tools);
@@ -358,11 +317,7 @@ class LinearAxis extends MachineAssembly {
       1,
       machinekit.assembly.MachineAssembly.AssemblyBomMass.Point(
         sectionArea * length * 1e-9 * 7850,
-        new cadkit.modeling.Vector(
-          0,
-          railY,
-          screwStart + length / 2
-        )
+        new cadkit.modeling.Vector(0, railY, screwStart + length / 2)
       )
     );
     configureAssembly();
@@ -458,11 +413,7 @@ class LinearAxis extends MachineAssembly {
           "axis",
           blockId,
           "rail",
-          {
-            x: 0,
-            y: 1,
-            z: 0
-          }
+          {x: 0, y: 1, z: 0}
         );
       }
     }
@@ -486,15 +437,7 @@ class LinearAxis extends MachineAssembly {
       addMemberConnector(
         housingId,
         'bolt${i}Head',
-        {
-          x: bolt.x,
-          y: bolt.y,
-          z: bolt.z + flange.housing.depth,
-          qx: bolt.qx,
-          qy: bolt.qy,
-          qz: bolt.qz,
-          qw: bolt.qw
-        }
+        {x: bolt.x, y: bolt.y, z: bolt.z + flange.housing.depth, qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw}
       );
       var screwId = '$prefix-screw$i';
       addComponent(screwId, flange.screw);

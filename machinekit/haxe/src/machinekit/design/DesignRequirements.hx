@@ -25,10 +25,7 @@ class DesignRequirements {
       case InterfaceAlignment(id, relationship):
         InterfaceAlignment(
           map(id),
-          materia.casting.InterfaceRelationship.InterfaceRelationships.remapMembers(
-            relationship,
-            map
-          )
+          materia.casting.InterfaceRelationship.InterfaceRelationships.remapMembers(relationship, map)
         );
       case Coaxial(id, first, second, tolerance):
         first.member = map(first.member);

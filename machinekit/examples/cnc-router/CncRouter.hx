@@ -103,11 +103,7 @@ class RouterPlate extends MachineComponent {
     var placed = cutout.placed(new Location(new Plane(
       new Vector(face.x, face.y, face.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     )));
     cutout.close();
     return Solids.cut(box, [placed]);
@@ -146,20 +142,8 @@ class FoldedZMotorPlate extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Solids.union([
       Part.box(x + 12, 16, 8).translated(new Vector(x / 2, 20, 0)),
-      Part.box(16, -y + 32, 8).translated(new Vector(
-        x,
-        (y + 20) / 2,
-        0
-      )),
-      Part.box(
-        70,
-        70,
-        8
-      ).translated(new Vector(
-        x,
-        y,
-        0
-      ))
+      Part.box(16, -y + 32, 8).translated(new Vector(x, (y + 20) / 2, 0)),
+      Part.box(70, 70, 8).translated(new Vector(x, y, 0))
     ]);
     if (detail == Envelope) return body;
     var holes:Array<Part> = [slot(x, y, (motor.spec.pilotDiameter + 0.2) / 2)];
@@ -171,29 +155,9 @@ class FoldedZMotorPlate extends MachineComponent {
     return Solids.cut(body, holes);
   }
   static function slot(x:Float, y:Float, radius:Float):Part return Solids.union([
-    Part.cylinderSpan(radius, -1, 10).translated(new Vector(
-      x - TENSION_TRAVEL / 2,
-      y,
-      0
-    )),
-    Part.cylinderSpan(
-      radius,
-      -1,
-      10
-    ).translated(new Vector(
-      x + TENSION_TRAVEL / 2,
-      y,
-      0
-    )),
-    Part.box(
-      TENSION_TRAVEL,
-      2 * radius,
-      11
-    ).translated(new Vector(
-      x,
-      y,
-      -1
-    ))
+    Part.cylinderSpan(radius, -1, 10).translated(new Vector(x - TENSION_TRAVEL / 2, y, 0)),
+    Part.cylinderSpan(radius, -1, 10).translated(new Vector(x + TENSION_TRAVEL / 2, y, 0)),
+    Part.box(TENSION_TRAVEL, 2 * radius, 11).translated(new Vector(x, y, -1))
   ]);
 }
 
@@ -241,16 +205,7 @@ class XNutBracket extends MachineComponent {
     if (detail == Envelope) return body;
     return Solids.cut(
       body,
-      [Part.cylinderAlong(
-        CncRouter.SCREW_CLEARANCE,
-        new Vector(-25, 0, CncRouter.X_SCREW_Z),
-        new Vector(
-          1,
-          0,
-          0
-        ),
-        50
-      )]
+      [Part.cylinderAlong(CncRouter.SCREW_CLEARANCE, new Vector(-25, 0, CncRouter.X_SCREW_Z), new Vector(1, 0, 0), 50)]
     );
   }
 }
@@ -400,11 +355,7 @@ class RouterSpindle extends MachineComponent {
       Part.cylinderSpan(9, 0, 8),
       Part.cylinderSpan(12, 8, NUT_LENGTH),
       body,
-      Part.cylinderSpan(
-        DIAMETER / 2 - 6,
-        NUT_LENGTH + BODY_LENGTH,
-        NUT_LENGTH + BODY_LENGTH + 10
-      )
+      Part.cylinderSpan(DIAMETER / 2 - 6, NUT_LENGTH + BODY_LENGTH, NUT_LENGTH + BODY_LENGTH + 10)
     ]);
   }
 }
@@ -444,11 +395,7 @@ class EndMill extends MachineComponent {
     if (detail == Envelope) return Part.cylinderSpan(diameter / 2, 0, stickout);
     return Solids.union([
       Part.cylinderSpan(diameter / 2, 0, fluteLength),
-      Part.cylinderSpan(
-        diameter / 2 - 0.2,
-        fluteLength,
-        stickout
-      )
+      Part.cylinderSpan(diameter / 2 - 0.2, fluteLength, stickout)
     ]);
   }
 }
@@ -550,13 +497,7 @@ class ToeClamp extends MachineComponent {
       bar,
       riser,
       Part.cylinderSpan(4, 0, stockHeight + 18, 17, 0),
-      Part.cylinderSpan(
-        7,
-        stockHeight + 10,
-        stockHeight + 16,
-        17,
-        0
-      )
+      Part.cylinderSpan(7, stockHeight + 10, stockHeight + 16, 17, 0)
     ]);
   }
 }
@@ -637,19 +578,8 @@ class CncRouter extends AxisBuilder {
   public final drill = new TwistDrill(5.5, 28, 40);
   public final specs:Array<RouterAxisSpec> = [
     {id: "x", lower: 0, upper: 300, initial: 150},
-    {
-      id: "y",
-      lower: 0,
-      upper: 300,
-      initial: 150,
-      rackingTolerance: 0.5
-    },
-    {
-      id: "z",
-      lower: -80,
-      upper: 0,
-      initial: 0
-    }
+    {id: "y", lower: 0, upper: 300, initial: 150, rackingTolerance: 0.5},
+    {id: "z", lower: -80, upper: 0, initial: 0}
   ];
   /** The stepper drivers' supply, as on most desktop routers. */
   public static inline var SUPPLY_VOLTS:Float = 24;
@@ -682,24 +612,12 @@ class CncRouter extends AxisBuilder {
       place(
         'side$name',
         new ExtrusionMember(profile, FRAME_LENGTH),
-        AxisBuilder.orient(
-          side * SIDE_X,
-          -halfFrame,
-          20,
-          up,
-          alongY
-        )
+        AxisBuilder.orient(side * SIDE_X, -halfFrame, 20, up, alongY)
       );
       place(
         'railY$name',
         LinearRail.metric(RAIL, FRAME_LENGTH - 40),
-        AxisBuilder.orient(
-          side * SIDE_X,
-          -halfFrame + 20,
-          railTop,
-          up,
-          alongY
-        )
+        AxisBuilder.orient(side * SIDE_X, -halfFrame + 20, railTop, up, alongY)
       );
       if (belts) {
         mountBeltY(side, name, shaft);
@@ -717,10 +635,7 @@ class CncRouter extends AxisBuilder {
           "aluminium 6061",
           "Motor plate",
           motorY,
-          AssemblyFrames.compose(
-            AssemblyFrames.inverse(platePose),
-            motorPose
-          )
+          AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)
         ),
         platePose
       );
@@ -730,47 +645,21 @@ class CncRouter extends AxisBuilder {
     for (entry in [
       {id: "crossFront", y: -halfFrame + 20},
       {id: "crossMiddle", y: 0.0},
-      {
-        id: "crossBack",
-        y: halfFrame - 20
-      }
+      {id: "crossBack", y: halfFrame - 20}
     ]) place(
       entry.id,
-      new ExtrusionMember(
-        profile,
-        inner
-      ),
-      AxisBuilder.orient(
-        -inner / 2,
-        entry.y,
-        20,
-        up,
-        alongX
-      )
+      new ExtrusionMember(profile, inner),
+      AxisBuilder.orient(-inner / 2, entry.y, 20, up, alongX)
     );
     place(
       "spoilboard",
-      new RouterPlate(
-        inner - 10,
-        FRAME_LENGTH - 40,
-        SPOILBOARD_TOP - 40,
-        "birch plywood",
-        "Spoilboard"
-      ),
-      AssemblyFrames.translation(
-        0,
-        0,
-        40
-      )
+      new RouterPlate(inner - 10, FRAME_LENGTH - 40, SPOILBOARD_TOP - 40, "birch plywood", "Spoilboard"),
+      AssemblyFrames.translation(0, 0, 40)
     );
     place(
       "stock",
       new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Stock"),
-      AssemblyFrames.translation(
-        0,
-        0,
-        SPOILBOARD_TOP
-      )
+      AssemblyFrames.translation(0, 0, SPOILBOARD_TOP)
     );
     var clamp = new ToeClamp(STOCK_HEIGHT);
     place("clampRight", clamp, AssemblyFrames.translation(STOCK_WIDTH / 2, 0, SPOILBOARD_TOP));
@@ -784,18 +673,8 @@ class CncRouter extends AxisBuilder {
       "railYLeft",
       "blockYLeft",
       LinearRailBlock.metric(RAIL),
-      AxisBuilder.orient(
-        -SIDE_X,
-        yb,
-        railTop,
-        up,
-        alongY
-      ),
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      AxisBuilder.orient(-SIDE_X, yb, railTop, up, alongY),
+      {x: 0, y: 1, z: 0}
     );
     // The screws' sense follows from the slide's direction, so they are driven once it exists.
     if (!belts) for (side in [-1, 1]) {
@@ -805,22 +684,8 @@ class CncRouter extends AxisBuilder {
         'screwY$name',
         'motorY$name',
         new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
-        AxisBuilder.orient(
-          side * 295,
-          halfFrame + 8 - shaft,
-          Y_SCREW_Z,
-          up,
-          [
-            0,
-            -1,
-            0
-          ]
-        ),
-        [
-          0,
-          -1,
-          0
-        ]
+        AxisBuilder.orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]),
+        [0, -1, 0]
       );
     }
     var uprightTop = railTop + railSpec.blockHeight - railSpec.railHeight;
@@ -831,25 +696,13 @@ class CncRouter extends AxisBuilder {
     attach(
       "beamUpper",
       new ExtrusionMember(profile, beamLength),
-      AxisBuilder.orient(
-        -beamLength / 2,
-        yb,
-        beamZ[0],
-        up,
-        alongX
-      ),
+      AxisBuilder.orient(-beamLength / 2, yb, beamZ[0], up, alongX),
       "uprightLeft"
     );
     attach(
       "beamLower",
       new ExtrusionMember(profile, beamLength),
-      AxisBuilder.orient(
-        -beamLength / 2,
-        yb,
-        beamZ[1],
-        up,
-        alongX
-      ),
+      AxisBuilder.orient(-beamLength / 2, yb, beamZ[1], up, alongX),
       "uprightLeft"
     );
     // The right upright carries the X motor, so it has the motor's pilot and bolt holes.
@@ -865,10 +718,7 @@ class CncRouter extends AxisBuilder {
         "aluminium 6061",
         "Gantry upright",
         motorY,
-        AssemblyFrames.compose(
-          AssemblyFrames.inverse(uprightRightPose),
-          motorXPose
-        )
+        AssemblyFrames.compose(AssemblyFrames.inverse(uprightRightPose), motorXPose)
       ),
       uprightRightPose,
       "beamUpper"
@@ -882,15 +732,8 @@ class CncRouter extends AxisBuilder {
     if (belts) {
       for (side in [-1, 1]) attach(
         'beltBracketY${side < 0 ? "Left" : "Right"}',
-        new YBeltBracket(
-          side,
-          Y_SCREW_Z + beltRadius()
-        ),
-        AssemblyFrames.translation(
-          side * SIDE_X,
-          yb,
-          0
-        ),
+        new YBeltBracket(side, Y_SCREW_Z + beltRadius()),
+        AssemblyFrames.translation(side * SIDE_X, yb, 0),
         side < 0 ? "uprightLeft" : "uprightRight"
       );
     } else {
@@ -903,25 +746,13 @@ class CncRouter extends AxisBuilder {
     attach(
       "railXUpper",
       LinearRail.metric(RAIL, railX),
-      AxisBuilder.orient(
-        -railX / 2,
-        railXFace,
-        beamZ[0],
-        front,
-        alongX
-      ),
+      AxisBuilder.orient(-railX / 2, railXFace, beamZ[0], front, alongX),
       "beamUpper"
     );
     attach(
       "railXLower",
       LinearRail.metric(RAIL, railX),
-      AxisBuilder.orient(
-        -railX / 2,
-        railXFace,
-        beamZ[1],
-        front,
-        alongX
-      ),
+      AxisBuilder.orient(-railX / 2, railXFace, beamZ[1], front, alongX),
       "beamLower"
     );
     if (belts) mountBeltX(yb, shaft);
@@ -937,54 +768,23 @@ class CncRouter extends AxisBuilder {
       "railXUpper",
       "blockXUpper",
       LinearRailBlock.metric(RAIL),
-      AxisBuilder.orient(
-        xc,
-        railXFace,
-        beamZ[0],
-        front,
-        alongX
-      ),
-      {
-        x: 1,
-        y: 0,
-        z: 0
-      }
+      AxisBuilder.orient(xc, railXFace, beamZ[0], front, alongX),
+      {x: 1, y: 0, z: 0}
     );
     if (!belts) driveRouterScrew(
       specs[0],
       "screwX",
       "motorX",
-      new LeadScrew(
-        thread,
-        outside - shaft + beamLength / 2 - 4
-      ),
-      AxisBuilder.orient(
-        outside - shaft,
-        yb,
-        X_SCREW_Z,
-        up,
-        [
-          -1,
-          0,
-          0
-        ]
-      ),
-      [
-        -1,
-        0,
-        0
-      ]
+      new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
+      AxisBuilder.orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]),
+      [-1, 0, 0]
     );
     var plateThickness = 12.0;
     var xPlateBottom = 128.0, xPlateHeight = 140.0;
     attach(
       "xPlate",
       new RouterPlate(120, plateThickness, xPlateHeight, "aluminium 6061", "X carriage plate"),
-      AssemblyFrames.translation(
-        xc,
-        blockFace - plateThickness / 2,
-        xPlateBottom
-      ),
+      AssemblyFrames.translation(xc, blockFace - plateThickness / 2, xPlateBottom),
       "blockXUpper"
     );
     attach(
@@ -996,11 +796,7 @@ class CncRouter extends AxisBuilder {
     if (belts) attach(
       "beltBracketX",
       new XBeltBracket(BELT_FAR_X(shaft), X_SCREW_Z - beltRadius()),
-      AssemblyFrames.translation(
-        xc,
-        yb,
-        0
-      ),
+      AssemblyFrames.translation(xc, yb, 0),
       "xPlate"
     );
     else attach("nutBracketX", new XNutBracket(), AssemblyFrames.translation(xc, yb, 0), "xPlate");
@@ -1013,13 +809,7 @@ class CncRouter extends AxisBuilder {
       attach(
         'railZ$name',
         LinearRail.metric(RAIL, railZ),
-        AxisBuilder.orient(
-          xc + side * 40,
-          railZFace,
-          xPlateBottom,
-          front,
-          vertical
-        ),
+        AxisBuilder.orient(xc + side * 40, railZFace, xPlateBottom, front, vertical),
         "xPlate"
       );
     }
@@ -1042,10 +832,7 @@ class CncRouter extends AxisBuilder {
           "aluminium 6061",
           "Z motor bracket",
           motorY,
-          AssemblyFrames.compose(
-            AssemblyFrames.inverse(bracketPose),
-            motorZPose
-          )
+          AssemblyFrames.compose(AssemblyFrames.inverse(bracketPose), motorZPose)
         ),
         bracketPose,
         "xPlate"
@@ -1066,18 +853,8 @@ class CncRouter extends AxisBuilder {
       "railZLeft",
       "blockZLeft",
       LinearRailBlock.metric(RAIL),
-      AxisBuilder.orient(
-        xc - 40,
-        railZFace,
-        zBlock,
-        front,
-        vertical
-      ),
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      AxisBuilder.orient(xc - 40, railZFace, zBlock, front, vertical),
+      {x: 0, y: 0, z: 1}
     );
     if (foldedZ) foldedZDrive(specs[2], thread, xc, screwZY, xPlateBottom, bracketPose, bracketTop, shaft);
     else driveRouterScrew(
@@ -1085,36 +862,14 @@ class CncRouter extends AxisBuilder {
       "screwZ",
       "motorZ",
       new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
-      AxisBuilder.orient(
-        xc,
-        screwZY,
-        zFace - shaft,
-        [
-          0,
-          1,
-          0
-        ],
-        [
-          0,
-          0,
-          -1
-        ]
-      ),
-      [
-        0,
-        0,
-        -1
-      ]
+      AxisBuilder.orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]),
+      [0, 0, -1]
     );
     var zPlateBottom = zBlock - 50;
     attach(
       "zPlate",
       new RouterPlate(120, plateThickness, 75, "aluminium 6061", "Z plate"),
-      AssemblyFrames.translation(
-        xc,
-        zBlockFace - plateThickness / 2,
-        zPlateBottom
-      ),
+      AssemblyFrames.translation(xc, zBlockFace - plateThickness / 2, zPlateBottom),
       "blockZLeft"
     );
     attach(
@@ -1128,11 +883,7 @@ class CncRouter extends AxisBuilder {
     attach(
       "spindleClamp",
       new SpindleClamp(RouterSpindle.DIAMETER, reach),
-      AssemblyFrames.translation(
-        xc,
-        toolY,
-        zPlateBottom + 5
-      ),
+      AssemblyFrames.translation(xc, toolY, zPlateBottom + 5),
       "zPlate"
     );
     attach("spindle", spindle, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z), "spindleClamp");
@@ -1160,17 +911,9 @@ class CncRouter extends AxisBuilder {
       "uprightLeft",
       [-SIDE_X - 18.0, yb, 70.0],
       [40.0, 6.0, 6.0],
-      [
-        0.0,
-        1,
-        0
-      ],
+      [0.0, 1, 0],
       -1,
-      [
-        1.0,
-        0,
-        0
-      ],
+      [1.0, 0, 0],
       true,
       (belts ? "pulley" : "screw") + "YLeft-turn"
     );
@@ -1181,17 +924,9 @@ class CncRouter extends AxisBuilder {
       "uprightRight",
       [SIDE_X + 18.0, yb, 70.0],
       [40.0, 6.0, 6.0],
-      [
-        0.0,
-        1,
-        0
-      ],
+      [0.0, 1, 0],
       -1,
-      [
-        1.0,
-        0,
-        0
-      ],
+      [1.0, 0, 0],
       true,
       (belts ? "pulley" : "screw") + "YRight-turn",
       2
@@ -1207,11 +942,7 @@ class CncRouter extends AxisBuilder {
       [6.0, 12.0, 6.0],
       [1.0, 0, 0],
       -1,
-      [
-        0.0,
-        1,
-        0
-      ],
+      [0.0, 1, 0],
       true,
       (belts ? "pulleyX-turn" : "screwX-turn")
     );
@@ -1222,17 +953,9 @@ class CncRouter extends AxisBuilder {
       "zPlate",
       [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
       [40.0, 6.0, 6.0],
-      [
-        0.0,
-        0,
-        1
-      ],
+      [0.0, 0, 1],
       1,
-      [
-        1.0,
-        0,
-        0
-      ],
+      [1.0, 0, 0],
       true,
       foldedZ ? "motorZ-turn" : "screwZ-turn"
     );
@@ -1270,11 +993,7 @@ class CncRouter extends AxisBuilder {
     attach(
       "foldedMotorPlateZ",
       new FoldedZMotorPlate(motor, offsetX, offsetY),
-      AssemblyFrames.translation(
-        xc,
-        screwY,
-        bracketTop
-      ),
+      AssemblyFrames.translation(xc, screwY, bracketTop),
       "motorBracketZ"
     );
     var screwInput = bracketTop + shaft + 8;
@@ -1292,14 +1011,7 @@ class CncRouter extends AxisBuilder {
       axis.id,
       "screwZ-turn",
       Transmission.LeadScrew("screwZ", "screwZNut"),
-      screwSense(
-        axis.id,
-        [
-          0.0,
-          0,
-          -1
-        ]
-      )
+      screwSense(axis.id, [0.0, 0, -1])
     );
     addMateOnAxis(
       "screwZ-turn",
@@ -1308,11 +1020,7 @@ class CncRouter extends AxisBuilder {
       "to-screwZ",
       "screwZ",
       "attach-screwZ",
-      {
-        x: 0,
-        y: 0,
-        z: -1
-      },
+      {x: 0, y: 0, z: -1},
       lead * axis.initial
     );
     supportScrew("screwZ-lead", Fixed, Free);
@@ -1334,49 +1042,25 @@ class CncRouter extends AxisBuilder {
       "to-pulleyMotorZ",
       "pulleyMotorZ",
       "attach-pulleyMotorZ",
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      {x: 0, y: 0, z: 1}
     );
     var cosine = offsetX / centre, sine = offsetY / centre;
     var beltPose = AssemblyFrames.fromRotationMatrix(
       xc,
       screwY,
       beltHeight,
-      [
-        cosine,
-        -sine,
-        0,
-        sine,
-        cosine,
-        0,
-        0,
-        0,
-        1
-      ]
+      [cosine, -sine, 0, sine, cosine, 0, 0, 0, 1]
     );
     attach("beltZ", loop, beltPose, "motorBracketZ");
     addBeltPath({
       belt: "beltZ",
-      wraps: [
-        {instanceId: "pulleyScrewZ", connectorName: "axis"},
-        {
-          instanceId: "pulleyMotorZ",
-          connectorName: "axis"
-        }
-      ]
+      wraps: [{instanceId: "pulleyScrewZ", connectorName: "axis"}, {instanceId: "pulleyMotorZ", connectorName: "axis"}]
     });
     addTransmission(
       "screwZ-belt",
       "screwZ-turn",
       "motorZ-turn",
-      Transmission.BeltReduction(
-        "beltZ",
-        "pulleyScrewZ",
-        "pulleyMotorZ"
-      ),
+      Transmission.BeltReduction("beltZ", "pulleyScrewZ", "pulleyMotorZ"),
       SenseTools.fromAlignment(1)
     );
     addMotor("motorZ", "motorZ-turn", "motorZ", addDriver("motorZ"));
@@ -1395,11 +1079,7 @@ class CncRouter extends AxisBuilder {
 	 */
   public function tools():Array<Tool> return [
     Tool.shaped(1, tool.stickout / 1000, spindle.holding(tool.cutter())),
-    Tool.shaped(
-      2,
-      drill.stickout / 1000,
-      spindle.holding(drill.cutter())
-    )
+    Tool.shaped(2, drill.stickout / 1000, spindle.holding(drill.cutter()))
   ];
 
   /** Work zero (G54) in machine coordinates, in millimetres: the stock's front-left top corner. */
@@ -1417,16 +1097,8 @@ class CncRouter extends AxisBuilder {
     if (!supplyAdded) {
       attach(
         "powerSupply",
-        new PowerSupply(
-          new machinekit.power.DcVoltage(SUPPLY_VOLTS),
-          new machinekit.power.DcCurrent(20),
-          4
-        ),
-        AssemblyFrames.translation(
-          0,
-          -320,
-          0
-        ),
+        new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(20), 4),
+        AssemblyFrames.translation(0, -320, 0),
         "sideLeft"
       );
       supplyAdded = true;
@@ -1434,11 +1106,7 @@ class CncRouter extends AxisBuilder {
     attach(
       id,
       new MotorDriver("GENERIC-DM542", new machinekit.power.PhaseRmsCurrent(2.8), MICROSTEPS),
-      AssemblyFrames.translation(
-        -180 + 125 * driverIndex++,
-        -200,
-        0
-      ),
+      AssemblyFrames.translation(-180 + 125 * driverIndex++, -200, 0),
       "sideLeft"
     );
     connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
@@ -1495,25 +1163,15 @@ class CncRouter extends AxisBuilder {
       "beltClamp",
       AssemblyFrames.compose(
         AssemblyFrames.inverse(zeroPoses.get(clampId)),
-        AssemblyFrames.translation(
-          world.x,
-          world.y,
-          world.z
-        )
+        AssemblyFrames.translation(world.x, world.y, world.z)
       )
     );
     addBeltPath({
       belt: beltId,
       clamp: {instanceId: clampId, connectorName: "beltClamp"},
       wraps: [
-        {
-          instanceId: driver,
-          connectorName: "attach-" + driver
-        },
-        {
-          instanceId: idler,
-          connectorName: "attach-" + idler
-        }
+        {instanceId: driver, connectorName: "attach-" + driver},
+        {instanceId: idler, connectorName: "attach-" + idler}
       ]
     });
   }
@@ -1534,10 +1192,7 @@ class CncRouter extends AxisBuilder {
         "aluminium 6061",
         "Motor plate",
         motorY,
-        AssemblyFrames.compose(
-          AssemblyFrames.inverse(platePose),
-          motorPose
-        )
+        AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)
       ),
       platePose,
       "beamUpper"
@@ -1552,11 +1207,7 @@ class CncRouter extends AxisBuilder {
         tip,
         X_SCREW_Z,
         up,
-        [
-          0,
-          1,
-          0
-        ]
+        [0, 1, 0]
       ), about: [
         0.0,
         1,
@@ -1571,17 +1222,7 @@ class CncRouter extends AxisBuilder {
     attach(
       "axleX",
       new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
-      AxisBuilder.orient(
-        -xm,
-        yb + 20,
-        X_SCREW_Z,
-        up,
-        [
-          0,
-          -1,
-          0
-        ]
-      ),
+      AxisBuilder.orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
       "idlerPlateX"
     );
     return "axleX";
@@ -1605,10 +1246,7 @@ class CncRouter extends AxisBuilder {
         "aluminium 6061",
         "Motor plate",
         motorY,
-        AssemblyFrames.compose(
-          AssemblyFrames.inverse(platePose),
-          motorPose
-        )
+        AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)
       ),
       platePose
     );
@@ -1622,11 +1260,7 @@ class CncRouter extends AxisBuilder {
         -end,
         Y_SCREW_Z,
         up,
-        [
-          -1,
-          0,
-          0
-        ]
+        [-1, 0, 0]
       ), about: [
         -1.0,
         0,
@@ -1641,17 +1275,7 @@ class CncRouter extends AxisBuilder {
     attach(
       'axleY$name',
       new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),
-      AxisBuilder.orient(
-        sign * (inner + shaft - BELT_PLATE),
-        -end,
-        Y_SCREW_Z,
-        up,
-        [
-          -sign,
-          0,
-          0
-        ]
-      ),
+      AxisBuilder.orient(sign * (inner + shaft - BELT_PLATE), -end, Y_SCREW_Z, up, [-sign, 0, 0]),
       'idlerPlateY$name'
     );
     return 'axleY$name';

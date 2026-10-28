@@ -35,34 +35,10 @@ class MotorShaftBearings {
     plate = new MotorPlate(motor, PLATE_THICKNESS);
     screw = plate.mountScrew();
     shaft = new SteppedShaft(
-      [
-        {diameter: bearing.bore, length: COLLAR_LENGTH},
-        {
-          diameter: 6,
-          length: SHAFT_LENGTH - COLLAR_LENGTH
-        }
-      ],
-      [
-        {
-          name: "bearingA",
-          z: 10
-        },
-        {
-          name: "bearingB",
-          z: SHAFT_LENGTH - 10 - bearing.width
-        }
-      ],
-      [{
-        name: "outputKey",
-        z0: 52,
-        key: key
-      }],
-      [{
-        name: "bearingBRing",
-        z0: 50,
-        width: ring.thickness,
-        diameter: ring.spec.grooveDiameter
-      }]
+      [{diameter: bearing.bore, length: COLLAR_LENGTH}, {diameter: 6, length: SHAFT_LENGTH - COLLAR_LENGTH}],
+      [{name: "bearingA", z: 10}, {name: "bearingB", z: SHAFT_LENGTH - 10 - bearing.width}],
+      [{name: "outputKey", z0: 52, key: key}],
+      [{name: "bearingBRing", z0: 50, width: ring.thickness, diameter: ring.spec.grooveDiameter}]
     );
   }
 
@@ -117,30 +93,12 @@ class MotorShaftBearings {
   public function components():Array<{id:String, component:MachineComponent}> {
     var result:Array<{id:String, component:MachineComponent}> = [
       {id: "motor", component: motor},
-      {
-        id: "plate",
-        component: plate
-      },
-      {
-        id: "shaft",
-        component: shaft
-      },
-      {
-        id: "bearingA",
-        component: bearing
-      },
-      {
-        id: "bearingB",
-        component: bearing
-      },
-      {
-        id: "key",
-        component: key
-      },
-      {
-        id: "ring",
-        component: ring
-      }
+      {id: "plate", component: plate},
+      {id: "shaft", component: shaft},
+      {id: "bearingA", component: bearing},
+      {id: "bearingB", component: bearing},
+      {id: "key", component: key},
+      {id: "ring", component: ring}
     ];
     for (i in 1...5) result.push({id: 'screw$i', component: screw});
     return result;

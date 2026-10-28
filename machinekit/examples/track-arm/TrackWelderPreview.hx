@@ -32,10 +32,7 @@ class TrackWelderPreview {
       },
       seams,
       weldment.reference,
-      WeldMetal.carrierOf(
-        cell,
-        weldment
-      ),
+      WeldMetal.carrierOf(cell, weldment),
       scene.metresPerUnit
     )]}];
     return SceneArtifact.encode(scene);

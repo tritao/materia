@@ -132,26 +132,11 @@ class MillSpindleChecks {
     for (pair in [
       ["zAxis/head", "spindle/motorCarrier"],
       ["spindle/motorCarrier", "spindle/motor"],
-      [
-        "spindle/piston",
-        "spindle/pistonRod"
-      ],
-      [
-        "zAxis/head",
-        "spindle/spindle"
-      ],
-      [
-        "spindle/spindle",
-        "spindle/reactionFrame"
-      ],
-      [
-        "spindle/reactionFrame",
-        "spindle/cylinder"
-      ],
-      [
-        "spindle/beltGuard",
-        "spindle/motorCarrier"
-      ]
+      ["spindle/piston", "spindle/pistonRod"],
+      ["zAxis/head", "spindle/spindle"],
+      ["spindle/spindle", "spindle/reactionFrame"],
+      ["spindle/reactionFrame", "spindle/cylinder"],
+      ["spindle/beltGuard", "spindle/motorCarrier"]
     ]) {
       var members = assembly.components(),
         a = members.filter(m -> m.id == pair[0])[0], b = members.filter(m -> m.id == pair[1])[0];
@@ -208,20 +193,12 @@ class MillSpindleChecks {
     probe.addComponent(
       "probe",
       new MillPanel(20, 20, 20),
-      materia.assembly.AssemblyFrames.translation(
-        0,
-        l.spindleY,
-        l.headBottom + l.headHeight + 150
-      )
+      materia.assembly.AssemblyFrames.translation(0, l.spindleY, l.headBottom + l.headHeight + 150)
     );
     fixed.addComponent(
       "obstruction",
       new MillPanel(20, 20, 20),
-      materia.assembly.AssemblyFrames.translation(
-        0,
-        l.spindleY,
-        l.headBottom + l.headHeight - 50
-      )
+      materia.assembly.AssemblyFrames.translation(0, l.spindleY, l.headBottom + l.headHeight - 50)
     );
     blocked.include("spindle", probe);
     blocked.include("frame", fixed);

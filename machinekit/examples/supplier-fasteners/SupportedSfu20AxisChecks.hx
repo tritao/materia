@@ -93,19 +93,7 @@ class SupportedSfu20AxisChecks {
           count: clearances.length,
           exemptPairs: axis.threadedPairs,
           conflicts: conflicts,
-          samples: [
-            0.0,
-            0.625,
-            1.25,
-            1.875,
-            2.5,
-            3.125,
-            3.75,
-            4.375,
-            150,
-            299.375,
-            300
-          ]
+          samples: [0.0, 0.625, 1.25, 1.875, 2.5, 3.125, 3.75, 4.375, 150, 299.375, 300]
         },
         null,
         "  "
@@ -118,22 +106,10 @@ class SupportedSfu20AxisChecks {
       {id: "fixed", sku: "1012003"},
       {id: "floating", sku: "1013003"},
       {id: "railLeft", sku: "1058002"},
-      {
-        id: "blockLeft",
-        sku: "1055002"
-      },
-      {
-        id: "screw",
-        sku: "1033003"
-      },
-      {
-        id: "nut",
-        sku: "1035003"
-      },
-      {
-        id: "housing",
-        sku: "1037002"
-      }
+      {id: "blockLeft", sku: "1055002"},
+      {id: "screw", sku: "1033003"},
+      {id: "nut", sku: "1035003"},
+      {id: "housing", sku: "1037002"}
     ];
     var byId:Map<String, MachineComponent> = [];
     for (e in loaded.components()) byId.set(e.id, e.component);
@@ -183,19 +159,11 @@ class SupportedSfu20AxisChecks {
     sys.io.File.saveContent(output + "sfu20-axis.assembly.json", saved);
     sys.io.File.saveContent(
       output + "sfu20-axis.bom.json",
-      haxe.Json.stringify(
-        loaded.billOfMaterials().lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(loaded.billOfMaterials().lines(), null, "  ")
     );
     sys.io.File.saveContent(
       output + "sfu20-axis.sourcing.json",
-      haxe.Json.stringify(
-        plan.lines(loaded.billOfMaterials()),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(plan.lines(loaded.billOfMaterials()), null, "  ")
     );
     var exportCache = new PosedParts(), parts:Array<Part> = [], shapes:Array<Shape> = [];
     try {
@@ -229,10 +197,7 @@ class SupportedSfu20AxisChecks {
             "16 mm race root",
             "M15x1 SW22 retaining-nut height 6 mm; retention/preload not qualified"
           ],
-          supportHashes: [
-            Vallder15SupportSeats.BK_HASH,
-            Vallder15SupportSeats.BF_HASH
-          ]
+          supportHashes: [Vallder15SupportSeats.BK_HASH, Vallder15SupportSeats.BF_HASH]
         },
         null,
         "  "

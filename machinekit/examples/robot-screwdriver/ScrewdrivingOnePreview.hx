@@ -42,13 +42,7 @@ class ScrewdrivingOnePreview {
         minimumStroke: 2,
         maximumStroke: 18
       },
-      {
-        leadInMm: 0.5,
-        maximumAxisAngle: 0.1,
-        prevailingTorque: 0.2,
-        stiffnessNmPerRad: 40,
-        stripTorque: 22
-      }
+      {leadInMm: 0.5, maximumAxisAngle: 0.1, prevailingTorque: 0.2, stiffnessNmPerRad: 40, stripTorque: 22}
     );
     var definition = scene.assemblyDefinition;
     if (definition == null) throw "Drive-one scene lost its assembly";

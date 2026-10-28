@@ -101,23 +101,11 @@ class PickingStationWorkflow {
       var requirements = [for (reference in targetPlan.requirements) inventory.requirement(reference.id)];
       AtomicFile.write(
         exportPrefix + ".csv",
-        SheetPlanExporter.csv(
-          targetPlan,
-          stock,
-          requirements,
-          validation,
-          inventory.piece(pieceId)
-        )
+        SheetPlanExporter.csv(targetPlan, stock, requirements, validation, inventory.piece(pieceId))
       );
       AtomicFile.write(
         exportPrefix + ".svg",
-        SheetPlanExporter.svg(
-          targetPlan,
-          stock,
-          requirements,
-          validation,
-          inventory.piece(pieceId)
-        )
+        SheetPlanExporter.svg(targetPlan, stock, requirements, validation, inventory.piece(pieceId))
       );
       Sys.println('Exported ${exportPrefix}.csv and ${exportPrefix}.svg');
     }
@@ -217,23 +205,11 @@ class PickingStationWorkflow {
     var firstRequirements = [for (reference in firstPlan.requirements) inventory.requirement(reference.id)];
     AtomicFile.write(
       exportDirectory + "/station-cut-list.csv",
-      SheetPlanExporter.csv(
-        firstPlan,
-        firstStock,
-        firstRequirements,
-        firstValidation,
-        inventory.piece("sheet-001")
-      )
+      SheetPlanExporter.csv(firstPlan, firstStock, firstRequirements, firstValidation, inventory.piece("sheet-001"))
     );
     AtomicFile.write(
       exportDirectory + "/station-layout.svg",
-      SheetPlanExporter.svg(
-        firstPlan,
-        firstStock,
-        firstRequirements,
-        firstValidation,
-        inventory.piece("sheet-001")
-      )
+      SheetPlanExporter.svg(firstPlan, firstStock, firstRequirements, firstValidation, inventory.piece("sheet-001"))
     );
     inventory.execute(firstPlan.id, "sheet-001", "station-cut-001", true);
     inventory = SheetInventory.open(path);

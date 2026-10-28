@@ -4,16 +4,8 @@ class HzMotionCadAudit {
     x:Float, y:Float, z:Float, r:Array<Float>):cadkit.modeling.Part {
     return p.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(
       new cadkit.modeling.Vector(x, y, z),
-      new cadkit.modeling.Vector(
-        r[0],
-        r[3],
-        r[6]
-      ),
-      new cadkit.modeling.Vector(
-        r[2],
-        r[5],
-        r[8]
-      )
+      new cadkit.modeling.Vector(r[0], r[3], r[6]),
+      new cadkit.modeling.Vector(r[2], r[5], r[8])
     )));
   }
   static function main() {
@@ -36,11 +28,7 @@ class HzMotionCadAudit {
           index: i,
           volume: solid.volume(),
           min: [lo.get_x(), lo.get_y(), lo.get_z()],
-          max: [
-            hi.get_x(),
-            hi.get_y(),
-            hi.get_z()
-          ]
+          max: [hi.get_x(), hi.get_y(), hi.get_z()]
         });
         solid.close();
       }
@@ -53,16 +41,8 @@ class HzMotionCadAudit {
             r: a.get_radius(),
             o: [o.get_x(), o.get_y(), o.get_z()],
             d: [d.get_x(), d.get_y(), d.get_z()],
-            min: [
-              mn.get_x(),
-              mn.get_y(),
-              mn.get_z()
-            ],
-            max: [
-              mx.get_x(),
-              mx.get_y(),
-              mx.get_z()
-            ]
+            min: [mn.get_x(), mn.get_y(), mn.get_z()],
+            max: [mx.get_x(), mx.get_y(), mx.get_z()]
           });
         }
         if (f.surfaceKind() == CadKit.SurfaceKind.Plane && f.faceArea() > 20) {
@@ -70,11 +50,7 @@ class HzMotionCadAudit {
           planes.push({
             area: f.faceArea(),
             center: [c.get_x(), c.get_y(), c.get_z()],
-            normal: [
-              n.get_x(),
-              n.get_y(),
-              n.get_z()
-            ]
+            normal: [n.get_x(), n.get_y(), n.get_z()]
           });
         }
         f.close();
@@ -86,16 +62,8 @@ class HzMotionCadAudit {
         model: r.model,
         sha256: r.sha256,
         volumeMm3: s.volume(),
-        min: [
-          lo.get_x(),
-          lo.get_y(),
-          lo.get_z()
-        ],
-        max: [
-          hi.get_x(),
-          hi.get_y(),
-          hi.get_z()
-        ]
+        min: [lo.get_x(), lo.get_y(), lo.get_z()],
+        max: [hi.get_x(), hi.get_y(), hi.get_z()]
       });
       if (r.model == "M60D-BK12-C") {
         var motor = false, base = false, pilot = false;
@@ -191,11 +159,7 @@ class HzMotionCadAudit {
     }
     sys.io.File.saveContent(
       root + "/build/suppliers/hzmotion/cad/import-audit.json",
-      haxe.Json.stringify(
-        out,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(out, null, "  ")
     );
     Sys.println("Imported " + out.length + " HZMotion STEP files");
   }

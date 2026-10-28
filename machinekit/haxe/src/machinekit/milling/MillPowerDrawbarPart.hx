@@ -23,10 +23,7 @@ class MillPowerDrawbarPart extends MachineComponent {
   ];
   public static function parameters():Array<ComponentParameter> return [
     P.text("role", "drawbar"),
-    P.flag(
-      "compactCylinder",
-      false
-    )
+    P.flag("compactCylinder", false)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -53,11 +50,7 @@ class MillPowerDrawbarPart extends MachineComponent {
   override public function hasGeometry():Bool return true;
   static function ring(r:Float, b:Float, lo:Float, hi:Float):Part return Solids.cut(
     Part.cylinderSpan(r, lo, hi),
-    [Part.cylinderSpan(
-      b,
-      lo - 1,
-      hi + 1
-    )]
+    [Part.cylinderSpan(b, lo - 1, hi + 1)]
   );
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var role = values().token("role");
@@ -79,42 +72,15 @@ class MillPowerDrawbarPart extends MachineComponent {
         Solids.cut(
           Solids.union([taper, Part.cylinderSpan(23, -10, 0), Part.cylinderSpan(17, -35, -10)]),
           [
-            Part.cylinderSpan(
-              3,
-              -36,
-              -5
-            ),
-            Part.box(
-              10,
-              8,
-              11
-            ).translated(new Vector(
-              23,
-              0,
-              -10
-            )),
-            Part.box(
-              10,
-              8,
-              11
-            ).translated(new Vector(
-              -23,
-              0,
-              -10
-            ))
+            Part.cylinderSpan(3, -36, -5),
+            Part.box(10, 8, 11).translated(new Vector(23, 0, -10)),
+            Part.box(10, 8, 11).translated(new Vector(-23, 0, -10))
           ]
         );
       case "reactionFrame":
         var rows = [
           ring(70, 22, 242, 250),
-          Solids.cut(
-            Part.box(140, 120, 8).translated(new Vector(0, 0, 322)),
-            [Part.cylinderSpan(
-              12,
-              321,
-              331
-            )]
-          )
+          Solids.cut(Part.box(140, 120, 8).translated(new Vector(0, 0, 322)), [Part.cylinderSpan(12, 321, 331)])
         ];
         for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) rows.push(Part.cylinderSpan(6, 249, 323, x, y));
         var cuts = [];
@@ -127,17 +93,8 @@ class MillPowerDrawbarPart extends MachineComponent {
       case "cylinder":
         var rows = [
           Part.box(120, 120, 8).translated(new Vector(0, 0, 330)),
-          Part.box(120, 120, 8).translated(new Vector(
-            0,
-            0,
-            422
-          )),
-          ring(
-            55,
-            50,
-            338,
-            422
-          )
+          Part.box(120, 120, 8).translated(new Vector(0, 0, 422)),
+          ring(55, 50, 338, 422)
         ];
         for (x in [-45.0, 45.0]) for (y in [-45.0, 45.0]) rows.push(Part.cylinderSpan(3, 337, 423, x, y));
         var cuts = [Part.cylinderSpan(10.5, 329, 431)];
@@ -164,11 +121,7 @@ class MillPowerDrawbarPart extends MachineComponent {
       case "reactionFrame":
         var rows = [
           ring(70, 22, 242, 250),
-          Part.box(140, 100, MillDrawbarLayout.BRIDGE_THICKNESS).translated(new Vector(
-            0,
-            0,
-            bridge
-          ))
+          Part.box(140, 100, MillDrawbarLayout.BRIDGE_THICKNESS).translated(new Vector(0, 0, bridge))
         ];
         for (x in [-60.0, 60.0]) for (y in [-35.0, 35.0]) rows.push(Part.cylinderSpan(6, 249, bridge + 1, x, y));
         var cuts = [Part.cylinderSpan(12, bridge - 1, b + 1)];
@@ -194,11 +147,7 @@ class MillPowerDrawbarPart extends MachineComponent {
             0,
             b
           )),
-          Part.box(
-            MillDrawbarLayout.WIDTH,
-            MillDrawbarLayout.WIDTH,
-            MillDrawbarLayout.CAP
-          ).translated(new Vector(
+          Part.box(MillDrawbarLayout.WIDTH, MillDrawbarLayout.WIDTH, MillDrawbarLayout.CAP).translated(new Vector(
             0,
             0,
             top - MillDrawbarLayout.CAP

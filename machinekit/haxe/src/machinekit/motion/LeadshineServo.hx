@@ -70,10 +70,7 @@ class LeadshineServo extends ServoMotor {
         rows,
         s -> ({
           source: s.designation == pageVariant.designation ? MS1AE_SOURCE : SOURCE,
-          sources : s.designation == pageVariant.designation ? [
-            SOURCE,
-            MS1AE_SOURCE
-          ] : [SOURCE],
+          sources : s.designation == pageVariant.designation ? [SOURCE, MS1AE_SOURCE] : [SOURCE],
           standard : null,
           standardEdition : null,
           dimensionKind : Mixed,
@@ -125,14 +122,12 @@ class LeadshineServo extends ServoMotor {
         bodyLength: spec.bodyLength,
         shaftDiameter: spec.shaftDiameter,
         shaftLength: spec.shaftLength,
-        electrical: spec.voltage > 220 ? ServoMotor.highVoltageWinding(
-          spec.ratedTorque,
-          spec.ratedRpm * rpm
-        ) : ServoMotor.acWinding(
-          spec.ratedTorque,
-          spec.ratedRpm * rpm
-        )
-      },
+        electrical: spec.voltage > 220 ? ServoMotor.highVoltageWinding(spec.ratedTorque,
+      spec.ratedRpm * rpm) : ServoMotor.acWinding(
+        spec.ratedTorque,
+        spec.ratedRpm * rpm
+      )
+    },
       Catalog
     );
     this.spec = spec;
@@ -210,32 +205,16 @@ class LeadshineServo extends ServoMotor {
     return new SteppedShaft(
       [{diameter: spec.shaftDiameter, length: spec.shaftLength}],
       null,
-      [{
-        name: "key",
-        z0: spec.shaftLength - 3 - spec.keyLength,
-        key: key
-      }]
+      [{name: "key", z0: spec.shaftLength - 3 - spec.keyLength, key: key}]
     );
   }
 
   static function box(w:Float, d:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part return Part.prism(
     [
-      new Vector(
-        x - w / 2,
-        y - d / 2
-      ),
-      new Vector(
-        x + w / 2,
-        y - d / 2
-      ),
-      new Vector(
-        x + w / 2,
-        y + d / 2
-      ),
-      new Vector(
-        x - w / 2,
-        y + d / 2
-      )
+      new Vector(x - w / 2, y - d / 2),
+      new Vector(x + w / 2, y - d / 2),
+      new Vector(x + w / 2, y + d / 2),
+      new Vector(x - w / 2, y + d / 2)
     ],
     z0,
     z1
@@ -301,26 +280,11 @@ class LeadshineServo extends ServoMotor {
             new Vector(-half + c, -half),
             new Vector(half - c, -half),
             new Vector(half, -half + c),
-            new Vector(
-              half,
-              half - c
-            ),
-            new Vector(
-              half - c,
-              half
-            ),
-            new Vector(
-              -half + c,
-              half
-            ),
-            new Vector(
-              -half,
-              half - c
-            ),
-            new Vector(
-              -half,
-              -half + c
-            )
+            new Vector(half, half - c),
+            new Vector(half - c, half),
+            new Vector(-half + c, half),
+            new Vector(-half, half - c),
+            new Vector(-half, -half + c)
           ],
           -l + rear,
           -t
@@ -368,11 +332,7 @@ class LeadshineServo extends ServoMotor {
       || pilotClearance < 0) throw "Servo mounting cutout needs positive thickness and nonnegative pilot clearance";
     var owned:Array<Part> = [];
     return Solids.building(owned, tracked -> {tracked.push(Solids.named(
-      Part.cylinderSpan(
-        (spec.pilotDiameter + pilotClearance) / 2,
-        0,
-        thickness
-      ),
+      Part.cylinderSpan((spec.pilotDiameter + pilotClearance) / 2, 0, thickness),
       "pilot"
     ));
     var i = 1;
@@ -386,13 +346,7 @@ class LeadshineServo extends ServoMotor {
 
   override public function toolSpecs():Array<machinekit.component.ToolSpec> return [new machinekit.component.ToolSpec(
     "mountingCutout",
-    [
-      ComponentRecipeSupport.toolDepth(10),
-      ComponentRecipeSupport.length(
-        "pilotClearance",
-        0.2
-      )
-    ]
+    [ComponentRecipeSupport.toolDepth(10), ComponentRecipeSupport.length("pilotClearance", 0.2)]
   )];
   override function buildTool(name:String, values:ComponentValues):Part {
     if (name == "mountingCutout") return mountingCutout(values.number("depth"), values.number("pilotClearance"));

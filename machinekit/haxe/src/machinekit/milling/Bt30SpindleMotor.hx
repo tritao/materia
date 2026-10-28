@@ -32,10 +32,7 @@ class Bt30SpindleMotor extends ServoMotor {
         bodyLength: 160,
         shaftDiameter: 20,
         shaftLength: 30,
-        electrical: ServoMotor.acWinding(
-          torque,
-          speed
-        )
+        electrical: ServoMotor.acWinding(torque, speed)
       },
       Assumed
     );
@@ -48,24 +45,7 @@ class Bt30SpindleMotor extends ServoMotor {
     pilotDiameter: 40,
     pilotHeight: 2,
     holeDiameter: 5.5,
-    holes: [
-      {
-        x: -30,
-        y: -30
-      },
-      {
-        x: 30,
-        y: -30
-      },
-      {
-        x: 30,
-        y: 30
-      },
-      {
-        x: -30,
-        y: 30
-      }
-    ]
+    holes: [{x: -30, y: -30}, {x: 30, y: -30}, {x: 30, y: 30}, {x: -30, y: 30}]
   };
   /** Continuous axial envelope, retaining the narrower body above its flange. */
   override public function axialEnvelope(minOffset:Float, maxOffset:Float, includeShaft:Bool = false):Part {
@@ -73,20 +53,8 @@ class Bt30SpindleMotor extends ServoMotor {
       || !Math.isFinite(maxOffset) || minOffset > maxOffset) throw "Invalid motor axial envelope";
     var parts = [
       Part.cylinderSpan(rating.bodyDiameter / 2, -rating.bodyLength + minOffset, maxOffset),
-      Part.box(
-        110,
-        110,
-        10 + maxOffset - minOffset
-      ).translated(new Vector(
-        0,
-        0,
-        -10 + minOffset
-      )),
-      Part.cylinderSpan(
-        20,
-        minOffset,
-        2 + maxOffset
-      )
+      Part.box(110, 110, 10 + maxOffset - minOffset).translated(new Vector(0, 0, -10 + minOffset)),
+      Part.cylinderSpan(20, minOffset, 2 + maxOffset)
     ];
     if (includeShaft) parts.push(Part.cylinderSpan(rating.shaftDiameter / 2,
       minOffset, rating.shaftLength + maxOffset));
@@ -105,18 +73,7 @@ class Bt30SpindleMotor extends ServoMotor {
       Solids.union([
         base,
         Part.box(110, 110, 10).translated(new Vector(0, 0, -10)),
-        Solids.cut(
-          Part.cylinderSpan(
-            20,
-            0,
-            2
-          ),
-          [Part.cylinderSpan(
-            10.5,
-            -1,
-            3
-          )]
-        )
+        Solids.cut(Part.cylinderSpan(20, 0, 2), [Part.cylinderSpan(10.5, -1, 3)])
       ]),
       tools
     );

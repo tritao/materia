@@ -37,16 +37,8 @@ class SfuNut extends LeadScrewNut {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = super.geometry(detail), s = spec;
     return Solids.building([body], owned -> {var tail = Solids.cut(
-      Part.cylinderSpan(
-        s.pilot / 2 + 0.1,
-        s.offset + s.thickness,
-        s.length + 0.1
-      ),
-      [Part.cylinderSpan(
-        s.barrel / 2,
-        s.offset + s.thickness - 0.1,
-        s.length + 0.2
-      )]
+      Part.cylinderSpan(s.pilot / 2 + 0.1, s.offset + s.thickness, s.length + 0.1),
+      [Part.cylinderSpan(s.barrel / 2, s.offset + s.thickness - 0.1, s.length + 0.2)]
     );
     owned.push(tail);
     var tools = [tail];
@@ -71,21 +63,8 @@ class SfuNut extends LeadScrewNut {
   public static function familyRecipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.sfu-nut",
-      [
-        P.choice(
-          "model",
-          SfuFamilyData.nutModels(),
-          "SFU1605"
-        ),
-        P.length(
-          "raceRootDiameter",
-          13
-        )
-      ],
-      v -> new SfuNut(
-        v.token("model"),
-        v.number("raceRootDiameter")
-      )
+      [P.choice("model", SfuFamilyData.nutModels(), "SFU1605"), P.length("raceRootDiameter", 13)],
+      v -> new SfuNut(v.token("model"), v.number("raceRootDiameter"))
     );
     return recipe;
   }

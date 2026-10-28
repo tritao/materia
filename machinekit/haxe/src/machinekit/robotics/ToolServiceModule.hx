@@ -146,37 +146,13 @@ class ToolServiceModule extends MachineComponent {
     if (recipe == null) recipe = new machinekit.component.ComponentType(
       "machinekit.robotics.tool-service-module",
       [
-        machinekit.component.ComponentRecipeSupport.scalar(
-          "voltage",
-          24,
-          0.001
-        ),
-        machinekit.component.ComponentRecipeSupport.scalar(
-          "totalCurrent",
-          5,
-          0.001
-        ),
-        machinekit.component.ComponentRecipeSupport.scalar(
-          "branchCurrent",
-          2,
-          0.001
-        ),
-        machinekit.component.ComponentRecipeSupport.text(
-          "protocol",
-          "Modbus RTU / RS485"
-        ),
-        machinekit.component.ComponentRecipeSupport.text(
-          "connectorKey",
-          "provisional-tool-service-v1"
-        ),
-        machinekit.component.ComponentRecipeSupport.count(
-          "pins",
-          8
-        ),
-        machinekit.component.ComponentRecipeSupport.count(
-          "outlets",
-          1
-        )
+        machinekit.component.ComponentRecipeSupport.scalar("voltage", 24, 0.001),
+        machinekit.component.ComponentRecipeSupport.scalar("totalCurrent", 5, 0.001),
+        machinekit.component.ComponentRecipeSupport.scalar("branchCurrent", 2, 0.001),
+        machinekit.component.ComponentRecipeSupport.text("protocol", "Modbus RTU / RS485"),
+        machinekit.component.ComponentRecipeSupport.text("connectorKey", "provisional-tool-service-v1"),
+        machinekit.component.ComponentRecipeSupport.count("pins", 8),
+        machinekit.component.ComponentRecipeSupport.count("outlets", 1)
       ],
       v -> new ToolServiceModule(
         new ToolServiceSpec(
@@ -226,11 +202,7 @@ class ToolServiceModule extends MachineComponent {
     parts.push(Part.cylinderAlong(6, new Vector(-width / 2 - 8, 0, 10), Vector.X(), 9));
     for (i in 1...outlets + 1) parts.push(Part.cylinderAlong(
       6,
-      new Vector(
-        width / 2 - 1,
-        outlets == 1 ? 0 : (i == 1 ? -11 : 11),
-        10
-      ),
+      new Vector(width / 2 - 1, outlets == 1 ? 0 : (i == 1 ? -11 : 11), 10),
       Vector.X(),
       9
     ));
@@ -243,11 +215,7 @@ class ToolServiceModule extends MachineComponent {
     tools.push(Part.cylinderAlong(4, new Vector(-width / 2 - 8.1, 0, 10), Vector.X(), 5));
     for (i in 1...outlets + 1) tools.push(Part.cylinderAlong(
       4,
-      new Vector(
-        width / 2 + 3,
-        outlets == 1 ? 0 : (i == 1 ? -11 : 11),
-        10
-      ),
+      new Vector(width / 2 + 3, outlets == 1 ? 0 : (i == 1 ? -11 : 11), 10),
       Vector.X(),
       5.1
     ));

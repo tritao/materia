@@ -58,25 +58,12 @@ class ScrewFinalPassTests {
       "final-probe",
       1,
       ScrewdriverProcessTests.program(),
-      new Transform3(
-        new Vec3(1, 1, 1),
-        Quat.identity()
-      ),
-      new Transform3(
-        new Vec3(
-          0,
-          0,
-          0
-        ),
-        Quat.identity()
-      ),
+      new Transform3(new Vec3(1, 1, 1), Quat.identity()),
+      new Transform3(new Vec3(0, 0, 0), Quat.identity()),
       1,
       2,
       0.04,
-      {
-        socket: head,
-        advanceMm: 1.8
-      }
+      {socket: head, advanceMm: 1.8}
     );
   }
   static function runner(motion:FinalMotion,

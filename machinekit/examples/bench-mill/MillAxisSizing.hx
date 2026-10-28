@@ -71,11 +71,7 @@ class MillAxisSizing {
     var phases:Array<DutyPhase> = [];
     for (leg in [
       {name: "cut", speed: FEED_MM_MIN / 60, force: CUTTING_N},
-      {
-        name: "rapid return",
-        speed: RAPID_MM_MIN / 60,
-        force: 0.0
-      }
+      {name: "rapid return", speed: RAPID_MM_MIN / 60, force: 0.0}
     ]) {
       var v = Math.min(leg.speed, Math.sqrt(stroke * ACCELERATION * 1000));
       var ramp = v / (ACCELERATION * 1000), cruise = Math.max(0, stroke / v - ramp);
@@ -178,13 +174,7 @@ class MillAxisSizing {
       var transmission = TimingBelt.reduction(
         belt,
         cast(member(a, "xyStage/motorPulleyX"), TimingPulley),
-        cast(
-          member(
-            a,
-            "xyStage/screwPulleyX"
-          ),
-          TimingPulley
-        ),
+        cast(member(a, "xyStage/screwPulleyX"), TimingPulley),
         1
       );
       ratio = Math.abs(transmission.ratio);
@@ -273,12 +263,7 @@ class MillAxisSizing {
         root: "xyStage/blockX0",
         motor: "xyStage/motorX",
         screw: "xyStage/screwX",
-        rotating: [
-          "xyStage/screwX",
-          "xyStage/screwRetainerX",
-          "xyStage/screwPulleyX",
-          "xyStage/motorPulleyX"
-        ],
+        rotating: ["xyStage/screwX", "xyStage/screwRetainerX", "xyStage/screwPulleyX", "xyStage/motorPulleyX"],
         bearingSpan: xy.xFloatingX - xy.xFixedX,
         stroke: 50,
         travel: 2 * xy.xHalfTravel,
@@ -289,11 +274,7 @@ class MillAxisSizing {
         root: "xyStage/blockY0",
         motor: "xyStage/motorY",
         screw: "xyStage/screwY",
-        rotating: [
-          "xyStage/screwY",
-          "xyStage/screwRetainerY",
-          "xyStage/couplingY"
-        ],
+        rotating: ["xyStage/screwY", "xyStage/screwRetainerY", "xyStage/couplingY"],
         bearingSpan: Math.abs(xy.yFixedY - xy.yFloatingY),
         stroke: 50,
         travel: 2 * xy.yHalfTravel,
@@ -304,10 +285,7 @@ class MillAxisSizing {
         root: "zAxis/blockLeftLower",
         motor: "zAxis/motor",
         screw: "zAxis/screw",
-        rotating: [
-          "zAxis/screw",
-          "zAxis/coupling"
-        ],
+        rotating: ["zAxis/screw", "zAxis/coupling"],
         bearingSpan: Math.abs(z.fixedZ - z.floatingZ),
         stroke: 50,
         travel: Math.abs(z.lower),
@@ -331,24 +309,13 @@ class MillAxisSizing {
     var variants:Array<Dynamic> = [];
     for (p in [
       {name: "ELM2L-1500LA100FT-H MS1AE", motor: 80, spindle: 30},
-      {
-        name: "ELM2M-2000LB130F-H",
-        motor: 80,
-        spindle: 25
-      },
-      {
-        name: "ELM2M-2900LD180FT-H",
-        motor: 96,
-        spindle: 18
-      }
+      {name: "ELM2M-2000LB130F-H", motor: 80, spindle: 25},
+      {name: "ELM2M-2900LD180FT-H", motor: 96, spindle: 18}
     ]) {
       var drive = MillMotorStudy.selection(c.frame, p.name, p.motor, p.spindle), a = MillFramePreview.concept(
         c.reference,
         c.frame,
-        new MillBeltSpindle(
-          0,
-          drive
-        )
+        new MillBeltSpindle(0, drive)
       ), m = drive.motor();
       var variantZ = axisReport(a, axes[2]);
       if (variantZ.cadMovingMassKg
@@ -377,10 +344,7 @@ class MillAxisSizing {
         root: "zAxis/blockLeftLower",
         motor: "zAxis/motor",
         screw: "zAxis/screw",
-        rotating: [
-          "zAxis/screw",
-          "zAxis/coupling"
-        ],
+        rotating: ["zAxis/screw", "zAxis/coupling"],
         bearingSpan: Math.abs(compactZ.fixedZ - compactZ.floatingZ),
         stroke: 50,
         travel: Math.abs(compactZ.lower),

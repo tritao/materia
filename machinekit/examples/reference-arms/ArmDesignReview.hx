@@ -71,14 +71,7 @@ class ArmDesignReview {
         converted.model,
         converted.model.links[0].id,
         frames[0].id,
-        new Transform3(
-          new Vec3(
-            0,
-            0,
-            0.15
-          ),
-          Quat.identity()
-        )
+        new Transform3(new Vec3(0, 0, 0.15), Quat.identity())
       );
       var solver = new ReferenceKinematics(arm), tolerance = new IkTolerance(1e-6, 1e-6, 400, 0.005);
       function bounded(q:Array<Float>):Bool {
@@ -108,10 +101,7 @@ class ArmDesignReview {
             ) > 1e-6) throw "Standalone reachable FK/IK regression: " + id + " probe " + index;
           ik = {
             positionError: PoseMath.distance(solver.forward(solved), p),
-            angleError: PoseMath.angle(
-              solver.forward(solved),
-              p
-            )
+            angleError: PoseMath.angle(solver.forward(solved), p)
           };
         }
         observations.push({
@@ -127,14 +117,7 @@ class ArmDesignReview {
         var options:Array<Array<Float>> = solver.exact == null ? solver.sampleCandidates(target,
           8, tolerance) : [for (b in solver.exact.branches(
             target,
-            seed == null ? [
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0
-            ] : seed
+            seed == null ? [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] : seed
           )) b.q];
         if (options.length == 0) {
           var q = solver.solvePose(target, seed == null ? [0.2, -0.8, 1.0, 0.1, -0.6, 0.2] : seed, tolerance);
@@ -214,10 +197,7 @@ class ArmDesignReview {
           a: a[j],
           b: b[j],
           positionError: PoseMath.distance(pa, pb),
-          angleError: PoseMath.angle(
-            pa,
-            pb
-          ),
+          angleError: PoseMath.angle(pa, pb),
           scope: "FK equivalence only; not a clear full-turn path or harness permission"
         });
       }

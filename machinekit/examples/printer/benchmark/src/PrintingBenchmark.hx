@@ -298,10 +298,7 @@ class PrintingBenchmark {
       reference: estimate.seconds,
       cpuSeconds: compileSeconds,
       elapsedSeconds: compileElapsed,
-      overall: planned / Math.max(
-        compileSeconds,
-        1e-9
-      ),
+      overall: planned / Math.max(compileSeconds, 1e-9),
       worstWindow: worstRatio,
       sections: sink.run.length,
       segments: sink.segments
@@ -360,16 +357,8 @@ class PrintingBenchmark {
         ToolpathOp.Move(
           Cut,
           toolpathkit.geometry.PathGeometry.Line(
-            new toolpathkit.geometry.Point3(
-              0.01,
-              0.01,
-              0.01
-            ),
-            new toolpathkit.geometry.Point3(
-              0.02,
-              0.01,
-              0.01
-            )
+            new toolpathkit.geometry.Point3(0.01, 0.01, 0.01),
+            new toolpathkit.geometry.Point3(0.02, 0.01, 0.01)
           ),
           0.02,
           0,
@@ -378,22 +367,8 @@ class PrintingBenchmark {
       ],
       new toolpathkit.tool.ToolLibrary(),
       [
-        new toolpathkit.setup.Setup(
-          "1",
-          new toolpathkit.geometry.Point3(
-            0,
-            0,
-            0
-          )
-        ),
-        new toolpathkit.setup.Setup(
-          "offset",
-          new toolpathkit.geometry.Point3(
-            0.1,
-            0.1,
-            0
-          )
-        )
+        new toolpathkit.setup.Setup("1", new toolpathkit.geometry.Point3(0, 0, 0)),
+        new toolpathkit.setup.Setup("offset", new toolpathkit.geometry.Point3(0.1, 0.1, 0))
       ]
     );
     var lowered = ToolpathMotion.lower(motionOnly(source), machine.binding.machine);
@@ -425,11 +400,7 @@ class PrintingBenchmark {
       {name: "x", dx: 1.0, dy: 0.0},
       {name: "y", dx: 0.0, dy: 1.0},
       {name: "45", dx: 1.0, dy: 1.0},
-      {
-        name: "135",
-        dx: -1.0,
-        dy: 1.0
-      }
+      {name: "135", dx: -1.0, dy: 1.0}
     ]) {
       var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
       var from = new toolpathkit.geometry.Point3(0.11 - 0.05 * move.dx / length, 0.11 - 0.05 * move.dy / length, 0.01);
@@ -440,17 +411,10 @@ class PrintingBenchmark {
           toolpathkit.geometry.PathGeometry.Line(from, to),
           1.0,
           0.0001,
-          new toolpathkit.path.Provenance(
-            1,
-            1,
-            0
-          )
+          new toolpathkit.path.Provenance(1, 1, 0)
         )],
         new toolpathkit.tool.ToolLibrary(),
-        [new toolpathkit.setup.Setup(
-          "1",
-          origin
-        )]
+        [new toolpathkit.setup.Setup("1", origin)]
       );
       var lowered = ToolpathMotion.lower(program, machine.binding.machine);
       var motion = lowered.program;
@@ -558,7 +522,8 @@ class PrintingBenchmark {
     var report:Array<String> = [];
     for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}]) {
       var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
-      var from = new toolpathkit.geometry.Point3(0.11 - 0.025 * move.dx / length, 0.11 - 0.025 * move.dy / length, 0.01);
+      var from = new toolpathkit.geometry.Point3(0.11 - 0.025 * move.dx / length,
+        0.11 - 0.025 * move.dy / length, 0.01);
       var to = new toolpathkit.geometry.Point3(0.11 + 0.025 * move.dx / length, 0.11 + 0.025 * move.dy / length, 0.01);
       function plans(axes:PrinterAxes):ExecutionPlan {
         var program = new ToolpathProgram(
@@ -567,17 +532,10 @@ class PrintingBenchmark {
             toolpathkit.geometry.PathGeometry.Line(from, to),
             1.0,
             0.0001,
-            new toolpathkit.path.Provenance(
-              1,
-              1,
-              0
-            )
+            new toolpathkit.path.Provenance(1, 1, 0)
           )],
           new toolpathkit.tool.ToolLibrary(),
-          [new toolpathkit.setup.Setup(
-            "1",
-            origin
-          )]
+          [new toolpathkit.setup.Setup("1", origin)]
         );
         var lowered = ToolpathMotion.lower(program, axes.binding.machine);
         if (lowered.program == null) throw "the step move lowers to nothing";
@@ -1030,11 +988,7 @@ class PrintingBenchmark {
       part.close();
       if (dump != null) sys.io.File.saveContent(
         '$dump/$name.gcode',
-        PrinterWriter.write(
-          sliced.program,
-          machine.controller,
-          PrinterFlavour.Klipper
-        )
+        PrinterWriter.write(sliced.program, machine.controller, PrinterFlavour.Klipper)
       );
       return sliced;
     }
@@ -1045,11 +999,7 @@ class PrintingBenchmark {
       var read = CncCompiler.compileDetailed(
         sys.io.File.getContent(file),
         machine.controller,
-        new toolpathkit.geometry.Point3(
-          0.0,
-          0.0,
-          0.01
-        )
+        new toolpathkit.geometry.Point3(0.0, 0.0, 0.01)
       );
       for (item in read.diagnostics) if (item.severity
         == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code: " + item.message;

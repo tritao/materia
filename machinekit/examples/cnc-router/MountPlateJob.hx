@@ -55,29 +55,12 @@ class MountPlateJob {
     // Step clamps hold the stock's left and right edges: bar and bolt, 18 mm above its top.
     var clamps = [
       new Fixture("clamp-left", -0.042, 0.008, 0.0325, 0.0575, 0.0, 0.018),
-      new Fixture(
-        "clamp-right",
-        0.112,
-        0.162,
-        0.0325,
-        0.0575,
-        0.0,
-        0.018
-      )
+      new Fixture("clamp-right", 0.112, 0.162, 0.0325, 0.0575, 0.0, 0.018)
     ];
     var setup = new Setup(
       "1",
       new Point3(0, 0, 0),
-      new SetupStock(
-        0.0,
-        WIDTH / 1000,
-        0.0,
-        DEPTH / 1000,
-        0.0,
-        -drillDepth / 1000,
-        0.02,
-        clamps
-      )
+      new SetupStock(0.0, WIDTH / 1000, 0.0, DEPTH / 1000, 0.0, -drillDepth / 1000, 0.02, clamps)
     );
     // The machine starts at its initial pose, which in work coordinates is above the stock's middle.
     var offset = CncRouter.workOffset();
@@ -85,11 +68,7 @@ class MountPlateJob {
     var job = new CamJob(
       0.02,
       12000,
-      new Point3(
-        (start[0] - offset[0]) / 1000,
-        (start[1] - offset[1]) / 1000,
-        (start[2] - offset[2]) / 1000
-      ),
+      new Point3((start[0] - offset[0]) / 1000, (start[1] - offset[1]) / 1000, (start[2] - offset[2]) / 1000),
       BLEND,
       CHORD
     );

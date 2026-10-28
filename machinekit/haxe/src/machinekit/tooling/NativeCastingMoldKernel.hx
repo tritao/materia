@@ -30,11 +30,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
       var intervals:Array<Array<Float>> = [];
       for (axis in 0...3) {
         var frame = CastingSectionContours.normalFrame(
-          {
-            x: axis == 0 ? 1 : 0,
-            y : axis == 1 ? 1 : 0,
-            z : axis == 2 ? 1 : 0
-          },
+          {x: axis == 0 ? 1 : 0, y : axis == 1 ? 1 : 0, z : axis == 2 ? 1 : 0},
           affectedId
         );
         var local = scope.own(machinekit.assembly.PosedParts.moved(source, F.inverse(frame)));
@@ -205,11 +201,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 
   static function copy(value:CastingRegionMoments):CastingRegionMoments return {
     volumeMm3: value.volumeMm3,
-    firstMomentMm4: {
-      x: value.firstMomentMm4.x,
-      y: value.firstMomentMm4.y,
-      z: value.firstMomentMm4.z
-    }
+    firstMomentMm4: {x: value.firstMomentMm4.x, y: value.firstMomentMm4.y, z: value.firstMomentMm4.z}
   };
 
   static function measure(part:Part):CastingRegionMoments {
@@ -260,11 +252,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
       || total.mass <= 0) throw "Invalid native casting mass: " + d.input.id;
     var result = {
       massKg: total.mass,
-      centerOfMassMoldMm: {
-        x: total.x / total.mass,
-        y: total.y / total.mass,
-        z: total.z / total.mass
-      }
+      centerOfMassMoldMm: {x: total.x / total.mass, y: total.y / total.mass, z: total.z / total.mass}
     };
     if (massKeys.length >= CACHE_LIMIT) massCache.remove(massKeys.shift());
     massKeys.push(key);
@@ -313,11 +301,7 @@ class NativeCastingMoldKernel implements CastingMoldKernel {
 
   static function copyMass(value:CastingMassProperties):CastingMassProperties return {
     massKg: value.massKg,
-    centerOfMassMoldMm: {
-      x: value.centerOfMassMoldMm.x,
-      y: value.centerOfMassMoldMm.y,
-      z: value.centerOfMassMoldMm.z
-    }
+    centerOfMassMoldMm: {x: value.centerOfMassMoldMm.x, y: value.centerOfMassMoldMm.y, z: value.centerOfMassMoldMm.z}
   };
 
   static function contribution(

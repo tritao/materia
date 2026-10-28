@@ -100,15 +100,7 @@ class CastingFillGeometry {
     return Sketch.rectangle(
       high.x - low.x + 2 * padding,
       high.y - low.y + 2 * padding,
-      new Plane(
-        new Vector(
-          (low.x + high.x) / 2,
-          (low.y + high.y) / 2,
-          height
-        ),
-        Vector.X(),
-        Vector.Z()
-      )
+      new Plane(new Vector((low.x + high.x) / 2, (low.y + high.y) / 2, height), Vector.X(), Vector.Z())
     );
   }
 

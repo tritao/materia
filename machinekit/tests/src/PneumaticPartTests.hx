@@ -57,15 +57,7 @@ class PneumaticPartTests {
     )) throw "Double-solenoid valve latching";
     var routedHose = new RoutedHose(
       "CHECK-HOSE",
-      [
-        new cadkit.modeling.Vector(),
-        new cadkit.modeling.Vector(0, 100, 0),
-        new cadkit.modeling.Vector(
-          100,
-          100,
-          0
-        )
-      ],
+      [new cadkit.modeling.Vector(), new cadkit.modeling.Vector(0, 100, 0), new cadkit.modeling.Vector(100, 100, 0)],
       6,
       4,
       0.03
@@ -117,13 +109,7 @@ class PneumaticPartTests {
       "guide",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: 0,
-        upper: 460,
-        velocity: null,
-        effort: null,
-        overtravel: 0
-      }
+      {lower: 0, upper: 460, velocity: null, effort: null, overtravel: 0}
     );
     bound.addComponent("cylinder", door, AssemblyFrames.translation(0, 0, -door.bodyLength - door.stemLength));
     bound.addComponent("supply", new AirSupply());
@@ -172,12 +158,7 @@ class PneumaticPartTests {
       "guide",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: 0,
-        upper: 460,
-        velocity: null,
-        effort: null
-      }
+      {lower: 0, upper: 460, velocity: null, effort: null}
     );
     crossed.addComponent("cylinder", door, AssemblyFrames.translation(0, 0, -door.bodyLength - door.stemLength));
     crossed.addComponent("supply", new AirSupply());

@@ -26,17 +26,7 @@ class LinearMountContactTests {
       holeHeight,
       -rack.spec.lengthMm / 2,
       height + washer.thickness + rack.spec.faceWidthMm,
-      [
-        0,
-        -1,
-        0,
-        0,
-        0,
-        1,
-        -1,
-        0,
-        0
-      ]
+      [0, -1, 0, 0, 0, 1, -1, 0, 0]
     );
     var stock = {x: -width / 2, y: -length / 2, z: 0.0, width: width, depth: length, height: height};
     var allocation:MountHoleErrorAllocation = {
@@ -110,11 +100,7 @@ class LinearMountContactTests {
         schema: 1,
         host: "pad",
         element: "rack",
-        frame: F.translation(
-          0,
-          0,
-          10
-        ),
+        frame: F.translation(0, 0, 10),
         terms: [{
           name: "receiver-bending",
           members: ["receiver"],
@@ -133,21 +119,14 @@ class LinearMountContactTests {
       supported.addComponent("receiver", compliant, F.translation(10, 20, 30));
       supported.addComponent(
         "pad",
-        new machinekit.structural.LinearMountSteel(new ComponentValues().setNumber(
-          "width",
-          width
-        ).setNumber(
+        new machinekit.structural.LinearMountSteel(new ComponentValues().setNumber("width", width).setNumber(
           "length",
           length
         ).setNumber(
           "thickness",
           8
         )),
-        F.translation(
-          10,
-          20,
-          22
-        )
+        F.translation(10, 20, 22)
       );
       supported.addComponent("rack", rack, F.compose(F.translation(10, 20, 30), pose));
       var saved = machinekit.assembly.MachineAssembly.decode(supported.encode());
@@ -178,10 +157,7 @@ class LinearMountContactTests {
       var broken = new machinekit.assembly.MachineAssembly();
       broken.addComponent(
         "receiver",
-        new machinekit.structural.LinearMountSteel(member.values().setToken(
-          "compliance",
-          haxe.Json.stringify(model)
-        ))
+        new machinekit.structural.LinearMountSteel(member.values().setToken("compliance", haxe.Json.stringify(model)))
       );
       broken.addComponent("pad", member);
       broken.addComponent("rack", rack, pose);
@@ -195,11 +171,7 @@ class LinearMountContactTests {
       check(refused, "FEM rejects a missing load-path member instead of exporting a hidden rigid support");
       if (output != null) sys.io.File.saveContent(
         output + '/fem-compliance.json',
-        haxe.Json.stringify(
-          supportedFem,
-          null,
-          "  "
-        )
+        haxe.Json.stringify(supportedFem, null, "  ")
       );
 
       var raw = own(rack.geometry()), placed = own(PosedParts.moved(raw, pose));
@@ -212,11 +184,7 @@ class LinearMountContactTests {
       for (i in 0...derived.holes.length) {
         var hole = derived.holes[i], localSeat = F.compose(
           element.connectors[i].frame,
-          F.translation(
-            0,
-            -element.bore.counterboreDepth,
-            0
-          )
+          F.translation(0, -element.bore.counterboreDepth, 0)
         );
         var seat = F.compose(pose, localSeat);
         var screw = MountServiceScrews.select(
@@ -225,23 +193,14 @@ class LinearMountContactTests {
           seat,
           facet.holes[i],
           hole.frame,
-          [
-            20,
-            25,
-            30,
-            35
-          ]
+          [20, 25, 30, 35]
         );
         check(screw.length == 25, "real M6x25 fits counterbore, grip, thread, tip gap and back wall");
         var screwPose = F.compose(seat, F.inverse(screw.connector("head").frame));
         var screwRaw = own(screw.geometry()), screwBody = own(PosedParts.moved(screwRaw, screwPose));
         var washerRaw = own(washer.geometry()), spacer = own(PosedParts.moved(
           washerRaw,
-          F.translation(
-            hole.frame.x,
-            hole.frame.y,
-            height
-          )
+          F.translation(hole.frame.x, hole.frame.y, height)
         ));
         spacers.push(spacer);
         var toRack = spacer.distance(placed), toSteel = spacer.distance(receiver);
@@ -284,16 +243,8 @@ class LinearMountContactTests {
         0,
         -200,
         backingThickness + rail.spec.railHeight,
-        [
-          0.0,
-          0,
-          1
-        ],
-        [
-          0.0,
-          1,
-          0
-        ]
+        [0.0, 0, 1],
+        [0.0, 1, 0]
       );
       var backing = new machinekit.structural.SeatedPlate(40, 440, backingThickness, "thin backing fixture",
         [{name: "rail", frame: F.identity(), holes: rail.mountingConnectors().map(c -> {var p = F.compose(
@@ -310,18 +261,8 @@ class LinearMountContactTests {
           c.name,
           railElement,
           railSeat,
-          machinekit.component.Solids.axial(
-            railSeat.x,
-            railSeat.y,
-            0
-          ),
-          [
-            20,
-            25,
-            30,
-            35,
-            40
-          ]
+          machinekit.component.Solids.axial(railSeat.x, railSeat.y, 0),
+          [20, 25, 30, 35, 40]
         );
         var w = own(PosedParts.moved(own(stack.washer.geometry()), stack.washerPose));
         var n = own(PosedParts.moved(own(stack.nut.geometry()), stack.nutPose));

@@ -65,10 +65,7 @@ class ReferenceHousingChecks {
       [box.minY, -48.5],
       [box.maxY, 36.5],
       [box.minZ, -45],
-      [
-        box.maxZ,
-        40
-      ]
+      [box.maxZ, 40]
     ]) near(
       pair[0],
       pair[1],
@@ -135,18 +132,9 @@ class ReferenceHousingChecks {
     var pairs:Array<Array<String>> = [
       ["stem-pocket", "stator-bore"],
       ["cable-hole", "stator-bore"],
-      [
-        "cable-hole",
-        "stem-pocket"
-      ],
-      [
-        "rear-cavity",
-        "rotor-bearing-seat"
-      ],
-      [
-        "stem-pocket",
-        "rear-cavity"
-      ]
+      ["cable-hole", "stem-pocket"],
+      ["rear-cavity", "rotor-bearing-seat"],
+      ["stem-pocket", "rear-cavity"]
     ];
     for (i in 0...12) pairs.push(['gear-screw-$i', "stator-bore"]);
     for (i in 0...6) pairs.push(['cover-screw-$i', "rear-cavity"]);

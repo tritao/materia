@@ -88,22 +88,7 @@ class InsertHoles {
       version: 5,
       holes: [{
         id: "fixing",
-        frame: F.fromRotationMatrix(
-          0,
-          0,
-          depth,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        ),
+        frame: F.fromRotationMatrix(0, 0, depth, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
         diameter: diameter,
         depth: depth,
         extent: "through",
@@ -153,11 +138,7 @@ class InsertHoles {
           usableDepth: cast h.threadDepth,
           cylindricalDepth: h.depth,
           point: 0,
-          stock: [
-            width,
-            depth,
-            height
-          ][materia.casting.InsertHoleGeometry.axis(h)],
+          stock: [width, depth, height][materia.casting.InsertHoleGeometry.axis(h)],
           minEngagement: InsertHoleCodec.threadLimits(h).minEngagement,
           minTipGap: InsertHoleCodec.threadLimits(h).minTipGap,
           minBack: limits.minBack

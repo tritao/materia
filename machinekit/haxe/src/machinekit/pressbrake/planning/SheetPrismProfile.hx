@@ -76,20 +76,8 @@ class SheetPrismProfile {
         var polygon = clean([
           new Point2(left, yAt(lower, left)),
           new Point2(right, yAt(lower, right)),
-          new Point2(
-            right,
-            yAt(
-              upper,
-              right
-            )
-          ),
-          new Point2(
-            left,
-            yAt(
-              upper,
-              left
-            )
-          )
+          new Point2(right, yAt(upper, right)),
+          new Point2(left, yAt(upper, left))
         ]);
         if (polygon.length < 3) throw new SheetDiagnosis(
           "press.profile-decomposition",
@@ -104,16 +92,8 @@ class SheetPrismProfile {
         area += Math.abs(twiceArea) / 2;
         pieces.push(new ConvexPrism(
           id + ":piece:" + pieces.length,
-          [for (point in polygon) new Vector(
-            point.x,
-            point.y,
-            0
-          )],
-          new Vector(
-            0,
-            0,
-            -thickness
-          )
+          [for (point in polygon) new Vector(point.x, point.y, 0)],
+          new Vector(0, 0, -thickness)
         ));
       }
     }

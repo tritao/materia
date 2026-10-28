@@ -119,12 +119,7 @@ class CoreXyPlotter extends AxisBuilder {
   public final motor:NemaStepper;
   public final specs:Array<PlotterAxisSpec> = [
     {id: "x", lower: -35, upper: 35, initial: 0},
-    {
-      id: "y",
-      lower: -35,
-      upper: 35,
-      initial: 0
-    }
+    {id: "y", lower: -35, upper: 35, initial: 0}
   ];
   /** Pitch radius of the pulleys, in millimetres. */
   public final pulleyRadius:Float;
@@ -147,11 +142,7 @@ class CoreXyPlotter extends AxisBuilder {
     place(
       "base",
       new PlotterBlock(BASE_WIDTH, BASE_DEPTH, BASE_TOP, "aluminium 6061", "Base plate"),
-      AssemblyFrames.translation(
-        0,
-        0,
-        0
-      )
+      AssemblyFrames.translation(0, 0, 0)
     );
     var railTop = BASE_TOP + railSpec.railHeight;
     var blockTop = BASE_TOP + railSpec.blockHeight;
@@ -160,13 +151,7 @@ class CoreXyPlotter extends AxisBuilder {
       attach(
         'railY$name',
         LinearRail.metric(RAIL, RAIL_LENGTH),
-        AxisBuilder.orient(
-          side * RAIL_X,
-          -RAIL_LENGTH / 2,
-          railTop,
-          up,
-          alongY
-        ),
+        AxisBuilder.orient(side * RAIL_X, -RAIL_LENGTH / 2, railTop, up, alongY),
         "base"
       );
     }
@@ -177,30 +162,10 @@ class CoreXyPlotter extends AxisBuilder {
       BELT_WIDTH,
       [
         new BeltWrap(-INNER_X, 0, R, 1),
-        new BeltWrap(
-          COLUMN_X - 2 * R,
-          -2 * R,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          COLUMN_X,
-          -CORNER_Y,
-          R,
-          1
-        ),
-        new BeltWrap(
-          COLUMN_X,
-          CORNER_Y,
-          R,
-          1
-        ),
-        new BeltWrap(
-          -INNER_X,
-          CORNER_Y,
-          R,
-          1
-        )
+        new BeltWrap(COLUMN_X - 2 * R, -2 * R, R, -1),
+        new BeltWrap(COLUMN_X, -CORNER_Y, R, 1),
+        new BeltWrap(COLUMN_X, CORNER_Y, R, 1),
+        new BeltWrap(-INNER_X, CORNER_Y, R, 1)
       ]
     );
     var beltB = new TimingBelt(
@@ -208,30 +173,10 @@ class CoreXyPlotter extends AxisBuilder {
       BELT_WIDTH,
       [
         new BeltWrap(INNER_X, 0, R, -1),
-        new BeltWrap(
-          -(COLUMN_X - 2 * R),
-          -2 * R,
-          R,
-          1
-        ),
-        new BeltWrap(
-          -COLUMN_X,
-          -CORNER_Y,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          -COLUMN_X,
-          CORNER_Y,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          INNER_X,
-          CORNER_Y,
-          R,
-          -1
-        )
+        new BeltWrap(-(COLUMN_X - 2 * R), -2 * R, R, 1),
+        new BeltWrap(-COLUMN_X, -CORNER_Y, R, -1),
+        new BeltWrap(-COLUMN_X, CORNER_Y, R, -1),
+        new BeltWrap(INNER_X, CORNER_Y, R, -1)
       ]
     );
     attach("beltA", beltA, AssemblyFrames.translation(0, 0, levelA), "base");
@@ -260,11 +205,7 @@ class CoreXyPlotter extends AxisBuilder {
           attach(
             parent,
             new PlotterPin(motor.variant.shaftDiameter, pinLength, "Idler pin"),
-            AssemblyFrames.translation(
-              wrap.x,
-              wrap.y,
-              BASE_TOP
-            ),
+            AssemblyFrames.translation(wrap.x, wrap.y, BASE_TOP),
             "base"
           );
         }
@@ -282,48 +223,26 @@ class CoreXyPlotter extends AxisBuilder {
       "railYLeft",
       "blockYLeft",
       LinearRailBlock.metric(RAIL),
-      AxisBuilder.orient(
-        -RAIL_X,
-        0,
-        railTop,
-        up,
-        alongY
-      ),
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      AxisBuilder.orient(-RAIL_X, 0, railTop, up, alongY),
+      {x: 0, y: 1, z: 0}
     );
     attach(
       "bracketLeft",
       new PlotterBlock(80, 36, 6, "aluminium 6061", "Gantry bracket"),
-      AssemblyFrames.translation(
-        -95,
-        0,
-        bracketBase
-      ),
+      AssemblyFrames.translation(-95, 0, bracketBase),
       "blockYLeft"
     );
     var barHeight = 20.0;
     attach(
       "crossbar",
       new PlotterBlock(190, 20, barHeight, "aluminium 6061", "Gantry crossbar"),
-      AssemblyFrames.translation(
-        0,
-        20,
-        bracketBase
-      ),
+      AssemblyFrames.translation(0, 20, bracketBase),
       "bracketLeft"
     );
     attach(
       "bracketRight",
       new PlotterBlock(80, 36, 6, "aluminium 6061", "Gantry bracket"),
-      AssemblyFrames.translation(
-        95,
-        0,
-        bracketBase
-      ),
+      AssemblyFrames.translation(95, 0, bracketBase),
       "crossbar"
     );
     attach(
@@ -341,11 +260,7 @@ class CoreXyPlotter extends AxisBuilder {
         attach(
           pin,
           new PlotterPin(motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
-          AssemblyFrames.translation(
-            wrap.x,
-            wrap.y,
-            bracketBase + 6
-          ),
+          AssemblyFrames.translation(wrap.x, wrap.y, bracketBase + 6),
           wrap.x < 0 ? "bracketLeft" : "bracketRight"
         );
         hang(id, beltPulley(), AssemblyFrames.translation(wrap.x, wrap.y, level), pin);
@@ -359,13 +274,7 @@ class CoreXyPlotter extends AxisBuilder {
     attach(
       "railX",
       LinearRail.metric(RAIL, railLength),
-      AxisBuilder.orient(
-        -railLength / 2,
-        railXFace,
-        railZ,
-        front,
-        alongX
-      ),
+      AxisBuilder.orient(-railLength / 2, railXFace, railZ, front, alongX),
       "crossbar"
     );
     slide(
@@ -374,22 +283,14 @@ class CoreXyPlotter extends AxisBuilder {
       "blockX",
       LinearRailBlock.metric(RAIL),
       AxisBuilder.orient(0, railXFace, railZ, front, alongX),
-      {
-        x: 1,
-        y: 0,
-        z: 0
-      }
+      {x: 1, y: 0, z: 0}
     );
     var blockFront = railXFace - (railSpec.blockHeight - railSpec.railHeight);
     var plateBase = bracketBase - 2, plateHeight = levelB - 3 - plateBase;
     attach(
       "carriagePlate",
       new PlotterBlock(40, 6, plateHeight, "aluminium 6061", "Carriage plate"),
-      AssemblyFrames.translation(
-        0,
-        blockFront - 3,
-        plateBase
-      ),
+      AssemblyFrames.translation(0, blockFront - 3, plateBase),
       "blockX"
     );
     // The clamp holds the belts' gantry strands, which run at y = -R from the gantry's middle line.
@@ -398,11 +299,7 @@ class CoreXyPlotter extends AxisBuilder {
     attach(
       "clamp",
       new PlotterBlock(24, 9, padTop - padBase, "aluminium 6061", "Belt clamp"),
-      AssemblyFrames.translation(
-        0,
-        blockFront - 4.5,
-        padBase
-      ),
+      AssemblyFrames.translation(0, blockFront - 4.5, padBase),
       "carriagePlate"
     );
     for (b in 0...2) {
@@ -412,11 +309,7 @@ class CoreXyPlotter extends AxisBuilder {
         "belt" + letter,
         AssemblyFrames.compose(
           AssemblyFrames.inverse(zeroPoses.get("clamp")),
-          AssemblyFrames.translation(
-            0,
-            -R,
-            b == 0 ? levelA : levelB
-          )
+          AssemblyFrames.translation(0, -R, b == 0 ? levelA : levelB)
         )
       );
       addBeltPath({belt: "belt" + letter,
@@ -435,11 +328,7 @@ class CoreXyPlotter extends AxisBuilder {
     attach(
       "pen",
       new PlotterPin(8, penLength, "Pen", "plastic"),
-      AssemblyFrames.translation(
-        0,
-        blockFront - 6 - 4,
-        PEN_BASE
-      ),
+      AssemblyFrames.translation(0, blockFront - 6 - 4, PEN_BASE),
       "carriagePlate"
     );
     exposeConnector("penTip", "pen", "tip");
@@ -447,16 +336,8 @@ class CoreXyPlotter extends AxisBuilder {
     // Supply and drivers stay on the fixed frame; the supply's service port sets their voltage.
     attach(
       "powerSupply",
-      new PowerSupply(
-        new machinekit.power.DcVoltage(SUPPLY_VOLTS),
-        new machinekit.power.DcCurrent(10),
-        2
-      ),
-      AssemblyFrames.translation(
-        BASE_WIDTH / 2 + 70,
-        0,
-        BASE_TOP
-      ),
+      new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(10), 2),
+      AssemblyFrames.translation(BASE_WIDTH / 2 + 70, 0, BASE_TOP),
       "base"
     );
     // Each stepper turns its belt's driving pulley.
@@ -465,11 +346,7 @@ class CoreXyPlotter extends AxisBuilder {
       attach(
         driver,
         new MotorDriver("GENERIC-TMC2209", new machinekit.power.PhaseRmsCurrent(1.68), 16),
-        AssemblyFrames.translation(
-          entry.x,
-          -BASE_DEPTH / 2 + 20,
-          BASE_TOP
-        ),
+        AssemblyFrames.translation(entry.x, -BASE_DEPTH / 2 + 20, BASE_TOP),
         "base"
       );
       connectPorts('$driver-power', "powerSupply", entry.id == "A" ? "power1" : "power2", driver, "power");

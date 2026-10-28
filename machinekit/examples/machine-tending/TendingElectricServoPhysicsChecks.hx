@@ -30,23 +30,7 @@ class TendingElectricServoPhysicsChecks {
       var segment = new TrajectorySegment(
         Int64.ofInt(0),
         Int64.fromFloat(3000000000.0),
-        [[
-          start,
-          0,
-          0,
-          10 * delta / Math.pow(
-            T,
-            3
-          ),
-          -15 * delta / Math.pow(
-            T,
-            4
-          ),
-          6 * delta / Math.pow(
-            T,
-            5
-          )
-        ]]
+        [[start, 0, 0, 10 * delta / Math.pow(T, 3), -15 * delta / Math.pow(T, 4), 6 * delta / Math.pow(T, 5)]]
       );
       runtime.submitPlan(
         new ExecutionPlanSubmission(
@@ -87,11 +71,7 @@ class TendingElectricServoPhysicsChecks {
           [resetStart],
           [0],
           [0],
-          [new TrajectorySegment(
-            Int64.ofInt(0),
-            Int64.ofInt(1000000000),
-            [[resetStart]]
-          )],
+          [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[resetStart]])],
           null,
           null,
           [0.00001],
@@ -120,18 +100,7 @@ class TendingElectricServoPhysicsChecks {
           [0.1],
           [0],
           [0],
-          [new TrajectorySegment(
-            Int64.ofInt(0),
-            Int64.ofInt(2000000000),
-            [[
-              0.1,
-              0,
-              0,
-              0.125,
-              -0.09375,
-              0.01875
-            ]]
-          )],
+          [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(2000000000), [[0.1, 0, 0, 0.125, -0.09375, 0.01875]])],
           null,
           null,
           [0.00001],
@@ -169,14 +138,7 @@ class TendingElectricServoPhysicsChecks {
           [new TrajectorySegment(
             Int64.ofInt(0),
             Int64.ofInt(1000000000),
-            [[
-              anchor,
-              0,
-              0,
-              10 * move,
-              -15 * move,
-              6 * move
-            ]]
+            [[anchor, 0, 0, 10 * move, -15 * move, 6 * move]]
           )],
           null,
           null,

@@ -54,10 +54,7 @@ class PosedParts {
   /** `component`'s geometry moved to `pose`: a new owned part. */
   public function posed(component:MachineComponent,
     pose:AssemblyFrame, detail:ComponentDetail = Preview):Part return moved(
-      local(
-        component,
-        detail
-      ),
+      local(component, detail),
       pose
     );
 
@@ -67,11 +64,7 @@ class PosedParts {
     return part.placed(new Location(new Plane(
       new Vector(pose.x, pose.y, pose.z),
       new Vector(x.x, x.y, x.z),
-      new Vector(
-        z.x,
-        z.y,
-        z.z
-      )
+      new Vector(z.x, z.y, z.z)
     )));
   }
 
@@ -110,28 +103,16 @@ class PosedParts {
 
   /** The member `id` of `assembly` at its pose in `state`: a new owned part. `label` names the assembly in the error for an unknown id. */
   public function member(assembly:MachineAssembly, state:AssemblyState, label:String, id:String):Part return posed(
-    component(
-      assembly,
-      label,
-      id
-    ),
+    component(assembly, label, id),
     state.worldPose(id)
   );
 
   /** The volume (mm³) members `a` and `b` of `assembly` share at the poses in `state`. */
   public function volume(assembly:MachineAssembly,
     state:AssemblyState, label:String, a:String, b:String):Float return overlap(
-      component(
-        assembly,
-        label,
-        a
-      ),
+      component(assembly, label, a),
       state.worldPose(a),
-      component(
-        assembly,
-        label,
-        b
-      ),
+      component(assembly, label, b),
       state.worldPose(b)
     );
 
@@ -146,11 +127,7 @@ class PosedParts {
     label:String,
     moving:Array<String>,
     others:Array<String>,
-    describe:(
-      String,
-      String,
-      Float
-    ) -> String,
+    describe:(String, String, Float) -> String,
     limit:Float = 1e-3
   ):Void {
     var ids = moving.concat(others), components = [for (id in ids) component(assembly, label, id)];

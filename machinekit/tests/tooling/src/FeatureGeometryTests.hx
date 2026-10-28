@@ -28,18 +28,9 @@ class FeatureGeometryTests {
       [
         new cadkit.modeling.Vector(0, 0),
         new cadkit.modeling.Vector(40, 0),
-        new cadkit.modeling.Vector(
-          40,
-          20
-        ),
-        new cadkit.modeling.Vector(
-          10,
-          40
-        ),
-        new cadkit.modeling.Vector(
-          0,
-          40
-        )
+        new cadkit.modeling.Vector(40, 20),
+        new cadkit.modeling.Vector(10, 40),
+        new cadkit.modeling.Vector(0, 40)
       ],
       0,
       30
@@ -124,14 +115,8 @@ class FeatureGeometryTests {
       {x: 20, y: -15},
       {x: 20, y: 0},
       {x: 0, y: 0},
-      {
-        x: 0,
-        y: 15
-      },
-      {
-        x: -20,
-        y: 15
-      }
+      {x: 0, y: 15},
+      {x: -20, y: 15}
     ]));
     var cavity = CastingCavityCad.part(CastingCavities.derive(body, [stepped])[0]);
     check(Math.abs(cavity.volume() - 27000) < 1e-6, "stepped prism agrees with two analytic rectangles");

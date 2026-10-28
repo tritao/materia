@@ -13,15 +13,8 @@ class ToolLengthSetter extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 40),
     P.length("height", 60),
-    P.length(
-      "stroke",
-      5
-    ),
-    P.quantity(
-      "repeatability",
-      0.005,
-      "mm"
-    )
+    P.length("stroke", 5),
+    P.quantity("repeatability", 0.005, "mm")
   ];
   public function new(?v:ComponentValues) {
     super("tool-length-setter", "tool length setter", "steel", inputs(), v);
@@ -49,26 +42,11 @@ class ToolLengthSetter extends AssumedCatalogComponent {
         {r: r, z: 0.0},
         {r: r, z: 0.5 * h},
         {r: 0.85 * r, z: 0.55 * h},
-        {
-          r: 0.75 * r,
-          z: 0.55 * h
-        },
-        {
-          r: 0.75 * r,
-          z: 0.9 * h
-        },
-        {
-          r: 0.45 * r,
-          z: 0.9 * h
-        },
-        {
-          r: 0.45 * r,
-          z: h
-        },
-        {
-          r: 0.0,
-          z: h
-        }
+        {r: 0.75 * r, z: 0.55 * h},
+        {r: 0.75 * r, z: 0.9 * h},
+        {r: 0.45 * r, z: 0.9 * h},
+        {r: 0.45 * r, z: h},
+        {r: 0.0, z: h}
       ]),
       "setter"
     );

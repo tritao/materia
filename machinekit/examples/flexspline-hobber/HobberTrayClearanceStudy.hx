@@ -26,14 +26,8 @@ class HobberTrayClearanceStudy {
       [
         new Vector(opening[0], opening[1]),
         new Vector(opening[2], opening[1]),
-        new Vector(
-          opening[2],
-          opening[3]
-        ),
-        new Vector(
-          opening[0],
-          opening[3]
-        )
+        new Vector(opening[2], opening[3]),
+        new Vector(opening[0], opening[3])
       ],
       z + p.stackZMm.trayUnderside - 1,
       z + p.stackZMm.trayTop + 1

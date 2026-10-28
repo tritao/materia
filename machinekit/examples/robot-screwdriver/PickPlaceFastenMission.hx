@@ -8,11 +8,7 @@ class PickPlaceFastenMission {
     var plateTool = "handling/tool/gripperB/body.close";
     function wait(name:String, value:Bool, timeout:Float = 10):Void steps.push({
       kind: "waitFor",
-      waitFor: {
-        name: name,
-        value: value,
-        timeout: timeout
-      }
+      waitFor: {name: name, value: value, timeout: timeout}
     });
     function signal(name:String, value:Bool):Void steps.push({kind: "signal", signal: {name: name, value: value}});
     function pick(part:String, tool:String):Void steps.push({
@@ -25,10 +21,7 @@ class PickPlaceFastenMission {
     });
     function place(part:String, connector:String, tool:String):Void steps.push({
       kind: "place",
-      at: {
-        occurrence: part,
-        connector: connector
-      },
+      at: {occurrence: part, connector: connector},
       tool: tool,
       toolYaw: tool == plateTool ? Math.PI / 2 : Math.PI,
       approachDistance : 0.08,

@@ -33,11 +33,7 @@ class CastingFeaturePatterns {
       y,
       0,
       null,
-      [
-        CastingDimension.Width,
-        CastingDimension.Depth,
-        CastingDimension.Height
-      ]
+      [CastingDimension.Width, CastingDimension.Depth, CastingDimension.Height]
     );
 
   public static function foot(
@@ -54,13 +50,7 @@ class CastingFeaturePatterns {
     stemTop:Float,
     accessOpenings:Array<CastingOpening>,
     stemOpenings:Array<CastingOpening>,
-    ?plate: {
-      owner: String,
-      openings: Array<CastingOpening>,
-      width: Float,
-      depth: Float,
-      thickness: Float
-    }
+    ?plate: {owner: String, openings: Array<CastingOpening>, width: Float, depth: Float, thickness: Float}
   ):Array<CastingFeature> {
     var centre = alongX ? x : y, low = Math.min(centre - accessWidth / 2, edge), high = Math.max(
       centre + accessWidth / 2,

@@ -73,11 +73,7 @@ class MotorPlate extends MachineComponent {
     for (point in profileHolePositions()) addConnector(
       'profileBolt${i++}',
       Face,
-      Solids.axial(
-        point.x,
-        point.y,
-        thickness
-      )
+      Solids.axial(point.x, point.y, thickness)
     );
   }
 
@@ -154,40 +150,13 @@ class MotorPlate extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.assembly.motor-plate", [
-      P.choice(
-        "motor",
-        motorModels(),
-        "17HS19-1684S1"
-      ),
-      P.length(
-        "thickness",
-        6
-      ),
-      P.length(
-        "margin",
-        10
-      ),
-      P.choice(
-        "profileSystem",
-        [
-          "None",
-          "TSLOT-30-SLOT8",
-          "TSLOT-40-SLOT8"
-        ],
-        "None"
-      ),
-      P.length(
-        "railSpacing",
-        0
-      ),
-      P.length(
-        "alongPitch",
-        0
-      ),
-      P.length(
-        "profileHoleDiameter",
-        0
-      )
+      P.choice("motor", motorModels(), "17HS19-1684S1"),
+      P.length("thickness", 6),
+      P.length("margin", 10),
+      P.choice("profileSystem", ["None", "TSLOT-30-SLOT8", "TSLOT-40-SLOT8"], "None"),
+      P.length("railSpacing", 0),
+      P.length("alongPitch", 0),
+      P.length("profileHoleDiameter", 0)
     ], v -> {var mount: Null<ProfilePlateMount> = null;
     if (v.token("profileSystem") == "None") {
       if (v.number("railSpacing") != 0 || v.number("alongPitch") != 0

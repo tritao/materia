@@ -26,10 +26,7 @@ class MillSpindleMotorSupport extends MachineComponent {
       "Spindle motor shelf bridge on tapered head",
       "steel",
       false,
-      new ComponentValues().setNumber(
-        "height",
-        height
-      )
+      new ComponentValues().setNumber("height", height)
     );
     addConnector("mount", Mount, Solids.axial(0, 0, 0));
   }
@@ -39,11 +36,7 @@ class MillSpindleMotorSupport extends MachineComponent {
     var h = parameterNumber("height");
     return Solids.union([
       Part.box(20, 80, h).translated(new Vector(48, 0, 0)),
-      Part.box(62, 80, 8).translated(new Vector(
-        69,
-        0,
-        h - 8
-      ))
+      Part.box(62, 80, 8).translated(new Vector(69, 0, h - 8))
     ]);
   }
 }

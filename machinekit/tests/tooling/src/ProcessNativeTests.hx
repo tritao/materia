@@ -39,12 +39,7 @@ class ProcessNativeTests {
       9.80665,
       null,
       null,
-      [
-        1,
-        3,
-        5,
-        9
-      ]
+      [1, 3, 5, 9]
     );
     var owned:Array<Part> = [];
     try {
@@ -138,24 +133,14 @@ class ProcessNativeTests {
   static function verifyJunction():Void {
     var boxes:Array<MoldBox> = [
       {x: -5, y: -1, z: -4, width: 10, depth: 2, height: 8},
-      {
-        x: -1,
-        y: -5,
-        z: -4,
-        width: 2,
-        depth: 10,
-        height: 8
-      }
+      {x: -1, y: -5, z: -4, width: 2, depth: 10, height: 8}
     ];
     var report = materia.tooling.process.JunctionThickness.analyze(
       "junction",
       "source",
       boxes,
       [],
-      {
-        diameterToleranceMm: 0.01,
-        maximumCells: 50000
-      }
+      {diameterToleranceMm: 0.01, maximumCells: 50000}
     );
     var owned:Array<Part> = [];
     try {

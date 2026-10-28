@@ -12,43 +12,15 @@ class DustShoe extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 180),
-    P.length(
-      "spindleClearance",
-      130
-    ),
-    P.length(
-      "height",
-      30
-    ),
-    P.length(
-      "brushLength",
-      60
-    ),
-    P.length(
-      "hoseDiameter",
-      100
-    ),
-    P.length(
-      "hoseOffset",
-      130
-    ),
-    P.length(
-      "hoseRise",
-      40
-    ),
-    P.quantity(
-      "hoseAngle",
-      0,
-      "rad"
-    ),
-    P.length(
-      "liftStroke",
-      120
-    ),
-    P.length(
-      "liftBore",
-      25
-    )
+    P.length("spindleClearance", 130),
+    P.length("height", 30),
+    P.length("brushLength", 60),
+    P.length("hoseDiameter", 100),
+    P.length("hoseOffset", 130),
+    P.length("hoseRise", 40),
+    P.quantity("hoseAngle", 0, "rad"),
+    P.length("liftStroke", 120),
+    P.length("liftBore", 25)
   ];
   public function new(?v:ComponentValues) {
     super("dust-shoe", "lifting dust shoe", "aluminium 6061", inputs(), v);
@@ -102,18 +74,9 @@ class DustShoe extends AssumedCatalogComponent {
       [Solids.named(
         Part.revolve([
           {r: inner - 0.1, z: -n("brushLength") - 0.1},
-          {
-            r: outer - skirt,
-            z: -n("brushLength") - 0.1
-          },
-          {
-            r: outer - skirt,
-            z: 0.0
-          },
-          {
-            r: inner - 0.1,
-            z: 0.0
-          }
+          {r: outer - skirt, z: -n("brushLength") - 0.1},
+          {r: outer - skirt, z: 0.0},
+          {r: inner - 0.1, z: 0.0}
         ]),
         "brush-gap"
       )]
@@ -124,20 +87,9 @@ class DustShoe extends AssumedCatalogComponent {
 
   function envelope():Part {
     return Solids.building([], parts -> {parts.push(Solids.cut(
-      Solids.named(
-        Part.cylinderSpan(
-          n("diameter") / 2,
-          -n("brushLength"),
-          n("height")
-        ),
-        "shoe-brush-envelope"
-      ),
+      Solids.named(Part.cylinderSpan(n("diameter") / 2, -n("brushLength"), n("height")), "shoe-brush-envelope"),
       [Solids.named(
-        Part.cylinderSpan(
-          n("spindleClearance") / 2,
-          -n("brushLength") - 1,
-          n("height") + 1
-        ),
+        Part.cylinderSpan(n("spindleClearance") / 2, -n("brushLength") - 1, n("height") + 1),
         "spindle-clearance"
       )]
     ));

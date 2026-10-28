@@ -40,17 +40,7 @@ class HobberMoldSetup {
           0,
           0,
           foundation.body.parameterNumber("height"),
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
+          [1, 0, 0, 0, -1, 0, 0, 0, -1]
         )
       }
     };

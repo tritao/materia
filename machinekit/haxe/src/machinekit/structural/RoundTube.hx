@@ -25,11 +25,7 @@ class RoundTube implements StructuralProfile {
     if (!(length > 0)) throw "Round tube needs a positive length";
     return Solids.cut(
       Part.cylinderSpan(outerDiameter / 2, 0, length),
-      [Part.cylinderSpan(
-        outerDiameter / 2 - wall,
-        -0.1,
-        length + 0.1
-      )]
+      [Part.cylinderSpan(outerDiameter / 2 - wall, -0.1, length + 0.1)]
     );
   }
 

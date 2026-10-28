@@ -28,11 +28,7 @@ class AirSupply extends MachineComponent implements PressureSource {
   override public function hasGeometry():Bool return true;
   /** Head with its gauge, filter bowl and drain (`PneumaticBodies.frl`). The envelope box is also the mass model. */
   override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? Solids.named(
-    Part.box(
-      60,
-      40,
-      100
-    ),
+    Part.box(60, 40, 100),
     "frl"
   ) : PneumaticBodies.frl(
     60,
@@ -44,13 +40,7 @@ class AirSupply extends MachineComponent implements PressureSource {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.pneumatic.air-supply",
-      [new machinekit.component.ComponentParameter(
-        "pressurePa",
-        Scalar,
-        Number(600000),
-        "Pa",
-        0
-      )],
+      [new machinekit.component.ComponentParameter("pressurePa", Scalar, Number(600000), "Pa", 0)],
       v -> new AirSupply(v.number("pressurePa"))
     );
     return recipe;

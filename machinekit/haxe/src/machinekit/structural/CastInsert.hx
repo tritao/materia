@@ -14,54 +14,25 @@ class CastInsert extends MachineComponent {
   final sourceDesign:machinekit.design.DesignInterfaces;
 
   public static function parameters():Array<ComponentParameter> return [
-    P.choice(
-      "buildStage",
-      materia.casting.InsertStages.tokens(),
-      materia.casting.InsertStages.InsertStage.Service
-    ),
+    P.choice("buildStage", materia.casting.InsertStages.tokens(), materia.casting.InsertStages.InsertStage.Service),
     P.choice(
       "stockMaterial",
       materia.casting.InsertMaterial.InsertMaterials.tokens(),
       materia.casting.InsertMaterial.C45Bright
     ),
-    P.text(
-      "holes",
-      InsertHoles.fromNeutral([])
-    ),
-    P.text(
-      "interfaces",
-      "[]"
-    ),
-    P.text(
-      "anchorage",
-      haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(Undeclared))
-    ),
-    P.text(
-      "body",
-      InsertBodyCodec.encode(Primitive(Box(
-        35,
-        400,
-        20
-      )))
-    ),
+    P.text("holes", InsertHoles.fromNeutral([])),
+    P.text("interfaces", "[]"),
+    P.text("anchorage", haxe.Json.stringify(materia.casting.InsertAnchorage.InsertAnchorageCodec.record(Undeclared))),
+    P.text("body", InsertBodyCodec.encode(Primitive(Box(35, 400, 20)))),
     P.text(
       "origin",
       haxe.Json.stringify(materia.casting
     .InsertOrigin.InsertOriginCodec.record(Fabricated(materia.casting.InsertManufacturing.InsertManufacturingCodec
     .draft(materia.casting.InsertMaterial.InsertMaterials.specification(materia.casting.InsertMaterial.C45Bright)))))
   ),
-    P.length(
-      "positionTolerance",
-      0.01
-    ),
-    P.requiredChoice(
-      "role",
-      materia.casting.InsertSpec.InsertRoles.tokens()
-    ),
-    P.text(
-      "label",
-      "rail seat"
-    ),
+    P.length("positionTolerance", 0.01),
+    P.requiredChoice("role", materia.casting.InsertSpec.InsertRoles.tokens()),
+    P.text("label", "rail seat"),
     P.choice(
       "finish",
       materia.casting.InsertSpec.InsertFinishes.tokens(),
@@ -78,10 +49,7 @@ class CastInsert extends MachineComponent {
       false,
       null,
       false,
-      new ComponentValues().setToken(
-        "role",
-        InsertRole.GenericMount
-      )
+      new ComponentValues().setToken("role", InsertRole.GenericMount)
     );
     return recipe;
   }
@@ -202,11 +170,7 @@ class CastInsert extends MachineComponent {
   public static function boxValues(width:Float, depth:Float,
     height:Float):ComponentValues return manufacturedValues(materia.casting.InsertMaterial.C45Bright).setToken(
       "body",
-      InsertBodyCodec.encode(Primitive(Box(
-        width,
-        depth,
-        height
-      )))
+      InsertBodyCodec.encode(Primitive(Box(width, depth, height)))
     );
 
   /** Grade and the attached manufacturing choices are authored together, so a

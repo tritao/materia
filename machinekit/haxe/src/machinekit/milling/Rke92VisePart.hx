@@ -11,24 +11,8 @@ import machinekit.component.ComponentRecipeSupport as P;
 class Rke92VisePart extends MachineComponent {
   static var recipe:Null<ComponentType>;
   static function parameters():Array<ComponentParameter> return [
-    P.choice(
-      "role",
-      [
-        "body",
-        "jaw-back",
-        "slide",
-        "jaw-plate",
-        "drive",
-        "stop",
-        "clamp",
-        "key"
-      ],
-      "body"
-    ),
-    P.length(
-      "depth",
-      39
-    )
+    P.choice("role", ["body", "jaw-back", "slide", "jaw-plate", "drive", "stop", "clamp", "key"], "body"),
+    P.length("depth", 39)
   ];
   public function new(role:String = "body", depth:Float = 39) {
     var v = P.resolve(parameters(), new ComponentValues().setToken("role", role).setNumber("depth", depth));
@@ -39,10 +23,7 @@ class Rke92VisePart extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.milling.rke92-reference-part",
       parameters(),
-      v -> new Rke92VisePart(
-        v.token("role"),
-        v.number("depth")
-      )
+      v -> new Rke92VisePart(v.token("role"), v.number("depth"))
     );
     return recipe;
   }
@@ -55,11 +36,7 @@ class Rke92VisePart extends MachineComponent {
         var body = Part.box(94, 276, 80).translated(new Vector(0, 138, 0));
         var cuts = [
           Part.box(52, 197, 57).translated(new Vector(0, 178.5, 24)),
-          Part.box(20, 278, 5.2).translated(new Vector(
-            0,
-            138,
-            -1
-          ))
+          Part.box(20, 278, 5.2).translated(new Vector(0, 138, -1))
         ];
         for (side in [-1, 1]) cuts.push(Part.box(12, 278, 16).translated(new Vector(side * 42, 138, 12)));
         Solids.cut(body, cuts);

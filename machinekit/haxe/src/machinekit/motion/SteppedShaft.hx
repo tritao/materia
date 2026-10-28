@@ -140,11 +140,7 @@ class SteppedShaft extends MachineComponent {
       addConnector(
         keyway.name,
         Face,
-        Solids.axial(
-          0,
-          radius - keyway.key.spec.shaftDepth,
-          keyway.z0 + keyway.key.length / 2
-        )
+        Solids.axial(0, radius - keyway.key.spec.shaftDepth, keyway.z0 + keyway.key.length / 2)
       );
     }
     this.grooves = resolvedGrooves;
@@ -361,33 +357,15 @@ class SteppedShaft extends MachineComponent {
       var spec:ParallelKeySpec = {
         minShaft: cast field(specData, "minShaft"),
         maxShaft: cast field(specData, "maxShaft"),
-        width: cast field(
-          specData,
-          "width"
-        ),
-        height: cast field(
-          specData,
-          "height"
-        ),
-        shaftDepth: cast field(
-          specData,
-          "shaftDepth"
-        ),
-        hubDepth: cast field(
-          specData,
-          "hubDepth"
-        )
+        width: cast field(specData, "width"),
+        height: cast field(specData, "height"),
+        shaftDepth: cast field(specData, "shaftDepth"),
+        hubDepth: cast field(specData, "hubDepth")
       };
       var key = field(keyData,
         "codeOnly") == true ? ParallelKey.custom(spec, cast field(keyData, "length")) : ParallelKey.metric(
-          cast field(
-            keyData,
-            "size"
-          ),
-          cast field(
-            keyData,
-            "length"
-          )
+          cast field(keyData, "size"),
+          cast field(keyData, "length")
         );
       rebuilt.push({name: cast field(entry, "name"), z0: cast field(entry, "z0"), key: key});
     }
@@ -411,32 +389,17 @@ class SteppedShaft extends MachineComponent {
     var inputRaw = field(raw, "inputThread"), outputRaw = field(raw, "outputThread");
     var inputThread:ShaftThreadEnd = inputRaw == null ? null : {
       diameter : cast field(inputRaw, "diameter"),
-      pitch : cast field(
-        inputRaw,
-        "pitch"
-      ),
-      length : cast field(
-        inputRaw,
-        "length"
-      )
+      pitch : cast field(inputRaw, "pitch"),
+      length : cast field(inputRaw, "length")
     };
     var outputThread:ShaftThreadEnd = outputRaw == null ? null : {
       diameter : cast field(outputRaw, "diameter"),
-      pitch : cast field(
-        outputRaw,
-        "pitch"
-      ),
-      length : cast field(
-        outputRaw,
-        "length"
-      )
+      pitch : cast field(outputRaw, "pitch"),
+      length : cast field(outputRaw, "length")
     };
     var detail:ShaftDetail = {
       inputChamfer: cast field(raw, "inputChamfer"),
-      outputChamfer: cast field(
-        raw,
-        "outputChamfer"
-      ),
+      outputChamfer: cast field(raw, "outputChamfer"),
       inputThread: inputThread,
       outputThread: outputThread,
       shoulders: shoulders
@@ -450,26 +413,11 @@ class SteppedShaft extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.stepped-shaft",
       [
-        ComponentRecipeSupport.text(
-          "sections",
-          '[{"diameter":10,"length":100}]'
-        ),
-        ComponentRecipeSupport.text(
-          "faces",
-          "[]"
-        ),
-        ComponentRecipeSupport.text(
-          "keyways",
-          "[]"
-        ),
-        ComponentRecipeSupport.text(
-          "grooves",
-          "[]"
-        ),
-        ComponentRecipeSupport.text(
-          "shaftDetail",
-          "{}"
-        )
+        ComponentRecipeSupport.text("sections", '[{"diameter":10,"length":100}]'),
+        ComponentRecipeSupport.text("faces", "[]"),
+        ComponentRecipeSupport.text("keyways", "[]"),
+        ComponentRecipeSupport.text("grooves", "[]"),
+        ComponentRecipeSupport.text("shaftDetail", "{}")
       ],
       v -> SteppedShaft.fromRecipe(v),
       true
@@ -605,11 +553,7 @@ class SteppedShaft extends MachineComponent {
     var adjacent = Math.max(diameterAt(shoulder.z - 1e-5), diameterAt(shoulder.z + 1e-5));
     return Solids.cut(
       Part.cylinderSpan(adjacent / 2 + 1, shoulder.z - width / 2, shoulder.z + width / 2),
-      [Part.cylinderSpan(
-        diameter / 2,
-        shoulder.z - width / 2 - 0.05,
-        shoulder.z + width / 2 + 0.05
-      )]
+      [Part.cylinderSpan(diameter / 2, shoulder.z - width / 2 - 0.05, shoulder.z + width / 2 + 0.05)]
     );
   }
 
@@ -626,14 +570,8 @@ class SteppedShaft extends MachineComponent {
       [
         new Vector(-width / 2, floor),
         new Vector(width / 2, floor),
-        new Vector(
-          width / 2,
-          radius + depth
-        ),
-        new Vector(
-          -width / 2,
-          radius + depth
-        ),
+        new Vector(width / 2, radius + depth),
+        new Vector(-width / 2, radius + depth),
       ],
       keyway.z0,
       keyway.z0 + keyway.key.length

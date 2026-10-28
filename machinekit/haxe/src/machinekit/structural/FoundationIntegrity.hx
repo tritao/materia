@@ -8,10 +8,7 @@ import materia.assembly.AssemblyFrames as F;
 class FoundationIntegrity {
   public static function check(
     foundation:MineralFoundation,
-    ?measured:Map<
-      String,
-      materia.assembly.AssemblyRecord.AssemblyFrame
-  >
+    ?measured:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame>
   ):Diagnostics {
     var out = new Diagnostics(),
       poses = measured == null ? foundation.solvedPoses() : measured, bodyPose = poses.get("casting");
@@ -95,10 +92,7 @@ class FoundationIntegrity {
   public static function checkMounts(
     assembly:MachineAssembly,
     mounts:Array<{name:String, parent:String}>,
-    ?jointIds:Map<
-      String,
-      String
-  >
+    ?jointIds:Map<String, String>
   ):Diagnostics {
     var out = new Diagnostics(), members = assembly.components(), joints = assembly.definition().joints;
     for (m in mounts) {

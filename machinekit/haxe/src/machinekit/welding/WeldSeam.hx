@@ -57,17 +57,7 @@ class SeamFrame {
       position.x,
       position.y,
       position.z,
-      [
-        x.x,
-        y.x,
-        z.x,
-        x.y,
-        y.y,
-        z.y,
-        x.z,
-        y.z,
-        z.z
-      ]
+      [x.x, y.x, z.x, x.y, y.y, z.y, x.z, y.z, z.z]
     );
   }
 

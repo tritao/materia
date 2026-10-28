@@ -160,10 +160,7 @@ class ToolingReleaseExport {
           [plan.document.input.id],
           machinekit.assembly.PosedParts.moved(local, member.pose),
           Board,
-          {
-            stock: member.panel.stock,
-            pose: member.pose
-          }
+          {stock: member.panel.stock, pose: member.pose}
         );
       }
       for (core in plan.cores) add(
@@ -186,20 +183,14 @@ class ToolingReleaseExport {
             former.featureIds,
             ToolingVolume.geometryOf(former.volume),
             Board,
-            {
-              stock: plan.document.recipe.panel,
-              pose: item.construction.stockToMold
-            }
+            {stock: plan.document.recipe.panel, pose: item.construction.stockToMold}
           );
         } else for (board in item.boards) add(
           board.id,
           former.featureIds,
           machinekit.structural.CastingRegionCad.part(board.region),
           Board,
-          {
-            stock: board.stock,
-            pose: board.pose
-          }
+          {stock: board.stock, pose: board.pose}
         );
       }
       for (seal in plan.seals) add(
@@ -219,10 +210,7 @@ class ToolingReleaseExport {
       for (insert in plan.document.input.inserts) add(
         materia.tooling.ToolingIds.derive("insert-", insert.id),
         [insert.id],
-        CastingMoldCad.steel(
-          plan,
-          insert.id
-        ),
+        CastingMoldCad.steel(plan, insert.id),
         BondingSteel,
         null
       );
@@ -231,10 +219,7 @@ class ToolingReleaseExport {
         add(
           hardware.id,
           [hardware.insertId, hardware.anchorId],
-          machinekit.assembly.PosedParts.moved(
-            local,
-            hardware.pose
-          ),
+          machinekit.assembly.PosedParts.moved(local, hardware.pose),
           BondingSteel,
           null
         );
@@ -335,10 +320,7 @@ class ToolingReleaseExport {
     dir:String,
     ?chemical:materia.tooling.ToolingValidation
   ):Array<materia.tooling.ToolingValidation> return writeReport(
-    build(
-      plan,
-      shop
-    ),
+    build(plan, shop),
     materia.tooling.casting.CastingMoldPlanner.fingerprint(plan),
     dir,
     chemical

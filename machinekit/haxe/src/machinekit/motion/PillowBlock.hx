@@ -262,26 +262,14 @@ class PillowBlock extends MachineComponent {
     var barrel = Solids.named(Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight), "barrel");
     var body = Solids.union([base, barrel]);
     var boreTool = Solids.named(
-      Part.cylinderSpan(
-        bearing.outside / 2,
-        -baseWidth / 2 - 0.1,
-        baseWidth / 2 + 0.1,
-        0,
-        shaftHeight
-      ),
+      Part.cylinderSpan(bearing.outside / 2, -baseWidth / 2 - 0.1, baseWidth / 2 + 0.1, 0, shaftHeight),
       "bore"
     );
     if (detail == Envelope) return Solids.cut(body, [boreTool]);
     var tools = [boreTool];
     var bolt = 1;
     for (x in [-boltSpacing / 2, boltSpacing / 2]) tools.push(Solids.named(
-      Part.cylinderAlongY(
-        mountHoleDiameter / 2,
-        -0.1,
-        baseHeight + 0.1,
-        x,
-        0
-      ),
+      Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, x, 0),
       "bolt" + bolt++
     ));
     return Solids.cut(body, tools);
@@ -303,11 +291,7 @@ class PillowBlock extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.pillow-block",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        PillowBlock.catalog(),
-        "UCP204"
-      )],
+      [ComponentRecipeSupport.catalog("designation", PillowBlock.catalog(), "UCP204")],
       v -> PillowBlock.metric(v.token("designation")),
       true
     );

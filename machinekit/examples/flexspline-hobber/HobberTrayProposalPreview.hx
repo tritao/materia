@@ -9,11 +9,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 /** Exploded 3D review of the dimensioned proposal, deliberately separate from the working enclosure. */
 class HobberTrayProposalPreview {
   static function polygon(loop:Array<Array<Float>>, z0:Float, z1:Float):Part return Part.prism(
-    [for (p in loop) new Vector(
-      p[0],
-      p[1],
-      0
-    )],
+    [for (p in loop) new Vector(p[0], p[1], 0)],
     z0,
     z1
   );
@@ -77,62 +73,19 @@ class HobberTrayProposalPreview {
       "tray-proposal",
       "PROPOSAL: one-piece 13 mm tray; shown 40 mm above installed position",
       tray,
-      [
-        0.45,
-        0.56,
-        0.64
-      ]
+      [0.45, 0.56, 0.64]
     );
     add(
       "inner-tape-proposal",
       "PROPOSAL: 15 mm tape, 2 mm installed thickness; rear support still to detail",
-      Solids.cut(
-        polygon(
-          shifted(
-            inner,
-            15
-          ),
-          seat + 15,
-          seat + 17
-        ),
-        [polygon(
-          inner,
-          seat + 14,
-          seat + 18
-        )]
-      ),
-      [
-        0.15,
-        0.65,
-        0.40
-      ]
+      Solids.cut(polygon(shifted(inner, 15), seat + 15, seat + 17), [polygon(inner, seat + 14, seat + 18)]),
+      [0.15, 0.65, 0.40]
     );
     add(
       "outer-tape-proposal",
       "PROPOSAL: outer gasket loop; shown 15 mm above installed position",
-      Solids.cut(
-        polygon(
-          shifted(
-            outer,
-            5
-          ),
-          seat + 15,
-          seat + 17
-        ),
-        [polygon(
-          shifted(
-            outer,
-            20
-          ),
-          seat + 14,
-          seat + 18
-        )]
-      ),
-      [
-        0.15,
-        0.65,
-        0.40
-      ]
+      Solids.cut(polygon(shifted(outer, 5), seat + 15, seat + 17), [polygon(shifted(outer, 20), seat + 14, seat + 18)]),
+      [0.15, 0.65, 0.40]
     );
     var socket = machinekit.hobbing.FoundationLayout.traySocket();
     var socketGeometry = socket.geometry();
@@ -157,43 +110,19 @@ class HobberTrayProposalPreview {
       add(
         "anchor-socket-" + i,
         "PROPOSAL: M6 x 40 socket, blind bore and crimped tail; OD/tail nominal",
-        move(
-          socket.geometry(),
-          pt[0],
-          pt[1],
-          seat - machinekit.structural.FixingSockets.LENGTH
-        ),
-        [
-          0.67,
-          0.70,
-          0.74
-        ]
+        move(socket.geometry(), pt[0], pt[1], seat - machinekit.structural.FixingSockets.LENGTH),
+        [0.67, 0.70, 0.74]
       );
       add(
         "compression-sleeve-" + i,
         "PROPOSAL: removable compression sleeve OD10 ID6.6 x 8 mm; lifted with sheet",
         move(
-          Solids.cut(
-            Part.cylinderSpan(
-              5,
-              seat + 40,
-              seat + 48
-            ),
-            [Part.cylinderSpan(
-              3.3,
-              seat + 39,
-              seat + 49
-            )]
-          ),
+          Solids.cut(Part.cylinderSpan(5, seat + 40, seat + 48), [Part.cylinderSpan(3.3, seat + 39, seat + 49)]),
           pt[0],
           pt[1],
           0
         ),
-        [
-          0.75,
-          0.76,
-          0.78
-        ]
+        [0.75, 0.76, 0.78]
       );
     }
     var model = new AssemblyModel("mm");

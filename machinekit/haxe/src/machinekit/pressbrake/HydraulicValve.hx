@@ -42,11 +42,7 @@ class HydraulicValve extends MachineComponent implements ValveSpec {
       60,
       70,
       2,
-      [
-        -22,
-        0,
-        22
-      ]
+      [-22, 0, 22]
     );
 
   override public function massGeometry():Null<Part> return Solids.named(Part.box(120,

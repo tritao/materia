@@ -194,11 +194,7 @@ class WeldSeamChecks {
     for (seam in lap) if (seam.joint != JointType.Lap) throw 'Seam ${seam.name()} should be a lap, not ${seam.joint}';
     var butt = find(
       Part.box(100, 50, 10).translated(new Vector(-50, 0, 0)),
-      Part.box(100, 50, 10).translated(new Vector(
-        50,
-        0,
-        0
-      ))
+      Part.box(100, 50, 10).translated(new Vector(50, 0, 0))
     );
     if (butt.length != 4) throw 'Two plates butted edge to edge should have four seams, got ${butt.length}';
     for (seam in butt) {

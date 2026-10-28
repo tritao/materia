@@ -23,10 +23,7 @@ class BrakedReferencePreview {
       belts: [],
       program: {
         axes: [for (j in joints) j.id],
-        waypoints: [
-          out,
-          [for (_ in joints) 0.0]
-        ],
+        waypoints: [out, [for (_ in joints) 0.0]],
         loop: false,
         positionTolerance: 0.005
       }
@@ -161,25 +158,14 @@ class BrakedReferencePreview {
       bodies.push({
         id: o.id,
         massKg: part.physicalMassKg,
-        centerMetres: [
-          p.x * scene.metresPerUnit,
-          p.y * scene.metresPerUnit,
-          p.z * scene.metresPerUnit
-        ],
+        centerMetres: [p.x * scene.metresPerUnit, p.y * scene.metresPerUnit, p.z * scene.metresPerUnit],
         rotation: AssemblyFrames.toRotationMatrix(pose),
         localInertia: part.physicalInertiaKgM2
       });
     }
     sys.io.File.saveContent(
       root + "/arm-design/zeroerr-braked-inertials.json",
-      haxe.Json.stringify(
-        {
-          totalMassKg: mass,
-          bodies: bodies
-        },
-        null,
-        "  "
-      )
+      haxe.Json.stringify({totalMassKg: mass, bodies: bodies}, null, "  ")
     );
     Sys.println("Stationary original preview: "
       + out + "; total mass=" + mass + " kg; brakes=" + converted.model.brakes.length);

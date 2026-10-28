@@ -30,11 +30,7 @@ class RotaryHeadCheck {
         30,
         head.regenerativePower
       ),
-      AssemblyFrames.translation(
-        -300,
-        0,
-        0
-      )
+      AssemblyFrames.translation(-300, 0, 0)
     );
     machine.include("head", head);
     var drivers:Array<String> = [];
@@ -43,11 +39,7 @@ class RotaryHeadCheck {
       machine.addComponent(
         id,
         new MotorDriver("GENERIC-SERVO-AMP", head.driverPhaseCurrent),
-        AssemblyFrames.translation(
-          -250,
-          index * 80,
-          0
-        )
+        AssemblyFrames.translation(-250, index * 80, 0)
       );
       machine.connectPorts('power$index', "supply", 'power${index + 1}', id, "power");
       drivers.push(id);

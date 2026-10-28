@@ -122,18 +122,9 @@ class Rack extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.transmission.involute-rack",
       [
-        ComponentRecipeSupport.length(
-          "moduleSize",
-          2
-        ),
-        ComponentRecipeSupport.count(
-          "teethCount",
-          10
-        ),
-        ComponentRecipeSupport.length(
-          "faceWidth",
-          10
-        ),
+        ComponentRecipeSupport.length("moduleSize", 2),
+        ComponentRecipeSupport.count("teethCount", 10),
+        ComponentRecipeSupport.length("faceWidth", 10),
         new ComponentParameter(
           "pressureAngle",
           Angle,
@@ -142,14 +133,8 @@ class Rack extends MachineComponent {
           SpurGear.MIN_PRESSURE_ANGLE,
           SpurGear.MAX_PRESSURE_ANGLE
         ),
-        ComponentRecipeSupport.length(
-          "barHeight",
-          3
-        ),
-        ComponentRecipeSupport.length(
-          "backlash",
-          0
-        )
+        ComponentRecipeSupport.length("barHeight", 3),
+        ComponentRecipeSupport.length("backlash", 0)
       ],
       v -> new Rack(
         v.number("moduleSize"),

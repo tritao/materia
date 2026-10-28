@@ -114,11 +114,7 @@ class StraightBoundaryReview {
     };
     sys.io.File.saveContent(
       directory + "/build/straight/clearance-boundaries-" + label + ".json",
-      haxe.Json.stringify(
-        report,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(report, null, "  ")
     );
   }
 }

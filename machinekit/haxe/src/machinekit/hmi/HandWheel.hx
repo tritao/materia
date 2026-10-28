@@ -19,109 +19,32 @@ class HandWheel extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    R.catalog(
-      "model",
-      ControlCatalogs.wheels(),
-      ControlCatalogs.YUMO
-    ),
+    R.catalog("model", ControlCatalogs.wheels(), ControlCatalogs.YUMO),
     HmiPart.basisParameter("catalog"),
-    R.length(
-      "outerDiameter",
-      60
-    ),
-    R.length(
-      "flangeThickness",
-      6
-    ),
-    R.length(
-      "coneHeight",
-      11
-    ),
-    R.length(
-      "ringDiameter",
-      49
-    ),
-    R.length(
-      "ringHeight",
-      9
-    ),
-    R.length(
-      "dialDiameter",
-      44
-    ),
-    R.length(
-      "dialRecess",
-      2
-    ),
-    R.flag(
-      "handle",
-      true
-    ),
-    R.length(
-      "handleDiameter",
-      10
-    ),
-    R.length(
-      "handleProtrusion",
-      12
-    ),
-    R.length(
-      "handleRadius",
-      17
-    ),
-    R.length(
-      "bossDiameter",
-      43
-    ),
-    R.length(
-      "bossDepth",
-      3
-    ),
-    R.length(
-      "panelClearance",
-      1
-    ),
-    R.length(
-      "maxPanelThickness",
-      6
-    ),
-    R.length(
-      "studCircleDiameter",
-      50.8
-    ),
-    R.length(
-      "studDiameter",
-      3
-    ),
-    R.length(
-      "studHoleDiameter",
-      3.2
-    ),
-    R.length(
-      "studLength",
-      10
-    ),
-    R.count(
-      "studCount",
-      3
-    ),
-    R.length(
-      "terminalLength",
-      28
-    ),
-    R.length(
-      "terminalWidth",
-      11
-    ),
-    R.length(
-      "terminalDepth",
-      5.5
-    ),
-    R.scalar(
-      "massGrams",
-      250,
-      1
-    )
+    R.length("outerDiameter", 60),
+    R.length("flangeThickness", 6),
+    R.length("coneHeight", 11),
+    R.length("ringDiameter", 49),
+    R.length("ringHeight", 9),
+    R.length("dialDiameter", 44),
+    R.length("dialRecess", 2),
+    R.flag("handle", true),
+    R.length("handleDiameter", 10),
+    R.length("handleProtrusion", 12),
+    R.length("handleRadius", 17),
+    R.length("bossDiameter", 43),
+    R.length("bossDepth", 3),
+    R.length("panelClearance", 1),
+    R.length("maxPanelThickness", 6),
+    R.length("studCircleDiameter", 50.8),
+    R.length("studDiameter", 3),
+    R.length("studHoleDiameter", 3.2),
+    R.length("studLength", 10),
+    R.count("studCount", 3),
+    R.length("terminalLength", 28),
+    R.length("terminalWidth", 11),
+    R.length("terminalDepth", 5.5),
+    R.scalar("massGrams", 250, 1)
   ];
 
   public function new(?v:ComponentValues) {
@@ -130,11 +53,7 @@ class HandWheel extends HmiPart {
       "manual pulse generator hand wheel",
       "aluminium 6061",
       inputs(),
-      ControlCatalogs.withModel(
-        ControlCatalogs.wheels(),
-        ControlCatalogs.YUMO,
-        v
-      )
+      ControlCatalogs.withModel(ControlCatalogs.wheels(), ControlCatalogs.YUMO, v)
     );
     positive([
       "outerDiameter",
@@ -225,39 +144,18 @@ class HandWheel extends HmiPart {
         Part.revolve([
           {r: 0.0, z: flange},
           {r: n("outerDiameter") / 2, z: flange},
-          {
-            r: n("ringDiameter") / 2,
-            z: flange + n("coneHeight")
-          },
-          {
-            r: n("ringDiameter") / 2,
-            z: top
-          },
-          {
-            r: n("dialDiameter") / 2,
-            z: top
-          },
-          {
-            r: n("dialDiameter") / 2,
-            z: top - n("dialRecess")
-          },
-          {
-            r: 0.0,
-            z: top - n("dialRecess")
-          }
+          {r: n("ringDiameter") / 2, z: flange + n("coneHeight")},
+          {r: n("ringDiameter") / 2, z: top},
+          {r: n("dialDiameter") / 2, z: top},
+          {r: n("dialDiameter") / 2, z: top - n("dialRecess")},
+          {r: 0.0, z: top - n("dialRecess")}
         ]),
         "wheel"
       )];
       if (flag("handle")) {
         var from = top - n("dialRecess");
         parts.push(Solids.named(
-          Part.cylinderSpan(
-            n("handleDiameter") / 2,
-            from,
-            top + n("handleProtrusion"),
-            0.0,
-            -n("handleRadius")
-          ),
+          Part.cylinderSpan(n("handleDiameter") / 2, from, top + n("handleProtrusion"), 0.0, -n("handleRadius")),
           "handle"
         ));
       }

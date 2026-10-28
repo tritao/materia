@@ -143,13 +143,7 @@ class CoreXyPrinterJob {
       cartridge.power(cartridge.spec.volts),
       hotend.lossCoefficient,
       hotend.fanLossCoefficient,
-      Math.min(
-        hotend.maxTemperature,
-        Math.min(
-          cartridge.spec.maxTemperature,
-          thermistor.spec.maxTemperature
-        )
-      ) - 10.0
+      Math.min(hotend.maxTemperature, Math.min(cartridge.spec.maxTemperature, thermistor.spec.maxTemperature)) - 10.0
     );
     var bed = printer.bed.spec;
     var bedHeater = heater(
@@ -178,10 +172,7 @@ class CoreXyPrinterJob {
       meltLag: material.meltLag,
       rampLength: 0.0005,
       minExtrusionTemperature: material.minExtrusionTemperature,
-      heaters: [
-        hotendHeater,
-        bedHeater
-      ],
+      heaters: [hotendHeater, bedHeater],
       controller: {stepTickHz: STEP_TICK_HZ},
       deposit: "printed"
     };
@@ -262,51 +253,15 @@ class CoreXyPrinterChecks {
   /** Each pulley's angle per millimetre of x and of y, in pitch radii. */
   static final TERMS:Array<PrinterPulleyTerm> = [
     new PrinterPulleyTerm("pulleyA", 1, -1),
-    new PrinterPulleyTerm(
-      "idlerAFront",
-      1,
-      -1
-    ),
-    new PrinterPulleyTerm(
-      "idlerARear",
-      1,
-      -1
-    ),
-    new PrinterPulleyTerm(
-      "pulleyB",
-      1,
-      1
-    ),
-    new PrinterPulleyTerm(
-      "idlerBFront",
-      1,
-      1
-    ),
-    new PrinterPulleyTerm(
-      "idlerBRear",
-      1,
-      1
-    ),
-    new PrinterPulleyTerm(
-      "idlerAStart",
-      1,
-      0
-    ),
-    new PrinterPulleyTerm(
-      "idlerAEnd",
-      -1,
-      0
-    ),
-    new PrinterPulleyTerm(
-      "idlerBStart",
-      1,
-      0
-    ),
-    new PrinterPulleyTerm(
-      "idlerBEnd",
-      -1,
-      0
-    )
+    new PrinterPulleyTerm("idlerAFront", 1, -1),
+    new PrinterPulleyTerm("idlerARear", 1, -1),
+    new PrinterPulleyTerm("pulleyB", 1, 1),
+    new PrinterPulleyTerm("idlerBFront", 1, 1),
+    new PrinterPulleyTerm("idlerBRear", 1, 1),
+    new PrinterPulleyTerm("idlerAStart", 1, 0),
+    new PrinterPulleyTerm("idlerAEnd", -1, 0),
+    new PrinterPulleyTerm("idlerBStart", 1, 0),
+    new PrinterPulleyTerm("idlerBEnd", -1, 0)
   ];
 
   public static function run():Void {
@@ -606,12 +561,7 @@ class CoreXyPrinterChecks {
         state,
         [110.0, 110, z],
         ["blockZLeft", "blockZRight"],
-        [
-          "postLeftRear",
-          "postRightRear",
-          "crossTopRear",
-          "crossBottomRear"
-        ]
+        ["postLeftRear", "postRightRear", "crossTopRear", "crossBottomRear"]
       );
     }
     checkClear(printer, state, [110.0, 110, 220], ["homeTriggerZ"], ["basePlate", "motorZFront", "powerSupply"]);
@@ -694,14 +644,8 @@ class CoreXyPrinterChecks {
       ["railYLeft", "blockYLeft"],
       ["railYRight", "blockYRight"],
       ["railX", "blockX"],
-      [
-        "railZLeft",
-        "blockZLeft"
-      ],
-      [
-        "railZRight",
-        "blockZRight"
-      ]
+      ["railZLeft", "blockZLeft"],
+      ["railZRight", "blockZRight"]
     ]) {
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose(pair[0])), state.worldPose(pair[1]));
       var rail = [for (entry in printer.components()) if (entry.id == pair[0]) cast(entry.component, LinearRail)][0];

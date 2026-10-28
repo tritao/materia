@@ -21,22 +21,7 @@ import materia.assembly.AssemblyFrames;
     nonfinite.x = Math.NaN;
     for (invalid in [
       AssemblyFrames.translation(174.15, -1023, 550),
-      AssemblyFrames.fromRotationMatrix(
-        175.15,
-        -1023,
-        550,
-        [
-          0.0,
-          1,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      ),
+      AssemblyFrames.fromRotationMatrix(175.15, -1023, 550, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]),
       nonfinite,
       null
     ]) {

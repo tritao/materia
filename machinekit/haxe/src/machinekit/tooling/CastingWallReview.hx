@@ -50,19 +50,10 @@ class CastingWallReview {
   static function size(b:Box3, axis:Int):Float return axis == 0 ? b.width : axis == 1 ? b.depth : b.height;
   static function overlap(a:Box3, b:Box3, axis:Int):Float return Math.min(
     lo(a, axis) + size(a, axis),
-    lo(b, axis) + size(
-      b,
-      axis
-    )
+    lo(b, axis) + size(b, axis)
   ) - Math.max(
-    lo(
-      a,
-      axis
-    ),
-    lo(
-      b,
-      axis
-    )
+    lo(a, axis),
+    lo(b, axis)
   );
   static function vector(axis:Int, value:Float):Vector return new Vector(
     axis == 0 ? value : 0,
@@ -215,18 +206,7 @@ class CastingWallReview {
       distance:Float,
       region:Box3,
       method:String,
-      witness:Null<{
-        first: {
-          x:Float,
-          y:Float,
-          z:Float
-        },
-        second: {
-          x:Float,
-          y:Float,
-          z:Float
-        }
-      }>,
+      witness:Null<{first: {x:Float, y:Float, z:Float}, second: {x:Float, y:Float, z:Float}}>,
       ?axis:materia.tooling.process.OrthogonalSections.SectionAxis,
       allowContact:Bool = false
     ):Void {
@@ -250,10 +230,7 @@ class CastingWallReview {
         };
         row.id = materia.tooling.ToolingIds.derive(
           "aggregate-gap-",
-          haxe.crypto.Sha256.encode(ToolingCodec.canonical(row)).substr(
-            0,
-            24
-          )
+          haxe.crypto.Sha256.encode(ToolingCodec.canonical(row)).substr(0, 24)
         );
         rows.set(row.id, row);
       }
@@ -301,10 +278,7 @@ class CastingWallReview {
             var swept:Part;
             try swept = local.own(SweptRemoval.sweep(
               local.own(new Part(missing.shape.cloneShape())),
-              vector(
-                lower.axis,
-                -2 * delta
-              )
+              vector(lower.axis, -2 * delta)
             )) catch (error:Dynamic) {
               if (Std.string(error).indexOf("Unsupported removal boundary surface") < 0) throw error;
               var owner = ownership(missing), region = bounds(prism);
@@ -397,20 +371,8 @@ class CastingWallReview {
           var contact = local.own(new Model(shared.shape.common(body.shape)));
           if (contact.shape.subshapeCount(CadKit.ShapeKind.Vertex) + contact.shape.subshapeCount(CadKit.ShapeKind.Edge)
             + contact.shape.subshapeCount(CadKit.ShapeKind.Face) > 0) add(
-              {
-                ids: a.ids,
-                featureIds: a.featureIds,
-                assemblyIds: a.assemblyIds,
-                insert: true,
-                tooling: false
-              },
-              {
-                ids: b.ids,
-                featureIds: b.featureIds,
-                assemblyIds: b.assemblyIds,
-                insert: true,
-                tooling: false
-              },
+              {ids: a.ids, featureIds: a.featureIds, assemblyIds: a.assemblyIds, insert: true, tooling: false},
+              {ids: b.ids, featureIds: b.featureIds, assemblyIds: b.assemblyIds, insert: true, tooling: false},
               0,
               bounds(contact),
               "Exact contact between separate steel assemblies inside the casting envelope",
@@ -437,13 +399,7 @@ class CastingWallReview {
         ];
       for (axis in 0...3) if (Math.abs(Math.abs(normal[axis]) - 1) < 1e-9) planeByIndex.set(
         index,
-        {
-          face: face,
-          box: faceBoxes[index],
-          axis: axis,
-          coordinate: coordinate[axis],
-          normal: normal[axis]
-        }
+        {face: face, box: faceBoxes[index], axis: axis, coordinate: coordinate[axis], normal: normal[axis]}
       );
     }
     if (Sys.getEnv("MATERIA_AGGREGATE_PROGRESS") == "1") Sys.println("Aggregate faces: " + faces.length);
@@ -499,18 +455,7 @@ class CastingWallReview {
                   pair.get_distance(),
                   bounds(segment),
                   "Exact closest segment inside resin",
-                  {
-                    first: {
-                      x: start.x,
-                      y: start.y,
-                      z: start.z
-                    },
-                    second: {
-                      x: end.x,
-                      y: end.y,
-                      z: end.z
-                    }
-                  }
+                  {first: {x: start.x, y: start.y, z: start.z}, second: {x: end.x, y: end.y, z: end.z}}
                 );
               }
             }

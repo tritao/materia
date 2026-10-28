@@ -89,14 +89,7 @@ class LinearRail extends MachineComponent {
     for (i in 0...holePositions.length) addConnector(
       'mount${i + 1}',
       Mount,
-      AssemblyFrames.alongY(
-        0,
-        0,
-        holePositions[i],
-        0,
-        1,
-        0
-      )
+      AssemblyFrames.alongY(0, 0, holePositions[i], 0, 1, 0)
     );
     // Datasheet mass per metre, centred on the section's bounding box.
     var kg = spec.railMassKgPerMetre * length / 1000, w = spec.railWidth, h = spec.railHeight;
@@ -150,20 +143,8 @@ class LinearRail extends MachineComponent {
     return Solids.cut(
       body,
       [for (z in holePositions) for (tool in [
-        Part.cylinderAlongY(
-          bore.through / 2,
-          -spec.railHeight - 1,
-          1,
-          0,
-          z
-        ),
-        Part.cylinderAlongY(
-          bore.counterbore / 2,
-          -bore.depth,
-          1,
-          0,
-          z
-        )
+        Part.cylinderAlongY(bore.through / 2, -spec.railHeight - 1, 1, 0, z),
+        Part.cylinderAlongY(bore.counterbore / 2, -bore.depth, 1, 0, z)
       ]) tool]
     );
   }
@@ -201,18 +182,9 @@ class LinearRail extends MachineComponent {
   function section():Part return Part.prism(
     [
       new Vector(-spec.railWidth / 2, -spec.railHeight),
-      new Vector(
-        spec.railWidth / 2,
-        -spec.railHeight
-      ),
-      new Vector(
-        spec.railWidth / 2,
-        0
-      ),
-      new Vector(
-        -spec.railWidth / 2,
-        0
-      ),
+      new Vector(spec.railWidth / 2, -spec.railHeight),
+      new Vector(spec.railWidth / 2, 0),
+      new Vector(-spec.railWidth / 2, 0),
     ],
     0,
     length
@@ -224,29 +196,11 @@ class LinearRail extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.linear-rail",
       [
-        ComponentRecipeSupport.catalog(
-          "profile",
-          LinearRailSystem.catalog(),
-          "MGN12C"
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          100
-        ),
-        ComponentRecipeSupport.choice(
-          "geometry",
-          [
-            NOMINAL,
-            MEASURED
-          ],
-          NOMINAL
-        )
+        ComponentRecipeSupport.catalog("profile", LinearRailSystem.catalog(), "MGN12C"),
+        ComponentRecipeSupport.length("length", 100),
+        ComponentRecipeSupport.choice("geometry", [NOMINAL, MEASURED], NOMINAL)
       ],
-      v -> new LinearRail(
-        LinearRailSystem.catalog().get(v.token("profile")),
-        v.number("length"),
-        v.token("geometry")
-      ),
+      v -> new LinearRail(LinearRailSystem.catalog().get(v.token("profile")), v.number("length"), v.token("geometry")),
       false,
       false,
       ["geometry"]

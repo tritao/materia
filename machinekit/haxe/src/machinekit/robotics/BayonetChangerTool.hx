@@ -79,10 +79,7 @@ class BayonetChangerTool extends MachineComponent {
         name: 'airIn$i',
         kind: Pneumatic,
         role: Consumer,
-        iface: Coupling(
-          'schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}',
-          i
-        ),
+        iface: Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', i),
         required: false
       });
       addPort({name: 'airOut$i', kind: Pneumatic, role: Supply, iface: Thread(row.outsideThread), required: false});
@@ -102,11 +99,7 @@ class BayonetChangerTool extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.bayonet-changer-tool",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        BayonetChangerTool.catalog(),
-        "10.07.13.00018"
-      )],
+      [ComponentRecipeSupport.catalog("designation", BayonetChangerTool.catalog(), "10.07.13.00018")],
       v -> new BayonetChangerTool(v.token("designation")),
       true
     );

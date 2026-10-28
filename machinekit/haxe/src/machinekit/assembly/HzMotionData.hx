@@ -32,36 +32,12 @@ class HzMotionData {
       shoulderZ: 85,
       massKg: 0.79,
       baseHoles: [
-        {
-          x: -25,
-          z: 24,
-          diameter: 7
-        },
-        {
-          x: -23,
-          z: 64,
-          diameter: 6.6
-        },
-        {
-          x: -23,
-          z: 77,
-          diameter: 6.6
-        },
-        {
-          x: 25,
-          z: 24,
-          diameter: 7
-        },
-        {
-          x: 23,
-          z: 64,
-          diameter: 6.6
-        },
-        {
-          x: 23,
-          z: 77,
-          diameter: 6.6
-        }
+        {x: -25, z: 24, diameter: 7},
+        {x: -23, z: 64, diameter: 6.6},
+        {x: -23, z: 77, diameter: 6.6},
+        {x: 25, z: 24, diameter: 7},
+        {x: 23, z: 64, diameter: 6.6},
+        {x: 23, z: 77, diameter: 6.6}
       ],
       bearing: "7001A",
       bearingArrangement: "DF",
@@ -96,26 +72,10 @@ class HzMotionData {
       shoulderZ: 85,
       massKg: 0.84,
       baseHoles: [
-        {
-          x: -26,
-          z: 32,
-          diameter: 9
-        },
-        {
-          x: -26,
-          z: 72,
-          diameter: 9
-        },
-        {
-          x: 26,
-          z: 32,
-          diameter: 9
-        },
-        {
-          x: 26,
-          z: 72,
-          diameter: 9
-        }
+        {x: -26, z: 32, diameter: 9},
+        {x: -26, z: 72, diameter: 9},
+        {x: 26, z: 32, diameter: 9},
+        {x: 26, z: 72, diameter: 9}
       ],
       bearing: "7001A",
       bearingArrangement: "DF",
@@ -150,26 +110,10 @@ class HzMotionData {
       shoulderZ: null,
       massKg: 0.66,
       baseHoles: [
-        {
-          x: -25,
-          z: 24,
-          diameter: 6.6
-        },
-        {
-          x: -25,
-          z: 44,
-          diameter: 6.6
-        },
-        {
-          x: 25,
-          z: 24,
-          diameter: 6.6
-        },
-        {
-          x: 25,
-          z: 44,
-          diameter: 6.6
-        }
+        {x: -25, z: 24, diameter: 6.6},
+        {x: -25, z: 44, diameter: 6.6},
+        {x: 25, z: 24, diameter: 6.6},
+        {x: 25, z: 44, diameter: 6.6}
       ],
       bearing: null,
       bearingArrangement: null,
@@ -204,26 +148,10 @@ class HzMotionData {
       shoulderZ: null,
       massKg: 1.43,
       baseHoles: [
-        {
-          x: -22.5,
-          z: 31,
-          diameter: 5.5
-        },
-        {
-          x: -22.5,
-          z: 49,
-          diameter: 5.5
-        },
-        {
-          x: 22.5,
-          z: 31,
-          diameter: 5.5
-        },
-        {
-          x: 22.5,
-          z: 49,
-          diameter: 5.5
-        }
+        {x: -22.5, z: 31, diameter: 5.5},
+        {x: -22.5, z: 49, diameter: 5.5},
+        {x: 22.5, z: 31, diameter: 5.5},
+        {x: 22.5, z: 49, diameter: 5.5}
       ],
       bearing: "7001A",
       bearingArrangement: "DF",
@@ -291,36 +219,12 @@ class HzMotionData {
       shoulderZ: 109,
       massKg: 1.39,
       baseHoles: [
-        {
-          x: -29,
-          z: 42,
-          diameter: 6.6
-        },
-        {
-          x: -29,
-          z: 87,
-          diameter: 6.6
-        },
-        {
-          x: -29,
-          z: 102,
-          diameter: 6.6
-        },
-        {
-          x: 29,
-          z: 42,
-          diameter: 6.6
-        },
-        {
-          x: 29,
-          z: 87,
-          diameter: 6.6
-        },
-        {
-          x: 29,
-          z: 102,
-          diameter: 6.6
-        }
+        {x: -29, z: 42, diameter: 6.6},
+        {x: -29, z: 87, diameter: 6.6},
+        {x: -29, z: 102, diameter: 6.6},
+        {x: 29, z: 42, diameter: 6.6},
+        {x: 29, z: 87, diameter: 6.6},
+        {x: 29, z: 102, diameter: 6.6}
       ],
       bearing: "7002A",
       bearingArrangement: "DF",
@@ -354,18 +258,7 @@ class HzMotionData {
       shaftBore: 10,
       shoulderZ: null,
       massKg: null,
-      baseHoles: [
-        {
-          x: -23.0,
-          z: 10,
-          diameter: 6.6
-        },
-        {
-          x: 23.0,
-          z: 10,
-          diameter: 6.6
-        }
-      ],
+      baseHoles: [{x: -23.0, z: 10, diameter: 6.6}, {x: 23.0, z: 10, diameter: 6.6}],
       bearing: "6000ZZ",
       bearingArrangement: "single floating",
       maxAxialLoadKgf: null,
@@ -398,18 +291,7 @@ class HzMotionData {
       shaftBore: 15,
       shoulderZ: null,
       massKg: null,
-      baseHoles: [
-        {
-          x: -27.0,
-          z: 10,
-          diameter: 6.6
-        },
-        {
-          x: 27.0,
-          z: 10,
-          diameter: 6.6
-        }
-      ],
+      baseHoles: [{x: -27.0, z: 10, diameter: 6.6}, {x: 27.0, z: 10, diameter: 6.6}],
       bearing: "6002ZZ",
       bearingArrangement: "single floating",
       maxAxialLoadKgf: null,
@@ -475,18 +357,7 @@ class HzMotionData {
       shaftBore: 10,
       shoulderZ: null,
       massKg: null,
-      baseHoles: [
-        {
-          x: -26,
-          z: 10,
-          diameter: 9
-        },
-        {
-          x: 26,
-          z: 10,
-          diameter: 9
-        }
-      ],
+      baseHoles: [{x: -26, z: 10, diameter: 9}, {x: 26, z: 10, diameter: 9}],
       bearing: "6000ZZ",
       bearingArrangement: "single floating",
       maxAxialLoadKgf: null,
@@ -497,951 +368,141 @@ class HzMotionData {
     }
   ];
   public static function coverage():Array<HzMotionCoverage> return [
-    {
-      family: "A",
-      motorInterface: "38A",
-      support: "FKA06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "38A",
-      support: "FKA08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "38A",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "38A",
-      support: "FK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "40B",
-      support: "FKA06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "40B",
-      support: "FKA08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "40B",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "40B",
-      support: "FK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60C",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60C",
-      support: "FK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60C",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60D",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60D",
-      support: "FK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60D",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60D",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60DP",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60DP",
-      support: "FK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60DP",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "60DP",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "80E",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "80E",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "80EP",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "80EP",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "85F",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "A",
-      motorInterface: "85F",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "116S",
-      support: "FK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "130G",
-      support: "FK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "130G",
-      support: "FK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "130G",
-      support: "MBK15DF",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "130G",
-      support: "MBK17DF",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "130G",
-      support: "MBK20DF",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "180H",
-      support: "WBK25DF",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "180H",
-      support: "WBK25DFD",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "180H",
-      support: "WBK30DF",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "B",
-      motorInterface: "180H",
-      support: "WBK30DFD",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "H",
-      motorInterface: "60D",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "H",
-      motorInterface: "60DP",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "H",
-      motorInterface: "80E",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "H",
-      motorInterface: "80EP",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "38A",
-      support: "FKA06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "38A",
-      support: "FKA08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "38A",
-      support: "FKA10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "38A",
-      support: "FKA12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "40B",
-      support: "FKA06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "40B",
-      support: "FKA08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "40B",
-      support: "FKA10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "40B",
-      support: "FKA12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60C",
-      support: "FKA10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60C",
-      support: "FKA12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60C",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60D",
-      support: "FKA10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60D",
-      support: "FKA12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60D",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60D",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60DP",
-      support: "FKA10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60DP",
-      support: "FKA12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60DP",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "60DP",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "80E",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "80E",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "80EP",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "80EP",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "85F",
-      support: "FKA15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "L",
-      motorInterface: "85F",
-      support: "FKA20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60D",
-      support: "BK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60D",
-      support: "EK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60D",
-      support: "BK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60D",
-      support: "EK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60DP",
-      support: "BK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60DP",
-      support: "EK12",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60DP",
-      support: "BK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "60DP",
-      support: "EK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80E",
-      support: "BK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80E",
-      support: "EK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80E",
-      support: "AK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80E",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80EP",
-      support: "BK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80EP",
-      support: "EK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80EP",
-      support: "AK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "80EP",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "90X",
-      support: "BK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "90X",
-      support: "EK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "90X",
-      support: "AK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "90X",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "BK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "BK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "EK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "SBK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "SBK25D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "SBK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100Y",
-      support: "SBK30D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "BK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "BK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "EK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "SBK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "SBK25D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "SBK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "100YP",
-      support: "SBK30D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "BK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "EK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "SBK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "SBK25D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "SBK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "116S",
-      support: "SBK30D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "BK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "EK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "AK20",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "SBK25",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "SBK25D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "SBK30",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "130G",
-      support: "SBK30D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165Y",
-      support: "SBK35D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165Y",
-      support: "SBK40D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165S",
-      support: "SBK35D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165S",
-      support: "SBK40D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165G",
-      support: "SBK35D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165G",
-      support: "SBK40D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165YP",
-      support: "SBK35D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "C",
-      motorInterface: "165YP",
-      support: "SBK40D",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "38A",
-      support: "FK06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "38A",
-      support: "FK08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "38A",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "40B",
-      support: "FK06",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "40B",
-      support: "FK08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "40B",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "60C",
-      support: "FK08",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "60C",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "60DP",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "80E",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "80EP",
-      support: "FK10",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "80EP",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    },
-    {
-      family: "KK",
-      motorInterface: "85F",
-      support: "FK15",
-      sourcePage: 3,
-      status: "coverage-matrix-only"
-    }
+    {family: "A", motorInterface: "38A", support: "FKA06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "38A", support: "FKA08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "38A", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "38A", support: "FK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "40B", support: "FKA06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "40B", support: "FKA08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "40B", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "40B", support: "FK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60C", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60C", support: "FK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60C", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60D", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60D", support: "FK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60D", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60D", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60DP", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60DP", support: "FK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60DP", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "60DP", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "80E", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "80E", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "80EP", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "80EP", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "85F", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "A", motorInterface: "85F", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "116S", support: "FK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "130G", support: "FK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "130G", support: "FK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "130G", support: "MBK15DF", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "130G", support: "MBK17DF", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "130G", support: "MBK20DF", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "180H", support: "WBK25DF", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "180H", support: "WBK25DFD", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "180H", support: "WBK30DF", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "B", motorInterface: "180H", support: "WBK30DFD", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "H", motorInterface: "60D", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "H", motorInterface: "60DP", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "H", motorInterface: "80E", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "H", motorInterface: "80EP", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "38A", support: "FKA06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "38A", support: "FKA08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "38A", support: "FKA10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "38A", support: "FKA12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "40B", support: "FKA06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "40B", support: "FKA08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "40B", support: "FKA10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "40B", support: "FKA12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60C", support: "FKA10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60C", support: "FKA12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60C", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60D", support: "FKA10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60D", support: "FKA12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60D", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60D", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60DP", support: "FKA10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60DP", support: "FKA12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60DP", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "60DP", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "80E", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "80E", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "80EP", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "80EP", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "85F", support: "FKA15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "L", motorInterface: "85F", support: "FKA20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60D", support: "BK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60D", support: "EK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60D", support: "BK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60D", support: "EK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60DP", support: "BK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60DP", support: "EK12", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60DP", support: "BK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "60DP", support: "EK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80E", support: "BK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80E", support: "EK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80E", support: "AK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80E", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80EP", support: "BK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80EP", support: "EK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80EP", support: "AK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "80EP", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "90X", support: "BK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "90X", support: "EK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "90X", support: "AK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "90X", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "BK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "BK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "EK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "SBK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "SBK25D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "SBK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100Y", support: "SBK30D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "BK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "BK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "EK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "SBK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "SBK25D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "SBK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "100YP", support: "SBK30D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "BK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "EK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "SBK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "SBK25D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "SBK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "116S", support: "SBK30D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "BK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "EK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "AK20", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "SBK25", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "SBK25D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "SBK30", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "130G", support: "SBK30D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165Y", support: "SBK35D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165Y", support: "SBK40D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165S", support: "SBK35D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165S", support: "SBK40D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165G", support: "SBK35D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165G", support: "SBK40D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165YP", support: "SBK35D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "C", motorInterface: "165YP", support: "SBK40D", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "38A", support: "FK06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "38A", support: "FK08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "38A", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "40B", support: "FK06", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "40B", support: "FK08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "40B", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "60C", support: "FK08", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "60C", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "60DP", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "80E", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "80EP", support: "FK10", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "80EP", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"},
+    {family: "KK", motorInterface: "85F", support: "FK15", sourcePage: 3, status: "coverage-matrix-only"}
   ];
   public static function discrepancies():Array<String> return [
     "Motor PDF p4 flange F=5 for 60D differs from C drawing F=6; individual model drawing governs",
@@ -1459,21 +520,9 @@ class HzMotionData {
           {x: -25, z: 24, diameter: 7},
           {x: -25, z: 64, diameter: 6.6},
           {x: -25, z: 77, diameter: 6.6},
-          {
-            x: 25,
-            z: 24,
-            diameter: 7
-          },
-          {
-            x: 25,
-            z: 64,
-            diameter: 6.6
-          },
-          {
-            x: 25,
-            z: 77,
-            diameter: 6.6
-          }
+          {x: 25, z: 24, diameter: 7},
+          {x: 25, z: 64, diameter: 6.6},
+          {x: 25, z: 77, diameter: 6.6}
         ];
         p.pilotDepth = 6;
       }
@@ -1484,55 +533,17 @@ class HzMotionData {
     {
       model: "M60D-BK12-C",
       sha256: "aa90581f9b8b5efed4a02cd195d9edd0737f6ddbf130cf0ffbca8f6edb686b48",
-      translation: [
-        0,
-        25,
-        84.5
-      ],
-      rotation: [
-        -1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        -1
-      ],
+      translation: [0, 25, 84.5],
+      rotation: [-1, 0, 0, 0, 1, 0, 0, 0, -1],
       interfaces: {
         width: 65,
         baseHoles: [
-          {
-            x: -25,
-            z: 24,
-            diameter: 7
-          },
-          {
-            x: -23,
-            z: 64,
-            diameter: 6.6
-          },
-          {
-            x: -23,
-            z: 77,
-            diameter: 6.6
-          },
-          {
-            x: 25,
-            z: 24,
-            diameter: 7
-          },
-          {
-            x: 23,
-            z: 64,
-            diameter: 6.6
-          },
-          {
-            x: 23,
-            z: 77,
-            diameter: 6.6
-          }
+          {x: -25, z: 24, diameter: 7},
+          {x: -23, z: 64, diameter: 6.6},
+          {x: -23, z: 77, diameter: 6.6},
+          {x: 25, z: 24, diameter: 7},
+          {x: 23, z: 64, diameter: 6.6},
+          {x: 23, z: 77, diameter: 6.6}
         ],
         boltSeatY: 24,
         bearingCentreZ: 70
@@ -1541,55 +552,17 @@ class HzMotionData {
     {
       model: "M80E-BK15-C",
       sha256: "cc8e49d9861330d5bb01342578dfb880e7020c1aa065aa1c7a7b807168af318b",
-      translation: [
-        0,
-        28,
-        109
-      ],
-      rotation: [
-        -1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        -1
-      ],
+      translation: [0, 28, 109],
+      rotation: [-1, 0, 0, 0, 1, 0, 0, 0, -1],
       interfaces: {
         width: 88,
         baseHoles: [
-          {
-            x: -29,
-            z: 42,
-            diameter: 6.6
-          },
-          {
-            x: 29,
-            z: 42,
-            diameter: 6.6
-          },
-          {
-            x: -27,
-            z: 87,
-            diameter: 6.6
-          },
-          {
-            x: 27,
-            z: 87,
-            diameter: 6.6
-          },
-          {
-            x: -27,
-            z: 102,
-            diameter: 6.6
-          },
-          {
-            x: 27,
-            z: 102,
-            diameter: 6.6
-          }
+          {x: -29, z: 42, diameter: 6.6},
+          {x: 29, z: 42, diameter: 6.6},
+          {x: -27, z: 87, diameter: 6.6},
+          {x: 27, z: 87, diameter: 6.6},
+          {x: -27, z: 102, diameter: 6.6},
+          {x: 27, z: 102, diameter: 6.6}
         ],
         bearingCentreZ: 93,
         boltSeatY: 32
@@ -1598,72 +571,22 @@ class HzMotionData {
     {
       model: "BF12",
       sha256: "85be1102d186b901fa8a8d7f65000777d18a4aa25082c2a0242e658746fcf559",
-      translation: [
-        0,
-        25,
-        20
-      ],
-      rotation: [
-        1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1
-      ],
+      translation: [0, 25, 20],
+      rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1],
       interfaces: {
         width: 60,
-        baseHoles: [
-          {
-            x: -23.0,
-            z: 10,
-            diameter: 6.6
-          },
-          {
-            x: 23.0,
-            z: 10,
-            diameter: 6.6
-          }
-        ],
+        baseHoles: [{x: -23.0, z: 10, diameter: 6.6}, {x: 23.0, z: 10, diameter: 6.6}],
         boltSeatY: 31
       }
     },
     {
       model: "BF15",
       sha256: "4b4c9c572ddf8fd7aa31193754405e96c9768b6582f2295c17ebb80fd81873a1",
-      translation: [
-        0,
-        28,
-        0
-      ],
-      rotation: [
-        1,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1
-      ],
+      translation: [0, 28, 0],
+      rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1],
       interfaces: {
         width: 70,
-        baseHoles: [
-          {
-            x: -27.0,
-            z: 10,
-            diameter: 6.6
-          },
-          {
-            x: 27.0,
-            z: 10,
-            diameter: 6.6
-          }
-        ],
+        baseHoles: [{x: -27.0, z: 10, diameter: 6.6}, {x: 27.0, z: 10, diameter: 6.6}],
         boltSeatY: 32
       }
     }

@@ -219,16 +219,7 @@ class PartTraySeatPad extends MachineComponent {
   function wire(z:Float, x:Float, y:Float):Curve {
     var hx = x * 0.5, hy = y * 0.5;
     return Curve.polyline(
-      [
-        new Vector(-hx, -hy, z),
-        new Vector(hx, -hy, z),
-        new Vector(hx, hy, z),
-        new Vector(
-          -hx,
-          hy,
-          z
-        )
-      ],
+      [new Vector(-hx, -hy, z), new Vector(hx, -hy, z), new Vector(hx, hy, z), new Vector(-hx, hy, z)],
       true
     );
   }

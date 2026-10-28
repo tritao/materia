@@ -20,20 +20,8 @@ class RobotArmPreview {
     var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
     scene.robotTools = RobotScene.robotTools(robot.tool, "tool");
     function onto(pad:String):Array<materia.project.SceneArtifact.SceneArtifactMissionStep> return [
-      {
-        kind: "pick",
-        at: {
-          occurrence: "workpiece",
-          connector: "top"
-        }
-      },
-      {
-        kind: "place",
-        at: {
-          occurrence: pad,
-          connector: "top"
-        }
-      }
+      {kind: "pick", at: {occurrence: "workpiece", connector: "top"}},
+      {kind: "place", at: {occurrence: pad, connector: "top"}}
     ];
     scene.missions = [{loop: true, steps: onto("padPlace").concat(onto("padPick"))}];
     return SceneArtifact.encode(scene);

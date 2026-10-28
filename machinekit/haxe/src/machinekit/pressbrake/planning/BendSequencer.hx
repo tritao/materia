@@ -143,10 +143,7 @@ class BendSequencer {
         new SheetDiagnosis(
           "press.tool-support",
           "No bed-center candidate supports the authored material-bearing seam",
-          [
-            "bend:" + bend.id,
-            station.id
-          ]
+          ["bend:" + bend.id, station.id]
         )
       );
       for (center in centers) for (edge in gauges) {
@@ -182,10 +179,7 @@ class BendSequencer {
             new SheetDiagnosis(
               "press.no-grip-candidate",
               "No supplied wall-grip candidate clears this stroke",
-              [
-                "bend:" + bend.id,
-                station.id
-              ]
+              ["bend:" + bend.id, station.id]
             ),
             orientation,
             edge

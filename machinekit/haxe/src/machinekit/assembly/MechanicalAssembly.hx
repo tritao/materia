@@ -132,11 +132,7 @@ class MechanicalAssembly {
       parentConnector: joint.parentConnector,
       child: map(joint.child),
       childConnector: joint.childConnector,
-      axis: {
-        x: joint.axis.x,
-        y: joint.axis.y,
-        z: joint.axis.z
-      },
+      axis: {x: joint.axis.x, y: joint.axis.y, z: joint.axis.z},
       limits: {
         lower: joint.limits.lower,
         upper: joint.limits.upper,

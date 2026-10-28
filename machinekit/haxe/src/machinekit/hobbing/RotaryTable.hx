@@ -25,10 +25,7 @@ class RotaryTable extends MachineAssembly implements machinekit.motion.Precision
       || this.clamp.parameterNumber("height") > 10) throw "rotary table reference seats do not fit installed parts";
     addComponent(
       "housing",
-      new TableHousing(large ? new ComponentValues().setNumber("outside", 270).setNumber(
-        "bearingSeat",
-        220
-      ).setNumber(
+      new TableHousing(large ? new ComponentValues().setNumber("outside", 270).setNumber("bearingSeat", 220).setNumber(
         "bearingWidth",
         20
       ) : null)
@@ -76,14 +73,8 @@ class RotaryTable extends MachineAssembly implements machinekit.motion.Precision
         effort: this.motor.peakTorque,
         acceleration: 10,
         assumptions: (this.motor.ratingsBasis == Assumed ? [
-          {
-            quantity : "speed limit",
-            label : "assumed direct motor rating"
-          },
-          {
-            quantity : "effort limit",
-            label : "assumed peak motor torque"
-          }
+          {quantity : "speed limit", label : "assumed direct motor rating"},
+          {quantity : "effort limit", label : "assumed peak motor torque"}
         ] : []).concat([{
           quantity : "acceleration limit",
           label : "assumed table positioning limit 10 rad/s²"

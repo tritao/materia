@@ -16,21 +16,10 @@ class FormerManufacturingTests {
       profiles: [],
       regions: [],
       cuts: [],
-      pieces: [{
-        x: 0,
-        y: 0,
-        z: 0,
-        width: width,
-        depth: depth,
-        height: height
-      }]
+      pieces: [{x: 0, y: 0, z: 0, width: width, depth: depth, height: height}]
     },
     featureIds: [],
-    withdrawal: {
-      x: 0,
-      y: 0,
-      z: -1
-    },
+    withdrawal: {x: 0, y: 0, z: -1},
     draftDegrees: 0
   };
 
@@ -93,10 +82,7 @@ class FormerManufacturingTests {
       for (program in programs) {
         var code = cnckit.CncWriter.write(
           program.program,
-          new cnckit.CncController(
-            cnckit.CncDialect.LinuxCnc,
-            program.program.tools
-          )
+          new cnckit.CncController(cnckit.CncDialect.LinuxCnc, program.program.tools)
         );
         check(code.indexOf("G54") >= 0, "former programs export with the declared controller work offset");
         var report = actual.cut(stockkit.CutMoves.fromProgram(program.program));
@@ -169,29 +155,13 @@ class FormerManufacturingTests {
     var neck = box(longId, 90, 100, 90);
     neck.volume.pieces = [
       {x: 10, y: 10, z: 30, width: 90, depth: 100, height: 90},
-      {
-        x: 0,
-        y: 0,
-        z: 0,
-        width: 110,
-        depth: 120,
-        height: 12
-      }
+      {x: 0, y: 0, z: 0, width: 110, depth: 120, height: 12}
     ];
     neck.volume.profiles = [{
       panelId: "test-wall",
       operationId: "neck-opening",
-      contour: materia.tooling.panel.PanelContours.rectangle(
-        10,
-        10,
-        90,
-        100
-      ),
-      pose: F.translation(
-        0,
-        0,
-        12
-      ),
+      contour: materia.tooling.panel.PanelContours.rectangle(10, 10, 90, 100),
+      pose: F.translation(0, 0, 12),
       depth: 18,
       subtract: []
     }];
@@ -225,28 +195,8 @@ class FormerManufacturingTests {
     tapered.volume.pieces = [];
     tapered.volume.regions = [materia.casting.CastingRegion.Drafted(
       "tapered-cam",
-      materia.casting.CastingProfiles.rectangle(
-        0,
-        0,
-        40,
-        30
-      ),
-      F.fromRotationMatrix(
-        0,
-        30,
-        8,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      materia.casting.CastingProfiles.rectangle(0, 0, 40, 30),
+      F.fromRotationMatrix(0, 30, 8, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       8,
       3
     )];
@@ -257,29 +207,8 @@ class FormerManufacturingTests {
     rounded.volume.pieces = [];
     rounded.volume.regions = [materia.casting.CastingRegion.Drafted(
       "rounded-taper-cam",
-      materia.casting.CastingProfiles.roundedRectangle(
-        0,
-        0,
-        40,
-        30,
-        6
-      ),
-      F.fromRotationMatrix(
-        0,
-        30,
-        8,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      ),
+      materia.casting.CastingProfiles.roundedRectangle(0, 0, 40, 30, 6),
+      F.fromRotationMatrix(0, 30, 8, [1, 0, 0, 0, -1, 0, 0, 0, -1]),
       8,
       3
     )];

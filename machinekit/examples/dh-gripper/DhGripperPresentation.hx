@@ -14,18 +14,12 @@ class DhGripperPresentation {
     result.views[0].camera = Frame(focus, -1.1, 0.35, 1.15);
     var detail:Array<PartSelector> = [
       {occurrence: "jaw-left", subtree: false},
-      {
-        occurrence: "finger-left",
-        subtree: false
-      }
+      {occurrence: "finger-left", subtree: false}
     ];
     // Frame service hardware, rather than the workpiece or the routed cable.
     var jawFocus = detail.concat([
       {occurrence: "finger-left-screw-0", subtree: false},
-      {
-        occurrence: "finger-left-screw-1",
-        subtree: false
-      }
+      {occurrence: "finger-left-screw-1", subtree: false}
     ]);
     var detailVisibility = [for (part in definition.occurrences) if (part.id == "blank-60"
       || part.id == "electrical-cable" || part.id == "cable-end-connector"
@@ -41,15 +35,7 @@ class DhGripperPresentation {
       label: "Jaw detail",
       camera: Frame(jawFocus, 2.0, 0.65, 1.5),
       visibility: detailVisibility,
-      sections: [{
-        occurrence: null,
-        point: guide,
-        normal: {
-          x: 0,
-          y: 0,
-          z: -1
-        }
-      }],
+      sections: [{occurrence: null, point: guide, normal: {x: 0, y: 0, z: -1}}],
       explode: 0,
       source: Generated("dh-gripper")
     });
@@ -65,11 +51,7 @@ class DhGripperPresentation {
     for (side in ["left", "right"]) {
       for (index in 0...2) result.explode.push({
         select: {occurrence: 'finger-$side-screw-$index', subtree: false},
-        direction: {
-          x: 0,
-          y: 1,
-          z: 0
-        },
+        direction: {x: 0, y: 1, z: 0},
         distance: 35,
         stage: 1,
         source: Generated("dh-gripper")
@@ -88,10 +70,7 @@ class DhGripperPresentation {
       instruction: "Open the jaws fully before changing the left finger.",
       view: "assembled",
       highlight: detail,
-      action: SetJoints([{
-        joint: DhGripperJaws.MASTER,
-        value: 25
-      }])
+      action: SetJoints([{joint: DhGripperJaws.MASTER, value: 25}])
     }];
     function move(id:String, title:String, instruction:String, distance:Float, install:Bool):Void {
       var select:PartSelector = {occurrence: id, subtree: false};
@@ -102,13 +81,7 @@ class DhGripperPresentation {
         instruction : instruction,
         view : "finger-service",
         highlight : [select],
-        action : install ? Install(
-          select,
-          motion
-        ) : Remove(
-          select,
-          motion
-        )
+        action : install ? Install(select, motion) : Remove(select, motion)
       });
     }
     for (index in 0...2) move(

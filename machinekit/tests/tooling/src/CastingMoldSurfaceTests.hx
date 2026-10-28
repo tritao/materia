@@ -21,11 +21,7 @@ import materia.tooling.panel.PanelContours;
     plan.document.input.inserts = [];
     var neck:CastingRegion = Placed({
       solid: Prism(PanelContours.relievedRectangle(50, 50, 40, 40, 3), 10),
-      pose: F.translation(
-        0,
-        0,
-        30
-      )
+      pose: F.translation(0, 0, 30)
     });
     plan.cores[0].cavity = Union([MoldRegions.box({x: 30, y: 30, z: 10, width: 40, depth: 40, height: 20}), neck]);
     var scope = new cadkit.modeling.Scope();

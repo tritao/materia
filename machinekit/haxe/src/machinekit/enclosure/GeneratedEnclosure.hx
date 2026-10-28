@@ -54,92 +54,35 @@ class GeneratedEnclosure extends MachineAssembly {
     add(
       "hobService",
       new EnclosurePanel(d, h, "compact-laminate-6"),
-      F.fromRotationMatrix(
-        layout.lowX - 20,
-        cy,
-        floor,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      )
+      F.fromRotationMatrix(layout.lowX - 20, cy, floor, [0, -1, 0, 1, 0, 0, 0, 0, 1])
     );
     add(
       "swivelService",
       new EnclosurePanel(d, h, "compact-laminate-6"),
-      F.fromRotationMatrix(
-        layout.highX + 20,
-        cy,
-        floor,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
-      )
+      F.fromRotationMatrix(layout.highX + 20, cy, floor, [0, -1, 0, 1, 0, 0, 0, 0, 1])
     );
     add(
       "rearMistPanel",
       new EnclosureCutPanel(w, h, "compact-laminate-6", 0, 0, 0, h - 120, 100),
-      F.translation(
-        cx,
-        layout.rearY + 20,
-        floor
-      )
+      F.translation(cx, layout.rearY + 20, floor)
     );
     // X width and Z height become machine X/Y; the sheet thickness becomes machine Z.
     add(
       "roof",
       new EnclosurePanel(w, d, "compact-laminate-6"),
-      F.fromRotationMatrix(
-        cx,
-        layout.frontY,
-        layout.roofZ + 20,
-        [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          -1,
-          0
-        ]
-      )
+      F.fromRotationMatrix(cx, layout.frontY, layout.roofZ + 20, [1, 0, 0, 0, 0, 1, 0, -1, 0])
     );
     var left = layout.doorX - layout.doorWidth / 2 - layout.lowX,
       right = layout.highX - layout.doorX - layout.doorWidth / 2;
     add(
       "frontLeft",
       new EnclosurePanel(left, h, "compact-laminate-6"),
-      F.translation(
-        layout.lowX + left / 2,
-        layout.frontY - 20,
-        floor
-      )
+      F.translation(layout.lowX + left / 2, layout.frontY - 20, floor)
     );
     add(
       "frontRight",
       new EnclosurePanel(right, h, "compact-laminate-6"),
-      F.translation(
-        layout.highX - right / 2,
-        layout.frontY - 20,
-        floor
-      )
+      F.translation(layout.highX - right / 2, layout.frontY - 20, floor)
     );
     var b = layout.input.plinth;
     // Separate lifted-out blanks avoid trapping one large sheet around the assembled machine.
@@ -151,17 +94,7 @@ class GeneratedEnclosure extends MachineAssembly {
           (x0 + x1) / 2,
           y0,
           floor + TraySeat.BOTTOM + TraySeat.THICKNESS / 2,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1, 0, 0, 0, 0, 1, 0, -1, 0]
         )
       );
     }
@@ -189,73 +122,20 @@ class GeneratedEnclosure extends MachineAssembly {
       var x = side < 0 ? layout.lowX : layout.highX;
       support(
         side < 0 ? "trayLeftSupport" : "trayRightSupport",
-        [
-          {min : [0.0, 0, -40], max : [6.0, d, -10]},
-          {
-            min : [
-              0.0,
-              0,
-              -10
-            ],
-            max : [
-              25.0,
-              d,
-              -4
-            ]
-          }
-        ],
-        F.fromRotationMatrix(
-          x,
-          side < 0 ? layout.frontY : layout.rearY,
-          floor,
-          [
-            -side,
-            0,
-            0,
-            0,
-            -side,
-            0,
-            0,
-            0,
-            1
-          ]
-        )
+        [{min : [0.0, 0, -40], max : [6.0, d, -10]}, {min : [0.0, 0, -10], max : [25.0, d, -4]}],
+        F.fromRotationMatrix(x, side < 0 ? layout.frontY : layout.rearY, floor, [-side, 0, 0, 0, -side, 0, 0, 0, 1])
       );
     }
     for (side in [-1, 1]) {
       var y = side < 0 ? layout.frontY : layout.rearY;
       support(
         side < 0 ? "trayFrontSupport" : "trayRearSupport",
-        [
-          {min : [0.0, 0, -40], max : [w - 50, 6.0, -10]},
-          {
-            min : [
-              0.0,
-              0,
-              -10
-            ],
-            max : [
-              w - 50,
-              25.0,
-              -4
-            ]
-          }
-        ],
+        [{min : [0.0, 0, -40], max : [w - 50, 6.0, -10]}, {min : [0.0, 0, -10], max : [w - 50, 25.0, -4]}],
         F.fromRotationMatrix(
           side < 0 ? layout.lowX + 25 : layout.highX - 25,
           y,
           floor,
-          [
-            -side,
-            0,
-            0,
-            0,
-            -side,
-            0,
-            0,
-            0,
-            1
-          ]
+          [-side, 0, 0, 0, -side, 0, 0, 0, 1]
         )
       );
     }
@@ -296,68 +176,13 @@ class GeneratedEnclosure extends MachineAssembly {
       "trayRearServiceBridge",
       [
         {min: [-75.0, 0, -10], max: [-55.0, 25, -4]},
-        {
-          min: [55.0, 0, -10],
-          max: [
-            75.0,
-            25,
-            -4
-          ]
-        },
-        {
-          min: [
-            -58.0,
-            0,
-            -4
-          ],
-          max: [
-            -55.0,
-            23,
-            13
-          ]
-        },
-        {
-          min: [
-            55.0,
-            0,
-            -4
-          ],
-          max: [
-            58.0,
-            23,
-            13
-          ]
-        },
-        {
-          min: [
-            -55.0,
-            21,
-            -4
-          ],
-          max: [
-            55.0,
-            23,
-            13
-          ]
-        },
-        {
-          min: [
-            -75.0,
-            0,
-            13
-          ],
-          max: [
-            75.0,
-            30,
-            17
-          ]
-        }
+        {min: [55.0, 0, -10], max: [75.0, 25, -4]},
+        {min: [-58.0, 0, -4], max: [-55.0, 23, 13]},
+        {min: [55.0, 0, -4], max: [58.0, 23, 13]},
+        {min: [-55.0, 21, -4], max: [55.0, 23, 13]},
+        {min: [-75.0, 0, 13], max: [75.0, 30, 17]}
       ],
-      F.translation(
-        bx,
-        b.maxY,
-        floor
-      ),
+      F.translation(bx, b.maxY, floor),
       "steel"
     );
     box("trayBridgeSealLeft", bx - 75, b.maxY, 11, bx - 60, b.maxY + 25, 13, "nitrile rubber NBR");
@@ -385,17 +210,7 @@ class GeneratedEnclosure extends MachineAssembly {
         side < 0 ? layout.lowX : layout.highX,
         cy,
         floor + TraySeat.TOP,
-        [
-          0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
+        [0, -1, 0, 1, 0, 0, 0, 0, 1]
       )
     );
     var pose = F.translation(layout.doorX, layout.frontY - (layout.input.opposedDoors == true ? 80 : 50), floor + 30);

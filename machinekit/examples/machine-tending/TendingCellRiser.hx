@@ -17,13 +17,7 @@ class TendingCellRiser extends MillPanel {
     if (baseFlange == null) throw "Cobot arm has no solved base flange";
     return AssemblyFrames.compose(
       placement,
-      AssemblyFrames.compose(
-        baseFlange,
-        arm.memberConnectorFrame(
-          "baseFlange",
-          "floor"
-        )
-      )
+      AssemblyFrames.compose(baseFlange, arm.memberConnectorFrame("baseFlange", "floor"))
     );
   }
 
@@ -31,9 +25,6 @@ class TendingCellRiser extends MillPanel {
   public static function armSeatFrame(arm:CobotArm,
     riserPose:AssemblyFrame, placement:AssemblyFrame):AssemblyFrame return AssemblyFrames.compose(
       AssemblyFrames.inverse(riserPose),
-      armFloorFrame(
-        arm,
-        placement
-      )
+      armFloorFrame(arm, placement)
     );
 }

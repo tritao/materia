@@ -22,10 +22,7 @@ class LevelingFoot extends AssumedCatalogComponent {
     LevelingFootCodec.encode(Foot(
       100,
       20,
-      machinekit.standard.FastenerThreads.metric(
-        20,
-        2.5
-      ),
+      machinekit.standard.FastenerThreads.metric(20, 2.5),
       20,
       120,
       100,

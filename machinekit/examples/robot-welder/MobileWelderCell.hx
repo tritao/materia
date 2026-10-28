@@ -45,13 +45,7 @@ class MobileWelderCell extends MachineAssembly {
     var tableFrame = solvedPoses().get("table");
     var seat = AssemblyFrames.compose(
       AssemblyFrames.inverse(tableFrame),
-      AssemblyFrames.compose(
-        desired,
-        memberConnectorFrame(
-          "work/basePlate",
-          "base"
-        )
-      )
+      AssemblyFrames.compose(desired, memberConnectorFrame("work/basePlate", "base"))
     );
     addMemberConnector("table", "weldmentSeat", seat);
     addMate("work-mount", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
@@ -59,11 +53,7 @@ class MobileWelderCell extends MachineAssembly {
     addMemberConnector(
       "work/basePlate",
       "clampSeat",
-      Solids.axial(
-        WeldingCell.CLAMP_X,
-        WeldingCell.CLAMP_Y,
-        WeldingWorkpiece.PLATE_THICKNESS
-      )
+      Solids.axial(WeldingCell.CLAMP_X, WeldingCell.CLAMP_Y, WeldingWorkpiece.PLATE_THICKNESS)
     );
     addMate("work-clamp", "fixed", "work/basePlate", "clampSeat", "clamp", "contact");
     connectPorts("work-lead", "robot", "workLead", "clamp", "lead");

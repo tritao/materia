@@ -117,10 +117,7 @@ class TimingPulley extends MachineComponent {
       );
       result.line(landEnd, grooveStart).arc(grooveStart, polar(rf, center), grooveEnd).line(grooveEnd, landStart).arc(
         landStart,
-        polar(
-          ra,
-          center + angleStep / 2
-        ),
+        polar(ra, center + angleStep / 2),
         next
       );
     }
@@ -133,31 +130,10 @@ class TimingPulley extends MachineComponent {
     if (standardRecipeTypeCache == null) standardRecipeTypeCache = new ComponentType(
       "machinekit.transmission.timing-pulley",
       [
-        ComponentRecipeSupport.choice(
-          "profile",
-          [
-            "GT2",
-            "HTD3M",
-            "HTD5M",
-            "HTD8M",
-            "HTD14M",
-            "T5",
-            "XL"
-          ],
-          "GT2"
-        ),
-        ComponentRecipeSupport.count(
-          "teeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          5
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          6
-        )
+        ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
+        ComponentRecipeSupport.count("teeth", 20),
+        ComponentRecipeSupport.length("boreDiameter", 5),
+        ComponentRecipeSupport.length("thickness", 6)
       ],
       v -> new TimingPulley(
         ComponentRecipeSupport.profile(v.token("profile")),
@@ -175,38 +151,15 @@ class TimingPulley extends MachineComponent {
     if (customRecipeTypeCache == null) customRecipeTypeCache = new ComponentType(
       "machinekit.transmission.custom-timing-pulley",
       [
-        ComponentRecipeSupport.choice(
-          "family",
-          ["CUSTOM"],
-          "CUSTOM"
-        ),
-        ComponentRecipeSupport.length(
-          "pitch",
-          2
-        ),
-        ComponentRecipeSupport.length(
-          "pitchLineDifferential",
-          0.254
-        ),
-        ComponentRecipeSupport.count(
-          "teeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "boreDiameter",
-          5
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          6
-        )
+        ComponentRecipeSupport.choice("family", ["CUSTOM"], "CUSTOM"),
+        ComponentRecipeSupport.length("pitch", 2),
+        ComponentRecipeSupport.length("pitchLineDifferential", 0.254),
+        ComponentRecipeSupport.count("teeth", 20),
+        ComponentRecipeSupport.length("boreDiameter", 5),
+        ComponentRecipeSupport.length("thickness", 6)
       ],
       v -> new TimingPulley(
-        Custom(
-          v.token("family"),
-          v.number("pitch"),
-          v.number("pitchLineDifferential")
-        ),
+        Custom(v.token("family"), v.number("pitch"), v.number("pitchLineDifferential")),
         v.integer("teeth"),
         v.number("boreDiameter"),
         v.number("thickness")

@@ -94,10 +94,8 @@ class TendingReachReuseChecks {
       "the real cell repairs its missing route"
     );
     for (retained in changed.transfers) require(
-      haxe.Json.stringify(TendingReachReuse.findRoute(
-        repairedCell,
-        retained.request
-      )) == haxe.Json.stringify(retained.positions),
+      haxe.Json.stringify(TendingReachReuse.findRoute(repairedCell,
+      retained.request)) == haxe.Json.stringify(retained.positions),
       "repair retains every unaffected real-cell route exactly"
     );
     require(changed.transfers.length == count - 1, "real-cell repair leaves its input certificate untouched");

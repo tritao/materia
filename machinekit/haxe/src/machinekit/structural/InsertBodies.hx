@@ -33,24 +33,9 @@ class InsertBodies {
       for (s in [
         [0.0, wide, thin, 0.0],
         [span * 0.25, wide, thin, tail.wave],
-        [
-          span * 0.60,
-          wide * 0.92,
-          thin,
-          -tail.wave
-        ],
-        [
-          span - tail.blend,
-          radius,
-          radius,
-          0.0
-        ],
-        [
-          span + tail.blend,
-          radius,
-          radius,
-          0.0
-        ]
+        [span * 0.60, wide * 0.92, thin, -tail.wave],
+        [span - tail.blend, radius, radius, 0.0],
+        [span + tail.blend, radius, radius, 0.0]
       ]) {
         sections.push(Curve.polyline([for (i in 0...24) {
           var angle = 2 * Math.PI * i / 24;

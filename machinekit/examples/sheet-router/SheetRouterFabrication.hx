@@ -37,12 +37,7 @@ class SheetRouterFabrication {
       for (m in members) {
         if (!groups.exists(m.profile)) groups.set(
           m.profile,
-          {
-            designation: m.profile,
-            description: m.profile,
-            quantity: 0,
-            totalLength: 0.0
-          }
+          {designation: m.profile, description: m.profile, quantity: 0, totalLength: 0.0}
         );
         var g = groups.get(m.profile);
         Reflect.setField(g, "quantity", (cast Reflect.field(g, "quantity"):Int) + 1);
@@ -66,10 +61,7 @@ class SheetRouterFabrication {
         preparations : prep.preparations,
         removedInteriorVolumeMm3 : prep.removedVolumeMm3,
         jigFootDatumsMm : feet,
-        railPadDatumsMm : [
-          machine.zeroPose("railPadYLeft"),
-          machine.zeroPose("railPadYRight")
-        ],
+        railPadDatumsMm : [machine.zeroPose("railPadYLeft"), machine.zeroPose("railPadYRight")],
         source : "Frozen SheetRouter envelopes; continuous stringers, coped/intersection-trimmed pieces"
       };
       File.saveContent(report, haxe.Json.stringify(result, null, "  ") + "\n");

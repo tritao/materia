@@ -68,36 +68,12 @@ class ThermistorInput extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.control.thermistor-input",
       [
-        new ComponentParameter(
-          "pullupOhm",
-          Scalar,
-          Number(4700),
-          "ohm",
-          0
-        ),
-        new ComponentParameter(
-          "referenceVolts",
-          Scalar,
-          Number(3.3),
-          "V",
-          0
-        ),
-        ComponentRecipeSupport.count(
-          "channels",
-          2
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          30
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          4
-        )
+        new ComponentParameter("pullupOhm", Scalar, Number(4700), "ohm", 0),
+        new ComponentParameter("referenceVolts", Scalar, Number(3.3), "V", 0),
+        ComponentRecipeSupport.count("channels", 2),
+        ComponentRecipeSupport.length("width", 30),
+        ComponentRecipeSupport.length("depth", 20),
+        ComponentRecipeSupport.length("height", 4)
       ],
       v -> new ThermistorInput(
         v.number("pullupOhm"),
@@ -139,13 +115,7 @@ class ThermistorInput extends MachineComponent {
       width,
       depth,
       height,
-      {
-        vents : true,
-        terminals : Std.int(Math.min(
-          16,
-          2 * channels
-        ))
-      }
+      {vents : true, terminals : Std.int(Math.min(16, 2 * channels))}
     );
   override public function massGeometry():Null<Part> return envelope();
   function envelope():Part return Solids.named(Part.box(width, depth, height), "thermistor-front-end");

@@ -61,16 +61,8 @@ class BendPrismProfile {
         var polygon = clean([
           zone.point(first, 0, innerDepth),
           zone.point(last, 0, innerDepth),
-          zone.point(
-            last,
-            0,
-            outerDepth
-          ),
-          zone.point(
-            first,
-            0,
-            outerDepth
-          )
+          zone.point(last, 0, outerDepth),
+          zone.point(first, 0, outerDepth)
         ]);
         result.push(new ConvexPrism(id + ":sector:" + i, polygon, zone.frame.direction(new Vector(0, zone.width, 0))));
         error = Math.max(error, radius * delta * delta / 8);
@@ -80,10 +72,7 @@ class BendPrismProfile {
           new Point2(left, 0),
           new Point2(right, 0),
           new Point2(right, zone.width),
-          new Point2(
-            left,
-            zone.width
-          )
+          new Point2(left, zone.width)
         ]);
         var scale = Math.max(1, radius * Math.abs(zone.angle) / zone.allowance);
         for (region in regions) for (part in clipped(region, clip, id, i, left, right)) {
@@ -120,10 +109,7 @@ class BendPrismProfile {
       throw new SheetDiagnosis(
         failure.code,
         "Developed bend strip " + sector + " [" + left + ", " + right + "]: " + failure.message,
-        [
-          id,
-          "sector:" + sector
-        ]
+        [id, "sector:" + sector]
       );
     }
   }

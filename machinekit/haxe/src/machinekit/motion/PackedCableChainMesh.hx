@@ -54,14 +54,7 @@ class PackedCableChainMesh {
       indices = Bytes.alloc(indexCount * 4);
       for (q in 0...Std.int(vertexCount / 4)) for (k in 0...6) indices.setInt32(
         (q * 6 + k) * 4,
-        q * 4 + ([
-          0,
-          1,
-          2,
-          0,
-          2,
-          3
-        ][k])
+        q * 4 + ([0, 1, 2, 0, 2, 3][k])
       );
     }
   }

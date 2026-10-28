@@ -33,36 +33,12 @@ class SheetRouterServiceChecks {
         points: [
           [port.x, y, table.z],
           [port.x, y, crossZ],
-          [
-            inner,
-            y,
-            crossZ
-          ],
-          [
-            inner,
-            valve.y,
-            crossZ
-          ],
-          [
-            outside,
-            valve.y,
-            crossZ
-          ],
-          [
-            outside,
-            valve.y,
-            650
-          ],
-          [
-            valve.x,
-            valve.y,
-            650
-          ],
-          [
-            valve.x,
-            valve.y,
-            valve.z + 120
-          ]
+          [inner, y, crossZ],
+          [inner, valve.y, crossZ],
+          [outside, valve.y, crossZ],
+          [outside, valve.y, 650],
+          [valve.x, valve.y, 650],
+          [valve.x, valve.y, valve.z + 120]
         ]
       });
       var header = i % 2 == 0 ? "leftVacuumHeader" : "vacuumHeader", out = i % 2 == 0 ? row + 1 : 4 - row;
@@ -74,16 +50,8 @@ class SheetRouterServiceChecks {
           [h.x, h.y, h.z],
           [h.x, h.y, 300],
           [h.x, valve.y, 300],
-          [
-            valve.x,
-            valve.y,
-            300
-          ],
-          [
-            valve.x,
-            valve.y,
-            valve.z
-          ]
+          [valve.x, valve.y, 300],
+          [valve.x, valve.y, valve.z]
         ]
       });
     }
@@ -99,36 +67,12 @@ class SheetRouterServiceChecks {
         [h.x, h.y, h.z],
         [h.x, h.y, 450],
         [right + 800, h.y, 450],
-        [
-          right + 800,
-          back + 180,
-          450
-        ],
-        [
-          left - 850,
-          back + 180,
-          450
-        ],
-        [
-          left - 850,
-          l.y,
-          450
-        ],
-        [
-          left - 125,
-          l.y,
-          450
-        ],
-        [
-          left - 125,
-          l.y,
-          l.z
-        ],
-        [
-          l.x,
-          l.y,
-          l.z
-        ]
+        [right + 800, back + 180, 450],
+        [left - 850, back + 180, 450],
+        [left - 850, l.y, 450],
+        [left - 125, l.y, 450],
+        [left - 125, l.y, l.z],
+        [l.x, l.y, l.z]
       ]
     });
     var pump = F.compose(machine.zeroPose("vacuumBlower"), machine.component("vacuumBlower").connector("vacuum").frame);
@@ -139,26 +83,10 @@ class SheetRouterServiceChecks {
       points: [
         [pump.x, pump.y, pump.z],
         [pump.x, pump.y, 650],
-        [
-          right + 1000,
-          pump.y,
-          650
-        ],
-        [
-          right + 1000,
-          inlet.y,
-          650
-        ],
-        [
-          right + 1000,
-          inlet.y,
-          inlet.z
-        ],
-        [
-          inlet.x,
-          inlet.y,
-          inlet.z
-        ]
+        [right + 1000, pump.y, 650],
+        [right + 1000, inlet.y, 650],
+        [right + 1000, inlet.y, inlet.z],
+        [inlet.x, inlet.y, inlet.z]
       ]
     });
     return result;

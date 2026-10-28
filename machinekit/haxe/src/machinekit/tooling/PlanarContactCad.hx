@@ -74,17 +74,11 @@ class PlanarContactCad {
       return missing.subshapeCount(CadKit.ShapeKind.Face) > 0 ? finish(
         ToolingCheckStatus.Fail,
         "Support leaves required contact area uncovered: " + uncovered + " mm2.",
-        Evaluated(
-          area,
-          uncovered
-        )
+        Evaluated(area, uncovered)
       ) : finish(
         ToolingCheckStatus.Pass,
         "Exact planar booleans cover the source boundary, including its holes; physical qualification is separate.",
-        Evaluated(
-          area,
-          0
-        )
+        Evaluated(area, 0)
       );
     } catch (error:Dynamic) {
       for (shape in shapes) shape.close();

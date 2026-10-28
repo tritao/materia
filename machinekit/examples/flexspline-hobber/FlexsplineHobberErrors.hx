@@ -30,16 +30,10 @@ class FlexsplineHobberErrors {
       "mandrel", machine.mandrel.eccentricity), HobbingErrorSource.workEccentricity(
         "table-radial",
         tablePart,
-        Math.max(
-          0,
-          table.number("radialRunout") / 2 - table.number("radialNrro")
-        )
+        Math.max(0, table.number("radialRunout") / 2 - table.number("radialNrro"))
       ), HobbingErrorSource.tableAxial(
         tablePart,
-        Math.max(
-          0,
-          table.number("axialRunout") - 2 * table.number("axialNrro")
-        )
+        Math.max(0, table.number("axialRunout") - 2 * table.number("axialNrro"))
       ), HobbingErrorSource.tableTilt(
         tablePart,
         table.number("momentStiffness"),
@@ -83,10 +77,7 @@ class FlexsplineHobberErrors {
         tablePart,
         field + "="
         + table.number(field) + " " + table.basis(field) + "; " + table.reason(field) + "; assumed order " + order,
-        (
-          t,
-          a
-        ) -> new stockkit.hobbing.HobbingAxes(
+        (t, a) -> new stockkit.hobbing.HobbingAxes(
           a.x,
           a.y,
           a.z,
@@ -112,10 +103,7 @@ class FlexsplineHobberErrors {
       "Assumed closed-loop compliance: mean drag "
       + table.number("sealDrag") + " N m + twice-turn ripple " + table.number("sealDragRipple")
       + " N m, divided by " + table.number("servoTorsionalStiffness") + " N m/rad; " + table.reason("sealDrag"),
-      (
-        t,
-        a
-      ) -> new stockkit.hobbing.HobbingAxes(
+      (t, a) -> new stockkit.hobbing.HobbingAxes(
         a.x,
         a.y,
         a.z,
@@ -190,12 +178,7 @@ class FlexsplineHobberErrors {
       machine.hob.design,
       at,
       passes,
-      sources(
-        machine,
-        radialForce,
-        wall,
-        sync
-      ),
+      sources(machine, radialForce, wall, sync),
       wall.wall,
       radialStep,
       axialStep,

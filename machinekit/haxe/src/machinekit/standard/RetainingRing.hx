@@ -32,69 +32,15 @@ class RetainingRing extends MachineComponent {
   public var thickness(get, never):Float;
 
   static function rows():Array<RetainingRingSpec> return [
-    {
-      shaftDiameter: 5,
-      grooveDiameter: 4.8,
-      outerDiameter: 8.7,
-      grooveWidth: 0.7,
-      thickness: 0.6
-    },
-    {
-      shaftDiameter: 6,
-      grooveDiameter: 5.7,
-      outerDiameter: 10.0,
-      grooveWidth: 0.8,
-      thickness: 0.7
-    },
-    {
-      shaftDiameter: 8,
-      grooveDiameter: 7.6,
-      outerDiameter: 12.2,
-      grooveWidth: 0.9,
-      thickness: 0.8
-    },
-    {
-      shaftDiameter: 10,
-      grooveDiameter: 9.6,
-      outerDiameter: 15.0,
-      grooveWidth: 1.1,
-      thickness: 1.0
-    },
-    {
-      shaftDiameter: 12,
-      grooveDiameter: 11.5,
-      outerDiameter: 18.0,
-      grooveWidth: 1.1,
-      thickness: 1.0
-    },
-    {
-      shaftDiameter: 15,
-      grooveDiameter: 14.3,
-      outerDiameter: 21.0,
-      grooveWidth: 1.1,
-      thickness: 1.0
-    },
-    {
-      shaftDiameter: 17,
-      grooveDiameter: 16.2,
-      outerDiameter: 24.0,
-      grooveWidth: 1.1,
-      thickness: 1.0
-    },
-    {
-      shaftDiameter: 20,
-      grooveDiameter: 19.0,
-      outerDiameter: 27.0,
-      grooveWidth: 1.3,
-      thickness: 1.2
-    },
-    {
-      shaftDiameter: 25,
-      grooveDiameter: 23.9,
-      outerDiameter: 34.0,
-      grooveWidth: 1.3,
-      thickness: 1.2
-    },
+    {shaftDiameter: 5, grooveDiameter: 4.8, outerDiameter: 8.7, grooveWidth: 0.7, thickness: 0.6},
+    {shaftDiameter: 6, grooveDiameter: 5.7, outerDiameter: 10.0, grooveWidth: 0.8, thickness: 0.7},
+    {shaftDiameter: 8, grooveDiameter: 7.6, outerDiameter: 12.2, grooveWidth: 0.9, thickness: 0.8},
+    {shaftDiameter: 10, grooveDiameter: 9.6, outerDiameter: 15.0, grooveWidth: 1.1, thickness: 1.0},
+    {shaftDiameter: 12, grooveDiameter: 11.5, outerDiameter: 18.0, grooveWidth: 1.1, thickness: 1.0},
+    {shaftDiameter: 15, grooveDiameter: 14.3, outerDiameter: 21.0, grooveWidth: 1.1, thickness: 1.0},
+    {shaftDiameter: 17, grooveDiameter: 16.2, outerDiameter: 24.0, grooveWidth: 1.1, thickness: 1.0},
+    {shaftDiameter: 20, grooveDiameter: 19.0, outerDiameter: 27.0, grooveWidth: 1.3, thickness: 1.2},
+    {shaftDiameter: 25, grooveDiameter: 23.9, outerDiameter: 34.0, grooveWidth: 1.3, thickness: 1.2},
   ];
 
   public static function catalog():Catalog<RetainingRingSpec> {
@@ -162,11 +108,7 @@ class RetainingRing extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.retaining-ring",
-      [ComponentRecipeSupport.catalog(
-        "shaft",
-        RetainingRing.catalog(),
-        "8"
-      )],
+      [ComponentRecipeSupport.catalog("shaft", RetainingRing.catalog(), "8")],
       v -> RetainingRing.forShaft(Std.parseFloat(v.token("shaft"))),
       true
     );

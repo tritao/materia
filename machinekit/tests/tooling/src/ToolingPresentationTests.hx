@@ -9,28 +9,10 @@ class ToolingPresentationTests {
     var definition:AssemblyDefinition = {
       schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION,
       id: "rotated-review",
-      definitions: [{
-        id: "part",
-        connectors: [{
-          name: "seat",
-          frame: F.identity()
-        }]
-      }],
+      definitions: [{id: "part", connectors: [{name: "seat", frame: F.identity()}]}],
       occurrences: [
-        {
-          id: "base",
-          definition: "part",
-          initialPose: rotation
-        },
-        {
-          id: "cover",
-          definition: "part",
-          initialPose: F.translation(
-            30,
-            0,
-            0
-          )
-        }
+        {id: "base", definition: "part", initialPose: rotation},
+        {id: "cover", definition: "part", initialPose: F.translation(30, 0, 0)}
       ],
       joints: [{
         id: "fixed",
@@ -40,18 +22,9 @@ class ToolingPresentationTests {
         parentConnector: "seat",
         child: "cover",
         childConnector: "seat",
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        axis: {x: 0, y: 0, z: 1},
         defaultValue: 0,
-        limits: {
-          lower: null,
-          upper: null,
-          velocity: null,
-          effort: null
-        }
+        limits: {lower: null, upper: null, velocity: null, effort: null}
       }]
     };
     var offsets = new Map<String, materia.assembly.AssemblyDefinition.AssemblyVector>();
@@ -69,27 +42,11 @@ class ToolingPresentationTests {
       id: "nested-review",
       definitions: [],
       joints: [],
-      occurrences: [{
-        id: "unit",
-        definition: "sub",
-        assembly: "sub",
-        initialPose: rotation
-      }],
+      occurrences: [{id: "unit", definition: "sub", assembly: "sub", initialPose: rotation}],
       assemblies: [{
         id: "sub",
-        definitions: [{
-          id: "part",
-          connectors: []
-        }],
-        occurrences: [{
-          id: "cover",
-          definition: "part",
-          initialPose: F.translation(
-            30,
-            0,
-            0
-          )
-        }],
+        definitions: [{id: "part", connectors: []}],
+        occurrences: [{id: "cover", definition: "part", initialPose: F.translation(30, 0, 0)}],
         joints: []
       }]
     };

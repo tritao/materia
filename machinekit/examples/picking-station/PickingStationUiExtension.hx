@@ -46,29 +46,14 @@ class PickingStationUiExtension {
     var state = scenario.state();
     var rows:Array<Dynamic> = [
       {key: "status", text: "Status: " + Std.string(state.status)},
-      {
-        key: "sku",
-        text: state.currentSku == null ? "No active pick" : 'SKU: ${state.currentSku}'
-      },
-      {
-        key : "quantity",
-        text : state.currentSku == null ? "" : 'Pick quantity: ${state.requestedQuantity}'
-      },
-      {
-        key : "source",
-        text : state.sourcePositionId == null ? "" : 'Source: ${state.sourcePositionId}'
-      },
+      {key: "sku", text: state.currentSku == null ? "No active pick" : 'SKU: ${state.currentSku}'},
+      {key : "quantity", text : state.currentSku == null ? "" : 'Pick quantity: ${state.requestedQuantity}'},
+      {key : "source", text : state.sourcePositionId == null ? "" : 'Source: ${state.sourcePositionId}'},
       {
         key : "progress",
         text : 'Progress: ${state.completedLines}/${state.totalLines} lines · ${scenario.totalPickedQuantity()} units'
       },
-      {
-        key : "feedback",
-        text : shortFeedback(
-          state.status,
-          state.feedback
-        )
-      },
+      {key : "feedback", text : shortFeedback(state.status, state.feedback)},
       {
         key : "selected",
         text : state.selectedPositionId
@@ -104,21 +89,9 @@ class PickingStationUiExtension {
         rows: rows,
         actionAfter: 6,
         actions: [
-          {
-            id: "start-order",
-            label: "Start order",
-            enabled: state.status == Idle
-          },
-          {
-            id: "confirm-pick",
-            label: "Confirm pick",
-            enabled: state.status == Running
-          },
-          {
-            id: "reset-fixture",
-            label: "Reset fixture",
-            enabled: true
-          }
+          {id: "start-order", label: "Start order", enabled: state.status == Idle},
+          {id: "confirm-pick", label: "Confirm pick", enabled: state.status == Running},
+          {id: "reset-fixture", label: "Reset fixture", enabled: true}
         ]
       },
       colours: colours,

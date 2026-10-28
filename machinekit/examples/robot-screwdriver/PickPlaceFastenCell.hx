@@ -48,29 +48,13 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
       12,
       6,
       null,
-      new ParallelGripperSpec(
-        32,
-        work.plate.width,
-        60,
-        16,
-        false,
-        12,
-        6
-      )
+      new ParallelGripperSpec(32, work.plate.width, 60, 16, false, 12, 6)
     );
     handling = new RobotArm(false, gripper);
     include(
       "handling",
       handling,
-      {
-        x: -550,
-        y: -450,
-        z: 0,
-        qx: 0,
-        qy: 0,
-        qz: Math.sin(Math.PI / 4),
-        qw: Math.cos(Math.PI / 4)
-      }
+      {x: -550, y: -450, z: 0, qx: 0, qy: 0, qz: Math.sin(Math.PI / 4), qw: Math.cos(Math.PI / 4)}
     );
     // Keep a 25 mm gap from the fastening table while supporting all three tray footprints.
     addComponent("handlingTable",
@@ -112,11 +96,7 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
     addComponent(
       "fixture-present",
       new DigitalSensor("presence"),
-      AssemblyFrames.translation(
-        fixtureHeadX,
-        -500 - work.plate.width / 2 - 9,
-        RobotArm.TABLE_TOP
-      )
+      AssemblyFrames.translation(fixtureHeadX, -500 - work.plate.width / 2 - 9, RobotArm.TABLE_TOP)
     );
     addPresence("fixture-present", "table/plateSeat", work.plate.thickness + 5);
     connectPorts("fixture-presence-input", "fixture-present", "signal", HANDLING_CONTROLLER, "input5");
@@ -141,10 +121,7 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
     var seat = connector(tray + "/slot-0-0");
     var frame = AssemblyFrames.compose(
       solvedPoses().get(seat.instanceId),
-      memberConnectorFrame(
-        seat.instanceId,
-        seat.connectorName
-      )
+      memberConnectorFrame(seat.instanceId, seat.connectorName)
     );
     // Keep the physical head outside the finger sweep; the sensed volume stays on the pocket datum.
     addComponent(
@@ -172,19 +149,11 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
       joints,
       limits,
       {x: -450, y: -850, z: 500},
-      {
-        x: 0,
-        y: 0,
-        z: -1
-      },
+      {x: 0, y: 0, z: -1},
       [for (spec in handling.specs) spec.initial],
       "handling/tool/gripperA/body",
       "tcp",
-      {
-        x: -1,
-        y: 0,
-        z: 0
-      }
+      {x: -1, y: 0, z: 0}
     );
     if (park == null) throw "Handling arm has no reachable park clear of the fastening fixture";
     handlingPark = park;

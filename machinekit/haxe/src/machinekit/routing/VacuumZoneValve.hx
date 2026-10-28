@@ -11,20 +11,9 @@ class VacuumZoneValve extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("bore", 50),
     P.length("length", 120),
-    P.length(
-      "diameter",
-      90
-    ),
-    P.quantity(
-      "ratedVacuum",
-      40000,
-      "Pa"
-    ),
-    P.quantity(
-      "flow",
-      300,
-      "m3/h"
-    )
+    P.length("diameter", 90),
+    P.quantity("ratedVacuum", 40000, "Pa"),
+    P.quantity("flow", 300, "m3/h")
   ];
   public function new(?v:ComponentValues) {
     super("vacuum-zone-valve", "vacuum zone isolation valve", "aluminium 6061", inputs(), v);
@@ -55,26 +44,11 @@ class VacuumZoneValve extends AssumedCatalogComponent {
         {r: n("bore") / 2, z: 0.0},
         {r: r, z: 0.0},
         {r: r, z: flange},
-        {
-          r: 0.72 * r,
-          z: flange
-        },
-        {
-          r: 0.72 * r,
-          z: l - flange
-        },
-        {
-          r: r,
-          z: l - flange
-        },
-        {
-          r: r,
-          z: l
-        },
-        {
-          r: n("bore") / 2,
-          z: l
-        }
+        {r: 0.72 * r, z: flange},
+        {r: 0.72 * r, z: l - flange},
+        {r: r, z: l - flange},
+        {r: r, z: l},
+        {r: n("bore") / 2, z: l}
       ]),
       "valve-body"
     );
@@ -98,14 +72,7 @@ class VacuumZoneValve extends AssumedCatalogComponent {
 
   function envelope():Part return Solids.cut(
     Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "valve-body"),
-    [Solids.named(
-      Part.cylinderSpan(
-        n("bore") / 2,
-        -1,
-        n("length") + 1
-      ),
-      "flow-bore"
-    )]
+    [Solids.named(Part.cylinderSpan(n("bore") / 2, -1, n("length") + 1), "flow-bore")]
   );
   override public function io():MachineIo return {inputs: [], outputs: ["open"], analogOutputs: []};
 }

@@ -25,30 +25,9 @@ class SpindleCartridge extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.union([
-    Solids.named(
-      Part.cylinderSpan(
-        Er20Holder.DIAMETER / 2,
-        Er20Holder.LENGTH,
-        30
-      ),
-      "nose"
-    ),
-    Solids.named(
-      Part.cylinderSpan(
-        DIAMETER / 2,
-        30,
-        LENGTH
-      ),
-      "body"
-    ),
-    Solids.named(
-      Part.cylinderSpan(
-        10,
-        LENGTH,
-        LENGTH + 30
-      ),
-      "drive-shaft"
-    )
+    Solids.named(Part.cylinderSpan(Er20Holder.DIAMETER / 2, Er20Holder.LENGTH, 30), "nose"),
+    Solids.named(Part.cylinderSpan(DIAMETER / 2, 30, LENGTH), "body"),
+    Solids.named(Part.cylinderSpan(10, LENGTH, LENGTH + 30), "drive-shaft")
   ]);
 
   static var spindleRecipe:Null<ComponentType>;
@@ -87,18 +66,9 @@ class Er20Holder extends MachineComponent {
         {r: r - 1, z: 0.0},
         {r: r, z: 1.0},
         {r: r, z: nut},
-        {
-          r: 0.85 * r,
-          z: nut + 1
-        },
-        {
-          r: 0.85 * r,
-          z: LENGTH
-        },
-        {
-          r: bore,
-          z: LENGTH
-        }
+        {r: 0.85 * r, z: nut + 1},
+        {r: 0.85 * r, z: LENGTH},
+        {r: bore, z: LENGTH}
       ]),
       "collet-nut"
     );
@@ -115,16 +85,8 @@ class Er20Holder extends MachineComponent {
         cadkit.modeling.Align.Min
       );
       var notch = raw.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(
-        new cadkit.modeling.Vector(
-          -Math.sin(angle) * depth,
-          Math.cos(angle) * depth,
-          -0.1
-        ),
-        new cadkit.modeling.Vector(
-          Math.cos(angle),
-          Math.sin(angle),
-          0
-        ),
+        new cadkit.modeling.Vector(-Math.sin(angle) * depth, Math.cos(angle) * depth, -0.1),
+        new cadkit.modeling.Vector(Math.cos(angle), Math.sin(angle), 0),
         cadkit.modeling.Vector.Z()
       )));
       raw.close();
@@ -139,14 +101,7 @@ class Er20Holder extends MachineComponent {
 
   function envelope():Part return Solids.cut(
     Solids.named(Part.cylinderSpan(DIAMETER / 2, 0, LENGTH), "collet-nut"),
-    [Solids.named(
-      Part.cylinderSpan(
-        BORE_DIAMETER / 2,
-        -0.1,
-        LENGTH + 0.1
-      ),
-      "tool-bore"
-    )]
+    [Solids.named(Part.cylinderSpan(BORE_DIAMETER / 2, -0.1, LENGTH + 0.1), "tool-bore")]
   );
   static var holderRecipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

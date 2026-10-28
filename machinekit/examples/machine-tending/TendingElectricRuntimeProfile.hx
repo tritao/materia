@@ -94,15 +94,9 @@ class TendingElectricRuntimeProfile {
       seating: row.activeStockOwner == "tool" ? row.guardLimits.afterRelease : null,
       locating : locating,
       placing : placing,
-      registration : Reflect.hasField(
-        row.guardLimits,
-        "beforePickup"
-      ) ? row.guardLimits.beforePickup : null,
+      registration : Reflect.hasField(row.guardLimits, "beforePickup") ? row.guardLimits.beforePickup : null,
       clamping : row.station == "vise-load" ? row.guardLimits.afterClamp : null,
-      doorPolicy : StringTools.startsWith(
-        Std.string(row.station),
-        "vise-"
-      ) ? "confirmed open" : "confirmed closed",
+      doorPolicy : StringTools.startsWith(Std.string(row.station), "vise-") ? "confirmed open" : "confirmed closed",
       park : transfer[0].copy(),
       simulationOnly : true,
       ordinaryMissionCompatible : false,

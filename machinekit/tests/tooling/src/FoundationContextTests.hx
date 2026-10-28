@@ -46,11 +46,7 @@ class FoundationContextTests {
     rigidRestraints: [],
     blankMarginMm: 12,
     blankKerfMm: 3.2,
-    couponClearancesMm: [
-      0.1,
-      0.2,
-      0.3
-    ]
+    couponClearancesMm: [0.1, 0.2, 0.3]
   };
 
 
@@ -90,10 +86,7 @@ class FoundationContextTests {
     }
     ];
     var foundation = new MineralFoundation(
-      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber(
-        "height",
-        60
-      ),
+      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 60),
       placements
     );
     var assembly = new MachineAssembly();
@@ -110,29 +103,13 @@ class FoundationContextTests {
       "mount",
       "axisWitness",
       "mount",
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      {x: 0, y: 1, z: 0}
     );
     var relationship:InterfaceRelationship = {
       id: "seat-pair",
       kind: Parallel,
-      members: [
-        ComponentInterface(
-          "base/left",
-          "seat-plane"
-        ),
-        ComponentInterface(
-          "base/right",
-          "seat-plane"
-        )
-      ],
-      tolerance: PerLength(
-        0.005,
-        300
-      ),
+      members: [ComponentInterface("base/left", "seat-plane"), ComponentInterface("base/right", "seat-plane")],
+      tolerance: PerLength(0.005, 300),
       metrology: {
         method: IndicatorReversal,
         instrumentReference: materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),
@@ -147,17 +124,8 @@ class FoundationContextTests {
         {
           id: "seat-axis-" + side,
           kind: Perpendicular,
-          members: [
-            ComponentInterface(
-              "base/" + side,
-              "seat-plane"
-            ),
-            MachineAxis("C")
-          ],
-          tolerance: PerLength(
-            0.005,
-            300
-          ),
+          members: [ComponentInterface("base/" + side, "seat-plane"), MachineAxis("C")],
+          tolerance: PerLength(0.005, 300),
           metrology: {
             method: AxisMasterIndicator,
             instrumentReference: materia.casting.CastingInput.CastingTextInput.Known("synthetic-instrument"),
@@ -183,11 +151,7 @@ class FoundationContextTests {
         foundation,
         "context-fixture",
         1,
-        FoundationAssemblyContext.snapshot(
-          assembly,
-          "base/casting",
-          bindings
-        )
+        FoundationAssemblyContext.snapshot(assembly, "base/casting", bindings)
       )) == ToolingCodec.inputFingerprint(input),
       "binding order does not change the context fingerprint"
     );
@@ -245,16 +209,7 @@ class FoundationContextTests {
     var nestedContext = FoundationAssemblyContext.snapshot(
       nested,
       "station/base/casting",
-      [
-        {
-          id: "left",
-          member: "station/base/left"
-        },
-        {
-          id: "right",
-          member: "station/base/right"
-        }
-      ]
+      [{id: "left", member: "station/base/left"}, {id: "right", member: "station/base/right"}]
     );
     var nestedInput = FoundationToolingAdapter.snapshot(foundation, "context-fixture", 1, nestedContext);
     check(
@@ -273,13 +228,7 @@ class FoundationContextTests {
     var wrong = FoundationAssemblyContext.snapshot(
       assembly,
       "base/casting",
-      [
-        {id: "left", member: "axisWitness"},
-        {
-          id: "right",
-          member: "base/right"
-        }
-      ]
+      [{id: "left", member: "axisWitness"}, {id: "right", member: "base/right"}]
     );
     rejects(
       () -> FoundationToolingAdapter.snapshot(foundation, "context-fixture", 1, wrong),

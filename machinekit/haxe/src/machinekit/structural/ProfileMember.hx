@@ -39,26 +39,10 @@ class ProfileMember extends MachineComponent {
   /** Shared modular T-slot members, optionally carrying a complete measured section variant. */
   public static function tslotRecipeType():ComponentType {
     if (tslotRecipe == null) tslotRecipe = new ProfileMemberRecipeType("machinekit.structural.tslot-member", [
-      ComponentRecipeSupport.choice(
-        "system",
-        [
-          "TSLOT-30-SLOT8",
-          "TSLOT-40-SLOT8"
-        ],
-        "TSLOT-40-SLOT8"
-      ),
-      ComponentRecipeSupport.length(
-        "width",
-        40
-      ),
-      ComponentRecipeSupport.length(
-        "height",
-        40
-      ),
-      ComponentRecipeSupport.length(
-        "length",
-        100
-      ),
+      ComponentRecipeSupport.choice("system", ["TSLOT-30-SLOT8", "TSLOT-40-SLOT8"], "TSLOT-40-SLOT8"),
+      ComponentRecipeSupport.length("width", 40),
+      ComponentRecipeSupport.length("height", 40),
+      ComponentRecipeSupport.length("length", 100),
       ComponentRecipeSupport.optionalText("section")
     ], v -> {var section = v.optionalToken("section");
     return new ProfileMember(
@@ -79,19 +63,10 @@ class ProfileMember extends MachineComponent {
     if (drawingRecipe == null) drawingRecipe = new ProfileMemberRecipeType(
       "machinekit.structural.drawing-profile-member",
       [
-        ComponentRecipeSupport.text(
-          "section",
-          DrawingExtrusionProfile.defaultSectionText()
-        ),
-        ComponentRecipeSupport.length(
-          "length",
-          100
-        )
+        ComponentRecipeSupport.text("section", DrawingExtrusionProfile.defaultSectionText()),
+        ComponentRecipeSupport.length("length", 100)
       ],
-      v -> new ProfileMember(
-        DrawingExtrusionProfile.fromText(v.token("section")),
-        v.number("length")
-      )
+      v -> new ProfileMember(DrawingExtrusionProfile.fromText(v.token("section")), v.number("length"))
     );
     return drawingRecipe;
   }

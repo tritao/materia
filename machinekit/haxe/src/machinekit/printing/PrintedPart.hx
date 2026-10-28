@@ -21,11 +21,7 @@ class PrintedPart extends MachineComponent {
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.box(
-      MARKER,
-      MARKER,
-      MARKER * 0.2
-    ),
+    Part.box(MARKER, MARKER, MARKER * 0.2),
     "marker"
   );
 }

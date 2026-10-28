@@ -133,18 +133,9 @@ class PickingStationChecks {
     var request:Dynamic = haxe.Json.parse(haxe.Json.stringify({
       protocol: "materia.project-ui.v1",
       actions: [
-        {
-          kind: "action",
-          id: "start-order"
-        },
-        {
-          kind: "select",
-          id: "project:" + wrong
-        },
-        {
-          kind: "action",
-          id: "confirm-pick"
-        }
+        {kind: "action", id: "start-order"},
+        {kind: "select", id: "project:" + wrong},
+        {kind: "action", id: "confirm-pick"}
       ]
     }));
     var projectUi:Dynamic = PickingStationUiExtension.render(request);
@@ -163,38 +154,14 @@ class PickingStationChecks {
     var completedRequest:Dynamic = haxe.Json.parse(haxe.Json.stringify({
       protocol: "materia.project-ui.v1",
       actions: [
-        {
-          kind: "action",
-          id: "start-order"
-        },
-        {
-          kind: "select",
-          id: "project:" + scenario.orderLines[0].sourcePositionId
-        },
-        {
-          kind: "action",
-          id: "confirm-pick"
-        },
-        {
-          kind: "select",
-          id: "project:" + scenario.orderLines[1].sourcePositionId
-        },
-        {
-          kind: "action",
-          id: "confirm-pick"
-        },
-        {
-          kind: "select",
-          id: "project:" + scenario.orderLines[2].sourcePositionId
-        },
-        {
-          kind: "action",
-          id: "confirm-pick"
-        },
-        {
-          kind: "action",
-          id: "confirm-pick"
-        }
+        {kind: "action", id: "start-order"},
+        {kind: "select", id: "project:" + scenario.orderLines[0].sourcePositionId},
+        {kind: "action", id: "confirm-pick"},
+        {kind: "select", id: "project:" + scenario.orderLines[1].sourcePositionId},
+        {kind: "action", id: "confirm-pick"},
+        {kind: "select", id: "project:" + scenario.orderLines[2].sourcePositionId},
+        {kind: "action", id: "confirm-pick"},
+        {kind: "action", id: "confirm-pick"}
       ]
     }));
     var completedUi:Dynamic = PickingStationUiExtension.render(completedRequest);

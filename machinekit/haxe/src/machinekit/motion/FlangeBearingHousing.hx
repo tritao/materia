@@ -79,13 +79,7 @@ class FlangeBearingHousing extends MachineComponent {
     var tools = [boreTool];
     var bolt = 1;
     for (point in boltPattern()) tools.push(Solids.named(
-      Part.cylinderSpan(
-        screw.clearanceDiameter(Medium) / 2,
-        -0.1,
-        depth + 0.1,
-        point.x,
-        point.y
-      ),
+      Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y),
       "bolt" + bolt++
     ));
     return Solids.cut(body, tools);
@@ -110,30 +104,12 @@ class FlangeBearingHousing extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.flange-bearing-housing",
       [
-        ComponentRecipeSupport.catalog(
-          "bearing",
-          DeepGrooveBearing.catalog(),
-          "608"
-        ),
-        ComponentRecipeSupport.flag(
-          "shielded",
-          true
-        ),
-        ComponentRecipeSupport.choice(
-          "fit",
-          [
-            "Slip",
-            "Transition",
-            "Interference"
-          ],
-          "Slip"
-        )
+        ComponentRecipeSupport.catalog("bearing", DeepGrooveBearing.catalog(), "608"),
+        ComponentRecipeSupport.flag("shielded", true),
+        ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")
       ],
       v -> new FlangeBearingHousing(
-        DeepGrooveBearing.metric(
-          v.token("bearing"),
-          v.boolean("shielded")
-        ),
+        DeepGrooveBearing.metric(v.token("bearing"), v.boolean("shielded")),
         ComponentRecipeSupport.fit(v.token("fit"))
       )
     );

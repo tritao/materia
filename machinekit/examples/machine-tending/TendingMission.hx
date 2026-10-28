@@ -39,20 +39,12 @@ class TendingMission {
       result.push({
         kind: "moveVia",
         at: {occurrence: toolTcp(tool), connector: "tcp"},
-        poses: [for (position in positions) jointWaypointAt(
-          cell,
-          position
-        )],
+        poses: [for (position in positions) jointWaypointAt(cell, position)],
         timeoutSeconds: MOTION_TIMEOUT
       });
     }
     function moveToVise(tool:String, station:String = "vise"):Void movePath(
-      TendingReach.transferPositions(
-        cell.reach,
-        station,
-        tool,
-        tool
-      ).slice(1),
+      TendingReach.transferPositions(cell.reach, station, tool, tool).slice(1),
       tool
     );
     function moveFromVise(tool:String, station:String = "vise"):Void {
@@ -62,18 +54,11 @@ class TendingMission {
     }
     function pick(occurrence:String, station:String, tool:String):Void result.push({
       kind: "pick",
-      at: {
-        occurrence: occurrence,
-        connector: "grasp"
-      },
+      at: {occurrence: occurrence, connector: "grasp"},
       tool: tool,
       timeoutSeconds: MOTION_TIMEOUT,
       approachDistance: cell.production.electricProcess ? 0 : cell.reach.handlingApproachMm / 1000,
-      toolYaw : TendingReach.toolYaw(
-        cell.reach,
-        station,
-        tool
-      )
+      toolYaw : TendingReach.toolYaw(cell.reach, station, tool)
     });
     function place(target:materia.project.SceneArtifact.SceneArtifactPlace,
       station:String, tool:String):Void result.push({
@@ -82,11 +67,7 @@ class TendingMission {
         tool: tool,
         timeoutSeconds: MOTION_TIMEOUT,
         approachDistance: cell.production.electricProcess ? 0 : cell.reach.handlingApproachMm / 1000,
-        toolYaw : TendingReach.toolYaw(
-          cell.reach,
-          station,
-          tool
-        )
+        toolYaw : TendingReach.toolYaw(cell.reach, station, tool)
       });
     function rowOf(slot:Int):Int return cell.production.rowOf(slot);
     function columnOf(slot:Int):Int return cell.production.columnOf(slot);

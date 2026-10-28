@@ -30,10 +30,7 @@ class AssemblyInventory {
   public static function massProperties(
     flat:FlatAssembly,
     poses:Map<String, AssemblyFrame>,
-    cache:Map<
-      String,
-      MassProperties
-  >
+    cache:Map<String, MassProperties>
   ):MachineAssemblyMassProperties {
     var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
     var posed:Array<{id:String, properties:MassProperties, pose:AssemblyFrame, centre:Vector}> = [];

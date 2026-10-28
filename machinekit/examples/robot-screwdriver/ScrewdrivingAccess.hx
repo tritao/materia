@@ -257,10 +257,7 @@ class ScrewdrivingAccess implements ScrewAccess {
           if (target.held) {
             var payload = parts.posed(
               source[0],
-              AssemblyFrames.compose(
-                socket,
-                AssemblyFrames.inverse(screw.driveFrame())
-              )
+              AssemblyFrames.compose(socket, AssemblyFrames.inverse(screw.driveFrame()))
             );
             try {
               var box = PosedParts.boxOf(payload);

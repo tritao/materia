@@ -112,22 +112,10 @@ class KlipperConfig {
     for (suffix in [
       ["STEP", "step of the extruder"],
       ["DIR", "direction of the extruder"],
-      [
-        "ENABLE",
-        "enable of the extruder"
-      ],
-      [
-        "UART",
-        "driver UART of the extruder"
-      ],
-      [
-        "HEATER",
-        "the hotend's cartridge"
-      ],
-      [
-        "SENSOR",
-        "the hotend's thermistor"
-      ]
+      ["ENABLE", "enable of the extruder"],
+      ["UART", "driver UART of the extruder"],
+      ["HEATER", "the hotend's cartridge"],
+      ["SENSOR", "the hotend's thermistor"]
     ]) result.push({
       pin: 'PIN_EXTRUDER_${suffix[0]}',
       meaning: suffix[1]
@@ -160,24 +148,12 @@ class KlipperConfig {
         ["kinematics",
       "corexy"],
       ["max_velocity", number(printer.maxVelocity)],
-      [
-        "max_accel",
-        number(printer.maxAccel)
-      ],
-      [
-        "max_z_velocity",
-        number(printer.maxZVelocity)
-      ],
-      [
-        "max_z_accel",
-        number(printer.maxZAccel)
-      ],
+      ["max_accel", number(printer.maxAccel)],
+      ["max_z_velocity", number(printer.maxZVelocity)],
+      ["max_z_accel", number(printer.maxZAccel)],
       ["# Klipper jumps a corner's velocity by up to this (junction deviation); this model plans corners as blended arcs with"],
       ["# no jump (AM-D4), so a real machine is slightly harder on its corners than the plan: written out, not left to default."],
-      [
-        "square_corner_velocity",
-        number(printer.squareCornerVelocity)
-      ]
+      ["square_corner_velocity", number(printer.squareCornerVelocity)]
     ]
     );
     for (stepper in printer.steppers) {
@@ -185,18 +161,9 @@ class KlipperConfig {
       var entries = [
         ["step_pin", 'PIN_${upper}_STEP'],
         ["dir_pin", 'PIN_${upper}_DIR'],
-        [
-          "enable_pin",
-          '!PIN_${upper}_ENABLE'
-        ],
-        [
-          "microsteps",
-          Std.string(stepper.microsteps)
-        ],
-        [
-          "rotation_distance",
-          number(stepper.rotationDistance)
-        ]
+        ["enable_pin", '!PIN_${upper}_ENABLE'],
+        ["microsteps", Std.string(stepper.microsteps)],
+        ["rotation_distance", number(stepper.rotationDistance)]
       ];
       if (stepper.leads) {
         entries.push(["endstop_pin", 'PIN_${upper}_ENDSTOP']);
@@ -209,13 +176,7 @@ class KlipperConfig {
       section("stepper_" + stepper.name, entries);
       section(
         "tmc2209 stepper_" + stepper.name,
-        [
-          ["uart_pin", 'PIN_${upper}_UART'],
-          [
-            "run_current",
-            number(stepper.runCurrent)
-          ]
-        ]
+        [["uart_pin", 'PIN_${upper}_UART'], ["run_current", number(stepper.runCurrent)]]
       );
     }
     var extruder = printer.extruder;
@@ -224,82 +185,25 @@ class KlipperConfig {
       [
         ["step_pin", "PIN_EXTRUDER_STEP"],
         ["dir_pin", "PIN_EXTRUDER_DIR"],
-        [
-          "enable_pin",
-          "!PIN_EXTRUDER_ENABLE"
-        ],
-        [
-          "microsteps",
-          Std.string(extruder.microsteps)
-        ],
-        [
-          "rotation_distance",
-          number(extruder.rotationDistance)
-        ],
-        [
-          "gear_ratio",
-          extruder.gearRatio
-        ],
-        [
-          "nozzle_diameter",
-          number(extruder.nozzleDiameter)
-        ],
-        [
-          "filament_diameter",
-          number(extruder.filamentDiameter)
-        ],
-        [
-          "heater_pin",
-          "PIN_EXTRUDER_HEATER"
-        ],
-        [
-          "sensor_type",
-          extruder.heater.sensorType
-        ],
-        [
-          "sensor_pin",
-          "PIN_EXTRUDER_SENSOR"
-        ],
-        [
-          "pullup_resistor",
-          number(extruder.heater.pullupOhm)
-        ],
-        [
-          "control",
-          "pid"
-        ],
-        [
-          "pid_Kp",
-          number(scaled(extruder.heater.kp))
-        ],
-        [
-          "pid_Ki",
-          number(scaled(extruder.heater.ki))
-        ],
-        [
-          "pid_Kd",
-          number(scaled(extruder.heater.kd))
-        ],
-        [
-          "min_temp",
-          number(extruder.heater.minTemp)
-        ],
-        [
-          "max_temp",
-          number(extruder.heater.maxTemp)
-        ],
-        [
-          "min_extrude_temp",
-          number(extruder.minExtrudeTemp)
-        ],
-        [
-          "pressure_advance",
-          number(extruder.pressureAdvance)
-        ],
-        [
-          "pressure_advance_smooth_time",
-          number(extruder.pressureAdvanceSmoothTime)
-        ]
+        ["enable_pin", "!PIN_EXTRUDER_ENABLE"],
+        ["microsteps", Std.string(extruder.microsteps)],
+        ["rotation_distance", number(extruder.rotationDistance)],
+        ["gear_ratio", extruder.gearRatio],
+        ["nozzle_diameter", number(extruder.nozzleDiameter)],
+        ["filament_diameter", number(extruder.filamentDiameter)],
+        ["heater_pin", "PIN_EXTRUDER_HEATER"],
+        ["sensor_type", extruder.heater.sensorType],
+        ["sensor_pin", "PIN_EXTRUDER_SENSOR"],
+        ["pullup_resistor", number(extruder.heater.pullupOhm)],
+        ["control", "pid"],
+        ["pid_Kp", number(scaled(extruder.heater.kp))],
+        ["pid_Ki", number(scaled(extruder.heater.ki))],
+        ["pid_Kd", number(scaled(extruder.heater.kd))],
+        ["min_temp", number(extruder.heater.minTemp)],
+        ["max_temp", number(extruder.heater.maxTemp)],
+        ["min_extrude_temp", number(extruder.minExtrudeTemp)],
+        ["pressure_advance", number(extruder.pressureAdvance)],
+        ["pressure_advance_smooth_time", number(extruder.pressureAdvanceSmoothTime)]
       ]
     );
     section("tmc2209 extruder", [["uart_pin", "PIN_EXTRUDER_UART"], ["run_current", number(extruder.runCurrent)]]);
@@ -309,38 +213,14 @@ class KlipperConfig {
       [
         ["heater_pin", "PIN_BED_HEATER"],
         ["sensor_type", bed.sensorType],
-        [
-          "sensor_pin",
-          "PIN_BED_SENSOR"
-        ],
-        [
-          "pullup_resistor",
-          number(bed.pullupOhm)
-        ],
-        [
-          "control",
-          "pid"
-        ],
-        [
-          "pid_Kp",
-          number(scaled(bed.kp))
-        ],
-        [
-          "pid_Ki",
-          number(scaled(bed.ki))
-        ],
-        [
-          "pid_Kd",
-          number(scaled(bed.kd))
-        ],
-        [
-          "min_temp",
-          number(bed.minTemp)
-        ],
-        [
-          "max_temp",
-          number(bed.maxTemp)
-        ]
+        ["sensor_pin", "PIN_BED_SENSOR"],
+        ["pullup_resistor", number(bed.pullupOhm)],
+        ["control", "pid"],
+        ["pid_Kp", number(scaled(bed.kp))],
+        ["pid_Ki", number(scaled(bed.ki))],
+        ["pid_Kd", number(scaled(bed.kd))],
+        ["min_temp", number(bed.minTemp)],
+        ["max_temp", number(bed.maxTemp)]
       ]
     );
     var probe = printer.probe;
@@ -350,10 +230,7 @@ class KlipperConfig {
         ["pin", "PIN_PROBE"],
         ["x_offset", number(probe.xOffset)],
         ["y_offset", number(probe.yOffset)],
-        [
-          "z_offset",
-          number(probe.zOffset)
-        ]
+        ["z_offset", number(probe.zOffset)]
       ]
     );
     section("fan", [["pin", "PIN_PART_FAN"]]);

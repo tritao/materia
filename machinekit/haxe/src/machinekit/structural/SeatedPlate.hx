@@ -34,12 +34,7 @@ class SeatedPlate extends MachineComponent {
     thickness:Float,
     name:String,
     seats:Array<PlateSeat>,
-    ?slots:Array<{
-      x:Float,
-      y:Float,
-      length:Float,
-      width:Float
-    }>,
+    ?slots:Array<{x:Float, y:Float, length:Float, width:Float}>,
     material:String = "aluminium 6061"
   ) {
     if (!(length > 0) || !(width > 0) || !(thickness > 0)) throw "A seated plate needs positive dimensions";

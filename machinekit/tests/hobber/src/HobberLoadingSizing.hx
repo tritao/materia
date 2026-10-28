@@ -25,22 +25,11 @@ class HobberLoadingSizing {
     var z = 363.0, r = radius + pad;
     if (top) return [
       Part.cylinderSpan(r, z - pad, z + 120 + 40 + pad),
-      Part.cylinderSpan(
-        radius + 25 + pad,
-        z + 30 - pad,
-        1400
-      )
+      Part.cylinderSpan(radius + 25 + pad, z + 30 - pad, 1400)
     ];
     var parts = [
       Part.cylinderSpan(r, z - pad, z + FRONT_LIFT + 40 + pad),
-      box(
-        -600,
-        0,
-        -r,
-        r,
-        z + FRONT_LIFT - pad,
-        z + FRONT_LIFT + 40 + pad
-      )
+      box(-600, 0, -r, r, z + FRONT_LIFT - pad, z + FRONT_LIFT + 40 + pad)
     ];
     // Two side fingers: rear extent +15 mm, 25 mm outside the cup,
     // 3 mm nominal contact engagement, gripping its upper 10 mm.

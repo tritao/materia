@@ -37,14 +37,7 @@ class BallScrewRetainer extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var body = Solids.union([
       Solids.named(Part.cylinderSpan(10, 0, 4), "retaining-nut"),
-      Solids.named(
-        Part.cylinderSpan(
-          10.5,
-          4,
-          5
-        ),
-        "washer"
-      )
+      Solids.named(Part.cylinderSpan(10.5, 4, 5), "washer")
     ]);
     var tools = [Part.cylinderSpan(6.1, -0.1, 5.1)];
     if (detail == Preview) for (axis in 0...4) {

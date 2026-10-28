@@ -19,10 +19,7 @@ class SheetRouterSizingChecks {
     if (!ok) throw "SR4 sizing: " + label;
   }
   static function near(a:Float, b:Float, label:String):Void check(
-    Math.isFinite(a) && Math.abs(a - b) < 1e-9 * Math.max(
-      1,
-      Math.abs(b)
-    ),
+    Math.isFinite(a) && Math.abs(a - b) < 1e-9 * Math.max(1, Math.abs(b)),
     label + ": " + a + " vs " + b
   );
   static function reject(fn:Void -> Void, label:String):Void {
@@ -126,11 +123,7 @@ class SheetRouterSizingChecks {
         rating.designation + "-" + side,
         null,
         null,
-        Transmission.SimpleTransmission(
-          shaft.id,
-          5,
-          0
-        )
+        Transmission.SimpleTransmission(shaft.id, 5, 0)
       );
       actuator.drive = new ServoDrive(
         rating.ratedTorque,
@@ -242,10 +235,7 @@ class SheetRouterSizingChecks {
       machine.replaceComponent("pinionXPreload", old);
       machine.replaceComponent(
         "pinionYLeftPreload",
-        new PreloadedPinionMount(new ComponentValues().setNumber(
-          "springForce",
-          10
-        ))
+        new PreloadedPinionMount(new ComponentValues().setNumber("springForce", 10))
       );
       var inadequate = SheetRouterSizing.report(machine,
         "y"), preloadRejected = false, failures:Array<String> = inadequate.failures;

@@ -83,10 +83,7 @@ class BayonetChangerMaster extends MachineComponent {
         name: 'airOut$i',
         kind: Pneumatic,
         role: Supply,
-        iface: Coupling(
-          'schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}',
-          i
-        ),
+        iface: Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', i),
         required: false
       });
       addBridge('airIn$i', 'airOut$i');
@@ -99,14 +96,7 @@ class BayonetChangerMaster extends MachineComponent {
     declareMass(
       m,
       new Vector(0, 0, z / 2),
-      new InertiaTensor(
-        m * (y * y + z * z) / 12,
-        0,
-        0,
-        m * (x * x + z * z) / 12,
-        0,
-        m * (x * x + y * y) / 12
-      )
+      new InertiaTensor(m * (y * y + z * z) / 12, 0, 0, m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12)
     );
   }
 
@@ -115,11 +105,7 @@ class BayonetChangerMaster extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.bayonet-changer-master",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        BayonetChangerMaster.catalog(),
-        "10.07.13.00013"
-      )],
+      [ComponentRecipeSupport.catalog("designation", BayonetChangerMaster.catalog(), "10.07.13.00013")],
       v -> new BayonetChangerMaster(v.token("designation")),
       true
     );

@@ -7,31 +7,11 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Static rotary clamp. Reference row is Assumed; dimensions are simplified envelopes. */
 class RotaryClamp extends MachineComponent implements machinekit.motion.MotorBrakeSpec {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      150,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      120,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      10,
-      "mm"
-    ),
-    P.quantity(
-      "holdingTorque",
-      100,
-      "N m"
-    ),
-    P.quantity(
-      "releaseTime",
-      0.1,
-      "s"
-    )
+    P.quantity("outside", 150, "mm"),
+    P.quantity("bore", 120, "mm"),
+    P.quantity("height", 10, "mm"),
+    P.quantity("holdingTorque", 100, "N m"),
+    P.quantity("releaseTime", 0.1, "s")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {

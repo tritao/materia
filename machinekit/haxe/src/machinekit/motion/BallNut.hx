@@ -35,14 +35,7 @@ class BallNut extends LeadScrewNut {
     addConnector(
       "lubricator",
       Mount,
-      AssemblyFrames.alongY(
-        0,
-        flangeDiameter / 2,
-        bodyLength + flangeThickness / 2,
-        0,
-        1,
-        0
-      )
+      AssemblyFrames.alongY(0, flangeDiameter / 2, bodyLength + flangeThickness / 2, 0, 1, 0)
     );
     var holes:Array<machinekit.design.DesignInterfaces.HoleInterface> = [], i = 0;
     for (p in boltPattern()) holes.push({
@@ -65,17 +58,7 @@ class BallNut extends LeadScrewNut {
           0,
           flangeDiameter / 2,
           bodyLength + flangeThickness / 2,
-          [
-            1,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1, 0, 0, 0, 0, 1, 0, -1, 0]
         )
       }],
       []
@@ -89,16 +72,7 @@ class BallNut extends LeadScrewNut {
     // Radial fitting on the flange between the two upper mounting holes.
     var fitting = Solids.union([
       Solids.named(Part.cylinderAlongY(2.8, 22.5, 25, 0, z), "grease-fitting-base"),
-      Solids.named(
-        Part.cylinderAlongY(
-          1.6,
-          24.8,
-          27,
-          0,
-          z
-        ),
-        "grease-fitting-nipple"
-      )
+      Solids.named(Part.cylinderAlongY(1.6, 24.8, 27, 0, z), "grease-fitting-nipple")
     ]);
     body = Solids.union([body, fitting]);
     if (detail == Envelope) return body;
@@ -107,11 +81,7 @@ class BallNut extends LeadScrewNut {
     for (end in [0.0, bodyLength + flangeThickness - 0.45]) {
       var ring = Solids.cut(
         Part.cylinderSpan(11.2, end - 0.01, end + 0.46),
-        [Part.cylinderSpan(
-          9.2,
-          end - 0.1,
-          end + 0.6
-        )]
+        [Part.cylinderSpan(9.2, end - 0.1, end + 0.6)]
       );
       tools.push(ring);
     }
@@ -125,11 +95,7 @@ class BallNut extends LeadScrewNut {
     // Relief at the barrel/flange shoulder and a visible mouth in the grease nipple.
     tools.push(Solids.cut(
       Part.cylinderSpan(14.1, bodyLength - 0.8, bodyLength),
-      [Part.cylinderSpan(
-        13.6,
-        bodyLength - 0.9,
-        bodyLength + 0.1
-      )]
+      [Part.cylinderSpan(13.6, bodyLength - 0.9, bodyLength + 0.1)]
     ));
     tools.push(Part.cylinderAlongY(0.65, 25.8, 27.1, 0, z));
     return Solids.cut(body, tools);
@@ -139,10 +105,7 @@ class BallNut extends LeadScrewNut {
   public static function ballRecipeType():ComponentType {
     if (ballRecipe == null) ballRecipe = new ComponentType(
       "machinekit.motion.ball-nut",
-      [ComponentRecipeSupport.flag(
-        "preloaded",
-        true
-      )],
+      [ComponentRecipeSupport.flag("preloaded", true)],
       v -> new BallNut(v.boolean("preloaded"))
     );
     return ballRecipe;

@@ -11,22 +11,9 @@ class MillSupportTray extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("width", 1100),
     P.length("depth", 800),
-    P.length(
-      "height",
-      2
-    ),
-    P.quantity(
-      "millX",
-      0,
-      "mm",
-      null
-    ),
-    P.quantity(
-      "millY",
-      0,
-      "mm",
-      null
-    )
+    P.length("height", 2),
+    P.quantity("millX", 0, "mm", null),
+    P.quantity("millY", 0, "mm", null)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

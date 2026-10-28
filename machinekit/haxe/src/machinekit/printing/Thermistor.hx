@@ -82,11 +82,7 @@ class Thermistor extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.thermistor",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "NTC-100K-B3950"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "NTC-100K-B3950")],
       v -> new Thermistor(v.token("designation"))
     );
     return recipe;
@@ -100,11 +96,7 @@ class Thermistor extends MachineComponent {
     );
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.cylinderSpan(
-      spec.beadDiameter / 2,
-      0,
-      spec.length
-    ),
+    Part.cylinderSpan(spec.beadDiameter / 2, 0, spec.length),
     "bead"
   );
 }

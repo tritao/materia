@@ -89,10 +89,7 @@ class BatterySimulator {
   function observation(voltage:Float, current:Float, timestampNs:Int64):BatteryReading return new BatteryReading(
     batteryId,
     chargeFraction,
-    Math.max(
-      0.0,
-      voltage
-    ),
+    Math.max(0.0, voltage),
     current,
     25.0,
     storage.capacityWh * chargeFraction,

@@ -13,18 +13,9 @@ class ToolingPin extends MachineComponent {
   static var recipe:Null<ComponentType>;
   static function parameters():Array<machinekit.component.ComponentParameter> return [
     P.length("diameter", 6),
-    P.length(
-      "length",
-      40
-    ),
-    P.length(
-      "headDiameter",
-      0
-    ),
-    P.length(
-      "headLength",
-      0
-    )
+    P.length("length", 40),
+    P.length("headDiameter", 0),
+    P.length("headLength", 0)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(

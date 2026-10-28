@@ -21,10 +21,7 @@ class TendingElectricZone {
     scene:TendingElectricSimScene,
     simulation:Simulation,
     fixtures:AssemblyState,
-    objects:Map<
-      Int,
-      SimObject
-  >
+    objects:Map<Int, SimObject>
   ) {
     this.simulation = simulation;
     var sensors = fixtures.definition.sensors;
@@ -38,20 +35,8 @@ class TendingElectricZone {
     world.setBodyPose(zone, pose(frame));
     for (i in 0...Std.int(boxes.length / 6)) world.add(
       zone,
-      new CollisionPose(
-        boxes[i * 6] * 0.001,
-        boxes[i * 6 + 1] * 0.001,
-        boxes[i * 6 + 2] * 0.001,
-        0,
-        0,
-        0,
-        1
-      ),
-      Box(
-        boxes[i * 6 + 3] * 0.001,
-        boxes[i * 6 + 4] * 0.001,
-        boxes[i * 6 + 5] * 0.001
-      )
+      new CollisionPose(boxes[i * 6] * 0.001, boxes[i * 6 + 1] * 0.001, boxes[i * 6 + 2] * 0.001, 0, 0, 0, 1),
+      Box(boxes[i * 6 + 3] * 0.001, boxes[i * 6 + 4] * 0.001, boxes[i * 6 + 5] * 0.001)
     );
     var bodies:Array<Int> = [];
     for (shape in scene.blueprint.linkCollisionShapes) {

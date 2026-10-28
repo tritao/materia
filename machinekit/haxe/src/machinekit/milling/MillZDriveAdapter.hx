@@ -14,22 +14,10 @@ class MillZDriveAdapter extends MachineComponent {
   static function parameters():Array<ComponentParameter> return [
     P.length("motorOffset", 60),
     P.length("stemHeight", 60),
-    P.length(
-      "width",
-      220
-    ),
-    P.length(
-      "spacing",
-      180
-    ),
-    P.length(
-      "thickness",
-      20
-    ),
-    P.length(
-      "stemWidth",
-      110
-    )
+    P.length("width", 220),
+    P.length("spacing", 180),
+    P.length("thickness", 20),
+    P.length("stemWidth", 110)
   ];
   public function new(?values:ComponentValues) {
     var v = P.resolve(parameters(), values);
@@ -52,11 +40,7 @@ class MillZDriveAdapter extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var t = parameterNumber("thickness"), body = Solids.union([
       Part.box(parameterNumber("width"), t, 40),
-      Part.box(
-        parameterNumber("stemWidth"),
-        t,
-        parameterNumber("stemHeight")
-      ).translated(new Vector(
+      Part.box(parameterNumber("stemWidth"), t, parameterNumber("stemHeight")).translated(new Vector(
         0,
         0,
         -parameterNumber("stemHeight")

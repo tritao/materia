@@ -56,11 +56,7 @@ class AssemblyFemExport {
       for (term in record.terms) terms.push({
         name: term.name,
         members: term.members.map(resolve),
-        flexibilityMPerN: {
-          x: term.xMPerN,
-          y: term.yMPerN,
-          z: term.zMPerN
-        },
+        flexibilityMPerN: {x: term.xMPerN, y: term.yMPerN, z: term.zMPerN},
         reference: term.reference,
         assumed: term.assumed
       });

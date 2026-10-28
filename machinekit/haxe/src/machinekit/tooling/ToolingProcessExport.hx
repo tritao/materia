@@ -129,11 +129,7 @@ class ToolingProcessExport {
         b.height,
         materia.assembly.AssemblyFrames.compose(
           inverse,
-          materia.assembly.AssemblyFrames.translation(
-            b.x + b.width / 2,
-            b.y + b.depth / 2,
-            b.z
-          )
+          materia.assembly.AssemblyFrames.translation(b.x + b.width / 2, b.y + b.depth / 2, b.z)
         )
       );
       return [for (value in [
@@ -307,10 +303,7 @@ class ToolingProcessExport {
         [p.document.input.id],
         ToolingCheckStatus.Pass,
         "Symmetric difference against actual foundation.body.asCastGeometry() passed; see fill-foundation-cad-check.json.",
-        [
-          sourceFingerprint,
-          "fill-foundation-cad-check.json"
-        ]
+        [sourceFingerprint, "fill-foundation-cad-check.json"]
       ));
     }
     return checks;

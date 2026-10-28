@@ -114,11 +114,7 @@ class CncRouterChecks {
       [300.0, 300, -80],
       [0.0, 300, -80],
       [300.0, 0, -40],
-      [
-        37.5,
-        212,
-        -12.5
-      ]
+      [37.5, 212, -12.5]
     ];
     for (position in positions) {
       state.setJoint("x", position[0]);
@@ -143,10 +139,7 @@ class CncRouterChecks {
         {id: "screwX", axis: 0},
         {id: "screwYLeft", axis: 1},
         {id: "screwYRight", axis: 1},
-        {
-          id: "screwZ",
-          axis: 2
-        }
+        {id: "screwZ", axis: 2}
       ]) near(
         state.joint(screw.id + "-turn"),
         Math.PI * position[screw.axis],
@@ -208,24 +201,14 @@ class CncRouterChecks {
       state,
       [150, 150, 0],
       ["zPlate", "spindle", "spindleClamp"],
-      [
-        "motorBracketZ",
-        "motorZ",
-        "xPlate",
-        "screwZ"
-      ]
+      ["motorBracketZ", "motorZ", "xPlate", "screwZ"]
     );
     checkClear(
       router,
       state,
       [150, 150, -80],
       ["zPlate", "spindle", "spindleClamp"],
-      [
-        "motorBracketZ",
-        "motorZ",
-        "xPlate",
-        "screwZ"
-      ]
+      ["motorBracketZ", "motorZ", "xPlate", "screwZ"]
     );
 
     // Each screw's turn is a lead-screw drive, so its thread sets the ratio.
@@ -250,13 +233,7 @@ class CncRouterChecks {
       state,
       [150, 150, 0],
       ["motorZ", "screwZCoupling"],
-      [
-        "motorBracketZ",
-        "standoffZ1",
-        "standoffZ2",
-        "standoffZ3",
-        "standoffZ4"
-      ]
+      ["motorBracketZ", "standoffZ1", "standoffZ2", "standoffZ3", "standoffZ4"]
     );
     checkClear(router, state, [150, 150, 0], ["screwYRightCoupling"], ["motorPlateYRight"]);
     checkClear(router, state, [0, 0, 0], ["screwXCoupling"], ["uprightRight", "xPlate", "nutBracketX"]);
@@ -266,12 +243,7 @@ class CncRouterChecks {
       state,
       [150, 150, 0],
       ["screwZCoupling"],
-      [
-        "motorBracketZ",
-        "zPlate",
-        "blockZLeft",
-        "blockZRight"
-      ]
+      ["motorBracketZ", "zPlate", "blockZLeft", "blockZRight"]
     );
     checkClear(router, state, [150, 150, -80], ["screwZCoupling"], ["motorBracketZ", "zPlate"]);
     // Every axis has room past its travel before its blocks reach their rail ends.
@@ -321,42 +293,10 @@ class CncRouterChecks {
     var pulleys = [
       {id: "pulleyX", axis: 0, direction: [1.0, 0, 0]},
       {id: "idlerX", axis: 0, direction: [1.0, 0, 0]},
-      {
-        id: "pulleyYLeft",
-        axis: 1,
-        direction: [
-          0.0,
-          1,
-          0
-        ]
-      },
-      {
-        id: "idlerYLeft",
-        axis: 1,
-        direction: [
-          0.0,
-          1,
-          0
-        ]
-      },
-      {
-        id: "pulleyYRight",
-        axis: 1,
-        direction: [
-          0.0,
-          1,
-          0
-        ]
-      },
-      {
-        id: "idlerYRight",
-        axis: 1,
-        direction: [
-          0.0,
-          1,
-          0
-        ]
-      }
+      {id: "pulleyYLeft", axis: 1, direction: [0.0, 1, 0]},
+      {id: "idlerYLeft", axis: 1, direction: [0.0, 1, 0]},
+      {id: "pulleyYRight", axis: 1, direction: [0.0, 1, 0]},
+      {id: "idlerYRight", axis: 1, direction: [0.0, 1, 0]}
     ];
     for (pulley in pulleys) {
       var drive = beltDrive(router, pulley.id);
@@ -378,11 +318,7 @@ class CncRouterChecks {
       [300.0, 300, -80],
       [0.0, 300, -80],
       [300.0, 0, -40],
-      [
-        37.5,
-        212,
-        -12.5
-      ]
+      [37.5, 212, -12.5]
     ];
     for (position in positions) {
       state.setJoint("x", position[0]);
@@ -503,52 +439,28 @@ class CncRouterChecks {
       state,
       [150, 0, 0],
       gantry,
-      [
-        "idlerPlateYLeft",
-        "idlerPlateYRight",
-        "idlerYLeft",
-        "idlerYRight",
-        "axleYLeft",
-        "axleYRight"
-      ]
+      ["idlerPlateYLeft", "idlerPlateYRight", "idlerYLeft", "idlerYRight", "axleYLeft", "axleYRight"]
     );
     checkClear(
       router,
       state,
       [300, 300, -80],
       ["motorX", "motorPlateX", "idlerPlateX", "pulleyX", "idlerX"],
-      [
-        "crossBack",
-        "sideLeft",
-        "sideRight",
-        "spoilboard"
-      ]
+      ["crossBack", "sideLeft", "sideRight", "spoilboard"]
     );
     checkClear(
       router,
       state,
       [300, 0, 0],
       ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"],
-      [
-        "pulleyX",
-        "idlerX",
-        "motorX",
-        "motorPlateX",
-        "idlerPlateX"
-      ]
+      ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]
     );
     checkClear(
       router,
       state,
       [0, 0, 0],
       ["xPlate", "beltBracketX", "blockXUpper", "blockXLower"],
-      [
-        "pulleyX",
-        "idlerX",
-        "motorX",
-        "motorPlateX",
-        "idlerPlateX"
-      ]
+      ["pulleyX", "idlerX", "motorX", "motorPlateX", "idlerPlateX"]
     );
     checkXHomeClearance(router);
     Sys.println('cnc router belts: ${report.join("; ")}');
@@ -579,18 +491,9 @@ class CncRouterChecks {
       ["railYLeft", "blockYLeft"],
       ["railYRight", "blockYRight"],
       ["railXUpper", "blockXUpper"],
-      [
-        "railXLower",
-        "blockXLower"
-      ],
-      [
-        "railZLeft",
-        "blockZLeft"
-      ],
-      [
-        "railZRight",
-        "blockZRight"
-      ]
+      ["railXLower", "blockXLower"],
+      ["railZLeft", "blockZLeft"],
+      ["railZRight", "blockZRight"]
     ]) {
       var local = AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose(pair[0])), state.worldPose(pair[1]));
       var rail = [for (entry in router.components()) if (entry.id == pair[0]) cast(entry.component, LinearRail)][0];
@@ -624,20 +527,8 @@ class CncRouterChecks {
         router,
         state,
         [x, 150.0, z],
-        [
-          "xPlate",
-          "zPlate",
-          "blockZLeft",
-          "blockZRight",
-          "spindleClamp",
-          "spindle",
-          "tool",
-          "homeTriggerZ"
-        ],
-        [
-          "homeX",
-          "homeXMount"
-        ]
+        ["xPlate", "zPlate", "blockZLeft", "blockZRight", "spindleClamp", "spindle", "tool", "homeTriggerZ"],
+        ["homeX", "homeXMount"]
       );
       checkClear(router, state, [x, 150.0, z], ["homeTriggerX"], ["beamUpper", "railXUpper"]);
     }

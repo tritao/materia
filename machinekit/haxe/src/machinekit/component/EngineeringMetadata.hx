@@ -17,30 +17,9 @@ class EngineeringMetadata implements ComponentFacet {
       || errorsBasis == Catalog) && StringTools.trim(source).length == 0) throw "Catalog basis requires a source";
   }
   public static function parameters():Array<ComponentParameter> return [
-    P.choice(
-      "ratingsBasis",
-      [
-        "Assumed",
-        "Catalog",
-        "Stated",
-        "Derived"
-      ],
-      "Assumed"
-    ),
-    P.choice(
-      "errorsBasis",
-      [
-        "Assumed",
-        "Catalog",
-        "Stated",
-        "Derived"
-      ],
-      "Assumed"
-    ),
-    P.text(
-      "source",
-      ""
-    )
+    P.choice("ratingsBasis", ["Assumed", "Catalog", "Stated", "Derived"], "Assumed"),
+    P.choice("errorsBasis", ["Assumed", "Catalog", "Stated", "Derived"], "Assumed"),
+    P.text("source", "")
   ];
   public static function basis(value:String):ValueBasis return switch value {
     case "Assumed":

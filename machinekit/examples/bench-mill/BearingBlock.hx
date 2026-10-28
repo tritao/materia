@@ -67,20 +67,8 @@ class BearingBlock extends MachineComponent {
     ));
     var bottom = height - POCKET_DEPTH, cutHeight = POCKET_DEPTH + 1;
     var pieces = [
-      Part.box(pocketWidth - 2 * POCKET_RADIUS, pocketDepth, cutHeight).translated(new Vector(
-        0,
-        pocketY,
-        bottom
-      )),
-      Part.box(
-        pocketWidth,
-        pocketDepth - 2 * POCKET_RADIUS,
-        cutHeight
-      ).translated(new Vector(
-        0,
-        pocketY,
-        bottom
-      ))
+      Part.box(pocketWidth - 2 * POCKET_RADIUS, pocketDepth, cutHeight).translated(new Vector(0, pocketY, bottom)),
+      Part.box(pocketWidth, pocketDepth - 2 * POCKET_RADIUS, cutHeight).translated(new Vector(0, pocketY, bottom))
     ];
     for (sx in [-1, 1]) for (sy in [-1, 1]) pieces.push(Part.cylinderSpan(
       POCKET_RADIUS,

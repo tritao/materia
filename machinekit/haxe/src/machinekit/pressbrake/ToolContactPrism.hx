@@ -22,15 +22,9 @@ class ToolContactPrism {
       var edges:Array<Segment> = [];
       for (edge in loop) edges.push(edge.isLine() ? Segment.line(
         new Point2(edge.start.x + y, edge.start.y + z),
-        new Point2(
-          edge.end.x + y,
-          edge.end.y + z
-        )
+        new Point2(edge.end.x + y, edge.end.y + z)
       ) : Segment.arc(
-        new Point2(
-          edge.arcCenter().x + y,
-          edge.arcCenter().y + z
-        ),
+        new Point2(edge.arcCenter().x + y, edge.arcCenter().y + z),
         edge.radius,
         edge.startAngle,
         edge.sweep

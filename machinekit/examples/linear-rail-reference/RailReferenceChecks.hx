@@ -26,11 +26,7 @@ class RailReferenceChecks {
     var b = p.shape.bounds();
     return {
       min: [b.get_min().get_x(), b.get_min().get_y(), b.get_min().get_z()],
-      max: [
-        b.get_max().get_x(),
-        b.get_max().get_y(),
-        b.get_max().get_z()
-      ],
+      max: [b.get_max().get_x(), b.get_max().get_y(), b.get_max().get_z()],
       volume: p.volume(),
       solids: p.solidCount()
     };
@@ -105,25 +101,9 @@ class RailReferenceChecks {
       var spec = nominalBlock.spec, bore = spec.railBore;
       var matched = machinekit.component.Solids.cut(
         LinearRail.measuredSection(size.rail, 150),
-        [for (z in [
-          15.0,
-          75,
-          135
-        ]) for (tool in [
-          Part.cylinderAlongY(
-            bore.through / 2,
-            -spec.railHeight - 1,
-            1,
-            0,
-            z
-          ),
-          Part.cylinderAlongY(
-            bore.counterbore / 2,
-            -bore.depth,
-            1,
-            0,
-            z
-          )
+        [for (z in [15.0, 75, 135]) for (tool in [
+          Part.cylinderAlongY(bore.through / 2, -spec.railHeight - 1, 1, 0, z),
+          Part.cylinderAlongY(bore.counterbore / 2, -bore.depth, 1, 0, z)
         ]) tool]
       );
       var lost = supplierRail.subtract(matched),
@@ -212,10 +192,7 @@ class RailReferenceChecks {
         comparison.include("supplier", supplier, AssemblyFrames.translation(55, 0, 0));
         sys.io.File.saveBytes(
           output + "comparison.mtrg",
-          SceneArtifact.encode(AssemblyPreview.scene(
-            comparison,
-            "HGR15-HGH15CA-reference"
-          ))
+          SceneArtifact.encode(AssemblyPreview.scene(comparison, "HGR15-HGH15CA-reference"))
         );
       }
       nominalPreview.close();
@@ -230,20 +207,16 @@ class RailReferenceChecks {
       haxe.Json.stringify(
         {
           sizes: report,
-          checkedLengths: [
-            150,
-            237,
-            440,
-            600
-          ],
-          notes: [
-            "Reference STEP exteriors are not load, preload or mass qualifications; masses and ratings come from the catalogue rows.",
-            "Supplier carriages reach below the rail-top datum; the nominal carriage outline omits that volume."
-          ]
-        },
-        null,
-        "  "
-      )
+          checkedLengths: [150,
+      237, 440, 600],
+      notes: [
+        "Reference STEP exteriors are not load, preload or mass qualifications; masses and ratings come from the catalogue rows.",
+        "Supplier carriages reach below the rail-top datum; the nominal carriage outline omits that volume."
+      ]
+    },
+      null,
+      "  "
+    )
     );
     trace("One rail and one carriage recipe: measured sections, supplier exteriors, bores, tapped holes, envelopes and comparison export passed");
   }

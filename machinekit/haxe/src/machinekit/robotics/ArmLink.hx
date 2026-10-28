@@ -65,14 +65,7 @@ class ArmLink extends MachineComponent {
     addConnector(
       "end",
       Mount,
-      AssemblyFrames.alongY(
-        -offset * end.x,
-        -offset * end.y,
-        length - offset * end.z,
-        end.x,
-        end.y,
-        end.z
-      )
+      AssemblyFrames.alongY(-offset * end.x, -offset * end.y, length - offset * end.z, end.x, end.y, end.z)
     );
   }
 
@@ -112,44 +105,13 @@ class ArmLink extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.arm-link",
       [
-        ComponentRecipeSupport.length(
-          "length",
-          300
-        ),
-        ComponentRecipeSupport.length(
-          "diameter",
-          80
-        ),
-        ComponentRecipeSupport.length(
-          "wall",
-          5
-        ),
-        ComponentRecipeSupport.length(
-          "collarDiameter",
-          100
-        ),
-        ComponentRecipeSupport.choice(
-          "startAxis",
-          [
-            "+X",
-            "-X",
-            "+Z"
-          ],
-          "+Z"
-        ),
-        ComponentRecipeSupport.choice(
-          "endAxis",
-          [
-            "+X",
-            "-X",
-            "+Z"
-          ],
-          "+Z"
-        ),
-        ComponentRecipeSupport.length(
-          "endJointLength",
-          0
-        )
+        ComponentRecipeSupport.length("length", 300),
+        ComponentRecipeSupport.length("diameter", 80),
+        ComponentRecipeSupport.length("wall", 5),
+        ComponentRecipeSupport.length("collarDiameter", 100),
+        ComponentRecipeSupport.choice("startAxis", ["+X", "-X", "+Z"], "+Z"),
+        ComponentRecipeSupport.choice("endAxis", ["+X", "-X", "+Z"], "+Z"),
+        ComponentRecipeSupport.length("endJointLength", 0)
       ],
       v -> new ArmLink(
         v.number("length"),
@@ -200,11 +162,7 @@ class ArmLink extends MachineComponent {
       Part.cylinderAlong(
         collarDiameter / 2,
         new Vector(0, 0, 0),
-        new Vector(
-          start.x,
-          start.y,
-          start.z
-        ),
+        new Vector(start.x, start.y, start.z),
         COLLAR_THICKNESS
       ),
       "collar"

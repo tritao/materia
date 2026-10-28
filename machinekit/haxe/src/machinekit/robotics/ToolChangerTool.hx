@@ -49,24 +49,11 @@ class ToolChangerTool extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.tool-changer-tool",
       [
-        ComponentRecipeSupport.count(
-          "airChannels",
-          2
-        ),
-        ComponentRecipeSupport.length(
-          "diameter",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          12
-        )
+        ComponentRecipeSupport.count("airChannels", 2),
+        ComponentRecipeSupport.length("diameter", 60),
+        ComponentRecipeSupport.length("thickness", 12)
       ],
-      v -> new ToolChangerTool(
-        v.integer("airChannels"),
-        v.number("diameter"),
-        v.number("thickness")
-      ),
+      v -> new ToolChangerTool(v.integer("airChannels"), v.number("diameter"), v.number("thickness")),
       true
     );
     return recipeTypeCache;
@@ -99,27 +86,13 @@ class ToolChangerTool extends MachineComponent {
     var r = diameter / 2;
     var shape = Solids.cut(
       Solids.named(Part.cylinderSpan(r, 0, thickness), "body"),
-      [Solids.named(
-        Part.cylinderSpan(
-          0.6 * r + 0.2,
-          -0.1,
-          Math.min(
-            3.0,
-            thickness - 1
-          )
-        ),
-        "coupling-recess"
-      )]
+      [Solids.named(Part.cylinderSpan(0.6 * r + 0.2, -0.1, Math.min(3.0, thickness - 1)), "coupling-recess")]
     );
     return Solids.cut(shape, [for (i in 0...airChannels) {
       var angle = 2 * Math.PI * i / airChannels, dir = new cadkit.modeling.Vector(Math.cos(angle), Math.sin(angle), 0);
       Solids.named(
-        Part.cylinderAlong(
-          1.5,
-          new cadkit.modeling.Vector(dir.x * (r - 6), dir.y * (r - 6), 0.4 * thickness),
-          dir,
-          6.1
-        ),
+        Part.cylinderAlong(1.5,
+        new cadkit.modeling.Vector(dir.x * (r - 6), dir.y * (r - 6), 0.4 * thickness), dir, 6.1),
         "air-port"
       );
     }

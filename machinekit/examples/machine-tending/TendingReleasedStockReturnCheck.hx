@@ -75,15 +75,7 @@ class TendingReleasedStockReturnCheck {
     var root = physical(sim, identity.linkIndex(model.links[0].id));
     reference.setRootPose(
       kinematic.bodyIndex(model.links[0].id),
-      new Transform(
-        root.x,
-        root.y,
-        root.z,
-        root.qx,
-        root.qy,
-        root.qz,
-        root.qw
-      )
+      new Transform(root.x, root.y, root.z, root.qx, root.qy, root.qz, root.qw)
     );
     var snapshot = new KinematicSnapshot(kinematic);
     snapshot.evaluate(reference);
@@ -120,10 +112,7 @@ class TendingReleasedStockReturnCheck {
         * actual.qx + predicted.qy * actual.qy + predicted.qz * actual.qz + predicted.qw * actual.qw);
       var mismatch = Math.sqrt(dx * dx + dy * dy + dz * dz) + 2 * radius * Math.sqrt(Math.max(
         0,
-        1 - Math.min(1, dot) * Math.min(
-          1,
-          dot
-        )
+        1 - Math.min(1, dot) * Math.min(1, dot)
       ));
       maxMismatch = Math.max(maxMismatch, mismatch);
       if (mismatch > RESERVE) throw "Physical/FK return geometry differs beyond its explicit reserve: " + id;
@@ -140,15 +129,7 @@ class TendingReleasedStockReturnCheck {
       if (object.handle.rawValue() == stock.handle.rawValue()) throw "Released stock is still marked carried";
       var p = sim.objectPose(object), local = AssemblyFrames.compose(
         inverse,
-        {
-          x: p.x,
-          y: p.y,
-          z: p.z,
-          qx: p.qx,
-          qy: p.qy,
-          qz: p.qz,
-          qw: p.qw
-        }
+        {x: p.x, y: p.y, z: p.z, qx: p.qx, qy: p.qy, qz: p.qz, qw: p.qw}
       );
       var body = bodies.carry(flange, "observed-payload-" + object.handle.rawValue(), 2);
       description.addObject(
@@ -172,15 +153,7 @@ class TendingReleasedStockReturnCheck {
     );
     description.addFixed(
       "observed released stock",
-      new CollisionPose(
-        released.x,
-        released.y,
-        released.z,
-        released.qx,
-        released.qy,
-        released.qz,
-        released.qw
-      ),
+      new CollisionPose(released.x, released.y, released.z, released.qx, released.qy, released.qz, released.qw),
       Convex(stock.shape.convexVertices()),
       0,
       0,
@@ -241,10 +214,7 @@ class TendingReleasedStockReturnCheck {
       return result;
     }
     var piece = selected[0], c = centre(piece.shape.convexVertices()), world = AssemblyFrames.transformPoint(
-      physical(
-        sim,
-        piece.link
-      ),
+      physical(sim, piece.link),
       c[0],
       c[1],
       c[2]

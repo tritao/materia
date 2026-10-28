@@ -13,23 +13,9 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
   public final variant:String;
   static var recipe:Null<ComponentType>;
   public static function parameters():Array<ComponentParameter> return RotaryAxisSpec.parameters().concat([
-    P.choice(
-      "variant",
-      [
-        "body",
-        "rotor",
-        "adapter"
-      ],
-      "body"
-    ),
-    P.length(
-      "adapterHeight",
-      92
-    ),
-    P.length(
-      "adapterOutside",
-      270
-    )
+    P.choice("variant", ["body", "rotor", "adapter"], "body"),
+    P.length("adapterHeight", 92),
+    P.length("adapterOutside", 270)
   ]);
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -107,11 +93,7 @@ class PurchasedRotaryPart extends MachineComponent implements MotorDrive impleme
     }
     var envelope = variant == "body" ? Solids.union([
       Part.cylinderSpan(od / 2, 0, axis.number("flangeThickness")),
-      Part.cylinderSpan(
-        axis.number("barrelDiameter") / 2,
-        axis.number("flangeThickness"),
-        h
-      )
+      Part.cylinderSpan(axis.number("barrelDiameter") / 2, axis.number("flangeThickness"), h)
     ]) : Part.cylinderSpan(
       od / 2,
       0,

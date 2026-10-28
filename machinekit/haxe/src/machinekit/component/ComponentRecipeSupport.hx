@@ -65,39 +65,12 @@ class ComponentRecipeSupport {
     );
 
   public static function threadParameters():Array<ComponentParameter> return [
-    choice(
-      "family",
-      [
-        "MetricTrapezoidal",
-        "Acme",
-        "Ball"
-      ],
-      "MetricTrapezoidal"
-    ),
-    length(
-      "screwDiameter",
-      8
-    ),
-    length(
-      "pitch",
-      2
-    ),
-    count(
-      "starts",
-      1
-    ),
-    choice(
-      "hand",
-      [
-        "RightHand",
-        "LeftHand"
-      ],
-      "RightHand"
-    ),
-    length(
-      "raceRootDiameter",
-      0
-    )
+    choice("family", ["MetricTrapezoidal", "Acme", "Ball"], "MetricTrapezoidal"),
+    length("screwDiameter", 8),
+    length("pitch", 2),
+    count("starts", 1),
+    choice("hand", ["RightHand", "LeftHand"], "RightHand"),
+    length("raceRootDiameter", 0)
   ];
 
   public static function thread(v:ComponentValues):LeadScrewThread return new LeadScrewThread(
@@ -278,29 +251,10 @@ class ComponentRecipeSupport {
 
   /** Inputs describing a port's mating interface, under one name prefix. */
   public static function interfaceParameters(prefix:String):Array<ComponentParameter> return [
-    choice(
-      prefix + "Kind",
-      [
-        "PushIn",
-        "Thread",
-        "Plug",
-        "Coupling",
-        "Unspecified"
-      ],
-      "PushIn"
-    ),
-    length(
-      prefix + "Size",
-      6
-    ),
-    text(
-      prefix + "Name",
-      ""
-    ),
-    count(
-      prefix + "Channel",
-      0
-    )
+    choice(prefix + "Kind", ["PushIn", "Thread", "Plug", "Coupling", "Unspecified"], "PushIn"),
+    length(prefix + "Size", 6),
+    text(prefix + "Name", ""),
+    count(prefix + "Channel", 0)
   ];
 
   public static function interfaceFrom(values:ComponentValues,
@@ -338,10 +292,7 @@ class ComponentRecipeSupport {
     return [for (p in points) new Vector(
       cast Reflect.field(p, "x"),
       cast Reflect.field(p, "y"),
-      cast Reflect.field(
-        p,
-        "z"
-      )
+      cast Reflect.field(p, "z")
     )];
   }
 

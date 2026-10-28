@@ -25,11 +25,7 @@ class TendingElectricSimDriver implements TendingElectricEdgeDriver {
   final planMemory = new Arena(4096);
   final payloads:Map<
     String,
-    {
-      object:nativekit.sim.SimObject,
-      grip:SimulatedElectricGripper,
-      mass:robotkit.tool.MassProperties
-    }
+    {object:nativekit.sim.SimObject, grip:SimulatedElectricGripper, mass:robotkit.tool.MassProperties}
   > = [];
   public var retentionFault(default, null):Dynamic = null;
   public function carrying(side:String):Bool return payloads.exists(side);
@@ -93,10 +89,7 @@ class TendingElectricSimDriver implements TendingElectricEdgeDriver {
     harness:SimulationHarness,
     runtime:RobotRuntime,
     scene:TendingElectricSimScene,
-    names:Map<
-      Int,
-      String
-  >,
+    names:Map<Int, String>,
     grips:Array<SimulatedElectricGripper>
   ) {
     this.harness = harness;
@@ -157,14 +150,8 @@ class TendingElectricSimDriver implements TendingElectricEdgeDriver {
         0,
         0,
         10 * delta / Math.pow(duration, 3),
-        -15 * delta / Math.pow(
-          duration,
-          4
-        ),
-        6 * delta / Math.pow(
-          duration,
-          5
-        )
+        -15 * delta / Math.pow(duration, 4),
+        6 * delta / Math.pow(duration, 5)
       ];
       for (power in 0...6) coefficients.offset(j * 6 + power).store(row[power]);
     }
@@ -176,18 +163,9 @@ class TendingElectricSimDriver implements TendingElectricEdgeDriver {
     )];
     var arrays = new robotkit.execution.SegmentArrays(
       new NativeSpan<Int64>(starts, 1),
-      new NativeSpan<Int64>(
-        durations,
-        1
-      ),
-      new NativeSpan<Int>(
-        degrees,
-        1
-      ),
-      new NativeSpan<Float>(
-        coefficients,
-        36
-      ),
+      new NativeSpan<Int64>(durations, 1),
+      new NativeSpan<Int>(degrees, 1),
+      new NativeSpan<Float>(coefficients, 36),
       scene.armJoints,
       measured,
       couplings
@@ -226,15 +204,7 @@ class TendingElectricSimDriver implements TendingElectricEdgeDriver {
       var p = harness.simulation.objectPose(payload.object);
       var c = payload.mass.centerOfMass;
       var point = materia.assembly.AssemblyFrames.transformPoint(
-        {
-          x: p.x,
-          y: p.y,
-          z: p.z,
-          qx: p.qx,
-          qy: p.qy,
-          qz: p.qz,
-          qw: p.qw
-        },
+        {x: p.x, y: p.y, z: p.z, qx: p.qx, qy: p.qy, qz: p.qz, qw: p.qw},
         c.x,
         c.y,
         c.z

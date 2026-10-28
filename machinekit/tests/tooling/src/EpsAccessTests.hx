@@ -53,14 +53,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     } else {
       region = Difference(
         Union([box(0, 0, 0, 80, 90, 100), box(-30, -10, -10, 30, 110, 120)]),
-        [box(
-          -40,
-          20,
-          0,
-          100,
-          50,
-          18
-        )]
+        [box(-40, 20, 0, 100, 50, 18)]
       );
       frame = F.fromRotationMatrix(0, 0, 0, [0, 0, 1, 1, 0, 0, 0, 1, 0]);
     }
@@ -210,26 +203,11 @@ import machinekit.tooling.NativeCastingMoldKernel;
       id: "side-pocket",
       kind: ServiceOpening,
       geometry: {
-        solid: Cut(materia.casting.CastingSolid.Box(
-          30,
-          40,
-          30
-        )),
-        pose: F.translation(
-          0,
-          bounds.y + bounds.depth - 20,
-          30
-        )
+        solid: Cut(materia.casting.CastingSolid.Box(30, 40, 30)),
+        pose: F.translation(0, bounds.y + bounds.depth - 20, 30)
       },
       openings: [materia.casting.CastingPatterns.face("body.y-max")],
-      draft: {
-        degrees: 0,
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
-      },
+      draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
       cornerRadius: 0,
       owner: null,
       adjustable: []
@@ -276,11 +254,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     insert.body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(40, 35, 19));
     insert.interfaces = [{
       id: "finished-seat",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        15
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 15)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
       allowanceMm: 4,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing error allocation"),
@@ -333,10 +307,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     var hole = materia.tooling.casting.InsertFixturePlanner.availableHoles(insert)[0];
     var selected = materia.tooling.casting.InsertFixturePlanner.select(
       hole,
-      F.compose(
-        document.setup.sourceToMold,
-        insert.pose
-      ),
+      F.compose(document.setup.sourceToMold, insert.pose),
       fixture.mountingFace,
       document.recipe.hardware
     );
@@ -400,26 +371,11 @@ import machinekit.tooling.NativeCastingMoldKernel;
       kind: item.id == "bed-void" ? materia.casting.CastingFeature.CastingFeatureKind.Lightening
       : materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
       geometry : {
-        solid : materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-          40,
-          40,
-          60
-        )),
-        pose : F.translation(
-          item.id == "bed-void" ? -10 : 10,
-          item.y,
-          item.z
-        )
+        solid : materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(40, 40, 60)),
+        pose : F.translation(item.id == "bed-void" ? -10 : 10, item.y, item.z)
       },
       openings : [materia.casting.CastingPatterns.face(item.face)],
-      draft : {
-        degrees : 0,
-        axis : {
-          x : 0,
-          y : 0,
-          z : 1
-        }
-      },
+      draft : {degrees : 0, axis : {x : 0, y : 0, z : 1}},
       cornerRadius : 0,
       owner : null,
       adjustable : []
@@ -429,11 +385,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
       item.id,
       item.strategy,
       item.priority,
-      {
-        x: 0.0,
-        y: 0.0,
-        z: item.sign
-      }
+      {x: 0.0, y: 0.0, z: item.sign}
     );
     document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(document.input);
 
@@ -518,11 +470,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
       hardwareId: "mask",
       plugLength: null,
       farEndId: null,
-      withdrawal: {
-        x: 0,
-        y: 0,
-        z: -1
-      }
+      withdrawal: {x: 0, y: 0, z: -1}
     };
     var volume:materia.tooling.casting.CastingMoldPlan.MoldVolume = {
       id: "datum",
@@ -535,11 +483,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     var support:materia.tooling.casting.CastingMoldPlan.MoldFixtureSupport = OnDatum(
       volume,
       {x: 0, y: 0, z: -1},
-      {
-        primaryId: "pin",
-        secondaryId: "slot",
-        baselineMm: 20
-      }
+      {primaryId: "pin", secondaryId: "slot", baselineMm: 20}
     );
     var direction = machinekit.tooling.CastingMoldCad.maskAssemblyDirection(hole, protection, support);
     check(direction.z == 1, "A plain through mask enters from the open far end above its bed datum");
@@ -554,38 +498,10 @@ import machinekit.tooling.NativeCastingMoldKernel;
       steel = scope.own(steel.translated(new cadkit.modeling.Vector(0, 0, 40)));
       var mask = scope.own(bore.translated(new cadkit.modeling.Vector(0, 0, 40)));
       var members:Array<machinekit.tooling.SweptRemoval.RemovalMember> = [
-        {
-          id: "bed",
-          part: bed,
-          direction: new cadkit.modeling.Vector(
-            0,
-            0,
-            1
-          )
-        },
-        {
-          id: "datum",
-          part: datum,
-          direction: new cadkit.modeling.Vector(
-            0,
-            0,
-            1
-          )
-        },
-        {
-          id: "steel",
-          part: steel,
-          direction: new cadkit.modeling.Vector(
-            0,
-            0,
-            1
-          )
-        },
-        {
-          id: "mask",
-          part: mask,
-          direction: direction
-        }
+        {id: "bed", part: bed, direction: new cadkit.modeling.Vector(0, 0, 1)},
+        {id: "datum", part: datum, direction: new cadkit.modeling.Vector(0, 0, 1)},
+        {id: "steel", part: steel, direction: new cadkit.modeling.Vector(0, 0, 1)},
+        {id: "mask", part: mask, direction: direction}
       ];
       var assembly = machinekit.tooling.SweptRemoval.analyze(members, 1e-4);
       var edges = [for (edge in assembly.blocking) edge.movingId + "->" + edge.blockerId];
@@ -638,26 +554,11 @@ import machinekit.tooling.NativeCastingMoldKernel;
         id: "fixing-access",
         kind: materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
         geometry: {
-          solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(
-            25,
-            40,
-            70
-          )),
-          pose: F.translation(
-            right - size.height - 12.5 + proud,
-            0,
-            30
-          )
+          solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Box(25, 40, 70)),
+          pose: F.translation(right - size.height - 12.5 + proud, 0, 30)
         },
         openings: [materia.casting.CastingPatterns.face("body.z-max")],
-        draft: {
-          degrees: 0,
-          axis: {
-            x: 0,
-            y: 0,
-            z: 1
-          }
-        },
+        draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
         cornerRadius: 0,
         owner: null,
         adjustable: []
@@ -669,11 +570,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
       "fixing-access",
       materia.tooling.casting.CastingSetup.CoreStrategy.ReusableFormer,
       10,
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      {x: 0, y: 0, z: 1}
     );
     document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(document.input);
     return document;
@@ -781,14 +678,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     recipe.hardware.minimumBridgeWidth = 80;
     var cavity = {x: -300.0, y: -200.0, z: 0.0, width: 600.0, depth: 400.0, height: 60.0};
     var cores = [for (index in 0...2) MoldCoreLayers.box(
-      {
-        x: index == 0 ? -180.0 : 100.0,
-        y : -40.0 + 20 * index,
-        z : 0.0,
-        width : 80.0,
-        depth : 80.0,
-        height : 60.0
-      },
+      {x: index == 0 ? -180.0 : 100.0, y : -40.0 + 20 * index, z : 0.0, width : 80.0, depth : 80.0, height : 60.0},
       "row-" + index,
       recipe,
       materia.tooling.casting.CoreSupport.CoreSupportKind.Bridge
@@ -815,13 +705,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
     var hole = materia.casting.CastingProfiles.rectangle(45, 35, 30, 30);
     var receiver = {x: 0.0, y: 0.0, z: 0.0, width: 120.0, depth: 100.0, height: 1.0};
     var patch = materia.tooling.casting.EPSAccessNetworks.contactRectangle(
-      [
-        {depth: 0, contour: profile},
-        {
-          depth: 1,
-          contour: hole
-        }
-      ],
+      [{depth: 0, contour: profile}, {depth: 1, contour: hole}],
       receiver,
       'contact-with-datum',
       20
@@ -832,18 +716,9 @@ import machinekit.tooling.NativeCastingMoldKernel;
       {x: 0.0, y: 0.0},
       {x: 120.0, y: 0.0},
       {x: 120.0, y: 40.0},
-      {
-        x: 40.0,
-        y: 40.0
-      },
-      {
-        x: 40.0,
-        y: 100.0
-      },
-      {
-        x: 0.0,
-        y: 100.0
-      }
+      {x: 40.0, y: 40.0},
+      {x: 40.0, y: 100.0},
+      {x: 0.0, y: 100.0}
     ]);
     patch = materia.tooling.casting.EPSAccessNetworks.contactRectangle(
       [{depth: 0, contour: concave}],
@@ -855,14 +730,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
       [patch],
       [
         {x: 0.0, y: 0.0, z: 0.0, width: 120.0, depth: 40.0, height: 1.0},
-        {
-          x: 0.0,
-          y: 40.0,
-          z: 0.0,
-          width: 40.0,
-          depth: 60.0,
-          height: 1.0
-        }
+        {x: 0.0, y: 40.0, z: 0.0, width: 40.0, depth: 60.0, height: 1.0}
       ]
     )) > 1e-7) throw 'Certified EPS foot crosses a concave branch: ' + haxe.Json.stringify(patch);
     var gapCore = materia.tooling.casting.MoldCoreLayers.box(
@@ -880,32 +748,14 @@ import machinekit.tooling.NativeCastingMoldKernel;
         recipe.routerDiameter,
         recipe.minimumLigament
       ),
-      pose: materia.assembly.AssemblyFrames.translation(
-        0,
-        0,
-        -recipe.panel.measuredThickness
-      ),
-      withdrawal: {
-        x: 0.0,
-        y: 0.0,
-        z: -1.0
-      }
+      pose: materia.assembly.AssemblyFrames.translation(0, 0, -recipe.panel.measuredThickness),
+      withdrawal: {x: 0.0, y: 0.0, z: -1.0}
     };
     var foam = materia.tooling.casting.MoldCores.singleBox(gapCore.foamEnvelope, gapCore.id);
     materia.tooling.casting.CoreSupports.socketFoot(
       gapCore,
-      {
-        x: foam.x,
-        y: foam.y,
-        width: foam.width,
-        depth: foam.depth
-      },
-      {
-        x: 20.0,
-        y: 20.0,
-        width: 100.0,
-        depth: 100.0
-      },
+      {x: foam.x, y: foam.y, width: foam.width, depth: foam.depth},
+      {x: 20.0, y: 20.0, width: 100.0, depth: 100.0},
       0,
       10,
       recipe,
@@ -985,21 +835,13 @@ import machinekit.tooling.NativeCastingMoldKernel;
             index == 0 ? 60 : 30,
             index == 0 ? 50 : 30
           )),
-          pose : F.translation(
-            index == 0 ? -20 : 40,
-            0,
-            index == 0 ? 0 : 10
-          )
+          pose : F.translation(index == 0 ? -20 : 40, 0, index == 0 ? 0 : 10)
         }, openings : index == 0 ? [
           materia.casting.CastingPatterns.face("body.z-min"),
           materia.casting.CastingPatterns.feature("drive-channel")
         ] : [materia.casting.CastingPatterns.feature("shaft")], draft : {
           degrees : 0,
-          axis : {
-            x : 0,
-            y : 0,
-            z : 1
-          }
+          axis : {x : 0, y : 0, z : 1}
         }, cornerRadius : 0, owner : null, adjustable : []
     }
     ];
@@ -1008,11 +850,7 @@ import machinekit.tooling.NativeCastingMoldKernel;
       feature.id,
       SacrificialEPS,
       0,
-      {
-        x: 0.0,
-        y: 0.0,
-        z: -1.0
-      }
+      {x: 0.0, y: 0.0, z: -1.0}
     );
     document.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(document.input);
     var before = materia.tooling.ToolingCodec.encodeInput(document.input);
@@ -1038,25 +876,11 @@ import machinekit.tooling.NativeCastingMoldKernel;
       id: "round-neighbour",
       kind: materia.casting.CastingFeature.CastingFeatureKind.ServiceOpening,
       geometry: {
-        solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(
-          20,
-          50
-        )),
-        pose: F.translation(
-          90,
-          0,
-          0
-        )
+        solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(20, 50)),
+        pose: F.translation(90, 0, 0)
       },
       openings: [materia.casting.CastingPatterns.face("body.z-min")],
-      draft: {
-        degrees: 0,
-        axis: {
-          x: 0,
-          y: 0,
-          z: 1
-        }
-      },
+      draft: {degrees: 0, axis: {x: 0, y: 0, z: 1}},
       cornerRadius: 0,
       owner: null,
       adjustable: []

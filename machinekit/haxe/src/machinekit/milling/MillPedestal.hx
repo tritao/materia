@@ -80,11 +80,7 @@ class MillPedestal extends MineralFoundation {
           CastingPatterns.face("body.side-5"),
           CastingPatterns.face("body.side-7")
         ],
-        pose: AssemblyFrames.translation(
-          0,
-          0,
-          height - d.capEmbedment
-        )
+        pose: AssemblyFrames.translation(0, 0, height - d.capEmbedment)
       }]
     );
   }

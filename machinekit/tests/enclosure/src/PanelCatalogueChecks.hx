@@ -54,13 +54,7 @@ class PanelCatalogueChecks {
       RouterCut,
       "trim",
       None,
-      {
-        coolantRecord: null,
-        heatLimitC: null,
-        fireClass: "claimed",
-        fireRecord: null,
-        impactRecord: null
-      }
+      {coolantRecord: null, heatLimitC: null, fireClass: "claimed", fireRecord: null, impactRecord: null}
     );
     }, "source record");
     rejected(() -> {new LaminatedPanel(
@@ -70,11 +64,7 @@ class PanelCatalogueChecks {
       "trim",
       None,
       null,
-      {
-        value: 1e9,
-        basis: machinekit.transmission.ValueBasis.Measured,
-        source: ""
-      }
+      {value: 1e9, basis: machinekit.transmission.ValueBasis.Measured, source: ""}
     );
     }, "missing source");
     rejected(() -> {PanelCatalogue.require("missing");

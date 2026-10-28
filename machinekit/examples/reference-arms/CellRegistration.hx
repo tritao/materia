@@ -91,12 +91,7 @@ class CellRegistration {
   };
   static function transform(f:AssemblyFrame):Transform3 return new Transform3(
     new Vec3(f.x, f.y, f.z),
-    new Quat(
-      f.qx,
-      f.qy,
-      f.qz,
-      f.qw
-    )
+    new Quat(f.qx, f.qy, f.qz, f.qw)
   );
   static function pose(f:AssemblyFrame):Pose3 return new Pose3(f.x, f.y, f.z, f.qx, f.qy, f.qz, f.qw);
   static function pieces(scene:SceneArtifactData, ?overrideDoor:Bool):Array<RegisteredPiece> {
@@ -113,10 +108,7 @@ class CellRegistration {
       for (i in 0...hulls.length) result.push({
         name: o.id + (hulls.length > 1 ? '/piece$i' : ''),
         vertices : [for (value in hulls[i]) value * scene.metresPerUnit],
-        frame : scaled(
-          state.worldPose(o.id),
-          scene.metresPerUnit
-        )
+        frame : scaled(state.worldPose(o.id), scene.metresPerUnit)
       });
     }
     return result;
@@ -155,10 +147,7 @@ class CellRegistration {
           massKg: mass,
           centerLocalMetres: [for (v in part.centerOfMass) v * scale],
           inertiaLocalKgM2: inertia,
-          frameMetres: scaled(
-            state.worldPose(o.id),
-            scale
-          ),
+          frameMetres: scaled(state.worldPose(o.id), scale),
           declaredMass: part.physicalMassDeclared
         });
       }
@@ -332,10 +321,7 @@ class CellRegistration {
     var tools:Map<String, Array<RegisteredPiece>> = [];
     for (entry in toolStates) tools.set(
       Std.string(entry.holding),
-      [for (p in pieces(readScene(
-        Std.string(entry.file),
-        Std.string(entry.sha256)
-      ))) if (StringTools.startsWith(
+      [for (p in pieces(readScene(Std.string(entry.file), Std.string(entry.sha256)))) if (StringTools.startsWith(
         p.name,
         "tool/"
       )) p]
@@ -367,14 +353,7 @@ class CellRegistration {
         var lift:Float = suffix == "" ? 0 : config.approachMm;
         targets.push({
           name: station + suffix,
-          frame: AssemblyFrames.compose(
-            AssemblyFrames.translation(
-              0,
-              0,
-              lift / 1000
-            ),
-            target
-          )
+          frame: AssemblyFrames.compose(AssemblyFrames.translation(0, 0, lift / 1000), target)
         });
       }
     }
@@ -500,19 +479,13 @@ class CellRegistration {
             "fixture/" + piece.name,
             Fixture,
             piece.vertices,
-            transform(AssemblyFrames.compose(
-              baseInverse,
-              piece.frame
-            ))
+            transform(AssemblyFrames.compose(baseInverse, piece.frame))
           );
           builder.add(
             "seated/mill-stock",
             Loose,
             stockPiece.vertices,
-            transform(AssemblyFrames.compose(
-              baseInverse,
-              stockPiece.frame
-            ))
+            transform(AssemblyFrames.compose(baseInverse, stockPiece.frame))
           );
           for (piece in tools.get(holding)) {
             var local = AssemblyFrames.compose(flangePose, AssemblyFrames.compose(inverseMount, piece.frame));
@@ -555,13 +528,7 @@ class CellRegistration {
               "seated/" + Std.string(entry.name),
               Loose,
               stockPiece.vertices,
-              transform(AssemblyFrames.compose(
-                baseInverse,
-                scaled(
-                  frame,
-                  0.001
-                )
-              ))
+              transform(AssemblyFrames.compose(baseInverse, scaled(frame, 0.001)))
             );
           }
           var width:Float = config.pedestalWidthMm;
@@ -571,15 +538,7 @@ class CellRegistration {
             box(width / 1000, width / 1000, candidate[2] / 1000),
             transform(AssemblyFrames.compose(
               baseInverse,
-              {
-                x: base.x,
-                y: base.y,
-                z: 0.0,
-                qx: 0.0,
-                qy: 0.0,
-                qz: 0.0,
-                qw: 1.0
-              }
+              {x: base.x, y: base.y, z: 0.0, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0}
             ))
           );
           var result = builder.clearance(() -> new collisionkit.native.NativeCollisionWorld());
@@ -638,15 +597,7 @@ class CellRegistration {
           var selectedYaw = 0.0;
           for (roll in [0.0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]) {
             var orientation = AssemblyFrames.compose(
-              {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                qx: 0.0,
-                qy: 0.0,
-                qz: Math.sin(roll / 2),
-                qw: Math.cos(roll / 2)
-              },
+              {x: 0.0, y: 0.0, z: 0.0, qx: 0.0, qy: 0.0, qz: Math.sin(roll / 2), qw: Math.cos(roll / 2)},
               {
                 x: 0.0,
                 y: 0.0,
@@ -676,14 +627,7 @@ class CellRegistration {
             if (options.length == 0) for (seed in [
               reference,
               [1.7, 0.6, 0.5, 2.6, -1.57, 1.4],
-              [
-                -1.7,
-                0.6,
-                0.5,
-                2.6,
-                -1.57,
-                -1.4
-              ]
+              [-1.7, 0.6, 0.5, 2.6, -1.57, -1.4]
             ]) {
               var q = solver.solvePose(wanted, seed, tolerance);
               if (q != null) options.push(q);
@@ -735,11 +679,7 @@ class CellRegistration {
         if (refining) {
           for (spec in [
             {station: "outfeed-0-1", channel: "B", from: "A"},
-            {
-              station: "outfeed-0-2",
-              channel: "A",
-              from: "B"
-            }
+            {station: "outfeed-0-2", channel: "A", from: "B"}
           ]) {
             var upper = [for (p in solved) if (p.name == spec.station + "-clearance"
               && p.channel == spec.channel) p][0];
@@ -751,15 +691,7 @@ class CellRegistration {
               stage.q,
               upper.q,
               lower.q,
-              [for (holding in [
-                "empty",
-                "A",
-                "B",
-                "AB"
-              ]) world(
-                "Closed",
-                holding
-              )]
+              [for (holding in ["empty", "A", "B", "AB"]) world("Closed", holding)]
             );
             if (selection.clearance != null) {
               upper.q = selection.clearance;
@@ -786,10 +718,7 @@ class CellRegistration {
             solvers,
             goals,
             base,
-            [for (holding in ["empty", "A", "B", "AB"]) world(
-              "Open",
-              holding
-            )]
+            [for (holding in ["empty", "A", "B", "AB"]) world("Open", holding)]
           );
           var portalPoints:Array<Array<Float>> = portal.points;
           for (q in portalPoints) waypointPool.push(q);
@@ -894,11 +823,7 @@ class CellRegistration {
           if (refining) sys.io.File.saveContent(
             ROOT + "/original-refinement-progress.json",
             haxe.Json.stringify(
-              {
-                routes: routes,
-                edgeChecks: roadmap.edgeChecks,
-                cacheHits: roadmap.cacheHits
-              },
+              {routes: routes, edgeChecks: roadmap.edgeChecks, cacheHits: roadmap.cacheHits},
               null,
               "  "
             )

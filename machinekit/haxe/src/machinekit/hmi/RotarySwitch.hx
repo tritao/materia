@@ -19,43 +19,15 @@ class RotarySwitch extends HmiPart {
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
     R.count("positions", 12),
-    R.length(
-      "knobDiameter",
-      25
-    ),
-    R.length(
-      "knobHeight",
-      18
-    ),
-    R.length(
-      "bushDiameter",
-      10
-    ),
-    R.length(
-      "panelThickness",
-      3
-    ),
-    R.length(
-      "nutDiameter",
-      14
-    ),
-    R.length(
-      "nutThickness",
-      2
-    ),
-    R.length(
-      "bodyDiameter",
-      30
-    ),
-    R.length(
-      "behindDepth",
-      25
-    ),
-    R.scalar(
-      "massGrams",
-      25,
-      1
-    )
+    R.length("knobDiameter", 25),
+    R.length("knobHeight", 18),
+    R.length("bushDiameter", 10),
+    R.length("panelThickness", 3),
+    R.length("nutDiameter", 14),
+    R.length("nutThickness", 2),
+    R.length("bodyDiameter", 30),
+    R.length("behindDepth", 25),
+    R.scalar("massGrams", 25, 1)
   ];
 
   public function new(?v:ComponentValues) {
@@ -107,22 +79,8 @@ class RotarySwitch extends HmiPart {
     return [new DeviceBodySpec("switch", "rotary switch body", "ABS black", function() {
       return Solids.union([
         Solids.named(Part.cylinderSpan(n("bushDiameter") / 2, -t - nut, 0.0), "bush"),
-        Solids.named(
-          Part.cylinderSpan(
-            n("nutDiameter") / 2,
-            -t - nut,
-            -t
-          ),
-          "nut"
-        ),
-        Solids.named(
-          Part.cylinderSpan(
-            n("bodyDiameter") / 2,
-            -n("behindDepth"),
-            -t - nut
-          ),
-          "body"
-        )
+        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
+        Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
       ]);
     }
     ), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
@@ -133,14 +91,8 @@ class RotarySwitch extends HmiPart {
           {r: r - 1.0, z: 0.0},
           {r: r, z: 1.0},
           {r: r, z: k - 2.0},
-          {
-            r: r - 2.0,
-            z: k
-          },
-          {
-            r: 0.0,
-            z: k
-          }
+          {r: r - 2.0, z: k},
+          {r: 0.0, z: k}
         ]),
         "knob"
       );

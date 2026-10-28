@@ -31,18 +31,9 @@ class RailSeatTests {
     var assembly = new MachineAssembly();
     assembly.include("frame", frame);
     var groups = [
-      {
-        name: "xyStage",
-        foundation: frame.base,
-        prefix: "frame/base",
-        rails: MillRailPlacement.y(frame.xyAxis.guided())
-      },
-      {
-        name: "zAxis",
-        foundation: frame.column,
-        prefix: "frame/column",
-        rails: MillRailPlacement.z(frame.zAxis)
-      }
+      {name: "xyStage",
+      foundation: frame.base, prefix: "frame/base", rails: MillRailPlacement.y(frame.xyAxis.guided())},
+      {name: "zAxis", foundation: frame.column, prefix: "frame/column", rails: MillRailPlacement.z(frame.zAxis)}
     ];
     for (group in groups) {
       var rails = new MachineAssembly();
@@ -145,10 +136,7 @@ class RailSeatTests {
       bad.addDesignRequirement(Coaxial(
         "deliberate-misalignment",
         {member: "screw", feature: "head"},
-        {
-          member: "steel",
-          feature: requirement.holeId
-        },
+        {member: "steel", feature: requirement.holeId},
         1e-6
       ));
       var failed = AssemblyDesignChecks.check(bad);

@@ -32,49 +32,17 @@ class ThreePhaseRectifier extends PowerSupply {
     if (rectifierRecipe == null) rectifierRecipe = new ComponentType(
       "machinekit.power.three-phase-rectifier",
       [
-        ComponentRecipeSupport.scalar(
-          "lineVoltage",
-          400,
-          0.001
-        ),
-        ComponentRecipeSupport.scalar(
-          "frequency",
-          50,
-          0.001
-        ),
-        ComponentRecipeSupport.scalar(
-          "current",
-          20,
-          0.001
-        ),
-        ComponentRecipeSupport.count(
-          "outlets",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          240
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          120
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          100
-        ),
-        ComponentRecipeSupport.scalar(
-          "regenerativePower",
-          8000,
-          0
-        )
+        ComponentRecipeSupport.scalar("lineVoltage", 400, 0.001),
+        ComponentRecipeSupport.scalar("frequency", 50, 0.001),
+        ComponentRecipeSupport.scalar("current", 20, 0.001),
+        ComponentRecipeSupport.count("outlets", 4),
+        ComponentRecipeSupport.length("width", 240),
+        ComponentRecipeSupport.length("height", 120),
+        ComponentRecipeSupport.length("depth", 100),
+        ComponentRecipeSupport.scalar("regenerativePower", 8000, 0)
       ],
       v -> new ThreePhaseRectifier(
-        new AcMains(
-          ThreePhase,
-          new AcRmsVoltage(v.number("lineVoltage")),
-          v.number("frequency")
-        ),
+        new AcMains(ThreePhase, new AcRmsVoltage(v.number("lineVoltage")), v.number("frequency")),
         new DcCurrent(v.number("current")),
         v.integer("outlets"),
         v.number("width"),

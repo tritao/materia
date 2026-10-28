@@ -12,28 +12,11 @@ class BrakeResistor extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("resistance", 80, "ohm"),
-    P.quantity(
-      "continuousPower",
-      1000,
-      "W"
-    ),
-    P.quantity(
-      "pulseEnergy",
-      15000,
-      "J"
-    ),
-    P.length(
-      "width",
-      80
-    ),
-    P.length(
-      "length",
-      300
-    ),
-    P.length(
-      "height",
-      60
-    )
+    P.quantity("continuousPower", 1000, "W"),
+    P.quantity("pulseEnergy", 15000, "J"),
+    P.length("width", 80),
+    P.length("length", 300),
+    P.length("height", 60)
   ];
   public function new(?v:ComponentValues) {
     super("brake-resistor", "VFD braking resistor", "aluminium 6061", inputs(), v);

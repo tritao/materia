@@ -14,22 +14,8 @@ class TendingPhysicalMassChecks {
       materialId: "aluminium",
       density: 2700,
       volume: 72000,
-      centerOfMass: [
-        0,
-        0,
-        10
-      ],
-      inertia: [
-        24000000,
-        0,
-        0,
-        0,
-        24000000,
-        0,
-        0,
-        0,
-        43200000
-      ]
+      centerOfMass: [0, 0, 10],
+      inertia: [24000000, 0, 0, 0, 24000000, 0, 0, 0, 43200000]
     };
     var resolved = AssemblyPhysicalPartView.massProperties(part,
       0.001), tensor:robotkit.spatial.Inertia3 = cast resolved.inertia;

@@ -63,19 +63,10 @@ class BlockBracket extends MachineComponent {
     if (recipe == null) recipe = new machinekit.component.ComponentType(
       "machinekit.structural.block-bracket",
       [
-        machinekit.component.ComponentRecipeSupport.text(
-          "label",
-          "bracket"
-        ),
-        machinekit.component.ComponentRecipeSupport.text(
-          "blocks",
-          '[{"min":[0,0,0],"max":[10,10,10]}]'
-        )
+        machinekit.component.ComponentRecipeSupport.text("label", "bracket"),
+        machinekit.component.ComponentRecipeSupport.text("blocks", '[{"min":[0,0,0],"max":[10,10,10]}]')
       ],
-      v -> new BlockBracket(
-        v.token("label"),
-        readBlocks(v.token("blocks"))
-      ),
+      v -> new BlockBracket(v.token("label"), readBlocks(v.token("blocks"))),
       true
     );
     return recipe;

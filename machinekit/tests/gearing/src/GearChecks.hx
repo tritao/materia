@@ -49,11 +49,7 @@ class GearChecks {
   static function events(ratio:Float, rpm:Float = 3000):Array<TimedEvent> {
     var result = [
       new TimedEvent(Int64.ofInt(0), "hob.speed", Analog(rpm)),
-      new TimedEvent(
-        Int64.ofInt(0),
-        "hob.direction",
-        Analog(1)
-      )
+      new TimedEvent(Int64.ofInt(0), "hob.direction", Analog(1))
     ];
     for (value in GearEvents.engage(1, [new GearTerm(0, ratio, 1000000, 2 * Math.PI / 8388608)], 4000)) switch value {
       case Process(command, argument):
@@ -71,10 +67,7 @@ class GearChecks {
     var still = new ArrayStreamSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Int64.ofInt(1000000000),
-      coefficients: [[
-        0.0,
-        0.0
-      ]]
+      coefficients: [[0.0, 0.0]]
     }]);
     var good = checker.checkSegments(still, 0, 0, events(1 / 200));
     check(good.diagnostics.length == 0, "15 rpm geared table passes");
@@ -108,10 +101,7 @@ class GearChecks {
     var additive = new ArrayStreamSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Int64.ofInt(1000000000),
-      coefficients: [[
-        0.0,
-        1.0
-      ]]
+      coefficients: [[0.0, 1.0]]
     }]);
     var sum = checker.checkSegments(additive, 3, 0, events(1 / 100));
     check(
@@ -128,14 +118,7 @@ class GearChecks {
       still,
       5,
       0,
-      [new TimedEvent(
-        Int64.ofInt(0),
-        GearEvents.channel(1),
-        Process(
-          "gear.release",
-          0
-        )
-      )]
+      [new TimedEvent(Int64.ofInt(0), GearEvents.channel(1), Process("gear.release", 0))]
     );
     check(released.diagnostics.length == 0, "release clears geared speed");
     // A one-nanosecond overspeed interval between the ordinary sampling grid still gets checked.
@@ -152,16 +135,7 @@ class GearChecks {
     var masterPlan = new ArrayStreamSegments([{
       timeFromStartNs: Int64.ofInt(0),
       durationNs: Int64.ofInt(1000000000),
-      coefficients: [
-        [
-          0.0,
-          100 * Math.PI
-        ],
-        [
-          0.0,
-          0.0
-        ]
-      ]
+      coefficients: [[0.0, 100 * Math.PI], [0.0, 0.0]]
     }]);
     var ordinaryEvents = events(1 / 200);
     check(
@@ -188,18 +162,8 @@ class GearChecks {
     near(timing.loopHz, 4000, 1e-9, "driver and owner provide loop rate");
     var span = Provenance.cam(0);
     var lowered = new ToolpathLowering(binding).lower([
-      ToolpathOp.ElectronicGear(
-        "table/C",
-        [new toolpathkit.path.GearTerm(
-          "spindle/B",
-          1 / 200
-        )],
-        span
-      ),
-      ToolpathOp.ReleaseGear(
-        "table/C",
-        span
-      )
+      ToolpathOp.ElectronicGear("table/C", [new toolpathkit.path.GearTerm("spindle/B", 1 / 200)], span),
+      ToolpathOp.ReleaseGear("table/C", span)
     ]);
     var program = lowered.program;
     if (program == null) throw "missing gear program";

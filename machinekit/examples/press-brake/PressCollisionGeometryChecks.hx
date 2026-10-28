@@ -42,22 +42,10 @@ class PressCollisionGeometryChecks {
       [
         new Vector(x - h, y - h, z - h),
         new Vector(x + h, y - h, z - h),
-        new Vector(
-          x + h,
-          y + h,
-          z - h
-        ),
-        new Vector(
-          x - h,
-          y + h,
-          z - h
-        )
+        new Vector(x + h, y + h, z - h),
+        new Vector(x - h, y + h, z - h)
       ],
-      new Vector(
-        0,
-        0,
-        2 * h
-      )
+      new Vector(0, 0, 2 * h)
     );
   }
   static function overlaps(bodies:Array<PressCollisionBody>, point:Vector):Bool {
@@ -106,45 +94,16 @@ class PressCollisionGeometryChecks {
     var station = new ToolStation(
       "split",
       new ToolRow(
-        [
-          new ToolSegment(Punch(punch), 100),
-          new ToolSegment(
-            Punch(punch),
-            50,
-            new ToolHorn(
-              ToolHornEnd.Left,
-              10,
-              25
-            )
-          )
-        ],
+        [new ToolSegment(Punch(punch), 100), new ToolSegment(Punch(punch), 50, new ToolHorn(ToolHornEnd.Left, 10, 25))],
         [20]
       ),
-      new ToolRow(
-        [
-          new ToolSegment(
-            SingleV(die),
-            100
-          ),
-          new ToolSegment(
-            SingleV(die),
-            50
-          )
-        ],
-        [30]
-      ),
+      new ToolRow([new ToolSegment(SingleV(die), 100), new ToolSegment(SingleV(die), 50)], [30]),
       700
     );
     var other = new ToolStation(
       "neck",
       new ToolRow([new ToolSegment(Punch(ToolingCatalogue.gooseneck()), 100)], []),
-      new ToolRow(
-        [new ToolSegment(
-          SingleV(die),
-          100
-        )],
-        []
-      ),
+      new ToolRow([new ToolSegment(SingleV(die), 100)], []),
       1100
     );
     var layout = new ToolLayout(1600, [station, other]), geometry = PressGeometry.reference(layout, true, 30);
@@ -245,12 +204,7 @@ class PressCollisionGeometryChecks {
     check(minimum(member(actualMachine, "ramBracketLeft"), 2) == 1120, "Ram bracket follows physical downward stroke");
     var clampId = press.pressGeometryDatums().tools[0].punch + "-clamp";
     var clamp = member(actualMachine, clampId), homeClamp = member(
-      PressCollisionGeometry.machineMembers(
-        actual,
-        0,
-        50,
-        20
-      ),
+      PressCollisionGeometry.machineMembers(actual, 0, 50, 20),
       clampId
     );
     check(
@@ -287,11 +241,7 @@ class PressCollisionGeometryChecks {
       "collision-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(installed.processTooling())),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var sheet = SheetDemoParts.p2(stock), root = sheet.walls()[0], bend = sheet.bends()[0];
     var hole = WallOutline.polygon([new Point2(20, 50), new Point2(30, 50), new Point2(30, 70), new Point2(20, 70)]);
@@ -303,15 +253,8 @@ class PressCollisionGeometryChecks {
       sheet.flat(),
       bend.id,
       installed,
-      new BendOrientation(
-        true,
-        false,
-        -10
-      ),
-      new GaugeEdge(
-        bend.wallB,
-        new WallEdge(1)
-      ),
+      new BendOrientation(true, false, -10),
+      new GaugeEdge(bend.wallB, new WallEdge(1)),
       new AirBending()
     );
     var foreign = new ToolStation(
@@ -327,15 +270,8 @@ class PressCollisionGeometryChecks {
         sheet.flat(),
         bend.id,
         foreign,
-        new BendOrientation(
-          true,
-          false,
-          -10
-        ),
-        new GaugeEdge(
-          bend.wallB,
-          new WallEdge(1)
-        ),
+        new BendOrientation(true, false, -10),
+        new GaugeEdge(bend.wallB, new WallEdge(1)),
         new AirBending()
       );
     } catch (failure:SheetDiagnosis) {
@@ -385,11 +321,7 @@ class PressCollisionGeometryChecks {
         prediction,
         installed.processTooling(),
         actual.station(installed.id),
-        new BendOrientation(
-          false,
-          true,
-          -10
-        )
+        new BendOrientation(false, true, -10)
       );
       var bodies = PressCollisionGeometry.sheet(opposite, pose), active:Array<PressCollisionBody> = [];
       for (body in bodies) switch body.owner {

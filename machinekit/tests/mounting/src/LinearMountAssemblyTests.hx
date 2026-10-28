@@ -22,17 +22,7 @@ class LinearMountAssemblyTests {
       rack.spec.pitchHeightMm - rack.spec.holeHeightMm,
       250,
       thickness + washer.thickness + rack.spec.faceWidthMm,
-      [
-        0,
-        1,
-        0,
-        0,
-        0,
-        -1,
-        -1,
-        0,
-        0
-      ]
+      [0, 1, 0, 0, 0, -1, -1, 0, 0]
     );
     var stock = {x: -height / 2, y: -length / 2, z: 0.0, width: height, depth: length, height: thickness};
     var u = materia.casting.CastingInput.Unresolved("Study placement/transfer accuracy not measured");
@@ -105,16 +95,8 @@ class LinearMountAssemblyTests {
       -centre + 12 + rail.spec.railHeight,
       -200,
       railWidthCoordinate,
-      [
-        1.0,
-        0,
-        0
-      ],
-      [
-        0.0,
-        1,
-        0
-      ]
+      [1.0, 0, 0],
+      [0.0, 1, 0]
     );
     var padHoles:Array<materia.casting.InsertHole> = [], layerHoles:Array<materia.casting.InsertHole> = [];
     function clearance(id:String, x:Float, y:Float, d:Float):Void {
@@ -196,14 +178,7 @@ class LinearMountAssemblyTests {
       for (i in 0...derived.holes.length) {
         var h = derived.holes[i], seat = F.compose(
           rackPose,
-          F.compose(
-            source.connectors[i].frame,
-            F.translation(
-              0,
-              -source.bore.counterboreDepth,
-              0
-            )
-          )
+          F.compose(source.connectors[i].frame, F.translation(0, -source.bore.counterboreDepth, 0))
         );
         var bolt = MountServiceScrews.select(h.id, source, seat, sourceFacet.holes[i], h.frame, [20, 25, 30]);
         var boltPose = F.compose(seat, F.inverse(bolt.connector("head").frame));
@@ -234,11 +209,7 @@ class LinearMountAssemblyTests {
           footElement,
           seat,
           F.alongY(-centre, anchors[i], 31.1, 1, 0, 0),
-          [
-            20,
-            25,
-            30
-          ]
+          [20, 25, 30]
         );
         var boltBody = placed(bolt.screw,
           bolt.screwPose), nutBody = placed(bolt.nut, bolt.nutPose), washerBody = placed(
@@ -278,11 +249,7 @@ class LinearMountAssemblyTests {
       for (i in 0...9) {
         var gear = own(machinekit.assembly.PosedParts.moved(
           pinionRaw,
-          F.translation(
-            rack.spec.pitchHeightMm - rack.spec.holeHeightMm + radius,
-            -225 + i * 56.25,
-            pinionFaceStart
-          )
+          F.translation(rack.spec.pitchHeightMm - rack.spec.holeHeightMm + radius, -225 + i * 56.25, pinionFaceStart)
         ));
         check(gear.distance(receiverBody) >= 1.0, "pinion envelope clears complete receiver/foot");
       }
@@ -292,16 +259,8 @@ class LinearMountAssemblyTests {
           -centre + 12 + rail.spec.railHeight,
           -200 + i * 50,
           railWidthCoordinate,
-          [
-            1.0,
-            0,
-            0
-          ],
-          [
-            0.0,
-            1,
-            0
-          ]
+          [1.0, 0, 0],
+          [0.0, 1, 0]
         );
         var body = placed(block, pose);
         check(body.distance(receiverBody) > 1, "guide block sweep clears outboard foot");

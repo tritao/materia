@@ -38,24 +38,7 @@ class ToolingSourceCasting extends MachineComponent {
             id: "body",
             height: 1,
             pose: F.identity(),
-            profile: [
-              {
-                x: -0.5,
-                y: -0.5
-              },
-              {
-                x: 0.5,
-                y: -0.5
-              },
-              {
-                x: 0.5,
-                y: 0.5
-              },
-              {
-                x: -0.5,
-                y: 0.5
-              }
-            ]
+            profile: [{x: -0.5, y: -0.5}, {x: 0.5, y: -0.5}, {x: 0.5, y: 0.5}, {x: -0.5, y: 0.5}]
           }],
           features: [],
           inserts: []

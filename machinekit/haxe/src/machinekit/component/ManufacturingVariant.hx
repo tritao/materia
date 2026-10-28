@@ -13,12 +13,7 @@ class ManufacturingVariant {
     process:String,
     material:String,
     status:String,
-    hardware:Array<{
-      partNumber:String,
-      quantity:Int,
-      description:String,
-      material:String
-    }>,
+    hardware:Array<{partNumber:String, quantity:Int, description:String, material:String}>,
     pendingChecks:Array<String>
   ) {
     if (id == null || id.length == 0 || process == null || process.length == 0 || material == null || material.length

@@ -75,25 +75,13 @@ class MillGuidedXYStage extends AxisBuilder {
       y,
       z,
       [0, 0, 1],
-      [
-        1,
-        0,
-        0
-      ]
+      [1, 0, 0]
     ) : orient(
       x,
       y,
       z,
-      [
-        0,
-        0,
-        1
-      ],
-      [
-        0,
-        1,
-        0
-      ]
+      [0, 0, 1],
+      [0, 1, 0]
     );
     var yp:Array<AssemblyFrame> = [], xp:Array<AssemblyFrame> = [];
     for (placed in MillRailPlacement.y(l)) {
@@ -112,11 +100,7 @@ class MillGuidedXYStage extends AxisBuilder {
       "blockY0",
       l.block,
       yp[0],
-      {
-        x: 0,
-        y: -1,
-        z: 0
-      },
+      {x: 0, y: -1, z: 0},
       yp.slice(1),
       l.yOvertravel
     );
@@ -183,11 +167,7 @@ class MillGuidedXYStage extends AxisBuilder {
       attach(
         'blockYBolt$i-$hole',
         SocketHeadCapScrew.metric(mountingSize, boltLength),
-        F.translation(
-          p.x,
-          p.y,
-          saddleBottom + MillCrossSaddle.BLOCK_SEAT
-        ),
+        F.translation(p.x, p.y, saddleBottom + MillCrossSaddle.BLOCK_SEAT),
         "saddle"
       );
     }
@@ -195,12 +175,7 @@ class MillGuidedXYStage extends AxisBuilder {
       attach(
         side < 0 ? "railXFront" : "railXRear",
         l.xRail,
-        horizontal(
-          -l.xRail.length / 2,
-          l.centreY + side * l.xRailSpacing / 2,
-          xRailPlane + g.railHeight,
-          true
-        ),
+        horizontal(-l.xRail.length / 2, l.centreY + side * l.xRailSpacing / 2, xRailPlane + g.railHeight, true),
         "saddle"
       );
       for (span in [-l.xBlockSpan, l.xBlockSpan]) xp.push(horizontal(
@@ -216,11 +191,7 @@ class MillGuidedXYStage extends AxisBuilder {
       "blockX0",
       l.block,
       xp[0],
-      {
-        x: -1,
-        y: 0,
-        z: 0
-      },
+      {x: -1, y: 0, z: 0},
       xp.slice(1),
       l.xOvertravel
     );
@@ -230,10 +201,7 @@ class MillGuidedXYStage extends AxisBuilder {
       l.tableWidth,
       l.tableThickness,
       l.riserHeight,
-      l.driveInterfaces ? 34 : Math.max(
-        34,
-        g.blockHoleSpacingAcross + 24
-      ),
+      l.driveInterfaces ? 34 : Math.max(34, g.blockHoleSpacingAcross + 24),
       l.driveInterfaces
     );
     attach("table", table, F.translation(0, l.centreY, tableBottom), "blockX0");

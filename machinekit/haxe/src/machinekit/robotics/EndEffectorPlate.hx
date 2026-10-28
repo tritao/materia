@@ -85,11 +85,7 @@ class EndEffectorPlate extends MachineComponent {
     for (point in toolBoltPattern()) addConnector(
       'toolBolt${i++}',
       Mount,
-      Solids.axial(
-        point.x,
-        point.y,
-        this.thickness
-      )
+      Solids.axial(point.x, point.y, this.thickness)
     );
   }
 
@@ -113,13 +109,7 @@ class EndEffectorPlate extends MachineComponent {
     var bolt = 1;
     for (point in toolBoltPattern()) {
       var tool = Solids.named(
-        Part.cylinderSpan(
-          toolScrew.clearanceDiameter(Medium) / 2,
-          -0.1,
-          thickness + 0.1,
-          point.x,
-          point.y
-        ),
+        Part.cylinderSpan(toolScrew.clearanceDiameter(Medium) / 2, -0.1, thickness + 0.1, point.x, point.y),
         "toolbolt" + bolt++
       );
       tracked.push(tool);
@@ -189,37 +179,15 @@ class EndEffectorPlate extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.end-effector-plate",
       [
-        ComponentRecipeSupport.length(
-          "flangePitchCircle",
-          40
-        ),
-        ComponentRecipeSupport.count(
-          "flangeBoltCount",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "thickness",
-          12
-        ),
-        ComponentRecipeSupport.length(
-          "toolBoltCircleDiameter",
-          65
-        ),
-        ComponentRecipeSupport.count(
-          "toolBoltCount",
-          4
-        ),
-        ComponentRecipeSupport.catalog(
-          "toolMountScrew",
-          toolScrewCatalog(),
-          "M5"
-        )
+        ComponentRecipeSupport.length("flangePitchCircle", 40),
+        ComponentRecipeSupport.count("flangeBoltCount", 4),
+        ComponentRecipeSupport.length("thickness", 12),
+        ComponentRecipeSupport.length("toolBoltCircleDiameter", 65),
+        ComponentRecipeSupport.count("toolBoltCount", 4),
+        ComponentRecipeSupport.catalog("toolMountScrew", toolScrewCatalog(), "M5")
       ],
       v -> new EndEffectorPlate(
-        new RobotFlange(
-          v.number("flangePitchCircle"),
-          v.integer("flangeBoltCount")
-        ),
+        new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
         v.number("thickness"),
         v.number("toolBoltCircleDiameter"),
         v.integer("toolBoltCount"),

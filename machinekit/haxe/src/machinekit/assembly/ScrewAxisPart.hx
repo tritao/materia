@@ -127,32 +127,12 @@ class ScrewAxisPart extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.assembly.twin-rail-screw-part",
       [
-        P.choice(
-          "kind",
-          kinds(),
-          "base"
-        ),
-        P.choice(
-          "revision",
-          ["v2-tapped"],
-          "v2-tapped"
-        ),
-        P.length(
-          "screwLength",
-          400
-        ),
-        P.length(
-          "railLength",
-          300
-        ),
-        P.length(
-          "railSpacing",
-          134
-        ),
-        P.length(
-          "travel",
-          200
-        )
+        P.choice("kind", kinds(), "base"),
+        P.choice("revision", ["v2-tapped"], "v2-tapped"),
+        P.length("screwLength", 400),
+        P.length("railLength", 300),
+        P.length("railSpacing", 134),
+        P.length("travel", 200)
       ],
       v -> new ScrewAxisPart(
         v.token("kind"),

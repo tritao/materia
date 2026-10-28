@@ -55,11 +55,7 @@ class CobotToolLink extends MachineComponent {
     for (point in CobotWristMount.points(module, CLOCKING)) addConnector(
       'inputBolt${index++}',
       Mount,
-      Solids.axial(
-        point.x,
-        point.y,
-        CobotWristLink.HUB_DEPTH
-      )
+      Solids.axial(point.x, point.y, CobotWristLink.HUB_DEPTH)
     );
   }
 
@@ -95,13 +91,7 @@ class CobotToolLink extends MachineComponent {
     var index = 1;
     for (point in CobotWristMount.points(module, CLOCKING)) {
       holes.push(Solids.named(
-        Part.cylinderSpan(
-          CobotWristMount.HOLE_RADIUS,
-          -0.1,
-          CobotWristLink.HUB_DEPTH + 0.1,
-          point.x,
-          point.y
-        ),
+        Part.cylinderSpan(CobotWristMount.HOLE_RADIUS, -0.1, CobotWristLink.HUB_DEPTH + 0.1, point.x, point.y),
         'input-M4-$index'
       ));
       holes.push(Solids.named(
@@ -112,13 +102,7 @@ class CobotToolLink extends MachineComponent {
     index = 1;
     var screw = flange.mountScrewPart(16);
     for (point in flange.boltPattern()) holes.push(Solids.named(
-      Part.cylinderSpan(
-        (screw.diameter + 0.2) / 2,
-        length - 7.5,
-        length + 0.1,
-        point.x,
-        point.y
-      ),
+      Part.cylinderSpan((screw.diameter + 0.2) / 2, length - 7.5, length + 0.1, point.x, point.y),
       'flange-thread-${index++}'
     ));
     var pilot = CobotWristMount.pilot(module);

@@ -121,10 +121,7 @@ class MillMachiningSetup {
     var tool = Tool.shaped(
       1,
       toolLength / 1000,
-      reference.tool.cutter().withHolder(
-        holderDiameter / 1000,
-        (toolLength - reference.tool.stickout) / 1000
-      )
+      reference.tool.cutter().withHolder(holderDiameter / 1000, (toolLength - reference.tool.stickout) / 1000)
     );
     var target = block.geometry();
     var program = BearingBlockJob.generate(
@@ -136,11 +133,7 @@ class MillMachiningSetup {
       "Finished bearing block", target, block.materialId, 0.002));
     target.close();
     data.machining = {
-      setupJoints: [{
-        joint: "workholding/half-opening",
-        position: block.width / 2000,
-        tolerance: 0.00005
-      }],
+      setupJoints: [{joint: "workholding/half-opening", position: block.width / 2000, tolerance: 0.00005}],
       kinematicPreview: true,
       mission: MISSION,
       program: program,
@@ -148,11 +141,7 @@ class MillMachiningSetup {
       spindle: "spindle/spindle",
       channelScope: "spindle",
       workOffset: [for (v in offset) v / 1000],
-      tools: [{
-        number: 1,
-        length: tool.length,
-        profile: tool.profile().encode()
-      }],
+      tools: [{number: 1, length: tool.length, profile: tool.profile().encode()}],
       stocks: ["machining-stock"],
       toolPart: "spindle/tool",
       loadedTool: 1,

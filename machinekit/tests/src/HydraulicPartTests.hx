@@ -66,13 +66,7 @@ class HydraulicPartTests {
         "ram",
         "cylinder",
         "valve",
-        new CylinderPhaseSpeeds(
-          120,
-          80,
-          8,
-          70,
-          68.5
-        )
+        new CylinderPhaseSpeeds(120, 80, 8, 70, 68.5)
       ),
       "Hydraulic binding needs explicit phase speeds"
     );
@@ -84,13 +78,7 @@ class HydraulicPartTests {
         "ram",
         "cylinder",
         "pneumatic-valve",
-        new CylinderPhaseSpeeds(
-          100,
-          80,
-          8,
-          70,
-          68.5
-        )
+        new CylinderPhaseSpeeds(100, 80, 8, 70, 68.5)
       ),
       "Hydraulic cylinder needs a closed-centre hydraulic valve"
     );
@@ -133,23 +121,13 @@ class HydraulicPartTests {
       "guide",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: null,
-        effort: null,
-        overtravel: 0
-      }
+      {lower: 0, upper: 100, velocity: null, effort: null, overtravel: 0}
     );
     var cylinder = new HydraulicCylinder(160, 100, 100);
     result.addComponent(
       "cylinder",
       cylinder,
-      AssemblyFrames.translation(
-        0,
-        0,
-        -cylinder.bodyLength - cylinder.stemLength
-      )
+      AssemblyFrames.translation(0, 0, -cylinder.bodyLength - cylinder.stemLength)
     );
     result.addComponent("supply", new HydraulicSupply(pressurePa));
     result.addComponent("valve", new HydraulicValve());

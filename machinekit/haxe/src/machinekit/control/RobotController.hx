@@ -19,29 +19,12 @@ class RobotController extends ControllerCabinet {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.control.robot-controller",
       [
-        ComponentRecipeSupport.count(
-          "axes",
-          6
-        ),
-        ComponentRecipeSupport.count(
-          "inputs",
-          16
-        ),
-        ComponentRecipeSupport.count(
-          "outputs",
-          16
-        ),
-        ComponentRecipeSupport.count(
-          "valves",
-          4
-        )
+        ComponentRecipeSupport.count("axes", 6),
+        ComponentRecipeSupport.count("inputs", 16),
+        ComponentRecipeSupport.count("outputs", 16),
+        ComponentRecipeSupport.count("valves", 4)
       ],
-      v -> new RobotController(
-        v.integer("axes"),
-        v.integer("inputs"),
-        v.integer("outputs"),
-        v.integer("valves")
-      )
+      v -> new RobotController(v.integer("axes"), v.integer("inputs"), v.integer("outputs"), v.integer("valves"))
     );
     return recipe;
   }

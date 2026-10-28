@@ -127,14 +127,7 @@ class VacuumGenerator extends MachineComponent {
       declareMass(
         m,
         new Vector(0, 0, z / 2),
-        new InertiaTensor(
-          m * (y * y + z * z) / 12,
-          0,
-          0,
-          m * (x * x + z * z) / 12,
-          0,
-          m * (x * x + y * y) / 12
-        )
+        new InertiaTensor(m * (y * y + z * z) / 12, 0, 0, m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12)
       );
     }
   }
@@ -146,25 +139,15 @@ class VacuumGenerator extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.vacuum-generator", [
-      ComponentRecipeSupport.choice(
-        "model",
-        [CUSTOM].concat(catalog().designations()),
-        CUSTOM
-      ),
+      ComponentRecipeSupport.choice("model", [CUSTOM].concat(catalog().designations()), CUSTOM),
       ComponentRecipeSupport.optionalScalar("ratedVacuumKpa")
     ].concat(ComponentRecipeSupport
       .interfaceParameters("airInterface")).concat(ComponentRecipeSupport.interfaceParameters("vacuumInterface")),
     // A catalogue model's row sets every other input.
     v -> v.token("model") != CUSTOM ? model(v.token("model")) : new VacuumGenerator(
       v.optionalNumber("ratedVacuumKpa"),
-      ComponentRecipeSupport.interfaceFrom(
-        v,
-        "airInterface"
-      ),
-      ComponentRecipeSupport.interfaceFrom(
-        v,
-        "vacuumInterface"
-      )
+      ComponentRecipeSupport.interfaceFrom(v, "airInterface"),
+      ComponentRecipeSupport.interfaceFrom(v, "vacuumInterface")
     ), true);
     return recipeTypeCache;
   }

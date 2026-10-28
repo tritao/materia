@@ -98,11 +98,7 @@ class ScrewSupportUnit extends MachineComponent {
     if (vallder != null) for (datum in Vallder15SupportSeats.datums(model, vallder.cadSha256)) addConnector(
       datum.name,
       Axis,
-      Solids.axial(
-        0,
-        0,
-        datum.z
-      )
+      Solids.axial(0, 0, datum.z)
     );
     if (s.base) {
       addConnector("base", Mount, AssemblyFrames.translation(0, -s.shaftHeight, 0));
@@ -116,18 +112,7 @@ class ScrewSupportUnit extends MachineComponent {
     for (p in mountingPositions()) addConnector(
       'mount${index++}',
       Mount,
-      s.base ? AssemblyFrames.alongY(
-        p.x,
-        -s.shaftHeight,
-        p.z,
-        0,
-        1,
-        0
-      ) : Solids.axial(
-        p.x,
-        p.y,
-        s.height
-      )
+      s.base ? AssemblyFrames.alongY(p.x, -s.shaftHeight, p.z, 0, 1, 0) : Solids.axial(p.x, p.y, s.height)
     );
     var weighed = [for (source in s.sources) if (source.massKg != null) source];
     if (weighed.length > 0) {
@@ -249,44 +234,16 @@ class ScrewSupportUnit extends MachineComponent {
       return named;
     }
     var body = Solids.union([
-      keep(
-        box(
-          -s.width / 2,
-          s.width / 2,
-          -s.shaftHeight,
-          -s.shaftHeight + foot,
-          -s.length / 2,
-          s.length / 2
-        ),
-        "foot"
-      ),
+      keep(box(-s.width / 2, s.width / 2, -s.shaftHeight, -s.shaftHeight + foot, -s.length / 2, s.length / 2), "foot"),
       keep(
         Part.prism(
           [
-            new Vector(
-              -upper / 2,
-              -s.shaftHeight + foot - 0.01
-            ),
-            new Vector(
-              upper / 2,
-              -s.shaftHeight + foot - 0.01
-            ),
-            new Vector(
-              upper / 2,
-              top - c
-            ),
-            new Vector(
-              upper / 2 - c,
-              top
-            ),
-            new Vector(
-              -upper / 2 + c,
-              top
-            ),
-            new Vector(
-              -upper / 2,
-              top - c
-            )
+            new Vector(-upper / 2, -s.shaftHeight + foot - 0.01),
+            new Vector(upper / 2, -s.shaftHeight + foot - 0.01),
+            new Vector(upper / 2, top - c),
+            new Vector(upper / 2 - c, top),
+            new Vector(-upper / 2 + c, top),
+            new Vector(-upper / 2, top - c)
           ],
           -s.length / 2,
           s.length / 2
@@ -297,13 +254,7 @@ class ScrewSupportUnit extends MachineComponent {
     var tools = [keep(Part.cylinderSpan(s.bore / 2, -s.length / 2 - 0.1, s.length / 2 + 0.1), "bore")];
     for (p in mountingPositions()) {
       tools.push(keep(
-        Part.cylinderAlongY(
-          s.sources[0].holeDiameter / 2,
-          -s.shaftHeight - 0.1,
-          -s.shaftHeight + foot + 0.1,
-          p.x,
-          p.z
-        ),
+        Part.cylinderAlongY(s.sources[0].holeDiameter / 2, -s.shaftHeight - 0.1, -s.shaftHeight + foot + 0.1, p.x, p.z),
         "bolt-hole"
       ));
       tools.push(keep(
@@ -338,54 +289,23 @@ class ScrewSupportUnit extends MachineComponent {
           [
             new Vector(-half + c, -half),
             new Vector(half - c, -half),
-            new Vector(
-              half,
-              -half + c
-            ),
-            new Vector(
-              half,
-              half - c
-            ),
-            new Vector(
-              half - c,
-              half
-            ),
-            new Vector(
-              -half + c,
-              half
-            ),
-            new Vector(
-              -half,
-              half - c
-            ),
-            new Vector(
-              -half,
-              -half + c
-            )
+            new Vector(half, -half + c),
+            new Vector(half, half - c),
+            new Vector(half - c, half),
+            new Vector(-half + c, half),
+            new Vector(-half, half - c),
+            new Vector(-half, -half + c)
           ],
           0,
           s.height
         ),
         "flange"
       ),
-      keep(
-        Part.cylinderSpan(
-          boss,
-          s.height - 0.01,
-          s.length
-        ),
-        "boss"
-      )
+      keep(Part.cylinderSpan(boss, s.height - 0.01, s.length), "boss")
     ]);
     var tools = [keep(Part.cylinderSpan(s.bore / 2, -0.1, s.length + 0.1), "bore")];
     for (p in mountingPositions()) tools.push(keep(
-      Part.cylinderSpan(
-        s.sources[0].holeDiameter / 2,
-        -0.1,
-        s.height + 0.1,
-        p.x,
-        p.y
-      ),
+      Part.cylinderSpan(s.sources[0].holeDiameter / 2, -0.1, s.height + 0.1, p.x, p.y),
       "bolt-hole"
     ));
     return Solids.cut(body, tools);
@@ -427,24 +347,7 @@ class ScrewSupportUnit extends MachineComponent {
   }
 
   static function box(x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float):Part return Part.prism(
-    [
-      new Vector(
-        x0,
-        y0
-      ),
-      new Vector(
-        x1,
-        y0
-      ),
-      new Vector(
-        x1,
-        y1
-      ),
-      new Vector(
-        x0,
-        y1
-      )
-    ],
+    [new Vector(x0, y0), new Vector(x1, y0), new Vector(x1, y1), new Vector(x0, y1)],
     z0,
     z1
   );
@@ -455,25 +358,10 @@ class ScrewSupportUnit extends MachineComponent {
     if (supportRecipe == null) supportRecipe = new ComponentType(
       "machinekit.motion.screw-support-unit",
       [
-        ComponentRecipeSupport.choice(
-          "model",
-          ScrewSupportCatalog.models(),
-          "BK12"
-        ),
-        ComponentRecipeSupport.choice(
-          "geometry",
-          [
-            NOMINAL,
-            "vallder",
-            "hzmotion"
-          ],
-          NOMINAL
-        )
+        ComponentRecipeSupport.choice("model", ScrewSupportCatalog.models(), "BK12"),
+        ComponentRecipeSupport.choice("geometry", [NOMINAL, "vallder", "hzmotion"], NOMINAL)
       ],
-      v -> new ScrewSupportUnit(
-        v.token("model"),
-        v.token("geometry")
-      ),
+      v -> new ScrewSupportUnit(v.token("model"), v.token("geometry")),
       true,
       false,
       ["geometry"]

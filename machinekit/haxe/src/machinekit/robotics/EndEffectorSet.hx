@@ -194,10 +194,7 @@ class EndEffectorSet extends EndEffector {
       "fixed",
       MachineAssembly.join("robot", changer.instanceId),
       changer.connectorName,
-      MachineAssembly.join(
-        "tool",
-        toolMount.instanceId
-      ),
+      MachineAssembly.join("tool", toolMount.instanceId),
       toolMount.connectorName
     );
     for (mapping in changer.ports) {
@@ -207,10 +204,7 @@ class EndEffectorSet extends EndEffector {
         changer.name + "/" + mapping.robot,
         MachineAssembly.join("robot", from.instanceId),
         from.portName,
-        MachineAssembly.join(
-          "tool",
-          to.instanceId
-        ),
+        MachineAssembly.join("tool", to.instanceId),
         to.portName
       );
     }

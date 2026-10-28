@@ -42,10 +42,7 @@ class ExportLocalMotors {
     var text = Json.stringify(
       {
         schema_version: 1,
-        source_models: [
-          "machinekit.motion.LeadshineServo",
-          "machinekit.milling.Bt30SpindleMotor"
-        ],
+        source_models: ["machinekit.motion.LeadshineServo", "machinekit.milling.Bt30SpindleMotor"],
         baseline: {
           designation: baseline.designation,
           rating: baseline.rating,

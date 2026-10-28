@@ -221,15 +221,7 @@ class TendingContactSearchAction {
     if (!wrong.stopped) throw "Support search accepted an unrelated contact";
     var forces:Array<Dynamic> = [
       {bodyA: 7, bodyB: 8, force: [1.7, 0.0, 2.35]},
-      {
-        bodyA: 8,
-        bodyB: 7,
-        force: [
-          1.55,
-          0.0,
-          -1.6
-        ]
-      }
+      {bodyA: 8, bodyB: 7, force: [1.55, 0.0, -1.6]}
     ];
     var load = contactLoad(forces, 7, [0.0, 0, 1]);
     if (Math.abs(load.axialN - 3.95) > 1e-12
@@ -237,15 +229,7 @@ class TendingContactSearchAction {
       >= 5) throw "Opposing friction must cancel only in the resultant, not axial/contact loads";
     var swapped:Array<Dynamic> = [
       {bodyA: 8, bodyB: 7, force: [-1.7, 0.0, -2.35]},
-      {
-        bodyA: 7,
-        bodyB: 8,
-        force: [
-          -1.55,
-          0.0,
-          1.6
-        ]
-      }
+      {bodyA: 7, bodyB: 8, force: [-1.55, 0.0, 1.6]}
     ];
     var other = contactLoad(swapped, 7, [0.0, 0, 1]);
     if (Math.abs(load.resultantN - other.resultantN) > 1e-12) throw "Body ordering changed measured resultant";

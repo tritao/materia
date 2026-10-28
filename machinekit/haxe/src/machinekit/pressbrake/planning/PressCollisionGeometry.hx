@@ -77,11 +77,7 @@ class PressCollisionGeometry {
         pieces.push(new ConvexPrism(
           label + ":piece:" + pieces.length,
           polygon,
-          new Vector(
-            prism.end - prism.start,
-            0,
-            0
-          )
+          new Vector(prism.end - prism.start, 0, 0)
         ));
       }
       result.push(new PressCollisionBody(punch ? Punch(station, i) : Die(station, i), pieces, error));
@@ -139,11 +135,7 @@ class PressCollisionGeometry {
       MachineMember(contacts[i].id),
       contacts[i].id,
       fingers[i],
-      new Vector(
-        0,
-        gaugeX,
-        gaugeR
-      )
+      new Vector(0, gaugeX, gaugeR)
     ));
     for (member in press.machineMembers()) result.push(member.at(ramTravel, gaugeX, gaugeR));
     return result;
@@ -156,25 +148,8 @@ class PressCollisionGeometry {
       owner,
       [new ConvexPrism(
         id,
-        [
-          new Vector(x, y, z),
-          new Vector(highX, y, z),
-          new Vector(
-            highX,
-            highY,
-            z
-          ),
-          new Vector(
-            x,
-            highY,
-            z
-          )
-        ],
-        new Vector(
-          0,
-          0,
-          envelope.maxZ - envelope.minZ
-        )
+        [new Vector(x, y, z), new Vector(highX, y, z), new Vector(highX, highY, z), new Vector(x, highY, z)],
+        new Vector(0, 0, envelope.maxZ - envelope.minZ)
       )],
       0
     );

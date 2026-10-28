@@ -7,21 +7,9 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Hob spindle housing. Reference row is Assumed; dimensions are simplified envelopes. */
 class SpindleHousing extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      90,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      62,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      180,
-      "mm"
-    )
+    P.quantity("outside", 90, "mm"),
+    P.quantity("bore", 62, "mm"),
+    P.quantity("height", 180, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -58,27 +46,11 @@ class SpindleHousing extends MachineComponent {
   public function interfaceName():String return "ASSUMED-TF20";
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part return Solids.cut(
-    cadkit.modeling.Part.cylinderSpan(
-      parameterNumber("outside") / 2,
-      0,
-      180
-    ),
+    cadkit.modeling.Part.cylinderSpan(parameterNumber("outside") / 2, 0, 180),
     [
-      cadkit.modeling.Part.cylinderSpan(
-        31,
-        -0.1,
-        120
-      ),
-      cadkit.modeling.Part.cylinderSpan(
-        17,
-        120,
-        129
-      ),
-      cadkit.modeling.Part.cylinderSpan(
-        31,
-        129,
-        180.1
-      )
+      cadkit.modeling.Part.cylinderSpan(31, -0.1, 120),
+      cadkit.modeling.Part.cylinderSpan(17, 120, 129),
+      cadkit.modeling.Part.cylinderSpan(31, 129, 180.1)
     ]
   );
 }

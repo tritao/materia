@@ -51,11 +51,7 @@ class BendRegistrationChecks {
       "registration-steel",
       1.5,
       BendRule.Process(rule),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var sheet = SheetDemoParts.p2(stock), bends = sheet.bends();
     var first = bends[0], second = bends[1];
@@ -118,15 +114,7 @@ class BendRegistrationChecks {
     );
     var tapered = shaped(
       stock,
-      WallOutline.polygon([
-        new Point2(0, 0),
-        new Point2(40, 0),
-        new Point2(60, 120),
-        new Point2(
-          0,
-          120
-        )
-      ])
+      WallOutline.polygon([new Point2(0, 0), new Point2(40, 0), new Point2(60, 120), new Point2(0, 120)])
     );
     var taperedBend = tapered.bends()[0];
     var taperedProcess = rule.predict(stock, taperedBend.angle, 120);
@@ -153,35 +141,9 @@ class BendRegistrationChecks {
       stock,
       new WallOutline([
         Segment.line(new Point2(0, 0), new Point2(40, 0)),
-        Segment.arc(
-          new Point2(
-            40,
-            60
-          ),
-          60,
-          -Math.PI / 2,
-          Math.PI
-        ),
-        Segment.line(
-          new Point2(
-            40,
-            120
-          ),
-          new Point2(
-            0,
-            120
-          )
-        ),
-        Segment.line(
-          new Point2(
-            0,
-            120
-          ),
-          new Point2(
-            0,
-            0
-          )
-        )
+        Segment.arc(new Point2(40, 60), 60, -Math.PI / 2, Math.PI),
+        Segment.line(new Point2(40, 120), new Point2(0, 120)),
+        Segment.line(new Point2(0, 120), new Point2(0, 0))
       ])
     );
     var roundedBend = rounded.bends()[0], roundedProcess = rule.predict(stock, roundedBend.angle, 120);

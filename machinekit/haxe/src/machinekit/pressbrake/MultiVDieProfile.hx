@@ -38,18 +38,9 @@ class MultiVDieProfile {
     var active = groove(activeFace);
     var rectangle = new ToolProfilePolygon([
       new ToolProfilePoint(-size / 2, -size),
-      new ToolProfilePoint(
-        size / 2,
-        -size
-      ),
-      new ToolProfilePoint(
-        size / 2,
-        0
-      ),
-      new ToolProfilePoint(
-        -size / 2,
-        0
-      )
+      new ToolProfilePoint(size / 2, -size),
+      new ToolProfilePoint(size / 2, 0),
+      new ToolProfilePoint(-size / 2, 0)
     ]);
     var block = new ToolProfilePrism(rectangle, start, end).geometry();
     try {
@@ -118,10 +109,7 @@ class MultiVDieProfile {
       for (i in 2...(edges.length - 1)) {
         var edge = edges[i];
         result.push(edge.isLine() ? Segment.line(rotated(edge.start, angle), rotated(edge.end, angle)) : Segment.arc(
-          rotated(
-            edge.arcCenter(),
-            angle
-          ),
+          rotated(edge.arcCenter(), angle),
           edge.radius,
           edge.startAngle + angle,
           edge.sweep

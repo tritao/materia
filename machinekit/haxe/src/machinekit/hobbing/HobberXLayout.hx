@@ -57,10 +57,7 @@ class HobberXLayout {
     var face = start + motor.shaftLength, rear = face + motor.bodyLength, floating = start - length + 12.5;
     var bedRear = up10(Math.max(
       retract + COLUMN_REAR + OVERTRAVEL + 35,
-      Math.max(
-        railStart + railLength + 25,
-        rear + 20
-      )
+      Math.max(railStart + railLength + 25, rear + 20)
     ));
     return {
       railStart: railStart,

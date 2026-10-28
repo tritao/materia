@@ -66,11 +66,8 @@ class WristInterfaceChecks {
       "UR digital input remapping"
     );
     check(
-      ReferenceWristInterfaces.pin(male, "tool", "POWER") == 5 && ReferenceWristInterfaces.pin(
-        female,
-        "tool",
-        "GND"
-      ) == 8,
+      ReferenceWristInterfaces.pin(male,
+      "tool", "POWER") == 5 && ReferenceWristInterfaces.pin(female, "tool", "GND") == 8,
       "UR dedicated power pins"
     );
     var expectedMale = ["RS485+", "RS485-", "TI1", "TI0", "POWER", "TO1", "TO0", "GND"];
@@ -262,10 +259,7 @@ class WristInterfaceChecks {
         }
       }
       for (p in robot.wristInterfaces) for (port in p.ports) reject(
-        () -> ReferenceWristInterfaces.requireMatingFrame(
-          p,
-          port.id
-        ),
+        () -> ReferenceWristInterfaces.requireMatingFrame(p, port.id),
         "invented manufacturer socket placement"
       );
       reject(
@@ -297,10 +291,7 @@ class WristInterfaceChecks {
       haxe.Json.stringify(
         {
           status: "documented electrical profiles checked; physical socket pose/key orientation unqualified",
-          models: [
-            "ur5e",
-            "fairino5_v6"
-          ],
+          models: ["ur5e", "fairino5_v6"],
           profiles: 3,
           pinoutAndPowerChecks: true,
           sourceFkRetained: true,

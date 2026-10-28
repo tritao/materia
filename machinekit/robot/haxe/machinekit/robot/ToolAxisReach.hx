@@ -11,24 +11,12 @@ class ToolAxisReach {
     state:AssemblyState,
     joints:Array<String>,
     limits:Array<{lower:Float, upper:Float}>,
-    target: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
-    direction: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
+    target: {x: Float, y: Float, z: Float},
+    direction: {x: Float, y: Float, z: Float},
     seed:Array<Float>,
     occurrence:String,
     connector:String,
-    ?xDirection: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
+    ?xDirection: {x: Float, y: Float, z: Float},
     ?residualTolerance:Float
   ):Null<Array<Float>> {
     if (residualTolerance != null && (!Math.isFinite(residualTolerance)
@@ -88,26 +76,12 @@ class ToolAxisReach {
     state,
     joints,
     limits,
-    {
-      x: target.x,
-      y: target.y,
-      z: target.z
-    },
-    AssemblyFrames.transformVector(
-      target,
-      0,
-      0,
-      1
-    ),
+    {x: target.x, y: target.y, z: target.z},
+    AssemblyFrames.transformVector(target, 0, 0, 1),
     seed,
     occurrence,
     connector,
-    AssemblyFrames.transformVector(
-      target,
-      1,
-      0,
-      0
-    ),
+    AssemblyFrames.transformVector(target, 1, 0, 0),
     residualTolerance
   );
 
@@ -115,23 +89,11 @@ class ToolAxisReach {
     state:AssemblyState,
     joints:Array<String>,
     q:Array<Float>,
-    target: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
-    direction: {
-      x: Float,
-      y: Float,
-      z: Float
-    },
+    target: {x: Float, y: Float, z: Float},
+    direction: {x: Float, y: Float, z: Float},
     occurrence:String,
     connector:String,
-    ?xDirection: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    ?xDirection: {x: Float, y: Float, z: Float}
   ):Array<Float> {
     for (i in 0...joints.length) state.setJoint(joints[i], q[i]);
     state.forwardKinematics();

@@ -18,27 +18,11 @@ class RbkSfuAxis extends TwinRailScrewAxis {
     return new ScrewAxisComponents(
       MotorMount.of("RBK12-57", null, "vallder"),
       NemaStepper.model(motorModel),
-      new SfuDrawingScrew(
-        "SFU1605",
-        layout.screwLength,
-        BallScrew.RACE_ROOT_DIAMETER
-      ),
-      new SfuNut(
-        "SFU1605",
-        BallScrew.RACE_ROOT_DIAMETER
-      ),
-      ScrewSupportUnit.model(
-        "BF12",
-        "vallder"
-      ),
-      LinearRail.metric(
-        "HGH15CA",
-        layout.railLength
-      ),
-      LinearRailBlock.metric(
-        "HGH15CA",
-        LinearRailBlock.SUPPLIER
-      ),
+      new SfuDrawingScrew("SFU1605", layout.screwLength, BallScrew.RACE_ROOT_DIAMETER),
+      new SfuNut("SFU1605", BallScrew.RACE_ROOT_DIAMETER),
+      ScrewSupportUnit.model("BF12", "vallder"),
+      LinearRail.metric("HGH15CA", layout.railLength),
+      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
       motorWasher
     );
   }

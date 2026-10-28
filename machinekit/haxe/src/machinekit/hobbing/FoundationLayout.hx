@@ -81,10 +81,7 @@ class FoundationLayout {
     return {
       id: id,
       part: new CastInsert(CastInsert.precastHoles(
-        CastInsert.boxValues(w, d, h).setToken("role", role).setToken(
-          "label",
-          label
-        ).setToken(
+        CastInsert.boxValues(w, d, h).setToken("role", role).setToken("label", label).setToken(
           "finish",
           GroundAfterCasting
         ),
@@ -122,17 +119,7 @@ class FoundationLayout {
         x * (HobberXLayout.front().bedLength / 2 - 100),
         y * 380,
         720,
-        [
-          1.0,
-          0,
-          0,
-          0,
-          0,
-          y,
-          0,
-          -y,
-          0
-        ]
+        [1.0, 0, 0, 0, 0, y, 0, -y, 0]
       ),
       [y < 0 ? "body.y-min" : "body.y-max"],
       fixtureHoles(20)
@@ -145,12 +132,7 @@ class FoundationLayout {
     return [Patterns.box(
       "tray-front-ledge",
       InterfaceRecess,
-      faces([
-        "body.x-min",
-        "body.y-min",
-        "body.y-max",
-        "body.z-max"
-      ]),
+      faces(["body.x-min", "body.y-min", "body.y-max", "body.z-max"]),
       a,
       l,
       depth,
@@ -175,11 +157,7 @@ class FoundationLayout {
     ), Patterns.box(
       "tray-rear-ledge-right",
       InterfaceRecess,
-      faces([
-        "body.x-max",
-        "body.y-max",
-        "body.z-max"
-      ]),
+      faces(["body.x-max", "body.y-max", "body.z-max"]),
       a,
       (l - TRAY_REAR_BRIDGE_WIDTH) / 2,
       depth,
@@ -190,10 +168,7 @@ class FoundationLayout {
     ), Patterns.box(
       "tray-left-ledge",
       InterfaceRecess,
-      faces([
-        "body.y-min",
-        "body.z-max"
-      ]),
+      faces(["body.y-min", "body.z-max"]),
       w - 2 * a,
       a,
       depth,
@@ -204,10 +179,7 @@ class FoundationLayout {
     ), Patterns.box(
       "tray-right-ledge",
       InterfaceRecess,
-      faces([
-        "body.y-max",
-        "body.z-max"
-      ]),
+      faces(["body.y-max", "body.z-max"]),
       w - 2 * a,
       a,
       depth,
@@ -246,11 +218,7 @@ class FoundationLayout {
       id: "trayClampSeat" + out.length,
       part: traySocket(),
       openings: faces(["body.z-max"]),
-      pose: F.translation(
-        x,
-        y,
-        d[2] - machinekit.structural.FixingSockets.LENGTH
-      ),
+      pose: F.translation(x, y, d[2] - machinekit.structural.FixingSockets.LENGTH),
       clampHeight: height
     });
     for (side in [-1, 1]) for (x in [-1, 0, 1]) add(x * (d[0] / 2 - 100), side * (d[1] / 2 - 35));
@@ -273,17 +241,7 @@ class FoundationLayout {
         HobberZLayout.SEAT_FACE_X + HobberZLayout.SPINE_FRONT_COLUMN_Y,
         0,
         HobberZLayout.FOUNDATION_ORIGIN_Z,
-        [
-          0.0,
-          -1,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ]
+        [0.0, -1, 0, 1, 0, 0, 0, 0, 1]
       );
     default:
       throw "Unknown hobber foundation frame: " + kind;
@@ -315,11 +273,7 @@ class FoundationLayout {
         var opening = alongX ? "body.x-max" : p.y < 0 ? "body.y-min" : "body.y-max";
         var edge = alongX ? d[0] / 2 : p.y < 0 ? -d[1] / 2 : d[1] / 2;
         cores = cores.concat(Patterns.foot(
-          {
-            access: 'foot$i-access',
-            stem: 'foot$i-stem',
-            register: 'foot$i-plate-register'
-          },
+          {access: 'foot$i-access', stem: 'foot$i-stem', register: 'foot$i-plate-register'},
           p.x,
           p.y,
           edge,
@@ -358,10 +312,7 @@ class FoundationLayout {
       cores.push(Patterns.box(
         "chip-drain",
         ServiceOpening,
-        [
-          C.feature("work-well"),
-          C.feature("pocket-frontSocketEnd-leftRailInside-floor")
-        ],
+        [C.feature("work-well"), C.feature("pocket-frontSocketEnd-leftRailInside-floor")],
         drainRear - drainFront,
         CHIP_DRAIN_WIDTH,
         CHIP_DRAIN_DEPTH,
@@ -410,10 +361,7 @@ class FoundationLayout {
       for (side in [-1, 1]) cores.push(Patterns.box(
         "tray-rear-bridge-seat-" + (side < 0 ? "left" : "right"),
         InterfaceRecess,
-        faces([
-          "body.x-max",
-          "body.z-max"
-        ]).concat([C.feature("X-drive-channel")]),
+        faces(["body.x-max", "body.z-max"]).concat([C.feature("X-drive-channel")]),
         25,
         (TRAY_REAR_BRIDGE_WIDTH - DRIVE_CHANNEL_WIDTH) / 2,
         10,
@@ -445,11 +393,7 @@ class FoundationLayout {
       for (side in [-1, 1]) cores.push(Patterns.box(
         "head-recess-" + (side < 0 ? "left" : "right"),
         ServiceOpening,
-        faces([
-          "body.y-max",
-          "body.z-min",
-          "body.z-max"
-        ]),
+        faces(["body.y-max", "body.z-min", "body.z-max"]),
         sideWidth,
         COLUMN_HEAD_DEPTH,
         d[2],
@@ -502,11 +446,7 @@ class FoundationLayout {
       w,
       d,
       h,
-      F.translation(
-        x,
-        y,
-        z
-      ),
+      F.translation(x, y, z),
       openings,
       holes
     ));
@@ -527,10 +467,7 @@ class FoundationLayout {
         [],
         fixtureHoles(
           TABLE_INSERT_THICKNESS,
-          InsertHoles.through(
-            TABLE_INSERT_BORE,
-            TABLE_INSERT_THICKNESS
-          ),
+          InsertHoles.through(TABLE_INSERT_BORE, TABLE_INSERT_THICKNESS),
           (TABLE_INSERT_WIDTH + TABLE_INSERT_BORE) / 4
         )
       );
@@ -545,17 +482,7 @@ class FoundationLayout {
           layout.railStart + layout.railLength / 2 - centre,
           side * BED_RAIL_CENTRE,
           RAIL_SEAT_HEIGHT,
-          [
-            0.0,
-            1,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            0,
-            1
-          ]
+          [0.0, 1, 0, -1, 0, 0, 0, 0, 1]
         ),
         ["body.z-max"],
         none
@@ -571,17 +498,7 @@ class FoundationLayout {
           (layout.motorFace + layout.deckStart) / 2 - centre,
           0,
           DRIVE_SEAT_HEIGHT,
-          [
-            0.0,
-            1,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            0,
-            1
-          ]
+          [0.0, 1, 0, -1, 0, 0, 0, 0, 1]
         ),
         [],
         fixtureHoles(20)
@@ -609,22 +526,7 @@ class FoundationLayout {
         380,
         100,
         20,
-        F.fromRotationMatrix(
-          0,
-          -40,
-          10,
-          [
-            1.0,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        ),
+        F.fromRotationMatrix(0, -40, 10, [1.0, 0, 0, 0, -1, 0, 0, 0, -1]),
         ["body.z-min"],
         fixtureHoles(20)
       ));
@@ -635,22 +537,7 @@ class FoundationLayout {
         35,
         480,
         20,
-        F.fromRotationMatrix(
-          side * 145,
-          90,
-          245,
-          [
-            1.0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
-        ),
+        F.fromRotationMatrix(side * 145, 90, 245, [1.0, 0, 0, 0, 0, 1, 0, -1, 0]),
         ["body.y-max"],
         none
       ));
@@ -661,22 +548,7 @@ class FoundationLayout {
         100,
         460,
         20,
-        F.fromRotationMatrix(
-          0,
-          HobberZLayout.SEAT_COLUMN_Y,
-          250,
-          [
-            -1.0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            1,
-            0
-          ]
-        ),
+        F.fromRotationMatrix(0, HobberZLayout.SEAT_COLUMN_Y, 250, [-1.0, 0, 0, 0, 0, 1, 0, 1, 0]),
         [],
         fixtureHoles(20)
       ));

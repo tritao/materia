@@ -134,11 +134,7 @@ class FrameAssembly {
         name: m.name,
         start: new Vector(a.x, a.y, a.z),
         end: new Vector(b.x, b.y, b.z),
-        reference: new Vector(
-          ref.x,
-          ref.y,
-          ref.z
-        ),
+        reference: new Vector(ref.x, ref.y, ref.z),
         profile: m.profile
       });
     }
@@ -215,12 +211,7 @@ class FrameAssembly {
       if (line == null) {
         byDesignation.set(
           designation,
-          {
-            designation: designation,
-            description: m.profile.profileDescription(),
-            quantity: 1,
-            totalLength: len
-          }
+          {designation: designation, description: m.profile.profileDescription(), quantity: 1, totalLength: len}
         );
         order.push(designation);
       } else {
@@ -283,22 +274,10 @@ class FrameAssembly {
     var endNode = startOffset + length;
     var far = endNode + Math.abs(setback) + 1;
     var points = atStart ? [new Vector(x0, z0), new Vector(x1, z1), new Vector(x1, far), new Vector(x0, far)] : [
-      new Vector(
-        x0,
-        -far
-      ),
-      new Vector(
-        x1,
-        -far
-      ),
-      new Vector(
-        x1,
-        endNode - (z1 - startOffset)
-      ),
-      new Vector(
-        x0,
-        endNode - (z0 - startOffset)
-      )
+      new Vector(x0, -far),
+      new Vector(x1, -far),
+      new Vector(x1, endNode - (z1 - startOffset)),
+      new Vector(x0, endNode - (z0 - startOffset))
     ];
     var yMargin = Math.max(1, (bounds.maxY - bounds.minY) * 0.1);
     var plane = new Plane(new Vector(0, bounds.maxY + yMargin, 0), Vector.X(), Vector.Y().scale(-1));

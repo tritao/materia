@@ -22,13 +22,7 @@ class TrackArmPreview {
         {kind: "pick", at: {occurrence: "workpiece", connector: "top"}},
         ready(0),
         ready(3000),
-        {
-          kind: "place",
-          at: {
-            occurrence: "padPlace",
-            connector: "top"
-          }
-        },
+        {kind: "place", at: {occurrence: "padPlace", connector: "top"}},
         ready(3000)
       ]
     }];

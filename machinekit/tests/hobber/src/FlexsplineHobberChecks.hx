@@ -98,10 +98,7 @@ class FlexsplineHobberChecks {
       "sync",
       "runtime observations",
       "test zero measured following error",
-      (
-        t,
-        a
-      ) -> a
+      (t, a) -> a
     );
     var errors = FlexsplineHobberErrors.sources(machine, t -> 20, ring, sync);
     check(errors.length == 21, "HB11 installed parts expose independently selectable error sources");
@@ -123,14 +120,7 @@ class FlexsplineHobberChecks {
       forces.afterPass(
         new stockkit.hobbing.GashPass(0, 0, 0, 0.5, 1),
         new HobbingAxes(46, 0, 0, 0, 0, 0),
-        new HobbingAxes(
-          46,
-          0,
-          0,
-          0,
-          0.625,
-          0
-        ),
+        new HobbingAxes(46, 0, 0, 0, 0.625, 0),
         16
       );
       check(
@@ -147,14 +137,7 @@ class FlexsplineHobberChecks {
       forces.afterPass(
         new stockkit.hobbing.GashPass(0, 1, 1, 1.5, 2),
         new HobbingAxes(46, 0, 0, 0, 0, 0),
-        new HobbingAxes(
-          46,
-          0,
-          0,
-          0,
-          0.625,
-          0
-        ),
+        new HobbingAxes(46, 0, 0, 0, 0.625, 0),
         16
       );
       check(!FlexsplineHobberLoads.fits(machine,
@@ -306,10 +289,7 @@ class FlexsplineHobberChecks {
         hob,
         motion.axesAt,
         passes,
-        [ring.source(
-          "assumed reference support",
-          t -> force
-        )],
+        [ring.source("assumed reference support", t -> force)],
         0.6,
         0.1,
         0.2,
@@ -511,23 +491,11 @@ class FlexsplineHobberChecks {
     var settings = {
       threads: Reflect.field(report, "threads"),
       sweepToleranceMm: tolerance,
-      pathToleranceMm: Reflect.field(
-        report,
-        "pathToleranceMm"
-      ),
-      historyCsv: Reflect.field(
-        report,
-        "historyCsv"
-      ),
-      fineFullStrokeValidated: Reflect.field(
-        report,
-        "fineFullStrokeValidated"
-      ) == true,
+      pathToleranceMm: Reflect.field(report, "pathToleranceMm"),
+      historyCsv: Reflect.field(report, "historyCsv"),
+      fineFullStrokeValidated: Reflect.field(report, "fineFullStrokeValidated") == true,
       forceStudyValidated: validated,
-      acceptanceBasis: Reflect.field(
-        report,
-        "acceptanceBasis"
-      )
+      acceptanceBasis: Reflect.field(report, "acceptanceBasis")
     };
     Sys.println("REFERENCE_FORCE_INPUTS " + haxe.Json.stringify({
       peakTangentialN: number("forceN"),
@@ -539,19 +507,10 @@ class FlexsplineHobberChecks {
       variationBasis : history == null ? "legacy run has no per-pass record: retain conservative 0..peak radial range"
       : "measured radial window statistics and successive per-gash steps",
       sweepToleranceMm : tolerance,
-      threads : Reflect.field(
-        report,
-        "threads"
-      ),
-      fineFullStrokeValidated : Reflect.field(
-        report,
-        "fineFullStrokeValidated"
-      ) == true,
+      threads : Reflect.field(report, "threads"),
+      fineFullStrokeValidated : Reflect.field(report, "fineFullStrokeValidated") == true,
       forceStudyValidated : validated,
-      acceptanceBasis : Reflect.field(
-        report,
-        "acceptanceBasis"
-      )
+      acceptanceBasis : Reflect.field(report, "acceptanceBasis")
     }));
     supportSensitivity(
       meanKnown ? thicknessMean : number("radialN"),

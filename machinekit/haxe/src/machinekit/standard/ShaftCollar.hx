@@ -30,54 +30,14 @@ class ShaftCollar extends MachineComponent {
 
   static function rows():Array<ShaftCollarSpec> return [
     {boreDiameter: 5, outerDiameter: 12, width: 8, setScrew: "M3"},
-    {
-      boreDiameter: 6,
-      outerDiameter: 14,
-      width: 9,
-      setScrew: "M4"
-    },
-    {
-      boreDiameter: 8,
-      outerDiameter: 16,
-      width: 11,
-      setScrew: "M4"
-    },
-    {
-      boreDiameter: 10,
-      outerDiameter: 22,
-      width: 13,
-      setScrew: "M5"
-    },
-    {
-      boreDiameter: 12,
-      outerDiameter: 25,
-      width: 15,
-      setScrew: "M5"
-    },
-    {
-      boreDiameter: 15,
-      outerDiameter: 28,
-      width: 17,
-      setScrew: "M6"
-    },
-    {
-      boreDiameter: 17,
-      outerDiameter: 32,
-      width: 19,
-      setScrew: "M6"
-    },
-    {
-      boreDiameter: 20,
-      outerDiameter: 35,
-      width: 21,
-      setScrew: "M6"
-    },
-    {
-      boreDiameter: 25,
-      outerDiameter: 40,
-      width: 23,
-      setScrew: "M8"
-    },
+    {boreDiameter: 6, outerDiameter: 14, width: 9, setScrew: "M4"},
+    {boreDiameter: 8, outerDiameter: 16, width: 11, setScrew: "M4"},
+    {boreDiameter: 10, outerDiameter: 22, width: 13, setScrew: "M5"},
+    {boreDiameter: 12, outerDiameter: 25, width: 15, setScrew: "M5"},
+    {boreDiameter: 15, outerDiameter: 28, width: 17, setScrew: "M6"},
+    {boreDiameter: 17, outerDiameter: 32, width: 19, setScrew: "M6"},
+    {boreDiameter: 20, outerDiameter: 35, width: 21, setScrew: "M6"},
+    {boreDiameter: 25, outerDiameter: 40, width: 23, setScrew: "M8"},
   ];
 
   public static function catalog():Catalog<ShaftCollarSpec> {
@@ -124,22 +84,8 @@ class ShaftCollar extends MachineComponent {
   override public function hasGeometry():Bool return true;
 
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Solids.named(
-      Part.cylinderSpan(
-        spec.outerDiameter / 2,
-        0,
-        spec.width
-      ),
-      "body"
-    ),
-    [Solids.named(
-      Part.cylinderSpan(
-        spec.boreDiameter / 2,
-        -0.1,
-        spec.width + 0.1
-      ),
-      "bore"
-    )]
+    Solids.named(Part.cylinderSpan(spec.outerDiameter / 2, 0, spec.width), "body"),
+    [Solids.named(Part.cylinderSpan(spec.boreDiameter / 2, -0.1, spec.width + 0.1), "bore")]
   );
 
   function get_boreDiameter():Float return spec.boreDiameter;
@@ -150,11 +96,7 @@ class ShaftCollar extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.standard.shaft-collar",
-      [ComponentRecipeSupport.catalog(
-        "bore",
-        ShaftCollar.catalog(),
-        "8"
-      )],
+      [ComponentRecipeSupport.catalog("bore", ShaftCollar.catalog(), "8")],
       v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
       true
     );

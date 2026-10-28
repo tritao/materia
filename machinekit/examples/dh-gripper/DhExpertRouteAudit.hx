@@ -25,16 +25,10 @@ class DhExpertRouteAudit {
   static function bound(a:Shape, b:Shape):Float {
     var x = bounds(a), y = bounds(b), dx = Math.max(0, Math.max(x.low.x - y.high.x, y.low.x - x.high.x)), dy = Math.max(
       0,
-      Math.max(
-        x.low.y - y.high.y,
-        y.low.y - x.high.y
-      )
+      Math.max(x.low.y - y.high.y, y.low.y - x.high.y)
     ), dz = Math.max(
       0,
-      Math.max(
-        x.low.z - y.high.z,
-        y.low.z - x.high.z
-      )
+      Math.max(x.low.z - y.high.z, y.low.z - x.high.z)
     );
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
@@ -47,37 +41,18 @@ class DhExpertRouteAudit {
   static function f(v:Dynamic):AssemblyFrame return {
     x: n(Reflect.field(v, "x")),
     y: n(Reflect.field(v, "y")),
-    z: n(Reflect.field(
-      v,
-      "z"
-    )),
-    qx: n(Reflect.field(
-      v,
-      "qx"
-    )),
-    qy: n(Reflect.field(
-      v,
-      "qy"
-    )),
-    qz: n(Reflect.field(
-      v,
-      "qz"
-    )),
-    qw: n(Reflect.field(
-      v,
-      "qw"
-    ))
+    z: n(Reflect.field(v, "z")),
+    qx: n(Reflect.field(v, "qx")),
+    qy: n(Reflect.field(v, "qy")),
+    qz: n(Reflect.field(v, "qz")),
+    qw: n(Reflect.field(v, "qw"))
   };
   static function place(s:Shape, p:AssemblyFrame):Shape {
     var r = AssemblyFrames.toRotationMatrix(p);
     var result = new Location(new Plane(
       new Vector(p.x, p.y, p.z),
       new Vector(r[0], r[3], r[6]),
-      new Vector(
-        r[2],
-        r[5],
-        r[8]
-      )
+      new Vector(r[2], r[5], r[8])
     )).apply(s);
     var b = bounds(s), low = new Vector(1e30, 1e30, 1e30), high = new Vector(-1e30, -1e30, -1e30);
     for (x in [b.low.x, b.high.x]) for (y in [b.low.y, b.high.y]) for (z in [b.low.z, b.high.z]) {

@@ -21,22 +21,10 @@ class SheetRouterAxesTests {
   static function baseline():Void {
     var machines:Array<{name:String, machine:MachineAssembly}> = [
       {name: 'desktop-router', machine: new CncRouter()},
-      {
-        name: 'gantry-picker',
-        machine: new GantryPicker()
-      },
-      {
-        name: 'gantry-welder',
-        machine: new GantryWelder()
-      },
-      {
-        name: 'overhead-arm',
-        machine: new OverheadArm()
-      },
-      {
-        name: 'corexy',
-        machine: new CoreXyPlotter()
-      }
+      {name: 'gantry-picker', machine: new GantryPicker()},
+      {name: 'gantry-welder', machine: new GantryWelder()},
+      {name: 'overhead-arm', machine: new OverheadArm()},
+      {name: 'corexy', machine: new CoreXyPlotter()}
     ];
     var expected = [
       "0aaf594dfe25b262b80f7ffb5e517cf522c117fac85d847aee5ce694e8dca885",

@@ -25,10 +25,7 @@ class HobberMoldChecks {
     }
     points.sort((a, b) -> Reflect.compare(
       Math.atan2(a.y - center.y, a.x - center.x),
-      Math.atan2(
-        b.y - center.y,
-        b.x - center.x
-      )
+      Math.atan2(b.y - center.y, b.x - center.x)
     ));
     var inside = points.length >= 3;
     for (index in 0...points.length) {

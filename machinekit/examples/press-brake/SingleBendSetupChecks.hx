@@ -44,11 +44,7 @@ class SingleBendSetupChecks {
       "setup-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(tooling)),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var planner = new BendSetup(geometry), process = new AirBending();
     var sheet = SheetDemoParts.p2(stock), bend = sheet.bends()[0], state = sheet.flat();
@@ -101,11 +97,7 @@ class SingleBendSetupChecks {
       sheet.flat().set(bend.id, bend.angle),
       second.id,
       station,
-      new BendOrientation(
-        true,
-        true,
-        -10
-      ),
+      new BendOrientation(true, true, -10),
       edge,
       process
     );
@@ -128,10 +120,7 @@ class SingleBendSetupChecks {
         longBend.id,
         station,
         orientation,
-        new GaugeEdge(
-          longBend.wallB,
-          new WallEdge(1)
-        ),
+        new GaugeEdge(longBend.wallB, new WallEdge(1)),
         process
       );
     }
@@ -144,10 +133,7 @@ class SingleBendSetupChecks {
         shortBend.id,
         station,
         orientation,
-        new GaugeEdge(
-          shortBend.wallB,
-          new WallEdge(1)
-        ),
+        new GaugeEdge(shortBend.wallB, new WallEdge(1)),
         process
       );
     }
@@ -162,10 +148,7 @@ class SingleBendSetupChecks {
         wideBend.id,
         station,
         orientation,
-        new GaugeEdge(
-          wideBend.wallB,
-          new WallEdge(1)
-        ),
+        new GaugeEdge(wideBend.wallB, new WallEdge(1)),
         process
       );
     }
@@ -183,11 +166,7 @@ class SingleBendSetupChecks {
     var deepStock = new SheetMaterial(
       "depth-stock",
       1.5,
-      BendRule.Process(new ProcessBendRule(
-        tooling,
-        calibration,
-        "depth-lot"
-      )),
+      BendRule.Process(new ProcessBendRule(tooling, calibration, "depth-lot")),
       stock.mechanical
     );
     var deep = fixture(deepStock, 40, 100), deepBend = deep.bends()[0];
@@ -198,10 +177,7 @@ class SingleBendSetupChecks {
         deepBend.id,
         station,
         orientation,
-        new GaugeEdge(
-          deepBend.wallB,
-          new WallEdge(1)
-        ),
+        new GaugeEdge(deepBend.wallB, new WallEdge(1)),
         new AirBending(calibration),
         "depth-lot"
       );

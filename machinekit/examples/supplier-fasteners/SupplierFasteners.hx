@@ -99,14 +99,8 @@ class SupplierFasteners {
         sourceUrl : mapping.source_url,
         supplierEvidence : mapping.evidence,
         dimensionalComparison : {
-          headDiameter : {
-            model : screw.spec.headDiameter,
-            supplier : mapping.evidence.head_diameter_mm
-          },
-          headHeight : {
-            model : screw.spec.headHeight,
-            supplier : mapping.evidence.head_height_mm
-          }
+          headDiameter : {model : screw.spec.headDiameter, supplier : mapping.evidence.head_diameter_mm},
+          headHeight : {model : screw.spec.headHeight, supplier : mapping.evidence.head_height_mm}
         },
         compatibilityVerified : false
       });
@@ -206,10 +200,7 @@ class SupplierFasteners {
         geometrySource: section.system_id == null ? "drawing_extrusion" : "tslot_section_variant",
         status : "valid_parametric_geometry",
         sourceSha256 : section.source_sha256,
-        testedLengthsMm : [
-          100,
-          250
-        ],
+        testedLengthsMm : [100, 250],
         areaMm2 : volume / 100,
         compatibilityVerified : false
       });
@@ -256,12 +247,7 @@ class SupplierFasteners {
       if (!useAfterCloseRejected) throw "Supplier import did not close";
       save(
         output + "/imported-reference-example.json",
-        {
-          bom: reference.bom,
-          assetId: asset.asset_id,
-          geometrySource: "supplier_cad",
-          mountingFrameStatus: "unverified"
-        }
+        {bom: reference.bom, assetId: asset.asset_id, geometrySource: "supplier_cad", mountingFrameStatus: "unverified"}
       );
       break;
     }
@@ -271,10 +257,6 @@ class SupplierFasteners {
 
   static function save(path:String, value:Dynamic):Void sys.io.File.saveContent(
     path,
-    haxe.Json.stringify(
-      value,
-      null,
-      "  "
-    ) + "\n"
+    haxe.Json.stringify(value, null, "  ") + "\n"
   );
 }

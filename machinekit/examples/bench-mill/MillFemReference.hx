@@ -11,11 +11,7 @@ class MillFemReference {
   public static function capture(
     assembly:MachineAssembly,
     frame:BenchMillFrame,
-    ?extraPose: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    ?extraPose: {x: Float, y: Float, z: Float}
   ):Dynamic {
     var xy:MillXYStageLayout = frame.xyAxis, z:MillZAxisLayout = frame.zAxis;
     var poses = [{x: 0.0, y: 0.0, z: 0.0}, {x: 0.0, y: 0.0, z: z.lower / 2}];
@@ -54,12 +50,7 @@ class MillFemReference {
           id: member.id,
           volumeMm3: shape.volume(),
           massKg: physical.mass,
-          centreOfMassMm: F.transformPoint(
-            world,
-            c.x,
-            c.y,
-            c.z
-          ),
+          centreOfMassMm: F.transformPoint(world, c.x, c.y, c.z),
           boundsMm: PosedParts.boxOf(shape)
         });
         catch (error:Dynamic) {
@@ -76,11 +67,7 @@ class MillFemReference {
         keyDatums: {
           toolTipMm: state.worldConnector("spindle/tool", "tip"),
           tableTopMm: table,
-          workpieceReferenceMm: F.translation(
-            table.x + offset.x,
-            table.y + offset.y,
-            table.z + offset.z
-          )
+          workpieceReferenceMm: F.translation(table.x + offset.x, table.y + offset.y, table.z + offset.z)
         }
       });
     }

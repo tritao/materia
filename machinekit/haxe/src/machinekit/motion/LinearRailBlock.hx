@@ -81,14 +81,7 @@ class LinearRailBlock extends MachineComponent {
     ]) addConnector(
       'mount${index++}',
       Mount,
-      AssemblyFrames.alongY(
-        x,
-        top,
-        z,
-        0,
-        1,
-        0
-      )
+      AssemblyFrames.alongY(x, top, z, 0, 1, 0)
     );
     // Datasheet mass, centred on the outline above the rail top.
     var kg = spec.blockMassKg, w = spec.blockWidth, l = spec.blockLength;
@@ -118,18 +111,7 @@ class LinearRailBlock extends MachineComponent {
     if (drawing == NOMINAL) return detail == Envelope ? outline() : ProfileRailShapes.block(spec);
     var lo = HgReferenceData.low(spec.designation), hi = HgReferenceData.high(spec.designation);
     if (detail == Envelope) return Part.prism(
-      [
-        new Vector(lo[0], lo[1]),
-        new Vector(hi[0], lo[1]),
-        new Vector(
-          hi[0],
-          hi[1]
-        ),
-        new Vector(
-          lo[0],
-          hi[1]
-        )
-      ],
+      [new Vector(lo[0], lo[1]), new Vector(hi[0], lo[1]), new Vector(hi[0], hi[1]), new Vector(lo[0], hi[1])],
       lo[2],
       hi[2]
     );
@@ -168,14 +150,8 @@ class LinearRailBlock extends MachineComponent {
       [min.get_y(), lo[1]],
       [min.get_z(), lo[2]],
       [max.get_x(), hi[0]],
-      [
-        max.get_y(),
-        hi[1]
-      ],
-      [
-        max.get_z(),
-        hi[2]
-      ]
+      [max.get_y(), hi[1]],
+      [max.get_z(), hi[2]]
     ]) if (Math.abs(pair[0] - pair[1]) > 0.02) {
       shape.close();
       throw 'Pinned $model CAD frame differs from its reviewed interface';
@@ -189,14 +165,8 @@ class LinearRailBlock extends MachineComponent {
       [
         new Vector(-spec.blockWidth / 2, 0),
         new Vector(spec.blockWidth / 2, 0),
-        new Vector(
-          spec.blockWidth / 2,
-          top
-        ),
-        new Vector(
-          -spec.blockWidth / 2,
-          top
-        ),
+        new Vector(spec.blockWidth / 2, top),
+        new Vector(-spec.blockWidth / 2, top),
       ],
       -spec.blockLength / 2,
       spec.blockLength / 2
@@ -209,24 +179,10 @@ class LinearRailBlock extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.linear-rail-block",
       [
-        ComponentRecipeSupport.catalog(
-          "profile",
-          LinearRailSystem.catalog(),
-          "MGN12C"
-        ),
-        ComponentRecipeSupport.choice(
-          "geometry",
-          [
-            NOMINAL,
-            SUPPLIER
-          ],
-          NOMINAL
-        )
+        ComponentRecipeSupport.catalog("profile", LinearRailSystem.catalog(), "MGN12C"),
+        ComponentRecipeSupport.choice("geometry", [NOMINAL, SUPPLIER], NOMINAL)
       ],
-      v -> new LinearRailBlock(
-        LinearRailSystem.catalog().get(v.token("profile")),
-        v.token("geometry")
-      ),
+      v -> new LinearRailBlock(LinearRailSystem.catalog().get(v.token("profile")), v.token("geometry")),
       true,
       false,
       ["geometry"]

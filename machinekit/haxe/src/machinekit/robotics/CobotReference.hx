@@ -63,30 +63,9 @@ class CobotReference {
       reach: reach,
       payload: payload,
       mass: mass,
-      d: [
-        dimensions[0],
-        0,
-        0,
-        dimensions[3],
-        dimensions[4],
-        dimensions[5]
-      ],
-      a: [
-        0,
-        -dimensions[1],
-        -dimensions[2],
-        0,
-        0,
-        0
-      ],
-      alpha: [
-        Math.PI / 2,
-        0,
-        0,
-        Math.PI / 2,
-        -Math.PI / 2,
-        0
-      ],
+      d: [dimensions[0], 0, 0, dimensions[3], dimensions[4], dimensions[5]],
+      a: [0, -dimensions[1], -dimensions[2], 0, 0, 0],
+      alpha: [Math.PI / 2, 0, 0, Math.PI / 2, -Math.PI / 2, 0],
       speeds: speeds,
       modules: modules
     };

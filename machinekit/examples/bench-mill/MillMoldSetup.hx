@@ -48,22 +48,7 @@ class MillMoldSetup {
         sourceFingerprint: ToolingCodec.inputFingerprint(source),
         fillHeightMm: depth,
         freeboardMm: 0,
-        sourceToMold: F.fromRotationMatrix(
-          0,
-          0,
-          depth / 2,
-          [
-            0,
-            0,
-            1,
-            1,
-            0,
-            0,
-            0,
-            1,
-            0
-          ]
-        )
+        sourceToMold: F.fromRotationMatrix(0, 0, depth / 2, [0, 0, 1, 1, 0, 0, 0, 1, 0])
       };
       document.recipe.id = "mill-column-panel-eps-review";
       document.recipe.coreWireAxis = materia.tooling.ToolingRecipe.CoreWireAxis.Z;
@@ -81,22 +66,7 @@ class MillMoldSetup {
         sourceFingerprint: ToolingCodec.inputFingerprint(input),
         fillHeightMm: height,
         freeboardMm: 0,
-        sourceToMold: F.fromRotationMatrix(
-          0,
-          0,
-          height,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
-        )
+        sourceToMold: F.fromRotationMatrix(0, 0, height, [1, 0, 0, 0, -1, 0, 0, 0, -1])
       },
       recipe: recipe
     };

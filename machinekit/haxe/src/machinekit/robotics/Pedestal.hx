@@ -226,13 +226,7 @@ class Pedestal extends MachineComponent {
     var anchor = 1;
     for (point in floorBoltPattern()) {
       var tool = Solids.named(
-        Part.cylinderSpan(
-          screw.clearanceDiameter(Medium) / 2,
-          anchorStart,
-          baseThickness + 0.1,
-          point.x,
-          point.y
-        ),
+        Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y),
         "anchor" + anchor++
       );
       tracked.push(tool);
@@ -306,64 +300,22 @@ class Pedestal extends MachineComponent {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.pedestal",
       [
-        ComponentRecipeSupport.length(
-          "flangePitchCircle",
-          40
-        ),
-        ComponentRecipeSupport.count(
-          "flangeBoltCount",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          150
-        ),
-        ComponentRecipeSupport.length(
-          "columnDiameter",
-          60
-        ),
-        ComponentRecipeSupport.count(
-          "floorBoltCount",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "baseThickness",
-          12
-        ),
-        ComponentRecipeSupport.length(
-          "anchorCircleDiameter",
-          90
-        ),
-        ComponentRecipeSupport.length(
-          "gussetHeight",
-          0
-        ),
-        ComponentRecipeSupport.length(
-          "gussetThickness",
-          4
-        ),
-        ComponentRecipeSupport.count(
-          "gussetCount",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "levelingFootDiameter",
-          0
-        ),
-        ComponentRecipeSupport.length(
-          "levelingFootHeight",
-          4
-        ),
-        ComponentRecipeSupport.length(
-          "cablePathDiameter",
-          0
-        )
+        ComponentRecipeSupport.length("flangePitchCircle", 40),
+        ComponentRecipeSupport.count("flangeBoltCount", 4),
+        ComponentRecipeSupport.length("height", 150),
+        ComponentRecipeSupport.length("columnDiameter", 60),
+        ComponentRecipeSupport.count("floorBoltCount", 4),
+        ComponentRecipeSupport.length("baseThickness", 12),
+        ComponentRecipeSupport.length("anchorCircleDiameter", 90),
+        ComponentRecipeSupport.length("gussetHeight", 0),
+        ComponentRecipeSupport.length("gussetThickness", 4),
+        ComponentRecipeSupport.count("gussetCount", 4),
+        ComponentRecipeSupport.length("levelingFootDiameter", 0),
+        ComponentRecipeSupport.length("levelingFootHeight", 4),
+        ComponentRecipeSupport.length("cablePathDiameter", 0)
       ],
       v -> new Pedestal(
-        new RobotFlange(
-          v.number("flangePitchCircle"),
-          v.integer("flangeBoltCount")
-        ),
+        new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
         v.number("height"),
         v.number("columnDiameter"),
         v.integer("floorBoltCount"),

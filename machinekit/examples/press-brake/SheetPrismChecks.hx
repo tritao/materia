@@ -25,22 +25,10 @@ class SheetPrismChecks {
       [
         new Vector(x - 0.1, y - 0.1, -1),
         new Vector(x + 0.1, y - 0.1, -1),
-        new Vector(
-          x + 0.1,
-          y + 0.1,
-          -1
-        ),
-        new Vector(
-          x - 0.1,
-          y + 0.1,
-          -1
-        )
+        new Vector(x + 0.1, y + 0.1, -1),
+        new Vector(x - 0.1, y + 0.1, -1)
       ],
-      new Vector(
-        0,
-        0,
-        0.5
-      )
+      new Vector(0, 0, 0.5)
     );
   }
   static function overlaps(profile:SheetPrismProfile, point:ConvexPrism):Bool {
@@ -71,14 +59,8 @@ class SheetPrismChecks {
       new Point2(10, 0),
       new Point2(10, 3),
       new Point2(3, 3),
-      new Point2(
-        3,
-        10
-      ),
-      new Point2(
-        0,
-        10
-      )
+      new Point2(3, 10),
+      new Point2(0, 10)
     ]);
     var concave = SheetPrismProfile.of("concave", concaveOutline, 1.5);
     near(concave.area, 51, "Concave decomposition preserves missing quadrant");
@@ -88,26 +70,8 @@ class SheetPrismChecks {
     var hole = [
       Segment.line(new Point2(2, 2), new Point2(2, 8)),
       Segment.line(new Point2(2, 8), new Point2(8, 8)),
-      Segment.line(
-        new Point2(
-          8,
-          8
-        ),
-        new Point2(
-          8,
-          2
-        )
-      ),
-      Segment.line(
-        new Point2(
-          8,
-          2
-        ),
-        new Point2(
-          2,
-          2
-        )
-      )
+      Segment.line(new Point2(8, 8), new Point2(8, 2)),
+      Segment.line(new Point2(8, 2), new Point2(2, 2))
     ];
     var holedOutline = new WallOutline(WallOutline.rectangle(10, 10).loops()[0], [hole]);
     var holed = SheetPrismProfile.of("holed", holedOutline, 1.5);
@@ -123,15 +87,7 @@ class SheetPrismChecks {
     check(!hit, "Rigid placement preserves the hole");
     var annulusOutline = new WallOutline(
       [Segment.arc(new Point2(5, 5), 5, 0, 2 * Math.PI)],
-      [[Segment.arc(
-        new Point2(
-          5,
-          5
-        ),
-        2,
-        0,
-        -2 * Math.PI
-      )]]
+      [[Segment.arc(new Point2(5, 5), 2, 0, -2 * Math.PI)]]
     );
     var annulus = SheetPrismProfile.of("annulus", annulusOutline, 1.5, 0.01);
     check(annulus.curveError > 0 && annulus.curveError <= 0.01 + 1e-12, "Circular chord error is explicit and bounded");

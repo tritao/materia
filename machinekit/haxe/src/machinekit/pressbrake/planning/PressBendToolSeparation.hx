@@ -18,21 +18,9 @@ class PressBendToolSeparation {
       new Vector(0, 1, 0),
       new Vector(0, 0, 1),
       frame.direction(new Vector(1, 0, 0)),
-      frame.direction(new Vector(
-        0,
-        0,
-        1
-      )),
-      end.direction(new Vector(
-        1,
-        0,
-        0
-      )),
-      end.direction(new Vector(
-        0,
-        0,
-        1
-      ))
+      frame.direction(new Vector(0, 0, 1)),
+      end.direction(new Vector(1, 0, 0)),
+      end.direction(new Vector(0, 0, 1))
     ];
     var lowY = Math.POSITIVE_INFINITY, highY = Math.NEGATIVE_INFINITY;
     var lowZ = Math.POSITIVE_INFINITY, highZ = Math.NEGATIVE_INFINITY;
@@ -47,14 +35,8 @@ class PressBendToolSeparation {
       var clip = WallOutline.polygon([
         new Point2(interval[0], lowZ - 1),
         new Point2(interval[1], lowZ - 1),
-        new Point2(
-          interval[1],
-          highZ + 1
-        ),
-        new Point2(
-          interval[0],
-          highZ + 1
-        )
+        new Point2(interval[1], highZ + 1),
+        new Point2(interval[0], highZ + 1)
       ]);
       for (section in OutlineBoolean.intersection(tool.section, clip, "tool-support-interval")) {
         var separated = false;

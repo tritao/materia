@@ -42,15 +42,7 @@ class CastingSectionContours {
       var face = scope.own(Sketch.rectangle(
         high.x - low.x + 2 * margin,
         high.y - low.y + 2 * margin,
-        new Plane(
-          new Vector(
-            (low.x + high.x) / 2,
-            (low.y + high.y) / 2,
-            0
-          ),
-          Vector.X(),
-          Vector.Z()
-        )
+        new Plane(new Vector((low.x + high.x) / 2, (low.y + high.y) / 2, 0), Vector.X(), Vector.Z())
       ));
       // Filled planar intersection removes internal seams at blind-hole
       // floors. A boundary-edge section alone can mistake those for holes.
@@ -82,10 +74,7 @@ class CastingSectionContours {
               kind: Arc,
               start: {x: a.x, y: a.y},
               end: {x: b.x, y: b.y},
-              center: {
-                x: center.x,
-                y: center.y
-              },
+              center: {x: center.x, y: center.y},
               sweep: sweep
             });
           }

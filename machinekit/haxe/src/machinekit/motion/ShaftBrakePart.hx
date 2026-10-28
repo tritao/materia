@@ -94,14 +94,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
     var inner = section.inner, outer = section.outer, start = section.start, end = section.end;
     return Solids.building([], parts -> {var ring = Solids.cut(
       Solids.named(Part.cylinderSpan(outer, start, end), role),
-      [Solids.named(
-        Part.cylinderSpan(
-          inner,
-          start - 0.1,
-          end + 0.1
-        ),
-        "bore"
-      )]
+      [Solids.named(Part.cylinderSpan(inner, start - 0.1, end + 0.1), "bore")]
     );
     parts.push(ring);
     if (role == "hub" || role == "disc") return ring;
@@ -111,10 +104,7 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
       [
         new Vector(0, 0),
         new Vector(radius * Math.cos(first), radius * Math.sin(first)),
-        new Vector(
-          radius * Math.cos(last),
-          radius * Math.sin(last)
-        )
+        new Vector(radius * Math.cos(last), radius * Math.sin(last))
       ],
       start - 0.1,
       end + 0.1
@@ -131,31 +121,11 @@ class ShaftBrakePart extends MachineComponent implements MotorBrakeSpec {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.shaft-brake-part",
       [
-        ComponentRecipeSupport.length(
-          "bore",
-          19
-        ),
-        ComponentRecipeSupport.choice(
-          "role",
-          [
-            "hub",
-            "disc",
-            "front",
-            "shell",
-            "back"
-          ],
-          "shell"
-        ),
-        ComponentRecipeSupport.count(
-          "sector",
-          0
-        )
+        ComponentRecipeSupport.length("bore", 19),
+        ComponentRecipeSupport.choice("role", ["hub", "disc", "front", "shell", "back"], "shell"),
+        ComponentRecipeSupport.count("sector", 0)
       ],
-      values -> new ShaftBrakePart(
-        values.number("bore"),
-        values.token("role"),
-        values.integer("sector")
-      )
+      values -> new ShaftBrakePart(values.number("bore"), values.token("role"), values.integer("sector"))
     );
     return recipe;
   }

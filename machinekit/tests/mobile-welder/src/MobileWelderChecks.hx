@@ -21,15 +21,7 @@ class MobileWelderChecks {
         width: 1000,
         payloadX: 700,
         batteryX: -600,
-        battery: new BatteryPack(
-          48,
-          25000,
-          1000,
-          600,
-          180,
-          230,
-          4
-        )
+        battery: new BatteryPack(48, 25000, 1000, 600, 180, 230, 4)
       }
     );
     if (robot.hasPort("compressedAir")

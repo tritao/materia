@@ -121,25 +121,11 @@ class FlexsplineHobberBudget {
     Sys.stdout().flush();
     if (mode == "geometry-speed") {
       var reference = InspectionRingStock.create(
-        new RingGrid(
-          s.rootRadius() - wall.wall,
-          s.tipRadius(),
-          0,
-          s.faceWidth,
-          radialStep,
-          axialStep
-        ),
+        new RingGrid(s.rootRadius() - wall.wall, s.tipRadius(), 0, s.faceWidth, radialStep, axialStep),
         inspection
       );
       var candidate = InspectionRingStock.create(
-        new RingGrid(
-          s.rootRadius() - wall.wall,
-          s.tipRadius(),
-          0,
-          s.faceWidth,
-          radialStep,
-          axialStep
-        ),
+        new RingGrid(s.rootRadius() - wall.wall, s.tipRadius(), 0, s.faceWidth, radialStep, axialStep),
         inspection
       );
       if (reference == null || candidate == null) throw "reference inspection domains unavailable";
@@ -307,12 +293,9 @@ class FlexsplineHobberBudget {
           failedClass6LeadParameters: failed,
           threads: threads,
           sweepToleranceMm: tolerance,
-          pathToleranceMm: tolerance
-        / 16,
-        endpointZMm: [
-          0.0,
-          s.faceWidth
-        ],
+          pathToleranceMm: tolerance / 16,
+          endpointZMm: [0.0,
+        s.faceWidth],
         scope: "complete HB8 stroke; lead-only baseline and combined physical inspections with exact face-end samples; profile budget and per-source end superposition are separate"
       })
       );

@@ -35,11 +35,7 @@ class MillYNutBridge extends MachineComponent {
     var rise = parameterNumber("rise");
     var pieces = [
       Part.box(84, rise + 54, 12).translated(new Vector(0, (rise - 6) / 2, 0)),
-      Part.box(84, 12, 72).translated(new Vector(
-        0,
-        rise - 6,
-        -60
-      ))
+      Part.box(84, 12, 72).translated(new Vector(0, rise - 6, -60))
     ];
     for (side in [-1, 1]) {
       var rib = Part.prism([new Vector(0, 30), new Vector(-60, rise - 12), new Vector(0, rise - 12)], -3, 3);

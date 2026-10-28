@@ -87,10 +87,7 @@ class ReplicationContactCad {
                         body,
                         F.compose(masterPose, master.reference),
                         contact,
-                        F.compose(
-                          pose,
-                          InterfaceRequirements.geometryFrame(requirement.geometry)
-                        )
+                        F.compose(pose, InterfaceRequirements.geometryFrame(requirement.geometry))
                       );
                       checks.push(result(rule, ids, report.status, key + ": " + report.message));
                   }

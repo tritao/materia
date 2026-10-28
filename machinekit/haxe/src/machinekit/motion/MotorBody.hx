@@ -43,13 +43,7 @@ class MotorBody {
     ));
     var body = Solids.union(pieces);
     var tools = [for (hole in holes) Solids.named(
-      Part.cylinderSpan(
-        holeDiameter / 2,
-        -flange - 0.1,
-        0.1,
-        hole.x,
-        hole.y
-      ),
+      Part.cylinderSpan(holeDiameter / 2, -flange - 0.1, 0.1, hole.x, hole.y),
       "bolt-hole"
     )];
     for (tool in tools) owned.push(tool);
@@ -65,22 +59,10 @@ class MotorBody {
       new Vector(h, -h + c),
       new Vector(h, h - c),
       new Vector(h - c, h),
-      new Vector(
-        -h + c,
-        h
-      ),
-      new Vector(
-        -h,
-        h - c
-      ),
-      new Vector(
-        -h,
-        -h + c
-      ),
-      new Vector(
-        -h + c,
-        -h
-      )
+      new Vector(-h + c, h),
+      new Vector(-h, h - c),
+      new Vector(-h, -h + c),
+      new Vector(-h + c, -h)
     ];
   }
 }

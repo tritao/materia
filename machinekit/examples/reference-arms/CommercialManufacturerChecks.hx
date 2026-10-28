@@ -23,14 +23,7 @@ class CommercialManufacturerChecks {
         converted.model,
         converted.model.links[0].id,
         frames[0].id,
-        new Transform3(
-          new Vec3(
-            0,
-            0,
-            0.15
-          ),
-          Quat.identity()
-        )
+        new Transform3(new Vec3(0, 0, 0.15), Quat.identity())
       );
       var rows:Array<Dynamic> = [], probes:Array<Array<Float>> = model.probes;
       var solver = new motionkit.robot.ManipulatorKinematics(arm);

@@ -25,24 +25,11 @@ class ReplicationContactTests {
   };
   static function source(insert:machinekit.structural.CastInsert):materia.tooling.casting.CastingToolingInput {
     var foundation = new machinekit.structural.MineralFoundation(
-      new machinekit.component.ComponentValues().setNumber(
-        "width",
-        100
-      ).setNumber(
-        "depth",
-        80
-      ).setNumber(
-        "height",
-        40
-      ),
+      new machinekit.component.ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
         part: insert,
-        pose: F.translation(
-          0,
-          0,
-          20
-        ),
+        pose: F.translation(0, 0, 20),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       }]
     );
@@ -51,21 +38,14 @@ class ReplicationContactTests {
     var context = machinekit.tooling.FoundationAssemblyContext.snapshot(
       assembly,
       "base/casting",
-      [{
-        id: "seat",
-        member: "base/seat"
-      }]
+      [{id: "seat", member: "base/seat"}]
     );
     return machinekit.tooling.FoundationToolingAdapter.snapshot(foundation, "replication-contact", 1, context);
   }
   static function replicatedLayer():Void {
     var requirement:materia.casting.InterfaceRequirement = {
       id: "finished-plane",
-      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-        0,
-        0,
-        21
-      )),
+      geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 21)),
       route: materia.casting.InterfaceRequirement.InterfaceRoute.Replicated,
       allowanceMm: 1,
       finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -94,16 +74,8 @@ class ReplicationContactTests {
       masters: [{
         id: "master",
         kind: materia.tooling.casting.ReplicationJig.ReplicationMasterKind.GroundPlate,
-        body: materia.casting.CastingSolid.Box(
-          50,
-          40,
-          2
-        ),
-        pose: F.translation(
-          0,
-          0,
-          41
-        ),
+        body: materia.casting.CastingSolid.Box(50, 40, 2),
+        pose: F.translation(0, 0, 41),
         reference: F.identity(),
         members: [materia.casting.InterfaceRelationship.InterfaceMember.ComponentInterface(
           "base/seat",

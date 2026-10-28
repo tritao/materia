@@ -28,10 +28,7 @@ class MillMotorPreviewChecks {
     var instance = document.createInstance("spindle/motorCarrier", definition);
     instance.restoreProperty(
       "machinekit.occurrence",
-      TypedProperty.text(
-        "machinekit.occurrence",
-        "spindle/motorCarrier"
-      )
+      TypedProperty.text("machinekit.occurrence", "spindle/motorCarrier")
     );
     var saved = DocumentCodec.encode(document);
     MachineKitRecipes.forget(document);
@@ -44,10 +41,7 @@ class MillMotorPreviewChecks {
     var freshInstance = fresh.createInstance("spindle/motorCarrier", freshDefinition), messages:Array<String> = [];
     freshInstance.restoreProperty(
       "machinekit.occurrence",
-      TypedProperty.text(
-        "machinekit.occurrence",
-        "spindle/motorCarrier"
-      )
+      TypedProperty.text("machinekit.occurrence", "spindle/motorCarrier")
     );
     MachineKitRecipes.reconcileDocument(fresh, saved, messages);
     var rebuilt = MachineKitRecipes.component(freshInstance);

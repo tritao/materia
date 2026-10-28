@@ -167,25 +167,8 @@ class RbkAxisPart extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "example.rbk-axis.fabricated-part",
-      [
-        P.choice(
-          "kind",
-          kinds(),
-          "base"
-        ),
-        P.choice(
-          "revision",
-          [
-            "v1-clearance",
-            "v2-tapped"
-          ],
-          "v1-clearance"
-        )
-      ],
-      v -> new RbkAxisPart(
-        v.token("kind"),
-        v.token("revision")
-      ),
+      [P.choice("kind", kinds(), "base"), P.choice("revision", ["v1-clearance", "v2-tapped"], "v1-clearance")],
+      v -> new RbkAxisPart(v.token("kind"), v.token("revision")),
       true
     );
     return recipe;

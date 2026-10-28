@@ -13,14 +13,7 @@ class TendingEndEffectorPreview {
     assembly.include(
       "tool",
       TendingReach.tendingTool().build(new RobotFlange(50)),
-      AssemblyFrames.compose(
-        AssemblyFrames.translation(
-          0,
-          0,
-          160
-        ),
-        AssemblyFrames.turnY(Math.PI)
-      )
+      AssemblyFrames.compose(AssemblyFrames.translation(0, 0, 160), AssemblyFrames.turnY(Math.PI))
     );
     // Compile the real pneumatic bindings with their regulated pressure. The
     // remote FRL is a service source, not part of the displayed wrist tool.
@@ -39,15 +32,7 @@ class TendingEndEffectorPreview {
     presentation.views.push({
       id: "tool-services",
       label: "Tool services and guides",
-      camera: Frame(
-        [{
-          occurrence: "tool",
-          subtree: true
-        }],
-        2.0,
-        0.45,
-        1.25
-      ),
+      camera: Frame([{occurrence: "tool", subtree: true}], 2.0, 0.45, 1.25),
       visibility: [],
       sections: [],
       explode: 0,

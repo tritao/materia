@@ -66,13 +66,7 @@ class SectionContourTests {
       );
       var draft = materia.casting.CastingDraftSections.sections(
         "rounded-draft",
-        materia.casting.CastingProfiles.roundedRectangle(
-          -20,
-          -15,
-          40,
-          30,
-          4
-        ),
+        materia.casting.CastingProfiles.roundedRectangle(-20, -15, 40, 30, 4),
         F.identity(),
         60,
         2
@@ -96,17 +90,11 @@ class SectionContourTests {
         cuts: [],
         regions: [materia.casting.CastingRegion.Difference(
           materia.casting.CastingRegion.Placed({
-            solid: Cut(materia.casting.CastingSolid.Cylinder(
-              40,
-              40
-            )),
+            solid: Cut(materia.casting.CastingSolid.Cylinder(40, 40)),
             pose: F.identity()
           }),
           [materia.casting.CastingRegion.Placed({
-            solid: Cut(materia.casting.CastingSolid.Cylinder(
-              20,
-              40
-            )),
+            solid: Cut(materia.casting.CastingSolid.Cylinder(20, 40)),
             pose: F.identity()
           })]
         )]
@@ -152,17 +140,7 @@ class SectionContourTests {
         0,
         0,
         20,
-        [
-          1,
-          0,
-          0,
-          0,
-          Math.sqrt(0.5),
-          -Math.sqrt(0.5),
-          0,
-          Math.sqrt(0.5),
-          Math.sqrt(0.5)
-        ]
+        [1, 0, 0, 0, Math.sqrt(0.5), -Math.sqrt(0.5), 0, Math.sqrt(0.5), Math.sqrt(0.5)]
       );
       var failure = "";
       try S.section(outer, tilted, "elliptical-cut") catch (error:Dynamic) failure = Std.string(error);

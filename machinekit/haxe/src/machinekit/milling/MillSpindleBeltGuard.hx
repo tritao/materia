@@ -32,11 +32,7 @@ class MillSpindleBeltGuard extends MachineComponent {
     return slot(
       distance + 2 * radius,
       2 * radius,
-      new Plane(
-        new Vector(75, 39, bottom),
-        new Vector(150, 78, 0),
-        Vector.Z()
-      ),
+      new Plane(new Vector(75, 39, bottom), new Vector(150, 78, 0), Vector.Z()),
       top - bottom
     );
   }
@@ -62,48 +58,22 @@ class MillSpindleBeltGuard extends MachineComponent {
     for (x in [120.0, 180.0]) for (y in [48.0, 108.0]) cuts.push(slot(
       28,
       12,
-      new Plane(
-        new Vector(x, y, 263),
-        Vector.X(),
-        Vector.Z()
-      ),
+      new Plane(new Vector(x, y, 263), Vector.X(), Vector.Z()),
       10
     ));
     var shell = Solids.cut(Solids.union([wall, top]), cuts);
     var joined = Solids.union([
       shell,
       Part.box(16, 16, 2).translated(new Vector(96, 105, 268)),
-      Part.box(20, 14, 2).translated(new Vector(
-        165,
-        121,
-        268
-      ))
+      Part.box(20, 14, 2).translated(new Vector(165, 121, 268))
     ]);
     var finished = Solids.cut(
       joined,
       [
         Part.cylinderSpan(2.25, 267, 271, 94, 108),
-        Part.cylinderSpan(
-          2.25,
-          267,
-          271,
-          165,
-          121
-        ),
-        Part.cylinderSpan(
-          4.5,
-          263,
-          268,
-          94,
-          108
-        ),
-        Part.cylinderSpan(
-          4.5,
-          263,
-          268,
-          165,
-          121
-        )
+        Part.cylinderSpan(2.25, 267, 271, 165, 121),
+        Part.cylinderSpan(4.5, 263, 268, 94, 108),
+        Part.cylinderSpan(4.5, 263, 268, 165, 121)
       ]
     );
     try {
@@ -118,15 +88,7 @@ class MillSpindleBeltGuard extends MachineComponent {
   static function centeredCapsule(radius:Float, bottom:Float, top:Float):Part return slot(
     MillSpindleMotorLayout.CENTRES + 2 * radius,
     2 * radius,
-    new Plane(
-      new Vector(
-        0,
-        MillSpindleMotorLayout.CENTRES / 2,
-        bottom
-      ),
-      Vector.Y(),
-      Vector.Z()
-    ),
+    new Plane(new Vector(0, MillSpindleMotorLayout.CENTRES / 2, bottom), Vector.Y(), Vector.Z()),
     top - bottom
   );
   function centeredGeometry():Part {
@@ -137,20 +99,12 @@ class MillSpindleBeltGuard extends MachineComponent {
         (MillSpindleMotorLayout.PLATE_REAR + MillSpindleMotorLayout.PLATE_FRONT) / 2,
         270
       )),
-      Part.cylinderSpan(
-        12,
-        269,
-        273
-      )
+      Part.cylinderSpan(12, 269, 273)
     ];
     for (x in [-30.0, 30.0]) for (y in [90.0, 150.0]) cuts.push(slot(
       22,
       12,
-      new Plane(
-        new Vector(x, y, 263),
-        Vector.Y(),
-        Vector.Z()
-      ),
+      new Plane(new Vector(x, y, 263), Vector.Y(), Vector.Z()),
       10
     ));
     var shell = Solids.cut(Solids.union([wall, centeredCapsule(48, 270, 272)]), cuts);

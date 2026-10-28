@@ -39,24 +39,9 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 
   public static function catalog():Catalog<NemaFrameInterface> {
     if (frameTable == null) frameTable = new Catalog("NEMA frame", spec -> Std.string(spec.frame), [
-      {
-        frame: 17,
-        face: 42.3,
-        boltSpacing: 31.0,
-        pilotDiameter: 22.0
-      },
-      {
-        frame: 23,
-        face: 56.4,
-        boltSpacing: 47.14,
-        pilotDiameter: 38.1
-      },
-      {
-        frame: 34,
-        face: 86.0,
-        boltSpacing: 69.6,
-        pilotDiameter: 73.0
-      },
+      {frame: 17, face: 42.3, boltSpacing: 31.0, pilotDiameter: 22.0},
+      {frame: 23, face: 56.4, boltSpacing: 47.14, pilotDiameter: 38.1},
+      {frame: 34, face: 86.0, boltSpacing: 69.6, pilotDiameter: 73.0},
     ], spec -> ({source: switch (spec.frame) {
       case 17 | 23:
         "https://www.nanotec.com/fileadmin/files/Katalog/linear-actuators-en.pdf";
@@ -205,11 +190,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
         standardEdition: null,
         dimensionKind: Unverified,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "holdingTorque",
-          "ratedCurrent",
-          "stepAngle"
-        ]
+        verifiedFields: ["holdingTorque", "ratedCurrent", "stepAngle"]
       })
     );
     return ratingTable;
@@ -389,27 +370,12 @@ class NemaStepper extends MachineComponent implements MotorDrive {
       holdingTorque: rated.holdingTorque * scale,
       assumed: assumed,
       assumptions: [
-        {
-          quantity: "inertia",
-          label: "rotor inertia"
-        },
-        {
-          quantity: "motor curve",
-          label: "stepper inductance"
-        },
-        {
-          quantity: "speed limit",
-          label: "stepper inductance"
-        }
+        {quantity: "inertia", label: "rotor inertia"},
+        {quantity: "motor curve", label: "stepper inductance"},
+        {quantity: "speed limit", label: "stepper inductance"}
       ].concat(scale == 1 ? [] : [
-        {
-          quantity : "motor curve",
-          label : "stepper current scaling"
-        },
-        {
-          quantity : "speed limit",
-          label : "stepper current scaling"
-        }
+        {quantity : "motor curve", label : "stepper current scaling"},
+        {quantity : "speed limit", label : "stepper current scaling"}
       ])
     };
   }
@@ -445,15 +411,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
     if (detail == Envelope) {
       var body = Solids.named(
         Part.prism(
-          [
-            new Vector(-half, -half),
-            new Vector(half, -half),
-            new Vector(half, half),
-            new Vector(
-              -half,
-              half
-            )
-          ],
+          [new Vector(-half, -half), new Vector(half, -half), new Vector(half, half), new Vector(-half, half)],
           -bodyLength,
           0
         ),
@@ -468,26 +426,11 @@ class NemaStepper extends MachineComponent implements MotorDrive {
           new Vector(-half + c, -half),
           new Vector(half - c, -half),
           new Vector(half, -half + c),
-          new Vector(
-            half,
-            half - c
-          ),
-          new Vector(
-            half - c,
-            half
-          ),
-          new Vector(
-            -half + c,
-            half
-          ),
-          new Vector(
-            -half,
-            half - c
-          ),
-          new Vector(
-            -half,
-            -half + c
-          )
+          new Vector(half, half - c),
+          new Vector(half - c, half),
+          new Vector(-half + c, half),
+          new Vector(-half, half - c),
+          new Vector(-half, -half + c)
         ],
         -bodyLength,
         0
@@ -585,19 +528,8 @@ class NemaStepper extends MachineComponent implements MotorDrive {
     "mountingCutout",
     [
       ComponentRecipeSupport.toolDepth(10),
-      ComponentRecipeSupport.length(
-        "pilotClearance",
-        0.2
-      ),
-      ComponentRecipeSupport.choice(
-        "fit",
-        [
-          "Fine",
-          "Medium",
-          "Coarse"
-        ],
-        "Medium"
-      )
+      ComponentRecipeSupport.length("pilotClearance", 0.2),
+      ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
     ]
   )];
 
@@ -615,11 +547,7 @@ class NemaStepper extends MachineComponent implements MotorDrive {
   public static function namedRecipeType():ComponentType {
     if (namedRecipeTypeCache == null) namedRecipeTypeCache = new ComponentType(
       "machinekit.motion.nema-stepper",
-      [ComponentRecipeSupport.catalog(
-        "model",
-        NemaStepper.variantCatalog(),
-        "17HS19-1684S1"
-      )],
+      [ComponentRecipeSupport.catalog("model", NemaStepper.variantCatalog(), "17HS19-1684S1")],
       v -> NemaStepper.model(v.token("model")),
       true
     );
@@ -632,24 +560,10 @@ class NemaStepper extends MachineComponent implements MotorDrive {
     if (genericRecipeTypeCache == null) genericRecipeTypeCache = new ComponentType(
       "machinekit.motion.generic-nema-stepper",
       [
-        ComponentRecipeSupport.choice(
-          "frame",
-          [
-            "17",
-            "23",
-            "34"
-          ],
-          "17"
-        ),
-        ComponentRecipeSupport.length(
-          "bodyLength",
-          48
-        )
+        ComponentRecipeSupport.choice("frame", ["17", "23", "34"], "17"),
+        ComponentRecipeSupport.length("bodyLength", 48)
       ],
-      v -> NemaStepper.frame(
-        Std.parseInt(v.token("frame")),
-        v.number("bodyLength")
-      )
+      v -> NemaStepper.frame(Std.parseInt(v.token("frame")), v.number("bodyLength"))
     );
     return genericRecipeTypeCache;
   }

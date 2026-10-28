@@ -55,26 +55,10 @@ class ToolClamp extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.pressbrake.tool-clamp", [
-      ComponentRecipeSupport.choice(
-        "mode",
-        [
-          "Manual",
-          "Powered"
-        ],
-        "Manual"
-      ),
-      ComponentRecipeSupport.length(
-        "width",
-        50
-      ),
-      ComponentRecipeSupport.length(
-        "depth",
-        40
-      ),
-      ComponentRecipeSupport.length(
-        "height",
-        60
-      )
+      ComponentRecipeSupport.choice("mode", ["Manual", "Powered"], "Manual"),
+      ComponentRecipeSupport.length("width", 50),
+      ComponentRecipeSupport.length("depth", 40),
+      ComponentRecipeSupport.length("height", 60)
     ], v -> {var mode = switch v.token("mode") {
       case "Manual":
         ToolClampMode.Manual;

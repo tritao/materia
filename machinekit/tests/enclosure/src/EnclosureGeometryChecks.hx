@@ -19,11 +19,7 @@ class EnclosureGeometryChecks {
       var result = local.placed(new Location(new Plane(
         new Vector(pose.x, pose.y, pose.z),
         new Vector(x.x, x.y, x.z),
-        new Vector(
-          z.x,
-          z.y,
-          z.z
-        )
+        new Vector(z.x, z.y, z.z)
       )));
       local.close();
       return result;

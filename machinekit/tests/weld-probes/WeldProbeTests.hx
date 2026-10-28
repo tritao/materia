@@ -114,16 +114,8 @@ class WeldProbeTests {
       {
         frame: weldment.reference,
         nominal: AssemblyFrames.identity(),
-        translation: [
-          0.02,
-          0.02,
-          0.0
-        ],
-        rotation: [
-          0.0,
-          0.0,
-          2 * Math.PI / 180
-        ],
+        translation: [0.02, 0.02, 0.0],
+        rotation: [0.0, 0.0, 2 * Math.PI / 180],
         measurementError: 0.00001,
         calibratedError: 0.000002,
         contactOffset: 0.0005,
@@ -202,11 +194,7 @@ class WeldProbeTests {
     var measuredEnvelope = new ContactPoseEnvelope(
       nominalWork,
       new Vec3(0.02, 0.02, 0),
-      new Vec3(
-        0,
-        0,
-        2 * Math.PI / 180
-      ),
+      new Vec3(0, 0, 2 * Math.PI / 180),
       0.00001
     );
     var parkingError = new Transform3(new Vec3(0.011, -0.014, 0), Quat.fromRollPitchYaw(0, 0, 0.025));
@@ -422,11 +410,7 @@ class WeldProbeTests {
       observations.push(new PlaneContact(
         new Vec3(normal.x, normal.y, normal.z),
         stage.face.offset() * 0.001,
-        actual.transformPoint(new Vec3(
-          point.x * 0.001,
-          point.y * 0.001,
-          point.z * 0.001
-        ))
+        actual.transformPoint(new Vec3(point.x * 0.001, point.y * 0.001, point.z * 0.001))
       ));
     }
     var fitted = ContactRegistration.fit(observations, Transform3.identity());

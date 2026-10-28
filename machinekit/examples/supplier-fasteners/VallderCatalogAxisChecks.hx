@@ -43,28 +43,11 @@ class VallderCatalogAxisChecks {
     var selected = new ScrewAxisComponents(
       MotorMount.of("RBK12-57", null, "vallder"),
       NemaStepper.model("23HS22-2804S"),
-      new SfuDrawingScrew(
-        "SFU1605",
-        500,
-        BallScrew.RACE_ROOT_DIAMETER
-      ),
-      new SfuNut(
-        "SFU1605",
-        13
-      ),
-      ScrewSupportUnit.model(
-        "BF12",
-        "vallder"
-      ),
-      LinearRail.metric(
-        "HGH15CA",
-        400,
-        LinearRail.MEASURED
-      ),
-      LinearRailBlock.metric(
-        "HGH15CA",
-        LinearRailBlock.SUPPLIER
-      ),
+      new SfuDrawingScrew("SFU1605", 500, BallScrew.RACE_ROOT_DIAMETER),
+      new SfuNut("SFU1605", 13),
+      ScrewSupportUnit.model("BF12", "vallder"),
+      LinearRail.metric("HGH15CA", 400, LinearRail.MEASURED),
+      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER),
       false
     );
     var axis = new TwinRailScrewAxis(layout, selected);
@@ -116,24 +99,12 @@ class VallderCatalogAxisChecks {
     sys.io.File.saveContent(output + "vallder-catalog.assembly.json", saved);
     sys.io.File.saveContent(
       output + "vallder-catalog.bom.json",
-      haxe.Json.stringify(
-        axis.billOfMaterials().lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(axis.billOfMaterials().lines(), null, "  ")
     );
     sys.io.File.saveContent(output + "vallder-catalog.sourcing.json", haxe.Json.stringify(sourcing, null, "  "));
     sys.io.File.saveContent(
       output + "vallder-catalog.checks.json",
-      haxe.Json.stringify(
-        {
-          checks: checks,
-          boundRecipes: bound,
-          clearances: clearances
-        },
-        null,
-        "  "
-      )
+      haxe.Json.stringify({checks: checks, boundRecipes: bound, clearances: clearances}, null, "  ")
     );
     var scene = AssemblyPreview.scene(loaded, "vallder-catalog-axis"), definition = scene.assemblyDefinition;
     if (definition == null) throw "Missing axis definition";

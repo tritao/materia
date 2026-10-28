@@ -83,76 +83,16 @@ class RotaryAxisSpec {
       "Published purchase data; source: machinekit/STRAIN_WAVE_RESEARCH.md, Suppliers and prices. Confirm unit certificate.";
     return [
       {name: "faceDiameter", value: 200, unit: "mm", basis: Catalog, reason: c},
-      {
-        name: "height",
-        value: 210,
-        unit: "mm",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "bore",
-        value: 40,
-        unit: "mm",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "mass",
-        value: 52,
-        unit: "kg",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "continuousTorque",
-        value: 54.9,
-        unit: "N m",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "peakTorque",
-        value: 223,
-        unit: "N m",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "continuousCurrent",
-        value: 3.43,
-        unit: "A rms",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "peakCurrent",
-        value: 17.9,
-        unit: "A rms",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "ratedSpeed",
-        value: 200 * Math.PI / 30,
-        unit: "rad/s",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "maxSpeed",
-        value: 234 * Math.PI / 30,
-        unit: "rad/s",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "loadCapacity",
-        value: 50,
-        unit: "kg",
-        basis: Catalog,
-        reason: c
-      },
+      {name: "height", value: 210, unit: "mm", basis: Catalog, reason: c},
+      {name: "bore", value: 40, unit: "mm", basis: Catalog, reason: c},
+      {name: "mass", value: 52, unit: "kg", basis: Catalog, reason: c},
+      {name: "continuousTorque", value: 54.9, unit: "N m", basis: Catalog, reason: c},
+      {name: "peakTorque", value: 223, unit: "N m", basis: Catalog, reason: c},
+      {name: "continuousCurrent", value: 3.43, unit: "A rms", basis: Catalog, reason: c},
+      {name: "peakCurrent", value: 17.9, unit: "A rms", basis: Catalog, reason: c},
+      {name: "ratedSpeed", value: 200 * Math.PI / 30, unit: "rad/s", basis: Catalog, reason: c},
+      {name: "maxSpeed", value: 234 * Math.PI / 30, unit: "rad/s", basis: Catalog, reason: c},
+      {name: "loadCapacity", value: 50, unit: "kg", basis: Catalog, reason: c},
       {
         name: "absoluteAccuracy",
         value: 5 * arc,
@@ -160,48 +100,12 @@ class RotaryAxisSpec {
         basis: Catalog,
         reason: c + " Published positioning accuracy; not NRRO or interpolation error."
       },
-      {
-        name: "repeatability",
-        value: 2 * arc,
-        unit: "rad",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "clampPressure",
-        value: 600000,
-        unit: "Pa",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "driverAcLow",
-        value: 220,
-        unit: "V rms",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "driverAcHigh",
-        value: 380,
-        unit: "V rms",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "ingressRating",
-        value: 67,
-        unit: "IP code",
-        basis: Catalog,
-        reason: c
-      },
-      {
-        name: "naturalCooling",
-        value: 1,
-        unit: "boolean",
-        basis: Catalog,
-        reason: c
-      },
+      {name: "repeatability", value: 2 * arc, unit: "rad", basis: Catalog, reason: c},
+      {name: "clampPressure", value: 600000, unit: "Pa", basis: Catalog, reason: c},
+      {name: "driverAcLow", value: 220, unit: "V rms", basis: Catalog, reason: c},
+      {name: "driverAcHigh", value: 380, unit: "V rms", basis: Catalog, reason: c},
+      {name: "ingressRating", value: 67, unit: "IP code", basis: Catalog, reason: c},
+      {name: "naturalCooling", value: 1, unit: "boolean", basis: Catalog, reason: c},
       {
         name: "housingDiameter",
         value: 260,

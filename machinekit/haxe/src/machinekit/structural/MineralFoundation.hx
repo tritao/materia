@@ -52,10 +52,7 @@ class MineralFoundation extends MachineAssembly {
       if (row.openings == null) throw "Foundation insert requires declared recess openings: " + row.id;
       var recess:CastingFeature = {id: 'insert-${row.id}', kind: InsertRecess, geometry: {
         solid: materia.casting.CastingFeature.CastingGeometrySolid.Insert(row.part.bodySpec()),
-        pose: F.compose(
-          F.identity(),
-          row.pose
-        )
+        pose: F.compose(F.identity(), row.pose)
       }, openings: [for (opening in row.openings) {
         kind:opening.kind, target:opening.target
       }

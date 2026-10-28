@@ -13,38 +13,14 @@ class VacuumTable extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 1600),
     P.length("length", 2600),
-    P.length(
-      "height",
-      50
-    ),
-    P.length(
-      "wall",
-      15
-    ),
-    P.count(
-      "columns",
-      2
-    ),
-    P.count(
-      "rows",
-      3
-    ),
-    P.length(
-      "gridPitch",
-      50
-    ),
-    P.length(
-      "grooveWidth",
-      6
-    ),
-    P.length(
-      "grooveDepth",
-      5
-    ),
-    P.length(
-      "zonePortDiameter",
-      50
-    )
+    P.length("height", 50),
+    P.length("wall", 15),
+    P.count("columns", 2),
+    P.count("rows", 3),
+    P.length("gridPitch", 50),
+    P.length("grooveWidth", 6),
+    P.length("grooveDepth", 5),
+    P.length("zonePortDiameter", 50)
   ];
   public function new(?v:ComponentValues) {
     super("vacuum-table", "zoned vacuum plenum table", "aluminium 6061", inputs(), v);

@@ -161,10 +161,7 @@ class MobileWeldStations {
     var chassis = Transform3.fromPose2(start);
     var firstJoint = [for (joint in flat.joints) if (joint.id == arm.group.jointIds[0]) joint][0];
     var armMount = chassis.inverse().compose(transform(
-      state.worldConnector(
-        firstJoint.parent,
-        firstJoint.parentConnector
-      ),
+      state.worldConnector(firstJoint.parent, firstJoint.parentConnector),
       scene.metresPerUnit
     ));
     var points = [for (seam in seams) new Vec3(
@@ -198,10 +195,7 @@ class MobileWeldStations {
         boxes,
         poses,
         FloorMap.DEFAULT_RESOLUTION,
-        FloorMap.navigationMargin(
-          radius,
-          0.3
-        ),
+        FloorMap.navigationMargin(radius, 0.3),
         FloorMap.DEFAULT_CLEARANCE,
         "map"
       ),
@@ -223,17 +217,8 @@ class MobileWeldStations {
     qw: frame.qw
   };
   static function transform(frame:AssemblyFrame, scale:Float):Transform3 return new Transform3(
-    new Vec3(
-      frame.x * scale,
-      frame.y * scale,
-      frame.z * scale
-    ),
-    new Quat(
-      frame.qx,
-      frame.qy,
-      frame.qz,
-      frame.qw
-    )
+    new Vec3(frame.x * scale, frame.y * scale, frame.z * scale),
+    new Quat(frame.qx, frame.qy, frame.qz, frame.qw)
   );
 
   function collisionAt(station:WeldStationCandidate):CollisionSceneBuilder {
@@ -288,16 +273,8 @@ class MobileWeldStations {
         qz: work.rotation.z,
         qw: work.rotation.w
       },
-      translation: [
-        0.02,
-        0.02,
-        0.0
-      ],
-      rotation: [
-        0.0,
-        0.0,
-        2 * Math.PI / 180
-      ],
+      translation: [0.02, 0.02, 0.0],
+      rotation: [0.0, 0.0, 2 * Math.PI / 180],
       measurementError: 0.00001,
       calibratedError: 0.0,
       contactOffset: processkit.tool.WeldArcModel.TOUCH_TOLERANCE,
@@ -365,11 +342,7 @@ class MobileWeldStations {
         for (face in probeGeometry.faces) if (face.target && new Vec3(face.normal.x,
           face.normal.y, face.normal.z).sub(stage.normal).norm() < 1e-8
           && Math.abs(face.offset() - stage.offset) < 1e-8 && face.contains(
-            new Vector(
-              workPoint.x,
-              workPoint.y,
-              workPoint.z
-            ),
+            new Vector(workPoint.x, workPoint.y, workPoint.z),
             0.000001
           )) patch = true;
         if (!patch) throw "Nominal contact ray misses the selected target CAD patch";
@@ -484,11 +457,7 @@ class MobileWeldStations {
           home.translation.y / scene.metresPerUnit,
           home.translation.z / scene.metresPerUnit
         ),
-        wire: new Vector(
-          wire.x,
-          wire.y,
-          wire.z
-        )
+        wire: new Vector(wire.x, wire.y, wire.z)
       }
     ).require();
   }

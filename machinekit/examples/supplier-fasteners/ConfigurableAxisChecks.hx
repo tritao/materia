@@ -71,24 +71,11 @@ class ConfigurableAxisChecks {
     var wrongNut = new ScrewAxisComponents(
       MotorMount.of("RBK12-57", null, "vallder"),
       NemaStepper.model("OPENBUILDS-NEMA23-56"),
-      new SfuDrawingScrew(
-        "SFU1605",
-        400,
-        BallScrew.RACE_ROOT_DIAMETER
-      ),
+      new SfuDrawingScrew("SFU1605", 400, BallScrew.RACE_ROOT_DIAMETER),
       new BallNut(),
-      ScrewSupportUnit.model(
-        "BF12",
-        "vallder"
-      ),
-      LinearRail.metric(
-        "HGH15CA",
-        300
-      ),
-      LinearRailBlock.metric(
-        "HGH15CA",
-        LinearRailBlock.SUPPLIER
-      )
+      ScrewSupportUnit.model("BF12", "vallder"),
+      LinearRail.metric("HGH15CA", 300),
+      LinearRailBlock.metric("HGH15CA", LinearRailBlock.SUPPLIER)
     );
     rejects(() -> wrongNut.check(defaults), "Reject nominal SFU nut with a different flange/length");
     var layout = new ScrewAxisLayout(300, 500, 400, 160);
@@ -159,11 +146,7 @@ class ConfigurableAxisChecks {
     sys.io.File.saveContent(output + "extended-300.sourcing.json", haxe.Json.stringify(lines, null, "  "));
     sys.io.File.saveContent(
       output + "extended-300.bom.json",
-      haxe.Json.stringify(
-        axis.billOfMaterials().lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(axis.billOfMaterials().lines(), null, "  ")
     );
     var scene = AssemblyPreview.scene(loaded, "extended-300-axis"), definition = scene.assemblyDefinition;
     if (definition == null) throw "Missing assembly definition";
@@ -178,19 +161,11 @@ class ConfigurableAxisChecks {
     sys.io.File.saveContent(output + "stepperonline-300.assembly.json", secondSaved);
     sys.io.File.saveContent(
       output + "stepperonline-300.bom.json",
-      haxe.Json.stringify(
-        candidate.billOfMaterials().lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(candidate.billOfMaterials().lines(), null, "  ")
     );
     sys.io.File.saveContent(
       output + "stepperonline-300.sourcing.json",
-      haxe.Json.stringify(
-        new SourcingPlan().lines(candidate.billOfMaterials()),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(new SourcingPlan().lines(candidate.billOfMaterials()), null, "  ")
     );
     var secondScene = AssemblyPreview.scene(secondLoaded,
       "stepperonline-300-axis"), secondDefinition = secondScene.assemblyDefinition;

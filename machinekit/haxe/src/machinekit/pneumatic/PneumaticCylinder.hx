@@ -52,14 +52,7 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
     addConnector(
       "portB",
       Face,
-      materia.assembly.AssemblyFrames.alongY(
-        bodyWidth / 2,
-        0,
-        bodyLength - capLength,
-        1,
-        0,
-        0
-      )
+      materia.assembly.AssemblyFrames.alongY(bodyWidth / 2, 0, bodyLength - capLength, 1, 0, 0)
     );
     addPort({name: "A", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true, connector: "portA"});
     addPort({name: "B", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true, connector: "portB"});
@@ -82,17 +75,10 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(Solids.building([],
     parts -> {parts.push(Solids.named(
-      family == "ISO15552" ? Part.box(
-        bodyWidth,
-        bodyWidth,
-        bodyLength
-      ) : Part.cylinderSpan(
-        bodyWidth / 2,
-        0,
-        bodyLength
-      ),
-      "barrel"
-    ));
+      family == "ISO15552" ? Part.box(bodyWidth,
+    bodyWidth, bodyLength) : Part.cylinderSpan(bodyWidth / 2, 0, bodyLength),
+    "barrel"
+  ));
   parts.push(Solids.named(Part.cylinderSpan(bore / 2, capLength, bodyLength - capLength), "pistonBore"));
   parts.push(Solids.named(Part.cylinderSpan(rod / 2 + 0.1, bodyLength - capLength, bodyLength + 0.1), "rodBearing"));
   return Solids.cut(parts[0], [parts[1], parts[2]]);
@@ -101,36 +87,12 @@ class PneumaticCylinder extends MachineComponent implements CylinderSpec {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.pneumatic.cylinder",
       [
-        ComponentRecipeSupport.choice(
-          "family",
-          [
-            "ISO6432",
-            "ISO15552"
-          ],
-          "ISO6432"
-        ),
-        ComponentRecipeSupport.length(
-          "bore",
-          25
-        ),
-        ComponentRecipeSupport.length(
-          "stroke",
-          100
-        ),
-        new machinekit.component.ComponentParameter(
-          "ratedSpeed",
-          Scalar,
-          Number(300),
-          "mm/s",
-          0
-        )
+        ComponentRecipeSupport.choice("family", ["ISO6432", "ISO15552"], "ISO6432"),
+        ComponentRecipeSupport.length("bore", 25),
+        ComponentRecipeSupport.length("stroke", 100),
+        new machinekit.component.ComponentParameter("ratedSpeed", Scalar, Number(300), "mm/s", 0)
       ],
-      v -> new PneumaticCylinder(
-        v.token("family"),
-        v.number("bore"),
-        v.number("stroke"),
-        v.number("ratedSpeed")
-      )
+      v -> new PneumaticCylinder(v.token("family"), v.number("bore"), v.number("stroke"), v.number("ratedSpeed"))
     );
     return recipe;
   }

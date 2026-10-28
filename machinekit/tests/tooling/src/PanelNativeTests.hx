@@ -49,16 +49,7 @@ class PanelNativeTests {
       bodyHeight: 100,
       offsetX: 20,
       slotY: 150,
-      tabs: [
-        {
-          center: 55.0,
-          width: 30.0
-        },
-        {
-          center: 210.0,
-          width: 44.0
-        }
-      ],
+      tabs: [{center: 55.0, width: 30.0}, {center: 210.0, width: 44.0}],
       clearance: 0.2,
       routerDiameter: 6,
       minimumLigament: 6
@@ -76,22 +67,7 @@ class PanelNativeTests {
         7,
         6,
         6,
-        {
-          width: 220,
-          height: 160,
-          primary: {
-            x: 40,
-            y: 40
-          },
-          secondary: {
-            x: 140,
-            y: 80
-          },
-          bolt: {
-            x: 90,
-            y: 110
-          }
-        }
+        {width: 220, height: 160, primary: {x: 40, y: 40}, secondary: {x: 140, y: 80}, bolt: {x: 90, y: 110}}
       )
     ];
     for (pair in pairs) {
@@ -214,30 +190,10 @@ class PanelNativeTests {
       var secondary = pinStock.translated(new Vector(140, 35, 0));
       pinStock.close();
       var members:Array<machinekit.tooling.SweptRemoval.RemovalMember> = [
-        {
-          id: pair.fixed.id,
-          part: localLower,
-          direction: new Vector(
-            0,
-            0,
-            -1
-          )
-        },
-        {
-          id: pair.moving.id,
-          part: upper,
-          direction: Vector.X()
-        },
-        {
-          id: "primary-pin",
-          part: primary,
-          direction: Vector.Z()
-        },
-        {
-          id: "secondary-pin",
-          part: secondary,
-          direction: Vector.Z()
-        }
+        {id: pair.fixed.id, part: localLower, direction: new Vector(0, 0, -1)},
+        {id: pair.moving.id, part: upper, direction: Vector.X()},
+        {id: "primary-pin", part: primary, direction: Vector.Z()},
+        {id: "secondary-pin", part: secondary, direction: Vector.Z()}
       ];
       var report = SweptRemoval.analyze(members);
       var edges = [for (e in report.blocking) e.movingId + "->" + e.blockerId];
@@ -264,11 +220,7 @@ class PanelNativeTests {
     endpoint.close();
     var report = SweptRemoval.analyze([
       {id: "A", part: a, direction: Vector.X()},
-      {
-        id: "B",
-        part: b,
-        direction: Vector.Z()
-      }
+      {id: "B", part: b, direction: Vector.Z()}
     ]);
     check(
       report.blocking.filter(e -> e.movingId == "A" && e.blockerId == "B").length == 1,
@@ -281,11 +233,7 @@ class PanelNativeTests {
     rejects(
       () -> SweptRemoval.analyze([
         {id: "A", part: a, direction: Vector.X()},
-        {
-          id: "B",
-          part: b,
-          direction: Vector.X().scale(-1)
-        }
+        {id: "B", part: b, direction: Vector.X().scale(-1)}
       ]),
       "A, B"
     );

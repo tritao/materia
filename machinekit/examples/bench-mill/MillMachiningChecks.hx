@@ -31,10 +31,7 @@ class MillMachiningChecks {
       if (job == null) throw id + " has no machining job";
       for (selection in [
         {part: "zAxis/motor", motor: "ELM2H-0750LA80E"},
-        {
-          part: "spindle/motor",
-          motor: "ELM2L-1500LA100FT-H MS1AE"
-        }
+        {part: "spindle/motor", motor: "ELM2L-1500LA100FT-H MS1AE"}
       ]) {
         var selected = data.parts.filter(p -> p.id == selection.part);
         check(

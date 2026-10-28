@@ -42,12 +42,7 @@ class ScrewBowlFeeder extends MachineAssembly {
     var centerZ = headSeat - drop / 2;
     for (side in [-1, 1]) addComponent(
       side < 0 ? "trackLeft" : "trackRight",
-      new FeederSolid(
-        "Head-supported guide rail",
-        railWidth,
-        distance,
-        8
-      ),
+      new FeederSolid("Head-supported guide rail", railWidth, distance, 8),
       {
         x : side * (trackGap + railWidth) / 2,
         y : centerY + 8 * Math.sin(tilt),
@@ -102,52 +97,16 @@ private class FeederBowl extends MachineComponent {
     var radius = diameter / 2;
     addFacet(machinekit.component.CollisionHullFacet.fromBoxes([
       [-radius, -radius, 0.0, radius, radius, 4.0],
-      [
-        -radius,
-        -radius,
-        4.0,
-        -radius + 3,
-        radius,
-        height
-      ],
-      [
-        radius - 3,
-        -radius,
-        4.0,
-        radius,
-        radius,
-        height
-      ],
-      [
-        -radius + 3,
-        -radius,
-        4.0,
-        radius - 3,
-        -radius + 3,
-        height
-      ],
-      [
-        -radius + 3,
-        radius - 3,
-        4.0,
-        radius - 3,
-        radius,
-        height
-      ]
+      [-radius, -radius, 4.0, -radius + 3, radius, height],
+      [radius - 3, -radius, 4.0, radius, radius, height],
+      [-radius + 3, -radius, 4.0, radius - 3, -radius + 3, height],
+      [-radius + 3, radius - 3, 4.0, radius - 3, radius, height]
     ]));
     addConnector("mount", Mount, AssemblyFrames.translation(0, 0, 0));
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
-    Part.cylinderSpan(
-      diameter / 2,
-      0,
-      height
-    ),
-    [Part.cylinderSpan(
-      diameter / 2 - 3,
-      4,
-      height + 0.1
-    )]
+    Part.cylinderSpan(diameter / 2, 0, height),
+    [Part.cylinderSpan(diameter / 2 - 3, 4, height + 0.1)]
   );
 }

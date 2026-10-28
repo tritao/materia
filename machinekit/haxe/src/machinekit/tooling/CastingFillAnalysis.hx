@@ -107,13 +107,7 @@ class CastingFillAnalysis {
         var local = own(resources, machinekit.structural.CastingCavityCad.part(cavity));
         boundaries.push({
           id: cavity.featureId,
-          part: own(
-            resources,
-            machinekit.assembly.PosedParts.moved(
-              local,
-              plan.document.setup.sourceToMold
-            )
-          )
+          part: own(resources, machinekit.assembly.PosedParts.moved(local, plan.document.setup.sourceToMold))
         });
       }
       var owners = new Map<String, Array<String>>();
@@ -136,10 +130,7 @@ class CastingFillAnalysis {
       // region remains exact for box and non-box geometry alike.
       for (core in plan.cores) cores.push({
         id: core.id,
-        part: own(
-          resources,
-          machinekit.structural.CastingRegionCad.part(core.cavity)
-        )
+        part: own(resources, machinekit.structural.CastingRegionCad.part(core.cavity))
       });
       var report = analyze(
         plan.document.input.id,
@@ -201,14 +192,7 @@ class CastingFillAnalysis {
             id: "fill-blocker-" + index,
             part: own(
               resources,
-              ToolingBlock.placedBox({
-                x: box.x,
-                y: box.y,
-                z: fillHeight,
-                width: box.width,
-                depth: box.depth,
-                height: 1
-              })
+              ToolingBlock.placedBox({x: box.x, y: box.y, z: fillHeight, width: box.width, depth: box.depth, height: 1})
             )
           });
         }
@@ -251,25 +235,16 @@ class CastingFillAnalysis {
           geometries.push(ceiling);
           var point = ceiling.highestPoint(), ids = boundaryIds(part, boundaries, sourceId);
           pockets.push({
-            id: "air-" + haxe.crypto.Sha256.encode(ToolingCodec.canonical({
-              heightMm: height,
-              componentKey: key
-            })).substr(
+            id: "air-" + haxe.crypto.Sha256.encode(ToolingCodec.canonical({heightMm: height,
+            componentKey: key})).substr(
               0,
               16
             ),
             sealedAtMm: height,
             volumeMm3: part.volume(),
-            geometry: CadAirAbove(
-              height,
-              key
-            ),
+            geometry: CadAirAbove(height, key),
             sourceIds: ids,
-            proposedVentPoint: {
-              x: point.x,
-              y: point.y,
-              z: point.z
-            }
+            proposedVentPoint: {x: point.x, y: point.y, z: point.z}
           });
           trapped.push(part);
         }
@@ -385,10 +360,7 @@ class CastingFillAnalysis {
         totalMixVolumeMm3: fluid.volume(),
         geometricResinVolumeMm3: source.volume(),
         openFillAreaMm2: openArea,
-        openFillGeometry: CadOpening(
-          fillHeight,
-          [for (blocker in actualBlockers) blocker.id]
-        ),
+        openFillGeometry: CadOpening(fillHeight, [for (blocker in actualBlockers) blocker.id]),
         levels: levels,
         trappedPockets: pockets,
         validation: checks

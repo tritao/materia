@@ -130,11 +130,7 @@ class WristGeometryInspection {
     sys.io.File.saveContent(
       directory + "/fr5-step.json",
       haxe.Json.stringify(
-        {
-          source: file,
-          sha256: ReferenceWristInterfaces.digest(sys.io.File.getBytes(file)),
-          solids: records
-        },
+        {source: file, sha256: ReferenceWristInterfaces.digest(sys.io.File.getBytes(file)), solids: records},
         null,
         "  "
       )

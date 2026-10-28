@@ -44,10 +44,7 @@ class InsertFixtureCad {
   public static function checkAssembly(
     plan:InsertPlatePlan,
     assembly:MachineAssembly,
-    additional:Array<{
-      id:String,
-      direction:cadkit.modeling.Vector
-    }>
+    additional:Array<{id:String, direction:cadkit.modeling.Vector}>
   ):InsertFixtureReview {
     materia.tooling.casting.InsertFixturePlanner.validatePlate(plan);
     var poses = assembly.solvedPoses();
@@ -59,10 +56,7 @@ class InsertFixtureCad {
       threadMates.set(site.id, ToolingIds.derive("insert-", site.insertId));
       if (site.plug != null) threadMates.set(
         ToolingIds.derive("", site.id, "-far-end"),
-        ToolingIds.derive(
-          "insert-",
-          site.insertId
-        )
+        ToolingIds.derive("insert-", site.insertId)
       );
     }
     for (mask in plan.masks) {
@@ -72,20 +66,13 @@ class InsertFixtureCad {
         threadMates.set(mask.protection.hardwareId, ToolingIds.derive("insert-", insert.id));
         if (mask.protection.farEndId != null) threadMates.set(
           mask.protection.farEndId,
-          ToolingIds.derive(
-            "insert-",
-            insert.id
-          )
+          ToolingIds.derive("insert-", insert.id)
         );
       }
     }
     for (member in plan.assembly.members) directions.set(
       member.panel.id,
-      new cadkit.modeling.Vector(
-        member.withdrawal.x,
-        member.withdrawal.y,
-        member.withdrawal.z
-      )
+      new cadkit.modeling.Vector(member.withdrawal.x, member.withdrawal.y, member.withdrawal.z)
     );
     for (i in 0...2) directions.set("fixture-locator-" + i, new cadkit.modeling.Vector(0, 0, -1));
     for (i in 0...plan.clampPoints.length) {
@@ -205,14 +192,7 @@ class InsertFixtureCad {
         "fixture-clamp-" + i,
         hardware.supportScrewDiameter,
         2 * thickness,
-        F.compose(
-          lower.pose,
-          F.translation(
-            at.x,
-            at.y,
-            2 * thickness
-          )
-        )
+        F.compose(lower.pose, F.translation(at.x, at.y, 2 * thickness))
       );
     }
     for (insert in plan.document.input.inserts) {
@@ -251,14 +231,7 @@ class InsertFixtureCad {
             plug.length
           ),
           F.compose(
-            F.compose(
-              site.entry,
-              F.translation(
-                0,
-                0,
-                hole.depth - plug.length
-              )
-            ),
+            F.compose(site.entry, F.translation(0, 0, hole.depth - plug.length)),
             machinekit.standard.SocketSetScrew.boreSeat()
           )
         );
@@ -278,14 +251,7 @@ class InsertFixtureCad {
           mask.protection.farEndId,
           far,
           F.compose(
-            F.compose(
-              entry,
-              F.translation(
-                0,
-                0,
-                hole.depth - (cast mask.protection.plugLength:Float)
-              )
-            ),
+            F.compose(entry, F.translation(0, 0, hole.depth - (cast mask.protection.plugLength:Float))),
             ToolingPin.boreSeat(far)
           )
         );
@@ -310,10 +276,7 @@ class InsertFixtureCad {
       assembly.addMemberConnector(
         root,
         ToolingIds.derive("", row.id, "-seat"),
-        F.compose(
-          F.inverse(rootPose),
-          poses.get(row.id)
-        )
+        F.compose(F.inverse(rootPose), poses.get(row.id))
       );
       assembly.addMemberConnector(row.id, "fixture-seat", F.identity());
       assembly.addMate(

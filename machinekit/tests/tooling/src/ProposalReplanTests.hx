@@ -28,16 +28,7 @@ class ProposalReplanTests {
   }
 
   static function foundation(placements:Array<CastInsertPlacement>):MineralFoundation return new MineralFoundation(
-    new ComponentValues().setNumber(
-      "width",
-      240
-    ).setNumber(
-      "depth",
-      180
-    ).setNumber(
-      "height",
-      100
-    ),
+    new ComponentValues().setNumber("width", 240).setNumber("depth", 180).setNumber("height", 100),
     placements
   );
 
@@ -83,10 +74,7 @@ class ProposalReplanTests {
       var thread = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating());
       var values = CastInsert.precastHoles(
         CastInsert.boxValues(40, 40, INSERT_HEIGHT),
-        InsertHoles.tappedBlind(
-          thread,
-          INSERT_HEIGHT
-        )
+        InsertHoles.tappedBlind(thread, INSERT_HEIGHT)
       );
       values.setToken("role", InsertRole.LiftingMount).setToken("finish", InsertFinish.AsSupplied).setToken(
         "label",
@@ -96,11 +84,7 @@ class ProposalReplanTests {
       placements.push({
         id: "lift-" + index,
         part: insert,
-        pose: F.translation(
-          position.x,
-          position.y,
-          position.z - INSERT_HEIGHT
-        ),
+        pose: F.translation(position.x, position.y, position.z - INSERT_HEIGHT),
         openings: [CastingPatterns.face("body.z-max")]
       });
       var returned = F.transformPoint(initial.setup.sourceToMold, position.x, position.y, position.z);

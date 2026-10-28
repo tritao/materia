@@ -32,10 +32,7 @@ class FastenedAssembly extends MachineAssembly {
       screw,
       {
         minimumDiameters: minimumDiameters,
-        angleWindow: angleWindow == null ? null : {
-          minimum : angleWindow.minimum,
-          maximum : angleWindow.maximum
-        }
+        angleWindow: angleWindow == null ? null : {minimum : angleWindow.minimum, maximum : angleWindow.maximum}
       }
     );
     return this;

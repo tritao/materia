@@ -80,13 +80,7 @@ class PneumaticVise extends MachineAssembly {
       "guide",
       {x: 0, y: -1, z: 0},
       jawDefault,
-      {
-        lower: 0,
-        upper: stroke,
-        velocity: null,
-        effort: null,
-        overtravel: cylinder.endStopCompliance
-      }
+      {lower: 0, upper: stroke, velocity: null, effort: null, overtravel: cylinder.endStopCompliance}
     );
     // The piston rod is fixed to the moving jaw and reaches back into the cylinder body.
     var rodFrame:AssemblyFrame = {x: 0, y: 0, z: 0, qx: Math.sin(Math.PI / 4), qy: 0, qz: 0, qw: Math.cos(Math.PI / 4)};

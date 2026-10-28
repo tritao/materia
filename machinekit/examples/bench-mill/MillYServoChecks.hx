@@ -104,26 +104,11 @@ class MillYServoChecks {
       ["motorMountY", "motorY"],
       ["motorMountY", "screwY"],
       ["motorMountY", "couplingY"],
-      [
-        "motorMountY",
-        "fixedPedestalY"
-      ],
-      [
-        "floatingBearingY",
-        "screwY"
-      ],
-      [
-        "floatingBearingY",
-        "floatingPedestalY"
-      ],
-      [
-        "couplingY",
-        "screwY"
-      ],
-      [
-        "couplingY",
-        "motorShaftY"
-      ]
+      ["motorMountY", "fixedPedestalY"],
+      ["floatingBearingY", "screwY"],
+      ["floatingBearingY", "floatingPedestalY"],
+      ["couplingY", "screwY"],
+      ["couplingY", "motorShaftY"]
     ]) overlap(
       stage.component(pair[0]),
       poses.get(pair[0]),
@@ -137,16 +122,7 @@ class MillYServoChecks {
     var access:Array<{id:String, part:Part}> = [];
     for (station in [24.0, 40]) access.push({
       id: "coupling key " + station,
-      part: Part.cylinderAlong(
-        2.5,
-        new Vector(
-          0,
-          l.yMotorFace - station,
-          l.yScrewZ + 12.6
-        ),
-        Vector.Z(),
-        30
-      )
+      part: Part.cylinderAlong(2.5, new Vector(0, l.yMotorFace - station, l.yScrewZ + 12.6), Vector.Z(), 30)
     });
     for (m in stage.components()) if (StringTools.startsWith(m.id, "mountYBolt") || StringTools.startsWith(
       m.id,
@@ -163,11 +139,7 @@ class MillYServoChecks {
       id: "motor key " + hole.x + "/" + hole.y,
       part: Part.cylinderAlong(
         2.5,
-        new Vector(
-          hole.x,
-          l.yMotorFace + mounting.flangeThickness + 5.1,
-          l.yScrewZ + hole.y
-        ),
+        new Vector(hole.x, l.yMotorFace + mounting.flangeThickness + 5.1, l.yScrewZ + hole.y),
         Vector.Y(),
         30
       )
@@ -240,10 +212,7 @@ class MillYServoChecks {
           toolApproachMm: 30,
           yOvertravelMm: l.yOvertravel,
           bayRoofZ: l.yBayTop,
-          shaftPassageMm: [
-            22,
-            22
-          ],
+          shaftPassageMm: [22, 22],
           yCompliance: "unspecified; kinematic lead only",
           motorFaceY: l.yMotorFace,
           screwLengthMm: l.yDriveScrew.totalLength,

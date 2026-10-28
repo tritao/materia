@@ -39,14 +39,8 @@ class Extruder extends MachineComponent {
     if (table == null) table = new Catalog(
       "extruder",
       s -> s.designation,
-      [{
-        designation: "GEARED-HOB-7.3",
-        width: 42.0,
-        height: 44.0,
-        depth: 22.0,
-        hobDiameter: 7.3,
-        filamentDiameter: 1.75
-      }],
+      [{designation: "GEARED-HOB-7.3",
+      width: 42.0, height: 44.0, depth: 22.0, hobDiameter: 7.3, filamentDiameter: 1.75}],
       _ -> ({
         source: "Assumed geared extruder with a 7.3 mm hobbed gear; no vendor verification",
         standard: null,
@@ -77,11 +71,7 @@ class Extruder extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.extruder",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "GEARED-HOB-7.3"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "GEARED-HOB-7.3")],
       v -> new Extruder(v.token("designation"))
     );
     return recipe;

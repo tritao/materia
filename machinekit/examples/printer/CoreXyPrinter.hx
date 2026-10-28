@@ -92,33 +92,15 @@ class CoreXyPrinter extends AxisBuilder {
   /** Where the three bed screws stand. */
   public static final SCREWS:Array<{id:String, x:Float, y:Float}> = [
     {id: "screwZRearLeft", x: -140, y: 130},
-    {
-      id: "screwZRearRight",
-      x: 140,
-      y: 130
-    },
-    {
-      id: "screwZFront",
-      x: 0,
-      y: -130
-    }
+    {id: "screwZRearRight", x: 140, y: 130},
+    {id: "screwZFront", x: 0, y: -130}
   ];
 
   public final motor:NemaStepper;
   public final specs:Array<PrinterAxisSpec> = [
     {id: "x", lower: 0, upper: BED, initial: BED / 2},
-    {
-      id: "y",
-      lower: 0,
-      upper: BED,
-      initial: BED / 2
-    },
-    {
-      id: "z",
-      lower: 0,
-      upper: Z_TRAVEL,
-      initial: 10
-    }
+    {id: "y", lower: 0, upper: BED, initial: BED / 2},
+    {id: "z", lower: 0, upper: Z_TRAVEL, initial: 10}
   ];
   /** Pitch radius of the belt pulleys, in millimetres. */
   public final pulleyRadius:Float;
@@ -175,53 +157,25 @@ class CoreXyPrinter extends AxisBuilder {
         place(
           'side${level.name}$name',
           new GantryExtrusion(profile, memberLength),
-          AxisBuilder.orient(
-            side * RAIL_X,
-            memberY0,
-            level.z + 10,
-            up,
-            alongY
-          )
+          AxisBuilder.orient(side * RAIL_X, memberY0, level.z + 10, up, alongY)
         );
       }
       for (entry in [{name: "Front", y: FRONT_Y}, {name: "Rear", y: REAR_Y}]) place(
         'cross${level.name}${entry.name}',
-        new GantryExtrusion(
-          profile,
-          2 * (RAIL_X - 10)
-        ),
-        AxisBuilder.orient(
-          -(RAIL_X - 10),
-          entry.y,
-          level.z + 10,
-          up,
-          alongX
-        )
+        new GantryExtrusion(profile, 2 * (RAIL_X - 10)),
+        AxisBuilder.orient(-(RAIL_X - 10), entry.y, level.z + 10, up, alongX)
       );
     }
     for (x in [-1, 1]) for (entry in [{name: "Front", y: FRONT_Y}, {name: "Rear", y: REAR_Y}]) place(
       'post${x < 0 ? "Left" : "Right"}${entry.name}',
-      new GantryExtrusion(
-        profile,
-        postLength
-      ),
-      AxisBuilder.orient(
-        x * RAIL_X,
-        entry.y,
-        20,
-        front,
-        vertical
-      )
+      new GantryExtrusion(profile, postLength),
+      AxisBuilder.orient(x * RAIL_X, entry.y, 20, front, vertical)
     );
     var baseDepth = REAR_Y - FRONT_Y - 20;
     place(
       "basePlate",
       new GantryPlate("Base plate", 2 * (RAIL_X - 10), baseDepth, 6),
-      AssemblyFrames.translation(
-        0,
-        (FRONT_Y + REAR_Y) / 2,
-        20
-      )
+      AssemblyFrames.translation(0, (FRONT_Y + REAR_Y) / 2, 20)
     );
 
     // ---- Y: the gantry on two rails on the top ring. ------------------------------------------------------------
@@ -232,13 +186,7 @@ class CoreXyPrinter extends AxisBuilder {
       place(
         'railY$name',
         LinearRail.metric(RAIL, railLength),
-        AxisBuilder.orient(
-          side * RAIL_X,
-          railStart,
-          railTop,
-          up,
-          alongY
-        )
+        AxisBuilder.orient(side * RAIL_X, railStart, railTop, up, alongY)
       );
     }
     var gy = MACHINE_ZERO_Y + TOOL_OFFSET_Y;
@@ -248,29 +196,15 @@ class CoreXyPrinter extends AxisBuilder {
       "railYLeft",
       "blockYLeft",
       LinearRailBlock.metric(RAIL),
-      AxisBuilder.orient(
-        -RAIL_X,
-        gy,
-        railTop,
-        up,
-        alongY
-      ),
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      AxisBuilder.orient(-RAIL_X, gy, railTop, up, alongY),
+      {x: 0, y: 1, z: 0}
     );
     var blockTop = RING_TOP + railSpec.blockHeight;
     var bracketHeight = 6.0;
     attach(
       "bracketLeft",
       new GantryPlate("Gantry bracket", 72, 36, bracketHeight),
-      AssemblyFrames.translation(
-        -RAIL_X + 15,
-        gy,
-        blockTop
-      ),
+      AssemblyFrames.translation(-RAIL_X + 15, gy, blockTop),
       "blockYLeft"
     );
     var barHeight = 40.0, barBase = blockTop;
@@ -278,23 +212,13 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "crossbar",
       new GantryExtrusion(TSlotExtrusion.forProfile("HFS5-2040"), barLength),
-      AxisBuilder.orient(
-        -barLength / 2,
-        gy + 20,
-        barBase + barHeight / 2,
-        up,
-        alongX
-      ),
+      AxisBuilder.orient(-barLength / 2, gy + 20, barBase + barHeight / 2, up, alongX),
       "bracketLeft"
     );
     attach(
       "bracketRight",
       new GantryPlate("Gantry bracket", 72, 36, bracketHeight),
-      AssemblyFrames.translation(
-        RAIL_X - 15,
-        gy,
-        blockTop
-      ),
+      AssemblyFrames.translation(RAIL_X - 15, gy, blockTop),
       "crossbar"
     );
     attach(
@@ -314,30 +238,10 @@ class CoreXyPrinter extends AxisBuilder {
       BELT_WIDTH,
       [
         new BeltWrap(-INNER_X, gy, R, 1),
-        new BeltWrap(
-          COLUMN_X - 2 * R,
-          gy - 2 * R,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          COLUMN_X,
-          FRONT_Y,
-          R,
-          1
-        ),
-        new BeltWrap(
-          COLUMN_X,
-          REAR_Y,
-          R,
-          1
-        ),
-        new BeltWrap(
-          -INNER_X,
-          REAR_Y,
-          R,
-          1
-        )
+        new BeltWrap(COLUMN_X - 2 * R, gy - 2 * R, R, -1),
+        new BeltWrap(COLUMN_X, FRONT_Y, R, 1),
+        new BeltWrap(COLUMN_X, REAR_Y, R, 1),
+        new BeltWrap(-INNER_X, REAR_Y, R, 1)
       ],
       null,
       0.0,
@@ -348,30 +252,10 @@ class CoreXyPrinter extends AxisBuilder {
       BELT_WIDTH,
       [
         new BeltWrap(INNER_X, gy, R, -1),
-        new BeltWrap(
-          -(COLUMN_X - 2 * R),
-          gy - 2 * R,
-          R,
-          1
-        ),
-        new BeltWrap(
-          -COLUMN_X,
-          FRONT_Y,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          -COLUMN_X,
-          REAR_Y,
-          R,
-          -1
-        ),
-        new BeltWrap(
-          INNER_X,
-          REAR_Y,
-          R,
-          -1
-        )
+        new BeltWrap(-(COLUMN_X - 2 * R), gy - 2 * R, R, 1),
+        new BeltWrap(-COLUMN_X, FRONT_Y, R, -1),
+        new BeltWrap(-COLUMN_X, REAR_Y, R, -1),
+        new BeltWrap(INNER_X, REAR_Y, R, -1)
       ],
       null,
       0.0,
@@ -390,17 +274,7 @@ class CoreXyPrinter extends AxisBuilder {
       attach(
         'motor${entry.id}',
         entry.id == "A" ? motor : NemaStepper.frame(17),
-        AxisBuilder.orient(
-          entry.x,
-          REAR_Y,
-          motorFace,
-          [
-            0.0,
-            1,
-            0
-          ],
-          up
-        ),
+        AxisBuilder.orient(entry.x, REAR_Y, motorFace, [0.0, 1, 0], up),
         plate
       );
     }
@@ -422,11 +296,7 @@ class CoreXyPrinter extends AxisBuilder {
           attach(
             parent,
             new GantryIdlerPin(motor.variant.shaftDiameter, pinLength),
-            AssemblyFrames.translation(
-              wrap.x,
-              wrap.y,
-              RING_TOP
-            ),
+            AssemblyFrames.translation(wrap.x, wrap.y, RING_TOP),
             w == 2 ? "crossTopFront" : "crossTopRear"
           );
         }
@@ -447,11 +317,7 @@ class CoreXyPrinter extends AxisBuilder {
         attach(
           pin,
           new GantryIdlerPin(motor.variant.shaftDiameter, level + BELT_WIDTH + 2 - (blockTop + bracketHeight)),
-          AssemblyFrames.translation(
-            wrap.x,
-            wrap.y,
-            blockTop + bracketHeight
-          ),
+          AssemblyFrames.translation(wrap.x, wrap.y, blockTop + bracketHeight),
           bracket
         );
         hang(id, beltPulley(), AssemblyFrames.translation(wrap.x, wrap.y, level), pin);
@@ -466,13 +332,7 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "railX",
       LinearRail.metric(RAIL, railXLength),
-      AxisBuilder.orient(
-        -railXLength / 2,
-        railXFace,
-        railZ,
-        front,
-        alongX
-      ),
+      AxisBuilder.orient(-railXLength / 2, railXFace, railZ, front, alongX),
       "crossbar"
     );
     slide(
@@ -480,18 +340,8 @@ class CoreXyPrinter extends AxisBuilder {
       "railX",
       "blockX",
       LinearRailBlock.metric(CARRIAGE_RAIL),
-      AxisBuilder.orient(
-        xc,
-        railXFace,
-        railZ,
-        front,
-        alongX
-      ),
-      {
-        x: 1,
-        y: 0,
-        z: 0
-      }
+      AxisBuilder.orient(xc, railXFace, railZ, front, alongX),
+      {x: 1, y: 0, z: 0}
     );
     var blockFront = railXFace - (carriageSpec.blockHeight - railSpec.railHeight);
     var plateBase = NOZZLE_Z + 35, plateHeight = levelB - 3 - plateBase;
@@ -499,22 +349,14 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "carriagePlate",
       new GantryPlate("Carriage plate", 30, 6, plateHeight),
-      AssemblyFrames.translation(
-        xc,
-        plateY,
-        plateBase
-      ),
+      AssemblyFrames.translation(xc, plateY, plateBase),
       "blockX"
     );
     var padBase = plateBase + plateHeight, padTop = levelA + BELT_WIDTH + 2;
     attach(
       "clamp",
       new GantryPlate("Belt clamp", 24, 9, padTop - padBase),
-      AssemblyFrames.translation(
-        xc,
-        blockFront - 4.5,
-        padBase
-      ),
+      AssemblyFrames.translation(xc, blockFront - 4.5, padBase),
       "carriagePlate"
     );
     for (b in 0...2) {
@@ -524,11 +366,7 @@ class CoreXyPrinter extends AxisBuilder {
         "belt" + letter,
         AssemblyFrames.compose(
           AssemblyFrames.inverse(zeroPoses.get("clamp")),
-          AssemblyFrames.translation(
-            xc,
-            gy - R,
-            b == 0 ? levelA : levelB
-          )
+          AssemblyFrames.translation(xc, gy - R, b == 0 ? levelA : levelB)
         )
       );
       addBeltPath({belt: "belt" + letter,
@@ -552,11 +390,7 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "toolheadMount",
       new GantryPlate("Hotend mount", 30, plateY - 3 - (ny - 13), 20),
-      AssemblyFrames.translation(
-        nx,
-        (plateY - 3 + ny - 13) / 2,
-        mountZ
-      ),
+      AssemblyFrames.translation(nx, (plateY - 3 + ny - 13) / 2, mountZ),
       "carriagePlate"
     );
     attach("hotend", hotend, AssemblyFrames.translation(nx, ny, blockBottom), "toolheadMount");
@@ -566,26 +400,14 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "thermistor",
       hotendThermistor,
-      AxisBuilder.orient(
-        nx - 20,
-        ny,
-        blockBottom + blockHeight / 2 + 3,
-        up,
-        alongX
-      ),
+      AxisBuilder.orient(nx - 20, ny, blockBottom + blockHeight / 2 + 3, up, alongX),
       "hotend"
     );
     // The heatsink fan blows across the heatsink from the right; the blower lies beside the block, its outlet towards the nozzle.
     attach(
       "hotendFan",
       new Fan("FAN-4010-24V"),
-      AxisBuilder.orient(
-        nx + 11,
-        ny,
-        blockBottom + blockHeight + 10,
-        up,
-        alongX
-      ),
+      AxisBuilder.orient(nx + 11, ny, blockBottom + blockHeight + 10, up, alongX),
       "toolheadMount"
     );
     attach(
@@ -640,11 +462,7 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "extruderMountPlate",
       new GantryPlate("Extruder mount", 42, plateFront - (ny + 11), spec.height),
-      AssemblyFrames.translation(
-        nx,
-        (plateFront + ny + 11) / 2,
-        zE - spec.height / 2
-      ),
+      AssemblyFrames.translation(nx, (plateFront + ny + 11) / 2, zE - spec.height / 2),
       "carriagePlate"
     );
     attach("extruder", extruder, AssemblyFrames.translation(nx, ny, zE), "extruderMountPlate");
@@ -662,11 +480,7 @@ class CoreXyPrinter extends AxisBuilder {
       "to-extruderGear",
       "extruderGear",
       "attach-extruderGear",
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      {x: 0, y: 1, z: 0}
     );
     hang("extruderPinion", pinion, AxisBuilder.orient(motorShaft, gearFront, zE, up, alongY), "motorE");
     addMateOnAxis(
@@ -676,11 +490,7 @@ class CoreXyPrinter extends AxisBuilder {
       "to-extruderPinion",
       "extruderPinion",
       "attach-extruderPinion",
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      }
+      {x: 0, y: 1, z: 0}
     );
     addTransmission(
       "extruder-gear",
@@ -711,17 +521,7 @@ class CoreXyPrinter extends AxisBuilder {
       place(
         rail,
         LinearRail.metric(Z_RAIL, railLength),
-        AxisBuilder.orient(
-          side * RAIL_X,
-          postFront,
-          railBottom,
-          [
-            0.0,
-            -1,
-            0
-          ],
-          vertical
-        )
+        AxisBuilder.orient(side * RAIL_X, postFront, railBottom, [0.0, -1, 0], vertical)
       );
       if (first) {
         slide(
@@ -729,22 +529,8 @@ class CoreXyPrinter extends AxisBuilder {
           rail,
           'blockZ$name',
           LinearRailBlock.metric(Z_RAIL),
-          AxisBuilder.orient(
-            side * RAIL_X,
-            postFront,
-            blockMid,
-            [
-              0.0,
-              -1,
-              0
-            ],
-            vertical
-          ),
-          {
-            x: 0,
-            y: 0,
-            z: -1
-          }
+          AxisBuilder.orient(side * RAIL_X, postFront, blockMid, [0.0, -1, 0], vertical),
+          {x: 0, y: 0, z: -1}
         );
         first = false;
       }
@@ -755,11 +541,7 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "wingLeft",
       new GantryPlate("Bed wing", wingWidth, wingDepth, 8),
-      AssemblyFrames.translation(
-        -RAIL_X,
-        wingRear - wingDepth / 2,
-        carrierBottom
-      ),
+      AssemblyFrames.translation(-RAIL_X, wingRear - wingDepth / 2, carrierBottom),
       "blockZLeft"
     );
     attach(
@@ -771,23 +553,13 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "wingRight",
       new GantryPlate("Bed wing", wingWidth, wingDepth, 8),
-      AssemblyFrames.translation(
-        RAIL_X,
-        wingRear - wingDepth / 2,
-        carrierBottom
-      ),
+      AssemblyFrames.translation(RAIL_X, wingRear - wingDepth / 2, carrierBottom),
       "carrier"
     );
     attach(
       "blockZRight",
       LinearRailBlock.metric(Z_RAIL),
-      AxisBuilder.orient(
-        RAIL_X,
-        postFront,
-        blockMid,
-        [0.0, -1, 0],
-        vertical
-      ),
+      AxisBuilder.orient(RAIL_X, postFront, blockMid, [0.0, -1, 0], vertical),
       "wingRight"
     );
     attach(
@@ -823,17 +595,7 @@ class CoreXyPrinter extends AxisBuilder {
         entry.id,
         motorId,
         new LeadScrew(thread, screwLength),
-        AxisBuilder.orient(
-          entry.x,
-          entry.y,
-          screwBottom,
-          [
-            0.0,
-            1,
-            0
-          ],
-          up
-        ),
+        AxisBuilder.orient(entry.x, entry.y, screwBottom, [0.0, 1, 0], up),
         up,
         false,
         driverFor
@@ -869,17 +631,9 @@ class CoreXyPrinter extends AxisBuilder {
       "carriagePlate",
       [xc - 24.0, plateY, railZ - 6.0],
       [8.0, 8.0, 12.0],
-      [
-        1.0,
-        0,
-        0
-      ],
+      [1.0, 0, 0],
       -1,
-      [
-        0.0,
-        1,
-        0
-      ]
+      [0.0, 1, 0]
     );
     addHomeSwitch(
       ySpec,
@@ -888,17 +642,9 @@ class CoreXyPrinter extends AxisBuilder {
       "bracketLeft",
       [-RAIL_X - 2.0, gy - 22.0, blockTop + 6.0],
       [8.0, 8.0, 10.0],
-      [
-        0.0,
-        1,
-        0
-      ],
+      [0.0, 1, 0],
       -1,
-      [
-        1.0,
-        0,
-        0
-      ]
+      [1.0, 0, 0]
     );
     // Z homes with the bed lowered, so that X and Y never find the nozzle over a bed that is up: an inductive
     // sensor on a pillar from the base plate senses a steel flag under the bed's carrier. Pre-homing the bed
@@ -911,17 +657,9 @@ class CoreXyPrinter extends AxisBuilder {
       "carrier",
       [60.0, -60.0, carrierBottomZero() - 6.0],
       [12.0, 12.0, 6.0],
-      [
-        0.0,
-        0,
-        -1
-      ],
+      [0.0, 0, -1],
       1,
-      [
-        1.0,
-        0,
-        0
-      ],
+      [1.0, 0, 0],
       true
     );
     // A probe beside the nozzle for levelling the bed: its face is a millimetre above the nozzle tip.
@@ -931,27 +669,13 @@ class CoreXyPrinter extends AxisBuilder {
     attach(
       "probeMount",
       new GantryPlate("Probe mount", 30, 20, 6),
-      AssemblyFrames.translation(
-        nx + PROBE_X - 5,
-        ny + PROBE_Y,
-        face + probe.spec.length - 6
-      ),
+      AssemblyFrames.translation(nx + PROBE_X - 5, ny + PROBE_Y, face + probe.spec.length - 6),
       "toolheadMount"
     );
     attach(
       "probe",
       probe,
-      AxisBuilder.orient(
-        nx + PROBE_X,
-        ny + PROBE_Y,
-        face + probe.spec.length,
-        [1.0, 0, 0],
-        [
-          0.0,
-          0,
-          -1
-        ]
-      ),
+      AxisBuilder.orient(nx + PROBE_X, ny + PROBE_Y, face + probe.spec.length, [1.0, 0, 0], [0.0, 0, -1]),
       "probeMount"
     );
   }
@@ -973,16 +697,8 @@ class CoreXyPrinter extends AxisBuilder {
     if (!supplyAdded) {
       attach(
         "powerSupply",
-        new PowerSupply(
-          new machinekit.power.DcVoltage(SUPPLY_VOLTS),
-          new machinekit.power.DcCurrent(20),
-          8
-        ),
-        AssemblyFrames.translation(
-          0,
-          FRONT_Y + 40,
-          26
-        ),
+        new PowerSupply(new machinekit.power.DcVoltage(SUPPLY_VOLTS), new machinekit.power.DcCurrent(20), 8),
+        AssemblyFrames.translation(0, FRONT_Y + 40, 26),
         "basePlate"
       );
       supplyAdded = true;
@@ -995,11 +711,7 @@ class CoreXyPrinter extends AxisBuilder {
         new machinekit.power.PhaseRmsCurrent(extruderMotor ? EXTRUDER_DRIVER_CURRENT : DRIVER_CURRENT),
         MICROSTEPS
       ),
-      AssemblyFrames.translation(
-        -120 + 40 * driverIndex++,
-        FRONT_Y + 80,
-        26
-      ),
+      AssemblyFrames.translation(-120 + 40 * driverIndex++, FRONT_Y + 80, 26),
       "basePlate"
     );
     connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");

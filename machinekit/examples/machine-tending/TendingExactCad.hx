@@ -122,11 +122,7 @@ class TendingExactCad {
     var shape = new Location(new Plane(
       new Vector(pose.x, pose.y, pose.z),
       new Vector(m[0], m[3], m[6]),
-      new Vector(
-        m[2],
-        m[5],
-        m[8]
-      )
+      new Vector(m[2], m[5], m[8])
     )).apply(raw);
     placed.set(id, {key: key, shape: shape});
     return shape;

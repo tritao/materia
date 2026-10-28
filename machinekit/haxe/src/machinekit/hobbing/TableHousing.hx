@@ -7,31 +7,11 @@ import machinekit.component.ComponentRecipeSupport as P;
 /** Rotary table housing. Reference row is Assumed; dimensions are simplified envelopes. */
 class TableHousing extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
-    P.quantity(
-      "outside",
-      180,
-      "mm"
-    ),
-    P.quantity(
-      "bore",
-      80,
-      "mm"
-    ),
-    P.quantity(
-      "height",
-      80,
-      "mm"
-    ),
-    P.quantity(
-      "bearingSeat",
-      120,
-      "mm"
-    ),
-    P.quantity(
-      "bearingWidth",
-      16,
-      "mm"
-    )
+    P.quantity("outside", 180, "mm"),
+    P.quantity("bore", 80, "mm"),
+    P.quantity("height", 80, "mm"),
+    P.quantity("bearingSeat", 120, "mm"),
+    P.quantity("bearingWidth", 16, "mm")
   ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
@@ -65,11 +45,7 @@ class TableHousing extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
     var tools = [
       cadkit.modeling.Part.cylinderSpan(75, -0.1, 45),
-      cadkit.modeling.Part.cylinderSpan(
-        parameterNumber("bearingSeat") / 2,
-        45,
-        45 + parameterNumber("bearingWidth")
-      )
+      cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat") / 2, 45, 45 + parameterNumber("bearingWidth"))
     ];
     if (parameterNumber("bearingSeat") > 120) tools.push(cadkit.modeling.Part.cylinderSpan(
       parameterNumber("bearingSeat") / 2,

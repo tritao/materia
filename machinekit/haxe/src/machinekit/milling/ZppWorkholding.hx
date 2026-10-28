@@ -33,15 +33,8 @@ class ZppWorkholding extends MachineAssembly {
     var mountHalf = pneumatic ? 64 : 41;
     for (x in [-mountHalf, mountHalf]) for (y in [-mountHalf, mountHalf]) fixed(
       'plateBolt$x-$y',
-      SocketHeadCapScrew.metric(
-        "M10",
-        pneumatic ? 30 : 25
-      ),
-      F.translation(
-        x,
-        y,
-        ADAPTER + (pneumatic ? 16 : 12)
-      ),
+      SocketHeadCapScrew.metric("M10", pneumatic ? 30 : 25),
+      F.translation(x, y, ADAPTER + (pneumatic ? 16 : 12)),
       "plate"
     );
     fixed("vise", new ZppComponent(pneumatic ? "ar-body" : "body"), F.translation(0, 0, base), "plate");
@@ -65,11 +58,7 @@ class ZppWorkholding extends MachineAssembly {
         id + "Guide",
         id,
         "guide",
-        {
-          x : side,
-          y : 0,
-          z : 0
-        },
+        {x : side, y : 0, z : 0},
         stockDepth / 2,
         {
           lower : pneumatic ? stockDepth / 2 : 0,
@@ -95,11 +84,7 @@ class ZppWorkholding extends MachineAssembly {
     if (!pneumatic) for (side in [-1, 1]) fixed(
       "parallel" + side,
       new MillPanel(stockDepth - 0.2, 5, PARALLELS),
-      F.translation(
-        0,
-        side * (stockWidth / 2 - 2.5),
-        base + ZppComponent.BED
-      ),
+      F.translation(0, side * (stockWidth / 2 - 2.5), base + ZppComponent.BED),
       "vise"
     );
     if (pneumatic) {
@@ -108,12 +93,7 @@ class ZppWorkholding extends MachineAssembly {
       addSwitch(
         "clamped-position",
         "half-opening",
-        {
-          lower: stockDepth / 2,
-          upper: stockDepth / 2 + 0.05,
-          velocity: null,
-          effort: null
-        },
+        {lower: stockDepth / 2, upper: stockDepth / 2 + 0.05, velocity: null, effort: null},
         0.01
       );
       addSwitch(

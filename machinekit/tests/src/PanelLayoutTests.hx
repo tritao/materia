@@ -25,30 +25,10 @@ class PanelLayoutTests {
     3.0,
     48.0,
     [
-      new PlacedPart(
-        "wheel",
-        PartPresets.yumoIsm6045(),
-        45.0,
-        0.0
-      ),
-      new PlacedPart(
-        "estop",
-        PartPresets.xb2Es542(),
-        -50.0,
-        25.0
-      ),
-      new PlacedPart(
-        "axis",
-        PartPresets.rotarySwitch(12),
-        -55.0,
-        -15.0
-      ),
-      new PlacedPart(
-        "button",
-        PartPresets.pushButton16(),
-        -20.0,
-        -15.0
-      )
+      new PlacedPart("wheel", PartPresets.yumoIsm6045(), 45.0, 0.0),
+      new PlacedPart("estop", PartPresets.xb2Es542(), -50.0, 25.0),
+      new PlacedPart("axis", PartPresets.rotarySwitch(12), -55.0, -15.0),
+      new PlacedPart("button", PartPresets.pushButton16(), -20.0, -15.0)
     ]
   );
 
@@ -99,18 +79,8 @@ class PanelLayoutTests {
       3.0,
       48.0,
       [
-        new PlacedPart(
-          "a",
-          PartPresets.pushButton16(),
-          0.0,
-          0.0
-        ),
-        new PlacedPart(
-          "b",
-          PartPresets.pushButton16(),
-          23.0,
-          0.0
-        )
+        new PlacedPart("a", PartPresets.pushButton16(), 0.0, 0.0),
+        new PlacedPart("b", PartPresets.pushButton16(), 23.0, 0.0)
       ]
     );
     check(hasProblem(overlapping, "bodies of a and b overlap"), "Rear bodies that overlap");
@@ -120,12 +90,7 @@ class PanelLayoutTests {
       4.0,
       3.0,
       48.0,
-      [new PlacedPart(
-        "wheel",
-        PartPresets.vallderMpg(),
-        0.0,
-        0.0
-      )]
+      [new PlacedPart("wheel", PartPresets.vallderMpg(), 0.0, 0.0)]
     );
     check(hasProblem(thick, "wheel allows 3"), "A panel thicker than the Vallder studs allow");
     check(
@@ -138,12 +103,7 @@ class PanelLayoutTests {
     rejects("no part", () -> new PlacedPart("x", null, 0.0, 0.0));
     rejects(
       "a part that states no panel mount",
-      () -> new PlacedPart(
-        "x",
-        new machinekit.control.SafetyRelay(),
-        0.0,
-        0.0
-      )
+      () -> new PlacedPart("x", new machinekit.control.SafetyRelay(), 0.0, 0.0)
     );
 
     // The wheel's panel template: a 44 mm opening and three 3.2 mm holes on a 50.8 mm circle at 120 degrees.
@@ -175,18 +135,8 @@ class PanelLayoutTests {
       3.0,
       48.0,
       [
-        new PlacedPart(
-          "a",
-          PartPresets.pushButton16(),
-          0.0,
-          0.0
-        ),
-        new PlacedPart(
-          "b",
-          PartPresets.pushButton16(),
-          10.0,
-          0.0
-        )
+        new PlacedPart("a", PartPresets.pushButton16(), 0.0, 0.0),
+        new PlacedPart("b", PartPresets.pushButton16(), 10.0, 0.0)
       ]
     );
     check(

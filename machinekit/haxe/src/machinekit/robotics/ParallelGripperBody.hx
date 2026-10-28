@@ -44,14 +44,7 @@ class ParallelGripperBody extends MachineComponent {
     addConnector(
       "cylinderMount",
       Mount,
-      AssemblyFrames.compose(
-        AssemblyFrames.translation(
-          spec.cylinderStartX(),
-          0,
-          spec.cylinderAxisZ()
-        ),
-        cylinderAxis
-      )
+      AssemblyFrames.compose(AssemblyFrames.translation(spec.cylinderStartX(), 0, spec.cylinderAxisZ()), cylinderAxis)
     );
     // Mount the valve flush on the outside -Y face, with its ports pointing away
     // from the housing. The former internal seat buried most of the valve in solid material.
@@ -59,26 +52,10 @@ class ParallelGripperBody extends MachineComponent {
       "valveSeat",
       Mount,
       AssemblyFrames.compose(
-        AssemblyFrames.translation(
-          spec.valveSeatX(),
-          -spec.bodyDepth / 2,
-          spec.bodyLength * 0.25
-        ),
+        AssemblyFrames.translation(spec.valveSeatX(), -spec.bodyDepth / 2, spec.bodyLength * 0.25),
         AssemblyFrames.compose(
-          {
-            x: 0,
-            y: 0,
-            z: 0,
-            qx: Math.sin(Math.PI / 4),
-            qy: 0,
-            qz: 0,
-            qw: Math.cos(Math.PI / 4)
-          },
-          Solids.axial(
-            0,
-            0,
-            0
-          )
+          {x: 0, y: 0, z: 0, qx: Math.sin(Math.PI / 4), qy: 0, qz: 0, qw: Math.cos(Math.PI / 4)},
+          Solids.axial(0, 0, 0)
         )
       )
     );
@@ -99,10 +76,7 @@ class ParallelGripperBody extends MachineComponent {
       spec.maximumPartWidth(),
       spec.fingerLength,
       spec.fingerPadFrictionCoefficient,
-      [
-        ParallelGripper.FINGER_LEFT,
-        ParallelGripper.FINGER_RIGHT
-      ],
+      [ParallelGripper.FINGER_LEFT, ParallelGripper.FINGER_RIGHT],
       spec.supportStep
     ));
     addFacet(CollisionHullFacet.fromBoxes(housingCollisionBoxes(spec)));
@@ -112,26 +86,11 @@ class ParallelGripperBody extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.parallel-gripper-body",
       [
-        ComponentRecipeSupport.count(
-          "size",
-          32
-        ),
-        ComponentRecipeSupport.length(
-          "expectedPartWidth",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "fingerLength",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "openingTravel",
-          16
-        ),
-        ComponentRecipeSupport.flag(
-          "supportStep",
-          false
-        )
+        ComponentRecipeSupport.count("size", 32),
+        ComponentRecipeSupport.length("expectedPartWidth", 60),
+        ComponentRecipeSupport.length("fingerLength", 60),
+        ComponentRecipeSupport.length("openingTravel", 16),
+        ComponentRecipeSupport.flag("supportStep", false)
       ],
       v -> new ParallelGripperBody(new ParallelGripperSpec(
         v.integer("size"),
@@ -178,14 +137,7 @@ class ParallelGripperBody extends MachineComponent {
     if (reliefZ <= 0 || innerHalf <= 0) throw "Gripper housing needs room for its swept jaw reliefs";
     return [
       [-spec.bodyWidth / 2, -spec.bodyDepth / 2, 0, spec.bodyWidth / 2, spec.bodyDepth / 2, reliefZ],
-      [
-        -innerHalf,
-        -spec.bodyDepth / 2,
-        reliefZ,
-        innerHalf,
-        spec.bodyDepth / 2,
-        spec.bodyLength
-      ]
+      [-innerHalf, -spec.bodyDepth / 2, reliefZ, innerHalf, spec.bodyDepth / 2, spec.bodyLength]
     ];
   }
 
@@ -217,11 +169,7 @@ class ParallelGripperBody extends MachineComponent {
           "left-jaw-relief"
         ),
         Solids.named(
-          Part.box(
-            rightMax - rightMin,
-            notchDepth,
-            notchHeight
-          ).translated(new Vector(
+          Part.box(rightMax - rightMin, notchDepth, notchHeight).translated(new Vector(
             (rightMin + rightMax) / 2,
             0,
             reliefZ
@@ -229,13 +177,7 @@ class ParallelGripperBody extends MachineComponent {
           "right-jaw-relief"
         )
       ],
-      parts -> Solids.cut(
-        parts[0],
-        [
-          parts[1],
-          parts[2]
-        ]
-      )
+      parts -> Solids.cut(parts[0], [parts[1], parts[2]])
     );
   }
 }

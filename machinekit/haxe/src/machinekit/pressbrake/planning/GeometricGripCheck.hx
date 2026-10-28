@@ -153,11 +153,7 @@ class GeometricGripCheck implements GripCheck {
     return new SheetDiagnosis(
       code,
       "Gripper on wall " + grip.wall + " fails against " + obstacle + " at sample " + sample,
-      [
-        "wall:" + grip.wall,
-        obstacle,
-        "sample:" + sample
-      ]
+      ["wall:" + grip.wall, obstacle, "sample:" + sample]
     );
   }
 }

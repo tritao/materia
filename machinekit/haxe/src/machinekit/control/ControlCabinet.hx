@@ -13,30 +13,12 @@ class ControlCabinet extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 800),
     P.length("depth", 300),
-    P.length(
-      "height",
-      1000
-    ),
-    P.length(
-      "wall",
-      2
-    ),
-    P.count(
-      "dinRows",
-      4
-    ),
-    P.count(
-      "inputs",
-      0
-    ),
-    P.count(
-      "outputs",
-      0
-    ),
-    P.count(
-      "analogOutputs",
-      0
-    )
+    P.length("height", 1000),
+    P.length("wall", 2),
+    P.count("dinRows", 4),
+    P.count("inputs", 0),
+    P.count("outputs", 0),
+    P.count("analogOutputs", 0)
   ];
   public function new(?v:ComponentValues) {
     super("control-cabinet", "control cabinet with DIN rows and derived I/O", "steel", inputs(), v);
@@ -52,11 +34,7 @@ class ControlCabinet extends AssumedCatalogComponent {
     for (i in 0...parameterCount("dinRows")) addConnector(
       "din" + (i + 1),
       Mount,
-      F.translation(
-        0,
-        -n("depth") / 2 + n("wall") + 7.5,
-        (i + 1) * n("height") / (parameterCount("dinRows") + 1)
-      )
+      F.translation(0, -n("depth") / 2 + n("wall") + 7.5, (i + 1) * n("height") / (parameterCount("dinRows") + 1))
     );
   }
   public static function recipeType():ComponentType {

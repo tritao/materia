@@ -60,13 +60,7 @@ class ScrewdrivingMissionTests {
         minimumStroke: 2,
         maximumStroke: 18
       },
-      {
-        leadInMm: 0.5,
-        maximumAxisAngle: 0.1,
-        prevailingTorque: 0.2,
-        stiffnessNmPerRad: 40,
-        stripTorque: 22
-      }
+      {leadInMm: 0.5, maximumAxisAngle: 0.1, prevailingTorque: 0.2, stiffnessNmPerRad: 40, stripTorque: 22}
     );
     var mission = ScrewdrivingMission.generate(found, job);
     check(mission.require().length == 4, "Every current flange fastening produces a presenter trip");
@@ -120,10 +114,7 @@ class ScrewdrivingMissionTests {
       "An empty assembly is diagnosed rather than reported complete"
     );
     var duplicate = ScrewdrivingMission.generate(
-      new FasteningsResult(
-        [found.fastenings[0], found.fastenings[0]],
-        new Diagnostics()
-      ),
+      new FasteningsResult([found.fastenings[0], found.fastenings[0]], new Diagnostics()),
       job
     );
     check(

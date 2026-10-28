@@ -109,10 +109,7 @@ class FormerManufacturing {
         + former.draftDegrees + " degrees") : cutter.fluteLengthMm + 1e-7
         < bounds.height ? Unsupported("Declared cutter cannot reach the former height") : Solid(
           stock,
-          Math.max(
-            0,
-            stock.measuredThickness - bounds.height
-          ),
+          Math.max(0, stock.measuredThickness - bounds.height),
           cutter
         );
       return result;
@@ -209,14 +206,7 @@ class FormerManufacturing {
         id: id,
         stock: stock,
         region: region,
-        pose: F.compose(
-          frame,
-          F.translation(
-            bounds.x,
-            bounds.y,
-            bounds.z
-          )
-        )
+        pose: F.compose(frame, F.translation(bounds.x, bounds.y, bounds.z))
       });
     }
     var profiles:Array<CastingRegion> = [];
@@ -229,14 +219,8 @@ class FormerManufacturing {
       profiles.push(region);
       var bounds = MoldRegions.exactBounds(MoldRegions.moved(region, F.inverse(frame)), former.volume.id);
       var neckBox = MoldRegions.moved(
-        MoldRegions.box({
-          x: body.x,
-          y: body.y,
-          z: bounds.z,
-          width: body.width,
-          depth: body.depth,
-          height: bounds.height
-        }),
+        MoldRegions.box({x: body.x,
+        y: body.y, z: bounds.z, width: body.width, depth: body.depth, height: bounds.height}),
         frame
       );
       var board:CastingRegion = Difference(Intersection([region, neckBox]), [air]);
@@ -257,14 +241,7 @@ class FormerManufacturing {
         || operation.side == materia.tooling.ToolingEnums.MachiningSide.NegativeZ ? 0 : t - operation.depth;
       cuts.push(Placed({
         solid: Prism(operation.contour, operation.depth),
-        pose: F.compose(
-          member.pose,
-          F.translation(
-            0,
-            0,
-            z
-          )
-        )
+        pose: F.compose(member.pose, F.translation(0, 0, z))
       }));
     }
     return Difference(body, cuts);
@@ -315,25 +292,12 @@ class FormerManufacturing {
         ? 0 : member.panel.stock.measuredThickness - operation.depth;
       rebateCuts.push(Placed({
         solid: Prism(operation.contour, operation.depth),
-        pose: F.compose(
-          member.pose,
-          F.translation(
-            0,
-            0,
-            z
-          )
-        )
+        pose: F.compose(member.pose, F.translation(0, 0, z))
       }));
     }
     var seals:CastingRegion = Intersection([
       envelope,
-      Difference(
-        Union(rebateCuts.concat(construction.sealingRegions)),
-        [
-          boardUnion,
-          interior
-        ]
-      )
+      Difference(Union(rebateCuts.concat(construction.sealingRegions)), [boardUnion, interior])
     ]);
     var scope = new Scope();
     try {

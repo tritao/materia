@@ -58,11 +58,7 @@ class PressBlock extends MachineComponent {
   }
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.box(
-      width,
-      depth,
-      height
-    ),
+    Part.box(width, depth, height),
     "body"
   );
 }
@@ -101,43 +97,17 @@ class PressSideFrame extends MachineComponent {
     var front = rearOffset - depth / 2, rear = rearOffset + depth / 2;
     return [
       new PressEnvelope(left, front, 0, right, throat, bedHeight),
-      new PressEnvelope(
-        left,
-        throat,
-        0,
-        right,
-        rear,
-        height
-      ),
-      new PressEnvelope(
-        left,
-        front,
-        bedHeight + openHeight,
-        right,
-        throat,
-        height
-      )
+      new PressEnvelope(left, throat, 0, right, rear, height),
+      new PressEnvelope(left, front, bedHeight + openHeight, right, throat, height)
     ];
   }
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.building([],
     parts -> {parts.push(Solids.named(
-      Part.box(
-        thickness,
-        depth,
-        height
-      ).translated(new Vector(
-        0,
-        rearOffset,
-        0
-      )),
+      Part.box(thickness, depth, height).translated(new Vector(0, rearOffset, 0)),
       "side-plate"
     ));
   parts.push(Solids.named(
-    Part.box(thickness + 2, throat + 101, openHeight).translated(new Vector(
-      0,
-      (throat - 101) / 2,
-      bedHeight
-    )),
+    Part.box(thickness + 2, throat + 101, openHeight).translated(new Vector(0, (throat - 101) / 2, bedHeight)),
     "throat-opening"
   ));
   return Solids.cut(parts[0], [parts[1]]);
@@ -232,12 +202,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     var dieRow = new ToolRow([new ToolSegment(SingleV(die), 200)], []);
     toolLayout = layout == null ? new ToolLayout(
       bedLength,
-      [new ToolStation(
-        "V12",
-        punchRow,
-        dieRow,
-        (bedLength - 200) / 2
-      )]
+      [new ToolStation("V12", punchRow, dieRow, (bedLength - 200) / 2)]
     ) : layout;
     if (toolLayout.bedLength != bedLength
       || toolLayout.stations().length == 0) throw "Reference press needs installed tooling on its 1600 mm bed";
@@ -260,23 +225,11 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         side < 0 ? "Y1" : "Y2",
         guide,
         new PressBlock("Ram guide", 40, 100, 160),
-        at(
-          x,
-          -160,
-          bedHeight + openHeight
-        ),
+        at(x, -160, bedHeight + openHeight),
         'frame$name',
-        {
-          x : 0,
-          y : 0,
-          z : -1
-        },
+        {x : 0, y : 0, z : -1},
         stroke,
-        at(
-          side * 650,
-          0,
-          bedHeight + openHeight + 220
-        )
+        at(side * 650, 0, bedHeight + openHeight + 220)
       );
       setJointStop(side < 0 ? "Y1" : "Y2", ramStopResponse());
       fixed('scale$name',
@@ -329,17 +282,8 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     fixed("ram", new PressBlock("Ram beam", bedLength, 100, 220), at(0, 0, bedHeight + openHeight), "guideLeft");
     for (side in [-1, 1]) fixed(
       side < 0 ? "ramBracketLeft" : "ramBracketRight",
-      new PressBlock(
-        "Ram guide bracket",
-        160,
-        180,
-        80
-      ),
-      at(
-        side * 750,
-        -80,
-        bedHeight + openHeight + 80
-      ),
+      new PressBlock("Ram guide bracket", 160, 180, 80),
+      at(side * 750, -80, bedHeight + openHeight + 80),
       "ram"
     );
     // The torsion-bar coupling owns the equality of both guide coordinates. Adding
@@ -356,11 +300,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       fixed(
         side < 0 ? "supportLeft" : "supportRight",
         new PressBlock("Front sheet support", 80, 300, 20),
-        at(
-          side * 450,
-          -240,
-          bedHeight - 20
-        ),
+        at(side * 450, -240, bedHeight - 20),
         "bed"
       );
       fixed(side < 0 ? "curtainLeft" : "curtainRight", new PressLightCurtain(), at(side * 900, -300, 600), "bed");
@@ -369,11 +309,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     fixed(
       "power",
       new PowerSupply(ServoMotor.LOW_VOLTAGE_BUS, new machinekit.power.DcCurrent(30), 3, 120, 60, 30, 1500),
-      at(
-        0,
-        420,
-        500
-      ),
+      at(0, 420, 500),
       "bed"
     );
     // The stop is independent of the ram. Its face descends by the commanded stopping travel.
@@ -383,11 +319,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       new PressBlock("Mechanical depth stop", 100, 80, 40),
       at(0, 300, bedHeight + openHeight),
       "bed",
-      {
-        x: 0,
-        y: 0,
-        z: -1
-      },
+      {x: 0, y: 0, z: -1},
       stroke
     );
     servoScrew(
@@ -396,21 +328,9 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       "depth",
       new BallScrew(300),
       at(0, 300, bedHeight + openHeight - 180),
-      at(
-        0,
-        300,
-        bedHeight + openHeight - 20
-      ),
-      {
-        x: 0,
-        y: 0,
-        z: -1
-      },
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      },
+      at(0, 300, bedHeight + openHeight - 20),
+      {x: 0, y: 0, z: -1},
+      {x: 0, y: 0, z: 1},
       "GENERIC-LV-SERVO-50W",
       1
     );
@@ -420,11 +340,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       new PressBlock("Backgauge carriage", gaugeWidth, 80, 60),
       at(0, 0, 660),
       "bed",
-      {
-        x: 0,
-        y: 1,
-        z: 0
-      },
+      {x: 0, y: 1, z: 0},
       gaugeTravel
     );
     for (side in [-1, 1]) {
@@ -478,11 +394,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         new PressBlock("Backgauge lift", gaugeWidth, 40, 40),
         at(0, 40, gaugeBaseHeight - 40),
         "gaugeX",
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        {x: 0, y: 0, z: 1},
         gaugeRTravel
       );
       for (side in [-1, 1]) {
@@ -496,21 +408,9 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         "gaugeR",
         new BallScrew(300),
         at(0, 60, gaugeBaseHeight - 130),
-        at(
-          0,
-          60,
-          gaugeBaseHeight - 30
-        ),
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        },
-        {
-          x: 0,
-          y: 0,
-          z: 1
-        },
+        at(0, 60, gaugeBaseHeight - 30),
+        {x: 0, y: 0, z: 1},
+        {x: 0, y: 0, z: 1},
         "GENERIC-LV-SERVO-100W",
         3,
         "gaugeX"
@@ -523,11 +423,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       meeting(
         gaugeParent,
         id,
-        at(
-          side * fingerHalfSpacing,
-          GaugeFinger.PIVOT_DEPTH_MM,
-          gaugeBaseHeight - GaugeFinger.DATUM_HEIGHT_MM
-        )
+        at(side * fingerHalfSpacing, GaugeFinger.PIVOT_DEPTH_MM, gaugeBaseHeight - GaugeFinger.DATUM_HEIGHT_MM)
       );
       var joint = '$id-hinge';
       addMateOnAxis(
@@ -539,13 +435,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         'attach-$id',
         {x: -1, y: 0, z: 0},
         0,
-        {
-          lower: -GaugeFinger.DROP_ANGLE,
-          upper: 0,
-          velocity: null,
-          effort: null,
-          overtravel: GaugeFinger.OVERTRAVEL
-        }
+        {lower: -GaugeFinger.DROP_ANGLE, upper: 0, velocity: null, effort: null, overtravel: GaugeFinger.OVERTRAVEL}
       );
       setPassive(joint);
       setJointStop(joint, GaugeFinger.stopResponse());
@@ -567,11 +457,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         fixed(
           id,
           placement.segment,
-          at(
-            placement.start,
-            0,
-            bedHeight + machinekit.pressbrake.ToolProfiles.height(placement.segment.profile)
-          ),
+          at(placement.start, 0, bedHeight + machinekit.pressbrake.ToolProfiles.height(placement.segment.profile)),
           "bed"
         );
       }
@@ -585,11 +471,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
         fixed(
           '$id-clamp',
           new ToolClamp(Manual, placement.segment.length, 40, holderHeight),
-          at(
-            placement.start + placement.segment.length / 2,
-            0,
-            bedHeight + openHeight - holderHeight
-          ),
+          at(placement.start + placement.segment.length / 2, 0, bedHeight + openHeight - holderHeight),
           "ram"
         );
         toolClampMembers.push('$id-clamp');
@@ -640,11 +522,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
     fixed(
       '$id-driver',
       new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)),
-      at(
-        -200 + outlet * 100,
-        420,
-        600
-      ),
+      at(-200 + outlet * 100, 420, 600),
       "bed"
     );
     connectPorts('$id-power', "power", 'power$outlet', '$id-driver', "power");
@@ -682,13 +560,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
       'attach-$id',
       axis,
       0,
-      {
-        lower: 0,
-        upper: travel,
-        velocity: null,
-        effort: null,
-        overtravel: 1
-      }
+      {lower: 0, upper: travel, velocity: null, effort: null, overtravel: 1}
     );
   }
   function pose(id:String):AssemblyFrame {

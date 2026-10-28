@@ -189,14 +189,7 @@ class MachineAssemblyDescriptionTests {
     var slider = new RobotFlange(50);
     var collision = machinekit.component.CollisionHullFacet.fromBoxes([
       [-20, -20, 0, -10, 20, 5],
-      [
-        10,
-        -20,
-        0,
-        20,
-        20,
-        5
-      ]
+      [10, -20, 0, 20, 20, 5]
     ]);
     @:privateAccess slider.addFacet(collision);
     inner.addComponent("slider", slider);
@@ -209,14 +202,7 @@ class MachineAssemblyDescriptionTests {
       "face",
       {x: 1, y: 0, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 10,
-        velocity: null,
-        effort: null,
-        overtravel: 2,
-        rackingTolerance: 0.5
-      }
+      {lower: 0, upper: 10, velocity: null, effort: null, overtravel: 2, rackingTolerance: 0.5}
     );
     var state = new AssemblyState(inner.definition());
     var trigger = state.worldConnector("slider", "face");
@@ -276,11 +262,7 @@ class MachineAssemblyDescriptionTests {
     var wrongMains = false;
     try {
       var wrong = new machinekit.power.ThreePhaseRectifier(
-        new machinekit.power.AcMains(
-          SinglePhase,
-          new machinekit.power.AcRmsVoltage(230),
-          50
-        ),
+        new machinekit.power.AcMains(SinglePhase, new machinekit.power.AcRmsVoltage(230), 50),
         new machinekit.power.DcCurrent(20)
       );
     } catch (error:Dynamic) {
@@ -431,11 +413,7 @@ class MachineAssemblyDescriptionTests {
       "driver",
       0.5,
       null,
-      {
-        speedChannel: "spindle.speed",
-        directionChannel: "spindle.direction",
-        radiansPerSpeedUnit: 1.0
-      }
+      {speedChannel: "spindle.speed", directionChannel: "spindle.direction", radiansPerSpeedUnit: 1.0}
     );
     var outer = new MachineAssembly();
     outer.include("mill", spindle);
@@ -559,18 +537,9 @@ class MachineAssemblyDescriptionTests {
     var sources:Array<Transmission> = [
       Transmission.LeadScrew("screw", "nut"),
       Transmission.GearMesh("driver", "driven"),
-      Transmission.RackAndPinion(
-        "pinion",
-        null
-      ),
-      Transmission.TimingBelt(
-        "belt",
-        "pulley"
-      ),
-      Transmission.RollerChain(
-        null,
-        "sprocket"
-      )
+      Transmission.RackAndPinion("pinion", null),
+      Transmission.TimingBelt("belt", "pulley"),
+      Transmission.RollerChain(null, "sprocket")
     ];
     for (source in sources) {
       var record:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
@@ -589,10 +558,7 @@ class MachineAssemblyDescriptionTests {
     var sprocket = machinekit.transmission.Sprocket.forChain("ANSI25", 20, 5, 8);
     var chainRecord:machinekit.assembly.MachineAssemblyDescription.TransmissionRecord = {
       coupling: "chain",
-      source: Transmission.RollerChain(
-        null,
-        "sprocket"
-      ),
+      source: Transmission.RollerChain(null, "sprocket"),
       sense: Opposite,
       leaderZero: 0
     };
@@ -617,11 +583,7 @@ class MachineAssemblyDescriptionTests {
       "face",
       turning,
       turning == "screw" ? "input" : "axis",
-      {
-        x : 0,
-        y : 1,
-        z : 0
-      }
+      {x : 0, y : 1, z : 0}
     );
     // A right-hand Tr10 x 2 screw: one turn moves its nut 2 mm back along the screw, from 10 mm.
     var lead = assembly.addTransmission("lead",
@@ -767,12 +729,7 @@ class MachineAssemblyDescriptionTests {
       "face",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: -1e-9,
-        upper: 1e-9,
-        velocity: null,
-        effort: null
-      }
+      {lower: -1e-9, upper: 1e-9, velocity: null, effort: null}
     );
     assembly.addMateOnAxis("turn", "continuous", "base", "face", "screw", "input", {x: 0, y: 1, z: 0});
     assembly.addTransmission("lead", "slide", "turn", Transmission.LeadScrew("screw", "nut"), Same);
@@ -856,11 +813,7 @@ class MachineAssemblyDescriptionTests {
     assembly.addComponent(
       "belt-idler",
       new TimingPulley(GT2, 20, 8, 6),
-      materia.assembly.AssemblyFrames.translation(
-        0,
-        0,
-        444
-      )
+      materia.assembly.AssemblyFrames.translation(0, 0, 444)
     );
     var beltState = new cadkit.modeling.AssemblyState(assembly.definition());
     assembly.addMemberConnector(
@@ -873,26 +826,13 @@ class MachineAssemblyDescriptionTests {
       "beltClamp",
       materia.assembly.AssemblyFrames.compose(
         materia.assembly.AssemblyFrames.inverse(beltState.worldPose("slider")),
-        materia.assembly.AssemblyFrames.translation(
-          0,
-          -belt.wraps()[0].radius,
-          222
-        )
+        materia.assembly.AssemblyFrames.translation(0, -belt.wraps()[0].radius, 222)
       )
     );
     assembly.addBeltPath({
       belt: "belt-part",
       clamp: {instanceId: "slider", connectorName: "beltClamp"},
-      wraps: [
-        {
-          instanceId: "pulley",
-          connectorName: "beltWrap"
-        },
-        {
-          instanceId: "belt-idler",
-          connectorName: "front"
-        }
-      ]
+      wraps: [{instanceId: "pulley", connectorName: "beltWrap"}, {instanceId: "belt-idler", connectorName: "front"}]
     });
     assembly.addTransmission("belt", "slide", "pulley-turn", Transmission.TimingBelt("belt-part", "pulley"), Same);
     var run = belt.strands()[0];
@@ -1192,10 +1132,7 @@ class MachineAssemblyDescriptionTests {
     servoMachine.addMateOnAxis("turn", "continuous", "base", "face", "servo", "shaft", {x: 0, y: 1, z: 0});
     servoMachine.addComponent(
       "driver",
-      new MotorDriver(
-        "GENERIC-LV-SERVO-AMP",
-        new machinekit.power.PhaseRmsCurrent(40)
-      )
+      new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(40))
     );
     servoMachine.addComponent(
       "supply",
@@ -1325,10 +1262,7 @@ class MachineAssemblyDescriptionTests {
       case Typed(id, values):
         Typed(
           id,
-          [for (entry in values) entry.name != "current" ? entry : {
-            name : "current",
-            value : SavedValue.Number(1.68)
-          }]
+          [for (entry in values) entry.name != "current" ? entry : {name : "current", value : SavedValue.Number(1.68)}]
         );
       case other:
         other;
@@ -1419,11 +1353,7 @@ class MachineAssemblyDescriptionTests {
       var id = element.property("cadkit.assembly.id");
       if (id != null
         && id.value == "part") element.setPlacement(new cadkit.parametric.Placement(new cadkit.modeling.Plane(
-          new cadkit.modeling.Vector(
-            25,
-            0,
-            0
-          ),
+          new cadkit.modeling.Vector(25, 0, 0),
           cadkit.modeling.Vector.X(),
           cadkit.modeling.Vector.Z()
         )));
@@ -1620,24 +1550,14 @@ class MachineAssemblyDescriptionTests {
     assembly.addMateOnAxis("output", "continuous", "base", "driven", "driven", "front", {x: 0, y: 0, z: 1});
     assembly.addBeltPath({
       belt: "belt",
-      wraps: [
-        {instanceId: "driver", connectorName: "front"},
-        {
-          instanceId: "driven",
-          connectorName: "front"
-        }
-      ]
+      wraps: [{instanceId: "driver", connectorName: "front"}, {instanceId: "driven", connectorName: "front"}]
     });
     close(
       assembly.addTransmission(
         "reduction",
         "input",
         "output",
-        Transmission.BeltReduction(
-          "belt",
-          "driver",
-          "driven"
-        ),
+        Transmission.BeltReduction("belt", "driver", "driven"),
         Same
       ),
       0.5,
@@ -1648,53 +1568,20 @@ class MachineAssemblyDescriptionTests {
       belt,
       {
         belt: "belt",
-        wraps: [
-          {
-            instanceId: "driver",
-            connectorName: "front"
-          },
-          {
-            instanceId: "driven",
-            connectorName: "front"
-          }
-        ]
+        wraps: [{instanceId: "driver", connectorName: "front"}, {instanceId: "driven", connectorName: "front"}]
       },
       "input",
       "output",
       "driver",
       "driven",
       assembly.definition(),
-      TimingBelt.reduction(
-        belt,
-        new TimingPulley(
-          GT2,
-          20,
-          8,
-          6
-        ),
-        new TimingPulley(
-          GT2,
-          40,
-          8,
-          6
-        ),
-        -1
-      )
+      TimingBelt.reduction(belt, new TimingPulley(GT2, 20, 8, 6), new TimingPulley(GT2, 40, 8, 6), -1)
     ) catch (error:machinekit.transmission.TransmissionDesignError) wrongSense = true;
     if (!wrongSense) throw "Opposite Sense on a plain loop must be rejected";
     var serpentine = new TimingBelt(
       GT2,
       6,
-      [
-        new BeltWrap(0, 0, 10, 1),
-        new BeltWrap(100, 0, 10, -1),
-        new BeltWrap(
-          50,
-          60,
-          10,
-          1
-        )
-      ]
+      [new BeltWrap(0, 0, 10, 1), new BeltWrap(100, 0, 10, -1), new BeltWrap(50, 60, 10, 1)]
     );
     if (machinekit.transmission.BeltStretch.contactDirection(serpentine,
       0, 1) != -1) throw "Back-side serpentine contact must reverse pulley direction";
@@ -1745,11 +1632,7 @@ class MachineAssemblyDescriptionTests {
       "other",
       "unrelatedMotor",
       "shaftAxis",
-      {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      {x: 0, y: 0, z: 1}
     );
     assembly.addMotor("unrelated-drive", "unrelated-turn", "unrelatedMotor", "unrelatedDriver");
     var unrelatedMaximum = unrelated.rating.maximumVoltage;
@@ -1823,14 +1706,7 @@ private class TestServo extends machinekit.component.MachineComponent implements
       ratedSpeed: 314,
       maxSpeed: 500,
       encoderCounts: 4096,
-      torqueSpeed: [
-        0,
-        1.9,
-        314,
-        1.9,
-        500,
-        0.64
-      ]
+      torqueSpeed: [0, 1.9, 314, 1.9, 500, 0.64]
     };
 
 }

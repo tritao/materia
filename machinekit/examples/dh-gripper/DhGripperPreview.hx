@@ -251,24 +251,12 @@ class DhGripperPreview {
       // ahead of the rear-most 31.5 mm centring boss in the pinned supplier STEP.
       referenceFrame = {
         offset: [offset.x, offset.y, offset.z],
-        flange: [
-          194.503081202068 + offset.x,
-          -100.27830199531 + offset.y,
-          307.089453582398 + offset.z
-        ],
-        grasp: [
-          194.503081202068 + offset.x,
-          60 + offset.y,
-          307.089453582398 + offset.z
-        ]
+        flange: [194.503081202068 + offset.x, -100.27830199531 + offset.y, 307.089453582398 + offset.z],
+        grasp: [194.503081202068 + offset.x, 60 + offset.y, 307.089453582398 + offset.z]
       };
       sys.io.File.saveContent(
         directory() + "/build/reference-frame.json",
-        haxe.Json.stringify(
-          referenceFrame,
-          null,
-          "  "
-        )
+        haxe.Json.stringify(referenceFrame, null, "  ")
       );
       var parts:Array<SceneArtifactPart> = [];
       var shapes = [body, cableShape];
@@ -358,15 +346,7 @@ class DhGripperPreview {
             id,
             (variant == "sls-pa12" ? "SLS PA12 " : "CNC aluminium ") + (i == 0 ? "left finger" : "right finger"),
             finger,
-            variant == "sls-pa12" ? [
-              0.72,
-              0.73,
-              0.75
-            ] : [
-              0.72,
-              0.55,
-              0.26
-            ]
+            variant == "sls-pa12" ? [0.72, 0.73, 0.75] : [0.72, 0.55, 0.26]
           ));
           finger.exportStep(directory() + '/build/$variant/$id.step');
           model.add(id);
@@ -438,10 +418,7 @@ class DhGripperPreview {
       var variant = family.variant(id);
       var bom = [for (side in ["left", "right"]) family.create(
         id,
-        new machinekit.component.ComponentValues().setToken(
-          "side",
-          side
-        )
+        new machinekit.component.ComponentValues().setToken("side", side)
       ).bom];
       sys.io.File.saveContent(directory() + '/build/$prefix-manufacturing.json', haxe.Json.stringify({family: family.id,
         interfaceId: family.interfaceId, variant: variant.id, process: variant.process,

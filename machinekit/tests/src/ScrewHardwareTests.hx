@@ -56,20 +56,8 @@ private class HardwareMeasuredIo implements ScrewdriverIo {
       acquiredAt: now,
       clockId: "hardware-test-clock",
       selectedProgramCode: code,
-      inputs: [
-        true,
-        false,
-        false
-      ],
-      values: [
-        0.2,
-        12.3,
-        pins[2] || pins[3] ? 2 : 0,
-        5,
-        2,
-        0,
-        1
-      ]
+      inputs: [true, false, false],
+      values: [0.2, 12.3, pins[2] || pins[3] ? 2 : 0, 5, 2, 0, 1]
     };
   }
 }
@@ -150,16 +138,7 @@ class ScrewHardwareTests {
   }
   static function profile(reverseNeedsStart:Bool = true):ScrewdriverIoProfile return new ScrewdriverIoProfile(
     [0, 1],
-    [
-      {
-        slot: 1,
-        code: 1
-      },
-      {
-        slot: 2,
-        code: 2
-      }
-    ],
+    [{slot: 1, code: 1}, {slot: 2, code: 2}],
     2,
     3,
     4,
@@ -218,12 +197,7 @@ class ScrewHardwareTests {
     var device = new ScrewdriverProcessDevice(
       hardware,
       hardware,
-      {
-        start: "start",
-        direction: "reverse",
-        program: "program",
-        vacuum: "vacuum"
-      },
+      {start: "start", direction: "reverse", program: "program", vacuum: "vacuum"},
       1,
       hardware
     );
@@ -284,12 +258,7 @@ class ScrewHardwareTests {
     var ownedProcess = new ScrewdriverProcessDevice(
       owner,
       owner,
-      {
-        start: "start",
-        direction: "reverse",
-        program: "program",
-        vacuum: "vacuum"
-      },
+      {start: "start", direction: "reverse", program: "program", vacuum: "vacuum"},
       1,
       owner
     );
@@ -356,17 +325,8 @@ class ScrewHardwareTests {
       "driver_frame",
       "base_link",
       0,
-      [
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        1
-      ]
+      [0, 0, 0],
+      [0, 0, 0, 1]
     ));
     for (name in ["start", "reverse", "vacuum"]) blueprint.addChannel(new ProcessChannelDeclaration(
       name,
@@ -425,12 +385,7 @@ class ScrewHardwareTests {
         new FixedAcquisitionDevice(),
         () -> 0.125,
         "driver",
-        {
-          start: "start",
-          direction: "reverse",
-          program: "vacuum",
-          vacuum: "program"
-        },
+        {start: "start", direction: "reverse", program: "vacuum", vacuum: "program"},
         1
       );
       });

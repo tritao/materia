@@ -34,31 +34,12 @@ class InsertDrawing {
     };
     var views = [
       {axis: 2, x: 0.0, y: 0.0, name: "XY entry projection"},
-      {
-        axis: 1,
-        x: dimensions.width + 20,
-        y: 0.0,
-        name: "XZ entry projection"
-      },
-      {
-        axis: 0,
-        x: 2 * dimensions.width + dimensions.depth + 40,
-        y: 0.0,
-        name: "YZ entry projection"
-      }
+      {axis: 1, x: dimensions.width + 20, y: 0.0, name: "XZ entry projection"},
+      {axis: 0, x: 2 * dimensions.width + dimensions.depth + 40, y: 0.0, name: "YZ entry projection"}
     ];
     function line(layer:DrawingLayer, x1:Float, y1:Float, x2:Float, y2:Float):Void entities.push(Curve(
       layer,
-      Segment.line(
-        new Point2(
-          x1,
-          y1
-        ),
-        new Point2(
-          x2,
-          y2
-        )
-      )
+      Segment.line(new Point2(x1, y1), new Point2(x2, y2))
     ));
     function circle(layer:DrawingLayer, x:Float, y:Float, radius:Float):Void {
       entities.push(Curve(layer, Segment.arc(new Point2(x, y), radius, 0, Math.PI)));

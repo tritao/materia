@@ -40,10 +40,7 @@ class DesignInterfaceTests {
     var counterbored = fixture();
     counterbored.replaceComponent(
       "housing",
-      new DesignFixturePart(new ComponentValues().setBoolean(
-        "counterbored",
-        true
-      ))
+      new DesignFixturePart(new ComponentValues().setBoolean("counterbored", true))
     );
     check(
       !AssemblyDesignChecks.check(counterbored).hasErrors(),
@@ -135,23 +132,7 @@ class DesignInterfaceTests {
           bad.addDesignRequirement(AccessPath(
             "bad-frame",
             {member: "housing", feature: "lubrication"},
-            [{
-              id: "tool",
-              frame: {
-                x: 0,
-                y: 0,
-                z: 0,
-                qx: 0,
-                qy: 0,
-                qz: 0,
-                qw: 2
-              },
-              volume: CylinderVolume(
-                4,
-                1,
-                16
-              )
-            }],
+            [{id: "tool", frame: {x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 2}, volume: CylinderVolume(4, 1, 16)}],
             [],
             WholeAssembly
           ));
@@ -163,34 +144,16 @@ class DesignInterfaceTests {
           altered.addComponent(
             "cover",
             new DesignFixturePart(new ComponentValues().setBoolean("plate", true)),
-            F.translation(
-              0,
-              0,
-              mode == "stack" ? -5 : -4
-            )
+            F.translation(0, 0, mode == "stack" ? -5 : -4)
           );
           altered.addComponent(
             "clamp",
             SocketHeadCapScrew.metric("M6", 16),
-            mode == "direction" ? F.translation(
-              0,
-              0,
-              -4
-            ) : F.fromRotationMatrix(
+            mode == "direction" ? F.translation(0, 0, -4) : F.fromRotationMatrix(
               1,
               0,
               -4,
-              [
-                1,
-                0,
-                0,
-                0,
-                -1,
-                0,
-                0,
-                0,
-                -1
-              ]
+              [1, 0, 0, 0, -1, 0, 0, 0, -1]
             )
           );
           for (r in bad.designRequirements()) altered.addDesignRequirement(r);
@@ -206,15 +169,7 @@ class DesignInterfaceTests {
     bench.addDesignRequirement(AccessPath(
       "bench",
       {member: "pump/housing", feature: "lubrication"},
-      [{
-        id: "tool",
-        frame: F.identity(),
-        volume: CylinderVolume(
-          4,
-          1,
-          16
-        )
-      }],
+      [{id: "tool", frame: F.identity(), volume: CylinderVolume(4, 1, 16)}],
       [],
       InstalledMembers(["pump/housing"])
     ));
@@ -270,40 +225,18 @@ class DesignInterfaceTests {
     a.addComponent(
       "cover",
       new DesignFixturePart(new ComponentValues().setBoolean("plate", true)),
-      F.translation(
-        0,
-        0,
-        -4
-      )
+      F.translation(0, 0, -4)
     );
     a.addComponent(
       "clamp",
       SocketHeadCapScrew.metric("M6", 16),
-      F.fromRotationMatrix(
-        0,
-        0,
-        -4,
-        [
-          1,
-          0,
-          0,
-          0,
-          -1,
-          0,
-          0,
-          0,
-          -1
-        ]
-      )
+      F.fromRotationMatrix(0, 0, -4, [1, 0, 0, 0, -1, 0, 0, 0, -1])
     );
     a.addDesignRequirement(FastenerJoint(
       "cover-clamp",
       "clamp",
       {member: "housing", feature: "fixing"},
-      [{
-        member: "cover",
-        feature: "clearance"
-      }]
+      [{member: "cover", feature: "clearance"}]
     ));
     if (servicePose != null) {
       a.addComponent("service-cover", new DesignFixturePart(new ComponentValues().setBoolean("plate", true)));
@@ -317,26 +250,13 @@ class DesignInterfaceTests {
         "mount",
         {x: 0, y: 1, z: 0},
         0,
-        {
-          lower: 0,
-          upper: 100,
-          effort: null,
-          velocity: null
-        }
+        {lower: 0, upper: 100, effort: null, velocity: null}
       );
     }
     a.addDesignRequirement(AccessPath(
       "lubrication",
       {member: "housing", feature: "lubrication"},
-      [{
-        id: "connector",
-        frame: F.identity(),
-        volume: CylinderVolume(
-          4,
-          1,
-          16
-        )
-      }],
+      [{id: "connector", frame: F.identity(), volume: CylinderVolume(4, 1, 16)}],
       servicePose == null ? [] : servicePose,
       WholeAssembly
     ));
@@ -349,14 +269,8 @@ private class DesignFixturePart extends MachineComponent {
   static function parameters():Array<ComponentParameter> return [
     P.flag("plate", false),
     P.flag("thin", false),
-    P.flag(
-      "undrilled",
-      false
-    ),
-    P.flag(
-      "counterbored",
-      false
-    )
+    P.flag("undrilled", false),
+    P.flag("counterbored", false)
   ];
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("test.design.pump-part",

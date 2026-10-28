@@ -58,15 +58,7 @@ class MillMotorStudy {
     );
     return {
       reference: reference,
-      frame: BenchMillFrame.create(
-        f,
-        z,
-        new MillXYStageLayout(
-          f,
-          z.spindleY,
-          BenchMill.RAIL
-        )
-      )
+      frame: BenchMillFrame.create(f, z, new MillXYStageLayout(f, z.spindleY, BenchMill.RAIL))
     };
   }
   public static function selection(
@@ -162,10 +154,7 @@ class MillMotorStudy {
       var instance = document.createInstance("spindle/motorCarrier", definition);
       instance.restoreProperty(
         "machinekit.occurrence",
-        TypedProperty.text(
-          "machinekit.occurrence",
-          "spindle/motorCarrier"
-        )
+        TypedProperty.text("machinekit.occurrence", "spindle/motorCarrier")
       );
       var diagnostics:Array<String> = [];
       if (savedDocument != null) MachineKitRecipes.reconcileDocument(document, savedDocument, diagnostics);
@@ -201,26 +190,13 @@ class MillMotorStudy {
     var reports:Array<MillMotorReport> = [];
     for (p in [
       {id: "1500w", name: "ELM2L-1500LA100FT-H MS1AE", motor: 80, spindle: 30},
-      {
-        id: "2000w",
-        name: "ELM2M-2000LB130F-H",
-        motor: 80,
-        spindle: 25
-      },
-      {
-        id: "2900w",
-        name: "ELM2M-2900LD180FT-H",
-        motor: 96,
-        spindle: 18
-      }
+      {id: "2000w", name: "ELM2M-2000LB130F-H", motor: 80, spindle: 25},
+      {id: "2900w", name: "ELM2M-2900LD180FT-H", motor: 96, spindle: 18}
     ]) {
       var drive = selection(c.frame, p.name, p.motor, p.spindle), assembly = MillFramePreview.concept(
         c.reference,
         c.frame,
-        new MillBeltSpindle(
-          0,
-          drive
-        )
+        new MillBeltSpindle(0, drive)
       );
       assembly.validate();
       var result = report(assembly, c.frame, drive, baselineMass);
@@ -228,10 +204,7 @@ class MillMotorStudy {
       sys.io.File.saveContent(directory + "/motor-" + p.id + ".json", Json.stringify(result, null, "  "));
       sys.io.File.saveBytes(
         directory + "/mill-motor-" + p.id + ".mtrg",
-        SceneArtifact.encode(AssemblyPreview.scene(
-          assembly,
-          "mill-motor-" + p.id
-        ))
+        SceneArtifact.encode(AssemblyPreview.scene(assembly, "mill-motor-" + p.id))
       );
       Sys.println('Motor study ${p.id}: added Z mass ${result.addedMovingMassKg} kg');
     }

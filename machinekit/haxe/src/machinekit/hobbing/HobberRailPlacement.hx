@@ -41,16 +41,8 @@ class HobberRailPlacement {
           start.x + normal.x * rail.spec.railHeight,
           start.y + normal.y * rail.spec.railHeight,
           start.z + normal.z * rail.spec.railHeight,
-          [
-            normal.x,
-            normal.y,
-            normal.z
-          ],
-          [
-            along.x,
-            along.y,
-            along.z
-          ]
+          [normal.x, normal.y, normal.z],
+          [along.x, along.y, along.z]
         ), contact : F.alongY(
           start.x,
           start.y,
@@ -67,10 +59,7 @@ class HobberRailPlacement {
   public static function fingerprint(placed:HobberPlacedRail):String {
     var rail = placed.rail;
     return haxe.crypto.Sha256.encode(materia.tooling.ToolingCodec.canonical({
-      definition: machinekit.assembly.MachineAssembly.definitionKey(
-        placed.memberId,
-        rail
-      ),
+      definition: machinekit.assembly.MachineAssembly.definitionKey(placed.memberId, rail),
       specification: rail.spec,
       length: rail.length,
       mountingHole: rail.mountingHole(),

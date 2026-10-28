@@ -49,15 +49,7 @@ class FlangeBearingAssembly extends MachineAssembly {
       addMemberConnector(
         "housing",
         'bolt${i}Head',
-        {
-          x: bolt.x,
-          y: bolt.y,
-          z: bolt.z + housing.depth,
-          qx: bolt.qx,
-          qy: bolt.qy,
-          qz: bolt.qz,
-          qw: bolt.qw
-        }
+        {x: bolt.x, y: bolt.y, z: bolt.z + housing.depth, qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw}
       );
       addComponent('screw$i', screw);
       addMate('screw$i-seat', "fixed", "housing", 'bolt${i}Head', 'screw$i', "head");

@@ -32,16 +32,8 @@ class MillMotorStudyChecks {
 
     for (p in [
       {name: "ELM2L-1500LA100FT-H MS1AE", motor: 80, spindle: 30},
-      {
-        name: "ELM2M-2000LB130F-H",
-        motor: 80,
-        spindle: 25
-      },
-      {
-        name: "ELM2M-2900LD180FT-H",
-        motor: 96,
-        spindle: 18
-      }
+      {name: "ELM2M-2000LB130F-H", motor: 80, spindle: 25},
+      {name: "ELM2M-2900LD180FT-H", motor: 96, spindle: 18}
     ]) {
       var drive = MillMotorStudy.selection(c.frame, p.name, p.motor, p.spindle);
       var head = new MillSpindleHead(c.frame.zAxis, 0, drive), parts = head.components(), poses = head.solvedPoses();

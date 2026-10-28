@@ -74,41 +74,13 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.motion.power-supply",
       [
-        new ComponentParameter(
-          "voltage",
-          ComponentParameterType.Scalar,
-          ComponentValue.Number(24),
-          "V",
-          0.001
-        ),
-        new ComponentParameter(
-          "current",
-          ComponentParameterType.Scalar,
-          ComponentValue.Number(10),
-          "A DC",
-          0.001
-        ),
-        ComponentRecipeSupport.count(
-          "outlets",
-          1
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          120
-        ),
-        ComponentRecipeSupport.length(
-          "height",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "depth",
-          30
-        ),
-        ComponentRecipeSupport.scalar(
-          "regenerativePower",
-          0,
-          0
-        )
+        new ComponentParameter("voltage", ComponentParameterType.Scalar, ComponentValue.Number(24), "V", 0.001),
+        new ComponentParameter("current", ComponentParameterType.Scalar, ComponentValue.Number(10), "A DC", 0.001),
+        ComponentRecipeSupport.count("outlets", 1),
+        ComponentRecipeSupport.length("width", 120),
+        ComponentRecipeSupport.length("height", 60),
+        ComponentRecipeSupport.length("depth", 30),
+        ComponentRecipeSupport.scalar("regenerativePower", 0, 0)
       ],
       v -> new PowerSupply(
         new machinekit.power.DcVoltage(v.number("voltage")),
@@ -154,23 +126,13 @@ class PowerSupply extends MachineComponent implements ElectricalSource {
 
   /** A vented cover with the screw-terminal strip along its top (`DeviceHousing.panelModule`). */
   override public function geometry(detail:ComponentDetail = Preview):Part return detail == Envelope ? Solids.named(
-    Part.box(
-      width,
-      height,
-      depth
-    ),
+    Part.box(width, height, depth),
     "body"
   ) : machinekit.power.DeviceHousing.panelModule(
     width,
     height,
     depth,
-    {
-      vents : true,
-      terminals : Std.int(Math.min(
-        12,
-        3 + 2 * outlets
-      ))
-    }
+    {vents : true, terminals : Std.int(Math.min(12, 3 + 2 * outlets))}
   );
 
   override public function presentationView():Null<machinekit.component.ComponentView

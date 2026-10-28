@@ -53,10 +53,7 @@ class FairinoAdapterPreview {
       single.exposePort("powerIn", "adapter", "powerIn");
       sys.io.File.saveBytes(
         dir + "/" + variant.toLowerCase() + ".mtrg",
-        SceneArtifact.encode(AssemblyPreview.scene(
-          single,
-          "Fairino " + variant + " estimated layout"
-        ))
+        SceneArtifact.encode(AssemblyPreview.scene(single, "Fairino " + variant + " estimated layout"))
       );
       assembly.addComponent(variant, adapter, AssemblyFrames.translation(variant == "Expert" ? 100 : 0, 0, 0));
       records.push({
@@ -84,11 +81,7 @@ class FairinoAdapterPreview {
     );
     sys.io.File.saveContent(
       dir + "/selected-dual-gripper-bom.json",
-      haxe.Json.stringify(
-        selectedBom.lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(selectedBom.lines(), null, "  ")
     );
     var bom = assembly.billOfMaterials();
     check(

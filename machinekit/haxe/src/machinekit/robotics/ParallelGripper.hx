@@ -37,13 +37,7 @@ class ParallelGripper extends MachineAssembly {
       "start",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: spec.jawTravel(),
-        velocity: spec.cylinderSpeed,
-        effort: null,
-        overtravel: cushion
-      }
+      {lower: 0, upper: spec.jawTravel(), velocity: spec.cylinderSpeed, effort: null, overtravel: cushion}
     );
     addMateOnAxis(
       "jaw-right-slide",
@@ -54,13 +48,7 @@ class ParallelGripper extends MachineAssembly {
       "start",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: -spec.jawTravel(),
-        upper: 0,
-        velocity: spec.cylinderSpeed,
-        effort: null,
-        overtravel: cushion
-      }
+      {lower: -spec.jawTravel(), upper: 0, velocity: spec.cylinderSpeed, effort: null, overtravel: cushion}
     );
     addCoupling("jaw-mirror", "jaw-left-slide", "jaw-right-slide", -1);
     addMate("finger-left-mount", "fixed", "jawLeft", "fingerSeat", FINGER_LEFT, "mount");
@@ -77,11 +65,7 @@ class ParallelGripper extends MachineAssembly {
       "gripper cylinder support",
       [
         {
-          min: [
-            spec.cylinderStartX(),
-            spec.bodyDepth / 2,
-            supportZ
-          ],
+          min: [spec.cylinderStartX(), spec.bodyDepth / 2, supportZ],
           max: [
             -spec.bodyWidth / 2 + ParallelGripperSpec.CYLINDER_BRACKET_LAP,
             outsideY,
@@ -89,16 +73,8 @@ class ParallelGripper extends MachineAssembly {
           ]
         },
         {
-          min: [
-            spec.cylinderStartX(),
-            cylinder.bodyWidth / 2,
-            supportZ
-          ],
-          max: [
-            spec.cylinderStartX() + cylinder.bodyLength,
-            outsideY,
-            spec.cylinderAxisZ() + 1
-          ]
+          min: [spec.cylinderStartX(), cylinder.bodyWidth / 2, supportZ],
+          max: [spec.cylinderStartX() + cylinder.bodyLength, outsideY, spec.cylinderAxisZ() + 1]
         }
       ]
     );
@@ -124,12 +100,7 @@ class ParallelGripper extends MachineAssembly {
     addSwitch(
       "jaw-open",
       "jaw-left-slide",
-      {
-        lower: -cushion,
-        upper: ParallelGripperSpec.SWITCH_EDGE_CLEARANCE,
-        velocity: null,
-        effort: null
-      },
+      {lower: -cushion, upper: ParallelGripperSpec.SWITCH_EDGE_CLEARANCE, velocity: null, effort: null},
       0.25
     );
     addSwitch(
@@ -147,12 +118,7 @@ class ParallelGripper extends MachineAssembly {
     addSwitch(
       "gripped",
       "jaw-left-slide",
-      {
-        lower: gripWindow.lower,
-        upper: gripWindow.upper,
-        velocity: null,
-        effort: null
-      },
+      {lower: gripWindow.lower, upper: gripWindow.upper, velocity: null, effort: null},
       0.25
     );
   }

@@ -128,28 +128,13 @@ class PressGeometry {
         var polygon = [
           point(pose, box.minX, box.minY, box.minZ),
           point(pose, box.maxX, box.minY, box.minZ),
-          point(
-            pose,
-            box.maxX,
-            box.maxY,
-            box.minZ
-          ),
-          point(
-            pose,
-            box.minX,
-            box.maxY,
-            box.minZ
-          )
+          point(pose, box.maxX, box.maxY, box.minZ),
+          point(pose, box.minX, box.maxY, box.minZ)
         ];
         pieces.push(new ConvexPrism(
           frame.member + ":volume:" + pieces.length,
           polygon,
-          point(
-            pose,
-            box.minX,
-            box.minY,
-            box.maxZ
-          ).subtract(polygon[0])
+          point(pose, box.minX, box.minY, box.maxZ).subtract(polygon[0])
         ));
       }
       members.push(new PressMachineMember(frame.member, Fixed, pieces));
@@ -166,26 +151,10 @@ class PressGeometry {
       source.pressCapacityN(),
       source.pressProfile(),
       source.pressToolLayout(),
-      envelope(
-        assembly,
-        state,
-        datums.ram
-      ),
-      travel(
-        state,
-        datums.ramJoint
-      ),
-      travel(
-        state,
-        datums.gaugeXJoint
-      ),
-      datums.gaugeRJoint == null ? new PressTravel(
-        0,
-        0
-      ) : travel(
-        state,
-        datums.gaugeRJoint
-      ),
+      envelope(assembly, state, datums.ram),
+      travel(state, datums.ramJoint),
+      travel(state, datums.gaugeXJoint),
+      datums.gaugeRJoint == null ? new PressTravel(0, 0) : travel(state, datums.gaugeRJoint),
       stations,
       fingers,
       contacts,
@@ -206,16 +175,7 @@ class PressGeometry {
     for (id in ids) result.push(new PressMachineMember(
       id,
       motion,
-      PressCollisionGeometry.box(
-        MachineMember(id),
-        id,
-        envelope(
-          assembly,
-          state,
-          id
-        ),
-        new Vector()
-      ).pieces()
+      PressCollisionGeometry.box(MachineMember(id), id, envelope(assembly, state, id), new Vector()).pieces()
     ));
   }
   static function travel(state:AssemblyState, id:String):PressTravel {
@@ -258,14 +218,7 @@ class PressGeometry {
         PressCollisionGeometry.box(
           MachineMember("bed"),
           "bed",
-          new PressEnvelope(
-            -800,
-            -90,
-            600,
-            800,
-            90,
-            800
-          ),
+          new PressEnvelope(-800, -90, 600, 800, 90, 800),
           new Vector()
         ).pieces()
       ),
@@ -275,14 +228,7 @@ class PressGeometry {
         PressCollisionGeometry.box(
           MachineMember("gaugeX"),
           "gaugeX",
-          new PressEnvelope(
-            -400,
-            -40,
-            660,
-            400,
-            40,
-            720
-          ),
+          new PressEnvelope(-400, -40, 660, 400, 40, 720),
           new Vector()
         ).pieces()
       )
@@ -293,14 +239,7 @@ class PressGeometry {
       PressCollisionGeometry.box(
         MachineMember("gaugeR"),
         "gaugeR",
-        new PressEnvelope(
-          -400,
-          20,
-          fingerTop - 40,
-          400,
-          60,
-          fingerTop
-        ),
+        new PressEnvelope(-400, 20, fingerTop - 40, 400, 60, fingerTop),
         new Vector()
       ).pieces()
     ));
@@ -308,22 +247,8 @@ class PressGeometry {
       var id = side < 0 ? "frameLeft" : "frameRight", center = side * 825;
       var boxes = [
         new PressEnvelope(center - 25, -100, 0, center + 25, 230, 800),
-        new PressEnvelope(
-          center - 25,
-          230,
-          0,
-          center + 25,
-          500,
-          1600
-        ),
-        new PressEnvelope(
-          center - 25,
-          -100,
-          1120,
-          center + 25,
-          230,
-          1600
-        )
+        new PressEnvelope(center - 25, 230, 0, center + 25, 500, 1600),
+        new PressEnvelope(center - 25, -100, 1120, center + 25, 230, 1600)
       ];
       var pieces:Array<ConvexPrism> = [];
       for (box in boxes) for (piece in PressCollisionGeometry.box(
@@ -342,58 +267,18 @@ class PressGeometry {
       40 * 1000 * 9.80665,
       StopControlled,
       layout,
-      new PressEnvelope(
-        -800,
-        -50,
-        1120,
-        800,
-        50,
-        1340
-      ),
-      new PressTravel(
-        0,
-        100
-      ),
-      new PressTravel(
-        0,
-        500
-      ),
-      new PressTravel(
-        0,
-        withR ? 120 : 0
-      ),
+      new PressEnvelope(-800, -50, 1120, 800, 50, 1340),
+      new PressTravel(0, 100),
+      new PressTravel(0, 500),
+      new PressTravel(0, withR ? 120 : 0),
       stations,
       [
-        new PressEnvelope(
-          -fingerHalfSpacing - 10,
-          0,
-          fingerTop - 20,
-          -fingerHalfSpacing + 10,
-          60,
-          fingerTop + 1
-        ),
-        new PressEnvelope(
-          fingerHalfSpacing - 10,
-          0,
-          fingerTop - 20,
-          fingerHalfSpacing + 10,
-          60,
-          fingerTop + 1
-        )
+        new PressEnvelope(-fingerHalfSpacing - 10, 0, fingerTop - 20, -fingerHalfSpacing + 10, 60, fingerTop + 1),
+        new PressEnvelope(fingerHalfSpacing - 10, 0, fingerTop - 20, fingerHalfSpacing + 10, 60, fingerTop + 1)
       ],
       [
-        new PressFingerDatum(
-          "fingerLeft",
-          -fingerHalfSpacing,
-          0,
-          fingerTop
-        ),
-        new PressFingerDatum(
-          "fingerRight",
-          fingerHalfSpacing,
-          0,
-          fingerTop
-        )
+        new PressFingerDatum("fingerLeft", -fingerHalfSpacing, 0, fingerTop),
+        new PressFingerDatum("fingerRight", fingerHalfSpacing, 0, fingerTop)
       ],
       members
     );

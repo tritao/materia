@@ -58,11 +58,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
         bodyLength: pocketLengths[size] - 2,
         shaftDiameter: 8,
         shaftLength: 10,
-        electrical: ServoMotor.lowVoltageWinding(
-          torque,
-          0.8 * rate,
-          rate
-        )
+        electrical: ServoMotor.lowVoltageWinding(torque, 0.8 * rate, rate)
       },
       Assumed
     );
@@ -130,26 +126,11 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.cobot-joint",
       [
-        ComponentRecipeSupport.scalar(
-          "size",
-          2
-        ),
-        ComponentRecipeSupport.scalar(
-          "speedDegrees",
-          180
-        ),
-        ComponentRecipeSupport.length(
-          "inputPilotDepth",
-          0
-        ),
-        ComponentRecipeSupport.flag(
-          "wristStator",
-          false
-        ),
-        ComponentRecipeSupport.flag(
-          "wristRotor",
-          false
-        )
+        ComponentRecipeSupport.scalar("size", 2),
+        ComponentRecipeSupport.scalar("speedDegrees", 180),
+        ComponentRecipeSupport.length("inputPilotDepth", 0),
+        ComponentRecipeSupport.flag("wristStator", false),
+        ComponentRecipeSupport.flag("wristRotor", false)
       ],
       v -> new CobotJoint(
         Std.int(v.number("size")),

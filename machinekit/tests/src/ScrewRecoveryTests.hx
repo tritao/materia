@@ -166,22 +166,8 @@ class ScrewRecoveryTests {
     "recovery-probe",
     1,
     ScrewdriverProcessTests.program(),
-    new Transform3(
-      new Vec3(
-        0.1,
-        0,
-        0.2
-      ),
-      Quat.identity()
-    ),
-    new Transform3(
-      new Vec3(
-        0.2,
-        0,
-        0.2
-      ),
-      Quat.identity()
-    ),
+    new Transform3(new Vec3(0.1, 0, 0.2), Quat.identity()),
+    new Transform3(new Vec3(0.2, 0, 0.2), Quat.identity()),
     1,
     2
   );

@@ -17,19 +17,7 @@ class ThreadDrawingPreview {
       direction: [0, -1, 0],
       up: [0, 0, 1],
       showHiddenLines: true,
-      section: {
-        origin: [
-          0,
-          0,
-          0
-        ],
-        normal: [
-          0,
-          1,
-          0
-        ],
-        keepPositive: true
-      }
+      section: {origin: [0, 0, 0], normal: [0, 1, 0], keepPositive: true}
     };
     var end:DrawingViewSpec = {id: "plate-end", direction: [0, 0, 1], up: [0, 1, 0], showHiddenLines: true};
     var shaft:DrawingViewSpec = {id: "screw-side", direction: [0, -1, 0], up: [0, 0, 1], showHiddenLines: true};
@@ -45,14 +33,8 @@ class ThreadDrawingPreview {
       + ', end=' + endDrawing.callouts.length + ', shaft=' + shaftDrawing.callouts.length;
     return [
       {name: "plate-section.svg", svg: DrawingSvgExporter.svg(sectionDrawing)},
-      {
-        name: "plate-end.svg",
-        svg: DrawingSvgExporter.svg(endDrawing)
-      },
-      {
-        name: "screw-side.svg",
-        svg: DrawingSvgExporter.svg(shaftDrawing)
-      }
+      {name: "plate-end.svg", svg: DrawingSvgExporter.svg(endDrawing)},
+      {name: "screw-side.svg", svg: DrawingSvgExporter.svg(shaftDrawing)}
     ];
   }
 }

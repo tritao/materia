@@ -43,14 +43,8 @@ class ToolingBlock extends MachineComponent {
 
   static function parameters():Array<machinekit.component.ComponentParameter> return [
     P.length("width", 100),
-    P.length(
-      "depth",
-      80
-    ),
-    P.length(
-      "height",
-      50
-    )
+    P.length("depth", 80),
+    P.length("height", 50)
   ];
 
   public static function recipeType():ComponentType {

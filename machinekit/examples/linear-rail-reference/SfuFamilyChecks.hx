@@ -100,10 +100,7 @@ class SfuFamilyChecks {
       var large = StringTools.startsWith(model, "SFU25"), screw = new SfuDrawingScrew(
         model,
         500,
-        large ? 21 : StringTools.startsWith(
-          model,
-          "SFU16"
-        ) ? 13 : 16
+        large ? 21 : StringTools.startsWith(model, "SFU16") ? 13 : 16
       ), p = screw.geometry();
       check(p.valid() && p.solidCount() == 1, "Drawing screw solid " + model);
       check(
@@ -133,11 +130,7 @@ class SfuFamilyChecks {
       assembly.addComponent(
         model + "-screw",
         screw,
-        F.translation(
-          (large ? 800 : 650) + (model.indexOf("10") > 0 ? 75 : 0),
-          0,
-          0
-        )
+        F.translation((large ? 800 : 650) + (model.indexOf("10") > 0 ? 75 : 0), 0, 0)
       );
       p.close();
     }
@@ -166,10 +159,7 @@ class SfuFamilyChecks {
     sys.io.File.saveContent(output + "sfu-family.assembly.json", encoded);
     sys.io.File.saveBytes(
       output + "sfu-family.mtrg",
-      SceneArtifact.encode(AssemblyPreview.scene(
-        assembly,
-        "SFU and DSG family"
-      ))
+      SceneArtifact.encode(AssemblyPreview.scene(assembly, "SFU and DSG family"))
     );
     trace(checks + " SFU/DSG geometry, journal, screw, pattern and persistence checks passed");
   }

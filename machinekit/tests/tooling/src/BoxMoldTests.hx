@@ -39,15 +39,8 @@ class BoxMoldTests {
       materia.tooling.ToolingRecipe.CoreWireAxis.Z
     );
     cutting.solid = materia.casting.CastingRegion.Placed({
-      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(
-        16,
-        20
-      )),
-      pose: F.translation(
-        20,
-        15,
-        0
-      )
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(16, 20)),
+      pose: F.translation(20, 15, 0)
     });
     var scope = new cadkit.modeling.Scope();
     try {

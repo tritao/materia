@@ -83,13 +83,7 @@ class CoreXyPrinterKlipper {
     return {
       name: "CoreXY printer",
       maxVelocity: Math.min(Math.min(x.speed, y.speed), cartesianSpeed) * 1000.0,
-      maxAccel: Math.min(
-        Math.min(
-          x.acceleration,
-          y.acceleration
-        ),
-        cartesianAcceleration
-      ) * 1000.0,
+      maxAccel: Math.min(Math.min(x.acceleration, y.acceleration), cartesianAcceleration) * 1000.0,
       maxZVelocity: z.speed * 1000.0,
       maxZAccel: z.acceleration * 1000.0,
       squareCornerVelocity: SQUARE_CORNER_VELOCITY,

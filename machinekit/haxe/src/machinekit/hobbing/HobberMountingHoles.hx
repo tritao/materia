@@ -28,10 +28,7 @@ class HobberMountingHoles {
         placed.rail.mountingThread(),
         clearance == null ? null : clearance.diameter,
         clearance == null ? null : clearance.reference,
-        [
-          BeforeCasting,
-          TransferAfterCasting
-        ],
+        [BeforeCasting, TransferAfterCasting],
         {
           placementOffsetMm : Unresolved("RM0 insert placement offset"),
           placementAngleRad : Unresolved("RM0 insert angular placement"),

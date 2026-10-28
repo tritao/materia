@@ -47,55 +47,16 @@ class OperatorProfileCodec {
     }
     return new OperatorProfile(
       text(value, "name"),
-      [for (a in list(value, "axes")) new OperatorAxis(
-        text(a, "id"),
-        text(
-          a,
-          "label"
-        )
-      )],
+      [for (a in list(value, "axes")) new OperatorAxis(text(a, "id"), text(a, "label"))],
       pendant,
-      [for (k in list(
-        value,
-        "keys"
-      )) new OperatorKey(
-        readAction(text2(
-          k,
-          "action"
-        )),
-        text2(
-          k,
-          "label"
-        )
-      )],
-      [for (m in list(
-        value,
-        "modes"
-      )) readMode(name(m))],
-      flag(
-        value,
-        "hasSpindle"
-      ),
-      flag(
-        value,
-        "hasDoor"
-      ),
-      [for (r in list(
-        value,
-        "jogRules"
-      )) new JogRule(
-        text(
-          r,
-          "axis"
-        ),
-        readCondition(text(
-          r,
-          "blockedWhen"
-        )),
-        text(
-          r,
-          "reason"
-        )
+      [for (k in list(value, "keys")) new OperatorKey(readAction(text2(k, "action")), text2(k, "label"))],
+      [for (m in list(value, "modes")) readMode(name(m))],
+      flag(value, "hasSpindle"),
+      flag(value, "hasDoor"),
+      [for (r in list(value, "jogRules")) new JogRule(
+        text(r, "axis"),
+        readCondition(text(r, "blockedWhen")),
+        text(r, "reason")
       )]
     );
   }

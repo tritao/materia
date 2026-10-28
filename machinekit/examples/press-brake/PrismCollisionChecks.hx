@@ -17,21 +17,8 @@ class PrismCollisionChecks {
   static function box(id:String, x:Float, y:Float, z:Float):ConvexPrism {
     return new ConvexPrism(
       id,
-      [
-        new Vector(-x, -y, -z),
-        new Vector(x, -y, -z),
-        new Vector(x, y, -z),
-        new Vector(
-          -x,
-          y,
-          -z
-        )
-      ],
-      new Vector(
-        0,
-        0,
-        2 * z
-      )
+      [new Vector(-x, -y, -z), new Vector(x, -y, -z), new Vector(x, y, -z), new Vector(-x, y, -z)],
+      new Vector(0, 0, 2 * z)
     );
   }
   static function invalid(action:Void -> Void):Void {
@@ -80,25 +67,8 @@ class PrismCollisionChecks {
     check(rod.inset(0) == rod, "Zero inset preserves immutable material");
     var insetFixture = new ConvexPrism(
       "oblique-inset",
-      [
-        new Vector(-1, -1, 0),
-        new Vector(1, -1, 0),
-        new Vector(
-          1,
-          1,
-          0
-        ),
-        new Vector(
-          -1,
-          1,
-          0
-        )
-      ],
-      new Vector(
-        1,
-        0,
-        2
-      )
+      [new Vector(-1, -1, 0), new Vector(1, -1, 0), new Vector(1, 1, 0), new Vector(-1, 1, 0)],
+      new Vector(1, 0, 2)
     );
     var obliqueInner = insetFixture.inset(0.1);
     check(obliqueInner != null, "Oblique extrusion retains its face inset");
@@ -158,14 +128,7 @@ class PrismCollisionChecks {
     check(!query.overlap(skew, rod), "Skew separation is symmetric");
     check(query.separation(rod, skew) > 0, "Skew separation certifies a positive convex distance");
     var common = Location.translation(new Vector(1000, 2000, 3000)).compose(Location.rotation(
-      new Axis(
-        new Vector(),
-        new Vector(
-          3,
-          1,
-          2
-        )
-      ),
+      new Axis(new Vector(), new Vector(3, 1, 2)),
       0.7
     ));
     check(query.overlap(rod.placed(common), penetrating.placed(common)), "Rigid transform preserves penetration");
@@ -180,11 +143,7 @@ class PrismCollisionChecks {
     var oblique = new ConvexPrism(
       "oblique",
       [new Vector(0, 0), new Vector(0, 2), new Vector(2, 2), new Vector(2, 0)],
-      new Vector(
-        1,
-        0.3,
-        2
-      )
+      new Vector(1, 0.3, 2)
     );
     var inner = contained.placed(Location.translation(new Vector(1.5, 1.15, 1)));
     check(query.overlap(oblique, inner), "Oblique extrusion with clockwise winding contains its centre");
@@ -202,16 +161,7 @@ class PrismCollisionChecks {
     invalid(function() {
       var result = new ConvexPrism(
         "concave",
-        [
-          new Vector(0, 0),
-          new Vector(2, 0),
-          new Vector(1, 1),
-          new Vector(2, 2),
-          new Vector(
-            0,
-            2
-          )
-        ],
+        [new Vector(0, 0), new Vector(2, 0), new Vector(1, 1), new Vector(2, 2), new Vector(0, 2)],
         Vector.Z()
       );
     }
@@ -219,16 +169,7 @@ class PrismCollisionChecks {
     invalid(function() {
       var result = new ConvexPrism(
         "nonplanar",
-        [
-          new Vector(0, 0),
-          new Vector(2, 0),
-          new Vector(2, 2),
-          new Vector(
-            0,
-            2,
-            0.1
-          )
-        ],
+        [new Vector(0, 0), new Vector(2, 0), new Vector(2, 2), new Vector(0, 2, 0.1)],
         Vector.Z()
       );
     }

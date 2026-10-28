@@ -19,29 +19,12 @@ class CncController extends ControllerCabinet {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.control.cnc-controller",
       [
-        ComponentRecipeSupport.count(
-          "axes",
-          4
-        ),
-        ComponentRecipeSupport.count(
-          "inputs",
-          16
-        ),
-        ComponentRecipeSupport.count(
-          "outputs",
-          16
-        ),
-        ComponentRecipeSupport.count(
-          "valves",
-          8
-        )
+        ComponentRecipeSupport.count("axes", 4),
+        ComponentRecipeSupport.count("inputs", 16),
+        ComponentRecipeSupport.count("outputs", 16),
+        ComponentRecipeSupport.count("valves", 8)
       ],
-      v -> new CncController(
-        v.integer("axes"),
-        v.integer("inputs"),
-        v.integer("outputs"),
-        v.integer("valves")
-      )
+      v -> new CncController(v.integer("axes"), v.integer("inputs"), v.integer("outputs"), v.integer("valves"))
     );
     return recipe;
   }

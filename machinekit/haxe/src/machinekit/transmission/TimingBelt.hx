@@ -260,11 +260,7 @@ class TimingBelt extends MachineComponent {
     if (driverTeeth < 8 || idlerTeeth < 8) throw "Timing belt pulleys need at least 8 teeth";
     return new TimingBelt(beltProfile, width, [
       new BeltWrap(0, 0, pitch * driverTeeth / (2 * Math.PI)),
-      new BeltWrap(
-        centreDistance,
-        0,
-        pitch * idlerTeeth / (2 * Math.PI)
-      )
+      new BeltWrap(centreDistance, 0, pitch * idlerTeeth / (2 * Math.PI))
     ], switch beltProfile {
       case Custom(_, _, _):
         null;
@@ -533,14 +529,7 @@ class TimingBelt extends MachineComponent {
     var inner = outer == left ? right : left;
     return Solids.cut(
       Solids.named(Part.prism(outer, 0, width), "outer"),
-      [Solids.named(
-        Part.prism(
-          inner,
-          -0.1,
-          width + 0.1
-        ),
-        "inner"
-      )]
+      [Solids.named(Part.prism(inner, -0.1, width + 0.1), "inner")]
     );
   }
 
@@ -579,45 +568,13 @@ class TimingBelt extends MachineComponent {
     if (pairRecipeTypeCache == null) pairRecipeTypeCache = new ComponentType(
       "machinekit.transmission.timing-belt",
       [
-        ComponentRecipeSupport.choice(
-          "profile",
-          [
-            "GT2",
-            "HTD3M",
-            "HTD5M",
-            "HTD8M",
-            "HTD14M",
-            "T5",
-            "XL"
-          ],
-          "GT2"
-        ),
-        ComponentRecipeSupport.count(
-          "driverTeeth",
-          20
-        ),
-        ComponentRecipeSupport.count(
-          "idlerTeeth",
-          20
-        ),
-        ComponentRecipeSupport.length(
-          "centreDistance",
-          200
-        ),
-        ComponentRecipeSupport.length(
-          "width",
-          6
-        ),
-        ComponentRecipeSupport.scalar(
-          "cordRigidity",
-          0,
-          0
-        ),
-        ComponentRecipeSupport.scalar(
-          "dampingRatio",
-          0,
-          0
-        )
+        ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
+        ComponentRecipeSupport.count("driverTeeth", 20),
+        ComponentRecipeSupport.count("idlerTeeth", 20),
+        ComponentRecipeSupport.length("centreDistance", 200),
+        ComponentRecipeSupport.length("width", 6),
+        ComponentRecipeSupport.scalar("cordRigidity", 0, 0),
+        ComponentRecipeSupport.scalar("dampingRatio", 0, 0)
       ],
       v -> TimingBelt.twoPulley(
         ComponentRecipeSupport.profile(v.token("profile")),

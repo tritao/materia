@@ -105,59 +105,20 @@ class ServoMotor extends MachineComponent implements MotorDrive {
           bodyLength: length,
           shaftDiameter: shaftDiameter,
           shaftLength: shaftLength,
-          electrical: acWinding(
-            rated,
-            3000.0 * rpm
-          )
+          electrical: acWinding(rated, 3000.0 * rpm)
         };
       }
       table = [
         generic("GENERIC-SERVO-50W", 50, 3.0e-6, 40, 70, 8, 20),
-        generic(
-          "GENERIC-SERVO-100W",
-          100,
-          5.0e-6,
-          40,
-          85,
-          8,
-          20
-        ),
-        generic(
-          "GENERIC-SERVO-200W",
-          200,
-          2.5e-5,
-          60,
-          100,
-          14,
-          30
-        ),
-        generic(
-          "GENERIC-SERVO-400W",
-          400,
-          5.0e-5,
-          60,
-          130,
-          14,
-          30
-        ),
-        generic(
-          "GENERIC-SERVO-750W",
-          750,
-          1.2e-4,
-          80,
-          145,
-          19,
-          35
-        )
+        generic("GENERIC-SERVO-100W", 100, 5.0e-6, 40, 85, 8, 20),
+        generic("GENERIC-SERVO-200W", 200, 2.5e-5, 60, 100, 14, 30),
+        generic("GENERIC-SERVO-400W", 400, 5.0e-5, 60, 130, 14, 30),
+        generic("GENERIC-SERVO-750W", 750, 1.2e-4, 80, 145, 19, 35)
       ];
       // Distinct saved designations preserve the selected winding on reconstruction.
       var baseRows = table.copy();
       for (row in baseRows) table.push({
-        designation: StringTools.replace(
-          row.designation,
-          "GENERIC-SERVO-",
-          "GENERIC-LV-SERVO-"
-        ),
+        designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-LV-SERVO-"),
         ratedTorque: row.ratedTorque,
         peakTorque: row.peakTorque,
         ratedSpeed: row.ratedSpeed,
@@ -168,18 +129,10 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         bodyLength: row.bodyLength,
         shaftDiameter: row.shaftDiameter,
         shaftLength: row.shaftLength,
-        electrical: lowVoltageWinding(
-          row.ratedTorque,
-          row.ratedSpeed,
-          row.maxSpeed
-        )
+        electrical: lowVoltageWinding(row.ratedTorque, row.ratedSpeed, row.maxSpeed)
       });
       for (row in baseRows) table.push({
-        designation: StringTools.replace(
-          row.designation,
-          "GENERIC-SERVO-",
-          "GENERIC-HV-SERVO-"
-        ),
+        designation: StringTools.replace(row.designation, "GENERIC-SERVO-", "GENERIC-HV-SERVO-"),
         ratedTorque: row.ratedTorque,
         peakTorque: row.peakTorque,
         ratedSpeed: row.ratedSpeed,
@@ -190,10 +143,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
         bodyLength: row.bodyLength,
         shaftDiameter: row.shaftDiameter,
         shaftLength: row.shaftLength,
-        electrical: highVoltageWinding(
-          row.ratedTorque,
-          row.ratedSpeed
-        )
+        electrical: highVoltageWinding(row.ratedTorque, row.ratedSpeed)
       });
       for (name in LeadshineServo.catalog().designations()) table.push(LeadshineServo.model(name).rating);
     }
@@ -294,28 +244,12 @@ class ServoMotor extends MachineComponent implements MotorDrive {
     ratedSpeed: rating.ratedSpeed,
     maxSpeed: rating.maxSpeed,
     encoderCounts: rating.encoderCounts,
-    torqueSpeed: [
-      0,
-      rating.peakTorque,
-      rating.ratedSpeed,
-      rating.peakTorque,
-      rating.maxSpeed,
-      rating.ratedTorque
-    ],
+    torqueSpeed: [0, rating.peakTorque, rating.ratedSpeed, rating.peakTorque, rating.maxSpeed, rating.ratedTorque],
     assumed: ratingsBasis == Assumed ? ["servo ratings"] : null,
     assumptions : ratingsBasis == Assumed ? [
-      {
-        quantity : "motor curve",
-        label : "servo ratings"
-      },
-      {
-        quantity : "inertia",
-        label : "servo ratings"
-      },
-      {
-        quantity : "speed limit",
-        label : "servo ratings"
-      }
+      {quantity : "motor curve", label : "servo ratings"},
+      {quantity : "inertia", label : "servo ratings"},
+      {quantity : "speed limit", label : "servo ratings"}
     ] : null
   };
 

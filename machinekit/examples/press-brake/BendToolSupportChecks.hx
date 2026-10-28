@@ -41,11 +41,7 @@ class BendToolSupportChecks {
         Vector.X(),
         Vector.Y(),
         Vector.Z(),
-        new Vector(
-          1,
-          2,
-          3
-        ).normalized()
+        new Vector(1, 2, 3).normalized()
       ]) {
         var bound = PressBendToolBounds.projectionAlong(stock, placement, axis);
         for (i in 0...201) for (along in [0.0, 10.0]) for (depth in [0.0, 1.0, 2.0]) {
@@ -106,21 +102,7 @@ class BendToolSupportChecks {
     var relieved = new ToolStation(
       "relieved",
       new ToolRow(
-        [
-          new ToolSegment(
-            punch,
-            100,
-            new ToolHorn(
-              ToolHornEnd.Left,
-              25,
-              25
-            )
-          ),
-          new ToolSegment(
-            punch,
-            50
-          )
-        ],
+        [new ToolSegment(punch, 100, new ToolHorn(ToolHornEnd.Left, 25, 25)), new ToolSegment(punch, 50)],
         [0]
       ),
       die,
@@ -146,22 +128,10 @@ class BendToolSupportChecks {
     );
   }
   static function rect(y:Float, z:Float, width:Float, height:Float):WallOutline return WallOutline.polygon([
-    new Point2(
-      y,
-      z
-    ),
-    new Point2(
-      y + width,
-      z
-    ),
-    new Point2(
-      y + width,
-      z + height
-    ),
-    new Point2(
-      y,
-      z + height
-    )
+    new Point2(y, z),
+    new Point2(y + width, z),
+    new Point2(y + width, z + height),
+    new Point2(y, z + height)
   ]);
   static function tool(section:WallOutline, first:Float, last:Float):ToolContactPrism return new ToolContactPrism(
     section,

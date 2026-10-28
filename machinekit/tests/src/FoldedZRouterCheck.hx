@@ -139,14 +139,7 @@ class FoldedZRouterCheck {
         state,
         position,
         ["motorZ"],
-        [
-          "xPlate",
-          "zPlate",
-          "spindle",
-          "uprightRight",
-          "beamUpper",
-          "beamLower"
-        ]
+        ["xPlate", "zPlate", "spindle", "uprightRight", "beamUpper", "beamLower"]
       );
       CncRouterChecks.checkClearWith(
         parts,
@@ -154,12 +147,7 @@ class FoldedZRouterCheck {
         state,
         position,
         ["beltZ"],
-        [
-          "zPlate",
-          "spindle",
-          "uprightRight",
-          "beamUpper"
-        ]
+        ["zPlate", "spindle", "uprightRight", "beamUpper"]
       );
       CncRouterChecks.checkClearWith(
         parts,
@@ -167,12 +155,7 @@ class FoldedZRouterCheck {
         state,
         position,
         ["foldedMotorPlateZ"],
-        [
-          "screwZ",
-          "spindle",
-          "uprightRight",
-          "beamUpper"
-        ]
+        ["screwZ", "spindle", "uprightRight", "beamUpper"]
       );
     }
     });

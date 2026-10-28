@@ -47,11 +47,7 @@ class MillFemExport {
     return {
       toolTipMm: state.worldConnector("spindle/tool", "tip"),
       tableTopMm: table,
-      workpieceReferenceMm: F.translation(
-        table.x + height.x,
-        table.y + height.y,
-        table.z + height.z
-      ),
+      workpieceReferenceMm: F.translation(table.x + height.x, table.y + height.y, table.z + height.z),
       workpieceReferenceNote: "20 kg payload centre, assumed 50 mm above table; not a qualified cutting contact"
     };
   }
@@ -61,10 +57,7 @@ class MillFemExport {
     for (entry in [
       {joint: "xyStage/x", member: "xyStage/table"},
       {joint: "xyStage/y", member: "xyStage/table"},
-      {
-        joint: "zAxis/z",
-        member: "spindle/tool"
-      }
+      {joint: "zAxis/z", member: "spindle/tool"}
     ]) {
       var original = state.joint(entry.joint), before = state.worldPose(entry.member);
       var joint = state.definition.joints.filter(j -> j.id == entry.joint)[0];
@@ -132,12 +125,7 @@ class MillFemExport {
     File.saveContent(runtime, haxe.Json.stringify(paths));
     var process = sys.io.Process.run(
       "python3",
-      [
-        repository + "/" + DIRECTORY + "/fem/provenance.py",
-        repository,
-        runtime,
-        file
-      ]
+      [repository + "/" + DIRECTORY + "/fem/provenance.py", repository, runtime, file]
     );
     var output = process.readStdout(), code = process.exitCode();
     process.close();
@@ -179,10 +167,7 @@ class MillFemExport {
         second: steel,
         overlapMm3: overlap,
         connection: "unassigned",
-        datumMm: state.worldConnector(
-          steel,
-          "top"
-        )
+        datumMm: state.worldConnector(steel, "top")
       });
     }
     });
@@ -193,43 +178,24 @@ class MillFemExport {
         first: base,
         second: column,
         connection: "unassigned",
-        datumMm: state.worldConnector(
-          base,
-          "top"
-        )
+        datumMm: state.worldConnector(base, "top")
       });
       var foot = 'frame/levelingFoot$corner';
       supports.push({
         id: corner,
         member: foot,
         floorMm: state.worldConnector(foot, "floor"),
-        seatMm: state.worldConnector(
-          'frame/base/foot$corner',
-          "top"
-        ),
+        seatMm: state.worldConnector('frame/base/foot$corner', "top"),
         restraint: "unassigned"
       });
     }
     var guides:Array<Dynamic> = [];
     for (group in [
       {axis: "x", ids: ["xyStage/blockX0", "xyStage/blockX1", "xyStage/blockX2", "xyStage/blockX3"]},
-      {
-        axis: "y",
-        ids: [
-          "xyStage/blockY0",
-          "xyStage/blockY1",
-          "xyStage/blockY2",
-          "xyStage/blockY3"
-        ]
-      },
+      {axis: "y", ids: ["xyStage/blockY0", "xyStage/blockY1", "xyStage/blockY2", "xyStage/blockY3"]},
       {
         axis: "z",
-        ids: [
-          "zAxis/blockLeftLower",
-          "zAxis/blockLeftUpper",
-          "zAxis/blockRightLower",
-          "zAxis/blockRightUpper"
-        ]
+        ids: ["zAxis/blockLeftLower", "zAxis/blockLeftUpper", "zAxis/blockRightLower", "zAxis/blockRightUpper"]
       }
     ]) for (id in group.ids) {
       var block:machinekit.motion.LinearRailBlock = cast members.filter(m -> m.id == id)[0].component;
@@ -248,42 +214,19 @@ class MillFemExport {
       revision: StringTools.trim(command(repository, ["rev-parse", "HEAD"])),
       trackedDiffSha256: Sha256.encode(command(
         repository,
-        [
-          "diff",
-          "--binary",
-          "HEAD",
-          "--",
-          "machinekit",
-          "cadkit",
-          "projectkit",
-          "haxeon"
-        ]
+        ["diff", "--binary", "HEAD", "--", "machinekit", "cadkit", "projectkit", "haxeon"]
       )),
       exporterSha256: Sha256.encode(File.getContent(repository + "/" + DIRECTORY + "/MillFemExport.hx")),
-      sourceBuild: sourceBuildProvenance(
-        repository,
-        folder
-      )
+      sourceBuild: sourceBuildProvenance(repository, folder)
     };
     var result = {
       schemaVersion: 1,
       status: "geometry packet; not solver-ready",
       geometryFrame: "world",
       poseApplication: "already-applied",
-      units: {
-        length: "mm",
-        force: "N",
-        mass: "kg",
-        time: "s",
-        modulus: "Pa",
-        density: "kg/m3"
-      },
+      units: {length: "mm", force: "N", mass: "kg", time: "s", modulus: "Pa", density: "kg/m3"},
       provenance: identity,
-      jointsMm: {
-        x: state.joint("xyStage/x"),
-        y: state.joint("xyStage/y"),
-        z: state.joint("zAxis/z")
-      },
+      jointsMm: {x: state.joint("xyStage/x"), y: state.joint("xyStage/y"), z: state.joint("zAxis/z")},
       jointDirections: jointDirections(state),
       parts: parts,
       materials: materials,
@@ -308,17 +251,11 @@ class MillFemExport {
         seatWidth: frame.layout.seatWidth,
         insertThickness: frame.layout.insertThickness
       },
-      conceptReference: {
-        file: "mill-frame-concept.json",
-        sha256: Sha256.encode(referenceText)
-      },
+      conceptReference: {file: "mill-frame-concept.json", sha256: Sha256.encode(referenceText)},
       datums: datums(state),
       totalComponentMassKg: totalMass,
       solidMassKg: solidMass,
-      castingMassKg: {
-        base: frame.base.castingByWeight().kg,
-        column: frame.column.castingByWeight().kg
-      },
+      castingMassKg: {base: frame.base.castingByWeight().kg, column: frame.column.castingByWeight().kg},
       studyEnvelope: {
         cuttingForcePerAxisN: 500,
         payloadKg: 20,
@@ -421,24 +358,14 @@ class MillFemExport {
           holeId: holes[0].id,
           thread: details.columnAnchorThread.thread.designation,
           preloadN: machinekit.design.ThreadedHolePolicy.assemblyPreloadN(details.columnAnchorThread.thread),
-          bearingPointMm: {
-            x: hole.x,
-            y: hole.y,
-            z: body.boundsMm.maxZ
-          },
+          bearingPointMm: {x: hole.x, y: hole.y, z: body.boundsMm.maxZ},
           patchRadiusMm: head.headDiameter / 2
         });
       }
       var packet = {
         source: source,
         pads: exported.parts.filter(part -> padIds.indexOf(part.id) >= 0),
-        sourceRevision: StringTools.trim(command(
-          root(),
-          [
-            "rev-parse",
-            "HEAD"
-          ]
-        )),
+        sourceRevision: StringTools.trim(command(root(), ["rev-parse", "HEAD"])),
         radiusMm: radius,
         sourcePoseMm: source.poseMm,
         stemHalfWidthMm: layout.columnWidth / 2,

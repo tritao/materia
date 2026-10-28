@@ -8,14 +8,7 @@ class MillFabricationPreview {
       frame.base,
       "base",
       "mill-base-process-review",
-      (
-        plan,
-        review
-      ) -> MillMoldChecks.run(
-        frame,
-        plan,
-        review
-      )
+      (plan, review) -> MillMoldChecks.run(frame, plan, review)
     );
   }
 

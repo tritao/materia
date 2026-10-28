@@ -68,11 +68,7 @@ class FoundationSizing {
       var width = minimum + index * increment;
       var part = new CastInsert(prototype.values().copy().setToken(
         "body",
-        materia.casting.InsertSpec.InsertBodyCodec.encode(Primitive(Box(
-          width,
-          depth,
-          height
-        )))
+        materia.casting.InsertSpec.InsertBodyCodec.encode(Primitive(Box(width, depth, height)))
       ));
       try {
         machinekit.tooling.InsertAnchorGeometry.derive(id, part, rule, FootprintOnly, 0);
@@ -138,10 +134,7 @@ class FoundationSizing {
               row.id,
               row.part,
               rule,
-              Casting(
-                body,
-                row.pose
-              ),
+              Casting(body, row.pose),
               liftingShare
             )
         }

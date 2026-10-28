@@ -32,14 +32,7 @@ class WeldingTorchNozzle extends MachineComponent {
     var nozzle = WeldingTorch.NOZZLE_LENGTH;
     return Solids.union([
       Solids.named(Part.cylinderSpan(WeldingTorch.NOZZLE_R, 0, nozzle), "nozzle"),
-      Solids.named(
-        Part.cylinderSpan(
-          WeldingTorch.TIP_R,
-          nozzle,
-          nozzle + WeldingTorch.TIP_PROTRUSION
-        ),
-        "tip"
-      )
+      Solids.named(Part.cylinderSpan(WeldingTorch.TIP_R, nozzle, nozzle + WeldingTorch.TIP_PROTRUSION), "tip")
     ]);
   }
 }

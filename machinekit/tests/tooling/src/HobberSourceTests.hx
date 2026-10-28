@@ -156,12 +156,7 @@ import materia.assembly.AssemblyFrames as F;
           id: site.id,
           part: site.part,
           openings: site.openings,
-          pose: F.fromRotationMatrix(
-            site.pose.x,
-            54,
-            site.pose.z,
-            F.toRotationMatrix(site.pose)
-          )
+          pose: F.fromRotationMatrix(site.pose.x, 54, site.pose.z, F.toRotationMatrix(site.pose))
         };
         var message = "";
         try machinekit.tooling.InsertAnchorGeometry.checkSourceClearance(

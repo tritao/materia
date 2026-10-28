@@ -16,10 +16,7 @@ class OverheadArmPreview {
       var targets:Array<SceneArtifactJointTarget> = [
         {joint: "x", position: x / 1000},
         {joint: "y", position: y / 1000},
-        {
-          joint: "z",
-          position: 0.15
-        }
+        {joint: "z", position: 0.15}
       ];
       for (index in 0...cell.arm.specs.length) targets.push({
         joint: "arm/" + cell.arm.specs[index].id,
@@ -31,32 +28,11 @@ class OverheadArmPreview {
       loop: false,
       steps: [
         ready(200, 0),
-        {
-          kind: "pick",
-          at: {
-            occurrence: "workpiece",
-            connector: "top"
-          }
-        },
-        ready(
-          200,
-          0
-        ),
-        ready(
-          2800,
-          1500
-        ),
-        {
-          kind: "place",
-          at: {
-            occurrence: "padPlace",
-            connector: "top"
-          }
-        },
-        ready(
-          2800,
-          1500
-        )
+        {kind: "pick", at: {occurrence: "workpiece", connector: "top"}},
+        ready(200, 0),
+        ready(2800, 1500),
+        {kind: "place", at: {occurrence: "padPlace", connector: "top"}},
+        ready(2800, 1500)
       ]
     }];
     return SceneArtifact.encode(scene);

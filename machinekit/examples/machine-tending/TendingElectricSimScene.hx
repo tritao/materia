@@ -98,10 +98,7 @@ class TendingElectricSimScene {
           inflation.set(d.id, decomposed.inflation);
           sys.io.File.saveContent(
             cache,
-            haxe.Json.stringify({
-              pieces: decomposed.pieces,
-              inflationMm: decomposed.inflation
-            })
+            haxe.Json.stringify({pieces: decomposed.pieces, inflationMm: decomposed.inflation})
           );
         }
       } else {
@@ -226,15 +223,7 @@ class TendingElectricSimScene {
         side,
         AssemblyFrames.compose(
           carrier.offset,
-          {
-            x: at.x * 0.001,
-            y: at.y * 0.001,
-            z: at.z * 0.001,
-            qx: at.qx,
-            qy: at.qy,
-            qz: at.qz,
-            qw: at.qw
-          }
+          {x: at.x * 0.001, y: at.y * 0.001, z: at.z * 0.001, qx: at.qx, qy: at.qy, qz: at.qz, qw: at.qw}
         )
       );
     }

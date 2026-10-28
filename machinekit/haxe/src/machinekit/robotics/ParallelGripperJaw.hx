@@ -26,57 +26,26 @@ class ParallelGripperJaw extends MachineComponent {
     addConnector(
       "start",
       Axis,
-      AssemblyFrames.alongY(
-        -spec.jawWidth / 2,
-        0,
-        spec.cylinderAxisZ() - (spec.bodyLength - spec.jawHeight),
-        1,
-        0,
-        0
-      )
+      AssemblyFrames.alongY(-spec.jawWidth / 2, 0, spec.cylinderAxisZ() - (spec.bodyLength - spec.jawHeight), 1, 0, 0)
     );
     addConnector("cylinderSeat", Axis, AssemblyFrames.alongY(0, 0, 0, 1, 0, 0));
     addConnector(
       "rodMount",
       Mount,
       AssemblyFrames.compose(
-        AssemblyFrames.translation(
-          -spec.jawWidth / 2,
-          0,
-          spec.cylinderAxisZ() - (spec.bodyLength - spec.jawHeight)
-        ),
-        AssemblyFrames.compose(
-          AssemblyFrames.turnY(Math.PI / 2.0),
-          Solids.axial(
-            0,
-            0,
-            0
-          )
-        )
+        AssemblyFrames.translation(-spec.jawWidth / 2, 0, spec.cylinderAxisZ() - (spec.bodyLength - spec.jawHeight)),
+        AssemblyFrames.compose(AssemblyFrames.turnY(Math.PI / 2.0), Solids.axial(0, 0, 0))
       )
     );
     var reach = spec.guideTongueReach();
     var inner = -side * spec.jawWidth / 2;
     addFacet(CollisionHullFacet.fromBoxes([
+      [-spec.jawWidth / 2, -spec.bodyDepth / 2, 0, spec.jawWidth / 2, spec.bodyDepth / 2, spec.jawHeight],
       [
-        -spec.jawWidth / 2,
-        -spec.bodyDepth / 2,
-        0,
-        spec.jawWidth / 2,
-        spec.bodyDepth / 2,
-        spec.jawHeight
-      ],
-      [
-        Math.min(
-          inner,
-          inner - side * reach
-        ),
+        Math.min(inner, inner - side * reach),
         -spec.bodyDepth / 2,
         -ParallelGripperSpec.GUIDE_TONGUE_HEIGHT,
-        Math.max(
-          inner,
-          inner - side * reach
-        ),
+        Math.max(inner, inner - side * reach),
         spec.bodyDepth / 2,
         0
       ]
@@ -89,26 +58,10 @@ class ParallelGripperJaw extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.robotics.parallel-gripper-jaw",
       [
-        ComponentRecipeSupport.count(
-          "size",
-          32
-        ),
-        ComponentRecipeSupport.length(
-          "expectedPartWidth",
-          60
-        ),
-        ComponentRecipeSupport.length(
-          "openingTravel",
-          16
-        ),
-        ComponentRecipeSupport.choice(
-          "side",
-          [
-            "left",
-            "right"
-          ],
-          "left"
-        ),
+        ComponentRecipeSupport.count("size", 32),
+        ComponentRecipeSupport.length("expectedPartWidth", 60),
+        ComponentRecipeSupport.length("openingTravel", 16),
+        ComponentRecipeSupport.choice("side", ["left", "right"], "left"),
         ComponentRecipeSupport.optionalLength("fingerWidth")
       ],
       v -> new ParallelGripperJaw(

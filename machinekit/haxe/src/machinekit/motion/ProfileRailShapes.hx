@@ -21,18 +21,7 @@ class ProfileRailShapes {
   public static function rail(spec:LinearRailProfileSpec, length:Float, holes:Array<Float>):Part {
     var w = spec.railWidth, h = spec.railHeight, bore = spec.railBore;
     return Solids.building([], owned -> {var body = Part.prism(
-      [
-        new Vector(-w / 2, -h),
-        new Vector(w / 2, -h),
-        new Vector(
-          w / 2,
-          0
-        ),
-        new Vector(
-          -w / 2,
-          0
-        )
-      ],
+      [new Vector(-w / 2, -h), new Vector(w / 2, -h), new Vector(w / 2, 0), new Vector(-w / 2, 0)],
       0,
       length
     );
@@ -47,10 +36,7 @@ class ProfileRailShapes {
       [
         new Vector(side * w / 2, 0),
         new Vector(side * (w / 2 - chamfer), 0.1),
-        new Vector(
-          side * (w / 2 + 0.1),
-          -chamfer
-        )
+        new Vector(side * (w / 2 + 0.1), -chamfer)
       ],
       -0.1,
       length + 0.1
@@ -90,18 +76,9 @@ class ProfileRailShapes {
           new Vector(-w / 2, 0),
           new Vector(w / 2, 0),
           new Vector(w / 2, top - c),
-          new Vector(
-            w / 2 - c,
-            top
-          ),
-          new Vector(
-            -w / 2 + c,
-            top
-          ),
-          new Vector(
-            -w / 2,
-            top - c
-          )
+          new Vector(w / 2 - c, top),
+          new Vector(-w / 2 + c, top),
+          new Vector(-w / 2, top - c)
         ],
         -steel / 2,
         steel / 2
@@ -117,11 +94,7 @@ class ProfileRailShapes {
       ));
       var sealStart = end > 0 ? steel / 2 + cap : -steel / 2 - cap - seal;
       keep(Solids.named(
-        Part.box(capWidth * 0.97, capTop * 0.95, seal, Center, Min, Min).translated(new Vector(
-          0,
-          0,
-          sealStart
-        )),
+        Part.box(capWidth * 0.97, capTop * 0.95, seal, Center, Min, Min).translated(new Vector(0, 0, sealStart)),
         "seal"
       ));
     }

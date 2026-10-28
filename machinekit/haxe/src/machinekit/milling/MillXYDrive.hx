@@ -30,11 +30,6 @@ class MillXYDrive {
     ScrewSupportUnit.bk12(),
     ScrewSupportUnit.bf12(),
     LeadshineServo.model("ELM2H-0400LA60F"),
-    new ShaftCoupling(
-      14,
-      12,
-      null,
-      28
-    )
+    new ShaftCoupling(14, 12, null, 28)
   );
 }

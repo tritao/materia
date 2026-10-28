@@ -88,18 +88,11 @@ class HgFamilyChecks {
     var output = Sys.getEnv("MATERIA_ROOT") + "/build/suppliers/vallder/hg-reference/";
     sys.io.File.saveContent(
       output + "family-checks.json",
-      haxe.Json.stringify(
-        {checks: checks, models: rows},
-        null,
-        "  "
-      )
+      haxe.Json.stringify({checks: checks, models: rows}, null, "  ")
     );
     sys.io.File.saveBytes(
       output + "family.mtrg",
-      SceneArtifact.encode(AssemblyPreview.scene(
-        assembly,
-        "HG reference family"
-      ))
+      SceneArtifact.encode(AssemblyPreview.scene(assembly, "HG reference family"))
     );
     trace(checks + " HG family geometry, bore and interface checks passed");
   }

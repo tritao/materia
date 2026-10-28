@@ -29,10 +29,7 @@ class ReferenceCartesianReview {
       converted.model,
       converted.model.links[0].id,
       tip.id,
-      new Transform3(
-        new Vec3(0, 0, 0.15),
-        Quat.identity()
-      )
+      new Transform3(new Vec3(0, 0, 0.15), Quat.identity())
     );
     var solver = new ReferenceKinematics(arm);
     var tolerance = new IkTolerance(1e-6, 1e-6, 400, 0.005);

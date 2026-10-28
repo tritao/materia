@@ -172,14 +172,7 @@ class ScrewdrivingEquipmentTests {
       "manual",
       "base",
       "mount",
-      [
-        {robot: "power", tool: "power"},
-        {robot: "control", tool: "control"},
-        {
-          robot: "vacuum",
-          tool: "vacuum"
-        }
-      ]
+      [{robot: "power", tool: "power"}, {robot: "control", tool: "control"}, {robot: "vacuum", tool: "vacuum"}]
     );
     set.addTool("driver", cell.arm.tool);
     var bundle = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "driver", "tcp");

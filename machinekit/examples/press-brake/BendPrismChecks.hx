@@ -27,11 +27,7 @@ class BendPrismChecks {
       "bend-collision-steel",
       1.5,
       BendRule.KFactor(new KFactorTable([0], [0.5])),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var result = new Sheet(stock), root = result.addWall(WallOutline.rectangle(50, 100));
     var child = SheetDemoParts.flange(result, root, 1, 40, angle, radius);
@@ -54,22 +50,10 @@ class BendPrismChecks {
       [
         new Vector(x - 0.01, y - 0.01, z - 0.01),
         new Vector(x + 0.01, y - 0.01, z - 0.01),
-        new Vector(
-          x + 0.01,
-          y + 0.01,
-          z - 0.01
-        ),
-        new Vector(
-          x - 0.01,
-          y + 0.01,
-          z - 0.01
-        )
+        new Vector(x + 0.01, y + 0.01, z - 0.01),
+        new Vector(x - 0.01, y + 0.01, z - 0.01)
       ],
-      new Vector(
-        0,
-        0,
-        0.02
-      )
+      new Vector(0, 0, 0.02)
     );
   }
   static function overlaps(profile:BendPrismProfile, point:Vector):Bool {
@@ -105,14 +89,8 @@ class BendPrismChecks {
       var hole = WallOutline.polygon([
         new Point2(allowance * 0.4, 40),
         new Point2(allowance * 0.6, 40),
-        new Point2(
-          allowance * 0.6,
-          60
-        ),
-        new Point2(
-          allowance * 0.4,
-          60
-        )
+        new Point2(allowance * 0.6, 60),
+        new Point2(allowance * 0.4, 60)
       ]);
       var cutBend = graph.cutBend(bend.id, hole, "collision-hole");
       for (fraction in [0.0, 0.4, 1.0]) {
@@ -130,18 +108,9 @@ class BendPrismChecks {
         hemBend.id,
         WallOutline.polygon([
           new Point2(hemAllowance * 0.4, 40),
-          new Point2(
-            hemAllowance * 0.6,
-            40
-          ),
-          new Point2(
-            hemAllowance * 0.6,
-            60
-          ),
-          new Point2(
-            hemAllowance * 0.4,
-            60
-          )
+          new Point2(hemAllowance * 0.6, 40),
+          new Point2(hemAllowance * 0.6, 60),
+          new Point2(hemAllowance * 0.4, 60)
         ]),
         "hem-collision-hole"
       );
@@ -153,12 +122,7 @@ class BendPrismChecks {
       var roundedAllowance = rounded.bendAllowance(roundedBend);
       var roundedCut = rounded.cutBend(
         roundedBend.id,
-        new WallOutline([Segment.arc(
-          new Point2(roundedAllowance / 2, 50),
-          roundedAllowance / 10,
-          0,
-          2 * Math.PI
-        )]),
+        new WallOutline([Segment.arc(new Point2(roundedAllowance / 2, 50), roundedAllowance / 10, 0, 2 * Math.PI)]),
         "round-collision-hole"
       );
       var roundedZone = rounded.evaluate(rounded.folded()).bend(roundedBend.id);

@@ -17,71 +17,20 @@ class PushButton extends HmiPart {
 
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
-    R.choice(
-      "colour",
-      [
-        "green",
-        "yellow",
-        "red",
-        "white",
-        "blue",
-        "black"
-      ],
-      "white"
-    ),
-    R.flag(
-      "illuminated",
-      true
-    ),
-    R.length(
-      "bezelDiameter",
-      19
-    ),
-    R.length(
-      "bezelHeight",
-      1.5
-    ),
-    R.length(
-      "capDiameter",
-      16
-    ),
-    R.length(
-      "capHeight",
-      6
-    ),
-    R.length(
-      "keepOutDiameter",
-      20
-    ),
-    R.length(
-      "barrelDiameter",
-      16.2
-    ),
-    R.length(
-      "panelThickness",
-      3
-    ),
-    R.length(
-      "nutDiameter",
-      22
-    ),
-    R.length(
-      "nutThickness",
-      2.5
-    ),
-    R.length(
-      "bodyDiameter",
-      24
-    ),
-    R.length(
-      "behindDepth",
-      25
-    ),
-    R.scalar(
-      "massGrams",
-      8,
-      1
-    )
+    R.choice("colour", ["green", "yellow", "red", "white", "blue", "black"], "white"),
+    R.flag("illuminated", true),
+    R.length("bezelDiameter", 19),
+    R.length("bezelHeight", 1.5),
+    R.length("capDiameter", 16),
+    R.length("capHeight", 6),
+    R.length("keepOutDiameter", 20),
+    R.length("barrelDiameter", 16.2),
+    R.length("panelThickness", 3),
+    R.length("nutDiameter", 22),
+    R.length("nutThickness", 2.5),
+    R.length("bodyDiameter", 24),
+    R.length("behindDepth", 25),
+    R.scalar("massGrams", 8, 1)
   ];
 
   public function new(?v:ComponentValues) {
@@ -139,22 +88,8 @@ class PushButton extends HmiPart {
     return [new DeviceBodySpec("housing", "push button housing", "ABS black", function() {
       return Solids.union([
         Solids.named(Part.cylinderSpan(n("barrelDiameter") / 2, -t - nut, 0.0), "barrel"),
-        Solids.named(
-          Part.cylinderSpan(
-            n("nutDiameter") / 2,
-            -t - nut,
-            -t
-          ),
-          "nut"
-        ),
-        Solids.named(
-          Part.cylinderSpan(
-            n("bodyDiameter") / 2,
-            -n("behindDepth"),
-            -t - nut
-          ),
-          "body"
-        )
+        Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
+        Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
       ]);
     }
     ), new DeviceBodySpec("cap", "push button cap", materialSpec(), function() {
@@ -165,18 +100,9 @@ class PushButton extends HmiPart {
           {r: b, z: 0.0},
           {r: b, z: bh},
           {r: c, z: bh},
-          {
-            r: c,
-            z: top - 1.2
-          },
-          {
-            r: c - 1.2,
-            z: top
-          },
-          {
-            r: 0.0,
-            z: top
-          }
+          {r: c, z: top - 1.2},
+          {r: c - 1.2, z: top},
+          {r: 0.0, z: top}
         ]),
         "cap"
       );

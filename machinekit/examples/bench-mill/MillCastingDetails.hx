@@ -88,20 +88,8 @@ class MillCastingDetails {
       jointJackThread.clearanceDiameter,
       jointFixtureThread.clearanceDiameter
     ) / 2 + Math.max(
-      Math.max(
-        clearance.minWall,
-        clearance.minClearance
-      ),
-      Math.max(
-        Math.max(
-          jack.minWall,
-          jack.minClearance
-        ),
-        Math.max(
-          fixture.minWall,
-          fixture.minClearance
-        )
-      )
+      Math.max(clearance.minWall, clearance.minClearance),
+      Math.max(Math.max(jack.minWall, jack.minClearance), Math.max(fixture.minWall, fixture.minClearance))
     );
     return columnBoltLengthIncrement * Math.ceil(separation / columnBoltLengthIncrement);
   }

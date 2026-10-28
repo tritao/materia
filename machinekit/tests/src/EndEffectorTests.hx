@@ -44,15 +44,7 @@ class EndEffectorTests {
     tool.addBomItem(
       {partNumber: "TUBE", description: "Attached tube", quantity: 1, material: "polyurethane"},
       1,
-      Attached(
-        1,
-        "cup",
-        new Vector(
-          0,
-          10,
-          0
-        )
-      )
+      Attached(1, "cup", new Vector(0, 10, 0))
     );
     tool.workingFrame("contact", "cup", "contact", true);
     tool.validate();
@@ -71,19 +63,7 @@ class EndEffectorTests {
     var half = Math.sqrt(0.5);
     rotated.addComponent(
       "plate",
-      new EndEffectorTestPart(
-        "ROTATED",
-        2,
-        {
-          x: 10,
-          y: 0,
-          z: 0,
-          qx: 0,
-          qy: 0,
-          qz: half,
-          qw: half
-        }
-      )
+      new EndEffectorTestPart("ROTATED", 2, {x: 10, y: 0, z: 0, qx: 0, qy: 0, qz: half, qw: half})
     );
     rotated.mount("plate", "mount");
     rotated.workingFrame("tip", "plate", "tip", true);

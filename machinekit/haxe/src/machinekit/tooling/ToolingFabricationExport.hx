@@ -70,10 +70,7 @@ class ToolingFabricationExport {
     if (Std.isOfType(component, ToolingPin)) return {
       classification: SupportedHardware,
       lengthMm: component.parameterNumber("length"),
-      diameterMm: Math.max(
-        component.parameterNumber("diameter"),
-        component.parameterNumber("headDiameter")
-      )
+      diameterMm: Math.max(component.parameterNumber("diameter"), component.parameterNumber("headDiameter"))
     };
     return {classification: UnsupportedHardware, lengthMm: null, diameterMm: null};
   }
@@ -427,11 +424,8 @@ class ToolingFabricationExport {
       sourceFingerprint: sourceFingerprint,
       inputFingerprint: ToolingCodec.inputFingerprint(p.document.input),
       jigs: materia.tooling.casting.ReplicationJig.ReplicationJigCodec.records(jigs),
-      validation: materia.tooling.casting.ReplicationJigs.analyze(
-        p.document.input,
-        jigs,
-        p.options.precision
-      ).concat(ReplicationContactCad.review(
+      validation: materia.tooling.casting.ReplicationJigs.analyze(p.document.input,
+      jigs, p.options.precision).concat(ReplicationContactCad.review(
         p.document.input,
         jigs
       ))
@@ -543,10 +537,7 @@ class ToolingFabricationExport {
         featureId: core.featureId,
         support: core.support,
         removal: removal,
-        withdrawal: MoldCores.withdrawal(
-          core,
-          panels
-        )
+        withdrawal: MoldCores.withdrawal(core, panels)
       });
       else records.push({coreId: core.id, featureId: core.featureId, support: core.support, removal: removal});
     }
@@ -680,16 +671,7 @@ class ToolingFabricationExport {
       function rectangle(x:Float, y:Float, w:Float, h:Float):Void {
         for (edge in PanelContours.rectangle(x, y, w, h)) entities.push(Curve(
           Outline,
-          Segment.line(
-            new Point2(
-              edge.start.x,
-              edge.start.y
-            ),
-            new Point2(
-              edge.end.x,
-              edge.end.y
-            )
-          )
+          Segment.line(new Point2(edge.start.x, edge.start.y), new Point2(edge.end.x, edge.end.y))
         ));
       }
       rectangle(0, 0, p.document.recipe.panel.width, p.document.recipe.panel.height);
@@ -736,10 +718,7 @@ class ToolingFabricationExport {
     for (core in p.cores) for (job in MoldCores.cuttingJobs(core)) data(
       dir,
       job.id + ".cutting.json",
-      MoldCores.cuttingJobRecord(
-        core,
-        job.cutting
-      )
+      MoldCores.cuttingJobRecord(core, job.cutting)
     );
     text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
     var volumeRows = [["member_id", "material", "piece", "width_mm", "depth_mm", "height_mm", "reusable"]];

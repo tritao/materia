@@ -56,10 +56,7 @@ class ScrewdrivingExecution {
     );
     state.setJoint(initialJoints[5], initial[5] + 0.001);
     var rotatedX = materia.assembly.AssemblyFrames.transformVector(
-      state.worldConnector(
-        "arm/tool/driver/carrier",
-        "tcp"
-      ),
+      state.worldConnector("arm/tool/driver/carrier", "tcp"),
       1,
       0,
       0

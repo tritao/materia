@@ -52,19 +52,13 @@ class BendRegistration {
       var scale = (reachX + reachY + 1) / Math.sqrt(norm);
       var crossing = Segment.line(
         new Point2(center.x - b * scale, center.y + a * scale),
-        new Point2(
-          center.x + b * scale,
-          center.y - a * scale
-        )
+        new Point2(center.x + b * scale, center.y - a * scale)
       );
       var intersections = OutlineGeometry.intersections(boundary, crossing);
       if (intersections.length == 0) throw new SheetDiagnosis(
         "press.gauge-edge-miss",
         "Selected boundary does not reach finger " + finger.id,
-        [
-          "wall:" + gauge.wall,
-          finger.id
-        ]
+        ["wall:" + gauge.wall, finger.id]
       );
       var points:Array<Vector> = [];
       for (point in intersections) {
@@ -76,10 +70,7 @@ class BendRegistration {
       if (points.length == 0) throw new SheetDiagnosis(
         "press.gauge-travel",
         "All boundary contacts at finger " + finger.id + " exceed nominal X/R travel",
-        [
-          "wall:" + gauge.wall,
-          finger.id
-        ]
+        ["wall:" + gauge.wall, finger.id]
       );
       points.sort(function(left:Vector, right:Vector):Int {
         return left.y < right.y ? -1 : left.y > right.y ? 1 : left.z < right.z ? -1 : left.z > right.z ? 1 : 0;

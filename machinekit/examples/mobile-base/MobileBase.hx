@@ -151,11 +151,7 @@ class LidarPuck extends MachineComponent {
     return Solids.union([
       Part.cylinderSpan(DIAMETER / 2, 0, 40),
       Part.cylinderSpan(DIAMETER / 2 - 5, 40, 60),
-      Part.cylinderSpan(
-        DIAMETER / 2,
-        60,
-        HEIGHT
-      )
+      Part.cylinderSpan(DIAMETER / 2, 60, HEIGHT)
     ]);
   }
 }
@@ -257,29 +253,13 @@ class MobileBase extends MachineAssembly {
 
   static final SIDES:Array<{name:String, sign:Int, joint:String}> = [
     {name: "Left", sign: 1, joint: "wheel_l"},
-    {
-      name: "Right",
-      sign: -1,
-      joint: "wheel_r"
-    }
+    {name: "Right", sign: -1, joint: "wheel_r"}
   ];
   static final CORNERS:Array<{name:String, x:Int, y:Int}> = [
     {name: "FrontLeft", x: 1, y: 1},
-    {
-      name: "FrontRight",
-      x: 1,
-      y: -1
-    },
-    {
-      name: "RearLeft",
-      x: -1,
-      y: 1
-    },
-    {
-      name: "RearRight",
-      x: -1,
-      y: -1
-    }
+    {name: "FrontRight", x: 1, y: -1},
+    {name: "RearLeft", x: -1, y: 1},
+    {name: "RearRight", x: -1, y: -1}
   ];
 
   /**
@@ -312,11 +292,7 @@ class MobileBase extends MachineAssembly {
     addComponent(
       "basePlate",
       new SeatedPlate(length, width, BASE_THICKNESS, "Base plate", baseSeats(), wheelSlots()),
-      AssemblyFrames.translation(
-        0,
-        0,
-        BASE_Z
-      )
+      AssemblyFrames.translation(0, 0, BASE_Z)
     );
 
     addComponent("battery", battery);
@@ -351,12 +327,7 @@ class MobileBase extends MachineAssembly {
         "bore",
         {x: 0, y: 1, z: 0},
         0,
-        {
-          lower: null,
-          upper: null,
-          velocity: null,
-          effort: null
-        }
+        {lower: null, upper: null, velocity: null, effort: null}
       );
       // The wheel's drive: the stepper through the gearhead, which is where those limits come from.
       var driver = 'driver${side.name}';
@@ -364,11 +335,7 @@ class MobileBase extends MachineAssembly {
       addMemberConnector(
         "basePlate",
         driver,
-        Solids.axial(
-          layout == null ? side.sign * 210 : 200,
-          layout == null ? 0 : side.sign * 80,
-          BASE_THICKNESS
-        )
+        Solids.axial(layout == null ? side.sign * 210 : 200, layout == null ? 0 : side.sign * 80, BASE_THICKNESS)
       );
       addMate('$driver-mount', "fixed", "basePlate", driver, driver, "mount");
       connectPorts(
@@ -444,11 +411,7 @@ class MobileBase extends MachineAssembly {
       seats.push({
         name: 'post${corner.name}',
         frame: SeatedPlate.onTop(x, y, BASE_THICKNESS),
-        holes: [{
-          x: x,
-          y: y,
-          diameter: 8.4
-        }]
+        holes: [{x: x, y: y, diameter: 8.4}]
       });
     }
     return seats;
@@ -471,10 +434,7 @@ class MobileBase extends MachineAssembly {
     // The arm's own cell lies along its -Y; a quarter turn about the seat's up axis brings that ahead.
     seats.push({
       name: "payload",
-      frame: AssemblyFrames.compose(
-        SeatedPlate.onTop(payloadX, 0, DECK_THICKNESS),
-        AssemblyFrames.turnY(ARM_TURN)
-      ),
+      frame: AssemblyFrames.compose(SeatedPlate.onTop(payloadX, 0, DECK_THICKNESS), AssemblyFrames.turnY(ARM_TURN)),
       holes: []
     });
     return seats;
@@ -496,17 +456,7 @@ class MobileBase extends MachineAssembly {
       x,
       y,
       z,
-      [
-        -sign,
-        0,
-        0,
-        0,
-        0,
-        sign,
-        0,
-        1,
-        0
-      ]
+      [-sign, 0, 0, 0, 0, sign, 0, 1, 0]
     );
 
   /** Distance between the wheels' mid-tread planes, measured from the solved assembly. */

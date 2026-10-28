@@ -123,25 +123,14 @@ class RobotArmAnalyticTests {
               [0.0, 1.0],
               [target, target],
               source.q,
-              new motionkit.kinematics.IkTolerance(
-                1e-6,
-                1e-6
-              ),
+              new motionkit.kinematics.IkTolerance(1e-6, 1e-6),
               [for (_ in 0...6) 1.0],
               [for (_ in 0...6) 1.0]
             );
             var problem = new motionkit.robot.CandidateProblem(
               arm,
               request,
-              new motionkit.robot.CandidateProblem.CandidateSamplingOptions(
-                1,
-                1,
-                1,
-                true,
-                null,
-                null,
-                pin
-              )
+              new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1, 1, 1, true, null, null, pin)
             );
             check(problem.family == "EAIK", "Authored industrial ladder must use the analytic backend");
             for (layer in problem.samples) {

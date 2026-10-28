@@ -116,14 +116,7 @@ class AggregateWallTests {
       var networkGaps = CastingWallReview.measure(
         "network",
         network,
-        [for (index in 0...voids.length) obstacle(
-          [
-            "left",
-            "bridge",
-            "right"
-          ][index],
-          voids[index]
-        )],
+        [for (index in 0...voids.length) obstacle(["left", "bridge", "right"][index], voids[index])],
         limits(),
         scope
       );
@@ -179,11 +172,7 @@ class AggregateWallTests {
           id: "insert-case",
           source: resin,
           body: insertBody,
-          obstacles: [obstacle(
-            "source-insert",
-            insert,
-            true
-          )],
+          obstacles: [obstacle("source-insert", insert, true)],
           expected: insertGaps
         }
       ]) {
@@ -209,17 +198,8 @@ class AggregateWallTests {
       var loftBody = scope.own(Part.box(80, 80, 30));
       var socketLocal =
         scope.own(machinekit.structural.InsertBodies.part(materia.casting.InsertSpec.InsertBody.CrimpedSocket(
-          materia.casting.CastingSolid.Cylinder(
-            8,
-            10
-          ),
-          {
-            length: 10,
-            width: 10,
-            thickness: 2,
-            wave: 1,
-            blend: 1
-          }
+          materia.casting.CastingSolid.Cylinder(8, 10),
+          {length: 10, width: 10, thickness: 2, wave: 1, blend: 1}
         )));
       var socket = scope.own(socketLocal.translated(new Vector(0,
         0, 5))), loftResin = scope.own(loftBody.subtract(socket));
@@ -255,15 +235,7 @@ class AggregateWallTests {
       var same = CastingWallReview.measure(
         "assembly",
         assemblyResin,
-        [
-          obstacle("plate", plate, true, "insert-A"),
-          obstacle(
-            "head",
-            head,
-            true,
-            "insert-A"
-          )
-        ],
+        [obstacle("plate", plate, true, "insert-A"), obstacle("head", head, true, "insert-A")],
         limits(),
         scope,
         assemblyBody
@@ -274,10 +246,7 @@ class AggregateWallTests {
         "assembly",
         "source",
         "process",
-        materia.casting.BoxAlgebra.subtract(
-          [bodyBox],
-          cuts
-        ),
+        materia.casting.BoxAlgebra.subtract([bodyBox], cuts),
         [],
         [],
         60,
@@ -301,15 +270,7 @@ class AggregateWallTests {
       var separate = CastingWallReview.measure(
         "assembly",
         assemblyResin,
-        [
-          obstacle("plate", plate, true, "insert-A"),
-          obstacle(
-            "head",
-            head,
-            true,
-            "insert-B"
-          )
-        ],
+        [obstacle("plate", plate, true, "insert-A"), obstacle("head", head, true, "insert-B")],
         limits(),
         scope,
         assemblyBody
@@ -326,20 +287,7 @@ class AggregateWallTests {
       var touchingGaps = CastingWallReview.measure(
         "assembly",
         touchingResin,
-        [
-          obstacle(
-            "plate",
-            plate,
-            true,
-            "insert-A"
-          ),
-          obstacle(
-            "head",
-            touchingHead,
-            true,
-            "insert-B"
-          )
-        ],
+        [obstacle("plate", plate, true, "insert-A"), obstacle("head", touchingHead, true, "insert-B")],
         limits(),
         scope,
         assemblyBody
@@ -353,39 +301,15 @@ class AggregateWallTests {
       );
       var neck:Array<materia.casting.Box3> = [
         {x: 0, y: 0, z: 0, width: 2, depth: 2, height: 10},
-        {
-          x: 2,
-          y: 0,
-          z: 0,
-          width: 2,
-          depth: 2,
-          height: 2
-        },
-        {
-          x: 4,
-          y: 0,
-          z: 0,
-          width: 4,
-          depth: 2,
-          height: 6
-        }
+        {x: 2, y: 0, z: 0, width: 2, depth: 2, height: 2},
+        {x: 4, y: 0, z: 0, width: 4, depth: 2, height: 6}
       ];
       var trapped = materia.tooling.process.FillAnalysis.analyze(
         "assembly",
         "source",
         "process",
         neck,
-        [{
-          id: "insert-A",
-          box: {
-            x: 4,
-            y: 0,
-            z: 6,
-            width: 4,
-            depth: 2,
-            height: 1
-          }
-        }],
+        [{id: "insert-A", box: {x: 4, y: 0, z: 6, width: 4, depth: 2, height: 1}}],
         [],
         10,
         2400,

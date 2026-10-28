@@ -110,10 +110,7 @@ class CollisionHullFacet implements ComponentFacet {
   public static function cylinder(radius:Float, lower:Float, upper:Float):Array<Float> {
     if (!Math.isFinite(radius) || radius <= 0) throw "Collision cylinder needs a positive radius";
     return prism(
-      [for (i in 0...32) new Vector(
-        radius * Math.cos(i * 2 * Math.PI / 32),
-        radius * Math.sin(i * 2 * Math.PI / 32)
-      )],
+      [for (i in 0...32) new Vector(radius * Math.cos(i * 2 * Math.PI / 32), radius * Math.sin(i * 2 * Math.PI / 32))],
       lower,
       upper
     );

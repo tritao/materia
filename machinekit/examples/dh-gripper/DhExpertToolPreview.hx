@@ -126,50 +126,12 @@ class DhExpertToolPreview {
       "A DH lead: 100 mm exit, R55 horizontal return",
       sweep(
         [
-          Curve.line(
-            a,
-            new Vector(
-              -148,
-              0,
-              37
-            )
-          ),
-          Curve.arc(
-            new Vector(
-              -148,
-              0,
-              37
-            ),
-            new Vector(
-              -203,
-              55,
-              37
-            ),
-            new Vector(
-              -148,
-              110,
-              37
-            )
-          ),
-          Curve.line(
-            new Vector(
-              -148,
-              110,
-              37
-            ),
-            new Vector(
-              -108,
-              110,
-              37
-            )
-          )
+          Curve.line(a, new Vector(-148, 0, 37)),
+          Curve.arc(new Vector(-148, 0, 37), new Vector(-203, 55, 37), new Vector(-148, 110, 37)),
+          Curve.line(new Vector(-148, 110, 37), new Vector(-108, 110, 37))
         ],
         a,
-        new Vector(
-          -1,
-          0,
-          0
-        ),
+        new Vector(-1, 0, 0),
         3.2
       ),
       dark
@@ -179,43 +141,9 @@ class DhExpertToolPreview {
       "B DH lead: 100 mm exit, R55 horizontal return",
       sweep(
         [
-          Curve.line(
-            b,
-            new Vector(
-              96,
-              148,
-              60
-            )
-          ),
-          Curve.arc(
-            new Vector(
-              96,
-              148,
-              60
-            ),
-            new Vector(
-              41,
-              203,
-              60
-            ),
-            new Vector(
-              -14,
-              148,
-              60
-            )
-          ),
-          Curve.line(
-            new Vector(
-              -14,
-              148,
-              60
-            ),
-            new Vector(
-              -14,
-              108,
-              60
-            )
-          )
+          Curve.line(b, new Vector(96, 148, 60)),
+          Curve.arc(new Vector(96, 148, 60), new Vector(41, 203, 60), new Vector(-14, 148, 60)),
+          Curve.line(new Vector(-14, 148, 60), new Vector(-14, 108, 60))
         ],
         b,
         Vector.Y(),
@@ -227,35 +155,13 @@ class DhExpertToolPreview {
     add(
       "a-service-coupler",
       "A supplier tail / Expert socket estimated mating envelope",
-      Part.cylinderAlong(
-        8,
-        new Vector(
-          -108,
-          110,
-          37
-        ),
-        Vector.X(),
-        24
-      ),
+      Part.cylinderAlong(8, new Vector(-108, 110, 37), Vector.X(), 24),
       grey
     );
     add(
       "b-service-coupler",
       "B supplier tail / Expert socket estimated mating envelope",
-      Part.cylinderAlong(
-        8,
-        new Vector(
-          -14,
-          108,
-          60
-        ),
-        new Vector(
-          0,
-          -1,
-          0
-        ),
-        24
-      ),
+      Part.cylinderAlong(8, new Vector(-14, 108, 60), new Vector(0, -1, 0), 24),
       grey
     );
     add(
@@ -267,58 +173,19 @@ class DhExpertToolPreview {
     add(
       "expert-branch-a",
       "Expert branch A: analytic circular layout",
-      arcLead(
-        "branch-a",
-        new Vector(-84, 110, 37),
-        Vector.X(),
-        new Vector(
-          -30,
-          87,
-          30
-        )
-      ),
+      arcLead("branch-a", new Vector(-84, 110, 37), Vector.X(), new Vector(-30, 87, 30)),
       dark
     );
     add(
       "expert-branch-b",
       "Expert branch B: analytic circular layout",
-      arcLead(
-        "branch-b",
-        new Vector(-14, 84, 60),
-        new Vector(
-          0,
-          -1,
-          0
-        ),
-        new Vector(
-          -25,
-          45,
-          40
-        )
-      ),
+      arcLead("branch-b", new Vector(-14, 84, 60), new Vector(0, -1, 0), new Vector(-25, 45, 40)),
       dark
     );
     add(
       "expert-power-lead",
       "Expert external power: tool-side segment to provisional wrist handoff",
-      arcLead(
-        "power",
-        new Vector(
-          -43,
-          65,
-          30
-        ),
-        new Vector(
-          -1,
-          0,
-          0
-        ),
-        new Vector(
-          -45,
-          -42,
-          20
-        )
-      ),
+      arcLead("power", new Vector(-43, 65, 30), new Vector(-1, 0, 0), new Vector(-45, -42, 20)),
       dark
     );
     var signalStart = new Vector(-7, 65, 30);
@@ -327,89 +194,20 @@ class DhExpertToolPreview {
       "Expert wrist signal: flexible R30/R37.5 outboard route",
       sweep(
         [
+          Curve.arc(signalStart, new Vector(30.5, 102.5, 30), new Vector(-7, 140, 30)),
+          Curve.line(new Vector(-7, 140, 30), new Vector(-90, 140, 30)),
           Curve.arc(
-            signalStart,
-            new Vector(
-              30.5,
-              102.5,
-              30
-            ),
-            new Vector(
-              -7,
-              140,
-              30
-            )
+            new Vector(-90, 140, 30),
+            new Vector(-111.2132034356, 131.2132034356, 30),
+            new Vector(-120, 110, 30)
           ),
-          Curve.line(
-            new Vector(
-              -7,
-              140,
-              30
-            ),
-            new Vector(
-              -90,
-              140,
-              30
-            )
-          ),
+          Curve.line(new Vector(-120, 110, 30), new Vector(-120, -35, 30)),
           Curve.arc(
-            new Vector(
-              -90,
-              140,
-              30
-            ),
-            new Vector(
-              -111.2132034356,
-              131.2132034356,
-              30
-            ),
-            new Vector(
-              -120,
-              110,
-              30
-            )
+            new Vector(-120, -35, 30),
+            new Vector(-111.2132034356, -56.2132034356, 30),
+            new Vector(-90, -65, 30)
           ),
-          Curve.line(
-            new Vector(
-              -120,
-              110,
-              30
-            ),
-            new Vector(
-              -120,
-              -35,
-              30
-            )
-          ),
-          Curve.arc(
-            new Vector(
-              -120,
-              -35,
-              30
-            ),
-            new Vector(
-              -111.2132034356,
-              -56.2132034356,
-              30
-            ),
-            new Vector(
-              -90,
-              -65,
-              30
-            )
-          ),
-          Curve.line(
-            new Vector(
-              -90,
-              -65,
-              30
-            ),
-            new Vector(
-              -80,
-              -65,
-              30
-            )
-          )
+          Curve.line(new Vector(-90, -65, 30), new Vector(-80, -65, 30))
         ],
         signalStart,
         Vector.X(),
@@ -422,26 +220,8 @@ class DhExpertToolPreview {
       "expert-wrist-elbow",
       "Expert right-angle wrist plug estimated envelope; mating unresolved",
       machinekit.component.Solids.union([
-        Part.cylinderAlong(
-          7,
-          new Vector(
-            -65,
-            -65,
-            -12
-          ),
-          Vector.Z(),
-          42
-        ),
-        Part.cylinderAlong(
-          6,
-          new Vector(
-            -80,
-            -65,
-            30
-          ),
-          Vector.X(),
-          15
-        )
+        Part.cylinderAlong(7, new Vector(-65, -65, -12), Vector.Z(), 42),
+        Part.cylinderAlong(6, new Vector(-80, -65, 30), Vector.X(), 15)
       ]),
       grey
     );
@@ -474,11 +254,7 @@ class DhExpertToolPreview {
     machinekit.robotics.DhDualGripperServices.addPurchases(purchases);
     sys.io.File.saveContent(
       directory + "/service-bom.json",
-      haxe.Json.stringify(
-        purchases.billOfMaterials().lines(),
-        null,
-        "  "
-      )
+      haxe.Json.stringify(purchases.billOfMaterials().lines(), null, "  ")
     );
     var bytes = SceneArtifact.encode({
       lengthUnit: "mm",
@@ -528,13 +304,9 @@ class DhExpertToolPreview {
           dhBendRadiusMm: 55,
           expertCableRadiusVerified: false,
           robotMatingFrameVerified: false,
-          externalPowerEndpoint: [
-            -45,
-            -42,
-            20
-          ],
-          purchasedAdapter: machinekit
-      .robotics.DhDualGripperServices.adapter().manufacturerPartNumber,
+          externalPowerEndpoint: [-45,
+      -42, 20],
+      purchasedAdapter: machinekit.robotics.DhDualGripperServices.adapter().manufacturerPartNumber,
       unexpectedInterferences: unexpected,
       attachmentPolicy: "Only the two branch end disks enter the estimated overmold, limited to 64 mm3 each; all other pairs must remain below 0.1 mm3 overlap",
       checks: checks,

@@ -19,17 +19,7 @@ class ExtrusionCollision {
           0,
           0,
           0,
-          [
-            1.0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            0,
-            -1,
-            0
-          ]
+          [1.0, 0, 0, 0, 0, 1, 0, -1, 0]
         ) : F.identity();
       var local = PosedParts.moved(part, F.inverse(frame));
       try {

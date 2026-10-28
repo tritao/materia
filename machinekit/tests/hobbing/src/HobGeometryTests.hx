@@ -99,16 +99,8 @@ class HobGeometryTests {
             for (sample in 0...8) {
               var p = expected[Std.int(sample * (expected.length - 1) / 8)];
               var line = cadkit.modeling.Curve.line(
-                new cadkit.modeling.Vector(
-                  p.x,
-                  p.y,
-                  p.z + hob.parameterNumber("height") / 2
-                ),
-                new cadkit.modeling.Vector(
-                  p.x,
-                  p.y,
-                  p.z + hob.parameterNumber("height") / 2 + 1
-                )
+                new cadkit.modeling.Vector(p.x, p.y, p.z + hob.parameterNumber("height") / 2),
+                new cadkit.modeling.Vector(p.x, p.y, p.z + hob.parameterNumber("height") / 2 + 1)
               );
               var vertex = line.shape.subshape(CadKit.ShapeKind.Vertex, 0);
               line.close();
@@ -155,11 +147,7 @@ class HobGeometryTests {
           shape = null;
           sys.io.File.saveBytes(
             out + "/hob.mtrg",
-            materia.project.SceneArtifact.encode({
-              lengthUnit: "mm",
-              metresPerUnit: 0.001,
-              parts: [rendered]
-            })
+            materia.project.SceneArtifact.encode({lengthUnit: "mm", metresPerUnit: 0.001, parts: [rendered]})
           );
         }
       }

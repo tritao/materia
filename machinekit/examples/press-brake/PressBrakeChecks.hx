@@ -26,10 +26,7 @@ class PressBrakeChecks {
         || presentation.procedures[0].steps.length != 3) throw "Press setup review lost its views or steps";
       materia.presentation.PresentationCodec.decode(
         definition,
-        materia.presentation.PresentationCodec.encode(
-          definition,
-          presentation
-        )
+        materia.presentation.PresentationCodec.encode(definition, presentation)
       );
       if (materia.assembly.AssemblyDefinitionCodec.encode(definition)
         != before) throw "Setup review changed the engineering press";
@@ -63,25 +60,14 @@ class PressBrakeChecks {
       "mount",
       {x: -1, y: 0, z: 0},
       0,
-      {
-        lower: -GaugeFinger.DROP_ANGLE,
-        upper: 0,
-        velocity: null,
-        effort: null,
-        overtravel: GaugeFinger.OVERTRAVEL
-      }
+      {lower: -GaugeFinger.DROP_ANGLE, upper: 0, velocity: null, effort: null, overtravel: GaugeFinger.OVERTRAVEL}
     );
     recipeFixture.setPassive("contact-hinge");
     recipeFixture.setJointStop("contact-hinge", GaugeFinger.stopResponse());
     recipeFixture.addSwitch(
       "contact-observed",
       "contact-hinge",
-      {
-        lower: -GaugeFinger.SWITCH_WINDOW,
-        upper: GaugeFinger.OVERTRAVEL,
-        velocity: null,
-        effort: null
-      },
+      {lower: -GaugeFinger.SWITCH_WINDOW, upper: GaugeFinger.OVERTRAVEL, velocity: null, effort: null},
       0
     );
     var rebuilt = MachineAssembly.decode(recipeFixture.encode());
@@ -90,12 +76,7 @@ class PressBrakeChecks {
     invalidObserved.addSwitch(
       "outside-observed",
       "contact-hinge",
-      {
-        lower: GaugeFinger.OVERTRAVEL * 2,
-        upper: GaugeFinger.OVERTRAVEL * 3,
-        velocity: null,
-        effort: null
-      },
+      {lower: GaugeFinger.OVERTRAVEL * 2, upper: GaugeFinger.OVERTRAVEL * 3, velocity: null, effort: null},
       0
     );
     var rejectedObservation = false;
@@ -116,23 +97,8 @@ class PressBrakeChecks {
       1600,
       [new ToolStation(
         "four-V",
-        new ToolRow(
-          [new ToolSegment(
-            Punch(ToolingCatalogue.gooseneck()),
-            200
-          )],
-          []
-        ),
-        new ToolRow(
-          [new ToolSegment(
-            FourV(
-              ToolingCatalogue.fourV(),
-              0
-            ),
-            200
-          )],
-          []
-        ),
+        new ToolRow([new ToolSegment(Punch(ToolingCatalogue.gooseneck()), 200)], []),
+        new ToolRow([new ToolSegment(FourV(ToolingCatalogue.fourV(), 0), 200)], []),
         700
       )]
     );

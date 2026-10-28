@@ -90,37 +90,9 @@ class PendantCompilerTests {
     var plain = new OperatorProfile(
       "plain",
       [new OperatorAxis("x", "X")],
-      [
-        "x",
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ],
-      [
-        new OperatorKey(
-          Unused,
-          ""
-        ),
-        new OperatorKey(
-          Unused,
-          ""
-        ),
-        new OperatorKey(
-          Unused,
-          ""
-        )
-      ],
-      [
-        Auto,
-        Jog
-      ],
+      ["x", null, null, null, null, null, null, null, null, null, null],
+      [new OperatorKey(Unused, ""), new OperatorKey(Unused, ""), new OperatorKey(Unused, "")],
+      [Auto, Jog],
       false,
       false,
       []
@@ -155,10 +127,7 @@ class PendantCompilerTests {
     // Shared vectors: the Rust tests decode these same bytes. Set PENDANT_VECTORS=write to refresh.
     var lines = [
       line("drill-tap", ReferenceOperatorProfiles.drillTap()),
-      line(
-        "hobber",
-        ReferenceOperatorProfiles.hobber()
-      )
+      line("hobber", ReferenceOperatorProfiles.hobber())
     ].join("\n") + "\n";
     var h = PendantCompiler.compile(ReferenceOperatorProfiles.hobber(), [1, 10, 100], 50, 250);
     var event = new PendantEvent();
@@ -171,22 +140,10 @@ class PendantCompilerTests {
     event.reason = 0;
     var frames = [
       "state-allowed " + hex(framed),
-      "event-move " + hex(new OperatorFrame(
-        OperatorFrame.EVENT,
-        event.encode()
-      ).encode()),
-      "profile-hobber " + hex(new OperatorFrame(
-        OperatorFrame.PROFILE,
-        h.profile
-      ).encode()),
-      "reason-hobber-0 " + hex(new OperatorFrame(
-        OperatorFrame.REASON_TEXT,
-        h.reasons[0]
-      ).encode()),
-      "config-hobber-axis-5 " + hex(new OperatorFrame(
-        OperatorFrame.CONFIG,
-        h.labels[4]
-      ).encode())
+      "event-move " + hex(new OperatorFrame(OperatorFrame.EVENT, event.encode()).encode()),
+      "profile-hobber " + hex(new OperatorFrame(OperatorFrame.PROFILE, h.profile).encode()),
+      "reason-hobber-0 " + hex(new OperatorFrame(OperatorFrame.REASON_TEXT, h.reasons[0]).encode()),
+      "config-hobber-axis-5 " + hex(new OperatorFrame(OperatorFrame.CONFIG, h.labels[4]).encode())
     ].join("\n") + "\n";
     check("profiles", lines);
     check("frames", frames);

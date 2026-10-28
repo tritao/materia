@@ -16,14 +16,7 @@ class FoundationStudyGeometry {
     w:Float, d:Float, h:Float, x:Float, y:Float, z:Float):FoundationStudyRegion return {
       id: id,
       kind: null,
-      box: {
-        x: x - w / 2,
-        y: y - d / 2,
-        z: z,
-        width: w,
-        depth: d,
-        height: h
-      }
+      box: {x: x - w / 2, y: y - d / 2, z: z, width: w, depth: d, height: h}
     };
 
   public static function bounds(row:FoundationStudyRegion):Array<Float> return BoxAlgebra.limits(row.box);

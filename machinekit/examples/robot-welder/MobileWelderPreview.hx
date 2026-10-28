@@ -43,16 +43,10 @@ class MobileWelderPreview {
       trackWidth: robot.trackWidth() / 1000,
       maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED,
       maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
-      maxLinearAcceleration: Math.min(
-        MobileBase.MAX_LINEAR_ACCELERATION,
-        acceleration
-      ),
+      maxLinearAcceleration: Math.min(MobileBase.MAX_LINEAR_ACCELERATION, acceleration),
       maxAngularAcceleration: Math.min(
         MobileBase.MAX_ANGULAR_ACCELERATION,
-        acceleration * 6 * robot.trackWidth() / 1000 / (Math.pow(
-          robot.length / 1000,
-          2
-        ) + Math.pow(
+        acceleration * 6 * robot.trackWidth() / 1000 / (Math.pow(robot.length / 1000, 2) + Math.pow(
           robot.width / 1000,
           2
         ))
@@ -97,11 +91,7 @@ class MobileWelderPreview {
       computerLoadWatts: MobileWeldingRobot.COMPUTER_LOAD_WATTS,
       chargerOccurrence: "charger",
       chargerPowerWatts: cell.charger.outputWatts,
-      dockPose: {
-        x: dock.x / 1000,
-        y: dock.y / 1000,
-        yaw: dockYaw
-      },
+      dockPose: {x: dock.x / 1000, y: dock.y / 1000, yaw: dockYaw},
       dockPositionToleranceMeters: cell.charger.dockPositionToleranceMm / 1000,
       dockHeadingToleranceRadians: cell.charger.dockHeadingToleranceRad
     };

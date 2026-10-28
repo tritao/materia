@@ -97,27 +97,11 @@ class Sfu20AxisPart extends MachineComponent {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.assembly.sfu20-axis-part",
       [
-        P.choice(
-          "kind",
-          kinds(),
-          "base"
-        ),
-        P.length(
-          "travel",
-          300
-        ),
-        P.length(
-          "screwLength",
-          600
-        ),
-        P.length(
-          "railLength",
-          450
-        ),
-        P.length(
-          "railSpacing",
-          180
-        )
+        P.choice("kind", kinds(), "base"),
+        P.length("travel", 300),
+        P.length("screwLength", 600),
+        P.length("railLength", 450),
+        P.length("railSpacing", 180)
       ],
       v -> new Sfu20AxisPart(
         v.token("kind"),

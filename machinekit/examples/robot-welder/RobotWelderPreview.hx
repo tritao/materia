@@ -43,10 +43,7 @@ class RobotWelderPreview {
 	 */
   public static function cell():Bytes return encode(
     new WeldingCell(),
-    (cell, scene) -> mission(
-      cell,
-      scene.metresPerUnit
-    ).require()
+    (cell, scene) -> mission(cell, scene.metresPerUnit).require()
   );
 
   /** The seam the single-seam cell welds by default: the plate's T-joint with the upright, on the upright's +Y side. */
@@ -55,39 +52,23 @@ class RobotWelderPreview {
   /** The cell with a mission of one weld, of the seam `WELD_SEAM`: for tests that look at one bead. */
   public static function seamCell():Bytes return encode(
     new WeldingCell(),
-    (cell, scene) -> [weldStep(
-      cell,
-      scene.metresPerUnit
-    )]
+    (cell, scene) -> [weldStep(cell, scene.metresPerUnit)]
   );
 
   /** Process-quality examples over the same CAD-derived plate seam. */
   public static function wovenCell():Bytes return encode(
     new WeldingCell(),
-    (cell, scene) -> [weldStep(
-      cell,
-      scene.metresPerUnit,
-      null,
-      7
-    )]
+    (cell, scene) -> [weldStep(cell, scene.metresPerUnit, null, 7)]
   );
   public static function multipassCell():Bytes return encode(
     new WeldingCell(),
-    (cell, scene) -> [weldStep(
-      cell,
-      scene.metresPerUnit,
-      null,
-      10
-    )]
+    (cell, scene) -> [weldStep(cell, scene.metresPerUnit, null, 10)]
   );
 
   /** The cell with a mission that welds the first post's perimeter only. */
   public static function postCell():Bytes return encode(
     new WeldingCell(),
-    (cell, scene) -> [postStep(
-      cell,
-      scene.metresPerUnit
-    )]
+    (cell, scene) -> [postStep(cell, scene.metresPerUnit)]
   );
 
   static function encode(
@@ -171,10 +152,7 @@ class RobotWelderPreview {
       wireOf(cell),
       [seam],
       weldment.reference,
-      WeldMetal.carrierOf(
-        cell,
-        weldment
-      ),
+      WeldMetal.carrierOf(cell, weldment),
       metresPerUnit
     );
   }
@@ -193,10 +171,7 @@ class RobotWelderPreview {
     return WeldingRecipe.fillet(seams[0].legSize, wireOf(cell)).step(
       seams,
       weldment.reference,
-      WeldMetal.carrierOf(
-        cell,
-        weldment
-      ),
+      WeldMetal.carrierOf(cell, weldment),
       metresPerUnit
     );
   }
@@ -629,11 +604,7 @@ class RobotWelderChecks {
           JOINTS,
           limits,
           target,
-          {
-            x: wire.x,
-            y: wire.y,
-            z: wire.z
-          },
+          {x: wire.x, y: wire.y, z: wire.z},
           seed,
           "arm/tool/torch",
           "tcp"
@@ -669,11 +640,7 @@ class RobotWelderChecks {
           JOINTS,
           limits,
           target,
-          {
-            x: wire.x,
-            y: wire.y,
-            z: wire.z
-          },
+          {x: wire.x, y: wire.y, z: wire.z},
           seed,
           "arm/tool/torch",
           "tcp"
@@ -804,11 +771,7 @@ class CellAccess implements WeldAccess {
         RobotWelderChecks.JOINTS,
         limits,
         target,
-        {
-          x: wire.x,
-          y: wire.y,
-          z: wire.z
-        },
+        {x: wire.x, y: wire.y, z: wire.z},
         seed,
         "arm/tool/torch",
         "tcp"

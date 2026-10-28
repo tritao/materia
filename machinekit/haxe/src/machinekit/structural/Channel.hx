@@ -38,18 +38,9 @@ class Channel implements StructuralProfile {
         new Vector(w, t),
         new Vector(t, t),
         new Vector(t, h - t),
-        new Vector(
-          w,
-          h - t
-        ),
-        new Vector(
-          w,
-          h
-        ),
-        new Vector(
-          0,
-          h
-        ),
+        new Vector(w, h - t),
+        new Vector(w, h),
+        new Vector(0, h),
       ],
       0,
       length

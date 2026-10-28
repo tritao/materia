@@ -219,10 +219,7 @@ class ToolingPackageManifest {
               text(
                 reference,
                 ["tooling.insert.anchorage." + insert.id + "." + anchor.id + ".locking"],
-                [
-                  "insert-anchorage",
-                  "fabrication-validation.json"
-                ],
+                ["insert-anchorage", "fabrication-validation.json"],
                 insert.id
               );
             case Shoulder:
@@ -242,20 +239,14 @@ class ToolingPackageManifest {
     if (f.spec.mixBearingStressMPa == null) add(
       "Cured mix bearing strength",
       ["tooling.insert.anchorage."],
-      [
-        "insert-anchorage",
-        "fabrication-validation.json"
-      ],
+      ["insert-anchorage", "fabrication-validation.json"],
       null,
       ".capacity.bearing"
     );
     if (f.spec.mixTensileStrengthMPa == null) add(
       "Cured mix tensile strength",
       ["tooling.insert.anchorage."],
-      [
-        "insert-anchorage",
-        "fabrication-validation.json"
-      ],
+      ["insert-anchorage", "fabrication-validation.json"],
       null,
       ".capacity.cone"
     );
@@ -282,49 +273,30 @@ class ToolingPackageManifest {
       if (process.maximumAirEscapeWidthMm == null) add(
         "Permitted air-escape width",
         ["process.fill.air-escape-width"],
-        [
-          "fill-",
-          "fabrication-validation.json"
-        ]
+        ["fill-", "fabrication-validation.json"]
       );
     }
     // Existing physical-evidence checks have named dependencies, not guessed
     // values or reflected nullable field names. Source changes stay separate.
     add(
       "Machine, measured tools, fixtures and work-coordinate qualification",
-      [
-        "fabrication.cam.",
-        "fabrication.fixture-machining."
-      ],
-      [
-        "cam-",
-        ".ngc",
-        "machining-instructions.md"
-      ]
+      ["fabrication.cam.", "fabrication.fixture-machining."],
+      ["cam-", ".ngc", "machining-instructions.md"]
     );
     add(
       "Board/grip, pocket-jig, machining and contact-face sealing trial",
       ["fabrication.former-machining."],
-      [
-        "former-",
-        "machining-instructions.md"
-      ]
+      ["former-", "machining-instructions.md"]
     );
     add(
       "Compaction method and measured peak pressure",
       ["fabrication.loads.compaction", "anchorage-compaction"],
-      [
-        "load-",
-        "fabrication-validation.json"
-      ]
+      ["load-", "fabrication-validation.json"]
     );
     add(
       "Insert anchorage pull-out/shear coupon",
       ["tooling.insert.anchorage."],
-      [
-        "insert-anchorage",
-        "fabrication-validation.json"
-      ],
+      ["insert-anchorage", "fabrication-validation.json"],
       null,
       ".capacity"
     );
@@ -338,56 +310,32 @@ class ToolingPackageManifest {
         "fabrication.support-loadpath.",
         "closure-loads"
       ],
-      [
-        "load-",
-        "hardware",
-        "fabrication-validation.json"
-      ]
+      ["load-", "hardware", "fabrication-validation.json"]
     );
     add(
       "Resin, EPS, adhesive and release-system compatibility evidence",
-      [
-        "fabrication.materials.compatibility",
-        "materials-process"
-      ],
-      [
-        "material",
-        "fabrication-validation.json"
-      ]
+      ["fabrication.materials.compatibility", "materials-process"],
+      ["material", "fabrication-validation.json"]
     );
     add(
       "Insert inspection results and drawing release",
-      [
-        "fabrication.insert.inspection.",
-        "fabrication.insert.final-inspection.",
-        "fabrication.insert.drawing."
-      ],
+      ["fabrication.insert.inspection.", "fabrication.insert.final-inspection.", "fabrication.insert.drawing."],
       insertFiles
     );
     add(
       "Datum accuracy, fixing, hole protection and post-cure removal evidence",
-      [
-        "tooling.fixture.attachment.",
-        "insert-fixtures"
-      ],
+      ["tooling.fixture.attachment.", "insert-fixtures"],
       insertFiles
     );
     for (unit in plan.coreUnits) add(
       "EPS breakup and extraction trial",
       ["process.castability.release." + unit.featureId],
-      [
-        "core-",
-        "castability-",
-        "fabrication-validation.json"
-      ]
+      ["core-", "castability-", "fabrication-validation.json"]
     );
     add(
       "Handling equipment, measured mass/CoM and flip procedure",
       ["tooling.handling.flip"],
-      [
-        "handling",
-        "fabrication-validation.json"
-      ]
+      ["handling", "fabrication-validation.json"]
     );
     add(
       "Native reconstruction and sequence review",
@@ -511,14 +459,7 @@ class ToolingPackageManifest {
     for (row in rows) {
       materia.casting.CastingFeatureCodec.fields(
         row,
-        [
-          "rule",
-          "affectedIds",
-          "status",
-          "severity",
-          "message",
-          "evidence"
-        ]
+        ["rule", "affectedIds", "status", "severity", "message", "evidence"]
       );
       var status:materia.tooling.ToolingDiagnostic.ToolingCheckStatus =
         switch materia.casting.CastingRecordCodec.string(
@@ -551,20 +492,11 @@ class ToolingPackageManifest {
       };
       var check:ToolingValidation = {
         rule: materia.casting.CastingRecordCodec.string(row, "rule"),
-        affectedIds: strings(Reflect.field(
-          row,
-          "affectedIds"
-        )),
+        affectedIds: strings(Reflect.field(row, "affectedIds")),
         status: status,
         severity: severity,
-        message: materia.casting.CastingRecordCodec.string(
-          row,
-          "message"
-        ),
-        evidence: strings(Reflect.field(
-          row,
-          "evidence"
-        ))
+        message: materia.casting.CastingRecordCodec.string(row, "message"),
+        evidence: strings(Reflect.field(row, "evidence"))
       };
       ToolingReadiness.validate(check);
       result.push(check);

@@ -86,10 +86,7 @@ class CastingTests {
     var parts:Array<MachineComponent> = [
       casting,
       new CastInsert(new ComponentValues().setToken("role", "generic-mount")),
-      new CastInsert(new ComponentValues().setToken(
-        "role",
-        "threaded-anchor"
-      ).setToken(
+      new CastInsert(new ComponentValues().setToken("role", "threaded-anchor").setToken(
         "body",
         materia.casting.InsertSpec
       .InsertBodyCodec.encode(materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Cylinder(
@@ -97,13 +94,8 @@ class CastingTests {
         40
       )))
     )),
-      new machinekit.milling.MillSupportTray(new ComponentValues().setNumber(
-        "width",
-        1200
-      ).setNumber(
-        "depth",
-        900
-      ).setNumber(
+      new machinekit.milling.MillSupportTray(new ComponentValues().setNumber("width",
+      1200).setNumber("depth", 900).setNumber(
         "millX",
         -80
       ).setNumber(
@@ -123,10 +115,7 @@ class CastingTests {
     }
     rejects(() -> new MineralCasting(new ComponentValues().setToken("material", "steel")), "casting material lock");
     rejects(
-      () -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber(
-        "positionTolerance",
-        0
-      )),
+      () -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setNumber("positionTolerance", 0)),
       "insert tolerance positive"
     );
     rejects(
@@ -147,29 +136,13 @@ class CastingTests {
     var placements:Array<CastInsertPlacement> = [{
       id: "seat",
       part: insert,
-      openings: [
-        CastingPatterns.face("body.z-max"),
-        CastingPatterns.face("body.x-max")
-      ],
-      pose: F.translation(
-        80,
-        0,
-        90
-      )
+      openings: [CastingPatterns.face("body.z-max"), CastingPatterns.face("body.x-max")],
+      pose: F.translation(80, 0, 90)
     }];
     var breakout = "";
     try new MineralFoundation(
       v,
-      [{
-        id: "seat",
-        part: insert,
-        openings: [CastingPatterns.face("body.z-max")],
-        pose: F.translation(
-          80,
-          0,
-          90
-        )
-      }]
+      [{id: "seat", part: insert, openings: [CastingPatterns.face("body.z-max")], pose: F.translation(80, 0, 90)}]
     ) catch (error:Dynamic) breakout = Std.string(error);
     check(
       breakout.indexOf("Undeclared casting breakout: insert-seat body.x-max") >= 0,
@@ -229,10 +202,7 @@ class CastingTests {
     );
     var bored = new CastInsert(CastInsert.boxValues(40, 40, 20).setToken("role", "generic-mount").setToken(
       "holes",
-      machinekit.structural.InsertHoles.through(
-        18,
-        20
-      )
+      machinekit.structural.InsertHoles.through(18, 20)
     ));
     var boredShape = bored.geometry();
     check(boredShape.valid() && boredShape.solidCount() == 1, "bored foot seat remains one solid");
@@ -241,10 +211,7 @@ class CastingTests {
     rejects(
       () -> new CastInsert(new ComponentValues().setToken("role", "generic-mount").setToken(
         "holes",
-        machinekit.structural.InsertHoles.through(
-          40,
-          20
-        )
+        machinekit.structural.InsertHoles.through(40, 20)
       )),
       "reject insert bore consuming seat"
     );
@@ -263,10 +230,7 @@ class InputProbe extends MachineComponent {
   public static function parameters():Array<ComponentParameter> return [
     P.length("length", 10),
     P.count("count", 2),
-    P.text(
-      "label",
-      "reference"
-    )
+    P.text("label", "reference")
   ];
 
   public static function recipeType():ComponentType {

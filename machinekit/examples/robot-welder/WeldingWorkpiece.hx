@@ -94,13 +94,7 @@ class WeldingWorkpiece extends MachineAssembly {
   /** The welded joints: both sides of the upright to the plate, and each post to the beam. */
   public function weldment():Weldment return new Weldment(
     "basePlate",
-    [
-      "basePlate",
-      "upright",
-      "beam",
-      "postLeft",
-      "postRight"
-    ]
+    ["basePlate", "upright", "beam", "postLeft", "postRight"]
   ).join(
     "basePlate",
     "upright",

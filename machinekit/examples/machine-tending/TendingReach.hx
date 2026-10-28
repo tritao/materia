@@ -466,10 +466,7 @@ class TendingReach {
         }
         var placement = AssemblyFrames.compose(
           grasp,
-          AssemblyFrames.inverse(state.worldConnector(
-            tool.contact.occurrence,
-            tool.contact.connector
-          ))
+          AssemblyFrames.inverse(state.worldConnector(tool.contact.occurrence, tool.contact.connector))
         );
         for (occurrence in flat.occurrences) if (tool.members.indexOf(occurrence.id) >= 0) {
           var part = [for (part in physical.parts) if (part.id == occurrence.definition) part][0];
@@ -492,10 +489,7 @@ class TendingReach {
             occurrence.id,
             {
               radius: previous == null ? projected : Math.max(previous.radius, projected),
-              minimumZ : previous == null ? minimumZ : Math.min(
-                previous.minimumZ,
-                minimumZ
-              )
+              minimumZ : previous == null ? minimumZ : Math.min(previous.minimumZ, minimumZ)
             }
           );
         }
@@ -513,10 +507,7 @@ class TendingReach {
     var neighbourY = Math.max(BenchMill.STOCK_DEPTH / 2, presenceHeadOffsetY() + DigitalSensor.BODY_DEPTH / 2);
     return {
       x: Math.max(BenchMill.STOCK_WIDTH + PartTray.PAD_EDGE_WIDTH, radius + neighbourX + allowance),
-      y: Math.max(
-        BenchMill.STOCK_DEPTH + PartTray.PAD_EDGE_DEPTH,
-        radius + neighbourY + allowance
-      )
+      y: Math.max(BenchMill.STOCK_DEPTH + PartTray.PAD_EDGE_DEPTH, radius + neighbourY + allowance)
     };
   }
 
@@ -1044,10 +1035,7 @@ class TendingReach {
         exchangePayloads.push({
           body: CellCollisionSnapshot.observation(
             "payload:" + occurrence,
-            Held(
-              "reach-arm",
-              converted.model.links[holder.link].id
-            ),
+            Held("reach-arm", converted.model.links[holder.link].id),
             vertices
           ),
           holder: occurrence,
@@ -1155,82 +1143,18 @@ class TendingReach {
       // The shared door and vise solutions follow the first real mission route
       // so IK chooses their branch from the infeed grasp, not from the vise.
       var baseTargets = firstTrayTargets.concat([
-        {
-          name: "outside staging",
-          point: [
-            portalX,
-            cell.opening.y - toolStandOff,
-            stagingZ
-          ]
-        },
-        {
-          name: "outside door",
-          point: [
-            portalX,
-            cell.opening.y - doorStandOff,
-            doorwayZ
-          ]
-        },
-        {
-          name: "doorway center",
-          point: [
-            portalX,
-            cell.opening.y,
-            doorwayZ
-          ]
-        },
-        {
-          name: "doorway-inner",
-          point: [
-            portalX,
-            cell.opening.y + doorStandOff / 4,
-            doorwayZ
-          ]
-        },
-        {
-          name: "inside doorway",
-          point: [
-            portalX,
-            cell.opening.y + doorStandOff / 2,
-            doorwayZ
-          ]
-        },
-        {
-          name: "inside door",
-          point: insideDoor
-        },
-        {
-          name: "vise-transfer",
-          point: viseTransfer
-        },
-        {
-          name: "vise-transfer-inner",
-          point: viseTransferInner
-        },
-        {
-          name: "vise-load-approach",
-          point: loadApproach
-        },
-        {
-          name: "vise-load",
-          point: [
-            loadWorld.x,
-            loadWorld.y,
-            loadWorld.z
-          ]
-        },
-        {
-          name: "vise-approach",
-          point: viseApproach
-        },
-        {
-          name: "vise",
-          point: [
-            graspWorld.x,
-            graspWorld.y,
-            graspWorld.z
-          ]
-        }
+        {name: "outside staging", point: [portalX, cell.opening.y - toolStandOff, stagingZ]},
+        {name: "outside door", point: [portalX, cell.opening.y - doorStandOff, doorwayZ]},
+        {name: "doorway center", point: [portalX, cell.opening.y, doorwayZ]},
+        {name: "doorway-inner", point: [portalX, cell.opening.y + doorStandOff / 4, doorwayZ]},
+        {name: "inside doorway", point: [portalX, cell.opening.y + doorStandOff / 2, doorwayZ]},
+        {name: "inside door", point: insideDoor},
+        {name: "vise-transfer", point: viseTransfer},
+        {name: "vise-transfer-inner", point: viseTransferInner},
+        {name: "vise-load-approach", point: loadApproach},
+        {name: "vise-load", point: [loadWorld.x, loadWorld.y, loadWorld.z]},
+        {name: "vise-approach", point: viseApproach},
+        {name: "vise", point: [graspWorld.x, graspWorld.y, graspWorld.z]}
       ]).concat(remainingTrayTargets);
       // Exact contact interfaces need IK accuracy below their numerical tolerance.
       var options = new IkOptions(1e-10, 1e-10, 250, 0.001).reaching();
@@ -1298,27 +1222,8 @@ class TendingReach {
           + 'X ${candidate.baseXOffset}, Y ${candidate.baseYOffset}, riser ${candidate.height} mm');
         var height = candidate.height, baseXOffset = candidate.baseXOffset, baseYOffset = candidate.baseYOffset;
         var armPlacement = AssemblyFrames.compose(
-          AssemblyFrames.translation(
-            source.reference.d[3] + baseXOffset,
-            classBaseY + baseYOffset,
-            height
-          ),
-          AssemblyFrames.fromRotationMatrix(
-            0,
-            0,
-            0,
-            [
-              0.0,
-              1,
-              0,
-              -1,
-              0,
-              0,
-              0,
-              0,
-              1
-            ]
-          )
+          AssemblyFrames.translation(source.reference.d[3] + baseXOffset, classBaseY + baseYOffset, height),
+          AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1])
         );
         var baseFlange = mountedBaseFlange(source, armPlacement);
         memory("candidate ready");
@@ -1412,12 +1317,7 @@ class TendingReach {
             var pose = graspFrame(point, graspWorld, yaw);
             var desiredTool = new Transform3(
               new Vec3(point[0] / 1000, point[1] / 1000, point[2] / 1000),
-              new Quat(
-                pose.qx,
-                pose.qy,
-                pose.qz,
-                pose.qw
-              )
+              new Quat(pose.qx, pose.qy, pose.qz, pose.qw)
             );
             var target = inverse.compose(desiredTool.compose(request.toolOffset.inverse()));
             var solution = arm.solve(target, seed, options);
@@ -1450,12 +1350,7 @@ class TendingReach {
             var pose = graspFrame(point, graspWorld, yaw);
             var desiredTool = new Transform3(
               new Vec3(point[0] / 1000, point[1] / 1000, point[2] / 1000),
-              new Quat(
-                pose.qx,
-                pose.qy,
-                pose.qz,
-                pose.qw
-              )
+              new Quat(pose.qx, pose.qy, pose.qz, pose.qw)
             );
             var target = inverse.compose(desiredTool.compose(request.toolOffset.inverse()));
             for (pan in [-Math.PI / 2, 0.0, Math.PI / 2, Math.PI]) {
@@ -1498,10 +1393,7 @@ class TendingReach {
             SEATED_STOCK,
             Loose,
             [for (value in stockHull) value * millPhysical.metresPerUnit],
-            inverse.compose(metricPose(
-              blank,
-              millPhysical.metresPerUnit
-            ))
+            inverse.compose(metricPose(blank, millPhysical.metresPerUnit))
           );
           var clampedBodies:Array<CellHullObservation> = [];
           var clampedParts = new Map<String, Bool>();
@@ -1522,10 +1414,7 @@ class TendingReach {
               "machine:vise-clamped/" + occurrence.id,
               Fixture,
               vertices,
-              inverse.compose(metricPose(
-                closed,
-                millPhysical.metresPerUnit
-              )),
+              inverse.compose(metricPose(closed, millPhysical.metresPerUnit)),
               false,
               "machine:" + occurrence.id
             ));
@@ -1601,13 +1490,7 @@ class TendingReach {
               && [for (part in clampedBodies) part.id].indexOf(body.id) < 0) body];
             exchangeSpaces.set(
               tool,
-              transitSpace(
-                arm,
-                exchangeBodies,
-                solved[graspIndex],
-                exchangePayloads,
-                seatMembers
-              )
+              transitSpace(arm, exchangeBodies, solved[graspIndex], exchangePayloads, seatMembers)
             );
             var holder = toolRecord(tools, tool).contact.occurrence;
             var activePayloads = [for (payload in exchangePayloads) if (payload.holder == holder) payload];
@@ -1632,20 +1515,8 @@ class TendingReach {
             viseSpaces.set(
               "vise-load@" + tool,
               new ReachPlannerStates([
-                transitSpace(
-                  arm,
-                  loadBodies,
-                  solved[graspIndex],
-                  activePayloads,
-                  seatMembers
-                ),
-                transitSpace(
-                  arm,
-                  loadedBodies,
-                  solved[graspIndex],
-                  inactivePayloads,
-                  seatMembers
-                )
+                transitSpace(arm, loadBodies, solved[graspIndex], activePayloads, seatMembers),
+                transitSpace(arm, loadedBodies, solved[graspIndex], inactivePayloads, seatMembers)
               ])
             );
             // Closed-door handling carries one part: the next blank or the finish.
@@ -1664,13 +1535,7 @@ class TendingReach {
             for (body in sweptDoorBodies) closedBodies.push(body);
             closedTransitSpaces.set(
               tool,
-              transitSpace(
-                arm,
-                closedBodies,
-                solved[graspIndex],
-                closedPayloads,
-                seatMembers
-              )
+              transitSpace(arm, closedBodies, solved[graspIndex], closedPayloads, seatMembers)
             );
             for (needed in transferRequests) if (needed.role == Startup && needed.tool == tool) {
               var emptyBodies = [for (body in closedBodies) if (!(switch body.owner {
@@ -1935,12 +1800,7 @@ class TendingReach {
               var pose = graspFrame(point, graspWorld, yaw);
               var desiredTool = new Transform3(
                 new Vec3(point[0] / 1000, point[1] / 1000, point[2] / 1000),
-                new Quat(
-                  pose.qx,
-                  pose.qy,
-                  pose.qz,
-                  pose.qw
-                )
+                new Quat(pose.qx, pose.qy, pose.qz, pose.qw)
               );
               var target = inverse.compose(desiredTool.compose(request.toolOffset.inverse()));
               for (routeSeed in routeSeeds) {
@@ -1971,17 +1831,8 @@ class TendingReach {
                     if (prepareStaging) {
                       var staging = requests[stagingIndex], stagingPose = graspFrame(staging.point, graspWorld, yaw);
                       var stagingTool = new Transform3(
-                        new Vec3(
-                          stagingPose.x / 1000,
-                          stagingPose.y / 1000,
-                          stagingPose.z / 1000
-                        ),
-                        new Quat(
-                          stagingPose.qx,
-                          stagingPose.qy,
-                          stagingPose.qz,
-                          stagingPose.qw
-                        )
+                        new Vec3(stagingPose.x / 1000, stagingPose.y / 1000, stagingPose.z / 1000),
+                        new Quat(stagingPose.qx, stagingPose.qy, stagingPose.qz, stagingPose.qw)
                       );
                       var staged = arm.solve(
                         inverse.compose(stagingTool.compose(staging.toolOffset.inverse())),
@@ -2019,12 +1870,7 @@ class TendingReach {
                     var seated = graspFrame(destination.point, graspWorld, yaw);
                     var desired = new Transform3(
                       new Vec3(seated.x / 1000, seated.y / 1000, seated.z / 1000),
-                      new Quat(
-                        seated.qx,
-                        seated.qy,
-                        seated.qz,
-                        seated.qw
-                      )
+                      new Quat(seated.qx, seated.qy, seated.qz, seated.qw)
                     );
                     var insertion = arm.solve(
                       inverse.compose(desired.compose(destination.toolOffset.inverse())),
@@ -2072,10 +1918,7 @@ class TendingReach {
                     var lowerSeconds = 2 * timing.lowerBound(candidateFrom, attempt.q);
                     if (candidateStaging != null) lowerSeconds = Math.min(
                       lowerSeconds,
-                      2 * timing.lowerBound(
-                        turnReference,
-                        attempt.q
-                      )
+                      2 * timing.lowerBound(turnReference, attempt.q)
                     );
                     // Holding-posture search can move the start endpoint, so its
                     // original endpoint minimum cannot prune that search.
@@ -2243,13 +2086,7 @@ class TendingReach {
                     if (!exchangesValid || (selected != null && candidateSeconds >= selected.seconds)) continue;
                   }
                   selected = {
-                    approach: {
-                      name: request.name,
-                      tool: request.tool,
-                      position: attempt.q,
-                      target: pose,
-                      toolYaw: yaw
-                    },
+                    approach: {name: request.name, tool: request.tool, position: attempt.q, target: pose, toolYaw: yaw},
                     contact: candidateContact,
                     staging: candidateStaging,
                     clearance: candidateClearance,
@@ -2301,10 +2138,7 @@ class TendingReach {
                   for (needed in transferRequests) if (needed.role == TrayApproach
                     && needed.tool == request.tool && needed.toPose == request.name) certifiedEntries.set(
                       certificateKey(needed),
-                      {
-                        request: needed,
-                        positions: descent
-                      }
+                      {request: needed, positions: descent}
                     );
                 }
               }
@@ -2588,10 +2422,7 @@ class TendingReach {
       "machine:" + body.id,
       body.loose ? Loose : Fixture,
       localVertices(body),
-      inverse.compose(metricPose(
-        body.frame,
-        body.scale
-      ))
+      inverse.compose(metricPose(body.frame, body.scale))
     )];
 
   static function environmentPart(
@@ -2603,10 +2434,7 @@ class TendingReach {
   ):ReachEnvironmentHull return {
     id: id,
     vertices: vertices,
-    frame: AssemblyFrames.compose(
-      frame,
-      AssemblyFrames.identity()
-    ),
+    frame: AssemblyFrames.compose(frame, AssemblyFrames.identity()),
     scale: scale,
     loose: loose
   };
@@ -2618,10 +2446,7 @@ class TendingReach {
   static function posedVertices(part:ReachEnvironmentHull):Array<Float
     > return robotkit.collision.CollisionClearance.placed(
       localVertices(part),
-      metricPose(
-        part.frame,
-        part.scale
-      )
+      metricPose(part.frame, part.scale)
     );
 
   /** Independent CAD observations enter through part(), retaining typed ownership. */
@@ -2650,17 +2475,8 @@ class TendingReach {
   }
 
   static function metricPose(frame:AssemblyFrame, scale:Float):Transform3 return new Transform3(
-    new Vec3(
-      frame.x * scale,
-      frame.y * scale,
-      frame.z * scale
-    ),
-    new Quat(
-      frame.qx,
-      frame.qy,
-      frame.qz,
-      frame.qw
-    )
+    new Vec3(frame.x * scale, frame.y * scale, frame.z * scale),
+    new Quat(frame.qx, frame.qy, frame.qz, frame.qw)
   );
 
   static function mechanismObservations(
@@ -2760,10 +2576,7 @@ class TendingReach {
       };
       var shift = AssemblyFrames.compose(
         carrier.offset,
-        AssemblyFrames.compose(
-          metric,
-          AssemblyFrames.inverse(carrier.offset)
-        )
+        AssemblyFrames.compose(metric, AssemblyFrames.inverse(carrier.offset))
       );
       var vertices = switch hull.shape.geometry {
         case Convex(points):
@@ -2805,12 +2618,7 @@ class TendingReach {
     var build = scene.build(new NativeCollisionWorld());
     memory("after collision build");
     return new ReachCachedSpace(new ManipulatorPlannerSpace(
-      new CollisionPlannerSpace(
-        scene.description,
-        build,
-        scene.bodies,
-        scene.margins()
-      ),
+      new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins()),
       arm,
       reference,
       scene.bodies.reference.q
@@ -2860,11 +2668,7 @@ class TendingReach {
     var solver = new ManipulatorKinematics(arm, 1e-8), tolerance = HandlingPlanRunner.gripperTolerance();
     var line = new PoseLine(
       new PoseWaypoint(solver.forward(from), tolerance.position, tolerance.orientation),
-      new PoseWaypoint(
-        solver.forward(to),
-        tolerance.position,
-        tolerance.orientation
-      ),
+      new PoseWaypoint(solver.forward(to), tolerance.position, tolerance.orientation),
       OrientationPolicy.Fixed,
       0.1,
       0.08
@@ -2910,17 +2714,8 @@ class TendingReach {
     return AssemblyFrames.compose(placement, localBase);
   }
   static function transform(frame:AssemblyFrame):Transform3 return new Transform3(
-    new Vec3(
-      frame.x / 1000,
-      frame.y / 1000,
-      frame.z / 1000
-    ),
-    new Quat(
-      frame.qx,
-      frame.qy,
-      frame.qz,
-      frame.qw
-    )
+    new Vec3(frame.x / 1000, frame.y / 1000, frame.z / 1000),
+    new Quat(frame.qx, frame.qy, frame.qz, frame.qw)
   );
 }
 

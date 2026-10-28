@@ -168,11 +168,7 @@ class TSlotTable extends MachineAssembly {
           py + alongY * s / 2,
           level.z - s / 2,
           [-alongY, alongX, 0.0],
-          [
-            0.0,
-            0.0,
-            1.0
-          ]
+          [0.0, 0.0, 1.0]
         );
         angle('${level.id}-bracket-$ix-$iy-$axis', pose);
 
@@ -293,21 +289,14 @@ class TSlotTable extends MachineAssembly {
       LevelingFoot.of(Foot(
         profile.size,
         8,
-        machinekit.standard.FastenerThreads.metric(
-          hardware.footSpec().diameter,
-          hardware.footSpec().pitch
-        ),
+        machinekit.standard.FastenerThreads.metric(hardware.footSpec().diameter, hardware.footSpec().pitch),
         7,
         footHeight + hardware.footEngagement,
         footHeight,
         ThreadRoot,
         NoCollar
       )),
-      AssemblyFrames.translation(
-        x,
-        y,
-        0
-      )
+      AssemblyFrames.translation(x, y, 0)
     );
     box('foot-$ix-$iy', profile.size, profile.size, footHeight + hardware.footEngagement, x, y, 0);
     addPart('foot-locknut-$ix-$iy', locknut, AssemblyFrames.translation(x, y, footHeight - locknut.height));
@@ -345,16 +334,8 @@ class TSlotTable extends MachineAssembly {
           (ix < 0 ? left : right) + dx * s / 2,
           row.y + dy * s / 2,
           railZ,
-          [
-            0.0,
-            0.0,
-            -1.0 * ix * dy
-          ],
-          [
-            0.0,
-            -1.0 * dy,
-            0.0
-          ]
+          [0.0, 0.0, -1.0 * ix * dy],
+          [0.0, -1.0 * dy, 0.0]
         );
         angle('base-joint-${row.id}-$ix', pose);
       }
@@ -368,16 +349,8 @@ class TSlotTable extends MachineAssembly {
           ix * postX + dx * s / 2,
           iy < 0 ? front : back,
           postBottom,
-          [
-            0.0,
-            -1.0 * dx,
-            0.0
-          ],
-          [
-            0.0,
-            0.0,
-            -1.0
-          ]
+          [0.0, -1.0 * dx, 0.0],
+          [0.0, 0.0, -1.0]
         )
       );
     }
@@ -398,27 +371,9 @@ class TSlotTable extends MachineAssembly {
       });
       for (side in [-1, 1]) fasten(
         '$id-mount-$side',
-        AxisBuilder.orient(
-          x,
-          y + side * s / 2,
-          footHeight + recess,
-          [
-            0.0,
-            -1.0,
-            0.0
-          ],
-          [
-            0.0,
-            0.0,
-            -1.0
-          ]
-        ),
+        AxisBuilder.orient(x, y + side * s / 2, footHeight + recess, [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]),
         screw,
-        [
-          0.0,
-          1.0,
-          0.0
-        ]
+        [0.0, 1.0, 0.0]
       );
       addFoot(ix, iy, x, y, locknut);
     }
@@ -435,20 +390,7 @@ class TSlotTable extends MachineAssembly {
     );
     fasten(
       id + "-rail",
-      AssemblyFrames.compose(
-        pose,
-        AxisBuilder.orient(
-          s / 2,
-          0,
-          -t,
-          [0.0, -1.0, 0.0],
-          [
-            0.0,
-            0.0,
-            -1.0
-          ]
-        )
-      )
+      AssemblyFrames.compose(pose, AxisBuilder.orient(s / 2, 0, -t, [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]))
     );
   }
 
@@ -493,16 +435,8 @@ class TSlotTable extends MachineAssembly {
         0,
         0,
         -screw.length + profile.modeledSlotDepth() - TSlotTableHardware.TIP_CLEARANCE - hardware.nutDepth(profile),
-        [
-          0.0,
-          1.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          -1.0
-        ]
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, -1.0]
       )
     );
     if (nutAlong != null) {
@@ -521,14 +455,7 @@ class TSlotTable extends MachineAssembly {
   function localBox(id:String,
     w:Float, d:Float, h:Float, pose:AssemblyFrame, x:Float, y:Float, z:Float):Void boxes.push({
       id: id,
-      frame: AssemblyFrames.compose(
-        pose,
-        AssemblyFrames.translation(
-          x,
-          y,
-          z
-        )
-      ),
+      frame: AssemblyFrames.compose(pose, AssemblyFrames.translation(x, y, z)),
       width: w,
       depth: d,
       height: h
@@ -574,21 +501,7 @@ class TSlotTable extends MachineAssembly {
     addPart(
       id,
       new TableExtrusion(profile, length, foot ? hardware : null),
-      AxisBuilder.orient(
-        x0,
-        y0,
-        z0,
-        z0 == z1 ? [
-          0.0,
-          0.0,
-          1.0
-        ] : [
-          0.0,
-          1.0,
-          0.0
-        ],
-        along
-      )
+      AxisBuilder.orient(x0, y0, z0, z0 == z1 ? [0.0, 0.0, 1.0] : [0.0, 1.0, 0.0], along)
     );
     var s = profile.size;
     box(
@@ -598,19 +511,12 @@ class TSlotTable extends MachineAssembly {
       Math.abs(z1 - z0) + (z0 == z1 ? s : 0),
       (x0 + x1) / 2,
       (y0 + y1) / 2,
-      Math.min(
-        z0,
-        z1
-      ) - (z0 == z1 ? s / 2 : 0)
+      Math.min(z0, z1) - (z0 == z1 ? s / 2 : 0)
     );
   }
   function box(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float):Void boxes.push({
     id: id,
-    frame: AssemblyFrames.translation(
-      x,
-      y,
-      z
-    ),
+    frame: AssemblyFrames.translation(x, y, z),
     width: w,
     depth: d,
     height: h

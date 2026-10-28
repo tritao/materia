@@ -82,10 +82,7 @@ class LevelingFootTests {
         zRailStart: 40,
         zRailLength: 400
       },
-      {
-        footPockets: true,
-        columnFootWidth: 440
-      }
+      {footPockets: true, columnFootWidth: 440}
     );
     var frame = BenchMillFrame.create(layout);
     frame.validate();
@@ -103,20 +100,8 @@ class LevelingFootTests {
       local.close();
       var old = Solids.union([
         Part.cylinderSpan(35, -50, -30, pose.x, pose.y),
-        Part.cylinderSpan(
-          8,
-          -30,
-          65,
-          pose.x,
-          pose.y
-        ),
-        Part.cylinderSpan(
-          14,
-          40,
-          50,
-          pose.x,
-          pose.y
-        )
+        Part.cylinderSpan(8, -30, 65, pose.x, pose.y),
+        Part.cylinderSpan(14, 40, 50, pose.x, pose.y)
       ]);
       try {
         var a = actual.subtract(old), b = old.subtract(actual);
@@ -138,60 +123,17 @@ class LevelingFootTests {
     equivalent(
       "mill foot in floor frame",
       Foot(70, 20, m16, 20, 115, 90, Nominal, RoundCollar(28, 10, 90)),
-      Solids.union([
-        Part.cylinderSpan(
-          35,
-          0,
-          20
-        ),
-        Part.cylinderSpan(
-          8,
-          20,
-          115
-        ),
-        Part.cylinderSpan(
-          14,
-          90,
-          100
-        )
-      ])
+      Solids.union([Part.cylinderSpan(35, 0, 20), Part.cylinderSpan(8, 20, 115), Part.cylinderSpan(14, 90, 100)])
     );
     equivalent(
       "hobber foot",
       Foot(100, 15, m24, 15, 232, 207, Nominal, NoCollar),
-      Solids.union([
-        Part.cylinderSpan(
-          50,
-          0,
-          15
-        ),
-        Part.cylinderSpan(
-          12,
-          15,
-          232
-        ),
-        Part.cylinderSpan(
-          12,
-          39,
-          47
-        )
-      ])
+      Solids.union([Part.cylinderSpan(50, 0, 15), Part.cylinderSpan(12, 15, 232), Part.cylinderSpan(12, 39, 47)])
     );
     equivalent(
       "router foot",
       Foot(100, 20, FastenerThreads.metric(20, 2.5), 20, 120, 100, Nominal, NoCollar),
-      Solids.union([
-        Part.cylinderSpan(
-          50,
-          0,
-          20
-        ),
-        Part.cylinderSpan(
-          10,
-          20,
-          120
-        )
-      ])
+      Solids.union([Part.cylinderSpan(50, 0, 20), Part.cylinderSpan(10, 20, 120)])
     );
     for (s in [
       machinekit.structural.TSlotExtrusion.forProfile("HFS5-2020"),
@@ -201,76 +143,34 @@ class LevelingFootTests {
       var t = FastenerThreads.metric(thread.diameter, thread.pitch);
       equivalent(
         "table foot " + s.designation,
-        Foot(
-          s.size,
-          8,
-          t,
-          7,
-          40 + hardware.footEngagement,
-          40,
-          ThreadRoot,
-          NoCollar
-        ),
+        Foot(s.size, 8, t, 7, 40 + hardware.footEngagement, 40, ThreadRoot, NoCollar),
         Solids.union([
-          Part.cylinderSpan(
-            s.size / 2,
-            0,
-            8
-          ),
-          Part.cylinderSpan(
-            t.externalMinorDiameter() / 2,
-            7,
-            40 + hardware.footEngagement
-          )
+          Part.cylinderSpan(s.size / 2, 0, 8),
+          Part.cylinderSpan(t.externalMinorDiameter() / 2, 7, 40 + hardware.footEngagement)
         ])
       );
     }
     equivalent(
       "removable plate",
       Plate(110, 110, 15, 26),
-      Solids.cut(
-        Part.box(110, 110, 15),
-        [Part.cylinderSpan(
-          13,
-          -1,
-          16
-        )]
-      )
+      Solids.cut(Part.box(110, 110, 15), [Part.cylinderSpan(13, -1, 16)])
     );
     equivalent(
       "support nut",
       Nut(Hexagon(36), 19, m24),
-      Solids.cut(
-        Part.prism(Polygon.regular(6, 36), 0, 19),
-        [Part.cylinderSpan(
-          12,
-          -1,
-          20
-        )]
-      )
+      Solids.cut(Part.prism(Polygon.regular(6, 36), 0, 19), [Part.cylinderSpan(12, -1, 20)])
     );
     equivalent(
       "round nut",
       Nut(Round(28), 10, m16),
-      Solids.cut(
-        Part.cylinderSpan(14, 0, 10),
-        [Part.cylinderSpan(
-          8,
-          -1,
-          11
-        )]
-      )
+      Solids.cut(Part.cylinderSpan(14, 0, 10), [Part.cylinderSpan(8, -1, 11)])
     );
     equivalent("separate pad", Pad(70, 20), Part.cylinderSpan(35, 0, 20));
     equivalent("separate nominal screw", Screw(m16, 95, Nominal), Part.cylinderSpan(8, 0, 95));
     equivalent(
       "separate root screw",
       Screw(m16, 95, ThreadRoot),
-      Part.cylinderSpan(
-        m16.externalMinorDiameter() / 2,
-        0,
-        95
-      )
+      Part.cylinderSpan(m16.externalMinorDiameter() / 2, 0, 95)
     );
     rejects(() -> LevelingFootCodec.decode('{"version":0,"part":{}}'), "schema version");
     rejects(

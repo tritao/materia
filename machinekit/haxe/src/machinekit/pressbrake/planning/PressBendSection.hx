@@ -49,20 +49,14 @@ class PressBendSection {
       if (zone.curvedInnerRadius() > 0) edges.push(Segment.arc(
         center,
         zone.curvedInnerRadius(),
-        Math.atan2(
-          a.y - center.y,
-          a.x - center.x
-        ),
+        Math.atan2(a.y - center.y, a.x - center.x),
         sweep
       ));
       edges.push(Segment.line(b, c));
       edges.push(Segment.arc(
         center,
         zone.curvedInnerRadius() + zone.thickness,
-        Math.atan2(
-          c.y - center.y,
-          c.x - center.x
-        ),
+        Math.atan2(c.y - center.y, c.x - center.x),
         -sweep
       ));
       edges.push(Segment.line(d, a));

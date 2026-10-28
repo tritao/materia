@@ -29,15 +29,9 @@ class InsertStageTests {
     var insert = new CastInsert(CastInsert.precastHoles(
       CastInsert.manufacturedValues(materia.casting.InsertMaterial.C45Bright).setToken(
         "body",
-        InsertBodyCodec.encode(Primitive(Cylinder(
-          12,
-          12
-        )))
+        InsertBodyCodec.encode(Primitive(Cylinder(12, 12)))
       ),
-      InsertHoles.tappedBlind(
-        InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating()),
-        12
-      )
+      InsertHoles.tappedBlind(InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating()), 12)
     ).setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.HatchMount
@@ -77,15 +71,7 @@ class InsertStageTests {
       values(),
       [],
       null,
-      [{
-        id: "hatch",
-        part: insert,
-        pose: F.translation(
-          0,
-          0,
-          40
-        )
-      }]
+      [{id: "hatch", part: insert, pose: F.translation(0, 0, 40)}]
     );
     check(foundation.castingMemberIds().length == 1, "bonded steel is not a pour member");
     var raw = foundation.body.asCastGeometry(), service = foundation.body.geometry();
@@ -136,15 +122,7 @@ class InsertStageTests {
         values(),
         [],
         null,
-        [{
-          id: "hatch",
-          part: insert,
-          pose: F.translation(
-            15,
-            0,
-            40
-          )
-        }]
+        [{id: "hatch", part: insert, pose: F.translation(15, 0, 40)}]
       ),
       "breaks into a cavity or outside the casting"
     );
@@ -154,15 +132,7 @@ class InsertStageTests {
         values(),
         [],
         null,
-        [{
-          id: "hatch",
-          part: insert,
-          pose: F.translation(
-            13,
-            0,
-            40
-          )
-        }]
+        [{id: "hatch", part: insert, pose: F.translation(13, 0, 40)}]
       ),
       "declared radial wall"
     );
@@ -186,10 +156,7 @@ class InsertStageTests {
     var manufacturing = InsertManufacturingCodec.draft(material);
     manufacturing.holeRoutes = [
       {holeId: "pre", route: InsertHoleRoute.BeforeCasting},
-      {
-        holeId: "post",
-        route: InsertHoleRoute.TransferAfterCasting
-      }
+      {holeId: "post", route: InsertHoleRoute.TransferAfterCasting}
     ];
     var values = CastInsert.boxValues(50,
       40, 20).setToken("role", materia.casting.InsertSpec.InsertRole.GenericMount).setToken(
@@ -256,11 +223,7 @@ class InsertStageTests {
       "interfaces",
       haxe.Json.stringify(materia.casting.InterfaceRequirement.InterfaceRequirements.records([{
         id: "finished-top",
-        geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(
-          0,
-          0,
-          20
-        )),
+        geometry: materia.casting.InterfaceRequirement.PrecisionGeometry.Plane(F.translation(0, 0, 20)),
         route: materia.casting.InterfaceRequirement.InterfaceRoute.Ground,
         allowanceMm: 1,
         finishingProcessErrorMm: materia.casting.CastingInput.Unresolved("Finishing process error allocation"),
@@ -380,21 +343,11 @@ class InsertStageTests {
     }
     for (part in owned) part.close();
     var foundation = new machinekit.structural.MineralFoundation(
-      new ComponentValues().setNumber("width", 100).setNumber(
-        "depth",
-        80
-      ).setNumber(
-        "height",
-        100
-      ),
+      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 100),
       [{
         id: "seat",
         part: raw,
-        pose: F.translation(
-          0,
-          0,
-          80
-        ),
+        pose: F.translation(0, 0, 80),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       }]
     );

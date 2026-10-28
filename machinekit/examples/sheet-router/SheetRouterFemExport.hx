@@ -37,25 +37,12 @@ class SheetRouterFemExport {
         beams.push({
           id: member.id,
           startMm: vector(F.transformPoint(pose, 0, 0, 0)),
-          endMm: vector(F.transformPoint(
-            pose,
-            0,
-            0,
-            tube.length
-          )),
-          sectionX: vector(F.transformVector(
-            pose,
-            1,
-            0,
-            0
-          )),
+          endMm: vector(F.transformPoint(pose, 0, 0, tube.length)),
+          sectionX: vector(F.transformVector(pose, 1, 0, 0)),
           widthMm: tube.profile.width,
           heightMm: tube.profile.height,
           wallMm: tube.profile.wall,
-          youngsMPa: modulus(
-            material.physical.youngsModulusPa,
-            member.component.materialSpec()
-          ),
+          youngsMPa: modulus(material.physical.youngsModulusPa, member.component.materialSpec()),
           densityKgPerMm3: material.physical.density / 1e9
         });
       }
@@ -66,32 +53,20 @@ class SheetRouterFemExport {
           widthMm: plate.width,
           depthMm: plate.depth,
           thicknessMm: plate.height,
-          ribDepthMm: Std.isOfType(
-            plate,
-            machinekit.gantry.GantryParts.GantryStiffenedPlate
-          ) ? cast(
+          ribDepthMm: Std.isOfType(plate, machinekit.gantry.GantryParts.GantryStiffenedPlate) ? cast(
             plate,
             machinekit.gantry.GantryParts.GantryStiffenedPlate
           ).ribDepth : 0,
-          ribWidthMm : Std.isOfType(
-            plate,
-            machinekit.gantry.GantryParts.GantryStiffenedPlate
-          ) ? cast(
+          ribWidthMm : Std.isOfType(plate, machinekit.gantry.GantryParts.GantryStiffenedPlate) ? cast(
             plate,
             machinekit.gantry.GantryParts.GantryStiffenedPlate
           ).ribWidth : 0,
-          ribThicknessMm : Std.isOfType(
-            plate,
-            machinekit.gantry.GantryParts.GantryStiffenedPlate
-          ) ? cast(
+          ribThicknessMm : Std.isOfType(plate, machinekit.gantry.GantryParts.GantryStiffenedPlate) ? cast(
             plate,
             machinekit.gantry.GantryParts.GantryStiffenedPlate
           ).ribWall : 0,
           poseMm : pose,
-          youngsMPa : modulus(
-            material.physical.youngsModulusPa,
-            member.component.materialSpec()
-          )
+          youngsMPa : modulus(material.physical.youngsModulusPa, member.component.materialSpec())
         });
       }
     }
@@ -121,10 +96,7 @@ class SheetRouterFemExport {
           id: member.id,
           axis: axis,
           railPointMm: vector(state.worldConnector(member.id, "rail")),
-          mountPointMm: vector(state.worldConnector(
-            member.id,
-            "top"
-          )),
+          mountPointMm: vector(state.worldConnector(member.id, "top")),
           radialNPerMm: axis == "y" ? 539000.0 : 460000.0,
           lateralNPerMm : 100000.0,
           basis
@@ -151,13 +123,7 @@ class SheetRouterFemExport {
         blockZMm: vector(state.worldPose("blockZ")),
         blocks: blocks(),
         drives: drives(),
-        spindleMountsMm: [for (x in [
-          -50.0,
-          50.0
-        ]) for (z in [
-          110.0,
-          230.0
-        ]) vector(F.transformPoint(
+        spindleMountsMm: [for (x in [-50.0, 50.0]) for (z in [110.0, 230.0]) vector(F.transformPoint(
           state.worldPose("spindleMount"),
           x,
           machine.spindle.n("diameter") / 2 + 18,
@@ -180,12 +146,7 @@ class SheetRouterFemExport {
       beamFootWeldLegMm: machine.spec.beamFootWelded ? 8 : 0,
       guideLayout : machine.spec.frontGuides,
       yBlockSpacing : machine.spec.yBlockSpacing,
-      units : {
-        length : "mm",
-        force : "N",
-        mass : "kg",
-        youngsModulus : "MPa"
-      },
+      units : {length : "mm", force : "N", mass : "kg", youngsModulus : "MPa"},
       workY : spec.workY,
       parts : exported.parts,
       materials : exported.materials,
@@ -196,11 +157,7 @@ class SheetRouterFemExport {
       poses : poses,
       supports : supports,
       axes : axes,
-      loadCases : {
-        cuttingPerAxisN : 300,
-        accelerationMPerS2 : 3,
-        gravityMPerS2 : 9.80665
-      },
+      loadCases : {cuttingPerAxisN : 300, accelerationMPerS2 : 3, gravityMPerS2 : 9.80665},
       interfaces : {
         guideTranslationNPerMm : 100000.0,
         guideRotationNmmPerRad : 10000000.0,

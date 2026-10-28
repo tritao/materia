@@ -54,11 +54,7 @@ class LinearMountAccessTests {
       }
       var hollow = Solids.cut(
         Part.box(100, 540, 100).translated(new Vector(0, 0, -100)),
-        [Part.box(88, 542, 88).translated(new Vector(
-          0,
-          0,
-          -94
-        ))]
+        [Part.box(88, 542, 88).translated(new Vector(0, 0, -94))]
       );
       var host = own(Solids.cut(hollow, cutters));
       var pad = new machinekit.structural.SeatedPlate(100, 440, 8,
@@ -140,17 +136,7 @@ class LinearMountAccessTests {
           end < 0 ? 6.5 : -6.5,
           end * (cage.length / 2 - 8),
           -18.5,
-          [
-            1,
-            0,
-            0,
-            0,
-            -1,
-            0,
-            0,
-            0,
-            -1
-          ]
+          [1, 0, 0, 0, -1, 0, 0, 0, -1]
         );
         var body = placed(own(bolt.geometry()), pose);
         check(
@@ -215,18 +201,8 @@ class LinearMountAccessTests {
             {
               reviewOnly: true,
               railDatumMm: 12,
-              tubeMm: {
-                width: 100,
-                height: 100,
-                wall: 6,
-                length: 540
-              },
-              cassetteMm: {
-                width: 24,
-                height: 10,
-                length: 440,
-                coverThickness: 2
-              },
+              tubeMm: {width: 100, height: 100, wall: 6, length: 540},
+              cassetteMm: {width: 24, height: 10, length: 440, coverThickness: 2},
               endWithdrawalMm: 750,
               cassetteTopClearanceMm: 0.5,
               replicationThicknessMm: 4,

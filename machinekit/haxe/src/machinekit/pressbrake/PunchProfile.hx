@@ -84,10 +84,7 @@ class PunchProfile {
         var b = points[(i + 1) % points.length];
         var finish = plane.toWorld(new Vector(b.y, b.z));
         edges.push(Curve.named(
-          i == contactEdge ? Curve.arc(a, plane.toWorld(new Vector(0, 0)), finish) : Curve.line(
-            a,
-            finish
-          ),
+          i == contactEdge ? Curve.arc(a, plane.toWorld(new Vector(0, 0)), finish) : Curve.line(a, finish),
           i == contactEdge ? "punch.contact" : 'punch.section.$i'
         ));
       }
@@ -126,10 +123,7 @@ class PunchProfile {
       var next = points[(i + 1) % points.length];
       edges.push(i == contactEdge ? contactArc().segment() : Segment.line(
         new Point2(points[i].y, points[i].z),
-        new Point2(
-          next.y,
-          next.z
-        )
+        new Point2(next.y, next.z)
       ));
     }
     return new WallOutline(edges);

@@ -50,22 +50,10 @@ class LinearScale extends MachineComponent implements EncoderPart {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.linear-scale",
       [
-        ComponentRecipeSupport.length(
-          "length",
-          300
-        ),
-        ComponentRecipeSupport.scalar(
-          "countsPerMillimetre",
-          200
-        ),
-        ComponentRecipeSupport.flag(
-          "absolute",
-          false
-        ),
-        ComponentRecipeSupport.flag(
-          "index",
-          true
-        )
+        ComponentRecipeSupport.length("length", 300),
+        ComponentRecipeSupport.scalar("countsPerMillimetre", 200),
+        ComponentRecipeSupport.flag("absolute", false),
+        ComponentRecipeSupport.flag("index", true)
       ],
       v -> new LinearScale(
         v.number("length"),
@@ -122,34 +110,13 @@ class LinearScale extends MachineComponent implements EncoderPart {
           new Vector(-half, -thick),
           new Vector(half, -thick),
           new Vector(half, thick - c),
-          new Vector(
-            half - c,
-            thick
-          ),
-          new Vector(
-            track,
-            thick
-          ),
-          new Vector(
-            track,
-            thick - depth
-          ),
-          new Vector(
-            -track,
-            thick - depth
-          ),
-          new Vector(
-            -track,
-            thick
-          ),
-          new Vector(
-            -half + c,
-            thick
-          ),
-          new Vector(
-            -half,
-            thick - c
-          )
+          new Vector(half - c, thick),
+          new Vector(track, thick),
+          new Vector(track, thick - depth),
+          new Vector(-track, thick - depth),
+          new Vector(-track, thick),
+          new Vector(-half + c, thick),
+          new Vector(-half, thick - c)
         ],
         0,
         length
@@ -164,15 +131,7 @@ class LinearScale extends MachineComponent implements EncoderPart {
     var half = WIDTH / 2, thick = THICKNESS / 2;
     return Solids.named(
       Part.prism(
-        [
-          new Vector(-half, -thick),
-          new Vector(half, -thick),
-          new Vector(half, thick),
-          new Vector(
-            -half,
-            thick
-          )
-        ],
+        [new Vector(-half, -thick), new Vector(half, -thick), new Vector(half, thick), new Vector(-half, thick)],
         0,
         length
       ),

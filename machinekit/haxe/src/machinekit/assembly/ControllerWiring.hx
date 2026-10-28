@@ -150,10 +150,7 @@ class ControllerWiring {
       signals.push({
         name: wire.id,
         from: {controller: wire.fromInstance, port: wire.fromPort},
-        to: {
-          controller: wire.toInstance,
-          port: wire.toPort
-        }
+        to: {controller: wire.toInstance, port: wire.toPort}
       });
     }
     for (entry in controllers) {

@@ -272,35 +272,17 @@ class MotorMount extends MachineComponent {
     for (i in 0...s.motorBolts.length) addConnector(
       'motorBolt${i + 1}',
       Face,
-      Solids.axial(
-        s.motorBolts[i].x,
-        h + s.motorBolts[i].y,
-        0
-      )
+      Solids.axial(s.motorBolts[i].x, h + s.motorBolts[i].y, 0)
     );
     for (i in 0...s.baseHoles.length) addConnector(
       'baseBolt${i + 1}',
       Face,
-      F.alongY(
-        s.baseHoles[i].x,
-        0,
-        s.baseHoles[i].z,
-        0,
-        1,
-        0
-      )
+      F.alongY(s.baseHoles[i].x, 0, s.baseHoles[i].z, 0, 1, 0)
     );
     for (i in 0...s.auxiliaryHoles.length) addConnector(
       'baseAux${i + 1}',
       Face,
-      F.alongY(
-        s.auxiliaryHoles[i].x,
-        0,
-        s.auxiliaryHoles[i].z,
-        0,
-        1,
-        0
-      )
+      F.alongY(s.auxiliaryHoles[i].x, 0, s.auxiliaryHoles[i].z, 0, 1, 0)
     );
     if (s.shoulderZ != null) addConnector("screwShoulder", Axis, Solids.axial(0, h, s.shoulderZ));
     if (s.family == "A") addConnector("fixedSupport", Mount, F.alongY(0, h, s.rearEnd, 0, 0, -1));
@@ -365,14 +347,8 @@ class MotorMount extends MachineComponent {
       [
         new Vector(lo.get_x(), lo.get_y()),
         new Vector(hi.get_x(), lo.get_y()),
-        new Vector(
-          hi.get_x(),
-          hi.get_y()
-        ),
-        new Vector(
-          lo.get_x(),
-          hi.get_y()
-        )
+        new Vector(hi.get_x(), hi.get_y()),
+        new Vector(lo.get_x(), hi.get_y())
       ],
       lo.get_z(),
       hi.get_z()
@@ -393,12 +369,7 @@ class MotorMount extends MachineComponent {
         imported.close();
         var t = asset.translation, placed = machinekit.assembly.PosedParts.moved(
           raw,
-          F.fromRotationMatrix(
-            t[0],
-            t[1],
-            t[2],
-            asset.rotation
-          )
+          F.fromRotationMatrix(t[0], t[1], t[2], asset.rotation)
         );
         raw.close();
         return placed;
@@ -416,20 +387,8 @@ class MotorMount extends MachineComponent {
       var first = e.raw_orientation == "x_shaft_y_up";
       var location = new Location(new Plane(
         new Vector(0, first ? -e.raw_base_y : 0, -e.raw_motor_face_x),
-        new Vector(
-          0,
-          0,
-          1
-        ),
-        first ? new Vector(
-          -1,
-          0,
-          0
-        ) : new Vector(
-          0,
-          1,
-          0
-        )
+        new Vector(0, 0, 1),
+        first ? new Vector(-1, 0, 0) : new Vector(0, 1, 0)
       ));
       var normalized = raw.placed(location);
       raw.close();
@@ -493,10 +452,7 @@ class MotorMount extends MachineComponent {
         new Vector(x - width / 2, y0),
         new Vector(x + width / 2, y0),
         new Vector(x + width / 2, y1),
-        new Vector(
-          x - width / 2,
-          y1
-        )
+        new Vector(x - width / 2, y1)
       ],
       z0,
       z1
@@ -519,35 +475,10 @@ class MotorMount extends MachineComponent {
 
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.motion.motor-mount", [
-      P.choice(
-        "model",
-        models(),
-        "M60D-BK12-C"
-      ),
-      P.choice(
-        "revision",
-        revisions(),
-        HzMotionCatalog.revision()
-      ),
-      P.choice(
-        "bearingGrade",
-        [
-          "unspecified",
-          "C3",
-          "C4",
-          "C5"
-        ],
-        "unspecified"
-      ),
-      P.choice(
-        "geometry",
-        [
-          NOMINAL,
-          "hzmotion",
-          "vallder"
-        ],
-        NOMINAL
-      )
+      P.choice("model", models(), "M60D-BK12-C"),
+      P.choice("revision", revisions(), HzMotionCatalog.revision()),
+      P.choice("bearingGrade", ["unspecified", "C3", "C4", "C5"], "unspecified"),
+      P.choice("geometry", [NOMINAL, "hzmotion", "vallder"], NOMINAL)
     ], v -> {var model = v.token("model"), revision = v.token("revision");
     // A revision belongs to one maker's tables; the default follows the model.
     if ((rbkModels().indexOf(model) >= 0) != (revision == "vallder-rbk-v1")) revision = defaultRevision(model);

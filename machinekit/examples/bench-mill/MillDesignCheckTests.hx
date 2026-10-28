@@ -61,11 +61,7 @@ class MillDesignCheckTests {
       axes,
       "shifted screw",
       materia.assembly.AssemblyFrames.translation(0, 0, 0),
-      materia.assembly.AssemblyFrames.translation(
-        1,
-        0,
-        0
-      )
+      materia.assembly.AssemblyFrames.translation(1, 0, 0)
     );
     if (!axes.hasErrors()) throw "Shifted fastener axis accepted";
     count++;
@@ -74,22 +70,7 @@ class MillDesignCheckTests {
       angles,
       "tilted screw",
       materia.assembly.AssemblyFrames.translation(0, 0, 0),
-      materia.assembly.AssemblyFrames.fromRotationMatrix(
-        0,
-        0,
-        0,
-        [
-          0,
-          0,
-          1,
-          0,
-          1,
-          0,
-          -1,
-          0,
-          0
-        ]
-      )
+      materia.assembly.AssemblyFrames.fromRotationMatrix(0, 0, 0, [0, 0, 1, 0, 1, 0, -1, 0, 0])
     );
     if (!angles.hasErrors()) throw "Tilted fastener axis accepted";
     count++;

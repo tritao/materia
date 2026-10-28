@@ -83,11 +83,7 @@ class HeatedBed extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.printing.heated-bed",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        catalog(),
-        "BED-ALU-235-24V-300W"
-      )],
+      [ComponentRecipeSupport.catalog("designation", catalog(), "BED-ALU-235-24V-300W")],
       v -> new HeatedBed(v.token("designation"))
     );
     return recipe;
@@ -103,11 +99,7 @@ class HeatedBed extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     // The envelope is the whole slab, heater pad included: the pad below the plate takes up real space.
     if (detail == Envelope) return Solids.named(
-      Part.box(
-        spec.width,
-        spec.depth,
-        spec.plateThickness + spec.padThickness
-      ).translated(new cadkit.modeling.Vector(
+      Part.box(spec.width, spec.depth, spec.plateThickness + spec.padThickness).translated(new cadkit.modeling.Vector(
         0,
         0,
         -spec.plateThickness - spec.padThickness

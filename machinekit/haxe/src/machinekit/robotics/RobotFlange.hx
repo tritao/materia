@@ -68,48 +68,12 @@ class RobotFlange extends MachineComponent {
   static function rows():Array<RobotFlangeSpec> return [
     row(31.5, 4, "M5", 20, 5),
     row(40, 4, "M6", 25, 6),
-    row(
-      50,
-      4,
-      "M6",
-      31.5,
-      6
-    ),
-    row(
-      63,
-      4,
-      "M6",
-      40,
-      6
-    ),
-    row(
-      80,
-      6,
-      "M8",
-      50,
-      8
-    ),
-    row(
-      100,
-      6,
-      "M8",
-      63,
-      8
-    ),
-    row(
-      125,
-      6,
-      "M10",
-      80,
-      10
-    ),
-    row(
-      160,
-      6,
-      "M10",
-      100,
-      10
-    ),
+    row(50, 4, "M6", 31.5, 6),
+    row(63, 4, "M6", 40, 6),
+    row(80, 6, "M8", 50, 8),
+    row(100, 6, "M8", 63, 8),
+    row(125, 6, "M10", 80, 10),
+    row(160, 6, "M10", 100, 10),
   ];
 
   /** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
@@ -124,13 +88,7 @@ class RobotFlange extends MachineComponent {
         standardEdition: "2004",
         dimensionKind: Nominal,
         conformance: GenericApproximation,
-        verifiedFields: [
-          "pitchCircle",
-          "boltCount",
-          "screw",
-          "pilotDiameter",
-          "pinDiameter"
-        ]
+        verifiedFields: ["pitchCircle", "boltCount", "screw", "pilotDiameter", "pinDiameter"]
       })
     );
     return table;
@@ -211,13 +169,7 @@ class RobotFlange extends MachineComponent {
     var tools = [Solids.named(Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y), "pin")];
     var bolt = 1;
     for (point in boltPattern()) tools.push(Solids.named(
-      Part.cylinderSpan(
-        screw.clearanceDiameter(Medium) / 2,
-        -thickness - 0.1,
-        0.1,
-        point.x,
-        point.y
-      ),
+      Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y),
       "bolt" + bolt++
     ));
     return Solids.cut(body, tools);
@@ -243,33 +195,14 @@ class RobotFlange extends MachineComponent {
     // Named like the flange's own bodies, so the faces a cutout leaves in a mating part stay distinguishable.
     var tools = [
       Solids.named(
-        Part.cylinderSpan(
-          (pilotDiameter + pilotClearance) / 2,
-          -0.1,
-          pilotRecessDepth(pilotClearance)
-        ),
+        Part.cylinderSpan((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)),
         "pilot"
       ),
-      Solids.named(
-        Part.cylinderSpan(
-          (pinDiameter + pilotClearance) / 2,
-          -0.1,
-          depth + 0.1,
-          pin.x,
-          pin.y
-        ),
-        "pin"
-      ),
+      Solids.named(Part.cylinderSpan((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y), "pin"),
     ];
     var bolt = 1;
     for (point in boltPattern()) tools.push(Solids.named(
-      Part.cylinderSpan(
-        screw.clearanceDiameter(fit) / 2,
-        -0.1,
-        depth + 0.1,
-        point.x,
-        point.y
-      ),
+      Part.cylinderSpan(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y),
       "bolt" + bolt++
     ));
     return Solids.union(tools);
@@ -288,19 +221,8 @@ class RobotFlange extends MachineComponent {
     "mountingCutout",
     [
       ComponentRecipeSupport.toolDepth(pilotRecessDepth() + 1),
-      ComponentRecipeSupport.length(
-        "pilotClearance",
-        0.2
-      ),
-      ComponentRecipeSupport.choice(
-        "fit",
-        [
-          "Fine",
-          "Medium",
-          "Coarse"
-        ],
-        "Medium"
-      )
+      ComponentRecipeSupport.length("pilotClearance", 0.2),
+      ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")
     ]
   )];
 
@@ -318,20 +240,8 @@ class RobotFlange extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.robotics.robot-flange",
-      [
-        ComponentRecipeSupport.length(
-          "pitchCircleDiameter",
-          40
-        ),
-        ComponentRecipeSupport.count(
-          "boltCount",
-          4
-        )
-      ],
-      v -> new RobotFlange(
-        v.number("pitchCircleDiameter"),
-        v.integer("boltCount")
-      )
+      [ComponentRecipeSupport.length("pitchCircleDiameter", 40), ComponentRecipeSupport.count("boltCount", 4)],
+      v -> new RobotFlange(v.number("pitchCircleDiameter"), v.integer("boltCount"))
     );
     return recipeTypeCache;
   }

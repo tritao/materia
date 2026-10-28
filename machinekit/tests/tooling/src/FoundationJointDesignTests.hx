@@ -24,40 +24,19 @@ class FoundationJointDesignTests {
     route: FoundationJointRoute.Grouted,
     gapMm: 2,
     gapToleranceMm: 0.1,
-    seats: [{
-      id: "seat",
-      lower: {
-        member: "lower/seat",
-        feature: "seat"
-      },
-      upper: {
-        member: "upper/seat",
-        feature: "seat"
-      }
-    }],
+    seats: [{id: "seat",
+    lower: {member: "lower/seat", feature: "seat"}, upper: {member: "upper/seat", feature: "seat"}}],
     jacks: [{
       id: "jack",
       screw: "jack",
-      receiver: {
-        member: "block",
-        feature: "fixing"
-      },
-      bearing: {
-        member: "upper/seat",
-        feature: "seat"
-      }
+      receiver: {member: "block", feature: "fixing"},
+      bearing: {member: "upper/seat", feature: "seat"}
     }],
     anchors: [{
       id: "anchor",
       screw: "anchor",
-      target: {
-        member: "lower/seat",
-        feature: "fixing"
-      },
-      through: [{
-        member: "upper/seat",
-        feature: "fixing"
-      }]
+      target: {member: "lower/seat", feature: "fixing"},
+      through: [{member: "upper/seat", feature: "fixing"}]
     }],
     cureBeforeTorque: true
   };
@@ -100,49 +79,20 @@ class FoundationJointDesignTests {
   } {
     var thread = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(4).mating());
     var lower = new MineralFoundation(
-      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber(
-        "height",
-        40
-      ),
+      new ComponentValues().setNumber("width", 100).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
-        part: seat(
-          40,
-          InsertHoles.tappedBlind(
-            thread,
-            20
-          )
-        ),
-        pose: F.translation(
-          0,
-          0,
-          20
-        ),
+        part: seat(40, InsertHoles.tappedBlind(thread, 20)),
+        pose: F.translation(0, 0, 20),
         openings: [materia.casting.CastingPatterns.face("body.z-max")]
       }]
     );
     var upper = new MineralFoundation(
-      new ComponentValues().setNumber("width", 180).setNumber("depth", 80).setNumber(
-        "height",
-        40
-      ),
+      new ComponentValues().setNumber("width", 180).setNumber("depth", 80).setNumber("height", 40),
       [{
         id: "seat",
-        part: seat(
-          180,
-          InsertHoles.through(
-            thread.clearanceDiameter,
-            20
-          )
-        ),
-        pose: F.compose(
-          F.translation(
-            0,
-            0,
-            20
-          ),
-          F.turnY(Math.PI)
-        ),
+        part: seat(180, InsertHoles.through(thread.clearanceDiameter, 20)),
+        pose: F.compose(F.translation(0, 0, 20), F.turnY(Math.PI)),
         openings: [
           materia.casting.CastingPatterns.face("body.z-min"),
           materia.casting.CastingPatterns.face("body.x-min"),
@@ -153,10 +103,7 @@ class FoundationJointDesignTests {
     var blockThread = InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating());
     var block = new CastInsert(CastInsert.precastHoles(
       CastInsert.boxValues(40, 40, 10),
-      InsertHoles.tappedThrough(
-        blockThread,
-        10
-      )
+      InsertHoles.tappedThrough(blockThread, 10)
     ).setToken(
       "role",
       materia.casting.InsertSpec.InsertRole.ColumnMount
@@ -414,10 +361,7 @@ class FoundationJointDesignTests {
       var context = machinekit.tooling.FoundationAssemblyContext.snapshot(
         fixture.assembly,
         "lower/casting",
-        [{
-          id: "seat",
-          member: "lower/seat"
-        }]
+        [{id: "seat", member: "lower/seat"}]
       );
       var input = machinekit.tooling.FoundationToolingAdapter.snapshot(fixture.lower, "joint-bearing-test", 1, context);
       var reports = machinekit.tooling.FoundationJointCad.review(input);
@@ -431,10 +375,7 @@ class FoundationJointDesignTests {
     var context = machinekit.tooling.FoundationAssemblyContext.snapshot(
       fixture.assembly,
       "lower/casting",
-      [{
-        id: "seat",
-        member: "lower/seat"
-      }]
+      [{id: "seat", member: "lower/seat"}]
     );
     var input = machinekit.tooling.FoundationToolingAdapter.snapshot(fixture.lower, "joint-hardware-check", 1, context);
     var facts = input.interfaceContext;
@@ -450,10 +391,7 @@ class FoundationJointDesignTests {
     var fixture = model(joint()), context = machinekit.tooling.FoundationAssemblyContext.snapshot(
       fixture.assembly,
       "lower/casting",
-      [{
-        id: "seat",
-        member: "lower/seat"
-      }]
+      [{id: "seat", member: "lower/seat"}]
     );
     var input = machinekit.tooling.FoundationToolingAdapter.snapshot(fixture.lower, "joint-base", 1, context);
     check(
@@ -579,10 +517,7 @@ class FoundationJointDesignTests {
     var context = machinekit.tooling.FoundationAssemblyContext.snapshot(
       row.assembly,
       "lower/casting",
-      [{
-        id: "seat",
-        member: "lower/seat"
-      }]
+      [{id: "seat", member: "lower/seat"}]
     );
     var input = machinekit.tooling.FoundationToolingAdapter.snapshot(row.lower, "headless-jack", 1, context);
     var copied = materia.tooling.ToolingCodec.copyInput(input), sources = copied.interfaceContext;

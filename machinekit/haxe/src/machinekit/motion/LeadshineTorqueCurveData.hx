@@ -17,34 +17,8 @@ class LeadshineTorqueCurveData {
       review: "Page identifies MS1AE; current data specify 400 VAC and 4.5 Arms, whereas the local older PDF row specifies 380 VAC and 5.1 Arms. Do not assume the same winding/revision.",
       torqueReadingUncertaintyNm: 0.15,
       speedReadingUncertaintyRpm: 60,
-      continuous: [
-        {
-          rpm: 0.0,
-          torqueNm: 4.9
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 4.9
-        },
-        {
-          rpm: 5000.0,
-          torqueNm: 2.190588
-        }
-      ],
-      intermittent: [
-        {
-          rpm: 0.0,
-          torqueNm: 14.7
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 14.7
-        },
-        {
-          rpm: 5000.0,
-          torqueNm: 4.956322
-        }
-      ]
+      continuous: [{rpm: 0.0, torqueNm: 4.9}, {rpm: 3000.0, torqueNm: 4.9}, {rpm: 5000.0, torqueNm: 2.190588}],
+      intermittent: [{rpm: 0.0, torqueNm: 14.7}, {rpm: 3000.0, torqueNm: 14.7}, {rpm: 5000.0, torqueNm: 4.956322}]
     },
     {
       id: "ELM2M-2900LD180FT-H",
@@ -60,34 +34,8 @@ class LeadshineTorqueCurveData {
       review: "Graph intermittent plateau 46.5 Nm conflicts with page table peak 30 Nm and local older PDF peak 55.8 Nm. Page also differs in voltage, rotor inertia and mass.",
       torqueReadingUncertaintyNm: 1.0,
       speedReadingUncertaintyRpm: 30,
-      continuous: [
-        {
-          rpm: 0.0,
-          torqueNm: 18.6
-        },
-        {
-          rpm: 1500.0,
-          torqueNm: 18.6
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 9.92
-        }
-      ],
-      intermittent: [
-        {
-          rpm: 0.0,
-          torqueNm: 46.5
-        },
-        {
-          rpm: 1500.0,
-          torqueNm: 46.5
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 35.431915
-        }
-      ]
+      continuous: [{rpm: 0.0, torqueNm: 18.6}, {rpm: 1500.0, torqueNm: 18.6}, {rpm: 3000.0, torqueNm: 9.92}],
+      intermittent: [{rpm: 0.0, torqueNm: 46.5}, {rpm: 1500.0, torqueNm: 46.5}, {rpm: 3000.0, torqueNm: 35.431915}]
     },
     {
       id: "ELM2M-7500LD180FT-H",
@@ -103,34 +51,8 @@ class LeadshineTorqueCurveData {
       review: "Rated and peak torque labels match local values (48/119 Nm), but the page specifies 400 VAC, inertia 99.45 x 10^-4 kg m2 and mass 32 kg, versus local 380 VAC, 130 x 10^-4 kg m2 and 32.3 kg. Revision/conditions require reconciliation.",
       torqueReadingUncertaintyNm: 2.5,
       speedReadingUncertaintyRpm: 30,
-      continuous: [
-        {
-          rpm: 0.0,
-          torqueNm: 48.0
-        },
-        {
-          rpm: 1500.0,
-          torqueNm: 48.0
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 25.6
-        }
-      ],
-      intermittent: [
-        {
-          rpm: 0.0,
-          torqueNm: 119.0
-        },
-        {
-          rpm: 1500.0,
-          torqueNm: 119.0
-        },
-        {
-          rpm: 3000.0,
-          torqueNm: 101.87234
-        }
-      ]
+      continuous: [{rpm: 0.0, torqueNm: 48.0}, {rpm: 1500.0, torqueNm: 48.0}, {rpm: 3000.0, torqueNm: 25.6}],
+      intermittent: [{rpm: 0.0, torqueNm: 119.0}, {rpm: 1500.0, torqueNm: 119.0}, {rpm: 3000.0, torqueNm: 101.87234}]
     }
   ];
 }

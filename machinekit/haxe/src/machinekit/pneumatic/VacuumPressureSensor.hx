@@ -29,10 +29,7 @@ class VacuumPressureSensor extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.pneumatic.vacuum-pressure-sensor",
-      [ComponentRecipeSupport.length(
-        "tubeOdMm",
-        4
-      )],
+      [ComponentRecipeSupport.length("tubeOdMm", 4)],
       v -> new VacuumPressureSensor(v.number("tubeOdMm")),
       true
     );

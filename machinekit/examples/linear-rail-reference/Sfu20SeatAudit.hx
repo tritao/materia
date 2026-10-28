@@ -12,32 +12,16 @@ class Sfu20SeatAudit {
         solids.push({
           index: i,
           volume: solid.volume(),
-          min: [
-            b.get_min().get_x(),
-            b.get_min().get_y(),
-            b.get_min().get_z()
-          ],
-          max: [
-            b.get_max().get_x(),
-            b.get_max().get_y(),
-            b.get_max().get_z()
-          ]
+          min: [b.get_min().get_x(), b.get_min().get_y(), b.get_min().get_z()],
+          max: [b.get_max().get_x(), b.get_max().get_y(), b.get_max().get_z()]
         });
         solid.close();
       }
       var expected = model == "BK15" ? [
         {index : 11, lo : -7.5, hi : 1.5},
         {index : 7, lo : 1.5, hi : 10.5},
-        {
-          index : 25,
-          lo : -14.0,
-          hi : -7.5
-        },
-        {
-          index : 26,
-          lo : 10.5,
-          hi : 20.0
-        }
+        {index : 25, lo : -14.0, hi : -7.5},
+        {index : 26, lo : 10.5, hi : 20.0}
       ] : [{
         index : 7,
         lo : -4.5,
@@ -54,11 +38,7 @@ class Sfu20SeatAudit {
     }
     sys.io.File.saveContent(
       Sys.getEnv("MATERIA_ROOT") + "/build/suppliers/vallder/sfu20-seat-audit.json",
-      haxe.Json.stringify(
-        rows,
-        null,
-        "  "
-      )
+      haxe.Json.stringify(rows, null, "  ")
     );
   }
 }

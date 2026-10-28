@@ -16,10 +16,7 @@ typedef MillPlacedRail = {
 class MillRailPlacement {
   public static function fingerprint(rail:LinearRail,
     memberId:String):String return haxe.crypto.Sha256.encode(materia.tooling.ToolingCodec.canonical({
-      definition: machinekit.assembly.MachineAssembly.definitionKey(
-        memberId,
-        rail
-      ),
+      definition: machinekit.assembly.MachineAssembly.definitionKey(memberId, rail),
       specification: rail.spec,
       length: rail.length,
       mountingHole: rail.mountingHole(),
@@ -33,16 +30,8 @@ class MillRailPlacement {
         side * l.yRailSpacing / 2,
         l.yRailStart,
         l.yRailPlane + l.block.spec.railHeight,
-        [
-          0,
-          0,
-          1
-        ],
-        [
-          0,
-          1,
-          0
-        ]
+        [0, 0, 1],
+        [0, 1, 0]
       )
     };
   }

@@ -50,42 +50,9 @@ class BeltElasticityTests {
       "loop",
       [],
       [
-        {
-          stiffness: k,
-          terms: [
-            {joint: "motor", coefficient: 1.0},
-            {
-              joint: "a",
-              coefficient: -1.0
-            }
-          ]
-        },
-        {
-          stiffness: k,
-          terms: [
-            {
-              joint: "a",
-              coefficient: 1.0
-            },
-            {
-              joint: "b",
-              coefficient: -1.0
-            }
-          ]
-        },
-        {
-          stiffness: k,
-          terms: [
-            {
-              joint: "b",
-              coefficient: 1.0
-            },
-            {
-              joint: "motor",
-              coefficient: -1.0
-            }
-          ]
-        }
+        {stiffness: k, terms: [{joint: "motor", coefficient: 1.0}, {joint: "a", coefficient: -1.0}]},
+        {stiffness: k, terms: [{joint: "a", coefficient: 1.0}, {joint: "b", coefficient: -1.0}]},
+        {stiffness: k, terms: [{joint: "b", coefficient: 1.0}, {joint: "motor", coefficient: -1.0}]}
       ]
     ));
     var axes = [new AxisLoad("a", false, 1, 0, false, 0), new AxisLoad("b", false, 1, 0, false, 0)];
@@ -129,19 +96,7 @@ class BeltElasticityTests {
     series.elasticNetworks.push(new ElasticNetwork(
       "reduction-belt",
       ["reduction"],
-      [{
-        stiffness: 4000,
-        terms: [
-          {
-            joint: "shaft",
-            coefficient: 1.0
-          },
-          {
-            joint: "motor",
-            coefficient: -1.0 / 3
-          }
-        ]
-      }]
+      [{stiffness: 4000, terms: [{joint: "shaft", coefficient: 1.0}, {joint: "motor", coefficient: -1.0 / 3}]}]
     ));
     hold(series, "motor");
     var load = DriveLoads.forAxis(series, "axis");
@@ -158,37 +113,13 @@ class BeltElasticityTests {
     mixed.elasticNetworks.push(new ElasticNetwork(
       "driven-belt",
       ["reduction"],
-      [{
-        stiffness: 4000,
-        terms: [
-          {
-            joint: "shaft",
-            coefficient: 1.0
-          },
-          {
-            joint: "motor",
-            coefficient: -0.5
-          }
-        ]
-      }]
+      [{stiffness: 4000, terms: [{joint: "shaft", coefficient: 1.0}, {joint: "motor", coefficient: -0.5}]}]
     ));
     mixed.elasticNetworks[0].assumptions.push({quantity: "stiffness", label: "belt stiffness with pretension"});
     mixed.elasticNetworks.push(new ElasticNetwork(
       "unbound-belt",
       [],
-      [{
-        stiffness: 4000,
-        terms: [
-          {
-            joint: "orphan",
-            coefficient: 1.0
-          },
-          {
-            joint: "orphanOutput",
-            coefficient: -1.0
-          }
-        ]
-      }]
+      [{stiffness: 4000, terms: [{joint: "orphan", coefficient: 1.0}, {joint: "orphanOutput", coefficient: -1.0}]}]
     ));
     hold(mixed, "screw");
     hold(mixed, "motor");
@@ -218,27 +149,9 @@ class BeltElasticityTests {
     var sharedScalar = model(["x", "y", "left", "right"]);
     for (entry in [
       {id: "xl", leader: "x", motor: "left", ratio: 1.0, spring: 1000.0},
-      {
-        id: "yl",
-        leader: "y",
-        motor: "left",
-        ratio: 1.0,
-        spring: 1000.0
-      },
-      {
-        id: "xr",
-        leader: "x",
-        motor: "right",
-        ratio: 1.0,
-        spring: 4000.0
-      },
-      {
-        id: "yr",
-        leader: "y",
-        motor: "right",
-        ratio: -1.0,
-        spring: 4000.0
-      }
+      {id: "yl", leader: "y", motor: "left", ratio: 1.0, spring: 1000.0},
+      {id: "xr", leader: "x", motor: "right", ratio: 1.0, spring: 4000.0},
+      {id: "yr", leader: "y", motor: "right", ratio: -1.0, spring: 4000.0}
     ]) {
       var path = sharedScalar.addCoupling(new JointCoupling(entry.id, entry.leader, entry.motor, entry.ratio, 0));
       path.stiffness = entry.spring;
@@ -260,19 +173,7 @@ class BeltElasticityTests {
     summed.elasticNetworks.push(new ElasticNetwork(
       "other-belt",
       [],
-      [{
-        stiffness: 4000,
-        terms: [
-          {
-            joint: "first",
-            coefficient: 1.0
-          },
-          {
-            joint: "second",
-            coefficient: -1.0
-          }
-        ]
-      }]
+      [{stiffness: 4000, terms: [{joint: "first", coefficient: 1.0}, {joint: "second", coefficient: -1.0}]}]
     ));
     hold(summed, "first");
     hold(summed, "second");
@@ -288,19 +189,7 @@ class BeltElasticityTests {
     partial.elasticNetworks.push(new ElasticNetwork(
       "one-belt",
       [],
-      [{
-        stiffness: 4000,
-        terms: [
-          {
-            joint: "x",
-            coefficient: 1.0
-          },
-          {
-            joint: "motor",
-            coefficient: -0.5
-          }
-        ]
-      }]
+      [{stiffness: 4000, terms: [{joint: "x", coefficient: 1.0}, {joint: "motor", coefficient: -0.5}]}]
     ));
     var screwPath = partial.addCoupling(new JointCoupling("screw-path", "screw", "screwMotor", 2, 0));
     screwPath.stiffness = 1000;

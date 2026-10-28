@@ -75,18 +75,8 @@ class PanelToolingPreview {
       a,
       pair.fixed.id,
       x == 40 ? "primary-pin" : "secondary-pin",
-      new ToolingPin(new ComponentValues().setNumber(
-        "diameter",
-        6
-      ).setNumber(
-        "length",
-        2 * t + 4
-      )),
-      F.translation(
-        x,
-        35,
-        -2
-      ),
+      new ToolingPin(new ComponentValues().setNumber("diameter", 6).setNumber("length", 2 * t + 4)),
+      F.translation(x, 35, -2),
       base
     );
     hardware(
@@ -94,11 +84,7 @@ class PanelToolingPreview {
       pair.fixed.id,
       "bolt",
       SocketHeadCapScrew.metric("M6", boltLength),
-      F.translation(
-        90,
-        65,
-        2 * t + washer.thickness
-      ),
+      F.translation(90, 65, 2 * t + washer.thickness),
       base
     );
     hardware(a, pair.fixed.id, "top-washer", washer, F.translation(90, 65, 2 * t), base);
@@ -124,16 +110,7 @@ class PanelToolingPreview {
         bodyHeight: 100,
         offsetX: 20,
         slotY: 150,
-        tabs: [
-          {
-            center: 55.0,
-            width: 30.0
-          },
-          {
-            center: 210.0,
-            width: 44.0
-          }
-        ],
+        tabs: [{center: 55.0, width: 30.0}, {center: 210.0, width: 44.0}],
         clearance: 0.2,
         routerDiameter: 6,
         minimumLigament: 6
@@ -178,13 +155,7 @@ class PanelToolingPreview {
         wrench.close();
         try PanelKit.checkToolAccess(
           plan,
-          [
-            {id: "bolt-driver", clearance: worldDriver},
-            {
-              id: "nut-wrench",
-              clearance: worldWrench
-            }
-          ]
+          [{id: "bolt-driver", clearance: worldDriver}, {id: "nut-wrench", clearance: worldWrench}]
         ) catch (e:Dynamic) {
           worldDriver.close();
           worldWrench.close();
@@ -201,14 +172,8 @@ class PanelToolingPreview {
         report: report,
         closure: pair.joint.closure,
         panelFingerprints: [
-          {
-            id: pair.fixed.id,
-            sha256: PanelCodec.fingerprint(pair.fixed)
-          },
-          {
-            id: pair.moving.id,
-            sha256: PanelCodec.fingerprint(pair.moving)
-          }
+          {id: pair.fixed.id, sha256: PanelCodec.fingerprint(pair.fixed)},
+          {id: pair.moving.id, sha256: PanelCodec.fingerprint(pair.moving)}
         ],
         note: "Blocking report covers panels after loose closure hardware is removed; threads are semantic."
       });

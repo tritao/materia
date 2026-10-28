@@ -85,24 +85,14 @@ class RbkMountChecks {
       for (i in 0...holes.length) {
         var hole = holes[i], volume = overlap(
           shape,
-          vertical(
-            hole.diameter / 2 - 0.15,
-            hole.x,
-            hole.z,
-            bounds.get_max().get_y() + 1
-          )
+          vertical(hole.diameter / 2 - 0.15, hole.x, hole.z, bounds.get_max().get_y() + 1)
         );
         check(
           circleAt(verticalCircles, hole.x, hole.z, hole.diameter / 2),
           "Base datum matches an actual CAD bore edge"
         );
         if (hole.counterboreDiameter != null) check(
-          circleAt(
-            verticalCircles,
-            hole.x,
-            hole.z,
-            hole.counterboreDiameter / 2
-          ),
+          circleAt(verticalCircles, hole.x, hole.z, hole.counterboreDiameter / 2),
           "Counterbore diameter matches CAD"
         );
         report.push({model: model, feature: "baseBolt" + (i + 1), intersection_mm3: volume, x: hole.x, z: hole.z});
@@ -112,12 +102,7 @@ class RbkMountChecks {
       for (i in 0...extra.length) {
         var h = extra[i], volume = overlap(
           shape,
-          vertical(
-            h.diameter / 2 - 0.15,
-            h.x,
-            h.z,
-            bounds.get_max().get_y() + 1
-          )
+          vertical(h.diameter / 2 - 0.15, h.x, h.z, bounds.get_max().get_y() + 1)
         );
         check(circleAt(verticalCircles, h.x, h.z, h.diameter / 2), "Auxiliary datum matches an actual CAD bore edge");
         report.push({model: model, feature: "baseAux" + (i + 1), intersection_mm3: volume, x: h.x, z: h.z});
@@ -166,29 +151,13 @@ class RbkMountChecks {
       index++;
       sys.io.File.saveContent(
         dir + "rbk-interface-checks.json",
-        haxe.Json.stringify(
-          {
-            schema_version: 1,
-            checks: report,
-            failures: failures
-          },
-          null,
-          "  "
-        )
+        haxe.Json.stringify({schema_version: 1, checks: report, failures: failures}, null, "  ")
       );
       trace('Measured interfaces checked: $model; accumulated failures: $failures');
     }
     if (!persistenceOnly) sys.io.File.saveContent(
       dir + "rbk-interface-checks.json",
-      haxe.Json.stringify(
-        {
-          schema_version: 1,
-          checks: report,
-          failures: failures
-        },
-        null,
-        "  "
-      )
+      haxe.Json.stringify({schema_version: 1, checks: report, failures: failures}, null, "  ")
     );
     check(failures == 0, "RBK hole/pilot/motor/base checks need review; see rbk-interface-checks.json");
     var saved = assembly.encode(), loaded = MachineAssembly.decode(saved), poses = loaded.solvedPoses();
@@ -208,11 +177,7 @@ class RbkMountChecks {
     var document = new Document(), original = MotorMount.of("RBK12-57", null, "vallder");
     var instance = document.createInstance(
       "RBK",
-      MachineKitDocuments.define(
-        document,
-        MotorMount.recipeType(),
-        original.values()
-      )
+      MachineKitDocuments.define(document, MotorMount.recipeType(), original.values())
     );
     var volume = instance.shape().volume(), reloaded = DocumentCodec.decode(DocumentCodec.encode(document));
     var editable:cadkit.parametric.InstanceElement = cast reloaded.element(instance.id);

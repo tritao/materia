@@ -24,18 +24,11 @@ class CobotWristRotor extends MachineComponent {
     var radius = CobotWristMount.hubRadius(module);
     var ring = Solids.cut(
       Part.cylinderSpan(radius, -8, 0),
-      [Part.cylinderSpan(
-        module.pocketDiameter / 2 + 0.5,
-        -8.1,
-        0.1
-      )]
+      [Part.cylinderSpan(module.pocketDiameter / 2 + 0.5, -8.1, 0.1)]
     );
     var body = Solids.union([
       Solids.named(ring, "bearing-skirt"),
-      Solids.named(
-        Part.cylinderSpan(radius, -4, 0),
-        "output-plate"
-      )
+      Solids.named(Part.cylinderSpan(radius, -4, 0), "output-plate")
     ]);
     var cuts = CobotWristMount.housingCuts(module, true, clocking);
     var moved:Array<Part> = [];

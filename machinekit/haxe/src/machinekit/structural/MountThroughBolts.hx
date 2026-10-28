@@ -57,22 +57,8 @@ class MountThroughBolts {
         washer: washer,
         nut: nut,
         screwPose: pose,
-        washerPose: F.compose(
-          bearing,
-          F.translation(
-            0,
-            0,
-            grip
-          )
-        ),
-        nutPose: F.compose(
-          bearing,
-          F.translation(
-            0,
-            0,
-            threadStart
-          )
-        ),
+        washerPose: F.compose(bearing, F.translation(0, 0, grip)),
+        nutPose: F.compose(bearing, F.translation(0, 0, threadStart)),
         gripMm: grip,
         projectionMm: projection
       };

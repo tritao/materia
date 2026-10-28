@@ -22,62 +22,20 @@ class SheetRouterAtcChecks {
     var machine = new SheetRouter();
     var cases = [
       {inject: "missing_tool", expected: "missing_tool"},
-      {
-        inject: "occupied_return_pocket",
-        expected: "occupied_return_pocket"
-      },
-      {
-        inject: "clamp_timeout",
-        expected: "clamped_timeout"
-      },
-      {
-        inject: "vfd_at_speed",
-        expected: "spindle_stop_timeout"
-      },
-      {
-        inject: "independent_running",
-        expected: "spindle_stop_timeout"
-      },
-      {
-        inject: "air_low",
-        expected: "air_timeout"
-      },
-      {
-        inject: "release_pressure_loss",
-        expected: "release_interlock_lost"
-      },
-      {
-        inject: "cover_timeout",
-        expected: "cover_open_timeout"
-      },
-      {
-        inject: "stale_observation",
-        expected: "stale_or_invalid_observation"
-      },
-      {
-        inject: "wrong_motion_ack",
-        expected: "retract_timeout"
-      },
-      {
-        inject: "setter_stuck",
-        expected: "setter_clear_timeout"
-      },
-      {
-        inject: "setter_no_trigger",
-        expected: "setter_no_trigger"
-      },
-      {
-        inject: "stale_setter_edge",
-        expected: "setter_no_trigger"
-      },
-      {
-        inject: "axis_lease_missing",
-        expected: "axis_lease_missing"
-      },
-      {
-        inject: "axis_lease_lost",
-        expected: "axis_lease_lost"
-      }
+      {inject: "occupied_return_pocket", expected: "occupied_return_pocket"},
+      {inject: "clamp_timeout", expected: "clamped_timeout"},
+      {inject: "vfd_at_speed", expected: "spindle_stop_timeout"},
+      {inject: "independent_running", expected: "spindle_stop_timeout"},
+      {inject: "air_low", expected: "air_timeout"},
+      {inject: "release_pressure_loss", expected: "release_interlock_lost"},
+      {inject: "cover_timeout", expected: "cover_open_timeout"},
+      {inject: "stale_observation", expected: "stale_or_invalid_observation"},
+      {inject: "wrong_motion_ack", expected: "retract_timeout"},
+      {inject: "setter_stuck", expected: "setter_clear_timeout"},
+      {inject: "setter_no_trigger", expected: "setter_no_trigger"},
+      {inject: "stale_setter_edge", expected: "setter_no_trigger"},
+      {inject: "axis_lease_missing", expected: "axis_lease_missing"},
+      {inject: "axis_lease_lost", expected: "axis_lease_lost"}
     ];
     var results:Array<Dynamic> = [];
     for (c in cases) {
@@ -170,12 +128,7 @@ class SheetRouterAtcChecks {
     File.saveContent(
       "build/sheet-router-work/sr7/faults.json",
       haxe.Json.stringify(
-        {
-          status: "PASS",
-          cases: results,
-          persistenceFailure: disk,
-          assertions: assertions
-        },
+        {status: "PASS", cases: results, persistenceFailure: disk, assertions: assertions},
         null,
         "  "
       ) + "\n"
@@ -267,14 +220,7 @@ class SheetRouterAtcChecks {
         for (cover in [0.0, 150.0, 300.0, 450.0, 600.0]) pose(empty, [0, 0, 0], "filled-rack cover", cover);
         File.saveContent(
           'build/sheet-router-work/sr7/pocket-poses-y${Std.int(bed)}.json',
-          haxe.Json.stringify(
-            {
-              status: "PASS",
-              poses: poses
-            },
-            null,
-            "  "
-          ) + "\n"
+          haxe.Json.stringify({status: "PASS", poses: poses}, null, "  ") + "\n"
         );
         Sys.println('SR7 Y=$bed: ' + poses.length + ' filled-rack/pocket poses pass');
         Sys.stdout().flush();
@@ -349,14 +295,11 @@ class SheetRouterAtcChecks {
     if (Sys.args().indexOf("--transit-only") < 0 && Sys.args().indexOf("--cutting-only") < 0) File.saveContent(
       evidencePath,
       haxe.Json.stringify(
-        {
-          status: reports.length == expectedChanges ? "PASS" : "IN_PROGRESS",
-          reports : reports,
-          assertions : assertions
-        },
-        null,
-        "  "
-      ) + "\n"
+        {status: reports.length == expectedChanges ? "PASS" : "IN_PROGRESS",
+      reports : reports, assertions : assertions},
+      null,
+      "  "
+    ) + "\n"
     );
   }
   static function coverAndSetter():Void {
@@ -369,14 +312,8 @@ class SheetRouterAtcChecks {
         definition,
         [
           {a: "shoeLiftCylinder", b: "shoeLiftRod"},
-          {
-            a: "rackCoverLiftCylinder",
-            b: "rackCoverLiftRod"
-          },
-          {
-            a: "longestTool",
-            b: "setter"
-          }
+          {a: "rackCoverLiftCylinder", b: "rackCoverLiftRod"},
+          {a: "longestTool", b: "setter"}
         ]
       );
       try {

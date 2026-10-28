@@ -89,31 +89,19 @@ class DieProfile {
     for (i in 0...points.length) {
       var next = points[(i + 1) % points.length];
       edges.push(groove.shoulderRadius > 0 && (i == 3 || i == 6) ? contactArc(i).segment() : Segment.line(
-        new Point2(
-          points[i].y,
-          points[i].z
-        ),
-        new Point2(
-          next.y,
-          next.z
-        )
+        new Point2(points[i].y, points[i].z),
+        new Point2(next.y, next.z)
       ));
     }
     return new WallOutline(edges);
   }
   function contactArc(index:Int):ToolProfileArc return index == 3 ? new ToolProfileArc(
-    new ToolProfilePoint(
-      groove.vWidth / 2,
-      -groove.shoulderRadius
-    ),
+    new ToolProfilePoint(groove.vWidth / 2, -groove.shoulderRadius),
     groove.shoulderRadius,
     Math.PI / 2,
     (Math.PI - groove.includedAngle) / 2
   ) : new ToolProfileArc(
-    new ToolProfilePoint(
-      -groove.vWidth / 2,
-      -groove.shoulderRadius
-    ),
+    new ToolProfilePoint(-groove.vWidth / 2, -groove.shoulderRadius),
     groove.shoulderRadius,
     groove.includedAngle / 2,
     (Math.PI - groove.includedAngle) / 2
@@ -123,14 +111,8 @@ class DieProfile {
     var result = [
       new ToolProfilePoint(-width / 2, -height),
       new ToolProfilePoint(width / 2, -height),
-      new ToolProfilePoint(
-        width / 2,
-        0
-      ),
-      new ToolProfilePoint(
-        groove.vWidth / 2,
-        0
-      )
+      new ToolProfilePoint(width / 2, 0),
+      new ToolProfilePoint(groove.vWidth / 2, 0)
     ];
     if (groove.shoulderRadius > 0) result.push(new ToolProfilePoint(groove.tangentY(), groove.tangentZ()));
     result.push(new ToolProfilePoint(0, -groove.depth()));

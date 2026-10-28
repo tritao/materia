@@ -84,13 +84,7 @@ class BeltElasticity {
       var length = posed.freePaths(indexes[at], indexes[next])[0];
       spans.push({
         stiffness: BeltStretch.spanStiffness(ea, length),
-        terms: [
-          {joint: joints[at], coefficient: radii[at]},
-          {
-            joint: joints[next],
-            coefficient: -radii[next]
-          }
-        ]
+        terms: [{joint: joints[at], coefficient: radii[at]}, {joint: joints[next], coefficient: -radii[next]}]
       });
     }
     // This shaft-loop model requires fixed free-path lengths; do not silently omit a

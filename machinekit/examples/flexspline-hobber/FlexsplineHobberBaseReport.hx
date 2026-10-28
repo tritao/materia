@@ -34,18 +34,9 @@ class FlexsplineHobberBaseReport {
     }
     var oldRaw:Dynamic = Reflect.field(raw, "base"), old = {
       massKg: number(oldRaw, "massKg"),
-      width: number(
-        oldRaw,
-        "width"
-      ),
-      depth: number(
-        oldRaw,
-        "depth"
-      ),
-      height: number(
-        oldRaw,
-        "height"
-      )
+      width: number(oldRaw, "width"),
+      depth: number(oldRaw, "depth"),
+      height: number(oldRaw, "height")
     };
     var oldMoving = number(raw,
       "movingXKg"), oldColumn = number(Reflect.field(raw, "column"), "massKg"), oldInserts = number(
@@ -195,15 +186,8 @@ class FlexsplineHobberBaseReport {
         beforeAssemblyKg: oldColumn + oldInserts,
         afterAssemblyKg: columnKg
       },
-      beforeLoadingRevision: Reflect.field(
-        raw,
-        "beforeLoadingRevision"
-      ),
-      dimensionsMm: [
-        body.parameterNumber("width"),
-        body.parameterNumber("depth"),
-        body.parameterNumber("height")
-      ],
+      beforeLoadingRevision: Reflect.field(raw, "beforeLoadingRevision"),
+      dimensionsMm: [body.parameterNumber("width"), body.parameterNumber("depth"), body.parameterNumber("height")],
       workingHeightMm: work,
       feet: {
         count: 3,
@@ -219,10 +203,7 @@ class FlexsplineHobberBaseReport {
         vibrationMounts: false
       },
       table: {
-        form: Std.isOfType(
-          machine.table,
-          machinekit.motion.PurchasedRotaryTable
-        ) ? "purchased" : "built",
+        form: Std.isOfType(machine.table, machinekit.motion.PurchasedRotaryTable) ? "purchased" : "built",
         faceDiameterMm : machine.tableSpec.number("faceDiameter"),
         heightMm : machine.tableSpec.number("height"),
         throughBoreMm : machine.tableSpec.number("bore"),

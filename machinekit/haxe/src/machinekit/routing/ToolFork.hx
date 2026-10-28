@@ -13,18 +13,9 @@ class ToolFork extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 80),
     P.length("depth", 100),
-    P.length(
-      "thickness",
-      12
-    ),
-    P.length(
-      "gripDiameter",
-      40
-    ),
-    P.length(
-      "clearance",
-      0.5
-    )
+    P.length("thickness", 12),
+    P.length("gripDiameter", 40),
+    P.length("clearance", 0.5)
   ];
   public function new(?v:ComponentValues) {
     super("tool-fork", "open ISO30 rack fork", "PA12 nylon", inputs(), v);
@@ -44,23 +35,9 @@ class ToolFork extends AssumedCatalogComponent {
     return Solids.cut(
       Solids.named(Part.box(n("width"), n("depth"), n("thickness")), "fork"),
       [
+        Solids.named(Part.cylinderSpan(n("gripDiameter") / 2 + n("clearance"), -1, n("thickness") + 1), "grip"),
         Solids.named(
-          Part.cylinderSpan(
-            n("gripDiameter") / 2 + n("clearance"),
-            -1,
-            n("thickness") + 1
-          ),
-          "grip"
-        ),
-        Solids.named(
-          Part.box(
-            n("gripDiameter") + 2 * n("clearance"),
-            n("depth"),
-            n("thickness") + 2,
-            Center,
-            Min,
-            Min
-          ),
+          Part.box(n("gripDiameter") + 2 * n("clearance"), n("depth"), n("thickness") + 2, Center, Min, Min),
           "entry"
         )
       ]

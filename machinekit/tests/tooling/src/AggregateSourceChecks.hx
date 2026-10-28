@@ -28,20 +28,11 @@ class AggregateSourceChecks {
     vector(F.transformPoint(poses.get("base/casting"), 0, 0, 0), [0, frame.layout.baseCentreY, 0], "Base source frame");
     vector(
       F.transformPoint(poses.get("column/casting"), 0, 0, 0),
-      [
-        0,
-        frame.layout.columnCentreY,
-        frame.layout.columnMountPlane
-      ],
+      [0, frame.layout.columnCentreY, frame.layout.columnMountPlane],
       "Column source frame"
     );
     for (id in ["base/casting", "column/casting"]) for (axis in [[1.0, 0, 0], [0.0, 1, 0], [0.0, 0, 1]]) vector(
-      F.transformVector(
-        poses.get(id),
-        axis[0],
-        axis[1],
-        axis[2]
-      ),
+      F.transformVector(poses.get(id), axis[0], axis[1], axis[2]),
       axis,
       id + " orientation"
     );

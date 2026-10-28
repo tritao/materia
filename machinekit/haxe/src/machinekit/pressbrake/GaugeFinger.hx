@@ -39,15 +39,7 @@ class GaugeFinger extends MachineComponent {
 
   override public function hasGeometry():Bool return true;
   override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
-    Part.box(
-      WIDTH_MM,
-      DEPTH_MM,
-      HEIGHT_MM
-    ).translated(new Vector(
-      0,
-      DEPTH_MM / 2,
-      -DATUM_HEIGHT_MM
-    )),
+    Part.box(WIDTH_MM, DEPTH_MM, HEIGHT_MM).translated(new Vector(0, DEPTH_MM / 2, -DATUM_HEIGHT_MM)),
     "finger"
   );
 

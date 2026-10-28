@@ -34,36 +34,11 @@ class LinearBearing extends MachineComponent {
   public var length(get, never):Float;
 
   static function rows():Array<LinearBearingSpec> return [
-    {
-      designation: "LM8UU",
-      boreDiameter: 8,
-      outerDiameter: 15,
-      length: 24
-    },
-    {
-      designation: "LM10UU",
-      boreDiameter: 10,
-      outerDiameter: 19,
-      length: 29
-    },
-    {
-      designation: "LM12UU",
-      boreDiameter: 12,
-      outerDiameter: 21,
-      length: 30
-    },
-    {
-      designation: "LM16UU",
-      boreDiameter: 16,
-      outerDiameter: 28,
-      length: 37
-    },
-    {
-      designation: "LM20UU",
-      boreDiameter: 20,
-      outerDiameter: 32,
-      length: 42
-    },
+    {designation: "LM8UU", boreDiameter: 8, outerDiameter: 15, length: 24},
+    {designation: "LM10UU", boreDiameter: 10, outerDiameter: 19, length: 29},
+    {designation: "LM12UU", boreDiameter: 12, outerDiameter: 21, length: 30},
+    {designation: "LM16UU", boreDiameter: 16, outerDiameter: 28, length: 37},
+    {designation: "LM20UU", boreDiameter: 20, outerDiameter: 32, length: 42},
   ];
 
   public static function catalog():Catalog<LinearBearingSpec> {
@@ -77,11 +52,7 @@ class LinearBearing extends MachineComponent {
         standardEdition: null,
         dimensionKind: Nominal,
         conformance: NominalEnvelope,
-        verifiedFields: [
-          "boreDiameter",
-          "outerDiameter",
-          "length"
-        ]
+        verifiedFields: ["boreDiameter", "outerDiameter", "length"]
       })
     );
     return table;
@@ -113,11 +84,7 @@ class LinearBearing extends MachineComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var ownedParts:Array<Part> = [];
     return Solids.building(ownedParts, tracked -> {var outer = Solids.named(
-      Part.cylinderSpan(
-        outerDiameter / 2,
-        0,
-        length
-      ),
+      Part.cylinderSpan(outerDiameter / 2, 0, length),
       "body"
     );
     tracked.push(outer);
@@ -201,11 +168,7 @@ class LinearBearing extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
       "machinekit.motion.linear-bearing",
-      [ComponentRecipeSupport.catalog(
-        "designation",
-        LinearBearing.catalog(),
-        "LM8UU"
-      )],
+      [ComponentRecipeSupport.catalog("designation", LinearBearing.catalog(), "LM8UU")],
       v -> LinearBearing.metric(v.token("designation")),
       true
     );

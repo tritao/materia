@@ -44,42 +44,14 @@ class ToolingReleaseTests {
           sourceIds: ["casting"],
           part: bed,
           substrate: Board,
-          stock: {
-            stock: stock,
-            pose: F.translation(
-              0,
-              0,
-              -2
-            )
-          }
+          stock: {stock: stock, pose: F.translation(0, 0, -2)}
         },
-        {
-          id: "datum",
-          sourceIds: ["source-insert"],
-          part: fixture,
-          substrate: ToolingMetal,
-          stock: null
-        },
-        {
-          id: "core",
-          sourceIds: ["source-pocket"],
-          part: eps,
-          substrate: EPSCovering,
-          stock: null
-        },
-        {
-          id: "insert",
-          sourceIds: ["source-insert"],
-          part: insert,
-          substrate: BondingSteel,
-          stock: null
-        },
+        {id: "datum", sourceIds: ["source-insert"], part: fixture, substrate: ToolingMetal, stock: null},
+        {id: "core", sourceIds: ["source-pocket"], part: eps, substrate: EPSCovering, stock: null},
+        {id: "insert", sourceIds: ["source-insert"], part: insert, substrate: BondingSteel, stock: null},
         {
           id: "anchor",
-          sourceIds: [
-            "source-insert",
-            "source-anchor"
-          ],
+          sourceIds: ["source-insert", "source-anchor"],
           part: anchor,
           substrate: BondingSteel,
           stock: null

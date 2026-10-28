@@ -31,16 +31,7 @@ class MillZCouplingGuard extends MachineComponent {
     var w = parameterNumber("width");
     return Solids.cut(
       Part.box(w, 2, parameterNumber("height")),
-      [
-        Part.cylinderAlongY(2.25, -2, 2, -(w - 12) / 2, 8),
-        Part.cylinderAlongY(
-          2.25,
-          -2,
-          2,
-          (w - 12) / 2,
-          8
-        )
-      ]
+      [Part.cylinderAlongY(2.25, -2, 2, -(w - 12) / 2, 8), Part.cylinderAlongY(2.25, -2, 2, (w - 12) / 2, 8)]
     );
   }
 }

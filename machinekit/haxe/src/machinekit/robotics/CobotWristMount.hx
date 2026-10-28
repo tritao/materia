@@ -64,16 +64,8 @@ class CobotWristMount {
       Solids.named(Part.cylinderSpan(outer, module.length - 4.2, module.length + 0.1), "rotor-face-pocket"),
       Solids.named(
         Solids.cut(
-          Part.cylinderSpan(
-            outer,
-            module.length - 8.2,
-            module.length + 0.1
-          ),
-          [Part.cylinderSpan(
-            module.pocketDiameter / 2 + 0.3,
-            module.length - 8.3,
-            module.length + 0.2
-          )]
+          Part.cylinderSpan(outer, module.length - 8.2, module.length + 0.1),
+          [Part.cylinderSpan(module.pocketDiameter / 2 + 0.3, module.length - 8.3, module.length + 0.2)]
         ),
         "rotor-bearing-pocket"
       )
@@ -82,15 +74,7 @@ class CobotWristMount {
 
   /** The mating hub's annular locating lip, in a frame pointing into the module. */
   public static function pilot(module:CobotJoint):Part return Solids.cut(
-    Part.cylinderSpan(
-      pilotRadius(module),
-      0,
-      PILOT_DEPTH
-    ),
-    [Part.cylinderSpan(
-      module.pocketDiameter / 2 + 0.5,
-      -0.1,
-      PILOT_DEPTH + 0.1
-    )]
+    Part.cylinderSpan(pilotRadius(module), 0, PILOT_DEPTH),
+    [Part.cylinderSpan(module.pocketDiameter / 2 + 0.5, -0.1, PILOT_DEPTH + 0.1)]
   );
 }

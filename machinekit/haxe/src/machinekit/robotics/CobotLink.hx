@@ -70,11 +70,7 @@ class CobotLink extends MachineComponent {
       route = [
         start,
         new Vector(-previous.diameter / 2 - radius, 0, start.z),
-        new Vector(
-          a + nextRadius + radius,
-          0,
-          end.z
-        ),
+        new Vector(a + nextRadius + radius, 0, end.z),
         end
       ];
     } else if (Math.abs(alpha) > 1e-9) {
@@ -98,11 +94,7 @@ class CobotLink extends MachineComponent {
             seat.y - axis.y * (cap + radius),
             seat.z - axis.z * (cap + radius)
           ),
-          new Vector(
-            axis.x,
-            axis.y,
-            axis.z
-          ),
+          new Vector(axis.x, axis.y, axis.z),
           cap + radius
         ),
         "output-cap"
@@ -113,16 +105,8 @@ class CobotLink extends MachineComponent {
     parts.push(Solids.named(
       Part.cylinderAlong(
         outputPadRadius,
-        new Vector(
-          seat.x - axis.x * cap,
-          seat.y - axis.y * cap,
-          seat.z - axis.z * cap
-        ),
-        new Vector(
-          axis.x,
-          axis.y,
-          axis.z
-        ),
+        new Vector(seat.x - axis.x * cap, seat.y - axis.y * cap, seat.z - axis.z * cap),
+        new Vector(axis.x, axis.y, axis.z),
         cap
       ),
       "output-pad"
@@ -149,11 +133,7 @@ class CobotLink extends MachineComponent {
         holes.push(Solids.named(
           Part.cylinderAlong(
             radius - wall,
-            new Vector(
-              start.x + delta.x * fraction,
-              start.y + delta.y * fraction,
-              start.z + delta.z * fraction
-            ),
+            new Vector(start.x + delta.x * fraction, start.y + delta.y * fraction, start.z + delta.z * fraction),
             delta,
             length - 2 * wall
           ),

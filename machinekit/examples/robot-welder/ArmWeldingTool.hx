@@ -17,18 +17,9 @@ class ArmWeldingTool implements ArmTool {
   /** The torch's inlets, as the tool and the arm name them. */
   static final INLETS:Array<{tool:String, arm:String}> = [
     {tool: "power", arm: "torchPower"},
-    {
-      tool: "gas",
-      arm: "torchGas"
-    },
-    {
-      tool: "wire",
-      arm: "torchWire"
-    },
-    {
-      tool: "control",
-      arm: "torchControl"
-    }
+    {tool: "gas", arm: "torchGas"},
+    {tool: "wire", arm: "torchWire"},
+    {tool: "control", arm: "torchControl"}
   ];
 
   public final bendDegrees:Float;

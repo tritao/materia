@@ -34,11 +34,7 @@ class BendSequenceChecks {
       "sequence-steel",
       1.5,
       BendRule.Process(new ProcessBendRule(tooling)),
-      {
-        uts: 400,
-        yield: 250,
-        youngs: 205000
-      }
+      {uts: 400, yield: 250, youngs: 205000}
     );
     var grips = new GeometricGripCheck(geometry, new GripperBox(10, 10, 15), prisms);
     var timing = new BendTimeModel(press.phaseSpeeds, 1, 3, 1, 4, 2, 200, 100, 0.3);
@@ -60,64 +56,25 @@ class BendSequenceChecks {
           [
             new ToolSegment(Punch(punch), 20),
             new ToolSegment(Punch(punch), 50),
-            new ToolSegment(
-              Punch(punch),
-              40
-            ),
-            new ToolSegment(
-              Punch(punch),
-              50
-            ),
-            new ToolSegment(
-              Punch(punch),
-              20
-            )
+            new ToolSegment(Punch(punch), 40),
+            new ToolSegment(Punch(punch), 50),
+            new ToolSegment(Punch(punch), 20)
           ],
-          [
-            20,
-            0,
-            0,
-            20
-          ]
+          [20, 0, 0, 20]
         ) : new ToolRow(
-          [
-            new ToolSegment(
-              Punch(punch),
-              100
-            ),
-            new ToolSegment(
-              Punch(punch),
-              50
-            )
-          ],
+          [new ToolSegment(Punch(punch), 100), new ToolSegment(Punch(punch), 50)],
           [0]
         );
         var dieRow = part == 4 ? new ToolRow(
           [
             new ToolSegment(SingleV(raised), 20),
-            new ToolSegment(
-              SingleV(raised),
-              100
-            ),
-            new ToolSegment(
-              SingleV(raised),
-              40
-            ),
-            new ToolSegment(
-              SingleV(raised),
-              20
-            )
+            new ToolSegment(SingleV(raised), 100),
+            new ToolSegment(SingleV(raised), 40),
+            new ToolSegment(SingleV(raised), 20)
           ],
-          [
-            20,
-            0,
-            20
-          ]
+          [20, 0, 20]
         ) : new ToolRow(
-          [new ToolSegment(
-            SingleV(raised),
-            200
-          )],
+          [new ToolSegment(SingleV(raised), 200)],
           []
         );
         var layout = new ToolLayout(

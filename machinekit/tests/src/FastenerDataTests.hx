@@ -57,10 +57,7 @@ class FastenerDataTests {
     near(stainless.preloadN, 6850, "stainless kN converted to N");
     near(stainless.friction, 0.1, "stainless row friction");
     for (key in FastenerTightening.catalog().designations()) check(
-      StringTools.startsWith(
-        FastenerTightening.catalog().metadata(key).source,
-        "https://"
-      ),
+      StringTools.startsWith(FastenerTightening.catalog().metadata(key).source, "https://"),
       "row has published source"
     );
     var fine = machinekit.standard.FastenerThreads.metric(6, 0.75);

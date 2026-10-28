@@ -58,10 +58,7 @@ class DualArmGripperTool implements ArmTool {
         inwardReach,
         Math.max(
           grip.openJawCentre() + grip.jawWidth / 2,
-          Math.max(
-            grip.bodyWidth / 2,
-            grip.valveSeatX() + valve.bodyWidth / 2
-          )
+          Math.max(grip.bodyWidth / 2, grip.valveSeatX() + valve.bodyWidth / 2)
         )
       );
       crossAxisReach = Math.max(crossAxisReach, grip.supportSideReach());
@@ -77,10 +74,7 @@ class DualArmGripperTool implements ArmTool {
         jawAxisMax,
         Math.max(
           grip.bodyWidth / 2,
-          Math.max(
-            grip.openJawCentre() + grip.jawWidth / 2,
-            grip.valveSeatX() + valve.bodyWidth / 2
-          )
+          Math.max(grip.openJawCentre() + grip.jawWidth / 2, grip.valveSeatX() + valve.bodyWidth / 2)
         )
       );
     }
@@ -106,15 +100,7 @@ class DualArmGripperTool implements ArmTool {
     var seatA = plate.connector("toolBolt3").frame;
     var seatB = AssemblyFrames.compose(
       plate.connector("toolBolt1").frame,
-      {
-        x: 0,
-        y: 0,
-        z: 0,
-        qx: 0,
-        qy: Math.sin(Math.PI / 4),
-        qz: 0,
-        qw: Math.cos(Math.PI / 4)
-      }
+      {x: 0, y: 0, z: 0, qx: 0, qy: Math.sin(Math.PI / 4), qz: 0, qw: Math.cos(Math.PI / 4)}
     );
     result.addMemberConnector("plate", "gripperASeat", seatA);
     result.addMemberConnector("plate", "gripperBSeat", seatB);

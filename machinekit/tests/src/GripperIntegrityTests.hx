@@ -21,25 +21,7 @@ class GripperIntegrityTests {
     checkTool(new DualArmGripperTool(), "dual-default");
     checkTool(TendingReach.tendingTool(), "machine-tending");
     checkTool(
-      new DualArmGripperTool(
-        32,
-        50,
-        60,
-        16,
-        false,
-        20,
-        6,
-        null,
-        new ParallelGripperSpec(
-          25,
-          90,
-          45,
-          12,
-          false,
-          15,
-          6
-        )
-      ),
+      new DualArmGripperTool(32, 50, 60, 16, false, 20, 6, null, new ParallelGripperSpec(25, 90, 45, 12, false, 15, 6)),
       "dual-mixed"
     );
     var jaw = new ParallelGripperJaw(new ParallelGripperSpec(25, 90, 45, 12), -1);

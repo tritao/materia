@@ -54,37 +54,19 @@ class CobotWristLink extends MachineComponent {
     for (point in CobotWristMount.points(input)) addConnector(
       'inputBolt${index++}',
       Mount,
-      Solids.axial(
-        point.x,
-        point.y,
-        HUB_DEPTH
-      )
+      Solids.axial(point.x, point.y, HUB_DEPTH)
     );
     index = 1;
     for (point in CobotWristMount.points(output)) addConnector(
       'outputBolt${index++}',
       Mount,
-      AssemblyFrames.compose(
-        seat,
-        AssemblyFrames.alongY(
-          point.x,
-          point.y,
-          -HUB_DEPTH,
-          0,
-          0,
-          -1
-        )
-      )
+      AssemblyFrames.compose(seat, AssemblyFrames.alongY(point.x, point.y, -HUB_DEPTH, 0, 0, -1))
     );
     var reach = HUB_DEPTH + radius / 2;
     route = [
       new Vector(0, 0, reach),
       new Vector(-axis.x * reach, -axis.y * reach, reach),
-      new Vector(
-        -axis.x * reach,
-        -axis.y * reach,
-        length
-      )
+      new Vector(-axis.x * reach, -axis.y * reach, length)
     ];
   }
 
@@ -129,11 +111,7 @@ class CobotWristLink extends MachineComponent {
     var clearance = CLEARANCE + extra;
     return Part.cylinderAlong(
       output.diameter / 2 + clearance,
-      new Vector(
-        seat.x - axis.x * clearance,
-        seat.y - axis.y * clearance,
-        seat.z - axis.z * clearance
-      ),
+      new Vector(seat.x - axis.x * clearance, seat.y - axis.y * clearance, seat.z - axis.z * clearance),
       axis,
       output.length + 2 * radius + 2 * clearance
     );
@@ -150,10 +128,7 @@ class CobotWristLink extends MachineComponent {
     var pieces = [
       Solids.named(body, "shell"),
       Solids.named(softenedHub(CobotWristMount.hubRadius(input)), "input-hub"),
-      Solids.named(
-        atOutput(backHub(CobotWristMount.hubRadius(output))),
-        "output-hub"
-      )
+      Solids.named(atOutput(backHub(CobotWristMount.hubRadius(output))), "output-hub")
     ];
     var inputPilot = CobotWristMount.pilot(input);
     pieces.push(Solids.named(inputPilot.translated(new Vector(0, 0, -CobotWristMount.PILOT_DEPTH)), "input-pilot"));
@@ -174,13 +149,7 @@ class CobotWristLink extends MachineComponent {
     index = 1;
     for (point in CobotWristMount.points(output)) {
       holes.push(Solids.named(
-        atOutput(Part.cylinderSpan(
-          CobotWristMount.HOLE_RADIUS,
-          -HUB_DEPTH - 0.1,
-          0.1,
-          point.x,
-          point.y
-        )),
+        atOutput(Part.cylinderSpan(CobotWristMount.HOLE_RADIUS, -HUB_DEPTH - 0.1, 0.1, point.x, point.y)),
         'output-M4-${index}'
       ));
       holes.push(Solids.named(
@@ -199,18 +168,9 @@ class CobotWristLink extends MachineComponent {
       {r: 0, z: 0},
       {r: radius - bevel, z: 0},
       {r: radius, z: bevel},
-      {
-        r: radius,
-        z: HUB_DEPTH - bevel
-      },
-      {
-        r: radius - bevel,
-        z: HUB_DEPTH
-      },
-      {
-        r: 0,
-        z: HUB_DEPTH
-      }
+      {r: radius, z: HUB_DEPTH - bevel},
+      {r: radius - bevel, z: HUB_DEPTH},
+      {r: 0, z: HUB_DEPTH}
     ]);
   }
 

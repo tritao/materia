@@ -90,10 +90,7 @@ class MotorShaftBearingsPreview {
           parts.push(AssemblyPreview.part(
             definitionId,
             component.designation,
-            new Part(editable.definitionOutput(
-              instance,
-              "body"
-            ).cloneShape()),
+            new Part(editable.definitionOutput(instance, "body").cloneShape()),
             component.materialId
           ));
         }

@@ -38,10 +38,7 @@ class PanelKit {
   public static function assembly(
     plan:PanelAssemblyRecord,
     material:String = "birch plywood",
-    ?finishedComponents:Map<
-      String,
-      machinekit.component.MachineComponent
-  >
+    ?finishedComponents:Map<String, machinekit.component.MachineComponent>
   ):MachineAssembly {
     PanelAssemblyPlan.validate(plan);
     var assembly = new MachineAssembly();
@@ -74,11 +71,7 @@ class PanelKit {
         j.fixedId,
         materia.tooling.ToolingIds.derive("", j.id, "-fixed"),
         j.movingId,
-        materia.tooling.ToolingIds.derive(
-          "",
-          j.id,
-          "-moving"
-        )
+        materia.tooling.ToolingIds.derive("", j.id, "-moving")
       );
     }
     return assembly;

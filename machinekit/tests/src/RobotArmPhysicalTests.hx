@@ -140,21 +140,9 @@ class RobotArmPhysicalTests {
       var source = component.geometry();
       try {
         var result = source.placed(new cadkit.modeling.Location(new cadkit.modeling.Plane(
-          new cadkit.modeling.Vector(
-            frame.x,
-            frame.y,
-            frame.z
-          ),
-          new cadkit.modeling.Vector(
-            x.x,
-            x.y,
-            x.z
-          ),
-          new cadkit.modeling.Vector(
-            z.x,
-            z.y,
-            z.z
-          )
+          new cadkit.modeling.Vector(frame.x, frame.y, frame.z),
+          new cadkit.modeling.Vector(x.x, x.y, x.z),
+          new cadkit.modeling.Vector(z.x, z.y, z.z)
         )));
         source.close();
         return result;

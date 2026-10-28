@@ -15,11 +15,7 @@ class TrackArm extends LinearTrack {
     addComponent(
       "table",
       new ArmTable(3500, 500, tableTop),
-      AssemblyFrames.translation(
-        1500,
-        RobotArm.TABLE_CENTRE_Y,
-        0
-      )
+      AssemblyFrames.translation(1500, RobotArm.TABLE_CENTRE_Y, 0)
     );
     var pad = new ArmBlock(
       RobotArm.WORKPIECE_WIDTH + 20,
@@ -31,11 +27,7 @@ class TrackArm extends LinearTrack {
     for (station in [0, 1]) addComponent(
       station == 0 ? "padPick" : "padPlace",
       pad,
-      AssemblyFrames.translation(
-        station * axis.upper + RobotArm.PICK_X,
-        RobotArm.WORK_Y,
-        tableTop
-      )
+      AssemblyFrames.translation(station * axis.upper + RobotArm.PICK_X, RobotArm.WORK_Y, tableTop)
     );
     addComponent(
       "workpiece",
@@ -46,11 +38,7 @@ class TrackArm extends LinearTrack {
         "birch plywood",
         "track workpiece"
       ),
-      AssemblyFrames.translation(
-        RobotArm.PICK_X,
-        RobotArm.WORK_Y,
-        tableTop + RobotArm.PAD_HEIGHT
-      )
+      AssemblyFrames.translation(RobotArm.PICK_X, RobotArm.WORK_Y, tableTop + RobotArm.PAD_HEIGHT)
     );
   }
 }

@@ -150,10 +150,7 @@ class WeldingRecipe {
     var recipe = pass.recipe;
     var saved:materia.project.SceneArtifact.SceneArtifactWeldPass = {
       name: pass.name,
-      offset: [
-        pass.faceA * 0.001,
-        pass.faceB * 0.001
-      ],
+      offset: [pass.faceA * 0.001, pass.faceB * 0.001],
       interpassDwell: pass.interpassDwell,
       process: {
         wireSpeed: recipe.wireSpeed,
@@ -207,12 +204,7 @@ class WeldingRecipe {
       var tip = seamFrame.toAssemblyFrame();
       return {
         position: [tip.x * metresPerUnit, tip.y * metresPerUnit, tip.z * metresPerUnit],
-        rotation: [
-          tip.qx,
-          tip.qy,
-          tip.qz,
-          tip.qw
-        ]
+        rotation: [tip.qx, tip.qy, tip.qz, tip.qw]
       };
     }
     function direction(v:cadkit.modeling.Vector):Array<Float> return [v.x, v.y, v.z];
@@ -222,10 +214,7 @@ class WeldingRecipe {
     return {kind: "weld", weld: {frame: frame, metal: metal, path: [for (seam in seams) {
       kind:"line", seam:seam.name(), faces:[
         {member: seam.a.member, face: seam.a.face},
-        {
-          member: seam.b.member,
-          face: seam.b.face
-        }
+        {member: seam.b.member, face: seam.b.face}
       ], joint:switch seam.joint {
         case Fillet:
           "fillet";

@@ -161,34 +161,15 @@ class RecipeContractTests {
       checkRebuild(new SteppedShaft(
         [{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
         [{name: "bearing", z: 10}],
-        [{
-          name: "key",
-          z0: 52,
-          key: ParallelKey.forShaft(
-            6,
-            6
-          )
-        }],
-        [{
-          name: "ring",
-          z0: 50,
-          width: 1.2,
-          diameter: 7.6
-        }]
+        [{name: "key", z0: 52, key: ParallelKey.forShaft(6, 6)}],
+        [{name: "ring", z0: 50, width: 1.2, diameter: 7.6}]
       ));
       checkRebuild(new SteppedShaft(
         [{diameter: 12, length: 20}, {diameter: 8, length: 20}],
         null,
         null,
         null,
-        {
-          inputChamfer: 1,
-          outputThread: {
-            diameter: 6,
-            pitch: 1,
-            length: 5
-          }
-        }
+        {inputChamfer: 1, outputThread: {diameter: 6, pitch: 1, length: 5}}
       ));
     }
   }

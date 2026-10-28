@@ -16,17 +16,11 @@ class GantryPickerPreview {
     for (index in 0...GantryPicker.BOX_COUNT) {
       var pick:materia.project.SceneArtifact.SceneArtifactMissionStep = {
         kind: "pick",
-        at: {
-          occurrence: "box" + index,
-          connector: "top"
-        }
+        at: {occurrence: "box" + index, connector: "top"}
       };
       var place:materia.project.SceneArtifact.SceneArtifactMissionStep = {
         kind: "place",
-        at: {
-          occurrence: "slot" + index,
-          connector: "top"
-        }
+        at: {occurrence: "slot" + index, connector: "top"}
       };
       if (yaw) {
         pick.yaw = 0.0;
@@ -58,11 +52,7 @@ class GantryPickerChecks {
       axes: ["x", "y", "z"],
       spindle: "tool",
       channelScope: "gantry-picker-test",
-      workOffset: [
-        0.0,
-        0.0,
-        0.0
-      ],
+      workOffset: [0.0, 0.0, 0.0],
       tools: [],
       stocks: []
     };

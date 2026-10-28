@@ -62,22 +62,10 @@ class OriginalOutfeedBranches {
           checks: checks,
           transfer: transfer,
           descent: descent,
-          clearancePositionError: PoseMath.distance(
-            solver.forward(a),
-            solver.forward(clearance)
-          ),
-          clearanceAngleError: PoseMath.angle(
-            solver.forward(a),
-            solver.forward(clearance)
-          ),
-          approachPositionError: PoseMath.distance(
-            solver.forward(b),
-            solver.forward(approach)
-          ),
-          approachAngleError: PoseMath.angle(
-            solver.forward(b),
-            solver.forward(approach)
-          ),
+          clearancePositionError: PoseMath.distance(solver.forward(a), solver.forward(clearance)),
+          clearanceAngleError: PoseMath.angle(solver.forward(a), solver.forward(clearance)),
+          approachPositionError: PoseMath.distance(solver.forward(b), solver.forward(approach)),
+          approachAngleError: PoseMath.angle(solver.forward(b), solver.forward(approach)),
           scope: "Same Cartesian target frames; both segments continuously checked in all four closed-door holding states"
         };
         failures.push({leg: "transfer", proof: transfer});

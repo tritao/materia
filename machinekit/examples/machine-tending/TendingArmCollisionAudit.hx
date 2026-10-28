@@ -56,10 +56,7 @@ class TendingArmCollisionAudit {
     for (entry in source.components()) if (entry.id == "joint4" || entry.id == "link4") {
       var part = entry.component.geometry(), shape = placed(
         part.shape,
-        AssemblyFrames.compose(
-          placement,
-          state.worldPose(entry.id)
-        )
+        AssemblyFrames.compose(placement, state.worldPose(entry.id))
       );
       part.close();
       var gap = adapter.distance(shape), overlap = 0.0;
@@ -78,10 +75,7 @@ class TendingArmCollisionAudit {
     sys.io.File.saveContent(
       directory + (current ? "/adapter-current-cad-audit.json" : "/adapter-collision-audit.json"),
       haxe.Json.stringify(
-        {
-          sourceReportSha256 : haxe.crypto.Sha256.encode(bytes.toString()),
-          checks : checks
-        },
+        {sourceReportSha256 : haxe.crypto.Sha256.encode(bytes.toString()), checks : checks},
         null,
         "  "
       )
@@ -105,27 +99,11 @@ class TendingArmCollisionAudit {
       var world = new NativeCollisionWorld(), armBody = world.addBody(0), tableBody = world.addBody(1);
       world.setBodyPose(
         armBody,
-        new CollisionPose(
-          armPose.x,
-          armPose.y,
-          armPose.z,
-          armPose.qx,
-          armPose.qy,
-          armPose.qz,
-          armPose.qw
-        )
+        new CollisionPose(armPose.x, armPose.y, armPose.z, armPose.qx, armPose.qy, armPose.qz, armPose.qw)
       );
       world.setBodyPose(
         tableBody,
-        new CollisionPose(
-          tablePose.x,
-          tablePose.y,
-          tablePose.z,
-          tablePose.qx,
-          tablePose.qy,
-          tablePose.qz,
-          tablePose.qw
-        )
+        new CollisionPose(tablePose.x, tablePose.y, tablePose.z, tablePose.qx, tablePose.qy, tablePose.qz, tablePose.qw)
       );
       var facet:CollisionHullFacet = CollisionHullFacet.of(armComponent);
       for (hull in facet.hulls) world.add(armBody, CollisionPose.identity(), Convex(hull));
@@ -133,12 +111,7 @@ class TendingArmCollisionAudit {
       world.add(
         tableBody,
         CollisionPose.identity(),
-        Convex(cadkit.ConvexHullVertices.enclosingFromMesh(
-          mesh.vertices,
-          mesh.vertexCount,
-          0.001,
-          0.001
-        ).vertices)
+        Convex(cadkit.ConvexHullVertices.enclosingFromMesh(mesh.vertices, mesh.vertexCount, 0.001, 0.001).vertices)
       );
       var proxy = Math.POSITIVE_INFINITY;
       for (distance in world.distances(1000)) proxy = Math.min(proxy, distance.distance);
@@ -325,14 +298,7 @@ class TendingArmCollisionAudit {
     for (shape in locals) shape.close();
     sys.io.File.saveContent(
       directory + "/arm-collision-audit.json",
-      haxe.Json.stringify(
-        {
-          coverage: coverage,
-          checks: checks
-        },
-        null,
-        "  "
-      )
+      haxe.Json.stringify({coverage: coverage, checks: checks}, null, "  ")
     );
   }
 }

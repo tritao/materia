@@ -15,10 +15,7 @@ class MillYDriveSeat extends MachineComponent {
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
       "machinekit.milling.hzmotion-y-drive-seat",
-      [P.flag(
-        "floating",
-        false
-      )],
+      [P.flag("floating", false)],
       v -> new MillYDriveSeat(v.boolean("floating"))
     );
     return recipe;

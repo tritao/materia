@@ -99,10 +99,7 @@ class PrinterKlipperTests {
     var determinant = r[0][0] * r[1][1] - r[0][1] * r[1][0];
     var inverseTransposed = [
       [r[1][1] / determinant, -r[1][0] / determinant],
-      [
-        -r[0][1] / determinant,
-        r[0][0] / determinant
-      ]
+      [-r[0][1] / determinant, r[0][0] / determinant]
     ];
     for (degree in 0...360) {
       var d = [Math.cos(degree * Math.PI / 180.0), Math.sin(degree * Math.PI / 180.0)];

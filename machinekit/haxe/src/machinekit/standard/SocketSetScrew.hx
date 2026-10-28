@@ -25,10 +25,7 @@ class SocketSetScrew extends MachineComponent {
   static function parameters():Array<ComponentParameter> return [
     P.length("diameter", 6),
     P.length("pitch", 1),
-    P.length(
-      "length",
-      5
-    )
+    P.length("length", 5)
   ];
 
   public static function recipeType():ComponentType {
@@ -110,17 +107,7 @@ class SocketSetScrew extends MachineComponent {
     0,
     0,
     0,
-    [
-      1,
-      0,
-      0,
-      0,
-      -1,
-      0,
-      0,
-      0,
-      -1
-    ]
+    [1, 0, 0, 0, -1, 0, 0, 0, -1]
   );
 
   override public function componentType():Null<ComponentType> return recipeType();

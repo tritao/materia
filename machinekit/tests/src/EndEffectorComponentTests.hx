@@ -205,66 +205,11 @@ class EndEffectorComponentTests {
       .keepOnStop) throw "Gripper command must default open on a fault and retain a grasp through an ordinary stop";
     var faces:Array<GraspPlane> = [
       {origin: new Vec3(-30, 0, 15), normal: new Vec3(-1, 0, 0)},
-      {
-        origin: new Vec3(
-          30,
-          0,
-          15
-        ),
-        normal: new Vec3(
-          1,
-          0,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          -25,
-          15
-        ),
-        normal: new Vec3(
-          0,
-          -1,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          25,
-          15
-        ),
-        normal: new Vec3(
-          0,
-          1,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          0,
-          0
-        ),
-        normal: new Vec3(
-          0,
-          0,
-          -1
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          0,
-          30
-        ),
-        normal: new Vec3(
-          0,
-          0,
-          1
-        )
-      }
+      {origin: new Vec3(30, 0, 15), normal: new Vec3(1, 0, 0)},
+      {origin: new Vec3(0, -25, 15), normal: new Vec3(0, -1, 0)},
+      {origin: new Vec3(0, 25, 15), normal: new Vec3(0, 1, 0)},
+      {origin: new Vec3(0, 0, 0), normal: new Vec3(0, 0, -1)},
+      {origin: new Vec3(0, 0, 30), normal: new Vec3(0, 0, 1)}
     ];
     var hull:Array<Vec3> = [];
     for (x in [-30.0, 30.0]) for (y in [-25.0, 25.0]) for (z in [0.0, 30.0]) hull.push(new Vec3(x, y, z));
@@ -285,66 +230,11 @@ class EndEffectorComponentTests {
     if (!noFit) throw "Grasp planner accepted a blank outside the jaw opening range";
     var squareFaces:Array<GraspPlane> = [
       {origin: new Vec3(-30, 0, 15), normal: new Vec3(-1, 0, 0)},
-      {
-        origin: new Vec3(
-          30,
-          0,
-          15
-        ),
-        normal: new Vec3(
-          1,
-          0,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          -30,
-          15
-        ),
-        normal: new Vec3(
-          0,
-          -1,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          30,
-          15
-        ),
-        normal: new Vec3(
-          0,
-          1,
-          0
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          0,
-          0
-        ),
-        normal: new Vec3(
-          0,
-          0,
-          -1
-        )
-      },
-      {
-        origin: new Vec3(
-          0,
-          0,
-          30
-        ),
-        normal: new Vec3(
-          0,
-          0,
-          1
-        )
-      }
+      {origin: new Vec3(30, 0, 15), normal: new Vec3(1, 0, 0)},
+      {origin: new Vec3(0, -30, 15), normal: new Vec3(0, -1, 0)},
+      {origin: new Vec3(0, 30, 15), normal: new Vec3(0, 1, 0)},
+      {origin: new Vec3(0, 0, 0), normal: new Vec3(0, 0, -1)},
+      {origin: new Vec3(0, 0, 30), normal: new Vec3(0, 0, 1)}
     ];
     var squareHull:Array<Vec3> = [];
     for (x in [-30.0, 30.0]) for (y in [-30.0, 30.0]) for (z in [0.0, 30.0]) squareHull.push(new Vec3(x, y, z));
@@ -365,15 +255,7 @@ class EndEffectorComponentTests {
       20,
       6,
       null,
-      new ParallelGripperSpec(
-        25,
-        90,
-        45,
-        12,
-        false,
-        15,
-        6
-      )
+      new ParallelGripperSpec(25, 90, 45, 12, false, 15, 6)
     );
     var mixedEffector = mixedTool.build(new RobotFlange(50));
     var mixedTools = RobotScene.robotTools(mixedEffector, "tool");
@@ -480,10 +362,7 @@ class EndEffectorComponentTests {
       new FrameBar(30, 20, 90),
       new PneumaticManifold(2),
       new VacuumGenerator(),
-      new SuctionCup(
-        25,
-        18
-      )
+      new SuctionCup(25, 18)
     ];
     var ratedCup = new SuctionCup(40, 18, 1000, 5);
     var ratedGenerator = new VacuumGenerator(60);
