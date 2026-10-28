@@ -21,11 +21,7 @@ class CamSetupFixture {
       new Point3(0.0, 0.0, 0.0),
       new Point3(0.04, 0.0, 0.0),
       new Point3(0.04, 0.03, 0.0),
-      new Point3(
-        0.0,
-        0.03,
-        0.0
-      )
+      new Point3(0.0, 0.03, 0.0)
     ]);
     var tool = new Tool(7, 0.0, 0.002);
     var machine = new CamTestRig();
@@ -44,16 +40,7 @@ class CamSetupFixture {
     var occupied = new Setup(
       "1",
       new Point3(0, 0, 0),
-      new SetupStock(
-        -0.01,
-        0.05,
-        -0.01,
-        0.04,
-        0.0,
-        -0.003,
-        0.008,
-        [clamp]
-      )
+      new SetupStock(-0.01, 0.05, -0.01, 0.04, 0.0, -0.003, 0.008, [clamp])
     );
     var collision = "";
     try machine.export(program, occupied) catch (error:Dynamic) collision = Std.string(error);
@@ -75,27 +62,12 @@ class CamSetupFixture {
       [
         ToolpathOp.Move(
           MoveKind.Rapid,
-          PathGeometry.Line(
-            new Point3(0.0, 0.0, 0.008),
-            new Point3(
-              0.01,
-              0.0,
-              0.008
-            )
-          ),
+          PathGeometry.Line(new Point3(0.0, 0.0, 0.008), new Point3(0.01, 0.0, 0.008)),
           0.0,
           0.0,
-          new Provenance(
-            2,
-            1,
-            1
-          )
+          new Provenance(2, 1, 1)
         ),
-        ToolpathOp.End(new Provenance(
-          3,
-          1,
-          1
-        ))
+        ToolpathOp.End(new Provenance(3, 1, 1))
       ],
       new ToolLibrary(),
       [highClearance]
@@ -114,15 +86,7 @@ class CamSetupFixture {
         0.0,
         -0.003,
         0.008,
-        [new Fixture(
-          "tall-clamp",
-          0.01,
-          0.02,
-          0.01,
-          0.02,
-          0.0,
-          0.009
-        )]
+        [new Fixture("tall-clamp", 0.01, 0.02, 0.01, 0.02, 0.0, 0.009)]
       )
     ) catch (_:Dynamic) blockedSafeZ = true;
     check(blockedSafeZ, "setup rejects a safe Z below a fixture top");
@@ -131,29 +95,12 @@ class CamSetupFixture {
         ToolpathOp.ToolChange(7, new Provenance(4, 1, 1)),
         ToolpathOp.Move(
           MoveKind.Cut,
-          PathGeometry.Arc(
-            new Point3(
-              0.02,
-              0.02,
-              -0.001
-            ),
-            0.01,
-            0.0,
-            Math.PI
-          ),
+          PathGeometry.Arc(new Point3(0.02, 0.02, -0.001), 0.01, 0.0, Math.PI),
           0.01,
           0.0,
-          new Provenance(
-            5,
-            1,
-            1
-          )
+          new Provenance(5, 1, 1)
         ),
-        ToolpathOp.End(new Provenance(
-          6,
-          1,
-          1
-        ))
+        ToolpathOp.End(new Provenance(6, 1, 1))
       ],
       machine.toolLibrary,
       [clear]
@@ -169,15 +116,7 @@ class CamSetupFixture {
         0.0,
         -0.003,
         0.008,
-        [new Fixture(
-          "arc-clamp",
-          0.019,
-          0.021,
-          0.029,
-          0.031,
-          -0.003,
-          0.006
-        )]
+        [new Fixture("arc-clamp", 0.019, 0.021, 0.029, 0.031, -0.003, 0.006)]
       )
     );
     var arcError = "";

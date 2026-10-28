@@ -22,26 +22,10 @@ class SheetOperationsChecks {
     check(failed, label);
   }
   public static function rectangle(x:Float, y:Float, w:Float, h:Float):CamContour return new CamContour([
-    new Point3(
-      x,
-      y,
-      0.018
-    ),
-    new Point3(
-      x + w,
-      y,
-      0.018
-    ),
-    new Point3(
-      x + w,
-      y + h,
-      0.018
-    ),
-    new Point3(
-      x,
-      y + h,
-      0.018
-    )
+    new Point3(x, y, 0.018),
+    new Point3(x + w, y, 0.018),
+    new Point3(x + w, y + h, 0.018),
+    new Point3(x, y + h, 0.018)
   ]);
   static function settings():CamSheetProfileSettings return {
     autoTabs: 4,
@@ -205,11 +189,7 @@ class SheetOperationsChecks {
     );
     var job = new CamJob(0.025, 12000, new Point3(0, 0, 0.025)).surface(
       new Point3(0, 0, 0.018),
-      new Point3(
-        0.08,
-        0.096,
-        0.018
-      ),
+      new Point3(0.08, 0.096, 0.018),
       tool,
       0.016,
       0.05,
@@ -249,38 +229,10 @@ class SheetOperationsChecks {
       "per-operation speed changes without reloading tool"
     );
     var operations:Array<CamSheetOperation> = [
-      {
-        id: "large-out",
-        part: "large",
-        area: 0.4,
-        kind: "outside",
-        requires: [],
-        releases: true
-      },
-      {
-        id: "small-out",
-        part: "small",
-        area: 0.0025,
-        kind: "outside",
-        requires: [],
-        releases: true
-      },
-      {
-        id: "small-hole",
-        part: "small",
-        area: 0.0025,
-        kind: "inside",
-        requires: [],
-        releases: false
-      },
-      {
-        id: "large-hole",
-        part: "large",
-        area: 0.4,
-        kind: "inside",
-        requires: [],
-        releases: false
-      }
+      {id: "large-out", part: "large", area: 0.4, kind: "outside", requires: [], releases: true},
+      {id: "small-out", part: "small", area: 0.0025, kind: "outside", requires: [], releases: true},
+      {id: "small-hole", part: "small", area: 0.0025, kind: "inside", requires: [], releases: false},
+      {id: "large-hole", part: "large", area: 0.4, kind: "inside", requires: [], releases: false}
     ];
     var order = CamSheetOrder.order(operations);
     check(

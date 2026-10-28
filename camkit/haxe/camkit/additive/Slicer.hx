@@ -449,10 +449,8 @@ private class SliceRun {
       if (!segment.arc) continue;
       var steps = Std.int(Math.max(
         2,
-        Math.ceil(Math.abs(segment.sweep) / (2.0 * Math.acos(Math.max(
-          0.0,
-          1.0 - tolerance / (segment.radius * scale)
-        ))))
+        Math.ceil(Math.abs(segment.sweep) / (2.0 * Math.acos(Math.max(0.0,
+        1.0 - tolerance / (segment.radius * scale)))))
       ));
       for (step in 1...steps) {
         var angle = segment.startAngle + segment.sweep * step / steps;

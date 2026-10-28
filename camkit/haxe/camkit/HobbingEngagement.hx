@@ -19,10 +19,8 @@ class HobbingEngagement {
     overrun = maximum(
       lo,
       hi,
-      w -> Math.sqrt(Math.max(
-        0,
-        blankRadius * blankRadius - (centreDistance - w) * (centreDistance - w)
-      )) * tangent + Math.sqrt(Math.max(
+      w -> Math.sqrt(Math.max(0,
+      blankRadius * blankRadius - (centreDistance - w) * (centreDistance - w))) * tangent + Math.sqrt(Math.max(
         0,
         hobRadius * hobRadius - w * w
       )) / cosine
@@ -30,10 +28,8 @@ class HobbingEngagement {
     axialHalfSpan = maximum(
       lo,
       hi,
-      w -> Math.sqrt(Math.max(
-        0,
-        blankRadius * blankRadius - (centreDistance - w) * (centreDistance - w)
-      )) / cosine + Math.sqrt(Math.max(
+      w -> Math.sqrt(Math.max(0,
+      blankRadius * blankRadius - (centreDistance - w) * (centreDistance - w))) / cosine + Math.sqrt(Math.max(
         0,
         hobRadius * hobRadius - w * w
       )) * tangent

@@ -357,21 +357,7 @@ class CamIslandPocketFixture {
   }
 
   static function rectangle(x0:Float, y0:Float, x1:Float, y1:Float):Curve return Curve.polyline(
-    [
-      new Vector(x0, y0),
-      new Vector(
-        x1,
-        y0
-      ),
-      new Vector(
-        x1,
-        y1
-      ),
-      new Vector(
-        x0,
-        y1
-      )
-    ],
+    [new Vector(x0, y0), new Vector(x1, y0), new Vector(x1, y1), new Vector(x0, y1)],
     true
   );
 

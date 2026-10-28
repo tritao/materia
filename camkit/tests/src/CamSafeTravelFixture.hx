@@ -14,28 +14,13 @@ class CamSafeTravelFixture {
       new Point3(0.01, 0.01, 0),
       new Point3(0.03, 0.01, 0),
       new Point3(0.03, 0.02, 0),
-      new Point3(
-        0.01,
-        0.02,
-        0
-      )
+      new Point3(0.01, 0.02, 0)
     ]);
     var profileTool = new Tool(21, 0, 0.002);
     var drillTool = new Tool(22, 0, 0.001);
     var job = new CamJob(0.005, 10000, new Point3(0.002, 0.002, -0.001));
     var program = job.profile(contour, profileTool, -0.003, 0.005, "outside", 0.002, 0.001).drill(
-      [
-        new Point3(
-          0.018,
-          0.015,
-          0
-        ),
-        new Point3(
-          0.024,
-          0.015,
-          0
-        )
-      ],
+      [new Point3(0.018, 0.015, 0), new Point3(0.024, 0.015, 0)],
       drillTool,
       -0.004,
       0.001,
@@ -115,18 +100,14 @@ class CamSafeTravelFixture {
       case [Move(Cut, a, speedA, _, _), Move(Cut, b, speedB, _, _)]:
         check(Math.abs(speedA - speedB) < 1e-8, "mixed tool G-code preserves feed selection");
         check(
-          GeometryTools.pointAt(a, GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(
-            b,
-            GeometryTools.length(b)
-          )) < 1e-8,
+          GeometryTools.pointAt(a,
+          GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves feed endpoints"
         );
       case [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         check(
-          GeometryTools.pointAt(a, GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(
-            b,
-            GeometryTools.length(b)
-          )) < 1e-8,
+          GeometryTools.pointAt(a,
+          GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves rapid endpoints"
         );
       case [ToolChange(a, _), ToolChange(b, _)]:

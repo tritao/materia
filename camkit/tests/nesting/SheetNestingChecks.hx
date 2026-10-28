@@ -42,10 +42,7 @@ class SheetNestingChecks {
     widthTolerancePlus: 0,
     heightToleranceMinus: 0,
     heightTolerancePlus: 0,
-    allowedRotations: [
-      0,
-      90
-    ],
+    allowedRotations: [0, 90],
     directionConstraint: "free",
     shape: shape
   };
@@ -54,12 +51,7 @@ class SheetNestingChecks {
     var plan = result.plans[0], checked = SheetPlanValidator.validate(plan, stock, result.requirements);
     File.saveContent(
       outputDirectory + "/" + name + ".svg",
-      SheetPlanExporter.svg(
-        plan,
-        stock,
-        result.requirements,
-        checked
-      )
+      SheetPlanExporter.svg(plan, stock, result.requirements, checked)
     );
   }
   static function legacyFingerprint():Void {
@@ -85,13 +77,7 @@ class SheetNestingChecks {
     var s = stock(100, 100), r = CamSheetNester.nest(
       [req("panel", 45, 100, 2)],
       [{stock: s, quantity: 2}],
-      {
-        toolDiameter: 6,
-        gap: 4,
-        edgeMargin: 0,
-        seed: 31,
-        minimumRemnantSide: 10
-      }
+      {toolDiameter: 6, gap: 4, edgeMargin: 0, seed: 31, minimumRemnantSide: 10}
     );
     check(
       r.plans.length == 1 && r.guillotineSheets == 1,
@@ -183,21 +169,12 @@ class SheetNestingChecks {
       {x: 80.0, y: 20.0},
       {x: 20.0, y: 20.0},
       {x: 20.0, y: 80.0},
-      {
-        x: 0.0,
-        y: 80.0
-      }
+      {x: 0.0, y: 80.0}
     ]];
     var s = stock(105, 105), r = CamSheetNester.nest(
       [req("L", 80, 80, 2, l)],
       [{stock: s, quantity: 1}],
-      {
-        toolDiameter: 4,
-        gap: 1,
-        edgeMargin: 0,
-        seed: 31,
-        minimumRemnantSide: 10
-      }
+      {toolDiameter: 4, gap: 1, edgeMargin: 0, seed: 31, minimumRemnantSide: 10}
     );
     check(
       r.plans.length == 1 && SheetFreeLayout.placements(r.plans[0]).length == 2,
@@ -220,13 +197,7 @@ class SheetNestingChecks {
     r = CamSheetNester.nest(
       [req("ring", 200, 200, 1, ring), req("plug", 80, 80)],
       [{stock: s, quantity: 1}],
-      {
-        toolDiameter: 6,
-        gap: 1,
-        edgeMargin: 0,
-        seed: 31,
-        minimumRemnantSide: 10
-      }
+      {toolDiameter: 6, gap: 1, edgeMargin: 0, seed: 31, minimumRemnantSide: 10}
     );
     check(r.plans.length == 1 && r.stats.decompositions > 0, "material decomposition honors a real hole");
     var ringPlacement = SheetFreeLayout.placements(r.plans[0])[0], plug = SheetFreeLayout.placements(r.plans[0])[1];
@@ -301,12 +272,7 @@ class SheetNestingChecks {
     for (length in [2600.0, 3150.0]) {
       var count = length > 2800 ? 8 : 6, s = stock(1600, length), requirements = [
         req("panel", 700, 750, count),
-        req(
-          "small",
-          50,
-          50,
-          6
-        )
+        req("small", 50, 50, 6)
       ];
       var options:camkit.CamSheetNester.CamNestOptions = {
         toolDiameter: 6,
@@ -317,10 +283,7 @@ class SheetNestingChecks {
       };
       var a = CamSheetNester.nest(requirements, [{stock: s, quantity: 3}], options), b = CamSheetNester.nest(
         requirements,
-        [{
-          stock: s,
-          quantity: 3
-        }],
+        [{stock: s, quantity: 3}],
         options
       );
       check(
@@ -361,11 +324,7 @@ class SheetNestingChecks {
     var results = cabinet();
     if (args.length > 0) File.saveContent(
       args[0],
-      haxe.Json.stringify(
-        {assertions: assertions, cabinet: results},
-        null,
-        "  "
-      ) + "\n"
+      haxe.Json.stringify({assertions: assertions, cabinet: results}, null, "  ") + "\n"
     );
     Sys.println('Sheet nesting checks passed ($assertions assertions)');
   }

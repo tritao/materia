@@ -113,11 +113,7 @@ class CamExactBoundary {
           if (kind == CadKit.CurveKind.Line) {
             result.push(Line(
               new Point3(a.get_x() * 0.001, a.get_y() * 0.001, depth),
-              new Point3(
-                b.get_x() * 0.001,
-                b.get_y() * 0.001,
-                depth
-              )
+              new Point3(b.get_x() * 0.001, b.get_y() * 0.001, depth)
             ));
           } else if (kind == CadKit.CurveKind.Circle) {
             var axis = shape.edgeAxis(), center = axis.get_origin(), radius = axis.get_radius();
@@ -129,10 +125,7 @@ class CamExactBoundary {
             result.push(Arc(
               new Point3(center.get_x() * 0.001, center.get_y() * 0.001, depth),
               radius * 0.001,
-              Math.atan2(
-                a.get_y() - center.get_y(),
-                a.get_x() - center.get_x()
-              ),
+              Math.atan2(a.get_y() - center.get_y(), a.get_x() - center.get_x()),
               sign * shape.edgeLength() / radius
             ));
           } else throw "CAM exact offset needs planar lines and arcs";

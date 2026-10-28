@@ -156,11 +156,7 @@ class HobbingCamTests {
     binding.gearFollowers = ["table/C"];
     for (id in ["spindle/B", "table/C"]) binding.gearEncoders.set(
       id,
-      {
-        latencyNs: 1000000,
-        quantum: 2 * Math.PI / 8388608,
-        loopHz: 4000
-      }
+      {latencyNs: 1000000, quantum: 2 * Math.PI / 8388608, loopHz: 4000}
     );
     var lowered = new ToolpathLowering(binding).lower(job.program.ops), program = lowered.program;
     if (program == null) throw "missing lowered hobbing program";
@@ -218,12 +214,7 @@ class HobbingCamTests {
       [for (_ in 0...6) 1.0],
       [for (_ in 0...6) 2.0],
       [for (_ in 0...6) 10.0],
-      motionkit.robot.StartTolerances.uniform(
-        6,
-        0.00001,
-        0.01,
-        0.01
-      )
+      motionkit.robot.StartTolerances.uniform(6, 0.00001, 0.01, 0.01)
     );
     var compiled = compiler.compile(program, [0.06, 0.0, 0.0, 0.2, 0.0, 0.7], haxe.Int64.ofInt(1));
     var cuttingPlans = 0;
@@ -261,24 +252,7 @@ class HobbingCamTests {
     var wrong = new MachineBinding("work", "X", "Y", "Z", 0.02, new ToolpathChannels(""));
     rejects(() -> {new ToolpathLowering(wrong).lower([
       FeedPerRevolution("C", "Z", 0.001, Provenance.cam(0)),
-      Move(
-        Cut,
-        Line(
-          new Point3(
-            0,
-            0,
-            0
-          ),
-          new Point3(
-            0,
-            0,
-            0.01
-          )
-        ),
-        0.001,
-        0,
-        Provenance.cam(0)
-      )
+      Move(Cut, Line(new Point3(0, 0, 0), new Point3(0, 0, 0.01)), 0.001, 0, Provenance.cam(0))
     ]);
     }, "active spindle");
     Sys

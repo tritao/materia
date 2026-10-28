@@ -22,16 +22,8 @@ class CamTestRig {
   function get_toolLibrary():ToolLibrary return controller.toolLibrary;
 
   public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void binding.setTravel(new TravelEnvelope(
-    new Point3(
-      lower[0],
-      lower[1],
-      lower[2]
-    ),
-    new Point3(
-      upper[0],
-      upper[1],
-      upper[2]
-    )
+    new Point3(lower[0], lower[1], lower[2]),
+    new Point3(upper[0], upper[1], upper[2])
   ));
 
   public function compileDetailed(source:String, ?start:Point3):CncCompileResult return CncCompiler.compileDetailed(

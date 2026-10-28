@@ -17,11 +17,7 @@ class CamMeasuredToolFixture {
       new Point3(0.01, 0.01, 0),
       new Point3(0.03, 0.01, 0),
       new Point3(0.03, 0.02, 0),
-      new Point3(
-        0.01,
-        0.02,
-        0
-      )
+      new Point3(0.01, 0.02, 0)
     ]);
     var mill = new Tool(31, 0.04, 0.002);
     var drill = new Tool(32, 0.06, 0.001);
@@ -118,11 +114,7 @@ class CamMeasuredToolFixture {
 
     var imported = machine.compileDetailed(
       machine.export(program, CamTestSetup.standard()),
-      new Point3(
-        0.002,
-        0.002,
-        0.05
-      )
+      new Point3(0.002, 0.002, 0.05)
     );
     check(
       imported.diagnostics.length == 0 && imported.program.ops.length == program.ops.length,
@@ -131,10 +123,8 @@ class CamMeasuredToolFixture {
     for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         check(
-          GeometryTools.pointAt(a, GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(
-            b,
-            GeometryTools.length(b)
-          )) < 1e-8,
+          GeometryTools.pointAt(a,
+          GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "measured-tool G-code preserves programmed endpoints"
         );
       case [ToolLengthOffset(a, lengthA, _), ToolLengthOffset(b, lengthB, _)]:

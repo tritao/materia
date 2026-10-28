@@ -155,10 +155,7 @@ class CamSheetNfp {
       add(new Point2(highX, highY));
       if (highX - lowX > 1e-9 || highY - lowY > 1e-9) boundary.push(Segment.line(
         new Point2(lowX, lowY),
-        new Point2(
-          highX,
-          highY
-        )
+        new Point2(highX, highY)
       ));
     }
     var edges = obstacles(placed, variant, spacing, stats);
@@ -193,17 +190,7 @@ class CamSheetNfp {
       x: p.x,
       y: p.y,
       variant: variant,
-      shape: SheetPolygon.transform(
-        variant.shape,
-        0,
-        p.x,
-        p.y
-      ),
-      pieces: [for (piece in variant.pieces) SheetPolygon.transform(
-        [piece],
-        0,
-        p.x,
-        p.y
-      )[0]]
+      shape: SheetPolygon.transform(variant.shape, 0, p.x, p.y),
+      pieces: [for (piece in variant.pieces) SheetPolygon.transform([piece], 0, p.x, p.y)[0]]
     };
 }

@@ -333,10 +333,7 @@ class CamToolingPanels {
                 )],
                 tool,
                 depth,
-                Math.min(
-                  settings.safeZ,
-                  settings.approachClearance
-                ),
+                Math.min(settings.safeZ, settings.approachClearance),
                 settings.plungeFeed,
                 op.id,
                 -depth > settings.drillPeckRatio * tool.diameter ? settings.drillPeckDepth : 0

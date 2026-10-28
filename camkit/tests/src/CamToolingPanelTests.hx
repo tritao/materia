@@ -45,16 +45,7 @@ class CamToolingPanelTests {
     drillPeckDepth: 0.003,
     travelSpace: MachineCoordinates,
     workOriginReference: "test machine datum",
-    nominalDiameters: [
-      {
-        number: 1,
-        diameter: 0.002
-      },
-      {
-        number: 2,
-        diameter: 0.004
-      }
-    ],
+    nominalDiameters: [{number: 1, diameter: 0.002}, {number: 2, diameter: 0.004}],
     safeZ: 0.01,
     spindleRpm: 12000,
     feed: 0.01,
@@ -62,42 +53,10 @@ class CamToolingPanelTests {
     stepDown: 0.004,
     stepOverFraction: 0.4,
     blankMargin: 0.01,
-    tools: [
-      new Tool(
-        1,
-        0.05,
-        0.002,
-        null,
-        0.025,
-        0.03
-      ),
-      new Tool(
-        2,
-        0.06,
-        0.004,
-        null,
-        0.025,
-        0.03
-      )
-    ],
+    tools: [new Tool(1, 0.05, 0.002, null, 0.025, 0.03), new Tool(2, 0.06, 0.004, null, 0.025, 0.03)],
     fixtures: [],
-    travel: new TravelEnvelope(
-      new Point3(
-        -0.1,
-        -0.1,
-        -0.1
-      ),
-      new Point3(
-        1,
-        1,
-        0.1
-      )
-    ),
-    workOrigin: new Point3(
-      0,
-      0,
-      0
-    ),
+    travel: new TravelEnvelope(new Point3(-0.1, -0.1, -0.1), new Point3(1, 1, 0.1)),
+    workOrigin: new Point3(0, 0, 0),
     workholdingReference: null
   };
 
@@ -110,10 +69,7 @@ class CamToolingPanelTests {
       width: 1200,
       height: 800,
       coatedFace: Both,
-      allowedRotations: [
-        0,
-        90
-      ],
+      allowedRotations: [0, 90],
       directionConstraint: Free
     };
     var p = PanelJoints.blank("cam-panel", 100, 80, stock, 2, 2);
@@ -192,13 +148,7 @@ class CamToolingPanelTests {
     relieved.operations.push(PanelJoints.operation(
       "relieved",
       InsideProfile,
-      PanelContours.relievedRectangle(
-        30,
-        20,
-        30,
-        14,
-        1
-      ),
+      PanelContours.relievedRectangle(30, 20, 30, 14, 1),
       12,
       2,
       PositiveZ,
@@ -291,10 +241,8 @@ class CamToolingPanelTests {
     conventional.cutDirection = Conventional;
     var conventionalPrograms = CamToolingPanels.build(p, conventional);
     check(
-      area(conventionalPrograms[1].program, p.operations[0].id) > 0 && area(
-        conventionalPrograms[1].program,
-        "inside"
-      ) < 0,
+      area(conventionalPrograms[1].program,
+      p.operations[0].id) > 0 && area(conventionalPrograms[1].program, "inside") < 0,
       "conventional cutting reverses both material sides"
     );
     var extended = CamToolingPanels.openRebate(
@@ -322,11 +270,7 @@ class CamToolingPanelTests {
       new Point3(0.01, 0.01, 0),
       new Point3(0.11, 0.01, 0),
       new Point3(0.01, 0.015, 0),
-      new Point3(
-        0.11,
-        0.015,
-        0
-      )
+      new Point3(0.11, 0.015, 0)
     ]) {
       var closest = Math.POSITIVE_INFINITY;
       for (op in setups[1].program.ops) switch (op) {
@@ -337,17 +281,11 @@ class CamToolingPanelTests {
             var b = GeometryTools.pointAt(g, j == 32 ? length : length * j / 32), dx = b.x - a.x, dy = b.y - a.y;
             var square = dx * dx + dy * dy, t = square == 0 ? 0 : Math.max(
               0,
-              Math.min(
-                1,
-                ((corner.x - a.x) * dx + (corner.y - a.y) * dy) / square
-              )
+              Math.min(1, ((corner.x - a.x) * dx + (corner.y - a.y) * dy) / square)
             );
             closest = Math.min(
               closest,
-              Math.sqrt(Math.pow(corner.x - a.x - t * dx, 2) + Math.pow(
-                corner.y - a.y - t * dy,
-                2
-              ))
+              Math.sqrt(Math.pow(corner.x - a.x - t * dx, 2) + Math.pow(corner.y - a.y - t * dy, 2))
             );
             a = b;
           }
@@ -382,26 +320,11 @@ class CamToolingPanelTests {
         {x: 0, y: 0},
         {x: 100, y: 0},
         {x: 100, y: 80},
-        {
-          x: 60,
-          y: 80
-        },
-        {
-          x: 60,
-          y: 60
-        },
-        {
-          x: 40,
-          y: 60
-        },
-        {
-          x: 40,
-          y: 80
-        },
-        {
-          x: 0,
-          y: 80
-        }
+        {x: 60, y: 80},
+        {x: 60, y: 60},
+        {x: 40, y: 60},
+        {x: 40, y: 80},
+        {x: 0, y: 80}
       ],
       1
     );
@@ -497,30 +420,14 @@ class CamToolingPanelTests {
       new Point3(0, 0, 0),
       new Point3(0.03, 0, 0),
       new Point3(0.03, 0.01, 0),
-      new Point3(
-        0.01,
-        0.01,
-        0
-      ),
-      new Point3(
-        0.01,
-        0.03,
-        0
-      ),
-      new Point3(
-        0,
-        0.03,
-        0
-      )
+      new Point3(0.01, 0.01, 0),
+      new Point3(0.01, 0.03, 0),
+      new Point3(0, 0.03, 0)
     ]);
     for (direction in [camkit.CamCutDirection.Climb, camkit.CamCutDirection.Conventional]) {
       var raster = new camkit.CamJob(0.01, 12000, null, 0, 0, 0, false, direction, 0.0005).pocket(
         l,
-        new Tool(
-          1,
-          0,
-          0.002
-        ),
+        new Tool(1, 0, 0.002),
         -0.001,
         0.01,
         0.0008

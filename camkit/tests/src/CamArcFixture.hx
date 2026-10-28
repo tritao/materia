@@ -62,10 +62,8 @@ class CamArcFixture {
           'arc G-code keeps arc $index'
         );
         else check(
-          GeometryTools.pointAt(a, GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(
-            b,
-            GeometryTools.length(b)
-          )) < 1e-8,
+          GeometryTools.pointAt(a,
+          GeometryTools.length(a)).distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           'arc G-code keeps move $index end'
         );
       case _:

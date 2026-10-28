@@ -73,20 +73,8 @@ class CamPocketEntryFixture {
 
   static function rectangle(width:Float, height:Float):CamContour return new CamContour([
     new Point3(0, 0, 0),
-    new Point3(
-      width,
-      0,
-      0
-    ),
-    new Point3(
-      width,
-      height,
-      0
-    ),
-    new Point3(
-      0,
-      height,
-      0
-    )
+    new Point3(width, 0, 0),
+    new Point3(width, height, 0),
+    new Point3(0, height, 0)
   ]);
 }

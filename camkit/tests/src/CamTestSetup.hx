@@ -7,14 +7,6 @@ class CamTestSetup {
   public static function standard():Setup return new Setup(
     "1",
     new Point3(0, 0, 0),
-    new SetupStock(
-      -1.0,
-      1.0,
-      -1.0,
-      1.0,
-      0.0,
-      -1.0,
-      0.005
-    )
+    new SetupStock(-1.0, 1.0, -1.0, 1.0, 0.0, -1.0, 0.005)
   );
 }

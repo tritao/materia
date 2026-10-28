@@ -23,60 +23,20 @@ class CamGeneratedFixtures {
     var l = new CamContour([
       new toolpathkit.geometry.Point3(0, 0, 0),
       new toolpathkit.geometry.Point3(0.03, 0, 0),
-      new toolpathkit.geometry.Point3(
-        0.03,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0,
-        0.03,
-        0
-      )
+      new toolpathkit.geometry.Point3(0.03, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.03, 0),
+      new toolpathkit.geometry.Point3(0, 0.03, 0)
     ]);
     var u = new CamContour([
       new toolpathkit.geometry.Point3(0, 0, 0),
       new toolpathkit.geometry.Point3(0.03, 0, 0),
-      new toolpathkit.geometry.Point3(
-        0.03,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.02,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.02,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0,
-        0.03,
-        0
-      )
+      new toolpathkit.geometry.Point3(0.03, 0.03, 0),
+      new toolpathkit.geometry.Point3(0.02, 0.03, 0),
+      new toolpathkit.geometry.Point3(0.02, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.03, 0),
+      new toolpathkit.geometry.Point3(0, 0.03, 0)
     ]);
     var tool = new Tool(8, 0, 0.002);
     var lProgram = new CamJob(0.005, 10000).pocket(l, tool, -0.003, 0.005, 0.001, 0.001).finish();
@@ -143,15 +103,12 @@ class CamGeneratedFixtures {
     for (op in program.ops) switch op {
       case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 && Math.abs(b.z - depth) < 1e-9):
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = new toolpathkit.geometry.Point3(a.x + (b.x - a.x) * fraction, a.y + (b.y - a.y) * fraction, depth);
+          var point = new toolpathkit.geometry.Point3(a.x + (b.x - a.x) * fraction,
+            a.y + (b.y - a.y) * fraction, depth);
           var clearance = Math.POSITIVE_INFINITY;
           for (i in 0...contour.vertices.length) clearance = Math.min(
             clearance,
-            segmentDistance(
-              point,
-              contour.vertices[i],
-              contour.vertices[(i + 1) % contour.vertices.length]
-            )
+            segmentDistance(point, contour.vertices[i], contour.vertices[(i + 1) % contour.vertices.length])
           );
           check(
             inside(point, contour.vertices) && clearance >= 0.001 - 1e-8,
@@ -198,26 +155,10 @@ class CamGeneratedFixtures {
     var contour = new CamContour([
       new toolpathkit.geometry.Point3(0, 0, 0),
       new toolpathkit.geometry.Point3(0.03, 0, 0),
-      new toolpathkit.geometry.Point3(
-        0.03,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0,
-        0.03,
-        0
-      )
+      new toolpathkit.geometry.Point3(0.03, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.03, 0),
+      new toolpathkit.geometry.Point3(0, 0.03, 0)
     ]);
     var tool = new Tool(5, 0, 0.002);
     var program = new CamJob(0.005, 10000).profile(contour, tool, -0.002, 0.005, "outside").finish();
@@ -237,11 +178,7 @@ class CamGeneratedFixtures {
           var clearance = Math.POSITIVE_INFINITY;
           for (i in 0...contour.vertices.length) clearance = Math.min(
             clearance,
-            segmentDistance(
-              point,
-              contour.vertices[i],
-              contour.vertices[(i + 1) % contour.vertices.length]
-            )
+            segmentDistance(point, contour.vertices[i], contour.vertices[(i + 1) % contour.vertices.length])
           );
           check(clearance >= 0.001 - 1e-8, "concave outside cutter path clears its authored contour");
         }
@@ -318,36 +255,12 @@ class CamGeneratedFixtures {
     var narrowNotch = new CamContour([
       new toolpathkit.geometry.Point3(0, 0, 0),
       new toolpathkit.geometry.Point3(0.03, 0, 0),
-      new toolpathkit.geometry.Point3(
-        0.03,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.02,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.02,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.01,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0.01,
-        0.03,
-        0
-      ),
-      new toolpathkit.geometry.Point3(
-        0,
-        0.03,
-        0
-      )
+      new toolpathkit.geometry.Point3(0.03, 0.03, 0),
+      new toolpathkit.geometry.Point3(0.02, 0.03, 0),
+      new toolpathkit.geometry.Point3(0.02, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.01, 0),
+      new toolpathkit.geometry.Point3(0.01, 0.03, 0),
+      new toolpathkit.geometry.Point3(0, 0.03, 0)
     ]);
     rejected = false;
     try new CamJob(0.005,
@@ -355,8 +268,11 @@ class CamGeneratedFixtures {
     check(rejected, "outside cutter wider than a U notch is rejected");
   }
 
-  static function segmentDistance(point:toolpathkit.geometry.Point3,
-    a:toolpathkit.geometry.Point3, b:toolpathkit.geometry.Point3):Float {
+  static function segmentDistance(
+    point:toolpathkit.geometry.Point3,
+    a:toolpathkit.geometry.Point3,
+    b:toolpathkit.geometry.Point3
+  ):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var t = Math.max(0.0, Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
     return Math.sqrt(Math.pow(point.x - a.x - t * dx, 2) + Math.pow(point.y - a.y - t * dy, 2));
@@ -366,89 +282,13 @@ class CamGeneratedFixtures {
     var r = 5.0, diagonal = r / Math.sqrt(2.0);
     var pieces = [
       Curve.line(new Vector(5, 0), new Vector(35, 0)),
-      Curve.arc(
-        new Vector(35, 0),
-        new Vector(
-          35 + diagonal,
-          5 - diagonal
-        ),
-        new Vector(
-          40,
-          5
-        )
-      ),
-      Curve.line(
-        new Vector(
-          40,
-          5
-        ),
-        new Vector(
-          40,
-          15
-        )
-      ),
-      Curve.arc(
-        new Vector(
-          40,
-          15
-        ),
-        new Vector(
-          35 + diagonal,
-          15 + diagonal
-        ),
-        new Vector(
-          35,
-          20
-        )
-      ),
-      Curve.line(
-        new Vector(
-          35,
-          20
-        ),
-        new Vector(
-          5,
-          20
-        )
-      ),
-      Curve.arc(
-        new Vector(
-          5,
-          20
-        ),
-        new Vector(
-          5 - diagonal,
-          15 + diagonal
-        ),
-        new Vector(
-          0,
-          15
-        )
-      ),
-      Curve.line(
-        new Vector(
-          0,
-          15
-        ),
-        new Vector(
-          0,
-          5
-        )
-      ),
-      Curve.arc(
-        new Vector(
-          0,
-          5
-        ),
-        new Vector(
-          5 - diagonal,
-          5 - diagonal
-        ),
-        new Vector(
-          5,
-          0
-        )
-      )
+      Curve.arc(new Vector(35, 0), new Vector(35 + diagonal, 5 - diagonal), new Vector(40, 5)),
+      Curve.line(new Vector(40, 5), new Vector(40, 15)),
+      Curve.arc(new Vector(40, 15), new Vector(35 + diagonal, 15 + diagonal), new Vector(35, 20)),
+      Curve.line(new Vector(35, 20), new Vector(5, 20)),
+      Curve.arc(new Vector(5, 20), new Vector(5 - diagonal, 15 + diagonal), new Vector(0, 15)),
+      Curve.line(new Vector(0, 15), new Vector(0, 5)),
+      Curve.arc(new Vector(0, 5), new Vector(5 - diagonal, 5 - diagonal), new Vector(5, 0))
     ];
     var outline = Curve.wire(pieces);
     var sketch = Sketch.face(outline);

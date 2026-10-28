@@ -47,10 +47,7 @@ class CamSheetProfile {
     var length = GeometryTools.length(g),
       a = GeometryTools.pointAt(g, Math.min(length, from)), b = GeometryTools.pointAt(
         g,
-        Math.min(
-          length,
-          to
-        )
+        Math.min(length, to)
       );
     return switch (g) {
       case Line(_, _):
@@ -58,11 +55,7 @@ class CamSheetProfile {
       case Arc(c, r, start, sweep):
         var angle = start + sweep * from / length, turn = sweep * (to - from) / length;
         if (Math.abs(z0 - z1) < 1e-12) Arc(new Point3(c.x, c.y, z0), r, angle, turn) else Circular(
-          new Point3(
-            c.x,
-            c.y,
-            z0
-          ),
+          new Point3(c.x, c.y, z0),
           r,
           angle,
           turn,
@@ -247,10 +240,7 @@ class CamSheetProfile {
         Math.max(0, a - start),
         Math.min(span, b - start),
         height(a, (a + b) / 2),
-        height(
-          b,
-          (a + b) / 2
-        )
+        height(b, (a + b) / 2)
       );
       var begin = GeometryTools.pointAt(g, 0);
       if (previous != null && previous.distanceTo(begin) > 1e-10) output.push(Line(previous, begin));

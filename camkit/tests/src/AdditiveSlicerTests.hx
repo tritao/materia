@@ -187,10 +187,7 @@ class AdditiveSlicerTests {
     for (point in beads(thickProgram)) if (point.feature == "SolidInfill"
       && Math.abs(point.z - 0.0003) < 1e-9) reach = Math.max(
         reach,
-        Math.max(
-          Math.abs(point.x - centerX),
-          Math.abs(point.y - centerY)
-        )
+        Math.max(Math.abs(point.x - centerX), Math.abs(point.y - centerY))
       );
     near(reach, 0.005 - inset, "a 0.3 mm first layer's infill reaches its own core", 1e-7);
     part.close();

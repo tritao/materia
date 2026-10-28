@@ -108,14 +108,7 @@ class CamPocketPlanner {
         }
         if (Math.min(
           Math.min(pointDistance(a, u, v), pointDistance(b, u, v)),
-          Math.min(
-            pointDistance(u, a, b),
-            pointDistance(
-              v,
-              a,
-              b
-            )
-          )
+          Math.min(pointDistance(u, a, b), pointDistance(v, a, b))
         ) < guardedRadius - 1e-9) return false;
       }
     }

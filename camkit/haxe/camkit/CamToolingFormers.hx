@@ -27,10 +27,7 @@ class CamToolingFormers {
   public static function build(
     plan:FormerMachiningPlan,
     settings:CamToolingPanels.PanelCamSettings,
-    ?measuredTools:Map<
-      String,
-      Tool
-  >
+    ?measuredTools:Map<String, Tool>
   ):Array<FormerCamProgram> {
     var blankHeight = plan.stock.measuredThickness * 0.001, finishedHeight = plan.heightMm * 0.001;
     var declaredPlane = settings.spoilboardPlane;
@@ -65,31 +62,14 @@ class CamToolingFormers {
     var setup = new Setup(
       "1",
       settings.workOrigin,
-      new SetupStock(
-        0,
-        width,
-        0,
-        depth,
-        top,
-        base,
-        safe,
-        settings.fixtures,
-        base,
-        breakthrough
-      )
+      new SetupStock(0, width, 0, depth, top, base, safe, settings.fixtures, base, breakthrough)
     );
     function job():CamJob return new CamJob(
       safe,
       settings.spindleRpm,
       new Point3(0, 0, safe),
-      Math.min(
-        settings.blendTolerance,
-        contourTolerance
-      ),
-      Math.min(
-        settings.arcTolerance,
-        contourTolerance
-      ),
+      Math.min(settings.blendTolerance, contourTolerance),
+      Math.min(settings.arcTolerance, contourTolerance),
       settings.spindleSpinUpSeconds,
       true,
       settings.cutDirection,
@@ -105,11 +85,7 @@ class CamToolingFormers {
       rough.diameter * settings.stepOverFraction,
       settings.stepDown,
       settings.plungeFeed,
-      materia.tooling.ToolingIds.derive(
-        "",
-        plan.id,
-        "-facing"
-      )
+      materia.tooling.ToolingIds.derive("", plan.id, "-facing")
     );
     for (band in plan.bands) {
       if (band.topMm <= band.bottomMm
@@ -155,11 +131,7 @@ class CamToolingFormers {
           row.depth % 2 == 0 ? "outside" : "inside",
           finishedHeight + breakthrough,
           settings.plungeFeed,
-          materia.tooling.ToolingIds.derive(
-            "",
-            plan.id,
-            "-draft-finish"
-          ),
+          materia.tooling.ToolingIds.derive("", plan.id, "-draft-finish"),
           height,
           breakthrough
         );
@@ -180,10 +152,7 @@ class CamToolingFormers {
     spec:FormerCutter,
     number:Int,
     settings:CamToolingPanels.PanelCamSettings,
-    measuredTools:Null<Map<
-      String,
-      Tool
-  >>
+    measuredTools:Null<Map<String, Tool>>
   ):Tool {
     var radius = spec.tipDiameterMm * 0.0005, flute = spec.fluteLengthMm * 0.001;
     var outer = radius + flute * Math.tan(spec.taperDegrees * Math.PI / 180);
@@ -204,20 +173,8 @@ class CamToolingFormers {
       return measured;
     }
     var profile = spec.taperDegrees == 0 ? CutterProfile.flat(2 * radius, flute) : new CutterProfile([
-      Line(
-        0,
-        0,
-        radius,
-        0,
-        Cutting
-      ),
-      Line(
-        radius,
-        0,
-        outer,
-        flute,
-        Cutting
-      )
+      Line(0, 0, radius, 0, Cutting),
+      Line(radius, 0, outer, flute, Cutting)
     ]);
     return new Tool(number, 0, 2 * outer, profile, flute, spec.stickOutMm * 0.001, 2 * outer);
   }
@@ -284,11 +241,7 @@ class CamToolingFormers {
       tool.diameter * settings.stepOverFraction,
       settings.stepDown,
       settings.plungeFeed,
-      materia.tooling.ToolingIds.derive(
-        "",
-        plan.id,
-        "-outside"
-      )
+      materia.tooling.ToolingIds.derive("", plan.id, "-outside")
     );
     for (hole in band.contours) if (hole.depth % 2 == 1) {
       var children = [for (row in band.contours) if (row.depth == hole.depth + 1
@@ -306,11 +259,7 @@ class CamToolingFormers {
         tool.diameter * settings.stepOverFraction,
         settings.stepDown,
         settings.plungeFeed,
-        materia.tooling.ToolingIds.derive(
-          "",
-          plan.id,
-          "-inside"
-        )
+        materia.tooling.ToolingIds.derive("", plan.id, "-inside")
       );
     }
   }

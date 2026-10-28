@@ -38,10 +38,7 @@ class CamCastingContours {
         exact.push(cadkit.sheetmetal.Segment.arc(
           center,
           CastingProfiles.distance(s.center, s.start) * 0.001,
-          Math.atan2(
-            a.y - center.y,
-            a.x - center.x
-          ),
+          Math.atan2(a.y - center.y, a.x - center.x),
           s.sweep * (mirrorX ? -1 : 1)
         ));
       }

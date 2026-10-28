@@ -141,11 +141,7 @@ class CamKitTests {
         case ToolpathOp.Move(Cut, PathGeometry.Line(a, b), _, _, span):
           if (span.line == 2 && Math.abs(a.z + 0.001) < 1e-9 && Math.abs(b.z + 0.001) < 1e-9) best = Math.min(
             best,
-            distanceToLine(
-              sample,
-              a,
-              b
-            )
+            distanceToLine(sample, a, b)
           );
         case _:
       }
@@ -155,16 +151,8 @@ class CamKitTests {
       new Point3(0, 0, 0),
       new Point3(0.02, 0, 0),
       new Point3(0.02, 0.01, 0),
-      new Point3(
-        0.01,
-        0.005,
-        0
-      ),
-      new Point3(
-        0,
-        0.01,
-        0
-      )
+      new Point3(0.01, 0.005, 0),
+      new Point3(0, 0.01, 0)
     ]);
     check(
       new CamJob(0.005, 12000.0).pocket(concave, tool, -0.001, 0.01, 0.001).finish().ops.length > 0,
@@ -203,10 +191,7 @@ class CamKitTests {
     var sampleSpan = Provenance.cam(99);
     var sampled:Array<ToolpathOp> = [for (index in 1...samples.length) ToolpathOp.Move(
       Cut,
-      PathGeometry.Line(
-        samples[index - 1],
-        samples[index]
-      ),
+      PathGeometry.Line(samples[index - 1], samples[index]),
       0.01,
       0.0,
       sampleSpan
@@ -250,40 +235,15 @@ class CamKitTests {
         ToolpathOp.SetSetup("1", source),
         ToolpathOp.Move(
           Rapid,
-          PathGeometry.Line(
-            new Point3(
-              0.0,
-              0.0,
-              0.01
-            ),
-            new Point3(
-              0.01,
-              0.0,
-              0.01
-            )
-          ),
+          PathGeometry.Line(new Point3(0.0, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
           0.0,
           0.0,
           source
         ),
-        ToolpathOp.SetSetup(
-          "2",
-          source
-        ),
+        ToolpathOp.SetSetup("2", source),
         ToolpathOp.Move(
           Rapid,
-          PathGeometry.Line(
-            new Point3(
-              -0.09,
-              0.0,
-              0.01
-            ),
-            new Point3(
-              0.01,
-              0.0,
-              0.01
-            )
-          ),
+          PathGeometry.Line(new Point3(-0.09, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
           0.0,
           0.0,
           source
@@ -291,40 +251,11 @@ class CamKitTests {
         ToolpathOp.End(source)
       ],
       new ToolLibrary(),
-      [
-        new Setup(
-          "1",
-          new Point3(
-            0.1,
-            0,
-            0
-          )
-        ),
-        new Setup(
-          "2",
-          new Point3(
-            0.2,
-            0,
-            0
-          )
-        )
-      ]
+      [new Setup("1", new Point3(0.1, 0, 0)), new Setup("2", new Point3(0.2, 0, 0))]
     );
     var switchCode = switchMachine.export(
       switchedProgram,
-      new Setup(
-        "1",
-        new Point3(0.1, 0, 0),
-        new SetupStock(
-          -0.2,
-          0.2,
-          -0.1,
-          0.1,
-          0.0,
-          -0.01,
-          0.005
-        )
-      )
+      new Setup("1", new Point3(0.1, 0, 0), new SetupStock(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005))
     );
     check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0, "setup switches write G54 and G55");
     var switchedBack = switchMachine.compileDetailed(switchCode);
@@ -388,10 +319,7 @@ class CamKitTests {
     var denominator = dx * dx + dy * dy;
     var fraction = denominator == 0.0 ? 0.0 : Math.max(
       0.0,
-      Math.min(
-        1.0,
-        ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator
-      )
+      Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator)
     );
     return point.distanceTo(new Point3(a.x + fraction * dx, a.y + fraction * dy, point.z));
   }

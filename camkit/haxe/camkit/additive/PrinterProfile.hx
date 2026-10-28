@@ -58,10 +58,6 @@ class PrinterProfile {
     0.11,
     0.11,
     new Point3(0.03, 0.005, 0.0003),
-    new Point3(
-      0.11,
-      0.005,
-      0.0003
-    )
+    new Point3(0.11, 0.005, 0.0003)
   );
 }

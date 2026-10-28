@@ -195,10 +195,7 @@ class CamSheetNester {
           item.id,
           item.requirement.id,
           variant,
-          SheetPolygon.point(
-            f.x - b.minX,
-            f.y - b.minY
-          )
+          SheetPolygon.point(f.x - b.minX, f.y - b.minY)
         ));
         if (f.width - w > f.height - h) {
           if (f.width - w > SheetPolygon.EPS) free[index].push({
@@ -302,18 +299,8 @@ class CamSheetNester {
       var base = CamSheetNfp.decompose(req.shape, stats), variants:Array<CamNestVariant> = [];
       for (angle in req.allowedAngles) variants.push({
         angle: angle,
-        shape: SheetPolygon.transform(
-          req.shape,
-          angle,
-          0,
-          0
-        ),
-        pieces: [for (piece in base) SheetPolygon.transform(
-          [piece],
-          angle,
-          0,
-          0
-        )[0]]
+        shape: SheetPolygon.transform(req.shape, angle, 0, 0),
+        pieces: [for (piece in base) SheetPolygon.transform([piece], angle, 0, 0)[0]]
       });
       for (i in 0...req.quantity) {
         var id = '${req.id}-${i+1}';
@@ -322,10 +309,7 @@ class CamSheetNester {
           requirement: req,
           area: SheetPolygon.materialArea(req.shape),
           variants: variants,
-          tie: hash(
-            id,
-            seed
-          )
+          tie: hash(id, seed)
         });
       }
     }

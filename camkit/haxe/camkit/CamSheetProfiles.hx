@@ -24,19 +24,10 @@ class CamSheetProfiles {
         var count = s.isLine() ? 1 : Std.int(Math.max(1, Math.ceil(Math.abs(s.sweep) / Math.PI)));
         for (i in 0...count) {
           var segment = s.isLine() ? cadkit.sheetmetal.Segment.line(
-            new cadkit.sheetmetal.Point2(
-              s.start.x * 0.001,
-              s.start.y * 0.001
-            ),
-            new cadkit.sheetmetal.Point2(
-              s.end.x * 0.001,
-              s.end.y * 0.001
-            )
+            new cadkit.sheetmetal.Point2(s.start.x * 0.001, s.start.y * 0.001),
+            new cadkit.sheetmetal.Point2(s.end.x * 0.001, s.end.y * 0.001)
           ) : cadkit.sheetmetal.Segment.arc(
-            new cadkit.sheetmetal.Point2(
-              s.arcCenter().x * 0.001,
-              s.arcCenter().y * 0.001
-            ),
+            new cadkit.sheetmetal.Point2(s.arcCenter().x * 0.001, s.arcCenter().y * 0.001),
             s.radius * 0.001,
             s.startAngle + s.sweep * i / count,
             s.sweep / count
@@ -75,14 +66,8 @@ class CamSheetProfiles {
         var points = [for (v in loop) new Point3(v.x * 0.001,
           v.y * 0.001, surfaceZMetres)], contour = new CamContour(points);
         contour.exactBoundary = [for (i in 0...loop.length) cadkit.sheetmetal.Segment.line(
-          new cadkit.sheetmetal.Point2(
-            points[i].x,
-            points[i].y
-          ),
-          new cadkit.sheetmetal.Point2(
-            points[(i + 1) % points.length].x,
-            points[(i + 1) % points.length].y
-          )
+          new cadkit.sheetmetal.Point2(points[i].x, points[i].y),
+          new cadkit.sheetmetal.Point2(points[(i + 1) % points.length].x, points[(i + 1) % points.length].y)
         )];
         contours.push(contour);
       }
@@ -109,16 +94,8 @@ class CamSheetProfiles {
     return new CamContour([
       new Point3(x, y, surfaceZMetres),
       new Point3(x + width, y, surfaceZMetres),
-      new Point3(
-        x + width,
-        y + height,
-        surfaceZMetres
-      ),
-      new Point3(
-        x,
-        y + height,
-        surfaceZMetres
-      )
+      new Point3(x + width, y + height, surfaceZMetres),
+      new Point3(x, y + height, surfaceZMetres)
     ]);
   }
 }
