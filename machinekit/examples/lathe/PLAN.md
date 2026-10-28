@@ -90,8 +90,8 @@ separately.
 - `gantry/RotaryHead.hx` is the only rotary-axis precedent (servo plus gearhead).
 
 **Stock (main).**
-- StockKit is tri-dexel only (`stockkit/core/include/stockkit.h`, API v3). Tools are surfaces
-  of revolution about +Z (`toolpathkit/tool/CutterProfile`, `stockkit/core/src/profile.hpp`
+- StockKit is tri-dexel only (`stockkit/native/include/stockkit.h`, API v3). Tools are surfaces
+  of revolution about +Z (`toolpathkit/tool/CutterProfile`, `stockkit/native/src/profile.hpp`
   segments with arcs, `tool.hpp` cutting/shank/holder zones). `CutMotion.Path` only.
 - `StockComparison`, deviation colouring, `StockPreviewWorker`.
 - `app/MachiningStock` cuts the chord the tool tip travelled each tick and throws unless the

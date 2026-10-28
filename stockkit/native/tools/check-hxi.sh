@@ -15,7 +15,7 @@ output=${1:-"$module_dir/bindings/stockkit.hxi"}
     --library=stockkit_core \
     --interface=StockKitNative \
     --include="$module_dir/include" \
-    --source-label=core/bindings/stockkit_import.h \
+    --source-label=native/bindings/stockkit_import.h \
     --output="$output" \
     "$module_dir/bindings/stockkit_import.h"
 

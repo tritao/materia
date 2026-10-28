@@ -71,7 +71,7 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(AK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/animkit/native" animkit)
 set(SK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-add_subdirectory("${MATERIA_SOURCE_ROOT}/stockkit/core" stockkit)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/stockkit/native" stockkit)
 
 # CollisionKit: the collision world on coal and convex decomposition (V-HACD, single-threaded here), which
 # process planning's clearance checks use (collisionkit/plans/COLLISION.md CL-D2, CL8).

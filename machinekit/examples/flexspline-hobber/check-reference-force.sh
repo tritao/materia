@@ -10,7 +10,7 @@ case_name=${1:-run}
 cache=${HOBBER_NATIVE_CACHE:-"$root/../machine-tending/app/build/host/native"}
 stock=${HOBBER_STOCK_NATIVE:-"$root/build/flexspline-force-parallel/native"}
 if [[ -z "${HOBBER_STOCK_NATIVE:-}" ]]; then
-  cmake -S stockkit/core -B "$stock" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > "$evidence/native-build.log" 2>&1
+  cmake -S stockkit/native -B "$stock" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > "$evidence/native-build.log" 2>&1
   cmake --build "$stock" --target stockkit_core -j2 >> "$evidence/native-build.log" 2>&1
 fi
 export HAXEON_COMPILER_SERVER=0

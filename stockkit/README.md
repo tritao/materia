@@ -17,9 +17,9 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
 
 ## Layout
 
-- `core/` is the native library: C++ sources in `core/src`, the C ABI in `core/include/stockkit.h`
-  (`sk_*` functions), the generated Haxe binding in `core/bindings`, and native tests in `core/tests`.
-  The ring stock and rake code is in `core/src/ring`.
+- `native/` is the native library: C++ sources in `native/src`, the C ABI in `native/include/stockkit.h`
+  (`sk_*` functions), the generated Haxe binding in `native/bindings`, and native tests in `native/tests`.
+  The ring stock and rake code is in `native/src/ring`.
 - `haxe/stockkit` is the Haxe API over it. The root package is the Cartesian stock (`Stock*`, `Cut*`);
   `stockkit.ring` is the ring stock; `stockkit.hobbing` is the hob sweep, with `hobbing.forces` for
   cutting loads and `hobbing.errors` for the error budget and inspection; `stockkit.internal` is not API.
@@ -77,7 +77,7 @@ the Cartesian stock below.
   radii and three stock positions, against the Pappus volume of the swept
   tube.
 
-- **StockKit core** (`core/`, phase 3) is a C++17 library with a C ABI and
+- **StockKit core** (`native/`, phase 3) is a C++17 library with a C ABI and
   no dependencies, following CadKit's layering: opaque generation-checked
   handles, bulk arrays, no exceptions across the boundary.
   - The stock lives on a lattice (`sk_lattice`: origin, spacing, node
@@ -204,7 +204,7 @@ the Cartesian stock below.
   - Ramps (five tool shapes, plus a climbing ramp), helices and CamKit's
     ramped pocket must lie within the sampled reference's bounds.
   - A deliberate 0.1 µm error in the core fails both kinds of check.
-  - `core/tests/core_tests.cpp` adds closed-form checks through the C ABI:
+  - `native/tests/core_tests.cpp` adds closed-form checks through the C ABI:
     slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
     tie rules, provenance, handle validation, shank and holder contact,
     target comparison, snapshots and revisions, closed preview meshes whose
@@ -224,14 +224,14 @@ the Cartesian stock below.
 For standalone C++ checks and benchmarks, build the core directly:
 
 ```sh
-cmake -S stockkit/core -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
+cmake -S stockkit/native -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
 cmake --build build/stockkit-core
 build/stockkit-core/stockkit_core_tests
 build/stockkit-core/stockkit_core_bench        # optional ray spacing in mm, then "tri"
 ```
 
-After changing `core/include/stockkit.h`, regenerate the Haxe binding with
-`stockkit/core/tools/check-hxi.sh`. Variable-length results come back in one
+After changing `native/include/stockkit.h`, regenerate the Haxe binding with
+`stockkit/native/tools/check-hxi.sh`. Variable-length results come back in one
 call: the caller's capacity goes in through an in/out count, and a count too
 small comes back as the size needed (haxeon's queried outputs, with an
 initial capacity so small reads take one call). So `sk_stock_read_rays`

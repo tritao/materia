@@ -85,7 +85,7 @@ here (see FC3).
   "unsupported word". `CncWriter` is the LinuxCNC post. There is no GRBL anything.
 
 **Stock.**
-- StockKit is a tri-dexel model with exact interval endpoints (`stockkit/core/include/stockkit.h`,
+- StockKit is a tri-dexel model with exact interval endpoints (`stockkit/native/include/stockkit.h`,
   `core/src/sweep.cpp`).
 - Sweeps support only an axisymmetric tool with its axis along +Z. Tilted sweeps are open as
   `stockkit/TODO.md` Phase 7. DESIGN.md says new motions are new `SweptVolume` kinds, not a new

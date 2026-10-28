@@ -9,7 +9,7 @@ for router_mode in compact dense; do
   router_uniform=ON
   [[ "$router_mode" != dense ]] || router_uniform=OFF
   "$router_heavy" --mem 3G --need 1G --label "router-sheet-$router_mode" bash -c '
-    cmake -S stockkit/core -B "$1" -DCMAKE_BUILD_TYPE=Release -DSK_UNIFORM_TILES="$2" &&
+    cmake -S stockkit/native -B "$1" -DCMAKE_BUILD_TYPE=Release -DSK_UNIFORM_TILES="$2" &&
     cmake --build "$1" --parallel 2 &&
     ctest --test-dir "$1" -E stockkit_sheet_tests --output-on-failure
   ' bash "$router_output/$router_mode" "$router_uniform"

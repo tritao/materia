@@ -113,7 +113,7 @@ snapshot and cuts forward.
 
 | Piece | Where |
 |---|---|
-| Cartesian stock: `Stock`, `StockLattice`, `StockGrid`, `StockAxis`, `StockInterval` | `stockkit` (Haxe), over `stockkit/core` (C++17, C ABI, no dependencies) |
+| Cartesian stock: `Stock`, `StockLattice`, `StockGrid`, `StockAxis`, `StockInterval` | `stockkit` (Haxe), over `stockkit/native` (C++17, C ABI, no dependencies) |
 | Moves: `CutMove`, `CutMotion`, `CutMoves.fromProgram` | `stockkit` |
 | Tool shapes and zones: `CutterProfile`, `Tool.shaped` | `toolpathkit.tool` |
 | Results: `CutReport`, `MoveOutcome`, `OperationTotals`, `StockComparison` | `stockkit` |

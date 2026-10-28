@@ -23,7 +23,7 @@ mkdir -p "$evidence"
 exec 9>"$evidence/run.lock"
 flock -n 9 || { echo 'Reference budget is already running in this evidence directory.' >&2; exit 2; }
 if [[ "$mode" != parallel && -z "${HOBBER_STOCK_NATIVE:-}" ]]; then
-  cmake -S stockkit/core -B "$stock" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > "$evidence/native-build.log" 2>&1
+  cmake -S stockkit/native -B "$stock" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON > "$evidence/native-build.log" 2>&1
   cmake --build "$stock" --target stockkit_core -j2 >> "$evidence/native-build.log" 2>&1
 fi
 export HAXEON_COMPILER_SERVER=0
