@@ -3,7 +3,6 @@ import machinekit.design.AssemblyDesignChecks;
 import machinekit.design.DesignRequirement;
 import machinekit.milling.MillRailPlacement;
 import machinekit.milling.MillRailFasteners;
-import machinekit.assembly.PosedParts;
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.InsertStages;
 import materia.casting.InsertStages.InsertStage;

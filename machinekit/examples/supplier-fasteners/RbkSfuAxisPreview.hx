@@ -1,6 +1,5 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.AssemblyPreview;
-import machinekit.motion.MotorMount;
 import materia.project.SceneArtifact;
 
 /** Openable Materia artifact retaining the worked axis's components and joints. */

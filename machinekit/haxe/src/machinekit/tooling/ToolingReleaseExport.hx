@@ -9,7 +9,6 @@ import materia.tooling.ReleasePlan;
 import materia.tooling.ReleaseSystem;
 import materia.tooling.casting.CastingMoldPlan;
 import materia.tooling.casting.CastingMoldPlan.MoldFixtures;
-import materia.tooling.casting.MoldRegions;
 import materia.tooling.panel.PanelStockSpec;
 
 typedef ReleaseStockFrame = {

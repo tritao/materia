@@ -8,7 +8,6 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import machinekit.assembly.MachineAssemblyDescription.BeltPathRecord;
 import machinekit.assembly.MachineAssemblyDescription.TransmissionRecord;
 import machinekit.component.MachineComponent;
-import cadkit.modeling.AssemblyState;
 
 /** Compile one shaft belt's physical spans, regardless of how many motion records refer to it. */
 class BeltElasticity {

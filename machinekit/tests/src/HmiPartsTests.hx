@@ -6,7 +6,6 @@ import machinekit.catalog.CatalogMetadata;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.PanelMountFacet;
-import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 import machinekit.hmi.*;
 

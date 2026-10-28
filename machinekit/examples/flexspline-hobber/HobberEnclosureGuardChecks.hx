@@ -1,5 +1,4 @@
 import cadkit.modeling.AssemblyModel;
-import cadkit.modeling.AssemblyState;
 import processkit.guard.EnclosureGuard.GuardInput;
 import processkit.guard.EnclosureGuard.GuardOutput;
 import processkit.guard.EnclosureGuard.GuardFault;

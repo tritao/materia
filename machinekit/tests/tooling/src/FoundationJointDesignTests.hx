@@ -1,5 +1,4 @@
 import materia.casting.FoundationJoint;
-import materia.casting.FoundationJoint.FoundationJoints;
 import materia.casting.InterfaceRequirement;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.MachineAssembly;

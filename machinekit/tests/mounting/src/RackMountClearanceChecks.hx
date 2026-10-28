@@ -1,7 +1,6 @@
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import machinekit.assembly.PosedParts;
-import machinekit.assembly.AxisBuilder;
 import materia.assembly.AssemblyFrames as F;
 
 /** Same-body mount conflicts must be checked as well as moving-body conflicts.

@@ -1,6 +1,5 @@
 import cadkit.Shape;
 import cadkit.modeling.AssemblyModel;
-import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import materia.assembly.AssemblyFrames;
 

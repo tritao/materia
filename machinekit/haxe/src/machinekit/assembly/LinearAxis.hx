@@ -14,7 +14,6 @@ import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
-import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.LinearRailSystem;

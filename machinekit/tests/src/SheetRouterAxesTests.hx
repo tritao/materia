@@ -1,7 +1,4 @@
 import machinekit.assembly.MachineAssembly;
-import machinekit.gantry.Gantry;
-import machinekit.gantry.GantrySpec;
-import machinekit.gantry.GantrySpec.GantryDrive;
 import machinekit.component.*;
 import machinekit.motion.*;
 import machinekit.transmission.*;

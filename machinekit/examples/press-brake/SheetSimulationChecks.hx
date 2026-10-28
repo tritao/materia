@@ -1,7 +1,6 @@
 import NativeKitSim;
 import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.ManufacturedSheetState;
-import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetDemoParts;
 import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.process.ProcessBendRule;

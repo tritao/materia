@@ -1,4 +1,3 @@
-import cadkit.modeling.AssemblyState;
 import machinekit.screwdriving.ScrewdriverBit;
 import machinekit.screwdriving.TighteningController;
 import machinekit.screwdriving.TighteningSupplyFacet;

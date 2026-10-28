@@ -20,7 +20,6 @@ import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** One level's share of the nested mechanical definition. */
 private typedef LevelMechanical = {

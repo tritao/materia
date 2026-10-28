@@ -1,5 +1,4 @@
 import robotkit.model.*;
-import robotkit.model.CollisionShape.ContactSurface;
 import robotkit.runtime.*;
 import nativekit.sim.*;
 import robotkit.core.JointTarget;

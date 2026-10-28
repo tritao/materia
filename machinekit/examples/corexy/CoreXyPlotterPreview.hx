@@ -3,7 +3,6 @@ import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
-import machinekit.component.ComponentDetail;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingBelt.BeltWrap;
 import materia.assembly.AssemblyFrames;

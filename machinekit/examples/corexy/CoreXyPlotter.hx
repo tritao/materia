@@ -2,7 +2,6 @@ import machinekit.motion.PowerSupply;
 import machinekit.motion.MotorDriver;
 import cadkit.modeling.Part;
 import machinekit.assembly.Transmission;
-import machinekit.assembly.Sense.SenseTools;
 import machinekit.assembly.AxisBuilder;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -17,7 +16,6 @@ import machinekit.transmission.TimingBelt.BeltWrap;
 import machinekit.transmission.TimingBeltProfile;
 import machinekit.transmission.TimingPulley;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** A rectangular plate or block standing on its base (z=0), centred on its origin. */
 class PlotterBlock extends MachineComponent {

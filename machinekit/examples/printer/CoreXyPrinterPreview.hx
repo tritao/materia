@@ -13,7 +13,6 @@ import machinekit.motion.LinearRail;
 import machinekit.motion.NemaStepper;
 import machinekit.printing.Thermistor.ThermistorSpec;
 import machinekit.transmission.TimingBelt;
-import machinekit.transmission.TimingBelt.BeltWrap;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 

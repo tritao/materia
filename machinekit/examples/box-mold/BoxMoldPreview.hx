@@ -13,7 +13,6 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import materia.project.SceneArtifact;
 import materia.tooling.casting.CastingMoldPlanner;
-import materia.tooling.casting.CoreSupports;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 import materia.tooling.panel.PanelCodec;
 

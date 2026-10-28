@@ -5,7 +5,6 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
-import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;

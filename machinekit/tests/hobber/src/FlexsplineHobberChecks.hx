@@ -1,5 +1,4 @@
 import machinekit.structural.FoundationIntegrity;
-import machinekit.structural.MineralFoundation;
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames as F;
 import machinekit.assembly.PosedParts;

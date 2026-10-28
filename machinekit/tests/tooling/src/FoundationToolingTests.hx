@@ -1,7 +1,6 @@
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import machinekit.assembly.PosedParts;
 import machinekit.component.ComponentValues;
 import machinekit.structural.CastInsert;
 import materia.casting.CastingPatterns;

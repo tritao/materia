@@ -1,7 +1,6 @@
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.SourcingPlan;
 import machinekit.standard.SocketHeadCapScrew;
-import machinekit.standard.PropertyClass;
 import materia.assembly.AssemblyFrames;
 import cadkit.Shape;
 import cadkit.modeling.Part;

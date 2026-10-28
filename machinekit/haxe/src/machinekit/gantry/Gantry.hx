@@ -33,7 +33,6 @@ import machinekit.transmission.TimingPulley;
 import machinekit.transmission.Rack;
 import machinekit.transmission.SpurGear;
 import machinekit.robotics.RobotFlange;
-import machinekit.structural.TSlotExtrusion;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 

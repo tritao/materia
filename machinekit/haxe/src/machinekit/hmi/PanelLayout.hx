@@ -1,6 +1,5 @@
 package machinekit.hmi;
 
-import cadkit.modeling.Footprint;
 import cadkit.modeling.FootprintGeometry;
 /**
  * A panel (a pendant face, a door panel) and what sits on it. `problems()` is the layout check: every

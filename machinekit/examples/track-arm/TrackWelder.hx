@@ -10,7 +10,6 @@ import machinekit.welding.Weldment;
 import machinekit.welding.WireFeeder;
 import machinekit.welding.WorkClamp;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.welding.WeldMetal;

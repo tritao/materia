@@ -5,7 +5,6 @@ import materia.tooling.ToolingEnums.ToolingLengthUnit;
 import materia.tooling.casting.CastingToolingInput;
 import materia.tooling.casting.CastingToolingInput.CastingToolingInsert;
 import machinekit.structural.MineralFoundation;
-import machinekit.structural.MineralFoundation.CastInsertPlacement;
 
 /** Detached copy of source design records and the authoritative hole facet. */
 class FoundationToolingAdapter {

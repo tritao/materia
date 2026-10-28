@@ -1,4 +1,3 @@
-import FoundationStudyGeometry.FoundationStudyRegion;
 import FoundationStudyGeometry as Geometry;
 import materia.casting.BoxAlgebra;
 import materia.casting.CastingFeature.CastingFeatureKind;

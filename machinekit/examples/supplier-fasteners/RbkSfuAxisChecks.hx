@@ -1,5 +1,4 @@
 import machinekit.assembly.MachineAssembly;
-import machinekit.motion.MotorMount;
 import machinekit.motion.*;
 import machinekit.component.*;
 import cadkit.Shape;

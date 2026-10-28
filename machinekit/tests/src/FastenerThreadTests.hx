@@ -4,7 +4,6 @@ import machinekit.standard.HexBolt;
 import machinekit.standard.HexNut;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewThread;
-import machinekit.motion.LeadScrewNut;
 
 /** Component rebuilds attach nominal threads without changing their B-rep envelopes. */
 class FastenerThreadTests {

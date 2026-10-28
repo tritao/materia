@@ -2,7 +2,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Location;
 import machinekit.welding.WeldProbeGeometry;
-import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import materia.assembly.AssemblyFrames;
 import machinekit.welding.WeldProbeParkingBounds;
 import machinekit.welding.WeldProbePatterns;

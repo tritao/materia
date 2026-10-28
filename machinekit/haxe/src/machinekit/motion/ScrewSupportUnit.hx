@@ -1,7 +1,6 @@
 package machinekit.motion;
 
 import cadkit.InertiaTensor;
-import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.SupplierLibraries;

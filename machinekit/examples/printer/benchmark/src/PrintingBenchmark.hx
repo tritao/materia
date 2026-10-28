@@ -13,7 +13,6 @@ import machinekit.transmission.SpurGear;
 import materia.project.SceneArtifact;
 import motionkit.robot.ProgramBlocks;
 import motionkit.trajectory.InputShaper;
-import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ProgramSink;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.ProgramBarrier;

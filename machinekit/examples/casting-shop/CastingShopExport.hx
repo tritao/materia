@@ -1,4 +1,3 @@
-import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.ToolingValidation;

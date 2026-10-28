@@ -1,7 +1,6 @@
 import cadkit.modeling.*;
 import machinekit.motion.*;
 import machinekit.component.*;
-import machinekit.motion.MotorMount;
 class SupportFamilyChecks {
   static function main():Void {
     var rows:Array<Dynamic> = [];

@@ -9,7 +9,6 @@ import cadkit.parametric.DocumentCodec;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import materia.assembly.AssemblyFrames;
-import machinekit.motion.MotorMount;
 import machinekit.component.SupplierRecipeLibrary;
 import machinekit.component.SourcingPlan;
 

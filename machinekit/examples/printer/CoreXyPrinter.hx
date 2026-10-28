@@ -1,7 +1,6 @@
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.Sense.SenseTools;
 import machinekit.assembly.Transmission;
-import machinekit.component.ComponentDetail;
 import machinekit.gantry.GantryParts.GantryExtrusion;
 import machinekit.gantry.GantryParts.GantryIdlerPin;
 import machinekit.gantry.GantryParts.GantryPlate;
@@ -27,7 +26,6 @@ import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingBelt.BeltWrap;
 import machinekit.transmission.TimingPulley;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
  * A CoreXY FDM printer: a 2020 T-slot frame, a gantry on two MGN12 rails along Y carrying an MGN12 rail

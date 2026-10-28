@@ -2,7 +2,6 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.parametric.InstanceElement;
 import machinekit.document.MachineKitDocumentAssembly;
 import machinekit.component.Bom;
-import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.motion.NemaStepper;
 import machinekit.assembly.MotorPlate;

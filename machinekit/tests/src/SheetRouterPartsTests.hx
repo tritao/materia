@@ -1,5 +1,4 @@
 import machinekit.component.*;
-import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.motion.*;
 import machinekit.transmission.*;
 import machinekit.routing.*;
