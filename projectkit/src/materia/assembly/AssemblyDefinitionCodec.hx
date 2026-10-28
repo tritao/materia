@@ -518,6 +518,7 @@ class AssemblyDefinitionCodec {
       && (!Math.isFinite(limits.rackingTolerance) || limits.rackingTolerance <= 0)) return false;
     if (limits.overtravel != null && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) return false;
     if (limits.acceleration != null && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) return false;
+    if (!JointDetents.valid(limits.detents, limits.lower, limits.upper)) return false;
     return withinLimits(limits, value);
   }
 

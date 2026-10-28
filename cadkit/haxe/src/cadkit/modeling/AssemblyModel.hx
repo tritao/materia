@@ -432,7 +432,11 @@ class AssemblyModel {
       && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) || (limits.acceleration != null
       && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) || (limits.lower != null
       && limits.upper != null && limits.lower > limits.upper) || (limits.lower != null && value < limits.lower)
-      || (limits.upper != null && value > limits.upper)) throw "Assembly joint limits or default value are invalid";
+      || (limits.upper != null && value > limits.upper) || !materia.assembly.JointDetents.valid(
+        limits.detents,
+        limits.lower,
+        limits.upper
+      )) throw "Assembly joint limits or default value are invalid";
   }
 
   static function noLimits():AssemblyJointLimits return {lower: null, upper: null, velocity: null, effort: null};

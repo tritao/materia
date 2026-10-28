@@ -11,7 +11,9 @@ import kinematicskit.KinematicStatus;
 import kinematicskit.SolverWorkspace;
 import kinematicskit.Transform;
 import kinematicskit.Vector3;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.JointDetents;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
@@ -85,6 +87,8 @@ class AssemblyDrag {
   /** Joint IDs whose coordinates the drag may change, in the order of `AssemblyDragResult.coordinates`. */
   public final movableJoints:Array<String>;
   public final keepOrientation:Bool;
+  /** Place joints that have detents at their nearest detent (a switch clicks); false lets them turn freely. */
+  public var snapToDetents:Bool = true;
 
   final kinematics:AssemblyKinematics;
   final problem:KinematicProblem;
@@ -195,6 +199,10 @@ class AssemblyDrag {
     // Capped steps: a target far outside the reach would otherwise swing joints by radians per iteration.
     var solution = DampedLeastSquares.solve(problem, preview, maxIterations, 0.02, 1e-8, workspace, 0.1, metre);
     for (dof in dofs) preview.q[dof] = solution.state.q[dof];
+    if (snapToDetents) for (dof in dofs) {
+      var limits = detentLimits(kinematics.model.dofId(dof));
+      if (limits != null) preview.q[dof] = JointDetents.snap(limits, preview.q[dof]);
+    }
     snapshot.evaluate(preview);
     var model = kinematics.model;
     var grabbed = solution.tasks[0];
@@ -237,6 +245,13 @@ class AssemblyDrag {
     var model = kinematics.model;
     for (dof in dofs) result.setJoint(model.dofId(dof), preview.q[dof]);
     return result.record();
+  }
+
+  /** The limits of a joint that has detents, or null. */
+  function detentLimits(jointId:String):Null<AssemblyJointLimits> {
+    for (joint in state.definition.joints) if (joint.id
+      == jointId) return JointDetents.has(joint.limits) ? joint.limits : null;
+    return null;
   }
 
   function addDof(dof:Int):Void {

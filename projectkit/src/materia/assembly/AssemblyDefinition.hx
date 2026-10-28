@@ -73,6 +73,11 @@ enum abstract AssemblyMateKind(String) from String to String {
   /** Permitted dual-drive displacement disagreement, in the joint coordinate units. */
   @:id(8) @:optional var rackingTolerance:Null<Float>;
   @:id(7) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+  /**
+	 * The fixed positions the joint rests at, ascending, in the joint's units (a rotary switch's clicks). Editors place a
+	 * detented joint only at one of them unless the user asks for free motion (see `JointDetents`).
+	 */
+  @:id(9) @:optional var detents:Null<ReadOnlyArray<Float>>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
