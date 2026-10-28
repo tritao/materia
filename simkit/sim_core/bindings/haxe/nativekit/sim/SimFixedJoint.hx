@@ -14,10 +14,7 @@ class SimFixedJoint {
 
   /** Remove the connection while stopped, before removing either object. */
   public function dispose():Void SimWorld.check(
-    NativeKitSim.nksim_session_destroy_fixed_joint(
-      session.nativeHandle(),
-      handle
-    ),
+    NativeKitSim.nksim_session_destroy_fixed_joint(session.nativeHandle(), handle),
     "session.destroyFixedJoint"
   );
 }

@@ -19,21 +19,13 @@ class SimObject {
 
   /** Moves a kinematic object for the next tick, while stopped or running. */
   public function drive(pose:SimPose):Void SimWorld.check(
-    NativeKitSim.nksim_session_drive_object(
-      session.nativeHandle(),
-      handle,
-      pose.toNative()
-    ),
+    NativeKitSim.nksim_session_drive_object(session.nativeHandle(), handle, pose.toNative()),
     "object.drive"
   );
 
   /** Moves the object at rest while stopped; the pose becomes its reset pose. */
   public function teleport(pose:SimPose):Void SimWorld.check(
-    NativeKitSim.nksim_session_teleport_object(
-      session.nativeHandle(),
-      handle,
-      pose.toNative()
-    ),
+    NativeKitSim.nksim_session_teleport_object(session.nativeHandle(), handle, pose.toNative()),
     "object.teleport"
   );
 
@@ -52,10 +44,7 @@ class SimObject {
 
   /** Removes the object while stopped. */
   public function dispose():Void SimWorld.check(
-    NativeKitSim.nksim_session_destroy_object(
-      session.nativeHandle(),
-      handle
-    ),
+    NativeKitSim.nksim_session_destroy_object(session.nativeHandle(), handle),
     "object.dispose"
   );
 }
