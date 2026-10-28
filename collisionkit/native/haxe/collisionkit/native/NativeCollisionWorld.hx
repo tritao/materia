@@ -25,8 +25,8 @@ class NativeCollisionWorld implements CollisionWorld {
 
   public function new() {
     var version = CollisionKitNative.ck_api_version();
-    if (version != CollisionKitNativeConstants.CK_API_VERSION)
-      throw 'CollisionKit native API v$version is unsupported; expected v${CollisionKitNativeConstants.CK_API_VERSION}; rebuild the native library';
+    if (version != CollisionKitNativeConstants
+      .CK_API_VERSION) throw 'CollisionKit native API v$version is unsupported; expected v${CollisionKitNativeConstants.CK_API_VERSION}; rebuild the native library';
     var created = CollisionKitNative.ck_world_create();
     check(created.status, "world.create");
     owner = created.out_world;
@@ -64,16 +64,25 @@ class NativeCollisionWorld implements CollisionWorld {
   public function add(body:Int, offset:CollisionPose, geometry:CollisionGeometry):Int {
     requireLive();
     var at = flat(offset);
-    var shape = (kind:Int, params:Array<Float>) -> {
-      var result = CollisionKitNative.ck_add_shape(owner.borrow(), body, at, kind, params);
-      check(result.status, "add");
-      return result.out_object;
+    var shape = (kind:Int, params:Array<Float>) -> {var result = CollisionKitNative.ck_add_shape(
+      owner.borrow(),
+      body,
+      at,
+      kind,
+      params
+    );
+    check(result.status, "add");
+    return result.out_object;
     };
     return switch geometry {
-      case Box(halfX, halfY, halfZ): shape(CollisionKitNativeConstants.CK_SHAPE_BOX, [halfX, halfY, halfZ]);
-      case Sphere(radius): shape(CollisionKitNativeConstants.CK_SHAPE_SPHERE, [radius]);
-      case Capsule(radius, halfLength): shape(CollisionKitNativeConstants.CK_SHAPE_CAPSULE, [radius, halfLength]);
-      case Cylinder(radius, halfLength): shape(CollisionKitNativeConstants.CK_SHAPE_CYLINDER, [radius, halfLength]);
+      case Box(halfX, halfY, halfZ):
+        shape(CollisionKitNativeConstants.CK_SHAPE_BOX, [halfX, halfY, halfZ]);
+      case Sphere(radius):
+        shape(CollisionKitNativeConstants.CK_SHAPE_SPHERE, [radius]);
+      case Capsule(radius, halfLength):
+        shape(CollisionKitNativeConstants.CK_SHAPE_CAPSULE, [radius, halfLength]);
+      case Cylinder(radius, halfLength):
+        shape(CollisionKitNativeConstants.CK_SHAPE_CYLINDER, [radius, halfLength]);
       case HalfSpace(nx, ny, nz, offsetAlong):
         shape(CollisionKitNativeConstants.CK_SHAPE_HALFSPACE, [nx, ny, nz, offsetAlong]);
       case Convex(points):
@@ -85,8 +94,16 @@ class NativeCollisionWorld implements CollisionWorld {
         check(result.status, "add mesh");
         result.out_object;
       case HeightField(xSize, ySize, heights, rows, minHeight):
-        var result = CollisionKitNative.ck_add_height_field(owner.borrow(), body, at, xSize, ySize, heights, rows,
-          minHeight);
+        var result = CollisionKitNative.ck_add_height_field(
+          owner.borrow(),
+          body,
+          at,
+          xSize,
+          ySize,
+          heights,
+          rows,
+          minHeight
+        );
         check(result.status, "add height field");
         result.out_object;
     }
@@ -95,8 +112,8 @@ class NativeCollisionWorld implements CollisionWorld {
   public function setInflation(object:Int, radius:Float):Void {
     requireLive();
     var status = CollisionKitNative.ck_set_inflation(owner.borrow(), object, radius);
-    if (status == CollisionKitNativeConstants.CK_ERROR_UNSUPPORTED)
-      throw 'Collision object $object cannot be inflated (only primitives and convex sets can)';
+    if (status == CollisionKitNativeConstants
+      .CK_ERROR_UNSUPPORTED) throw 'Collision object $object cannot be inflated (only primitives and convex sets can)';
     check(status, "set_inflation");
   }
 
@@ -127,8 +144,16 @@ class NativeCollisionWorld implements CollisionWorld {
 
   public function setObjectMargins(a:Int, b:Int, air:Null<Float>, contact:Null<Float>):Void {
     requireLive();
-    check(CollisionKitNative.ck_set_object_margins(owner.borrow(), a, b, air == null ? -1.0 : air,
-      contact == null ? -1.0 : contact), "set_object_margins");
+    check(
+      CollisionKitNative.ck_set_object_margins(
+        owner.borrow(),
+        a,
+        b,
+        air == null ? -1.0 : air,
+        contact == null ? -1.0 : contact
+      ),
+      "set_object_margins"
+    );
   }
 
   public function pairStatus(a:Int, b:Int):CollisionPairStatus {
@@ -136,17 +161,28 @@ class NativeCollisionWorld implements CollisionWorld {
     var result = CollisionKitNative.ck_pair_status(owner.borrow(), a, b);
     check(result.status, "pair_status");
     return switch result.out_status {
-      case 0: Checked;
-      case 1: Static;
-      case 2: Rigid;
-      case 3: Adjacent;
-      case 4: OverlapsAtReference;
-      case 5: Allowed;
-      case 6: Unsupported;
-      case 7: Closure;
-      case 8: ProcessContact;
-      case 9: DeclaredContact;
-      case other: throw 'Unknown collision pair status $other';
+      case 0:
+        Checked;
+      case 1:
+        Static;
+      case 2:
+        Rigid;
+      case 3:
+        Adjacent;
+      case 4:
+        OverlapsAtReference;
+      case 5:
+        Allowed;
+      case 6:
+        Unsupported;
+      case 7:
+        Closure;
+      case 8:
+        ProcessContact;
+      case 9:
+        DeclaredContact;
+      case other:
+        throw 'Unknown collision pair status $other';
     }
   }
 
@@ -183,10 +219,7 @@ class NativeCollisionWorld implements CollisionWorld {
         continue;
       }
       var ids = result.out_pairs, rows = result.out_results;
-      return [
-        for (i in 0...count)
-          row(ids[4 * i], ids[4 * i + 1], ids[4 * i + 2], ids[4 * i + 3], rows, 10 * i)
-      ];
+      return [for (i in 0...count) row(ids[4 * i], ids[4 * i + 1], ids[4 * i + 2], ids[4 * i + 3], rows, 10 * i)];
     }
   }
 
@@ -205,23 +238,46 @@ class NativeCollisionWorld implements CollisionWorld {
 
   public function violation(margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation> {
     requireLive();
-    var result = CollisionKitNative.ck_violation(owner.borrow(), margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, inflation == null ? none : inflation, 4,
-      2);
+    var result = CollisionKitNative.ck_violation(
+      owner.borrow(),
+      margins.flat(),
+      margins.contact ? 1 : 0,
+      margins.ceiling == null ? -1.0 : margins.ceiling,
+      inflation == null ? none : inflation,
+      4,
+      2
+    );
     check(result.status, "violation");
     return result.out_found == 0 ? null : violationOf(result.out_pair, result.out_result, 0);
   }
 
   public function closest(margins:CollisionMargins):Null<CollisionViolation> {
     requireLive();
-    var result = CollisionKitNative.ck_closest(owner.borrow(), margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, 4, 2);
+    var result = CollisionKitNative.ck_closest(
+      owner.borrow(),
+      margins.flat(),
+      margins.contact ? 1 : 0,
+      margins.ceiling == null ? -1.0 : margins.ceiling,
+      4,
+      2
+    );
     check(result.status, "closest");
     return result.out_found == 0 ? null : violationOf(result.out_pair, result.out_result, 0);
   }
 
-  public function firstViolation(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation> {
+  public function firstViolation(poses:Array<Float>,
+    margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation> {
     requireLive();
-    var result = CollisionKitNative.ck_violation_batch(owner.borrow(), poses, inflation == null ? none : inflation,
-      margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, 4, 2);
+    var result = CollisionKitNative.ck_violation_batch(
+      owner.borrow(),
+      poses,
+      inflation == null ? none : inflation,
+      margins.flat(),
+      margins.contact ? 1 : 0,
+      margins.ceiling == null ? -1.0 : margins.ceiling,
+      4,
+      2
+    );
     check(result.status, "violation_batch");
     return result.out_set < 0 ? null : violationOf(result.out_pair, result.out_result, result.out_set);
   }
@@ -229,8 +285,15 @@ class NativeCollisionWorld implements CollisionWorld {
   public function violations(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Array<Bool> {
     requireLive();
     var sets = bodies == 0 ? 0 : Std.int(poses.length / (7 * bodies));
-    var result = CollisionKitNative.ck_violation_sets(owner.borrow(), poses, inflation == null ? none : inflation,
-      margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, sets);
+    var result = CollisionKitNative.ck_violation_sets(
+      owner.borrow(),
+      poses,
+      inflation == null ? none : inflation,
+      margins.flat(),
+      margins.contact ? 1 : 0,
+      margins.ceiling == null ? -1.0 : margins.ceiling,
+      sets
+    );
     check(result.status, "violation_sets");
     var flags = result.out_flags;
     return [for (s in 0...sets) flags[s] != 0];
@@ -242,12 +305,40 @@ class NativeCollisionWorld implements CollisionWorld {
     owner.close();
   }
 
-  static function violationOf(ids:Array<Int>, values:Array<Float>, set:Int):CollisionViolation
-    return new CollisionViolation(ids[0], ids[1], ids[2], ids[3], values[0], values[1], set);
+  static function violationOf(ids:Array<Int>,
+    values:Array<Float>, set:Int):CollisionViolation return new CollisionViolation(
+      ids[0],
+      ids[1],
+      ids[2],
+      ids[3],
+      values[0],
+      values[1],
+      set
+    );
 
-  static function row(a:Int, b:Int, bodyA:Int, bodyB:Int, rows:Array<Float>, r:Int):CollisionDistance
-    return new CollisionDistance(a, b, bodyA, bodyB, rows[r], [rows[r + 1], rows[r + 2], rows[r + 3]],
-      [rows[r + 4], rows[r + 5], rows[r + 6]], [rows[r + 7], rows[r + 8], rows[r + 9]]);
+  static function row(a:Int,
+    b:Int, bodyA:Int, bodyB:Int, rows:Array<Float>, r:Int):CollisionDistance return new CollisionDistance(
+      a,
+      b,
+      bodyA,
+      bodyB,
+      rows[r],
+      [
+        rows[r + 1],
+        rows[r + 2],
+        rows[r + 3]
+      ],
+      [
+        rows[r + 4],
+        rows[r + 5],
+        rows[r + 6]
+      ],
+      [
+        rows[r + 7],
+        rows[r + 8],
+        rows[r + 9]
+      ]
+    );
 
   static function flat(pose:CollisionPose):Array<Float> {
     var out:Array<Float> = [];
@@ -260,8 +351,8 @@ class NativeCollisionWorld implements CollisionWorld {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status == CollisionKitNativeConstants.CK_ERROR_UNSUPPORTED)
-      throw 'Collision $operation failed: a checked pair has shapes that cannot be compared (allow it or remove one)';
+    if (status == CollisionKitNativeConstants
+      .CK_ERROR_UNSUPPORTED) throw 'Collision $operation failed: a checked pair has shapes that cannot be compared (allow it or remove one)';
     if (status != CollisionKitNativeConstants.CK_OK) throw 'Collision $operation failed with error $status';
   }
 }

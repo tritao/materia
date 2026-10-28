@@ -75,7 +75,8 @@ interface CollisionWorld {
    * The first set with a violation reports it, with `set` its index; null
    * when every set is clear. The world is left posed at the last set checked.
    */
-  function firstViolation(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>;
+  function firstViolation(poses:Array<Float>,
+    margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>;
   /** As `firstViolation`, but for every set: true where the set has a violation (a planner's edge checks, CL-D7). */
   function violations(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Array<Bool>;
   function dispose():Void;

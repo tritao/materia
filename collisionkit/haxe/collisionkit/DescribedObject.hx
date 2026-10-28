@@ -18,8 +18,16 @@ class DescribedObject {
   public final inflation:Float;
   public final source:String;
 
-  public function new(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry, inflation:Float,
-      source:String, ?member:String, tool:Bool = false) {
+  public function new(
+    name:String,
+    body:Int,
+    offset:CollisionPose,
+    geometry:CollisionGeometry,
+    inflation:Float,
+    source:String,
+    ?member:String,
+    tool:Bool = false
+  ) {
     this.name = name;
     this.tool = tool;
     this.member = member == null ? name : member;

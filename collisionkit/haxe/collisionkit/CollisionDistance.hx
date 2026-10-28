@@ -16,8 +16,16 @@ class CollisionDistance {
   public final pointB:Array<Float>;
   public final normal:Array<Float>;
 
-  public function new(a:Int, b:Int, bodyA:Int, bodyB:Int, distance:Float, pointA:Array<Float>, pointB:Array<Float>,
-      normal:Array<Float>) {
+  public function new(
+    a:Int,
+    b:Int,
+    bodyA:Int,
+    bodyB:Int,
+    distance:Float,
+    pointA:Array<Float>,
+    pointB:Array<Float>,
+    normal:Array<Float>
+  ) {
     this.a = a;
     this.b = b;
     this.bodyA = bodyA;

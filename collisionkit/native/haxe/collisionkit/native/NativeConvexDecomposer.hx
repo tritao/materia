@@ -13,18 +13,21 @@ class NativeConvexDecomposer implements ConvexDecomposer {
     this.resolution = resolution;
   }
 
-  public function decompose(vertices:Array<Float>, indices:Array<Int>, maxPieces:Int, sampleSpacing:Float):ConvexDecomposition {
+  public function decompose(vertices:Array<Float>,
+    indices:Array<Int>, maxPieces:Int, sampleSpacing:Float):ConvexDecomposition {
     var created = CollisionKitNative.ck_decompose(vertices, indices, maxPieces, resolution, 64, sampleSpacing);
-    if (created.status != CollisionKitNativeConstants.CK_OK)
-      throw 'Convex decomposition failed with error ${created.status}';
+    if (created.status
+      != CollisionKitNativeConstants.CK_OK) throw 'Convex decomposition failed with error ${created.status}';
     var handle = created.out_decomposition;
     try {
       var info = CollisionKitNative.ck_decomposition_info(handle.borrow(), 3);
-      if (info.status != CollisionKitNativeConstants.CK_OK) throw 'Convex decomposition info failed with error ${info.status}';
+      if (info.status
+        != CollisionKitNativeConstants.CK_OK) throw 'Convex decomposition info failed with error ${info.status}';
       var pieces:Array<Array<Float>> = [];
       for (piece in 0...info.out_pieces) {
         var result = CollisionKitNative.ck_decomposition_piece(handle.borrow(), piece, 192);
-        if (result.status != CollisionKitNativeConstants.CK_OK) throw 'Convex decomposition piece failed with error ${result.status}';
+        if (result.status
+          != CollisionKitNativeConstants.CK_OK) throw 'Convex decomposition piece failed with error ${result.status}';
         pieces.push(result.out_points.slice(0, result.out_count));
       }
       var values = info.out_values;

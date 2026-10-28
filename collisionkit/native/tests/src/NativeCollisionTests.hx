@@ -58,17 +58,22 @@ class NativeCollisionTests {
     var q = Math.sqrt(0.5);
     var pose = new CollisionPose(1, 2, 3, 0, 0, q, q);
     var box = collisionkit.CollisionBounds.of(Box(2, 1, 0.5), pose, 0.1);
-    check(Math.abs(box.centre.x - 1) < 1e-12 && Math.abs(box.centre.y - 2) < 1e-12 &&
-      Math.abs(box.halfExtents.x - 1.1) < 1e-12 && Math.abs(box.halfExtents.y - 2.1) < 1e-12,
-      "box bounds apply rotation, translation and inflation");
-    var convex = collisionkit.CollisionBounds.of(Convex([0,0,0, 2,0,0, 0,1,0, 0,0,1]), pose, 0.1);
-    check(Math.abs(convex.centre.x - 0.5) < 1e-12 && Math.abs(convex.centre.y - 3) < 1e-12 &&
-      Math.abs(convex.halfExtents.x - 0.6) < 1e-12 && Math.abs(convex.halfExtents.y - 1.1) < 1e-12,
-      "convex bounds use posed vertices and inflation");
-    var cylinder = collisionkit.CollisionBounds.of(Cylinder(0.5, 2),
-      new CollisionPose(0,0,0, 0,q,0,q));
-    check(Math.abs(cylinder.halfExtents.x - 2) < 1e-12 && Math.abs(cylinder.halfExtents.z - 0.5) < 1e-12,
-      "axial primitive bounds rotate their axial and radial extents");
+    check(
+      Math.abs(box.centre.x - 1) < 1e-12 && Math.abs(box.centre.y - 2) < 1e-12
+      && Math.abs(box.halfExtents.x - 1.1) < 1e-12 && Math.abs(box.halfExtents.y - 2.1) < 1e-12,
+      "box bounds apply rotation, translation and inflation"
+    );
+    var convex = collisionkit.CollisionBounds.of(Convex([0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1]), pose, 0.1);
+    check(
+      Math.abs(convex.centre.x - 0.5) < 1e-12 && Math.abs(convex.centre.y - 3) < 1e-12
+      && Math.abs(convex.halfExtents.x - 0.6) < 1e-12 && Math.abs(convex.halfExtents.y - 1.1) < 1e-12,
+      "convex bounds use posed vertices and inflation"
+    );
+    var cylinder = collisionkit.CollisionBounds.of(Cylinder(0.5, 2), new CollisionPose(0, 0, 0, 0, q, 0, q));
+    check(
+      Math.abs(cylinder.halfExtents.x - 2) < 1e-12 && Math.abs(cylinder.halfExtents.z - 0.5) < 1e-12,
+      "axial primitive bounds rotate their axial and radial extents"
+    );
   }
 
   /** Rigid, adjacent and closure pairs, with their reasons, from the structure alone (COLLISION.md CL-D3). */
@@ -89,8 +94,15 @@ class NativeCollisionTests {
     builder.addClosure("loop", ClosureKind.Revolute, tip, end, z, 1e-3);
     var model = builder.build();
     var found = [for (pair in KinematicBodyPairs.of(model)) '${pair.a}-${pair.b}:${(pair.relation : Int)}'];
-    var expected = ['$base-$upper:1', '$base-$rod:1', '$upper-$fore:1', '$upper-$tool:1', '$fore-$tool:0',
-      '$fore-$rod:2', '$tool-$rod:2'];
+    var expected = [
+      '$base-$upper:1',
+      '$base-$rod:1',
+      '$upper-$fore:1',
+      '$upper-$tool:1',
+      '$fore-$tool:0',
+      '$fore-$rod:2',
+      '$tool-$rod:2'
+    ];
     check(found.join(",") == expected.join(","), 'body pairs for collision (${found.join(",")})');
     var groups = KinematicBodyPairs.rigidGroups(model);
     check(groups[tool] == fore && groups[fore] == fore && groups[rod] == rod, "rigid groups follow fixed joints");
@@ -98,8 +110,11 @@ class NativeCollisionTests {
     // As world rules, each with its reason.
     var world = new NativeCollisionWorld();
     var first = register(world, model, 0);
-    var spheres = [for (body in 0...model.bodyCount()) world.add(first + body, CollisionPose.identity(),
-      CollisionGeometry.Sphere(0.01))];
+    var spheres = [for (body in 0...model.bodyCount()) world.add(
+      first + body,
+      CollisionPose.identity(),
+      CollisionGeometry.Sphere(0.01)
+    )];
     check(world.pairStatus(spheres[fore], spheres[tool]) == CollisionPairStatus.Rigid, "rigid by the kit");
     check(world.pairStatus(spheres[upper], spheres[tool]) == CollisionPairStatus.Adjacent, "adjacent by the kit");
     check(world.pairStatus(spheres[tool], spheres[rod]) == CollisionPairStatus.Closure, "closure by the kit");
@@ -122,8 +137,11 @@ class NativeCollisionTests {
       var first = register(world, model, 0);
       var snapshot = new KinematicSnapshot(model);
       var offsets = [for (_ in 0...model.bodyCount()) Transform.translation(rng.signed(), rng.signed(), rng.signed())];
-      var spheres = [for (body in 0...model.bodyCount()) world.add(first + body, pose(offsets[body]),
-        CollisionGeometry.Sphere(0.05))];
+      var spheres = [for (body in 0...model.bodyCount()) world.add(
+        first + body,
+        pose(offsets[body]),
+        CollisionGeometry.Sphere(0.05)
+      )];
       var target = world.add(-1, CollisionPose.translation(0.3, -0.2, 0.4), CollisionGeometry.Sphere(0.1));
       for (_ in 0...10) {
         var state = new KinematicState(model, [for (_ in 0...model.dofCount()) rng.signed() * 2.0]);
@@ -132,16 +150,20 @@ class NativeCollisionTests {
         var found = world.distances(100.0);
         for (body in 0...model.bodyCount()) {
           var centre = snapshot.bodyPose(body).compose(offsets[body]);
-          var expected = Math.sqrt(Math.pow(centre.x - 0.3, 2) + Math.pow(centre.y + 0.2, 2) + Math.pow(centre.z - 0.4, 2))
-            - 0.15;
+          var expected = Math.sqrt(Math.pow(centre.x - 0.3, 2) + Math.pow(centre.y + 0.2, 2) + Math.pow(
+            centre.z - 0.4,
+            2
+          )) - 0.15;
           var row:Null<CollisionDistance> = null;
           for (candidate in found) if (candidate.a == spheres[body] && candidate.b == target) row = candidate;
           if (row == null) throw 'body $body sphere is not within the query';
           check(row.bodyA == first + body && row.bodyB == -1, "results name the bodies");
           worst = Math.max(worst, Math.abs(row.distance - expected));
           // The closest point on the body's sphere is 0.05 from its centre, toward the target.
-          var gap = Math.sqrt(Math.pow(row.pointA[0] - centre.x, 2) + Math.pow(row.pointA[1] - centre.y, 2)
-            + Math.pow(row.pointA[2] - centre.z, 2));
+          var gap = Math.sqrt(Math.pow(row.pointA[0] - centre.x, 2) + Math.pow(row.pointA[1] - centre.y, 2) + Math.pow(
+            row.pointA[2] - centre.z,
+            2
+          ));
           worstPoint = Math.max(worstPoint, Math.abs(gap - 0.05));
         }
       }
@@ -157,47 +179,127 @@ class NativeCollisionTests {
     var source = new collisionkit.CollisionDescription(0.005);
     var part = source.addBody("part", 0, false, CollisionPose.translation(1, 0, 0));
     var carrier = source.addBody("carrier", 1, false);
-    var sphere = source.addObject("part/sphere", part, CollisionPose.translation(0.2, 0, 0), CollisionGeometry.Sphere(0.02), 0.005);
-    var box = source.addObject("part/box", part, CollisionPose.translation(0, 0.2, 0), CollisionGeometry.Box(0.01, 0.02, 0.03));
-    var grip = source.addObject("carrier/grip", carrier, CollisionPose.identity(), CollisionGeometry.Box(0.001, 0.001, 0.001));
-    var otherGrip = source.addObject("carrier/other-grip", carrier, CollisionPose.translation(0, 0, 0.1), CollisionGeometry.Box(0.001, 0.001, 0.001));
-    var first = source.addFixed("probe/sphere", CollisionPose.translation(1.26, 0, 0), CollisionGeometry.Sphere(0.02), 2);
+    var sphere = source.addObject(
+      "part/sphere",
+      part,
+      CollisionPose.translation(0.2, 0, 0),
+      CollisionGeometry.Sphere(0.02),
+      0.005
+    );
+    var box = source.addObject(
+      "part/box",
+      part,
+      CollisionPose.translation(0, 0.2, 0),
+      CollisionGeometry.Box(
+        0.01,
+        0.02,
+        0.03
+      )
+    );
+    var grip = source.addObject(
+      "carrier/grip",
+      carrier,
+      CollisionPose.identity(),
+      CollisionGeometry.Box(
+        0.001,
+        0.001,
+        0.001
+      )
+    );
+    var otherGrip = source.addObject(
+      "carrier/other-grip",
+      carrier,
+      CollisionPose.translation(0, 0, 0.1),
+      CollisionGeometry.Box(
+        0.001,
+        0.001,
+        0.001
+      )
+    );
+    var first = source.addFixed(
+      "probe/sphere",
+      CollisionPose.translation(1.26, 0, 0),
+      CollisionGeometry.Sphere(0.02),
+      2
+    );
     var second = source.addFixed("probe/box", CollisionPose.translation(1, 0.25, 0), CollisionGeometry.Sphere(0.01), 3);
     source.setObjectMargins(sphere, first, 0.005, 0.002);
     var build = source.build(new NativeCollisionWorld());
     var ids = build.objects.copy();
-    var queries = [new CollisionPair(ids[sphere], ids[first], build.bodies[part], build.bodies[source.objects[first].body]),
-      new CollisionPair(ids[box], ids[second], build.bodies[part], build.bodies[source.objects[second].body])];
+    var queries = [
+      new CollisionPair(
+        ids[sphere],
+        ids[first],
+        build.bodies[part],
+        build.bodies[source.objects[first].body]
+      ),
+      new CollisionPair(
+        ids[box],
+        ids[second],
+        build.bodies[part],
+        build.bodies[source.objects[second].body]
+      )
+    ];
     var before = build.world.pairDistances(queries);
     check(before.length == 2 && Math.abs(before[0].distance - 0.015) < 1e-9, "described sphere keeps radial inflation");
     check(Math.abs(before[1].distance - 0.02) < 1e-9, "compound part keeps its box offset");
     var target = new CollisionPose(0, 0, 0, 0, 0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4));
     build.transferBody(part, CollisionPose.translation(1, 0, 0), target, false, [grip]);
     var attached = build.world.pairDistances(queries);
-    check(Math.abs(attached[0].distance - before[0].distance) < 1e-9 && Math.abs(attached[1].distance - before[1].distance) < 1e-9,
-      "changing carrier frame preserves every shape's world pose");
-    check(build.objects[sphere] == ids[sphere] && build.objects[box] == ids[box], "transfer preserves collision object ids");
-    check(build.description.bodies[part].fixed == false && build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.ProcessContact,
-      "attachment permits the explicitly named grasp contact");
-    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked &&
-      build.world.pairStatus(ids[box], ids[otherGrip]) == CollisionPairStatus.Checked,
-      "a second gripper on the same carrier still checks against every stock piece");
+    check(
+      Math.abs(attached[0].distance - before[0].distance) < 1e-9
+      && Math.abs(attached[1].distance - before[1].distance) < 1e-9,
+      "changing carrier frame preserves every shape's world pose"
+    );
+    check(
+      build.objects[sphere] == ids[sphere] && build.objects[box] == ids[box],
+      "transfer preserves collision object ids"
+    );
+    check(
+      build.description.bodies[part].fixed == false && build.world.pairStatus(ids[sphere],
+      ids[grip]) == CollisionPairStatus.ProcessContact,
+      "attachment permits the explicitly named grasp contact"
+    );
+    check(
+      build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked && build.world.pairStatus(
+        ids[box],
+        ids[otherGrip]
+      ) == CollisionPairStatus.Checked,
+      "a second gripper on the same carrier still checks against every stock piece"
+    );
     build.openContactWindow(part, carrier);
-    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.ProcessContact,
-      "an explicit process window overrides an authored object check");
+    check(
+      build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.ProcessContact,
+      "an explicit process window overrides an authored object check"
+    );
     build.closeContactWindow(part, carrier);
-    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked &&
-      build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.ProcessContact,
-      "closing a window restores both checked surfaces and named grasp contacts");
-    check(source.objects[sphere].offset.x == 0.2 && source.bodies[part].pose.x == 1,
-      "a live transfer leaves the original description reusable");
-    check(build.description.objects[sphere].inflation == 0.005 && build.description.marginBetweenObjects(sphere, first, true) == 0.002,
-      "live description preserves geometry padding and authored process margins");
+    check(
+      build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked && build.world.pairStatus(
+        ids[sphere],
+        ids[grip]
+      ) == CollisionPairStatus.ProcessContact,
+      "closing a window restores both checked surfaces and named grasp contacts"
+    );
+    check(
+      source.objects[sphere].offset.x == 0.2 && source.bodies[part].pose.x == 1,
+      "a live transfer leaves the original description reusable"
+    );
+    check(
+      build.description.objects[sphere].inflation == 0.005 && build.description.marginBetweenObjects(
+        sphere,
+        first,
+        true
+      ) == 0.002,
+      "live description preserves geometry padding and authored process margins"
+    );
     build.transferBody(part, target, CollisionPose.translation(0, 0.5, 0), true, []);
     var detached = build.world.pairDistances(queries);
-    check(build.description.bodies[part].fixed && build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.Checked &&
-      Math.abs(detached[0].distance - before[0].distance) < 1e-9 && Math.abs(detached[1].distance - before[1].distance) < 1e-9,
-      "detachment preserves shape poses and restores independent collision checks");
+    check(
+      build.description.bodies[part].fixed && build.world.pairStatus(ids[sphere],
+      ids[grip]) == CollisionPairStatus.Checked && Math.abs(detached[0].distance - before[0].distance) < 1e-9
+      && Math.abs(detached[1].distance - before[1].distance) < 1e-9,
+      "detachment preserves shape poses and restores independent collision checks"
+    );
     build.world.dispose();
   }
 
@@ -212,21 +314,38 @@ class NativeCollisionTests {
     source.setObjectMargins(first, other, 0.005, 0.005);
     var build = source.build(new NativeCollisionWorld());
     var air = build.world.violation(source.margins), contact = build.world.violation(source.contactMargins);
-    check(source.groupCount() == 2 && air != null && air.b == build.objects[other] && contact != null && contact.b == build.objects[other],
-      "one pair's work allowance never relaxes another pair sharing its margin class");
-    check(source.marginBetweenObjects(first, near) == 0.003 && source.marginBetweenObjects(first, other) == 0.005,
-      "sparse pair margins retain independently authored values");
-    build.world.setObjectRule(build.objects[first], build.objects[other], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
+    check(
+      source.groupCount() == 2
+      && air != null && air.b == build.objects[other] && contact != null && contact.b == build.objects[other],
+      "one pair's work allowance never relaxes another pair sharing its margin class"
+    );
+    check(
+      source.marginBetweenObjects(first, near) == 0.003 && source.marginBetweenObjects(first, other) == 0.005,
+      "sparse pair margins retain independently authored values"
+    );
+    build.world.setObjectRule(
+      build.objects[first],
+      build.objects[other],
+      CollisionPairRule.Allow,
+      CollisionPairStatus.ProcessContact
+    );
     build.world.setObjectMargins(build.objects[first], build.objects[near], 0.006, 0.0005);
     var raised = build.world.violation(source.margins);
-    check(raised != null && Math.abs(raised.required - 0.006) < 1e-12 && build.world.violation(source.contactMargins) == null,
-      "air and contact contexts select the same pair's distinct sparse margins");
-    check(build.world.violation(new CollisionMargins(2, 0.005, false, 0.002)) == null,
-      "a query ceiling applies to sparse margins as well as the class table");
+    check(
+      raised != null
+      && Math.abs(raised.required - 0.006) < 1e-12 && build.world.violation(source.contactMargins) == null,
+      "air and contact contexts select the same pair's distinct sparse margins"
+    );
+    check(
+      build.world.violation(new CollisionMargins(2, 0.005, false, 0.002)) == null,
+      "a query ceiling applies to sparse margins as well as the class table"
+    );
     build.world.setObjectMargins(build.objects[first], build.objects[near], null, null);
     var restored = build.world.violation(source.margins);
-    check(restored != null && Math.abs(restored.required - 0.005) < 1e-12,
-      "removing a sparse margin restores the group's margin");
+    check(
+      restored != null && Math.abs(restored.required - 0.005) < 1e-12,
+      "removing a sparse margin restores the group's margin"
+    );
     build.world.dispose();
   }
 
@@ -241,8 +360,17 @@ class NativeCollisionTests {
     var foreCapsule = world.add(fore, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Capsule(0.05, 0.2));
     var toolBox = world.add(tool, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1));
     var obstacle = world.add(-1, CollisionPose.translation(2.5, 0, 0), CollisionGeometry.Box(0.2, 0.2, 0.2));
-    var floor = world.add(-1, CollisionPose.translation(0, 0, -1),
-      CollisionGeometry.HeightField(4, 4, [for (_ in 0...9) 0.0], 3, -1));
+    var floor = world.add(
+      -1,
+      CollisionPose.translation(0, 0, -1),
+      CollisionGeometry.HeightField(
+        4,
+        4,
+        [for (_ in 0...9) 0.0],
+        3,
+        -1
+      )
+    );
 
     check(world.pairStatus(foreCapsule, toolBox) == CollisionPairStatus.Rigid, "forearm and tool are rigid");
     check(world.pairStatus(upperSphere, toolBox) == CollisionPairStatus.Adjacent, "upper arm and tool are adjacent");
@@ -261,14 +389,17 @@ class NativeCollisionTests {
 
     // Grasp the obstacle: it rides on the tool and follows the tool's rules.
     world.attach(obstacle, tool, CollisionPose.translation(0.3, 0, 0));
-    check(world.pairStatus(foreCapsule, obstacle) == CollisionPairStatus.Rigid, "a grasped part is rigid with the tool");
+    check(world.pairStatus(foreCapsule,
+      obstacle) == CollisionPairStatus.Rigid, "a grasped part is rigid with the tool");
     check(world.pairStatus(upperSphere, obstacle) == CollisionPairStatus.Adjacent, "and adjacent to the upper arm");
     snapshot.evaluate(new KinematicState(model, [0.0, Math.PI / 2]));
     place(world, first, model, snapshot);
     var held = world.distances(10.0).filter(d -> d.a == baseBox && d.b == obstacle);
     // With the elbow bent the held box is centred at (1, 1.3, 0): 0.7 along x and 1.0 along y from the base box.
-    check(held.length == 1 && Math.abs(held[0].distance - Math.sqrt(0.7 * 0.7 + 1.0 * 1.0)) < 1e-9,
-      'the held part follows the tool (${held.length == 1 ? held[0].distance : -1})');
+    check(
+      held.length == 1 && Math.abs(held[0].distance - Math.sqrt(0.7 * 0.7 + 1.0 * 1.0)) < 1e-9,
+      'the held part follows the tool (${held.length == 1 ? held[0].distance : -1})'
+    );
 
     // Raise the terrain to z = 0, into every link but the held part.
     world.setHeights(floor, [for (_ in 0...9) 1.0]);
@@ -300,18 +431,49 @@ class NativeCollisionTests {
    * snapshot.
    */
   static function testTwoModelsInOneWorld():Void {
-    var left = twoLinkArm(), right = twoLinkArm(Transform.translation(4.2, 0, 0).compose(Transform.axisAngle(0, 0, 1, Math.PI)));
+    var left = twoLinkArm(), right = twoLinkArm(Transform.translation(4.2, 0, 0).compose(Transform.axisAngle(
+      0,
+      0,
+      1,
+      Math.PI
+    )));
     var world = new NativeCollisionWorld();
     var a = register(world, left, 0), b = register(world, right, 0);
     check(a == 0 && b == 4 && world.bodyCount() == 8, "bodies of both models");
     world.setBodyStatic(a, true);
     world.setBodyStatic(b, true);
-    var tools = [world.add(a + 3, CollisionPose.identity(), CollisionGeometry.Sphere(0.11)),
-      world.add(b + 3, CollisionPose.identity(), CollisionGeometry.Sphere(0.11))];
-    var fores = [world.add(a + 2, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1)),
-      world.add(b + 2, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1))];
-    var bases = [world.add(a, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1)),
-      world.add(b, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1))];
+    var tools = [
+      world.add(a + 3, CollisionPose.identity(), CollisionGeometry.Sphere(0.11)),
+      world.add(
+        b + 3,
+        CollisionPose.identity(),
+        CollisionGeometry.Sphere(0.11)
+      )
+    ];
+    var fores = [
+      world.add(a + 2, CollisionPose.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1)),
+      world.add(
+        b + 2,
+        CollisionPose.translation(
+          0.5,
+          0,
+          0
+        ),
+        CollisionGeometry.Sphere(0.1)
+      )
+    ];
+    var bases = [
+      world.add(a, CollisionPose.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1)),
+      world.add(
+        b,
+        CollisionPose.identity(),
+        CollisionGeometry.Box(
+          0.1,
+          0.1,
+          0.1
+        )
+      )
+    ];
     check(world.pairStatus(tools[0], fores[0]) == CollisionPairStatus.Rigid, "left keeps its rules");
     check(world.pairStatus(tools[1], fores[1]) == CollisionPairStatus.Rigid, "right keeps its rules");
     check(world.pairStatus(tools[0], fores[1]) == CollisionPairStatus.Checked, "left tool against right forearm");
@@ -323,8 +485,11 @@ class NativeCollisionTests {
     place(world, b, right, snapshotB);
     // Tools at x = 2 and x = 2.2: spheres of 0.11 overlap.
     var hits = world.colliding(0.0);
-    check(hits.length == 1 && hits[0].a == tools[0] && hits[0].b == tools[1] && hits[0].bodyA == a + 3
-      && hits[0].bodyB == b + 3, "the two tools touch");
+    check(
+      hits.length == 1
+      && hits[0].a == tools[0] && hits[0].b == tools[1] && hits[0].bodyA == a + 3 && hits[0].bodyB == b + 3,
+      "the two tools touch"
+    );
     // Only the right arm moves: its elbow folds by 90 degrees, its tool to (3.2, -1, 0).
     snapshotB.evaluate(new KinematicState(right, [0.0, Math.PI / 2]));
     place(world, b, right, snapshotB);
@@ -337,7 +502,7 @@ class NativeCollisionTests {
   static function testInflationAgainstExactDistances():Void {
     var world = new NativeCollisionWorld();
     var body = world.addBody(0);
-    var cube = [for (i in 0...8) for (axis in 0...3) ((i >> axis) & 1) == 1 ? 0.1 : -0.1];
+    var cube = [for (i in 0...8) for (axis in 0...3)((i >> axis) & 1) == 1 ? 0.1 : -0.1];
     var sphere = world.add(body, CollisionPose.identity(), CollisionGeometry.Sphere(0.2));
     var box = world.add(-1, CollisionPose.translation(1, 0, 0), CollisionGeometry.Box(0.1, 0.3, 0.3));
     var hull = world.add(-1, CollisionPose.translation(0, 1, 0), CollisionGeometry.Convex(cube));
@@ -347,8 +512,8 @@ class NativeCollisionTests {
       for (object in [sphere, box, hull, capsule]) world.setInflation(object, radius);
       var found = world.distances(10.0);
       function of(object:Int):Float {
-        for (d in found) if (d.a == Std.int(Math.min(sphere, object)) && d.b == Std.int(Math.max(sphere, object)))
-          return d.distance;
+        for (d in found) if (d.a == Std.int(Math.min(sphere,
+          object)) && d.b == Std.int(Math.max(sphere, object))) return d.distance;
         throw 'pair with $object not found';
       }
       // Exact distances: centre gaps minus the radii and inflations of both.
@@ -357,7 +522,11 @@ class NativeCollisionTests {
       worst = Math.max(worst, Math.abs(of(capsule) - (1.0 - 0.25 - 0.2 - 2 * radius)));
     }
     check(worst < 1e-9, 'inflated distances are exact (worst $worst)');
-    var mesh = world.add(-1, CollisionPose.identity(), CollisionGeometry.Mesh([0, 0, -1, 1, 0, -1, 0, 1, -1], [0, 1, 2]));
+    var mesh = world.add(
+      -1,
+      CollisionPose.identity(),
+      CollisionGeometry.Mesh([0, 0, -1, 1, 0, -1, 0, 1, -1], [0, 1, 2])
+    );
     rejects(() -> world.setInflation(mesh, 0.1), "a mesh cannot be inflated");
     rejects(() -> world.setInflation(box, -0.1), "inflation is not negative");
     world.dispose();
@@ -381,10 +550,14 @@ class NativeCollisionTests {
     var inflation = [0.0, 0.0, 0.0, 0.11];
     var found = world.violation(margins, inflation);
     if (found == null) throw "assertion failed: the tool's inflation brings it within the margin";
-    check(found.a == toolBox && found.b == obstacle && found.bodyA == first + 3 && found.bodyB == -1,
-      "the tool's inflation brings it within the margin");
-    check(Math.abs(found.distance - 0.2) < 1e-9 && Math.abs(found.required - 0.21) < 1e-12,
-      'distance and required clearance (${found.distance}, ${found.required})');
+    check(
+      found.a == toolBox && found.b == obstacle && found.bodyA == first + 3 && found.bodyB == -1,
+      "the tool's inflation brings it within the margin"
+    );
+    check(
+      Math.abs(found.distance - 0.2) < 1e-9 && Math.abs(found.required - 0.21) < 1e-12,
+      'distance and required clearance (${found.distance}, ${found.required})'
+    );
     margins.set(1, 0, 0.3);
     var wider = world.violation(margins);
     check(wider != null && wider.required == 0.3, "the tool group's margin to the world group");
@@ -392,7 +565,10 @@ class NativeCollisionTests {
     margins.set(1, 0, 0.1);
     var closest = world.closest(margins);
     if (closest == null) throw "assertion failed: a closest pair";
-    check(closest.a == toolBox && Math.abs(closest.distance - 0.2) < 1e-9 && closest.required == 0.1, "the closest pair");
+    check(
+      closest.a == toolBox && Math.abs(closest.distance - 0.2) < 1e-9 && closest.required == 0.1,
+      "the closest pair"
+    );
 
     // A sweep of the elbow, as pose sets; the tool reaches the obstacle once inflated at the last set.
     var poses:Array<Float> = [];
@@ -413,8 +589,10 @@ class NativeCollisionTests {
 
   static function testRefusedHeights():Void {
     var world = new NativeCollisionWorld();
-    rejects(() -> world.add(-1, CollisionPose.identity(), CollisionGeometry.HeightField(1, 1, [0, 0, 0, -2], 2, -1)),
-      "heights below the minimum are refused");
+    rejects(
+      () -> world.add(-1, CollisionPose.identity(), CollisionGeometry.HeightField(1, 1, [0, 0, 0, -2], 2, -1)),
+      "heights below the minimum are refused"
+    );
     var field = world.add(-1, CollisionPose.identity(), CollisionGeometry.HeightField(1, 1, [0, 0, 0, 0], 2, -1));
     world.setHeights(field, [0, -1, 0, 0]);
     rejects(() -> world.setHeights(field, [0, -1.5, 0, 0]), "a dig below the minimum is refused, not clamped");
@@ -429,7 +607,17 @@ class NativeCollisionTests {
     if (root != null) builder.setRootPose(base, root);
     var z = new Vector3(0, 0, 1);
     builder.addJoint("shoulder", JointKind.Revolute, base, upper, Transform.identity(), Transform.identity(), z, -3, 3);
-    builder.addJoint("elbow", JointKind.Revolute, upper, fore, Transform.translation(1, 0, 0), Transform.identity(), z, -3, 3);
+    builder.addJoint(
+      "elbow",
+      JointKind.Revolute,
+      upper,
+      fore,
+      Transform.translation(1, 0, 0),
+      Transform.identity(),
+      z,
+      -3,
+      3
+    );
     builder.addFrame("flange", fore, Transform.translation(1, 0, 0));
     return builder.build();
   }
@@ -440,10 +628,25 @@ class NativeCollisionTests {
    * returns the smallest distance seen on the moving arm's pairs, and leaves
    * `state` where it ends.
    */
-  static function servo(model:KinematicModel, bodies:ModelBodies, build:CollisionBuild, state:KinematicState,
-      target:Vector3, steps:Int, avoid:Bool):Float {
-    var task = FrameTask.atFrame(model, model.frameIndex("flange"), Transform.translation(target.x, target.y, target.z),
-      1e-6, 1e-6, null, 7, FrameOrientation.Free);
+  static function servo(
+    model:KinematicModel,
+    bodies:ModelBodies,
+    build:CollisionBuild,
+    state:KinematicState,
+    target:Vector3,
+    steps:Int,
+    avoid:Bool
+  ):Float {
+    var task = FrameTask.atFrame(
+      model,
+      model.frameIndex("flange"),
+      Transform.translation(target.x, target.y, target.z),
+      1e-6,
+      1e-6,
+      null,
+      7,
+      FrameOrientation.Free
+    );
     var problem = new KinematicProblem(model).add(task);
     var qp = new NativeQpStep(problem.layout().width);
     var limits = StepLimits.ofVelocity([1.0, 1.0]);
@@ -475,7 +678,8 @@ class NativeCollisionTests {
       var description = new collisionkit.CollisionDescription();
       var reference = new KinematicState(model, [1.2, -1.6]);
       var bodies = ModelBodies.describe(description, model, "arm", 0, reference, "start", true);
-      description.addObject("tip", bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
+      description.addObject("tip",
+        bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
       bodies.declare();
       // A wall whose face is the plane x = 1.5.
       description.addFixed("wall", CollisionPose.translation(1.6, 0, 0), CollisionGeometry.Box(0.1, 2, 2), 1);
@@ -497,14 +701,46 @@ class NativeCollisionTests {
 
   /** CL5: the other side of a pair is another robot (no Jacobian in this solve); the arm still stops short of it. */
   static function testAvoidsAnotherRobot():Void {
-    var model = flangeArm(), other = flangeArm(Transform.translation(2.0, 1.2, 0).compose(Transform.axisAngle(0, 0, 1, Math.PI)));
+    var model = flangeArm(), other = flangeArm(Transform.translation(2.0, 1.2, 0).compose(Transform.axisAngle(
+      0,
+      0,
+      1,
+      Math.PI
+    )));
     var description = new collisionkit.CollisionDescription();
-    var bodies = ModelBodies.describe(description, model, "arm", 0, new KinematicState(model, [0.0, 0.0]), "start", true);
+    var bodies = ModelBodies.describe(
+      description,
+      model,
+      "arm",
+      0,
+      new KinematicState(model, [0.0, 0.0]),
+      "start",
+      true
+    );
     description.addObject("tip", bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
     bodies.declare();
-    var otherBodies = ModelBodies.describe(description, other, "other", 2, new KinematicState(other, [0.0, 0.0]), "start", true);
-    for (body in 1...3) description.addObject('other$body', otherBodies.bodies[body], CollisionPose.translation(0.5, 0, 0),
-      CollisionGeometry.Capsule(0.05, 0.5));
+    var otherBodies = ModelBodies.describe(
+      description,
+      other,
+      "other",
+      2,
+      new KinematicState(other, [0.0, 0.0]),
+      "start",
+      true
+    );
+    for (body in 1...3) description.addObject(
+      'other$body',
+      otherBodies.bodies[body],
+      CollisionPose.translation(
+        0.5,
+        0,
+        0
+      ),
+      CollisionGeometry.Capsule(
+        0.05,
+        0.5
+      )
+    );
     otherBodies.declare();
     var world = new NativeCollisionWorld();
     var build = description.build(world);
@@ -514,8 +750,10 @@ class NativeCollisionTests {
     var closest = servo(model, bodies, build, state, new Vector3(1.5, 1.2, 0), 400, true);
     check(closest >= 0.01 - 1e-3, 'the arm stops short of the other robot ($closest)');
     var pairs = bodies.avoidancePairs(build, world.distances(0.1), 0.01, 0.1);
-    check(pairs.length > 0 && pairs.filter(p -> p.bodyB == -1 || p.bodyA == -1).length == pairs.length,
-      "the other robot's side has no Jacobian in this solve");
+    check(
+      pairs.length > 0 && pairs.filter(p -> p.bodyB == -1 || p.bodyA == -1).length == pairs.length,
+      "the other robot's side has no Jacobian in this solve"
+    );
     world.dispose();
   }
 
@@ -530,7 +768,16 @@ class NativeCollisionTests {
     bodies.declare();
     // The wall's face is 4 mm beyond the tip sphere.
     var tipX = flangePoint(model, reference).x;
-    description.addFixed("wall", CollisionPose.translation(tipX + 0.05 + 0.004 + 0.1, 0, 0), CollisionGeometry.Box(0.1, 2, 2), 1);
+    description.addFixed(
+      "wall",
+      CollisionPose.translation(tipX + 0.05 + 0.004 + 0.1, 0, 0),
+      CollisionGeometry.Box(
+        0.1,
+        2,
+        2
+      ),
+      1
+    );
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var state = reference.copy();
@@ -538,21 +785,43 @@ class NativeCollisionTests {
     var start = world.distances(0.1)[0].distance;
     check(Math.abs(start - 0.004) < 1e-9, 'it starts 4 mm from the wall ($start)');
     // Holding its place (the target is where it is) it still backs out to the margin.
-    var task = FrameTask.atFrame(model, model.frameIndex("flange"), flangePoint(model, state), 1e-6, 1e-6, null, 7, FrameOrientation.Free);
+    var task = FrameTask.atFrame(
+      model,
+      model.frameIndex("flange"),
+      flangePoint(model, state),
+      1e-6,
+      1e-6,
+      null,
+      7,
+      FrameOrientation.Free
+    );
     var problem = new KinematicProblem(model).add(task);
     var qp = new NativeQpStep(2);
     var distances = [start];
     for (_ in 0...300) {
       bodies.place(build, state);
       var pairs = bodies.avoidancePairs(build, world.distances(0.1), 0.01, 0.1);
-      var step = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([1.0, 1.0]), 0.2, 1e-3, null, 1000, pairs, 0.5);
+      var step = DifferentialIk.step(
+        problem,
+        state,
+        0.01,
+        qp,
+        StepLimits.ofVelocity([1.0, 1.0]),
+        0.2,
+        1e-3,
+        null,
+        1000,
+        pairs,
+        0.5
+      );
       for (column in 0...2) state.q[problem.layout().dofs[column]] += step.velocity[column] * 0.01;
       bodies.place(build, state);
       distances.push(world.distances(0.1)[0].distance);
     }
     qp.dispose();
     var rising = true;
-    for (i in 1...distances.length) if (distances[i] < distances[i - 1] - 1e-9 && distances[i - 1] < 0.01 - 1e-4) rising = false;
+    for (i in 1...distances.length) if (distances[i] < distances[i - 1] - 1e-9
+      && distances[i - 1] < 0.01 - 1e-4) rising = false;
     var last = distances[distances.length - 1];
     check(rising && last >= 0.01 - 1e-3, 'the distance rises back to the margin (${distances[1]}, ..., $last)');
     world.dispose();
@@ -562,16 +831,61 @@ class NativeCollisionTests {
   static function testRelaxesRowsThatCannotHold():Void {
     var model = flangeArm();
     var state = new KinematicState(model, [0.5, -1.0]);
-    var task = FrameTask.atFrame(model, model.frameIndex("flange"), flangePoint(model, state), 1e-6, 1e-6, null, 7, FrameOrientation.Free);
+    var task = FrameTask.atFrame(
+      model,
+      model.frameIndex("flange"),
+      flangePoint(model, state),
+      1e-6,
+      1e-6,
+      null,
+      7,
+      FrameOrientation.Free
+    );
     var problem = new KinematicProblem(model).add(task);
     var qp = new NativeQpStep(2);
     // Inside the margin, but no joint may move at all.
-    var pair = new AvoidancePair(2, -1, new Vector3(2.05, 0, 0), new Vector3(2.054, 0, 0), new Vector3(1, 0, 0), 0.004, 0.01, 0.1);
-    var step = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([0.0, 0.0]), 0.2, 1e-3, null, 1000, [pair], 0.5);
-    check(step.avoided.length == 1 && step.relaxed.length == 1 && step.relaxed[0] == pair, "the row that cannot hold is relaxed and named");
+    var pair = new AvoidancePair(
+      2,
+      -1,
+      new Vector3(2.05, 0, 0),
+      new Vector3(2.054, 0, 0),
+      new Vector3(1, 0, 0),
+      0.004,
+      0.01,
+      0.1
+    );
+    var step = DifferentialIk.step(
+      problem,
+      state,
+      0.01,
+      qp,
+      StepLimits.ofVelocity([0.0, 0.0]),
+      0.2,
+      1e-3,
+      null,
+      1000,
+      [pair],
+      0.5
+    );
+    check(
+      step.avoided.length == 1 && step.relaxed.length == 1 && step.relaxed[0] == pair,
+      "the row that cannot hold is relaxed and named"
+    );
     check(Math.abs(step.velocity[0]) < 1e-9 && Math.abs(step.velocity[1]) < 1e-9, "and the limits still hold exactly");
     // With room to move, it holds as given.
-    var free = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([1.0, 1.0]), 0.2, 1e-3, null, 1000, [pair], 0.5);
+    var free = DifferentialIk.step(
+      problem,
+      state,
+      0.01,
+      qp,
+      StepLimits.ofVelocity([1.0, 1.0]),
+      0.2,
+      1e-3,
+      null,
+      1000,
+      [pair],
+      0.5
+    );
     check(free.relaxed.length == 0 && !free.fallback, "a row that can hold is not relaxed");
     qp.dispose();
   }
@@ -582,9 +896,12 @@ class NativeCollisionTests {
     for (_ in 0...model.bodyCount()) world.addBody(group);
     for (pair in KinematicBodyPairs.of(model)) {
       var reason = switch pair.relation {
-        case BodyPairRelation.Rigid: CollisionPairStatus.Rigid;
-        case BodyPairRelation.Adjacent: CollisionPairStatus.Adjacent;
-        case _: CollisionPairStatus.Closure;
+        case BodyPairRelation.Rigid:
+          CollisionPairStatus.Rigid;
+        case BodyPairRelation.Adjacent:
+          CollisionPairStatus.Adjacent;
+        case _:
+          CollisionPairStatus.Closure;
       }
       world.setBodyRule(first + pair.a, first + pair.b, CollisionPairRule.Allow, reason);
     }
@@ -618,20 +935,50 @@ class NativeCollisionTests {
   static function randomForest(rng:Rng):KinematicModel {
     var builder = new KinematicModelBuilder();
     var bodies = [builder.addBody("root")];
-    var kinds = [JointKind.Revolute, JointKind.Prismatic, JointKind.Fixed, JointKind.Revolute, JointKind.Revolute,
-      JointKind.Prismatic, JointKind.Revolute];
+    var kinds = [
+      JointKind.Revolute,
+      JointKind.Prismatic,
+      JointKind.Fixed,
+      JointKind.Revolute,
+      JointKind.Revolute,
+      JointKind.Prismatic,
+      JointKind.Revolute
+    ];
     for (i in 0...kinds.length) {
       var body = builder.addBody('b$i');
       var parent = i == 5 ? bodies[2] : bodies[bodies.length - 1];
-      builder.addJoint('j$i', kinds[i], parent, body, randomTransform(rng), randomTransform(rng),
-        new Vector3(rng.signed(), rng.signed(), rng.signed() + 0.1));
+      builder.addJoint(
+        'j$i',
+        kinds[i],
+        parent,
+        body,
+        randomTransform(rng),
+        randomTransform(rng),
+        new Vector3(
+          rng.signed(),
+          rng.signed(),
+          rng.signed() + 0.1
+        )
+      );
       bodies.push(body);
     }
     builder.couple("j4", "j3", 0.75, 0.1);
     var other = builder.addBody("other_root");
     builder.setRootPose(other, randomTransform(rng));
     var arm = builder.addBody("other_arm");
-    builder.addJoint("k0", JointKind.Revolute, other, arm, randomTransform(rng), randomTransform(rng), new Vector3(0, 0, 1));
+    builder.addJoint(
+      "k0",
+      JointKind.Revolute,
+      other,
+      arm,
+      randomTransform(rng),
+      randomTransform(rng),
+      new Vector3(
+        0,
+        0,
+        1
+      )
+    );
     builder.addFrame("tip", bodies[bodies.length - 1], randomTransform(rng));
     return builder.build();
   }
@@ -639,8 +986,12 @@ class NativeCollisionTests {
   static function randomTransform(rng:Rng):Transform {
     var ax = rng.signed(), ay = rng.signed(), az = rng.signed() + 0.1;
     var norm = Math.sqrt(ax * ax + ay * ay + az * az);
-    return new Transform(rng.signed(), rng.signed(), rng.signed(), 0.0, 0.0, 0.0, 1.0)
-      .compose(Transform.axisAngle(ax / norm, ay / norm, az / norm, rng.signed() * 2.0));
+    return new Transform(rng.signed(), rng.signed(), rng.signed(), 0.0, 0.0, 0.0, 1.0).compose(Transform.axisAngle(
+      ax / norm,
+      ay / norm,
+      az / norm,
+      rng.signed() * 2.0
+    ));
   }
 
   static function check(value:Bool, message:String):Void {
@@ -648,7 +999,7 @@ class NativeCollisionTests {
     if (!value) throw 'assertion failed: $message';
   }
 
-  static function rejects(action:Void->Void, message:String):Void {
+  static function rejects(action:Void -> Void, message:String):Void {
     var threw = false;
     try action() catch (_:Dynamic) threw = true;
     check(threw, message);

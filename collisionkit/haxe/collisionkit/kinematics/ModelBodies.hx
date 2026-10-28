@@ -39,8 +39,14 @@ class ModelBodies {
   final poseScratch:Array<Float> = [for (_ in 0...7) 0.0];
   var articulation = -1;
 
-  function new(description:CollisionDescription, model:KinematicModel, name:String, bodies:Array<Int>,
-      reference:KinematicState, referenceName:String) {
+  function new(
+    description:CollisionDescription,
+    model:KinematicModel,
+    name:String,
+    bodies:Array<Int>,
+    reference:KinematicState,
+    referenceName:String
+  ) {
     this.description = description;
     this.model = model;
     this.name = name;
@@ -56,10 +62,10 @@ class ModelBodies {
    * `describe`, and a second body on one link follows it, as in `follow`.
    * A rule the description already authors for a pair is kept.
    */
-  public static function bind(description:CollisionDescription, model:KinematicModel,
-      reference:KinematicState):ModelBodies {
+  public static function bind(description:CollisionDescription,
+    model:KinematicModel, reference:KinematicState):ModelBodies {
     if (reference.model != model) throw "Collision mapping needs a state of its model";
-    var direct = [for (_ in 0...model.bodyCount()) -1];
+    var direct = [for (_ in 0...model.bodyCount()) - 1];
     var result = new ModelBodies(description, model, "description", direct, reference, "authored reference");
     for (i in 0...description.bodies.length) {
       var body = description.bodies[i];
@@ -67,12 +73,23 @@ class ModelBodies {
       var carrier = model.bodyIndex(body.name);
       if (carrier < 0) throw 'Collision body "${body.name}" needs a named mechanical carrier';
       if (direct[carrier] < 0) direct[carrier] = i;
-      else { result.followers.push(i); result.followed.push(carrier); }
+      else {
+        result.followers.push(i);
+        result.followed.push(carrier);
+      }
     }
-    function structural(a:Int, b:Int, reason:CollisionPairStatus):Void
-      if (description.bodyRule(a, b) == null) description.setBodyRule(a, b, CollisionPairRule.Allow, reason);
-    for (pair in KinematicBodyPairs.of(model))
-      if (direct[pair.a] >= 0 && direct[pair.b] >= 0) structural(direct[pair.a], direct[pair.b], reasonOf(pair.relation));
+    function structural(a:Int,
+      b:Int, reason:CollisionPairStatus):Void if (description.bodyRule(a, b) == null) description.setBodyRule(
+        a,
+        b,
+        CollisionPairRule.Allow,
+        reason
+      );
+    for (pair in KinematicBodyPairs.of(model)) if (direct[pair.a] >= 0 && direct[pair.b] >= 0) structural(
+      direct[pair.a],
+      direct[pair.b],
+      reasonOf(pair.relation)
+    );
     for (i in 0...result.followers.length) {
       var follower = result.followers[i], target = direct[result.followed[i]];
       structural(target, follower, CollisionPairStatus.Rigid);
@@ -91,15 +108,29 @@ class ModelBodies {
    * `fixedRoots`, bodies rigid to a root of the model are fixed in the cell
    * (a robot bolted down); otherwise only the model's structure decides.
    */
-  public static function describe(description:CollisionDescription, model:KinematicModel, name:String, group:Int,
-      reference:KinematicState, referenceName:String, fixedRoots:Bool):ModelBodies {
+  public static function describe(
+    description:CollisionDescription,
+    model:KinematicModel,
+    name:String,
+    group:Int,
+    reference:KinematicState,
+    referenceName:String,
+    fixedRoots:Bool
+  ):ModelBodies {
     if (reference.model != model) throw 'Reference of "$name" must be a state of its model';
     var groups = KinematicBodyPairs.rigidGroups(model);
-    var bodies = [for (body in 0...model.bodyCount())
-      description.addBody('$name/${model.bodyIds[body]}', group, fixedRoots && model.bodyParentJoint[groups[body]] < 0)];
+    var bodies = [for (body in 0...model.bodyCount()) description.addBody(
+      '$name/${model.bodyIds[body]}',
+      group,
+      fixedRoots && model.bodyParentJoint[groups[body]] < 0
+    )];
     var result = new ModelBodies(description, model, name, bodies, reference, referenceName);
-    for (pair in KinematicBodyPairs.of(model))
-      description.setBodyRule(bodies[pair.a], bodies[pair.b], CollisionPairRule.Allow, reasonOf(pair.relation));
+    for (pair in KinematicBodyPairs.of(model)) description.setBodyRule(
+      bodies[pair.a],
+      bodies[pair.b],
+      CollisionPairRule.Allow,
+      reasonOf(pair.relation)
+    );
     result.poseDescription();
     return result;
   }
@@ -122,13 +153,18 @@ class ModelBodies {
   function addFollower(body:Int, followerName:String, group:Int, structural:Bool):Int {
     if (articulation >= 0) throw 'Bodies of "$name" are already declared as an articulation';
     var target = bodies[body];
-    var follower = description.addBody('$name/$followerName', group, description.bodies[target].fixed,
-      description.bodies[target].pose);
+    var follower = description.addBody(
+      '$name/$followerName',
+      group,
+      description.bodies[target].fixed,
+      description.bodies[target].pose
+    );
     if (structural) description.setBodyRule(target, follower, CollisionPairRule.Allow, CollisionPairStatus.Rigid);
     if (structural) for (rule in description.bodyRules.copy()) {
       if (rule.rule != CollisionPairRule.Allow) continue;
       if (rule.a == target && rule.b != follower) description.setBodyRule(follower, rule.b, rule.rule, rule.reason);
-      else if (rule.b == target && rule.a != follower) description.setBodyRule(rule.a, follower, rule.rule, rule.reason);
+      else if (rule.b == target && rule.a != follower) description.setBodyRule(rule.a,
+        follower, rule.rule, rule.reason);
     }
     followers.push(follower);
     followed.push(body);
@@ -162,35 +198,55 @@ class ModelBodies {
   }
 
   /** Transfer collision geometry and its mechanical follower together. */
-  public function transfer(build:CollisionBuild, body:Int, current:CollisionPose, target:CollisionPose,
-      fixed:Bool, carrier:Int, contacts:Array<Int>, ?releasedPolicy:CollisionDescription):Void {
+  public function transfer(
+    build:CollisionBuild,
+    body:Int,
+    current:CollisionPose,
+    target:CollisionPose,
+    fixed:Bool,
+    carrier:Int,
+    contacts:Array<Int>,
+    ?releasedPolicy:CollisionDescription
+  ):Void {
     if (build.description != description) throw "Transfer needs this mapping's live collision description";
-    if (bodies.indexOf(body) >= 0 || carrier < -1 || carrier >= model.bodyCount())
-      throw "Transfer needs an independent part and a valid mechanical carrier";
+    if (bodies.indexOf(body) >= 0 || carrier < -1
+      || carrier >= model.bodyCount()) throw "Transfer needs an independent part and a valid mechanical carrier";
     build.transferBody(body, current, target, fixed, contacts, releasedPolicy);
     var follower = followers.indexOf(body);
     if (carrier < 0) {
-      if (follower >= 0) { followers.splice(follower, 1); followed.splice(follower, 1); }
+      if (follower >= 0) {
+        followers.splice(follower, 1);
+        followed.splice(follower, 1);
+      }
     } else if (follower >= 0) followed[follower] = carrier;
-    else { followers.push(body); followed.push(carrier); }
+    else {
+      followers.push(body);
+      followed.push(carrier);
+    }
   }
 
   /** A state of the model at DOF values `q`, with the root poses of the reference (where the model sits in the cell). */
   public function state(q:Array<Float>):KinematicState {
     var state = new KinematicState(model, q);
-    for (body in 0...model.bodyCount()) if (model.bodyParentJoint[body] < 0) state.setRootPose(body, reference.rootPose(body));
+    for (body in 0...model.bodyCount()) if (model.bodyParentJoint[body] < 0) state.setRootPose(
+      body,
+      reference.rootPose(body)
+    );
     return state;
   }
 
   /** Update caller-owned scratch, including the reference's current root poses. */
   public function stateInto(q:Array<Float>, state:KinematicState):KinematicState {
-    if (state == null || q == null || state.model != model || q.length != model.dofCount())
-      throw "Collision scratch state has the wrong model or dimension";
+    if (state == null || q == null || state.model != model
+      || q.length != model.dofCount()) throw "Collision scratch state has the wrong model or dimension";
     for (i in 0...q.length) {
       if (!Math.isFinite(q[i])) throw "Collision coordinates must be finite";
       state.q[i] = q[i];
     }
-    for (body in 0...model.bodyCount()) if (model.bodyParentJoint[body] < 0) state.setRootPose(body, reference.rootPose(body));
+    for (body in 0...model.bodyCount()) if (model.bodyParentJoint[body] < 0) state.setRootPose(
+      body,
+      reference.rootPose(body)
+    );
     return state;
   }
 
@@ -230,8 +286,8 @@ class ModelBodies {
    * outside it, or a follower such as the tool, maps to its model body or
    * -1), with the pair's safety margin and influence distance.
    */
-  public function avoidancePairs(build:CollisionBuild, found:Array<CollisionDistance>, safety:Float,
-      influence:Float):Array<AvoidancePair> {
+  public function avoidancePairs(build:CollisionBuild,
+    found:Array<CollisionDistance>, safety:Float, influence:Float):Array<AvoidancePair> {
     function modelBody(worldBody:Int):Int {
       var described = build.bodyOf(worldBody);
       if (described < 0) return -1;
@@ -244,9 +300,24 @@ class ModelBodies {
     for (d in found) {
       var a = modelBody(d.bodyA), b = modelBody(d.bodyB);
       if (a < 0 && b < 0) continue;
-      pairs.push(new AvoidancePair(a, b, new Vector3(d.pointA[0], d.pointA[1], d.pointA[2]),
-        new Vector3(d.pointB[0], d.pointB[1], d.pointB[2]), new Vector3(d.normal[0], d.normal[1], d.normal[2]), d.distance,
-        safety, influence));
+      pairs.push(new AvoidancePair(
+        a,
+        b,
+        new Vector3(d.pointA[0], d.pointA[1], d.pointA[2]),
+        new Vector3(
+          d.pointB[0],
+          d.pointB[1],
+          d.pointB[2]
+        ),
+        new Vector3(
+          d.normal[0],
+          d.normal[1],
+          d.normal[2]
+        ),
+        d.distance,
+        safety,
+        influence
+      ));
     }
     return pairs;
   }
@@ -256,13 +327,17 @@ class ModelBodies {
     for (body in 0...bodies.length) description.bodies[bodies[body]].pose = pose(snapshot.bodyPose(body));
   }
 
-  public static function pose(t:Transform):CollisionPose return new CollisionPose(t.x, t.y, t.z, t.qx, t.qy, t.qz, t.qw);
+  public static function pose(t:Transform):CollisionPose return new CollisionPose(t.x,
+    t.y, t.z, t.qx, t.qy, t.qz, t.qw);
 
   static function reasonOf(relation:BodyPairRelation):CollisionPairStatus {
     return switch relation {
-      case BodyPairRelation.Rigid: CollisionPairStatus.Rigid;
-      case BodyPairRelation.Adjacent: CollisionPairStatus.Adjacent;
-      case _: CollisionPairStatus.Closure;
+      case BodyPairRelation.Rigid:
+        CollisionPairStatus.Rigid;
+      case BodyPairRelation.Adjacent:
+        CollisionPairStatus.Adjacent;
+      case _:
+        CollisionPairStatus.Closure;
     }
   }
 }

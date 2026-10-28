@@ -27,7 +27,15 @@ class CollisionPose {
 
   public static function identity():CollisionPose return new CollisionPose(0, 0, 0, 0, 0, 0, 1);
 
-  public static function translation(x:Float, y:Float, z:Float):CollisionPose return new CollisionPose(x, y, z, 0, 0, 0, 1);
+  public static function translation(x:Float, y:Float, z:Float):CollisionPose return new CollisionPose(
+    x,
+    y,
+    z,
+    0,
+    0,
+    0,
+    1
+  );
 
   /** Appends the seven numbers to `out`. */
   public function writeTo(out:Array<Float>):Void {
