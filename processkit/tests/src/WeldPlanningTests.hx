@@ -1,5 +1,4 @@
 import CollisionFixture;
-import collisionkit.native.NativeCollisionWorld;
 import motionkit.kinematics.IkTolerance;
 import motionkit.robot.ManipulatorKinematics;
 import processkit.WeldCorner;

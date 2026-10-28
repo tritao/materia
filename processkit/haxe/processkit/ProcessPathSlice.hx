@@ -3,8 +3,6 @@ package processkit;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
-import motionkit.path.PoseWaypoint;
-import motionkit.path.PoseDerivatives;
 
 /** Preserves authored primitive geometry when restarting inside a path. */
 class ProcessPathSlice {
