@@ -28,7 +28,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 
 | Control | Part | Notes |
 |---|---|---|
-| MPG wheel | Bought off the shelf: the "60 mm 6 pin 100 PPR handwheel" the SmartPendant uses (its README links an AliExpress listing; the maker publishes no part number) | Read on an MCU encoder timer; 400 counts per turn. The SmartPendant README says it also works from 3.3 V and wires it to 5 V tolerant pins, so it can run from 3.3 V with no level shifting. Verify the pinout and output type on arrival. |
+| MPG wheel | Bought off the shelf from Vallder: MPG hand wheel, 100 PPR, anodised aluminium, 4-pin version (5 V, GND, A, B), SKU 1165001, model OSBAO-80-100B-5E-4P. **Assumed 60 mm**: the listing gives "60 mm / 80 mm" without saying which, and the model name says 80. Confirm with Vallder before ordering. Fallback: the SmartPendant's 60 mm 6-pin listing. | Read on an MCU encoder timer; 400 counts per turn. Needs 5 V (at most 100 mA); outputs are 5 V level, so use 5 V tolerant timer pins or a level shifter. Output type, mounting hole and depth are not on the page: verify on arrival. 276 g as listed. |
 | Axis | 12-position panel rotary switch: OFF plus positions 1 to 11 | The position is the state, so it survives power cycles, reads with a glove and does not depend on the display. Positions are printed as plain numbers; the profile maps each to an axis and the OLED shows the name ("3: Z"). If the OLED fails, the printed number and the main HMI still identify the axis. |
 | Step | 3-position panel rotary switch | ×1, ×10, ×100. Universal across machines, so fixed. |
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
@@ -144,7 +144,7 @@ The wire schema, the controller-side code, the host link and how it is tested ar
 
 - **Button set.** Settled for v1 as three fixed keys and F1 to F3 profile keys. More user keys
   wait until a real machine shows what is missing.
-- **MPG.** Settled on the SmartPendant's part (60 mm, 6 pin, 100 PPR). Still to check on the real part: pinout, output type, whether it runs cleanly from 3.3 V, wheel feel, detent and price. SmartPendant's case is 160 x 65 x 20 mm, 55 mm with the wheel and handle, a size reference for ours.
+- **MPG.** Settled on the Vallder 100 PPR hand wheel, 4-pin, assuming 60 mm (unconfirmed). To check: the diameter with Vallder, then on the real part the output type, mounting hole and depth, 5 V tolerance of the timer pins, wheel feel, detent and weight (276 g as listed). SmartPendant's case is 160 x 65 x 20 mm, 55 mm with the wheel and handle, a size reference for ours.
 - **E-stop contact block.** Rating and terminals.
 - **pcbkit.** Whether it covers a G0B1 with FDCAN and an isolated transceiver today.
 - **Display burn-in.** Settings to confirm on a real module (the Waveshare listing gives no lifetime figures).
