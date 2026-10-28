@@ -20,7 +20,8 @@ class SolverWorkspace {
   /** Saved poses of the problem's moving roots (see `SolverSupport.saveRoots`). */
   public final roots:Array<Transform> = [];
 
-  public function new() {}
+  public function new() {
+  }
 
   public function prepare(problem:KinematicProblem):Void {
     if (snapshot == null || snapshot.model != problem.model) snapshot = new KinematicSnapshot(problem.model);

@@ -84,8 +84,7 @@ class KinematicModel {
   final frameIndexById = new Map<String, Int>();
   final closureIndexById = new Map<String, Int>();
 
-  @:allow(kinematicskit.KinematicModelBuilder)
-  function new(parts:KinematicModelParts) {
+  @:allow(kinematicskit.KinematicModelBuilder) function new(parts:KinematicModelParts) {
     this.bodyIds = parts.bodyIds;
     this.bodyParentJoint = parts.bodyParentJoint;
     this.bodyRootPoses = parts.bodyRootPoses;
@@ -159,8 +158,15 @@ class KinematicModel {
 
   static function transformAt(values:Array<Float>, index:Int):Transform {
     var o = index * 7;
-    return new Transform(values[o], values[o + 1], values[o + 2], values[o + 3], values[o + 4],
-      values[o + 5], values[o + 6]);
+    return new Transform(
+      values[o],
+      values[o + 1],
+      values[o + 2],
+      values[o + 3],
+      values[o + 4],
+      values[o + 5],
+      values[o + 6]
+    );
   }
 
   static function indexIn(map:Map<String, Int>, id:String):Int {

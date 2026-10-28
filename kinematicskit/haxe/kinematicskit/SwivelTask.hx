@@ -30,11 +30,22 @@ class SwivelTask implements KinematicTask {
   final pose:Array<Float> = [for (_ in 0...7) 0.0];
   var lastError = 0.0;
 
-  public function new(model:KinematicModel, shoulderBody:Int, shoulder:Vector3, elbowBody:Int, elbow:Vector3,
-      wristBody:Int, wrist:Vector3, target:Float, tolerance:Float, ?reference:Vector3, ?soft:Bool = false,
-      ?name:String) {
-    for (body in [shoulderBody, elbowBody, wristBody])
-      if (model == null || body < 0 || body >= model.bodyCount()) throw "Swivel task requires bodies of the model";
+  public function new(
+    model:KinematicModel,
+    shoulderBody:Int,
+    shoulder:Vector3,
+    elbowBody:Int,
+    elbow:Vector3,
+    wristBody:Int,
+    wrist:Vector3,
+    target:Float,
+    tolerance:Float,
+    ?reference:Vector3,
+    ?soft:Bool = false,
+    ?name:String
+  ) {
+    for (body in [shoulderBody, elbowBody, wristBody]) if (model == null
+      || body < 0 || body >= model.bodyCount()) throw "Swivel task requires bodies of the model";
     if (!Math.isFinite(target) || !(tolerance > 0.0)) throw "Swivel task needs a finite target and positive tolerance";
     var r = reference == null ? new Vector3(0, 0, 1) : reference;
     var norm = Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
@@ -61,8 +72,14 @@ class SwivelTask implements KinematicTask {
     return swivel(scratch, 0);
   }
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     if (pointJacobian.length < 6 * w) pointJacobian.resize(6 * w);
     worldPoints(snapshot);
@@ -84,11 +101,17 @@ class SwivelTask implements KinematicTask {
     }
     for (c in 0...w) jacobian[row * w + c] = 0.0;
     for (p in 0...3) {
-      snapshot.pointJacobianColumns(bodies[p], scratch[3 * p], scratch[3 * p + 1], scratch[3 * p + 2], layout,
-        pointJacobian);
+      snapshot.pointJacobianColumns(
+        bodies[p],
+        scratch[3 * p],
+        scratch[3 * p + 1],
+        scratch[3 * p + 2],
+        layout,
+        pointJacobian
+      );
       var gx = scratch[9 + 3 * p], gy = scratch[10 + 3 * p], gz = scratch[11 + 3 * p];
-      for (c in 0...w)
-        jacobian[row * w + c] += weight * (gx * pointJacobian[c] + gy * pointJacobian[w + c] + gz * pointJacobian[2 * w + c]);
+      for (c in 0...w) jacobian[row
+        * w + c] += weight * (gx * pointJacobian[c] + gy * pointJacobian[w + c] + gz * pointJacobian[2 * w + c]);
     }
   }
 
@@ -108,14 +131,18 @@ class SwivelTask implements KinematicTask {
     var ax = values[o + 6] - sx, ay = values[o + 7] - sy, az = values[o + 8] - sz;
     var length = Math.sqrt(ax * ax + ay * ay + az * az);
     if (length < 1e-12) throw 'Swivel task "$name": shoulder and wrist coincide';
-    ax /= length; ay /= length; az /= length;
+    ax /= length;
+    ay /= length;
+    az /= length;
     // u: the reference direction across the axis; v = a × u.
     var g = reference;
     var along = g[0] * ax + g[1] * ay + g[2] * az;
     var ux = g[0] - along * ax, uy = g[1] - along * ay, uz = g[2] - along * az;
     var un = Math.sqrt(ux * ux + uy * uy + uz * uz);
     if (un < 1e-9) throw 'Swivel task "$name": the shoulder-wrist line is parallel to the reference';
-    ux /= un; uy /= un; uz /= un;
+    ux /= un;
+    uy /= un;
+    uz /= un;
     var vx = ay * uz - az * uy, vy = az * ux - ax * uz, vz = ax * uy - ay * ux;
     var px = values[o + 3] - sx, py = values[o + 4] - sy, pz = values[o + 5] - sz;
     var x = px * ux + py * uy + pz * uz, y = px * vx + py * vy + pz * vz;

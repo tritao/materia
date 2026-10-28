@@ -38,7 +38,8 @@ class ClosureTask implements KinematicTask {
   static inline var ALIGNED_ANGLE:Float = 1e-6;
 
   public function new(model:KinematicModel, closure:Int, positionTolerance:Float, angularTolerance:Float) {
-    if (model == null || closure < 0 || closure >= model.closureCount()) throw "Closure task requires a closure of the model";
+    if (model == null
+      || closure < 0 || closure >= model.closureCount()) throw "Closure task requires a closure of the model";
     if (!(positionTolerance > 0.0) || !(angularTolerance > 0.0)) throw "Closure task tolerances must be positive";
     this.model = model;
     this.closure = closure;
@@ -46,15 +47,23 @@ class ClosureTask implements KinematicTask {
     this.angularTolerance = angularTolerance;
     kind = model.closureKind[closure];
     var value = model.closureValue[closure];
-    alignedSign = kind == ClosureKind.Angle && Math.abs(Math.sin(value)) < ALIGNED_ANGLE ? (Math.cos(value) > 0 ? 1.0 : -1.0) : 0.0;
+    alignedSign = kind == ClosureKind.Angle
+      && Math.abs(Math.sin(value)) < ALIGNED_ANGLE ? (Math.cos(value) > 0 ? 1.0 : -1.0) : 0.0;
     rows = alignedSign != 0 ? 2 : switch kind {
-      case ClosureKind.Fixed: 6;
-      case ClosureKind.Revolute: 5;
-      case ClosureKind.Spherical, ClosureKind.Planar: 3;
-      case ClosureKind.Parallel: 2;
-      case ClosureKind.Perpendicular, ClosureKind.Distance, ClosureKind.Angle: 1;
-      case ClosureKind.Prismatic: 5;
-      default: 4; // Cylindrical
+      case ClosureKind.Fixed:
+        6;
+      case ClosureKind.Revolute:
+        5;
+      case ClosureKind.Spherical, ClosureKind.Planar:
+        3;
+      case ClosureKind.Parallel:
+        2;
+      case ClosureKind.Perpendicular, ClosureKind.Distance, ClosureKind.Angle:
+        1;
+      case ClosureKind.Prismatic:
+        5;
+      default:
+        4; // Cylindrical
     };
   }
 
@@ -63,13 +72,22 @@ class ClosureTask implements KinematicTask {
   public function isSoft():Bool return false;
   public function positionError():Float return lastPositionError;
   public function orientationError():Float return lastOrientationError;
-  public function satisfied():Bool
-    return lastPositionError <= positionTolerance && lastOrientationError <= angularTolerance;
+  public function satisfied():Bool return lastPositionError <= positionTolerance
+    && lastOrientationError <= angularTolerance;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
-    if (jacobianA.length < 6 * w) { jacobianA.resize(6 * w); jacobianB.resize(6 * w); }
+    if (jacobianA.length < 6 * w) {
+      jacobianA.resize(6 * w);
+      jacobianB.resize(6 * w);
+    }
     var frameA = model.closureFrameA[closure], frameB = model.closureFrameB[closure];
     var bodyA = model.frameBody[frameA], bodyB = model.frameBody[frameB];
     var s = scratch;
@@ -92,14 +110,23 @@ class ClosureTask implements KinematicTask {
         lastOrientationError = Math.sqrt(phx * phx + phy * phy + phz * phz);
         // dφ = J_l⁻¹(φ) · R_Aᵀ (ω_B − ω_A), one column at a time.
         for (c in 0...w) {
-          FlatTransform.rotateInverse(s, 0, jacobianB[3 * w + c] - jacobianA[3 * w + c],
-            jacobianB[4 * w + c] - jacobianA[4 * w + c], jacobianB[5 * w + c] - jacobianA[5 * w + c], s, 29);
+          FlatTransform.rotateInverse(
+            s,
+            0,
+            jacobianB[3 * w + c] - jacobianA[3 * w + c],
+            jacobianB[4 * w + c] - jacobianA[4 * w + c],
+            jacobianB[5 * w + c] - jacobianA[5 * w + c],
+            s,
+            29
+          );
           Rotations.inverseLeftJacobian(phx, phy, phz, s[29], s[30], s[31], s, 32);
           jacobian[r * w + c] = g * s[32];
           jacobian[(r + 1) * w + c] = g * s[33];
           jacobian[(r + 2) * w + c] = g * s[34];
         }
-        residual[r] = -g * phx; residual[r + 1] = -g * phy; residual[r + 2] = -g * phz;
+        residual[r] = -g * phx;
+        residual[r + 1] = -g * phy;
+        residual[r + 2] = -g * phz;
       case ClosureKind.Revolute:
         lastPositionError = Math.sqrt(dx * dx + dy * dy + dz * dz);
         r = positionRows(residual, jacobian, r, w, dx, dy, dz, p);
@@ -116,9 +143,10 @@ class ClosureTask implements KinematicTask {
         var cx = ay * dz - az * dy, cy = az * dx - ax * dz, cz = ax * dy - ay * dx;
         residual[r] = -p * along;
         for (c in 0...w) {
-          var linear = ax * (jacobianB[c] - jacobianA[c]) + ay * (jacobianB[w + c] - jacobianA[w + c]) +
-            az * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
-          jacobian[r * w + c] = p * (linear + cx * jacobianA[3 * w + c] + cy * jacobianA[4 * w + c] + cz * jacobianA[5 * w + c]);
+          var linear = ax * (jacobianB[c] - jacobianA[c])
+            + ay * (jacobianB[w + c] - jacobianA[w + c]) + az * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
+          jacobian[r
+            * w + c] = p * (linear + cx * jacobianA[3 * w + c] + cy * jacobianA[4 * w + c] + cz * jacobianA[5 * w + c]);
         }
         r++;
         lastPositionError = Math.abs(along);
@@ -139,9 +167,8 @@ class ClosureTask implements KinematicTask {
         var value = ax * bx + ay * by + az * bz;
         var cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
         residual[r] = -g * value;
-        for (c in 0...w)
-          jacobian[r * w + c] = g * (cx * (jacobianA[3 * w + c] - jacobianB[3 * w + c]) +
-            cy * (jacobianA[4 * w + c] - jacobianB[4 * w + c]) + cz * (jacobianA[5 * w + c] - jacobianB[5 * w + c]));
+        for (c in 0...w) jacobian[r * w + c] = g * (cx * (jacobianA[3 * w + c] - jacobianB[3 * w + c])
+          + cy * (jacobianA[4 * w + c] - jacobianB[4 * w + c]) + cz * (jacobianA[5 * w + c] - jacobianB[5 * w + c]));
         lastPositionError = 0;
         lastOrientationError = Math.abs(value);
       case ClosureKind.Angle:
@@ -153,9 +180,8 @@ class ClosureTask implements KinematicTask {
         var value = angle - model.closureValue[closure];
         residual[r] = -g * value;
         var inverse = sine > 1e-12 ? 1.0 / sine : 0.0;
-        for (c in 0...w)
-          jacobian[r * w + c] = g * inverse * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
-            cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
+        for (c in 0...w) jacobian[r * w + c] = g * inverse * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c])
+          + cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
         lastPositionError = 0;
         lastOrientationError = Math.abs(value);
       case ClosureKind.Distance:
@@ -163,13 +189,14 @@ class ClosureTask implements KinematicTask {
         var length = Math.sqrt(dx * dx + dy * dy + dz * dz);
         var value = length - model.closureValue[closure];
         residual[r] = -p * value;
-        var ux = length > 0 ? dx / length : 0.0, uy = length > 0 ? dy / length : 0.0, uz = length > 0 ? dz / length : 0.0;
-        for (c in 0...w)
-          jacobian[r * w + c] = p * (ux * (jacobianB[c] - jacobianA[c]) + uy * (jacobianB[w + c] - jacobianA[w + c]) +
-            uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]));
+        var ux = length > 0 ? dx / length : 0.0,
+          uy = length > 0 ? dy / length : 0.0, uz = length > 0 ? dz / length : 0.0;
+        for (c in 0...w) jacobian[r * w + c] = p * (ux * (jacobianB[c] - jacobianA[c])
+          + uy * (jacobianB[w + c] - jacobianA[w + c]) + uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]));
         lastPositionError = Math.abs(value);
         lastOrientationError = 0;
-      default: // Prismatic (with its twist row below), Cylindrical
+      default:
+        // Prismatic (with its twist row below), Cylindrical
         var ax = s[14], ay = s[15], az = s[16];
         var along = dx * ax + dy * ay + dz * az;
         Rotations.perpendicularBasis(ax, ay, az, s, 23);
@@ -182,8 +209,8 @@ class ClosureTask implements KinematicTask {
           // d(d·u) ≈ u·(v_B − v_A) − along · (a × u)·ω_A, since u stays perpendicular to a.
           var cx = ay * uz - az * uy, cy = az * ux - ax * uz, cz = ax * uy - ay * ux;
           for (c in 0...w) {
-            var linear = ux * (jacobianB[c] - jacobianA[c]) + uy * (jacobianB[w + c] - jacobianA[w + c]) +
-              uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
+            var linear = ux * (jacobianB[c] - jacobianA[c])
+              + uy * (jacobianB[w + c] - jacobianA[w + c]) + uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
             var turning = cx * jacobianA[3 * w + c] + cy * jacobianA[4 * w + c] + cz * jacobianA[5 * w + c];
             jacobian[r * w + c] = p * (linear - along * turning);
           }
@@ -195,25 +222,33 @@ class ClosureTask implements KinematicTask {
         if (kind == ClosureKind.Prismatic) {
           // Twist about the axis: the relative rotation's component along it, dφ·a ≈ a·(ω_B − ω_A) near closure.
           Rotations.relativeRotationVector(s, 0, s, 7, s, 20);
-          var twist = s[20] * model.closureAxis[c3] + s[21] * model.closureAxis[c3 + 1] + s[22] * model.closureAxis[c3 + 2];
+          var twist = s[20]
+            * model.closureAxis[c3] + s[21] * model.closureAxis[c3 + 1] + s[22] * model.closureAxis[c3 + 2];
           lastOrientationError = Math.max(lastOrientationError, Math.abs(twist));
           var row = r + 2;
           residual[row] = -g * twist;
-          for (c in 0...w)
-            jacobian[row * w + c] = g * (ax * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
-              ay * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + az * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
+          for (c in 0...w) jacobian[row * w + c] = g * (ax * (jacobianB[3 * w + c] - jacobianA[3 * w + c])
+            + ay * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + az * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
         }
     }
   }
 
   /** Rows for `d = pB − pA`: residual `−d`, Jacobian `v_B − v_A`. */
-  function positionRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, w:Int, dx:Float, dy:Float, dz:Float,
-      scale:Float):Int {
+  function positionRows(
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int,
+    w:Int,
+    dx:Float,
+    dy:Float,
+    dz:Float,
+    scale:Float
+  ):Int {
     residual[row] = -scale * dx;
     residual[row + 1] = -scale * dy;
     residual[row + 2] = -scale * dz;
-    for (axis in 0...3) for (c in 0...w)
-      jacobian[(row + axis) * w + c] = scale * (jacobianB[axis * w + c] - jacobianA[axis * w + c]);
+    for (axis in 0...3) for (c in 0...w) jacobian[(row
+      + axis) * w + c] = scale * (jacobianB[axis * w + c] - jacobianA[axis * w + c]);
     return row + 3;
   }
 
@@ -228,9 +263,8 @@ class ClosureTask implements KinematicTask {
       residual[row] = -scale * sign * (bx * ux + by * uy + bz * uz);
       // d(b·u) ≈ (b × u)·(ω_B − ω_A) near closure.
       var cx = by * uz - bz * uy, cy = bz * ux - bx * uz, cz = bx * uy - by * ux;
-      for (c in 0...w)
-        jacobian[row * w + c] = scale * sign * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
-          cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
+      for (c in 0...w) jacobian[row * w + c] = scale * sign * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c])
+        + cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
       row++;
     }
   }
@@ -253,8 +287,8 @@ class ClosureTask implements KinematicTask {
       residual[row] = -scale * 2 * sign * across / q;
       var cx = by * uz - bz * uy, cy = bz * ux - bx * uz, cz = bx * uy - by * ux;
       for (c in 0...w) {
-        var wx = jacobianB[3 * w + c] - jacobianA[3 * w + c], wy = jacobianB[4 * w + c] - jacobianA[4 * w + c],
-          wz = jacobianB[5 * w + c] - jacobianA[5 * w + c];
+        var wx = jacobianB[3 * w + c] - jacobianA[3 * w + c],
+          wy = jacobianB[4 * w + c] - jacobianA[4 * w + c], wz = jacobianB[5 * w + c] - jacobianA[5 * w + c];
         var dAcross = cx * wx + cy * wy + cz * wz, dDot = -(nx * wx + ny * wy + nz * wz);
         jacobian[row * w + c] = scale * 2 * sign * (dAcross / q - across * sign * dDot / (q * q));
       }

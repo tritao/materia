@@ -16,8 +16,14 @@ interface KinematicTask {
    * `jacobian` (`layout.width` columns) for the evaluated `snapshot` of
    * `state`, and records the errors reported below.
    */
-  function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-    residual:Array<Float>, jacobian:Array<Float>, row:Int):Void;
+  function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void;
   /** Unweighted translational error at the last `evaluate`, in model length units. */
   function positionError():Float;
   /** Unweighted angular error at the last `evaluate`, in radians. */

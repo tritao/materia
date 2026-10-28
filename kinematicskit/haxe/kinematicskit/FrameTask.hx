@@ -56,15 +56,26 @@ class FrameTask implements KinematicTask {
   var lastPositionError = 0.0;
   var lastOrientationError = 0.0;
 
-  public function new(model:KinematicModel, body:Int, offset:Null<Transform>, target:Transform,
-      positionTolerance:Float, orientationTolerance:Float, ?positionAxes:Int = 7,
-      ?orientation:FrameOrientation, ?name:String) {
+  public function new(
+    model:KinematicModel,
+    body:Int,
+    offset:Null<Transform>,
+    target:Transform,
+    positionTolerance:Float,
+    orientationTolerance:Float,
+    ?positionAxes:Int = 7,
+    ?orientation:FrameOrientation,
+    ?name:String
+  ) {
     if (model == null || body < 0 || body >= model.bodyCount()) throw "Frame task requires a body of the model";
     if (positionAxes < 0 || positionAxes > ALL_AXES) throw "Frame task position axes must be a mask of AXIS_X/Y/Z";
-    if (!(positionTolerance > 0.0) || !(orientationTolerance > 0.0))
-      throw "Frame task tolerances must be positive";
+    if (!(positionTolerance > 0.0) || !(orientationTolerance > 0.0)) throw "Frame task tolerances must be positive";
     this.body = body;
-    FlatTransform.write(offset == null ? Transform.identity() : Transform.checked(offset, "Frame task offset"), offsetFlat, 0);
+    FlatTransform.write(
+      offset == null ? Transform.identity() : Transform.checked(offset, "Frame task offset"),
+      offsetFlat,
+      0
+    );
     setTarget(target);
     this.positionAxes = positionAxes;
     this.orientation = orientation == null ? FrameOrientation.Full : normalizedAxis(orientation);
@@ -72,21 +83,40 @@ class FrameTask implements KinematicTask {
     this.orientationTolerance = orientationTolerance;
     this.name = name == null ? model.bodyIds[body] : name;
     rows = bitCount(positionAxes) + switch this.orientation {
-      case Full: 3;
-      case Axis(_, _, _): 2;
-      case Free: 0;
+      case Full:
+        3;
+      case Axis(_, _, _):
+        2;
+      case Free:
+        0;
     };
   }
 
   /** A task on a model frame, optionally shifted further by `extraOffset` (e.g. a tool centre point). */
-  public static function atFrame(model:KinematicModel, frame:Int, target:Transform, positionTolerance:Float,
-      orientationTolerance:Float, ?extraOffset:Transform, ?positionAxes:Int = 7,
-      ?orientation:FrameOrientation):FrameTask {
+  public static function atFrame(
+    model:KinematicModel,
+    frame:Int,
+    target:Transform,
+    positionTolerance:Float,
+    orientationTolerance:Float,
+    ?extraOffset:Transform,
+    ?positionAxes:Int = 7,
+    ?orientation:FrameOrientation
+  ):FrameTask {
     if (frame < 0 || frame >= model.frameCount()) throw "Frame task requires a frame of the model";
     var offset = model.frameTransform(frame);
     if (extraOffset != null) offset = offset.compose(extraOffset);
-    return new FrameTask(model, model.frameBody[frame], offset, target, positionTolerance, orientationTolerance,
-      positionAxes, orientation, model.frameIds[frame]);
+    return new FrameTask(
+      model,
+      model.frameBody[frame],
+      offset,
+      target,
+      positionTolerance,
+      orientationTolerance,
+      positionAxes,
+      orientation,
+      model.frameIds[frame]
+    );
   }
 
   /**
@@ -96,8 +126,14 @@ class FrameTask implements KinematicTask {
   public function relativeTo(model:KinematicModel, reference:Int, ?referenceOffset:Transform):FrameTask {
     if (reference < 0 || reference >= model.bodyCount()) throw "Frame task reference must be a body of the model";
     referenceBody = reference;
-    FlatTransform.write(referenceOffset == null ? Transform.identity()
-      : Transform.checked(referenceOffset, "Frame task reference offset"), referenceFlat, 0);
+    FlatTransform.write(
+      referenceOffset == null ? Transform.identity() : Transform.checked(
+        referenceOffset,
+        "Frame task reference offset"
+      ),
+      referenceFlat,
+      0
+    );
     return this;
   }
 
@@ -110,8 +146,11 @@ class FrameTask implements KinematicTask {
   }
 
   /** Moves the target, e.g. while an editor gizmo is dragged; takes effect at the next `evaluate`. */
-  public function setTarget(target:Transform):Void
-    FlatTransform.write(Transform.checked(target, "Frame task target"), targetFlat, 0);
+  public function setTarget(target:Transform):Void FlatTransform.write(
+    Transform.checked(target, "Frame task target"),
+    targetFlat,
+    0
+  );
 
   public function target():Transform return FlatTransform.read(targetFlat, 0);
 
@@ -125,8 +164,8 @@ class FrameTask implements KinematicTask {
   public function isSoft():Bool return preference;
   public function positionError():Float return lastPositionError;
   public function orientationError():Float return lastOrientationError;
-  public function satisfied():Bool
-    return preference || lastPositionError <= positionTolerance && lastOrientationError <= orientationTolerance;
+  public function satisfied():Bool return preference
+    || lastPositionError <= positionTolerance && lastOrientationError <= orientationTolerance;
 
   /** The frame's current world pose in an evaluated snapshot. */
   public function currentPose(snapshot:KinematicSnapshot):Transform {
@@ -134,8 +173,14 @@ class FrameTask implements KinematicTask {
     return FlatTransform.read(scratch, 0);
   }
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     if (pointJacobian.length < 6 * w) pointJacobian.resize(6 * w);
     snapshot.attachedPoseInto(body, offsetFlat, 0, scratch, 0);
@@ -163,27 +208,46 @@ class FrameTask implements KinematicTask {
     } else {
       var squared = 0.0;
       for (bit in 0...3) if (positionAxes & (1 << bit) != 0) {
-        FlatTransform.rotate(targetFlat, 0, bit == 0 ? 1.0 : 0.0, bit == 1 ? 1.0 : 0.0, bit == 2 ? 1.0 : 0.0, scratch, 7);
+        FlatTransform.rotate(
+          targetFlat,
+          0,
+          bit == 0 ? 1.0 : 0.0,
+          bit == 1 ? 1.0 : 0.0,
+          bit == 2 ? 1.0 : 0.0,
+          scratch,
+          7
+        );
         var ax = scratch[7], ay = scratch[8], az = scratch[9];
         var e = ax * ex + ay * ey + az * ez;
         squared += e * e;
         residual[r] = positionWeight * e;
-        for (c in 0...w)
-          jacobian[r * w + c] = positionWeight * (ax * pointJacobian[c] + ay * pointJacobian[w + c] + az * pointJacobian[2 * w + c]);
+        for (c in 0...w) jacobian[r * w
+          + c] = positionWeight * (ax * pointJacobian[c] + ay * pointJacobian[w + c] + az * pointJacobian[2 * w + c]);
         r++;
       }
       lastPositionError = Math.sqrt(squared);
     }
     switch orientation {
       case Full:
-        Rotations.logOfProduct(targetFlat[3], targetFlat[4], targetFlat[5], targetFlat[6], -scratch[3], -scratch[4],
-          -scratch[5], scratch[6], scratch, 10);
+        Rotations.logOfProduct(
+          targetFlat[3],
+          targetFlat[4],
+          targetFlat[5],
+          targetFlat[6],
+          -scratch[3],
+          -scratch[4],
+          -scratch[5],
+          scratch[6],
+          scratch,
+          10
+        );
         var wx = scratch[10], wy = scratch[11], wz = scratch[12];
         lastOrientationError = Math.sqrt(wx * wx + wy * wy + wz * wz);
         residual[r] = orientationWeight * wx;
         residual[r + 1] = orientationWeight * wy;
         residual[r + 2] = orientationWeight * wz;
-        for (axis in 0...3) for (c in 0...w) jacobian[(r + axis) * w + c] = orientationWeight * pointJacobian[(3 + axis) * w + c];
+        for (axis in 0...3) for (c in 0...w) jacobian[(r
+          + axis) * w + c] = orientationWeight * pointJacobian[(3 + axis) * w + c];
       case Axis(ux, uy, uz):
         FlatTransform.rotate(scratch, 0, ux, uy, uz, scratch, 7);
         FlatTransform.rotate(targetFlat, 0, ux, uy, uz, scratch, 19);
@@ -196,9 +260,8 @@ class FrameTask implements KinematicTask {
           // current = a · p; d(a · p)/dq = (a × p) · ω.
           var cx = ay * pz - az * py, cy = az * px - ax * pz, cz = ax * py - ay * px;
           residual[r] = -orientationWeight * (ax * px + ay * py + az * pz);
-          for (c in 0...w)
-            jacobian[r * w + c] = orientationWeight * (cx * pointJacobian[3 * w + c] + cy * pointJacobian[4 * w + c] +
-              cz * pointJacobian[5 * w + c]);
+          for (c in 0...w) jacobian[r * w + c] = orientationWeight
+            * (cx * pointJacobian[3 * w + c] + cy * pointJacobian[4 * w + c] + cz * pointJacobian[5 * w + c]);
           r++;
         }
       case Free:
@@ -211,7 +274,8 @@ class FrameTask implements KinematicTask {
       var norm = Math.sqrt(x * x + y * y + z * z);
       if (!Math.isFinite(norm) || norm < 1e-12) throw "Frame task orientation axis must be non-zero";
       FrameOrientation.Axis(x / norm, y / norm, z / norm);
-    case other: other;
+    case other:
+      other;
   };
 
   static function bitCount(mask:Int):Int return (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1);

@@ -25,10 +25,14 @@ class FrameVelocityTask implements KinematicTask {
   final name:String;
 
   public function new(model:KinematicModel, body:Int, ?offset:Transform, ?name:String) {
-    if (model == null || body < 0 || body >= model.bodyCount()) throw "Frame velocity task requires a body of the model";
+    if (model == null
+      || body < 0 || body >= model.bodyCount()) throw "Frame velocity task requires a body of the model";
     this.body = body;
-    FlatTransform.write(offset == null ? Transform.identity() : Transform.checked(offset, "Frame velocity task offset"),
-      offsetFlat, 0);
+    FlatTransform.write(
+      offset == null ? Transform.identity() : Transform.checked(offset, "Frame velocity task offset"),
+      offsetFlat,
+      0
+    );
     this.name = name == null ? model.bodyIds[body] + " velocity" : name;
   }
 
@@ -42,10 +46,17 @@ class FrameVelocityTask implements KinematicTask {
 
   /** Expresses the twist relative to the frame `reference · referenceOffset`. Returns this. */
   public function relativeTo(model:KinematicModel, reference:Int, ?referenceOffset:Transform):FrameVelocityTask {
-    if (reference < 0 || reference >= model.bodyCount()) throw "Frame velocity task reference must be a body of the model";
+    if (reference < 0
+      || reference >= model.bodyCount()) throw "Frame velocity task reference must be a body of the model";
     referenceBody = reference;
-    FlatTransform.write(referenceOffset == null ? Transform.identity()
-      : Transform.checked(referenceOffset, "Frame velocity task reference offset"), referenceFlat, 0);
+    FlatTransform.write(
+      referenceOffset == null ? Transform.identity() : Transform.checked(
+        referenceOffset,
+        "Frame velocity task reference offset"
+      ),
+      referenceFlat,
+      0
+    );
     return this;
   }
 
@@ -66,8 +77,14 @@ class FrameVelocityTask implements KinematicTask {
   public function orientationError():Float return 0.0;
   public function satisfied():Bool return false;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     if (pointJacobian.length < 6 * w) pointJacobian.resize(6 * w);
     snapshot.attachedPoseInto(body, offsetFlat, 0, scratch, 0);
@@ -77,13 +94,20 @@ class FrameVelocityTask implements KinematicTask {
     if (referenceBody >= 0) {
       if (referenceJacobian.length < 6 * w) referenceJacobian.resize(6 * w);
       snapshot.attachedPoseInto(referenceBody, referenceFlat, 0, scratch, 7);
-      qx = scratch[10]; qy = scratch[11]; qz = scratch[12]; qw = scratch[13];
+      qx = scratch[10];
+      qy = scratch[11];
+      qz = scratch[12];
+      qw = scratch[13];
       snapshot.pointJacobianColumns(referenceBody, scratch[0], scratch[1], scratch[2], layout, referenceJacobian);
       for (i in 0...6 * w) pointJacobian[i] -= referenceJacobian[i];
     }
     var rotation = new Transform(0.0, 0.0, 0.0, qx, qy, qz, qw);
     for (block in 0...2) {
-      var world = rotation.transformVector(displacement[3 * block], displacement[3 * block + 1], displacement[3 * block + 2]);
+      var world = rotation.transformVector(
+        displacement[3 * block],
+        displacement[3 * block + 1],
+        displacement[3 * block + 2]
+      );
       residual[row + 3 * block] = weight * world.x;
       residual[row + 3 * block + 1] = weight * world.y;
       residual[row + 3 * block + 2] = weight * world.z;

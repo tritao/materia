@@ -1,9 +1,7 @@
 package kinematicskit;
 
 /** The arrays `KinematicModelBuilder` compiles, handed to `KinematicModel` in one piece. */
-@:allow(kinematicskit.KinematicModelBuilder)
-@:allow(kinematicskit.KinematicModel)
-class KinematicModelParts {
+@:allow(kinematicskit.KinematicModelBuilder) @:allow(kinematicskit.KinematicModel) class KinematicModelParts {
   var bodyIds:Array<String>;
   var bodyParentJoint:Array<Int>;
   var bodyRootPoses:Array<Transform>;
@@ -46,5 +44,6 @@ class KinematicModelParts {
   /** Planar offset, distance or angle of each closure (0 when the kind has none). */
   var closureValue:Array<Float>;
 
-  function new() {}
+  function new() {
+  }
 }

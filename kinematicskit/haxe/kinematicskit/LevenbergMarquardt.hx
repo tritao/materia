@@ -25,14 +25,21 @@ class LevenbergMarquardt {
   */
   public static inline var STATIONARY_RATIO:Float = 1e-4;
 
-  public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
-      ?initialDamping:Float = 1e-3, ?rankTolerance:Float = 1e-8, ?translationScale:Float = 1.0,
-      ?workspace:SolverWorkspace, ?levenberg:Bool = false):KinematicSolution {
-    if (problem == null || seed == null || seed.model != problem.model)
-      throw "Levenberg-Marquardt requires a problem and a seed state of its model";
-    if (maxIterations <= 0 || !(initialDamping > 0.0) || !Math.isFinite(initialDamping) ||
-        !(rankTolerance > 0.0) || !(translationScale > 0.0) || !Math.isFinite(translationScale))
-      throw "Levenberg-Marquardt settings must be finite and positive";
+  public static function solve(
+    problem:KinematicProblem,
+    seed:KinematicState,
+    ?maxIterations:Int = 100,
+    ?initialDamping:Float = 1e-3,
+    ?rankTolerance:Float = 1e-8,
+    ?translationScale:Float = 1.0,
+    ?workspace:SolverWorkspace,
+    ?levenberg:Bool = false
+  ):KinematicSolution {
+    if (problem == null || seed == null
+      || seed.model != problem.model) throw "Levenberg-Marquardt requires a problem and a seed state of its model";
+    if (maxIterations <= 0 || !(initialDamping > 0.0)
+      || !Math.isFinite(initialDamping) || !(rankTolerance > 0.0) || !(translationScale > 0.0)
+      || !Math.isFinite(translationScale)) throw "Levenberg-Marquardt settings must be finite and positive";
     var model = problem.model;
     var work = workspace == null ? new SolverWorkspace() : workspace;
     work.prepare(problem);
@@ -69,11 +76,13 @@ class LevenbergMarquardt {
         var largest = 1e-12;
         for (j in 0...count) largest = Math.max(largest, normal[j * count + j]);
         for (j in 0...count) normal[j * count + j] += damping * largest;
-      } else
-        for (j in 0...count) normal[j * count + j] += damping * Math.max(normal[j * count + j], 1e-12);
+      } else for (j in 0...count) normal[j * count + j] += damping * Math.max(normal[j * count + j], 1e-12);
       if (!LinearAlgebra.solveInPlace(normal, rhs, count, delta, 1e-30)) {
         damping = Math.min(1e16, damping * 10);
-        if (damping >= 1e16) { exhausted = true; break; }
+        if (damping >= 1e16) {
+          exhausted = true;
+          break;
+        }
         continue;
       }
 
@@ -88,9 +97,8 @@ class LevenbergMarquardt {
         var requested = current + delta[j] * stepFactor * scales[j];
         var value = Math.min(Math.max(requested, problem.lower[dof]), problem.upper[dof]);
         if (Math.abs(value - current) > 1e-14) moved = true;
-        else if (Math.abs(requested - current) > 1e-14 &&
-            ((current <= problem.lower[dof] && requested < current) || (current >= problem.upper[dof] && requested > current)))
-          outwardAtLimit = true;
+        else if (Math.abs(requested - current) > 1e-14 && ((current <= problem.lower[dof]
+          && requested < current) || (current >= problem.upper[dof] && requested > current))) outwardAtLimit = true;
         state.q[dof] = value;
         step[j] = 0.0;
       }
@@ -103,7 +111,10 @@ class LevenbergMarquardt {
       if (!moved) {
         limitStalled = outwardAtLimit;
         damping = Math.min(1e16, damping * 10);
-        if (damping >= 1e16) { exhausted = true; break; }
+        if (damping >= 1e16) {
+          exhausted = true;
+          break;
+        }
         // Nothing moved, so the residual and Jacobian still describe `state`.
         continue;
       }
@@ -123,12 +134,22 @@ class LevenbergMarquardt {
         SolverSupport.restoreRoots(problem, state, work.roots);
         problem.evaluate(state, snapshot, residual, jacobian);
         damping = Math.min(1e16, damping * 10);
-        if (damping >= 1e16) { exhausted = true; break; }
+        if (damping >= 1e16) {
+          exhausted = true;
+          break;
+        }
       }
     }
 
-    if (problem.satisfied())
-      return SolverSupport.finish(problem, state, work, KinematicStatus.Converged, iterations, rankTolerance, true);
+    if (problem.satisfied()) return SolverSupport.finish(
+      problem,
+      state,
+      work,
+      KinematicStatus.Converged,
+      iterations,
+      rankTolerance,
+      true
+    );
     // Stationary test on the scaled gradient Jᵀe at the final state.
     for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * count + j] * scales[j];
     LinearAlgebra.normalEquationsDense(scaled, rows, count, residual, normal, rhs);
@@ -141,11 +162,11 @@ class LevenbergMarquardt {
     var blocked = false;
     for (j in 0...dofCount) {
       var dof = active[j];
-      if ((state.q[dof] >= problem.upper[dof] && rhs[j] > threshold) ||
-          (state.q[dof] <= problem.lower[dof] && rhs[j] < -threshold)) blocked = true;
+      if ((state.q[dof] >= problem.upper[dof]
+        && rhs[j] > threshold) || (state.q[dof] <= problem.lower[dof] && rhs[j] < -threshold)) blocked = true;
     }
-    var status = limitStalled || blocked ? KinematicStatus.LimitBlocked
-      : stationary || exhausted ? KinematicStatus.Conflicting : KinematicStatus.IterationLimit;
+    var status = limitStalled || blocked ? KinematicStatus.LimitBlocked : stationary
+      || exhausted ? KinematicStatus.Conflicting : KinematicStatus.IterationLimit;
     return SolverSupport.finish(problem, state, work, status, iterations, rankTolerance, true);
   }
 }

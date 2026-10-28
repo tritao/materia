@@ -12,11 +12,11 @@ class KinematicBodyPairs {
   public static function of(model:KinematicModel):Array<BodyPair> {
     var group = rigidGroups(model);
     var count = model.bodyCount();
-    var relation:Array<Int> = [for (_ in 0...count * count) -1];
+    var relation:Array<Int> = [for (_ in 0...count * count) - 1];
     function mark(a:Int, b:Int, kind:BodyPairRelation):Void {
       if (a == b) return;
       var i = a < b ? a * count + b : b * count + a;
-      if (relation[i] < 0 || relation[i] > (kind : Int)) relation[i] = kind;
+      if (relation[i] < 0 || relation[i] > (kind:Int)) relation[i] = kind;
     }
     // Groups joined by one movable joint, and groups meeting through a closure.
     var groupAdjacent:Array<Array<Int>> = [];
@@ -26,8 +26,10 @@ class KinematicBodyPairs {
     }
     var groupClosure:Array<Array<Int>> = [];
     for (closure in 0...model.closureCount()) {
-      groupClosure.push([group[model.frameBody[model.closureFrameA[closure]]],
-        group[model.frameBody[model.closureFrameB[closure]]]]);
+      groupClosure.push([
+        group[model.frameBody[model.closureFrameA[closure]]],
+        group[model.frameBody[model.closureFrameB[closure]]]
+      ]);
     }
     for (a in 0...count) for (b in a + 1...count) {
       if (group[a] == group[b]) {
@@ -55,6 +57,6 @@ class KinematicBodyPairs {
     return group;
   }
 
-  static function sameGroups(link:Array<Int>, g:Int, h:Int):Bool
-    return (link[0] == g && link[1] == h) || (link[0] == h && link[1] == g);
+  static function sameGroups(link:Array<Int>,
+    g:Int, h:Int):Bool return (link[0] == g && link[1] == h) || (link[0] == h && link[1] == g);
 }

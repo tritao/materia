@@ -27,8 +27,15 @@ class DifferentialStep {
   public final avoided:Array<AvoidancePair>;
   public final relaxed:Array<AvoidancePair>;
 
-  public function new(velocity:Array<Float>, status:Int, iterations:Int, ?fallback:Bool = false, ?limited:Array<Int>,
-      ?avoided:Array<AvoidancePair>, ?relaxed:Array<AvoidancePair>) {
+  public function new(
+    velocity:Array<Float>,
+    status:Int,
+    iterations:Int,
+    ?fallback:Bool = false,
+    ?limited:Array<Int>,
+    ?avoided:Array<AvoidancePair>,
+    ?relaxed:Array<AvoidancePair>
+  ) {
     this.velocity = velocity;
     this.status = status;
     this.iterations = iterations;
@@ -60,13 +67,23 @@ class DifferentialStep {
  * with rows, the step is zero rather than an unchecked damped step.
  */
 class DifferentialIk {
-  public static function step(problem:KinematicProblem, state:KinematicState, dt:Float, qp:NativeQpStep,
-      ?limits:StepLimits, ?gain:Float = 1.0, ?damping:Float = 1e-3, ?workspace:SolverWorkspace,
-      ?maxIterations:Int = 1000, ?avoidance:Array<AvoidancePair>, ?xi:Float = 0.1):DifferentialStep {
-    if (problem == null || state == null || state.model != problem.model || qp == null)
-      throw "Differential IK requires a problem, a state of its model and a QP step";
-    if (!(dt > 0.0) || !Math.isFinite(dt) || !(gain > 0.0) || gain > 1.0 || !(damping >= 0.0))
-      throw "Differential IK needs dt > 0, gain in (0, 1] and damping >= 0";
+  public static function step(
+    problem:KinematicProblem,
+    state:KinematicState,
+    dt:Float,
+    qp:NativeQpStep,
+    ?limits:StepLimits,
+    ?gain:Float = 1.0,
+    ?damping:Float = 1e-3,
+    ?workspace:SolverWorkspace,
+    ?maxIterations:Int = 1000,
+    ?avoidance:Array<AvoidancePair>,
+    ?xi:Float = 0.1
+  ):DifferentialStep {
+    if (problem == null || state == null || state.model != problem.model
+      || qp == null) throw "Differential IK requires a problem, a state of its model and a QP step";
+    if (!(dt > 0.0) || !Math.isFinite(dt) || !(gain > 0.0)
+      || gain > 1.0 || !(damping >= 0.0)) throw "Differential IK needs dt > 0, gain in (0, 1] and damping >= 0";
     var layout = problem.layout();
     var width = layout.width;
     if (qp.width != width) throw 'Differential IK QP has ${qp.width} variables, the problem ${width}';
@@ -80,29 +97,70 @@ class DifferentialIk {
     (limits == null ? new StepLimits() : limits).bounds(problem, state, dt, lower, upper);
     var delta:Null<Array<Float>> = null;
     var status = -1, iterations = 0;
-    var avoidRows = avoidance == null || avoidance.length == 0 ? null : AvoidanceRows.build(layout, work.snapshot, avoidance, xi, dt);
+    var avoidRows = avoidance == null || avoidance.length == 0 ? null : AvoidanceRows.build(
+      layout,
+      work.snapshot,
+      avoidance,
+      xi,
+      dt
+    );
     var relaxed:Array<AvoidancePair> = [];
     try {
-      var solved = avoidRows == null || avoidRows.count() == 0 ? qp.solve(jacobian, residual, lower, upper, damping, 1e-9, maxIterations)
-        : qp.solveRows(jacobian, residual, lower, upper, avoidRows.matrix, avoidRows.lower, avoidRows.upper, damping, 1e-9, maxIterations);
+      var solved = avoidRows == null || avoidRows.count() == 0 ? qp.solve(
+        jacobian,
+        residual,
+        lower,
+        upper,
+        damping,
+        1e-9,
+        maxIterations
+      ) : qp.solveRows(
+        jacobian,
+        residual,
+        lower,
+        upper,
+        avoidRows.matrix,
+        avoidRows.lower,
+        avoidRows.upper,
+        damping,
+        1e-9,
+        maxIterations
+      );
       status = solved.status;
       iterations = solved.iterations;
       if (solved.solved()) delta = solved.step;
       if (avoidRows != null) relaxed = [for (row in solved.relaxed) avoidRows.pairs[row]];
-    } catch (_:Dynamic) {}
+    } catch (_:Dynamic) {
+    }
     var fallback = delta == null;
     var result:Array<Float> = delta == null ? [] : delta;
     if (fallback && avoidRows != null && avoidRows.count() > 0) {
       result = [for (_ in 0...width) 0.0];
     } else if (fallback) {
-      var damped = LinearAlgebra.dampedStep(jacobian, rows, width, [for (column in 0...width) column], residual,
-        Math.max(damping, 1e-6));
+      var damped = LinearAlgebra.dampedStep(
+        jacobian,
+        rows,
+        width,
+        [for (column in 0...width) column],
+        residual,
+        Math.max(
+          damping,
+          1e-6
+        )
+      );
       result = damped == null ? [for (_ in 0...width) 0.0] : damped;
       for (column in 0...width) result[column] = Math.min(Math.max(result[column], lower[column]), upper[column]);
     }
-    var limited = [for (column in 0...width)
-      if (result[column] <= lower[column] + 1e-12 || result[column] >= upper[column] - 1e-12) column];
-    return new DifferentialStep([for (value in result) value / dt], status, iterations, fallback, limited,
-      avoidRows == null ? [] : avoidRows.pairs, relaxed);
+    var limited = [for (column in 0...width) if (result[column] <= lower[column] + 1e-12
+      || result[column] >= upper[column] - 1e-12) column];
+    return new DifferentialStep(
+      [for (value in result) value / dt],
+      status,
+      iterations,
+      fallback,
+      limited,
+      avoidRows == null ? [] : avoidRows.pairs,
+      relaxed
+    );
   }
 }

@@ -14,13 +14,12 @@ class PostureTask implements KinematicTask {
   var lastError = 0.0;
 
   public function new(model:KinematicModel, targets:Array<Float>, weight:Float, ?dofWeights:Array<Float>) {
-    if (model == null || targets == null || targets.length != model.dofCount())
-      throw 'Posture task requires ${model == null ? 0 : model.dofCount()} target values';
+    if (model == null || targets == null || targets.length
+      != model.dofCount()) throw 'Posture task requires ${model == null ? 0 : model.dofCount()} target values';
     if (!Math.isFinite(weight) || weight < 0.0) throw "Posture task weight must be finite and non-negative";
-    if (dofWeights != null && dofWeights.length != targets.length)
-      throw "Posture task needs one DOF weight per target";
-    if (dofWeights != null) for (w in dofWeights) if (!Math.isFinite(w) || w < 0.0)
-      throw "Posture task DOF weights must be finite and non-negative";
+    if (dofWeights != null && dofWeights.length != targets.length) throw "Posture task needs one DOF weight per target";
+    if (dofWeights != null) for (w in dofWeights) if (!Math.isFinite(w)
+      || w < 0.0) throw "Posture task DOF weights must be finite and non-negative";
     this.targets = targets.copy();
     this.weight = weight;
     this.dofWeights = dofWeights == null ? [for (_ in 0...targets.length) 1.0] : dofWeights.copy();
@@ -36,8 +35,14 @@ class PostureTask implements KinematicTask {
   public function satisfied():Bool return true;
 
   /** Rows for DOFs outside the solve are zero: they cannot move, so they do not count. */
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     var squared = 0.0;
     for (i in 0...dofCount) {

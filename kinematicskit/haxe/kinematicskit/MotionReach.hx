@@ -39,8 +39,8 @@ class MotionReach {
             angular[column] += scale;
           }
         } else if (model.jointKind[joint] == JointKind.Prismatic) {
-          for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1])
-            distance[body * n + model.jointTermDof[term]] += Math.abs(model.jointTermScale[term]);
+          for (term in model.jointTermStart[joint]...model.jointTermStart[joint
+            + 1]) distance[body * n + model.jointTermDof[term]] += Math.abs(model.jointTermScale[term]);
           reach += Math.max(Math.abs(model.jointLower[joint]), Math.abs(model.jointUpper[joint]));
         }
         reach += length(model.jointParentTJoint, joint);
@@ -62,6 +62,7 @@ class MotionReach {
 
   static function length(transforms:Array<Float>, joint:Int):Float {
     var o = joint * 7;
-    return Math.sqrt(transforms[o] * transforms[o] + transforms[o + 1] * transforms[o + 1] + transforms[o + 2] * transforms[o + 2]);
+    return Math.sqrt(transforms[o]
+      * transforms[o] + transforms[o + 1] * transforms[o + 1] + transforms[o + 2] * transforms[o + 2]);
   }
 }

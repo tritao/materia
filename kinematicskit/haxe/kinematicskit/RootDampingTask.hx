@@ -13,10 +13,10 @@ class RootDampingTask implements KinematicTask {
   public var angularWeight:Float;
 
   public function new(model:KinematicModel, body:Int, linearWeight:Float, ?angularWeight:Float) {
-    if (model == null || body < 0 || body >= model.bodyCount() || model.bodyParentJoint[body] >= 0)
-      throw "Root damping task requires a root body of the model";
-    if (!(linearWeight >= 0.0) || (angularWeight != null && !(angularWeight >= 0.0)))
-      throw "Root damping weights must be non-negative";
+    if (model == null || body < 0 || body >= model.bodyCount()
+      || model.bodyParentJoint[body] >= 0) throw "Root damping task requires a root body of the model";
+    if (!(linearWeight >= 0.0)
+      || (angularWeight != null && !(angularWeight >= 0.0))) throw "Root damping weights must be non-negative";
     this.body = body;
     this.linearWeight = linearWeight;
     this.angularWeight = angularWeight == null ? linearWeight : angularWeight;
@@ -30,8 +30,14 @@ class RootDampingTask implements KinematicTask {
   public function orientationError():Float return 0.0;
   public function satisfied():Bool return true;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     for (r in 0...6) {
       residual[row + r] = 0.0;

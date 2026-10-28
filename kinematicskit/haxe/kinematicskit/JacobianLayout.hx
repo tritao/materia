@@ -23,11 +23,11 @@ class JacobianLayout {
 
   public function new(model:KinematicModel, dofs:Array<Int>, ?rootBodies:Array<Int>, ?rootModes:Array<RootMotion>) {
     this.dofs = dofs.copy();
-    columnOfDof = [for (_ in 0...model.dofCount()) -1];
+    columnOfDof = [for (_ in 0...model.dofCount()) - 1];
     for (column in 0...dofs.length) columnOfDof[dofs[column]] = column;
     this.rootBodies = rootBodies == null ? [] : rootBodies.copy();
     this.rootModes = rootModes == null ? [] : rootModes.copy();
-    blockOfRoot = [for (_ in 0...model.bodyCount()) -1];
+    blockOfRoot = [for (_ in 0...model.bodyCount()) - 1];
     rootColumns = [];
     var next = dofs.length;
     for (block in 0...this.rootBodies.length) {
@@ -38,9 +38,11 @@ class JacobianLayout {
     width = next;
   }
 
-  public static function all(model:KinematicModel):JacobianLayout
-    return new JacobianLayout(model, [for (dof in 0...model.dofCount()) dof]);
+  public static function all(model:KinematicModel):JacobianLayout return new JacobianLayout(
+    model,
+    [for (dof in 0...model.dofCount()) dof]
+  );
 
-  public static function columnsFor(mode:RootMotion):Int
-    return mode == RootMotion.Planar ? 3 : mode == RootMotion.Floating ? 6 : 0;
+  public static function columnsFor(mode:RootMotion):Int return mode
+    == RootMotion.Planar ? 3 : mode == RootMotion.Floating ? 6 : 0;
 }

@@ -32,9 +32,15 @@ class AvoidanceRows {
   public function count():Int return pairs.length;
 
   /** Rows for the pairs within their influence distance, at the evaluated `snapshot`. */
-  public static function build(layout:JacobianLayout, snapshot:KinematicSnapshot, pairs:Array<AvoidancePair>, xi:Float,
-      dt:Float):AvoidanceRows {
-    if (!(xi > 0) || !Math.isFinite(xi) || !(dt > 0) || !Math.isFinite(dt)) throw "Avoidance rows need a speed xi > 0 and dt > 0";
+  public static function build(
+    layout:JacobianLayout,
+    snapshot:KinematicSnapshot,
+    pairs:Array<AvoidancePair>,
+    xi:Float,
+    dt:Float
+  ):AvoidanceRows {
+    if (!(xi > 0)
+      || !Math.isFinite(xi) || !(dt > 0) || !Math.isFinite(dt)) throw "Avoidance rows need a speed xi > 0 and dt > 0";
     var w = layout.width;
     var near = [for (pair in pairs) if (pair.distance < pair.influence) pair];
     var matrix = [for (_ in 0...near.length * w) 0.0];
@@ -50,8 +56,8 @@ class AvoidanceRows {
         var p = side == 0 ? pair.pointA : pair.pointB;
         snapshot.pointJacobianColumns(body, p.x, p.y, p.z, layout, jacobian);
         var sign = side == 0 ? -1.0 : 1.0;
-        for (column in 0...w)
-          matrix[row * w + column] += sign * (n.x * jacobian[column] + n.y * jacobian[w + column] + n.z * jacobian[2 * w + column]);
+        for (column in 0...w) matrix[row * w
+          + column] += sign * (n.x * jacobian[column] + n.y * jacobian[w + column] + n.z * jacobian[2 * w + column]);
       }
       lower.push(-xi * (pair.distance - pair.safety) / (pair.influence - pair.safety) * dt);
       upper.push(Math.POSITIVE_INFINITY);

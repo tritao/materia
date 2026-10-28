@@ -21,30 +21,53 @@ class LookAtTask implements KinematicTask {
   final pointJacobian:Array<Float> = [];
   var lastError = 0.0;
 
-  public function new(model:KinematicModel, body:Int, offset:Null<Transform>, axis:Vector3, target:Vector3,
-      tolerance:Float, ?name:String) {
+  public function new(
+    model:KinematicModel,
+    body:Int,
+    offset:Null<Transform>,
+    axis:Vector3,
+    target:Vector3,
+    tolerance:Float,
+    ?name:String
+  ) {
     if (model == null || body < 0 || body >= model.bodyCount()) throw "Look-at task requires a body of the model";
     if (!(tolerance > 0.0)) throw "Look-at task tolerance must be positive";
     var norm = axis == null ? 0.0 : Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
     if (!Math.isFinite(norm) || norm < 1e-12) throw "Look-at task axis must be non-zero";
     this.body = body;
-    ux = axis.x / norm; uy = axis.y / norm; uz = axis.z / norm;
-    FlatTransform.write(offset == null ? Transform.identity() : Transform.checked(offset, "Look-at task offset"), offsetFlat, 0);
+    ux = axis.x / norm;
+    uy = axis.y / norm;
+    uz = axis.z / norm;
+    FlatTransform.write(
+      offset == null ? Transform.identity() : Transform.checked(offset, "Look-at task offset"),
+      offsetFlat,
+      0
+    );
     setTarget(target);
     this.tolerance = tolerance;
     this.name = name == null ? model.bodyIds[body] : name;
   }
 
-  public static function atFrame(model:KinematicModel, frame:Int, axis:Vector3, target:Vector3, tolerance:Float):LookAtTask {
+  public static function atFrame(model:KinematicModel,
+    frame:Int, axis:Vector3, target:Vector3, tolerance:Float):LookAtTask {
     if (frame < 0 || frame >= model.frameCount()) throw "Look-at task requires a frame of the model";
-    return new LookAtTask(model, model.frameBody[frame], model.frameTransform(frame), axis, target, tolerance,
-      model.frameIds[frame]);
+    return new LookAtTask(
+      model,
+      model.frameBody[frame],
+      model.frameTransform(frame),
+      axis,
+      target,
+      tolerance,
+      model.frameIds[frame]
+    );
   }
 
   public function setTarget(target:Vector3):Void {
-    if (target == null || !Math.isFinite(target.x) || !Math.isFinite(target.y) || !Math.isFinite(target.z))
-      throw "Look-at task target must be finite";
-    point[0] = target.x; point[1] = target.y; point[2] = target.z;
+    if (target == null || !Math.isFinite(target.x)
+      || !Math.isFinite(target.y) || !Math.isFinite(target.z)) throw "Look-at task target must be finite";
+    point[0] = target.x;
+    point[1] = target.y;
+    point[2] = target.z;
   }
 
   public function label():String return name;
@@ -54,8 +77,14 @@ class LookAtTask implements KinematicTask {
   public function orientationError():Float return lastError;
   public function satisfied():Bool return lastError <= tolerance;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     if (pointJacobian.length < 6 * w) pointJacobian.resize(6 * w);
     var s = scratch;
@@ -75,9 +104,9 @@ class LookAtTask implements KinematicTask {
       // d(a·p) ≈ (a × p)·ω + p·v / distance: the axis turns with the frame, and the
       // line of sight turns as the frame moves across it.
       var cx = ay * pz - az * py, cy = az * px - ax * pz, cz = ax * py - ay * px;
-      for (c in 0...w)
-        jacobian[(row + k) * w + c] = weight * (cx * pointJacobian[3 * w + c] + cy * pointJacobian[4 * w + c] +
-          cz * pointJacobian[5 * w + c] + (px * pointJacobian[c] + py * pointJacobian[w + c] + pz * pointJacobian[2 * w + c]) / distance);
+      for (c in 0...w) jacobian[(row
+        + k) * w + c] = weight * (cx * pointJacobian[3 * w + c] + cy * pointJacobian[4 * w + c] + cz * pointJacobian[5
+        * w + c] + (px * pointJacobian[c] + py * pointJacobian[w + c] + pz * pointJacobian[2 * w + c]) / distance);
     }
   }
 }

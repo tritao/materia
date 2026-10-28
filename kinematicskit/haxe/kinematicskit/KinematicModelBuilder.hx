@@ -17,7 +17,8 @@ class KinematicModelBuilder {
   final frameIndexById = new Map<String, Int>();
   final closureIndexById = new Map<String, Int>();
 
-  public function new() {}
+  public function new() {
+  }
 
   public function addBody(id:String):Int {
     requireId(id, "Kinematic body");
@@ -39,9 +40,19 @@ class KinematicModelBuilder {
    * `axis` is expressed in the joint frame and normalized here. Limits default
    * to unbounded; `continuous` marks a revolute joint whose value may wrap.
    */
-  public function addJoint(id:String, kind:JointKind, parent:Int, child:Int, parentTJoint:Transform,
-      jointTChild:Transform, ?axis:Vector3, ?lower:Float, ?upper:Float, ?defaultValue:Float = 0.0,
-      ?continuous:Bool = false):Int {
+  public function addJoint(
+    id:String,
+    kind:JointKind,
+    parent:Int,
+    child:Int,
+    parentTJoint:Transform,
+    jointTChild:Transform,
+    ?axis:Vector3,
+    ?lower:Float,
+    ?upper:Float,
+    ?defaultValue:Float = 0.0,
+    ?continuous:Bool = false
+  ):Int {
     requireId(id, "Kinematic joint");
     if (jointIndexById.exists(id)) throw 'Kinematic joint "$id" is declared more than once';
     requireBody(parent);
@@ -52,18 +63,41 @@ class KinematicModelBuilder {
       if (axis == null) throw 'Kinematic joint "$id" needs a motion axis';
       var norm = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
       if (!Math.isFinite(norm) || norm < 1e-9) throw 'Kinematic joint "$id" has a zero or non-finite axis';
-      ax = axis.x; ay = axis.y; az = axis.z;
-      if (norm != 1.0) { ax /= norm; ay /= norm; az /= norm; }
+      ax = axis.x;
+      ay = axis.y;
+      az = axis.z;
+      if (norm != 1.0) {
+        ax /= norm;
+        ay /= norm;
+        az /= norm;
+      }
     }
     var lo = lower == null ? Math.NEGATIVE_INFINITY : lower;
     var hi = upper == null ? Math.POSITIVE_INFINITY : upper;
     if (Math.isNaN(lo) || Math.isNaN(hi) || lo > hi) throw 'Kinematic joint "$id" has invalid limits';
     if (!Math.isFinite(defaultValue)) throw 'Kinematic joint "$id" default value must be finite';
     jointIndexById.set(id, joints.length);
-    joints.push(new JointSpec(id, kind, parent, child,
-      Transform.checked(parentTJoint, 'Kinematic joint "$id" parent frame'),
-      Transform.checked(jointTChild, 'Kinematic joint "$id" child frame'),
-      ax, ay, az, lo, hi, defaultValue, continuous && kind == JointKind.Revolute));
+    joints.push(new JointSpec(
+      id,
+      kind,
+      parent,
+      child,
+      Transform.checked(
+        parentTJoint,
+        'Kinematic joint "$id" parent frame'
+      ),
+      Transform.checked(
+        jointTChild,
+        'Kinematic joint "$id" child frame'
+      ),
+      ax,
+      ay,
+      az,
+      lo,
+      hi,
+      defaultValue,
+      continuous && kind == JointKind.Revolute
+    ));
     return joints.length - 1;
   }
 
@@ -72,8 +106,8 @@ class KinematicModelBuilder {
    * Coupling a target to several sources sums their terms: `Σ ratioᵢ * value(sourceᵢ) + Σ offsetᵢ`.
    */
   public function couple(target:String, source:String, ratio:Float, offset:Float):Void {
-    if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
-      throw 'Kinematic coupling of "$target" needs a finite non-zero ratio and finite offset';
+    if (!Math.isFinite(ratio) || ratio == 0.0 || !Math
+      .isFinite(offset)) throw 'Kinematic coupling of "$target" needs a finite non-zero ratio and finite offset';
     couplings.push(new CouplingSpec(target, source, ratio, offset));
   }
 
@@ -99,22 +133,31 @@ class KinematicModelBuilder {
    * authored position tolerance, if any; `value` is the planar offset,
    * distance or angle the kind needs.
    */
-  public function addClosure(id:String, kind:ClosureKind, frameA:Int, frameB:Int, ?axis:Vector3,
-      ?tolerance:Float, value:Float = 0):Int {
+  public function addClosure(
+    id:String,
+    kind:ClosureKind,
+    frameA:Int,
+    frameB:Int,
+    ?axis:Vector3,
+    ?tolerance:Float,
+    value:Float = 0
+  ):Int {
     requireId(id, "Kinematic closure");
     if (closureIndexById.exists(id)) throw 'Kinematic closure "$id" is declared more than once';
-    if (frameA < 0 || frameA >= frames.length || frameB < 0 || frameB >= frames.length)
-      throw 'Kinematic closure "$id" references an unknown frame';
+    if (frameA < 0 || frameA >= frames.length
+      || frameB < 0 || frameB >= frames.length) throw 'Kinematic closure "$id" references an unknown frame';
     var ax = 0.0, ay = 0.0, az = 1.0;
     if (axis != null) {
       var norm = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
       if (!Math.isFinite(norm) || norm < 1e-9) throw 'Kinematic closure "$id" has a zero or non-finite axis';
-      ax = axis.x / norm; ay = axis.y / norm; az = axis.z / norm;
-    } else if (kind != ClosureKind.Fixed && kind != ClosureKind.Spherical && kind != ClosureKind.Distance)
-      throw 'Kinematic closure "$id" needs an axis';
+      ax = axis.x / norm;
+      ay = axis.y / norm;
+      az = axis.z / norm;
+    } else if (kind != ClosureKind.Fixed
+      && kind != ClosureKind.Spherical && kind != ClosureKind.Distance) throw 'Kinematic closure "$id" needs an axis';
     if (!Math.isFinite(value)) throw 'Kinematic closure "$id" value must be finite';
-    if (tolerance != null && (!Math.isFinite(tolerance) || tolerance <= 0.0))
-      throw 'Kinematic closure "$id" tolerance must be finite and positive';
+    if (tolerance != null && (!Math.isFinite(tolerance)
+      || tolerance <= 0.0)) throw 'Kinematic closure "$id" tolerance must be finite and positive';
     closureIndexById.set(id, closures.length);
     closures.push(new ClosureSpec(id, kind, frameA, frameB, ax, ay, az, tolerance, value));
     return closures.length - 1;
@@ -125,17 +168,16 @@ class KinematicModelBuilder {
     var jointCount = joints.length;
 
     // Tree structure: at most one incoming joint per body, no cycles.
-    var parentJoint = [for (_ in 0...bodyCount) -1];
+    var parentJoint = [for (_ in 0...bodyCount) - 1];
     for (index in 0...jointCount) {
       var joint = joints[index];
-      if (parentJoint[joint.child] >= 0)
-        throw 'Kinematic body "${bodyIds[joint.child]}" has two parent joints ' +
-          '("${joints[parentJoint[joint.child]].id}" and "${joint.id}"); make one of them a closure';
+      if (parentJoint[joint.child] >= 0) throw 'Kinematic body "${bodyIds[joint.child]}" has two parent joints '
+        + '("${joints[parentJoint[joint.child]].id}" and "${joint.id}"); make one of them a closure';
       parentJoint[joint.child] = index;
     }
     var jointOrder:Array<Int> = [];
     var bodyOrder:Array<Int> = [];
-    var children:Array<Array<Int>> = [for (_ in 0...bodyCount) []];
+    var children:Array<Array<Int>> = [for (_ in 0...bodyCount)[]];
     for (index in 0...jointCount) children[joints[index].parent].push(index);
     for (body in 0...bodyCount) if (parentJoint[body] < 0) {
       var stack = [body];
@@ -149,8 +191,8 @@ class KinematicModelBuilder {
       }
     }
     if (bodyOrder.length != bodyCount) {
-      for (body in 0...bodyCount) if (bodyOrder.indexOf(body) < 0)
-        throw 'Kinematic tree contains a cycle through body "${bodyIds[body]}"';
+      for (body in 0...bodyCount) if (bodyOrder.indexOf(body)
+        < 0) throw 'Kinematic tree contains a cycle through body "${bodyIds[body]}"';
     }
 
     // Couplings: a coupled joint is the sum of its couplings' terms. Resolve each to the DOFs that
@@ -159,20 +201,23 @@ class KinematicModelBuilder {
     for (coupling in couplings) {
       var target = jointIndexById.get(coupling.target);
       var source = jointIndexById.get(coupling.source);
-      if (target == null || source == null)
-        throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" references an unknown joint';
+      if (target == null || source
+        == null) throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" references an unknown joint';
       if (target == source) throw 'Kinematic joint "${coupling.target}" cannot drive itself';
-      if (joints[target].kind == JointKind.Fixed || joints[source].kind == JointKind.Fixed)
-        throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" needs two movable joints';
+      if (joints[target].kind == JointKind.Fixed || joints[source].kind == JointKind
+        .Fixed) throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" needs two movable joints';
       var terms = couplingsOf.get(target);
-      if (terms == null) { terms = []; couplingsOf.set(target, terms); }
-      for (term in terms) if (term.source == coupling.source)
-        throw 'Kinematic joint "${coupling.target}" is coupled to "${coupling.source}" twice';
+      if (terms == null) {
+        terms = [];
+        couplingsOf.set(target, terms);
+      }
+      for (term in terms) if (term.source
+        == coupling.source) throw 'Kinematic joint "${coupling.target}" is coupled to "${coupling.source}" twice';
       terms.push(coupling);
     }
 
-    var jointDof = [for (_ in 0...jointCount) -1];
-    var jointSource = [for (_ in 0...jointCount) -1];
+    var jointDof = [for (_ in 0...jointCount) - 1];
+    var jointSource = [for (_ in 0...jointCount) - 1];
     var jointRatio = [for (_ in 0...jointCount) 1.0];
     var jointOffset = [for (_ in 0...jointCount) 0.0];
     var jointScale = [for (_ in 0...jointCount) 0.0];
@@ -208,8 +253,7 @@ class KinematicModelBuilder {
           next[next.length - 1] = cursor + 1;
           var source = sourceIndex(terms[cursor]);
           if (resolved[source]) continue;
-          if (visiting[source])
-            throw 'Kinematic couplings form a cycle through joint "${joints[source].id}"';
+          if (visiting[source]) throw 'Kinematic couplings form a cycle through joint "${joints[source].id}"';
           visiting[source] = true;
           stack.push(source);
           next.push(0);
@@ -220,8 +264,10 @@ class KinematicModelBuilder {
           var source = sourceIndex(term);
           for (k in 0...termDofs[source].length) {
             var at = dofs.indexOf(termDofs[source][k]);
-            if (at < 0) { dofs.push(termDofs[source][k]); scales.push(termScales[source][k] * term.ratio); }
-            else scales[at] += termScales[source][k] * term.ratio;
+            if (at < 0) {
+              dofs.push(termDofs[source][k]);
+              scales.push(termScales[source][k] * term.ratio);
+            } else scales[at] += termScales[source][k] * term.ratio;
           }
           constant += constants[source] * term.ratio + term.offset;
         }
@@ -230,7 +276,7 @@ class KinematicModelBuilder {
         constants[current] = constant;
         // One term from a single-DOF joint keeps the chained form (source, ratio, offset).
         if (terms.length == 1 && termDofs[sourceIndex(terms[0])].length == 1
-            && jointSource[sourceIndex(terms[0])] != KinematicModel.COMBINED) {
+          && jointSource[sourceIndex(terms[0])] != KinematicModel.COMBINED) {
           jointSource[current] = sourceIndex(terms[0]);
           jointRatio[current] = terms[0].ratio;
           jointOffset[current] = terms[0].offset;
@@ -258,15 +304,19 @@ class KinematicModelBuilder {
       var dof = jointDof[index];
       var a = termScales[index][0], b = constants[index];
       var lo = (joints[index].lower - b) / a, hi = (joints[index].upper - b) / a;
-      if (a < 0.0) { var swap = lo; lo = hi; hi = swap; }
+      if (a < 0.0) {
+        var swap = lo;
+        lo = hi;
+        hi = swap;
+      }
       if (!Math.isNaN(lo) && lo > dofLower[dof]) dofLower[dof] = lo;
       if (!Math.isNaN(hi) && hi < dofUpper[dof]) dofUpper[dof] = hi;
-      if (dofLower[dof] > dofUpper[dof])
-        throw 'Coupled joint "${joints[index].id}" leaves joint "${joints[dofJoint[dof]].id}" no valid range';
+      if (dofLower[dof]
+        > dofUpper[dof]) throw 'Coupled joint "${joints[index].id}" leaves joint "${joints[dofJoint[dof]].id}" no valid range';
     }
 
     // Movable joints on the path from each body's root, for Jacobians.
-    var bodyChain:Array<Array<Int>> = [for (_ in 0...bodyCount) []];
+    var bodyChain:Array<Array<Int>> = [for (_ in 0...bodyCount)[]];
     for (body in bodyOrder) {
       var joint = parentJoint[body];
       if (joint < 0) continue;
@@ -282,7 +332,8 @@ class KinematicModelBuilder {
     }
 
     var rootPoses:Array<Transform> = [];
-    for (body in 0...bodyCount) rootPoses.push(bodyRootPoses[body] == null ? Transform.identity() : bodyRootPoses[body]);
+    for (body in 0...bodyCount) rootPoses.push(bodyRootPoses[body]
+      == null ? Transform.identity() : bodyRootPoses[body]);
 
     var parts = new KinematicModelParts();
     parts.bodyIds = bodyIds.copy();
@@ -307,7 +358,10 @@ class KinematicModelBuilder {
     parts.jointScale = jointScale;
     var termStart = [0], termDof:Array<Int> = [], termScale:Array<Float> = [];
     for (index in 0...jointCount) {
-      for (k in 0...termDofs[index].length) { termDof.push(termDofs[index][k]); termScale.push(termScales[index][k]); }
+      for (k in 0...termDofs[index].length) {
+        termDof.push(termDofs[index][k]);
+        termScale.push(termScales[index][k]);
+      }
       termStart.push(termDof.length);
     }
     parts.jointTermStart = termStart;
@@ -335,13 +389,21 @@ class KinematicModelBuilder {
 
   function axes():Array<Float> {
     var result:Array<Float> = [];
-    for (joint in joints) { result.push(joint.ax); result.push(joint.ay); result.push(joint.az); }
+    for (joint in joints) {
+      result.push(joint.ax);
+      result.push(joint.ay);
+      result.push(joint.az);
+    }
     return result;
   }
 
   function closureAxes():Array<Float> {
     var result:Array<Float> = [];
-    for (closure in closures) { result.push(closure.ax); result.push(closure.ay); result.push(closure.az); }
+    for (closure in closures) {
+      result.push(closure.ax);
+      result.push(closure.ay);
+      result.push(closure.az);
+    }
     return result;
   }
 
@@ -354,8 +416,13 @@ class KinematicModelBuilder {
   static function flatten(values:Array<Transform>):Array<Float> {
     var result:Array<Float> = [];
     for (value in values) {
-      result.push(value.x); result.push(value.y); result.push(value.z);
-      result.push(value.qx); result.push(value.qy); result.push(value.qz); result.push(value.qw);
+      result.push(value.x);
+      result.push(value.y);
+      result.push(value.z);
+      result.push(value.qx);
+      result.push(value.qy);
+      result.push(value.qz);
+      result.push(value.qw);
     }
     return result;
   }
@@ -384,9 +451,21 @@ private class JointSpec {
   public final defaultValue:Float;
   public final continuous:Bool;
 
-  public function new(id:String, kind:JointKind, parent:Int, child:Int, parentTJoint:Transform,
-      jointTChild:Transform, ax:Float, ay:Float, az:Float, lower:Float, upper:Float,
-      defaultValue:Float, continuous:Bool) {
+  public function new(
+    id:String,
+    kind:JointKind,
+    parent:Int,
+    child:Int,
+    parentTJoint:Transform,
+    jointTChild:Transform,
+    ax:Float,
+    ay:Float,
+    az:Float,
+    lower:Float,
+    upper:Float,
+    defaultValue:Float,
+    continuous:Bool
+  ) {
     this.id = id;
     this.kind = kind;
     this.parent = parent;
@@ -440,8 +519,17 @@ private class ClosureSpec {
   public final tolerance:Null<Float>;
   public final value:Float;
 
-  public function new(id:String, kind:ClosureKind, frameA:Int, frameB:Int, ax:Float, ay:Float, az:Float,
-      tolerance:Null<Float>, value:Float) {
+  public function new(
+    id:String,
+    kind:ClosureKind,
+    frameA:Int,
+    frameB:Int,
+    ax:Float,
+    ay:Float,
+    az:Float,
+    tolerance:Null<Float>,
+    value:Float
+  ) {
     this.value = value;
     this.id = id;
     this.kind = kind;

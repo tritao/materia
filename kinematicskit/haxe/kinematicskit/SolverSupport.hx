@@ -8,8 +8,8 @@ class SolverSupport {
    * (about its origin) and adds v to its position. Allocates one pose per
    * moving root.
    */
-  public static function applyStep(problem:KinematicProblem, state:KinematicState, delta:Array<Float>,
-      factor:Float):Void {
+  public static function applyStep(problem:KinematicProblem,
+    state:KinematicState, delta:Array<Float>, factor:Float):Void {
     var layout = problem.layout();
     for (i in 0...layout.dofs.length) state.q[layout.dofs[i]] += factor * delta[i];
     for (block in 0...layout.rootBodies.length) {
@@ -20,13 +20,18 @@ class SolverSupport {
       if (layout.rootModes[block] == RootMotion.Planar) wz = factor * delta[c + 2];
       else {
         vz = factor * delta[c + 2];
-        wx = factor * delta[c + 3]; wy = factor * delta[c + 4]; wz = factor * delta[c + 5];
+        wx = factor * delta[c + 3];
+        wy = factor * delta[c + 4];
+        wz = factor * delta[c + 5];
       }
       var angle = Math.sqrt(wx * wx + wy * wy + wz * wz);
       var rx = 0.0, ry = 0.0, rz = 0.0, rw = 1.0;
       if (angle > 1e-15) {
         var s = Math.sin(angle * 0.5) / angle;
-        rx = wx * s; ry = wy * s; rz = wz * s; rw = Math.cos(angle * 0.5);
+        rx = wx * s;
+        ry = wy * s;
+        rz = wz * s;
+        rw = Math.cos(angle * 0.5);
       }
       // Exp(ω) · q, renormalized against drift.
       var qx = rw * pose.qx + rx * pose.qw + ry * pose.qz - rz * pose.qy;
@@ -34,7 +39,18 @@ class SolverSupport {
       var qz = rw * pose.qz + rx * pose.qy - ry * pose.qx + rz * pose.qw;
       var qw = rw * pose.qw - rx * pose.qx - ry * pose.qy - rz * pose.qz;
       var norm = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
-      state.setRootPose(body, new Transform(pose.x + vx, pose.y + vy, pose.z + vz, qx / norm, qy / norm, qz / norm, qw / norm));
+      state.setRootPose(
+        body,
+        new Transform(
+          pose.x + vx,
+          pose.y + vy,
+          pose.z + vz,
+          qx / norm,
+          qy / norm,
+          qz / norm,
+          qw / norm
+        )
+      );
     }
   }
 
@@ -54,18 +70,33 @@ class SolverSupport {
    * (allocates; once per solve). `scales` multiplies each Jacobian column
    * for the rank test, as the solver saw it.
    */
-  public static function finish(problem:KinematicProblem, state:KinematicState, workspace:SolverWorkspace,
-      status:KinematicStatus, iterations:Int, rankTolerance:Float, useScales:Bool):KinematicSolution {
+  public static function finish(
+    problem:KinematicProblem,
+    state:KinematicState,
+    workspace:SolverWorkspace,
+    status:KinematicStatus,
+    iterations:Int,
+    rankTolerance:Float,
+    useScales:Bool
+  ):KinematicSolution {
     var snapshot = workspace.snapshot;
     problem.evaluate(state, snapshot, workspace.residual, workspace.jacobian);
     var rows = problem.rowCount();
     var width = problem.layout().width;
     var hard = problem.hardRows();
     var matrix:Array<Float> = [];
-    for (row in hard) for (c in 0...width)
-      matrix.push(workspace.jacobian[row * width + c] * (useScales ? workspace.scales[c] : 1.0));
+    for (row in hard) for (c in 0...width) matrix.push(workspace.jacobian[row * width + c] * (useScales
+      ? workspace.scales[c] : 1.0));
     var rank = LinearAlgebra.rank(matrix, hard.length, width, rankTolerance);
-    return new KinematicSolution(status, state, iterations, LinearAlgebra.norm(workspace.residual, rows),
-      [for (task in problem.tasks) new TaskResult(task)], rank, width - rank, problem.limitHits(state.q));
+    return new KinematicSolution(
+      status,
+      state,
+      iterations,
+      LinearAlgebra.norm(workspace.residual, rows),
+      [for (task in problem.tasks) new TaskResult(task)],
+      rank,
+      width - rank,
+      problem.limitHits(state.q)
+    );
   }
 }

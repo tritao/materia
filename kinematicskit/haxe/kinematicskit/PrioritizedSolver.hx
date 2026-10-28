@@ -21,15 +21,21 @@ package kinematicskit;
  * `IterationLimit`. `maxStep` caps each step as in `DampedLeastSquares`.
  */
 class PrioritizedSolver {
-  public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
-      ?damping:Float = 0.02, ?rankTolerance:Float = 1e-8, ?workspace:SolverWorkspace,
-      ?maxStep:Float = Math.POSITIVE_INFINITY, ?translationScale:Float = 1.0,
-      ?stepTolerance:Float = 1e-10):KinematicSolution {
-    if (problem == null || seed == null || seed.model != problem.model)
-      throw "Prioritized solver requires a problem and a seed state of its model";
-    if (maxIterations < 0 || !Math.isFinite(damping) || !(damping > 0.0) || !(maxStep > 0.0) ||
-        !(translationScale > 0.0) || !(stepTolerance >= 0.0))
-      throw "Prioritized solver settings must be finite and positive";
+  public static function solve(
+    problem:KinematicProblem,
+    seed:KinematicState,
+    ?maxIterations:Int = 100,
+    ?damping:Float = 0.02,
+    ?rankTolerance:Float = 1e-8,
+    ?workspace:SolverWorkspace,
+    ?maxStep:Float = Math.POSITIVE_INFINITY,
+    ?translationScale:Float = 1.0,
+    ?stepTolerance:Float = 1e-10
+  ):KinematicSolution {
+    if (problem == null || seed == null
+      || seed.model != problem.model) throw "Prioritized solver requires a problem and a seed state of its model";
+    if (maxIterations < 0 || !Math.isFinite(damping) || !(damping > 0.0) || !(maxStep > 0.0) || !(translationScale
+      > 0.0) || !(stepTolerance >= 0.0)) throw "Prioritized solver settings must be finite and positive";
     var work = workspace == null ? new SolverWorkspace() : workspace;
     work.prepare(problem);
     var rows = problem.rowCount();
@@ -52,8 +58,15 @@ class PrioritizedSolver {
     for (iteration in 0...maxIterations) {
       problem.evaluate(state, snapshot, work.residual, work.jacobian);
       var met = problem.satisfied();
-      if (met && (!hasSoft || lastStep <= stepTolerance))
-        return SolverSupport.finish(problem, state, work, KinematicStatus.Converged, iteration, rankTolerance, false);
+      if (met && (!hasSoft || lastStep <= stepTolerance)) return SolverSupport.finish(
+        problem,
+        state,
+        work,
+        KinematicStatus.Converged,
+        iteration,
+        rankTolerance,
+        false
+      );
       var jacobian = work.jacobian, residual = work.residual;
       for (i in 0...width * width) normal[i] = 0.0;
       for (i in 0...width) gradient[i] = 0.0;
@@ -71,14 +84,39 @@ class PrioritizedSolver {
         pinned[i] = false;
         delta[i] = 0.0;
       }
-      if (!stepWithin(problem, state, layout, normal, gradient, jacobian, residual, hard, width, dofCount, m, delta,
-          pinned))
-        return SolverSupport.finish(problem, state, work, KinematicStatus.NumericalFailure, iteration, rankTolerance,
-          false);
+      if (!stepWithin(
+        problem,
+        state,
+        layout,
+        normal,
+        gradient,
+        jacobian,
+        residual,
+        hard,
+        width,
+        dofCount,
+        m,
+        delta,
+        pinned
+      )) return SolverSupport.finish(
+        problem,
+        state,
+        work,
+        KinematicStatus.NumericalFailure,
+        iteration,
+        rankTolerance,
+        false
+      );
       if (maxStep != Math.POSITIVE_INFINITY) {
         var ratio = 0.0;
-        for (i in 0...width)
-          ratio = Math.max(ratio, Math.abs(delta[i]) / (maxStep * DampedLeastSquares.columnScale(problem, i, translationScale)));
+        for (i in 0...width) ratio = Math.max(
+          ratio,
+          Math.abs(delta[i]) / (maxStep * DampedLeastSquares.columnScale(
+            problem,
+            i,
+            translationScale
+          ))
+        );
         if (ratio > 1.0) for (i in 0...width) delta[i] /= ratio;
       }
       lastStep = 0.0;
@@ -96,9 +134,21 @@ class PrioritizedSolver {
    * range and re-solving the rest, at most once per column. False when the
    * KKT system cannot be solved.
    */
-  static function stepWithin(problem:KinematicProblem, state:KinematicState, layout:JacobianLayout,
-      normal:Array<Float>, gradient:Array<Float>, jacobian:Array<Float>, residual:Array<Float>, hard:Array<Int>,
-      width:Int, dofCount:Int, m:Int, delta:Array<Float>, pinned:Array<Bool>):Bool {
+  static function stepWithin(
+    problem:KinematicProblem,
+    state:KinematicState,
+    layout:JacobianLayout,
+    normal:Array<Float>,
+    gradient:Array<Float>,
+    jacobian:Array<Float>,
+    residual:Array<Float>,
+    hard:Array<Int>,
+    width:Int,
+    dofCount:Int,
+    m:Int,
+    delta:Array<Float>,
+    pinned:Array<Bool>
+  ):Bool {
     // A small regularization of the constraint block: rank-deficient hard rows still solve, as a
     // least-squares fit of the constraint at weight 1/ε.
     var epsilon = 1e-10;
@@ -109,16 +159,16 @@ class PrioritizedSolver {
       for (a in 0...f) {
         var ca = free[a];
         var g = gradient[ca];
-        for (pinnedColumn in 0...width) if (pinned[pinnedColumn])
-          g -= normal[ca * width + pinnedColumn] * delta[pinnedColumn];
+        for (pinnedColumn in 0...width) if (pinned[pinnedColumn]) g -= normal[ca
+          * width + pinnedColumn] * delta[pinnedColumn];
         rhs[a] = g;
         for (b in 0...f) kkt[a * n + b] = normal[ca * width + free[b]];
       }
       for (k in 0...m) {
         var row = hard[k];
         var d = residual[row];
-        for (pinnedColumn in 0...width) if (pinned[pinnedColumn])
-          d -= jacobian[row * width + pinnedColumn] * delta[pinnedColumn];
+        for (pinnedColumn in 0...width) if (pinned[pinnedColumn]) d -= jacobian[row
+          * width + pinnedColumn] * delta[pinnedColumn];
         rhs[f + k] = d;
         for (a in 0...f) {
           var value = jacobian[row * width + free[a]];

@@ -30,7 +30,8 @@ class StepLimits {
   public var limitGain:Float = 1.0;
   public var ramped:Bool = false;
 
-  public function new() {}
+  public function new() {
+  }
 
   /** Velocity limits per column (and a configuration-limit gain): mink's differential-IK limits. */
   public static function ofVelocity(?velocity:Array<Float>, ?limitGain:Float = 1.0):StepLimits {
@@ -41,17 +42,22 @@ class StepLimits {
   }
 
   /** Writes the step bounds for `state` into `lower` and `upper` (one per layout column). */
-  public function bounds(problem:KinematicProblem, state:KinematicState, dt:Float, lower:Array<Float>,
-      upper:Array<Float>):Void {
+  public function bounds(
+    problem:KinematicProblem,
+    state:KinematicState,
+    dt:Float,
+    lower:Array<Float>,
+    upper:Array<Float>
+  ):Void {
     var layout = problem.layout();
     var width = layout.width;
     var dofCount = layout.dofs.length;
     if (!(dt > 0.0) || !Math.isFinite(dt)) throw "Step limits need a positive period";
     if (!(limitGain > 0.0) || limitGain > 1.0) throw "Step limit gain must be in (0, 1]";
-    for (values in [velocity, previousVelocity])
-      if (values != null && values.length != width) throw 'Step limits need one value per column ($width)';
-    if (acceleration != null && acceleration.length != width)
-      throw 'Step limits need one acceleration per column ($width)';
+    for (values in [velocity, previousVelocity]) if (values != null
+      && values.length != width) throw 'Step limits need one value per column ($width)';
+    if (acceleration != null
+      && acceleration.length != width) throw 'Step limits need one acceleration per column ($width)';
     if (ramped && previousVelocity == null) throw "A ramped step needs the previous velocities";
     for (column in 0...width) {
       // Distances to the stops (infinite without one, and for moving roots); each side bounds itself.
@@ -89,8 +95,13 @@ class StepLimits {
         vHigh = Math.min(safeHigh, accelHigh);
         // Entered too fast near a stop: position and braking win over acceleration.
         if (vLow > vHigh) {
-          if (accelLow > safeHigh) { vLow = safeHigh; vHigh = safeHigh; }
-          else { vLow = safeLow; vHigh = safeLow; }
+          if (accelLow > safeHigh) {
+            vLow = safeHigh;
+            vHigh = safeHigh;
+          } else {
+            vLow = safeLow;
+            vHigh = safeLow;
+          }
         }
       }
       // A DOF already outside its range may stay or move back, not further out.
@@ -105,8 +116,13 @@ class StepLimits {
       var stepLow = Math.max(low, vLow * dt), stepHigh = Math.min(high, vHigh * dt);
       // Should velocity and position bounds exclude each other, the position side wins.
       if (stepLow > stepHigh) {
-        if (vLow * dt > high) { stepLow = high; stepHigh = high; }
-        else { stepLow = low; stepHigh = low; }
+        if (vLow * dt > high) {
+          stepLow = high;
+          stepHigh = high;
+        } else {
+          stepLow = low;
+          stepHigh = low;
+        }
       }
       lower[column] = stepLow;
       upper[column] = stepHigh;

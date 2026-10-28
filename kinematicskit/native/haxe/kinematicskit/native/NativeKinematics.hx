@@ -24,8 +24,12 @@ class NativeKinematics {
   /** World poses of every body, seven floats each, for DOF values `q` (and optional root poses, seven per body). */
   public function forward(q:Array<Float>, ?rootPoses:Array<Float>):Array<Float> {
     requireLive();
-    var result = KinematicsKitNative.kk_forward(owner.borrow(), q, rootPoses == null ? [] : rootPoses,
-      model.bodyCount() * 7);
+    var result = KinematicsKitNative.kk_forward(
+      owner.borrow(),
+      q,
+      rootPoses == null ? [] : rootPoses,
+      model.bodyCount() * 7
+    );
     check(result.status, "forward");
     return result.out_poses;
   }
@@ -46,7 +50,14 @@ class NativeKinematics {
 
   /** The integer half of the packed model (format 2). */
   public static function packInts(model:KinematicModel):Array<Int> {
-    var ints = [2, model.bodyCount(), model.jointCount(), model.dofCount(), model.frameCount(), model.jointTermDof.length];
+    var ints = [
+      2,
+      model.bodyCount(),
+      model.jointCount(),
+      model.dofCount(),
+      model.frameCount(),
+      model.jointTermDof.length
+    ];
     for (body in 0...model.bodyCount()) ints.push(model.bodyParentJoint[body]);
     for (body in model.bodyOrder) ints.push(body);
     for (joint in 0...model.jointCount()) {
@@ -68,8 +79,13 @@ class NativeKinematics {
   public static function packReals(model:KinematicModel):Array<Float> {
     var reals:Array<Float> = [];
     for (pose in model.bodyRootPoses) {
-      reals.push(pose.x); reals.push(pose.y); reals.push(pose.z);
-      reals.push(pose.qx); reals.push(pose.qy); reals.push(pose.qz); reals.push(pose.qw);
+      reals.push(pose.x);
+      reals.push(pose.y);
+      reals.push(pose.z);
+      reals.push(pose.qx);
+      reals.push(pose.qy);
+      reals.push(pose.qz);
+      reals.push(pose.qw);
     }
     for (joint in 0...model.jointCount()) {
       for (k in 0...7) reals.push(model.jointParentTJoint[joint * 7 + k]);
@@ -90,7 +106,6 @@ class NativeKinematics {
   }
 
   static function check(status:Int, operation:String):Void {
-    if (status != KinematicsKitNativeConstants.KK_OK)
-      throw 'Native kinematics $operation failed with error $status';
+    if (status != KinematicsKitNativeConstants.KK_OK) throw 'Native kinematics $operation failed with error $status';
   }
 }

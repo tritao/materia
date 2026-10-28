@@ -14,8 +14,8 @@ class DofDampingTask implements KinematicTask {
   final dofCount:Int;
 
   public function new(model:KinematicModel, weights:Array<Float>) {
-    if (model == null || weights == null || weights.length != model.dofCount())
-      throw 'DOF damping task requires ${model == null ? 0 : model.dofCount()} weights';
+    if (model == null || weights == null || weights.length
+      != model.dofCount()) throw 'DOF damping task requires ${model == null ? 0 : model.dofCount()} weights';
     for (w in weights) if (!Math.isFinite(w) || w < 0.0) throw "DOF damping weights must be finite and non-negative";
     this.weights = weights.copy();
     dofCount = model.dofCount();
@@ -29,8 +29,14 @@ class DofDampingTask implements KinematicTask {
   public function satisfied():Bool return true;
 
   /** Rows for DOFs outside the solve are zero. */
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
-      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    layout:JacobianLayout,
+    residual:Array<Float>,
+    jacobian:Array<Float>,
+    row:Int
+  ):Void {
     var w = layout.width;
     for (i in 0...dofCount) {
       var column = layout.columnOfDof[i];

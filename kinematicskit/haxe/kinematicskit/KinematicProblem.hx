@@ -54,11 +54,17 @@ class KinematicProblem {
    * `RootDampingTask` to prefer joint motion over root motion.
    */
   public function setRootMotion(body:Int, mode:RootMotion):KinematicProblem {
-    if (body < 0 || body >= model.bodyCount() || model.bodyParentJoint[body] >= 0)
-      throw 'Kinematic problem body $body is not a root';
+    if (body < 0 || body >= model.bodyCount()
+      || model.bodyParentJoint[body] >= 0) throw 'Kinematic problem body $body is not a root';
     var index = rootBodies.indexOf(body);
-    if (index >= 0) { rootBodies.splice(index, 1); rootModes.splice(index, 1); }
-    if (mode != RootMotion.Fixed) { rootBodies.push(body); rootModes.push(mode); }
+    if (index >= 0) {
+      rootBodies.splice(index, 1);
+      rootModes.splice(index, 1);
+    }
+    if (mode != RootMotion.Fixed) {
+      rootBodies.push(body);
+      rootModes.push(mode);
+    }
     columns = new JacobianLayout(model, active, rootBodies, rootModes);
     return this;
   }
@@ -70,7 +76,8 @@ class KinematicProblem {
       var dof = model.dofIndex(id);
       if (dof < 0) throw 'Joint "$id" does not drive a DOF of its own';
       dof;
-    }]);
+    }
+    ]);
   }
 
   /** The Jacobian columns of a solve: one per active DOF, in active order. */
@@ -81,8 +88,8 @@ class KinematicProblem {
   /** Overrides one DOF's range; infinite bounds mean unlimited. */
   public function setLimits(dof:Int, lowerBound:Float, upperBound:Float):KinematicProblem {
     if (dof < 0 || dof >= model.dofCount()) throw 'Kinematic problem DOF $dof is not part of the model';
-    if (Math.isNaN(lowerBound) || Math.isNaN(upperBound) || lowerBound > upperBound)
-      throw 'Kinematic problem limits for "${model.dofId(dof)}" are invalid';
+    if (Math.isNaN(lowerBound) || Math.isNaN(upperBound)
+      || lowerBound > upperBound) throw 'Kinematic problem limits for "${model.dofId(dof)}" are invalid';
     lower[dof] = lowerBound;
     upper[dof] = upperBound;
     return this;
@@ -98,8 +105,12 @@ class KinematicProblem {
    * Evaluates `snapshot` at `state`, then every task into `residual` and the
    * row-major `jacobian` (`layout().width` columns).
    */
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, residual:Array<Float>,
-      jacobian:Array<Float>):Void {
+  public function evaluate(
+    state:KinematicState,
+    snapshot:KinematicSnapshot,
+    residual:Array<Float>,
+    jacobian:Array<Float>
+  ):Void {
     snapshot.evaluate(state);
     var row = 0;
     for (i in 0...tasks.length) {
@@ -135,6 +146,6 @@ class KinematicProblem {
     }
   }
 
-  public function limitHits(q:Array<Float>):Array<Int>
-    return [for (dof in active) if (q[dof] <= lower[dof] || q[dof] >= upper[dof]) dof];
+  public function limitHits(q:Array<Float>):Array<Int> return [for (dof in active) if (q[dof] <= lower[dof]
+    || q[dof] >= upper[dof]) dof];
 }

@@ -37,19 +37,34 @@ class NativeQpStep {
     if (width <= 0) throw "Native QP step needs at least one variable";
     this.width = width;
     var created = KinematicsKitNative.kk_qp_create(width);
-    if (created.status != KinematicsKitNativeConstants.KK_OK)
-      throw 'Native QP step creation failed with error ${created.status}';
+    if (created.status
+      != KinematicsKitNativeConstants.KK_OK) throw 'Native QP step creation failed with error ${created.status}';
     owner = created.out_qp;
   }
 
   /** `jacobian` is `residual.length` x `width`, row-major; infinite bounds mean unbounded. */
-  public function solve(jacobian:Array<Float>, residual:Array<Float>, lower:Array<Float>, upper:Array<Float>,
-      damping:Float, ?tolerance:Float = 1e-9, ?maxIterations:Int = 1000):QpStepResult {
+  public function solve(
+    jacobian:Array<Float>,
+    residual:Array<Float>,
+    lower:Array<Float>,
+    upper:Array<Float>,
+    damping:Float,
+    ?tolerance:Float = 1e-9,
+    ?maxIterations:Int = 1000
+  ):QpStepResult {
     if (disposed) throw "Native QP step has been disposed";
-    var result = KinematicsKitNative.kk_qp_solve(owner.borrow(), jacobian, residual, lower, upper, damping, tolerance,
-      maxIterations, width);
-    if (result.status != KinematicsKitNativeConstants.KK_OK)
-      throw 'Native QP step failed with error ${result.status}';
+    var result = KinematicsKitNative.kk_qp_solve(
+      owner.borrow(),
+      jacobian,
+      residual,
+      lower,
+      upper,
+      damping,
+      tolerance,
+      maxIterations,
+      width
+    );
+    if (result.status != KinematicsKitNativeConstants.KK_OK) throw 'Native QP step failed with error ${result.status}';
     return new QpStepResult(result.out_step, result.out_status, result.out_iterations);
   }
 
@@ -58,23 +73,46 @@ class NativeQpStep {
    * When they and the bounds admit no step, every row is relaxed by a heavily penalized slack, and
    * `relaxed` lists the rows that needed it.
    */
-  public function solveRows(jacobian:Array<Float>, residual:Array<Float>, lower:Array<Float>, upper:Array<Float>,
-      constraint:Array<Float>, rowLower:Array<Float>, rowUpper:Array<Float>, damping:Float, ?tolerance:Float = 1e-9,
-      ?maxIterations:Int = 1000):QpStepResult {
+  public function solveRows(
+    jacobian:Array<Float>,
+    residual:Array<Float>,
+    lower:Array<Float>,
+    upper:Array<Float>,
+    constraint:Array<Float>,
+    rowLower:Array<Float>,
+    rowUpper:Array<Float>,
+    damping:Float,
+    ?tolerance:Float = 1e-9,
+    ?maxIterations:Int = 1000
+  ):QpStepResult {
     if (disposed) throw "Native QP step has been disposed";
     var set = KinematicsKitNative.kk_qp_set_rows(owner.borrow(), constraint, rowLower, rowUpper);
     if (set != KinematicsKitNativeConstants.KK_OK) throw 'Native QP rows failed with error $set';
     try {
-      var result = KinematicsKitNative.kk_qp_solve(owner.borrow(), jacobian, residual, lower, upper, damping, tolerance,
-        maxIterations, width);
-      if (result.status != KinematicsKitNativeConstants.KK_OK)
-        throw 'Native QP step failed with error ${result.status}';
+      var result = KinematicsKitNative.kk_qp_solve(
+        owner.borrow(),
+        jacobian,
+        residual,
+        lower,
+        upper,
+        damping,
+        tolerance,
+        maxIterations,
+        width
+      );
+      if (result.status
+        != KinematicsKitNativeConstants.KK_OK) throw 'Native QP step failed with error ${result.status}';
       var flags = KinematicsKitNative.kk_qp_relaxed(owner.borrow(), rowLower.length);
-      if (flags.status != KinematicsKitNativeConstants.KK_OK) throw 'Native QP relaxation flags failed with error ${flags.status}';
+      if (flags.status
+        != KinematicsKitNativeConstants.KK_OK) throw 'Native QP relaxation flags failed with error ${flags.status}';
       clearRows();
       var relaxed = flags.out_relaxed;
-      return new QpStepResult(result.out_step, result.out_status, result.out_iterations,
-        [for (row in 0...rowLower.length) if (relaxed[row] != 0) row]);
+      return new QpStepResult(
+        result.out_step,
+        result.out_status,
+        result.out_iterations,
+        [for (row in 0...rowLower.length) if (relaxed[row] != 0) row]
+      );
     } catch (error:Dynamic) {
       clearRows();
       throw error;

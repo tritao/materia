@@ -17,13 +17,20 @@ package kinematicskit;
  * otherwise produce linearised steps of several radians.
  */
 class DampedLeastSquares {
-  public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
-      ?damping:Float = 0.02, ?rankTolerance:Float = 1e-8, ?workspace:SolverWorkspace,
-      ?maxStep:Float = Math.POSITIVE_INFINITY, ?translationScale:Float = 1.0):KinematicSolution {
-    if (problem == null || seed == null || seed.model != problem.model)
-      throw "Damped least squares requires a problem and a seed state of its model";
-    if (maxIterations < 0 || !Math.isFinite(damping) || damping < 0.0 || !(maxStep > 0.0) || !(translationScale > 0.0))
-      throw "Damped least squares settings must be finite and non-negative, with a positive step cap";
+  public static function solve(
+    problem:KinematicProblem,
+    seed:KinematicState,
+    ?maxIterations:Int = 100,
+    ?damping:Float = 0.02,
+    ?rankTolerance:Float = 1e-8,
+    ?workspace:SolverWorkspace,
+    ?maxStep:Float = Math.POSITIVE_INFINITY,
+    ?translationScale:Float = 1.0
+  ):KinematicSolution {
+    if (problem == null || seed == null
+      || seed.model != problem.model) throw "Damped least squares requires a problem and a seed state of its model";
+    if (maxIterations < 0 || !Math.isFinite(damping) || damping < 0.0 || !(maxStep > 0.0) || !(translationScale
+      > 0.0)) throw "Damped least squares settings must be finite and non-negative, with a positive step cap";
     var work = workspace == null ? new SolverWorkspace() : workspace;
     work.prepare(problem);
     var rows = problem.rowCount();
@@ -34,16 +41,36 @@ class DampedLeastSquares {
     problem.clamp(state.q);
     for (iteration in 0...maxIterations) {
       problem.evaluate(state, snapshot, work.residual, work.jacobian);
-      if (problem.satisfied())
-        return SolverSupport.finish(problem, state, work, KinematicStatus.Converged, iteration, rankTolerance, false);
+      if (problem.satisfied()) return SolverSupport.finish(
+        problem,
+        state,
+        work,
+        KinematicStatus.Converged,
+        iteration,
+        rankTolerance,
+        false
+      );
       LinearAlgebra.normalEquationsDense(work.jacobian, rows, width, work.residual, work.normal, work.rhs);
       for (i in 0...width) work.normal[i * width + i] += damping * damping;
-      if (!LinearAlgebra.solveInPlace(work.normal, work.rhs, width, work.delta, 1e-15))
-        return SolverSupport.finish(problem, state, work, KinematicStatus.NumericalFailure, iteration, rankTolerance,
-          false);
+      if (!LinearAlgebra.solveInPlace(work.normal, work.rhs, width, work.delta, 1e-15)) return SolverSupport.finish(
+        problem,
+        state,
+        work,
+        KinematicStatus.NumericalFailure,
+        iteration,
+        rankTolerance,
+        false
+      );
       if (maxStep != Math.POSITIVE_INFINITY) {
         var ratio = 0.0;
-        for (i in 0...width) ratio = Math.max(ratio, Math.abs(work.delta[i]) / (maxStep * columnScale(problem, i, translationScale)));
+        for (i in 0...width) ratio = Math.max(
+          ratio,
+          Math.abs(work.delta[i]) / (maxStep * columnScale(
+            problem,
+            i,
+            translationScale
+          ))
+        );
         if (ratio > 1.0) for (i in 0...width) work.delta[i] /= ratio;
       }
       SolverSupport.applyStep(problem, state, work.delta, 1.0);

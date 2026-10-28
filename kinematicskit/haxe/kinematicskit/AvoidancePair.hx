@@ -18,8 +18,16 @@ class AvoidancePair {
   public final safety:Float;
   public final influence:Float;
 
-  public function new(bodyA:Int, bodyB:Int, pointA:Vector3, pointB:Vector3, normal:Vector3, distance:Float, safety:Float,
-      influence:Float) {
+  public function new(
+    bodyA:Int,
+    bodyB:Int,
+    pointA:Vector3,
+    pointB:Vector3,
+    normal:Vector3,
+    distance:Float,
+    safety:Float,
+    influence:Float
+  ) {
     if (!(influence > safety) || safety < 0) throw "An avoidance pair needs 0 <= ds < di";
     this.bodyA = bodyA;
     this.bodyB = bodyB;

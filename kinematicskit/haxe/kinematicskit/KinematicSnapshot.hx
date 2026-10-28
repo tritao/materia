@@ -41,21 +41,32 @@ class KinematicSnapshot {
 
   public function evaluate(state:KinematicState):Void {
     if (state == null || state.model != model) throw "Kinematic snapshot requires a state of its own model";
-    if (state.q.length != model.dofCount())
-      throw 'Kinematic snapshot requires ${model.dofCount()} DOF values, got ${state.q.length}';
+    if (state.q.length
+      != model.dofCount()) throw 'Kinematic snapshot requires ${model.dofCount()} DOF values, got ${state.q.length}';
     var same = evaluated;
     // Driving joints retain the evaluated DOF values, independent of the
     // caller's mutable q array. Reuse them rather than copying another key.
-    if (same) for (i in 0...model.dofCount()) if (state.q[i] != values[model.dofJoint[i]]) { same = false; break; }
-    if (same) for (i in 0...roots.length) if (state.rootPose(roots[i]) != previousRoots[i]) { same = false; break; }
+    if (same) for (i in 0...model.dofCount()) if (state.q[i] != values[model.dofJoint[i]]) {
+      same = false;
+      break;
+    }
+    if (same) for (i in 0...roots.length) if (state.rootPose(roots[i]) != previousRoots[i]) {
+      same = false;
+      break;
+    }
     if (same) return;
     evaluated = false;
     evaluateValues(state.q);
     for (body in roots) {
       var root = state.rootPose(body);
       var o = body * 7;
-      poses[o] = root.x; poses[o + 1] = root.y; poses[o + 2] = root.z;
-      poses[o + 3] = root.qx; poses[o + 4] = root.qy; poses[o + 5] = root.qz; poses[o + 6] = root.qw;
+      poses[o] = root.x;
+      poses[o + 1] = root.y;
+      poses[o + 2] = root.z;
+      poses[o + 3] = root.qx;
+      poses[o + 4] = root.qy;
+      poses[o + 5] = root.qz;
+      poses[o + 6] = root.qw;
     }
     var parentTJoint = model.jointParentTJoint;
     var jointTChild = model.jointJointTChild;
@@ -72,16 +83,28 @@ class KinematicSnapshot {
       }
       var a = joint * 3;
       var ax = jointAxis[a], ay = jointAxis[a + 1], az = jointAxis[a + 2];
-      origins[a] = scratch[0]; origins[a + 1] = scratch[1]; origins[a + 2] = scratch[2];
+      origins[a] = scratch[0];
+      origins[a + 1] = scratch[1];
+      origins[a + 2] = scratch[2];
       FlatTransform.rotate(scratch, 0, ax, ay, az, axes, a);
       var value = values[joint];
       if (kind == JointKind.Revolute) {
         var s = Math.sin(value * 0.5);
-        scratch[7] = 0.0; scratch[8] = 0.0; scratch[9] = 0.0;
-        scratch[10] = ax * s; scratch[11] = ay * s; scratch[12] = az * s; scratch[13] = Math.cos(value * 0.5);
+        scratch[7] = 0.0;
+        scratch[8] = 0.0;
+        scratch[9] = 0.0;
+        scratch[10] = ax * s;
+        scratch[11] = ay * s;
+        scratch[12] = az * s;
+        scratch[13] = Math.cos(value * 0.5);
       } else {
-        scratch[7] = ax * value; scratch[8] = ay * value; scratch[9] = az * value;
-        scratch[10] = 0.0; scratch[11] = 0.0; scratch[12] = 0.0; scratch[13] = 1.0;
+        scratch[7] = ax * value;
+        scratch[8] = ay * value;
+        scratch[9] = az * value;
+        scratch[10] = 0.0;
+        scratch[11] = 0.0;
+        scratch[12] = 0.0;
+        scratch[13] = 1.0;
       }
       FlatTransform.compose(scratch, 0, scratch, 7, scratch, 14);
       FlatTransform.compose(scratch, 14, jointTChild, joint * 7, poses, childOffset);
@@ -91,15 +114,15 @@ class KinematicSnapshot {
   }
 
   function evaluateValues(q:Array<Float>):Void {
-    if (q.length != model.dofCount())
-      throw 'Kinematic snapshot requires ${model.dofCount()} DOF values, got ${q.length}';
+    if (q.length
+      != model.dofCount()) throw 'Kinematic snapshot requires ${model.dofCount()} DOF values, got ${q.length}';
     for (joint in model.jointValueOrder) {
       var source = model.jointSource[joint];
       if (source >= 0) values[joint] = values[source] * model.jointRatio[joint] + model.jointOffset[joint];
       else if (source == KinematicModel.COMBINED) {
         var sum = model.jointConstant[joint];
-        for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1])
-          sum += model.jointTermScale[term] * q[model.jointTermDof[term]];
+        for (term in model.jointTermStart[joint]...model.jointTermStart[joint
+          + 1]) sum += model.jointTermScale[term] * q[model.jointTermDof[term]];
         values[joint] = sum;
       } else {
         var dof = model.jointDof[joint];
@@ -133,8 +156,8 @@ class KinematicSnapshot {
   }
 
   /** Writes the world pose of `body · bodyTPoint` (seven floats at `pointOffset`) into `out` at `offset`. */
-  public function attachedPoseInto(body:Int, bodyTPoint:Array<Float>, pointOffset:Int, out:Array<Float>,
-      offset:Int):Void {
+  public function attachedPoseInto(body:Int,
+    bodyTPoint:Array<Float>, pointOffset:Int, out:Array<Float>, offset:Int):Void {
     requireEvaluated();
     FlatTransform.compose(poses, body * 7, bodyTPoint, pointOffset, out, offset);
   }
@@ -209,8 +232,8 @@ class KinematicSnapshot {
    * `layout.width` columns into `out` (which must hold 6 x width values).
    * Allocates nothing.
    */
-  public function pointJacobianColumns(body:Int, px:Float, py:Float, pz:Float, layout:JacobianLayout,
-      out:Array<Float>):Void {
+  public function pointJacobianColumns(body:Int,
+    px:Float, py:Float, pz:Float, layout:JacobianLayout, out:Array<Float>):Void {
     requireEvaluated();
     var w = layout.width;
     for (i in 0...6 * w) out[i] = 0.0;
@@ -253,9 +276,15 @@ class KinematicSnapshot {
     } else {
       for (axis in 0...3) out[axis * w + c + axis] = 1.0;
       // ω along x, y, z: linear e × r, angular e.
-      out[w + c + 3] = -rz; out[2 * w + c + 3] = ry; out[3 * w + c + 3] = 1.0;
-      out[c + 4] = rz; out[2 * w + c + 4] = -rx; out[4 * w + c + 4] = 1.0;
-      out[c + 5] = -ry; out[w + c + 5] = rx; out[5 * w + c + 5] = 1.0;
+      out[w + c + 3] = -rz;
+      out[2 * w + c + 3] = ry;
+      out[3 * w + c + 3] = 1.0;
+      out[c + 4] = rz;
+      out[2 * w + c + 4] = -rx;
+      out[4 * w + c + 4] = 1.0;
+      out[c + 5] = -ry;
+      out[w + c + 5] = rx;
+      out[5 * w + c + 5] = 1.0;
     }
   }
 

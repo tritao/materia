@@ -15,8 +15,16 @@ class KinematicSolution {
   /** Active DOFs sitting on a limit at `state`. */
   public final limitHits:Array<Int>;
 
-  public function new(status:KinematicStatus, state:KinematicState, iterations:Int, residualNorm:Float,
-      tasks:Array<TaskResult>, rank:Int, freeDofs:Int, limitHits:Array<Int>) {
+  public function new(
+    status:KinematicStatus,
+    state:KinematicState,
+    iterations:Int,
+    residualNorm:Float,
+    tasks:Array<TaskResult>,
+    rank:Int,
+    freeDofs:Int,
+    limitHits:Array<Int>
+  ) {
     this.status = status;
     this.state = state;
     this.iterations = iterations;
@@ -30,5 +38,6 @@ class KinematicSolution {
   public function converged():Bool return status == KinematicStatus.Converged;
 
   /** Labels of the hard tasks that missed their tolerances. */
-  public function unsatisfied():Array<String> return [for (task in tasks) if (!task.soft && !task.satisfied) task.label];
+  public function unsatisfied():Array<String> return [for (task in tasks) if (!task.soft
+    && !task.satisfied) task.label];
 }

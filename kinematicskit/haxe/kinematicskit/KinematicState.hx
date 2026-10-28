@@ -12,16 +12,15 @@ class KinematicState {
     this.model = model;
     if (q == null) this.q = [for (dof in 0...model.dofCount()) model.jointDefault[model.dofJoint[dof]]];
     else {
-      if (q.length != model.dofCount())
-        throw 'Kinematic state requires ${model.dofCount()} values, got ${q.length}';
+      if (q.length != model.dofCount()) throw 'Kinematic state requires ${model.dofCount()} values, got ${q.length}';
       this.q = q.copy();
     }
     rootPoses = [for (_ in 0...model.bodyCount()) null];
   }
 
   public function setRootPose(body:Int, pose:Transform):Void {
-    if (body < 0 || body >= model.bodyCount() || model.bodyParentJoint[body] >= 0)
-      throw 'Kinematic body $body is not a root';
+    if (body < 0
+      || body >= model.bodyCount() || model.bodyParentJoint[body] >= 0) throw 'Kinematic body $body is not a root';
     rootPoses[body] = Transform.checked(pose, "Kinematic root pose");
   }
 
