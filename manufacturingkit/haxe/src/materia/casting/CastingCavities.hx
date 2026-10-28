@@ -2,7 +2,6 @@ package materia.casting;
 
 import materia.casting.CastingFeature;
 import materia.casting.CastingPrism;
-import materia.casting.CastingPrism.CastingPoint2;
 import materia.assembly.AssemblyFrames as F;
 
 enum FinishedCavityGeometry {

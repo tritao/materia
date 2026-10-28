@@ -5,9 +5,6 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.tooling.ToolingEnums.ContactFace;
 import materia.tooling.panel.PanelJoints.PanelJointKind;
 import materia.tooling.panel.PanelJoints.PanelClosure;
-import materia.tooling.panel.PanelAssemblyPlan.PanelPlacement;
-import materia.tooling.panel.PanelAssemblyPlan.PanelAssemblyRecord;
-import materia.tooling.casting.CastingMoldPlan.PenetrationPlan;
 import materia.tooling.casting.CoreSupport.CoreSupportKind;
 
 import materia.casting.InsertSpec.InsertBodyCodec as InsertBodies;

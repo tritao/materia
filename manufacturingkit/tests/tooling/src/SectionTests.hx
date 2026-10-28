@@ -1,9 +1,7 @@
 import materia.casting.CastingFeature.CastingDimension;
 import materia.tooling.ToolingCodec;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.tooling.casting.CastingMoldPlanner;
 import materia.tooling.process.OrthogonalSections;
-import materia.tooling.process.CastingProcessSpec.ProcessSpecs;
 
 class SectionTests {
   static var assertions = 0;

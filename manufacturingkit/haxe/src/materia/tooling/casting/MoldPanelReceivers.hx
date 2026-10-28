@@ -2,7 +2,6 @@ package materia.tooling.casting;
 
 import materia.assembly.AssemblyFrames as F;
 import materia.tooling.casting.CastingMoldPlan;
-import materia.casting.CastingRegion;
 import materia.tooling.panel.PanelContours;
 import materia.tooling.panel.PanelJoints;
 import materia.tooling.panel.PanelCodec;

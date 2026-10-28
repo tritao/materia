@@ -7,10 +7,8 @@ import materia.tooling.casting.CastingMoldPlan.MoldOptions;
 import materia.tooling.export.ToolingFabrication;
 import materia.tooling.export.ToolingLoads;
 import materia.tooling.process.CastabilityAnalysis;
-import materia.tooling.process.CastingProcessAnalysis;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.FillAnalysis;
-import materia.tooling.process.JunctionThickness;
 import materia.tooling.process.OrthogonalSections;
 
 class ReviewContractTests {

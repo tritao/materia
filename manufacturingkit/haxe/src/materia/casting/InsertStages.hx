@@ -2,7 +2,6 @@ package materia.casting;
 
 import materia.assembly.AssemblyFrames as F;
 import materia.casting.InsertFinishing.InsertFinishResult;
-import materia.casting.InsertFinishing.InsertFinishedSteel;
 import materia.casting.InsertHole.HoleExtent;
 
 /** Physical construction state. The source body contains its declared stock;

@@ -1,4 +1,3 @@
-import materia.casting.BoxAlgebra;
 import materia.tooling.process.CastingProcessSpec;
 import materia.tooling.process.CastingProcessSpec.ProcessSpecs;
 import materia.tooling.process.FillAnalysis;
