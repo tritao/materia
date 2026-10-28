@@ -6,7 +6,6 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import motionkit.event.EventValue;
 import motionkit.robot.AxisKinematics;
-import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import robotkit.runtime.SimulationHarness;
