@@ -30,16 +30,41 @@ class PerspectiveCamera {
     clipFar = Math.max(100.0, distance * 100.0);
   }
 
-  /** Fits the depth range to visible world-space axis-aligned bounds. */
-  public function fitClipRange(bounds:Array<Array<Float>>):Void {
+  /** Fits depth to world bounds; a positive aspect excludes boxes outside the view. */
+  public function fitClipRange(bounds:Array<Array<Float>>, aspect:Float = 0.0,
+      fovYOverride:Float = 0.0):Void {
     var eye = eyePosition(), backward = viewDirection();
     var forward = [-backward[0], -backward[1], -backward[2]];
+    var sidePlanes:Array<Array<Float>> = [];
+    if (aspect > 0.0) {
+      var right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
+      var up = cross(backward, right);
+      var fov = fovYOverride > 0.0 ? clamp(fovYOverride, 1.0, 170.0) : FOV_Y;
+      var tanY = Math.tan(fov * Math.PI / 360.0), tanX = tanY * Math.max(0.01, aspect);
+      for (sign in [-1.0, 1.0]) {
+        sidePlanes.push([forward[0]*tanX+sign*right[0], forward[1]*tanX+sign*right[1], forward[2]*tanX]);
+        sidePlanes.push([forward[0]*tanY+sign*up[0], forward[1]*tanY+sign*up[1], forward[2]*tanY+sign*up[2]]);
+      }
+    }
     var nearest = 1e300, farthest = 0.0, crossesEye = false;
     for (box in bounds) {
       if (box == null || box.length != 6) continue;
       var cx = (box[0] + box[3]) * 0.5 - eye[0];
       var cy = (box[1] + box[4]) * 0.5 - eye[1];
       var cz = (box[2] + box[5]) * 0.5 - eye[2];
+      var hx = (box[3]-box[0])*0.5, hy = (box[4]-box[1])*0.5, hz = (box[5]-box[2])*0.5;
+      // Off-screen parts can straddle the eye's depth even when they cannot
+      // contribute a pixel. Letting them force the tiny inside-box near plane
+      // makes close-up CAD edges fight their own faces. Reject only boxes
+      // wholly outside a side plane, retaining conservative silhouette bounds.
+      var outside = false;
+      for (plane in sidePlanes) {
+        if (cx*plane[0]+cy*plane[1]+cz*plane[2]+
+            hx*Math.abs(plane[0])+hy*Math.abs(plane[1])+hz*Math.abs(plane[2]) < 0.0) {
+          outside = true;break;
+        }
+      }
+      if (outside) continue;
       var radius = Math.abs(forward[0]) * (box[3] - box[0]) * 0.5 +
         Math.abs(forward[1]) * (box[4] - box[1]) * 0.5 +
         Math.abs(forward[2]) * (box[5] - box[2]) * 0.5;

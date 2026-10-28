@@ -7,7 +7,7 @@ package tests;
 class PresentationCapture {
   static function mean(values:Array<Float>):Float {var sum=0.0;for(value in values)sum+=value;return sum/values.length;}
   public static function main():Int {
-    var args=Sys.args(),id:Null<String> = null;
+    var args=Sys.args(),id:Null<String> = null,document:Null<String> = null;
     var launch:Array<String> = [];
     var explode=0.0,distanceScale=1.0,step=0,dragFrames=0;
     var dragSamples:Array<Float> = [],dragTick=0,lastTick=0.0,lastFrame=-1;
@@ -18,7 +18,8 @@ class PresentationCapture {
     var uiSamples:Array<Float> = [],paintSamples:Array<Float> = [],submitSamples:Array<Float> = [],nativeSamples:Array<Float> = [];
     var procedure:Null<String> = null,editOffset:Null<String> = null;
     for(arg in args) {
-      if(arg=="--shaded")shaded=true;
+      if(StringTools.startsWith(arg,"--document="))document=arg.substr(11);
+      else if(arg=="--shaded")shaded=true;
       else if(StringTools.startsWith(arg,"--section-mode="))sectionMode=arg.substr(15);
       else if(StringTools.startsWith(arg,"--hide-occurrence="))hide.push(arg.substr(18));
       else if(StringTools.startsWith(arg,"--camera-yaw="))yaw=Std.parseFloat(arg.substr(13));
@@ -42,6 +43,10 @@ class PresentationCapture {
     var live=app.Main.open(launch),selected=false;
     while(live.tick()) {
       var editor=app.Main.liveEditor;
+      if(document!=null&&editor!=null&&!editor.openingProject()) {
+        editor.documents.requestOpenPath(document);document=null;
+        if(editor.documents.error!=null)throw editor.documents.error;
+      }
       if(!selected&&editor!=null&&!editor.openingProject()) {
         var viewport=editor.perspectiveViewport;
         if(viewport!=null&&viewport.presentation!=null) {
@@ -58,6 +63,9 @@ class PresentationCapture {
           viewport.presentationCameraDirty=true;viewport.updatePresentationCamera();
           viewport.camera.setTarget(viewport.camera.targetX,viewport.camera.targetY,viewport.camera.targetZ,viewport.camera.distance*distanceScale);
           if(Math.isFinite(yaw)||Math.isFinite(pitch))viewport.camera.setAngle(Math.isFinite(yaw)?yaw:viewport.camera.yaw,Math.isFinite(pitch)?pitch:viewport.camera.pitch);
+          viewport.fitCameraClipRange();
+          Sys.println("capture-camera "+haxe.Json.stringify({eye:viewport.camera.eyePosition(),
+            direction:viewport.camera.viewDirection(),near:viewport.camera.clipNear,far:viewport.camera.clipFar}));
           if(editOffset!=null){editor.scene.select("project:"+editOffset);editor.editPresentationOffset(viewport);}
           if(dragFrames>0) {
             var controller=viewport.presentation;if(controller==null)throw "Missing presentation controller";

@@ -114,12 +114,29 @@ class PresentationRuntimeTests {
     controller.restart();controller.next(false);
     var restarted=viewport.presentationFrame();if(restarted==null)throw "Missing Restart frame";
     check(signature(restarted)==stepOne,"Restart and Next reproduce the same step");
-    viewport.nextPresentationStep();viewport.advancePresentation(0.3);
+    viewport.updatePresentationCamera();
+    check(viewport.presentationCameraView=="inside","An explicit step view applies its camera");
+    viewport.camera.setAngle(0.7,0.4);
+    viewport.camera.setTarget(0.12,0.23,0.34,0.56);
+    function cameraPose():String return [viewport.camera.targetX,viewport.camera.targetY,viewport.camera.targetZ,
+      viewport.camera.distance,viewport.camera.yaw,viewport.camera.pitch].join(":");
+    var inspectionCamera=cameraPose();
+    viewport.nextPresentationStep();viewport.updatePresentationCamera();
+    check(cameraPose()==inspectionCamera,"Next preserves the user's camera when the view is unchanged");
+    viewport.advancePresentation(0.3);viewport.updatePresentationCamera();
+    check(cameraPose()==inspectionCamera,"Moving geometry does not drag a framed camera");
     var halfway=viewport.presentationFrame();if(halfway==null)throw "Missing animated frame";
     var traveling=halfway.poses.get("cover");if(traveling==null)throw "Missing traveling cover";
     check(controller.animating&&Math.abs(traveling.z-25)<1e-8,"Next animates along the stored movement path");
     viewport.advancePresentation(0.3);
     check(!controller.animating&&controller.cursor.step==2,"Animation completes into the folded next step");
+    viewport.updatePresentationCamera();
+    check(cameraPose()==inspectionCamera,"Animation completion preserves the camera as parts disappear");
+    viewport.previousPresentationStep();viewport.updatePresentationCamera();
+    check(cameraPose()==inspectionCamera,"Previous preserves the camera within the same view");
+    viewport.restartPresentationProcedure();viewport.updatePresentationCamera();
+    check(viewport.presentationCameraView=="assembled","Restart applies a different referenced view");
+
     viewport.resetPresentation();var reset=viewport.presentationFrame();if(reset==null)throw "Missing reset frame";
     check(signature(reset)==expected,"Reset yields the fresh-open frame after view and explode changes");
     check(AssemblyDefinitionCodec.encode(definition)==originalDefinition&&AssemblyDefinitionCodec.encodeState(definition,state)==originalState,

@@ -24,6 +24,7 @@ class AppTests {
 		if (MachineKitRecipeProjectTests.main() != 0) return 1;
     if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;
+    if (CameraClipRangeTests.main() != 0) return 1;
     if (StockSimulationTests.main() != 0) return 1;
     if (RuntimeGeometryTests.main() != 0) return 1;
     if (CosmeticThreadTests.main() != 0) return 1;

@@ -86,6 +86,7 @@ class EditorPerspectiveViewport implements View {
   var presentationPoseById:Map<String,SimulationPoseVisual> = [];
   var presentationCameraDirty=true;
   var presentationTarget:Null<Array<Float>>;
+  var presentationCameraView:Null<String>;
   var readOnly=false;
   var inspectionZoom:Float=1;
   public var onInspectionZoom:Null<Float->Void> = null;
@@ -216,12 +217,12 @@ class EditorPerspectiveViewport implements View {
     presentation.restart();presentationProcedureChanged();
   }
   function presentationProcedureChanged():Void {
-    presentationCameraDirty=true;clearHover();host.requestFrame();
+    clearHover();host.requestFrame();
   }
   public function advancePresentation(seconds:Float):Bool {
     var controller=presentation;if(controller==null||simulationActive)return false;
-    var step=controller.cursor.step,changed=controller.advance(seconds);
-    if(changed){if(controller.cursor.step!=step)presentationCameraDirty=true;clearHover();host.requestFrame();}return changed;
+    var changed=controller.advance(seconds);
+    if(changed){clearHover();host.requestFrame();}return changed;
   }
   /** Session-only disclosure; keep the default viewport clear for inspecting the assembly. */
   public var presentationControlsExpanded:Bool = false;
@@ -323,6 +324,13 @@ class EditorPerspectiveViewport implements View {
   }
   function updatePresentationCamera():Void {
     updatePresentation();var frame=presentationResult;if(frame==null)return;
+    // Step transport changes geometry, not camera intent. Reframe only on an explicit
+    // view change/reset; framing moving or disappearing parts causes camera jumps.
+    var reframe=presentationCameraDirty||presentationTarget==null||presentationCameraView!=frame.view;
+    if(!reframe)switch frame.camera {
+      case Frame(_,_,_,_):return;
+      case Anchored(_,_,_,_,_):
+    }
     var point:Array<Float>,span=0.0,yaw:Float,pitch:Float;
     switch frame.camera {
       case Anchored(anchor,offset,size,y,p):
@@ -346,7 +354,7 @@ class EditorPerspectiveViewport implements View {
         span=Math.max(bounds[3]-bounds[0],Math.max(bounds[4]-bounds[1],bounds[5]-bounds[2]))*margin;yaw=y;pitch=p;
     }
     var previous=presentationTarget;
-    if(presentationCameraDirty||previous==null) {
+    if(reframe) {
       camera.setAngle(yaw,pitch);
       camera.setTarget(point[0],point[1],point[2],Math.max(0.0001,span*0.5/Math.tan(PerspectiveCamera.FOV_Y*Math.PI/360)*1.15*Math.max(1,1/aspect())));
       presentationCameraDirty=false;
@@ -355,7 +363,7 @@ class EditorPerspectiveViewport implements View {
       camera.setTarget(camera.targetX+dx,camera.targetY+dy,camera.targetZ+dz,camera.distance);
       if(orbitPivot!=null){orbitPivot[0]+=dx;orbitPivot[1]+=dy;orbitPivot[2]+=dz;}
     }
-    presentationTarget=point;
+    presentationTarget=point;presentationCameraView=frame.view;
   }
   function inspectionLensScale():Float {
     if(!readOnly)return 1;
@@ -1067,7 +1075,8 @@ class EditorPerspectiveViewport implements View {
             world.maxX, world.maxY, world.maxZ]);
       }
     }
-    camera.fitClipRange(clipBounds);
+    camera.fitClipRange(clipBounds, aspect(),
+      !readOnly ? 0.0 : Math.max(5, Math.min(110, PerspectiveCamera.FOV_Y * inspectionZoom)));
   }
 
   function displayTransform(item:EditorSceneObject):Transform {

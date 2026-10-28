@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "camera-clip-tests" },
+  "entry": "tests.CameraClipRangeTests",
+  "sourceRoots": ["src"],
+  "scopeSourceRoots": false,
+  "dependencies": { "app": { "path": ".." } },
+  "target": "host",
+  "outputDir": "camera-clip/build"
+}
