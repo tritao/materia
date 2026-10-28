@@ -24,5 +24,12 @@ class PanelHardware {
   }
 
   /** The same hardware moved by (dx, dy, dz) and renamed, as a part's hardware lands in its panel. */
-  public function placed(newId:String, dx:Float, dy:Float, dz:Float):PanelHardware return new PanelHardware(newId, component, x + dx, y + dy, z + dz, flipped);
+  public function placed(newId:String, dx:Float, dy:Float, dz:Float):PanelHardware return new PanelHardware(
+    newId,
+    component,
+    x + dx,
+    y + dy,
+    z + dz,
+    flipped
+  );
 }

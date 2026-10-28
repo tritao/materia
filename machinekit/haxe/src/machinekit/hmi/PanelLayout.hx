@@ -111,7 +111,8 @@ class PanelLayout {
     for (c in controls) {
       var box = FootprintGeometry.extent(c.body(), c.x, c.y);
       var wx = width / 2 - wall + 1e-9, wy = height / 2 - wall + 1e-9;
-      if (box.x0 < -wx || box.x1 > wx || box.y0 < -wy || box.y1 > wy) found.push('the body of ${c.id} reaches into the case wall');
+      if (box.x0 < -wx
+        || box.x1 > wx || box.y0 < -wy || box.y1 > wy) found.push('the body of ${c.id} reaches into the case wall');
     }
     for (i in 0...controls.length) for (j in i + 1...controls.length) {
       var gap = gapBetween(controls[i], controls[j]);

@@ -50,7 +50,12 @@ class PanelAssemblyBuilder {
       // A device made of several finished bodies goes in as a subassembly of them; a one-solid part goes in as itself.
       var device:Null<HmiPart> = Std.isOfType(c.part, HmiPart) ? cast c.part : null;
       var expanded = device == null ? null : device.expand();
-      if (device != null) for (h in device.hardware()) partHardware.push(h.placed(c.id + "-" + h.id, c.x, c.y, layout.thickness));
+      if (device != null) for (h in device.hardware()) partHardware.push(h.placed(
+        c.id + "-" + h.id,
+        c.x,
+        c.y,
+        layout.thickness
+      ));
       if (expanded == null) target.addComponent(c.id, c.part, pose);
       else target.include(c.id, expanded, pose);
     }

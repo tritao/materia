@@ -13,93 +13,181 @@ import cadkit.modeling.AssemblyState;
 
 /** The rack drive is exercised here before a gantry uses the shared builder. */
 class AxisBuilderChecks {
-	static function check(condition:Bool, message:String):Void {
-		if (!condition) throw 'Axis builder: $message';
-	}
+  static function check(condition:Bool, message:String):Void {
+    if (!condition) throw 'Axis builder: $message';
+  }
 
-	public static function run():Void {
-		var builder = new AxisBuilder();
-		var axis:AxisSpec = {id: "x", lower: 0.0, upper: 100.0, initial: 25.0};
-		var along = [1.0, 0, 0], up = [0.0, 0, 1];
-		builder.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, -20, up, along));
-		builder.slide(axis, "rail", "carriage", LinearRailBlock.metric("MGN12C"),
-			AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0});
-		var motor = NemaStepper.frame(17);
-		builder.attach("motor", motor, AxisBuilder.orient(60, 30-motor.variant.shaftLength, 10, up, [0, 1, 0]), "carriage");
-		var pinion = new SpurGear(1, 20, 8);
-		var rack = new Rack(1, 100, 8);
-        var fixtureTop=10-pinion.pitchDiameter/2-1.25*rack.moduleSize-rack.barHeight;
-        builder.place("rackFixture",new machinekit.gantry.GantryParts.GantryPlate("anchored rack test fixture",rack.length+2*Math.PI*rack.moduleSize,8,10),AssemblyFrames.translation(110,34,fixtureTop-10));
-        var rackMount=new RackMount("rackFixture",AxisBuilder.orient(0,0,10,up,along),"rackFixture",[{first:"$rack",second:"rackFixture"}]);
-		builder.driveRack(axis, "pinion", "motor", pinion, AxisBuilder.orient(60, 30, 10, up, [0, 1, 0]),
-			rackMount, "rack", rack,
-			_ -> {
-				builder.attach("driver", new MotorDriver("GENERIC-TMC2209",
-					new machinekit.power.PhaseRmsCurrent(1.5), 16, new machinekit.power.DcVoltage(24)),
-					AssemblyFrames.translation(0, -100, 0), "rail");
-				return "driver";
-			});
-		builder.setJointStop("x", {timeConstantSec: 0.002, dampingRatio: 1.0});
-		var model = new AssemblyModel("mm");
-		builder.addTo(model, "");
-		var definition = model.definition("rack-axis");
-		check(definition.occurrences.length == 7, "the rack, support, pinion, carriage, rail, motor and driver are physical members");
-		var couplings = definition.couplings;
-		if (couplings == null) throw "Axis builder: missing coupling";
-		var actuators = definition.actuators;
-		if (actuators == null) throw "Axis builder: missing actuator";
-		check(couplings.length == 1 && couplings[0].source == "x" &&
-			couplings[0].target == "pinion-turn" && Math.abs(couplings[0].ratio - 0.1) < 1e-12,
-			"the module and tooth count derive 0.1 rad/mm without an authored ratio");
-		check(actuators.length == 1 && actuators[0].joint == "pinion-turn" &&
-			actuators[0].maxRate > 0, "the motor drives the pinion rather than a fictitious linear actuator");
-		var state = new AssemblyState(definition);
-		check(Math.abs(state.joint("pinion-turn") - 2.5) < 1e-10, "the shaft starts at the linear axis's initial coordinate");
-		for (coordinate in [0.0, 100.0]) {
-			state.setJoint("x", coordinate);
-			check(Math.abs(state.worldPose("carriage").x - (60 + coordinate)) < 1e-9,
-				"the carriage reaches each end of its travel");
-			check(Math.abs(state.joint("pinion-turn") - coordinate * 0.1) < 1e-10,
-				"the pinion follows the carriage through the physical rack relation");
-		}
-		// Transmission geometry probes need unconstrained coordinates even when the real machine has stops.
-		var probe = new machinekit.transmission.BeltPoseContext(definition);
-		probe.state.setJoint("x", 150.0);
-		check(Math.abs(probe.state.joint("x") - 150.0) < 1e-12, "the private pose probe can move beyond machine travel");
-		probe.reset();
-		check(Math.abs(probe.state.joint("x") - axis.initial) < 1e-12, "pose reset restores the authored coordinate");
-		var original = [for (joint in definition.joints) if (joint.id == "x") joint][0];
-		check(original.limits.lower == 0.0 && original.limits.upper == 100.0 && original.stop != null &&
-			original.stop.timeConstantSec == 0.002 && original.stop.dampingRatio == 1.0,
-			"probing preserves the source machine's bounded travel and physical stop response");
-		check(builder.axisOvertravel("x") > 0, "the block has rail room beyond both travel ends");
-		var rejected = false;
-		try builder.slide({id: "overrun", lower: -100.0, upper: 100.0, initial: 0.0}, "rail", "badCarriage",
-			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0})
-		catch (_:Dynamic) rejected = true;
-		check(rejected && builder.components().length == 7, "rail overrun is rejected before adding a carriage");
-		var multiRejected = false;
-		try builder.slide({id: "multi-overrun", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "badPair",
-			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0},
-			[AxisBuilder.orient(250, 0, -20, up, along)]) catch (_:Dynamic) multiRejected = true;
-		check(multiRejected && builder.components().length == 7, "a trailing block overrun rejects the whole carriage atomically");
-		var pair = new AxisBuilder();
-		pair.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
-		pair.slide({id: "x", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "first", LinearRailBlock.metric("MGN12C"),
-			AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, [AxisBuilder.orient(150, 0, 0, up, along)]);
-		check(Math.abs(pair.axisOvertravel("x") - 22.65) < 1e-9, "the block nearest the far stop limits the complete carriage to 22.65 mm reserve");
-		var capped = new AxisBuilder();
-		capped.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
-		for (limit in [-1.0, Math.NaN, Math.POSITIVE_INFINITY]) {
-			var badLimit = false;
-			try capped.slide({id: "bad-limit", lower: 0, upper: 100, initial: 0}, "rail", "bad", LinearRailBlock.metric("MGN12C"),
-				AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, null, limit) catch (_:Dynamic) badLimit = true;
-			check(badLimit && capped.components().length == 1, "invalid hardware reserve rejected before mutation");
-		}
-		capped.slide({id: "x", lower: 0, upper: 100, initial: 0}, "rail", "block", LinearRailBlock.metric("MGN12C"),
-			AxisBuilder.orient(60, 0, 0, up, along), {x: 1.0, y: 0.0, z: 0.0}, null, 0.5);
-		check(Math.abs(capped.axisOvertravel("x") - 0.5) < 1e-9, "hardware can constrain rail reserve");
-		var cappedModel = new AssemblyModel("mm"); capped.addTo(cappedModel, "");
-		check(cappedModel.definition("capped").joints[0].limits.overtravel == 0.5, "hardware reserve reaches joint limits");
-	}
+  public static function run():Void {
+    var builder = new AxisBuilder();
+    var axis:AxisSpec = {id: "x", lower: 0.0, upper: 100.0, initial: 25.0};
+    var along = [1.0, 0, 0], up = [0.0, 0, 1];
+    builder.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, -20, up, along));
+    builder.slide(
+      axis,
+      "rail",
+      "carriage",
+      LinearRailBlock.metric("MGN12C"),
+      AxisBuilder.orient(60, 0, -20, up, along),
+      {x: 1.0, y: 0.0, z: 0.0}
+    );
+    var motor = NemaStepper.frame(17);
+    builder.attach(
+      "motor",
+      motor,
+      AxisBuilder.orient(60, 30 - motor.variant.shaftLength, 10, up, [0, 1, 0]),
+      "carriage"
+    );
+    var pinion = new SpurGear(1, 20, 8);
+    var rack = new Rack(1, 100, 8);
+    var fixtureTop = 10 - pinion.pitchDiameter / 2 - 1.25 * rack.moduleSize - rack.barHeight;
+    builder.place(
+      "rackFixture",
+      new machinekit.gantry.GantryParts.GantryPlate(
+        "anchored rack test fixture",
+        rack.length + 2 * Math.PI * rack.moduleSize,
+        8,
+        10
+      ),
+      AssemblyFrames.translation(110, 34, fixtureTop - 10)
+    );
+    var rackMount = new RackMount(
+      "rackFixture",
+      AxisBuilder.orient(0, 0, 10, up, along),
+      "rackFixture",
+      [{first: "$rack", second: "rackFixture"}]
+    );
+    builder.driveRack(axis, "pinion",
+      "motor", pinion, AxisBuilder.orient(60, 30, 10, up, [0, 1, 0]), rackMount, "rack", rack, _ -> {builder.attach(
+        "driver",
+        new MotorDriver(
+          "GENERIC-TMC2209",
+          new machinekit.power.PhaseRmsCurrent(1.5),
+          16,
+          new machinekit.power.DcVoltage(24)
+        ),
+        AssemblyFrames.translation(0, -100, 0),
+        "rail"
+      );
+    return "driver";
+    });
+    builder.setJointStop("x", {timeConstantSec: 0.002, dampingRatio: 1.0});
+    var model = new AssemblyModel("mm");
+    builder.addTo(model, "");
+    var definition = model.definition("rack-axis");
+    check(
+      definition.occurrences.length == 7,
+      "the rack, support, pinion, carriage, rail, motor and driver are physical members"
+    );
+    var couplings = definition.couplings;
+    if (couplings == null) throw "Axis builder: missing coupling";
+    var actuators = definition.actuators;
+    if (actuators == null) throw "Axis builder: missing actuator";
+    check(
+      couplings.length == 1 && couplings[0].source == "x"
+      && couplings[0].target == "pinion-turn" && Math.abs(couplings[0].ratio - 0.1) < 1e-12,
+      "the module and tooth count derive 0.1 rad/mm without an authored ratio"
+    );
+    check(
+      actuators.length == 1 && actuators[0].joint == "pinion-turn" && actuators[0].maxRate > 0,
+      "the motor drives the pinion rather than a fictitious linear actuator"
+    );
+    var state = new AssemblyState(definition);
+    check(
+      Math.abs(state.joint("pinion-turn") - 2.5) < 1e-10,
+      "the shaft starts at the linear axis's initial coordinate"
+    );
+    for (coordinate in [0.0, 100.0]) {
+      state.setJoint("x", coordinate);
+      check(
+        Math.abs(state.worldPose("carriage").x - (60 + coordinate)) < 1e-9,
+        "the carriage reaches each end of its travel"
+      );
+      check(
+        Math.abs(state.joint("pinion-turn") - coordinate * 0.1) < 1e-10,
+        "the pinion follows the carriage through the physical rack relation"
+      );
+    }
+    // Transmission geometry probes need unconstrained coordinates even when the real machine has stops.
+    var probe = new machinekit.transmission.BeltPoseContext(definition);
+    probe.state.setJoint("x", 150.0);
+    check(Math.abs(probe.state.joint("x") - 150.0) < 1e-12, "the private pose probe can move beyond machine travel");
+    probe.reset();
+    check(Math.abs(probe.state.joint("x") - axis.initial) < 1e-12, "pose reset restores the authored coordinate");
+    var original = [for (joint in definition.joints) if (joint.id == "x") joint][0];
+    check(
+      original.limits.lower == 0.0 && original.limits.upper == 100.0
+      && original.stop != null && original.stop.timeConstantSec == 0.002 && original.stop.dampingRatio == 1.0,
+      "probing preserves the source machine's bounded travel and physical stop response"
+    );
+    check(builder.axisOvertravel("x") > 0, "the block has rail room beyond both travel ends");
+    var rejected = false;
+    try builder.slide(
+      {id: "overrun", lower: -100.0, upper: 100.0, initial: 0.0},
+      "rail",
+      "badCarriage",
+      LinearRailBlock.metric("MGN12C"),
+      AxisBuilder.orient(60, 0, -20, up, along),
+      {x: 1.0, y: 0.0, z: 0.0}
+    ) catch (_:Dynamic) rejected = true;
+    check(rejected && builder.components().length == 7, "rail overrun is rejected before adding a carriage");
+    var multiRejected = false;
+    try builder.slide(
+      {id: "multi-overrun", lower: 0.0, upper: 100.0, initial: 0.0},
+      "rail",
+      "badPair",
+      LinearRailBlock.metric("MGN12C"),
+      AxisBuilder.orient(60, 0, -20, up, along),
+      {x: 1.0, y: 0.0, z: 0.0},
+      [AxisBuilder.orient(250, 0, -20, up, along)]
+    ) catch (_:Dynamic) multiRejected = true;
+    check(
+      multiRejected && builder.components().length == 7,
+      "a trailing block overrun rejects the whole carriage atomically"
+    );
+    var pair = new AxisBuilder();
+    pair.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
+    pair.slide(
+      {id: "x", lower: 0.0, upper: 100.0, initial: 0.0},
+      "rail",
+      "first",
+      LinearRailBlock.metric("MGN12C"),
+      AxisBuilder.orient(60, 0, 0, up, along),
+      {x: 1.0, y: 0.0, z: 0.0},
+      [AxisBuilder.orient(150, 0, 0, up, along)]
+    );
+    check(
+      Math.abs(pair.axisOvertravel("x") - 22.65) < 1e-9,
+      "the block nearest the far stop limits the complete carriage to 22.65 mm reserve"
+    );
+    var capped = new AxisBuilder();
+    capped.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
+    for (limit in [-1.0, Math.NaN, Math.POSITIVE_INFINITY]) {
+      var badLimit = false;
+      try capped.slide(
+        {id: "bad-limit", lower: 0, upper: 100, initial: 0},
+        "rail",
+        "bad",
+        LinearRailBlock.metric("MGN12C"),
+        AxisBuilder.orient(60, 0, 0, up, along),
+        {x: 1.0, y: 0.0, z: 0.0},
+        null,
+        limit
+      ) catch (_:Dynamic) badLimit = true;
+      check(badLimit && capped.components().length == 1, "invalid hardware reserve rejected before mutation");
+    }
+    capped.slide(
+      {id: "x", lower: 0, upper: 100, initial: 0},
+      "rail",
+      "block",
+      LinearRailBlock.metric("MGN12C"),
+      AxisBuilder.orient(60, 0, 0, up, along),
+      {x: 1.0, y: 0.0, z: 0.0},
+      null,
+      0.5
+    );
+    check(Math.abs(capped.axisOvertravel("x") - 0.5) < 1e-9, "hardware can constrain rail reserve");
+    var cappedModel = new AssemblyModel("mm");
+    capped.addTo(cappedModel, "");
+    check(cappedModel.definition("capped").joints[0].limits.overtravel == 0.5, "hardware reserve reaches joint limits");
+  }
 }

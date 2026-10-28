@@ -10,108 +10,171 @@ import materia.project.SceneArtifact;
  * Study-specific checks remain executable separately; old projects are view aliases.
  */
 class MillProject {
- public static function baseMold():Bytes return moldScene(Base);
- public static function columnMold():Bytes return moldScene(Column);
- static function moldScene(casting:MillMoldSetup.MillMoldCasting):Bytes {
-  var data=SceneArtifact.decode(MillMoldPreview.scene(smallFrame(),casting));
-  var project:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
-  project.navigation=[{occurrence:machinekit.tooling.CastingMoldView.REFERENCE_ID,label:"Back to Small",
-   variant:"small",target:casting==Base?"frame/base/casting":"frame/column/casting"}];
-  return SceneArtifact.encode(data);
- }
+  public static function baseMold():Bytes return moldScene(Base);
+  public static function columnMold():Bytes return moldScene(Column);
+  static function moldScene(casting:MillMoldSetup.MillMoldCasting):Bytes {
+    var data = SceneArtifact.decode(MillMoldPreview.scene(smallFrame(), casting));
+    var project:materia.project.SceneArtifact.SceneArtifactProject = cast data.project;
+    project.navigation = [{
+      occurrence: machinekit.tooling.CastingMoldView.REFERENCE_ID,
+      label: "Back to Small",
+      variant: "small",
+      target: casting == Base ? "frame/base/casting" : "frame/column/casting"
+    }];
+    return SceneArtifact.encode(data);
+  }
 
- public static function smallFrame(?casting:MillCastingDetails):BenchMillFrame {
-  var reference=new BenchMill(false,false),f=MillFramePreview.layout(reference),guide=LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER);
-  var z=MillFramePreview.zLayout(reference,f,guide),xy=new MillXYStageLayout(f,z.spindleY,BenchMill.RAIL,guide,MillScrewDrive.m60dBk12());
-  return BenchMillFrame.create(f,z,xy,casting);
- }
- public static function smallAssembly():MachineAssembly {
-  return MillFramePreview.concept(new BenchMill(false,false),smallFrame());
- }
- public static function small():Bytes {
-  var frame=smallFrame();
-  if (frame.xyAxis == null) throw "Small mill frame requires its XY stage";
-  var xy:MillXYStageLayout = cast frame.xyAxis;
-  var bytes = new MillMachiningSetup(MillFramePreview.concept(new BenchMill(false,false),frame),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",xy.tableTop)
-   .scene("mill-small",["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]);
-  var data=SceneArtifact.decode(bytes);
-  if(data.project==null)data.project={dynamicParts:[],motions:[]};
-  var project:materia.project.SceneArtifact.SceneArtifactProject=cast data.project;
-  project.navigation=[
-   {occurrence:"frame/base/casting",label:"Open mold",variant:"small-base-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID},
-   {occurrence:"frame/column/casting",label:"Open mold",variant:"small-column-mold",target:machinekit.tooling.CastingMoldView.REFERENCE_ID}
-  ];
-  return SceneArtifact.encode(data);
- }
- public static function large():Bytes {
-  var layout=new MillCapacityLayout();
-  return new MillMachiningSetup(MillCapacityStudy.build(layout,false),["xyStage/x","xyStage/y","zAxis/z"],"xyStage/table",layout.tableTop)
-   .scene("mill-large",["400 x 300 x 380 mm packaging study; XY drives are not fitted. Shared bearing-block mission uses kinematic preview bounds."]);
- }
+  public static function smallFrame(?casting:MillCastingDetails):BenchMillFrame {
+    var reference = new BenchMill(false, false), f = MillFramePreview.layout(reference), guide = LinearRailBlock.metric(
+      BenchMill.RAIL,
+      LinearRailBlock.SUPPLIER
+    );
+    var z = MillFramePreview.zLayout(reference, f, guide), xy = new MillXYStageLayout(
+      f,
+      z.spindleY,
+      BenchMill.RAIL,
+      guide,
+      MillScrewDrive.m60dBk12()
+    );
+    return BenchMillFrame.create(f, z, xy, casting);
+  }
+  public static function smallAssembly():MachineAssembly {
+    return MillFramePreview.concept(new BenchMill(false, false), smallFrame());
+  }
+  public static function small():Bytes {
+    var frame = smallFrame();
+    if (frame.xyAxis == null) throw "Small mill frame requires its XY stage";
+    var xy:MillXYStageLayout = cast frame.xyAxis;
+    var bytes = new MillMachiningSetup(
+      MillFramePreview.concept(new BenchMill(false, false), frame),
+      ["xyStage/x", "xyStage/y", "zAxis/z"],
+      "xyStage/table",
+      xy.tableTop
+    ).scene(
+      "mill-small",
+      ["250 x 160 x 250 mm mechanical mill with shared bearing-block mission."]
+    );
+    var data = SceneArtifact.decode(bytes);
+    if (data.project == null) data.project = {dynamicParts: [], motions: []};
+    var project:materia.project.SceneArtifact.SceneArtifactProject = cast data.project;
+    project.navigation = [
+      {
+        occurrence: "frame/base/casting",
+        label: "Open mold",
+        variant: "small-base-mold",
+        target: machinekit.tooling.CastingMoldView.REFERENCE_ID
+      },
+      {
+        occurrence: "frame/column/casting",
+        label: "Open mold",
+        variant: "small-column-mold",
+        target: machinekit.tooling.CastingMoldView.REFERENCE_ID
+      }
+    ];
+    return SceneArtifact.encode(data);
+  }
+  public static function large():Bytes {
+    var layout = new MillCapacityLayout();
+    return new MillMachiningSetup(
+      MillCapacityStudy.build(layout, false),
+      ["xyStage/x", "xyStage/y", "zAxis/z"],
+      "xyStage/table",
+      layout.tableTop
+    ).scene(
+      "mill-large",
+      ["400 x 300 x 380 mm packaging study; XY drives are not fitted. Shared bearing-block mission uses kinematic preview bounds."]
+    );
+  }
 
- /** Shared writer retains each occurrence's hierarchy and cosmetic-thread data.
+  /** Shared writer retains each occurrence's hierarchy and cosmetic-thread data.
   * Imported bearing mass substitutes are for display only, not sizing.
   */
- public static function scene(assembly:MachineAssembly,id:String,diagnostics:Array<String>):Bytes {
-  assembly.validate();var model=new AssemblyModel("mm");assembly.addTo(model,"");
-  var definition=model.definition(id);
-  AssemblyPreview.preserveOwnership(definition,assembly.definition());
-  var definitions:Map<String,materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>=
-   [for(component in definition.definitions) component.id => component];
-  var shared=new Map<String,String>(), definitionByOccurrence=new Map<String,String>();
-  var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
-  for(row in assembly.components()) {
-   var mass:MassProperties;
-   if(Std.isOfType(row.component,MotorMount)&&cast(row.component,MotorMount).spec.massKg==null) {
-    var geometry=row.component.geometry();
-    var props=geometry.massProperties();
-    geometry.close();
-    mass=new MassProperties(props.volume*1e-9*7850,props.centerOfMass,machinekit.component.MassProperties.MassSource.Computed(Preview));
-   } else mass=row.component.massProperties();
-   var label=Std.isOfType(row.component,LeadshineServo)?row.component.designation+" — "+row.component.description:row.component.description;
-   var component=definitions.get(row.id);
-   if(component==null)throw 'Mill scene has no definition for "${row.id}"';
-   // Share only identical recipe geometry, physical properties and mechanical interfaces.
-   var key=haxe.Json.stringify({geometry:row.component.geometryKey(),label:label,mass:mass,
-    connectors:component.connectors,collisionHulls:component.collisionHulls,
-    robotFlangeConnector:component.robotFlangeConnector});
-   var owner=shared.get(key);
-   if(owner==null) {
-    owner=row.id;shared.set(key,owner);
-    parts.push(AssemblyPreview.part(owner,label,row.component.geometry(),row.component.materialId,null,mass));
-   }
-   definitionByOccurrence.set(row.id,owner);
+  public static function scene(assembly:MachineAssembly, id:String, diagnostics:Array<String>):Bytes {
+    assembly.validate();
+    var model = new AssemblyModel("mm");
+    assembly.addTo(model, "");
+    var definition = model.definition(id);
+    AssemblyPreview.preserveOwnership(definition, assembly.definition());
+    var definitions:Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition
+      > = [for (component in definition.definitions) component.id => component];
+    var shared = new Map<String, String>(), definitionByOccurrence = new Map<String, String>();
+    var parts:Array<materia.project.SceneArtifact.SceneArtifactPart> = [];
+    for (row in assembly.components()) {
+      var mass:MassProperties;
+      if (Std.isOfType(row.component, MotorMount) && cast(row.component, MotorMount).spec.massKg == null) {
+        var geometry = row.component.geometry();
+        var props = geometry.massProperties();
+        geometry.close();
+        mass = new MassProperties(
+          props.volume * 1e-9 * 7850,
+          props.centerOfMass,
+          machinekit.component.MassProperties.MassSource.Computed(Preview)
+        );
+      } else mass = row.component.massProperties();
+      var label = Std.isOfType(row.component,
+        LeadshineServo) ? row.component.designation + " — " + row.component.description : row.component.description;
+      var component = definitions.get(row.id);
+      if (component == null) throw 'Mill scene has no definition for "${row.id}"';
+      // Share only identical recipe geometry, physical properties and mechanical interfaces.
+      var key = haxe.Json.stringify({
+        geometry: row.component.geometryKey(),
+        label: label,
+        mass: mass,
+        connectors: component.connectors,
+        collisionHulls: component.collisionHulls,
+        robotFlangeConnector: component.robotFlangeConnector
+      });
+      var owner = shared.get(key);
+      if (owner == null) {
+        owner = row.id;
+        shared.set(key, owner);
+        parts.push(AssemblyPreview.part(owner, label, row.component.geometry(), row.component.materialId, null, mass));
+      }
+      definitionByOccurrence.set(row.id, owner);
+    }
+    AssemblyPreview.shareDefinitions(definition, definitionByOccurrence);
+    return SceneArtifact.encode({
+      lengthUnit: "mm",
+      metresPerUnit: 0.001,
+      parts: parts,
+      assemblyDefinition: definition,
+      recipeDiagnostics: diagnostics
+      .concat(["Imported bearing masses use display-only steel-volume estimates; not engineering sizing inputs."])
+    });
   }
-  AssemblyPreview.shareDefinitions(definition,definitionByOccurrence);
-  return SceneArtifact.encode({lengthUnit:"mm",metresPerUnit:0.001,parts:parts,assemblyDefinition:definition,
-   recipeDiagnostics:diagnostics.concat(["Imported bearing masses use display-only steel-volume estimates; not engineering sizing inputs."])});
- }
 
- public static function main():Void {
-  var root=Sys.getEnv("MATERIA_ROOT"),dir=root+"/machinekit/examples/bench-mill/build/mill";
-  sys.FileSystem.createDirectory(dir);
-  var assembly=smallAssembly(),reference=new BenchMill(false,false),f=MillFramePreview.layout(reference);
-  var z=MillFramePreview.zLayout(reference,f,LinearRailBlock.metric(BenchMill.RAIL,LinearRailBlock.SUPPLIER));
-  MillSpindleIntegrity.checkPayload(assembly,z).throwIfErrors();
-  MillSpindleIntegrity.checkMotorRemoval(assembly).throwIfErrors();
-  var bytes=small();
-  var decoded=SceneArtifact.decode(bytes);
-  for(id in ["xyStage/screwX","xyStage/screwY","zAxis/screw","spindle/drawbar","spindle/cylinder","spindle/motor","spindle/belt"])
-   if(decoded.parts.filter(p -> p.id==id).length!=1)throw "Unified small scene is missing "+id;
-  var exported=decoded.assemblyDefinition;
-  if(exported==null)throw "Unified small scene is missing its assembly";
-  var owned=0;
-  for(occurrence in assembly.definition().occurrences)if(occurrence.includePath!=null) {
-   owned++;
-   if(exported.occurrences.filter(o -> o.id==occurrence.id&&o.includePath==occurrence.includePath).length!=1)
-    throw "Unified small scene lost assembly ownership for "+occurrence.id;
+  public static function main():Void {
+    var root = Sys.getEnv("MATERIA_ROOT"), dir = root + "/machinekit/examples/bench-mill/build/mill";
+    sys.FileSystem.createDirectory(dir);
+    var assembly = smallAssembly(), reference = new BenchMill(false, false), f = MillFramePreview.layout(reference);
+    var z = MillFramePreview.zLayout(reference, f, LinearRailBlock.metric(BenchMill.RAIL, LinearRailBlock.SUPPLIER));
+    MillSpindleIntegrity.checkPayload(assembly, z).throwIfErrors();
+    MillSpindleIntegrity.checkMotorRemoval(assembly).throwIfErrors();
+    var bytes = small();
+    var decoded = SceneArtifact.decode(bytes);
+    for (id in [
+      "xyStage/screwX",
+      "xyStage/screwY",
+      "zAxis/screw",
+      "spindle/drawbar",
+      "spindle/cylinder",
+      "spindle/motor",
+      "spindle/belt"
+    ]) if (decoded.parts.filter(p -> p.id == id).length != 1) throw "Unified small scene is missing " + id;
+    var exported = decoded.assemblyDefinition;
+    if (exported == null) throw "Unified small scene is missing its assembly";
+    var owned = 0;
+    for (occurrence in assembly.definition().occurrences) if (occurrence.includePath != null) {
+      owned++;
+      if (exported.occurrences.filter(o -> o.id == occurrence.id && o.includePath == occurrence.includePath).length
+        != 1) throw "Unified small scene lost assembly ownership for " + occurrence.id;
+    }
+    if (owned == 0) throw "Unified small scene ownership check needs authored subassemblies";
+    sys.io.File.saveBytes(dir + "/small.mtrg", bytes);
+    sys.io.File.saveContent(dir + "/small.assembly.json", assembly.encode());
+    Sys.println("Unified small mill payload, motor removal and scene completeness passed");
+    MillCapacityStudy.main();
+    sys.io.File.saveBytes(dir + "/large.mtrg", large());
+    Sys.println("Unified mill project: small and large scenes generated");
   }
-  if(owned==0)throw "Unified small scene ownership check needs authored subassemblies";
-  sys.io.File.saveBytes(dir+"/small.mtrg",bytes);
-  sys.io.File.saveContent(dir+"/small.assembly.json",assembly.encode());
-  Sys.println("Unified small mill payload, motor removal and scene completeness passed");
-  MillCapacityStudy.main();
-  sys.io.File.saveBytes(dir+"/large.mtrg",large());
-  Sys.println("Unified mill project: small and large scenes generated");
- }
 }
