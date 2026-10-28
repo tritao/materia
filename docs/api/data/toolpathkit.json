@@ -18,7 +18,7 @@
     {
      "name": "ClearanceStock",
      "kind": "typedef",
-     "file": "toolpathkit/motion/haxe/toolpathkit/motion/RapidClearance.hx",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ClearanceStock.hx",
      "fields": [
       {
        "name": "minimum",
@@ -50,7 +50,7 @@
     {
      "name": "GearEncoderTiming",
      "kind": "typedef",
-     "file": "toolpathkit/motion/haxe/toolpathkit/motion/MachineBinding.hx",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/GearEncoderTiming.hx",
      "fields": [
       {
        "name": "latencyNs",
@@ -509,7 +509,7 @@
     {
      "name": "PrintingMotionContext",
      "kind": "typedef",
-     "file": "toolpathkit/motion/haxe/toolpathkit/motion/PrintingMotionBinding.hx",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/PrintingMotionContext.hx",
      "fields": [
       {
        "name": "definition",
@@ -925,7 +925,7 @@
     {
      "name": "ToolpathSourceMapEntry",
      "kind": "class",
-     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathSourceMap.hx",
+     "file": "toolpathkit/motion/haxe/toolpathkit/motion/ToolpathSourceMapEntry.hx",
      "fields": [
       {
        "name": "opIndex",
@@ -1123,7 +1123,7 @@
     {
      "name": "LayerVolume",
      "kind": "typedef",
-     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathProgram.hx",
+     "file": "toolpathkit/haxe/toolpathkit/path/LayerVolume.hx",
      "fields": [
       {
        "name": "index",
@@ -1184,7 +1184,7 @@
     {
      "name": "ObjectVolume",
      "kind": "typedef",
-     "file": "toolpathkit/haxe/toolpathkit/path/ToolpathProgram.hx",
+     "file": "toolpathkit/haxe/toolpathkit/path/ObjectVolume.hx",
      "fields": [
       {
        "name": "name",
@@ -1414,7 +1414,7 @@
     {
      "name": "ProvenanceKind",
      "kind": "enum",
-     "file": "toolpathkit/haxe/toolpathkit/path/Provenance.hx",
+     "file": "toolpathkit/haxe/toolpathkit/path/ProvenanceKind.hx",
      "fields": [
       {
        "name": "GCode",
@@ -1519,7 +1519,7 @@
      "name": "ToolpathOp",
      "kind": "enum",
      "file": "toolpathkit/haxe/toolpathkit/path/ToolpathOp.hx",
-     "doc": "Controller-independent CNC operations in LinuxCNC block order.",
+     "doc": "Controller-independent machining operations: milling and turning in LinuxCNC block order, with\nelectronic gearing for lathes and the printing operations below.",
      "fields": [
       {
        "name": "SetSetup",
@@ -1560,12 +1560,14 @@
       {
        "name": "ElectronicGear",
        "kind": "case",
-       "signature": "(follower:String, terms:Array<GearTerm>, provenance:Provenance)"
+       "signature": "(follower:String, terms:Array<GearTerm>, provenance:Provenance)",
+       "doc": "Add measured master motion to the follower's independently planned motion."
       },
       {
        "name": "ReleaseGear",
        "kind": "case",
-       "signature": "(follower:String, provenance:Provenance)"
+       "signature": "(follower:String, provenance:Provenance)",
+       "doc": "Stops following the master: the follower returns to its own planned motion."
       },
       {
        "name": "Dwell",
@@ -1912,7 +1914,7 @@
     {
      "name": "TravelViolation",
      "kind": "class",
-     "file": "toolpathkit/haxe/toolpathkit/setup/TravelEnvelope.hx",
+     "file": "toolpathkit/haxe/toolpathkit/setup/TravelViolation.hx",
      "doc": "One toolpath point outside the configured machine travel bounds.",
      "fields": [
       {
@@ -2221,7 +2223,7 @@
     {
      "name": "RouterCutResult",
      "kind": "typedef",
-     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCut.hx",
+     "file": "toolpathkit/haxe/toolpathkit/tool/RouterCutResult.hx",
      "fields": [
       {
        "name": "operation",

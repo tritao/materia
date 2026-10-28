@@ -726,6 +726,24 @@
      "doc": "A connector exported from a member of an assembly definition."
     },
     {
+     "name": "AssemblyFeatureReference",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/assembly/AssemblyFeatureReference.hx",
+     "fields": [
+      {
+       "name": "member",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "feature",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "An assembly-scoped component and one of its authored feature IDs. The using\ncontract determines whether the feature must be a hole, datum or interface."
+    },
+    {
      "name": "AssemblyFrame",
      "kind": "typedef",
      "file": "projectkit/src/materia/assembly/AssemblyRecord.hx",
@@ -786,6 +804,13 @@
        "kind": "method",
        "signature": "():AssemblyFrame",
        "static": true
+      },
+      {
+       "name": "sectionFrame",
+       "kind": "method",
+       "signature": "(direction:{x:Float, y:Float, z:Float}, sourceId:String):AssemblyFrame",
+       "static": true,
+       "doc": "Right-handed section frame with local Z along a declared unit normal."
       },
       {
        "name": "translation",
@@ -2234,6 +2259,744 @@
    ]
   },
   {
+   "name": "materia.presentation",
+   "types": [
+    {
+     "name": "AssemblyPresentation",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "schemaVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "definition",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "defaultView",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "views",
+       "kind": "var",
+       "signature": ":Array<PresentationView>"
+      },
+      {
+       "name": "explode",
+       "kind": "var",
+       "signature": ":Array<ExplodeOffset>"
+      },
+      {
+       "name": "procedures",
+       "kind": "var",
+       "signature": ":Array<Procedure>"
+      }
+     ]
+    },
+    {
+     "name": "AuthoredPresentation",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/PresentationEdits.hx",
+     "fields": [
+      {
+       "name": "schemaVersion",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "definition",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "views",
+       "kind": "var",
+       "signature": ":Array<PresentationView>"
+      },
+      {
+       "name": "explode",
+       "kind": "var",
+       "signature": ":Array<ExplodeOffset>"
+      },
+      {
+       "name": "procedures",
+       "kind": "var",
+       "signature": ":Array<Procedure>"
+      }
+     ],
+     "doc": "Only authored entries are persisted; generated entries are regenerated on every load."
+    },
+    {
+     "name": "CheckStatus",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Passed",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Failed",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ExplodeOffset",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "select",
+       "kind": "var",
+       "signature": ":PartSelector"
+      },
+      {
+       "name": "direction",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      },
+      {
+       "name": "distance",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "stage",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":PresentationSource",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "MotionEvidence",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Illustrative",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Checked",
+       "kind": "case",
+       "signature": "(checker:String, status:CheckStatus, geometryFingerprint:String, report:String)"
+      }
+     ]
+    },
+    {
+     "name": "PartMotion",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "select",
+       "kind": "var",
+       "signature": ":PartSelector"
+      },
+      {
+       "name": "motion",
+       "kind": "var",
+       "signature": ":PresentationMotion"
+      }
+     ],
+     "doc": "A rigid checked group may span unrelated occurrences with different parent frames."
+    },
+    {
+     "name": "PartSelector",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "subtree",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    },
+    {
+     "name": "PresentationCodec",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/PresentationCodec.hx",
+     "doc": "Strict boundary for both generated and authored presentation records.",
+     "fields": [
+      {
+       "name": "VERSION",
+       "kind": "var",
+       "signature": ":Dynamic",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, value:AssemblyPresentation):String",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, text:String):AssemblyPresentation",
+       "static": true
+      },
+      {
+       "name": "resolve",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, select:PartSelector):Array<String>",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, value:AssemblyPresentation):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PresentationCursor",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/PresentationEvaluator.hx",
+     "fields": [
+      {
+       "name": "view",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "explode",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "procedure",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "step",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "progress",
+       "kind": "var",
+       "signature": ":Float"
+      }
+     ]
+    },
+    {
+     "name": "PresentationEdits",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/PresentationEdits.hx",
+     "fields": [
+      {
+       "name": "empty",
+       "kind": "method",
+       "signature": "(definition:String):AuthoredPresentation",
+       "static": true
+      },
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(text:String):AuthoredPresentation",
+       "static": true
+      },
+      {
+       "name": "encode",
+       "kind": "method",
+       "signature": "(value:AuthoredPresentation):String",
+       "static": true
+      },
+      {
+       "name": "merge",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, ?generated:AssemblyPresentation, ?authored:AuthoredPresentation):AssemblyPresentation",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PresentationEvaluator",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/PresentationEvaluator.hx",
+     "doc": "Stateless evaluation. Input poses and engineering records are never modified.",
+     "fields": [
+      {
+       "name": "reset",
+       "kind": "method",
+       "signature": "(value:AssemblyPresentation):PresentationCursor",
+       "static": true
+      },
+      {
+       "name": "badge",
+       "kind": "method",
+       "signature": "(evidence:MotionEvidence, fingerprint:String):String",
+       "static": true
+      },
+      {
+       "name": "evaluate",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, solved:Map<String, AssemblyFrame>, value:AssemblyPresentation, cursor:PresentationCursor, fingerprint:String, ?playing:Bool):PresentationFrame",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PresentationFrame",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/PresentationEvaluator.hx",
+     "fields": [
+      {
+       "name": "view",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "poses",
+       "kind": "var",
+       "signature": ":Map<String, AssemblyFrame>"
+      },
+      {
+       "name": "visibility",
+       "kind": "var",
+       "signature": ":Map<String, VisibilityMode>"
+      },
+      {
+       "name": "highlight",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "jointOverrides",
+       "kind": "var",
+       "signature": ":Map<String, Float>"
+      },
+      {
+       "name": "sections",
+       "kind": "var",
+       "signature": ":Array<SectionPlane>"
+      },
+      {
+       "name": "camera",
+       "kind": "var",
+       "signature": ":ViewCamera"
+      },
+      {
+       "name": "activeStep",
+       "kind": "var",
+       "signature": ":Null<ProcedureStep>"
+      },
+      {
+       "name": "evidence",
+       "kind": "var",
+       "signature": ":Null<String>"
+      }
+     ]
+    },
+    {
+     "name": "PresentationGeometry",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/PresentationGeometry.hx",
+     "doc": "A producer and viewer share this fingerprint; presentation records are deliberately excluded.",
+     "fields": [
+      {
+       "name": "fingerprint",
+       "kind": "method",
+       "signature": "(artifact:SceneArtifactData):String",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "PresentationMotion",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "path",
+       "kind": "var",
+       "signature": ":Array<AssemblyVector>"
+      },
+      {
+       "name": "evidence",
+       "kind": "var",
+       "signature": ":MotionEvidence"
+      }
+     ]
+    },
+    {
+     "name": "PresentationSource",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Generated",
+       "kind": "case",
+       "signature": "(producer:String)"
+      },
+      {
+       "name": "Authored",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "PresentationView",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "camera",
+       "kind": "var",
+       "signature": ":ViewCamera"
+      },
+      {
+       "name": "visibility",
+       "kind": "var",
+       "signature": ":Array<VisibilityRule>"
+      },
+      {
+       "name": "sections",
+       "kind": "var",
+       "signature": ":Array<SectionPlane>"
+      },
+      {
+       "name": "explode",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":PresentationSource",
+       "optional": true
+      },
+      {
+       "name": "displayTransform",
+       "kind": "var",
+       "signature": ":materia.assembly.AssemblyRecord.AssemblyFrame",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "Presentations",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/Presentations.hx",
+     "doc": "Shared producer defaults; authored and generated records use the same format.",
+     "fields": [
+      {
+       "name": "assembled",
+       "kind": "method",
+       "signature": "(definition:AssemblyDefinition, ?yaw:Float, ?pitch:Float, ?producer:String):AssemblyPresentation",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "Procedure",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "kind",
+       "kind": "var",
+       "signature": ":ProcedureKind"
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":ProcedureStart"
+      },
+      {
+       "name": "steps",
+       "kind": "var",
+       "signature": ":Array<ProcedureStep>"
+      },
+      {
+       "name": "source",
+       "kind": "var",
+       "signature": ":PresentationSource",
+       "optional": true
+      }
+     ]
+    },
+    {
+     "name": "ProcedureKind",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Assembly",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Disassembly",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Service",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ProcedureStart",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Assembled",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Disassembled",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ProcedureStep",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "title",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "instruction",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "view",
+       "kind": "var",
+       "signature": ":String",
+       "optional": true
+      },
+      {
+       "name": "highlight",
+       "kind": "var",
+       "signature": ":Array<PartSelector>"
+      },
+      {
+       "name": "action",
+       "kind": "var",
+       "signature": ":StepAction"
+      }
+     ]
+    },
+    {
+     "name": "Procedures",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/Procedures.hx",
+     "doc": "Producer helper. The viewer always consumes explicit steps in the stored order.",
+     "fields": [
+      {
+       "name": "reverse",
+       "kind": "method",
+       "signature": "(procedure:Procedure, id:String, label:String, initial:Array<AssemblyJointCoordinate>):Procedure",
+       "static": true,
+       "doc": "Initial coordinates are required for every SetJoints key so reversal never guesses engineering state."
+      }
+     ]
+    },
+    {
+     "name": "SectionPlane",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":Null<String>"
+      },
+      {
+       "name": "point",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      },
+      {
+       "name": "normal",
+       "kind": "var",
+       "signature": ":AssemblyVector"
+      }
+     ]
+    },
+    {
+     "name": "StepAction",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Remove",
+       "kind": "case",
+       "signature": "(select:PartSelector, motion:PresentationMotion)"
+      },
+      {
+       "name": "Install",
+       "kind": "case",
+       "signature": "(select:PartSelector, motion:PresentationMotion)"
+      },
+      {
+       "name": "SetJoints",
+       "kind": "case",
+       "signature": "(coordinates:Array<AssemblyJointCoordinate>)"
+      },
+      {
+       "name": "Note",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "RemoveGroup",
+       "kind": "case",
+       "signature": "(members:Array<PartMotion>)"
+      },
+      {
+       "name": "InstallGroup",
+       "kind": "case",
+       "signature": "(members:Array<PartMotion>)"
+      }
+     ]
+    },
+    {
+     "name": "StepMotions",
+     "kind": "class",
+     "file": "projectkit/src/materia/presentation/StepMotions.hx",
+     "doc": "Common movement traversal for single parts and atomic rigid groups.",
+     "fields": [
+      {
+       "name": "members",
+       "kind": "method",
+       "signature": "(action:StepAction):Array<PartMotion>",
+       "static": true
+      },
+      {
+       "name": "installing",
+       "kind": "method",
+       "signature": "(action:StepAction):Bool",
+       "static": true
+      },
+      {
+       "name": "failed",
+       "kind": "method",
+       "signature": "(action:StepAction):Bool",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "ViewCamera",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Frame",
+       "kind": "case",
+       "signature": "(select:Array<PartSelector>, yaw:Float, pitch:Float, margin:Float)"
+      },
+      {
+       "name": "Anchored",
+       "kind": "case",
+       "signature": "(anchor:PartSelector, offset:AssemblyVector, span:Float, yaw:Float, pitch:Float)"
+      }
+     ]
+    },
+    {
+     "name": "VisibilityMode",
+     "kind": "enum",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "Shown",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Transparent",
+       "kind": "case",
+       "signature": ""
+      },
+      {
+       "name": "Hidden",
+       "kind": "case",
+       "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "VisibilityRule",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/presentation/AssemblyPresentation.hx",
+     "fields": [
+      {
+       "name": "select",
+       "kind": "var",
+       "signature": ":PartSelector"
+      },
+      {
+       "name": "mode",
+       "kind": "var",
+       "signature": ":VisibilityMode"
+      }
+     ]
+    }
+   ]
+  },
+  {
    "name": "materia.project",
    "types": [
     {
@@ -2394,7 +3157,7 @@
      "name": "MaterialLibrary",
      "kind": "class",
      "file": "projectkit/src/materia/project/MaterialLibrary.hx",
-     "doc": "Built-in material definitions shared by generators, the BOM, and the editor.",
+     "doc": "Built-in material definitions shared by generators, the BOM, and the editor.\n\nVisuals are metallic-roughness PBR, as SceneKit and glTF read them: `baseColor` is sRGB. A bare metal has\nmetallic 1 and its base colour is its reflectance at normal incidence (steel about 0.56 linear, sRGB 0.78;\naluminium about 0.91 linear), so metal reads as metal under the viewport look's studio room. Coatings that\nhide the metal (black oxide, paint) are dark or dielectric instead.",
      "fields": [
       {
        "name": "all",
@@ -2641,6 +3404,26 @@
      ]
     },
     {
+     "name": "MeshClosure",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/MeshClosure.hx",
+     "doc": "Producer-side proof for non-CAD meshes declared closed. Run once, never while clipping.",
+     "fields": [
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(part:SceneArtifactPart):Void",
+       "static": true
+      },
+      {
+       "name": "declare",
+       "kind": "method",
+       "signature": "(part:SceneArtifactPart):Void",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "MeshMassData",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/MeshMassProperties.hx",
@@ -2829,6 +3612,59 @@
      ]
     },
     {
+     "name": "SceneArtifactCableChainVisual",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "fixed",
+       "kind": "var",
+       "signature": ":SceneArtifactChainEnd"
+      },
+      {
+       "name": "moving",
+       "kind": "var",
+       "signature": ":SceneArtifactChainEnd"
+      },
+      {
+       "name": "bendRadius",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "innerWidth",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "innerHeight",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "wall",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "travel",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "axisJoint",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ],
+     "doc": "Chain dimensions are in assembly units; ends name actual member connectors."
+    },
+    {
      "name": "SceneArtifactCellController",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/SceneArtifact.hx",
@@ -2883,6 +3719,23 @@
      ]
     },
     {
+     "name": "SceneArtifactChainEnd",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneArtifact.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "connector",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
      "name": "SceneArtifactController",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/SceneArtifact.hx",
@@ -2926,6 +3779,12 @@
        "name": "assemblyState",
        "kind": "var",
        "signature": ":AssemblyStateRecord",
+       "optional": true
+      },
+      {
+       "name": "presentation",
+       "kind": "var",
+       "signature": ":AssemblyPresentation",
        "optional": true
       },
       {
@@ -3110,12 +3969,6 @@
        "name": "standstillConfirmationSeconds",
        "kind": "var",
        "signature": ":Float"
-      },
-      {
-       "name": "enclosureParts",
-       "kind": "var",
-       "signature": ":Array<String>",
-       "optional": true
       }
      ],
      "doc": "Runtime guard policy; door travel and linear speeds are SI, angles radians."
@@ -3542,54 +4395,6 @@
      ]
     },
     {
-     "name": "SceneArtifactInspectionCamera",
-     "kind": "typedef",
-     "file": "projectkit/src/materia/project/SceneArtifact.hx",
-     "fields": [
-      {
-       "name": "id",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "label",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "anchor",
-       "kind": "var",
-       "signature": ":String"
-      },
-      {
-       "name": "offset",
-       "kind": "var",
-       "signature": ":Array<Float>"
-      },
-      {
-       "name": "span",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "yaw",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "pitch",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "hiddenPrefixes",
-       "kind": "var",
-       "signature": ":Array<String>"
-      }
-     ],
-     "doc": "Inspection target is a world-aligned offset from the displayed anchor centre, in metres.\nOrientation is steady in world space, so a rotating part never spins the camera."
-    },
-    {
      "name": "SceneArtifactJointTarget",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/SceneArtifact.hx",
@@ -3657,6 +4462,12 @@
        "name": "enclosureGuard",
        "kind": "var",
        "signature": ":SceneArtifactEnclosureGuard",
+       "optional": true
+      },
+      {
+       "name": "cableChains",
+       "kind": "var",
+       "signature": ":Array<SceneArtifactCableChainVisual>",
        "optional": true
       }
      ]
@@ -4316,6 +5127,12 @@
        "signature": ":String"
       },
       {
+       "name": "closed",
+       "kind": "var",
+       "signature": ":Bool",
+       "optional": true
+      },
+      {
        "name": "red",
        "kind": "var",
        "signature": ":Float"
@@ -4727,15 +5544,15 @@
      "file": "projectkit/src/materia/project/SceneArtifact.hx",
      "fields": [
       {
-       "name": "inspectionCameras",
+       "name": "sources",
        "kind": "var",
-       "signature": ":Array<SceneArtifactInspectionCamera>",
+       "signature": ":materia.project.SceneSourceMap",
        "optional": true
       },
       {
-       "name": "initialView",
+       "name": "navigation",
        "kind": "var",
-       "signature": ":SceneArtifactView",
+       "signature": ":Array<materia.project.SceneSourceMap.SceneNavigation>",
        "optional": true
       },
       {
@@ -5369,23 +6186,6 @@
      "doc": "A pose in the assembly frame: position in metres and an xyzw rotation."
     },
     {
-     "name": "SceneArtifactView",
-     "kind": "typedef",
-     "file": "projectkit/src/materia/project/SceneArtifact.hx",
-     "fields": [
-      {
-       "name": "yaw",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "pitch",
-       "kind": "var",
-       "signature": ":Float"
-      }
-     ]
-    },
-    {
      "name": "SceneArtifactWeld",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/SceneArtifact.hx",
@@ -5855,6 +6655,33 @@
      "doc": "Contact registration after parking. Nominal is assembly_T_work; uncertainty rotates about the chassis origin."
     },
     {
+     "name": "SceneNavigation",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneSourceMap.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "variant",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "target",
+       "kind": "var",
+       "signature": ":String"
+      }
+     ]
+    },
+    {
      "name": "SceneScrew",
      "kind": "typedef",
      "file": "projectkit/src/materia/project/SceneScrewDefinition.hx",
@@ -6122,6 +6949,121 @@
        "signature": "(steps:Array<SceneArtifactMissionStep>):Void",
        "static": true,
        "doc": "All snug passes precede final; every connection and physical supply has exactly one owner."
+      }
+     ]
+    },
+    {
+     "name": "SceneSourceFeature",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneSourceMap.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "label",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "faces",
+       "kind": "var",
+       "signature": ":Array<Int>"
+      },
+      {
+       "name": "whole",
+       "kind": "var",
+       "signature": ":Bool"
+      }
+     ]
+    },
+    {
+     "name": "SceneSourceMap",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneSourceMap.hx",
+     "fields": [
+      {
+       "name": "features",
+       "kind": "var",
+       "signature": ":Array<SceneSourceFeature>"
+      },
+      {
+       "name": "members",
+       "kind": "var",
+       "signature": ":Array<SceneSourceMember>"
+      }
+     ],
+     "doc": "Producer-declared source links; IDs are opaque and never inferred from labels."
+    },
+    {
+     "name": "SceneSourceMaps",
+     "kind": "class",
+     "file": "projectkit/src/materia/project/SceneSourceMap.hx",
+     "fields": [
+      {
+       "name": "decode",
+       "kind": "method",
+       "signature": "(raw:Dynamic):SceneSourceMap",
+       "static": true
+      },
+      {
+       "name": "decodeNavigation",
+       "kind": "method",
+       "signature": "(raw:Dynamic):Array<SceneNavigation>",
+       "static": true
+      },
+      {
+       "name": "validate",
+       "kind": "method",
+       "signature": "(map:SceneSourceMap, data:SceneArtifactData):Void",
+       "static": true
+      },
+      {
+       "name": "tooling",
+       "kind": "method",
+       "signature": "(map:SceneSourceMap, id:String):Array<String>",
+       "static": true
+      },
+      {
+       "name": "sources",
+       "kind": "method",
+       "signature": "(map:SceneSourceMap, id:String):Array<String>",
+       "static": true
+      },
+      {
+       "name": "text",
+       "kind": "method",
+       "signature": "(value:String):Void",
+       "static": true
+      }
+     ]
+    },
+    {
+     "name": "SceneSourceMember",
+     "kind": "typedef",
+     "file": "projectkit/src/materia/project/SceneSourceMap.hx",
+     "fields": [
+      {
+       "name": "occurrence",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "sources",
+       "kind": "var",
+       "signature": ":Array<String>"
+      },
+      {
+       "name": "shared",
+       "kind": "var",
+       "signature": ":Bool"
       }
      ]
     },

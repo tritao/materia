@@ -5,6 +5,20 @@
    "name": "camkit",
    "types": [
     {
+     "name": "CamCastingContours",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamCastingContours.hx",
+     "doc": "Neutral finished line/arc profiles -> CAM contours, without compensation.\nProfile coordinates and XY normalization are mm; tolerance, margin and Z are m.\nThe same conversion accepts panel operations and filled tooling sections.",
+     "fields": [
+      {
+       "name": "fromProfile",
+       "kind": "method",
+       "signature": "(profile:Array<CastingSegment>, tolerance:Float, ?mirrorX:Bool, ?minX:Float, ?minY:Float, ?widthMm:Float, ?margin:Float, ?z:Float, ?context:String):CamContour",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "CamContour",
      "kind": "class",
      "file": "camkit/haxe/camkit/CamContour.hx",
@@ -105,7 +119,7 @@
      "name": "CamExactBoundary",
      "kind": "class",
      "file": "camkit/haxe/camkit/CamExactBoundary.hx",
-     "doc": "Exact compensation belongs to CamKit. Native geometry uses mm for its tolerance.\nThe final centreline is sampled to the declared chord tolerance, in metres.",
+     "doc": "Exact compensation belongs to CamKit. Native geometry uses mm for its tolerance.\nOffset edges stay exact lines/arcs in metres; chord samples only check area.",
      "fields": [
       {
        "name": "reliefCenters",
@@ -181,7 +195,7 @@
       {
        "name": "profile",
        "kind": "method",
-       "signature": "(contour:CamContour, tool:Tool, depth:Float, feed:Float, ?side:String, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float):CamJob",
+       "signature": "(contour:CamContour, tool:Tool, depth:Float, feed:Float, ?side:String, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String, ?startDepth:Float, ?contactHeight:Float):CamJob",
        "doc": "Offset closed profile; `outside` and `inside` use the cutter radius."
       },
       {
@@ -201,6 +215,12 @@
        "kind": "method",
        "signature": "(face:Face, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float, ?unit:String, ?chordToleranceMetres:Float, ?plungeFeed:Null<Float>):CamJob",
        "doc": "Clear a face around its internal islands, then finish every boundary."
+      },
+      {
+       "name": "pocketContours",
+       "kind": "method",
+       "signature": "(outer:CamContour, islands:Array<CamContour>, tool:Tool, depth:Float, feed:Float, stepOver:Float, ?stepDown:Float, ?plungeFeed:Null<Float>, ?featureRef:String):CamJob",
+       "doc": "Clear explicit contour space while keeping its islands. All coordinates\nare metres in one XY work plane; setup/stock validation remains with Setup."
       },
       {
        "name": "drill",
@@ -835,6 +855,20 @@
      ]
     },
     {
+     "name": "CamToolingFormers",
+     "kind": "class",
+     "file": "camkit/haxe/camkit/CamToolingFormers.hx",
+     "doc": "Board former machining through the same contour conversion, compensated\nprofiles and island clearing as panels. There is no separate CAM engine.\nCoordinates in the neutral record are mm; CamJob receives metres.",
+     "fields": [
+      {
+       "name": "build",
+       "kind": "method",
+       "signature": "(plan:FormerMachiningPlan, settings:CamToolingPanels.PanelCamSettings, ?measuredTools:Map<String, Tool>):Array<FormerCamProgram>",
+       "static": true
+      }
+     ]
+    },
+    {
      "name": "CamToolingPanels",
      "kind": "class",
      "file": "camkit/haxe/camkit/CamToolingPanels.hx",
@@ -849,7 +883,7 @@
       {
        "name": "openRebate",
        "kind": "method",
-       "signature": "(op:PanelOperation, outline:Array<PanelSegment>, radiusMm:Float):PanelOperation",
+       "signature": "(op:PanelOperation, outline:Array<CastingSegment>, radiusMm:Float):PanelOperation",
        "static": true,
        "doc": "Extend only outside the finished panel; neutral operation geometry is untouched."
       },
@@ -858,6 +892,23 @@
        "kind": "method",
        "signature": "(input:PanelPlan, settings:PanelCamSettings):Array<PanelCamSetup>",
        "static": true
+      }
+     ]
+    },
+    {
+     "name": "FormerCamProgram",
+     "kind": "typedef",
+     "file": "camkit/haxe/camkit/CamToolingFormers.hx",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String"
+      },
+      {
+       "name": "program",
+       "kind": "var",
+       "signature": ":ToolpathProgram"
       }
      ]
     },

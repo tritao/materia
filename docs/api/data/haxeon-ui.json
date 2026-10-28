@@ -2227,6 +2227,12 @@
      "doc": "Typed renderer facade for retained UI display lists.",
      "fields": [
       {
+       "name": "gpuFrameNanoseconds",
+       "kind": "var",
+       "signature": ":Float",
+       "doc": "GPU time of the newest measured frame in nanoseconds, as of the last pollGpuFrameTime."
+      },
+      {
        "name": "create",
        "kind": "method",
        "signature": "():Renderer",
@@ -2264,6 +2270,18 @@
        "name": "stats",
        "kind": "method",
        "signature": "():RendererStats"
+      },
+      {
+       "name": "setGpuFrameTiming",
+       "kind": "method",
+       "signature": "(enabled:Bool):Void",
+       "doc": "Measures the GPU time of the renderer's frames while enabled. Off by default; cheap to call each frame."
+      },
+      {
+       "name": "pollGpuFrameTime",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Reads the newest GPU frame time while timing is enabled; true when a result arrived since the last poll. A result\nbelongs to a frame a few frames back."
       },
       {
        "name": "dispose",
@@ -3951,6 +3969,18 @@
        "name": "withScope",
        "kind": "method",
        "signature": "(key:Key, build:() -> T):T"
+      },
+      {
+       "name": "currentScope",
+       "kind": "method",
+       "signature": "():KeyScope",
+       "doc": "The scope widgets built now are keyed under; withScopeUnder keys a deeper subtree by it."
+      },
+      {
+       "name": "withScopeUnder",
+       "kind": "method",
+       "signature": "(base:KeyScope, key:Key, build:() -> T):T",
+       "doc": "Builds under `base`'s child `key` rather than the current scope's, so a subtree placed anywhere below `base`\nkeeps one identity, and its state, wherever it moves. Keys must be unique among the subtrees built under `base`."
       },
       {
        "name": "state",
@@ -9391,6 +9421,12 @@
      "doc": "Window, pacing, and deterministic-capture policy for DesktopUiHost.",
      "fields": [
       {
+       "name": "applicationId",
+       "kind": "var",
+       "signature": ":Null<String>",
+       "doc": "Stable application identity, including Windows taskbar grouping."
+      },
+      {
        "name": "customTitlebar",
        "kind": "var",
        "signature": ":Bool"
@@ -9595,7 +9631,7 @@
      "name": "ScriptedInput",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/host/ScriptedInput.hx",
-     "doc": "Timed, window-local logical input through the normal managed event pump.\nTimes are seconds after the first content-ready frame; coordinates are window logical pixels.\nDelayed events retain their original deadlines, so overload remains measurable.",
+     "doc": "Timed, window-local logical input through the normal managed event pump.\nTimes are seconds after the first content-ready frame; coordinates are window logical pixels.\nA key event presses and releases NativeKit key code `key` with `modifiers` held (NativeKit bits, default none); a\ntext event types `text` as one text input per code point, as a keyboard layout would.\nDelayed events retain their original deadlines, so overload remains measurable.",
      "fields": [
       {
        "name": "scheduledAt",
@@ -12713,10 +12749,36 @@
        "doc": "Sets an editor value when its code-point length is already cached."
       },
       {
-       "name": "setValueProvider",
+       "name": "setValueSource",
        "kind": "method",
-       "signature": "(provider:() -> String, length:Int):Void",
+       "signature": "(source:SemanticsValueSource, length:Int):Void",
        "doc": "Defers assembling an editable document until a consumer reads its value."
+      },
+      {
+       "name": "sameValue",
+       "kind": "method",
+       "signature": "(other:Semantics):Bool",
+       "doc": "Whether this value equals `other`'s. Two values from the same source are compared by revision without reading\neither: a deferred value reads its source as it is now, so reading one set at an older revision would compare the\ncurrent value with itself."
+      }
+     ]
+    },
+    {
+     "name": "SemanticsValueSource",
+     "kind": "interface",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/semantics/SemanticsValueSource.hx",
+     "doc": "A value `Semantics` defers: read only when a consumer asks for it, and compared by revision instead of by content, so\nan editor's whole document is neither assembled nor compared on frames where it did not change.",
+     "fields": [
+      {
+       "name": "semanticsValue",
+       "kind": "method",
+       "signature": "():String",
+       "doc": "The current value."
+      },
+      {
+       "name": "semanticsValueRevision",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "A number that changes whenever `semanticsValue` would return something different."
       }
      ]
     }
@@ -18679,6 +18741,12 @@
        "signature": ":Null<(String) -> Void>"
       },
       {
+       "name": "onItemActivatedWithEvent",
+       "kind": "var",
+       "signature": ":Null<(String, UiEvent) -> Void>",
+       "doc": "Event-aware activation for callers that need pointer or keyboard modifiers."
+      },
+      {
        "name": "onItemClicked",
        "kind": "var",
        "signature": ":Null<(String, Int) -> Void>",
@@ -23901,6 +23969,12 @@
        "doc": "Changes whenever edits or shaping constraints recompute paragraph geometry."
       },
       {
+       "name": "visualRowsRevision",
+       "kind": "var",
+       "signature": ":Int",
+       "doc": "Logical/visual row boundaries and vertical placement; unwrapped viewport widths do not change these."
+      },
+      {
        "name": "textStyle",
        "kind": "var",
        "signature": ":TextStyle",
@@ -23971,7 +24045,7 @@
        "name": "visualRows",
        "kind": "method",
        "signature": "():Array<{start:Int, end:Int, top:Float, bottom:Float}>",
-       "doc": "Resolved visual rows, including wrapped continuations and the final empty row.\nOffsets are absolute codepoints; vertical bounds are in document coordinates."
+       "doc": "Resolved visual rows, including wrapped continuations and the final empty row.\nOffsets are absolute codepoints and contiguous; vertical bounds are in document coordinates."
       },
       {
        "name": "paragraphIndexAtY",
@@ -24128,10 +24202,22 @@
        "signature": ":Null<Array<TextColorRange>>"
       },
       {
+       "name": "rows",
+       "kind": "var",
+       "signature": ":Null<Array<TextEditorParagraphRow>>",
+       "doc": "Visual rows of this paragraph's current layout (see TextEditorLayout.measureRows); null until measured."
+      },
+      {
        "name": "layout",
        "kind": "var",
        "signature": ":TextLayout",
        "final": true
+      },
+      {
+       "name": "hasRightToLeftText",
+       "kind": "method",
+       "signature": "():Bool",
+       "doc": "Whether the text holds a right-to-left character or mark, which can make a paragraph's base direction\nright-to-left. A superset of the strong right-to-left ranges, so it never misses one."
       },
       {
        "name": "whitespaceTokens",
@@ -24142,6 +24228,43 @@
        "name": "new",
        "kind": "method",
        "signature": "(text:String, layout:TextLayout):Void"
+      }
+     ]
+    },
+    {
+     "name": "TextEditorParagraphRow",
+     "kind": "class",
+     "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextEditorLayout.hx",
+     "doc": "One visual row of a paragraph, in offsets and vertical bounds relative to the paragraph.",
+     "fields": [
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "end",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "top",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "bottom",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(start:Int, end:Int, top:Float, bottom:Float):Void"
       }
      ]
     },
@@ -24204,6 +24327,9 @@
      "name": "TextEditorState",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextEditorState.hx",
+     "implements": [
+      "SemanticsValueSource"
+     ],
      "doc": "Persistent editable text, selection and IME composition state for one widget ID.",
      "fields": [
       {
@@ -24418,7 +24544,7 @@
        "name": "surroundingText",
        "kind": "method",
        "signature": "(maxBefore:Int, maxAfter:Int):TextInputWindow",
-       "doc": "Returns surrounding text while keeping selection and composition in the window."
+       "doc": "The text around the caret for platform text input: up to `maxBefore` and `maxAfter` code points either side of the\nselection's focus, widened to hold a composition. The window does not grow with the selection, so a large one is\nreported clamped into it; a selection within the bounds is reported whole."
       },
       {
        "name": "applyTextEdit",
@@ -24662,6 +24788,17 @@
        "kind": "method",
        "signature": "():String",
        "doc": "Native text services interpret Haxeon's null representation of empty strings as empty UTF-8."
+      },
+      {
+       "name": "semanticsValue",
+       "kind": "method",
+       "signature": "():String"
+      },
+      {
+       "name": "semanticsValueRevision",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Advances when the text changes, including when the editor switches to another document."
       }
      ]
     },
@@ -24946,7 +25083,7 @@
      "name": "TextInputWindow",
      "kind": "class",
      "file": "haxeon/packages/ui/haxe/haxeon/ui/widgets/text/TextInputWindow.hx",
-     "doc": "A bounded UTF-8 window with absolute document code-point offsets.",
+     "doc": "A bounded UTF-8 window with absolute document code-point offsets, and the selection as reported with it: clamped\ninto the window, since platform text input requires it there, when a selection reaches past it.",
      "fields": [
       {
        "name": "text",
@@ -24967,9 +25104,21 @@
        "final": true
       },
       {
+       "name": "selectionStart",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
+       "name": "selectionEnd",
+       "kind": "var",
+       "signature": ":CodepointOffset",
+       "final": true
+      },
+      {
        "name": "new",
        "kind": "method",
-       "signature": "(text:String, start:CodepointOffset, end:CodepointOffset):Void"
+       "signature": "(text:String, start:CodepointOffset, end:CodepointOffset, ?selectionStart:CodepointOffset, ?selectionEnd:CodepointOffset):Void"
       }
      ]
     },

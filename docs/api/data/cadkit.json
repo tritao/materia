@@ -706,6 +706,27 @@
      ]
     },
     {
+     "name": "MeshFeatureEdges",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/MeshFeatureEdges.hx",
+     "doc": "Which tessellated edge segments are feature edges worth drawing, without changing the topology: only a segment\nshared by exactly two triangles whose analytic normals agree at both ends is smooth (a cylinder's seam, a face\nsplit across a plane). Open, non-manifold, unmatched or degenerate segments stay visible, and a BRep edge is\ndrawn whole or not at all. The streams are a `Mesh`'s, or the same layout from a stored artifact.",
+     "fields": [
+      {
+       "name": "ofMesh",
+       "kind": "method",
+       "signature": "(mesh:Mesh):Array<Bool>",
+       "static": true
+      },
+      {
+       "name": "classify",
+       "kind": "method",
+       "signature": "(vertices:Bytes, normals:Bytes, indices:Bytes, vertexCount:Int, indexCount:Int, ?edgeSegments:Bytes, ?edgeIds:Bytes):Array<Bool>",
+       "static": true,
+       "doc": "One flag per segment of `edgeSegments` (pairs of double 3D points, 48 bytes each): true when it is a feature."
+      }
+     ]
+    },
+    {
      "name": "Operation",
      "kind": "class",
      "file": "cadkit/haxe/src/cadkit/Operation.hx",
@@ -2985,6 +3006,80 @@
      ]
     },
     {
+     "name": "Footprint",
+     "kind": "enum",
+     "file": "cadkit/haxe/src/cadkit/modeling/Footprint.hx",
+     "doc": "A flat shape centred on a position, for layout and clearance work. Millimetres.",
+     "fields": [
+      {
+       "name": "Circle",
+       "kind": "case",
+       "signature": "(diameter:Float)"
+      },
+      {
+       "name": "Rect",
+       "kind": "case",
+       "signature": "(width:Float, height:Float)"
+      }
+     ]
+    },
+    {
+     "name": "FootprintGeometry",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/modeling/FootprintGeometry.hx",
+     "doc": "What can be asked of a Footprint: its extent, distances and gaps, and the solid that cuts it.",
+     "fields": [
+      {
+       "name": "halfExtent",
+       "kind": "method",
+       "signature": "(f:Footprint):{x:Float, y:Float}",
+       "static": true,
+       "doc": "Half the shape's width and height."
+      },
+      {
+       "name": "grow",
+       "kind": "method",
+       "signature": "(f:Footprint, margin:Float):Footprint",
+       "static": true,
+       "doc": "The shape grown by a margin on every side."
+      },
+      {
+       "name": "maxRadius",
+       "kind": "method",
+       "signature": "(f:Footprint):Float",
+       "static": true,
+       "doc": "Radius of the smallest circle around the shape."
+      },
+      {
+       "name": "area",
+       "kind": "method",
+       "signature": "(f:Footprint):Float",
+       "static": true
+      },
+      {
+       "name": "distanceTo",
+       "kind": "method",
+       "signature": "(f:Footprint, fx:Float, fy:Float, px:Float, py:Float):Float",
+       "static": true,
+       "doc": "Distance from a point to the edge of the shape centred at (fx, fy), negative inside it."
+      },
+      {
+       "name": "gap",
+       "kind": "method",
+       "signature": "(a:Footprint, ax:Float, ay:Float, b:Footprint, bx:Float, by:Float):Float",
+       "static": true,
+       "doc": "Gap between two shapes (negative when they overlap), each centred at its own position."
+      },
+      {
+       "name": "solid",
+       "kind": "method",
+       "signature": "(f:Footprint, x:Float, y:Float, z0:Float, z1:Float):Part",
+       "static": true,
+       "doc": "The solid that cuts the shape through z0 to z1, centred at (x, y)."
+      }
+     ]
+    },
+    {
      "name": "Location",
      "kind": "class",
      "file": "cadkit/haxe/src/cadkit/modeling/Location.hx",
@@ -3440,6 +3535,28 @@
        "signature": "(sides:Int, acrossFlats:Float):Array<Vector>",
        "static": true,
        "doc": "Regular polygon with a flat-to-flat width and one flat facing +X."
+      }
+     ]
+    },
+    {
+     "name": "RoundedRectangle",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/modeling/RoundedRectangle.hx",
+     "doc": "A rounded rectangle centred on x and y, extruded in z.",
+     "fields": [
+      {
+       "name": "area",
+       "kind": "method",
+       "signature": "(width:Float, height:Float, radius:Float):Float",
+       "static": true,
+       "doc": "Plan area, for volume checks."
+      },
+      {
+       "name": "box",
+       "kind": "method",
+       "signature": "(width:Float, height:Float, radius:Float, z0:Float, z1:Float):Part",
+       "static": true,
+       "doc": "The rounded box spanning z0 to z1; the radius must be below half the smaller side."
       }
      ]
     },
@@ -16553,6 +16670,107 @@
        "name": "AxisMaximum",
        "kind": "case",
        "signature": ""
+      }
+     ]
+    },
+    {
+     "name": "ThreadSurface",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/threads/ThreadSurface.hx",
+     "doc": "A cosmetic thread's surface: a threaded face's own triangles, clipped to the thread's span and unwrapped so\na `ThreadTexture` tiles along the helix (u turns once per start around the axis, v advances one per pitch).\nIt never asks the kernel for another tessellation. Planes where the thread stops inside the face become ring\nsegments, drawn as edges. Shared by the editor and other viewers of tessellated CAD (the docs' catalogue).",
+     "fields": [
+      {
+       "name": "positions",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Flat xyz per vertex, in the input's units."
+      },
+      {
+       "name": "normals",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "uvs",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Flat uv per vertex."
+      },
+      {
+       "name": "triangles",
+       "kind": "var",
+       "signature": ":Array<Int>",
+       "final": true,
+       "doc": "Three vertex indices per triangle."
+      },
+      {
+       "name": "rings",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Ring segments where the thread ends inside its face: six values (two points) each."
+      },
+      {
+       "name": "outsidePositions",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "The rest of the face, outside the thread's span, as plain triangles (flat xyz positions and normals, three\nvertices per triangle): with the thread surface it covers the face, for viewers that replace the face rather\nthan draw over it."
+      },
+      {
+       "name": "outsideNormals",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "vertexCount",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "phase",
+       "kind": "method",
+       "signature": "(name:String):Float",
+       "static": true,
+       "doc": "A stable texture phase per face name, so neighbouring threads do not line up."
+      },
+      {
+       "name": "unwrap",
+       "kind": "method",
+       "signature": "(faceName:String, spec:ThreadSpecData, frame:Plane, length:Float, pitch:Float, ringAtStart:Bool, ringAtEnd:Bool, points:Array<Float>, normals:Array<Float>, faceTriangles:Array<Int>):ThreadSurface",
+       "static": true,
+       "doc": "Unwraps one face's triangles (`points` and `normals` flat xyz per vertex, `faceTriangles` three indices per\ntriangle) for a thread whose axis frame is `frame` (origin on the axis at the thread's start, normal along\nthe axis) running `length` along it, with `pitch` in the same units."
+      }
+     ]
+    },
+    {
+     "name": "ThreadTexture",
+     "kind": "class",
+     "file": "cadkit/haxe/src/cadkit/threads/ThreadTexture.hx",
+     "doc": "A cosmetic thread texture for `ThreadSurface` coordinates: analytic flanks and root shading for the thread's\nprofile, as a tangent-space normal map or a colour (shade) map, RGBA8 with explicit mip levels whose normals\nretain their mean length for specular antialiasing. One period of the texture is one turn per start along u and one pitch along v.",
+     "fields": [
+      {
+       "name": "SIZE",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "MIPS",
+       "kind": "var",
+       "signature": ":Int",
+       "static": true
+      },
+      {
+       "name": "pixels",
+       "kind": "method",
+       "signature": "(spec:ThreadSpecData, normal:Bool):Bytes",
+       "static": true,
+       "doc": "All mip levels, largest first, each SIZE >> level square."
       }
      ]
     },

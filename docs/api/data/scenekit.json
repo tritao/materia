@@ -186,6 +186,12 @@
        "signature": "(first:Int, second:Int, third:Int):GeometryData"
       },
       {
+       "name": "setClosed",
+       "kind": "method",
+       "signature": "(closed:Bool):GeometryData",
+       "doc": "Only declare a checked closed solid boundary; open or unknown meshes stay uncapped."
+      },
+      {
        "name": "setPrimitiveType",
        "kind": "method",
        "signature": "(primitiveType:Int):GeometryData"
@@ -896,7 +902,14 @@
       {
        "name": "subelement",
        "kind": "method",
-       "signature": "():Int"
+       "signature": "():Int",
+       "doc": "Face/edge id, or a negative cap tag. Use capPlane() to identify a cap."
+      },
+      {
+       "name": "capPlane",
+       "kind": "method",
+       "signature": "():Int",
+       "doc": "Zero-based renderer section plane, or -1 for a real surface/edge. Caps have no face id."
       },
       {
        "name": "worldX",
@@ -1508,6 +1521,18 @@
        "kind": "method",
        "signature": "(directions:Array<Float>, sky:Array<Float>, ground:Array<Float>, ?colors:Array<Float>):SceneView",
        "doc": "Sets three world-space directions, intensities, and optional RGB light colors."
+      },
+      {
+       "name": "setStudioEnvironment",
+       "kind": "method",
+       "signature": "(radii:Array<Float>, reflection:Float, exposure:Float):SceneView",
+       "doc": "Studio environment: each light's soft-panel angular radius in radians (zero keeps a point light), how\nstrongly surfaces reflect the sky/ground room [0,1], and the exposure before PBR Neutral tone mapping\n(zero shows clamped colour). Without this call studio lights are points, reflection is 0.6, no tone mapping."
+      },
+      {
+       "name": "setStudioEdges",
+       "kind": "method",
+       "signature": "(onLight:Array<Float>, onDark:Array<Float>, contrastLuminance:Float):SceneView",
+       "doc": "CAD edge colours with a studio environment (display RGB): `onLight` on most parts, `onDark` on parts whose\nbase colour has a linear luminance below `contrastLuminance`. Call after setStudioEnvironment."
       },
       {
        "name": "setStudioDetail",

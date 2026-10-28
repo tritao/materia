@@ -61,6 +61,12 @@
        "signature": "(start:Int, end:Int, replacement:String):Bool"
       },
       {
+       "name": "editSince",
+       "kind": "method",
+       "signature": "(previous:Int):Null<TextDocumentEdit>",
+       "doc": "The replacement that turned revision `previous` into the current one, or null when that took more than one\nreplacement (or none). Lets a view of the document update only what the edit touched."
+      },
+      {
        "name": "sliceCodepoints",
        "kind": "method",
        "signature": "(start:Int, end:Int):String"
@@ -99,6 +105,51 @@
        "name": "paragraphRangeAtIndex",
        "kind": "method",
        "signature": "(number:Int):TextRange"
+      }
+     ]
+    },
+    {
+     "name": "TextDocumentEdit",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/TextDocument.hx",
+     "doc": "One replacement, in code points: `[start, oldEnd)` of the previous text became `[start, newEnd)`.",
+     "fields": [
+      {
+       "name": "revision",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "The revision the replacement produced."
+      },
+      {
+       "name": "start",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "oldEnd",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "newEnd",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "previousCodepointCount",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true,
+       "doc": "The document's length before the replacement."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(revision:Int, start:Int, oldEnd:Int, newEnd:Int, previousCodepointCount:Int):Void"
       }
      ]
     },
@@ -303,10 +354,51 @@
      "doc": "An offset measured in UTF-8 bytes, always at a validated code-point boundary."
     },
     {
+     "name": "ViewportLight",
+     "kind": "class",
+     "file": "haxeon/packages/editor/src/haxeon/editor/ViewportLook.hx",
+     "doc": "One light of a viewport's studio rig, in camera space.",
+     "fields": [
+      {
+       "name": "direction",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Unit direction from the light into the scene, in camera space (x right, y up, z toward the viewer)."
+      },
+      {
+       "name": "intensity",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Irradiance scale: a surface facing the light receives `intensity` times its albedo."
+      },
+      {
+       "name": "color",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Linear RGB tint."
+      },
+      {
+       "name": "radius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Angular radius of the light's soft panel, in radians. A panel is what metal reflects; zero makes the light a\npoint that only gives a specular highlight."
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(direction:Array<Float>, intensity:Float, color:Array<Float>, radius:Float):Void"
+      }
+     ]
+    },
+    {
      "name": "ViewportLook",
      "kind": "class",
      "file": "haxeon/packages/editor/src/haxeon/editor/ViewportLook.hx",
-     "doc": "The neutral look of a 3D editor viewport, shared so that editors read the same: a light background\ngradient, a workplane grid, and a three-light studio rig that turns with the camera, with presets.\n\nColors are linear RGB triples and light directions are camera-space vectors, so this has no UI or\nrenderer dependency; each editor wraps them in its own color type and camera.",
+     "doc": "The look of a 3D editor viewport, shared so that every view of a part reads the same: a light background\ngradient, a workplane grid, and a studio rig of three lights that turns with the camera, with presets. A preset\nis the whole lighting: lights, the room's sky and ground light, how strongly surfaces reflect the room, contact\nobscurance, the roughness floor and the exposure. Edge lines contrast with their surface (`edgeColor`).\n\nColors are linear RGB triples and light directions are camera-space vectors, so this has no UI or renderer\ndependency; each editor wraps them in its own color type and camera, and renderers outside the editor (the docs'\ncomponent viewers) build the same environment from these numbers.",
      "fields": [
       {
        "name": "Studio",
@@ -349,6 +441,74 @@
        "doc": "Default workplane grid spacing, in metres."
       },
       {
+       "name": "EdgeContrastLuminance",
+       "kind": "var",
+       "signature": ":Float",
+       "static": true,
+       "doc": "Surfaces whose base colour has a linear luminance below this get `edgeOnDark` edges."
+      },
+      {
+       "name": "lights",
+       "kind": "var",
+       "signature": ":Array<ViewportLight>",
+       "final": true,
+       "doc": "Key, fill and rim, in that order."
+      },
+      {
+       "name": "sky",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true,
+       "doc": "Room light from above and from below: the ambient term, and what surfaces reflect away from the lights."
+      },
+      {
+       "name": "ground",
+       "kind": "var",
+       "signature": ":Array<Float>",
+       "final": true
+      },
+      {
+       "name": "reflection",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "How strongly surfaces reflect the room, in [0, 1]."
+      },
+      {
+       "name": "occlusionRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Contact obscurance radius, in metres; zero disables it."
+      },
+      {
+       "name": "occlusionStrength",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Contact obscurance strength and angular bias, in [0, 1]."
+      },
+      {
+       "name": "occlusionBias",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "roughnessFloor",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Display-only minimum roughness, which broadens highlights on polished CAD faces."
+      },
+      {
+       "name": "exposure",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true,
+       "doc": "Exposure before tone mapping; zero shows shading clamped, without tone mapping."
+      },
+      {
        "name": "backgroundTop",
        "kind": "method",
        "signature": "():Array<Float>",
@@ -361,32 +521,31 @@
        "static": true
       },
       {
-       "name": "lightDirections",
+       "name": "edgeOnLight",
        "kind": "method",
-       "signature": "():Array<Array<Float>>",
+       "signature": "():Array<Float>",
        "static": true,
-       "doc": "Directions from each of the three lights into the scene, in camera space (x right, y up, z toward\nthe viewer). Shaders take the direction toward the light, so callers pass the negated vector."
+       "doc": "Edge lines on light surfaces: near black (display sRGB)."
       },
       {
-       "name": "intensities",
+       "name": "edgeOnDark",
        "kind": "method",
-       "signature": "(preset:Int):Array<Float>",
+       "signature": "():Array<Float>",
        "static": true,
-       "doc": "Key, fill and rim intensities, in the order of `lightDirections`."
+       "doc": "Edge lines on dark surfaces (black oxide, rubber, dark paint): a light grey, so their edges stay readable."
       },
       {
-       "name": "sky",
+       "name": "edgeColor",
        "kind": "method",
-       "signature": "(preset:Int):Array<Float>",
+       "signature": "(surface:Array<Float>):Array<Float>",
        "static": true,
-       "doc": "Ambient light from above."
+       "doc": "The edge colour for a surface of sRGB base colour `surface`."
       },
       {
-       "name": "ground",
+       "name": "preset",
        "kind": "method",
-       "signature": "(preset:Int):Array<Float>",
-       "static": true,
-       "doc": "Ambient light from below."
+       "signature": "(preset:Int):ViewportLook",
+       "static": true
       }
      ]
     }
