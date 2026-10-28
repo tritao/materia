@@ -11,7 +11,6 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Authors reusable component definitions, occurrences, and semantic joints. */

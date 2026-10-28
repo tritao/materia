@@ -1,6 +1,5 @@
 import cadkit.modeling.Location;
 import cadkit.modeling.Vector;
-import cadkit.sheetmetal.BendRule;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.OutlineGeometry;
 import cadkit.sheetmetal.OutlineBoolean;

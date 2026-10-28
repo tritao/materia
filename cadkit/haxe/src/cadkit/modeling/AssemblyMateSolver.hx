@@ -14,7 +14,6 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 import cadkit.modeling.AssemblySolve.AssemblySolveOptions;
 import cadkit.modeling.AssemblySolve.AssemblySolveSettings;
 

@@ -5,7 +5,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
-import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Feature;
 import cadkit.parametric.GeometricConnectors;
 import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
