@@ -3,7 +3,7 @@ package stockkit;
 /** How a stock preview colours its surfaces. Colours are 0xRRGGBBAA. */
 enum StockColoring {
   /** Surfaces take the colour of the move that made them; untouched stock takes `original`. */
-  BySource(color:CutMove->Int, original:Int);
+  BySource(color:CutMove -> Int, original:Int);
   /**
     Against a target stock on the same lattice: gouges deeper than
     `tolerance` in `gouge`, leftover thicker than `tolerance` in `leftover`,

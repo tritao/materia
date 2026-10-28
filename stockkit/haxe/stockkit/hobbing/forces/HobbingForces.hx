@@ -37,7 +37,7 @@ class HobbingForces {
     workRadius:Float,
     pressureAngle:Float,
     edgeWidth:Float,
-    ? material:KienzleMaterial
+    ?material:KienzleMaterial
   ) {
     for (v in [workRadius, pressureAngle, edgeWidth]) if (!Math.isFinite(v)) throw "invalid force setup";
     if (workRadius <= 0

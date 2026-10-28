@@ -28,17 +28,56 @@ class CutMoveTests {
     var stock = stockkit.Stock.empty(lattice);
     Assert.near(stock.volume(), 0.0, "empty stock holds nothing", 1e-18);
     var height = 0.0002, width = 0.0005, flat = width / 2 - height / 2, radius = height / 2;
-    var bead = Tool.shaped(1, height, new CutterProfile([
-      Line(0, 0, flat, 0, Cutting),
-      Arc(flat, radius, flat, 0, flat + radius, radius, Cutting),
-      Arc(flat, radius, flat + radius, radius, flat, height, Cutting)
-    ]));
+    var bead = Tool.shaped(
+      1,
+      height,
+      new CutterProfile([
+        Line(0, 0, flat, 0, Cutting),
+        Arc(
+          flat,
+          radius,
+          flat,
+          0,
+          flat + radius,
+          radius,
+          Cutting
+        ),
+        Arc(
+          flat,
+          radius,
+          flat + radius,
+          radius,
+          flat,
+          height,
+          Cutting
+        )
+      ])
+    );
     var source = Provenance.cam(1);
-    function laid(z:Float, from:Float, to:Float):stockkit.CutMove
-      return new stockkit.CutMove(bead, Path(Line(new Point3(from, 0.0, z), new Point3(to, 0.0, z))), Cut, 0, source);
+    function laid(z:Float, from:Float, to:Float):stockkit.CutMove return new stockkit.CutMove(
+      bead,
+      Path(Line(
+        new Point3(
+          from,
+          0.0,
+          z
+        ),
+        new Point3(
+          to,
+          0.0,
+          z
+        )
+      )),
+      Cut,
+      0,
+      source
+    );
     var area = (width - height) * height + Math.PI * height * height / 4;
     var first = stock.add([laid(0.0, 0.0, 0.008)])[0];
-    Assert.check(first > area * 0.008 && first < area * 0.008 * 1.15, "a bead adds its section times its length and a little for its ends");
+    Assert.check(
+      first > area * 0.008 && first < area * 0.008 * 1.15,
+      "a bead adds its section times its length and a little for its ends"
+    );
     Assert.near(stock.volume(), first, "the stock holds what was added", 1e-15);
     Assert.near(stock.add([laid(0.0, 0.0, 0.008)])[0], 0.0, "a bead inside material adds nothing", 1e-15);
     var second = stock.add([laid(height, 0.0, 0.008)])[0];
@@ -57,59 +96,182 @@ class CutMoveTests {
     var source = Provenance.cam(7, "face:3");
     var start = new Point3(0.01, 0.01, 0.002);
     var end = new Point3(0.02, 0.01, -0.001);
-    var program = new ToolpathProgram([
-      Move(Rapid, Line(start, end), 0, 0, source),
-      ToolChange(8, source),
-      ToolLengthOffset(8, 0.003, source),
-      Move(Ramp, Line(start, end), 0.001, 0, source),
-      Move(Retract, Line(end, start), 0, 0, source),
-      MachineMove(Rapid, Line(start, end), 0, 0, source)
-    ], library, [new Setup("1", new Point3(0, 0, 0))]);
+    var program = new ToolpathProgram(
+      [
+        Move(Rapid, Line(start, end), 0, 0, source),
+        ToolChange(8, source),
+        ToolLengthOffset(
+          8,
+          0.003,
+          source
+        ),
+        Move(
+          Ramp,
+          Line(
+            start,
+            end
+          ),
+          0.001,
+          0,
+          source
+        ),
+        Move(
+          Retract,
+          Line(
+            end,
+            start
+          ),
+          0,
+          0,
+          source
+        ),
+        MachineMove(
+          Rapid,
+          Line(
+            start,
+            end
+          ),
+          0,
+          0,
+          source
+        )
+      ],
+      library,
+      [new Setup(
+        "1",
+        new Point3(
+          0,
+          0,
+          0
+        )
+      )]
+    );
     var moves = CutMoves.fromProgram(program);
-    Assert.check(moves.length == 2 && moves[0].kind == Ramp &&
-      moves[1].kind == Retract && moves[1].rapid,
-      "shared move kinds reach stock simulation");
-    Assert.check(moves[0].operationId == "cam:7" &&
-      moves[0].featureRef == "face:3" && moves[0].toolId == 8 &&
-      moves[0].provenance == source,
-      "stock move retains operation, feature, tool and provenance");
+    Assert.check(
+      moves.length == 2 && moves[0].kind == Ramp && moves[1].kind == Retract && moves[1].rapid,
+      "shared move kinds reach stock simulation"
+    );
+    Assert.check(
+      moves[0].operationId == "cam:7"
+      && moves[0].featureRef == "face:3" && moves[0].toolId == 8 && moves[0].provenance == source,
+      "stock move retains operation, feature, tool and provenance"
+    );
     switch moves[0].motion {
       case Path(Line(a, b)):
         // H8 claims 3 mm but tool 8 measures 0: the real tip rides 3 mm high.
         Assert.near(a.z, 0.005, "a wrong H length lifts the start off its programmed tip", 1e-12);
         Assert.near(b.z, 0.002, "a wrong H length lifts the end off its programmed tip", 1e-12);
-      case _: Assert.check(false, "ramp remains a line");
+      case _:
+        Assert.check(false, "ramp remains a line");
     }
     var measured = new ToolLibrary();
     measured.set(new Tool(8, 0.003, 0.004));
-    var matched = CutMoves.fromProgram(new ToolpathProgram([
-      ToolChange(8, source),
-      ToolLengthOffset(8, 0.003, source),
-      Move(Ramp, Line(start, end), 0.001, 0, source),
-      ToolLengthOffset(0, 0.0, source),
-      Move(Ramp, Line(start, end), 0.001, 0, source)
-    ], measured, [new Setup("1", new Point3(0, 0, 0))]));
+    var matched = CutMoves.fromProgram(new ToolpathProgram(
+      [
+        ToolChange(8, source),
+        ToolLengthOffset(8, 0.003, source),
+        Move(
+          Ramp,
+          Line(
+            start,
+            end
+          ),
+          0.001,
+          0,
+          source
+        ),
+        ToolLengthOffset(
+          0,
+          0.0,
+          source
+        ),
+        Move(
+          Ramp,
+          Line(
+            start,
+            end
+          ),
+          0.001,
+          0,
+          source
+        )
+      ],
+      measured,
+      [new Setup(
+        "1",
+        new Point3(
+          0,
+          0,
+          0
+        )
+      )]
+    ));
     switch [matched[0].motion, matched[1].motion] {
       case [Path(Line(a, _)), Path(Line(b, _))]:
         Assert.near(a.z, start.z, "with G43 H matching the tool, the tip is the programmed point", 1e-12);
         Assert.near(b.z, start.z - 0.003, "after G49 the programmed point is the gauge line", 1e-12);
-      case _: Assert.check(false, "matched stock cuts remain lines");
+      case _:
+        Assert.check(false, "matched stock cuts remain lines");
     }
-    var placed = new ToolpathProgram([
-      ToolChange(8, source),
-      Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
-        0.01, 0, source),
-      SetSetup("2", source),
-      Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
-        0.01, 0, source)
-    ], library, [new Setup("1", new Point3(0, 0, 0)),
-      new Setup("2", new Point3(0.1, 0, 0))]);
+    var placed = new ToolpathProgram(
+      [
+        ToolChange(8, source),
+        Move(
+          Cut,
+          Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
+          0.01,
+          0,
+          source
+        ),
+        SetSetup(
+          "2",
+          source
+        ),
+        Move(
+          Cut,
+          Line(
+            new Point3(
+              0,
+              0,
+              0
+            ),
+            new Point3(
+              0.01,
+              0,
+              0
+            )
+          ),
+          0.01,
+          0,
+          source
+        )
+      ],
+      library,
+      [
+        new Setup(
+          "1",
+          new Point3(
+            0,
+            0,
+            0
+          )
+        ),
+        new Setup(
+          "2",
+          new Point3(
+            0.1,
+            0,
+            0
+          )
+        )
+      ]
+    );
     var placedMoves = CutMoves.fromProgram(placed);
     switch [placedMoves[0].motion, placedMoves[1].motion] {
       case [Path(Line(_, first)), Path(Line(_, second))]:
-        Assert.near(second.x - first.x, 0.1,
-          "stock moves follow the program's active setup", 1e-12);
-      case _: Assert.check(false, "placed stock cuts remain lines");
+        Assert.near(second.x - first.x, 0.1, "stock moves follow the program's active setup", 1e-12);
+      case _:
+        Assert.check(false, "placed stock cuts remain lines");
     }
   }
 
@@ -124,12 +286,14 @@ class CutMoveTests {
     Assert.check(rejected, "a diameter that contradicts the shape is rejected");
 
     var plain = new Tool(5, 0.0, 0.004);
-    Assert.near(plain.profile().cuttingDiameter(), 0.004,
-      "a diameter-only tool simulates as a flat mill", 1e-15);
-    Assert.near(plain.profile().height(), Tool.DEFAULT_FLUTE_LENGTH,
-      "with the default flute length when its length is unknown", 1e-15);
-    Assert.near(new Tool(5, 0.03, 0.004).profile().height(), 0.03,
-      "or flutes over its whole length", 1e-15);
+    Assert.near(plain.profile().cuttingDiameter(), 0.004, "a diameter-only tool simulates as a flat mill", 1e-15);
+    Assert.near(
+      plain.profile().height(),
+      Tool.DEFAULT_FLUTE_LENGTH,
+      "with the default flute length when its length is unknown",
+      1e-15
+    );
+    Assert.near(new Tool(5, 0.03, 0.004).profile().height(), 0.03, "or flutes over its whole length", 1e-15);
     rejected = false;
     try new Tool(6, 0.0, 0.0).profile() catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "a tool with no size has nothing to simulate");
@@ -141,31 +305,47 @@ class CutMoveTests {
 
   static function camProgram():Void {
     var contour = new CamContour([
-      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
-      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0),
+      new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0),
+      new Point3(
+        0.01,
+        0.015,
+        0
+      )
     ]);
     var small = new Tool(2, 0.0, 0.002);
     var large = Tool.shaped(3, 0.0, CutterProfile.bullNose(0.006, 0.001, 0.02));
-    var program = new CamJob(0.005, 12000)
-      .pocket(contour, small, -0.002, 0.01, 0.0015, 0.001)
-      .profile(contour, large, -0.003, 0.01)
-      .finish();
+    var program = new CamJob(0.005, 12000).pocket(contour, small, -0.002, 0.01, 0.0015, 0.001).profile(
+      contour,
+      large,
+      -0.003,
+      0.01
+    ).finish();
     Assert.check(program.tools.tool(3) == large, "CAM programs keep the tools they use");
     // CAM retracts before each tool change; the first retract has no tool loaded.
     var motions = 0, loaded = false;
     for (op in program.ops) switch op {
-      case ToolChange(_, _): loaded = true;
-      case Move(_, _, _, _, _): if (loaded) motions++;
+      case ToolChange(_, _):
+        loaded = true;
+      case Move(_, _, _, _, _):
+        if (loaded) motions++;
       case _:
     }
     var moves = CutMoves.fromProgram(program);
     Assert.check(moves.length == motions, "every CAM motion with a tool loaded becomes a cut move");
-    Assert.check(moves[0].tool == small && moves[moves.length - 1].tool == large,
-      "moves follow the CAM tool changes");
+    Assert.check(moves[0].tool == small && moves[moves.length - 1].tool == large, "moves follow the CAM tool changes");
     var rejected = false;
-    try new CamJob(0.005, 12000).pocket(contour, small, -0.002, 0.01, 0.0015, 0.001)
-      .profile(contour, new Tool(2, 0.0, 0.004), -0.003, 0.01)
-    catch (_:Dynamic) rejected = true;
+    try new CamJob(0.005, 12000).pocket(contour, small, -0.002, 0.01, 0.0015, 0.001).profile(
+      contour,
+      new Tool(
+        2,
+        0.0,
+        0.004
+      ),
+      -0.003,
+      0.01
+    ) catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "a CAM job cannot reuse a tool number for another tool");
   }
 

@@ -30,12 +30,12 @@ class GashPass {
     if (last - first > 2000000) throw "gash schedule exceeds two million passes";
     var result:Array<GashPass> = [];
     for (k in first...last + 1) {
-      var center = k * step / omega, start = Math.max(0,(k * step - halfAngle) / omega), end = Math.min(
+      var center = k * step / omega, start = Math.max(0, (k * step - halfAngle) / omega), end = Math.min(
         duration,
         (k * step + halfAngle) / omega
       );
       if (start >= end) continue;
-      var gash =(-k) % gashes;
+      var gash = (-k) % gashes;
       if (gash < 0) gash += gashes;
       result.push(new GashPass(gash, k - first, start, center, end));
     }
@@ -55,7 +55,7 @@ class GashPass {
       var t0 = Math.max(start.time, motion.timeAtMaster(k * step - halfAngle));
       var t1 = Math.min(end.time, motion.timeAtMaster(k * step + halfAngle));
       if (t0 >= t1) continue;
-      var gash =(-k) % gashes;
+      var gash = (-k) % gashes;
       if (gash < 0) gash += gashes;
       result.push(new GashPass(gash, k - first, t0, motion.timeAtMaster(k * step), t1));
     }

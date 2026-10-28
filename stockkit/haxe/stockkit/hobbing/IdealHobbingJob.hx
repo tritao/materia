@@ -41,7 +41,7 @@ class IdealHobbingJob {
     if (!Math.isFinite(duration) || duration <= 0) throw "job duration must be finite and positive";
     centerDistance = spec.pitchRadius() + hob.pitchDiameter / 2 + spec.profileShift * spec.module;
     var pitch = 2 * Math.PI / spec.teeth;
-    var phase =(Math.PI / spec.teeth - Math.PI / 2) % pitch;
+    var phase = (Math.PI / spec.teeth - Math.PI / 2) % pitch;
     if (phase < 0) phase += pitch;
     tablePhase = phase - shift * Math.cos(hob.leadAngle) / spec.pitchRadius();
   }
@@ -50,7 +50,7 @@ class IdealHobbingJob {
     return new HobbingAxes(centerDistance, shift, zStart + feed * c / (2 * Math.PI), -hob.leadAngle, b, c + tablePhase);
   }
   public function schedule(grid:RingGrid):Array<GashPass> {
-    var limit =(centerDistance - grid.radiusMax) / (hob.outsideDiameter / 2);
+    var limit = (centerDistance - grid.radiusMax) / (hob.outsideDiameter / 2);
     if (limit >= 1) throw "hob does not reach stock";
     var half = Math.acos(Math.max(-1, limit)) + Math.abs(hob.rake) + 0.01;
     return GashPass.constantSpeed(hob.gashes, rpm, duration, Math.min(Math.PI / 2, half));

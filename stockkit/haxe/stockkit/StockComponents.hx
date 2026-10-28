@@ -1,8 +1,9 @@
 package stockkit;
 
-private typedef LabelledInterval = {var lo: Float;
-var hi:Float;
-var label:Int;
+private typedef LabelledInterval = {
+  var lo:Float;
+  var hi:Float;
+  var label:Int;
 }
 private class ComponentAccum {
   public var parent:Int;
@@ -47,7 +48,7 @@ class StockComponents {
     supportPlaneZ:Float = 0,
     tolerance:Float = 1e-12,
     regionCount:Int = 1,
-    regionAt:Null<Float -> Float -> Int > = null
+    regionAt:Null<Float -> Float -> Int> = null
   ):Array<StockComponent> return fromRows(
     stock.grid,
     row -> stock.rays(
@@ -68,7 +69,7 @@ class StockComponents {
     supportPlaneZ:Float = 0,
     tolerance:Float = 1e-12,
     regionCount:Int = 1,
-    regionAt:Null<Float -> Float -> Int > = null
+    regionAt:Null<Float -> Float -> Int> = null
   ):Array<StockComponent> {
     if (grid.axis != Z || grid.countU < 1
       || grid.countV < 1 || !Math.isFinite(grid.spacing) || grid.spacing <= 0 || !Math.isFinite(grid.originU)
@@ -124,7 +125,7 @@ class StockComponents {
           }
           label = root(label);
           var component = nodes[label];
-          component.volume +=(interval.hi - interval.lo) * cellArea;
+          component.volume += (interval.hi - interval.lo) * cellArea;
           component.samples++;
           if (interval.lo <= supportPlaneZ + tolerance && interval.hi > supportPlaneZ + tolerance) {
             var region = regionAt == null ? 0 : regionAt(grid.u(i), grid.v(j));
@@ -138,8 +139,7 @@ class StockComponents {
           component.max[1] = Math.max(component.max[1], grid.v(j) + half);
           component.min[2] = Math.min(component.min[2], interval.lo);
           component.max[2] = Math.max(component.max[2], interval.hi);
-          ray.push({lo: interval.lo, hi: interval.hi, label: label}
-          );
+          ray.push({lo: interval.lo, hi: interval.hi, label: label});
         }
         current.push(ray);
       }
@@ -153,7 +153,7 @@ class StockComponents {
       result.push(new StockComponent(n.seedRay, n.seedZ, area, n.volume, n.min.copy(), n.max.copy(), n.samples, areas));
     }
     result.sort((a,
-      b) -> a.seedRay == b.seedRay ?(a.seedZ<b.seedZ ? -1 : a.seedZ> b.seedZ ? 1 : 0) : a.seedRay - b.seedRay);
+      b) -> a.seedRay == b.seedRay ? (a.seedZ < b.seedZ ? -1 : a.seedZ > b.seedZ ? 1 : 0) : a.seedRay - b.seedRay);
     return result;
   }
 }

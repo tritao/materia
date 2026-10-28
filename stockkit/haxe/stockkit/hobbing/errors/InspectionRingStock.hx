@@ -5,7 +5,7 @@ import stockkit.ring.RingGrid;
 import stockkit.ring.RingStock;
 import stockkit.ring.RingInterval;
 
-typedef InspectionSlice = {first: Int, last: Int, low: Float, high: Float};
+typedef InspectionSlice = {first:Int, last:Int, low:Float, high:Float};
 
 /** Physical rake stock only at the circles read by GearMeasurement: all radial
     samples at profile/pitch Z, all axial samples bracketing measurement radius.
@@ -28,7 +28,7 @@ class InspectionRingStock implements GearRings {
     if (value < values[0] || value > values[values.length - 1]) return -1;
     var lo = 0, hi = values.length - 1;
     while (hi - lo > 1) {
-      var mid =(lo + hi) >> 1;
+      var mid = (lo + hi) >> 1;
       if (values[mid] <= value) lo = mid;
       else hi = mid;
     }
@@ -44,9 +44,9 @@ class InspectionRingStock implements GearRings {
       var baseLow = min + lo * step, baseHigh = hi == values.length - 1 ? max : min + (hi + 1) * step;
       // Rounded domain bounds can otherwise move a retained centre by one ULP.
       // Search nearby bounds, accepting ONLY exact original sample coordinates.
-      for (da in - 2...3) for (db in - 2...3) {
+      for (da in -2...3) for (db in -2...3) {
         var a = baseLow + da * ulp(baseLow),
-          b = baseHigh + db * ulp(baseHigh), delta =(b - a) / (hi - lo + 1), same = true;
+          b = baseHigh + db * ulp(baseHigh), delta = (b - a) / (hi - lo + 1), same = true;
         for (i in lo...hi + 1) if (a + (i - lo + 0.5) * delta != values[i]) {
           same = false;
           break;
@@ -97,7 +97,7 @@ class InspectionRingStock implements GearRings {
   public function radii():Array<Float> return [for (i in 0...grid.radialCount) grid.radius(i)];
   public function axialPositions():Array<Float> return [for (i in 0...grid.axialCount) grid.z(i)];
   public function contains(r:Int,
-    z:Int):Bool return(z >= axial.first && z <= axial.last) || (r >= radial.first && r <= radial.last);
+    z:Int):Bool return (z >= axial.first && z <= axial.last) || (r >= radial.first && r <= radial.last);
   public function circle(r:Int, z:Int):Array<RingInterval> {
     grid.radius(r);
     grid.z(z);

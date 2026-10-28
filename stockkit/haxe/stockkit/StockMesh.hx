@@ -17,8 +17,15 @@ class StockMesh {
   public final colors:Bytes;
   public final triangleSources:Bytes;
 
-  public function new(vertexCount:Int, triangleCount:Int, positions:Bytes, normals:Bytes,
-      indices:Bytes, colors:Bytes, triangleSources:Bytes) {
+  public function new(
+    vertexCount:Int,
+    triangleCount:Int,
+    positions:Bytes,
+    normals:Bytes,
+    indices:Bytes,
+    colors:Bytes,
+    triangleSources:Bytes
+  ) {
     this.vertexCount = vertexCount;
     this.triangleCount = triangleCount;
     this.positions = positions;

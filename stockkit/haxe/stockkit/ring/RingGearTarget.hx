@@ -58,7 +58,7 @@ class RingGearTarget {
       // Root parameter runs flank->root; tip parameter runs flank->tip.
       var increasing = root ? spec.internal : !spec.internal;
       for (_ in 0...64) {
-        var t =(a + b) / 2;
+        var t = (a + b) / 2;
         var p = root ? profile.rootFillet(t) : profile.tipFillet(t);
         if ((p.radius() < radius) == increasing) a = t;
         else b = t;
@@ -68,7 +68,7 @@ class RingGearTarget {
     var half = Math.atan2(point.x, point.y), pitch = full / spec.teeth;
     var spans:Array<RingInterval> = [];
     for (tooth in 0...spec.teeth) {
-      var centre =(Math.PI / 2 + tooth * pitch) % full;
+      var centre = (Math.PI / 2 + tooth * pitch) % full;
       var left = centre - half, right = centre + half;
       if (left < 0) {
         spans.push(new RingInterval(0, right, -1, -1, -1, -1));

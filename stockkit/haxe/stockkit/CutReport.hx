@@ -9,8 +9,7 @@ class CutReport {
   }
 
   /** Volume each move removed, in the order given. */
-  public function removed():Array<Float>
-    return [for (outcome in moves) outcome.removed];
+  public function removed():Array<Float> return [for (outcome in moves) outcome.removed];
 
   public function removedVolume():Float {
     var total = 0.0;
@@ -19,23 +18,22 @@ class CutReport {
   }
 
   /** Rapid moves that removed more than `tolerance` of material (cubic metres). */
-  public function rapidContacts(tolerance:Float = 0.0):Array<MoveOutcome>
-    return [for (outcome in moves) if (outcome.move.rapid && outcome.removed > tolerance) outcome];
+  public function rapidContacts(tolerance:Float = 0.0):Array<MoveOutcome
+    > return [for (outcome in moves) if (outcome.move.rapid && outcome.removed > tolerance) outcome];
 
   /** Moves whose shank or holder overlapped more than `tolerance` of stock (cubic metres). */
-  public function collisions(tolerance:Float = 0.0):Array<MoveOutcome>
-    return [for (outcome in moves)
-      if (outcome.shankContact > tolerance || outcome.holderContact > tolerance) outcome];
+  public function collisions(tolerance:Float = 0.0):Array<MoveOutcome
+    > return [for (outcome in moves) if (outcome.shankContact > tolerance
+    || outcome.holderContact > tolerance) outcome];
 
   /** Totals per source operation, in order of first appearance. */
   public function byOperation():Array<OperationTotals> {
     var totals:Array<OperationTotals> = [];
     for (outcome in moves) {
       var entry:Null<OperationTotals> = null;
-      for (candidate in totals) if (candidate.toolId == outcome.move.toolId &&
-          candidate.operationId == outcome.move.operationId &&
-          (candidate.operationId != null || candidate.opIndex == outcome.move.opIndex))
-        entry = candidate;
+      for (candidate in totals) if (candidate.toolId == outcome.move.toolId
+        && candidate.operationId == outcome.move.operationId
+        && (candidate.operationId != null || candidate.opIndex == outcome.move.opIndex)) entry = candidate;
       if (entry == null) {
         entry = new OperationTotals(outcome.move);
         totals.push(entry);

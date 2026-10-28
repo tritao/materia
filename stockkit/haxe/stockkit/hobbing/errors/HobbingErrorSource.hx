@@ -10,13 +10,13 @@ class HobbingErrorSource {
   public final part:String;
   public final basis:String;
   public final apply:(Float, HobbingAxes) -> HobbingAxes;
-  public final warp:Null<Point3 -> Point3 >;
+  public final warp:Null<Point3 -> Point3>;
   public function new(
     id:String,
     part:String,
     basis:String,
     apply:(Float, HobbingAxes) -> HobbingAxes,
-    ? warp:Point3 -> Point3
+    ?warp:Point3 -> Point3
   ) {
     if (id == null || id.length == 0
       || part == null || part.length == 0 || basis == null || basis.length == 0) throw "error source needs provenance";
@@ -40,15 +40,13 @@ class HobbingErrorSource {
     return new HobbingErrorSource(id, part, 'eccentricity $e mm, phase $phase rad; fixed in rotating work frame',
       (t, a) -> shifted(a, o -> {o.workX += e * Math.cos(phase);
     o.workY += e * Math.sin(phase);
-    }
-    ));
+    }));
   }
   public static function tableAxial(part:String, tir:Float):HobbingErrorSource {
     amplitude(tir);
     return new HobbingErrorSource("table-axial", part,
-      'assumed axial TIR $tir mm /2, once per C turn',(t, a) -> shifted(a, o -> {o.workZ += tir / 2 * Math.cos(a.c);
-    }
-    ));
+      'assumed axial TIR $tir mm /2, once per C turn', (t, a) -> shifted(a, o -> {o.workZ += tir / 2 * Math.cos(a.c);
+    }));
   }
   /** Load-induced tilt, separate from axial TIR. Force is machine-radial N;
       bearing pivot depth/force height mm, moment stiffness Nm/rad. */
@@ -75,24 +73,20 @@ class HobbingErrorSource {
     o.workPivotZ = -pivotDepth;
     o.workTiltX -= theta * Math.sin(a.c);
     o.workTiltY -= theta * Math.cos(a.c);
-    }
-    );
-    }
-    );
+    });
+    });
   }
   public static function hobRadial(part:String, tir:Float):HobbingErrorSource {
     amplitude(tir);
     return new HobbingErrorSource("hob-radial",
-      part, 'radial TIR $tir mm /2, offset fixed to B rotor',(t, a) -> shifted(a, o -> {o.toolX += tir / 2;
-    }
-    ));
+      part, 'radial TIR $tir mm /2, offset fixed to B rotor', (t, a) -> shifted(a, o -> {o.toolX += tir / 2;
+    }));
   }
   public static function hobAxial(part:String, tir:Float):HobbingErrorSource {
     amplitude(tir);
     return new HobbingErrorSource("hob-axial", part, 'assumed sinusoidal axial TIR $tir mm /2 once per B turn',
       (t, a) -> shifted(a, o -> {o.toolZ += tir / 2 * Math.cos(a.b);
-    }
-    ));
+    }));
   }
   public static function encoder(part:String, e:Float, radius:Float):HobbingErrorSource {
     amplitude(e);
@@ -165,13 +159,12 @@ class HobbingErrorSource {
     amplitude(delay);
     if (!Math.isFinite(ratio)) throw "invalid sync ratio";
     return new HobbingErrorSource("sync", part, predict
-      ? "diagnostic delayed master with first-order prediction" : "diagnostic delayed master without prediction",(
+      ? "diagnostic delayed master with first-order prediction" : "diagnostic delayed master without prediction", (
         t,
         a
       ) -> {var error = ratio * (master(t - delay) + (predict ? delay * velocity(t - delay) : 0) - master(t));
     return new HobbingAxes(a.x, a.y, a.z, a.a, a.b, a.c + error, a.offset);
-    }
-    );
+    });
   }
   /** Assumed radial form waveform on a zero-rake hob's planar rake regions.
       Does not claim a measured profile map or arbitrary-rake planarity. */
@@ -179,25 +172,23 @@ class HobbingErrorSource {
     amplitude(peak);
     if (!Math.isFinite(pitch) || pitch <= 0) throw "invalid profile error pitch";
     return new HobbingErrorSource("hob-profile",
-      part, 'assumed sinusoidal radial form peak $peak mm per axial pitch $pitch mm; zero rake only',(
+      part, 'assumed sinusoidal radial form peak $peak mm per axial pitch $pitch mm; zero rake only', (
         t,
         a
       ) -> a, p -> {var r = Math.sqrt(p.x * p.x + p.y * p.y);
     var error = peak * Math.sin(2 * Math.PI * p.z / pitch), scale = r == 0 ? 1 : 1 + error / r;
     return new Point3(p.x * scale, p.y * scale, p.z);
-    }
-    );
+    });
   }
   public static function wall(part:String, stiffness:Float, radialForce:Float -> Float):HobbingErrorSource {
     if (!Math.isFinite(stiffness) || stiffness <= 0) throw "supported wall stiffness must be stated in N/mm";
     return new HobbingErrorSource("wall", part,
-      "quasistatic local wall recession F/k; supported stiffness explicitly supplied, not inferred from pressure",(
+      "quasistatic local wall recession F/k; supported stiffness explicitly supplied, not inferred from pressure", (
         t,
         a
       ) -> {var force = radialForce(t);
     amplitude(force);
     return new HobbingAxes(a.x + force / stiffness, a.y, a.z, a.a, a.b, a.c, a.offset);
-    }
-    );
+    });
   }
 }

@@ -44,8 +44,15 @@ class Stock {
   }
 
   /** A solid box; rays on its sides count as inside. */
-  public static function box(lattice:StockLattice, minX:Float, minY:Float, minZ:Float,
-      maxX:Float, maxY:Float, maxZ:Float):Stock {
+  public static function box(
+    lattice:StockLattice,
+    minX:Float,
+    minY:Float,
+    minZ:Float,
+    maxX:Float,
+    maxY:Float,
+    maxZ:Float
+  ):Stock {
     var box = new sk_box();
     box.set_struct_size(sk_box.size());
     box.set_min(0, minX);
@@ -64,8 +71,7 @@ class Stock {
     `positions` holds xyz triples and `indices` vertex triples. A ray through
     a shared edge or vertex is counted exactly once.
   **/
-  public static function fromTriangles(lattice:StockLattice, positions:Array<Float>,
-      indices:Array<Int>):Stock {
+  public static function fromTriangles(lattice:StockLattice, positions:Array<Float>, indices:Array<Int>):Stock {
     var created = StockKitNative.sk_stock_create_mesh(nativeLattice(lattice), positions, indices);
     check(created.status, "stock.fromTriangles");
     return new Stock(lattice, created.out_stock);
@@ -107,9 +113,13 @@ class Stock {
       for (index in start...end) {
         var outcome = result.out_results[index - start];
         history.push(moves[index]);
-        outcomes.push(new MoveOutcome(first + index - start, moves[index], outcome.get_removed(),
+        outcomes.push(new MoveOutcome(
+          first + index - start,
+          moves[index],
+          outcome.get_removed(),
           outcome.get_contact(StockKitNativeConstants.SK_ZONE_SHANK),
-          outcome.get_contact(StockKitNativeConstants.SK_ZONE_HOLDER)));
+          outcome.get_contact(StockKitNativeConstants.SK_ZONE_HOLDER)
+        ));
       }
       start = end;
     }
@@ -151,18 +161,25 @@ class Stock {
     alive();
     target.alive();
     var along = gridAlong(axis);
-    var result = StockKitNative.sk_stock_compare(owner.borrow(), target.owner.borrow(), nativeAxis(along.axis),
-      0, 0, along.countU, along.countV, along.rayCount());
+    var result = StockKitNative.sk_stock_compare(
+      owner.borrow(),
+      target.owner.borrow(),
+      nativeAxis(along.axis),
+      0,
+      0,
+      along.countU,
+      along.countV,
+      along.rayCount()
+    );
     check(result.status, "stock.compare");
     var rays = result.out_comparisons;
-    return new StockComparison(along, [for (ray in rays) ray.get_leftover()],
-      [for (ray in rays) ray.get_gouge()], [for (ray in rays) ray.get_largest_leftover()],
-      [for (ray in rays) ray.get_largest_gouge()],
-      [for (ray in rays) {
-        var source = ray.get_gouge_source();
-        source == StockKitNativeConstants.SK_SOURCE_NONE || source == StockKitNativeConstants.SK_SOURCE_STOCK
-          ? -1 : source;
-      }]);
+    return new StockComparison(along, [for (ray in rays) ray.get_leftover()], [for (ray in rays) ray.get_gouge()],
+      [for (ray in rays) ray.get_largest_leftover()], [for (ray in rays) ray.get_largest_gouge()], [for (ray in rays) {
+      var source = ray.get_gouge_source();
+      source == StockKitNativeConstants.SK_SOURCE_NONE
+        || source == StockKitNativeConstants.SK_SOURCE_STOCK ? -1 : source;
+    }
+    ]);
   }
 
   /**
@@ -170,8 +187,14 @@ class Stock {
     then Z (only Z unless tri-dexel). Walls gouged sideways show on the X
     and Y grids; each grid estimates the same volumes on its own.
   **/
-  public function compareAll(target:Stock):Array<StockComparison>
-    return [for (axis in [StockAxis.X, StockAxis.Y, StockAxis.Z]) if (lattice.has(axis)) compare(target, axis)];
+  public function compareAll(target:Stock):Array<StockComparison> return [for (axis in [
+    StockAxis.X,
+    StockAxis.Y,
+    StockAxis.Z
+  ]) if (lattice.has(axis)) compare(
+    target,
+    axis
+  )];
 
   /**
     Captures the stock and, unless `withHistory` is false, its history; see
@@ -194,11 +217,9 @@ class Stock {
   }
 
   /** Z-grid tiles across (x) and down (y); tile (tx, ty) holds rays from (tx, ty) times the tile size. */
-  public function tilesX():Int
-    return info().get_grids(2).get_tiles(0);
+  public function tilesX():Int return info().get_grids(2).get_tiles(0);
 
-  public function tilesY():Int
-    return info().get_grids(2).get_tiles(1);
+  public function tilesY():Int return info().get_grids(2).get_tiles(1);
 
   /** Each Z-grid tile's revision, row by row; it changes whenever the tile's rays change. */
   public function tileRevisions():Array<haxe.Int64> {
@@ -217,10 +238,19 @@ class Stock {
     (one 0xRRGGBBAA per ray of the Z grid) if given, else from `palette`
     indexed by source with `original` for untouched stock.
   **/
-  public function mesh(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, merge:Bool,
-      bottoms:Bool, ?palette:Array<Int>, original:Int = -1, ?rayColors:Array<Int>):StockMesh {
-    var flags = (merge ? StockKitNativeConstants.SK_MESH_MERGE : 0)
-      | (bottoms ? StockKitNativeConstants.SK_MESH_BOTTOMS : 0);
+  public function mesh(
+    tileX:Int,
+    tileY:Int,
+    tilesWide:Int,
+    tilesHigh:Int,
+    merge:Bool,
+    bottoms:Bool,
+    ?palette:Array<Int>,
+    original:Int = -1,
+    ?rayColors:Array<Int>
+  ):StockMesh {
+    var flags = (merge
+      ? StockKitNativeConstants.SK_MESH_MERGE : 0) | (bottoms ? StockKitNativeConstants.SK_MESH_BOTTOMS : 0);
     return meshWith(flags, tileX, tileY, tilesWide, tilesHigh, palette, original, rayColors);
   }
 
@@ -235,24 +265,46 @@ class Stock {
     finds there against the target, so walls cut too deep show as well as
     floors. Without `coloring` the mesh is white.
   **/
-  public function contour(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, ?coloring:StockColoring,
-      ?palette:Array<Int>):StockMesh {
+  public function contour(
+    tileX:Int,
+    tileY:Int,
+    tilesWide:Int,
+    tilesHigh:Int,
+    ?coloring:StockColoring,
+    ?palette:Array<Int>
+  ):StockMesh {
     if (!lattice.triDexel) throw "stock.contour needs a tri-dexel lattice";
     return switch coloring {
       case null:
         meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, null, 0, null);
       case BySource(color, original):
-        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh,
-          palette != null ? palette : [for (move in history) color(move)], original, null);
+        meshWith(
+          StockKitNativeConstants.SK_MESH_CONTOUR,
+          tileX,
+          tileY,
+          tilesWide,
+          tilesHigh,
+          palette != null ? palette : [for (move in history) color(move)],
+          original,
+          null
+        );
       case ByDeviation(target, _, _, _, _):
         target.alive();
-        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, null, 0, null,
-          coloring);
+        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, null, 0, null, coloring);
     };
   }
 
-  function meshWith(flags:Int, tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, palette:Null<Array<Int>>,
-      original:Int, rayColors:Null<Array<Int>>, ?deviation:StockColoring):StockMesh {
+  function meshWith(
+    flags:Int,
+    tileX:Int,
+    tileY:Int,
+    tilesWide:Int,
+    tilesHigh:Int,
+    palette:Null<Array<Int>>,
+    original:Int,
+    rayColors:Null<Array<Int>>,
+    ?deviation:StockColoring
+  ):StockMesh {
     alive();
     var created = StockKitNative.sk_stock_mesh(owner.borrow(), tileX, tileY, tilesWide, tilesHigh, flags);
     check(created.status, "stock.mesh");
@@ -261,15 +313,31 @@ class Stock {
       var handle = native.borrow();
       switch deviation {
         case ByDeviation(target, tolerance, onTarget, leftover, gouge):
-          check(StockKitNative.sk_mesh_color_by_deviation(handle, target.owner.borrow(), tolerance, onTarget,
-            leftover, gouge), "mesh.colorByDeviation");
+          check(
+            StockKitNative.sk_mesh_color_by_deviation(
+              handle,
+              target.owner.borrow(),
+              tolerance,
+              onTarget,
+              leftover,
+              gouge
+            ),
+            "mesh.colorByDeviation"
+          );
         case _:
       }
-      if (rayColors != null)
-        check(StockKitNative.sk_mesh_color_by_ray(handle, StockKitNativeConstants.SK_AXIS_Z, rayColors),
-          "mesh.colorByRay");
-      else if (palette != null)
-        check(StockKitNative.sk_mesh_color_by_source(handle, palette, original, original), "mesh.colorBySource");
+      if (rayColors != null) check(
+        StockKitNative.sk_mesh_color_by_ray(
+          handle,
+          StockKitNativeConstants.SK_AXIS_Z,
+          rayColors
+        ),
+        "mesh.colorByRay"
+      );
+      else if (palette != null) check(
+        StockKitNative.sk_mesh_color_by_source(handle, palette, original, original),
+        "mesh.colorBySource"
+      );
       var info = StockKitNative.sk_mesh_get_info(handle);
       check(info.status, "mesh.info");
       var positions = StockKitNative.sk_mesh_copy_positions(handle);
@@ -277,10 +345,19 @@ class Stock {
       var indices = StockKitNative.sk_mesh_copy_indices(handle);
       var colors = StockKitNative.sk_mesh_copy_colors(handle);
       var sources = StockKitNative.sk_mesh_copy_triangle_sources(handle);
-      for (status in [positions.status, normals.status, indices.status, colors.status, sources.status])
-        check(status, "mesh.copy");
-      var result = new StockMesh(info.out_info.get_vertex_count(), info.out_info.get_triangle_count(),
-        positions.output, normals.output, indices.output, colors.output, sources.output);
+      for (status in [positions.status, normals.status, indices.status, colors.status, sources.status]) check(
+        status,
+        "mesh.copy"
+      );
+      var result = new StockMesh(
+        info.out_info.get_vertex_count(),
+        info.out_info.get_triangle_count(),
+        positions.output,
+        normals.output,
+        indices.output,
+        colors.output,
+        sources.output
+      );
       native.close();
       return result;
     } catch (error:Dynamic) {
@@ -290,15 +367,14 @@ class Stock {
   }
 
   /** The intervals along ray (i, j) of the grid along `axis` (Z by default), in increasing order. */
-  public function ray(i:Int, j:Int, ?axis:StockAxis):Array<StockInterval>
-    return rays(i, j, 1, 1, axis)[0];
+  public function ray(i:Int, j:Int, ?axis:StockAxis):Array<StockInterval> return rays(i, j, 1, 1, axis)[0];
 
   /** Intervals of every ray in a block of the grid along `axis` (Z by default), i fastest. */
   public function rays(i0:Int, j0:Int, ni:Int, nj:Int, ?axis:StockAxis):Array<Array<StockInterval>> {
     alive();
     var along = gridAlong(axis);
-    if (i0 < 0 || j0 < 0 || ni < 0 || nj < 0 || i0 + ni > along.countU || j0 + nj > along.countV)
-      throw "stock ray block is outside the grid";
+    if (i0 < 0 || j0 < 0 || ni < 0
+      || nj < 0 || i0 + ni > along.countU || j0 + nj > along.countV) throw "stock ray block is outside the grid";
     var read = StockKitNative.sk_stock_read_rays(owner.borrow(), nativeAxis(along.axis), i0, j0, ni, nj, ni * nj);
     check(read.status, "stock.readRays");
     var result:Array<Array<StockInterval>> = [];
@@ -311,8 +387,7 @@ class Stock {
   }
 
   /** Material volume as the grid along `axis` (Z by default) measures it: interval lengths times spacing squared. */
-  public function volume(?axis:StockAxis):Float
-    return info().get_grids(nativeAxis(gridAlong(axis).axis)).get_volume();
+  public function volume(?axis:StockAxis):Float return info().get_grids(nativeAxis(gridAlong(axis).axis)).get_volume();
 
   /** Intervals over every grid. */
   public function intervalCount():Float {
@@ -323,12 +398,10 @@ class Stock {
   }
 
   /** Rays whose sweep the core evaluated over every cut so far. */
-  public function raysTested():Float
-    return haxe.Int64.toFloat(info().get_rays_tested());
+  public function raysTested():Float return haxe.Int64.toFloat(info().get_rays_tested());
 
   /** Bytes the core holds for this stock. */
-  public function bytes():Float
-    return haxe.Int64.toFloat(info().get_bytes());
+  public function bytes():Float return haxe.Int64.toFloat(info().get_bytes());
 
   public function dispose():Void {
     if (disposed) return;
@@ -342,12 +415,11 @@ class Stock {
     on `axis` (see `StockAxis`), for checking the core against references.
     Uses the tool's cutting zone, as `cut` does.
   **/
-  public static function sweep(tool:Tool, geometry:PathGeometry, axis:StockAxis, u:Float,
-      v:Float):Array<StockInterval> {
+  public static function sweep(tool:Tool,
+    geometry:PathGeometry, axis:StockAxis, u:Float, v:Float):Array<StockInterval> {
     var cutting = new NativeTool(tool);
     try {
-      var move = nativeMove(new CutMove(tool, Path(geometry), Cut, 0,
-        new toolpathkit.path.Provenance(1, 1, 0)), 0);
+      var move = nativeMove(new CutMove(tool, Path(geometry), Cut, 0, new toolpathkit.path.Provenance(1, 1, 0)), 0);
       var read = StockKitNative.sk_sweep_ray(cutting.borrow(), move, nativeAxis(axis), u, v);
       check(read.status, "sweep");
       var result = [for (native in read.out_intervals) interval(native)];
@@ -382,12 +454,14 @@ class Stock {
     return lattice.grid(axis);
   }
 
-  static function nativeAxis(axis:StockAxis):Int
-    return switch axis {
-      case X: StockKitNativeConstants.SK_AXIS_X;
-      case Y: StockKitNativeConstants.SK_AXIS_Y;
-      case Z: StockKitNativeConstants.SK_AXIS_Z;
-    };
+  static function nativeAxis(axis:StockAxis):Int return switch axis {
+    case X:
+      StockKitNativeConstants.SK_AXIS_X;
+    case Y:
+      StockKitNativeConstants.SK_AXIS_Y;
+    case Z:
+      StockKitNativeConstants.SK_AXIS_Z;
+  };
 
   static function nativeLattice(lattice:StockLattice):sk_lattice {
     var native = new sk_lattice();
@@ -428,8 +502,14 @@ class Stock {
     return native;
   }
 
-  static function arc(native:sk_move, center:toolpathkit.path.Point3, radius:Float,
-      startAngle:Float, sweepAngle:Float, rise:Float):Void {
+  static function arc(
+    native:sk_move,
+    center:toolpathkit.path.Point3,
+    radius:Float,
+    startAngle:Float,
+    sweepAngle:Float,
+    rise:Float
+  ):Void {
     native.set_kind(StockKitNativeConstants.SK_MOVE_ARC);
     native.set_center(0, center.x);
     native.set_center(1, center.y);
@@ -441,17 +521,19 @@ class Stock {
   }
 
   static function interval(native:sk_interval):StockInterval {
-    return new StockInterval(native.get_lo(), native.get_hi(),
-      source(native.get_lo_source()), source(native.get_hi_source()),
+    return new StockInterval(
+      native.get_lo(),
+      native.get_hi(),
+      source(native.get_lo_source()),
+      source(native.get_hi_source()),
       [for (k in 0...3) native.get_lo_normal(k)],
-      [for (k in 0...3) native.get_hi_normal(k)]);
+      [for (k in 0...3) native.get_hi_normal(k)]
+    );
   }
 
-  static function source(native:Int):Int
-    return native == StockKitNativeConstants.SK_SOURCE_STOCK ? ORIGINAL : native;
+  static function source(native:Int):Int return native == StockKitNativeConstants.SK_SOURCE_STOCK ? ORIGINAL : native;
 
   static function check(status:Int, operation:String):Void {
-    if (status != StockKitNativeConstants.SK_OK)
-      throw '$operation failed with StockKit error $status';
+    if (status != StockKitNativeConstants.SK_OK) throw '$operation failed with StockKit error $status';
   }
 }

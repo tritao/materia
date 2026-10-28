@@ -39,12 +39,12 @@ class HobbingErrorJob {
     firstTooth:Int,
     lastTooth:Int,
     tolerance:Float,
-    ? inspection:GearInspection,
-    ? motionKnots:Array<Float>,
+    ?inspection:GearInspection,
+    ?motionKnots:Array<Float>,
     threads:Int = 4,
     inspectionCross:Bool = false,
     faceEndpoints:Bool = false,
-    ? stockGrid:RingGrid
+    ?stockGrid:RingGrid
   ) {
     if (threads < 1 || threads > 128) throw "hobbing error threads must be 1..128";
     this.threads = threads;
@@ -129,7 +129,7 @@ class HobbingErrorJob {
       blank = RingStock.annulus(stockGrid);
     }
     var cross = inspectionCross && inspection != null ? InspectionRingStock.create(blank.grid, inspection) : null;
-    var stocks = cross == null ?[blank] : cross.stocks;
+    var stocks = cross == null ? [blank] : cross.stocks;
     if (cross != null) blank.dispose();
     var rings:GearRings = cross == null ? cast blank : cast cross;
     if (faceEndpoints) {
@@ -157,8 +157,7 @@ class HobbingErrorJob {
       computedCircles: computedCircles,
       faceEndpoints: faceEndpoints,
       scope: "physical metrology source cut; grading tolerance unchanged"
-    }
-    ));
+    }));
     var sweep:Null<HobbingSweep> = null;
     var started = Sys.time();
     try {
@@ -169,7 +168,7 @@ class HobbingErrorJob {
         if (motionKnots != null) {
           var lo = 0, hi = motionKnots.length;
           while (lo < hi) {
-            var mid =(lo + hi) >> 1;
+            var mid = (lo + hi) >> 1;
             if (motionKnots[mid] <= pass.start) lo = mid + 1;
             else hi = mid;
           }
@@ -187,8 +186,7 @@ class HobbingErrorJob {
             windows: done,
             total: passes.length,
             wallSeconds: Sys.time() - started
-          }
-          ));
+          }));
           Sys.stdout().flush();
         }
       }
@@ -207,8 +205,7 @@ class HobbingErrorJob {
         computedCircles: computedCircles,
         faceEndpoints: faceEndpoints,
         scope: "physical source cut; grading tolerance unchanged"
-      }
-      ));
+      }));
       sweep.dispose();
       for (stock in stocks) stock.dispose();
       return measured;

@@ -18,10 +18,8 @@ class CutMove {
   public final featureRef:Null<String>;
   public final toolId:Int;
 
-  public function new(tool:Tool, motion:CutMotion, kind:MoveKind,
-      opIndex:Int, provenance:Provenance) {
-    if (tool == null || motion == null || provenance == null)
-      throw "cut move needs a tool, motion and provenance";
+  public function new(tool:Tool, motion:CutMotion, kind:MoveKind, opIndex:Int, provenance:Provenance) {
+    if (tool == null || motion == null || provenance == null) throw "cut move needs a tool, motion and provenance";
     this.tool = tool;
     this.motion = motion;
     this.kind = kind;
@@ -32,6 +30,5 @@ class CutMove {
     this.toolId = tool.number;
   }
 
-  function get_rapid():Bool
-    return kind == Rapid || kind == Link || kind == Retract;
+  function get_rapid():Bool return kind == Rapid || kind == Link || kind == Retract;
 }

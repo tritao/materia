@@ -46,13 +46,18 @@ class CoreFixtures {
   /** Scrubbing a CamKit pocket matches cutting afresh, and the preview follows it. */
   static function timelineAndPreview():Void {
     var contour = new CamContour([
-      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
-      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0),
+      new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0),
+      new Point3(
+        0.01,
+        0.015,
+        0
+      )
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
-      .pocket(contour, tool, -0.004, 0.01, 0.0015, 0.002)
-      .finish();
+    var program = new CamJob(0.005,
+      12000, new Point3(0, 0, 0.005)).pocket(contour, tool, -0.004, 0.01, 0.0015, 0.002).finish();
     var moves = CutMoves.fromProgram(program);
     Assert.check(moves.length > 20, "pocket has enough moves to scrub");
     var lattice = new StockLattice(0, 0, -STOCK_Z + 0.0002, 0.0004, 101, 51, 25);
@@ -68,17 +73,18 @@ class CoreFixtures {
         var x = a.rays(0, 0, grid.countU, grid.countV, axis), y = b.rays(0, 0, grid.countU, grid.countV, axis);
         for (k in 0...x.length) {
           if (x[k].length != y[k].length) return false;
-          for (n in 0...x[k].length)
-            if (x[k][n].lo != y[k][n].lo || x[k][n].hi != y[k][n].hi || x[k][n].hiSource != y[k][n].hiSource)
-              return false;
+          for (n in 0...x[k].length) if (x[k][n].lo != y[k][n].lo
+            || x[k][n].hi != y[k][n].hi || x[k][n].hiSource != y[k][n].hiSource) return false;
         }
       }
       return true;
     }
     var timeline = new StockTimeline(Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0), moves, 7);
     var stock = timeline.stock;
-    Assert.check(timeline.position == moves.length && stock.history.length == moves.length,
-      "timeline starts at the program's end");
+    Assert.check(
+      timeline.position == moves.length && stock.history.length == moves.length,
+      "timeline starts at the program's end"
+    );
     var opColor = (move:CutMove) -> 0x10000000 * (move.opIndex % 7) + 0x80FF;
     var preview = new StockPreview(stock, BySource(opColor, 0xC0C0C0FF), 2);
     var all = preview.update();
@@ -94,30 +100,33 @@ class CoreFixtures {
     var before = preview.update().length;
     timeline.seek(15);
     var changed = preview.update();
-    Assert.check(changed.length > 0 && changed.length < preview.chunksX * preview.chunksY,
-      'one move rebuilds only the chunks it touched (${changed.length} of ${preview.chunksX * preview.chunksY}, $before before)');
+    Assert.check(
+      changed.length > 0 && changed.length < preview.chunksX * preview.chunksY,
+      'one move rebuilds only the chunks it touched (${changed.length} of ${preview.chunksX * preview.chunksY}, $before before)'
+    );
     // Picking a cut surface leads back to its move and source line.
     var picked:Null<CutMove> = null;
     for (chunk in 0...preview.meshes.length) {
       var mesh = preview.meshes[chunk];
       if (mesh == null) continue;
-      for (triangle in 0...mesh.triangleCount)
-        if (mesh.sourceAt(triangle) >= 0) {
-          picked = preview.pick(chunk, triangle);
-          break;
-        }
+      for (triangle in 0...mesh.triangleCount) if (mesh.sourceAt(triangle) >= 0) {
+        picked = preview.pick(chunk, triangle);
+        break;
+      }
       if (picked != null) break;
     }
-    Assert.check(picked != null && moves.indexOf(picked) >= 0 && picked.provenance != null,
-      "a picked cut surface names its move and source span");
+    Assert.check(
+      picked != null && moves.indexOf(picked) >= 0 && picked.provenance != null,
+      "a picked cut surface names its move and source span"
+    );
     // Surfaces are coloured by their move's operation.
     var mesh = preview.meshes[changed[0]];
     if (mesh == null) throw "rebuilt chunk has a mesh";
     var coloured = true;
     for (triangle in 0...mesh.triangleCount) {
       var vertex = mesh.indices.getInt32(12 * triangle);
-      var rgba = (mesh.colors.get(4 * vertex) << 24) | (mesh.colors.get(4 * vertex + 1) << 16)
-        | (mesh.colors.get(4 * vertex + 2) << 8) | mesh.colors.get(4 * vertex + 3);
+      var rgba = (mesh.colors.get(4 * vertex) << 24) | (mesh.colors.get(4 * vertex + 1)
+        << 16) | (mesh.colors.get(4 * vertex + 2) << 8) | mesh.colors.get(4 * vertex + 3);
       var source = mesh.sourceAt(triangle);
       var expected = source < 0 ? 0xC0C0C0FF : opColor(stock.history[source]);
       if (rgba != expected) coloured = false;
@@ -128,24 +137,27 @@ class CoreFixtures {
     function sameMeshes(update:StockPreviewUpdate):Bool {
       for (k in 0...update.chunks.length) {
         var a = update.meshes[k], b = preview.meshes[update.chunks[k]];
-        if (b == null || a.triangleCount != b.triangleCount || a.vertexCount != b.vertexCount ||
-            a.positions.compare(b.positions) != 0 || a.colors.compare(b.colors) != 0)
-          return false;
+        if (b == null || a.triangleCount != b.triangleCount || a.vertexCount != b.vertexCount
+          || a.positions.compare(b.positions) != 0 || a.colors.compare(b.colors) != 0) return false;
       }
       return true;
     }
     Assert.check(worker.refresh() && !worker.refresh(), "a worker runs one refresh at a time");
     worker.wait();
     var first = worker.take();
-    Assert.check(first.length == 1 && first[0].chunks.length == preview.chunksX * preview.chunksY &&
-      sameMeshes(first[0]), "the worker's first refresh meshes every chunk as the preview does");
+    Assert.check(
+      first.length == 1 && first[0].chunks.length == preview.chunksX * preview.chunksY && sameMeshes(first[0]),
+      "the worker's first refresh meshes every chunk as the preview does"
+    );
     timeline.seek(moves.length - 1);
     var expected = preview.update();
     Assert.check(worker.refresh(), "an idle worker starts the next refresh");
     worker.wait();
     var second = worker.take();
-    Assert.check(second.length == 1 && second[0].chunks.join(",") == expected.join(",") && sameMeshes(second[0]),
-      'the worker rebuilds only the chunks that changed (${second.length == 1 ? second[0].chunks.length : -1} of ${expected.length})');
+    Assert.check(
+      second.length == 1 && second[0].chunks.join(",") == expected.join(",") && sameMeshes(second[0]),
+      'the worker rebuilds only the chunks that changed (${second.length == 1 ? second[0].chunks.length : -1} of ${expected.length})'
+    );
     worker.dispose();
     timeline.dispose();
     stock.dispose();
@@ -154,15 +166,20 @@ class CoreFixtures {
   /** A pocket deeper than the flutes: the shank rubs, and the holder too once it is low enough. */
   static function collisions():Void {
     var contour = new CamContour([
-      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
-      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0),
+      new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0),
+      new Point3(
+        0.01,
+        0.015,
+        0
+      )
     ]);
     // 3 mm of flutes on a 6 mm shank, then a 20 mm holder 10 mm above the tip.
     var profile = CutterProfile.flat(0.004, 0.003).withShank(0.004, 0.007).withHolder(0.02, 0.03);
     var tool = Tool.shaped(3, 0.0, profile);
-    var program = new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
-      .pocket(contour, tool, -0.008, 0.01, 0.003, 0.004)
-      .finish();
+    var program = new CamJob(0.02,
+      12000, new Point3(0, 0, 0.02)).pocket(contour, tool, -0.008, 0.01, 0.003, 0.004).finish();
     var moves = CutMoves.fromProgram(program);
     var lattice = StockLattice.covering(0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, 0.0005);
     var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
@@ -186,8 +203,14 @@ class CoreFixtures {
     Assert.check(rubbed > 0, "operation totals carry the shank contact");
     // Cut 2 mm deeper with a short holder reach: now the holder hits.
     var short = Tool.shaped(4, 0.0, CutterProfile.flat(0.004, 0.003).withHolder(0.02, 0.03));
-    var deeper = [for (move in CutMoves.fromProgram(new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
-      .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish())) move];
+    var deeper = [for (move in CutMoves.fromProgram(new CamJob(0.02, 12000, new Point3(0, 0, 0.02)).pocket(
+      contour,
+      short,
+      -0.006,
+      0.01,
+      0.003,
+      0.002
+    ).finish())) move];
     var fresh = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var hits = [for (outcome in fresh.cut(deeper).moves) if (outcome.holderContact > 0) outcome];
     Assert.check(hits.length > 0, "a holder 3 mm above the tip hits a 6 mm pocket");
@@ -198,13 +221,18 @@ class CoreFixtures {
   /** A CamKit pocket compared with the finished part, then with a deliberate dip below the floor. */
   static function targetComparison():Void {
     var contour = new CamContour([
-      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
-      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0),
+      new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0),
+      new Point3(
+        0.01,
+        0.015,
+        0
+      )
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
-      .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
-      .finish();
+    var program = new CamJob(0.005,
+      12000, new Point3(0, 0, 0.005)).pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002).finish();
     var moves = CutMoves.fromProgram(program);
     var blank = Part.box(STOCK_X, STOCK_Y, STOCK_Z, Min, Min, Max);
     var pocketTool = Part.box(0.02, 0.01, 0.003, Min, Min, Min);
@@ -221,34 +249,63 @@ class CoreFixtures {
     Assert.near(comparison.gougeVolume(), 0, "CamKit's pocket does not gouge its part", 1e-15);
     // A round tool leaves a fillet of its radius in each inside corner.
     var r = 0.001;
-    Assert.near(comparison.leftoverVolume(), (4 - Math.PI) * r * r * 0.002,
-      "leftover is the corner fillets", 0.25 * (4 - Math.PI) * r * r * 0.002);
+    Assert.near(
+      comparison.leftoverVolume(),
+      (4 - Math.PI) * r * r * 0.002,
+      "leftover is the corner fillets",
+      0.25 * (4 - Math.PI) * r * r * 0.002
+    );
     Assert.near(comparison.thickestLeftover(), 0.002, "corner leftover is the pocket's full depth", 1e-12);
     // A stray move 0.1 mm below the floor gouges, and is named.
     var span = new Provenance(99, 1, 0);
-    var stray = new CutMove(tool, Path(Line(new Point3(0.015, 0.008, -0.0021),
-      new Point3(0.025, 0.008, -0.0021))), Cut, 99, span);
+    var stray = new CutMove(
+      tool,
+      Path(Line(new Point3(0.015, 0.008, -0.0021), new Point3(0.025, 0.008, -0.0021))),
+      Cut,
+      99,
+      span
+    );
     stock.cut([stray]);
     var gouged = stock.compare(target);
     Assert.near(gouged.deepestGouge(), 0.0001, "the dip is 0.1 mm deep", 1e-12);
     var culprits = gouged.gougingMoves(1e-6);
-    Assert.check(culprits.length == 1 && stock.history[culprits[0]] == stray,
-      "the gouge is attributed to the stray move");
+    Assert.check(
+      culprits.length == 1 && stock.history[culprits[0]] == stray,
+      "the gouge is attributed to the stray move"
+    );
     // A pass 0.1 mm into the pocket's -y wall, between Z rays: only the Y
     // grid sees it, and a contoured mesh coloured by deviation marks the wall.
-    var sideways = new CutMove(tool, Path(Line(new Point3(0.015, 0.0059, -0.001),
-      new Point3(0.025, 0.0059, -0.001))), Cut, 100, span);
+    var sideways = new CutMove(
+      tool,
+      Path(Line(new Point3(0.015, 0.0059, -0.001), new Point3(0.025, 0.0059, -0.001))),
+      Cut,
+      100,
+      span
+    );
     stock.cut([sideways]);
     Assert.near(stock.compare(target).deepestGouge(), 0.0001, "Z rays still see only the dip", 1e-12);
     var along = stock.compareAll(target);
     Assert.check(along.length == 3 && along[1].grid.axis == Y, "tri-dexel stock compares along X, Y and Z");
     Assert.near(along[1].deepestGouge(), 0.0001, "Y rays see the wall 0.1 mm too far", 1e-9);
     var wallCulprits = along[1].gougingMoves(1e-6);
-    Assert.check(wallCulprits.length == 1 && stock.history[wallCulprits[0]] == sideways,
-      "the wall gouge is attributed to the sideways pass");
+    Assert.check(
+      wallCulprits.length == 1 && stock.history[wallCulprits[0]] == sideways,
+      "the wall gouge is attributed to the sideways pass"
+    );
     var gougeColor = 0xFF0000FF;
-    var surface = stock.contour(0, 0, stock.tilesX(), stock.tilesY(),
-      ByDeviation(target, 0.00005, 0x00FF00FF, 0xFFFF00FF, gougeColor));
+    var surface = stock.contour(
+      0,
+      0,
+      stock.tilesX(),
+      stock.tilesY(),
+      ByDeviation(
+        target,
+        0.00005,
+        0x00FF00FF,
+        0xFFFF00FF,
+        gougeColor
+      )
+    );
     var wall = 0, floor = 0;
     for (v in 0...surface.vertexCount) {
       var red = surface.colors.get(4 * v) == 0xFF && surface.colors.get(4 * v + 1) == 0;
@@ -262,34 +319,75 @@ class CoreFixtures {
     stock.dispose();
   }
 
-  static function lowest(move:CutMove):Float
-    return switch move.motion {
-      case Path(Line(start, end)): Math.min(start.z, end.z);
-      case Path(Arc(center, _, _, _)): center.z;
-      case Path(Circular(center, _, _, _, _, rise)): center.z + Math.min(0, rise);
-    };
+  static function lowest(move:CutMove):Float return switch move.motion {
+    case Path(Line(start, end)):
+      Math.min(start.z, end.z);
+    case Path(Arc(center, _, _, _)):
+      center.z;
+    case Path(Circular(center, _, _, _, _, rise)):
+      center.z + Math.min(0, rise);
+  };
 
   static function ramps():Void {
     var r = 0.003;
-    var ramp:PathGeometry = Line(new Point3(0.008, 0.007, 0.001),
-      new Point3(0.032, 0.013, -0.004));
+    var ramp:PathGeometry = Line(new Point3(0.008, 0.007, 0.001), new Point3(0.032, 0.013, -0.004));
     for (tool in [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
-      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
-      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02)},
-      {name: "V-bit", profile: CutterProfile.vee(2 * r, Math.PI / 2, 0.02)},
-      {name: "tapered ball", profile: CutterProfile.taperedBall(0.002, 10 * Math.PI / 180, 2 * r, 0.02)}
-    ])
-      sampled(tool.profile, [ramp], '${tool.name} ramp');
+      {
+        name: "ball",
+        profile: CutterProfile.ball(
+          2 * r,
+          0.02
+        )
+      },
+      {
+        name: "bull-nose",
+        profile: CutterProfile.bullNose(
+          2 * r,
+          0.001,
+          0.02
+        )
+      },
+      {
+        name: "V-bit",
+        profile: CutterProfile.vee(
+          2 * r,
+          Math.PI / 2,
+          0.02
+        )
+      },
+      {
+        name: "tapered ball",
+        profile: CutterProfile.taperedBall(
+          0.002,
+          10 * Math.PI / 180,
+          2 * r,
+          0.02
+        )
+      }
+    ]) sampled(
+      tool.profile,
+      [ramp],
+      '${tool.name} ramp'
+    );
     // A ramp whose floor rises: the tool climbs out of the stock.
-    sampled(CutterProfile.ball(2 * r, 0.02), [Line(new Point3(0.03, 0.012, -0.005),
-      new Point3(0.012, 0.008, 0.002))], "ball climbing ramp");
+    sampled(
+      CutterProfile.ball(2 * r, 0.02),
+      [Line(new Point3(0.03, 0.012, -0.005), new Point3(0.012, 0.008, 0.002))],
+      "ball climbing ramp"
+    );
   }
 
   static function helices():Void {
     var r = 0.003;
-    function helix(radius:Float, turns:Float):PathGeometry
-      return Circular(new Point3(0.02, 0.01, 0.001), radius, 0.3, -2 * Math.PI * turns, XY, -0.004);
+    function helix(radius:Float, turns:Float):PathGeometry return Circular(
+      new Point3(0.02, 0.01, 0.001),
+      radius,
+      0.3,
+      -2 * Math.PI * turns,
+      XY,
+      -0.004
+    );
     sampled(CutterProfile.flat(2 * r, 0.02), [helix(0.002, 2)], "flat helix inside its radius");
     sampled(CutterProfile.ball(2 * r, 0.02), [helix(0.004, 1.5)], "ball helix wider than its radius");
     sampled(CutterProfile.bullNose(2 * r, 0.001, 0.02), [helix(0.0025, 3)], "bull-nose helix");
@@ -301,13 +399,18 @@ class CoreFixtures {
   **/
   static function rampedPocket():Void {
     var contour = new CamContour([
-      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
-      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0),
+      new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0),
+      new Point3(
+        0.01,
+        0.015,
+        0
+      )
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
-      .pocket(contour, tool, -0.001, 0.01, 0.0015, 0.002)
-      .finish();
+    var program = new CamJob(0.005,
+      12000, new Point3(0, 0, 0.005)).pocket(contour, tool, -0.001, 0.01, 0.0015, 0.002).finish();
     var moves = CutMoves.fromProgram(program);
     var ramped = false;
     for (move in moves) switch move.motion {
@@ -316,8 +419,7 @@ class CoreFixtures {
       case _:
     }
     Assert.check(ramped, "CamKit ramps into this pocket");
-    CoreComparison.againstSampled(moves, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, SAMPLES,
-      "ramped CAM pocket");
+    CoreComparison.againstSampled(moves, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, SAMPLES, "ramped CAM pocket");
   }
 
   /** Stock cast from CadKit tessellations matches the analytic solids. */
@@ -332,9 +434,11 @@ class CoreFixtures {
     Assert.near(fromMesh.intervalCount(), box.intervalCount(), "box mesh covers the box's rays", 0);
     Assert.near(fromMesh.volume(), box.volume(), "box mesh volume matches the box", 1e-15);
     var inside = fromMesh.ray(40, 20);
-    Assert.check(inside.length == 1 && inside[0].lo == 0 && inside[0].hi == 0.01
-      && inside[0].hiNormal[2] == 1 && inside[0].loSource == Stock.ORIGINAL,
-      "box mesh ray keeps exact faces, normals and source");
+    Assert.check(
+      inside.length == 1 && inside[0].lo == 0
+      && inside[0].hi == 0.01 && inside[0].hiNormal[2] == 1 && inside[0].loSource == Stock.ORIGINAL,
+      "box mesh ray keeps exact faces, normals and source"
+    );
     fromMesh.dispose();
     box.dispose();
 
@@ -346,17 +450,16 @@ class CoreFixtures {
     var stock = Stock.fromMesh(lattice, cylinderMesh);
     var rays = stock.rays(0, 0, grid.countU, grid.countV);
     var wrong = 0;
-    for (j in 0...grid.countV)
-      for (i in 0...grid.countU) {
-        var d = Math.sqrt(grid.u(i) * grid.u(i) + grid.v(j) * grid.v(j));
-        var ray = rays[j * grid.countU + i];
-        // Chords of the tessellation lie at most the deflection inside the circle.
-        if (d < radius - 2e-6) {
-          if (ray.length != 1 || ray[0].lo != 0 || ray[0].hi != 0.012) wrong++;
-        } else if (d > radius) {
-          if (ray.length != 0) wrong++;
-        }
+    for (j in 0...grid.countV) for (i in 0...grid.countU) {
+      var d = Math.sqrt(grid.u(i) * grid.u(i) + grid.v(j) * grid.v(j));
+      var ray = rays[j * grid.countU + i];
+      // Chords of the tessellation lie at most the deflection inside the circle.
+      if (d < radius - 2e-6) {
+        if (ray.length != 1 || ray[0].lo != 0 || ray[0].hi != 0.012) wrong++;
+      } else if (d > radius) {
+        if (ray.length != 0) wrong++;
       }
+    }
     Assert.check(wrong == 0, 'cylinder mesh rays ($wrong wrong)');
     stock.dispose();
   }
@@ -366,10 +469,31 @@ class CoreFixtures {
     var tool = Tool.shaped(1, 0.0, CutterProfile.flat(0.006, 0.02));
     var span = new Provenance(1, 1, 0);
     var moves = [
-      new CutMove(tool, Path(Line(new Point3(0.01, 0.01, -0.002), new Point3(0.03, 0.01, -0.002))),
-        Cut, 0, span),
-      new CutMove(tool, Path(Line(new Point3(0.02, 0.002, -0.001), new Point3(0.02, 0.018, -0.001))),
-        Rapid, 1, span)
+      new CutMove(
+        tool,
+        Path(Line(new Point3(0.01, 0.01, -0.002), new Point3(0.03, 0.01, -0.002))),
+        Cut,
+        0,
+        span
+      ),
+      new CutMove(
+        tool,
+        Path(Line(
+          new Point3(
+            0.02,
+            0.002,
+            -0.001
+          ),
+          new Point3(
+            0.02,
+            0.018,
+            -0.001
+          )
+        )),
+        Rapid,
+        1,
+        span
+      )
     ];
     var lattice = new StockLattice(0, 0, -STOCK_Z + 0.00025, 0.0005, 81, 41, 20);
     var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
@@ -377,14 +501,21 @@ class CoreFixtures {
     var removed = report.removed();
     Assert.check(removed.length == 2 && removed[0] > 0 && removed[1] > 0, "both moves remove material");
     var rapids = report.rapidContacts();
-    Assert.check(rapids.length == 1 && rapids[0].source == 1 && rapids[0].move == moves[1],
-      "the rapid through stock is reported");
+    Assert.check(
+      rapids.length == 1 && rapids[0].source == 1 && rapids[0].move == moves[1],
+      "the rapid through stock is reported"
+    );
     var floor = stock.ray(40, 20); // (0.02, 0.01): the slot, then the rapid above it
-    Assert.check(floor.length == 1 && floor[0].hi == -0.002 && floor[0].hiSource == 0
-      && stock.history[floor[0].hiSource] == moves[0], "slot floor points back at its move");
+    Assert.check(
+      floor.length == 1
+      && floor[0].hi == -0.002 && floor[0].hiSource == 0 && stock.history[floor[0].hiSource] == moves[0],
+      "slot floor points back at its move"
+    );
     var crossing = stock.ray(40, 8); // (0.02, 0.004): only the rapid
-    Assert.check(crossing.length == 1 && crossing[0].hi == -0.001 && crossing[0].hiSource == 1,
-      "rapid's cut points back at the rapid");
+    Assert.check(
+      crossing.length == 1 && crossing[0].hi == -0.001 && crossing[0].hiSource == 1,
+      "rapid's cut points back at the rapid"
+    );
     var untouched = stock.ray(2, 2);
     Assert.check(untouched[0].hiSource == Stock.ORIGINAL, "untouched stock keeps its original surface");
     // The same moves on one thread give the same stock.
@@ -402,15 +533,33 @@ class CoreFixtures {
 
   /** Cuts `geometry` and checks the stock, then sweeps each move along X and Y rays. */
   static function sampled(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void {
-    CoreComparison.againstSampled(ExactOracle.pathMoves(profile, geometry), 0, 0, -STOCK_Z,
-      STOCK_X, STOCK_Y, 0, SAMPLES, label);
+    CoreComparison.againstSampled(
+      ExactOracle.pathMoves(profile, geometry),
+      0,
+      0,
+      -STOCK_Z,
+      STOCK_X,
+      STOCK_Y,
+      0,
+      SAMPLES,
+      label
+    );
     horizontal(profile, geometry, label);
   }
 
-  static function horizontal(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void
-    for (g in geometry)
-      CoreComparison.sweepAgainstSampled(profile, g, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0.004,
-        SAMPLES, '$label (horizontal rays)');
+  static function horizontal(profile:CutterProfile,
+    geometry:Array<PathGeometry>, label:String):Void for (g in geometry) CoreComparison.sweepAgainstSampled(
+      profile,
+      g,
+      0,
+      0,
+      -STOCK_Z,
+      STOCK_X,
+      STOCK_Y,
+      0.004,
+      SAMPLES,
+      '$label (horizontal rays)'
+    );
 
   /**
     Level lines, arcs and plunges along X and Y rays. Once X and Y grids exist
@@ -420,16 +569,72 @@ class CoreFixtures {
     var r = 0.003;
     var moves:Array<PathGeometry> = [
       Line(new Point3(0.008, 0.006, -0.004), new Point3(0.033, 0.013, -0.004)),
-      Circular(new Point3(0.02, 0.01, -0.003), 0.006, 0.4, 3.9, XY, 0),
-      Circular(new Point3(0.02, 0.01, -0.003), 0.002, -1.0, -2 * Math.PI, XY, 0),
-      Line(new Point3(0.02, 0.011, 0.001), new Point3(0.02, 0.011, -0.006))
+      Circular(
+        new Point3(
+          0.02,
+          0.01,
+          -0.003
+        ),
+        0.006,
+        0.4,
+        3.9,
+        XY,
+        0
+      ),
+      Circular(
+        new Point3(
+          0.02,
+          0.01,
+          -0.003
+        ),
+        0.002,
+        -1.0,
+        -2 * Math.PI,
+        XY,
+        0
+      ),
+      Line(
+        new Point3(
+          0.02,
+          0.011,
+          0.001
+        ),
+        new Point3(
+          0.02,
+          0.011,
+          -0.006
+        )
+      )
     ];
     for (tool in [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
-      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
-      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02)},
-      {name: "V-bit", profile: CutterProfile.vee(2 * r, 60 * Math.PI / 180, 0.02)}
-    ])
-      horizontal(tool.profile, moves, '${tool.name} level moves');
+      {
+        name: "ball",
+        profile: CutterProfile.ball(
+          2 * r,
+          0.02
+        )
+      },
+      {
+        name: "bull-nose",
+        profile: CutterProfile.bullNose(
+          2 * r,
+          0.001,
+          0.02
+        )
+      },
+      {
+        name: "V-bit",
+        profile: CutterProfile.vee(
+          2 * r,
+          60 * Math.PI / 180,
+          0.02
+        )
+      }
+    ]) horizontal(
+      tool.profile,
+      moves,
+      '${tool.name} level moves'
+    );
   }
 }

@@ -6,8 +6,8 @@ class Assert {
     if (!ok) throw message;
   }
 
-  public static function near(actual:Float, expected:Float, message:String,
-      tolerance:Float = 1e-12):Void
-    check(Math.abs(actual - expected) <= tolerance,
-      '$message: expected $expected, got $actual');
+  public static function near(actual:Float, expected:Float, message:String, tolerance:Float = 1e-12):Void check(
+    Math.abs(actual - expected) <= tolerance,
+    '$message: expected $expected, got $actual'
+  );
 }

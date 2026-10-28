@@ -15,8 +15,7 @@ class CutMoves {
     before any tool change are skipped: there is no tool in the spindle to
     simulate.
   **/
-  public static function fromProgram(program:ToolpathProgram,
-      ?workOrigin:Point3):Array<CutMove> {
+  public static function fromProgram(program:ToolpathProgram, ?workOrigin:Point3):Array<CutMove> {
     var stockOrigin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
     var frame = ToolpathFrame.of(program);
     var moves:Array<CutMove> = [];
@@ -29,13 +28,21 @@ class CutMoves {
           var tool = frame.tool();
           if (tool == null) continue;
           var origin = frame.setup.workOrigin;
-          moves.push(new CutMove(tool, Path(GeometryOffset.translate(geometry,
-            [origin.x - stockOrigin.x, origin.y - stockOrigin.y,
-              origin.z - stockOrigin.z + frame.tipShift()])),
-            kind, index, provenance));
-        case MachineMove(Rapid, _, _, _, _),
-            MachineMove(Link, _, _, _, _),
-            MachineMove(Retract, _, _, _, _):
+          moves.push(new CutMove(
+            tool,
+            Path(GeometryOffset.translate(
+              geometry,
+              [
+                origin.x - stockOrigin.x,
+                origin.y - stockOrigin.y,
+                origin.z - stockOrigin.z + frame.tipShift()
+              ]
+            )),
+            kind,
+            index,
+            provenance
+          ));
+        case MachineMove(Rapid, _, _, _, _), MachineMove(Link, _, _, _, _), MachineMove(Retract, _, _, _, _):
           // Machine travel does not remove stock in the current work setup.
         case MachineMove(_, _, _, _, _):
           throw "stock simulation needs a setup transform for machine-coordinate cuts";

@@ -15,8 +15,7 @@ class HobbingSweep {
   final probes:Array<Point3>;
   var disposed = false;
   final batchDomains:Bool;
-  public function new(hob:HobDesign,
-    firstTooth:Int, lastTooth:Int, tolerance:Float = 0.00005, ? warp:Point3 -> Point3) {
+  public function new(hob:HobDesign, firstTooth:Int, lastTooth:Int, tolerance:Float = 0.00005, ?warp:Point3 -> Point3) {
     if (firstTooth > lastTooth || lastTooth - firstTooth > 256
       || !Math.isFinite(tolerance) || tolerance <= 0) throw "invalid hob sweep extent/tolerance";
     this.hob = hob;
@@ -70,7 +69,7 @@ class HobbingSweep {
     passes:Array<GashPass>,
     maxRefinements:Int = 3,
     maxTimeStep:Float = 0.001,
-    ? motionKnots:Array<Float>
+    ?motionKnots:Array<Float>
   ):HobbingReport {
     if (disposed) throw "hob sweep has been disposed";
     if (maxRefinements < 1 || maxRefinements > 8
@@ -101,7 +100,7 @@ class HobbingSweep {
           var comparison = stock.compareStock(previous), worst = 0.0;
           for (z in 0...stock.grid.axialCount) for (r in 0...stock.grid.radialCount) {
             var i = z * stock.grid.radialCount + r;
-            worst = Math.max(worst,(comparison.leftover[i] + comparison.gouge[i]) * stock.grid.radius(r));
+            worst = Math.max(worst, (comparison.leftover[i] + comparison.gouge[i]) * stock.grid.radius(r));
           }
           if (worst <= tolerance) {
             initial.dispose();
@@ -130,7 +129,7 @@ class HobbingSweep {
     passes:Array<GashPass>,
     maxRefinements:Int = 3,
     maxTimeStep:Float = 0.001,
-    ? progress:Dynamic -> Void
+    ?progress:Dynamic -> Void
   ):HobbingReport {
     if (disposed || stocks.length == 0 || maxRefinements < 1 || maxRefinements > 8
       || !Math.isFinite(maxTimeStep) || maxTimeStep <= 0) throw "invalid converged multi-stock sweep";
@@ -148,8 +147,7 @@ class HobbingSweep {
           pathToleranceMm: step,
           domains: stocks.length,
           windows: passes.length
-        }
-        );
+        });
         for (pass in passes) {
           poses += cutPassMany(stocks, axesAt, pass, step, maxTimeStep);
           completed++;
@@ -160,8 +158,7 @@ class HobbingSweep {
             windows: passes.length,
             poses: poses,
             seconds: Sys.time() - began
-          }
-          );
+          });
         }
 
         if (havePrevious) {
@@ -172,7 +169,7 @@ class HobbingSweep {
               comparison = stock.compareStock(previous[i]), domainWorst = 0.0, radial = -1, axial = -1;
             for (z in 0...stock.grid.axialCount) for (r in 0...stock.grid.radialCount) {
               var index = z * stock.grid.radialCount + r;
-              var change =(comparison.leftover[index] + comparison.gouge[index]) * stock.grid.radius(r);
+              var change = (comparison.leftover[index] + comparison.gouge[index]) * stock.grid.radius(r);
               if (!Math.isFinite(change)) throw "non-finite multi-stock convergence comparison";
               if (change > domainWorst) {
                 domainWorst = change;
@@ -187,8 +184,7 @@ class HobbingSweep {
               axialIndex: axial,
               radiusMm: radial < 0 ? null : stock.grid.radius(radial),
               zMm : axial < 0 ? null : stock.grid.z(axial)
-            }
-            );
+            });
             if (domainWorst > worst) {
               worst = domainWorst;
               worstDomain = i;
@@ -209,8 +205,7 @@ class HobbingSweep {
             domains: domains,
             poses: poses,
             seconds: Sys.time() - began
-          }
-          );
+          });
           if (worst <= tolerance) {
             for (saved in initial) saved.dispose();
             for (stock in previous) stock.dispose();
@@ -242,7 +237,7 @@ class HobbingSweep {
     pass:GashPass,
     pathTolerance:Float,
     maxTimeStep:Float = 0.001,
-    ? motionKnots:Array<Float>
+    ?motionKnots:Array<Float>
   ):Int {
     if (disposed) throw "hob sweep has been disposed";
     if (!Math.isFinite(pathTolerance)
@@ -261,7 +256,7 @@ class HobbingSweep {
     pass:GashPass,
     pathTolerance:Float,
     maxTimeStep:Float = 0.001,
-    ? motionKnots:Array<Float>
+    ?motionKnots:Array<Float>
   ):Int {
     if (disposed || stocks.length == 0) throw "invalid multi-stock rake sweep";
     if (!Math.isFinite(pathTolerance)
@@ -320,7 +315,7 @@ class HobbingSweep {
     function split(t0:Float,
       s0:HobbingAxes, p0:Array<Float>, t1:Float, s1:HobbingAxes, p1:Array<Float>, depth:Int):Void {
       if (depth > 24 || result.length > 1000000) throw "sweep path refinement exceeded limit";
-      var tm =(t0 + t1) / 2, sm = at(tm), pm = sm.poseValues(), error = 0.0;
+      var tm = (t0 + t1) / 2, sm = at(tm), pm = sm.poseValues(), error = 0.0;
       // Endpoints are cached through recursion. Identical affine arithmetic and
       // refinement tests, without reconstructing three native poses per node.
       var dr = [for (j in 0...9) pm[j] - (p0[j] + p1[j]) / 2];

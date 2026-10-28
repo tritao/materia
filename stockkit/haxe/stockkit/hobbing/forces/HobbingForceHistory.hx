@@ -18,10 +18,8 @@ class HobbingForceHistory {
     if (prepared) return;
     var events:Array<{time:Float, delta:Float}> = [];
     for (s in samples) {
-      events.push({time: s.pass.start, delta: s.radialForce}
-      );
-      events.push({time: s.pass.end, delta: -s.radialForce}
-      );
+      events.push({time: s.pass.start, delta: s.radialForce});
+      events.push({time: s.pass.end, delta: -s.radialForce});
     }
     events.sort((a, b) -> a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
     times = [];
@@ -45,7 +43,7 @@ class HobbingForceHistory {
     if (times.length == 0 || time >= times[times.length - 1]) return 0;
     var lo = 0, hi = times.length;
     while (lo < hi) {
-      var mid =(lo + hi) >> 1;
+      var mid = (lo + hi) >> 1;
       if (times[mid] <= time) lo = mid + 1;
       else hi = mid;
     }

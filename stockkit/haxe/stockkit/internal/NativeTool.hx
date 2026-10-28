@@ -18,10 +18,14 @@ class NativeTool {
       var native = new sk_profile_segment();
       native.set_struct_size(sk_profile_segment.size());
       native.set_zone(switch CutterProfile.zoneOf(segment) {
-        case Cutting: StockKitNativeConstants.SK_ZONE_CUTTING;
-        case Shank: StockKitNativeConstants.SK_ZONE_SHANK;
-        case Holder: StockKitNativeConstants.SK_ZONE_HOLDER;
-      });
+        case Cutting:
+          StockKitNativeConstants.SK_ZONE_CUTTING;
+        case Shank:
+          StockKitNativeConstants.SK_ZONE_SHANK;
+        case Holder:
+          StockKitNativeConstants.SK_ZONE_HOLDER;
+      }
+      );
       switch segment {
         case Line(r0, z0, r1, z1, _):
           native.set_kind(StockKitNativeConstants.SK_SEGMENT_LINE);
@@ -41,13 +45,12 @@ class NativeTool {
       segments.push(native);
     }
     var created = StockKitNative.sk_tool_create(segments);
-    if (created.status != StockKitNativeConstants.SK_OK)
-      throw 'tool ${tool.number} profile rejected by StockKit core (error ${created.status})';
+    if (created.status != StockKitNativeConstants
+      .SK_OK) throw 'tool ${tool.number} profile rejected by StockKit core (error ${created.status})';
     owner = created.out_tool;
   }
 
-  public function borrow():sk_tool_handle
-    return owner.borrow();
+  public function borrow():sk_tool_handle return owner.borrow();
 
   public function dispose():Void {
     if (disposed) return;

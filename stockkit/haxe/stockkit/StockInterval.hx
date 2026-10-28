@@ -14,8 +14,7 @@ class StockInterval {
   public final loNormal:Array<Float>;
   public final hiNormal:Array<Float>;
 
-  public function new(lo:Float, hi:Float, loSource:Int, hiSource:Int,
-      loNormal:Array<Float>, hiNormal:Array<Float>) {
+  public function new(lo:Float, hi:Float, loSource:Int, hiSource:Int, loNormal:Array<Float>, hiNormal:Array<Float>) {
     this.lo = lo;
     this.hi = hi;
     this.loSource = loSource;

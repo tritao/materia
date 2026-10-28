@@ -12,7 +12,7 @@ class HobbingAxes {
   public final b:Float;
   public final c:Float;
   public final offset:Null<HobbingPoseOffset>;
-  public function new(x:Float, y:Float, z:Float, a:Float, b:Float, c:Float, ? offset:HobbingPoseOffset) {
+  public function new(x:Float, y:Float, z:Float, a:Float, b:Float, c:Float, ?offset:HobbingPoseOffset) {
     for (v in [x, y, z, a, b, c]) if (!Math.isFinite(v)) throw "hobbing axes must be finite";
     this.offset = offset;
     this.x = x;

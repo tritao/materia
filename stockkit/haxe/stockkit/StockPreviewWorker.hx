@@ -42,8 +42,10 @@ class StockPreviewWorker {
     condition.release();
     // Only colouring by source reads the moves; the rest would copy the whole history.
     var withHistory = switch coloring {
-      case BySource(_, _): true;
-      case _: false;
+      case BySource(_, _):
+        true;
+      case _:
+        false;
     };
     var snapshot:Null<StockSnapshot> = null;
     try {
@@ -110,8 +112,8 @@ class StockPreviewWorker {
         if (shown == null) {
           // Any stock on the lattice will do: the snapshot replaces all of it.
           var lattice = taken.lattice;
-          shown = Stock.box(lattice, lattice.x(0), lattice.y(0), lattice.z(0),
-            lattice.x(1), lattice.y(1), lattice.z(1));
+          shown = Stock.box(lattice,
+            lattice.x(0), lattice.y(0), lattice.z(0), lattice.x(1), lattice.y(1), lattice.z(1));
           display = shown;
         }
         shown.restore(taken);
@@ -121,8 +123,12 @@ class StockPreviewWorker {
           preview = contoured;
         }
         var chunks = contoured.update();
-        update = new StockPreviewUpdate(chunks, [for (chunk in chunks) contoured.meshes[chunk]],
-          contoured.chunksX, contoured.chunksY);
+        update = new StockPreviewUpdate(
+          chunks,
+          [for (chunk in chunks) contoured.meshes[chunk]],
+          contoured.chunksX,
+          contoured.chunksY
+        );
       } catch (error:Dynamic) {
         problem = Std.string(error);
       }

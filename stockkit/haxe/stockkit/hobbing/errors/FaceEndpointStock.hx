@@ -28,8 +28,7 @@ class FaceEndpointStock implements GearRings {
       if (found < 0) throw "endpoint radius absent from base inspection";
       endpointRadii.push(found);
     }
-    for (i in 0...zs.length) nodes.push({z: zs[i], base: i, plane: -1}
-    );
+    for (i in 0...zs.length) nodes.push({z: zs[i], base: i, plane: -1});
     try {
       for (z in [0.0, faceWidth]) {
         var present = false;
@@ -42,8 +41,7 @@ class FaceEndpointStock implements GearRings {
         for (r in 0...endpointRadii.length) if (planeGrid.radius(r)
           != rs[endpointRadii[r]]) throw "face-end radial coordinates differ from inspection";
         var stock = RingStock.annulus(planeGrid);
-        nodes.push({z: z, base: -1, plane: planes.length}
-        );
+        nodes.push({z: z, base: -1, plane: planes.length});
         planes.push(stock);
         stocks.push(stock);
       }

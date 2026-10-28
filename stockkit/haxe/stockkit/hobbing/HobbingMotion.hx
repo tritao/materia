@@ -18,11 +18,11 @@ class HobbingMotion {
       || time < frames[0].time || time > frames[frames.length - 1].time) throw "sample time outside hobbing motion";
     var i = 0, j = frames.length - 1;
     while (j - i > 1) {
-      var middle =(i + j) >> 1;
+      var middle = (i + j) >> 1;
       if (frames[middle].time <= time) i = middle;
       else j = middle;
     }
-    var a = frames[i], b = frames[j], t =(time - a.time) / (b.time - a.time);
+    var a = frames[i], b = frames[j], t = (time - a.time) / (b.time - a.time);
     function mix(x:Float, y:Float):Float return x + (y - x) * t;
     var offset:Null<HobbingPoseOffset> = null;
     if (a.axes.offset != null || b.axes.offset != null) {

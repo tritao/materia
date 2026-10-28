@@ -67,7 +67,7 @@ class HobbingStream {
       var start = Math.max(frames[0].time, motion.timeAtMaster(phase - halfAngle));
       var end = Math.min(last.time, motion.timeAtMaster(phase + halfAngle));
       if (start < end) {
-        var gash =(-next) % sweep.hob.gashes;
+        var gash = (-next) % sweep.hob.gashes;
         if (gash < 0) gash += sweep.hob.gashes;
         var pass = new GashPass(gash, next - first, start, motion.timeAtMaster(phase), end);
         poses += sweep.cutPass(stock, motion.at, pass, sweep.tolerance / 16, 0.001, motion.times());

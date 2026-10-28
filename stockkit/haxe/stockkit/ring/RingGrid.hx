@@ -27,8 +27,8 @@ class RingGrid {
     this.zMax = zMax;
     radialCount = Std.int(nr);
     axialCount = Std.int(nz);
-    radialStep =(radiusMax - radiusMin) / radialCount;
-    axialStep =(zMax - zMin) / axialCount;
+    radialStep = (radiusMax - radiusMin) / radialCount;
+    axialStep = (zMax - zMin) / axialCount;
   }
   public function radius(index:Int):Float {
     if (index < 0 || index >= radialCount) throw "ring radial index out of range";

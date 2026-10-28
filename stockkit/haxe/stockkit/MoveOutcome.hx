@@ -14,8 +14,7 @@ class MoveOutcome {
   public final shankContact:Float;
   public final holderContact:Float;
 
-  public function new(source:Int, move:CutMove, removed:Float, shankContact:Float,
-      holderContact:Float) {
+  public function new(source:Int, move:CutMove, removed:Float, shankContact:Float, holderContact:Float) {
     this.source = source;
     this.move = move;
     this.removed = removed;

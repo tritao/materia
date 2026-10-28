@@ -14,8 +14,7 @@ class StockGrid {
   public final countU:Int;
   public final countV:Int;
 
-  public function new(axis:StockAxis, originU:Float, originV:Float, spacing:Float, countU:Int,
-      countV:Int) {
+  public function new(axis:StockAxis, originU:Float, originV:Float, spacing:Float, countU:Int, countV:Int) {
     this.axis = axis;
     this.originU = originU;
     this.originV = originV;

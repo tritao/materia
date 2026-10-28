@@ -57,21 +57,35 @@ class SampledReference {
     Bounds on the set of positions that `geometry` sweeps `profile` through
     along the `axis` ray at (u, v); see `ReferenceAxis` for the naming.
   **/
-  public static function sweepAlong(axis:ReferenceAxis, profile:CutterProfile,
-      geometry:PathGeometry, u:Float, v:Float, samples:Int):SpanBounds
-    return switch axis {
-      case Z: sweep(profile, geometry, u, v, samples);
-      case X: sweepHorizontal(profile, geometry, true, u, v, samples);
-      case Y: sweepHorizontal(profile, geometry, false, u, v, samples);
-    };
+  public static function sweepAlong(
+    axis:ReferenceAxis,
+    profile:CutterProfile,
+    geometry:PathGeometry,
+    u:Float,
+    v:Float,
+    samples:Int
+  ):SpanBounds return switch axis {
+    case Z:
+      sweep(profile, geometry, u, v, samples);
+    case X:
+      sweepHorizontal(profile, geometry, true, u, v, samples);
+    case Y:
+      sweepHorizontal(profile, geometry, false, u, v, samples);
+  };
 
   /**
     Horizontal rays: along +X at (y, z) when `alongX`, else along +Y at
     (x, z). At height h above the tip each pose is a disc of radius R(h),
     and grown by `rho` a disc of radius G(h), about the pose's axis.
   **/
-  static function sweepHorizontal(profile:CutterProfile, geometry:PathGeometry,
-      alongX:Bool, u:Float, v:Float, samples:Int):SpanBounds {
+  static function sweepHorizontal(
+    profile:CutterProfile,
+    geometry:PathGeometry,
+    alongX:Bool,
+    u:Float,
+    v:Float,
+    samples:Int
+  ):SpanBounds {
     if (samples < 1) throw "sampled reference needs at least one sample step";
     var path = new SampledPath(geometry);
     var section = new Section(profile);
@@ -99,8 +113,7 @@ class SampledReference {
   }
 
   /** Bounds on the set of heights that `geometry` sweeps `profile` through along the ray at (x, y). */
-  public static function sweep(profile:CutterProfile, geometry:PathGeometry,
-      x:Float, y:Float, samples:Int):SpanBounds {
+  public static function sweep(profile:CutterProfile, geometry:PathGeometry, x:Float, y:Float, samples:Int):SpanBounds {
     if (samples < 1) throw "sampled reference needs at least one sample step";
     var path = new SampledPath(geometry);
     var section = new Section(profile);
@@ -116,9 +129,7 @@ class SampledReference {
       var pose = section.inside(d);
       for (span in pose) inner.push({lo: span.lo + tipZ, hi: span.hi + tipZ});
       for (span in pose) outer.push({lo: span.lo + tipZ, hi: span.hi + tipZ});
-      if (rho > 0)
-        for (span in section.near(d, rho))
-          outer.push({lo: span.lo + tipZ, hi: span.hi + tipZ});
+      if (rho > 0) for (span in section.near(d, rho)) outer.push({lo: span.lo + tipZ, hi: span.hi + tipZ});
     }
     return {inner: merge(inner), outer: merge(outer)};
   }
@@ -129,13 +140,25 @@ class SampledReference {
     remains and `outer` (initial minus every inner sweep) contains all that
     remains.
   **/
-  public static function remaining(initial:Array<Span>, moves:Array<ReferenceMove>,
-      x:Float, y:Float, samples:Int):SpanBounds
-    return remainingAlong(Z, initial, moves, x, y, samples);
+  public static function remaining(initial:Array<Span>,
+    moves:Array<ReferenceMove>, x:Float, y:Float, samples:Int):SpanBounds return remainingAlong(
+      Z,
+      initial,
+      moves,
+      x,
+      y,
+      samples
+    );
 
   /** `remaining` along the `axis` ray at (u, v); see `ReferenceAxis` for the naming. */
-  public static function remainingAlong(axis:ReferenceAxis, initial:Array<Span>,
-      moves:Array<ReferenceMove>, u:Float, v:Float, samples:Int):SpanBounds {
+  public static function remainingAlong(
+    axis:ReferenceAxis,
+    initial:Array<Span>,
+    moves:Array<ReferenceMove>,
+    u:Float,
+    v:Float,
+    samples:Int
+  ):SpanBounds {
     var inner = merge(initial), outer = merge(initial);
     for (move in moves) {
       var swept = sweepAlong(axis, move.profile, move.geometry, u, v, samples);
@@ -146,20 +169,38 @@ class SampledReference {
   }
 
   /** Reference moves cutting with each move's whole tool profile. */
-  public static function fromCutMoves(moves:Array<CutMove>):Array<ReferenceMove>
-    return [for (move in moves) switch move.motion {
-      case Path(geometry): {profile: move.tool.profile(), geometry: geometry};
-    }];
+  public static function fromCutMoves(moves:Array<CutMove
+    >):Array<ReferenceMove> return [for (move in moves) switch move.motion {
+    case Path(geometry):
+      {profile: move.tool.profile(), geometry: geometry};
+  }
+  ];
 
   /**
     True when `inner` ⊆ `candidate` ⊆ `outer`, allowing `slack` metres of
     rounding: each set is shrunk by `slack` before it must fit inside the
     next one grown by `slack`.
   **/
-  public static function contains(inner:Array<Span>, candidate:Array<Span>,
-      outer:Array<Span>, slack:Float):Bool
-    return subset(erode(inner, slack), dilate(candidate, slack))
-      && subset(erode(candidate, slack), dilate(outer, slack));
+  public static function contains(inner:Array<Span>,
+    candidate:Array<Span>, outer:Array<Span>, slack:Float):Bool return subset(
+      erode(
+        inner,
+        slack
+      ),
+      dilate(
+        candidate,
+        slack
+      )
+    ) && subset(
+      erode(
+        candidate,
+        slack
+      ),
+      dilate(
+        outer,
+        slack
+      )
+    );
 
   /** Total length of a set of spans. */
   public static function measure(spans:Array<Span>):Float {
@@ -170,7 +211,10 @@ class SampledReference {
 
   /** Sorted, disjoint union; touching spans join. */
   public static function merge(spans:Array<Span>):Array<Span> {
-    var sorted = [for (span in spans) if (span.hi >= span.lo) {lo: span.lo, hi: span.hi}];
+    var sorted = [for (span in spans) if (span.hi >= span.lo) {
+      lo:span.lo, hi:span.hi
+    }
+    ];
     sorted.sort((a, b) -> a.lo < b.lo ? -1 : a.lo > b.lo ? 1 : 0);
     var merged:Array<Span> = [];
     for (span in sorted) {
@@ -202,12 +246,16 @@ class SampledReference {
     return merge(result);
   }
 
-  static function dilate(spans:Array<Span>, by:Float):Array<Span>
-    return merge([for (span in spans) {lo: span.lo - by, hi: span.hi + by}]);
+  static function dilate(spans:Array<Span>, by:Float):Array<Span> return merge([for (span in spans) {
+    lo:span.lo - by, hi:span.hi + by
+  }
+  ]);
 
-  static function erode(spans:Array<Span>, by:Float):Array<Span>
-    return [for (span in merge(spans)) if (span.hi - span.lo > 2 * by)
-      {lo: span.lo + by, hi: span.hi - by}];
+  static function erode(spans:Array<Span>,
+    by:Float):Array<Span> return [for (span in merge(spans)) if (span.hi - span.lo > 2 * by) {
+    lo:span.lo + by, hi:span.hi - by
+  }
+  ];
 
   /** Every span of `a` lies inside one span of `b` (both merged). */
   static function subset(a:Array<Span>, b:Array<Span>):Bool {
@@ -232,35 +280,41 @@ private class SampledPath {
     this.geometry = geometry;
     length = switch geometry {
       case Line(a, b):
-        Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)
-          + (b.z - a.z) * (b.z - a.z));
-      case Arc(_, radius, _, sweep): Math.abs(radius * sweep);
+        Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) + (b.z - a.z) * (b.z - a.z));
+      case Arc(_, radius, _, sweep):
+        Math.abs(radius * sweep);
       case Circular(_, radius, _, sweep, plane, rise):
         if (plane != XY) throw "sampled reference only sweeps XY arcs and helices";
         Math.sqrt(radius * sweep * radius * sweep + rise * rise);
     };
   }
 
-  public function x(t:Float):Float
-    return switch geometry {
-      case Line(a, b): a.x + (b.x - a.x) * t;
-      case Arc(c, radius, start, sweep): c.x + radius * Math.cos(start + sweep * t);
-      case Circular(c, radius, start, sweep, _, _): c.x + radius * Math.cos(start + sweep * t);
-    };
+  public function x(t:Float):Float return switch geometry {
+    case Line(a, b):
+      a.x + (b.x - a.x) * t;
+    case Arc(c, radius, start, sweep):
+      c.x + radius * Math.cos(start + sweep * t);
+    case Circular(c, radius, start, sweep, _, _):
+      c.x + radius * Math.cos(start + sweep * t);
+  };
 
-  public function y(t:Float):Float
-    return switch geometry {
-      case Line(a, b): a.y + (b.y - a.y) * t;
-      case Arc(c, radius, start, sweep): c.y + radius * Math.sin(start + sweep * t);
-      case Circular(c, radius, start, sweep, _, _): c.y + radius * Math.sin(start + sweep * t);
-    };
+  public function y(t:Float):Float return switch geometry {
+    case Line(a, b):
+      a.y + (b.y - a.y) * t;
+    case Arc(c, radius, start, sweep):
+      c.y + radius * Math.sin(start + sweep * t);
+    case Circular(c, radius, start, sweep, _, _):
+      c.y + radius * Math.sin(start + sweep * t);
+  };
 
-  public function z(t:Float):Float
-    return switch geometry {
-      case Line(a, b): a.z + (b.z - a.z) * t;
-      case Arc(c, _, _, _): c.z;
-      case Circular(c, _, _, _, _, rise): c.z + rise * t;
-    };
+  public function z(t:Float):Float return switch geometry {
+    case Line(a, b):
+      a.z + (b.z - a.z) * t;
+    case Arc(c, _, _, _):
+      c.z;
+    case Circular(c, _, _, _, _, rise):
+      c.z + rise * t;
+  };
 }
 
 /**
@@ -280,7 +334,8 @@ private class Section {
     top = profile.topRadius();
     var widest = 0.0;
     for (segment in profile.segments) switch segment {
-      case Line(r0, _, r1, _, _): widest = Math.max(widest, Math.max(r0, r1));
+      case Line(r0, _, r1, _, _):
+        widest = Math.max(widest, Math.max(r0, r1));
       case Arc(cr, cz, r0, z0, _, _, _):
         widest = Math.max(widest, cr + Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz)));
     }
@@ -357,8 +412,10 @@ private class Section {
         var arc = ArcGeometry.of(cr, cz, r0, z0, r1, z1);
         // Points cz + R sin(a) = h, on either side of the centre.
         var a = Math.asin(Math.max(-1.0, Math.min(1.0, (h - cz) / arc.radius)));
-        for (angle in [a, Math.PI - a]) if (arc.covers(angle))
-          widest = Math.max(widest, cr + arc.radius * Math.cos(angle));
+        for (angle in [a, Math.PI - a]) if (arc.covers(angle)) widest = Math.max(
+          widest,
+          cr + arc.radius * Math.cos(angle)
+        );
     }
     return widest;
   }
@@ -377,11 +434,9 @@ private class Section {
     for (segment in profile.segments) switch segment {
       case Line(r0, z0, r1, z1, _):
         // The profile allows a rounding-sized dip in height; order the ends.
-        widest = Math.max(widest, z0 <= z1 ? grownLine(r0, z0, r1, z1, h, rho)
-          : grownLine(r1, z1, r0, z0, h, rho));
+        widest = Math.max(widest, z0 <= z1 ? grownLine(r0, z0, r1, z1, h, rho) : grownLine(r1, z1, r0, z0, h, rho));
       case Arc(cr, cz, r0, z0, r1, z1, _):
-        widest = Math.max(widest, grownArc(ArcGeometry.of(cr, cz, r0, z0, r1, z1), cr, r0, z0,
-          r1, z1, h, rho));
+        widest = Math.max(widest, grownArc(ArcGeometry.of(cr, cz, r0, z0, r1, z1), cr, r0, z0, r1, z1, h, rho));
     }
     return widest;
   }
@@ -392,8 +447,7 @@ private class Section {
     a linear plus a concave function of z, found where its slope vanishes and
     clamped to the heights in reach.
   **/
-  static function grownLine(r0:Float, z0:Float, r1:Float, z1:Float, h:Float,
-      rho:Float):Float {
+  static function grownLine(r0:Float, z0:Float, r1:Float, z1:Float, h:Float, rho:Float):Float {
     var lo = Math.max(z0, h - rho), hi = Math.min(z1, h + rho);
     if (lo > hi) return -1;
     if (z1 == z0) return Math.max(r0, r1) + lift(rho, z0 - h);
@@ -412,8 +466,8 @@ private class Section {
     an end disc's, or a crossing of the line with one of those circles at an
     angle in range.
   **/
-  static function grownArc(arc:ArcGeometry, cr:Float, r0:Float, z0:Float, r1:Float,
-      z1:Float, h:Float, rho:Float):Float {
+  static function grownArc(arc:ArcGeometry,
+    cr:Float, r0:Float, z0:Float, r1:Float, z1:Float, h:Float, rho:Float):Float {
     var widest = -1.0;
     if (Math.abs(z0 - h) <= rho) widest = Math.max(widest, r0 + lift(rho, z0 - h));
     if (Math.abs(z1 - h) <= rho) widest = Math.max(widest, r1 + lift(rho, z1 - h));
@@ -421,19 +475,16 @@ private class Section {
     for (circle in [arc.radius + rho, arc.radius - rho]) {
       if (circle <= 0 || Math.abs(dz) > circle) continue;
       var dr = Math.sqrt(circle * circle - dz * dz);
-      for (side in [dr, -dr]) if (arc.covers(Math.atan2(dz, side)))
-        widest = Math.max(widest, cr + side);
+      for (side in [dr, -dr]) if (arc.covers(Math.atan2(dz, side))) widest = Math.max(widest, cr + side);
     }
     return widest;
   }
 
   /** sqrt(rho² - dz²), zero where rounding takes it below. */
-  static function lift(rho:Float, dz:Float):Float
-    return Math.sqrt(Math.max(0.0, rho * rho - dz * dz));
+  static function lift(rho:Float, dz:Float):Float return Math.sqrt(Math.max(0.0, rho * rho - dz * dz));
 
   /** The rho-neighbourhood of segment A-B, on the line r = d. */
-  static function capsule(ar:Float, az:Float, br:Float, bz:Float, d:Float,
-      rho:Float, spans:Array<Span>):Void {
+  static function capsule(ar:Float, az:Float, br:Float, bz:Float, d:Float, rho:Float, spans:Array<Span>):Void {
     disk(ar, az, rho, d, spans);
     disk(br, bz, rho, d, spans);
     var length = Math.sqrt((br - ar) * (br - ar) + (bz - az) * (bz - az));
@@ -449,8 +500,17 @@ private class Section {
   }
 
   /** The rho-neighbourhood of a minor arc, on the line r = d. */
-  static function annularSector(cr:Float, cz:Float, r0:Float, z0:Float, r1:Float,
-      z1:Float, d:Float, rho:Float, spans:Array<Span>):Void {
+  static function annularSector(
+    cr:Float,
+    cz:Float,
+    r0:Float,
+    z0:Float,
+    r1:Float,
+    z1:Float,
+    d:Float,
+    rho:Float,
+    spans:Array<Span>
+  ):Void {
     disk(r0, z0, rho, d, spans);
     disk(r1, z1, rho, d, spans);
     var radius = Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz));
@@ -495,7 +555,8 @@ private class Clip {
   public var lo = Math.NEGATIVE_INFINITY;
   public var hi = Math.POSITIVE_INFINITY;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function within(offset:Float, slope:Float, min:Float, max:Float):Void {
     if (slope == 0) {
@@ -525,15 +586,13 @@ private class ArcGeometry {
     this.high = high;
   }
 
-  public static function of(cr:Float, cz:Float, r0:Float, z0:Float, r1:Float,
-      z1:Float):ArcGeometry {
+  public static function of(cr:Float, cz:Float, r0:Float, z0:Float, r1:Float, z1:Float):ArcGeometry {
     var start = Math.atan2(z0 - cz, r0 - cr);
     var sweep = Math.atan2(z1 - cz, r1 - cr) - start;
     while (sweep > Math.PI) sweep -= 2 * Math.PI;
     while (sweep <= -Math.PI) sweep += 2 * Math.PI;
     var radius = Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz));
-    return new ArcGeometry(cz, radius, Math.min(start, start + sweep),
-      Math.max(start, start + sweep));
+    return new ArcGeometry(cz, radius, Math.min(start, start + sweep), Math.max(start, start + sweep));
   }
 
   /** True when angle `a`, taken modulo a turn, lies in [low, high]. */

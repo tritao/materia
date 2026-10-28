@@ -17,8 +17,14 @@ class StockComparison {
   /** Source (history index) of the move that cut the largest gouge on each ray, or -1. */
   public final gougeSource:Array<Int>;
 
-  public function new(grid:StockGrid, leftover:Array<Float>, gouge:Array<Float>,
-      largestLeftover:Array<Float>, largestGouge:Array<Float>, gougeSource:Array<Int>) {
+  public function new(
+    grid:StockGrid,
+    leftover:Array<Float>,
+    gouge:Array<Float>,
+    largestLeftover:Array<Float>,
+    largestGouge:Array<Float>,
+    gougeSource:Array<Int>
+  ) {
     this.grid = grid;
     this.leftover = leftover;
     this.gouge = gouge;
@@ -27,11 +33,9 @@ class StockComparison {
     this.gougeSource = gougeSource;
   }
 
-  public function leftoverVolume():Float
-    return sum(leftover) * grid.spacing * grid.spacing;
+  public function leftoverVolume():Float return sum(leftover) * grid.spacing * grid.spacing;
 
-  public function gougeVolume():Float
-    return sum(gouge) * grid.spacing * grid.spacing;
+  public function gougeVolume():Float return sum(gouge) * grid.spacing * grid.spacing;
 
   /** Deepest single gouge along any ray. */
   public function deepestGouge():Float {
@@ -50,10 +54,8 @@ class StockComparison {
   /** Sources of moves whose gouges exceed `tolerance` somewhere, each once, in increasing order. */
   public function gougingMoves(tolerance:Float):Array<Int> {
     var sources:Array<Int> = [];
-    for (index in 0...gougeSource.length)
-      if (largestGouge[index] > tolerance && gougeSource[index] >= 0
-          && sources.indexOf(gougeSource[index]) < 0)
-        sources.push(gougeSource[index]);
+    for (index in 0...gougeSource.length) if (largestGouge[index] > tolerance
+      && gougeSource[index] >= 0 && sources.indexOf(gougeSource[index]) < 0) sources.push(gougeSource[index]);
     sources.sort((a, b) -> a - b);
     return sources;
   }

@@ -28,10 +28,11 @@ import motionkit.program.Blend;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
 
-private typedef PendingOutputEvent = {var boundary:Int;
-var channel:String;
-var value:EventValue;
-var span:Provenance;
+private typedef PendingOutputEvent = {
+  var boundary:Int;
+  var channel:String;
+  var value:EventValue;
+  var span:Provenance;
 }
 
 /** Converts plain CNC operations to MotionKit paths, barriers, and source map. */
