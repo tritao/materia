@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 
 /** Sorted material arc [lo,hi] in [0,2*pi]. Artificial seam boundaries are not surfaces.
     Each real exposed endpoint retains its gash and pass; -1 means original stock. */

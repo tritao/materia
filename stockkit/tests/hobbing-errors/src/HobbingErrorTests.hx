@@ -8,7 +8,7 @@ class HobbingErrorTests {
   static function physical(tolerance:Float=0.0001,threads:Int=4):Void {
     var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
     var ideal=new IdealHobbingJob(spec,hob,3000,1.1,0,1);
-    var stock=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
+    var stock=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
     var passes=ideal.schedule(stock.grid);stock.dispose();
     var sources=[HobbingErrorSource.workEccentricity("mandrel","mandrel",0.004),
       HobbingErrorSource.hobRadial("arbor",0.004),HobbingErrorSource.hobAxial("arbor",0.004)];
@@ -30,7 +30,7 @@ class HobbingErrorTests {
     var ideal=new IdealHobbingJob(spec,hob,3000,1.1,0,1),inspection=new GearInspection(spec,spec.pitchRadius());
     var knots=[1.0,0.23,-1,0.17,0.23,0.0,ideal.duration];
     var source=HobbingErrorSource.measuredSync("test runtime",t->t<0.17?t*0.0001:t<0.23?0.000017-(t-0.17)*0.0002:0.000005,"piecewise linear measured residual with exact knots");
-    var stock=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);stock.setThreads(4);
+    var stock=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2);stock.setThreads(4);
     var passes=ideal.schedule(stock.grid),sweep=new HobbingSweep(hob,-6,6,0.0001);
     var direct:GearMeasurement;
     try{for(pass in passes)sweep.cutPass(stock,t->source.apply(t,ideal.axesAt(t)),pass,0.0001/16,0.001,knots);
@@ -48,7 +48,7 @@ class HobbingErrorTests {
   static function crossParity():Void {
     var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
     var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),cfg=new GearInspection(spec,spec.pitchRadius());
-    var blank=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2),cross=InspectionRingStock.create(blank.grid,cfg);
+    var blank=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2),cross=InspectionRingStock.create(blank.grid,cfg);
     check(cross!=null,"exact inspection cross exists for physical source fixture");
     var rejected=false;try{cross.boundaries(0,0);}catch(e:Dynamic){rejected=true;}
     check(rejected,"uncomputed circles cannot be read as cut geometry");cross.dispose();
@@ -77,7 +77,7 @@ class HobbingErrorTests {
     var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),cfg=new GearInspection(spec,spec.pitchRadius());
     var reports:Array<GearMeasurement> = [],legacy:Array<GearMeasurement> = [];
     for(excess in [false,true]){
-      var interior=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
+      var interior=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
       var covered=new FaceEndpointStock(interior,[interior],interior.grid,spec.faceWidth);
       for(part in covered.stocks)part.setThreads(4);
       var positions=covered.axialPositions();check(positions[0]==0&&positions[positions.length-1]==2,"face endpoints are exact measured planes");
@@ -100,7 +100,7 @@ class HobbingErrorTests {
     check(legacy[0].warnings.indexOf("Face endpoints not sampled; end excess material unchecked")>=0,"legacy inset inspection retains its coverage warning");
     near(reports[1].value("Fp"),reports[0].value("Fp"),1e-12,"face-end excess leaves interior pitch measurement unchanged");
     near(reports[1].value("Falpha"),reports[0].value("Falpha"),1e-12,"face-end excess leaves interior profile measurement unchanged");
-    var blank=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2),passes=motion.schedule(blank.grid);
+    var blank=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2),passes=motion.schedule(blank.grid);
     var cross=InspectionRingStock.create(blank.grid,cfg);if(cross==null)throw "exact radial strip for focused end check";
     var leadGrid=cross.stocks[1].grid;cross.dispose();blank.dispose();
     var focused=new HobbingErrorJob(spec,hob,motion.axesAt,passes,[],0.6,0.1,0.2,-6,6,0.000025,cfg,null,4,false,true,leadGrid).run([]);
@@ -112,7 +112,7 @@ class HobbingErrorTests {
   }
   static function multiConvergence():Void {
     var spec=new GearSpec(1,20,2,20*Math.PI/180),hob=new HobDesign(ConjugateRack.of(new ToothProfile(spec)),1,32,4);
-    var a=stockkit.RingStock.annulus(new stockkit.RingGrid(spec.pitchRadius()-0.1,spec.pitchRadius()+0.1,0.9,1.1,0.1,0.1)),b=stockkit.RingStock.annulus(a.grid),dense=stockkit.RingStock.annulus(a.grid);
+    var a=stockkit.ring.RingStock.annulus(new stockkit.ring.RingGrid(spec.pitchRadius()-0.1,spec.pitchRadius()+0.1,0.9,1.1,0.1,0.1)),b=stockkit.ring.RingStock.annulus(a.grid),dense=stockkit.ring.RingStock.annulus(a.grid);
     a.setThreads(1);b.setThreads(4);dense.setThreads(4);
     var motion=new IdealHobbingJob(spec,hob,3000,1.1,0,1),passes=motion.schedule(a.grid),sweep=new HobbingSweep(hob,-6,6,0.00005);
     var comparisons=0,finished=0;

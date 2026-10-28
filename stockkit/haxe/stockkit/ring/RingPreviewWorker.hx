@@ -1,5 +1,6 @@
-package stockkit;
+package stockkit.ring;
 
+import stockkit.StockMesh;
 import sys.thread.Condition;
 import sys.thread.Thread;
 

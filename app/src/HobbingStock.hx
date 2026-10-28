@@ -3,6 +3,7 @@ package app;
 import haxe.io.Bytes;
 import gearkit.*;
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 import nativekit.scene.GeometryData;
 import materia.project.SceneArtifact.SceneArtifactHobbing;

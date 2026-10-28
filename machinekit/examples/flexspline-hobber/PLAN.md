@@ -1353,7 +1353,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
 - Full HB8 reference entry/feed validation passed with the threaded force runner
   (results below). HB9's archived source remains unchanged. Loaded app acceptance
   remains separate from these static process-load checks.
-- Details and assumptions: `stockkit/HOBBING_FORCES.md`. Logs:
+- Details and assumptions: `stockkit/docs/HOBBING_FORCES.md`. Logs:
   `/tmp/flexspline-hb10-{tests,gearing,machine,stream,app-build,reference}.log`.
 
 - Validation: **18 force checks**, **19 gearbox/PlanCheck checks** and **248 machine
@@ -1387,7 +1387,7 @@ LD_LIBRARY_PATH="$PWD/build/flexspline-hb3/native:$PWD/haxeon/.tools/hashlink:$P
   construction is checked. The coarse physical source-cut mode is separate and
   pending; full reference-budget signatures, HB7 source studies and supported-wall
   calibration remain required before HB12. No physical ISO budget is claimed.
-- Details: `stockkit/HOBBING_ERRORS.md`. Logs:
+- Details: `stockkit/docs/HOBBING_ERRORS.md`. Logs:
   `/tmp/flexspline-hb11-{tests,machine,stream,app-build,physical}.log`.
   HB9/HB10 acceptance artifacts are left unchanged.
 

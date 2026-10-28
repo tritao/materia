@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 
 /** Cell-centred circumferential grid. Millimetres; angles about +Z from +X.
     Bounds are exact; cell sizes divide the bounds and never exceed requested spacing. */

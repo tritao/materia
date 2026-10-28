@@ -1,7 +1,7 @@
 package stockkit.hobbing;
 import gearkit.GearSpec;
 import gearkit.HobDesign;
-import stockkit.RingGrid;
+import stockkit.ring.RingGrid;
 
 /** External spur-gear driver, no machine/runtime coupling or error sources.
     Reference rack module/pressure angle must match; positive feed advances +Z. */

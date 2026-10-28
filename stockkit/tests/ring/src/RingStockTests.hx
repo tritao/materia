@@ -1,10 +1,10 @@
 import gearkit.GearSpec;
 import gearkit.ToothProfile;
-import stockkit.RingStock;
-import stockkit.RingGrid;
-import stockkit.RingCut;
-import stockkit.RingGearTarget;
-import stockkit.RingInterval;
+import stockkit.ring.RingStock;
+import stockkit.ring.RingGrid;
+import stockkit.ring.RingCut;
+import stockkit.ring.RingGearTarget;
+import stockkit.ring.RingInterval;
 
 class RingStockTests {
   static var assertions = 0;

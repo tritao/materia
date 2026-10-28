@@ -65,3 +65,16 @@ Roughly in priority order.
 - [ ] Haxeon rejects a second `var` of the same name in one block
   (`E1001 Duplicate local`, `Scope.define`), which Haxe allows as shadowing.
   Supporting it touches how locals, captures and cells are keyed by name.
+
+## Gear cutting (`stockkit.ring`, `stockkit.hobbing`)
+
+See [`docs/RING.md`](docs/RING.md) and [`docs/HOBBING.md`](docs/HOBBING.md).
+
+- [ ] Move the ring C++ (`ring.cpp`, `rake.cpp`) and its part of `api.cpp` and
+  `stockkit.h` into their own files, so the Cartesian and ring paths are
+  separate in the native core too.
+- [ ] Decide whether `stockkit.ring` and `stockkit.hobbing` become their own
+  package (depending on StockKit and GearKit) so CAM users no longer pull in
+  GearKit.
+- [ ] Split the test run into quick and thorough sets (see above); the HB4
+  reference acceptance is the slow part.

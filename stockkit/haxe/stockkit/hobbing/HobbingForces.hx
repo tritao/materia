@@ -1,6 +1,6 @@
 package stockkit.hobbing;
 
-import stockkit.RingStock;
+import stockkit.ring.RingStock;
 
 /** Optional per-pass observer. A COW previous stock plus native interval comparison
     gives removed volume, without copying circle intervals into the managed heap.

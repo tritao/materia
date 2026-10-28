@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 
 /** Remove one counterclockwise angular span on a radial circle and consecutive Z cells.
     start wraps; sweep is in [0,2*pi]. Gash/pass identifiers must be non-negative. */

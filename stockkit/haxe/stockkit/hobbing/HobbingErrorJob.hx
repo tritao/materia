@@ -1,7 +1,7 @@
 package stockkit.hobbing;
 import gearkit.*;
-import stockkit.RingStock;
-import stockkit.RingGrid;
+import stockkit.ring.RingStock;
+import stockkit.ring.RingGrid;
 
 /** Repeats physical rake subtraction and HB4 inspection from a fresh blank for
     every budget run. at() may be ideal motion or recorded HB7 actual observations;

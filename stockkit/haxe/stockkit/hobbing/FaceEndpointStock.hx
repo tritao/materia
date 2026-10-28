@@ -1,7 +1,7 @@
 package stockkit.hobbing;
 import gearkit.GearRings;
-import stockkit.RingGrid;
-import stockkit.RingStock;
+import stockkit.ring.RingGrid;
+import stockkit.ring.RingStock;
 
 /** Adds physically cut Z=0 and Z=faceWidth circles to an existing inspection.
     Interior coordinates are unchanged. These planes are sampling domains, not

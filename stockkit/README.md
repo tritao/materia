@@ -15,96 +15,17 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Circumferential ring stock
+## Gear cutting
 
-`RingStock` represents a gear tooth band as material arcs on cell-centred `(radius, z)` circles.
-Angles are radians about +Z from +X. Endpoint positions are double precision, with no angular
-raster; each endpoint carries the gash and pass that exposed it. The cells exactly cover the
-specified annulus and height. Native ring structs and handles are separate from Cartesian stock;
-the generated StockKit C ABI is version 5.
+`stockkit.ring` holds `RingStock`, a circumferential stock for gear tooth bands, and
+`stockkit.hobbing` cuts it with hob rake faces. Both depend on GearKit and are independent of
+the Cartesian stock below.
 
-```haxe
-var spec = new gearkit.GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-var stock = stockkit.RingStock.fromGearBlank(spec, 0.6); // mm; wall thickness BELOW the roots
-var saved = stock.snapshot();
-stock.cutRegion([new stockkit.RingCut(130, 0, stock.grid.axialCount, 0.1, 0.02, 3, 1)]);
-var arcs = stock.circle(130, 0); // sorted material intervals in [0, 2*pi]
-var comparison = stock.compare(spec); // full tooth, root/tip fillets included
-var mesh = stock.contour(); // StockMesh streams in mm; triangle source is a pass ID
-stock.restore(saved);
-saved.dispose();
-stock.dispose();
-```
+- [Ring stock](docs/RING.md): material arcs on `(radius, z)` circles, snapshots, comparison.
+- [Ideal hobbing sweeps and gear metrology](docs/HOBBING.md)
+- [Cutting loads (HB10)](docs/HOBBING_FORCES.md) and [error budget (HB11)](docs/HOBBING_ERRORS.md)
 
-`annulus(new RingGrid(...))` creates stock with explicit bounds and maximum radial/axial cell
-sizes. `cutSlab` intersects a planar slab analytically. `cutRegion` applies a validated batch in
-array order; negative starts and spans crossing the angular seam work, and a full revolution
-removes a whole circle. `setThreads` changes execution parallelism without changing endpoints or
-sources. Snapshots share immutable radial layers and remain valid after the original stock is
-disposed. Restore and `compareStock` require identical grids.
-
-`compare(GearSpec)` reports angular leftover/gouge per circle; `RingComparison` converts those
-to arc lengths in mm and cell-volume estimates in cubic mm. This is a geometric comparison,
-not ISO grading. `contour` displays the piecewise radial/axial cell boundary, suppressing internal
-faces; only its angular chords approximate the arcs. Metrology reads `circle` directly.
-`stockkit.hobbing.HobbingSweep` supplies the hob-edge sweep described below.
-
-Focused ring tests are in `tests/ring/haxeon.json` and are also a group of the main StockKit
-suite. The CMake `stockkit_ring_tests` target exercises the C ABI and the reference-part memory
-and snapshot budgets. The reference case includes a continuous 0.6 mm wall below the roots,
-5 micrometre radial cells, 0.1 mm axial cells and 200 material intervals per tooth-band circle.
-
-## Ideal hobbing sweeps
-
-`stockkit.hobbing` cuts the actual HB1 rake-face polygons through the HB2 circles. It has no
-machine, rigid joint coupling, target-profile cutter shortcut, or injected scallop-depth formula.
-`HobbingAxes` supplies X/Y/Z/A/B/C as a function of time: mm, unwrapped radians and seconds.
-X is centre distance; Y is shift along the hob axis; Z is head height. The frame chain tilts the
-hob from -Y by A, rotates it by B, then applies inverse C into the work frame.
-
-```haxe
-var spec = new gearkit.GearSpec(0.3, 200, 8, 20 * Math.PI / 180);
-var hob = new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)), 1, 32, 12);
-// Fast transverse slice with three measuring circles around the 30 mm pitch radius.
-var stock = stockkit.RingStock.annulus(new stockkit.RingGrid(29.925, 30.075, 3.999999, 4.000001, 0.05, 1));
-var job = new stockkit.hobbing.IdealHobbingJob(spec, hob, 3000, 1.1, 0, 4);
-var sweep = new stockkit.hobbing.HobbingSweep(hob, -8, 8); // inclusive axial tooth indices
-var report = sweep.cut(stock, job.axesAt, job.schedule(stock.grid));
-sweep.dispose();
-stock.dispose();
-```
-
-The ideal driver supports external spur gears and right-hand hobs. It sets the lead-angle tilt,
-table ratio, static shift compensation and optional feed in mm per work revolution. General
-motion is supplied independently. `HobbingMotion` interpolates controller samples and
-`GashPass.fromMotion` locates measured-B phase crossings between ticks, preserving independent
-actual C. Pass `motion.times()` as `motionKnots` to split sweeps at every controller knot.
-
-Native rake tools triangulate simple planar regions once and intersect swept triangle-endpoint
-convex hulls with each measuring circle. `HobbingSweep.cut` samples the actual rigid path,
-includes exact event-centre times, and refines the whole job until its observed per-circle angular
-symmetric difference, expressed as arc length, meets the requested tolerance (default 0.00005 mm).
-This is numerical convergence on the sampled circles. It does not establish a machine accuracy
-class. Nonlinear motion must be resolved by the caller's time knots and sampling interval.
-A failed job restores the incoming stock; each native pass is atomic. `cutPass` exposes one
-sampling resolution for studies. Gash/pass endpoint provenance is preserved.
-
-`HobbingSweep.cutPassMany` can share native geometry processing between pairs of
-independent inspection domains. Set `STOCKKIT_RAKE_BATCH_DOMAINS=1` before creating
-the sweep to opt in. It uses `sk_ring_stock_sweep_rake_pair`; an odd final domain
-uses the ordinary sweep. Both domains keep independent circle intersections,
-interval unions and provenance. Invalid arguments leave both stocks unchanged,
-and an exception during application restores both domains. Transforms and prism
-bounds are streamed once per pair, with no geometry cache across passes. Sweep
-sampling, tolerances and thread counts remain explicit. The ordinary single-stock
-force path is unchanged.
-
-Focused checks live in `tests/hobbing/haxeon.json` and also run as a main StockKit test group.
-They cover generating facets and their inverse-square gash-count trend, multiple starts, pitch
-thickness, axial-feed marks, controller interpolation and rollback. Their acceptance runs use
-transverse slices; full-face throughput, application playback and ISO metrology are later steps.
-
-## Current state (phases 0–5, phase 6 under way)
+## Cartesian stock: current state (phases 0–5 done, phase 6 nearly done)
 
 - Tool shapes live in ToolpathKit so any `Tool` can carry one:
   `toolpathkit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -315,31 +236,3 @@ automatically (see the CadKit README), so the Haxe tests run with:
 ```sh
 ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
 ```
-
-### Gear metrology
-
-`RingStock` implements GearKit's read-only `GearRings` interface. Use
-`gearkit.GearMeasurement.fromRings(stock, spec, inspection)` for tooth/flank traces,
-virtual-ball runout, circular thickness and per-parameter numerical grading.
-See [evaluation settings, units and qualification rules](../gearkit/METROLOGY.md).
-The native adapter test is `stockkit/tests/metrology/haxeon.json`; its `reference`
-argument runs the heavy full-face hobbing acceptance case.
-
-The HB4 reference's aggregate convergence failure has a small boundary diagnostic:
-
-```sh
-machinekit/examples/flexspline-hobber/check-hb4-boundary.sh
-```
-
-This reuses the validated native provider (`HB4_PROBE_NATIVE` overrides its path),
-compiles only the metrology entrypoint and runs 103 original gash windows at the
-exact offending radius/Z. The first two endpoint/provenance pairs must exactly
-match saved full-stroke snapshots before studying refinements 2–5. The script
-records native/binary/fixture hashes, four threads, path tolerances and timings.
-Observed time is about 88 seconds. It is a diagnostic, not full-circle convergence
-or reference grading. `HB4_BOUNDARY_INPUT` selects the companion
-`stockkit/tests/metrology/fixtures/hb4-profile-boundary.json` (111 windows); use a
-separate `HB4_BOUNDARY_EVIDENCE` directory for its results. The `convergence-probe`
-entrypoint retains the slower four-circle/full-stroke reproduction for rebuilding
-these anchors. Reference acceptance still requires all inspection circles and the
-physical face ends to satisfy the unchanged 0.00005 mm total-arc criterion.

@@ -1,9 +1,9 @@
 package stockkit.hobbing;
 import gearkit.GearInspection;
 import gearkit.GearRings;
-import stockkit.RingGrid;
-import stockkit.RingStock;
-import stockkit.RingInterval;
+import stockkit.ring.RingGrid;
+import stockkit.ring.RingStock;
+import stockkit.ring.RingInterval;
 
 typedef InspectionSlice={first:Int,last:Int,low:Float,high:Float};
 

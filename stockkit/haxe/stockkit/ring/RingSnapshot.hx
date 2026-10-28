@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 import StockKitNative;
 
 /** Immutable copy-on-write radial layers. Survives destruction of the original stock. */

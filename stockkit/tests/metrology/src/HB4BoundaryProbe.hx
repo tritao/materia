@@ -1,5 +1,6 @@
 import gearkit.*;
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 
 private typedef BoundaryProbeInput={radius:Float,z:Float,targetAngle:Float,radialLow:Float,radialHigh:Float,zLow:Float,zHigh:Float,

@@ -53,16 +53,16 @@ class FlexsplineHobberChecks {
     var mandrelError=errors.filter(e->e.id=="mandrel")[0];
     near(mandrelError.apply(0,new HobbingAxes(46,0,4,0,0,0)).pose().get_translation(0),46-machine.mandrel.eccentricity,1e-12,"part eccentricity controls physical work offset");
     check(errors.filter(e->e.id=="wall")[0].basis.indexOf("explicit test fixture stiffness")>=0,"wall support assumption stays in budget provenance");
-    var forceStock=stockkit.RingStock.annulus(new stockkit.RingGrid(29,30,0,1,1,1));
+    var forceStock=stockkit.ring.RingStock.annulus(new stockkit.ring.RingGrid(29,30,0,1,1,1));
     var forces=new stockkit.hobbing.HobbingForces(forceStock,30,20*Math.PI/180,1);
     try {
-      forceStock.cutRegion([new stockkit.RingCut(0,0,1,0,0.001,0,0)]);
+      forceStock.cutRegion([new stockkit.ring.RingCut(0,0,1,0,0.001,0,0)]);
       forces.afterPass(new stockkit.hobbing.GashPass(0,0,0,0.5,1),new HobbingAxes(46,0,0,0,0,0),new HobbingAxes(46,0,0,0,0.625,0),16);
       check(FlexsplineHobberLoads.fits(machine,cam,forces),"HB10 installed ratings accept modest measured chip load with reserve");
       var options=FlexsplineHobberLoads.planOptions(forces);
       check(options.resistingEfforts.get("X")==forces.maxRadial,"radial load reaches PlanCheck");
       check(options.resistingEfforts.get(FlexsplineHobber.C)==forces.maxTableTorqueBound,"table reaction reaches PlanCheck");
-      forceStock.cutRegion([new stockkit.RingCut(0,0,1,0.001,1,0,1)]);
+      forceStock.cutRegion([new stockkit.ring.RingCut(0,0,1,0.001,1,0,1)]);
       forces.afterPass(new stockkit.hobbing.GashPass(0,1,1,1.5,2),new HobbingAxes(46,0,0,0,0,0),new HobbingAxes(46,0,0,0,0.625,0),16);
       check(!FlexsplineHobberLoads.fits(machine,cam,forces),"HB10 installed ratings reject heavy measured chip load");
     }catch(e:Dynamic){forces.dispose();forceStock.dispose();throw e;}forces.dispose();forceStock.dispose();
@@ -123,7 +123,7 @@ class FlexsplineHobberChecks {
     var spec=new GearSpec(1,20,2,20*Math.PI/180);
     var hob=new gearkit.HobDesign(gearkit.ConjugateRack.of(new gearkit.ToothProfile(spec)),1,32,4);
     var motion=new stockkit.hobbing.IdealHobbingJob(spec,hob,3000,1.1,0,1);
-    var grid=stockkit.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
+    var grid=stockkit.ring.RingStock.fromGearBlank(spec,0.6,0.1,0.2);
     var passes=motion.schedule(grid.grid);grid.dispose();
     var force=100*Math.tan(spec.pressureAngle);
     var rows:Array<{factor:Float,thicknessChangeUm:Float,profileUm:Float}> = [];

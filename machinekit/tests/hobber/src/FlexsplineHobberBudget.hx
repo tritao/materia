@@ -1,5 +1,6 @@
 import gearkit.*;
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 import machinekit.hobbing.MandrelRadialSupport;
 

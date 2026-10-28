@@ -450,8 +450,8 @@ section; it does not copy them.
 
 | File | Tag | Notes |
 |---|---|---|
-| HOBBING_ERRORS.md | internal | HB11 engineering record. |
-| HOBBING_FORCES.md | internal | HB10 engineering record. |
+| docs/HOBBING_ERRORS.md | internal | HB11 engineering record. |
+| docs/HOBBING_FORCES.md | internal | HB10 engineering record. |
 | README.md | merge | Tri-dexel idea → `concepts/process/stock.md`; API → guides. Heading "phase 6 under way" disagrees with TODO.md ("phase 6 done apart from manifold contouring"). |
 | TODO.md | internal | |
 | docs/DESIGN.md | merge | Design rationale (CAMotics/FreeCAD comparison, OpenVDB decision) → `concepts/process/stock.md`. |

@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 
 /** Per-circle angular errors (radians), axial-major, radial index fastest.
     Arc lengths and cell-volume estimates use mm and cubic mm. This is geometric

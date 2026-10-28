@@ -1,6 +1,7 @@
-package stockkit;
+package stockkit.ring;
 
 import StockKitNative;
+import stockkit.StockMesh;
 import gearkit.GearSpec;
 
 /** Circumferential stock for gear cutting. Millimetres, radians; unlike Cartesian Stock's metres.

@@ -2,7 +2,7 @@ package stockkit.hobbing;
 import StockKitNative;
 import gearkit.HobDesign;
 import gearkit.Point3;
-import stockkit.RingStock;
+import stockkit.ring.RingStock;
 
 /** Sweeps the actual planar rake regions through sampled rigid poses. A native
     convex-prism sweep supplies circle intervals; no target GearSpec or quality

@@ -1,5 +1,6 @@
 import gearkit.*;
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 class HobbingForceTests {
   static var checks=0;

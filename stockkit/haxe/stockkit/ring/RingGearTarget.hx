@@ -1,4 +1,4 @@
-package stockkit;
+package stockkit.ring;
 
 import gearkit.GearSpec;
 import gearkit.ToothProfile;

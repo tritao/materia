@@ -1,5 +1,6 @@
 import gearkit.*;
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 
 typedef ForceSpeedResult={summary:Dynamic,stockHash:String,loadHash:String,seconds:Float,stockValues:Array<Float>,stockSources:Array<Int>,loadValues:Array<Float>};

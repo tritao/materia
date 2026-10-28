@@ -1,6 +1,6 @@
 package stockkit.hobbing;
 
-import stockkit.RingStock;
+import stockkit.ring.RingStock;
 
 /** Bounded measured-motion window. Finishes each complete gash window exactly once,
     retaining the bracketing controller samples until all overlapping windows are cut. */

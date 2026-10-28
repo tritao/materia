@@ -1,4 +1,5 @@
 import stockkit.*;
+import stockkit.ring.*;
 import stockkit.hobbing.*;
 import materia.assembly.AssemblyFrames as F;
 
