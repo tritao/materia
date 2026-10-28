@@ -71,7 +71,7 @@ class GeometryTests {
     var points = rack.flankSamples(), ymin = points[0].y, ymax = points[points.length - 1].y;
     // Heights between samples test interpolation and the independently derived closed-form oracle.
     for (i in 0...101) {
-      var y = ymin +(ymax - ymin) * (i + 0.37) / 101;
+      var y = ymin + (ymax - ymin) * (i + 0.37) / 101;
       var p = rack.envelopeAt(spec, y), r = p.radius();
       var alphaR = Math.acos(spec.baseRadius() / r);
       var expectedAngle = spec.pitchToothThickness()
@@ -130,15 +130,25 @@ class GeometryTests {
           near(nextTurn[i].z - p.z, hob.lead, 1e-12, "thread turn spacing");
         }
         near(maxRadius, 16, 1e-11, "cutting edge reaches outside circle");
-        var behind=0.1,back=hob.relievedFaceRegion(gash,thread,0,behind,0.05);
-        for(i in 0...region.length){
-          var before=region[i],after=back[i],radius=Math.sqrt(after.x*after.x+after.y*after.y);
-          var rotated=phase-behind,x=Math.cos(rotated)*after.x+Math.sin(rotated)*after.y,y=-Math.sin(rotated)*after.x+Math.cos(rotated)*after.y;
-          near(Math.sin(rake)*x+Math.cos(rake)*y,16*Math.sin(rake),1e-11,"relieved section stays planar at rake offset");
-          check(radius<=Math.sqrt(before.x*before.x+before.y*before.y)+1e-12&&radius>=dp/2-hob.rootHeight-1e-12,"relief stays behind edge and above root");
-          var a0=Math.atan2(-sn*before.x+cs*before.y,cs*before.x+sn*before.y);
-          var a1=Math.atan2(-sn*after.x+cs*after.y,cs*after.x+sn*after.y);
-          near(after.z-before.z,hob.lead*(a1-a0)/(2*Math.PI),1e-12,"backing follows the generating helix");
+        var behind = 0.1, back = hob.relievedFaceRegion(gash, thread, 0, behind, 0.05);
+        for (i in 0...region.length) {
+          var before = region[i], after = back[i], radius = Math.sqrt(after.x * after.x + after.y * after.y);
+          var rotated = phase - behind, x = Math.cos(rotated) * after.x + Math.sin(rotated) * after.y,
+            y = -Math.sin(rotated) * after.x + Math.cos(rotated) * after.y;
+          near(
+            Math.sin(rake) * x + Math.cos(rake) * y,
+            16 * Math.sin(rake),
+            1e-11,
+            "relieved section stays planar at rake offset"
+          );
+          check(
+            radius <= Math.sqrt(before.x * before.x + before.y * before.y) + 1e-12
+            && radius >= dp / 2 - hob.rootHeight - 1e-12,
+            "relief stays behind edge and above root"
+          );
+          var a0 = Math.atan2(-sn * before.x + cs * before.y, cs * before.x + sn * before.y);
+          var a1 = Math.atan2(-sn * after.x + cs * after.y, cs * after.x + sn * after.y);
+          near(after.z - before.z, hob.lead * (a1 - a0) / (2 * Math.PI), 1e-12, "backing follows the generating helix");
         }
         near(region[0].x, region[region.length - 1].x, 0, "closed rake region X");
         near(region[0].z, region[region.length - 1].z, 0, "closed rake region Z");
@@ -180,7 +190,7 @@ class GeometryTests {
       var target = new GearSpec(0.3, 240, 8, alpha, internal, 0.1);
       var tooth = new ToothProfile(target), points = common.flankSamples();
       for (i in 1...50) {
-        var y = points[0].y +(points[points.length - 1].y - points[0].y) * i / 50;
+        var y = points[0].y + (points[points.length - 1].y - points[0].y) * i / 50;
         var p = common.envelopeAt(target, y);
         near(p.distance(tooth.flankAtRadius(p.radius())), 0, 1e-6, "common rack generates another gear");
       }

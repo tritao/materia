@@ -55,8 +55,8 @@ class ConjugateRack {
     if (spec.sign() * (p.x * d.y - p.y * d.x) < 0) d = d.scaled(-1);
     var length = d.radius(), target = (p.x * d.x + p.y * d.y) / spec.pitchRadius();
     if (Math.abs(target) < 1e-14 * length) target = 0;
-    if (length <= 0 || target > length + 1e-12
-      || !Math.isFinite(target)) throw "profile normal cannot contact the rack pitch line";
+    if (length <= 0
+      || target > length + 1e-12 || !Math.isFinite(target)) throw "profile normal cannot contact the rack pitch line";
     var delta = Math.atan2(d.y, d.x);
     var low = spec.internal ? delta - Math.PI / 2 : delta - Math.PI;
     var high = spec.internal ? delta : delta - Math.PI / 2;
@@ -81,7 +81,7 @@ class ConjugateRack {
   public function flankAt(height:Float):Point2 {
     var segment = segmentAt(height);
     var a = flankPoints[segment], b = flankPoints[segment + 1];
-    return new Point2(a.x +(b.x - a.x) * (height - a.y) / (b.y - a.y), height);
+    return new Point2(a.x + (b.x - a.x) * (height - a.y) / (b.y - a.y), height);
   }
 
   /** Re-envelope the recovered rack at a normal-plane height onto a new gear.
@@ -125,7 +125,7 @@ class ConjugateRack {
       var i = 0;
       while (i + 1 < rootPoints.length && rootPoints[i + 1].y < height) i++;
       var a = rootPoints[i], b = rootPoints[i + 1];
-      top = new Point2(a.x +(b.x - a.x) * (height - a.y) / (b.y - a.y), height);
+      top = new Point2(a.x + (b.x - a.x) * (height - a.y) / (b.y - a.y), height);
       var j = rootPoints.length - 1;
       while (j >= 0) {
         if (rootPoints[j].y < height) blend.push(rootPoints[j]);

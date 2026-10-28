@@ -142,7 +142,7 @@ class ToothProfile {
     result.push(new Point2(-spec.rootRadius() * Math.sin(pitchHalf), spec.rootRadius() * Math.cos(pitchHalf)));
     var rootAngle = Math.atan2(side[0].x, side[0].y);
     for (i in 1...samples + 1) {
-      var angle = -pitchHalf +(pitchHalf - rootAngle) * i / samples;
+      var angle = -pitchHalf + (pitchHalf - rootAngle) * i / samples;
       result.push(new Point2(spec.rootRadius() * Math.sin(angle), spec.rootRadius() * Math.cos(angle)));
     }
     var j = 1;
@@ -158,7 +158,7 @@ class ToothProfile {
     j = side.length - 2;
     while (j >= 0) result.push(side[j--]);
     for (i in 1...samples + 1) {
-      var angle = rootAngle +(pitchHalf - rootAngle) * i / samples;
+      var angle = rootAngle + (pitchHalf - rootAngle) * i / samples;
       result.push(new Point2(spec.rootRadius() * Math.sin(angle), spec.rootRadius() * Math.cos(angle)));
     }
     // The last-to-first edge follows the root chord across a pitch; repeat/rotate for a full gear.

@@ -53,22 +53,23 @@ class HobDesign {
   /** One closed rake-face tooth region. thread=0..starts-1, turn is any axial turn
       of that thread. Consecutive thread starts are one axial pitch apart. */
   public function rakeFaceRegion(gash:Int, thread:Int = 0, turn:Int = 0):Array<Point3> {
-    return relievedFaceRegion(gash,thread,turn,0,0);
+    return relievedFaceRegion(gash, thread, turn, 0, 0);
   }
 
   /** Section behind the cutting face. Zero retreat/relief is exactly the rake cutter.
       Radial relief tapers linearly to zero at the root; the rake-plane offset is
       retained at each rotated section, including nonzero rake. This is an explicit
       backing-surface design assumption, not a supplier grinding specification. */
-  public function relievedFaceRegion(gash:Int,thread:Int,turn:Int,behind:Float,tipRelief:Float):Array<Point3> {
+  public function relievedFaceRegion(gash:Int, thread:Int, turn:Int, behind:Float, tipRelief:Float):Array<Point3> {
     if (gash < 0 || gash >= gashes || thread < 0 || thread >= starts) throw "hob gash or thread index is out of range";
-    var rootRadius=pitchDiameter/2-rootHeight,toothHeight=outsideDiameter/2-rootRadius;
-    if(!Math.isFinite(behind)||behind<0||!Math.isFinite(tipRelief)||tipRelief<0||tipRelief>=toothHeight)throw "invalid hob backing section";
+    var rootRadius = pitchDiameter / 2 - rootHeight, toothHeight = outsideDiameter / 2 - rootRadius;
+    if (!Math.isFinite(behind) || behind < 0
+      || !Math.isFinite(tipRelief) || tipRelief < 0 || tipRelief >= toothHeight) throw "invalid hob backing section";
     var phase = 2 * Math.PI * gash / gashes;
     var result:Array<Point3> = [];
     for (p in normalRegion) {
       var original = pitchDiameter / 2 - p.y;
-      var radius = original - tipRelief * (original-rootRadius)/toothHeight;
+      var radius = original - tipRelief * (original - rootRadius) / toothHeight;
       var faceAngle = Math.asin(outsideDiameter / 2 * Math.sin(rake) / radius) - rake;
       var angle = phase + faceAngle - behind;
       var z = p.x / Math.cos(leadAngle) + lead * angle / (2 * Math.PI) + thread * axialPitch + turn * lead;

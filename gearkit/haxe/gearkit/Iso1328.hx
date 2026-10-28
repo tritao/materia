@@ -17,26 +17,36 @@ class Iso1328 {
   public static function tolerance(s:GearSpec, parameter:String, grade:Int, rounded:Bool = true):Float {
     if (grade < 1 || grade > 11) throw "ISO flank class must be 1..11";
     var d = s.pitchDiameter(), m = s.module, b = s.faceWidth;
-    var ph = 0.4*m + 0.001*d + 4, pf = 0.55*m + 5;
-    var bh = 0.05*Math.sqrt(d) + 0.35*Math.sqrt(b) + 4;
-    var bf = 0.07*Math.sqrt(d) + 0.45*Math.sqrt(b) + 4;
-    var cumulative = 0.002*d + 0.55*Math.sqrt(d) + 0.7*m + 12;
+    var ph = 0.4 * m + 0.001 * d + 4, pf = 0.55 * m + 5;
+    var bh = 0.05 * Math.sqrt(d) + 0.35 * Math.sqrt(b) + 4;
+    var bf = 0.07 * Math.sqrt(d) + 0.45 * Math.sqrt(b) + 4;
+    var cumulative = 0.002 * d + 0.55 * Math.sqrt(d) + 0.7 * m + 12;
     var base = switch parameter {
-      case "fp": 0.001*d + 0.4*m + 5;
-      case "Fp": cumulative;
-      case "Fr": 0.9*cumulative;
-      case "Falpha": Math.sqrt(ph*ph + pf*pf);
-      case "ffalpha": pf;
-      case "fHalpha": ph;
-      case "Fbeta": Math.sqrt(bh*bh + bf*bf);
-      case "ffbeta": bf;
-      case "fHbeta": bh;
-      default: throw 'unknown ISO parameter $parameter';
+      case "fp":
+        0.001 * d + 0.4 * m + 5;
+      case "Fp":
+        cumulative;
+      case "Fr":
+        0.9 * cumulative;
+      case "Falpha":
+        Math.sqrt(ph * ph + pf * pf);
+      case "ffalpha":
+        pf;
+      case "fHalpha":
+        ph;
+      case "Fbeta":
+        Math.sqrt(bh * bh + bf * bf);
+      case "ffbeta":
+        bf;
+      case "fHbeta":
+        bh;
+      default:
+        throw 'unknown ISO parameter $parameter';
     };
-    var value = base*Math.pow(2, (grade-5)/2);
+    var value = base * Math.pow(2, (grade - 5) / 2);
     if (!rounded) return value;
     var step = value > 10 ? 1.0 : value >= 5 ? 0.5 : 0.1;
-    return Math.round(value/step)*step;
+    return Math.round(value / step) * step;
   }
   /** null means worse than class 11; never clamp a failing measurement. */
   public static function grade(s:GearSpec, parameter:String, micrometres:Float):Null<Int> {
