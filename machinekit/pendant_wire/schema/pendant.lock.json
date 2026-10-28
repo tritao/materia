@@ -91,6 +91,104 @@
       ],
       "size": 24
     },
+    "PendantProfile": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 11,
+          "name": "axes",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "rule_count",
+          "range": [
+            0,
+            8
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 8,
+          "name": "rule_axis",
+          "type": "u8"
+        },
+        {
+          "length": 8,
+          "name": "rule_condition",
+          "range": [
+            0,
+            31
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 8,
+          "name": "rule_reason",
+          "range": [
+            0,
+            7
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "has_spindle",
+          "range": [
+            0,
+            1
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "spindle_key",
+          "type": "u8"
+        },
+        {
+          "length": 3,
+          "name": "step_units",
+          "type": "i32"
+        },
+        {
+          "length": 1,
+          "name": "timeout_ms",
+          "range": [
+            1,
+            1000
+          ],
+          "type": "u16"
+        }
+      ],
+      "size": 52
+    },
+    "PendantReasonText": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "index",
+          "range": [
+            0,
+            7
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 21,
+          "name": "text",
+          "text": true,
+          "type": "u8"
+        },
+        {
+          "length": 2,
+          "name": "reserved",
+          "type": "u8",
+          "zero": true
+        }
+      ],
+      "size": 24
+    },
     "PendantState": {
       "endian": "little",
       "fields": [

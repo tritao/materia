@@ -49,6 +49,13 @@ or `text` still parses, since a modifier is never followed by `:`. Rust adds
 `valid()`, and `decode`/`encode` return false for a violation. Rules involving two fields stay in
 the consumer.
 
+## Haxe packed records
+
+A manifest may add `"packed_haxe": {"root", "package", "schema_label"}` to generate one Haxe class
+per packed struct (public fields, `encode()`, `decode()`, `check()` with the constraints). Haxe
+`Int` holds `u8`, `u16`, `i8`, `i16` and `i32` exactly, so a struct with any other field type is
+rejected at generation time. The output root must stay inside the manifest's directory.
+
 ## Message encoding
 
 Messages are MessagePack maps with positive integer field IDs sorted for

@@ -84,12 +84,19 @@ several KB. Values are placeholders.
 | `PENDANT_OUTPUT` | cabinet controller to pendant | LED states, status line text, refusal code, lease state. |
 
 - Payloads are defined in `pendant_wire/schema/pendant.wire.idl`, the same `.wire.idl` system as
-  RKD6, with a compatibility lock. `python -m tools.wire generate --config machinekit/pendant_wire/wire.json`
+  RKD6, with a compatibility lock. `python -m tools.wire generate --config machinekit/pendant_wire.json`
   writes the `no_std` Rust codec, which enforces the ranges, masks, reserved bytes, enum values and
   text rules declared in the schema (see `tools/wire/PROFILE.md`); `pendant_wire/src/lib.rs` keeps
   only the cross-field label index check and pins the byte layout in tests. Each
   record is exactly a valid CAN-FD length (STATE 8, CONFIG 16, OUTPUT 24 bytes), and CAN provides
   the identifier, length and CRC.
+- **Profile to controller.** `PendantCompiler` (Haxe) turns an `OperatorProfile` into a
+  `PendantProfile` record (axis indices, condition bits, rule reason ids, step sizes, timeout), the
+  reason texts and the label frames, plus a 32-bit FNV-1a digest of all of them. The host sends them
+  when a session opens and the controller compares digests; `CompiledProfile` in
+  `pendant_wire/src/authority.rs` decodes them. `pendant_wire/vectors/profiles.txt` holds the
+  compiled reference profiles; the Haxe tests assert the compiler produces them byte for byte and the
+  Rust tests decode them, run the jog scenarios on them and recompute the digests.
 - The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
   `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
   rules in Rust.

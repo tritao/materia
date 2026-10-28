@@ -4,6 +4,9 @@
 //! cabinet controller.
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 pub mod authority;
 pub mod pendant_wire;
 

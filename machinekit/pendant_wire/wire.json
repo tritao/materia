@@ -1,8 +1,0 @@
-{
-  "schema": "schema/pendant.wire.idl",
-  "lock": "schema/pendant.lock.json",
-  "rust": {},
-  "outputs": {
-    "rust": "src/pendant_wire.rs"
-  }
-}

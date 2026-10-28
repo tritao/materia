@@ -46,3 +46,30 @@ packed PendantOutput endian little {
     text : u8[21] text
     reserved : u8 zero
 }
+
+# Host to cabinet controller when a session opens. Travels over Ethernet with the session, not on
+# CAN, so it is not a CAN-FD length. Built by machinekit.operator.PendantCompiler from an
+# OperatorProfile; the controller refuses pendant jogging until it has one.
+packed PendantProfile endian little {
+    # Axis index at switch position 1 to 11; 255 when unused.
+    axes : u8[11]
+    rule_count : u8 range 0..8
+    # Rule i (i < rule_count) refuses jogging axis rule_axis[i] while bit rule_condition[i] of the
+    # active-condition mask is set, with reason text rule_reason[i]. Unused slots are zero.
+    rule_axis : u8[8]
+    rule_condition : u8[8] range 0..31
+    rule_reason : u8[8] range 0..7
+    has_spindle : u8 range 0..1
+    # Which of F1 to F3 (0 to 2) is the hold-to-run spindle jog; 255 when none.
+    spindle_key : u8
+    # Distance per wheel count for x1, x10, x100 in the controller's integer position units.
+    step_units : i32[3]
+    timeout_ms : u16 range 1..1000
+}
+
+# One status-line text per rule reason, sent after PendantProfile. 24 bytes.
+packed PendantReasonText endian little {
+    index : u8 range 0..7
+    text : u8[21] text
+    reserved : u8[2] zero
+}

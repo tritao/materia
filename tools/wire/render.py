@@ -10,6 +10,7 @@ from .backends.cpp import cpp_header, codec_cpp, codec_header
 from .backends.haxe import haxe_files
 from .backends.markdown import docs
 from .backends.packed_cpp import render as packed_cpp
+from .backends import packed_haxe
 from .backends.rust import render as packed_rust
 from .model import Schema
 from .validate import ValidationError, dump_normalized
@@ -48,6 +49,14 @@ def plan(schema: Schema, norm: dict[str, Any], config: dict[str, Any], root: Pat
         add(paths["packed_cpp"], packed_cpp(schema, norm, config["packed_cpp"]["namespace"]))
     if "rust" in config:
         add(paths["rust"], packed_rust(schema, norm))
+    if "packed_haxe" in config:
+        options = config["packed_haxe"]
+        haxe_root = (root / options["root"]).resolve()
+        if not haxe_root.is_relative_to(root):
+            raise ValidationError("Packed Haxe output root escapes manifest directory")
+        for path, content in packed_haxe.files(schema, norm, root=haxe_root, package=options["package"],
+                                                label=options["schema_label"]).items():
+            add(str(path.relative_to(root)), content)
     if "markdown" in config:
         options = config["markdown"]
         add(paths["markdown"], docs(schema, norm, title=options["title"], intro=options["intro"], codec_name=config.get("haxe", {}).get("codec_name", "wire codec")))
