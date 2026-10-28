@@ -143,6 +143,28 @@ Rules the controller enforces (the lease, hold-to-run, jog refusals, fail-safe d
 The wire schema, the controller-side code, the host link and how it is tested are described in
 `operator_link/README.md`.
 
+## Face model
+
+`machinekit/haxe/src/machinekit/pendant/` models the top face: each bought part as a `PendantControl`
+(cutout, keep-out, height above and depth behind the plate, mass, and where each number came from:
+`vendor-drawing`, `measured`, `datasheet` or `assumed`), a `PendantFace` with a checker, and
+`PendantFacePlate`, the plate as a solid with every cutout (the printable layout mock-up, STEP export
+through `Shape.exportStep`). `ReferencePendant` is the first layout and `PendantFaceSvg` draws it for
+review. `PendantFaceTests` asserts the layout passes its own checks, that each check catches what it
+should, and the plate's volume.
+
+First layout: a 220 x 110 mm face, 3 mm plate and wall, wheel on the right, E-stop, display and
+wheel-enable across the top left, axis and step switches with F1 and F2 below, then F3 and the fixed
+Start, Hold and Stop/Reset keys. What the checker already shows:
+
+- **The wheel sets the face size.** Its 80 mm flange and 72 mm stud circle need about 90 mm of face
+  in one direction, which makes the face about 220 x 110 mm, far from a 160 x 65 slab.
+- **Depth is the real problem.** With the E-stop's contact block assumed at 45 mm behind the plate and
+  the wheel 41 mm above it (27 without the handle), a 50 mm deep case is 94 mm tall with the face up.
+  A shallower E-stop (or a different mounting for its contacts) is the lever, so its measured depth
+  matters more than any other open number.
+- **Assumed numbers:** everything except the wheel (its drawing) is a placeholder until measured.
+
 ## Mechanics
 
 - Printed case first (CadKit, parametric), PA12 or similar for the product.
