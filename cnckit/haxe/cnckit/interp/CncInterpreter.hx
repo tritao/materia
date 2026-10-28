@@ -200,10 +200,7 @@ class CncInterpreter {
     }
     if ((cutterChange == 41 || cutterChange == 42) && (homeCode != 0 || (cycleChange > 0 && cycleChange != 80))) fail(
       line,
-      gColumn(
-        gWords,
-        homeCode != 0 ? homeCode : cycleChange
-      ),
+      gColumn(gWords, homeCode != 0 ? homeCode : cycleChange),
       "G28/G30 and drilling cycles require G40 before cutter compensation"
     );
     var effectiveMotion = modalMotion >= 0 ? modalMotion : state.motionMode;
@@ -431,10 +428,7 @@ class CncInterpreter {
       if (start.distanceTo(end) <= 1e-12) return;
       if (machineCoordinates) emit(ToolpathOp.MachineMove(
         mode == 0 ? MoveKind.Rapid : MoveKind.Cut,
-        PathGeometry.Line(
-          start,
-          end
-        ),
+        PathGeometry.Line(start, end),
         mode == 0 ? 0.0 : feed(line),
         mode == 0 ? 0.0 : state.blendTolerance,
         span
@@ -491,13 +485,7 @@ class CncInterpreter {
       var endRadius = Math.sqrt(Math.pow(finish[0] - c[0], 2) + Math.pow(finish[1] - c[1], 2));
       if (radius <= 1e-12 || Math.abs(endRadius - radius) > Math.max(1e-8, radius * 1e-5)) fail(
         line,
-        column(
-          first,
-          column(
-            second,
-            1
-          )
-        ),
+        column(first, column(second, 1)),
         "arc endpoint is not on its centre circle"
       );
       var begin = Math.atan2(origin[1] - c[1], origin[0] - c[0]);
@@ -624,19 +612,13 @@ class CncInterpreter {
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12) emit(machineCoordinates ? ToolpathOp.MachineMove(
       kind,
-      PathGeometry.Line(
-        start,
-        end
-      ),
+      PathGeometry.Line(start, end),
       0.0,
       0.0,
       span
     ) : ToolpathOp.Move(
       kind,
-      PathGeometry.Line(
-        start,
-        end
-      ),
+      PathGeometry.Line(start, end),
       0.0,
       0.0,
       span
@@ -756,11 +738,7 @@ class CncInterpreter {
   static function fail(line:Int, column:Int, message:String):Void throw new CncDiagnostic(
     Error,
     "CNC_INTERPRET",
-    new Provenance(
-      line,
-      column,
-      1
-    ),
+    new Provenance(line, column, 1),
     message
   );
 }

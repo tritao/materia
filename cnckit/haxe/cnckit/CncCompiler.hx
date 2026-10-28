@@ -58,14 +58,7 @@ class CncCompiler {
       case Move(kind, geometry, feed, tolerance, provenance):
         ops.push(ToolpathOp.Move(
           kind,
-          GeometryOffset.translate(
-            geometry,
-            [
-              -offset[0],
-              -offset[1],
-              -offset[2] - toolLength
-            ]
-          ),
+          GeometryOffset.translate(geometry, [-offset[0], -offset[1], -offset[2] - toolLength]),
           feed,
           tolerance,
           provenance
@@ -83,11 +76,7 @@ class CncCompiler {
     if (ops.length == 0 && diagnostics.length == 0) diagnostics.push(new CncDiagnostic(
       Error,
       "CNC_EMPTY",
-      new Provenance(
-        1,
-        1,
-        0
-      ),
+      new Provenance(1, 1, 0),
       "G-code contains no executable motion or barrier"
     ));
     diagnostics.sort(function(a, b) {
@@ -120,11 +109,7 @@ class CncCompiler {
     if (ops.length == 0 && diagnostics.length == 0) diagnostics.push(new CncDiagnostic(
       Error,
       "CNC_EMPTY",
-      new Provenance(
-        1,
-        1,
-        0
-      ),
+      new Provenance(1, 1, 0),
       "G-code contains no executable motion or barrier"
     ));
     diagnostics.sort(function(a, b) {

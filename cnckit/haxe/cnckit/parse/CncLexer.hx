@@ -25,11 +25,7 @@ class CncLexer {
         if (slash >= 0 && StringTools.trim(line.substring(0, slash)).length == 0) diagnostics.push(new CncDiagnostic(
           Warning,
           "CNC_BLOCK_DELETE_IGNORED",
-          new Provenance(
-            index + 1,
-            slash + 1,
-            1
-          ),
+          new Provenance(index + 1, slash + 1, 1),
           "block-delete marker ignored; block executed"
         ));
         if (block.words.length > 0 || block.command != null || block.comments.length > 0) blocks.push(block);
@@ -102,11 +98,7 @@ class CncLexer {
       var body = semicolon < 0 ? line.substring(end) : line.substring(end, semicolon);
       if (semicolon >= 0) comments.push(new CncComment(
         StringTools.trim(line.substring(semicolon + 1)),
-        new Provenance(
-          lineNumber,
-          semicolon + 1,
-          line.length - semicolon
-        )
+        new Provenance(lineNumber, semicolon + 1, line.length - semicolon)
       ));
       var arguments = new Map<String, String>();
       for (token in splitArguments(body)) {
@@ -125,11 +117,7 @@ class CncLexer {
       if (ch == ";") {
         comments.push(new CncComment(
           StringTools.trim(line.substring(index + 1)),
-          new Provenance(
-            lineNumber,
-            index + 1,
-            line.length - index
-          )
+          new Provenance(lineNumber, index + 1, line.length - index)
         ));
         break;
       }
@@ -139,11 +127,7 @@ class CncLexer {
         if (close < 0) fail(lineNumber, index + 1, 1, "unclosed comment");
         comments.push(new CncComment(
           StringTools.trim(line.substring(index + 1, close)),
-          new Provenance(
-            lineNumber,
-            index + 1,
-            close - index + 1
-          )
+          new Provenance(lineNumber, index + 1, close - index + 1)
         ));
         index = close + 1;
         continue;
@@ -163,10 +147,7 @@ class CncLexer {
           letter,
           0.0,
           new Provenance(lineNumber, column, close - column + 1),
-          line.substring(
-            index + 1,
-            close
-          )
+          line.substring(index + 1, close)
         ));
         index = close + 1;
         continue;
@@ -193,11 +174,7 @@ class CncLexer {
         var message = StringTools.trim(line.substring(index));
         if (message.length > 0) comments.push(new CncComment(
           message,
-          new Provenance(
-            lineNumber,
-            index + 1,
-            line.length - index
-          )
+          new Provenance(lineNumber, index + 1, line.length - index)
         ));
         break;
       }
@@ -254,11 +231,7 @@ class CncLexer {
   static function fail(line:Int, column:Int, length:Int, message:String):Void throw new CncDiagnostic(
     Error,
     "CNC_LEX",
-    new Provenance(
-      line,
-      column,
-      length
-    ),
+    new Provenance(line, column, length),
     message
   );
 }

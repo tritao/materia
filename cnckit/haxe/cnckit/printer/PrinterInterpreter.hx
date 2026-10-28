@@ -590,11 +590,7 @@ class PrinterInterpreter {
   static function fail(line:Int, column:Int, message:String):Void throw new CncDiagnostic(
     Error,
     "CNC_INTERPRET",
-    new Provenance(
-      line,
-      column,
-      1
-    ),
+    new Provenance(line, column, 1),
     message
   );
 }

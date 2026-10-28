@@ -125,11 +125,7 @@ class CncCompensator {
         if (endPoint.distanceTo(nextStart) > 1e-9) {
           var turn = cross(
             tangent(geometry(contours[cursor]), true, plane),
-            tangent(
-              geometry(contours[cursor + 1]),
-              false,
-              plane
-            )
+            tangent(geometry(contours[cursor + 1]), false, plane)
           );
           if (Math.abs(turn) < 1e-9) fail(
             opSpan(contours[cursor + 1]),

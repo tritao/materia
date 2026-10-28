@@ -112,22 +112,7 @@ class RobotInterfaceTests {
 
     fsm = new RobotInterface();
     output = fsm.update(
-      input(
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true,
-        true
-      ),
+      input(false, true, false, false, false, false, false, false, false, false, true, true, true, true),
       0.01
     );
     check(
@@ -170,43 +155,13 @@ class RobotInterfaceTests {
       "a robot entering the zone stops a closing door"
     );
     output = fsm.update(
-      input(
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        true,
-        false,
-        true,
-        true,
-        true,
-        false
-      ),
+      input(false, false, false, false, false, true, true, false, true, false, true, true, true, false),
       0.01
     );
     check(output.alarm == RobotInterfaceAlarm.RobotInZone,
       "a robot-zone alarm cannot reset while the zone is occupied");
     output = fsm.update(
-      input(
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        true,
-        false,
-        true,
-        true,
-        true,
-        true
-      ),
+      input(false, false, false, false, false, false, true, false, true, false, true, true, true, true),
       0.01
     );
     output = fsm.update(
@@ -225,22 +180,7 @@ class RobotInterfaceTests {
     fsm = new RobotInterface();
     output = fsm.update(input(false, false, false, false, true), 0.01);
     output = fsm.update(
-      input(
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        true,
-        true,
-        true,
-        false
-      ),
+      input(false, false, false, false, false, false, false, true, true, false, true, true, true, false),
       0.01
     );
     check(
@@ -271,24 +211,7 @@ class RobotInterfaceTests {
     fsm = new RobotInterface();
     output = fsm.update(input(false, false, false, false, true), 0.01);
     output = fsm.update(
-      input(
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        true,
-        true,
-        true,
-        true,
-        false,
-        true
-      ),
+      input(false, false, false, false, false, false, false, true, true, false, true, true, true, true, false, true),
       0.01
     );
     check(

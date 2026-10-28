@@ -647,113 +647,34 @@ class CncKitTests {
       ToolpathOp.SetSetup("1", p),
       ToolpathOp.ToolChange(1, p),
       ToolpathOp.Spindle(Clockwise, 12000, p),
-      ToolpathOp.Coolant(
-        true,
-        false,
-        p
-      ),
-      ToolpathOp.Move(
-        Rapid,
-        PathGeometry.Line(
-          new Point3(
-            -0.1,
-            0.0,
-            0.01
-          ),
-          new Point3(
-            0.01,
-            0.0,
-            0.01
-          )
-        ),
-        0.0,
-        0.0,
-        p
-      ),
+      ToolpathOp.Coolant(true, false, p),
+      ToolpathOp.Move(Rapid, PathGeometry.Line(new Point3(-0.1, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)), 0.0, 0.0, p),
+      ToolpathOp.Move(Cut,
+      PathGeometry.Line(new Point3(0.01, 0.0, 0.01), new Point3(0.02, 0.0, 0.01)), 0.01, 0.0002, p),
       ToolpathOp.Move(
         Cut,
-        PathGeometry.Line(
-          new Point3(
-            0.01,
-            0.0,
-            0.01
-          ),
-          new Point3(
-            0.02,
-            0.0,
-            0.01
-          )
-        ),
+        PathGeometry.Arc(new Point3(0.02, 0.005, 0.01), 0.005, -Math.PI / 2, Math.PI / 2),
         0.01,
         0.0002,
         p
       ),
       ToolpathOp.Move(
         Cut,
-        PathGeometry.Arc(
-          new Point3(
-            0.02,
-            0.005,
-            0.01
-          ),
-          0.005,
-          -Math.PI / 2,
-          Math.PI / 2
-        ),
-        0.01,
-        0.0002,
-        p
-      ),
-      ToolpathOp.Move(
-        Cut,
-        PathGeometry.Line(
-          new Point3(
-            0.025,
-            0.005,
-            0.01
-          ),
-          new Point3(
-            0.03,
-            0.005,
-            0.01
-          )
-        ),
+        PathGeometry.Line(new Point3(0.025, 0.005, 0.01), new Point3(0.03, 0.005, 0.01)),
         0.01,
         0.0,
         p
       ),
-      ToolpathOp.SetSetup(
-        "2",
-        p
-      ),
+      ToolpathOp.SetSetup("2", p),
       ToolpathOp.Move(
         Rapid,
-        PathGeometry.Line(
-          new Point3(
-            -0.07,
-            0.005,
-            0.01
-          ),
-          new Point3(
-            0.01,
-            0.005,
-            0.01
-          )
-        ),
+        PathGeometry.Line(new Point3(-0.07, 0.005, 0.01), new Point3(0.01, 0.005, 0.01)),
         0.0,
         0.0,
         p
       ),
-      ToolpathOp.Coolant(
-        false,
-        false,
-        p
-      ),
-      ToolpathOp.Spindle(
-        Off,
-        0.0,
-        p
-      ),
+      ToolpathOp.Coolant(false, false, p),
+      ToolpathOp.Spindle(Off, 0.0, p),
       ToolpathOp.End(p)
     ];
     var setup = new Setup("1", new Point3(0.1, 0, 0), new SetupStock(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005));
@@ -829,14 +750,7 @@ class CncKitTests {
       new ToolpathProgram(
         [ToolpathOp.SetSetup("fixture-only", p)],
         machine.toolLibrary,
-        [new Setup(
-          "fixture-only",
-          new Point3(
-            0,
-            0,
-            0
-          )
-        )]
+        [new Setup("fixture-only", new Point3(0, 0, 0))]
       ),
       machine.controller
     ) catch (error:Dynamic) rejected = Std.string(error).indexOf("cannot map setup") >= 0;
@@ -846,12 +760,7 @@ class CncKitTests {
       new ToolpathProgram(
         [ToolpathOp.MachineMove(
           Cut,
-          PathGeometry.Arc(
-            new Point3(0.02, 0.005, 0.01),
-            0.005,
-            -Math.PI / 2,
-            Math.PI / 2
-          ),
+          PathGeometry.Arc(new Point3(0.02, 0.005, 0.01), 0.005, -Math.PI / 2, Math.PI / 2),
           0.01,
           0.0,
           p
@@ -872,30 +781,11 @@ class CncKitTests {
     var printing:Array<ToolpathOp> = [
       ToolpathOp.Heat("hotend", 210, true, p),
       ToolpathOp.Deposit(8e-8, 4.5e-4, 2e-4, p),
-      ToolpathOp.FilamentMove(
-        -0.001,
-        0.03,
-        p
-      ),
-      ToolpathOp.Fan(
-        "part",
-        1.0,
-        p
-      ),
-      ToolpathOp.Layer(
-        0,
-        2e-4,
-        p
-      ),
-      ToolpathOp.Feature(
-        toolpathkit.path.PrintFeature.Infill,
-        p
-      ),
-      ToolpathOp.PrintObject(
-        "a",
-        true,
-        p
-      ),
+      ToolpathOp.FilamentMove(-0.001, 0.03, p),
+      ToolpathOp.Fan("part", 1.0, p),
+      ToolpathOp.Layer(0, 2e-4, p),
+      ToolpathOp.Feature(toolpathkit.path.PrintFeature.Infill, p),
+      ToolpathOp.PrintObject("a", true, p),
       ToolpathOp.DepositOff(p)
     ];
     for (op in printing) {

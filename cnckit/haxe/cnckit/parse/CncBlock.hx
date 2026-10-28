@@ -17,10 +17,7 @@ class CncBlock {
     span:Provenance,
     ?comments:Array<CncComment>,
     ?command:String,
-    ?arguments:Map<
-      String,
-      String
-  >
+    ?arguments:Map<String, String>
   ) {
     this.words = words.copy();
     this.span = span;

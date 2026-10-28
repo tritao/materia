@@ -158,10 +158,7 @@ class PrinterGcodeTests {
     check(
       tags(ops).slice(0,
       5).join("|") == "heat hotend 210|heat bed 60|heat bed 60 wait|heat hotend 210 wait|fan part 127",
-      "temperatures and the fan come first, in order: " + tags(ops).slice(
-        0,
-        8
-      )
+      "temperatures and the fan come first, in order: " + tags(ops).slice(0, 8)
     );
     var layers = layersOf(ops);
     check(layers.length == 2 && layers[0].index == 0 && layers[1].index == 1, "two layers");
@@ -284,10 +281,7 @@ class PrinterGcodeTests {
     check(list.indexOf("fan chamber_fan 128") >= 0, "SET_FAN_SPEED: " + list);
     check(
       warnings(result, "CNC_PRINTER_IGNORED") == 2,
-      "the macro and the pressure advance are reported once each: " + warnings(
-        result,
-        "CNC_PRINTER_IGNORED"
-      )
+      "the macro and the pressure advance are reported once each: " + warnings(result, "CNC_PRINTER_IGNORED")
     );
     var radii:Array<Float> = [], sweeps:Array<Float> = [];
     for (op in result.program.ops) switch op {
@@ -360,14 +354,7 @@ class PrinterGcodeTests {
     var cncOnly = new ToolpathProgram(
       [ToolpathOp.Spindle(Clockwise, 1000, span)],
       new ToolLibrary(),
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     );
     var message = "";
     try PrinterWriter.write(cncOnly, controller()) catch (error:Dynamic) message = Std.string(error);
@@ -379,14 +366,7 @@ class PrinterGcodeTests {
     var heater = new ToolpathProgram(
       [ToolpathOp.Heat("tank", 40, false, span)],
       new ToolLibrary(),
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     );
     try PrinterWriter.write(heater, controller(), Marlin) catch (error:Dynamic) message = Std.string(error);
     check(message.indexOf("no heater") >= 0, "Marlin has no generic heater: " + message);
@@ -404,10 +384,7 @@ class PrinterGcodeTests {
     function p(x:Float, y:Float):Point3 return new Point3(x * 0.001, y * 0.001, z);
     function line(a:Point3, b:Point3, kind:toolpathkit.path.MoveKind = Cut):ToolpathOp return ToolpathOp.Move(
       kind,
-      PathGeometry.Line(
-        a,
-        b
-      ),
+      PathGeometry.Line(a, b),
       kind == Cut ? 0.04 : 0.15,
       0.0001,
       span
@@ -415,161 +392,29 @@ class PrinterGcodeTests {
     var ops:Array<ToolpathOp> = [
       ToolpathOp.Heat("bed", 60, true, span),
       ToolpathOp.Heat("hotend", 210, true, span),
-      ToolpathOp.Fan(
-        "part",
-        1.0,
-        span
-      ),
-      ToolpathOp.PrintObject(
-        "tab",
-        true,
-        span
-      ),
-      ToolpathOp.Layer(
-        0,
-        z,
-        span
-      ),
-      ToolpathOp.Feature(
-        ExternalPerimeter,
-        span
-      ),
-      line(
-        p(
-          50,
-          50
-        ),
-        p(
-          60,
-          50
-        ),
-        Rapid
-      ),
-      ToolpathOp.Deposit(
-        bead,
-        width,
-        height,
-        span
-      ),
-      line(
-        p(
-          60,
-          50
-        ),
-        p(
-          70,
-          50
-        )
-      ),
-      line(
-        p(
-          70,
-          50
-        ),
-        p(
-          70,
-          60
-        )
-      ),
-      ToolpathOp.Move(
-        Cut,
-        PathGeometry.Arc(
-          new Point3(
-            0.065,
-            0.06,
-            z
-          ),
-          0.005,
-          0.0,
-          Math.PI
-        ),
-        0.04,
-        0.0001,
-        span
-      ),
-      ToolpathOp.Feature(
-        Infill,
-        span
-      ),
-      line(
-        p(
-          60,
-          60
-        ),
-        p(
-          60,
-          52
-        )
-      ),
+      ToolpathOp.Fan("part", 1.0, span),
+      ToolpathOp.PrintObject("tab", true, span),
+      ToolpathOp.Layer(0, z, span),
+      ToolpathOp.Feature(ExternalPerimeter, span),
+      line(p(50, 50), p(60, 50), Rapid),
+      ToolpathOp.Deposit(bead, width, height, span),
+      line(p(60, 50), p(70, 50)),
+      line(p(70, 50), p(70, 60)),
+      ToolpathOp.Move(Cut, PathGeometry.Arc(new Point3(0.065, 0.06, z), 0.005, 0.0, Math.PI), 0.04, 0.0001, span),
+      ToolpathOp.Feature(Infill, span),
+      line(p(60, 60), p(60, 52)),
       ToolpathOp.DepositOff(span),
-      ToolpathOp.FilamentMove(
-        -0.0008,
-        0.035,
-        span
-      ),
-      line(
-        p(
-          60,
-          52
-        ),
-        p(
-          55,
-          52
-        ),
-        Rapid
-      ),
-      ToolpathOp.FilamentMove(
-        0.0008,
-        0.035,
-        span
-      ),
-      ToolpathOp.Dwell(
-        0.5,
-        span
-      ),
-      ToolpathOp.Layer(
-        1,
-        2 * z,
-        span
-      ),
-      ToolpathOp.Deposit(
-        bead,
-        width,
-        height,
-        span
-      ),
-      line(
-        p(
-          55,
-          52
-        ),
-        p(
-          56,
-          52
-        )
-      ),
-      ToolpathOp.PrintObject(
-        "tab",
-        false,
-        span
-      ),
-      ToolpathOp.Fan(
-        "part",
-        0.0,
-        span
-      ),
-      ToolpathOp.Heat(
-        "hotend",
-        0,
-        false,
-        span
-      ),
-      ToolpathOp.Heat(
-        "bed",
-        0,
-        false,
-        span
-      ),
+      ToolpathOp.FilamentMove(-0.0008, 0.035, span),
+      line(p(60, 52), p(55, 52), Rapid),
+      ToolpathOp.FilamentMove(0.0008, 0.035, span),
+      ToolpathOp.Dwell(0.5, span),
+      ToolpathOp.Layer(1, 2 * z, span),
+      ToolpathOp.Deposit(bead, width, height, span),
+      line(p(55, 52), p(56, 52)),
+      ToolpathOp.PrintObject("tab", false, span),
+      ToolpathOp.Fan("part", 0.0, span),
+      ToolpathOp.Heat("hotend", 0, false, span),
+      ToolpathOp.Heat("bed", 0, false, span),
       ToolpathOp.End(span)
     ];
     return new ToolpathProgram(ops, new ToolLibrary(), [new Setup("1", new Point3(0, 0, 0))]);
@@ -620,17 +465,7 @@ class PrinterGcodeTests {
     // A controller without arcs gets chords, with the volume still right.
     var flat = PrinterWriter.write(
       program,
-      controller(new PrinterSettings(
-        0.00175,
-        0.0008,
-        0.035,
-        0.0,
-        0.035,
-        0.005,
-        0.0001,
-        0.0002,
-        false
-      ))
+      controller(new PrinterSettings(0.00175, 0.0008, 0.035, 0.0, 0.035, 0.005, 0.0001, 0.0002, false))
     );
     check(
       ("\n" + flat).indexOf("\nG3 ") < 0 && ("\n" + flat).indexOf("\nG2 ") < 0 && PrinterWriter.write(
