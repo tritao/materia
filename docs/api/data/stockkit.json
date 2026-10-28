@@ -556,7 +556,7 @@
     {
      "name": "StockComponent",
      "kind": "class",
-     "file": "stockkit/haxe/stockkit/StockComponents.hx",
+     "file": "stockkit/haxe/stockkit/StockComponent.hx",
      "doc": "One material component on the dexel lattice. Areas/volumes are sampled,\njust as Stock.volume is; supportArea is material crossing supportPlaneZ.",
      "fields": [
       {
@@ -973,7 +973,7 @@
     {
      "name": "StockPreviewUpdate",
      "kind": "class",
-     "file": "stockkit/haxe/stockkit/StockPreviewWorker.hx",
+     "file": "stockkit/haxe/stockkit/StockPreviewUpdate.hx",
      "doc": "The chunks one refresh rebuilt: chunk `chunks[k]` now has mesh `meshes[k]`.",
      "fields": [
       {
@@ -1148,43 +1148,6 @@
    "name": "stockkit.hobbing",
    "types": [
     {
-     "name": "FaceEndpointStock",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/FaceEndpointStock.hx",
-     "implements": [
-      "GearRings"
-     ],
-     "doc": "Adds physically cut Z=0 and Z=faceWidth circles to an existing inspection.\nInterior coordinates are unchanged. These planes are sampling domains, not\nextra material or an extrapolation of unseen face ends.",
-     "fields": [
-      {
-       "name": "stocks",
-       "kind": "var",
-       "signature": ":Array<RingStock>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(base:GearRings, baseStocks:Array<RingStock>, grid:RingGrid, faceWidth:Float):Void"
-      },
-      {
-       "name": "radii",
-       "kind": "method",
-       "signature": "():Array<Float>"
-      },
-      {
-       "name": "axialPositions",
-       "kind": "method",
-       "signature": "():Array<Float>"
-      },
-      {
-       "name": "boundaries",
-       "kind": "method",
-       "signature": "(r:Int, z:Int):Array<Float>"
-      }
-     ]
-    },
-    {
      "name": "GashPass",
      "kind": "class",
      "file": "stockkit/haxe/stockkit/hobbing/GashPass.hx",
@@ -1311,307 +1274,6 @@
        "name": "pose",
        "kind": "method",
        "signature": "():sk_rake_pose"
-      }
-     ]
-    },
-    {
-     "name": "HobbingErrorJob",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/HobbingErrorJob.hx",
-     "doc": "Repeats physical rake subtraction and HB4 inspection from a fresh blank for\nevery budget run. at() may be ideal motion or recorded HB7 actual observations;\nmeasured sync must not be injected a second time. No target-boundary shortcuts.",
-     "fields": [
-      {
-       "name": "sources",
-       "kind": "var",
-       "signature": ":Array<HobbingErrorSource>",
-       "final": true
-      },
-      {
-       "name": "threads",
-       "kind": "var",
-       "signature": ":Int",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(spec:GearSpec, hob:HobDesign, at:(Float) -> HobbingAxes, passes:Array<GashPass>, sources:Array<HobbingErrorSource>, wall:Float, radialStep:Float, axialStep:Float, firstTooth:Int, lastTooth:Int, tolerance:Float, ?inspection:GearInspection, ?motionKnots:Array<Float>, ?threads:Int, ?inspectionCross:Bool, ?faceEndpoints:Bool, ?stockGrid:RingGrid):Void"
-      },
-      {
-       "name": "run",
-       "kind": "method",
-       "signature": "(enabled:Array<String>):GearMeasurement"
-      },
-      {
-       "name": "budget",
-       "kind": "method",
-       "signature": "(?relativeTolerance:Float, ?absoluteTolerance:Float):ErrorBudget"
-      }
-     ]
-    },
-    {
-     "name": "HobbingErrorSource",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/HobbingErrorSource.hx",
-     "doc": "Identified error with provenance. Perturbs tool/work motion before cutting,\nnever metrology values after the fact. Dimensions mm/rad/s; phases explicit.",
-     "fields": [
-      {
-       "name": "id",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "part",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "basis",
-       "kind": "var",
-       "signature": ":String",
-       "final": true
-      },
-      {
-       "name": "apply",
-       "kind": "var",
-       "signature": ":(Float, HobbingAxes) -> HobbingAxes",
-       "final": true
-      },
-      {
-       "name": "warp",
-       "kind": "var",
-       "signature": ":Null<(Point3) -> Point3>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(id:String, part:String, basis:String, apply:(Float, HobbingAxes) -> HobbingAxes, ?warp:(Point3) -> Point3):Void"
-      },
-      {
-       "name": "workEccentricity",
-       "kind": "method",
-       "signature": "(id:String, part:String, e:Float, ?phase:Float):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "tableAxial",
-       "kind": "method",
-       "signature": "(part:String, tir:Float):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "tableTilt",
-       "kind": "method",
-       "signature": "(part:String, stiffness:Float, pivotDepth:Float, forceHeight:Float, radialForce:(Float) -> Float):HobbingErrorSource",
-       "static": true,
-       "doc": "Load-induced tilt, separate from axial TIR. Force is machine-radial N;\nbearing pivot depth/force height mm, moment stiffness Nm/rad."
-      },
-      {
-       "name": "hobRadial",
-       "kind": "method",
-       "signature": "(part:String, tir:Float):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "hobAxial",
-       "kind": "method",
-       "signature": "(part:String, tir:Float):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "encoder",
-       "kind": "method",
-       "signature": "(part:String, e:Float, radius:Float):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "graduation",
-       "kind": "method",
-       "signature": "(part:String, peak:Float, order:Int):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "measuredSync",
-       "kind": "method",
-       "signature": "(part:String, error:(Float) -> Float, basis:String):HobbingErrorSource",
-       "static": true
-      },
-      {
-       "name": "latency",
-       "kind": "method",
-       "signature": "(part:String, delay:Float, ratio:Float, master:(Float) -> Float, velocity:(Float) -> Float, predict:Bool):HobbingErrorSource",
-       "static": true,
-       "doc": "Diagnostic latency model. A runtime study should instead supply the measured\nC error in apply(), avoiding double counting encoder/servo errors already present."
-      },
-      {
-       "name": "profile",
-       "kind": "method",
-       "signature": "(part:String, peak:Float, pitch:Float):HobbingErrorSource",
-       "static": true,
-       "doc": "Assumed radial form waveform on a zero-rake hob's planar rake regions.\nDoes not claim a measured profile map or arbitrary-rake planarity."
-      },
-      {
-       "name": "wall",
-       "kind": "method",
-       "signature": "(part:String, stiffness:Float, radialForce:(Float) -> Float):HobbingErrorSource",
-       "static": true
-      }
-     ]
-    },
-    {
-     "name": "HobbingForceHistory",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/HobbingForceHistory.hx",
-     "doc": "Opt-in per-gash history, separate from the bounded online force observer.\nReconstructs the same overlapping rectangular window-mean radial loads.\nThis is not instantaneous tooth force. Times seconds, forces N.",
-     "fields": [
-      {
-       "name": "samples",
-       "kind": "var",
-       "signature": ":Array<HobbingForceSample>",
-       "final": true
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "():Void"
-      },
-      {
-       "name": "add",
-       "kind": "method",
-       "signature": "(sample:HobbingForceSample):Void"
-      },
-      {
-       "name": "radialAt",
-       "kind": "method",
-       "signature": "(time:Float):Float",
-       "doc": "Right-continuous radial window load for a later wall-source sweep."
-      },
-      {
-       "name": "statistics",
-       "kind": "method",
-       "signature": "(start:Float, end:Float):Dynamic"
-      },
-      {
-       "name": "writeCsv",
-       "kind": "method",
-       "signature": "(path:String):Void"
-      }
-     ]
-    },
-    {
-     "name": "HobbingForceSample",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/HobbingForceSample.hx",
-     "doc": "One gash's window-AVERAGE loads, not an instantaneous tooth peak.\nmm³/mm²/mm inputs; N, Nm, W, J outputs. Table torque is a magnitude bound\n(resultant force at work radius), not a signed force-vector prediction."
-    },
-    {
-     "name": "HobbingForces",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/HobbingForces.hx",
-     "doc": "Optional per-pass observer. A COW previous stock plus native interval comparison\ngives removed volume, without copying circle intervals into the managed heap.\nCall after EVERY pass in cutting order; unrelated stock edits invalidate attribution.\nSummary storage is bounded. Pass means are rectangular loads over their windows;\nmaxima sum overlapping windows at each start. These are NOT tooth-force peaks.",
-     "fields": [
-      {
-       "name": "material",
-       "kind": "var",
-       "signature": ":KienzleMaterial",
-       "final": true
-      },
-      {
-       "name": "edgeWidth",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "workRadius",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "pressureAngle",
-       "kind": "var",
-       "signature": ":Float",
-       "final": true
-      },
-      {
-       "name": "passes",
-       "kind": "var",
-       "signature": ":Int"
-      },
-      {
-       "name": "volume",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "energy",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "maxTangential",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "maxRadial",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "maxHobTorque",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "maxTableTorqueBound",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "maxPower",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "last",
-       "kind": "var",
-       "signature": ":Null<HobbingForceSample>"
-      },
-      {
-       "name": "maxGashTangential",
-       "kind": "var",
-       "signature": ":Float"
-      },
-      {
-       "name": "peakActiveWindows",
-       "kind": "var",
-       "signature": ":Int"
-      },
-      {
-       "name": "new",
-       "kind": "method",
-       "signature": "(stock:RingStock, workRadius:Float, pressureAngle:Float, edgeWidth:Float, ?material:KienzleMaterial):Void",
-       "doc": "edgeWidth is an explicitly assumed effective engaged cutting-edge width, mm;\ninterval volume alone cannot identify chip width and thickness separately."
-      },
-      {
-       "name": "afterPass",
-       "kind": "method",
-       "signature": "(pass:GashPass, start:HobbingAxes, end:HobbingAxes, hobRadius:Float):HobbingForceSample"
-      },
-      {
-       "name": "retainedBytes",
-       "kind": "method",
-       "signature": "():Float"
-      },
-      {
-       "name": "dispose",
-       "kind": "method",
-       "signature": "():Void"
       }
      ]
     },
@@ -1976,11 +1638,200 @@
        "signature": "(grid:RingGrid):Array<GashPass>"
       }
      ]
+    }
+   ]
+  },
+  {
+   "name": "stockkit.hobbing.errors",
+   "types": [
+    {
+     "name": "FaceEndpointStock",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/FaceEndpointStock.hx",
+     "implements": [
+      "GearRings"
+     ],
+     "doc": "Adds physically cut Z=0 and Z=faceWidth circles to an existing inspection.\nInterior coordinates are unchanged. These planes are sampling domains, not\nextra material or an extrapolation of unseen face ends.",
+     "fields": [
+      {
+       "name": "stocks",
+       "kind": "var",
+       "signature": ":Array<RingStock>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(base:GearRings, baseStocks:Array<RingStock>, grid:RingGrid, faceWidth:Float):Void"
+      },
+      {
+       "name": "radii",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "axialPositions",
+       "kind": "method",
+       "signature": "():Array<Float>"
+      },
+      {
+       "name": "boundaries",
+       "kind": "method",
+       "signature": "(r:Int, z:Int):Array<Float>"
+      }
+     ]
+    },
+    {
+     "name": "HobbingErrorJob",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/HobbingErrorJob.hx",
+     "doc": "Repeats physical rake subtraction and HB4 inspection from a fresh blank for\nevery budget run. at() may be ideal motion or recorded HB7 actual observations;\nmeasured sync must not be injected a second time. No target-boundary shortcuts.",
+     "fields": [
+      {
+       "name": "sources",
+       "kind": "var",
+       "signature": ":Array<HobbingErrorSource>",
+       "final": true
+      },
+      {
+       "name": "threads",
+       "kind": "var",
+       "signature": ":Int",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(spec:GearSpec, hob:HobDesign, at:(Float) -> HobbingAxes, passes:Array<GashPass>, sources:Array<HobbingErrorSource>, wall:Float, radialStep:Float, axialStep:Float, firstTooth:Int, lastTooth:Int, tolerance:Float, ?inspection:GearInspection, ?motionKnots:Array<Float>, ?threads:Int, ?inspectionCross:Bool, ?faceEndpoints:Bool, ?stockGrid:RingGrid):Void"
+      },
+      {
+       "name": "run",
+       "kind": "method",
+       "signature": "(enabled:Array<String>):GearMeasurement"
+      },
+      {
+       "name": "budget",
+       "kind": "method",
+       "signature": "(?relativeTolerance:Float, ?absoluteTolerance:Float):ErrorBudget"
+      }
+     ]
+    },
+    {
+     "name": "HobbingErrorSource",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/HobbingErrorSource.hx",
+     "doc": "Identified error with provenance. Perturbs tool/work motion before cutting,\nnever metrology values after the fact. Dimensions mm/rad/s; phases explicit.",
+     "fields": [
+      {
+       "name": "id",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "part",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "basis",
+       "kind": "var",
+       "signature": ":String",
+       "final": true
+      },
+      {
+       "name": "apply",
+       "kind": "var",
+       "signature": ":(Float, HobbingAxes) -> HobbingAxes",
+       "final": true
+      },
+      {
+       "name": "warp",
+       "kind": "var",
+       "signature": ":Null<(Point3) -> Point3>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(id:String, part:String, basis:String, apply:(Float, HobbingAxes) -> HobbingAxes, ?warp:(Point3) -> Point3):Void"
+      },
+      {
+       "name": "workEccentricity",
+       "kind": "method",
+       "signature": "(id:String, part:String, e:Float, ?phase:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "tableAxial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "tableTilt",
+       "kind": "method",
+       "signature": "(part:String, stiffness:Float, pivotDepth:Float, forceHeight:Float, radialForce:(Float) -> Float):HobbingErrorSource",
+       "static": true,
+       "doc": "Load-induced tilt, separate from axial TIR. Force is machine-radial N;\nbearing pivot depth/force height mm, moment stiffness Nm/rad."
+      },
+      {
+       "name": "hobRadial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "hobAxial",
+       "kind": "method",
+       "signature": "(part:String, tir:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "encoder",
+       "kind": "method",
+       "signature": "(part:String, e:Float, radius:Float):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "graduation",
+       "kind": "method",
+       "signature": "(part:String, peak:Float, order:Int):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "measuredSync",
+       "kind": "method",
+       "signature": "(part:String, error:(Float) -> Float, basis:String):HobbingErrorSource",
+       "static": true
+      },
+      {
+       "name": "latency",
+       "kind": "method",
+       "signature": "(part:String, delay:Float, ratio:Float, master:(Float) -> Float, velocity:(Float) -> Float, predict:Bool):HobbingErrorSource",
+       "static": true,
+       "doc": "Diagnostic latency model. A runtime study should instead supply the measured\nC error in apply(), avoiding double counting encoder/servo errors already present."
+      },
+      {
+       "name": "profile",
+       "kind": "method",
+       "signature": "(part:String, peak:Float, pitch:Float):HobbingErrorSource",
+       "static": true,
+       "doc": "Assumed radial form waveform on a zero-rake hob's planar rake regions.\nDoes not claim a measured profile map or arbitrary-rake planarity."
+      },
+      {
+       "name": "wall",
+       "kind": "method",
+       "signature": "(part:String, stiffness:Float, radialForce:(Float) -> Float):HobbingErrorSource",
+       "static": true
+      }
+     ]
     },
     {
      "name": "InspectionRingStock",
      "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/InspectionRingStock.hx",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/InspectionRingStock.hx",
      "implements": [
       "GearRings"
      ],
@@ -2044,7 +1895,7 @@
     {
      "name": "InspectionSlice",
      "kind": "typedef",
-     "file": "stockkit/haxe/stockkit/hobbing/InspectionRingStock.hx",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/InspectionRingStock.hx",
      "fields": [
       {
        "name": "first",
@@ -2069,16 +1920,209 @@
      ]
     },
     {
-     "name": "KienzleMaterial",
-     "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/KienzleMaterial.hx",
-     "doc": "Empirical coefficients, NOT a hardness/material database. kc11 is N/mm² at\nh=1 mm, mc dimensionless. No rake, speed, wear or ploughing correction."
-    },
-    {
      "name": "RingCompliance",
      "kind": "class",
-     "file": "stockkit/haxe/stockkit/hobbing/RingCompliance.hx",
+     "file": "stockkit/haxe/stockkit/hobbing/errors/RingCompliance.hx",
      "doc": "Quasistatic in-plane n=2 thin-ring model. mm, N, Young's modulus N/mm².\nw=d*cos(2 theta), U=9*pi*E*I*d²/(2R³), I=width*wall³/12.\nMandrel support is a separately stated generalized stiffness in parallel.\nHigher modes, local tooth bending, contact lift-off and dynamics are omitted."
+    }
+   ]
+  },
+  {
+   "name": "stockkit.hobbing.forces",
+   "types": [
+    {
+     "name": "HobbingForceHistory",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/forces/HobbingForceHistory.hx",
+     "doc": "Opt-in per-gash history, separate from the bounded online force observer.\nReconstructs the same overlapping rectangular window-mean radial loads.\nThis is not instantaneous tooth force. Times seconds, forces N.",
+     "fields": [
+      {
+       "name": "samples",
+       "kind": "var",
+       "signature": ":Array<HobbingForceSample>",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "():Void"
+      },
+      {
+       "name": "add",
+       "kind": "method",
+       "signature": "(sample:HobbingForceSample):Void"
+      },
+      {
+       "name": "radialAt",
+       "kind": "method",
+       "signature": "(time:Float):Float",
+       "doc": "Right-continuous radial window load for a later wall-source sweep."
+      },
+      {
+       "name": "statistics",
+       "kind": "method",
+       "signature": "(start:Float, end:Float):Dynamic"
+      },
+      {
+       "name": "writeCsv",
+       "kind": "method",
+       "signature": "(path:String):Void"
+      }
+     ]
+    },
+    {
+     "name": "HobbingForceSample",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/forces/HobbingForceSample.hx",
+     "doc": "One gash's window-AVERAGE loads, not an instantaneous tooth peak.\nmm³/mm²/mm inputs; N, Nm, W, J outputs. Table torque is a magnitude bound\n(resultant force at work radius), not a signed force-vector prediction."
+    },
+    {
+     "name": "HobbingForces",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/forces/HobbingForces.hx",
+     "doc": "Optional per-pass observer. A COW previous stock plus native interval comparison\ngives removed volume, without copying circle intervals into the managed heap.\nCall after EVERY pass in cutting order; unrelated stock edits invalidate attribution.\nSummary storage is bounded. Pass means are rectangular loads over their windows;\nmaxima sum overlapping windows at each start. These are NOT tooth-force peaks.",
+     "fields": [
+      {
+       "name": "material",
+       "kind": "var",
+       "signature": ":KienzleMaterial",
+       "final": true
+      },
+      {
+       "name": "edgeWidth",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "workRadius",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "pressureAngle",
+       "kind": "var",
+       "signature": ":Float",
+       "final": true
+      },
+      {
+       "name": "passes",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "volume",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "energy",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxTangential",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxRadial",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxHobTorque",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxTableTorqueBound",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "maxPower",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "last",
+       "kind": "var",
+       "signature": ":Null<HobbingForceSample>"
+      },
+      {
+       "name": "maxGashTangential",
+       "kind": "var",
+       "signature": ":Float"
+      },
+      {
+       "name": "peakActiveWindows",
+       "kind": "var",
+       "signature": ":Int"
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(stock:RingStock, workRadius:Float, pressureAngle:Float, edgeWidth:Float, ?material:KienzleMaterial):Void",
+       "doc": "edgeWidth is an explicitly assumed effective engaged cutting-edge width, mm;\ninterval volume alone cannot identify chip width and thickness separately."
+      },
+      {
+       "name": "afterPass",
+       "kind": "method",
+       "signature": "(pass:GashPass, start:HobbingAxes, end:HobbingAxes, hobRadius:Float):HobbingForceSample"
+      },
+      {
+       "name": "retainedBytes",
+       "kind": "method",
+       "signature": "():Float"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
+    },
+    {
+     "name": "KienzleMaterial",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/hobbing/forces/KienzleMaterial.hx",
+     "doc": "Empirical coefficients, NOT a hardness/material database. kc11 is N/mm² at\nh=1 mm, mc dimensionless. No rake, speed, wear or ploughing correction."
+    }
+   ]
+  },
+  {
+   "name": "stockkit.internal",
+   "types": [
+    {
+     "name": "NativeTool",
+     "kind": "class",
+     "file": "stockkit/haxe/stockkit/internal/NativeTool.hx",
+     "doc": "A tool registered with the core: its flutes cut, its shank and holder are checked for contact.",
+     "fields": [
+      {
+       "name": "tool",
+       "kind": "var",
+       "signature": ":Tool",
+       "final": true
+      },
+      {
+       "name": "new",
+       "kind": "method",
+       "signature": "(tool:Tool):Void"
+      },
+      {
+       "name": "borrow",
+       "kind": "method",
+       "signature": "():sk_tool_handle"
+      },
+      {
+       "name": "dispose",
+       "kind": "method",
+       "signature": "():Void"
+      }
+     ]
     }
    ]
   },
