@@ -8,6 +8,7 @@ import sys.io.File;
 
 class PendantTests {
   static function check(ok:Bool, message:String):Void if (!ok) throw message;
+
   static function rejects(message:String, body:() -> Void):Void {
     var failed = false;
     try body() catch (_:Dynamic) failed = true;
@@ -155,7 +156,8 @@ class PendantTests {
         solid: () -> pendantCase.board()
       }],
       "FR4 PCB",
-      ReferencePendant.groups()
+      ReferencePendant.groups(),
+      pendantCase.hardware()
     );
     var report = AssemblyIntegrity.check(assembly);
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
@@ -180,7 +182,22 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 26, "Twenty-six bodies: " + ids.length);
+    check(ids.length == 46, "Forty-six bodies, twenty of them hardware: " + ids.length);
+    // Hardware: an insert and a screw in each post and standoff, sized from the pilot holes the shell is cut with.
+    check(
+      ids.indexOf("case/insert-6") >= 0 && ids.indexOf("case/screw-6") >= 0
+      && ids.indexOf("case/board-insert-4") >= 0 && ids.indexOf("case/board-screw-4") >= 0,
+      "Hardware members"
+    );
+    var m3 = ThreadedInsert.m3(), m25 = ThreadedInsert.m2_5();
+    check(
+      m3.pilotDiameter == PendantCase.PILOT_DIAMETER && m3.pilotDepth == PendantCase.PILOT_DEPTH,
+      "Post pilot matches the M3 insert"
+    );
+    check(
+      m25.pilotDiameter == PendantCase.STANDOFF_PILOT && m25.pilotDepth == PendantCase.STANDOFF_PILOT_DEPTH,
+      "Standoff pilot matches the M2.5 insert"
+    );
     // The wheel turns on its housing and each knob on its switch: three free joints, the wheel's named for its encoder.
     var joints = assembly.derived().definition.joints;
     var encoders = [for (j in joints) if (j.id == "jog/wheel/encoder") j];
@@ -194,8 +211,8 @@ class PendantTests {
     var purchases = 0;
     for (line in bom.lines()) purchases += line.quantity;
     check(
-      purchases == 15,
-      "Fifteen purchases (plate, shell, board and twelve controls): "
+      purchases == 35,
+      "Thirty-five purchases (plate, shell, board, twelve controls, ten inserts and ten screws): "
       + purchases + " " + [for (l in bom.lines()) l.partNumber + " x" + l.quantity].join(", ")
     );
 
@@ -266,5 +283,6 @@ class PendantTests {
     );
     trace("pendant tests passed");
   }
+
   public static function main():Void run();
 }

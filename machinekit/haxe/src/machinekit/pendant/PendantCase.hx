@@ -24,42 +24,61 @@ import machinekit.hmi.*;
 class PendantCase {
   public static inline var BACK_WALL:Float = 3.0;
   public static inline var POST_DIAMETER:Float = 9.0;
+
   /** Hole for an M3 heat-set insert (about 4.6 mm outer, 5.7 mm long; check the insert's datasheet). */
   public static inline var PILOT_DIAMETER:Float = 4.2;
+
   public static inline var PILOT_DEPTH:Float = 7.5;
+
   /** Room kept around a screw head and around a post. */
   public static inline var HEAD_CLEARANCE:Float = 3.0;
+
   public static inline var BODY_CLEARANCE:Float = 1.5;
+
   /** M12 panel receptacle: hole for an M16 rear-mount thread (assumed, check the part), body and length behind the wall. */
   public static inline var RECEPTACLE_HOLE:Float = 16.2;
+
   public static inline var RECEPTACLE_BODY:Float = 22.0;
   public static inline var RECEPTACLE_LENGTH:Float = 25.0;
   public static inline var TONGUE_HEIGHT:Float = 3.0;
   public static inline var TONGUE_WIDTH:Float = 1.6;
   public static inline var TONGUE_CLEARANCE:Float = 0.25;
   public static inline var BOARD_THICKNESS:Float = 1.6;
+
   /** Height of the board's components on the side away from the face (assumed). */
   public static inline var BOARD_COMPONENTS:Float = 10.0;
+
   public static inline var BOARD_MARGIN:Float = 2.0;
+
   /** A tower that does not touch a wall is tied to the nearest one by a rib this thick, up to just below the board. */
   public static inline var RIB_THICKNESS:Float = 1.6;
+
   /** How far a post's circle runs into the wall it is placed against, so the two print as one body. */
   static inline var POST_EMBED:Float = 0.75;
+
   /** The longest rib worth printing; a tower further from every wall is tied to a nearby post instead. */
   static inline var MAX_RIB:Float = 16.0;
+
   /** Ribs and the elements they join overlap by this much, which makes the union one solid. */
   static inline var RIB_OVERLAP:Float = 0.2;
+
   /** A strip of board narrower than this beside a notch is not worth keeping. */
   static inline var SLIVER:Float = 8.0;
+
   /** Controls deeper than this pass through the board's plane instead of ending above it. */
   public static inline var PASS_THROUGH:Float = 30.0;
+
   public static inline var STANDOFF_DIAMETER:Float = 7.0;
+
   /** Hole for an M2.5 heat-set insert (about 3.6 mm outer, 4 mm long). */
   public static inline var STANDOFF_PILOT:Float = 3.4;
+
   public static inline var STANDOFF_PILOT_DEPTH:Float = 6.0;
   public static inline var BOARD_HOLE:Float = 2.7;
+
   /** A 22.3 mm opening in a side wall for a 3-position enabling switch whose body is about 26 mm across and 30 long, pointing inwards (assumed). */
   public static inline var ENABLING_HOLE:Float = 22.3;
+
   public static inline var ENABLING_BODY:Float = 26.0;
   public static inline var ENABLING_DEPTH:Float = 30.0;
   public static inline var STRAP_SLOT_WIDTH:Float = 24.0;
@@ -69,14 +88,19 @@ class PendantCase {
   public final posts:Array<{x:Float, y:Float}>;
   public final connectorX:Float;
   public final connectorZ:Float;
+
   /** Top face of the board envelope, behind the shallow controls. */
   public final boardTop:Float;
+
   public final standoffs:Array<{x:Float, y:Float}>;
   public final strapSlots:Array<{x:Float, y:Float}>;
+
   /** The enabling switch's body centre in plan, lying against a side wall at the back, or null when no free place exists. */
   public final enabling:Null<{x:Float, y:Float}>;
+
   /** Plan rectangles (centre and size) of the ribs that tie free-standing posts and standoffs to a wall. */
   public final ribs:Array<{x:Float, y:Float, w:Float, h:Float}>;
+
   public final notes:Array<String>;
 
   function new(
@@ -185,6 +209,7 @@ class PendantCase {
   }
 
   static function receptacleFootprint():Footprint return Rect(RECEPTACLE_BODY + 4.0, RECEPTACLE_LENGTH + 2.0);
+
   static function receptacleCentreY(face:PanelLayout, wallY:Float):Float return wallY + RECEPTACLE_LENGTH / 2;
 
   /** The receptacle runs horizontally at depth z: only parts reaching below its top, near the bottom wall, can block it. */
@@ -416,10 +441,10 @@ class PendantCase {
   static function ribTop(boardTop:Float):Float return boardTop - BOARD_THICKNESS - 1.0;
 
   /**
-   * Every post and standoff must be part of the surrounding structure, not a tower standing on the back wall alone: one
-   * that touches a wall is already joined to it, any other gets a thin rib to the nearest wall that is clear of the
-   * deep parts, the receptacle, the enabling switch and the other towers.
-   */
+	 * Every post and standoff must be part of the surrounding structure, not a tower standing on the back wall alone: one
+	 * that touches a wall is already joined to it, any other gets a thin rib to the nearest wall that is clear of the
+	 * deep parts, the receptacle, the enabling switch and the other towers.
+	 */
   static function placeRibs(
     face:PanelLayout,
     posts:Array<{x:Float, y:Float}>,
@@ -629,6 +654,44 @@ class PendantCase {
 
   static function dist(ax:Float,
     ay:Float, bx:Float, by:Float):Float return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+
+  /**
+	 * The inserts and screws the plan implies: an M3 insert in each post with a button head screw through the plate's
+	 * counterbore, and an M2.5 insert in each standoff with a screw through the board. Screw lengths are the shortest
+	 * standard ones that reach 90 % of the insert, and never past the bottom of its pilot hole.
+	 */
+  public function hardware():Array<PanelHardware> {
+    var result:Array<PanelHardware> = [];
+    var caseInsert = ThreadedInsert.m3(), boardInsert = ThreadedInsert.m2_5();
+    var bearing = face.thickness - PanelFacePlate.COUNTERBORE_DEPTH;
+    var caseLength = standardLength(bearing + 0.9 * caseInsert.length, bearing + caseInsert.pilotDepth);
+    var underside = boardTop - BOARD_THICKNESS;
+    var boardLength = standardLength(
+      BOARD_THICKNESS + 0.9 * boardInsert.length,
+      BOARD_THICKNESS + boardInsert.pilotDepth
+    );
+    var i = 0;
+    for (p in posts) {
+      i++;
+      result.push({id: 'insert-$i', component: caseInsert, x: p.x, y: p.y, z: 0.0});
+      result.push({id: 'screw-$i', component: ButtonHeadScrew.m3(caseLength), x: p.x, y: p.y, z: bearing});
+    }
+    i = 0;
+    for (s in standoffs) {
+      i++;
+      result.push({id: 'board-insert-$i', component: boardInsert, x: s.x, y: s.y, z: underside});
+      result.push({id: 'board-screw-$i', component: ButtonHeadScrew.m2_5(boardLength), x: s.x, y: s.y, z: boardTop});
+    }
+    return result;
+  }
+
+  static function standardLength(atLeast:Float, atMost:Float):Float {
+    for (l in [4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 16.0]) if (l >= atLeast) {
+      if (l > atMost) throw 'No standard screw length between $atLeast and $atMost mm';
+      return l;
+    }
+    throw 'No standard screw length reaches $atLeast mm';
+  }
 
   /** The posts, standoffs, receptacle, enabling switch and strap slots as marks for PanelLayoutSvg. */
   public function marks():Array<SvgMark> {

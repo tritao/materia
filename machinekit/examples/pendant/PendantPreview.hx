@@ -17,13 +17,16 @@ class PendantPreview {
         solid: () -> pendantCase.board()
       }],
       "FR4 PCB",
-      ReferencePendant.groups()
+      ReferencePendant.groups(),
+      pendantCase.hardware()
     );
   }
+
   public static function preview():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(
     assembly(),
     "pendant"
   ));
+
   public static function main():Void {
     var bytes = preview();
     var root = Sys.getCwd();
