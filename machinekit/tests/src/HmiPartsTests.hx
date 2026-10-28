@@ -98,6 +98,10 @@ class HmiPartsTests {
     near(yumo.panelHoles()[0].diameter, 3.2, "YUMO stud holes"); near(vallder.panelHoles()[0].diameter, 4.8, "Vallder stud holes");
     check(estop2.designation != estop.designation && estop2.bom.description.indexOf("2 NC") >= 0, "A second block is a different part");
     check(axis.designation != step.designation && axis.bom.description.indexOf("12 positions") >= 0 && step.bom.description.indexOf("3 positions") >= 0, "Positions are in the part");
+    // The contacts are ports to wire into a safety chain: one NC dry contact per block.
+    var contacts = estop2.ports();
+    check(contacts.length == 2 && contacts[0].name == "nc1" && contacts[1].name == "nc2" && contacts[0].required == true, "Two blocks, two required NC contact ports");
+    check(estop.ports().length == 1 && compact.ports().length == 1, "One block, one contact port");
     near(yumo.massProperties().mass * 1000.0, 250.0, "YUMO mass", 1e-6);
 
     rejects("a ring wider than the flange", () -> new HandWheel(new ComponentValues().setNumber("ringDiameter", 70)));

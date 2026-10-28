@@ -596,7 +596,7 @@ and the vacuum pump, and records the cost.
   - `DustShoe` (lift cylinder, brush, hose);
   - `VacuumTable` (plenum grid, zones, valves), `Spoilboard`, `VacuumBlower`.
 - `power` and `control`:
-  - `Vfd`, `SafetyRelay`, `EmergencyStopButton`, `Contactor`, `CircuitBreaker`, `BrakeResistor`;
+  - `Vfd`, `SafetyRelay`, `EmergencyStop` (machinekit.hmi), `Contactor`, `CircuitBreaker`, `BrakeResistor`;
   - `ControlCabinet` with DIN rows and an I/O count derived from the parts;
   - `LevellingFoot` with a load rating.
 - All rows are marked Assumed until SR19 checks them against a datasheet.

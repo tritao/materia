@@ -115,7 +115,7 @@ class SheetRouter extends Gantry {
         attach("mainBreaker",new machinekit.power.CircuitBreaker(),F.compose(cabinetPose,F.translation(0,0,600)),"base");
         attach("mainContactor",new machinekit.power.Contactor(),F.compose(cabinetPose,F.translation(80,0,600)),"base");
         attach("safetyRelay",new machinekit.control.SafetyRelay(),F.compose(cabinetPose,F.translation(180,0,600)),"base");
-        attach("emergencyStop",new machinekit.control.EmergencyStopButton(),F.compose(cabinetPose,F.translation(0,200,900)),"base");
+        attach("emergencyStop",new machinekit.hmi.EmergencyStop(new ComponentValues().setInteger("blocks",2)),F.compose(cabinetPose,F.translation(0,200,900)),"base");
         connectPorts("spindleMotor","vfd","motor","spindle","motor");
         connectPorts("vfdBrake","vfd","brake_resistor","brakeResistor","brake");
         // Safety contacts are physical parts only; SR17 authors and validates their wiring.

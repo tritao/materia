@@ -6,7 +6,6 @@ import machinekit.component.ComponentRegistry;
 class ControlComponents {
 	public static function register(registry:ComponentRegistry):Void {
 		registry.register(SafetyRelay.recipeType());
-		registry.register(EmergencyStopButton.recipeType());
 		registry.register(ControlCabinet.recipeType());
 
 		registry.register(CncController.recipeType());

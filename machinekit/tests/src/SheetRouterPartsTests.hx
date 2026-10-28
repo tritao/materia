@@ -47,7 +47,6 @@ class SheetRouterPartsTests {
       Contactor.recipeType(),
       CircuitBreaker.recipeType(),
       SafetyRelay.recipeType(),
-      EmergencyStopButton.recipeType(),
       ControlCabinet.recipeType(),
       LevelingFoot.recipeType()
     ];
@@ -55,7 +54,7 @@ class SheetRouterPartsTests {
       new HelicalRack(),new HelicalPinion(),new PreloadedPinionMount(),new AtcSpindle(),new ToolHolder(),new Collet(),
       new ToolFork(),new ToolRack(),new ToolLengthSetter(),new DustShoe(),new VacuumTable(),new Spoilboard(),
       new VacuumBlower(),new VacuumZoneValve(),new Vfd(),new BrakeResistor(),new Contactor(),new CircuitBreaker(),
-      new SafetyRelay(),new EmergencyStopButton(),new ControlCabinet(),new LevelingFoot()];
+      new SafetyRelay(),new ControlCabinet(),new LevelingFoot()];
     for(part in direct) {
       var copy=part.componentType().create(part.values());
       check(part.designation==copy.designation,'direct constructor identity '+part.designation);

@@ -19,7 +19,6 @@ class ComponentClassification {
 		file(registry, "machinekit.control.cnc-controller", "Controllers and cabinets", ComponentKind.Generic);
 		file(registry, "machinekit.control.control-cabinet", "Controllers and cabinets", ComponentKind.Generic);
 		file(registry, "machinekit.control.robot-controller", "Controllers and cabinets", ComponentKind.Generic);
-		file(registry, "machinekit.control.emergency-stop-button", "Safety", ComponentKind.Generic);
 		file(registry, "machinekit.control.safety-relay", "Safety", ComponentKind.Generic);
 		file(registry, "machinekit.control.digital-sensor", "Sensors and inputs", ComponentKind.Generic);
 		file(registry, "machinekit.control.thermistor-input", "Sensors and inputs", ComponentKind.Generic);

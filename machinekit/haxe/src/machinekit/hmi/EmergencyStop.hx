@@ -33,6 +33,8 @@ class EmergencyStop extends HmiPart {
     require(count("blocks") >= 1 && count("blocks") <= 3, "one to three contact blocks");
     require(n("blockThickness") * count("blocks") <= n("baseDepth") + 1e-9 && n("blockWidth") <= n("baseWidth"), "the blocks fit the base");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
+    // One NC dry contact per block, to be wired into the safety chain.
+    for (i in 1...count("blocks") + 1) addPort({name: "nc" + i, kind: Signal, role: Passive, iface: Plug("dry-contact", 2), required: true});
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
