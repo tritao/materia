@@ -64,8 +64,14 @@ class PendantTests {
     plain.close();
 
     // Every part's solid is clear of the others, the plate and the shell.
-    var report = AssemblyIntegrity.check(PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell(), [{id: "board", solid: () -> pendantCase.board()}]));
+    var assembly = PanelAssemblyBuilder.build(layout, () -> pendantCase.plate(), () -> pendantCase.shell(), [{id: "board", solid: () -> pendantCase.board()}], "FR4 PCB", ReferencePendant.groups());
+    var report = AssemblyIntegrity.check(assembly);
     check(report.errors().length == 0, "Interference: " + [for (e in report.errors()) e.message].join(" | "));
+    // The hierarchy reads case, jog, selectors, function and cycle keys, with the E-stop and display on their own.
+    var ids = [for (c in assembly.components()) c.id];
+    for (id in ["case/plate", "case/shell", "case/board", "jog/wheel", "jog/wheel-enable", "selectors/axis", "selectors/step", "function-keys/f2", "cycle-keys/hold", "estop", "display"])
+      check(ids.indexOf(id) >= 0, "Missing member " + id + " in " + ids.join(", "));
+    check(ids.length == 15, "Fifteen members: " + ids.length);
 
     var stepDir = Sys.getEnv("PENDANT_CASE_STEP_DIR");
     if (stepDir != null && stepDir != "") { shell.shape.exportStep(stepDir + "/pendant-shell.step"); plate.shape.exportStep(stepDir + "/pendant-plate.step"); }

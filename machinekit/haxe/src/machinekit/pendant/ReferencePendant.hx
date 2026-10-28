@@ -28,6 +28,14 @@ class ReferencePendant {
     return new PanelLayout(114.0, 210.0, 3.0, 3.0, 48.0, controls);
   }
 
+  /** How the controls are grouped in the assembly's hierarchy: by what the operator does with them. */
+  public static function groups():Array<PanelGroup> return [
+    new PanelGroup("jog", ["wheel", "wheel-enable"]),
+    new PanelGroup("selectors", ["axis", "step"]),
+    new PanelGroup("function-keys", ["f1", "f2", "f3"]),
+    new PanelGroup("cycle-keys", ["start", "hold", "stop"])
+  ];
+
   /** The case for the reference layout. */
   public static function pendantCase():PendantCase return PendantCase.plan(layout());
 }
