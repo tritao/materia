@@ -49,10 +49,7 @@ class SceneBlowFeedTests {
     var flat:materia.assembly.AssemblyDefinition = {schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION,
       id: "blow-test", lengthUnit: "mm", definitions: [{
         id: "same",
-        connectors: [{
-          name: "receipt",
-          frame: AssemblyFrames.identity()
-        }]
+        connectors: [{name: "receipt", frame: AssemblyFrames.identity()}]
       }], joints: [], occurrences: [for (id in [
         "screw1",
         "work",
@@ -67,13 +64,7 @@ class SceneBlowFeedTests {
       metresPerUnit: 0.001,
       parts: [],
       assemblyDefinition: flat,
-      missions: [{
-        steps: [{
-          kind: "screw",
-          screw: Single(job)
-        }],
-        blowFeeds: [path]
-      }]
+      missions: [{steps: [{kind: "screw", screw: Single(job)}], blowFeeds: [path]}]
     };
     SceneBlowFeeds.validate([path], scene.missions[0], scene);
     check(true, "Named tube/receiver, actual sensor and owned inventory qualify");

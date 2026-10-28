@@ -28,16 +28,8 @@ class SceneScrewTests {
       presenter: "nest",
       presentSensor: "nest/present",
       socket: AssemblyFrames.identity(),
-      pickup: AssemblyFrames.translation(
-        0,
-        0,
-        0.1
-      ),
-      entry: AssemblyFrames.translation(
-        0,
-        0,
-        -0.01
-      ),
+      pickup: AssemblyFrames.translation(0, 0, 0.1),
+      entry: AssemblyFrames.translation(0, 0, -0.01),
       seat: AssemblyFrames.identity(),
       hole: AssemblyFrames.identity(),
       leadMm: 1,
@@ -56,13 +48,7 @@ class SceneScrewTests {
         minimumStroke: 2,
         maximumStroke: 18
       },
-      simulation: {
-        leadInMm: 0.5,
-        maximumAxisAngle: 0.1,
-        prevailingTorque: 0.1,
-        stiffnessNmPerRad: 20,
-        stripTorque: 15
-      }
+      simulation: {leadInMm: 0.5, maximumAxisAngle: 0.1, prevailingTorque: 0.1, stiffnessNmPerRad: 20, stripTorque: 15}
     };
   }
   static function bad(change:SceneScrew -> Void, diagnostic:String):Void {
@@ -128,11 +114,7 @@ class SceneScrewTests {
         pickup: AssemblyFrames.identity()
       },
       rejectMember: "bin",
-      reject: AssemblyFrames.translation(
-        0,
-        0,
-        0.1
-      )
+      reject: AssemblyFrames.translation(0, 0, 0.1)
     };
     SceneScrewDefinition.validateScene(candidate, flat, data);
     check(true, "The replacement resolves its exact component and scoped presence sensor");
@@ -195,18 +177,10 @@ class SceneScrewTests {
         screw: "spare",
         presenter: "reserve",
         presentSensor: "reserve/present",
-        pickup: AssemblyFrames.translation(
-          0,
-          0,
-          0.1
-        )
+        pickup: AssemblyFrames.translation(0, 0, 0.1)
       },
       rejectMember: "bin",
-      reject: AssemblyFrames.translation(
-        0,
-        0,
-        0.1
-      )
+      reject: AssemblyFrames.translation(0, 0, 0.1)
     };
     var restoredRecovery = SceneScrewDefinition.decode(haxeon.wire.JsonWire.encode(recovering));
     SceneScrewDefinition.validate(restoredRecovery, ["screw1", "work", "clamp", "nest", "spare", "reserve", "bin"]);
@@ -236,21 +210,13 @@ class SceneScrewTests {
     checks = 0;
     var qualified = job();
     qualified.recovery = {
-      replacement: {
-        screw: "spare",
-        presenter: "reserve",
-        presentSensor: "reserve/present",
-        pickup: qualified.pickup
-      },
+      replacement: {screw: "spare", presenter: "reserve", presentSensor: "reserve/present", pickup: qualified.pickup},
       rejectMember: "bin",
       reject: qualified.pickup
     };
     var staged:Array<SceneArtifactMissionStep> = [
       {kind: "screw", screw: Snug(qualified, 2)},
-      {
-        kind: "screw",
-        screw: Final(qualified.fastening)
-      }
+      {kind: "screw", screw: Final(qualified.fastening)}
     ];
     SceneScrewInvocation.validate(staged);
     var invocation:ScrewInvocation = Snug(qualified, 2);

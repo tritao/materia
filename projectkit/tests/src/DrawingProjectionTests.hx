@@ -27,16 +27,8 @@ class DrawingProjectionTests {
       [0.0, 1.0, 0.0],
       [0.0, 0.0, 1.0],
       [1.0, 0.0, 1.0],
-      [
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        0.0,
-        1.0,
-        1.0
-      ]
+      [1.0, 1.0, 1.0],
+      [0.0, 1.0, 1.0]
     ];
     var vertices = Bytes.alloc(points.length * 24), normals = Bytes.alloc(points.length * 24);
     for (index in 0...points.length) for (axis in 0...3) vertices.setDouble(index * 24 + axis * 8, points[index][axis]);
@@ -84,78 +76,15 @@ class DrawingProjectionTests {
       [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
       [1.0, 0.0, 0.0, 1.0, 1.0, 0.0],
       [1.0, 1.0, 0.0, 0.0, 1.0, 0.0],
-      [
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0,
-        0.0,
-        1.0
-      ],
-      [
-        1.0,
-        0.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        1.0,
-        1.0,
-        1.0,
-        0.0,
-        1.0,
-        1.0
-      ],
-      [
-        0.0,
-        1.0,
-        1.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      [
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        1.0
-      ],
-      [
-        1.0,
-        1.0,
-        0.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      [
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
+      [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+      [0.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+      [1.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+      [1.0, 1.0, 1.0, 0.0, 1.0, 1.0],
+      [0.0, 1.0, 1.0, 0.0, 0.0, 1.0],
+      [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+      [1.0, 0.0, 0.0, 1.0, 0.0, 1.0],
+      [1.0, 1.0, 0.0, 1.0, 1.0, 1.0],
+      [0.0, 1.0, 0.0, 0.0, 1.0, 1.0]
     ];
     var edges = Bytes.alloc(edgePoints.length * 48);
     for (edge in 0...edgePoints.length) for (coordinate in 0...6) edges.setDouble(
@@ -250,21 +179,9 @@ class DrawingProjectionTests {
         toleranceClass: "6H",
         profile: ThreadProfile.Metric
       },
-      origin: [
-        0.5,
-        0.5,
-        1
-      ],
-      xDirection: [
-        1,
-        0,
-        0
-      ],
-      direction: [
-        0,
-        0,
-        1
-      ],
+      origin: [0.5, 0.5, 1],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, 1],
       length: 8,
       ringAtStart: false,
       ringAtEnd: true
@@ -275,19 +192,7 @@ class DrawingProjectionTests {
       direction: [1, 0, 0],
       up: [0, 0, 1],
       showHiddenLines: true,
-      section: {
-        origin: [
-          0.5,
-          0,
-          0
-        ],
-        normal: [
-          1,
-          0,
-          0
-        ],
-        keepPositive: true
-      }
+      section: {origin: [0.5, 0, 0], normal: [1, 0, 0], keepPositive: true}
     };
     var section = DrawingProjection.project(part, 0.001, sectionView);
     check(
@@ -333,15 +238,7 @@ class DrawingProjectionTests {
     var blindBottom = DrawingProjection.project(
       part,
       0.001,
-      {
-        id: "blind-hole-bottom",
-        direction: [0, 0, -1],
-        up: [
-          0,
-          1,
-          0
-        ]
-      }
+      {id: "blind-hole-bottom", direction: [0, 0, -1], up: [0, 1, 0]}
     );
     check(
       [for (line in blindBottom.lines) if (line.faceName == thread.faceName) line].length == 0,
@@ -362,24 +259,12 @@ class DrawingProjectionTests {
     var throughTop = DrawingProjection.project(
       part,
       0.001,
-      {
-        id: "through-hole-top",
-        direction: [0, 0, 1],
-        up: [0, 1, 0]
-      }
+      {id: "through-hole-top", direction: [0, 0, 1], up: [0, 1, 0]}
     );
     var throughBottom = DrawingProjection.project(
       part,
       0.001,
-      {
-        id: "through-hole-bottom",
-        direction: [0, 0, -1],
-        up: [
-          0,
-          1,
-          0
-        ]
-      }
+      {id: "through-hole-bottom", direction: [0, 0, -1], up: [0, 1, 0]}
     );
     check(
       [for (line in throughTop.lines) if (line.faceName == thread.faceName) line].length == 112
@@ -405,21 +290,9 @@ class DrawingProjectionTests {
       faceName: thread.faceName,
       faceIndex: thread.faceIndex,
       spec: thread.spec,
-      origin: [
-        0.0005,
-        0.0005,
-        0.001
-      ],
-      xDirection: [
-        1,
-        0,
-        0
-      ],
-      direction: [
-        0,
-        0,
-        1
-      ],
+      origin: [0.0005, 0.0005, 0.001],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, 1],
       length: 0.008,
       ringAtStart: thread.ringAtStart,
       ringAtEnd: thread.ringAtEnd
@@ -444,21 +317,9 @@ class DrawingProjectionTests {
         toleranceClass: "nominal",
         profile: ThreadProfile.Ball
       },
-      origin: [
-        0.5,
-        0.5,
-        1
-      ],
-      xDirection: [
-        1,
-        0,
-        0
-      ],
-      direction: [
-        0,
-        0,
-        1
-      ],
+      origin: [0.5, 0.5, 1],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, 1],
       length: 8,
       ringAtStart: false,
       ringAtEnd: true
@@ -483,21 +344,9 @@ class DrawingProjectionTests {
         toleranceClass: "6g",
         profile: ThreadProfile.Metric
       },
-      origin: [
-        0.5,
-        0.5,
-        1
-      ],
-      xDirection: [
-        0,
-        1,
-        0
-      ],
-      direction: [
-        1,
-        0,
-        0
-      ],
+      origin: [0.5, 0.5, 1],
+      xDirection: [0, 1, 0],
+      direction: [1, 0, 0],
       length: 8,
       ringAtStart: false,
       ringAtEnd: true

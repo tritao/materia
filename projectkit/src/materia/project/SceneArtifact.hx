@@ -1994,16 +1994,7 @@ class SceneArtifact {
       var sensor:SceneArtifactRobotSensor = {
         kind: text(raw, "kind"),
         id: text(raw, "id"),
-        mount: {
-          occurrence: text(
-            mount,
-            "occurrence"
-          ),
-          connector: text(
-            mount,
-            "connector"
-          )
-        }
+        mount: {occurrence: text(mount, "occurrence"), connector: text(mount, "connector")}
       };
       if (rays != null) sensor.rayCount = Std.int(rays);
       if (range != null) sensor.maxRange = range;
@@ -2077,102 +2068,30 @@ class SceneArtifact {
         name: text(raw, "name"),
         sensor: text(raw, "sensor"),
         slot: integer(raw, "slot"),
-        mount: text(
-          raw,
-          "mount"
-        ),
-        target: text(
-          raw,
-          "target"
-        ),
-        feedsExtruder: flag(
-          raw,
-          "feedsExtruder"
-        ),
-        r0Ohm: field(
-          raw,
-          "r0Ohm"
-        ),
-        t0Celsius: field(
-          raw,
-          "t0Celsius"
-        ),
-        beta: field(
-          raw,
-          "beta"
-        ),
-        pullupOhm: field(
-          raw,
-          "pullupOhm"
-        ),
-        vRef: field(
-          raw,
-          "vRef"
-        ),
-        kp: field(
-          raw,
-          "kp"
-        ),
-        ki: field(
-          raw,
-          "ki"
-        ),
-        kd: field(
-          raw,
-          "kd"
-        ),
-        maxDuty: field(
-          raw,
-          "maxDuty"
-        ),
-        maxTemperature: field(
-          raw,
-          "maxTemperature"
-        ),
-        bandCelsius: field(
-          raw,
-          "bandCelsius"
-        ),
-        pidRangeCelsius: field(
-          raw,
-          "pidRangeCelsius"
-        ),
-        gainWindowSeconds: field(
-          raw,
-          "gainWindowSeconds"
-        ),
-        gainMinCelsius: field(
-          raw,
-          "gainMinCelsius"
-        ),
-        hysteresisCelsius: field(
-          raw,
-          "hysteresisCelsius"
-        ),
-        hysteresisWindowSeconds: field(
-          raw,
-          "hysteresisWindowSeconds"
-        ),
-        heatCapacity: field(
-          raw,
-          "heatCapacity"
-        ),
-        power: field(
-          raw,
-          "power"
-        ),
-        loss: field(
-          raw,
-          "loss"
-        ),
-        fanLoss: field(
-          raw,
-          "fanLoss"
-        ),
-        ambient: field(
-          raw,
-          "ambient"
-        )
+        mount: text(raw, "mount"),
+        target: text(raw, "target"),
+        feedsExtruder: flag(raw, "feedsExtruder"),
+        r0Ohm: field(raw, "r0Ohm"),
+        t0Celsius: field(raw, "t0Celsius"),
+        beta: field(raw, "beta"),
+        pullupOhm: field(raw, "pullupOhm"),
+        vRef: field(raw, "vRef"),
+        kp: field(raw, "kp"),
+        ki: field(raw, "ki"),
+        kd: field(raw, "kd"),
+        maxDuty: field(raw, "maxDuty"),
+        maxTemperature: field(raw, "maxTemperature"),
+        bandCelsius: field(raw, "bandCelsius"),
+        pidRangeCelsius: field(raw, "pidRangeCelsius"),
+        gainWindowSeconds: field(raw, "gainWindowSeconds"),
+        gainMinCelsius: field(raw, "gainMinCelsius"),
+        hysteresisCelsius: field(raw, "hysteresisCelsius"),
+        hysteresisWindowSeconds: field(raw, "hysteresisWindowSeconds"),
+        heatCapacity: field(raw, "heatCapacity"),
+        power: field(raw, "power"),
+        loss: field(raw, "loss"),
+        fanLoss: field(raw, "fanLoss"),
+        ambient: field(raw, "ambient")
       };
       var fan:Dynamic = Reflect.field(raw, "fan");
       if (fan != null) heater.fan = Std.isOfType(fan, String) ? fan : fail();
@@ -2314,20 +2233,8 @@ class SceneArtifact {
       var tool:SceneArtifactRobotTool = {
         kind: text(raw, "kind"),
         members: members(raw, "members"),
-        contact: {
-          occurrence: text(
-            contact,
-            "occurrence"
-          ),
-          connector: text(
-            contact,
-            "connector"
-          )
-        },
-        channel: text(
-          raw,
-          "channel"
-        )
+        contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
+        channel: text(raw, "channel")
       };
       if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
       if (Reflect.field(raw, "controller") != null) tool.controller = text(raw, "controller");
@@ -2357,34 +2264,13 @@ class SceneArtifact {
         if (bit == null) fail();
         tool.screwdriver = {
           bit: {kind: text(bit, "kind"), size: text(bit, "size")},
-          bitMember: text(
-            driver,
-            "bitMember"
-          ),
-          directionChannel: text(
-            driver,
-            "directionChannel"
-          ),
-          programChannel: text(
-            driver,
-            "programChannel"
-          ),
-          vacuumChannel: text(
-            driver,
-            "vacuumChannel"
-          ),
-          feedJoint: text(
-            driver,
-            "feedJoint"
-          ),
-          spindleJoint: text(
-            driver,
-            "spindleJoint"
-          ),
-          strokeEncoder: text(
-            driver,
-            "strokeEncoder"
-          ),
+          bitMember: text(driver, "bitMember"),
+          directionChannel: text(driver, "directionChannel"),
+          programChannel: text(driver, "programChannel"),
+          vacuumChannel: text(driver, "vacuumChannel"),
+          feedJoint: text(driver, "feedJoint"),
+          spindleJoint: text(driver, "spindleJoint"),
+          strokeEncoder: text(driver, "strokeEncoder"),
           maxTorque: number("maxTorque"),
           maxSpeed: number("maxSpeed"),
           strokeMm: number("strokeMm"),
@@ -2402,10 +2288,7 @@ class SceneArtifact {
         tool.torch = {
           wireSpeedChannel: text(welder, "wireSpeedChannel"),
           voltageChannel: text(welder, "voltageChannel"),
-          groundedWork: [for (id in (cast work: Array<Dynamic>)) Std.isOfType(
-            id,
-            String
-          ) ? (id : String) : fail()],
+          groundedWork: [for (id in (cast work: Array<Dynamic>)) Std.isOfType(id, String) ? (id : String) : fail()],
           maxCurrentA : number("maxCurrentA"),
           efficiency : number("efficiency"),
           wireDiameterMm : number("wireDiameterMm"),
@@ -2429,10 +2312,7 @@ class SceneArtifact {
       && name != "screwFeeders" && name != "blowFeeds") Reflect.setField(
         envelope,
         name,
-        Reflect.field(
-          mission,
-          name
-        )
+        Reflect.field(mission, name)
       );
     if (mission.blowFeeds != null) Reflect.setField(
       envelope,
@@ -3134,10 +3014,7 @@ class SceneArtifact {
       if (value == null) fail();
       return {
         position: numbers(Reflect.field(value, "position"), 3),
-        rotation: numbers(
-          Reflect.field(value, "rotation"),
-          4
-        )
+        rotation: numbers(Reflect.field(value, "rotation"), 4)
       };
     }
     function seamFaces(value:Dynamic):Array<SceneArtifactWeldFace> {
@@ -3166,18 +3043,9 @@ class SceneArtifact {
         seam: seam,
         faces: seamFaces(Reflect.field(item, "faces")),
         joint: joint,
-        start: pose(Reflect.field(
-          item,
-          "start"
-        )),
-        stop: pose(Reflect.field(
-          item,
-          "stop"
-        )),
-        normals: [for (normal in (cast normals: Array<Dynamic>)) numbers(
-          normal,
-          3
-        )]
+        start: pose(Reflect.field(item, "start")),
+        stop: pose(Reflect.field(item, "stop")),
+        normals: [for (normal in (cast normals: Array<Dynamic>)) numbers(normal, 3)]
       };
     }
     var metal:Dynamic = Reflect.field(raw,
@@ -3196,39 +3064,15 @@ class SceneArtifact {
       var pass:SceneArtifactWeldPass = {
         name: name,
         offset: numbers(Reflect.field(item, "offset"), 2),
-        interpassDwell: number(
-          item,
-          "interpassDwell"
-        ),
+        interpassDwell: number(item, "interpassDwell"),
         process: {
-          wireSpeed: number(
-            process,
-            "wireSpeed"
-          ),
-          voltage: number(
-            process,
-            "voltage"
-          ),
-          travelSpeed: number(
-            process,
-            "travelSpeed"
-          ),
-          approach: number(
-            process,
-            "approach"
-          ),
-          startDwell: number(
-            process,
-            "startDwell"
-          ),
-          craterDwell: number(
-            process,
-            "craterDwell"
-          ),
-          burnback: number(
-            process,
-            "burnback"
-          )
+          wireSpeed: number(process, "wireSpeed"),
+          voltage: number(process, "voltage"),
+          travelSpeed: number(process, "travelSpeed"),
+          approach: number(process, "approach"),
+          startDwell: number(process, "startDwell"),
+          craterDwell: number(process, "craterDwell"),
+          burnback: number(process, "burnback")
         }
       };
       var weave:Dynamic = Reflect.field(item, "weave");
@@ -3238,14 +3082,8 @@ class SceneArtifact {
         pass.weave = {
           pattern: pattern,
           amplitude: number(weave, "amplitude"),
-          cyclesPerMetre: number(
-            weave,
-            "cyclesPerMetre"
-          ),
-          edgeDwell: number(
-            weave,
-            "edgeDwell"
-          )
+          cyclesPerMetre: number(weave, "cyclesPerMetre"),
+          edgeDwell: number(weave, "edgeDwell")
         };
       }
       pass;
@@ -3464,17 +3302,10 @@ class SceneArtifact {
       if (!Std.isOfType(position, Array) || (cast position:Array<Dynamic>).length != 3 || !Std.isOfType(rotation,
         Array) || (cast rotation:Array<Dynamic>).length != 4) fail();
       return {
-        position: [for (item in (cast position: Array<Dynamic>)) Std.isOfType(item, Float) || Std.isOfType(
-          item,
-          Int
-        ) ? (item : Float) : fail()],
-        rotation : [for (item in (cast rotation : Array<Dynamic>)) Std.isOfType(
-          item,
-          Float
-        ) || Std.isOfType(
-          item,
-          Int
-        ) ? (item : Float) : fail()]
+        position: [for (item in (cast position: Array<Dynamic>)) Std.isOfType(item,
+        Float) || Std.isOfType(item, Int) ? (item : Float) : fail()],
+        rotation : [for (item in (cast rotation : Array<Dynamic>)) Std.isOfType(item,
+        Float) || Std.isOfType(item, Int) ? (item : Float) : fail()]
       };
     }
     var steps:Dynamic = Reflect.field(decoded, "steps");
@@ -3746,10 +3577,7 @@ class SceneArtifact {
         computerLoadWatts: energyNumber("computerLoadWatts"),
         chargerOccurrence: energyText("chargerOccurrence"),
         chargerPowerWatts: energyNumber("chargerPowerWatts"),
-        dockPose: floorPose(Reflect.field(
-          energyRaw,
-          "dockPose"
-        )),
+        dockPose: floorPose(Reflect.field(energyRaw, "dockPose")),
         dockPositionToleranceMeters: energyNumber("dockPositionToleranceMeters"),
         dockHeadingToleranceRadians: energyNumber("dockHeadingToleranceRadians")
       };
@@ -3877,23 +3705,11 @@ class SceneArtifact {
     ];
     var machining:SceneArtifactMachining = {
       axes: [for (axis in list(Reflect.field(decoded, "axes"))) text(axis)],
-      spindle: text(Reflect.field(
-        decoded,
-        "spindle"
-      )),
-      channelScope: text(Reflect.field(
-        decoded,
-        "channelScope"
-      )),
-      workOffset: [for (value in list(Reflect.field(
-        decoded,
-        "workOffset"
-      ))) number(value)],
+      spindle: text(Reflect.field(decoded, "spindle")),
+      channelScope: text(Reflect.field(decoded, "channelScope")),
+      workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
       tools: tools,
-      stocks: [for (stock in list(Reflect.field(
-        decoded,
-        "stocks"
-      ))) text(stock)]
+      stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]
     };
     for (field in ["program", "programFile", "programSha256"]) {
       var value = Reflect.field(decoded, field);
@@ -3939,10 +3755,7 @@ class SceneArtifact {
     var mission:Dynamic = Reflect.field(decoded, "mission");
     if (mission != null) machining.mission = {
       id: text(Reflect.field(mission, "id")),
-      label: text(Reflect.field(
-        mission,
-        "label"
-      ))
+      label: text(Reflect.field(mission, "label"))
     };
     var sacrificial:Dynamic = Reflect.field(decoded, "sacrificial");
     if (sacrificial != null) machining.sacrificial = [for (id in list(sacrificial)) text(id)];

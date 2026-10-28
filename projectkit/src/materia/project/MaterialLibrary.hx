@@ -23,15 +23,8 @@ class MaterialLibrary {
   ):MaterialDef return {
     id: id,
     name: name,
-    visual: {
-      baseColor: color,
-      metallic: metallic,
-      roughness: roughness
-    },
-    physical: {
-      density: density,
-      spec: spec
-    }
+    visual: {baseColor: color, metallic: metallic, roughness: roughness},
+    physical: {density: density, spec: spec}
   };
 
   public static function all():Array<MaterialDef> return [material(
@@ -45,11 +38,7 @@ class MaterialLibrary {
   ), material(
     "painted",
     "Painted steel",
-    [
-      0.24,
-      0.34,
-      0.43
-    ],
+    [0.24, 0.34, 0.43],
     0.0,
     0.48,
     7850,
@@ -57,11 +46,7 @@ class MaterialLibrary {
   ), material(
     "machined-steel",
     "Machined steel",
-    [
-      0.77,
-      0.78,
-      0.79
-    ],
+    [0.77, 0.78, 0.79],
     1.0,
     0.34,
     7850,
@@ -69,11 +54,7 @@ class MaterialLibrary {
   ), material(
     "steel-c45",
     "C45 steel",
-    [
-      0.77,
-      0.78,
-      0.79
-    ],
+    [0.77, 0.78, 0.79],
     1.0,
     0.34,
     7850,
@@ -81,11 +62,7 @@ class MaterialLibrary {
   ), material(
     "steel-8",
     "Class 8 steel",
-    [
-      0.77,
-      0.78,
-      0.79
-    ],
+    [0.77, 0.78, 0.79],
     1.0,
     0.34,
     7850,
@@ -93,11 +70,7 @@ class MaterialLibrary {
   ), material(
     "steel-8-8",
     "Class 8.8 steel",
-    [
-      0.77,
-      0.78,
-      0.79
-    ],
+    [0.77, 0.78, 0.79],
     1.0,
     0.34,
     7850,
@@ -105,11 +78,7 @@ class MaterialLibrary {
   ), material(
     "steel-10-9",
     "Class 10.9 steel",
-    [
-      0.77,
-      0.78,
-      0.79
-    ],
+    [0.77, 0.78, 0.79],
     1.0,
     0.34,
     7850,
@@ -117,11 +86,7 @@ class MaterialLibrary {
   ), material(
     "stainless-a2-70",
     "A2-70 stainless steel",
-    [
-      0.79,
-      0.79,
-      0.78
-    ],
+    [0.79, 0.79, 0.78],
     1.0,
     0.32,
     7900,
@@ -129,11 +94,7 @@ class MaterialLibrary {
   ), material(
     "steel-12-9",
     "Class 12.9 steel",
-    [
-      0.18,
-      0.19,
-      0.20
-    ],
+    [0.18, 0.19, 0.20],
     0.55,
     0.52,
     7850,
@@ -141,11 +102,7 @@ class MaterialLibrary {
   ), material(
     "black-oxide",
     "Black oxide steel",
-    [
-      0.18,
-      0.19,
-      0.20
-    ],
+    [0.18, 0.19, 0.20],
     0.55,
     0.52,
     7850,
@@ -153,11 +110,7 @@ class MaterialLibrary {
   ), material(
     "bearing-steel",
     "Bearing steel",
-    [
-      0.79,
-      0.80,
-      0.81
-    ],
+    [0.79, 0.80, 0.81],
     1.0,
     0.30,
     7810,
@@ -165,11 +118,7 @@ class MaterialLibrary {
   ), material(
     "aluminium",
     "Anodized aluminium 6061",
-    [
-      0.86,
-      0.87,
-      0.88
-    ],
+    [0.86, 0.87, 0.88],
     1.0,
     0.42,
     2700,
@@ -177,11 +126,7 @@ class MaterialLibrary {
   ), material(
     "rubber",
     "Rubber",
-    [
-      0.10,
-      0.10,
-      0.11
-    ],
+    [0.10, 0.10, 0.11],
     0.0,
     0.90,
     1100,
@@ -189,11 +134,7 @@ class MaterialLibrary {
   ), material(
     "nitrile-rubber",
     "Nitrile rubber",
-    [
-      0.10,
-      0.10,
-      0.11
-    ],
+    [0.10, 0.10, 0.11],
     0.0,
     0.90,
     1100,
@@ -203,11 +144,7 @@ class MaterialLibrary {
   material("pa12-nylon", "PA12 nylon (nominal)", [0.68, 0.69, 0.71], 0.0, 0.85, 1000, "PA12 nylon"), material(
     "plastic",
     "Engineering plastic",
-    [
-      0.28,
-      0.30,
-      0.32
-    ],
+    [0.28, 0.30, 0.32],
     0.0,
     0.55,
     1200,
@@ -217,11 +154,7 @@ class MaterialLibrary {
   material("abs-black", "ABS, black", [0.07, 0.07, 0.08], 0.0, 0.45, 1050, "ABS black"), material(
     "abs-white",
     "ABS, white",
-    [
-      0.86,
-      0.86,
-      0.84
-    ],
+    [0.86, 0.86, 0.84],
     0.0,
     0.40,
     1050,
@@ -229,11 +162,7 @@ class MaterialLibrary {
   ), material(
     "abs-red",
     "ABS, signal red",
-    [
-      0.78,
-      0.07,
-      0.06
-    ],
+    [0.78, 0.07, 0.06],
     0.0,
     0.32,
     1050,
@@ -241,11 +170,7 @@ class MaterialLibrary {
   ), material(
     "abs-green",
     "ABS, signal green",
-    [
-      0.07,
-      0.52,
-      0.20
-    ],
+    [0.07, 0.52, 0.20],
     0.0,
     0.35,
     1050,
@@ -253,11 +178,7 @@ class MaterialLibrary {
   ), material(
     "abs-yellow",
     "ABS, signal yellow",
-    [
-      0.95,
-      0.74,
-      0.06
-    ],
+    [0.95, 0.74, 0.06],
     0.0,
     0.35,
     1050,
@@ -265,11 +186,7 @@ class MaterialLibrary {
   ), material(
     "abs-blue",
     "ABS, signal blue",
-    [
-      0.10,
-      0.28,
-      0.68
-    ],
+    [0.10, 0.28, 0.68],
     0.0,
     0.35,
     1050,
@@ -277,11 +194,7 @@ class MaterialLibrary {
   ), material(
     "fr4-pcb",
     "FR-4 circuit board, green",
-    [
-      0.04,
-      0.33,
-      0.17
-    ],
+    [0.04, 0.33, 0.17],
     0.0,
     0.42,
     1850,
@@ -293,11 +206,7 @@ class MaterialLibrary {
     "Device housing, light grey", [0.80, 0.80, 0.78], 0.0, 0.55, 1200, "device housing"), material(
       "device-housing-dark",
       "Device housing, dark grey",
-      [
-        0.20,
-        0.21,
-        0.22
-      ],
+      [0.20, 0.21, 0.22],
       0.0,
       0.50,
       1200,
@@ -305,11 +214,7 @@ class MaterialLibrary {
     ), polycarbonate(), material(
       "polyurethane",
       "Polyurethane",
-      [
-        0.26,
-        0.34,
-        0.37
-      ],
+      [0.26, 0.34, 0.37],
       0.0,
       0.65,
       1200,
@@ -335,11 +240,7 @@ class MaterialLibrary {
   ), toolingEPS(), toolingBoard(), mineralCast(), assumedReplication(), material(
     "carbide",
     "Cemented carbide",
-    [
-      0.70,
-      0.71,
-      0.72
-    ],
+    [0.70, 0.71, 0.72],
     1.0,
     0.35,
     14500,
@@ -347,11 +248,7 @@ class MaterialLibrary {
   ), material(
     "cast-iron",
     "Cast iron",
-    [
-      0.58,
-      0.59,
-      0.60
-    ],
+    [0.58, 0.59, 0.60],
     1.0,
     0.55,
     7200,
@@ -359,11 +256,7 @@ class MaterialLibrary {
   ), material(
     "bronze",
     "Bronze",
-    [
-      0.80,
-      0.60,
-      0.38
-    ],
+    [0.80, 0.60, 0.38],
     1.0,
     0.38,
     8800,
@@ -371,11 +264,7 @@ class MaterialLibrary {
   ), material(
     "brass",
     "Brass",
-    [
-      0.92,
-      0.82,
-      0.55
-    ],
+    [0.92, 0.82, 0.55],
     1.0,
     0.34,
     8500,
@@ -383,11 +272,7 @@ class MaterialLibrary {
   ), material(
     "spring-steel",
     "Spring steel",
-    [
-      0.72,
-      0.73,
-      0.75
-    ],
+    [0.72, 0.73, 0.75],
     1.0,
     0.38,
     7850,
@@ -449,13 +334,7 @@ class MaterialLibrary {
       assumed: true,
       specificEnergyJPerMm3: energy,
       chipLoads: [
-        {
-          minDiameterMm: 3,
-          maxDiameterMm: 6,
-          minChipMm: low,
-          nominalChipMm: nominal,
-          maxChipMm: high
-        },
+        {minDiameterMm: 3, maxDiameterMm: 6, minChipMm: low, nominalChipMm: nominal, maxChipMm: high},
         {
           minDiameterMm: 6.000001,
           maxDiameterMm: 12,

@@ -146,15 +146,7 @@ class PresentationEvaluator {
       }
       var rotation = parent == null ? null : scopePoses.get(parent);
       var delta = rotation == null ? direction : AssemblyFrames.transformPoint(
-        {
-          x : 0,
-          y : 0,
-          z : 0,
-          qx : rotation.qx,
-          qy : rotation.qy,
-          qz : rotation.qz,
-          qw : rotation.qw
-        },
+        {x : 0, y : 0, z : 0, qx : rotation.qx, qy : rotation.qy, qz : rotation.qz, qw : rotation.qw},
         direction.x,
         direction.y,
         direction.z
@@ -173,13 +165,7 @@ class PresentationEvaluator {
       for (offset in value.explode) move(
         offset.select,
         offset.direction,
-        offset.distance * Math.max(
-          0,
-          Math.min(
-            1,
-            cursor.explode * stages - offset.stage + 1
-          )
-        )
+        offset.distance * Math.max(0, Math.min(1, cursor.explode * stages - offset.stage + 1))
       );
       if (procedure != null) {
         var removed = new Map<String, PresentationMotion>();

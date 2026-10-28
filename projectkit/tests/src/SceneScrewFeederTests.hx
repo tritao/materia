@@ -25,11 +25,7 @@ class SceneScrewFeederTests {
       presenter: "nest",
       presentSensor: "nest/present",
       inventory: ["a", "b"],
-      deposit: AssemblyFrames.translation(
-        0,
-        0,
-        0.03
-      ),
+      deposit: AssemblyFrames.translation(0, 0, 0.03),
       bufferCapacity: 2,
       trackDelay: 0.1,
       deliveryDelay: 0.2,
@@ -74,11 +70,7 @@ class SceneScrewFeederTests {
       presenter: "nest",
       presentSensor: "nest/present",
       inventory: ["screw1"],
-      deposit: AssemblyFrames.translation(
-        0,
-        0,
-        0.1
-      ),
+      deposit: AssemblyFrames.translation(0, 0, 0.1),
       bufferCapacity: 2,
       trackDelay: 0.1,
       deliveryDelay: 0.2,
@@ -98,13 +90,7 @@ class SceneScrewFeederTests {
       metresPerUnit: 0.001,
       parts: [],
       assemblyDefinition: flat,
-      missions: [{
-        steps: [{
-          kind: "screw",
-          screw: Single(job)
-        }],
-        screwFeeders: [feed]
-      }]
+      missions: [{steps: [{kind: "screw", screw: Single(job)}], screwFeeders: [feed]}]
     };
     SceneScrewFeeders.validate([feed], scene.missions[0], scene);
     check(true, "Feeder packet resolves its named free supply and sensor");

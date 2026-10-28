@@ -53,26 +53,11 @@ class SceneContactRegistration {
     var nominal:AssemblyFrame = {
       x: number(Reflect.field(pose, "x")),
       y: number(Reflect.field(pose, "y")),
-      z: number(Reflect.field(
-        pose,
-        "z"
-      )),
-      qx: number(Reflect.field(
-        pose,
-        "qx"
-      )),
-      qy: number(Reflect.field(
-        pose,
-        "qy"
-      )),
-      qz: number(Reflect.field(
-        pose,
-        "qz"
-      )),
-      qw: number(Reflect.field(
-        pose,
-        "qw"
-      ))
+      z: number(Reflect.field(pose, "z")),
+      qx: number(Reflect.field(pose, "qx")),
+      qy: number(Reflect.field(pose, "qy")),
+      qz: number(Reflect.field(pose, "qz")),
+      qw: number(Reflect.field(pose, "qw"))
     };
     var faces:Array<SceneContactFace> = [for (face in array(Reflect.field(raw, "faces"))) {
       var target:Dynamic = Reflect.field(face, "target");
@@ -95,26 +80,11 @@ class SceneContactRegistration {
     return {
       frame: text(Reflect.field(raw, "frame")),
       nominal: nominal,
-      translation: vector(Reflect.field(
-        raw,
-        "translation"
-      )),
-      rotation: vector(Reflect.field(
-        raw,
-        "rotation"
-      )),
-      measurementError: number(Reflect.field(
-        raw,
-        "measurementError"
-      )),
-      calibratedError: number(Reflect.field(
-        raw,
-        "calibratedError"
-      )),
-      contactOffset: number(Reflect.field(
-        raw,
-        "contactOffset"
-      )),
+      translation: vector(Reflect.field(raw, "translation")),
+      rotation: vector(Reflect.field(raw, "rotation")),
+      measurementError: number(Reflect.field(raw, "measurementError")),
+      calibratedError: number(Reflect.field(raw, "calibratedError")),
+      contactOffset: number(Reflect.field(raw, "contactOffset")),
       faces: faces
     };
   }

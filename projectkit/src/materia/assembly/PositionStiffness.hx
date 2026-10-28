@@ -70,10 +70,7 @@ class PositionStiffness {
         var index = ids.indexOf(coordinate.joint);
         enclosed = add(
           enclosed,
-          multiply(
-            exact(coordinate.coefficient),
-            exact(coordinate.coefficient > 0 ? lower[index] : upper[index])
-          )
+          multiply(exact(coordinate.coefficient), exact(coordinate.coefficient > 0 ? lower[index] : upper[index]))
         );
       }
       if (!(enclosed.lower > 0.0)) throw "A spring span reaches zero compliance within declared travel";
@@ -168,10 +165,7 @@ class PositionStiffness {
     var result = exact(spring.compliance);
     for (coordinate in spring.coordinates) result = add(
       result,
-      multiply(
-        exact(coordinate.coefficient),
-        exact(q[ids.indexOf(coordinate.joint)])
-      )
+      multiply(exact(coordinate.coefficient), exact(q[ids.indexOf(coordinate.joint)]))
     );
     return result;
   }

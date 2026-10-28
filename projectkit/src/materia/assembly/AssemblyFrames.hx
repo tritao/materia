@@ -191,11 +191,7 @@ class AssemblyFrames {
     x:Float,
     y:Float,
     z:Float,
-    target: {
-      x: Float,
-      y: Float,
-      z: Float
-    }
+    target: {x: Float, y: Float, z: Float}
   ):Void {
     var tx = 2 * (frame.qy * z - frame.qz * y);
     var ty = 2 * (frame.qz * x - frame.qx * z);

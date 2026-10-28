@@ -196,10 +196,7 @@ class DrawingProjection {
       var sectionSpec:DrawingSectionSpec = cast view.section;
       section = {
         origin: point(sectionSpec.origin, 'Drawing view "${view.id}" section origin'),
-        normal: unit(
-          sectionSpec.normal,
-          'Drawing view "${view.id}" section normal'
-        ),
+        normal: unit(sectionSpec.normal, 'Drawing view "${view.id}" section normal'),
         sign: sectionSpec.keepPositive ? 1.0 : -1.0
       };
     }
@@ -213,10 +210,7 @@ class DrawingProjection {
     var projectPoint = function(p:Point3):Point2 return {
       x: dot(p, right) * unitScale,
       y: dot(p, up) * unitScale,
-      depth: dot(
-        p,
-        direction
-      ) * unitScale
+      depth: dot(p, direction) * unitScale
     };
     var vertices:Array<Point3> = [];
     for (index in 0...part.vertexCount) vertices.push({
@@ -341,12 +335,7 @@ class DrawingProjection {
       lengthUnit: "mm",
       lines: lines,
       callouts: callouts,
-      bounds: {
-        minX: minX,
-        minY: minY,
-        maxX: maxX,
-        maxY: maxY
-      }
+      bounds: {minX: minX, minY: minY, maxX: maxX, maxY: maxY}
     };
   }
 
@@ -386,13 +375,7 @@ class DrawingProjection {
       if (coplanarTriangles.length > 0) {
         for (triangle in coplanarTriangles) appendHatchIntervals(
           intervals,
-          lineHits(
-            triangle,
-            offset,
-            axis,
-            normalX,
-            normalY
-          ),
+          lineHits(triangle, offset, axis, normalX, normalY),
           offset
         );
       } else {
@@ -577,18 +560,8 @@ class DrawingProjection {
     var orientation = area > 0 ? 1.0 : -1.0, lower = 0.0, upper = 1.0;
     for (edge in [
       {x0: triangle.x0, y0: triangle.y0, x1: triangle.x1, y1: triangle.y1},
-      {
-        x0: triangle.x1,
-        y0: triangle.y1,
-        x1: triangle.x2,
-        y1: triangle.y2
-      },
-      {
-        x0: triangle.x2,
-        y0: triangle.y2,
-        x1: triangle.x0,
-        y1: triangle.y0
-      }
+      {x0: triangle.x1, y0: triangle.y1, x1: triangle.x2, y1: triangle.y2},
+      {x0: triangle.x2, y0: triangle.y2, x1: triangle.x0, y1: triangle.y0}
     ]) {
       var dx = edge.x1 - edge.x0, dy = edge.y1 - edge.y0;
       var first = orientation * (dx * (a.y - edge.y0) - dy * (a.x - edge.x0));
@@ -626,11 +599,7 @@ class DrawingProjection {
     project:Point3 -> Point2,
     style:String,
     faceName:Null<String>,
-    section:Null<{
-      origin:Point3,
-      normal:Point3,
-      sign:Float
-    }>
+    section:Null<{origin:Point3, normal:Point3, sign:Float}>
   ):Void {
     var clipped = section == null ? segment : clipEdge(segment.a, segment.b, cast section);
     if (clipped != null) appendProjectedLine(output, project(clipped.a), project(clipped.b), style, faceName);
@@ -640,11 +609,7 @@ class DrawingProjection {
     output:Array<DrawingLine>,
     segment:Segment3,
     project:Point3 -> Point2,
-    section:Null<{
-      origin:Point3,
-      normal:Point3,
-      sign:Float
-    }>,
+    section:Null<{origin:Point3, normal:Point3, sign:Float}>,
     occlusion:Null<DrawingOcclusionNode>,
     showHidden:Bool,
     epsilon:Float,
@@ -675,11 +640,7 @@ class DrawingProjection {
     thread:ThreadRenderData,
     direction:Point3,
     project:Point3 -> Point2,
-    section:Null<{
-      origin:Point3,
-      normal:Point3,
-      sign:Float
-    }>,
+    section:Null<{origin:Point3, normal:Point3, sign:Float}>,
     occlusion:Null<DrawingOcclusionNode>,
     showHidden:Bool,
     epsilon:Float,
@@ -743,10 +704,7 @@ class DrawingProjection {
         y: 0,
         leaderX: projectedCentre.x,
         leaderY: projectedCentre.y,
-        text: threadCallout(
-          thread,
-          unitScale
-        ),
+        text: threadCallout(thread, unitScale),
         faceName: face
       };
       callouts.push(callout);
@@ -771,16 +729,7 @@ class DrawingProjection {
     }
     if (thread.ringAtStart) appendThreadLine(
       lines,
-      {
-        a: add(start, scale(side, -major)),
-        b: add(
-          start,
-          scale(
-            side,
-            major
-          )
-        )
-      },
+      {a: add(start, scale(side, -major)), b: add(start, scale(side, major))},
       project,
       section,
       occlusion,
@@ -833,11 +782,7 @@ class DrawingProjection {
     style:String,
     faceName:String,
     project:Point3 -> Point2,
-    section:Null<{
-      origin:Point3,
-      normal:Point3,
-      sign:Float
-    }>,
+    section:Null<{origin:Point3, normal:Point3, sign:Float}>,
     occlusion:Null<DrawingOcclusionNode>,
     showHidden:Bool,
     epsilon:Float
@@ -953,10 +898,7 @@ class DrawingProjection {
   }
 
   static function signedSection(point:Point3, section: {origin: Point3, normal: Point3, sign: Float}):Float return dot(
-    sub(
-      point,
-      section.origin
-    ),
+    sub(point, section.origin),
     section.normal
   ) * section.sign;
 

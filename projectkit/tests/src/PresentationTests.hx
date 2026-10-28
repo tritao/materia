@@ -38,12 +38,7 @@ class PresentationTests {
       subtree: false}, b:PartSelector = {occurrence: "unit/b", subtree: false};
     var path:PresentationMotion = {
       path: [{x: 0, y: 0, z: 0}, {x: 0, y: 10, z: 0}],
-      evidence: Checked(
-        "swept-removal",
-        Passed,
-        "geometry",
-        "group report"
-      )
+      evidence: Checked("swept-removal", Passed, "geometry", "group report")
     };
     var members:Array<PartMotion> = [{select: a, motion: path}, {select: b, motion: path}];
     var record = materia.presentation.Presentations.assembled(definition);
@@ -57,10 +52,7 @@ class PresentationTests {
         id: "withdraw",
         title: "Withdraw group",
         instruction: "Move together",
-        highlight: [
-          a,
-          b
-        ],
+        highlight: [a, b],
         action: RemoveGroup(members)
       }]
     };
@@ -129,21 +121,10 @@ class PresentationTests {
     var definition:AssemblyDefinition = {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "test",
-      definitions: [{
-        id: "part",
-        connectors: []
-      }],
+      definitions: [{id: "part", connectors: []}],
       occurrences: [
-        {
-          id: "unit/a",
-          definition: "part",
-          initialPose: AssemblyFrames.identity()
-        },
-        {
-          id: "unit/b",
-          definition: "part",
-          initialPose: AssemblyFrames.identity()
-        }
+        {id: "unit/a", definition: "part", initialPose: AssemblyFrames.identity()},
+        {id: "unit/b", definition: "part", initialPose: AssemblyFrames.identity()}
       ],
       joints: []
     };
@@ -151,12 +132,7 @@ class PresentationTests {
     var leaf:PartSelector = {occurrence: "unit/a", subtree: false};
     var motion:PresentationMotion = {
       path: [{x: 0, y: 0, z: 0}, {x: 0, y: 5, z: 0}],
-      evidence: Checked(
-        "checker",
-        Failed,
-        "geometry",
-        "report"
-      )
+      evidence: Checked("checker", Failed, "geometry", "report")
     };
     var value:AssemblyPresentation = {
       schemaVersion: 1,
@@ -165,37 +141,14 @@ class PresentationTests {
       views: [{
         id: "assembled",
         label: "Assembled",
-        camera: Frame(
-          [select],
-          0,
-          0,
-          1
-        ),
+        camera: Frame([select], 0, 0, 1),
         visibility: [],
         sections: [],
         explode: 0
       }],
       explode: [
-        {
-          select: select,
-          direction: {
-            x: 1,
-            y: 0,
-            z: 0
-          },
-          distance: 10,
-          stage: 1
-        },
-        {
-          select: leaf,
-          direction: {
-            x: 0,
-            y: 1,
-            z: 0
-          },
-          distance: 20,
-          stage: 2
-        }
+        {select: select, direction: {x: 1, y: 0, z: 0}, distance: 10, stage: 1},
+        {select: leaf, direction: {x: 0, y: 1, z: 0}, distance: 20, stage: 2}
       ],
       procedures: [{
         id: "remove",
@@ -203,23 +156,8 @@ class PresentationTests {
         kind: Disassembly,
         start: Assembled,
         steps: [
-          {
-            id: "a",
-            title: "Remove A",
-            instruction: "Withdraw A",
-            highlight: [leaf],
-            action: Remove(
-              leaf,
-              motion
-            )
-          },
-          {
-            id: "b",
-            title: "Note",
-            instruction: "Inspect",
-            highlight: [],
-            action: Note
-          }
+          {id: "a", title: "Remove A", instruction: "Withdraw A", highlight: [leaf], action: Remove(leaf, motion)},
+          {id: "b", title: "Note", instruction: "Inspect", highlight: [], action: Note}
         ]
       }]
     };
@@ -360,13 +298,8 @@ class PresentationTests {
       "Playback suppresses display motion"
     );
     check(
-      signature(PresentationEvaluator.evaluate(
-        definition,
-        poses,
-        value,
-        PresentationEvaluator.reset(value),
-        "geometry"
-      )) == fresh,
+      signature(PresentationEvaluator.evaluate(definition,
+      poses, value, PresentationEvaluator.reset(value), "geometry")) == fresh,
       "Reset equals fresh open"
     );
     check(
@@ -439,31 +372,13 @@ class PresentationTests {
         id: "unit",
         definition: "module",
         assembly: "module",
-        initialPose: AssemblyFrames.translation(
-          100,
-          0,
-          0
-        )
+        initialPose: AssemblyFrames.translation(100, 0, 0)
       }],
       joints: [],
       assemblies: [{
         id: "module",
-        definitions: [{
-          id: "part",
-          connectors: []
-        }],
-        occurrences: [
-          {
-            id: "a",
-            definition: "part",
-            initialPose: a
-          },
-          {
-            id: "b",
-            definition: "part",
-            initialPose: b
-          }
-        ],
+        definitions: [{id: "part", connectors: []}],
+        occurrences: [{id: "a", definition: "part", initialPose: a}, {id: "b", definition: "part", initialPose: b}],
         joints: []
       }]
     };
@@ -486,24 +401,10 @@ class PresentationTests {
     var definition:AssemblyDefinition = {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "joints",
-      definitions: [{
-        id: "part",
-        connectors: [{
-          name: "pin",
-          frame: AssemblyFrames.identity()
-        }]
-      }],
+      definitions: [{id: "part", connectors: [{name: "pin", frame: AssemblyFrames.identity()}]}],
       occurrences: [
-        {
-          id: "base",
-          definition: "part",
-          initialPose: AssemblyFrames.identity()
-        },
-        {
-          id: "jaw",
-          definition: "part",
-          initialPose: AssemblyFrames.identity()
-        }
+        {id: "base", definition: "part", initialPose: AssemblyFrames.identity()},
+        {id: "jaw", definition: "part", initialPose: AssemblyFrames.identity()}
       ],
       joints: [{
         id: "open",
@@ -513,18 +414,9 @@ class PresentationTests {
         parentConnector: "pin",
         child: "jaw",
         childConnector: "pin",
-        axis: {
-          x: 1,
-          y: 0,
-          z: 0
-        },
+        axis: {x: 1, y: 0, z: 0},
         defaultValue: 0,
-        limits: {
-          lower: null,
-          upper: null,
-          velocity: null,
-          effort: null
-        }
+        limits: {lower: null, upper: null, velocity: null, effort: null}
       }]
     };
     var value:AssemblyPresentation = {
@@ -534,15 +426,7 @@ class PresentationTests {
       views: [{
         id: "assembled",
         label: "Assembled",
-        camera: Frame(
-          [{
-            occurrence: "base",
-            subtree: false
-          }],
-          0,
-          0,
-          1
-        ),
+        camera: Frame([{occurrence: "base", subtree: false}], 0, 0, 1),
         visibility: [],
         sections: [],
         explode: 0
@@ -559,18 +443,9 @@ class PresentationTests {
             title: "Open",
             instruction: "Open jaws",
             highlight: [],
-            action: SetJoints([{
-              joint: "open",
-              value: 5
-            }])
+            action: SetJoints([{joint: "open", value: 5}])
           },
-          {
-            id: "inspect",
-            title: "Inspect",
-            instruction: "Inspect jaws",
-            highlight: [],
-            action: Note
-          }
+          {id: "inspect", title: "Inspect", instruction: "Inspect jaws", highlight: [], action: Note}
         ]
       }]
     };
@@ -583,10 +458,7 @@ class PresentationTests {
     var state:materia.assembly.AssemblyDefinition.AssemblyStateRecord = {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       definition: definition.id,
-      jointCoordinates: [{
-        joint: "open",
-        value: 0
-      }],
+      jointCoordinates: [{joint: "open", value: 0}],
       rootPoses: []
     };
     var before = AssemblyDefinitionCodec.encodeState(definition, state);
@@ -605,10 +477,7 @@ class PresentationTests {
       value.procedures[0],
       "restore",
       "Restore",
-      [{
-        joint: "open",
-        value: 0
-      }]
+      [{joint: "open", value: 0}]
     );
     switch reverse.steps[1].action {
       case SetJoints(keys):

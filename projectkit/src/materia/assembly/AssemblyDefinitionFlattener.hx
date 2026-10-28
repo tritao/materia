@@ -53,13 +53,7 @@ class AssemblyDefinitionFlattener {
       for (member in flat.occurrences) if (StringTools.startsWith(member.id, prefix) && !incoming.exists(member.id)) {
         roots.push({
           occurrence: member.id,
-          pose: AssemblyFrames.compose(
-            root.pose,
-            AssemblyFrames.compose(
-              inverse,
-              member.initialPose
-            )
-          )
+          pose: AssemblyFrames.compose(root.pose, AssemblyFrames.compose(inverse, member.initialPose))
         });
         count++;
       }
@@ -330,15 +324,9 @@ class AssemblyDefinitionFlattener {
     joints:Array<KinematicJoint>,
     couplings:Array<AssemblyJointCoupling>,
     mates:Null<Array<AssemblyMate>>,
-    library:Map<
-      String,
-      AssemblySubdefinition
-  >,
+    library:Map<String, AssemblySubdefinition>,
     flat:AssemblyDefinition,
-    active:Map<
-      String,
-      Bool
-  >,
+    active:Map<String, Bool>,
     ?actuators:Array<AssemblyActuator>,
     ?encoders:Array<AssemblyEncoder>,
     ?sensors:Array<AssemblySensor>,
@@ -426,10 +414,7 @@ class AssemblyDefinitionFlattener {
         flat.occurrences.push(flatOccurrence);
         for (connector in component.connectors) connectors.set(
           connector.name,
-          {
-            occurrence: path,
-            connector: connector.name
-          }
+          {occurrence: path, connector: connector.name}
         );
       }
       members.set(occurrence.id, {connectors: connectors});
@@ -471,10 +456,7 @@ class AssemblyDefinitionFlattener {
       var expanded:AssemblyJointCoupling = {
         id: scoped(prefix, coupling.id),
         source: scoped(prefix, coupling.source),
-        target: scoped(
-          prefix,
-          coupling.target
-        ),
+        target: scoped(prefix, coupling.target),
         ratio: coupling.ratio,
         offset: coupling.offset
       };
@@ -482,17 +464,11 @@ class AssemblyDefinitionFlattener {
       if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
       if (coupling.calibration != null) expanded.calibration = BeltCalibration.BeltCalibrations.copy(
         coupling.calibration,
-        id -> scoped(
-          prefix,
-          id
-        )
+        id -> scoped(prefix, id)
       );
       if (coupling.stiffnessLaw != null) expanded.stiffnessLaw = copyComplianceLaw(
         coupling.stiffnessLaw,
-        id -> scoped(
-          prefix,
-          id
-        )
+        id -> scoped(prefix, id)
       );
       if (coupling.dampingRatio != null) expanded.dampingRatio = coupling.dampingRatio;
       if (coupling.backlash != null) expanded.backlash = coupling.backlash;
@@ -523,10 +499,7 @@ class AssemblyDefinitionFlattener {
       for (encoder in encoders) flat.encoders.push(copyEncoder(
         encoder,
         scoped(prefix, encoder.id),
-        scoped(
-          prefix,
-          encoder.joint
-        )
+        scoped(prefix, encoder.joint)
       ));
     }
     if (sensors != null) {
@@ -551,14 +524,8 @@ class AssemblyDefinitionFlattener {
           hysteresis: contact.hysteresis,
           repeatability: contact.repeatability,
           seed: contact.seed,
-          driveJoint: contact.driveJoint == null ? null : scoped(
-            prefix,
-            contact.driveJoint
-          ),
-          homeAfter : contact.homeAfter == null ? null : [for (id in contact.homeAfter) scoped(
-            prefix,
-            id
-          )]
+          driveJoint: contact.driveJoint == null ? null : scoped(prefix, contact.driveJoint),
+          homeAfter : contact.homeAfter == null ? null : [for (id in contact.homeAfter) scoped(prefix, id)]
         });
       }
     }

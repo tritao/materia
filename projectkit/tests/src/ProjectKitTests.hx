@@ -49,22 +49,8 @@ class ProjectKitTests {
       contactForceN: 5,
       contactThresholdN: 2,
       confirmationSamples: 2,
-      virtualMass: [
-        80,
-        80,
-        80,
-        1,
-        1,
-        1
-      ],
-      damping: [
-        4000,
-        4000,
-        4000,
-        20,
-        20,
-        20
-      ],
+      virtualMass: [80, 80, 80, 1, 1, 1],
+      damping: [4000, 4000, 4000, 20, 20, 20],
       maximumLinearSpeed: 0.004,
       maximumAngularSpeed: 0.0008,
       maximumStepSeconds: 0.01,
@@ -87,24 +73,15 @@ class ProjectKitTests {
     var sensor:materia.project.SceneArtifact.SceneArtifactRobotSensor = {
       kind: "force_torque",
       id: "tool/force-torque",
-      mount: {
-        occurrence: "tool",
-        connector: "tcp"
-      }
+      mount: {occurrence: "tool", connector: "tcp"}
     };
     var tool:materia.project.SceneArtifact.SceneArtifactRobotTool = {
       kind: "screwdriver",
       members: ["tool"],
-      contact: {
-        occurrence: "tool",
-        connector: "tcp"
-      },
+      contact: {occurrence: "tool", connector: "tcp"},
       channel: "tool/start",
       screwdriver: {
-        bit: {
-          kind: "hex",
-          size: "5"
-        },
+        bit: {kind: "hex", size: "5"},
         bitMember: "tool",
         directionChannel: "tool/direction",
         programChannel: "tool/program",
@@ -210,16 +187,10 @@ class ProjectKitTests {
       "mission force-search and physical-thread selections survive their independent JSON fields"
     );
     var toolChanger:materia.project.SceneArtifact.SceneArtifactToolChanger = {
-      master: {
-        occurrence: "robot/master",
-        connector: "tool"
-      },
+      master: {occurrence: "robot/master", connector: "tool"},
       lockOutput: "changer.lock",
       lockedInput: "changer.locked",
-      identityInputs: [
-        "changer.id0",
-        "changer.id1"
-      ],
+      identityInputs: ["changer.id0", "changer.id1"],
       initialToolId: "gripper",
       maximumObservationAgeSeconds: 0.1,
       tools: [
@@ -228,10 +199,7 @@ class ProjectKitTests {
           channel: "grip.close",
           occurrence: "robot/gripper",
           connector: "mount",
-          dock: {
-            occurrence: "dock/gripper",
-            connector: "seat"
-          },
+          dock: {occurrence: "dock/gripper", connector: "seat"},
           identityCode: 1
         },
         {
@@ -239,19 +207,13 @@ class ProjectKitTests {
           channel: "driver.start",
           occurrence: "robot/driver",
           connector: "mount",
-          dock: {
-            occurrence: "dock/driver",
-            connector: "seat"
-          },
+          dock: {occurrence: "dock/driver", connector: "seat"},
           identityCode: 2
         }
       ]
     };
     var changerMission:materia.project.SceneArtifact.SceneArtifactMission = {
-      steps: [{
-        kind: "changeTool",
-        targetToolId: "screwdriver"
-      }],
+      steps: [{kind: "changeTool", targetToolId: "screwdriver"}],
       toolChanger: toolChanger
     };
     var changerJson = @:privateAccess SceneArtifact.encodeMission(changerMission);
@@ -329,24 +291,10 @@ class ProjectKitTests {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "fixture",
       lengthUnit: "mm",
-      definitions: [{
-        id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
-      }],
+      definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
       occurrences: [
-        {
-          id: "base",
-          definition: "body",
-          initialPose: frame
-        },
-        {
-          id: "arm",
-          definition: "body",
-          initialPose: frame
-        }
+        {id: "base", definition: "body", initialPose: frame},
+        {id: "arm", definition: "body", initialPose: frame}
       ],
       joints: [{
         id: "hinge",
@@ -356,17 +304,8 @@ class ProjectKitTests {
         parentConnector: "pin",
         child: "arm",
         childConnector: "pin",
-        axis: {
-          x: 0.0,
-          y: 0.0,
-          z: 1.0
-        },
-        limits: {
-          lower: -1.0,
-          upper: 1.0,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null},
         defaultValue: 0.0
       }]
     };
@@ -394,13 +333,7 @@ class ProjectKitTests {
       ratio: 2.0,
       offset: 0.0,
       stiffness: 4000.0,
-      stiffnessLaw: [{
-        compliance: 0.001,
-        coordinates: [{
-          joint: "hinge",
-          coefficient: 0.0001
-        }]
-      }]
+      stiffnessLaw: [{compliance: 0.001, coordinates: [{joint: "hinge", coefficient: 0.0001}]}]
     }];
     var savedSpring = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(springModel));
     near(savedSpring.couplings[0].stiffnessLaw[0].coordinates[0].coefficient, 0.0001, "compliance wire round trip");
@@ -409,12 +342,7 @@ class ProjectKitTests {
       id: "cell",
       lengthUnit: "mm",
       definitions: [],
-      occurrences: [{
-        id: "printer",
-        definition: springModel.id,
-        assembly: springModel.id,
-        initialPose: frame
-      }],
+      occurrences: [{id: "printer", definition: springModel.id, assembly: springModel.id, initialPose: frame}],
       joints: [],
       assemblies: [{
         id: springModel.id,
@@ -487,18 +415,8 @@ class ProjectKitTests {
     var state:AssemblyStateRecord = {
       schemaVersion: AssemblyDefinitionCodec.VERSION,
       definition: model.id,
-      jointCoordinates: [{
-        joint: "hinge",
-        value: 0.25
-      }],
-      rootPoses: [{
-        occurrence: "base",
-        pose: AssemblyFrames.translation(
-          1,
-          2,
-          3
-        )
-      }]
+      jointCoordinates: [{joint: "hinge", value: 0.25}],
+      rootPoses: [{occurrence: "base", pose: AssemblyFrames.translation(1, 2, 3)}]
     };
     var restored = AssemblyDefinitionCodec.decodeState(model, AssemblyDefinitionCodec.encodeState(model, state));
     near(restored.jointCoordinates[0].value, 0.25, "state coordinate round trip");
@@ -556,17 +474,8 @@ class ProjectKitTests {
       parentConnector: "pin",
       child: "tool",
       childConnector: "pin",
-      axis: {
-        x: 1.0,
-        y: 0.0,
-        z: 0.0
-      },
-      limits: {
-        lower: -1.0,
-        upper: 1.0,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 1.0, y: 0.0, z: 0.0},
+      limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null},
       defaultValue: 0.0
     });
     model.switches = [
@@ -702,12 +611,7 @@ class ProjectKitTests {
       id: "cell",
       lengthUnit: "mm",
       definitions: [],
-      occurrences: [{
-        id: "press",
-        definition: model.id,
-        assembly: model.id,
-        initialPose: AssemblyFrames.identity()
-      }],
+      occurrences: [{id: "press", definition: model.id, assembly: model.id, initialPose: AssemblyFrames.identity()}],
       joints: [],
       assemblies: [{
         id: model.id,
@@ -791,17 +695,7 @@ class ProjectKitTests {
         faceDescriptors: "[{\"index\":0}]",
         physicalMassKg: 2.4,
         physicalMassDeclared: true,
-        physicalInertiaKgM2: [
-          0.2,
-          0,
-          0,
-          0,
-          0.3,
-          0,
-          0,
-          0,
-          0.4
-        ]
+        physicalInertiaKgM2: [0.2, 0, 0, 0, 0.3, 0, 0, 0, 0.4]
       }],
       recipeDocument: "cube",
       recipeDiagnostics: ["ok"]
@@ -815,29 +709,14 @@ class ProjectKitTests {
     data.parts[0].faceRanges = [{faceIndex: 0, firstIndex: 0, indexCount: 12}];
     data.assemblyDefinition = definition();
     var map:materia.project.SceneSourceMap = {
-      features: [{
-        id: "seat",
-        label: "Guide seat",
-        occurrence: "base",
-        faces: [0],
-        whole: false
-      }],
-      members: [{
-        occurrence: "arm",
-        sources: ["seat"],
-        shared: false
-      }]
+      features: [{id: "seat", label: "Guide seat", occurrence: "base", faces: [0], whole: false}],
+      members: [{occurrence: "arm", sources: ["seat"], shared: false}]
     };
     data.project = {
       dynamicParts: [],
       motions: [],
       sources: map,
-      navigation: [{
-        occurrence: "base",
-        label: "Open mold",
-        variant: "fixture-mold",
-        target: "finished-casting"
-      }]
+      navigation: [{occurrence: "base", label: "Open mold", variant: "fixture-mold", target: "finished-casting"}]
     };
     var encoded = SceneArtifact.encode(data), decoded = SceneArtifact.decode(encoded);
     var project:materia.project.SceneArtifact.SceneArtifactProject = cast decoded.project;
@@ -891,10 +770,7 @@ class ProjectKitTests {
     data.robotSensors = [{
       kind: "tool_contact",
       id: "arm/tool/tip-contact",
-      mount: {
-        occurrence: "base",
-        connector: "pin"
-      }
+      mount: {occurrence: "base", connector: "pin"}
     }];
     var contactSensor = SceneArtifact.decode(SceneArtifact.encode(data)).robotSensors[0];
     check(
@@ -920,21 +796,9 @@ class ProjectKitTests {
         toleranceClass: "6H",
         profile: materia.project.ThreadSpecData.ThreadProfile.Metric
       },
-      origin: [
-        4,
-        5,
-        6
-      ],
-      xDirection: [
-        1,
-        0,
-        0
-      ],
-      direction: [
-        0,
-        0,
-        -1
-      ],
+      origin: [4, 5, 6],
+      xDirection: [1, 0, 0],
+      direction: [0, 0, -1],
       length: 20,
       ringAtStart: false,
       ringAtEnd: true
@@ -987,20 +851,7 @@ class ProjectKitTests {
       motions: [{
         joint: "hinge",
         loop: true,
-        keys: [
-          {
-            time: 0.0,
-            position: 0.0
-          },
-          {
-            time: 1.0,
-            position: 0.25
-          },
-          {
-            time: 2.0,
-            position: 0.0
-          }
-        ]
+        keys: [{time: 0.0, position: 0.0}, {time: 1.0, position: 0.25}, {time: 2.0, position: 0.0}]
       }]
     };
     moving.project = publishedMotion;
@@ -1071,12 +922,7 @@ class ProjectKitTests {
     AssemblyDefinitionCodec.validate(original);
     AssemblyDefinitionCodec.validateState(
       original,
-      {
-        schemaVersion: AssemblyDefinitionCodec.VERSION,
-        definition: original.id,
-        jointCoordinates: [],
-        rootPoses: []
-      }
+      {schemaVersion: AssemblyDefinitionCodec.VERSION, definition: original.id, jointCoordinates: [], rootPoses: []}
     );
     check(AssemblyDefinitionCodec.encode(original) == beforeValidation, "validation leaves its input unchanged");
     check(
@@ -1092,12 +938,7 @@ class ProjectKitTests {
       lengthUnit: "mm",
       definitions: [],
       joints: [],
-      occurrences: [{
-        id: "cell",
-        definition: "unit",
-        assembly: "unit",
-        initialPose: AssemblyFrames.identity()
-      }],
+      occurrences: [{id: "cell", definition: "unit", assembly: "unit", initialPose: AssemblyFrames.identity()}],
       assemblies: [{
         id: "unit",
         definitions: original.definitions,
@@ -1142,11 +983,7 @@ class ProjectKitTests {
     var motion:materia.project.SceneArtifact.SceneArtifactMachineMotion = {
       belts: [],
       contacts: contacts,
-      program: {
-        axes: ["hinge"],
-        waypoints: [[0.2]],
-        loop: true
-      },
+      program: {axes: ["hinge"], waypoints: [[0.2]], loop: true},
       virtualDevice: true
     };
     var data:materia.project.SceneArtifact.SceneArtifactData = {
@@ -1184,18 +1021,7 @@ class ProjectKitTests {
     var digital:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {
       durationSec: 2,
       loop: false,
-      events: [
-        {
-          timeSec: 0.1,
-          channel: "valve/A",
-          value: true
-        },
-        {
-          timeSec: 1.5,
-          channel: "valve/A",
-          value: false
-        }
-      ]
+      events: [{timeSec: 0.1, channel: "valve/A", value: true}, {timeSec: 1.5, channel: "valve/A", value: false}]
     };
     motion.digitalProgram = digital;
     var saved = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
@@ -1243,17 +1069,8 @@ class ProjectKitTests {
         parentConnector: "pin",
         child: id,
         childConnector: "pin",
-        axis: {
-          x: 0.0,
-          y: 0.0,
-          z: 1.0
-        },
-        limits: {
-          lower: 0.0,
-          upper: 300.0,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: 0.0, upper: 300.0, velocity: null, effort: null},
         defaultValue: 0.0
       });
     }
@@ -1267,17 +1084,8 @@ class ProjectKitTests {
       depthAxis: "depth",
       gaugeX: "X",
       topSwitch: "top",
-      fingerSwitches: [
-        "left",
-        "right"
-      ],
-      steps: [{
-        gaugeXmm: 150,
-        gaugeRmm: 0,
-        clampTravelMm: 78.5,
-        depthTravelMm: 83,
-        withdrawalMm: 20
-      }],
+      fingerSwitches: ["left", "right"],
+      steps: [{gaugeXmm: 150, gaugeRmm: 0, clampTravelMm: 78.5, depthTravelMm: 83, withdrawalMm: 20}],
       positionToleranceMm: 0.05,
       requestTimeoutSeconds: 20,
       releaseTravelMm: 0.5,
@@ -1344,26 +1152,14 @@ class ProjectKitTests {
         parentConnector: "pin",
         child: child,
         childConnector: "pin",
-        axis: {
-          x: 0.0,
-          y: 1.0,
-          z: 0.0
-        },
-        limits: {
-          lower: null,
-          upper: null,
-          velocity: 10.0,
-          effort: 1.0
-        },
+        axis: {x: 0.0, y: 1.0, z: 0.0},
+        limits: {lower: null, upper: null, velocity: 10.0, effort: 1.0},
         defaultValue: 0.0
       };
     var robot:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "robot", lengthUnit: "mm", definitions: [{
         id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
+        connectors: [{name: "pin", frame: frame}]
       }], occurrences: [for (id in [
         "chassis",
         "left",
@@ -1374,16 +1170,8 @@ class ProjectKitTests {
     }
     ], joints:[
       wheel("wheel_l", "left", AssemblyJointType.Continuous),
-      wheel(
-        "wheel_r",
-        "right",
-        AssemblyJointType.Continuous
-      ),
-      wheel(
-        "lift",
-        "mast",
-        AssemblyJointType.Prismatic
-      )
+      wheel("wheel_r", "right", AssemblyJointType.Continuous),
+      wheel("lift", "mast", AssemblyJointType.Prismatic)
     ]};
     var base:materia.project.SceneArtifact.SceneArtifactMobileBase = {
       leftWheel: "wheel_l",
@@ -1448,11 +1236,7 @@ class ProjectKitTests {
       computerLoadWatts: 120,
       chargerOccurrence: "charger",
       chargerPowerWatts: 3000,
-      dockPose: {
-        x: -3.35,
-        y: 0,
-        yaw: Math.PI / 2
-      },
+      dockPose: {x: -3.35, y: 0, yaw: Math.PI / 2},
       dockPositionToleranceMeters: 0.015,
       dockHeadingToleranceRadians: 0.02
     };
@@ -1496,14 +1280,8 @@ class ProjectKitTests {
     base.origin = {x: 1.0, y: -0.5, yaw: 0.25};
     var jointStep:materia.project.SceneArtifact.SceneArtifactMissionStep = {
       kind: "moveJoints",
-      at: {
-        occurrence: "mast",
-        connector: "pin"
-      },
-      joints: [{
-        joint: "lift",
-        position: 0.02
-      }]
+      at: {occurrence: "mast", connector: "pin"},
+      joints: [{joint: "lift", position: 0.02}]
     };
     data.missions = [{steps: [jointStep]}];
     var jointBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
@@ -1540,24 +1318,7 @@ class ProjectKitTests {
     robot.joints[2].limits.upper = null;
     var mission:materia.project.SceneArtifact.SceneArtifactMission = {
       loop: true,
-      steps: [
-        {
-          kind: "goTo",
-          pose: {
-            x: 2.0,
-            y: 1.0,
-            yaw: Math.PI
-          }
-        },
-        {
-          kind: "goTo",
-          pose: {
-            x: 0.0,
-            y: 0.0,
-            yaw: 0.0
-          }
-        }
-      ]
+      steps: [{kind: "goTo", pose: {x: 2.0, y: 1.0, yaw: Math.PI}}, {kind: "goTo", pose: {x: 0.0, y: 0.0, yaw: 0.0}}]
     };
     data.missions = [mission];
     var decoded = SceneArtifact.decode(SceneArtifact.encode(data));
@@ -1674,20 +1435,7 @@ class ProjectKitTests {
       kind: "robot_zone",
       occurrence: "chassis",
       connector: "pin",
-      zoneBoxes: [
-        0,
-        0,
-        0,
-        10,
-        20,
-        30,
-        50,
-        0,
-        5,
-        5,
-        5,
-        5
-      ]
+      zoneBoxes: [0, 0, 0, 10, 20, 30, 50, 0, 5, 5, 5, 5]
     }];
     var zoneDefinition = SceneArtifact.decode(SceneArtifact.encode(data)).assemblyDefinition;
     var zoneSensors = zoneDefinition == null ? null : zoneDefinition.sensors;
@@ -1709,14 +1457,7 @@ class ProjectKitTests {
       occurrence: "chassis",
       connector: "pin",
       range: 0.02,
-      zoneBoxes: [
-        0,
-        0,
-        0,
-        1,
-        1,
-        1
-      ]
+      zoneBoxes: [0, 0, 0, 1, 1, 1]
     }];
     rejects(function() SceneArtifact.encode(data), "presence sensor with zone boxes");
     robot.sensors = [{id: "chassis/presence", kind: "presence", occurrence: "chassis", connector: "pin", range: 0.02}];
@@ -1730,14 +1471,7 @@ class ProjectKitTests {
     data.signals = [];
     data.missions = [{
       controllerId: "robotController",
-      steps: [{
-        kind: "waitFor",
-        waitFor: {
-          name: "chassis/presence",
-          value: true,
-          timeout: 1.0
-        }
-      }]
+      steps: [{kind: "waitFor", waitFor: {name: "chassis/presence", value: true, timeout: 1.0}}]
     }];
     var localSensorMission = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     var localSensorWaitName = "";
@@ -1787,17 +1521,8 @@ class ProjectKitTests {
       parentConnector: "pin",
       child: "arm2",
       childConnector: "pin",
-      axis: {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0
-      },
-      limits: {
-        lower: -1.0,
-        upper: 1.0,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null},
       defaultValue: 0.0
     });
     for (mount in [["arm", "toolA"], ["arm2", "toolB"]]) assembly.joints.push({
@@ -1808,54 +1533,23 @@ class ProjectKitTests {
       parentConnector: "pin",
       child: mount[1],
       childConnector: "pin",
-      axis: {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0
-      },
-      limits: {
-        lower: null,
-        upper: null,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: null, upper: null, velocity: null, effort: null},
       defaultValue: 0.0
     });
     data.assemblyDefinition = assembly;
     data.controllers = [
       {id: "handler", kind: "robot", joints: ["hinge"], sensors: [], channels: ["placed"]},
-      {
-        id: "driver",
-        kind: "robot",
-        joints: ["hinge2"],
-        sensors: [],
-        channels: []
-      }
+      {id: "driver", kind: "robot", joints: ["hinge2"], sensors: [], channels: []}
     ];
     data.signals = [{
       name: "placed",
       from: {controller: "handler", port: "placed"},
-      to: {
-        controller: "driver",
-        port: "placed"
-      }
+      to: {controller: "driver", port: "placed"}
     }];
     data.robotTools = [
-      {
-        kind: "suction",
-        members: ["toolA"],
-        contact: {occurrence: "toolA", connector: "pin"},
-        channel: "grip-a"
-      },
-      {
-        kind: "suction",
-        members: ["toolB"],
-        contact: {
-          occurrence: "toolB",
-          connector: "pin"
-        },
-        channel: "grip-b"
-      }
+      {kind: "suction", members: ["toolA"], contact: {occurrence: "toolA", connector: "pin"}, channel: "grip-a"},
+      {kind: "suction", members: ["toolB"], contact: {occurrence: "toolB", connector: "pin"}, channel: "grip-b"}
     ];
     materia.project.SceneArtifact.assignToolControllers(data);
     check(
@@ -1865,40 +1559,15 @@ class ProjectKitTests {
     var handling:materia.project.SceneArtifact.SceneArtifactMission = {
       controllerId: "handler",
       steps: [
-        {
-          kind: "pick",
-          at: {
-            occurrence: "fixture",
-            connector: "pin"
-          }
-        },
-        {
-          kind: "signal",
-          signal: {
-            name: "placed",
-            value: true
-          }
-        }
+        {kind: "pick", at: {occurrence: "fixture", connector: "pin"}},
+        {kind: "signal", signal: {name: "placed", value: true}}
       ]
     };
     var driving:materia.project.SceneArtifact.SceneArtifactMission = {
       controllerId: "driver",
       steps: [
-        {
-          kind: "waitFor",
-          waitFor: {
-            name: "placed",
-            value: true,
-            timeout: 30
-          }
-        },
-        {
-          kind: "pick",
-          at: {
-            occurrence: "fixture",
-            connector: "pin"
-          }
-        }
+        {kind: "waitFor", waitFor: {name: "placed", value: true, timeout: 30}},
+        {kind: "pick", at: {occurrence: "fixture", connector: "pin"}}
       ]
     };
     data.missions = [handling, driving];
@@ -1913,16 +1582,7 @@ class ProjectKitTests {
     driving.steps[1].tool = null;
     data.missions = [
       handling,
-      {
-        controllerId: "handler",
-        steps: [{
-          kind: "pick",
-          at: {
-            occurrence: "fixture",
-            connector: "pin"
-          }
-        }]
-      }
+      {controllerId: "handler", steps: [{kind: "pick", at: {occurrence: "fixture", connector: "pin"}}]}
     ];
     rejects(() -> SceneArtifact.encode(data), "A controller runs one program");
     data.missions = [handling, driving];
@@ -1955,35 +1615,14 @@ class ProjectKitTests {
       parentConnector: "pin",
       child: "master",
       childConnector: "pin",
-      axis: {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0
-      },
-      limits: {
-        lower: null,
-        upper: null,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: null, upper: null, velocity: null, effort: null},
       defaultValue: 0.0
     });
     assembly.sensors = [
       {id: "changer/locked", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
-      {
-        id: "changer/id0",
-        kind: "presence",
-        occurrence: "master",
-        connector: "pin",
-        range: 0.01
-      },
-      {
-        id: "changer/id1",
-        kind: "presence",
-        occurrence: "master",
-        connector: "pin",
-        range: 0.01
-      }
+      {id: "changer/id0", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
+      {id: "changer/id1", kind: "presence", occurrence: "master", connector: "pin", range: 0.01}
     ];
     data.assemblyDefinition = assembly;
     data.robotTools = [
@@ -1991,20 +1630,14 @@ class ProjectKitTests {
         kind: "suction",
         controller: "robotController",
         members: ["toolA"],
-        contact: {
-          occurrence: "toolA",
-          connector: "pin"
-        },
+        contact: {occurrence: "toolA", connector: "pin"},
         channel: "grip-a"
       },
       {
         kind: "suction",
         controller: "robotController",
         members: ["toolB"],
-        contact: {
-          occurrence: "toolB",
-          connector: "pin"
-        },
+        contact: {occurrence: "toolB", connector: "pin"},
         channel: "grip-b"
       }
     ];
@@ -2012,32 +1645,19 @@ class ProjectKitTests {
       id: "robotController",
       kind: "robot",
       joints: ["hinge"],
-      sensors: [
-        "changer/locked",
-        "changer/id0",
-        "changer/id1"
-      ],
+      sensors: ["changer/locked", "changer/id0", "changer/id1"],
       channels: ["changer.lock"]
     }];
     data.signals = [{
       name: "changer.lock",
       from: {controller: "robotController", port: "lock"},
-      to: {
-        controller: "robotController",
-        port: "lock-command"
-      }
+      to: {controller: "robotController", port: "lock-command"}
     }];
     var changer:materia.project.SceneArtifact.SceneArtifactToolChanger = {
-      master: {
-        occurrence: "master",
-        connector: "pin"
-      },
+      master: {occurrence: "master", connector: "pin"},
       lockOutput: "changer.lock",
       lockedInput: "changer/locked",
-      identityInputs: [
-        "changer/id0",
-        "changer/id1"
-      ],
+      identityInputs: ["changer/id0", "changer/id1"],
       initialToolId: "gripper",
       maximumObservationAgeSeconds: 0.1,
       tools: [
@@ -2046,10 +1666,7 @@ class ProjectKitTests {
           channel: "grip-a",
           occurrence: "toolA",
           connector: "pin",
-          dock: {
-            occurrence: "dockA",
-            connector: "pin"
-          },
+          dock: {occurrence: "dockA", connector: "pin"},
           identityCode: 1
         },
         {
@@ -2057,10 +1674,7 @@ class ProjectKitTests {
           channel: "grip-b",
           occurrence: "toolB",
           connector: "pin",
-          dock: {
-            occurrence: "dockB",
-            connector: "pin"
-          },
+          dock: {occurrence: "dockB", connector: "pin"},
           identityCode: 2
         }
       ]
@@ -2069,25 +1683,9 @@ class ProjectKitTests {
       controllerId: "robotController",
       toolChanger: changer,
       steps: [
-        {
-          kind: "pick",
-          at: {
-            occurrence: "arm",
-            connector: "pin"
-          }
-        },
-        {
-          kind: "changeTool",
-          targetToolId: "cup",
-          timeoutSeconds: 30
-        },
-        {
-          kind: "pick",
-          at: {
-            occurrence: "arm",
-            connector: "pin"
-          }
-        }
+        {kind: "pick", at: {occurrence: "arm", connector: "pin"}},
+        {kind: "changeTool", targetToolId: "cup", timeoutSeconds: 30},
+        {kind: "pick", at: {occurrence: "arm", connector: "pin"}}
       ]
     };
     data.missions = [mission];
@@ -2123,10 +1721,7 @@ class ProjectKitTests {
     var cell:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "cell", lengthUnit: "mm", definitions: [{
         id: "body",
-        connectors: [{
-          name: "tcp",
-          frame: frame
-        }]
+        connectors: [{name: "tcp", frame: frame}]
       }], occurrences: [for (id in [
         "torch",
         "plate",
@@ -2138,10 +1733,7 @@ class ProjectKitTests {
     function welder():materia.project.SceneArtifact.SceneArtifactTorch return {
       wireSpeedChannel: "tool/torch.wire_speed",
       voltageChannel: "tool/torch.voltage",
-      groundedWork: [
-        "plate",
-        "upright"
-      ],
+      groundedWork: ["plate", "upright"],
       maxCurrentA: 350.0,
       efficiency: 0.88,
       wireDiameterMm: 1.2,
@@ -2152,10 +1744,7 @@ class ProjectKitTests {
     function torch():materia.project.SceneArtifact.SceneArtifactRobotTool return {
       kind: "torch",
       members: ["torch"],
-      contact: {
-        occurrence: "torch",
-        connector: "tcp"
-      },
+      contact: {occurrence: "torch", connector: "tcp"},
       channel: "tool/torch.arc",
       sensor: "tool/torch.weld",
       torch: welder()
@@ -2193,21 +1782,14 @@ class ProjectKitTests {
     // A suction tool beside it keeps working, and the torch's channels may not collide with it.
     data.robotTools = [
       torch(),
-      {
-        kind: "suction",
-        members: ["plate"],
-        contact: {occurrence: "plate", connector: "tcp"},
-        channel: "cup.enable"
-      }
+      {kind: "suction", members: ["plate"], contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable"}
     ];
     var both = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
     check(both != null && both.length == 2, "torch beside a suction tool");
     data.robotTools = [torch()];
     function bad(
-      change:(
-        materia.project.SceneArtifact.SceneArtifactRobotTool,
-        materia.project.SceneArtifact.SceneArtifactTorch
-      ) -> Void,
+      change:(materia.project.SceneArtifact.SceneArtifactRobotTool,
+      materia.project.SceneArtifact.SceneArtifactTorch) -> Void,
       message:String
     ):Void {
       var tool = torch(), welding = welder();
@@ -2281,86 +1863,24 @@ class ProjectKitTests {
       seam: seam,
       faces: faces,
       joint: "fillet",
-      start: {
-        position: from,
-        rotation: rotation
-      },
-      stop: {
-        position: to,
-        rotation: rotation
-      },
+      start: {position: from, rotation: rotation},
+      stop: {position: to, rotation: rotation},
       normals: normals
     };
     function line():materia.project.SceneArtifact.SceneArtifactWeldSegment return segment(
       "plate:f3|upright:f7",
-      [
-        {
-          member: "plate",
-          face: "f3"
-        },
-        {
-          member: "upright",
-          face: "f7"
-        }
-      ],
-      [
-        0.0,
-        0.0,
-        0.01
-      ],
-      [
-        0.18,
-        0.0,
-        0.01
-      ],
-      [
-        [
-          0.0,
-          0.0,
-          1.0
-        ],
-        [
-          0.0,
-          -1.0,
-          0.0
-        ]
-      ],
+      [{member: "plate", face: "f3"}, {member: "upright", face: "f7"}],
+      [0.0, 0.0, 0.01],
+      [0.18, 0.0, 0.01],
+      [[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]],
       intoY
     );
     function second():materia.project.SceneArtifact.SceneArtifactWeldSegment return segment(
       "plate:f3|plate:f9",
-      [
-        {
-          member: "plate",
-          face: "f3"
-        },
-        {
-          member: "plate",
-          face: "f9"
-        }
-      ],
-      [
-        0.18,
-        0.0,
-        0.01
-      ],
-      [
-        0.18,
-        0.06,
-        0.01
-      ],
-      [
-        [
-          0.0,
-          0.0,
-          1.0
-        ],
-        [
-          -1.0,
-          0.0,
-          0.0
-        ]
-      ],
+      [{member: "plate", face: "f3"}, {member: "plate", face: "f9"}],
+      [0.18, 0.0, 0.01],
+      [0.18, 0.06, 0.01],
+      [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]],
       intoX
     );
     function seam():materia.project.SceneArtifact.SceneArtifactWeld return {
@@ -2370,10 +1890,7 @@ class ProjectKitTests {
       legSize: 0.005,
       passes: [{
         name: "single",
-        offset: [
-          0.0,
-          0.0
-        ],
+        offset: [0.0, 0.0],
         interpassDwell: 0.0,
         process: {
           wireSpeed: 8.0,
@@ -2492,35 +2009,10 @@ class ProjectKitTests {
         line(),
         segment(
           "plate:f3|plate:f9",
-          [
-            {member: "plate", face: "f3"},
-            {
-              member: "plate",
-              face: "f9"
-            }
-          ],
-          [
-            0.5,
-            0.0,
-            0.01
-          ],
-          [
-            0.5,
-            0.06,
-            0.01
-          ],
-          [
-            [
-              0.0,
-              0.0,
-              1.0
-            ],
-            [
-              -1.0,
-              0.0,
-              0.0
-            ]
-          ],
+          [{member: "plate", face: "f3"}, {member: "plate", face: "f9"}],
+          [0.5, 0.0, 0.01],
+          [0.5, 0.06, 0.01],
+          [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]],
           intoX
         )
       ],
@@ -2554,12 +2046,7 @@ class ProjectKitTests {
       offset: [0.002, 0.003],
       interpassDwell: 0.5,
       process: multipass.passes[0].process,
-      weave: {
-        pattern: "triangle",
-        amplitude: 0.001,
-        cyclesPerMetre: 100,
-        edgeDwell: 0.05
-      }
+      weave: {pattern: "triangle", amplitude: 0.001, cyclesPerMetre: 100, edgeDwell: 0.05}
     });
     data.missions = [mission(multipass)];
     var passesBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
@@ -2602,15 +2089,7 @@ class ProjectKitTests {
       weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]}];
     data.robotTools = [
       torch(),
-      {
-        kind: "suction",
-        members: ["upright"],
-        contact: {
-          occurrence: "upright",
-          connector: "tcp"
-        },
-        channel: "cup.enable"
-      }
+      {kind: "suction", members: ["upright"], contact: {occurrence: "upright", connector: "tcp"}, channel: "cup.enable"}
     ];
     rejects(function() SceneArtifact.encode(data), "a mission that picks and welds");
     data.missions = [mission(seam())];
@@ -2649,26 +2128,14 @@ class ProjectKitTests {
       parentConnector: "pin",
       child: child,
       childConnector: "pin",
-      axis: {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0
-      },
-      limits: {
-        lower: -1.0,
-        upper: 1.0,
-        velocity: null,
-        effort: null
-      },
+      axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null},
       defaultValue: 0.0
     };
     var machine:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "machine", lengthUnit: "mm", definitions: [{
         id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
+        connectors: [{name: "pin", frame: frame}]
       }], occurrences: [for (id in [
         "bed",
         "gantry",
@@ -2683,32 +2150,11 @@ class ProjectKitTests {
       axes: ["x", "y", "z"],
       spindle: "spindle",
       channelScope: "cabinet/process",
-      workOffset: [
-        0.1,
-        0.1,
-        -0.05
-      ],
+      workOffset: [0.1, 0.1, -0.05],
       tools: [{
         number: 1,
         length: 0.03,
-        profile: [
-          [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.003,
-            0.0
-          ],
-          [
-            0.0,
-            0.0,
-            0.003,
-            0.0,
-            0.003,
-            0.02
-          ]
-        ]
+        profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]
       }],
       stocks: ["bed"],
       sacrificial: ["gantry"],
@@ -2721,10 +2167,7 @@ class ProjectKitTests {
     var data:materia.project.SceneArtifact.SceneArtifactData = {
       lengthUnit: "mm",
       metresPerUnit: 0.001,
-      parts: [
-        part("body"),
-        part("finished")
-      ],
+      parts: [part("body"), part("finished")],
       assemblyDefinition: machine,
       machining: job
     };
@@ -2849,26 +2292,14 @@ class ProjectKitTests {
         parentConnector: "pin",
         child: child,
         childConnector: "pin",
-        axis: {
-          x: 0.0,
-          y: 0.0,
-          z: 1.0
-        },
-        limits: {
-          lower: -1.0,
-          upper: 1.0,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null},
         defaultValue: 0.0
       };
     var printer:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "printer", lengthUnit: "mm", definitions: [{
         id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
+        connectors: [{name: "pin", frame: frame}]
       }], occurrences: [for (id in [
         "bed",
         "gantry",
@@ -2882,24 +2313,9 @@ class ProjectKitTests {
     }
     ], joints:[
       joint("y", AssemblyJointType.Prismatic, "bed", "gantry"),
-      joint(
-        "x",
-        AssemblyJointType.Prismatic,
-        "gantry",
-        "carriage"
-      ),
-      joint(
-        "z",
-        AssemblyJointType.Prismatic,
-        "carriage",
-        "block"
-      ),
-      joint(
-        "e",
-        AssemblyJointType.Continuous,
-        "block",
-        "gear"
-      )
+      joint("x", AssemblyJointType.Prismatic, "gantry", "carriage"),
+      joint("z", AssemblyJointType.Prismatic, "carriage", "block"),
+      joint("e", AssemblyJointType.Continuous, "block", "gear")
     ]};
     function heater(name:String,
       slot:Int, mount:String, ?fan:String):materia.project.SceneArtifact.SceneArtifactHeater {
@@ -2937,11 +2353,7 @@ class ProjectKitTests {
     }
     var job:materia.project.SceneArtifact.SceneArtifactPrinting = {
       source: "G21\nG90\nM83\nG1 X10 Y10 E0.5 F1200\n",
-      axes: [
-        "x",
-        "y",
-        "z"
-      ],
+      axes: ["x", "y", "z"],
       extruder: "e",
       filamentDiameter: 1.75e-3,
       gearRadius: 3.65e-3,
@@ -2951,19 +2363,7 @@ class ProjectKitTests {
       meltLag: 0.04,
       rampLength: 0.0005,
       minExtrusionTemperature: 170.0,
-      heaters: [
-        heater(
-          "hotend",
-          0,
-          "sensor",
-          "fan.part"
-        ),
-        heater(
-          "bed",
-          1,
-          "bedSensor"
-        )
-      ],
+      heaters: [heater("hotend", 0, "sensor", "fan.part"), heater("bed", 1, "bedSensor")],
       controller: {stepTickHz: 40000}
     };
     var data:materia.project.SceneArtifact.SceneArtifactData = {
@@ -2991,12 +2391,7 @@ class ProjectKitTests {
     check(restored.shaping == null, "a job without shapers has none");
     job.shaping = [
       {axis: "x", kind: "mzv", frequency: 52.5, damping: 0.1},
-      {
-        axis: "y",
-        kind: "ei",
-        frequency: 40.0,
-        damping: 0.05
-      }
+      {axis: "y", kind: "ei", frequency: 40.0, damping: 0.05}
     ];
     var shaped = SceneArtifact.decode(SceneArtifact.encode(data)).printing;
     check(
@@ -3008,12 +2403,7 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "a shaper on a joint that is no print axis");
     job.shaping = [
       {axis: "x", kind: "zv", frequency: 50.0, damping: 0.1},
-      {
-        axis: "x",
-        kind: "zv",
-        frequency: 50.0,
-        damping: 0.1
-      }
+      {axis: "x", kind: "zv", frequency: 50.0, damping: 0.1}
     ];
     rejects(function() SceneArtifact.encode(data), "an axis shaped twice");
     job.shaping = [{axis: "x", kind: "wiggle", frequency: 50.0, damping: 0.1}];
@@ -3056,11 +2446,7 @@ class ProjectKitTests {
       axes: ["x", "y", "z"],
       spindle: "gear",
       channelScope: "",
-      workOffset: [
-        0.0,
-        0.0,
-        0.0
-      ],
+      workOffset: [0.0, 0.0, 0.0],
       tools: [],
       stocks: [],
       controller: {stepTickHz: 40000}
@@ -3082,26 +2468,14 @@ class ProjectKitTests {
         parentConnector : "pin",
         child : child,
         childConnector : "pin",
-        axis : {
-          x : 0.0,
-          y : 0.0,
-          z : 1.0
-        },
-        limits : {
-          lower : null,
-          upper : null,
-          velocity : null,
-          effort : null
-        },
+        axis : {x : 0.0, y : 0.0, z : 1.0},
+        limits : {lower : null, upper : null, velocity : null, effort : null},
         defaultValue : 0.0
       };
     var chain:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
       id: "chain", lengthUnit: "mm", definitions: [{
         id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
+        connectors: [{name: "pin", frame: frame}]
       }], occurrences: [for (id in [
         "tip",
         "base",
@@ -3115,25 +2489,9 @@ class ProjectKitTests {
     // Listed out of order on purpose: a body's root need not be its first occurrence.
     joints:[
       joint("tip-seat", AssemblyJointType.Fixed, "arm", "tip"),
-      joint(
-        "plate-seat",
-        AssemblyJointType.Fixed,
-        "base",
-        "plate"
-      ),
-      joint(
-        "hinge",
-        AssemblyJointType.Revolute,
-        "plate",
-        "arm"
-      ),
-      joint(
-        "loop",
-        AssemblyJointType.Revolute,
-        "tip",
-        "base",
-        AssemblyJointRole.Closure
-      )
+      joint("plate-seat", AssemblyJointType.Fixed, "base", "plate"),
+      joint("hinge", AssemblyJointType.Revolute, "plate", "arm"),
+      joint("loop", AssemblyJointType.Revolute, "tip", "base", AssemblyJointRole.Closure)
     ]};
     var found = AssemblyBodies.of(chain);
     check(found.length == 3, "fixed joints merge occurrences into bodies");
@@ -3197,15 +2555,8 @@ class ProjectKitTests {
     var custom:MaterialDef = {
       id: "custom-bronze",
       name: "Custom bronze",
-      visual: {
-        baseColor: [0.5, 0.3, 0.2],
-        metallic: 0.7,
-        roughness: 0.4
-      },
-      physical: {
-        density: 8700.0,
-        spec: "custom bronze"
-      }
+      visual: {baseColor: [0.5, 0.3, 0.2], metallic: 0.7, roughness: 0.4},
+      physical: {density: 8700.0, spec: "custom bronze"}
     };
     MaterialLibrary.validateCustom([custom]);
     check(true, "valid custom material");
