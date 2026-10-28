@@ -23,9 +23,10 @@ import machinekit.hmi.*;
  */
 class PendantCase {
   public static inline var BACK_WALL:Float = 3.0;
-  public static inline var POST_DIAMETER:Float = 8.0;
-  public static inline var PILOT_DIAMETER:Float = 2.6;
-  public static inline var PILOT_DEPTH:Float = 14.0;
+  public static inline var POST_DIAMETER:Float = 9.0;
+  /** Hole for an M3 heat-set insert (about 4.6 mm outer, 5.7 mm long; check the insert's datasheet). */
+  public static inline var PILOT_DIAMETER:Float = 4.2;
+  public static inline var PILOT_DEPTH:Float = 7.5;
   /** Room kept around a screw head and around a post. */
   public static inline var HEAD_CLEARANCE:Float = 3.0;
   public static inline var BODY_CLEARANCE:Float = 1.5;
@@ -42,8 +43,10 @@ class PendantCase {
   public static inline var BOARD_MARGIN:Float = 2.0;
   /** Controls deeper than this pass through the board's plane instead of ending above it. */
   public static inline var PASS_THROUGH:Float = 30.0;
-  public static inline var STANDOFF_DIAMETER:Float = 6.0;
-  public static inline var STANDOFF_PILOT:Float = 2.2;
+  public static inline var STANDOFF_DIAMETER:Float = 7.0;
+  /** Hole for an M2.5 heat-set insert (about 3.6 mm outer, 4 mm long). */
+  public static inline var STANDOFF_PILOT:Float = 3.4;
+  public static inline var STANDOFF_PILOT_DEPTH:Float = 6.0;
   public static inline var BOARD_HOLE:Float = 2.7;
   /** A 22.3 mm opening for a 3-position enabling switch whose body is about 26 mm across and 30 deep (assumed). */
   public static inline var ENABLING_HOLE:Float = 22.3;
@@ -295,7 +298,7 @@ class PendantCase {
     }
     for (s in standoffs) {
       var standoff = Part.cylinderSpan(STANDOFF_DIAMETER / 2, -face.caseInnerDepth - 0.5, underside, s.x, s.y);
-      var pilot = Part.cylinderSpan(STANDOFF_PILOT / 2, underside - 8.0, underside + 1.0, s.x, s.y);
+      var pilot = Part.cylinderSpan(STANDOFF_PILOT / 2, underside - STANDOFF_PILOT_DEPTH, underside + 1.0, s.x, s.y);
       current = fuseThenDrill(current, standoff, pilot);
     }
     return current;

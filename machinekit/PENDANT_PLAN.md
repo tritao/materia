@@ -196,7 +196,7 @@ The bought parts, the panel layout and its checks are generic and live in `machi
   fixed Start, Hold and Stop/Reset keys along the bottom. The cheap E-stop is 43 mm deep, so the case is
   48 mm and the pendant 89 mm tall face up with the handle (the wheel stands 38 mm).
 - **Case.** `PendantCase` plans and builds the shell: a rounded box (8 mm corners, 3 mm walls and back) open at the
-  top; six M3 screw posts rising to the plate; an M12 receptacle hole in the bottom wall (16.2 mm, an assumed M16
+  top; six 9 mm M3 screw posts rising to the plate, each with a hole for an M3 heat-set insert (the board standoffs take M2.5 inserts); an M12 receptacle hole in the bottom wall (16.2 mm, an assumed M16
   rear-mount thread) with room for its body; a **board envelope** behind the shallow controls (1.6 mm, 10 mm of
   components on the back side) on four standoffs, notched for the posts, the receptacle, the enabling switch and the
   deep E-stop that passes through its plane; two strap slots through the back wall; the **blanked enabling-switch

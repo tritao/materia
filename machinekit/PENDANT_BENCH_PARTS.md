@@ -56,6 +56,7 @@ details before adding a part to the model.
 | 14 | **Logic analyzer**, 8 channel USB (skip if owned) | 1 | Saleae-compatible. | AliExpress: `USB logic analyzer 24MHz 8 channel` | Sees the MPG A/B edges. |
 | 15 | **Cabinet-side terminals** (v1 pendant interface) | 1 set | DIN rail, 2 to 3 spring or screw terminal blocks per signal group, a short DIN rail piece, end clamps, a PE terminal. | `DIN rail terminal block 2.5mm2`, `DIN rail PE terminal` | Wire gauge fits the pigtail; groups: loop, 24 V, CAN, shield. |
 | 16 | **Fuse holder and fuses** | 1 + 5 | DIN or terminal fuse holder, 1 A or 2 A fast fuses for the pendant's 24 V. | `DIN rail fuse terminal block 5x20`, `fuse 5x20 1A` | Holder rating; indicator, if any. |
+| 18 | **Heat-set inserts and screws** | 10 + 4 | Brass M3 inserts (about 4.6 mm outer, 5.7 mm long) for the six plate posts, M2.5 inserts (about 3.6 mm outer, 4 mm long) for the four board standoffs, M3 x 12 and M2.5 x 6 screws, and a soldering iron with an insert tip. | `M3 heat set insert 5.7mm`, `M2.5 heat set insert` | Outer diameter and length against the case's 4.2 mm and 3.4 mm holes (7.5 and 6 mm deep); try one in a printed test post first. |
 | 17 | **Cabinet wall mock-up** | 1 | A scrap of plate (about as thick as the real enclosure wall) with the M12 bulkhead hole, to test mounting, shield contact and cable entry. | | Hole size and torque; whether the shield bonds to the plate. |
 
 A bench supply (24 V) and a multimeter are assumed. A scope helps with items 1, 7 and 11.

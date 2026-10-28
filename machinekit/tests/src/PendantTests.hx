@@ -43,9 +43,9 @@ class PendantTests {
     var r = PanelFacePlate.CORNER_RADIUS;
     var underside = pendantCase.boardTop - PendantCase.BOARD_THICKNESS;
     var shellExpected = RoundedRectangle.area(190.0, 110.0, r) * 51.0 - RoundedRectangle.area(184.0, 104.0, r - 3.0) * 48.0
-      + 6 * Math.PI * 16.0 * 48.0 + 4 * Math.PI * 9.0 * (underside + 48.0)
+      + 6 * Math.PI * 20.25 * 48.0 + 4 * Math.PI * 12.25 * (underside + 48.0)
       - Math.PI * 8.1 * 8.1 * 3.0 - 2 * 24.0 * 4.0 * 3.0 - Math.PI * 11.15 * 11.15 * 2.2
-      - 6 * Math.PI * 1.3 * 1.3 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.1 * 1.1 * 8.0;
+      - 6 * Math.PI * 2.1 * 2.1 * PendantCase.PILOT_DEPTH - 4 * Math.PI * 1.7 * 1.7 * PendantCase.STANDOFF_PILOT_DEPTH;
     check(Math.abs(shell.volume() - shellExpected) / shellExpected < 0.005, "Shell volume " + shell.volume() + " vs " + shellExpected);
 
     // What the plan added: standoffs, strap slots, a board behind the shallow parts, the enabling pocket and a tongue.
