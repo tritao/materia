@@ -41,6 +41,17 @@ class ComponentRecipeSupport {
 		return result;
 	}
 
+	/**
+	 * A designation that follows a recipe's inputs: the id, a tag for how far its numbers can be trusted, and a short hash
+	 * of every input, so two parts are the same part exactly when their inputs are equal.
+	 */
+	public static function designationFor(id:String, tag:String, values:ComponentValues):String {
+		var names = values.names();
+		names.sort(Reflect.compare);
+		var key = Json.stringify([for (name in names) {name: name, value: Std.string(values.get(name))}]);
+		return id.toUpperCase() + "-" + tag.toUpperCase() + "-" + haxe.crypto.Sha256.encode(key).substr(0, 12);
+	}
+
 	/** A quantity whose engineering unit travels with its recipe schema. */
 	public static function quantity(name:String, value:Float, unit:String, minimum:Null<Float> = 0):ComponentParameter
 		return new ComponentParameter(name, Scalar, Number(value), unit, minimum);

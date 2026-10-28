@@ -23,7 +23,7 @@ class HmiPart extends MachineComponent {
     var v = ComponentRecipeSupport.resolve(parameters, inputs);
     if (v.get("material") == null) v.setToken("material", material);
     var tag = v.token("basis");
-    super(id.toUpperCase() + "-" + tag.toUpperCase() + "-" + haxe.crypto.Sha256.encode(key(v)).substr(0, 12), label, v.token("material"), false, v);
+    super(ComponentRecipeSupport.designationFor(id, tag, v), label, v.token("material"), false, v);
     stored = v.copy();
     basis = switch tag {
       case "catalog": Catalog;
@@ -36,12 +36,6 @@ class HmiPart extends MachineComponent {
   /** The provenance input every part declares. */
   public static function basisParameter(value:String = "assumed"):ComponentParameter
     return ComponentRecipeSupport.choice("basis", ["catalog", "stated", "assumed", "measured"], value);
-
-  static function key(v:ComponentValues):String {
-    var names = v.names();
-    names.sort(Reflect.compare);
-    return haxe.Json.stringify([for (name in names) {name: name, value: Std.string(v.get(name))}]);
-  }
 
   public function n(name:String):Float return parameterNumber(name);
   public function flag(name:String):Bool return stored.boolean(name);

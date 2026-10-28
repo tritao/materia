@@ -12,21 +12,13 @@ class AssumedCatalogComponent extends MachineComponent {
     var v = ComponentRecipeSupport.resolve(parameters, inputs);
     if (v.get("material") == null) v.setToken("material", material);
     super(
-      id.toUpperCase() + "-ASSUMED-" + haxe.crypto.Sha256.encode(key(v)).substr(0, 12),
+      ComponentRecipeSupport.designationFor(id, "assumed", v),
       "Assumed " + label,
       v.token("material"),
       false,
       v
     );
     assumedInputs = v.copy();
-  }
-  static function key(v:ComponentValues):String {
-    var names = v.names();
-    names.sort(Reflect.compare);
-    return haxe.Json.stringify([for (name in names) {
-      name:name, value:Std.string(v.get(name))
-    }
-    ]);
   }
   public function flag(name:String):Bool return assumedInputs.boolean(name);
   public function io():MachineIo return {inputs:[], outputs:[], analogOutputs:[]};
