@@ -59,7 +59,6 @@ import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.pneumatic.VacuumControlValve;
 import machinekit.welding.WeldingInterfaces;
 import machinekit.welding.WeldingTorch;
-import robotkit.model.CollisionShape;
 import robotkit.tool.ToolGeometry;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedGripper;

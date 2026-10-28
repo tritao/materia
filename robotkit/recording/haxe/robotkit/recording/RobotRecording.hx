@@ -1,7 +1,6 @@
 package robotkit.recording;
 
 import robotkit.core.JointTarget;
-import robotkit.core.Robot;
 import robotkit.core.RobotCommand;
 import robotkit.core.RobotEvent;
 import robotkit.core.RobotFault;

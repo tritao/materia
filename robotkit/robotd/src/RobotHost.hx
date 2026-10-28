@@ -9,7 +9,6 @@ import robotkit.profile.RobotForkConfiguration;
 import robotkit.profile.RobotMobileConfiguration;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;

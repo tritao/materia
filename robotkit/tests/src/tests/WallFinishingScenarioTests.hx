@@ -33,7 +33,6 @@ import processkit.work.SourceKind;
 import processkit.perception.SimulatedSurfaceScanner;
 import processkit.perception.SurfaceRegistration;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.mobile.MobileBase;

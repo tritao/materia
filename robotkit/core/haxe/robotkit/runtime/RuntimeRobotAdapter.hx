@@ -15,7 +15,6 @@ import robotkit.core.RobotStatus;
 import robotkit.core.RobotThreadToken;
 import robotkit.core.SensorFrame;
 import robotkit.core.StopMode;
-import robotkit.world.RobotWorld;
 
 import RobotKitRuntime;
 import haxe.Int64;

@@ -19,7 +19,6 @@ import kinematicskit.KinematicState;
 import robotkit.kinematics.RobotKinematics;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.simulation.SimulatedRobot;
 import robotkit.core.RobotCommand;

@@ -15,10 +15,8 @@ import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
 import robotkit.tool.Tool;
-import robotkit.model.CollisionShape;
 import robotkit.tool.ToolGeometry;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
@@ -33,7 +31,6 @@ import processkit.work.BucketSweep;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
 import robotkit.simulation.SimulatedRobot;
-import robotkit.core.RobotCommand;
 
 /**
  * M12 acceptance tests for the simulated excavator: the 4-DOF

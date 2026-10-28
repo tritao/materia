@@ -2,7 +2,6 @@ package robotkit.simulation;
 
 import robotkit.core.RobotId;
 import robotkit.runtime.RuntimeRobotAdapter;
-import robotkit.world.RobotWorld;
 
 import robotkit.runtime.RobotRuntime;
 
