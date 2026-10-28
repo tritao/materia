@@ -25,10 +25,7 @@ class TorqueSpeedCurve {
   /** The same torque up to `maxSpeed`, then nothing: how a drive with only two numbers behaves. */
   public static function flat(torque:Float, maxSpeed:Float):TorqueSpeedCurve return new TorqueSpeedCurve(
     [0.0, maxSpeed],
-    [
-      torque,
-      torque
-    ]
+    [torque, torque]
   );
 
   /** Torque available at `speed`, in either direction. */

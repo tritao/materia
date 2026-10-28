@@ -86,11 +86,7 @@ class LoadSafetyPolicy implements Safety {
       forkState.sourceClockId,
       forkState.receivedClockId,
       effective,
-      loadFootprint(
-        base.footprint,
-        load,
-        configuration.unknownPayloadMarginMeters
-      )
+      loadFootprint(base.footprint, load, configuration.unknownPayloadMarginMeters)
     );
     return currentState;
   }
@@ -141,10 +137,7 @@ class LoadSafetyPolicy implements Safety {
       new FootprintPoint(minX, minY),
       new FootprintPoint(maxX, minY),
       new FootprintPoint(maxX, maxY),
-      new FootprintPoint(
-        minX,
-        maxY
-      )
+      new FootprintPoint(minX, maxY)
     ]);
   }
 }

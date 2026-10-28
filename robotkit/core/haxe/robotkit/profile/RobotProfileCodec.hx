@@ -61,24 +61,15 @@ class RobotProfileCodec {
           text(source, "leftWheelJoint"),
           text(source, "rightWheelJoint"),
           positive(source, "wheelRadius"),
-          positive(
-            source,
-            "trackWidth"
-          )
+          positive(source, "trackWidth")
         );
       case "ackermann":
         Ackermann(
           text(source, "steeringJoint"),
           text(source, "driveWheelJoint"),
           positive(source, "wheelBase"),
-          positive(
-            source,
-            "wheelRadius"
-          ),
-          positive(
-            source,
-            "maxSteeringAngle"
-          )
+          positive(source, "wheelRadius"),
+          positive(source, "maxSteeringAngle")
         );
       case "holonomic":
         var raw:Dynamic = required(source, "wheelJointIds");
@@ -100,14 +91,8 @@ class RobotProfileCodec {
       drive,
       positive(value, "maxLinearSpeed"),
       positive(value, "maxAngularSpeed"),
-      positive(
-        value,
-        "maxLinearAcceleration"
-      ),
-      positive(
-        value,
-        "maxAngularAcceleration"
-      ),
+      positive(value, "maxLinearAcceleration"),
+      positive(value, "maxAngularAcceleration"),
       length,
       width
     );
@@ -121,30 +106,12 @@ class RobotProfileCodec {
     maxLiftHeightMeters: value.maxLiftHeightMeters
   };
   static function readFork(value:Dynamic):RobotForkConfiguration return new RobotForkConfiguration(
-    text(
-      value,
-      "liftJoint"
-    ),
-    positive(
-      value,
-      "maxMassKg"
-    ),
-    positive(
-      value,
-      "maxLoadMomentKgMeters"
-    ),
-    positive(
-      value,
-      "maxLiftHeightMeters"
-    ),
-    optionalText(
-      value,
-      "tiltJoint"
-    ),
-    optionalText(
-      value,
-      "spreadJoint"
-    )
+    text(value, "liftJoint"),
+    positive(value, "maxMassKg"),
+    positive(value, "maxLoadMomentKgMeters"),
+    positive(value, "maxLiftHeightMeters"),
+    optionalText(value, "tiltJoint"),
+    optionalText(value, "spreadJoint")
   );
   static function required(value:Dynamic, name:String):Dynamic {
     if (value == null || !Reflect.hasField(value, name)) throw "Missing RobotProfile field";

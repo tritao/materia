@@ -88,15 +88,7 @@ class SimulationHarness {
     return space.session.createObject(
       MotionType.Static,
       SimShape.plane(),
-      new SimPose(
-        at[0],
-        at[1],
-        at[2],
-        facing[0],
-        facing[1],
-        facing[2],
-        facing[3]
-      )
+      new SimPose(at[0], at[1], at[2], facing[0], facing[1], facing[2], facing[3])
     );
   }
 
@@ -113,15 +105,8 @@ class SimulationHarness {
     stop();
     return space.session.createObject(
       dynamicBody ? MotionType.Dynamic : MotionType.Static,
-      SimShape.box(
-        halfExtents[0],
-        halfExtents[1],
-        halfExtents[2]
-      ),
-      makePose(
-        position,
-        orientation
-      ),
+      SimShape.box(halfExtents[0], halfExtents[1], halfExtents[2]),
+      makePose(position, orientation),
       dynamicBody ? mass : 0.0
     );
   }

@@ -138,17 +138,8 @@ class HeaterDeviceTests {
       "tip",
       "tool",
       1,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     ));
     var options = new VirtualDeviceOptions();
     options.stepsPerUnit = [1000.0];
@@ -178,21 +169,9 @@ class HeaterDeviceTests {
       null,
       true,
       [
-        new ProcessTimedEvent(
-          Int64.ofInt(0),
-          HOTEND,
-          ProcessEventValue.Analog(hotendTarget)
-        ),
-        new ProcessTimedEvent(
-          Int64.ofInt(0),
-          BED,
-          ProcessEventValue.Analog(bedTarget)
-        ),
-        new ProcessTimedEvent(
-          Int64.ofInt(0),
-          FAN,
-          ProcessEventValue.Analog(fan)
-        )
+        new ProcessTimedEvent(Int64.ofInt(0), HOTEND, ProcessEventValue.Analog(hotendTarget)),
+        new ProcessTimedEvent(Int64.ofInt(0), BED, ProcessEventValue.Analog(bedTarget)),
+        new ProcessTimedEvent(Int64.ofInt(0), FAN, ProcessEventValue.Analog(fan))
       ]
     ),
       1
@@ -250,30 +229,10 @@ class HeaterDeviceTests {
     // A fault in each of the ways a heater runs away; each switches the target channels off and stops the robot.
     for (case_ in [
       {label: "a dead element", kind: VirtualHeaters.ELEMENT, value: 0.0, code: HeaterSensor.NOT_HEATING},
-      {
-        label: "a fallen thermistor",
-        kind: VirtualHeaters.SENSOR_ATTACHED,
-        value: 0.0,
-        code: HeaterSensor.NOT_HEATING
-      },
-      {
-        label: "a draught",
-        kind: VirtualHeaters.BLAST,
-        value: 3.0,
-        code: HeaterSensor.NOT_HEATING
-      },
-      {
-        label: "a broken thermistor wire",
-        kind: VirtualHeaters.SENSOR_OPEN,
-        value: 1.0,
-        code: HeaterSensor.SENSOR_OPEN
-      },
-      {
-        label: "a shorted thermistor",
-        kind: VirtualHeaters.SENSOR_SHORT,
-        value: 1.0,
-        code: HeaterSensor.SENSOR_SHORT
-      }
+      {label: "a fallen thermistor", kind: VirtualHeaters.SENSOR_ATTACHED, value: 0.0, code: HeaterSensor.NOT_HEATING},
+      {label: "a draught", kind: VirtualHeaters.BLAST, value: 3.0, code: HeaterSensor.NOT_HEATING},
+      {label: "a broken thermistor wire", kind: VirtualHeaters.SENSOR_OPEN, value: 1.0, code: HeaterSensor.SENSOR_OPEN},
+      {label: "a shorted thermistor", kind: VirtualHeaters.SENSOR_SHORT, value: 1.0, code: HeaterSensor.SENSOR_SHORT}
     ]) {
       var r = rig(400.0, 210.0, 60.0, 0.0);
       r.heaters.setInput("hotend", case_.kind, case_.value);

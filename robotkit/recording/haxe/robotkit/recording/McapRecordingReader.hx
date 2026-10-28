@@ -139,22 +139,10 @@ class McapRecordingReader {
     return new McapRecordingStatus(
       parseInt(fields, "state"),
       parseWide(fields, "accepted"),
-      parseWide(
-        fields,
-        "written"
-      ),
-      parseWide(
-        fields,
-        "dropped"
-      ),
-      parseWide(
-        fields,
-        "queued"
-      ),
-      parseWide(
-        fields,
-        "queued_bytes"
-      ),
+      parseWide(fields, "written"),
+      parseWide(fields, "dropped"),
+      parseWide(fields, "queued"),
+      parseWide(fields, "queued_bytes"),
       fields.exists("error") ? fields.get("error") : ""
     );
   }

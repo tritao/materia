@@ -125,10 +125,7 @@ class WorkTests {
       new Point2(1.5, 0.85),
       new Point2(2.15, 1.5),
       new Point2(1.5, 2.15),
-      new Point2(
-        0.85,
-        1.5
-      )
+      new Point2(0.85, 1.5)
     ]);
     var diamondSurface = new WorkSurface(
       "rotated-exclusion",
@@ -144,14 +141,8 @@ class WorkTests {
       new Point2(2.2, 0.8),
       new Point2(2.2, 1.3),
       new Point2(1.3, 1.3),
-      new Point2(
-        1.3,
-        2.2
-      ),
-      new Point2(
-        0.8,
-        2.2
-      )
+      new Point2(1.3, 2.2),
+      new Point2(0.8, 2.2)
     ]);
     var concaveSurface = new WorkSurface(
       "concave-exclusion",
@@ -192,18 +183,9 @@ class WorkTests {
 
   static function rect(x:Float, y:Float, width:Float, height:Float):Polygon2 return new Polygon2([
     new Point2(x, y),
-    new Point2(
-      x + width,
-      y
-    ),
-    new Point2(
-      x + width,
-      y + height
-    ),
-    new Point2(
-      x,
-      y + height
-    )
+    new Point2(x + width, y),
+    new Point2(x + width, y + height),
+    new Point2(x, y + height)
   ]);
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

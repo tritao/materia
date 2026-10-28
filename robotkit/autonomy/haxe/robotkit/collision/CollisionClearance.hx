@@ -118,15 +118,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       result.addObject(
         shape.name == "" ? link + "/shape/" + i : shape.name,
         body,
-        new CollisionPose(
-          p[0],
-          p[1],
-          p[2],
-          q[0],
-          q[1],
-          q[2],
-          q[3]
-        ),
+        new CollisionPose(p[0], p[1], p[2], q[0], q[1], q[2], q[3]),
         shape.geometry,
         shape.inflation,
         "authored shape",
@@ -153,12 +145,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
 
   static function transform(p:CollisionPose):Transform3 return new Transform3(
     new robotkit.spatial.Vec3(p.x, p.y, p.z),
-    new robotkit.spatial.Quat(
-      p.qx,
-      p.qy,
-      p.qz,
-      p.qw
-    )
+    new robotkit.spatial.Quat(p.qx, p.qy, p.qz, p.qw)
   );
 
   /** Finite, link-local points for motion bounds; queries retain exact geometry. */
@@ -330,15 +317,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
         current.rotation.z,
         current.rotation.w
       ),
-      new CollisionPose(
-        target.x,
-        target.y,
-        target.z,
-        target.qx,
-        target.qy,
-        target.qz,
-        target.qw
-      ),
+      new CollisionPose(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
       detached || !arm.moves(link),
       detached ? -1 : carrier,
       contacts,
@@ -492,10 +471,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     var bounds = new ClearanceMotionBounds(
       arm.model,
       [for (id in arm.group.jointIds) arm.model.dofIndex(id)],
-      arm.stateOf(
-        q,
-        mapping.reference.q
-      ),
+      arm.stateOf(q, mapping.reference.q),
       errors,
       arm.model.frameIndex(arm.flangeFrame),
       robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp),
@@ -508,10 +484,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     upper:Array<Float>):ClearanceMotionEnvelope return new ClearanceMotionEnvelope(
       arm.model,
       [for (id in arm.group.jointIds) arm.model.dofIndex(id)],
-      arm.stateOf(
-        [for (i in 0...lower.length) lower[i] + (upper[i] - lower[i]) * 0.5],
-        mapping.reference.q
-      ),
+      arm.stateOf([for (i in 0...lower.length) lower[i] + (upper[i] - lower[i]) * 0.5], mapping.reference.q),
       lower,
       upper,
       [for (link in bodyLinks) arm.model.bodyIndex(link)],
@@ -524,10 +497,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float return new ClearanceMotionBounds(
     arm.model,
     [for (id in arm.group.jointIds) arm.model.dofIndex(id)],
-    arm.stateOf(
-      q,
-      mapping.reference.q
-    ),
+    arm.stateOf(q, mapping.reference.q),
     errors,
     arm.model.frameIndex(arm.flangeFrame),
     robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp),
@@ -569,10 +539,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     for (window in windows) if (window.margin != null) descriptionBuild().openObjectWindow(
       window.a,
       window.b,
-      wanted == null ? window.margin : Math.min(
-        window.margin,
-        wanted
-      )
+      wanted == null ? window.margin : Math.min(window.margin, wanted)
     );
     var original = contact ? data.contactMargins : data.margins;
     if (windows.length == 0 && wanted == null) return original;

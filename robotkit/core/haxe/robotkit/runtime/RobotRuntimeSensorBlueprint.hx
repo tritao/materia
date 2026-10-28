@@ -129,17 +129,8 @@ class RobotRuntimeSensorBlueprint {
       linkId,
       linkId,
       root,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     )];
   }
 }

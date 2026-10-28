@@ -121,11 +121,7 @@ class SimulatedSuctionTool implements SimulationStepObserver {
       touched.object,
       robotIndex,
       linkIndex,
-      relativePose(
-        link.position,
-        link.rotation,
-        seated
-      )
+      relativePose(link.position, link.rotation, seated)
     );
     held = touched.object;
   }

@@ -58,11 +58,7 @@ class Conformance {
       period,
       substeps,
       SimulationSpace.MUJOCO,
-      {
-        integrator: integrator,
-        solverIterations: solverIterations,
-        lineSearchIterations: lineSearchIterations
-      }
+      {integrator: integrator, solverIterations: solverIterations, lineSearchIterations: lineSearchIterations}
     );
     var simulation = harness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
@@ -71,12 +67,7 @@ class Conformance {
     var runtime = simulation.addRobotAtPose(
       blueprint,
       [start[1], start[2], start[3]],
-      [
-        start[4],
-        start[5],
-        start[6],
-        start[7]
-      ]
+      [start[4], start[5], start[6], start[7]]
     );
     harness.spawnPlane();
     if (pose != null) simulation.setJointPositions(0, pose.jointPositions(model));

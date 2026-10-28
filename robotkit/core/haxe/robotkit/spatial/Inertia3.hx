@@ -35,20 +35,12 @@ class Inertia3 {
     var basis = [
       rotation.rotate(new Vec3(1, 0, 0)),
       rotation.rotate(new Vec3(0, 1, 0)),
-      rotation.rotate(new Vec3(
-        0,
-        0,
-        1
-      ))
+      rotation.rotate(new Vec3(0, 0, 1))
     ];
     var r = [
       [basis[0].x, basis[1].x, basis[2].x],
       [basis[0].y, basis[1].y, basis[2].y],
-      [
-        basis[0].z,
-        basis[1].z,
-        basis[2].z
-      ]
+      [basis[0].z, basis[1].z, basis[2].z]
     ];
     var tensor = [[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]];
     var result = [for (_ in 0...3)[0.0, 0.0, 0.0]];

@@ -79,12 +79,7 @@ class PickPallet implements Skill {
     if (violation != null) return lifecycle.fail(violation);
     var value = new GoTo(
       navigator,
-      new NavigationGoal(
-        approachPose,
-        estimate.referenceFrame,
-        positionTolerance,
-        headingTolerance
-      ),
+      new NavigationGoal(approachPose, estimate.referenceFrame, positionTolerance, headingTolerance),
       observePerception,
       blockedTimeoutSeconds
     );

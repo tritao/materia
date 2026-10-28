@@ -99,12 +99,7 @@ class Simulation {
       blueprint,
       initialPose == null ? null : makePose(
         [initialPose.x, initialPose.y, 0.0],
-        [
-          0.0,
-          0.0,
-          Math.sin(initialPose.yaw * 0.5),
-          Math.cos(initialPose.yaw * 0.5)
-        ]
+        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]
       ),
       virtualDevice,
       null,
@@ -224,10 +219,7 @@ class Simulation {
         );
         for (i in 0...16) robotDesc.set_virtual_device_controller(
           i,
-          Std.parseInt("0x" + virtualDevice.controller.substr(
-            i * 2,
-            2
-          ))
+          Std.parseInt("0x" + virtualDevice.controller.substr(i * 2, 2))
         );
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
@@ -684,27 +676,11 @@ class Simulation {
           otherPieceIndex: value.get_other_piece_index(),
           otherObject: value.get_other_object().rawValue(),
           distance: value.get_distance(),
-          position: new Vec3(
-            value.get_position(0),
-            value.get_position(1),
-            value.get_position(2)
-          ),
-          normal: new Vec3(
-            value.get_normal(0),
-            value.get_normal(1),
-            value.get_normal(2)
-          ),
+          position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
+          normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
           wrenchValid: value.get_wrench_valid() != 0,
-          force: new Vec3(
-            value.get_force_on_link(0),
-            value.get_force_on_link(1),
-            value.get_force_on_link(2)
-          ),
-          torque: new Vec3(
-            value.get_torque_on_link(0),
-            value.get_torque_on_link(1),
-            value.get_torque_on_link(2)
-          ),
+          force: new Vec3(value.get_force_on_link(0), value.get_force_on_link(1), value.get_force_on_link(2)),
+          torque: new Vec3(value.get_torque_on_link(0), value.get_torque_on_link(1), value.get_torque_on_link(2)),
           carriedObject: value.get_carried_object().rawValue(),
           active: value.get_active() != 0,
           stepIndex: stepResult.out_step_index,
@@ -1097,14 +1073,8 @@ class Simulation {
     joint:Int, position:Float, velocity:Float, maxEffort:Float = 0):Void {
     ensureLive();
     check(
-      RobotKitSimKit.rk_simulation_drive_process_joint(
-        owner.borrow(),
-        robotIndex,
-        joint,
-        position,
-        velocity,
-        maxEffort
-      ),
+      RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(),
+      robotIndex, joint, position, velocity, maxEffort),
       "simulation.driveProcessJoint"
     );
   }

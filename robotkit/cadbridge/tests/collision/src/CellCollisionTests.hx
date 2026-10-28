@@ -94,18 +94,7 @@ class CellCollisionTests {
       "probe",
       "probe",
       new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
-      ToolGeometry.box(
-        new Vec3(
-          0.05,
-          0.05,
-          0.05
-        ),
-        new Vec3(
-          0.05,
-          0,
-          0
-        )
-      )
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0))
     );
     options.toolFrame = "flange";
     return options;
@@ -127,12 +116,7 @@ class CellCollisionTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     var points = cube(0, 0, 0, 50);
     var vertices = Bytes.alloc(points.length * 8);
@@ -222,11 +206,7 @@ class CellCollisionTests {
     var fixture = description.addFixed(
       "fixture",
       CollisionPose.translation(1.5, 0, 0),
-      CollisionGeometry.Box(
-        0.1,
-        0.1,
-        0.1
-      ),
+      CollisionGeometry.Box(0.1, 0.1, 0.1),
       3,
       0.0,
       "primitive"
@@ -248,11 +228,7 @@ class CellCollisionTests {
     var fixture = description.addFixed(
       "fixture",
       CollisionPose.translation(1.95, 0.0, 0.3),
-      CollisionGeometry.Box(
-        0.05,
-        0.05,
-        0.05
-      ),
+      CollisionGeometry.Box(0.05, 0.05, 0.05),
       3,
       0.0,
       "primitive"
@@ -298,11 +274,7 @@ class CellCollisionTests {
       "bracket",
       AssemblyFrames.identity(),
       0.001,
-      CadPartCollision.Decomposed(
-        part,
-        0.1,
-        8
-      ),
+      CadPartCollision.Decomposed(part, 0.1, 8),
       3,
       decomposer,
       cache
@@ -319,11 +291,7 @@ class CellCollisionTests {
       "bracket",
       AssemblyFrames.identity(),
       0.001,
-      CadPartCollision.Decomposed(
-        part,
-        0.1,
-        8
-      ),
+      CadPartCollision.Decomposed(part, 0.1, 8),
       3,
       decomposer,
       cache
@@ -374,39 +342,9 @@ class CellCollisionTests {
       description,
       robot,
       CollisionClearance.combine([
-        CollisionClearance.convex(
-          "upper-hull",
-          "upper",
-          cube(
-            0.5,
-            0,
-            0,
-            0.05
-          ),
-          false
-        ),
-        CollisionClearance.convex(
-          "torch",
-          "fore",
-          cube(
-            1.05,
-            0,
-            0,
-            0.03
-          ),
-          true
-        ),
-        CollisionClearance.convex(
-          "workpiece",
-          "base",
-          cube(
-            1.5,
-            1.0,
-            0,
-            0.1
-          ),
-          false
-        )
+        CollisionClearance.convex("upper-hull", "upper", cube(0.5, 0, 0, 0.05), false),
+        CollisionClearance.convex("torch", "fore", cube(1.05, 0, 0, 0.03), true),
+        CollisionClearance.convex("workpiece", "base", cube(1.5, 1.0, 0, 0.1), false)
       ])
     );
     check(description.objects[objects[0]].body == robot.linkBody("upper"), "a link hull is on its link");

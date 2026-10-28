@@ -52,14 +52,7 @@ class WheelOdometryLocalization implements Localization {
       pose,
       referenceFrame,
       bodyFrame,
-      new PoseCovariance2(
-        varianceX,
-        covarianceXY,
-        covarianceXYaw,
-        varianceY,
-        covarianceYYaw,
-        varianceYaw
-      ),
+      new PoseCovariance2(varianceX, covarianceXY, covarianceXYaw, varianceY, covarianceYYaw, varianceYaw),
       LocalizationQuality.Degraded,
       snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs,

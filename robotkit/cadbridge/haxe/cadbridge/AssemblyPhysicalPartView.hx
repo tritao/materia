@@ -32,14 +32,7 @@ class AssemblyPhysicalPartView {
     return new robotkit.tool.MassProperties(
       mass,
       center,
-      new robotkit.spatial.Inertia3(
-        tensor[0],
-        tensor[1],
-        tensor[2],
-        tensor[4],
-        tensor[5],
-        tensor[8]
-      )
+      new robotkit.spatial.Inertia3(tensor[0], tensor[1], tensor[2], tensor[4], tensor[5], tensor[8])
     );
   }
 

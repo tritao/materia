@@ -184,11 +184,7 @@ class RobotProtocol {
       value.width,
       value.height,
       value.format,
-      new BufferRef(
-        0,
-        0,
-        pixels.length
-      ),
+      new BufferRef(0, 0, pixels.length),
       value.linkId,
       value.mountPosition,
       value.mountRotation,

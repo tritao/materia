@@ -151,39 +151,16 @@ class CellCollisionCorpus {
       [
         CellCollisionSnapshot.observation(
           fixture.first,
-          Mechanism(
-            "robot",
-            "moving"
-          ),
-          cube(
-            0,
-            0,
-            0,
-            0.01
-          ),
+          Mechanism("robot", "moving"),
+          cube(0, 0, 0, 0.01),
           null,
           fixture.welding
         ),
         CellCollisionSnapshot.observation(
           fixture.second,
-          fixture.foreign ? Mechanism(
-            "mill",
-            "moving"
-          ) : Fixture,
-          cube(
-            0,
-            0,
-            0,
-            0.01
-          ),
-          new Transform3(
-            new Vec3(
-              0.02 + fixture.gap,
-              0,
-              0
-            ),
-            Quat.identity()
-          )
+          fixture.foreign ? Mechanism("mill", "moving") : Fixture,
+          cube(0, 0, 0, 0.01),
+          new Transform3(new Vec3(0.02 + fixture.gap, 0, 0), Quat.identity())
         )
       ]
     );
@@ -201,12 +178,7 @@ class CellCollisionCorpus {
     );
     var build = scene.build(new NativeCollisionWorld());
     var planner = new ManipulatorPlannerSpace(
-      new CollisionPlannerSpace(
-        scene.description,
-        build,
-        scene.bodies,
-        scene.margins()
-      ),
+      new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins()),
       arm,
       [0.0]
     );
@@ -236,40 +208,14 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "arm/tool",
-          Mechanism(
-            "robot",
-            "moving"
-          ),
-          cube(
-            1,
-            0,
-            0,
-            0.003
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "mill/thin-door-edge",
-          Fixture,
-          cube(
-            centre,
-            centre,
-            0,
-            0.001
-          )
-        )
+        CellCollisionSnapshot.observation("arm/tool", Mechanism("robot", "moving"), cube(1, 0, 0, 0.003)),
+        CellCollisionSnapshot.observation("mill/thin-door-edge", Fixture, cube(centre, centre, 0, 0.001))
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
     var build = scene.build(new NativeCollisionWorld());
     var planner = new ManipulatorPlannerSpace(
-      new CollisionPlannerSpace(
-        scene.description,
-        build,
-        scene.bodies,
-        scene.margins()
-      ),
+      new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins()),
       arm,
       [0.0]
     );
@@ -289,41 +235,9 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "torch",
-          Mechanism(
-            "robot",
-            "moving"
-          ),
-          cube(
-            0,
-            0,
-            0,
-            0.01
-          ),
-          null,
-          true
-        ),
-        CellCollisionSnapshot.observation(
-          "work",
-          Fixture,
-          cube(
-            0.021,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "unrelated-door",
-          Fixture,
-          cube(
-            0,
-            0.024,
-            0,
-            0.01
-          )
-        )
+        CellCollisionSnapshot.observation("torch", Mechanism("robot", "moving"), cube(0, 0, 0, 0.01), null, true),
+        CellCollisionSnapshot.observation("work", Fixture, cube(0.021, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("unrelated-door", Fixture, cube(0, 0.024, 0, 0.01))
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -350,26 +264,13 @@ class CellCollisionCorpus {
       "arm",
       arm.robot,
       linkShapes([{part: "arm/tool", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        Transform3.identity()
-      ]
+      [Transform3.identity(), Transform3.identity()]
     );
     captured.mechanism(
       "mill",
       arm.robot,
       linkShapes([{part: "mill/door", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        new Transform3(
-          new Vec3(
-            0.024,
-            0,
-            0
-          ),
-          Quat.identity()
-        )
-      ]
+      [Transform3.identity(), new Transform3(new Vec3(0.024, 0, 0), Quat.identity())]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
     var clearance = scene.clearance(() -> new NativeCollisionWorld());
@@ -422,28 +323,13 @@ class CellCollisionCorpus {
       "arm",
       model,
       linkShapes([{part: "arm-object", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        one,
-        one
-      ]
+      [Transform3.identity(), one, one]
     );
     captured.mechanism(
       "mill",
       model,
       linkShapes([{part: "foreign-door", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        one,
-        new Transform3(
-          new Vec3(
-            1.024,
-            0,
-            0
-          ),
-          Quat.identity()
-        )
-      ]
+      [Transform3.identity(), one, new Transform3(new Vec3(1.024, 0, 0), Quat.identity())]
     );
     var clearance = captured.describe(arm, [0.0], 0.005).clearance(() -> new NativeCollisionWorld());
     var found = clearance.closest([0.0]);
@@ -461,26 +347,8 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "loose",
-          Loose,
-          cube(
-            1,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "obstacle",
-          Fixture,
-          cube(
-            0,
-            1,
-            0,
-            0.01
-          )
-        )
+        CellCollisionSnapshot.observation("loose", Loose, cube(1, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("obstacle", Fixture, cube(0, 1, 0, 0.01))
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -509,29 +377,8 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "stock",
-          Loose,
-          cube(
-            1,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "seat-piece",
-          Fixture,
-          cube(
-            1.02,
-            0,
-            0,
-            0.01
-          ),
-          null,
-          false,
-          "vise-seat"
-        )
+        CellCollisionSnapshot.observation("stock", Loose, cube(1, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("seat-piece", Fixture, cube(1.02, 0, 0, 0.01), null, false, "vise-seat")
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -586,26 +433,9 @@ class CellCollisionCorpus {
       "arm",
       robot,
       linkShapes([{part: "jaw/pad", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        Transform3.identity(),
-        new Transform3(
-          new Vec3(
-            0,
-            0.02,
-            0
-          ),
-          Quat.identity()
-        )
-      ],
+      [Transform3.identity(), Transform3.identity(), new Transform3(new Vec3(0, 0.02, 0), Quat.identity())],
       null,
-      robotkit.kinematics.RobotKinematics.observedState(
-        robot,
-        [
-          0.6,
-          0.02
-        ]
-      )
+      robotkit.kinematics.RobotKinematics.observedState(robot, [0.6, 0.02])
     );
     captured.fixture("door", cube(0, 0.044, 0, 0.01), Transform3.identity());
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -616,12 +446,7 @@ class CellCollisionCorpus {
     );
     var build = scene.build(new NativeCollisionWorld());
     var planner = new ManipulatorPlannerSpace(
-      new CollisionPlannerSpace(
-        scene.description,
-        build,
-        scene.bodies,
-        scene.margins()
-      ),
+      new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins()),
       arm,
       [0.0],
       scene.bodies.reference.q
@@ -678,29 +503,8 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "loose",
-          Held(
-            "arm",
-            "moving"
-          ),
-          cube(
-            1,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "obstacle",
-          Fixture,
-          cube(
-            1.025,
-            0.025,
-            0,
-            0.01
-          )
-        )
+        CellCollisionSnapshot.observation("loose", Held("arm", "moving"), cube(1, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("obstacle", Fixture, cube(1.025, 0.025, 0, 0.01))
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -748,42 +552,9 @@ class CellCollisionCorpus {
       Transform3.identity(),
       [],
       [
-        CellCollisionSnapshot.observation(
-          "arm/tool",
-          Mechanism(
-            "arm",
-            "moving"
-          ),
-          cube(
-            1,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "wheel",
-          Mechanism(
-            "arm",
-            "wheel"
-          ),
-          cube(
-            0,
-            0,
-            0,
-            0.01
-          )
-        ),
-        CellCollisionSnapshot.observation(
-          "floor",
-          Fixture,
-          cube(
-            0,
-            0,
-            -0.059,
-            0.01
-          )
-        )
+        CellCollisionSnapshot.observation("arm/tool", Mechanism("arm", "moving"), cube(1, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("wheel", Mechanism("arm", "wheel"), cube(0, 0, 0, 0.01)),
+        CellCollisionSnapshot.observation("floor", Fixture, cube(0, 0, -0.059, 0.01))
       ]
     );
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -794,12 +565,7 @@ class CellCollisionCorpus {
     );
     var build = scene.build(new NativeCollisionWorld());
     var planner = new ManipulatorPlannerSpace(
-      new CollisionPlannerSpace(
-        scene.description,
-        build,
-        scene.bodies,
-        scene.margins()
-      ),
+      new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins()),
       arm,
       [0.0],
       scene.bodies.reference.q
@@ -815,10 +581,7 @@ class CellCollisionCorpus {
       "arm",
       arm.robot,
       linkShapes([{part: "torch", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
-      [
-        Transform3.identity(),
-        Transform3.identity()
-      ],
+      [Transform3.identity(), Transform3.identity()],
       ["torch"]
     );
     captured.object("work", [cube(0.021, 0, 0, 0.01), cube(0, 0.021, 0, 0.01)], Transform3.identity(), null, Fixture);
@@ -845,36 +608,11 @@ class CellCollisionCorpus {
       arm.robot,
       linkShapes([
         {part: "pad-A", link: 1, vertices: cube(1, 0, 0, 0.01)},
-        {
-          part: "pad-B",
-          link: 1,
-          vertices: cube(
-            1.04,
-            0,
-            0,
-            0.01
-          )
-        },
-        {
-          part: "plate",
-          link: 1,
-          vertices: cube(
-            1.1,
-            0,
-            0,
-            0.01
-          )
-        }
+        {part: "pad-B", link: 1, vertices: cube(1.04, 0, 0, 0.01)},
+        {part: "plate", link: 1, vertices: cube(1.1, 0, 0, 0.01)}
       ]),
-      [
-        Transform3.identity(),
-        Transform3.identity()
-      ],
-      [
-        "pad-A",
-        "pad-B",
-        "plate"
-      ]
+      [Transform3.identity(), Transform3.identity()],
+      ["pad-A", "pad-B", "plate"]
     );
     captured.object("stock", [cube(1.02, 0, 0, 0.01), cube(1.02, 0, 0, 0.01)], Transform3.identity(), "moving");
     var scene = captured.describe(arm, [0.0], 0.005), stock = scene.memberObjects(["stock"]);

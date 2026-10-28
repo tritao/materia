@@ -183,19 +183,13 @@ class WallFinishingScenarioTests {
       new Point2(-0.5, -0.15),
       new Point2(0.5, -0.15),
       new Point2(0.5, 0.15),
-      new Point2(
-        -0.5,
-        0.15
-      )
+      new Point2(-0.5, 0.15)
     ]);
     var exclusion = new Polygon2([
       new Point2(0.08, -0.01),
       new Point2(0.1, -0.01),
       new Point2(0.1, 0.01),
-      new Point2(
-        0.08,
-        0.01
-      )
+      new Point2(0.08, 0.01)
     ]);
     // Surface-local Y (vertical) maps to map Z. WorkPatchPlanner's own
     // candidate search has no notion of a separate wheeled-base height: the
@@ -218,10 +212,7 @@ class WallFinishingScenarioTests {
       [exclusion],
       0.002,
       "gypsum",
-      new Provenance(
-        "bim:wall-1",
-        SourceKind.Design
-      )
+      new Provenance("bim:wall-1", SourceKind.Design)
     );
 
     // -- scan --
@@ -539,11 +530,7 @@ class WallFinishingScenarioTests {
         robotkit.core.JointTargetMode.Effort
       ],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     );
     var replay = new ReplayRobot("wall-finishing-robot", recording, replayDescription, replayCapabilities);
     var replayed = 0;
@@ -619,11 +606,7 @@ class WallFinishingScenarioTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(
-        wheelIds,
-        wheelRadius,
-        baseRadius
-      ),
+      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4,
       0.6,
       0.5,
@@ -640,21 +623,9 @@ class WallFinishingScenarioTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [

@@ -77,11 +77,7 @@ class EndEffectorContactMuJoCo {
     );
     var obstacle = simulationHarness.spawnBox(
       [cup.centre.x, cup.centre.y, cup.centre.z + cup.halfExtents.z + 0.007],
-      [
-        0.005,
-        0.005,
-        0.005
-      ]
+      [0.005, 0.005, 0.005]
     );
     simulationHarness.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
@@ -152,11 +148,7 @@ class EndEffectorContactMuJoCo {
     ));
     simulationHarness.spawnBox(
       [bounds.centre.x, bounds.centre.y, bounds.centre.z + bounds.halfExtents.z + 0.007],
-      [
-        0.005,
-        0.005,
-        0.005
-      ]
+      [0.005, 0.005, 0.005]
     );
     simulationHarness.step(Int64.ofInt(2));
     var nearbyStep = simulation.stepIndex();
@@ -164,16 +156,8 @@ class EndEffectorContactMuJoCo {
     if (nearbyFrame.values.get(0) != 0 || vacuum.isHolding() || vacuum.vacuumKpa() != 0
       || nearbyFrame.sourceClockId != robot.sourceClockId) throw "Cup proximity must not produce a seal pressure";
     var touchingObject = simulationHarness.spawnBox(
-      [
-        bounds.centre.x,
-        bounds.centre.y,
-        bounds.centre.z + bounds.halfExtents.z + 0.003
-      ],
-      [
-        0.005,
-        0.005,
-        0.005
-      ]
+      [bounds.centre.x, bounds.centre.y, bounds.centre.z + bounds.halfExtents.z + 0.003],
+      [0.005, 0.005, 0.005]
     );
     simulationHarness.step(Int64.ofInt(3));
     var touching = false;

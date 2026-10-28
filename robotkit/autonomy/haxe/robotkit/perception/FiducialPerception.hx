@@ -137,11 +137,7 @@ class FiducialPerception implements Perception {
         appendObservation(
           frame,
           index,
-          new FiducialMarkerObservation(
-            Std.int(markerValue),
-            new Pose2(x, y, yaw),
-            confidence
-          ),
+          new FiducialMarkerObservation(Std.int(markerValue), new Pose2(x, y, yaw), confidence),
           detections,
           pallets,
           dockingTargets

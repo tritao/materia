@@ -162,17 +162,8 @@ class DepthCameraObstaclePerception implements Perception {
         points,
         frame.receivedTimestampNs,
         bodyLinkId,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
         frame.sourceClockId,
         frame.receivedClockId
       );

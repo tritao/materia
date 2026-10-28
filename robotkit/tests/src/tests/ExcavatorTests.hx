@@ -70,10 +70,7 @@ class ExcavatorTests {
     var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot(
       "two-pass-toolpath",
-      simulation.addRobot(RobotRuntimeCompiler.compile(
-        fixture.model,
-        new robotkit.profile.RobotProfile()
-      )),
+      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model, new robotkit.profile.RobotProfile())),
       fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]
@@ -88,11 +85,7 @@ class ExcavatorTests {
       robot,
       fixture.manipulator,
       "excavator",
-      PlanningLimits.ofGroup(
-        fixture.manipulator,
-        null,
-        1.0
-      ),
+      PlanningLimits.ofGroup(fixture.manipulator, null, 1.0),
       1.0,
       0.002,
       0.01,
@@ -163,12 +156,7 @@ class ExcavatorTests {
     var samples = [
       {x: 3.2, y: 0.0, z: -0.4, pitch: -0.4},
       {x: 3.6, y: 0.4, z: 0.1, pitch: -1.6},
-      {
-        x: 2.6,
-        y: -0.3,
-        z: 0.6,
-        pitch: 0.5
-      }
+      {x: 2.6, y: -0.3, z: 0.6, pitch: 0.5}
     ];
     var current = seed;
     for (sample in samples) {
@@ -236,11 +224,8 @@ class ExcavatorTests {
     var descend = points[points.length - 2];
     var open = points[points.length - 1];
     check(
-      approx(descend.work_T_tcp.translation.x, dump.x, 1e-9) && approx(
-        descend.work_T_tcp.translation.y,
-        dump.y,
-        1e-9
-      ) && approx(
+      approx(descend.work_T_tcp.translation.x,
+      dump.x, 1e-9) && approx(descend.work_T_tcp.translation.y, dump.y, 1e-9) && approx(
         descend.work_T_tcp.translation.z,
         0.4,
         1e-9
@@ -323,11 +308,7 @@ class ExcavatorTests {
       robot,
       fixture.manipulator,
       "excavator",
-      PlanningLimits.ofGroup(
-        fixture.manipulator,
-        null,
-        spec.maxAcceleration
-      ),
+      PlanningLimits.ofGroup(fixture.manipulator, null, spec.maxAcceleration),
       spec.maxJointStep,
       spec.positionTolerance,
       spec.orientationTolerance,
@@ -455,11 +436,7 @@ class ExcavatorTests {
       robot,
       fixture.manipulator,
       "excavator",
-      PlanningLimits.ofGroup(
-        fixture.manipulator,
-        null,
-        spec.maxAcceleration
-      ),
+      PlanningLimits.ofGroup(fixture.manipulator, null, spec.maxAcceleration),
       spec.maxJointStep,
       spec.positionTolerance,
       spec.orientationTolerance,
@@ -515,11 +492,7 @@ class ExcavatorTests {
       robot,
       fixture.manipulator,
       "excavator",
-      PlanningLimits.ofGroup(
-        fixture.manipulator,
-        null,
-        0.6
-      ),
+      PlanningLimits.ofGroup(fixture.manipulator, null, 0.6),
       6.5,
       2e-3,
       8e-3,
@@ -620,11 +593,7 @@ class ExcavatorTests {
       "bucket",
       "bucket",
       new Transform3(new Vec3(0.9, 0.0, -0.1), Quat.identity()),
-      ToolGeometry.box(new Vec3(
-        0.5,
-        0.6,
-        0.4
-      )),
+      ToolGeometry.box(new Vec3(0.5, 0.6, 0.4)),
       400.0
     );
     var manipulator = arm.withTool(tool.flangeTTcp);

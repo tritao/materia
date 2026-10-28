@@ -90,20 +90,8 @@ class WeldTests {
         wireSpeed: wire,
         voltageSet: volts,
         supplyReady: ready,
-        tipDistance: work.distance(
-          x,
-          0.0,
-          height
-        ),
-        wireDistance: work.ray(
-          x,
-          0.0,
-          height,
-          0.0,
-          0.0,
-          -1.0,
-          WeldArcModel.STRIKE_REACH
-        )
+        tipDistance: work.distance(x, 0.0, height),
+        wireDistance: work.ray(x, 0.0, height, 0.0, 0.0, -1.0, WeldArcModel.STRIKE_REACH)
       }
     );
   }
@@ -183,17 +171,8 @@ class WeldTests {
     var work = new GroundedWork().add(
       ConvexSolid.box(-1, -1, -1, 1, 1, 1),
       function() return {
-        position: [
-          body.x,
-          0.0,
-          0.0
-        ],
-        rotation: [
-          0.0,
-          0.0,
-          Math.sin(body.turn / 2),
-          Math.cos(body.turn / 2)
-        ]
+        position: [body.x, 0.0, 0.0],
+        rotation: [0.0, 0.0, Math.sin(body.turn / 2), Math.cos(body.turn / 2)]
       }
     );
     near(work.distance(3, 0, 0), 2.0, "the work is where its body is", 1e-9);
@@ -206,12 +185,7 @@ class WeldTests {
       ConvexSolid.box(-1, -2, -1, 1, 2, 1),
       function() return {
         position: [body.x, 0.0, 0.0],
-        rotation: [
-          0.0,
-          0.0,
-          Math.sin(body.turn / 2),
-          Math.cos(body.turn / 2)
-        ]
+        rotation: [0.0, 0.0, Math.sin(body.turn / 2), Math.cos(body.turn / 2)]
       }
     );
     near(work.distance(2, 0, 0), 0.0, "the turned box reaches 2 along X", 1e-9);
@@ -476,11 +450,7 @@ class WeldTests {
     [0.0, 0.0, 0.0],
     [0.1, 0.0, 0.0],
     [0.0, 0.0, 1.0],
-    [
-      0.0,
-      -1.0,
-      0.0
-    ],
+    [0.0, -1.0, 0.0],
     wire,
     EFFICIENCY
   );
@@ -594,14 +564,7 @@ class WeldTests {
     };
     var plan = WeldPlan.straight(
       new Transform3(new Vec3(0.1, 0.0, 0.0), Quat.identity()),
-      new Transform3(
-        new Vec3(
-          0.1,
-          0.5,
-          0.0
-        ),
-        Quat.identity()
-      ),
+      new Transform3(new Vec3(0.1, 0.5, 0.0), Quat.identity()),
       parameters
     );
     near(plan.length(), 0.5, "a plan's length is the seam's", 1e-12);
@@ -654,17 +617,7 @@ class WeldTests {
     var chain = new WeldPlan(
       [
         new WeldSegment(plan.start(), plan.stop()),
-        new WeldSegment(
-          turned,
-          new Transform3(
-            new Vec3(
-              -0.1,
-              0.5,
-              0.0
-            ),
-            quarter
-          )
-        )
+        new WeldSegment(turned, new Transform3(new Vec3(-0.1, 0.5, 0.0), quarter))
       ],
       parameters
     );
@@ -693,32 +646,7 @@ class WeldTests {
     var path = new WeldPathBead(
       [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]],
       [[0.1, 0.0, 0.0], [0.1, 0.06, 0.0]],
-      [
-        [
-          [
-            0.0,
-            0.0,
-            1.0
-          ],
-          [
-            0.0,
-            -1.0,
-            0.0
-          ]
-        ],
-        [
-          [
-            0.0,
-            0.0,
-            1.0
-          ],
-          [
-            -1.0,
-            0.0,
-            0.0
-          ]
-        ]
-      ],
+      [[[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]]],
       1.2,
       EFFICIENCY
     );

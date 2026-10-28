@@ -258,20 +258,8 @@ class ProcessTests {
       0,
       null,
       [
-        toolSensor(
-          "first/contact",
-          "tool_contact",
-          1,
-          110,
-          0
-        ),
-        toolSensor(
-          "first/pressure",
-          "tool_vacuum_kpa",
-          1,
-          110,
-          20
-        )
+        toolSensor("first/contact", "tool_contact", 1, 110, 0),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 1, 110, 20)
       ]
     );
     check(
@@ -289,20 +277,8 @@ class ProcessTests {
       0,
       null,
       [
-        toolSensor(
-          "first/contact",
-          "tool_contact",
-          2,
-          120,
-          1
-        ),
-        toolSensor(
-          "first/pressure",
-          "tool_vacuum_kpa",
-          2,
-          120,
-          45
-        )
+        toolSensor("first/contact", "tool_contact", 2, 120, 1),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 2, 120, 45)
       ]
     );
     check(

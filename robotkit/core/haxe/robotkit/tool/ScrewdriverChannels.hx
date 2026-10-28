@@ -18,25 +18,9 @@ class ScrewdriverChannels implements ToolChannels {
   }
 
   public function declarations():Array<ProcessChannelDeclaration> return [
-    new ProcessChannelDeclaration(
-      start,
-      ProcessEventValue.Digital(false),
-      false
-    ),
-    new ProcessChannelDeclaration(
-      direction,
-      ProcessEventValue.Digital(false),
-      false
-    ),
-    new ProcessChannelDeclaration(
-      program,
-      ProcessEventValue.Analog(0),
-      false
-    ),
-    new ProcessChannelDeclaration(
-      vacuum,
-      ProcessEventValue.Digital(false),
-      SuctionChannels.KEEPS_ON_STOP
-    )
+    new ProcessChannelDeclaration(start, ProcessEventValue.Digital(false), false),
+    new ProcessChannelDeclaration(direction, ProcessEventValue.Digital(false), false),
+    new ProcessChannelDeclaration(program, ProcessEventValue.Analog(0), false),
+    new ProcessChannelDeclaration(vacuum, ProcessEventValue.Digital(false), SuctionChannels.KEEPS_ON_STOP)
   ];
 }

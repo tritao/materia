@@ -62,20 +62,8 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
       var zone = world.addBody(0);
       for (box in 0...Std.int(boxes.length / 6)) world.add(
         zone,
-        new CollisionPose(
-          boxes.get(6 * box),
-          boxes.get(6 * box + 1),
-          boxes.get(6 * box + 2),
-          0,
-          0,
-          0,
-          1
-        ),
-        CollisionGeometry.Box(
-          boxes.get(6 * box + 3),
-          boxes.get(6 * box + 4),
-          boxes.get(6 * box + 5)
-        )
+        new CollisionPose(boxes.get(6 * box), boxes.get(6 * box + 1), boxes.get(6 * box + 2), 0, 0, 0, 1),
+        CollisionGeometry.Box(boxes.get(6 * box + 3), boxes.get(6 * box + 4), boxes.get(6 * box + 5))
       );
       zones.push(zone);
     }
@@ -91,10 +79,7 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
             robotIndex: mechanism.robotIndex,
             link: hull.link,
             body: body,
-            carrier: simulation.linkBody(
-              mechanism.robotIndex,
-              hull.link
-            )
+            carrier: simulation.linkBody(mechanism.robotIndex, hull.link)
           });
         }
         world.add(body, CollisionPose.identity(), CollisionGeometry.Convex(hull.shape.convexVertices()));
@@ -160,15 +145,7 @@ class SimulatedRobotZoneAdapter implements SimulationStepObserver {
       ));
       world.setBodyPose(
         zones[index],
-        new CollisionPose(
-          mount.x,
-          mount.y,
-          mount.z,
-          mount.qx,
-          mount.qy,
-          mount.qz,
-          mount.qw
-        )
+        new CollisionPose(mount.x, mount.y, mount.z, mount.qx, mount.qy, mount.qz, mount.qw)
       );
     }
     for (link in links) {

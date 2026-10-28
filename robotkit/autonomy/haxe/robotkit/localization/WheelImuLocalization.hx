@@ -135,14 +135,7 @@ class WheelImuLocalization implements Localization {
       pose,
       referenceFrame,
       bodyFrame,
-      new PoseCovariance2(
-        variancePosition,
-        0.0,
-        0.0,
-        variancePosition,
-        0.0,
-        varianceYaw
-      ),
+      new PoseCovariance2(variancePosition, 0.0, 0.0, variancePosition, 0.0, varianceYaw),
       LocalizationQuality.Degraded,
       snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs,

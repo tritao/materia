@@ -115,12 +115,7 @@ class RobotHost {
         liftJoint.limits.effort = 100.0;
         liftJoint.limits.maxAcceleration = 1.0;
         profile.mobileBase = new RobotMobileConfiguration(
-          RobotDriveConfiguration.Differential(
-            "joint/left-wheel",
-            "joint/right-wheel",
-            0.1,
-            0.5
-          ),
+          RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
           0.5,
           1.0,
           1.0,
@@ -249,10 +244,7 @@ class RobotHost {
             perceptionFixtureModel,
             robotkit.inference.InferenceSession.modelDigest(perceptionFixtureModel),
             "robotd",
-            [
-              "local",
-              "worldd"
-            ],
+            ["local", "worldd"],
             0.4,
             0.0,
             0.5

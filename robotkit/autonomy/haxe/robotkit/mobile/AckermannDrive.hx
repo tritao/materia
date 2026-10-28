@@ -54,14 +54,8 @@ class AckermannDrive implements DriveModel {
     if (Math.abs(twist.lateral) > 1e-9) throw "Ackermann drive cannot execute a lateral command";
     var limited = constrain(twist);
     if (Math.abs(limited.linear) < 1e-9 && Math.abs(limited.angular) < 1e-9) return [
-      JointTarget.position(
-        steeringJoint,
-        0.0
-      ),
-      JointTarget.velocity(
-        driveWheelJoint,
-        0.0
-      )
+      JointTarget.position(steeringJoint, 0.0),
+      JointTarget.velocity(driveWheelJoint, 0.0)
     ];
     var curvatureRatio = wheelBase * limited.angular / limited.linear;
     var steering = PlanarMath.atan(curvatureRatio);
@@ -74,10 +68,7 @@ class AckermannDrive implements DriveModel {
     var direction = limited.linear < 0.0 ? -1.0 : 1.0;
     return [
       JointTarget.position(steeringJoint, steering),
-      JointTarget.velocity(
-        driveWheelJoint,
-        direction * wheelLinearSpeed / wheelRadius
-      )
+      JointTarget.velocity(driveWheelJoint, direction * wheelLinearSpeed / wheelRadius)
     ];
   }
 

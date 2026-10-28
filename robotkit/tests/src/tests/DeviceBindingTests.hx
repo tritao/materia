@@ -23,10 +23,7 @@ class DeviceBindingTests {
       if (!value) throw 'assertion failed: $message';
     }
     function near(actual:Float, expected:Float, message:String):Void check(
-      Math.abs(actual - expected) <= 1e-9 * Math.max(
-        1.0,
-        Math.abs(expected)
-      ),
+      Math.abs(actual - expected) <= 1e-9 * Math.max(1.0, Math.abs(expected)),
       '$message: $actual, expected $expected'
     );
     function fails(action:Void -> Void, fragment:String, message:String):Void {
@@ -130,13 +127,7 @@ class DeviceBindingTests {
     fails(
       function() DeviceBinding.bind(
         model,
-        new DeviceLayout([
-          new DeviceChannel(0, "motor"),
-          new DeviceChannel(
-            1,
-            "motor"
-          )
-        ]),
+        new DeviceLayout([new DeviceChannel(0, "motor"), new DeviceChannel(1, "motor")]),
         20000
       ),
       "from channels 0 and 1",

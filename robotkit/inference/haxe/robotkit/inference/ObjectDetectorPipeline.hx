@@ -143,13 +143,7 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       var rectified = Bytes.alloc(pixels.length);
       rectification.remap(
         new ImageView(image.width, image.height, image.width * 3, 1, pixels),
-        new ImageView(
-          image.width,
-          image.height,
-          image.width * 3,
-          1,
-          rectified
-        )
+        new ImageView(image.width, image.height, image.width * 3, 1, rectified)
       );
       pixels = rectified;
     }
@@ -220,14 +214,8 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       var rays = camera.unproject([
         {x: box.x, y: box.y},
         {x: box.x + box.width, y: box.y},
-        {
-          x: box.x,
-          y: box.y + box.height
-        },
-        {
-          x: box.x + box.width,
-          y: box.y + box.height
-        }
+        {x: box.x, y: box.y + box.height},
+        {x: box.x + box.width, y: box.y + box.height}
       ]);
       var left = Math.POSITIVE_INFINITY, top = Math.POSITIVE_INFINITY;
       var right = Math.NEGATIVE_INFINITY, bottom = Math.NEGATIVE_INFINITY;

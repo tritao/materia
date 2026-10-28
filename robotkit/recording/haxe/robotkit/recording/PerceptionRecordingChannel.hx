@@ -32,10 +32,7 @@ class PerceptionRecordingChannel implements RecordingChannel<ImageDetectionObser
   public function fromWire(value:ImageDetectionObservationMsg):RobotRecordingEvent return Channel(
     value.logicalRobotId,
     name(),
-    RobotEvent.Observation(
-      value.ordinal,
-      value.toObservation()
-    )
+    RobotEvent.Observation(value.ordinal, value.toObservation())
   );
   public function robotId(value:ImageDetectionObservationMsg):RobotId return value.logicalRobotId;
   public function encode(value:ImageDetectionObservationMsg):Bytes return MessagePack.encode(value);

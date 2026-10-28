@@ -103,18 +103,7 @@ class ForceTorqueMeasurement {
       frame.sourceClockId,
       mapped.valueNs,
       mapped.errorBoundNs,
-      new Wrench3(
-        new Vec3(
-          values[0],
-          values[1],
-          values[2]
-        ),
-        new Vec3(
-          values[3],
-          values[4],
-          values[5]
-        )
-      )
+      new Wrench3(new Vec3(values[0], values[1], values[2]), new Vec3(values[3], values[4], values[5]))
     );
   }
 }

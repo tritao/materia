@@ -25,10 +25,7 @@ class Forks {
   public static function fromRobot(robot:Robot,
     model:RobotModel, profile:robotkit.profile.RobotProfile):Forks return fromBlueprint(
       robot,
-      RobotRuntimeCompiler.compile(
-        model,
-        profile
-      )
+      RobotRuntimeCompiler.compile(model, profile)
     );
 
   /** Builds the fork view from a previously compiled robot blueprint. */
@@ -46,11 +43,7 @@ class Forks {
       robot,
       new ForkConfig(
         axisConfig(config.lift),
-        new LoadLimits(
-          config.maxMassKg,
-          config.maxLoadMomentKgMeters,
-          config.maxLiftHeightMeters
-        ),
+        new LoadLimits(config.maxMassKg, config.maxLoadMomentKgMeters, config.maxLiftHeightMeters),
         config.tilt == null ? null : axisConfig(cast config.tilt),
         config.spread == null ? null : axisConfig(cast config.spread)
       )
@@ -85,16 +78,8 @@ class Forks {
     return new ForkState(
       robot.id(),
       readAxis(snapshot, config.lift, liftIndex),
-      config.tilt == null ? null : readAxis(
-        snapshot,
-        config.tilt,
-        cast tiltIndex
-      ),
-      config.spread == null ? null : readAxis(
-        snapshot,
-        config.spread,
-        cast spreadIndex
-      ),
+      config.tilt == null ? null : readAxis(snapshot, config.tilt, cast tiltIndex),
+      config.spread == null ? null : readAxis(snapshot, config.spread, cast spreadIndex),
       snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs,
       snapshot.sourceClockId,

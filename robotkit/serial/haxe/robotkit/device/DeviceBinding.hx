@@ -114,10 +114,7 @@ class DeviceBinding {
   static function bindActuators(robot:RobotModel, layout:DeviceLayout, stepTickHz:Int): {
     model: RobotModel,
     channels: Array<BoundChannel>,
-    wired: Map<
-      String,
-      Int
-  >
+    wired: Map<String, Int>
   } {
     if (robot == null || layout == null) throw "Device binding requires a model and a layout";
     if (stepTickHz <= 0) throw "Device binding requires a positive step tick rate";

@@ -136,12 +136,7 @@ class WorldTcpIntegration {
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
       profile.mobileBase = new robotkit.profile.RobotMobileConfiguration(
-        robotkit.profile.RobotDriveConfiguration.Differential(
-          "joint/left-wheel",
-          "joint/right-wheel",
-          0.1,
-          0.5
-        ),
+        robotkit.profile.RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
         0.5,
         1.0,
         1.0,
@@ -210,16 +205,8 @@ class WorldTcpIntegration {
         [0.0, 0.0, 0.0],
         target,
         [0.5, 0.5, 0.5],
-        [
-          0.5,
-          0.5,
-          0.5
-        ],
-        [
-          1.0,
-          1.0,
-          1.0
-        ]
+        [0.5, 0.5, 0.5],
+        [1.0, 1.0, 1.0]
       );
       var planSegments:Array<TrajectorySegment> = [for (segment in generated.segments()) new TrajectorySegment(
         segment.timeFromStartNs,
@@ -233,16 +220,8 @@ class WorldTcpIntegration {
         Int64.ofInt(0),
         0,
         initial,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
         planSegments
       )));
       waitUntil(
@@ -322,10 +301,7 @@ class WorldTcpIntegration {
         if (localRunner.update(local) != 1
           || remoteRunner.update(remote) != 1) throw "shared behavior did not emit one command on each adapter";
         recording.recordCommand(
-          robotkit.core.RobotCommand.JointTargets(
-            [robotkit.core.JointTarget.position(0, target)],
-            null
-          ),
+          robotkit.core.RobotCommand.JointTargets([robotkit.core.JointTarget.position(0, target)], null),
           LOGICAL_ID
         );
         if (localRunner.update(local) != 0
@@ -382,14 +358,8 @@ class WorldTcpIntegration {
       remote.submit(robotkit.core.RobotCommand.JointTargets(
         [
           robotkit.core.JointTarget.position(0, 0.25),
-          robotkit.core.JointTarget.velocity(
-            1,
-            0.5
-          ),
-          robotkit.core.JointTarget.effort(
-            2,
-            2.0
-          )
+          robotkit.core.JointTarget.velocity(1, 0.5),
+          robotkit.core.JointTarget.effort(2, 2.0)
         ],
         null
       ));
@@ -435,13 +405,7 @@ class WorldTcpIntegration {
         "receiving-to-staging",
         receiving.id,
         staging.id,
-        new Path(
-          [
-            receiving.pose,
-            staging.pose
-          ],
-          "map"
-        ),
+        new Path([receiving.pose, staging.pose], "map"),
         1.5,
         0.5
       ));
@@ -450,18 +414,7 @@ class WorldTcpIntegration {
       var mission = new Mission(
         "serial-transport",
         "Serial robot transport",
-        [new Transport(
-          "transport-pallet",
-          receiving.id,
-          staging.id,
-          new Payload(
-            100.0,
-            0.8,
-            0.6,
-            0.4,
-            0.4
-          )
-        )]
+        [new Transport("transport-pallet", receiving.id, staging.id, new Payload(100.0, 0.8, 0.6, 0.4, 0.4))]
       );
       var assignmentValue = new Dispatcher(fleet).dispatch(mission);
       if (assignmentValue == null) throw "serial robot was not assigned the facility mission";

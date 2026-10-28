@@ -63,19 +63,7 @@ class CollisionFixture {
         part.name,
         part.work ? Loose : Fixture,
         CollisionGeometry.Convex(part.vertices),
-        Transform3.fromArrays(
-          [
-            at.x,
-            at.y,
-            at.z
-          ],
-          [
-            at.qx,
-            at.qy,
-            at.qz,
-            at.qw
-          ]
-        )
+        Transform3.fromArrays([at.x, at.y, at.z], [at.qx, at.qy, at.qz, at.qw])
       );
     }
     scene.description.setGroupMargins(CollisionMarginClass.Tool, CollisionMarginClass.Work, margin, contactMargin);

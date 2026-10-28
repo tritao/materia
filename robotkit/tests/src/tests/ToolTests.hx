@@ -141,10 +141,7 @@ class ToolTests {
     var masked = group.solve(
       new Transform3(new Vec3(0.25, 0.4, -0.6), Quat.identity()),
       seed,
-      new IkOptions().freedom(
-        Free,
-        1
-      )
+      new IkOptions().freedom(Free, 1)
     );
     check(
       masked.converged && approx(masked.q[0], 0.25, 1e-4) && approx(masked.q[1], 0, 1e-12) && approx(
@@ -157,13 +154,7 @@ class ToolTests {
     var worldMasked = group.solve(
       new Transform3(new Vec3(0.15, -0.4, 0.7), Quat.identity()),
       seed,
-      new IkOptions().freedom(
-        Free,
-        1
-      ).movingBase(
-        Transform3.identity(),
-        0
-      )
+      new IkOptions().freedom(Free, 1).movingBase(Transform3.identity(), 0)
     );
     check(
       worldMasked.converged && approx(worldMasked.q[0], 0.15, 1e-4) && approx(worldMasked.q[1], 0, 1e-12) && approx(
@@ -210,33 +201,8 @@ class ToolTests {
     var tool = new MassProperties(2.0, new Vec3(0.1, 0, 0), new Inertia3(0.02, 0, 0, 0.03, 0, 0.04));
     var part = new WorkpieceLoad(
       "pick-a",
-      new MassProperties(
-        1.0,
-        new Vec3(0.1, 0, 0),
-        new Inertia3(
-          0.01,
-          0,
-          0,
-          0.02,
-          0,
-          0.01
-        )
-      ),
-      new Transform3(
-        new Vec3(
-          0,
-          0.2,
-          0
-        ),
-        Quat.fromAxisAngle(
-          new Vec3(
-            0,
-            0,
-            1
-          ),
-          Math.PI * 0.5
-        )
-      )
+      new MassProperties(1.0, new Vec3(0.1, 0, 0), new Inertia3(0.01, 0, 0, 0.02, 0, 0.01)),
+      new Transform3(new Vec3(0, 0.2, 0), Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI * 0.5))
     );
     var combined = tool.combined(part.atFlange());
     check(
@@ -274,11 +240,7 @@ class ToolTests {
       Transform3.identity(),
       [],
       1.0,
-      new MassProperties(
-        1.0,
-        new Vec3(0.1, 0, 0),
-        Inertia3.zero()
-      )
+      new MassProperties(1.0, new Vec3(0.1, 0, 0), Inertia3.zero())
     );
     var part = new WorkpieceLoad(
       "part-a",
@@ -287,13 +249,7 @@ class ToolTests {
     );
     var chart = new ReachLoadChart([
       new ReachLoadBand(0.5, new RobotPayloadLimit(4.0, 4.0)),
-      new ReachLoadBand(
-        2.0,
-        new RobotPayloadLimit(
-          4.0,
-          2.0
-        )
-      )
+      new ReachLoadBand(2.0, new RobotPayloadLimit(4.0, 2.0))
     ]);
     var bare = PayloadChecker.checkPath(manipulator, tool, null, chart, [[0.2], [1.2]], 0.1);
     check(bare.safe, "Tool alone fits the load chart through the move");
@@ -336,17 +292,7 @@ class ToolTests {
     var moving = SuctionCapacityChecker.checkPath(
       part,
       grip,
-      [
-        staticSample,
-        new SuctionMotionSample(
-          Transform3.identity(),
-          new Vec3(
-            4,
-            0,
-            0
-          )
-        )
-      ]
+      [staticSample, new SuctionMotionSample(Transform3.identity(), new Vec3(4, 0, 0))]
     );
     check(
       moving.safe && moving.worstShearMarginN > 0,
@@ -355,17 +301,7 @@ class ToolTests {
     var slipping = SuctionCapacityChecker.checkPath(
       part,
       grip,
-      [
-        staticSample,
-        new SuctionMotionSample(
-          Transform3.identity(),
-          new Vec3(
-            5,
-            0,
-            0
-          )
-        )
-      ]
+      [staticSample, new SuctionMotionSample(Transform3.identity(), new Vec3(5, 0, 0))]
     );
     check(
       !slipping.safe
@@ -375,14 +311,7 @@ class ToolTests {
     var lifting = SuctionCapacityChecker.checkPath(
       part,
       grip,
-      [new SuctionMotionSample(
-        Transform3.identity(),
-        new Vec3(
-          0,
-          0,
-          10
-        )
-      )]
+      [new SuctionMotionSample(Transform3.identity(), new Vec3(0, 0, 10))]
     );
     check(
       !lifting.safe && lifting.reason != null && lifting.reason.indexOf("Normal") >= 0,
@@ -457,21 +386,9 @@ class ToolTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [

@@ -34,12 +34,7 @@ class MachineAssemblyMassBridge {
       return {
         mass: properties.mass,
         centreOfMass: new Vector(centre.x, centre.y, centre.z),
-        inertia: properties.inertia == null ? null : properties.inertia.rotated(
-          half,
-          0,
-          0,
-          half
-        ),
+        inertia: properties.inertia == null ? null : properties.inertia.rotated(half, 0, 0, half),
         unaccounted : properties.unaccounted,
         unaccountedInertia : properties.unaccountedInertia
       };

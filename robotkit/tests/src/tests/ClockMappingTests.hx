@@ -62,10 +62,7 @@ class ClockMappingTests {
       Int64.ofInt(-50),
       0,
       Int64.ofInt(7),
-      Int64.sub(
-        hostAnchor,
-        Int64.ofInt(50)
-      ),
+      Int64.sub(hostAnchor, Int64.ofInt(50)),
       "sync session"
     ));
     var chained = registry.map(epoch, "camera", "world");
@@ -80,10 +77,7 @@ class ClockMappingTests {
       Int64.ofInt(900),
       0,
       Int64.ofInt(50),
-      Int64.add(
-        epoch,
-        Int64.ofInt(900)
-      ),
+      Int64.add(epoch, Int64.ofInt(900)),
       "alternate"
     ));
     var selected = registry.map(epoch, "camera", "world");
@@ -95,10 +89,7 @@ class ClockMappingTests {
       Int64.ofInt(951),
       0,
       Int64.ofInt(27),
-      Int64.add(
-        epoch,
-        Int64.ofInt(951)
-      ),
+      Int64.add(epoch, Int64.ofInt(951)),
       "replacement"
     ));
     check(registry.map(epoch, "camera", "world") != null, "one-nanosecond rounding difference is tolerated");
@@ -108,10 +99,7 @@ class ClockMappingTests {
       Int64.ofInt(952),
       0,
       Int64.ofInt(27),
-      Int64.add(
-        epoch,
-        Int64.ofInt(952)
-      ),
+      Int64.add(epoch, Int64.ofInt(952)),
       "replacement"
     ));
     check(registry.map(epoch, "camera", "world") == null, "larger equal-bound disagreement is ambiguous");

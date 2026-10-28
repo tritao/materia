@@ -309,14 +309,7 @@ class GnssPoseLocalization implements Localization {
       pose,
       referenceFrame,
       bodyFrame,
-      new PoseCovariance2(
-        1.0e30,
-        0.0,
-        0.0,
-        1.0e30,
-        0.0,
-        1.0e30
-      ),
+      new PoseCovariance2(1.0e30, 0.0, 0.0, 1.0e30, 0.0, 1.0e30),
       LocalizationQuality.Invalid,
       snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs,

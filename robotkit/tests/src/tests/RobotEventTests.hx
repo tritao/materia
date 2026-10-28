@@ -58,14 +58,7 @@ class RobotEventTests {
     "host.clock",
     Int64.ofInt(30),
     "host.clock",
-    [new ImageDetection(
-      "box",
-      0.9,
-      1,
-      2,
-      3,
-      4
-    )],
+    [new ImageDetection("box", 0.9, 1, 2, 3, 4)],
     0
   );
 

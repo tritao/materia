@@ -38,10 +38,7 @@ class SimulationPoseResetTests {
       null,
       null,
       null,
-      ToolGeometry.convex(
-        [piece],
-        0.005
-      ),
+      ToolGeometry.convex([piece], 0.005),
       0
     );
     simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
@@ -61,18 +58,7 @@ class SimulationPoseResetTests {
       null,
       null,
       null,
-      ToolGeometry.box(
-        new Vec3(
-          0.01,
-          0.01,
-          0.02
-        ),
-        new Vec3(
-          0,
-          0,
-          0.02
-        )
-      ),
+      ToolGeometry.box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)),
       0
     );
     boxSimulationHarness.step(Int64.ofInt(0));
@@ -289,10 +275,7 @@ class SimulationPoseResetTests {
       null,
       null,
       null,
-      ToolGeometry.convex(
-        [cup],
-        0.03
-      ),
+      ToolGeometry.convex([cup], 0.03),
       0
     );
     var obstacle = simulationHarness.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
@@ -308,11 +291,7 @@ class SimulationPoseResetTests {
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
     blueprint.linkCollisionShapes.push(new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(
       0,
-      new CollisionShape(collisionkit.CollisionGeometry.Box(
-        0.01,
-        0.01,
-        0.01
-      ))
+      new CollisionShape(collisionkit.CollisionGeometry.Box(0.01, 0.01, 0.01))
     ));
     var points:Array<Float> = [for (i in 0...8) for (a in 0...3)((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? 0.1 : 0.01)];
     var q = Math.sqrt(0.5);
@@ -325,10 +304,7 @@ class SimulationPoseResetTests {
       null,
       null,
       null,
-      [
-        sphere,
-        rotated
-      ],
+      [sphere, rotated],
       0
     );
     // Physical contacts need a dynamic participant. Static/kinematic pairs
@@ -430,11 +406,7 @@ class SimulationPoseResetTests {
       "motor",
       0.63,
       137.0,
-      robotkit.model.Transmission.SimpleTransmission(
-        "screw",
-        1.0,
-        0.0
-      )
+      robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)
     ));
     var driven = motorModel.coupledLimits("slide");
     var scale = Math.PI * 1000;
@@ -458,11 +430,7 @@ class SimulationPoseResetTests {
       "motor2",
       0.63,
       137.0,
-      robotkit.model.Transmission.SimpleTransmission(
-        "screw2",
-        1.0,
-        0.0
-      )
+      robotkit.model.Transmission.SimpleTransmission("screw2", 1.0, 0.0)
     ));
     var pair = 2 * 0.4 * scale * 0.63 / (10.0 + 2 * 0.4 * (4e-6 + 3e-5) * scale * scale);
     if (Math.abs(motorModel.coupledLimits("slide").requireAcceleration() - pair)
@@ -473,11 +441,7 @@ class SimulationPoseResetTests {
       "servo",
       null,
       null,
-      robotkit.model.Transmission.SimpleTransmission(
-        "screw",
-        1.0,
-        0.0
-      )
+      robotkit.model.Transmission.SimpleTransmission("screw", 1.0, 0.0)
     );
     servo.drive = new robotkit.model.ActuatorDrive.ServoDrive(0.5, 1.5, 100.0, 200.0, 3e-5, 4096.0);
     motorModel.addActuator(servo);

@@ -54,12 +54,7 @@ class Dock implements Skill {
       != target.detection.frameId) return lifecycle.fail("Docking target and localization frames differ");
     var value = new GoTo(
       navigator,
-      new NavigationGoal(
-        target.approachPose,
-        estimate.referenceFrame,
-        positionTolerance,
-        headingTolerance
-      ),
+      new NavigationGoal(target.approachPose, estimate.referenceFrame, positionTolerance, headingTolerance),
       observePerception,
       blockedTimeoutSeconds
     );

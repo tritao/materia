@@ -243,17 +243,8 @@ class EndEffectorRuntimeBridge {
           sensorId,
           linkId,
           flangeLinkIndex,
-          [
-            frame.position.x,
-            frame.position.y,
-            frame.position.z
-          ],
-          [
-            frame.quaternion.x,
-            frame.quaternion.y,
-            frame.quaternion.z,
-            frame.quaternion.w
-          ]
+          [frame.position.x, frame.position.y, frame.position.z],
+          [frame.quaternion.x, frame.quaternion.y, frame.quaternion.z, frame.quaternion.w]
         );
         blueprint.sensors.push(sensor);
         return sensor;

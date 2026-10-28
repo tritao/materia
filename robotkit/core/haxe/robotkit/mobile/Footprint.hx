@@ -35,14 +35,8 @@ class Footprint {
     return new Footprint([
       new FootprintPoint(-halfLength, -halfWidth),
       new FootprintPoint(halfLength, -halfWidth),
-      new FootprintPoint(
-        halfLength,
-        halfWidth
-      ),
-      new FootprintPoint(
-        -halfLength,
-        halfWidth
-      )
+      new FootprintPoint(halfLength, halfWidth),
+      new FootprintPoint(-halfLength, halfWidth)
     ]);
   }
 }

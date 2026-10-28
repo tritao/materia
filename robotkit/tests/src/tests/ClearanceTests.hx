@@ -57,11 +57,7 @@ class ClearanceTests {
     var wall = scene.addFixed(
       "wall",
       collisionkit.CollisionPose.translation(0.03, 0, 0),
-      collisionkit.CollisionGeometry.Box(
-        0.01,
-        0.01,
-        0.01
-      ),
+      collisionkit.CollisionGeometry.Box(0.01, 0.01, 0.01),
       0
     );
     var clearance = new CollisionClearance(arm, scene, [0.02], () -> new NativeCollisionWorld());
@@ -94,33 +90,15 @@ class ClearanceTests {
       var shape = new robotkit.model.CollisionShape(
         collisionkit.CollisionGeometry.Box(0.02, 0.02, 0.02),
         [x, 0, 0],
-        [
-          0,
-          0,
-          0,
-          1
-        ]
+        [0, 0, 0, 1]
       );
       shape.name = name;
       return shape;
     }
     var scene = CollisionClearance.combine([
       CollisionClearance.shapes(base.id, [cube("base block", 0.0)]),
-      CollisionClearance.shapes(
-        upper.id,
-        [cube(
-          "upper block",
-          0.015
-        )]
-      ),
-      CollisionClearance.shapes(
-        upper.id,
-        [cube(
-          "tool block",
-          0.03
-        )],
-        true
-      )
+      CollisionClearance.shapes(upper.id, [cube("upper block", 0.015)]),
+      CollisionClearance.shapes(upper.id, [cube("tool block", 0.03)], true)
     ]);
     var copy = scene.copy();
     var clearance = new CollisionClearance(arm, scene, [0.0], () -> new NativeCollisionWorld());
@@ -321,48 +299,10 @@ class ClearanceTests {
     var toolHull = box(0.0, 0.3, -0.01, 0.01, -0.01, 0.01);
     var bodies = CollisionClearance.combine([
       CollisionClearance.convex("tool", tool.id, toolHull, true),
-      CollisionClearance.convex(
-        "tool",
-        tool.id,
-        toolHull.copy(),
-        true
-      ),
-      CollisionClearance.convex(
-        "fixture",
-        base.id,
-        box(
-          0.4,
-          0.42,
-          -0.01,
-          0.01,
-          0.01025,
-          0.03
-        )
-      ),
-      CollisionClearance.convex(
-        "fixture",
-        base.id,
-        box(
-          0.43,
-          0.45,
-          -0.01,
-          0.01,
-          0.01025,
-          0.03
-        )
-      ),
-      CollisionClearance.convex(
-        "other",
-        base.id,
-        box(
-          0.46,
-          0.48,
-          -0.01,
-          0.01,
-          0.01025,
-          0.03
-        )
-      )
+      CollisionClearance.convex("tool", tool.id, toolHull.copy(), true),
+      CollisionClearance.convex("fixture", base.id, box(0.4, 0.42, -0.01, 0.01, 0.01025, 0.03)),
+      CollisionClearance.convex("fixture", base.id, box(0.43, 0.45, -0.01, 0.01, 0.01025, 0.03)),
+      CollisionClearance.convex("other", base.id, box(0.46, 0.48, -0.01, 0.01, 0.01025, 0.03))
     ]);
     var clearance = new CollisionClearance(arm, bodies, [0.0, 0.0], () -> new NativeCollisionWorld());
     var initial = clearance.violation([0.0, 0.0], true);
@@ -412,14 +352,7 @@ class ClearanceTests {
     var obstacles = [
       box(-2.0, 2.0, 0.07, 0.09, -0.01, 0.01),
       box(0.44, 0.46, -2.0, 2.0, -0.01, 0.01),
-      box(
-        -2.0,
-        2.0,
-        -2.0,
-        2.0,
-        -0.04,
-        -0.026
-      )
+      box(-2.0, 2.0, -2.0, 2.0, -0.04, -0.026)
     ];
     for (vertices in obstacles) {
       var model = new RobotModel("bounds-clearance");

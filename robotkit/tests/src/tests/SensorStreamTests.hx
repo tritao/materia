@@ -28,12 +28,7 @@ class SensorStreamTests {
       null,
       "camera.clock",
       "host.clock",
-      new CameraImage(
-        4,
-        4,
-        "rgb8",
-        haxe.io.Bytes.alloc(48)
-      )
+      new CameraImage(4, 4, "rgb8", haxe.io.Bytes.alloc(48))
     );
     var snapshot = new RobotSnapshot(
       "robot",
@@ -45,11 +40,7 @@ class SensorStreamTests {
       0,
       0,
       null,
-      [
-        imu,
-        lidar,
-        camera
-      ]
+      [imu, lidar, camera]
     );
     check(snapshot.sensors.length == 1 && snapshot.sensors.get(0).sensorId == "imu");
     check(snapshot.streamSequences.length == 3);

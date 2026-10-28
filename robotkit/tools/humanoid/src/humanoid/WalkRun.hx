@@ -99,11 +99,7 @@ class WalkRun {
       PHYSICS_STEP,
       1,
       SimulationSpace.MUJOCO,
-      {
-        integrator: INTEGRATOR_EULER,
-        solverIterations: 100,
-        lineSearchIterations: 50
-      }
+      {integrator: INTEGRATOR_EULER, solverIterations: 100, lineSearchIterations: 50}
     );
     var simulation = harness.simulation;
     var runtime = simulation.addRobotAtPose(blueprint, [0.0, 0.0, 0.793], [0.0, 0.0, 0.0, 1.0]);
@@ -141,10 +137,7 @@ class WalkRun {
       var pose = simulation.robotPose(0), velocity = simulation.robotBaseVelocity(0);
       return {
         down: rotateInverse(pose.rotation, [0.0, 0.0, -1.0]),
-        angularVelocity: rotateInverse(
-          pose.rotation,
-          velocity.angular
-        )
+        angularVelocity: rotateInverse(pose.rotation, velocity.angular)
       };
     };
     var session = new PolicySession(robot, controller, null, PHYSICS_STEP);
@@ -157,11 +150,7 @@ class WalkRun {
       worstTilt: 0.0,
       lowest: 9.0,
       worstEstimateError: 0.0,
-      meanEstimateError: [
-        0.0,
-        0.0,
-        0.0
-      ],
+      meanEstimateError: [0.0, 0.0, 0.0],
       clampedTargets: 0,
       recording: scenario.record
     };
@@ -197,10 +186,7 @@ class WalkRun {
         tilt: tilt,
         vx: local[0],
         vy: local[1],
-        wz: rotateInverse(
-          pose.rotation,
-          velocity.angular
-        )[2]
+        wz: rotateInverse(pose.rotation, velocity.angular)[2]
       });
       result.worstTilt = Math.max(result.worstTilt, tilt);
       if (t > 0.5) result.lowest = Math.min(result.lowest, pose.position[2]);
@@ -302,12 +288,7 @@ class WalkRun {
   }
 
   public static function rotateInverse(q:Array<Float>, v:Array<Float>):Array<Float> return rotate(
-    [
-      -q[0],
-      -q[1],
-      -q[2],
-      q[3]
-    ],
+    [-q[0], -q[1], -q[2], q[3]],
     v
   );
 }

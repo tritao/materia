@@ -67,17 +67,7 @@ class FloorMapTests {
     try clipped.plan(west, east) catch (_:Dynamic) clippedRoute = true;
     check(clippedRoute, "A fixed one-metre map margin clips the enlarged carrier's detour");
     var roomy = new AStarPlanner(new Costmap2(
-      FloorMap.rasterize(
-        [table],
-        goals,
-        0.05,
-        FloorMap.navigationMargin(
-          radius,
-          0.3
-        ),
-        1,
-        "map"
-      ),
+      FloorMap.rasterize([table], goals, 0.05, FloorMap.navigationMargin(radius, 0.3), 1, "map"),
       radius,
       true,
       0.3,

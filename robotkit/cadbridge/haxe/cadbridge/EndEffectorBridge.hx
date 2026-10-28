@@ -32,12 +32,7 @@ class EndEffectorBridge {
     var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state, solved));
     var transform = new Transform3(
       new Vec3(converted.position.x, converted.position.y, converted.position.z),
-      new Quat(
-        converted.quaternion.x,
-        converted.quaternion.y,
-        converted.quaternion.z,
-        converted.quaternion.w
-      )
+      new Quat(converted.quaternion.x, converted.quaternion.y, converted.quaternion.z, converted.quaternion.w)
     );
     var properties = endEffector.massPropertiesAtMount(state, solved);
     if (properties.unaccounted.length
@@ -113,16 +108,8 @@ class EndEffectorBridge {
     }
     if (!Math.isFinite(minX) || !Math.isFinite(maxX)) throw "End effector needs envelope geometry for collision";
     return {
-      centre: new Vec3(
-        ((minX + maxX) * 0.5) * 0.001,
-        ((minY + maxY) * 0.5) * 0.001,
-        ((minZ + maxZ) * 0.5) * 0.001
-      ),
-      halfExtents: new Vec3(
-        ((maxX - minX) * 0.5) * 0.001,
-        ((maxY - minY) * 0.5) * 0.001,
-        ((maxZ - minZ) * 0.5) * 0.001
-      )
+      centre: new Vec3(((minX + maxX) * 0.5) * 0.001, ((minY + maxY) * 0.5) * 0.001, ((minZ + maxZ) * 0.5) * 0.001),
+      halfExtents: new Vec3(((maxX - minX) * 0.5) * 0.001, ((maxY - minY) * 0.5) * 0.001, ((maxZ - minZ) * 0.5) * 0.001)
     };
   }
 }

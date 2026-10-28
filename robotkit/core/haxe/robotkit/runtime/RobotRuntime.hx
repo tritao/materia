@@ -85,10 +85,7 @@ class RobotRuntime {
     }
     // Configure before any worker or shared simulation tick can admit motion.
     for (joint in 0...blueprint.jointCount) if (references.requiresHome(joint)) check(
-      endpoint.requireReference(
-        joint,
-        true
-      ),
+      endpoint.requireReference(joint, true),
       'runtime.requireReference[$joint]'
     );
   }
@@ -158,11 +155,7 @@ class RobotRuntime {
       value.get_joint_count(),
       modes,
       execution,
-      new robotkit.core.TimingCapabilities(
-        true,
-        true,
-        Unchecked
-      )
+      new robotkit.core.TimingCapabilities(true, true, Unchecked)
     );
   }
 
@@ -254,10 +247,7 @@ class RobotRuntime {
           arrays.durations,
           arrays.degrees,
           arrays.coefficients,
-          new NativeSpan<Int>(
-            map,
-            arrays.jointMap.length
-          ),
+          new NativeSpan<Int>(map, arrays.jointMap.length),
           events
         );
       } else {

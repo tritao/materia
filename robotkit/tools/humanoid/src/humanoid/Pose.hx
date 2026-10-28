@@ -15,10 +15,7 @@ class Pose {
     rootPosition:Array<Float>,
     rootRotation:Array<Float>,
     joints:Map<String, Float>,
-    actuatorTargets:Map<
-      String,
-      Float
-  >
+    actuatorTargets:Map<String, Float>
   ) {
     this.name = name;
     this.rootPosition = rootPosition;
@@ -44,14 +41,8 @@ class Pose {
         name,
         floats(Reflect.field(pose, "rootPosition")),
         floats(Reflect.field(pose, "rootRotation")),
-        values(Reflect.field(
-          pose,
-          "joints"
-        )),
-        values(Reflect.field(
-          pose,
-          "actuatorTargets"
-        ))
+        values(Reflect.field(pose, "joints")),
+        values(Reflect.field(pose, "actuatorTargets"))
       );
     }
     throw 'no pose $name in $path';

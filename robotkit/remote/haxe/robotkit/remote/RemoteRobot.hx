@@ -127,11 +127,7 @@ class RemoteRobot implements Robot {
       0,
       [],
       ExecutionCapabilities.unavailable(),
-      new TimingCapabilities(
-        false,
-        false,
-        Unchecked
-      )
+      new TimingCapabilities(false, false, Unchecked)
     ) : robotkit.protocol.CapabilityCodec.decode(
       value,
       logicalId

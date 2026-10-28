@@ -386,22 +386,8 @@ class AssemblySimulationBridge {
     // part, per link, combined once every part is placed.
     var masses:Array<Array<{mass:Float, center:Array<Float>, inertia:Array<Float>}>> = [[{
       mass: 0.001,
-      center: [
-        0.0,
-        0.0,
-        0.0
-      ],
-      inertia: [
-        1e-6,
-        0,
-        0,
-        0,
-        1e-6,
-        0,
-        0,
-        0,
-        1e-6
-      ]
+      center: [0.0, 0.0, 0.0],
+      inertia: [1e-6, 0, 0, 0, 1e-6, 0, 0, 0, 1e-6]
     }]];
     var partLinks = new Map<String, AssemblyPartLink>();
     var offsets = new Map<String, AssemblyFrame>();
@@ -472,10 +458,7 @@ class AssemblySimulationBridge {
         var tensor:Array<Float> = mass == 0.0 ? [for (_ in 0...9) 0.0] : inertia == null ? rotated(
           part.inertia,
           offset,
-          part.density * Math.pow(
-            scale,
-            5
-          ) * mass / baseMass
+          part.density * Math.pow(scale, 5) * mass / baseMass
         ) : rotated(
           inertia,
           offset,
@@ -538,23 +521,11 @@ class AssemblySimulationBridge {
         if (parentLink == childLink && edge.type == AssemblyJointType.Fixed) {
           var a = AssemblyFrames.compose(
             offsetOf(edge.parent),
-            connector(
-              definitions.get(occurrenceDefinition(
-                definition,
-                edge.parent
-              )),
-              edge.parentConnector
-            )
+            connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector)
           );
           var b = AssemblyFrames.compose(
             offsetOf(edge.child),
-            connector(
-              definitions.get(occurrenceDefinition(
-                definition,
-                edge.child
-              )),
-              edge.childConnector
-            )
+            connector(definitions.get(occurrenceDefinition(definition, edge.child)), edge.childConnector)
           );
           var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
           var tolerance = edge.closureTolerance == null ? 1e-6 / scale : edge.closureTolerance;
@@ -566,13 +537,7 @@ class AssemblySimulationBridge {
         closures.push(edge.id);
         var frame = AssemblyFrames.compose(
           offsetOf(edge.parent),
-          connector(
-            definitions.get(occurrenceDefinition(
-              definition,
-              edge.parent
-            )),
-            edge.parentConnector
-          )
+          connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector)
         );
         var endpoint = AssemblyFrames.transformPoint(frame, edge.axis.x, edge.axis.y, edge.axis.z);
         closureGeometry.push({
@@ -580,16 +545,8 @@ class AssemblySimulationBridge {
           parent: linkOf(edge.parent).id,
           child: linkOf(edge.child).id,
           type: edge.type,
-          anchorParent: [
-            frame.x * scale,
-            frame.y * scale,
-            frame.z * scale
-          ],
-          axisParent: [
-            endpoint.x - frame.x,
-            endpoint.y - frame.y,
-            endpoint.z - frame.z
-          ]
+          anchorParent: [frame.x * scale, frame.y * scale, frame.z * scale],
+          axisParent: [endpoint.x - frame.x, endpoint.y - frame.y, endpoint.z - frame.z]
         });
         continue;
       }
@@ -616,13 +573,7 @@ class AssemblySimulationBridge {
       }
       var parentFrame = AssemblyFrames.compose(
         offsetOf(edge.parent),
-        connector(
-          definitions.get(occurrenceDefinition(
-            definition,
-            edge.parent
-          )),
-          edge.parentConnector
-        )
+        connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector)
       );
       var initial = placement.joint(edge.id);
       setFrame(
@@ -635,13 +586,7 @@ class AssemblySimulationBridge {
         joint,
         AssemblyFrames.compose(
           offsetOf(edge.child),
-          connector(
-            definitions.get(occurrenceDefinition(
-              definition,
-              edge.child
-            )),
-            edge.childConnector
-          )
+          connector(definitions.get(occurrenceDefinition(definition, edge.child)), edge.childConnector)
         ),
         false,
         scale
@@ -767,11 +712,7 @@ class AssemblySimulationBridge {
         actuator.id,
         actuator.maxEffort,
         actuator.maxRate,
-        Transmission.SimpleTransmission(
-          driven.id,
-          gear / factor,
-          -initial * factor
-        )
+        Transmission.SimpleTransmission(driven.id, gear / factor, -initial * factor)
       );
       if (actuator.pneumatic != null) {
         var p = actuator.pneumatic;

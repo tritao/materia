@@ -51,10 +51,7 @@ class FrameAwarePerception implements Perception {
     var filter = scanFilter;
     var scans = filter == null ? sensorFrames : [for (frame in sensorFrames) filter.applies(frame) ? filter.filter(
       frame,
-      referenceFromFrame(
-        frame.frameId,
-        estimate
-      )
+      referenceFromFrame(frame.frameId, estimate)
     ) : frame];
     var observed = source.observe(scans);
     var detections = [for (value in observed.detections()) transformDetection(value, estimate)];
@@ -78,10 +75,7 @@ class FrameAwarePerception implements Perception {
     var views:Array<FreeSpaceView> = layout == null ? [] : [for (frame in sensorFrames) if (frame.kind == "lidar"
       && frame.values.length > 0) layout.viewing(
         frame,
-        referenceFromFrame(
-          frame.frameId,
-          estimate
-        )
+        referenceFromFrame(frame.frameId, estimate)
       )];
     return new PerceptionSnapshot(
       detections,

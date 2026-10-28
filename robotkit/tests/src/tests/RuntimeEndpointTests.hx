@@ -154,14 +154,7 @@ class RuntimeEndpointTests {
       [0.0],
       [0.0],
       [0.0],
-      [new robotkit.execution.TrajectorySegment(
-        haxe.Int64.ofInt(0),
-        haxe.Int64.ofInt(1000000),
-        [[
-          0.0,
-          0.1
-        ]]
-      )]
+      [new robotkit.execution.TrajectorySegment(haxe.Int64.ofInt(0), haxe.Int64.ofInt(1000000), [[0.0, 0.1]])]
     );
     var limitRejected = false;
     try bounded.submit(robotkit.core.RobotCommand.ExecutionPlan(tooLarge)) catch (_:Dynamic) limitRejected = true;

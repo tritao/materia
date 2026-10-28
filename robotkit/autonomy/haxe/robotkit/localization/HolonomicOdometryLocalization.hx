@@ -52,14 +52,7 @@ class HolonomicOdometryLocalization implements Localization {
       pose,
       referenceFrame,
       bodyFrame,
-      new PoseCovariance2(
-        varianceX,
-        0.0,
-        0.0,
-        varianceY,
-        0.0,
-        varianceYaw
-      ),
+      new PoseCovariance2(varianceX, 0.0, 0.0, varianceY, 0.0, varianceYaw),
       LocalizationQuality.Degraded,
       snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs,

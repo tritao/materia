@@ -40,10 +40,7 @@ class MassProperties {
     return new MassProperties(
       total,
       centre,
-      first == null || second == null ? null : first.shifted(
-        massKg,
-        centerOfMass.sub(centre)
-      ).add(second.shifted(
+      first == null || second == null ? null : first.shifted(massKg, centerOfMass.sub(centre)).add(second.shifted(
         other.massKg,
         other.centerOfMass.sub(centre)
       ))

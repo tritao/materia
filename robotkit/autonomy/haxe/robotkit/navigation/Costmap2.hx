@@ -235,10 +235,7 @@ class Costmap2 {
       var centerY = (y + 0.5) * resolution;
       var t = lengthSquared <= 1e-18 ? 0.0 : Math.max(
         0.0,
-        Math.min(
-          1.0,
-          ((centerX - ax) * sx + (centerY - ay) * sy) / lengthSquared
-        )
+        Math.min(1.0, ((centerX - ax) * sx + (centerY - ay) * sy) / lengthSquared)
       );
       var dx = centerX - (ax + t * sx);
       var dy = centerY - (ay + t * sy);

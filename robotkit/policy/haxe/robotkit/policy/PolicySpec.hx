@@ -160,10 +160,7 @@ class PolicySpec {
     var sourceFields:Dynamic = Reflect.field(root, "source");
     if (sourceFields != null) for (key in Reflect.fields(sourceFields)) source.set(
       key,
-      Std.string(Reflect.field(
-        sourceFields,
-        key
-      ))
+      Std.string(Reflect.field(sourceFields, key))
     );
     var io:Dynamic = require(root, "io");
     var observation:Array<Dynamic> = require(root, "observation");
@@ -206,21 +203,8 @@ class PolicySpec {
     ], imu: {
       id: require(imu, "id"),
       link: require(imu, "link"),
-      position: floats(field(
-        imu,
-        "position",
-        [0.0, 0.0, 0.0]
-      )),
-      rotation: floats(field(
-        imu,
-        "rotation",
-        [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ]
-      ))
+      position: floats(field(imu, "position", [0.0, 0.0, 0.0])),
+      rotation: floats(field(imu, "rotation", [0.0, 0.0, 0.0, 1.0]))
     }, hold:hold == null ? null : {kp : require(
       hold,
       "kp"

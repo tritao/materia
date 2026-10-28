@@ -132,10 +132,7 @@ class PoseFusionLocalization implements Localization {
     absoluteQuality = observation.quality;
     sourceOrders.set(
       observation.sourceClockId,
-      new AbsoluteObservationOrder(
-        observation.sequence,
-        observation.sourceTimestampNs
-      )
+      new AbsoluteObservationOrder(observation.sequence, observation.sourceTimestampNs)
     );
     lastAbsoluteReceivedTimestampNs = observation.receivedTimestampNs;
     lastAbsoluteReceivedClockId = observation.receivedClockId;
@@ -240,10 +237,7 @@ class PoseFusionLocalization implements Localization {
 
   static function clamp(value:Float, minimum:Float, maximum:Float):Float return Math.max(
     minimum,
-    Math.min(
-      maximum,
-      value
-    )
+    Math.min(maximum, value)
   );
 
   static function fuseAxis(prior:Float, priorVariance:Float, measurement:Float, measurementVariance:Float):FusedAxis {

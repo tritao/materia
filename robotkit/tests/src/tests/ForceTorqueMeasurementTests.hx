@@ -27,14 +27,7 @@ class ForceTorqueMeasurementTests {
       frameId,
       Int64.ofInt(sequence),
       Int64.ofInt(timestamp),
-      values == null ? [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ] : values,
+      values == null ? [1, 2, 3, 4, 5, 6] : values,
       null,
       null,
       null,
@@ -107,22 +100,7 @@ class ForceTorqueMeasurementTests {
     );
     check(
       rejected(() -> read(
-        frame(
-          "ft/tool",
-          "tool/ft",
-          "force_torque",
-          "sensor.clock",
-          2,
-          100000,
-          [
-            1,
-            2,
-            Math.NaN,
-            4,
-            5,
-            6
-          ]
-        ),
+        frame("ft/tool", "tool/ft", "force_torque", "sensor.clock", 2, 100000, [1, 2, Math.NaN, 4, 5, 6]),
         102000,
         5000,
         mappings

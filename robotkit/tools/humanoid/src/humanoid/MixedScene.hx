@@ -48,16 +48,8 @@ class MixedScene {
       [0.0, 0.13585, 0.0],
       [0.0, -0.1197, 0.425],
       [0.0, 0.0, 0.39225],
-      [
-        0.0,
-        0.10915,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.09465
-      ]
+      [0.0, 0.10915, 0.0],
+      [0.0, 0.0, 0.09465]
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     for (i in 0...6) {
@@ -100,10 +92,7 @@ class MixedScene {
       if (rate == null || acceleration == null) throw "Mixed-scene gantry needs physical drive limits";
       var span = Math.min(
         0.3 * (joint.upperLimit - joint.lowerLimit),
-        Math.min(
-          rate * 0.5 / frequency,
-          acceleration * 0.5 / (frequency * frequency)
-        )
+        Math.min(rate * 0.5 / frequency, acceleration * 0.5 / (frequency * frequency))
       );
       positions[i] = mid + span * Math.sin(frequency * t);
     }

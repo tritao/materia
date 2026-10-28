@@ -58,23 +58,12 @@ class SuctionCapacityBridge {
     if (memberPose == null) throw 'Missing solved pose for "$cupInstanceId"';
     var mountTContact = AssemblyFrames.compose(
       AssemblyFrames.inverse(solved.mountWorld),
-      AssemblyFrames.compose(
-        memberPose,
-        effector.memberConnectorFrame(
-          cupInstanceId,
-          contactConnector
-        )
-      )
+      AssemblyFrames.compose(memberPose, effector.memberConnectorFrame(cupInstanceId, contactConnector))
     );
     var converted = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(mountTContact));
     var flangeTCup = new Transform3(
       new Vec3(converted.position.x, converted.position.y, converted.position.z),
-      new Quat(
-        converted.quaternion.x,
-        converted.quaternion.y,
-        converted.quaternion.z,
-        converted.quaternion.w
-      )
+      new Quat(converted.quaternion.x, converted.quaternion.y, converted.quaternion.z, converted.quaternion.w)
     );
     return new SuctionGrip(
       flangeTCup,

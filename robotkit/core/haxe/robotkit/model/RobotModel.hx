@@ -311,10 +311,7 @@ class RobotModel {
       inertia += entry.link.mass * Math.max(0.0, offset.dot(offset) - along * along);
       for (next in joints) if (next.parent == entry.link) frontier.push({
         link: next.child,
-        pose: entry.pose.compose(jointFrame(
-          next.parentFramePosition,
-          next.parentFrameRotation
-        )).compose(jointFrame(
+        pose: entry.pose.compose(jointFrame(next.parentFramePosition, next.parentFrameRotation)).compose(jointFrame(
           next.childFramePosition,
           next.childFrameRotation
         ).inverse())
@@ -325,17 +322,8 @@ class RobotModel {
 
   static function jointFrame(position:Array<Float>,
     rotation:Array<Float>):robotkit.spatial.Transform3 return new robotkit.spatial.Transform3(
-      new robotkit.spatial.Vec3(
-        position[0],
-        position[1],
-        position[2]
-      ),
-      new robotkit.spatial.Quat(
-        rotation[0],
-        rotation[1],
-        rotation[2],
-        rotation[3]
-      )
+      new robotkit.spatial.Vec3(position[0], position[1], position[2]),
+      new robotkit.spatial.Quat(rotation[0], rotation[1], rotation[2], rotation[3])
     );
 
   public function addSensor(sensor:Sensor):Sensor {

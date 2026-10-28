@@ -73,10 +73,7 @@ class Actuator {
         ) ? new StepperDrive(
           value,
           current.rotorInertia,
-          cast(
-            current,
-            StepperDrive
-          ).holdingTorque,
+          cast(current, StepperDrive).holdingTorque,
           current.curve
         ) : StepperDrive.stepsOnly(value);
     } else if (current != null && Std.isOfType(current, StepperDrive)) drive = null;

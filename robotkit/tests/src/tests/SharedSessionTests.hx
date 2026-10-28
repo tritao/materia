@@ -45,23 +45,11 @@ class SharedSessionTests {
       || compoundShape.convexPieceCounts()[0] != 24) throw "Compound shape lost ownership of its piece geometry";
     var compound = session.createObject(MotionType.Dynamic, compoundShape, new SimPose(5, 0, 2), 0.8);
     if (compound.overlapsVolume(new SimPose(5, 0, 2), [0.02, 0.02, 0.02]) || !compound.overlapsVolume(
-      new SimPose(
-        5.3,
-        0,
-        2
-      ),
-      [
-        0.02,
-        0.02,
-        0.02
-      ]
+      new SimPose(5.3, 0, 2),
+      [0.02, 0.02, 0.02]
     )) throw "Compound object's query filled its empty gap or lost its material";
     if (Math.abs(session.raycast(new SimPose(5, 0, 3), 0, 0, -1, 3) - 3) > 1e-9 || Math.abs(session.raycast(
-      new SimPose(
-        5.3,
-        0,
-        3
-      ),
+      new SimPose(5.3, 0, 3),
       0,
       0,
       -1,

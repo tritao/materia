@@ -47,12 +47,7 @@ class PerceptionInferenceTests {
       null,
       "camera.clock",
       "host.monotonic",
-      new CameraImage(
-        8,
-        4,
-        "rgb8",
-        pixels
-      )
+      new CameraImage(8, 4, "rgb8", pixels)
     );
   }
   static function wait(host:PerceptionHost):ImageDetectionObservation {
@@ -201,12 +196,7 @@ class PerceptionInferenceTests {
       null,
       "camera.clock",
       "host.monotonic",
-      new CameraImage(
-        8,
-        4,
-        "jpeg",
-        Bytes.ofString("jpeg")
-      )
+      new CameraImage(8, 4, "jpeg", Bytes.ofString("jpeg"))
     );
     throws(function() bad.submit(jpeg), "rgb8");
     bad.dispose();

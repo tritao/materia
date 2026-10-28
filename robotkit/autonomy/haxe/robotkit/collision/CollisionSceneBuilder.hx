@@ -198,16 +198,7 @@ class CollisionSceneBuilder {
     memberBodies.set(physical, body);
     objects.set(
       id,
-      description.addObject(
-        id,
-        body,
-        pose(offset),
-        geometry,
-        0,
-        "cell CAD/simulation hull",
-        physical,
-        tool
-      )
+      description.addObject(id, body, pose(offset), geometry, 0, "cell CAD/simulation hull", physical, tool)
     );
     ownership.set(id, {owner: owner});
   }

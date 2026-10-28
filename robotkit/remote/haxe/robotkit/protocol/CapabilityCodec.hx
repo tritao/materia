@@ -69,19 +69,10 @@ class CapabilityCodec {
         e.timedEvents,
         e.replacementBoundaries,
         e.holdResume,
-        guarantee(
-          e.polynomialLimits,
-          e.samplingResolutionNs
-        )
+        guarantee(e.polynomialLimits, e.samplingResolutionNs)
       ),
-      new robotkit.core.TimingCapabilities(
-        t.deadlines,
-        t.clockMapping,
-        guarantee(
-          t.prediction,
-          t.samplingResolutionNs
-        )
-      ),
+      new robotkit.core.TimingCapabilities(t.deadlines,
+      t.clockMapping, guarantee(t.prediction, t.samplingResolutionNs)),
       value.streams
     );
   }

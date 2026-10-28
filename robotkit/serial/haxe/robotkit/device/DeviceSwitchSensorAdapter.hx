@@ -77,12 +77,7 @@ class DeviceSwitchSensorAdapter {
       sequence = Int64.add(sequence, Int64.ofInt(1));
       runtime.publishSensorFrame(
         input.wiring.switchId,
-        [
-          observed.active ? 1.0 : 0.0,
-          count == 0 ? 0.0 : 1.0,
-          edge,
-          count
-        ],
+        [observed.active ? 1.0 : 0.0, count == 0 ? 0.0 : 1.0, edge, count],
         sequence,
         observed.sourceTimestampNs,
         clock,

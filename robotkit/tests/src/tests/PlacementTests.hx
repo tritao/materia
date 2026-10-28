@@ -136,11 +136,7 @@ class PlacementTests {
 
     var obstacles = obstacle(
       new Transform3(new Vec3(originalPose.x, originalPose.y, 0), Quat.identity()),
-      new Vec3(
-        0.01,
-        0.01,
-        1
-      )
+      new Vec3(0.01, 0.01, 1)
     );
     var withObstacle = WorkPatchPlanner.plan(
       scenario.design,
@@ -193,18 +189,7 @@ class PlacementTests {
     var shape = ToolGeometry.convex(
       [
         boxVertices(new Vec3(0.0, 0.0, 0.5), new Vec3(0.05, 0.05, 0.5)),
-        boxVertices(
-          new Vec3(
-            0.45,
-            0.0,
-            0.95
-          ),
-          new Vec3(
-            0.45,
-            0.05,
-            0.05
-          )
-        )
+        boxVertices(new Vec3(0.45, 0.0, 0.95), new Vec3(0.45, 0.05, 0.05))
       ],
       0.0
     );
@@ -213,22 +198,14 @@ class PlacementTests {
       manipulator,
       shape,
       new Transform3(new Vec3(0.45, 0.0, 0.45), Quat.identity()),
-      new Vec3(
-        0.04,
-        0.04,
-        0.04
-      )
+      new Vec3(0.04, 0.04, 0.04)
     );
     check(gap.violation([0.0]) == null, "Tool hulls leave the L-shaped empty corner clear");
     var cup = toolClearance(
       manipulator,
       shape,
       new Transform3(new Vec3(0.85, 0.0, 0.95), Quat.identity()),
-      new Vec3(
-        0.04,
-        0.04,
-        0.04
-      )
+      new Vec3(0.04, 0.04, 0.04)
     );
     check(cup.violation([0.0]) != null, "Tool hull detects an obstacle touching the offset cup");
   }
@@ -245,16 +222,9 @@ class PlacementTests {
     var manipulator = new Manipulator(model, base.id, flange.id);
     var checker = toolClearance(
       manipulator,
-      ToolGeometry.convex(
-        [boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))],
-        0.0
-      ),
+      ToolGeometry.convex([boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))], 0.0),
       Transform3.identity(),
-      new Vec3(
-        0.1,
-        0.1,
-        0.1
-      )
+      new Vec3(0.1, 0.1, 0.1)
     );
     check(checker.violation([-1.0]) == null, "Motion starts clear");
     check(checker.violation([1.0]) == null, "Motion ends clear");
@@ -267,11 +237,7 @@ class PlacementTests {
       "base",
       [
         new ToolpathPoint(manipulator.tcpPose([-1.0]), 0.05, true),
-        new ToolpathPoint(
-          manipulator.tcpPose([1.0]),
-          0.05,
-          true
-        )
+        new ToolpathPoint(manipulator.tcpPose([1.0]), 0.05, true)
       ]
     );
     var result = ReachabilityChecker.check(
@@ -294,21 +260,7 @@ class PlacementTests {
       "small-wall",
       "map",
       Transform3.identity(),
-      new Polygon2([
-        new Point2(-0.1, 0.0),
-        new Point2(
-          0.1,
-          0.0
-        ),
-        new Point2(
-          0.1,
-          0.3
-        ),
-        new Point2(
-          -0.1,
-          0.3
-        )
-      ])
+      new Polygon2([new Point2(-0.1, 0.0), new Point2(0.1, 0.0), new Point2(0.1, 0.3), new Point2(-0.1, 0.3)])
     );
     var shape = ToolGeometry.box(new Vec3(0.05, 0.05, 0.05));
     var obstacles = obstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
@@ -327,21 +279,13 @@ class PlacementTests {
       manipulator,
       ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
       Transform3.identity(),
-      new Vec3(
-        0.01,
-        0.01,
-        0.01
-      )
+      new Vec3(0.01, 0.01, 0.01)
     );
     var path = new Toolpath(
       "base",
       [
         new ToolpathPoint(manipulator.tcpPose([0.1]), 0.05, true),
-        new ToolpathPoint(
-          manipulator.tcpPose([0.2]),
-          0.05,
-          true
-        )
+        new ToolpathPoint(manipulator.tcpPose([0.2]), 0.05, true)
       ]
     );
     var result = ReachabilityChecker.check(
@@ -379,21 +323,13 @@ class PlacementTests {
       manipulator,
       ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
       Transform3.identity(),
-      new Vec3(
-        0.0025,
-        0.0025,
-        0.0025
-      )
+      new Vec3(0.0025, 0.0025, 0.0025)
     );
     var path = new Toolpath(
       "base",
       [
         new ToolpathPoint(manipulator.tcpPose([-0.01]), 0.05, true),
-        new ToolpathPoint(
-          manipulator.tcpPose([0.01]),
-          0.05,
-          true
-        )
+        new ToolpathPoint(manipulator.tcpPose([0.01]), 0.05, true)
       ]
     );
     var result = ReachabilityChecker.check(
@@ -444,10 +380,7 @@ class PlacementTests {
       new Point2(-3.0, 0.0),
       new Point2(3.0, 0.0),
       new Point2(3.0, 0.3),
-      new Point2(
-        -3.0,
-        0.3
-      )
+      new Point2(-3.0, 0.3)
     ]);
     var design = new WorkSurface("finish-wall", "map", Transform3.identity(), boundary);
     // Rotation whose columns send the surface's local X/Y/Z (along-wall,
@@ -480,21 +413,9 @@ class PlacementTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [

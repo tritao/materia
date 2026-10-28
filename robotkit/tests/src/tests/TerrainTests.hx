@@ -113,10 +113,7 @@ class TerrainTests {
       new Point2(0.0, -0.4),
       new Point2(3.0, -0.4),
       new Point2(3.0, 0.4),
-      new Point2(
-        0.0,
-        0.4
-      )
+      new Point2(0.0, 0.4)
     ]);
     for (row in 0...design.rows) for (col in 0...design.columns) {
       var point = new Point2(design.worldX(col), design.worldY(row));
@@ -172,14 +169,8 @@ class TerrainTests {
     var exclusion = new Polygon2([
       new Point2(wx - pad, wy - pad),
       new Point2(wx + pad, wy - pad),
-      new Point2(
-        wx + pad,
-        wy + pad
-      ),
-      new Point2(
-        wx - pad,
-        wy + pad
-      )
+      new Point2(wx + pad, wy + pad),
+      new Point2(wx - pad, wy + pad)
     ]);
     var excludedRegion = new EarthworkRegion("pad-excluded", existing, design, [exclusion], 0.005);
     check(

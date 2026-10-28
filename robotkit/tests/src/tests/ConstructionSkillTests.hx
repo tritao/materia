@@ -140,10 +140,7 @@ class ConstructionSkillTests {
       new Point2(-0.25, 0.0),
       new Point2(0.25, 0.0),
       new Point2(0.25, 0.3),
-      new Point2(
-        -0.25,
-        0.3
-      )
+      new Point2(-0.25, 0.3)
     ]);
     var rotation = Quat.fromRotationMatrix([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0]);
     var map_T_surface = new Transform3(new Vec3(-0.47, 0.0, -0.15), rotation);
@@ -195,11 +192,7 @@ class ConstructionSkillTests {
       manipulator,
       eventSource,
       spec.feedRate,
-      PlanningLimits.ofGroup(
-        manipulator,
-        null,
-        spec.maxAcceleration
-      ),
+      PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration),
       spec.maxJointStep
     );
     var paint = new Paint(
@@ -233,11 +226,7 @@ class ConstructionSkillTests {
       manipulator,
       eventSource,
       spec.feedRate,
-      PlanningLimits.ofGroup(
-        manipulator,
-        null,
-        spec.maxAcceleration
-      ),
+      PlanningLimits.ofGroup(manipulator, null, spec.maxAcceleration),
       spec.maxJointStep
     );
     var sand = new Sand(
@@ -265,11 +254,7 @@ class ConstructionSkillTests {
       "paint-head",
       "paint head",
       Transform3.identity(),
-      ToolGeometry.box(new Vec3(
-        0.05,
-        0.05,
-        0.05
-      ))
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05))
     );
     var obstacles = new CollisionDescription();
     obstacles.addFixed("wall", CollisionPose.identity(), Box(10, 10, 10), 0);
@@ -311,11 +296,7 @@ class ConstructionSkillTests {
       "wrong-tcp",
       "wrong TCP",
       new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
-      ToolGeometry.box(new Vec3(
-        0.05,
-        0.05,
-        0.05
-      ))
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05))
     );
     var rejected = false;
     try {
@@ -333,11 +314,7 @@ class ConstructionSkillTests {
         seed,
         paintMotion,
         null,
-        new ToolPlanningContext(
-          wrongTcp,
-          cell.obstacles,
-          cell.makeWorld
-        )
+        new ToolPlanningContext(wrongTcp, cell.obstacles, cell.makeWorld)
       );
     } catch (_:Dynamic) rejected = true;
     check(rejected, "Paint rejects a tool whose TCP differs from the manipulator TCP");
@@ -376,11 +353,7 @@ class ConstructionSkillTests {
         true,
         trajectorykit.validation.ValidationGuarantee.Unchecked
       ),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     );
     var replay = new ReplayRobot("construction-robot", recording, replayDescription, replayCapabilities);
     for (command in recording.commands) {
@@ -428,11 +401,7 @@ class ConstructionSkillTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(
-        wheelIds,
-        wheelRadius,
-        baseRadius
-      ),
+      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.4,
       0.6,
       0.5,
@@ -449,21 +418,9 @@ class ConstructionSkillTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [

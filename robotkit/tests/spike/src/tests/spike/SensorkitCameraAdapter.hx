@@ -46,12 +46,7 @@ class SensorkitCameraAdapter {
       sensor.frame == null ? null : sensor.frame.rotation,
       "sensorkit.sim",
       "sensorkit.sim",
-      new CameraImage(
-        width,
-        height,
-        "rgb8",
-        rgb
-      )
+      new CameraImage(width, height, "rgb8", rgb)
     );
   }
 

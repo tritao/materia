@@ -126,12 +126,7 @@ class RobotFrameTree2 {
         var half = value * 0.5;
         new SpatialPose3(
           [0.0, 0.0, 0.0],
-          [
-            axis[0] * Math.sin(half),
-            axis[1] * Math.sin(half),
-            axis[2] * Math.sin(half),
-            Math.cos(half)
-          ]
+          [axis[0] * Math.sin(half), axis[1] * Math.sin(half), axis[2] * Math.sin(half), Math.cos(half)]
         );
       case JointType.Prismatic:
         new SpatialPose3([axis[0] * value, axis[1] * value, axis[2] * value], [0.0, 0.0, 0.0, 1.0]);
@@ -164,10 +159,7 @@ private class SpatialPose3 {
     var offset = rotate(rotation, local.position);
     return new SpatialPose3(
       [position[0] + offset[0], position[1] + offset[1], position[2] + offset[2]],
-      multiply(
-        rotation,
-        local.rotation
-      )
+      multiply(rotation, local.rotation)
     );
   }
 

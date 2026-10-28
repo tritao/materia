@@ -63,10 +63,7 @@ class DifferentialDrive implements DriveModel {
     var halfTurnSpeed = twist.angular * trackWidth * 0.5;
     return [
       JointTarget.velocity(leftWheelJoint, leftDirection * (twist.linear - halfTurnSpeed) / wheelRadius),
-      JointTarget.velocity(
-        rightWheelJoint,
-        rightDirection * (twist.linear + halfTurnSpeed) / wheelRadius
-      )
+      JointTarget.velocity(rightWheelJoint, rightDirection * (twist.linear + halfTurnSpeed) / wheelRadius)
     ];
   }
 

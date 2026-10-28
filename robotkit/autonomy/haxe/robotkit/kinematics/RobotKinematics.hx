@@ -51,17 +51,8 @@ class RobotKinematics {
   }
 
   public static function toTransform3(value:Transform):Transform3 return new Transform3(
-    new Vec3(
-      value.x,
-      value.y,
-      value.z
-    ),
-    new Quat(
-      value.qx,
-      value.qy,
-      value.qz,
-      value.qw
-    )
+    new Vec3(value.x, value.y, value.z),
+    new Quat(value.qx, value.qy, value.qz, value.qw)
   );
 
   static function addJoint(builder:KinematicModelBuilder, joint:Joint, bodies:Map<String, Int>):Void {

@@ -31,10 +31,7 @@ class BeltResonanceCalibration {
     model:RobotModel,
     belts:Array<String>,
     measurement:ResonanceMeasurement,
-    pose:Map<
-      String,
-      Float
-  >
+    pose:Map<String, Float>
   ) {
     original = assembly;
     originalModel = model;

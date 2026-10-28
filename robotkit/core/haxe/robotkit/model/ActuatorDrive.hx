@@ -66,10 +66,7 @@ class StepperDrive extends ActuatorDrive {
     fullStepsPerRevolution,
     0.0,
     0.0,
-    TorqueSpeedCurve.flat(
-      0.0,
-      1.0
-    )
+    TorqueSpeedCurve.flat(0.0, 1.0)
   );
 
   /** Whether this drive knows its torque, or only its steps. */

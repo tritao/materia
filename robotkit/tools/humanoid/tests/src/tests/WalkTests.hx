@@ -32,12 +32,7 @@ class WalkTests {
     model: Files.robotkit("tests/fixtures/humanoid/unitree-g1-12dof.robot.json"),
     spec: Files.robotkit("tools/humanoid/policies/unitree-g1/policy.json"),
     seconds: seconds,
-    commands: [{
-      from: 0.0,
-      vx: vx,
-      vy: vy,
-      wz: wz
-    }],
+    commands: [{from: 0.0, vx: vx, vy: vy, wz: wz}],
     pushes: [],
     record: record,
     truthObservations: false,

@@ -312,12 +312,7 @@ class KinematicsTests {
     );
 
     arm.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "left",
-        "right",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
       1.0,
       1.0
     );
@@ -384,21 +379,9 @@ class KinematicsTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [

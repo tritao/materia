@@ -301,10 +301,7 @@ class RobotModelCodec {
       text(record, "joint"),
       kind,
       counts,
-      Reflect.hasField(record, "index") && Reflect.field(
-        record,
-        "index"
-      ) == true
+      Reflect.hasField(record, "index") && Reflect.field(record, "index") == true
     );
   }
 
@@ -355,14 +352,8 @@ class RobotModelCodec {
       joint.limits = new JointLimits(
         number(limits, "lower"),
         number(limits, "upper"),
-        nullableNumber(
-          limits,
-          "velocity"
-        ),
-        nullableNumber(
-          limits,
-          "effort"
-        ),
+        nullableNumber(limits, "velocity"),
+        nullableNumber(limits, "effort"),
         maxAcceleration
       );
       if (Reflect.hasField(record, "mechanicalLimits")) {
@@ -370,18 +361,9 @@ class RobotModelCodec {
         joint.mechanicalLimits = new JointLimits(
           number(mechanical, "lower"),
           number(mechanical, "upper"),
-          nullableNumber(
-            mechanical,
-            "velocity"
-          ),
-          nullableNumber(
-            mechanical,
-            "effort"
-          ),
-          nullableNumber(
-            mechanical,
-            "maxAcceleration"
-          )
+          nullableNumber(mechanical, "velocity"),
+          nullableNumber(mechanical, "effort"),
+          nullableNumber(mechanical, "maxAcceleration")
         );
         if (Reflect.hasField(mechanical, "rackingTolerance")) joint.mechanicalLimits.rackingTolerance = number(
           mechanical,
@@ -431,14 +413,8 @@ class RobotModelCodec {
         text(record, "id"),
         text(record, "leader"),
         text(record, "follower"),
-        number(
-          record,
-          "ratio"
-        ),
-        number(
-          record,
-          "offset"
-        )
+        number(record, "ratio"),
+        number(record, "offset")
       );
       var efficiency = optionalNumber(record, "efficiency");
       if (efficiency != null) {
@@ -496,10 +472,7 @@ class RobotModelCodec {
         var terms:Array<robotkit.model.ElasticNetwork.ElasticTerm> = [];
         for (term in array(span, "terms")) terms.push({
           joint: text(term, "joint"),
-          coefficient: number(
-            term,
-            "coefficient"
-          )
+          coefficient: number(term, "coefficient")
         });
         spans.push({stiffness: number(span, "stiffness"), terms: terms});
       }
@@ -509,10 +482,7 @@ class RobotModelCodec {
       network.assumptions = readAssumptions(record);
       for (clearance in array(record, "clearances")) network.clearances.push({
         joint: text(clearance, "joint"),
-        allowance: number(
-          clearance,
-          "allowance"
-        )
+        allowance: number(clearance, "allowance")
       });
       network.validate(model.joints, model.couplings);
       model.elasticNetworks.push(network);
@@ -550,22 +520,10 @@ class RobotModelCodec {
         text(record, "id"),
         text(record, "joint"),
         text(record, "releaseChannel"),
-        text(
-          record,
-          "releasedSensor"
-        ),
-        number(
-          record,
-          "holdingEffort"
-        ),
-        number(
-          record,
-          "releaseDelay"
-        ),
-        number(
-          record,
-          "applicationDelay"
-        ),
+        text(record, "releasedSensor"),
+        number(record, "holdingEffort"),
+        number(record, "releaseDelay"),
+        number(record, "applicationDelay"),
         Std.int(timeout),
         Std.int(age)
       ));
@@ -756,14 +714,8 @@ class RobotModelCodec {
     return new ContactSurface(
       vectorField(record, "friction", 3),
       fieldInt(record, "frictionDimensions"),
-      number(
-        record,
-        "contactTimeConstant"
-      ),
-      number(
-        record,
-        "contactDampingRatio"
-      )
+      number(record, "contactTimeConstant"),
+      number(record, "contactDampingRatio")
     );
   }
 
@@ -934,34 +886,13 @@ class RobotModelCodec {
     if (text(record, "kind") == "pneumatic") return new PneumaticDrive(
       number(record, "bore"),
       number(record, "rod"),
-      number(
-        record,
-        "stroke"
-      ),
-      number(
-        record,
-        "ratedSpeed"
-      ),
-      number(
-        record,
-        "pressurePa"
-      ),
-      text(
-        record,
-        "channelA"
-      ),
-      optionalText(
-        record,
-        "channelB"
-      ),
-      bool(
-        record,
-        "normallyToA"
-      ),
-      number(
-        record,
-        "extendSign"
-      )
+      number(record, "stroke"),
+      number(record, "ratedSpeed"),
+      number(record, "pressurePa"),
+      text(record, "channelA"),
+      optionalText(record, "channelB"),
+      bool(record, "normallyToA"),
+      number(record, "extendSign")
     );
     var curveValues:Dynamic = required(record, "curve");
     if (!Std.isOfType(curveValues, Array)) throw "Invalid RobotModel field curve";
@@ -974,17 +905,8 @@ class RobotModelCodec {
       case "stepper":
         new StepperDrive(
           number(record, "fullStepsPerRevolution"),
-          nonNegative(
-            number(record, "rotorInertia"),
-            "drive rotorInertia"
-          ),
-          nonNegative(
-            number(
-              record,
-              "holdingTorque"
-            ),
-            "drive holdingTorque"
-          ),
+          nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+          nonNegative(number(record, "holdingTorque"), "drive holdingTorque"),
           curve
         );
       case "servo":
@@ -992,24 +914,9 @@ class RobotModelCodec {
           number(record, "ratedTorque"),
           number(record, "peakTorque"),
           number(record, "ratedSpeed"),
-          number(
-            record,
-            "maxSpeed"
-          ),
-          nonNegative(
-            number(
-              record,
-              "rotorInertia"
-            ),
-            "drive rotorInertia"
-          ),
-          nonNegative(
-            number(
-              record,
-              "encoderCounts"
-            ),
-            "drive encoderCounts"
-          ),
+          number(record, "maxSpeed"),
+          nonNegative(number(record, "rotorInertia"), "drive rotorInertia"),
+          nonNegative(number(record, "encoderCounts"), "drive encoderCounts"),
           curve
         );
       case kind:
@@ -1063,10 +970,7 @@ class RobotModelCodec {
       parsed
     );
     if (Reflect.hasField(value, "positionLoopRate")) actuator.positionLoopRate = nonNegative(
-      number(
-        value,
-        "positionLoopRate"
-      ),
+      number(value, "positionLoopRate"),
       "actuator positionLoopRate"
     );
     if (Reflect.hasField(value, "speedLimiter")) actuator.speedLimiter = text(value, "speedLimiter");
@@ -1081,14 +985,8 @@ class RobotModelCodec {
       var process:Dynamic = Reflect.field(value, "processVelocity");
       actuator.processVelocity = new ProcessVelocityDrive(
         text(process, "speedChannel"),
-        text(
-          process,
-          "directionChannel"
-        ),
-        number(
-          process,
-          "radiansPerSpeedUnit"
-        )
+        text(process, "directionChannel"),
+        number(process, "radiansPerSpeedUnit")
       );
     }
     if (Reflect.hasField(value, "encoder") && Reflect.field(value, "encoder") != null) actuator.encoder = text(

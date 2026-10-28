@@ -242,11 +242,7 @@ class KinematicGroup {
   /** Fresh working data for the group, for a caller that keeps its own (a planner, a hot loop). */
   public function newData():KinematicGroupData return new KinematicGroupData(
     this,
-    swivel == null ? null : swivelTask(
-      0.0,
-      1.0,
-      false
-    )
+    swivel == null ? null : swivelTask(0.0, 1.0, false)
   );
 
   /** The flange's pose in the reference frame. */

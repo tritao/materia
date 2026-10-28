@@ -129,10 +129,7 @@ class Path {
       cast bestPose,
       bestTangent,
       bestCrossTrack,
-      Math.pow(
-        bestDistance,
-        0.5
-      )
+      Math.pow(bestDistance, 0.5)
     );
   }
 

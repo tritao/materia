@@ -203,10 +203,7 @@ class OutboundScheduler {
         continue;
       }
       if (Int64.compare(queue.queuedBytes, Int64.ofInt(budgetBytes)) >= 0 || Int64.compare(
-        Int64.add(
-          queue.queuedBytes,
-          Int64.ofInt(frameBytes)
-        ),
+        Int64.add(queue.queuedBytes, Int64.ofInt(frameBytes)),
         Int64.ofInt(capacityBytes - MIN_ESSENTIAL_RESERVE)
       ) > 0) {
         nextKey++;

@@ -270,10 +270,7 @@ class Navigation {
     var remainingDistance = atPathEnd ? goalDistance : Math.min(path.length - progressDistance, goalDistance);
     var speed = Math.min(
       Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
-      Math.pow(
-        2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance,
-        0.5
-      )
+      Math.pow(2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance, 0.5)
     );
     for (limit in currentSpeedLimits) {
       if (progressDistance >= limit.startDistanceMeters - 1e-9 && progressDistance <= limit.endDistanceMeters + 1e-9) {

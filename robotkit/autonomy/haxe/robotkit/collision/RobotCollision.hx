@@ -345,10 +345,7 @@ class RobotCollision {
 
   static function zeroWithinLimits(model:KinematicModel):Array<Float
     > return [for (dof in 0...model.dofCount()) Math.min(
-      Math.max(
-        0.0,
-        model.dofLower[dof]
-      ),
+      Math.max(0.0, model.dofLower[dof]),
       model.dofUpper[dof]
     )];
 

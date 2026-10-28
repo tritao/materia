@@ -116,11 +116,7 @@ class CollisionMuJoCoTests {
     var boxes = [for (box in BOXES) description.addFixed(
       'box',
       CollisionPose.translation(box[0], box[1], box[2]),
-      CollisionGeometry.Box(
-        box[3],
-        box[4],
-        box[5]
-      ),
+      CollisionGeometry.Box(box[3], box[4], box[5]),
       1
     )];
     var world = new NativeCollisionWorld();

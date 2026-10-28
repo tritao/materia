@@ -51,18 +51,7 @@ class Obstacle {
     if (crosses(a[0], a[1], b[0], b[1])) return 0.0;
     return Math.min(
       Math.min(pointToSegment(a[0], b[0], b[1]), pointToSegment(a[1], b[0], b[1])),
-      Math.min(
-        pointToSegment(
-          b[0],
-          a[0],
-          a[1]
-        ),
-        pointToSegment(
-          b[1],
-          a[0],
-          a[1]
-        )
-      )
+      Math.min(pointToSegment(b[0], a[0], a[1]), pointToSegment(b[1], a[0], a[1]))
     );
   }
 
@@ -72,10 +61,7 @@ class Obstacle {
     var lengthSquared = dx * dx + dy * dy;
     var t = lengthSquared <= 1e-18 ? 0.0 : Math.max(
       0.0,
-      Math.min(
-        1.0,
-        ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared
-      )
+      Math.min(1.0, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared)
     );
     var ex = a.x + t * dx - point.x, ey = a.y + t * dy - point.y;
     return Math.sqrt(ex * ex + ey * ey);

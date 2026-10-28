@@ -71,11 +71,7 @@ class PolicyRuntimeTests {
       dq: dq,
       angularVelocity: [1.0, -2.0, 4.0],
       down: [0.0, 0.1, -0.99],
-      command: {
-        vx: 0.5,
-        vy: -0.25,
-        wz: 1.0
-      },
+      command: {vx: 0.5, vy: -0.25, wz: 1.0},
       lastAction: action,
       gaitTime: 0.2
     });
@@ -105,16 +101,8 @@ class PolicyRuntimeTests {
       q: q,
       dq: dq,
       angularVelocity: [0.0, 0.0, 0.0],
-      down: [
-        0.0,
-        0.0,
-        -1.0
-      ],
-      command: {
-        vx: 0.0,
-        vy: 0.0,
-        wz: 0.0
-      },
+      down: [0.0, 0.0, -1.0],
+      command: {vx: 0.0, vy: 0.0, wz: 0.0},
       lastAction: action,
       gaitTime: 0.8 * 3 + 0.2
     });
@@ -128,21 +116,9 @@ class PolicyRuntimeTests {
     var frame = function(gyro:Float) return builder.build({
       q: spec.defaultPose,
       dq: [for (_ in 0...12) 0.0],
-      angularVelocity: [
-        gyro,
-        0.0,
-        0.0
-      ],
-      down: [
-        0.0,
-        0.0,
-        -1.0
-      ],
-      command: {
-        vx: 0.0,
-        vy: 0.0,
-        wz: 0.0
-      },
+      angularVelocity: [gyro, 0.0, 0.0],
+      down: [0.0, 0.0, -1.0],
+      command: {vx: 0.0, vy: 0.0, wz: 0.0},
       lastAction: [for (_ in 0...12) 0.0],
       gaitTime: 0.02
     });
@@ -218,10 +194,7 @@ class PolicyRuntimeTests {
     var shocked = estimator.update([0.5, 0.0, 0.0], [3.0 * g, g * Math.sin(angle), g * Math.cos(angle)], dt);
     var drift = Math.acos(Math.max(
       -1.0,
-      Math.min(
-        1.0,
-        before[0] * shocked[0] + before[1] * shocked[1] + before[2] * shocked[2]
-      )
+      Math.min(1.0, before[0] * shocked[0] + before[1] * shocked[1] + before[2] * shocked[2])
     ));
     if (drift > 0.02) throw 'a 3 g shock tilted the estimate by $drift rad';
     var length = Math.sqrt(shocked[0] * shocked[0] + shocked[1] * shocked[1] + shocked[2] * shocked[2]);

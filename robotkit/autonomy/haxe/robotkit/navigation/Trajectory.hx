@@ -164,10 +164,7 @@ class Trajectory {
       samples.push(new TrajectorySample(
         time,
         poses[index],
-        new Twist2(
-          direction[index] * speeds[index],
-          curvature[index] * speeds[index]
-        )
+        new Twist2(direction[index] * speeds[index], curvature[index] * speeds[index])
       ));
       if (index < poses.length - 1) {
         var sum = speeds[index] + speeds[index + 1];
@@ -183,10 +180,7 @@ class Trajectory {
       var ds = distances[index] - distances[index - 1];
       speeds[index] = Math.min(
         speeds[index],
-        Math.pow(
-          speeds[index - 1] * speeds[index - 1] + 2.0 * maxAcceleration * ds,
-          0.5
-        )
+        Math.pow(speeds[index - 1] * speeds[index - 1] + 2.0 * maxAcceleration * ds, 0.5)
       );
     }
     var index = speeds.length - 2;
@@ -194,10 +188,7 @@ class Trajectory {
       var ds = distances[index + 1] - distances[index];
       speeds[index] = Math.min(
         speeds[index],
-        Math.pow(
-          speeds[index + 1] * speeds[index + 1] + 2.0 * maxAcceleration * ds,
-          0.5
-        )
+        Math.pow(speeds[index + 1] * speeds[index + 1] + 2.0 * maxAcceleration * ds, 0.5)
       );
       index--;
     }

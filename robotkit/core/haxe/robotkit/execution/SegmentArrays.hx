@@ -104,14 +104,8 @@ class SegmentArrays {
     return new SegmentArrays(
       starts.slice(first, last - first),
       durations.slice(first, last - first),
-      degrees.slice(
-        first,
-        last - first
-      ),
-      coefficients.slice(
-        first * joints,
-        (last - first) * joints
-      ),
+      degrees.slice(first, last - first),
+      coefficients.slice(first * joints, (last - first) * joints),
       jointMap,
       heldPositions,
       couplings
@@ -180,11 +174,7 @@ class SegmentArrays {
       result.push(new TrajectorySegment(
         Int64.sub(starts.get(index), origin),
         durations.get(index),
-        [for (joint in 0...heldPositions.length)[for (power in 0...degree + 1) coefficient(
-          index,
-          joint,
-          power
-        )]]
+        [for (joint in 0...heldPositions.length)[for (power in 0...degree + 1) coefficient(index, joint, power)]]
       ));
     }
     return result;

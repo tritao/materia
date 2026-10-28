@@ -10,13 +10,7 @@ class PositionStiffnessTests {
     // EA = 1000 N, two one-metre paths together; q redistributes length between them.
     var belt = new PositionStiffness([
       {compliance: 0.1 / 1000, coordinates: [{joint: "x", coefficient: 1.0 / 1000}]},
-      {
-        compliance: 0.9 / 1000,
-        coordinates: [{
-          joint: "x",
-          coefficient: -1.0 / 1000
-        }]
-      }
+      {compliance: 0.9 / 1000, coordinates: [{joint: "x", coefficient: -1.0 / 1000}]}
     ]);
     near(belt.at(_ -> 0.0), 1000 * (1.0 / 0.1 + 1.0 / 0.9));
     near(belt.at(_ -> 0.4), 4000.0);
@@ -27,29 +21,8 @@ class PositionStiffnessTests {
       || range.maximum < 1000 * (1.0 / 0.1 + 1.0 / 0.9)) throw "Range must enclose the analytic extrema";
     // A skewed box: the minimum lies on a face, not at a sampled centre or vertex.
     var skew = new PositionStiffness([
-      {
-        compliance: 0.0001,
-        coordinates: [
-          {joint: "x", coefficient: 0.001},
-          {
-            joint: "y",
-            coefficient: 0.001
-          }
-        ]
-      },
-      {
-        compliance: 0.0009,
-        coordinates: [
-          {
-            joint: "x",
-            coefficient: -0.001
-          },
-          {
-            joint: "y",
-            coefficient: -0.001
-          }
-        ]
-      }
+      {compliance: 0.0001, coordinates: [{joint: "x", coefficient: 0.001}, {joint: "y", coefficient: 0.001}]},
+      {compliance: 0.0009, coordinates: [{joint: "x", coefficient: -0.001}, {joint: "y", coefficient: -0.001}]}
     ]);
     near(skew.range(id -> id == "x" ? {
       lower:0.0, upper:0.3
@@ -62,10 +35,7 @@ class PositionStiffnessTests {
     // Nut/bearing compliance remains in series as shaft length changes.
     var screw = new PositionStiffness([{
       compliance: 1.0 / 3e8 + 1.0 / 2e8 + 0.1 / 1e7,
-      coordinates: [{
-        joint: "nut",
-        coefficient: 1.0 / 1e7
-      }]
+      coordinates: [{joint: "nut", coefficient: 1.0 / 1e7}]
     }]);
     near(screw.at(_ -> 0.2), 1.0 / (1.0 / 3e8 + 1.0 / 2e8 + 0.3 / 1e7));
     var refused = false;

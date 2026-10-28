@@ -41,10 +41,7 @@ class Main {
           "remote",
           false,
           new SerialDeployment(deploymentPath),
-          new robotkit.auth.ClientCredentials(
-            Sys.getEnv("ROBOTKIT_IDENTITY"),
-            Sys.getEnv("ROBOTKIT_TOKEN")
-          )
+          new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"), Sys.getEnv("ROBOTKIT_TOKEN"))
         );
         remote.connect(remoteAddress.substr(0, separator), port, runtime.events);
       }

@@ -34,10 +34,7 @@ class PerceptionTests {
     var injectedYaw = degToRad(0.3);
     var trueTransform = new Transform3(
       new Vec3(0.0, 0.0, injectedOffset),
-      Quat.fromAxisAngle(
-        new Vec3(0.0, 1.0, 0.0),
-        injectedYaw
-      )
+      Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), injectedYaw)
     );
 
     // A modest bow (a much larger one is exercised in testDeviationMapReflectsBow)

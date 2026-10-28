@@ -138,16 +138,8 @@ class UrdfLoader {
       if (mimic != null) mimics.push({
         follower: jointName,
         leader: required(mimic, "joint"),
-        ratio: number(
-          mimic,
-          "multiplier",
-          1.0
-        ),
-        offset: number(
-          mimic,
-          "offset",
-          0.0
-        )
+        ratio: number(mimic, "multiplier", 1.0),
+        offset: number(mimic, "offset", 0.0)
       });
     }
     for (mimic in mimics) {
@@ -181,11 +173,7 @@ class UrdfLoader {
         "actuator/" + required(actuatorElement, "name"),
         effort,
         null,
-        SimpleTransmission(
-          joint.id,
-          reduction,
-          0.0
-        )
+        SimpleTransmission(joint.id, reduction, 0.0)
       ));
     }
     return new UrdfImport(model, warnings);

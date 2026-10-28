@@ -30,46 +30,17 @@ class RobotSessionIntegration {
         Int64.ofInt(1),
         Int64.ofInt(0),
         0,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
         [new robotkit.execution.TrajectorySegment(
           Int64.ofInt(0),
           Int64.ofInt(1000000000),
-          [
-            [
-              0.0,
-              0.1
-            ],
-            [
-              0.0,
-              0.0
-            ],
-            [
-              0.0,
-              0.0
-            ]
-          ]
+          [[0.0, 0.1], [0.0, 0.0], [0.0, 0.0]]
         )],
         null,
         null,
-        [
-          0.01,
-          0.01,
-          0.01
-        ],
+        [0.01, 0.01, 0.01],
         null,
         null,
         true
@@ -172,33 +143,12 @@ class RobotSessionIntegration {
         Int64.ofInt(0),
         0,
         anchor,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
         [for (index in 0...4) new robotkit.execution.TrajectorySegment(
           Int64.fromFloat(index * 2000000000.0),
           Int64.ofInt(2000000000),
-          [
-            [
-              anchor[0] + index * 0.02,
-              0.01
-            ],
-            [
-              anchor[1],
-              0.0
-            ],
-            [
-              anchor[2],
-              0.0
-            ]
-          ]
+          [[anchor[0] + index * 0.02, 0.01], [anchor[1], 0.0], [anchor[2], 0.0]]
         )],
         null,
         null,
@@ -351,38 +301,13 @@ class RobotSessionIntegration {
         Int64.ofInt(1),
         Int64.ofInt(0),
         0,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
         [new robotkit.execution.TrajectorySegment(
           Int64.ofInt(0),
           Int64.ofInt(100000000),
-          [
-            [
-              0.0,
-              0.0
-            ],
-            [
-              0.0,
-              0.0
-            ],
-            [
-              0.0,
-              0.0
-            ]
-          ]
+          [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
         )]
       )) catch (_:Dynamic) observerPlanRejected = true;
       if (!observerPlanRejected) throw "observer plan was not rejected by the client lease boundary";
@@ -401,38 +326,13 @@ class RobotSessionIntegration {
         Int64.ofInt(1),
         Int64.ofInt(0),
         0,
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
         [new robotkit.execution.TrajectorySegment(
           Int64.ofInt(0),
           Int64.ofInt(100000000),
-          [
-            [
-              0.0,
-              0.0
-            ],
-            [
-              0.0,
-              0.0
-            ],
-            [
-              0.0,
-              0.0
-            ]
-          ]
+          [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
         )]
       ));
       waitFor(controller, function() return controller.lastFault != null, "rejected plan did not return a fault");

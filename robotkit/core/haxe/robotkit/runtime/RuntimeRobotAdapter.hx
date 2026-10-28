@@ -189,10 +189,7 @@ class RuntimeRobotAdapter implements Robot {
           targets,
           commandSequence,
           null,
-          expiryNs == null || Int64.compare(
-            expiryNs,
-            Int64.ofInt(0)
-          ) == 0 ? null : expiryNs
+          expiryNs == null || Int64.compare(expiryNs, Int64.ofInt(0)) == 0 ? null : expiryNs
         );
       case ExecutionPlan(plan):
         if (!robotCapabilities.execution.plans) throw "Runtime endpoint does not support execution plans";

@@ -56,10 +56,7 @@ class RobotRuntimeCompiler {
         [for (link in robot.links) link.collisionGeometry],
         robot.collisionApproximation
       ),
-      compileConfiguration(
-        robot,
-        profile
-      ),
+      compileConfiguration(robot, profile),
       calibrationRevision
     );
     for (actuator in robot.actuators) {
@@ -159,16 +156,8 @@ class RobotRuntimeCompiler {
               process.speedChannel,
               process.directionChannel,
               process.radiansPerSpeedUnit,
-              requiredProcessLimit(
-                actuator.maxEffort,
-                actuator.id,
-                "effort"
-              ) * Math.abs(ratio) * actuator.efficiency,
-              requiredProcessLimit(
-                actuator.maxRate,
-                actuator.id,
-                "rate"
-              ) / Math.abs(ratio)
+              requiredProcessLimit(actuator.maxEffort, actuator.id, "effort") * Math.abs(ratio) * actuator.efficiency,
+              requiredProcessLimit(actuator.maxRate, actuator.id, "rate") / Math.abs(ratio)
             ));
           }
         case _:
@@ -269,17 +258,8 @@ class RobotRuntimeCompiler {
         frame == null ? link.id : frame.id,
         link.id,
         robot.links.indexOf(link),
-        frame == null ? [
-          0.0,
-          0.0,
-          0.0
-        ] : frame.position,
-        frame == null ? [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ] : frame.rotation,
+        frame == null ? [0.0, 0.0, 0.0] : frame.position,
+        frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
         sensor.updateRate,
         sensor.rayCount,
         sensor.maxRange,
@@ -1165,10 +1145,7 @@ class RobotRuntimeCompiler {
         case Differential(leftId, rightId, radius, trackWidth):
           for (role in [
             {id: leftId, path: "mobileBase.drive.leftWheelJointId"},
-            {
-              id: rightId,
-              path: "mobileBase.drive.rightWheelJointId"
-            }
+            {id: rightId, path: "mobileBase.drive.rightWheelJointId"}
           ]) {
             var index = resolveRole(role.id, role.path, [JointType.Revolute, JointType.Continuous]);
             if (index != null && wheelDirection(robot, index) == 0) diagnostics.push(new RobotCompileDiagnostic(
@@ -1199,10 +1176,7 @@ class RobotRuntimeCompiler {
           else for (index in 0...wheelIds.length) resolveRole(
             wheelIds[index],
             'mobileBase.drive.wheelJointIds[$index]',
-            [
-              JointType.Revolute,
-              JointType.Continuous
-            ]
+            [JointType.Revolute, JointType.Continuous]
           );
           positive(radius, "mobileBase.drive.wheelRadius");
           positive(baseRadius, "mobileBase.drive.baseRadius");
@@ -1245,14 +1219,8 @@ class RobotRuntimeCompiler {
             robot.joints[rightIndex].name,
             radius,
             trackWidth,
-            wheelDirection(
-              robot,
-              leftIndex
-            ),
-            wheelDirection(
-              robot,
-              rightIndex
-            )
+            wheelDirection(robot, leftIndex),
+            wheelDirection(robot, rightIndex)
           );
         case Ackermann(steeringId, driveId, wheelBase, radius, maxAngle):
           var steeringIndex = jointIndex(steeringId), driveIndex = jointIndex(driveId);

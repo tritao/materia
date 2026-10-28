@@ -217,12 +217,7 @@ class RobotServer {
       var streamId = "inference/" + observation.pipelineId;
       inferenceSequences.set(
         streamId,
-        new robotkit.protocol.StreamSequenceMsg(
-          streamId,
-          "inference",
-          observation.sequence,
-          observation.sourceClockId
-        )
+        new robotkit.protocol.StreamSequenceMsg(streamId, "inference", observation.sequence, observation.sourceClockId)
       );
       var consumers = perceptionConsumers.get(observation.pipelineId);
       if (consumers == null) continue;
@@ -256,10 +251,7 @@ class RobotServer {
       OutboundFamily.Observation,
       value.producerId,
       value.ordinal,
-      RobotProtocol.imageDetectionObservation(
-        value,
-        targetSession
-      )
+      RobotProtocol.imageDetectionObservation(value, targetSession)
     );
   }
 
@@ -454,12 +446,7 @@ class RobotServer {
         observerSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            403,
-            "observer is read-only",
-            false
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 403, "observer is read-only", false)),
           0,
           null,
           observerSession
@@ -474,12 +461,7 @@ class RobotServer {
         observerSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            400,
-            'invalid Hello payload: $error',
-            false
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 400, 'invalid Hello payload: $error', false)),
           0,
           null,
           observerSession
@@ -494,12 +476,7 @@ class RobotServer {
         observerSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            409,
-            "session already established",
-            false
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 409, "session already established", false)),
           0,
           null,
           observerSession
@@ -513,12 +490,7 @@ class RobotServer {
         observerSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            401,
-            "authentication or authorization denied",
-            true
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 401, "authentication or authorization denied", true)),
           0,
           null,
           observerSession
@@ -534,12 +506,7 @@ class RobotServer {
         observerSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            422,
-            "invalid stream subscriptions",
-            false
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 422, "invalid stream subscriptions", false)),
           0,
           null,
           observerSession
@@ -583,10 +550,7 @@ class RobotServer {
       transport,
       observerSession,
       RobotProtocol.capabilities(
-        robotkit.protocol.CapabilityCodec.encode(
-          runtime.capabilities("robotd"),
-          Int64.ofInt(robotId)
-        ),
+        robotkit.protocol.CapabilityCodec.encode(runtime.capabilities("robotd"), Int64.ofInt(robotId)),
         observerSession
       )
     );
@@ -650,12 +614,7 @@ class RobotServer {
         targetSession,
         new RobotFrame(
           RobotMessageType.Fault,
-          MessagePack.encode(new Fault(
-            Int64.ofInt(robotId),
-            403,
-            "deployment change denied",
-            false
-          )),
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 403, "deployment change denied", false)),
           0,
           null,
           targetSession
@@ -721,10 +680,7 @@ class RobotServer {
       sessionId
     ));
     send(RobotProtocol.capabilities(
-      robotkit.protocol.CapabilityCodec.encode(
-        runtime.capabilities("robotd"),
-        Int64.ofInt(robotId)
-      ),
+      robotkit.protocol.CapabilityCodec.encode(runtime.capabilities("robotd"), Int64.ofInt(robotId)),
       sessionId
     ));
     helloComplete = true;
@@ -758,11 +714,7 @@ class RobotServer {
       frame,
       new JointTargets(
         value.robotId,
-        [new JointTargetValue(
-          value.joint,
-          value.mode,
-          value.target
-        )],
+        [new JointTargetValue(value.joint, value.mode, value.target)],
         value.sequence,
         value.expiryNs
       )
@@ -1046,12 +998,7 @@ class RobotServer {
     sendTo(
       target,
       targetSession,
-      RobotProtocol.state(
-        message,
-        targetSession,
-        snapshot.sequence,
-        snapshot.sourceTimestampNs
-      )
+      RobotProtocol.state(message, targetSession, snapshot.sequence, snapshot.sourceTimestampNs)
     );
     var scheduler = outbound.get(target.rawValue());
     if (scheduler == null) return;
@@ -1093,13 +1040,7 @@ class RobotServer {
           OutboundFamily.Camera,
           sensor.sensorId,
           sensor.sequence,
-          RobotProtocol.cameraFrame(
-            camera,
-            image.bytes(),
-            targetSession,
-            sensor.sequence,
-            sensor.sourceTimestampNs
-          )
+          RobotProtocol.cameraFrame(camera, image.bytes(), targetSession, sensor.sequence, sensor.sourceTimestampNs)
         );
       } else {
         scheduler.offer(

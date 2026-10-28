@@ -41,11 +41,7 @@ class HydraulicModelTests {
       "cylinder",
       hydraulic.extensionForce(),
       hydraulic.ratedSpeed,
-      Transmission.SimpleTransmission(
-        joint.id,
-        1,
-        0
-      )
+      Transmission.SimpleTransmission(joint.id, 1, 0)
     );
     actuator.drive = hydraulic;
     result.addActuator(actuator);
@@ -183,10 +179,7 @@ class HydraulicModelTests {
     check(found, 'missing $code diagnosis');
   }
   static function near(actual:Float, expected:Float, message:String):Void check(
-    Math.isFinite(actual) && Math.abs(actual - expected) <= 1e-9 * Math.max(
-      1,
-      Math.abs(expected)
-    ),
+    Math.isFinite(actual) && Math.abs(actual - expected) <= 1e-9 * Math.max(1, Math.abs(expected)),
     message
   );
   static function check(value:Bool, message:String):Void {

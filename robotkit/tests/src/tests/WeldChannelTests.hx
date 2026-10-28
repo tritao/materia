@@ -75,31 +75,11 @@ class WeldChannelTests {
         null,
         true,
         [
-          new ProcessTimedEvent(
-            at,
-            VOLTAGE,
-            ProcessEventValue.Analog(24.0)
-          ),
-          new ProcessTimedEvent(
-            at,
-            WIRE,
-            ProcessEventValue.Analog(8.0)
-          ),
-          new ProcessTimedEvent(
-            at,
-            ARC,
-            ProcessEventValue.Digital(true)
-          ),
-          new ProcessTimedEvent(
-            at,
-            GRIPPER,
-            ProcessEventValue.Digital(true)
-          ),
-          new ProcessTimedEvent(
-            at,
-            SUCTION,
-            ProcessEventValue.Digital(true)
-          )
+          new ProcessTimedEvent(at, VOLTAGE, ProcessEventValue.Analog(24.0)),
+          new ProcessTimedEvent(at, WIRE, ProcessEventValue.Analog(8.0)),
+          new ProcessTimedEvent(at, ARC, ProcessEventValue.Digital(true)),
+          new ProcessTimedEvent(at, GRIPPER, ProcessEventValue.Digital(true)),
+          new ProcessTimedEvent(at, SUCTION, ProcessEventValue.Digital(true))
         ]
       ),
       1
@@ -140,11 +120,7 @@ class WeldChannelTests {
     // the suction tool keep what they had.
     for (case_ in [
       {label: "a commanded stop", abort: false, emergency: false},
-      {
-        label: "an abort",
-        abort: true,
-        emergency: false
-      }
+      {label: "an abort", abort: true, emergency: false}
     ]) {
       var rig = rig(900);
       check(running(rig.runtime), 'before ${case_.label} the arc burns, the wire feeds and the vacuum is on');

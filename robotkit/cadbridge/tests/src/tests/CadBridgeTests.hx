@@ -296,15 +296,7 @@ class CadBridgeTests {
     assembly.addBomItem(
       {partNumber: "TUBE", description: "Tube", quantity: 1, material: "polyurethane"},
       1,
-      Attached(
-        0.1,
-        "tool",
-        new Vector(
-          100,
-          0,
-          50
-        )
-      )
+      Attached(0.1, "tool", new Vector(100, 0, 50))
     );
     MachineAssemblyMassBridge.applyToLink(assembly, link);
     check(
@@ -350,10 +342,7 @@ class CadBridgeTests {
       SuctionCapacityChecker.checkPath(load, grip, [resting]).safe && !SuctionCapacityChecker.checkPath(
         load,
         grip,
-        [
-          resting,
-          accelerated
-        ]
+        [resting, accelerated]
       ).safe,
       "catalog cup holds the static sample and rejects excessive sideways acceleration"
     );
@@ -397,22 +386,9 @@ class CadBridgeTests {
     endEffector.workingFrame("contact", "body", "contact", true);
     endEffector.workingFrame("inspection", "body", "mount");
     endEffector.addBomItem(
-      {
-        partNumber: "ATTACHED-TUBE",
-        description: "attached air tube",
-        quantity: 1,
-        material: "polyurethane"
-      },
+      {partNumber: "ATTACHED-TUBE", description: "attached air tube", quantity: 1, material: "polyurethane"},
       1,
-      Attached(
-        1,
-        "body",
-        new Vector(
-          10,
-          0,
-          20
-        )
-      )
+      Attached(1, "body", new Vector(10, 0, 20))
     );
 
     var tool = EndEffectorBridge.toTool(endEffector, "contact");
@@ -643,22 +619,13 @@ class CadBridgeTests {
       set,
       "cup",
       "contact",
-      [EndEffectorControlBinding.Vacuum(
-        "cup.vacuum",
-        "tool/body",
-        "vacuum"
-      )]
+      [EndEffectorControlBinding.Vacuum("cup.vacuum", "tool/body", "vacuum")]
     );
     var gripper = EndEffectorRuntimeBridge.toRuntime(
       set,
       "gripper",
       "contact",
-      [EndEffectorControlBinding.Gripper(
-        "gripper.close",
-        "tool/body",
-        "open",
-        "close"
-      )]
+      [EndEffectorControlBinding.Gripper("gripper.close", "tool/body", "open", "close")]
     );
     check(
       cup.tool.id == "cup/contact" && gripper.tool.id == "gripper/contact" && cup.tool.id != gripper.tool.id,
@@ -726,12 +693,7 @@ class CadBridgeTests {
       set,
       "cup",
       "contact",
-      [EndEffectorControlBinding.Gripper(
-        "wrong",
-        "tool/body",
-        "open",
-        "close"
-      )]
+      [EndEffectorControlBinding.Gripper("wrong", "tool/body", "open", "close")]
     ) catch (_:Dynamic) rejected = true;
     check(rejected, "binding a capability to missing actuator ports is rejected");
     var combo = EndEffectorRuntimeBridge.toRuntime(
@@ -739,17 +701,8 @@ class CadBridgeTests {
       "combo",
       "contact",
       [
-        EndEffectorControlBinding.Gripper(
-          "combo.close",
-          "tool/body",
-          "open",
-          "close"
-        ),
-        EndEffectorControlBinding.Vacuum(
-          "combo.vacuum",
-          "tool/body",
-          "vacuum"
-        )
+        EndEffectorControlBinding.Gripper("combo.close", "tool/body", "open", "close"),
+        EndEffectorControlBinding.Vacuum("combo.vacuum", "tool/body", "vacuum")
       ]
     );
     check(
@@ -793,13 +746,7 @@ class CadBridgeTests {
       "manual",
       "base",
       "contact",
-      [
-        {robot: "coupledAir", tool: "air"},
-        {
-          robot: "valveCommand",
-          tool: "valveCommand"
-        }
-      ]
+      [{robot: "coupledAir", tool: "air"}, {robot: "valveCommand", tool: "valveCommand"}]
     );
     var effector = new EndEffector();
     effector.addComponent("generator", new VacuumGenerator());
@@ -862,17 +809,7 @@ class CadBridgeTests {
       "manual",
       "base",
       "contact",
-      [
-        {robot: "open", tool: "openAir"},
-        {
-          robot: "close",
-          tool: "closeAir"
-        },
-        {
-          robot: "air",
-          tool: "compressedAir"
-        }
-      ]
+      [{robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"}, {robot: "air", tool: "compressedAir"}]
     );
     var gripperTool = new EndEffector();
     gripperTool.include("gripper", new machinekit.robotics.ParallelGripper(new ParallelGripperSpec(40, 60, 60, 12)));
@@ -1088,18 +1025,9 @@ class CadBridgeTests {
       "end",
       'link${index + 1}',
       "mount",
-      {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0
-      },
+      {x: 0.0, y: 0.0, z: 1.0},
       0.0,
-      {
-        lower: -2.0,
-        upper: 2.0,
-        velocity: 1.0,
-        effort: 100.0
-      }
+      {lower: -2.0, upper: 2.0, velocity: 1.0, effort: 100.0}
     );
     arm.addComponent("baseFlange", new machinekit.robotics.RobotFlange(63));
     arm.addMate("baseFace", "fixed", "link0", "mount", "baseFlange", "face");
@@ -1119,12 +1047,7 @@ class CadBridgeTests {
       "mount",
       {x: 1.0, y: 0.0, z: 0.0},
       0.0,
-      {
-        lower: 0.0,
-        upper: 1000.0,
-        velocity: 100.0,
-        effort: 1000.0
-      }
+      {lower: 0.0, upper: 1000.0, velocity: 100.0, effort: 1000.0}
     );
     cell.include("arm", arm);
     cell.addMate("armMount", "fixed", "carriage", "end", "arm/link0", "mount");
@@ -1221,12 +1144,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     assembly.actuateDrive({
       id: "drive",
@@ -1332,12 +1250,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     driven.actuateDrive({
       id: "stepper",
@@ -1350,14 +1263,7 @@ class CadBridgeTests {
       maxStepRate: 200000,
       drive: "stepper",
       holdingTorque: 1.2,
-      torqueSpeed: [
-        0,
-        1.2,
-        100,
-        1.2,
-        400,
-        0.3
-      ]
+      torqueSpeed: [0, 1.2, 100, 1.2, 400, 0.3]
     });
     driven.actuateDrive({
       id: "servo",
@@ -1401,12 +1307,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: -3,
-        upper: 3,
-        velocity: 100,
-        effort: 1000
-      }
+      {lower: -3, upper: 3, velocity: 100, effort: 1000}
     );
     geared.actuateDrive({
       id: "servo",
@@ -1461,12 +1362,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     sensed.actuateDrive({
       id: "servo",
@@ -1512,12 +1408,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     screwed.mateOnAxis(
       "turn",
@@ -1528,12 +1419,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: null,
-        upper: null,
-        velocity: 70,
-        effort: 0
-      }
+      {lower: null, upper: null, velocity: 70, effort: 0}
     );
     screwed.couple("lead", "slide", "turn", Math.PI, 0, 0.4, 100.0, 0.05, 0.02);
     var screwParts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001, parts: [for (id in [
@@ -1591,14 +1477,7 @@ class CadBridgeTests {
     var authoredSlider = [for (entry in authored.definitions) if (entry.id == "slider") entry][0];
     authoredSlider.collisionHulls = machinekit.component.CollisionHullFacet.fromBoxes([
       [-20, -20, 0, -10, 20, 5],
-      [
-        10,
-        -20,
-        0,
-        20,
-        20,
-        5
-      ]
+      [10, -20, 0, 20, 20, 5]
     ]).hulls;
     var pieces = AssemblySimulationBridge.shapes(AssemblySimulationBridge.toRobotModel(authored, parts).model);
     check(
@@ -1629,12 +1508,7 @@ class CadBridgeTests {
       "mount",
       {x: 0, y: 1, z: 0},
       0,
-      {
-        lower: 0,
-        upper: 100,
-        velocity: 20,
-        effort: 50
-      }
+      {lower: 0, upper: 100, velocity: 20, effort: 50}
     );
     tipped.mate("tip-mount", "fixed", "slider", "tipSeat", "tip", "mount");
     var withTip = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001, parts: [for (id in [
@@ -1698,21 +1572,10 @@ class CadBridgeTests {
     nestedDefinition.occurrences[1].assembly = "slider-sub";
     nestedDefinition.assemblies = [{
       id: "slider-sub",
-      definitions: [{
-        id: "slider-part",
-        connectors: nestedDefinition.definitions[1].connectors
-      }],
-      occurrences: [{
-        id: "body",
-        definition: "slider-part",
-        initialPose: AssemblyFrames.identity()
-      }],
+      definitions: [{id: "slider-part", connectors: nestedDefinition.definitions[1].connectors}],
+      occurrences: [{id: "body", definition: "slider-part", initialPose: AssemblyFrames.identity()}],
       joints: [],
-      exposedConnectors: [{
-        name: "mount",
-        occurrence: "body",
-        connector: "mount"
-      }]
+      exposedConnectors: [{name: "mount", occurrence: "body", connector: "mount"}]
     }];
     parts.parts[1].id = "slider/slider-part";
     var nestedModel = AssemblySimulationBridge.toRobotModel(nestedDefinition, parts);
@@ -1743,12 +1606,7 @@ class CadBridgeTests {
       "hinge",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: -1,
-        upper: 1,
-        velocity: 2,
-        effort: 5
-      }
+      {lower: -1, upper: 1, velocity: 2, effort: 5}
     );
     var definition = assembly.definition("detachable-tool-test");
     var saved = new cadkit.modeling.AssemblyState(definition);
@@ -1864,11 +1722,7 @@ class CadBridgeTests {
       "the chassis link, which carries the base's parts, moves with the drive"
     );
     check(
-      approx(snapshot.velocities.get(0), 0.5 / 0.075, 1e-6) && approx(
-        snapshot.velocities.get(1),
-        -0.5 / 0.075,
-        1e-6
-      ),
+      approx(snapshot.velocities.get(0), 0.5 / 0.075, 1e-6) && approx(snapshot.velocities.get(1), -0.5 / 0.075, 1e-6),
       "the wheel joints spin at v / r, the right one negative"
     );
     // A positive yaw rate turns the base counter-clockwise in place.
@@ -1980,21 +1834,9 @@ class CadBridgeTests {
       new Vec3(0.0, 0.0, d1),
       new Vec3(0.0, shoulderOffset, 0.0),
       new Vec3(0.0, elbowOffset, a2),
-      new Vec3(
-        0.0,
-        0.0,
-        a3
-      ),
-      new Vec3(
-        0.0,
-        d4,
-        0.0
-      ),
-      new Vec3(
-        0.0,
-        0.0,
-        d5
-      )
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
     ];
     var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
     var jointNames = [
@@ -2042,41 +1884,17 @@ class CadBridgeTests {
       new Vector(-3.0, -3.0, 0.0),
       new Vector(3.0, -3.0, 0.0),
       new Vector(3.0, 3.0, 0.0),
-      new Vector(
-        1.0,
-        3.0,
-        0.0
-      ),
-      new Vector(
-        1.0,
-        1.0,
-        0.0
-      ),
-      new Vector(
-        -3.0,
-        1.0,
-        0.0
-      )
+      new Vector(1.0, 3.0, 0.0),
+      new Vector(1.0, 1.0, 0.0),
+      new Vector(-3.0, 1.0, 0.0)
     ]);
     var opening = closedCurve([
       new Vector(-2.0, -2.0, 0.0),
       new Vector(0.5, -2.0, 0.0),
       new Vector(0.5, -1.5, 0.0),
-      new Vector(
-        -1.5,
-        -1.5,
-        0.0
-      ),
-      new Vector(
-        -1.5,
-        -0.5,
-        0.0
-      ),
-      new Vector(
-        -2.0,
-        -0.5,
-        0.0
-      )
+      new Vector(-1.5, -1.5, 0.0),
+      new Vector(-1.5, -0.5, 0.0),
+      new Vector(-2.0, -0.5, 0.0)
     ]);
     var faceModel = Sketch.face(outer, [opening]);
     var face = new cadkit.Face(faceModel.shape.subshape(CadKit.ShapeKind.Face, 0));
@@ -2335,14 +2153,7 @@ private class BridgeRuntimePart extends MachineComponent {
     declareMass(
       gripper && vacuum ? 4 : gripper ? 3 : 1,
       new Vector(0, 0, length / 2),
-      new InertiaTensor(
-        2000000,
-        0,
-        0,
-        3000000,
-        0,
-        4000000
-      )
+      new InertiaTensor(2000000, 0, 0, 3000000, 0, 4000000)
     );
   }
 

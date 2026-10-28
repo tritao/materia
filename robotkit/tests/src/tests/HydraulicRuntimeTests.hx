@@ -65,11 +65,7 @@ class HydraulicRuntimeTests {
         null,
         null,
         true,
-        [new ProcessTimedEvent(
-          Int64.ofInt(1000000),
-          "A",
-          ProcessEventValue.Digital(true)
-        )]
+        [new ProcessTimedEvent(Int64.ofInt(1000000), "A", ProcessEventValue.Digital(true))]
       ),
         1
       );
@@ -100,11 +96,7 @@ class HydraulicRuntimeTests {
       "cylinder",
       drive.extensionForce(),
       drive.ratedSpeed,
-      Transmission.SimpleTransmission(
-        joint.id,
-        1,
-        0
-      )
+      Transmission.SimpleTransmission(joint.id, 1, 0)
     );
     actuator.drive = drive;
     model.addActuator(actuator);
@@ -131,21 +123,9 @@ class HydraulicRuntimeTests {
         null,
         true,
         [
-          new ProcessTimedEvent(
-            Int64.ofInt(1000000),
-            "A",
-            ProcessEventValue.Digital(true)
-          ),
-          new ProcessTimedEvent(
-            Int64.ofInt(1400000000),
-            "A",
-            ProcessEventValue.Digital(false)
-          ),
-          new ProcessTimedEvent(
-            Int64.ofInt(1600000000),
-            "B",
-            ProcessEventValue.Digital(true)
-          )
+          new ProcessTimedEvent(Int64.ofInt(1000000), "A", ProcessEventValue.Digital(true)),
+          new ProcessTimedEvent(Int64.ofInt(1400000000), "A", ProcessEventValue.Digital(false)),
+          new ProcessTimedEvent(Int64.ofInt(1600000000), "B", ProcessEventValue.Digital(true))
         ]
       ),
         1

@@ -213,17 +213,7 @@ class RobotRuntimeBlueprint {
     for (_ in 0...linkCount) links.push(new RobotRuntimeLinkBlueprint(
       1.0,
       [0.0, 0.0, 0.0],
-      [
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
     ));
     this.configuration = configuration;
   }

@@ -56,10 +56,7 @@ class JointRoute {
     to:Array<Float>,
     lower:Array<Float>,
     upper:Array<Float>,
-    clear:(
-      Array<Float>,
-      Array<Float>
-    ) -> Bool,
+    clear:(Array<Float>, Array<Float>) -> Bool,
     iterations:Int = 1024,
     step:Float = 0.08
   ):Array<Array<Float>> {

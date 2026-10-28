@@ -159,17 +159,7 @@ class SpatialTests {
     tree.add(new FrameTransform3(
       "room",
       "wall",
-      new Transform3(
-        new Vec3(2.0, 0.0, 0.0),
-        Quat.fromAxisAngle(
-          new Vec3(
-            0,
-            0,
-            1
-          ),
-          Math.PI * 0.5
-        )
-      )
+      new Transform3(new Vec3(2.0, 0.0, 0.0), Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI * 0.5))
     ));
 
     var projectTMap = new Transform3(
@@ -182,17 +172,7 @@ class SpatialTests {
     tree.add(new FrameTransform3(
       "arm_base",
       "flange",
-      new Transform3(
-        new Vec3(0.5, 0.0, 0.0),
-        Quat.fromAxisAngle(
-          new Vec3(
-            0,
-            1,
-            0
-          ),
-          0.3
-        )
-      )
+      new Transform3(new Vec3(0.5, 0.0, 0.0), Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.3))
     ));
     tree.add(new FrameTransform3("flange", "tcp", new Transform3(new Vec3(0.0, 0.0, 0.1), Quat.identity())));
 
@@ -204,54 +184,20 @@ class SpatialTests {
       new Vec3(0, 1, 0),
       Quat.identity()
     )).compose(new Transform3(
-      new Vec3(
-        0,
-        0,
-        1
-      ),
+      new Vec3(0, 0, 1),
       Quat.identity()
     )).compose(new Transform3(
-      new Vec3(
-        2,
-        0,
-        0
-      ),
-      Quat.fromAxisAngle(
-        new Vec3(
-          0,
-          0,
-          1
-        ),
-        Math.PI * 0.5
-      )
+      new Vec3(2, 0, 0),
+      Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI * 0.5)
     ));
     var projectTTcp = projectTMap.compose(new Transform3(new Vec3(0, 0, 0.5), Quat.identity())).compose(new Transform3(
-      new Vec3(
-        0,
-        0,
-        0.3
-      ),
+      new Vec3(0, 0, 0.3),
       Quat.identity()
     )).compose(new Transform3(
-      new Vec3(
-        0.5,
-        0,
-        0
-      ),
-      Quat.fromAxisAngle(
-        new Vec3(
-          0,
-          1,
-          0
-        ),
-        0.3
-      )
+      new Vec3(0.5, 0, 0),
+      Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.3)
     )).compose(new Transform3(
-      new Vec3(
-        0,
-        0,
-        0.1
-      ),
+      new Vec3(0, 0, 0.1),
       Quat.identity()
     ));
     var expectedWallTTcp = projectTWall.inverse().compose(projectTTcp);
@@ -280,34 +226,9 @@ class SpatialTests {
   static function sampleTransforms():Array<Transform3> {
     return [
       new Transform3(new Vec3(1.0, 2.0, -0.5), Quat.fromRollPitchYaw(0.3, -0.1, 0.7)),
-      new Transform3(
-        new Vec3(
-          -2.0,
-          0.4,
-          1.1
-        ),
-        Quat.fromRollPitchYaw(
-          -0.6,
-          0.2,
-          -0.4
-        )
-      ),
-      new Transform3(
-        new Vec3(
-          0.2,
-          -0.3,
-          0.05
-        ),
-        Quat.fromRollPitchYaw(
-          0.05,
-          0.9,
-          1.2
-        )
-      ),
-      new Transform3(
-        Vec3.zero(),
-        Quat.identity()
-      )
+      new Transform3(new Vec3(-2.0, 0.4, 1.1), Quat.fromRollPitchYaw(-0.6, 0.2, -0.4)),
+      new Transform3(new Vec3(0.2, -0.3, 0.05), Quat.fromRollPitchYaw(0.05, 0.9, 1.2)),
+      new Transform3(Vec3.zero(), Quat.identity())
     ];
   }
 

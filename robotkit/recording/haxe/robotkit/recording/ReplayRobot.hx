@@ -59,11 +59,7 @@ class ReplayRobot implements Robot {
       source.length == 0 ? 0 : source[0].snapshot.positions.length,
       [robotkit.core.JointTargetMode.Position],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     ) : capabilities;
   }
 
@@ -196,11 +192,7 @@ class ReplayRobot implements Robot {
       case Command(_), WorldEvent(_), RobotSnapshot(_), Sensor(_, _), Fault(_), ProcessEvent(_), Channel(_, _, _):
     }
     if (!hasSnapshot && frames.length > 0) source.push(new ReplayObservation(
-      copyWith(
-        current,
-        frames,
-        current.faultCode
-      ),
+      copyWith(current, frames, current.faultCode),
       currentFault,
       null,
       frames
@@ -244,10 +236,7 @@ class ReplayRobot implements Robot {
       value.committedUntilNs,
       value.queueEndTimeNs,
       value.setpointPositions.toArray(),
-      mergeSequences(
-        value.streamSequences,
-        sensors
-      )
+      mergeSequences(value.streamSequences, sensors)
     );
 
   static function mergeFrames(previous:Array<SensorFrame>, updates:Array<SensorFrame>):Array<SensorFrame> {

@@ -347,18 +347,9 @@ class RobotWorldTests {
       Int64.ofInt(1),
       Int64.ofInt(1),
       0,
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0],
+      [0.0, 0.0],
+      [0.0, 0.0],
       [segment],
       null,
       null,
@@ -376,31 +367,9 @@ class RobotWorldTests {
       Int64.ofInt(1),
       0,
       [0.0, 0.0],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        segment,
-        new TrajectorySegment(
-          Int64.ofInt(100000001),
-          Int64.ofInt(100000000),
-          [
-            [
-              0.1,
-              1.0
-            ],
-            [
-              -0.1,
-              -1.0
-            ]
-          ]
-        )
-      ]
+      [0.0, 0.0],
+      [0.0, 0.0],
+      [segment, new TrajectorySegment(Int64.ofInt(100000001), Int64.ofInt(100000000), [[0.1, 1.0], [-0.1, -1.0]])]
     ) catch (_:Dynamic) gapRejected = true;
     check(gapRejected, "execution plan rejects a one-nanosecond segment gap");
     var eventRejected = false;
@@ -410,14 +379,8 @@ class RobotWorldTests {
       Int64.ofInt(1),
       0,
       [0.0, 0.0],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0],
+      [0.0, 0.0],
       [segment],
       null,
       null,
@@ -425,11 +388,7 @@ class RobotWorldTests {
       null,
       null,
       false,
-      [new ProcessTimedEvent(
-        Int64.ofInt(100000001),
-        "test",
-        ProcessEventValue.Digital(true)
-      )]
+      [new ProcessTimedEvent(Int64.ofInt(100000001), "test", ProcessEventValue.Digital(true))]
     ) catch (_:Dynamic) eventRejected = true;
     check(eventRejected, "execution plan rejects an event beyond its payload duration");
     var recording = new RobotRecording();
@@ -552,16 +511,7 @@ class RobotWorldTests {
     ));
     recording.recordSensor(
       "robot-b",
-      new SensorFrame(
-        "wrong",
-        "imu",
-        "b/frame",
-        Int64.ofInt(1),
-        Int64.ofInt(101),
-        [9.0],
-        Int64.ofInt(201),
-        "b/link"
-      )
+      new SensorFrame("wrong", "imu", "b/frame", Int64.ofInt(1), Int64.ofInt(101), [9.0], Int64.ofInt(201), "b/link")
     );
     recording.recordSensor(
       "robot-a",
@@ -625,10 +575,7 @@ class RobotWorldTests {
     var source = [
       robotkit.core.JointTarget.position(0, 0.4),
       robotkit.core.JointTarget.velocity(1, -0.25),
-      robotkit.core.JointTarget.effort(
-        2,
-        3.5
-      )
+      robotkit.core.JointTarget.effort(2, 3.5)
     ];
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.JointTargets(source, null), "batch-robot");
@@ -670,13 +617,7 @@ class RobotWorldTests {
 
     var replay = new ReplayRobot("batch-robot", recording);
     replay.submit(RobotCommand.JointTargets(
-      [
-        robotkit.core.JointTarget.position(0, -0.1),
-        robotkit.core.JointTarget.velocity(
-          1,
-          0.5
-        )
-      ],
+      [robotkit.core.JointTarget.position(0, -0.1), robotkit.core.JointTarget.velocity(1, 0.5)],
       null
     ));
     switch replay.generatedCommands.commands[0] {
@@ -694,10 +635,7 @@ class RobotWorldTests {
     throws(
       function() robotkit.core.JointTarget.copyBatch([
         robotkit.core.JointTarget.position(0, 0.0),
-        robotkit.core.JointTarget.effort(
-          0,
-          1.0
-        )
+        robotkit.core.JointTarget.effort(0, 1.0)
       ]),
       "duplicate joints rejected within one atomic batch"
     );
@@ -737,10 +675,7 @@ class RobotWorldTests {
       function() new Footprint([
         new FootprintPoint(0.0, 0.0),
         new FootprintPoint(1.0, 0.0),
-        new FootprintPoint(
-          2.0,
-          0.0
-        )
+        new FootprintPoint(2.0, 0.0)
       ]),
       "degenerate footprint polygons are rejected"
     );
@@ -750,12 +685,7 @@ class RobotWorldTests {
     var differential = new MobileBase(
       differentialRobot,
       new DifferentialDrive(0, 1, 0.2, 0.6),
-      new MotionLimits(
-        1.0,
-        2.0,
-        0.5,
-        1.0
-      ),
+      new MotionLimits(1.0, 2.0, 0.5, 1.0),
       footprint
     );
     var bounded = differential.command(new Twist2(2.0, 4.0), 1.0);
@@ -800,15 +730,8 @@ class RobotWorldTests {
       "mobile-sim",
       mobileSimulation.addRobot(mobileBlueprint),
       "mobile simulation",
-      [
-        "base",
-        "left-wheel",
-        "right-wheel"
-      ],
-      [
-        "left-wheel-joint",
-        "right-wheel-joint"
-      ]
+      ["base", "left-wheel", "right-wheel"],
+      ["left-wheel-joint", "right-wheel-joint"]
     );
     var simulatedBase = new MobileBase(
       simulatedRobot,
@@ -873,10 +796,7 @@ class RobotWorldTests {
     var holonomic = new MobileBase(
       holonomicRobot,
       new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3),
-      new MotionLimits(
-        1.0,
-        2.0
-      )
+      new MotionLimits(1.0, 2.0)
     );
     holonomic.command(new Twist2(0.4, 0.5));
     check(switch holonomicRobot.lastCommand {
@@ -921,12 +841,7 @@ class RobotWorldTests {
     var reversed = new MobileBase(
       reversedRobot,
       new DifferentialDrive(0, 1, 0.2, 0.6, 1, -1),
-      new MotionLimits(
-        1.0,
-        2.0,
-        0.5,
-        1.0
-      )
+      new MotionLimits(1.0, 2.0, 0.5, 1.0)
     );
     reversed.command(new Twist2(2.0, 4.0), 1.0);
     check(switch reversedRobot.lastCommand {
@@ -941,10 +856,7 @@ class RobotWorldTests {
       "odom",
       Int64.ofInt(time),
       Int64.ofInt(time),
-      [
-        left,
-        right
-      ],
+      [left, right],
       [],
       [],
       1,
@@ -966,10 +878,7 @@ class RobotWorldTests {
       "odom",
       Int64.ofInt(time),
       Int64.ofInt(time),
-      [
-        left,
-        right
-      ],
+      [left, right],
       [],
       [],
       1,
@@ -1071,12 +980,7 @@ class RobotWorldTests {
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, tilt, -0.5, 0.7);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, spread, 0.0, 0.8);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       1.2,
       1.5,
       0.8,
@@ -1178,13 +1082,7 @@ class RobotWorldTests {
     var savedForkConfig = profile.forkMechanism;
     profile.forkMechanism = null;
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann(
-        "joint/tilt",
-        "joint/left-wheel",
-        1.2,
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel", 1.2, 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1214,12 +1112,7 @@ class RobotWorldTests {
     );
 
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "missing-left",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("missing-left", "joint/right-wheel", 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1231,12 +1124,7 @@ class RobotWorldTests {
       "robot model validation rejects mechanism roles that reference missing joints"
     );
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/lift",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/lift", "joint/right-wheel", 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1245,12 +1133,7 @@ class RobotWorldTests {
     for (value in typeDiagnostics) if (value.code == "RK_ROLE_TYPE") hasTypeError = true;
     check(hasTypeError, "robot model validation rejects joint types that cannot fill a mechanism role");
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/left-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/left-wheel", 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1262,12 +1145,7 @@ class RobotWorldTests {
     // Each wheel's direction comes from its joint axis in the base frame: a right wheel
     // turning about its outward motor shaft (-Y) rolls back on a positive rate.
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1374,12 +1252,7 @@ class RobotWorldTests {
     var shape = new CollisionShape(
       CollisionGeometry.Convex(points),
       [0.2, 0.3, 0.4],
-      [
-        0.0,
-        0.0,
-        Math.sin(Math.PI / 4),
-        Math.cos(Math.PI / 4)
-      ]
+      [0.0, 0.0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4)]
     );
     shape.name = "part";
     shape.inflation = 0.005;
@@ -1414,18 +1287,7 @@ class RobotWorldTests {
     for (geometry in [
       CollisionGeometry.Mesh(points, [0, 1, 2]),
       CollisionGeometry.HalfSpace(0, 0, 1, 0),
-      CollisionGeometry.HeightField(
-        1,
-        1,
-        [
-          0.0,
-          0,
-          0,
-          0
-        ],
-        2,
-        -1
-      )
+      CollisionGeometry.HeightField(1, 1, [0.0, 0, 0, 0], 2, -1)
     ]) check(
       new CollisionShape(geometry).validate() != null,
       "scene geometry is rejected on links"
@@ -1448,21 +1310,13 @@ class RobotWorldTests {
       "left-wheel-drive",
       90.0,
       12.0,
-      Transmission.SimpleTransmission(
-        source.joints[0].id,
-        2.0,
-        0.1
-      )
+      Transmission.SimpleTransmission(source.joints[0].id, 2.0, 0.1)
     ));
     source.addActuator(new Actuator(
       "left-wheel-assist",
       45.0,
       8.0,
-      Transmission.SimpleTransmission(
-        source.joints[0].id,
-        -3.0,
-        0.1
-      )
+      Transmission.SimpleTransmission(source.joints[0].id, -3.0, 0.1)
     ));
     source.addCoupling(new robotkit.model.JointCoupling(
       "paired-wheels",
@@ -1481,12 +1335,7 @@ class RobotWorldTests {
     source.links[0].collisionShapes.push(new CollisionShape(
       CollisionGeometry.Capsule(0.03, 0.12),
       [0.0, 0.0, 0.0],
-      [
-        0.70710678118654757,
-        0.0,
-        0.0,
-        0.70710678118654757
-      ]
+      [0.70710678118654757, 0.0, 0.0, 0.70710678118654757]
     ));
     source.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Cylinder(0.04, 0.1)));
     source.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
@@ -1520,18 +1369,7 @@ class RobotWorldTests {
       200.0,
       3e-5,
       1.26,
-      new robotkit.model.TorqueSpeedCurve(
-        [
-          0.0,
-          100.0,
-          400.0
-        ],
-        [
-          1.26,
-          1.26,
-          0.315
-        ]
-      )
+      new robotkit.model.TorqueSpeedCurve([0.0, 100.0, 400.0], [1.26, 1.26, 0.315])
     );
     if (source.actuators.length > 1) source.actuators[1].drive = new robotkit.model.ActuatorDrive.ServoDrive(
       0.64,
@@ -1549,10 +1387,7 @@ class RobotWorldTests {
     source.couplings[0].assumed = ["belt stiffness", "belt drag"];
     source.couplings[0].assumptions = [
       {quantity: "stiffness", label: "belt stiffness"},
-      {
-        quantity: "drag",
-        label: "belt drag"
-      }
+      {quantity: "drag", label: "belt drag"}
     ];
     source.actuators[0].assumed = ["rotor inertia"];
     source.actuators[0].assumptions = [{quantity: "inertia", label: "rotor inertia"}];
@@ -1617,15 +1452,7 @@ class RobotWorldTests {
       "all unsupported profile versions have one rejection message"
     );
     var holonomicProfile = new robotkit.profile.RobotProfile(new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(
-        [
-          "wheel/left",
-          "wheel/right",
-          "wheel/back"
-        ],
-        0.1,
-        0.3
-      ),
+      RobotDriveConfiguration.Holonomic(["wheel/left", "wheel/right", "wheel/back"], 0.1, 0.3),
       0.5,
       1.0
     ));
@@ -1653,13 +1480,7 @@ class RobotWorldTests {
     var ackermannSource = ackermannSourceDefinition.model;
     var ackermannSourceProfile = ackermannSourceDefinition.profile;
     ackermannSourceProfile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann(
-        "joint/tilt",
-        "joint/left-wheel",
-        1.2,
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel", 1.2, 0.1, 0.5),
       1.2,
       1.5
     );
@@ -1752,16 +1573,7 @@ class RobotWorldTests {
       1,
       paired.links[1].id,
       0,
-      new ContactSurface(
-        [
-          0.5,
-          0.0,
-          0.0
-        ],
-        3,
-        0.0,
-        0.0
-      )
+      new ContactSurface([0.5, 0.0, 0.0], 3, 0.0, 0.0)
     ));
     var pairedRestored = RobotModelCodec.decode(RobotModelCodec.encode(paired));
     check(
@@ -1827,10 +1639,7 @@ class RobotWorldTests {
     var badShape = RobotModelCodec.decode(encoded);
     badShape.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.0)));
     check(
-      hasDiagnostic(
-        RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()),
-        "RK_COLLISION_SHAPE"
-      ),
+      hasDiagnostic(RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
       "compiler rejects a non-positive collision shape size"
     );
     throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
@@ -2100,11 +1909,7 @@ class RobotWorldTests {
         frameId,
         Int64.ofInt(sequence),
         Int64.ofInt(sampleTimestamp),
-        [
-          latitude,
-          longitude,
-          yaw
-        ],
+        [latitude, longitude, yaw],
         Int64.ofInt(sampleTimestamp + 5),
         "antenna-link",
         null,
@@ -2163,17 +1968,8 @@ class RobotWorldTests {
       "GNSS rejects a fix outside its age window"
     );
     check(
-      gnss.update(fixSnapshot(
-        3,
-        100,
-        0.0,
-        oneMetreEast,
-        Math.PI * 0.5,
-        150,
-        "gnss-clock",
-        "host-clock",
-        "gnss-antenna"
-      )).quality != LocalizationQuality.Invalid,
+      gnss.update(fixSnapshot(3, 100, 0.0, oneMetreEast,
+      Math.PI * 0.5, 150, "gnss-clock", "host-clock", "gnss-antenna")).quality != LocalizationQuality.Invalid,
       "GNSS accepts a fix newer than the robot state"
     );
     check(
@@ -2329,14 +2125,7 @@ class RobotWorldTests {
       new Pose2(),
       "odom",
       "base",
-      new PoseCovariance2(
-        0.01,
-        0.0,
-        0.0,
-        0.01,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
       LocalizationQuality.Good,
       observed.sourceTimestampNs,
       observed.receivedTimestampNs,
@@ -2369,24 +2158,8 @@ class RobotWorldTests {
       "base",
       "fiducial/base",
       [
-        new FiducialTargetConfig(
-          11,
-          "pallet",
-          1.2,
-          0.8,
-          0.15
-        ),
-        new FiducialTargetConfig(
-          22,
-          "dock",
-          0.0,
-          0.0,
-          0.0,
-          new Pose2(
-            -0.5,
-            0.0
-          )
-        )
+        new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15),
+        new FiducialTargetConfig(22, "dock", 0.0, 0.0, 0.0, new Pose2(-0.5, 0.0))
       ],
       0.8
     );
@@ -2396,23 +2169,7 @@ class RobotWorldTests {
       "fiducial/camera",
       Int64.ofInt(1),
       Int64.ofInt(100),
-      [
-        11.0,
-        1.0,
-        0.0,
-        0.0,
-        0.95,
-        22.0,
-        2.0,
-        0.0,
-        0.0,
-        0.98,
-        99.0,
-        3.0,
-        0.0,
-        0.0,
-        0.99
-      ],
+      [11.0, 1.0, 0.0, 0.0, 0.95, 22.0, 2.0, 0.0, 0.0, 0.98, 99.0, 3.0, 0.0, 0.0, 0.99],
       Int64.ofInt(110),
       "fiducial/base"
     );
@@ -2431,10 +2188,7 @@ class RobotWorldTests {
         "fiducial/camera",
         Int64.ofInt(2),
         Int64.ofInt(120),
-        [
-          11.0,
-          1.0
-        ],
+        [11.0, 1.0],
         Int64.ofInt(130)
       )]),
       "fiducial records require complete values"
@@ -2456,32 +2210,13 @@ class RobotWorldTests {
       null,
       "camera.clock",
       "host.clock",
-      new CameraImage(
-        1,
-        1,
-        "rgb8",
-        pixels
-      )
+      new CameraImage(1, 1, "rgb8", pixels)
     );
     var typed = perception.observeCameraFrames(
       [camera],
       new PortFiducialDetector([
-        new FiducialMarkerObservation(
-          11,
-          new Pose2(
-            1.0,
-            0.0
-          ),
-          0.95
-        ),
-        new FiducialMarkerObservation(
-          22,
-          new Pose2(
-            2.0,
-            0.0
-          ),
-          0.98
-        )
+        new FiducialMarkerObservation(11, new Pose2(1.0, 0.0), 0.95),
+        new FiducialMarkerObservation(22, new Pose2(2.0, 0.0), 0.98)
       ])
     );
     check(
@@ -2495,25 +2230,11 @@ class RobotWorldTests {
       "fiducial/base",
       "base",
       "fiducial/base",
-      [new FiducialTargetConfig(
-        11,
-        "pallet",
-        1.2,
-        0.8,
-        0.15
-      )]
+      [new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15)]
     );
     var tiltedResult = tilted.observeCameraFrames(
       [camera],
-      new PortFiducialDetector([FiducialMarkerObservation.fromPose3(
-        11,
-        new Pose3(
-          1.0,
-          0.0,
-          0.0
-        ),
-        0.95
-      )])
+      new PortFiducialDetector([FiducialMarkerObservation.fromPose3(11, new Pose3(1.0, 0.0, 0.0), 0.95)])
     );
     check(
       tiltedResult.pallets().length == 1 && Math.abs(tiltedResult.pallets()[0].detection.pose.x - 1.5) < 1e-8
@@ -2529,29 +2250,7 @@ class RobotWorldTests {
       "depth-camera",
       Int64.ofInt(10),
       Int64.ofInt(150),
-      [
-        1.0,
-        0.0,
-        0.5,
-        1.04,
-        0.0,
-        0.5,
-        1.0,
-        0.04,
-        0.4,
-        3.0,
-        0.0,
-        0.4,
-        3.04,
-        0.0,
-        0.4,
-        0.5,
-        0.0,
-        3.0,
-        8.0,
-        0.0,
-        0.2
-      ],
+      [1.0, 0.0, 0.5, 1.04, 0.0, 0.5, 1.0, 0.04, 0.4, 3.0, 0.0, 0.4, 3.04, 0.0, 0.4, 0.5, 0.0, 3.0, 8.0, 0.0, 0.2],
       Int64.ofInt(160),
       "depth-link",
       null,
@@ -2574,10 +2273,7 @@ class RobotWorldTests {
         "camera",
         Int64.ofInt(1),
         Int64.ofInt(1),
-        [
-          1.0,
-          2.0
-        ],
+        [1.0, 2.0],
         Int64.ofInt(1)
       )]),
       "point-cloud perception rejects incomplete XYZ triples"
@@ -2598,12 +2294,7 @@ class RobotWorldTests {
       "base-link",
       "base",
       "base-link",
-      new PinholeCameraIntrinsics(
-        100.0,
-        100.0,
-        1.0,
-        1.0
-      ),
+      new PinholeCameraIntrinsics(100.0, 100.0, 1.0, 1.0),
       5.0,
       0.1,
       0.1,
@@ -2629,12 +2320,7 @@ class RobotWorldTests {
       null,
       "camera-clock",
       "host-clock",
-      new CameraImage(
-        4,
-        4,
-        "depth32f",
-        depthPixels
-      )
+      new CameraImage(4, 4, "depth32f", depthPixels)
     );
     var depthObstacles = depthPerception.observe([depthFrame]).obstacles();
     check(
@@ -2668,14 +2354,7 @@ class RobotWorldTests {
         frameId,
         Int64.ofInt(sequence),
         Int64.ofInt(sampleTimestamp),
-        [
-          0.0,
-          0.0,
-          gyro,
-          0.0,
-          0.0,
-          9.81
-        ],
+        [0.0, 0.0, gyro, 0.0, 0.0, 9.81],
         Int64.ofInt(timestamp + 1),
         "base",
         null,
@@ -2738,14 +2417,7 @@ class RobotWorldTests {
       "imu-frame",
       Int64.ofInt(2),
       Int64.ofInt(100000100),
-      [
-        0.0,
-        2.0,
-        0.0,
-        0.0,
-        0.0,
-        9.81
-      ],
+      [0.0, 2.0, 0.0, 0.0, 0.0, 9.81],
       Int64.ofInt(100000101),
       "imu/base",
       null,
@@ -2783,10 +2455,7 @@ class RobotWorldTests {
         "localized-base",
         Int64.ofInt(sequence),
         Int64.ofInt(timestamp),
-        [
-          left,
-          right
-        ],
+        [left, right],
         [],
         [],
         1,
@@ -2828,14 +2497,7 @@ class RobotWorldTests {
       new Pose2(2.0, -1.0, 0.25),
       "odom",
       "base",
-      new PoseCovariance2(
-        0.04,
-        0.01,
-        0.002,
-        0.09,
-        0.003,
-        0.01
-      ),
+      new PoseCovariance2(0.04, 0.01, 0.002, 0.09, 0.003, 0.01),
       Good,
       Int64.ofInt(300),
       Int64.ofInt(310),
@@ -2881,15 +2543,7 @@ class RobotWorldTests {
       frames,
       "map",
       "base",
-      new PoseFusionOptions(
-        0.00000002,
-        0.00000005,
-        2.0,
-        0.5,
-        0.25,
-        0.1,
-        0.05
-      )
+      new PoseFusionOptions(0.00000002, 0.00000005, 2.0, 0.5, 0.25, 0.1, 0.05)
     );
     var fusedInput = new RobotSnapshot(
       "fused-base",
@@ -2917,14 +2571,7 @@ class RobotWorldTests {
       new Pose2(0.3, 0.0, 0.0),
       "facility",
       "imu",
-      new PoseCovariance2(
-        0.04,
-        0.0,
-        0.0,
-        0.04,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01),
       Good,
       Int64.ofInt(100),
       Int64.ofInt(110),
@@ -2944,14 +2591,7 @@ class RobotWorldTests {
       new Pose2(0.5, 0.0, 0.0),
       "facility",
       "imu",
-      new PoseCovariance2(
-        0.04,
-        0.0,
-        0.0,
-        0.04,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01),
       Good,
       Int64.ofInt(120),
       Int64.ofInt(130),
@@ -2995,14 +2635,7 @@ class RobotWorldTests {
       new Pose2(50.0, 0.0, 0.0),
       "map",
       "base",
-      new PoseCovariance2(
-        0.01,
-        0.0,
-        0.0,
-        0.01,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
       Good,
       Int64.ofInt(110),
       Int64.ofInt(210),
@@ -3019,14 +2652,7 @@ class RobotWorldTests {
       new Pose2(25.0, 0.0, 0.0),
       "map",
       "base",
-      new PoseCovariance2(
-        0.01,
-        0.0,
-        0.0,
-        0.01,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
       Good,
       Int64.ofInt(220),
       Int64.ofInt(210),
@@ -3045,14 +2671,7 @@ class RobotWorldTests {
       new Pose2(5.9, 0.0, 0.0),
       "map",
       "base",
-      new PoseCovariance2(
-        0.01,
-        0.0,
-        0.0,
-        0.01,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
       Good,
       Int64.ofInt(230),
       Int64.ofInt(210),
@@ -3071,14 +2690,7 @@ class RobotWorldTests {
       new Pose2(6.0, 0.0, 0.0),
       "map",
       "base",
-      new PoseCovariance2(
-        0.01,
-        0.0,
-        0.0,
-        0.01,
-        0.0,
-        0.01
-      ),
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
       Good,
       Int64.ofInt(240),
       Int64.ofInt(0),
@@ -3146,18 +2758,7 @@ class RobotWorldTests {
     var trajectory = new Trajectory(
       [
         new TrajectorySample(0.0, new Pose2(), new Twist2()),
-        new TrajectorySample(
-          2.0,
-          new Pose2(
-            2.0,
-            0.0,
-            1.0
-          ),
-          new Twist2(
-            1.0,
-            0.5
-          )
-        )
+        new TrajectorySample(2.0, new Pose2(2.0, 0.0, 1.0), new Twist2(1.0, 0.5))
       ],
       "odom"
     );
@@ -3170,11 +2771,7 @@ class RobotWorldTests {
     throws(
       function() new Trajectory([
         new TrajectorySample(0.0, new Pose2(), Twist2.zero()),
-        new TrajectorySample(
-          0.0,
-          new Pose2(),
-          Twist2.zero()
-        )
+        new TrajectorySample(0.0, new Pose2(), Twist2.zero())
       ]),
       "Trajectory requires strictly increasing sample times"
     );
@@ -3184,12 +2781,7 @@ class RobotWorldTests {
     var profileBase = new MobileBase(
       profileRobot,
       new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(
-        1.0,
-        1.0,
-        0.8,
-        0.5
-      )
+      new MotionLimits(1.0, 1.0, 0.8, 0.5)
     );
     var profilePath = new Path([new Pose2(), new Pose2(2.0, 0.0, 0.0)], "odom");
     var profiled = Trajectory.fromPath(profilePath, profileBase, 1.0, 0.5, 0.1);
@@ -3224,10 +2816,7 @@ class RobotWorldTests {
         "trajectory-profile",
         Int64.ofInt(1),
         Int64.ofInt(1),
-        [
-          0.0,
-          0.0
-        ],
+        [0.0, 0.0],
         [],
         [],
         1,
@@ -3264,18 +2853,7 @@ class RobotWorldTests {
       "Trajectory parameterization preserves reverse body velocity"
     );
     var reversingTrajectory = Trajectory.fromPath(
-      new Path(
-        [
-          new Pose2(),
-          new Pose2(-0.4, 0.0, 0.0),
-          new Pose2(
-            0.2,
-            0.0,
-            0.0
-          )
-        ],
-        "odom"
-      ),
+      new Path([new Pose2(), new Pose2(-0.4, 0.0, 0.0), new Pose2(0.2, 0.0, 0.0)], "odom"),
       profileBase,
       0.5,
       0.5,
@@ -3307,17 +2885,8 @@ class RobotWorldTests {
     );
     var ackermannProfileBase = new MobileBase(
       new FakeRobot("ackermann-profile"),
-      new AckermannDrive(
-        0,
-        1,
-        1.0,
-        0.1,
-        0.2
-      ),
-      new MotionLimits(
-        1.0,
-        1.0
-      )
+      new AckermannDrive(0, 1, 1.0, 0.1, 0.2),
+      new MotionLimits(1.0, 1.0)
     );
     throws(
       function() Trajectory.fromPath(
@@ -3331,10 +2900,7 @@ class RobotWorldTests {
     );
     throws(
       function() Trajectory.fromPath(
-        new Path(
-          [new Pose2(), new Pose2(0.0, 0.0, 1.0), new Pose2(1.0, 0.0, 1.0)],
-          "odom"
-        ),
+        new Path([new Pose2(), new Pose2(0.0, 0.0, 1.0), new Pose2(1.0, 0.0, 1.0)], "odom"),
         profileBase
       ),
       "Trajectory rejects zero-distance pose changes that require an in-place rotation"
@@ -3356,16 +2922,7 @@ class RobotWorldTests {
       "Path projection stays monotonic and signs cross-track relative to the active segment"
     );
     var loopPath = new Path(
-      [
-        new Pose2(0.0, 0.0),
-        new Pose2(1.0, 0.0),
-        new Pose2(1.0, 1.0),
-        new Pose2(0.0, 1.0),
-        new Pose2(
-          0.0,
-          0.05
-        )
-      ],
+      [new Pose2(0.0, 0.0), new Pose2(1.0, 0.0), new Pose2(1.0, 1.0), new Pose2(0.0, 1.0), new Pose2(0.0, 0.05)],
       "map"
     );
     var nearLoopStart = new Pose2(0.0, 0.04, 0.0);
@@ -3436,10 +2993,7 @@ class RobotWorldTests {
       "nav-base",
       Int64.ofInt(sequence),
       Int64.ofInt(time),
-      [
-        left,
-        right
-      ],
+      [left, right],
       [],
       [],
       1,
@@ -3553,10 +3107,7 @@ class RobotWorldTests {
         "nav-overshoot",
         Int64.ofInt(3),
         Int64.ofInt(30),
-        [
-          12.0,
-          12.0
-        ],
+        [12.0, 12.0],
         [],
         [],
         1,
@@ -3595,10 +3146,7 @@ class RobotWorldTests {
       name,
       Int64.ofInt(tick),
       Int64.ofInt(tick * 10),
-      [
-        wheel,
-        wheel
-      ],
+      [wheel, wheel],
       [],
       [],
       1,
@@ -3674,12 +3222,7 @@ class RobotWorldTests {
       var speedBase = new MobileBase(
         speedRobot,
         new DifferentialDrive(0, 1, 0.1, 0.5),
-        new MotionLimits(
-          1.0,
-          2.0,
-          2.0,
-          10.0
-        )
+        new MotionLimits(1.0, 2.0, 2.0, 10.0)
       );
       var speedLocalization = new WheelOdometryLocalization(speedBase);
       speedLocalization.reset(new Pose2(x, 0.0, 0.0));
@@ -3721,12 +3264,7 @@ class RobotWorldTests {
     var zoneBase = new MobileBase(
       zoneRobot,
       new DifferentialDrive(0, 1, 0.1, 0.5),
-      new MotionLimits(
-        1.0,
-        2.0,
-        1.0,
-        10.0
-      )
+      new MotionLimits(1.0, 2.0, 1.0, 10.0)
     );
     zoneBase.command(new Twist2(0.6, 0.0));
     var zoneLocalization = new WheelOdometryLocalization(zoneBase);
@@ -3796,12 +3334,7 @@ class RobotWorldTests {
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       0.6,
       1.0,
       2.0,
@@ -4008,11 +3541,7 @@ class RobotWorldTests {
         "remembered",
         "obstacle",
         1.0,
-        new Pose2(
-          x,
-          y,
-          yaw
-        ),
+        new Pose2(x, y, yaw),
         "map",
         Int64.ofInt(1),
         Int64.ofInt(1),
@@ -4193,10 +3722,8 @@ class RobotWorldTests {
     );
     map.senseObstacles([along], null, 0.1);
     check(
-      !map.isTraversable(54, 50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) && map.isTraversable(
-        62,
-        50
-      ) && map.isTraversable(
+      !map.isTraversable(54,
+      50) && !map.isTraversable(45, 50) && map.isTraversable(50, 53) && map.isTraversable(62, 50) && map.isTraversable(
         37,
         50
       ),
@@ -4311,10 +3838,7 @@ class RobotWorldTests {
     );
     dynamicCostmap.clearDynamicObstacles();
     check(
-      dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) && dynamicCostmap.isTraversable(
-        2,
-        2
-      ),
+      dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) && dynamicCostmap.isTraversable(2, 2),
       "costmap clearing the dynamic layer leaves the grid's obstacles"
     );
 
@@ -4324,10 +3848,7 @@ class RobotWorldTests {
         "sighting",
         "obstacle",
         1.0,
-        new Pose2(
-          x,
-          y
-        ),
+        new Pose2(x, y),
         "map",
         Int64.ofInt(1),
         Int64.ofInt(1),
@@ -4352,11 +3873,7 @@ class RobotWorldTests {
         "sim-clock",
         "host-clock"
       ),
-      new Pose2(
-        0.0,
-        5.0,
-        0.0
-      )
+      new Pose2(0.0, 5.0, 0.0)
     );
     var memoryGrid = new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free);
     var memory = new Costmap2(memoryGrid, 0.0, false, 0.0, 0.0, 5.0);
@@ -4418,10 +3935,7 @@ class RobotWorldTests {
         "margin-obstacle",
         "obstacle",
         1.0,
-        new Pose2(
-          2.0,
-          2.0
-        ),
+        new Pose2(2.0, 2.0),
         "map",
         Int64.ofInt(1),
         Int64.ofInt(1),
@@ -4606,12 +4120,7 @@ class RobotWorldTests {
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       0.8,
       1.5,
       1.5,
@@ -4950,12 +4459,7 @@ class RobotWorldTests {
     right.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(right);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       0.8,
       1.5,
       100.0,
@@ -5020,10 +4524,8 @@ class RobotWorldTests {
       "IMU keeps publishing every tick while the plant drives the base"
     );
     check(
-      Math.abs(imuValue(snapshot, 2)) < 1e-4 && Math.abs(imuValue(snapshot, 3)) < 1e-2 && Math.abs(imuValue(
-        snapshot,
-        4
-      )) < 1e-2 && Math.abs(imuValue(
+      Math.abs(imuValue(snapshot, 2)) < 1e-4 && Math.abs(imuValue(snapshot,
+      3)) < 1e-2 && Math.abs(imuValue(snapshot, 4)) < 1e-2 && Math.abs(imuValue(
         snapshot,
         5
       ) - 9.81) < 1e-6,
@@ -5086,13 +4588,7 @@ class RobotWorldTests {
     plant.step(Int64.ofInt(tick++));
     var directStart = plant.pose;
     robot.submit(RobotCommand.JointTargets(
-      [
-        robotkit.core.JointTarget.velocity(0, 3.0),
-        robotkit.core.JointTarget.velocity(
-          1,
-          3.0
-        )
-      ],
+      [robotkit.core.JointTarget.velocity(0, 3.0), robotkit.core.JointTarget.velocity(1, 3.0)],
       null
     ));
     plant.step(Int64.ofInt(tick++));
@@ -5159,11 +4655,7 @@ class RobotWorldTests {
       wheelIds.push(joint.id);
     }
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(
-        wheelIds,
-        wheelRadius,
-        baseRadius
-      ),
+      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius),
       0.8,
       1.5,
       100.0,
@@ -5319,16 +4811,8 @@ class RobotWorldTests {
     var config = new ForkConfig(
       new ForkAxisConfig("mast-lift", 0.0, 2.0),
       new LoadLimits(1000.0, 600.0, 1.8),
-      new ForkAxisConfig(
-        "fork-tilt",
-        -0.5,
-        0.7
-      ),
-      new ForkAxisConfig(
-        "fork-spread",
-        0.0,
-        0.8
-      )
+      new ForkAxisConfig("fork-tilt", -0.5, 0.7),
+      new ForkAxisConfig("fork-spread", 0.0, 0.8)
     );
     var forks = new Forks(robot, config);
     var state = forks.state();
@@ -5363,14 +4847,7 @@ class RobotWorldTests {
     throws(
       function() new Forks(
         robot,
-        new ForkConfig(
-          new ForkAxisConfig("missing-lift", 0.0, 1.0),
-          new LoadLimits(
-            100.0,
-            100.0,
-            1.0
-          )
-        )
+        new ForkConfig(new ForkAxisConfig("missing-lift", 0.0, 1.0), new LoadLimits(100.0, 100.0, 1.0))
       ),
       "Forks requires configured joint names to exist in the robot description"
     );
@@ -5458,16 +4935,7 @@ class RobotWorldTests {
     var articulatedTree = RobotFrameTree2.fromSnapshot(
       perceptionModel,
       articulatedBlueprint,
-      new RobotSnapshot(
-        "mast",
-        Int64.ofInt(1),
-        Int64.ofInt(100),
-        [0.75],
-        [0.0],
-        [0.0],
-        1,
-        0
-      ),
+      new RobotSnapshot("mast", Int64.ofInt(1), Int64.ofInt(100), [0.75], [0.0], [0.0], 1, 0),
       "base"
     );
     var mastCamera = articulatedTree.lookup("base", "mast-camera");
@@ -5487,16 +4955,7 @@ class RobotWorldTests {
     var rotatingTree = RobotFrameTree2.fromSnapshot(
       rotatingModel,
       rotatingBlueprint,
-      new RobotSnapshot(
-        "turret",
-        Int64.ofInt(1),
-        Int64.ofInt(100),
-        [Math.PI * 0.5],
-        [0.0],
-        [0.0],
-        1,
-        0
-      ),
+      new RobotSnapshot("turret", Int64.ofInt(1), Int64.ofInt(100), [Math.PI * 0.5], [0.0], [0.0], 1, 0),
       "base"
     );
     var turretSensor = rotatingTree.lookup("base", "turret-sensor");
@@ -5513,19 +4972,10 @@ class RobotWorldTests {
       "laser",
       Int64.ofInt(9),
       Int64.ofInt(140),
-      [
-        1.0,
-        10.0,
-        10.0,
-        10.0
-      ],
+      [1.0, 10.0, 10.0, 10.0],
       Int64.ofInt(150),
       "base",
-      [
-        0.2,
-        0.0,
-        0.3
-      ],
+      [0.2, 0.0, 0.3],
       laserMount.rotation,
       "robot-boot",
       "host-clock"
@@ -5571,19 +5021,10 @@ class RobotWorldTests {
       "laser",
       Int64.ofInt(10),
       Int64.ofInt(140),
-      [
-        1.0,
-        10.0,
-        2.0,
-        10.0
-      ],
+      [1.0, 10.0, 2.0, 10.0],
       Int64.ofInt(150),
       "base",
-      [
-        0.2,
-        0.0,
-        0.3
-      ],
+      [0.2, 0.0, 0.3],
       laserMount.rotation,
       "robot-boot",
       "host-clock"
@@ -5614,11 +5055,7 @@ class RobotWorldTests {
       perception,
       new FixedLocalization(mapEstimate),
       null,
-      new LidarMapFilter(
-        knownMap,
-        0.1,
-        10.0
-      )
+      new LidarMapFilter(knownMap, 0.1, 10.0)
     );
     var leftOver = mappedPerception.observeRobotSnapshot(
       mappedSnapshot,
@@ -5669,11 +5106,7 @@ class RobotWorldTests {
         "laser",
         Int64.ofInt(10),
         Int64.ofInt(140),
-        [
-          1.0,
-          10.0,
-          10.0
-        ],
+        [1.0, 10.0, 10.0],
         Int64.ofInt(145),
         "base-link",
         null,
@@ -5714,11 +5147,7 @@ class RobotWorldTests {
         "camera-boot",
         "host-clock"
       ),
-      new Pose2(
-        3.0,
-        0.0,
-        0.0
-      )
+      new Pose2(3.0, 0.0, 0.0)
     );
     var semantic = new PerceptionSnapshot([palletDetection], [], [pallet], [dock]);
     check(
@@ -5833,17 +5262,7 @@ class RobotWorldTests {
       "battery state exposes charge, electrical state, and remaining energy"
     );
     throws(
-      function() new BatteryState(
-        "bad-pack",
-        1.1,
-        48.0,
-        0.0,
-        20.0,
-        Int64.ofInt(0),
-        Int64.ofInt(0),
-        "battery",
-        "host"
-      ),
+      function() new BatteryState("bad-pack", 1.1, 48.0, 0.0, 20.0, Int64.ofInt(0), Int64.ofInt(0), "battery", "host"),
       "battery state rejects invalid charge fractions"
     );
   }
@@ -5858,17 +5277,11 @@ class RobotWorldTests {
       robot,
       new DifferentialDrive(0, 1, 0.1, 0.5),
       new MotionLimits(1.0, 2.0, 2.0, 3.0),
-      Footprint.rectangle(
-        0.8,
-        0.6
-      )
+      Footprint.rectangle(0.8, 0.6)
     );
     var forks = new Forks(
       robot,
-      new ForkConfig(
-        new ForkAxisConfig("lift", 0.0, 2.0),
-        new LoadLimits(1000.0, 600.0, 2.0)
-      )
+      new ForkConfig(new ForkAxisConfig("lift", 0.0, 2.0), new LoadLimits(1000.0, 600.0, 2.0))
     );
     var policy = new LoadSafetyPolicy(base, forks, new LoadSafetyConfiguration());
     var unknown = policy.state();
@@ -6016,16 +5429,7 @@ class RobotWorldTests {
         [],
         [],
         [new Pallet(palletDetection, 1.2, 0.8, 0.15)],
-        [
-          new DockingTarget(
-            dockDetection,
-            dockApproach
-          ),
-          new DockingTarget(
-            chargerDetection,
-            chargerApproach
-          )
-        ]
+        [new DockingTarget(dockDetection, dockApproach), new DockingTarget(chargerDetection, chargerApproach)]
       );
     }
     );
@@ -6353,11 +5757,7 @@ class RobotWorldTests {
       "pallet-17",
       "pallet",
       0.98,
-      new Pose2(
-        pickPose.x + 0.5,
-        pickPose.y,
-        pickPose.yaw
-      ),
+      new Pose2(pickPose.x + 0.5, pickPose.y, pickPose.yaw),
       "odom",
       liveSnapshot.sourceSequence,
       liveSnapshot.sourceTimestampNs,
@@ -6551,11 +5951,7 @@ class RobotWorldTests {
         robotkit.core.JointTargetMode.Effort
       ],
       robotkit.core.ExecutionCapabilities.unavailable(),
-      new robotkit.core.TimingCapabilities(
-        false,
-        false,
-        trajectorykit.validation.ValidationGuarantee.Unchecked
-      )
+      new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
     );
 
     var goalReplay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
@@ -6651,10 +6047,7 @@ class RobotWorldTests {
     var replayDock = new Dock(replayNavigator, new DockingTarget(replayDockDetection, replayDockPose), observeReplay);
     var replayDockStatus = runReplay(
       replaySkillRunner.start(replayDock),
-      function(snapshot) return replaySkillRunner.update(
-        snapshot,
-        0.01
-      ),
+      function(snapshot) return replaySkillRunner.update(snapshot, 0.01),
       function() return false
     );
     check(
@@ -6673,11 +6066,7 @@ class RobotWorldTests {
         "pallet-17",
         "pallet",
         0.98,
-        new Pose2(
-          replayPickPose.x + 0.5,
-          replayPickPose.y,
-          replayPickPose.yaw
-        ),
+        new Pose2(replayPickPose.x + 0.5, replayPickPose.y, replayPickPose.yaw),
         "odom",
         replaySnapshot.sourceSequence,
         replaySnapshot.sourceTimestampNs,
@@ -6731,12 +6120,7 @@ class RobotWorldTests {
     var replayTravel = new FollowPath(
       replayNavigation,
       replayTravelPath,
-      new NavigationGoal(
-        replayTravelPose,
-        "odom",
-        0.02,
-        0.1
-      )
+      new NavigationGoal(replayTravelPose, "odom", 0.02, 0.1)
     );
     replayTravel.start();
     var replayTravelStatus = replayTravel.update(replay.snapshot(), 0.01);
@@ -6830,10 +6214,7 @@ class RobotWorldTests {
     replayCharge.start();
     var replayChargeStatus = runReplay(
       replayCharge.status(),
-      function(snapshot) return replayCharge.update(
-        snapshot,
-        0.01
-      ),
+      function(snapshot) return replayCharge.update(snapshot, 0.01),
       replayApproachReached
     );
     check(
@@ -6954,12 +6335,7 @@ class RobotWorldTests {
     addJoint("joint/tilt", "tilt", JointType.Revolute, carriage, -0.5, 0.5, 1000.0);
     addJoint("joint/spread", "spread", JointType.Prismatic, forks, 0.0, 0.8, 1000.0);
     profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left-wheel",
-        "joint/right-wheel",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
       0.5,
       1.0,
       2.0,
@@ -6986,23 +6362,11 @@ class RobotWorldTests {
       "frame/front",
       Int64.parseString("9007199254740993"),
       Int64.parseString("9223372036854775000"),
-      [
-        1.25,
-        2.5
-      ],
+      [1.25, 2.5],
       Int64.parseString("9223372036854775001"),
       "link/base",
-      [
-        0.1,
-        0.2,
-        0.3
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
+      [0.1, 0.2, 0.3],
+      [0.0, 0.0, 0.0, 1.0],
       "robot-a.reset-2",
       "host.monotonic"
     );
@@ -7017,25 +6381,11 @@ class RobotWorldTests {
       [],
       Int64.ofInt(160),
       "link/base",
-      [
-        0.2,
-        0.0,
-        0.8
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
+      [0.2, 0.0, 0.8],
+      [0.0, 0.0, 0.0, 1.0],
       "robot-a.reset-2",
       "host.monotonic",
-      new CameraImage(
-        2,
-        1,
-        "rgb8",
-        cameraBytes
-      )
+      new CameraImage(2, 1, "rgb8", cameraBytes)
     );
     var corruptSensor = robotkit.recording.RobotRecordingCodec.sensor(camera, "robot-a");
     corruptSensor.mountPosition = [0.0, 0.0];
@@ -7059,10 +6409,7 @@ class RobotWorldTests {
       1,
       0,
       Int64.parseString("9223372036854775002"),
-      [
-        sensor,
-        camera
-      ],
+      [sensor, camera],
       "robot-a.reset-2",
       "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP
@@ -7091,14 +6438,8 @@ class RobotWorldTests {
       RobotCommand.JointTargets(
         [
           robotkit.core.JointTarget.position(0, 0.75),
-          robotkit.core.JointTarget.velocity(
-            1,
-            -0.25
-          ),
-          robotkit.core.JointTarget.effort(
-            2,
-            3.5
-          )
+          robotkit.core.JointTarget.velocity(1, -0.25),
+          robotkit.core.JointTarget.effort(2, 3.5)
         ],
         Int64.parseString("9223372036854775003")
       ),
@@ -7220,12 +6561,7 @@ class RobotWorldTests {
           null,
           "clock",
           "host",
-          new CameraImage(
-            512,
-            1024,
-            "rgb8",
-            pixels
-          )
+          new CameraImage(512, 1024, "rgb8", pixels)
         )
       );
       var custom = new TestRecordingPayload();
@@ -7353,12 +6689,7 @@ class RobotWorldTests {
     throws(
       function() runtime.publishCameraFrame(
         "sensor/missing",
-        new CameraImage(
-          1,
-          1,
-          "jpeg",
-          haxe.io.Bytes.ofString("x")
-        ),
+        new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")),
         Int64.ofInt(2),
         Int64.ofInt(101)
       ),
@@ -7371,12 +6702,7 @@ class RobotWorldTests {
     throws(
       function() runtime.publishCameraFrame(
         "sensor/front-camera",
-        new CameraImage(
-          1,
-          1,
-          "jpeg",
-          haxe.io.Bytes.ofString("x")
-        ),
+        new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")),
         Int64.ofInt(1),
         Int64.ofInt(101)
       ),
@@ -7437,11 +6763,7 @@ class RobotWorldTests {
     simulationHarness.step(Int64.ofInt(1));
     simulationHarness.step(Int64.ofInt(2));
     var tool = new robotkit.tool.ToolRuntime(
-      new robotkit.tool.Tool(
-        "cup",
-        "cup",
-        robotkit.spatial.Transform3.identity()
-      ),
+      new robotkit.tool.Tool("cup", "cup", robotkit.spatial.Transform3.identity()),
       new robotkit.tool.SimulatedGripper(),
       new robotkit.tool.SimulatedVacuum()
     );
@@ -7484,23 +6806,11 @@ class RobotWorldTests {
     equal(adapter.applySnapshot(robot.snapshot()), 2, "later tool sensor frames update the selected tool");
     check(!tool.gripper.isGrasped() && !tool.vacuum.isHolding(), "lost contact and vacuum pressure clear the pickup");
     throws(
-      function() runtime.publishSensorFrame(
-        contact.id,
-        [0.5],
-        Int64.ofInt(3),
-        Int64.ofInt(6),
-        "robotkit.monotonic"
-      ),
+      function() runtime.publishSensorFrame(contact.id, [0.5], Int64.ofInt(3), Int64.ofInt(6), "robotkit.monotonic"),
       "one digital value"
     );
     throws(
-      function() runtime.publishSensorFrame(
-        pressure.id,
-        [-1.0],
-        Int64.ofInt(3),
-        Int64.ofInt(6),
-        "robotkit.monotonic"
-      ),
+      function() runtime.publishSensorFrame(pressure.id, [-1.0], Int64.ofInt(3), Int64.ofInt(6), "robotkit.monotonic"),
       "non-negative kPa"
     );
     selection.select(null, Int64.ofInt(6));
@@ -7526,17 +6836,8 @@ class RobotWorldTests {
       PixelFormat.RGB8,
       null,
       "base",
-      [
-        0.2,
-        0.0,
-        0.8
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
+      [0.2, 0.0, 0.8],
+      [0.0, 0.0, 0.0, 1.0],
       "robot.boot-1",
       "sensor.monotonic"
     );
@@ -7592,11 +6893,7 @@ class RobotWorldTests {
       2,
       2,
       PixelFormat.RGB8,
-      new BufferRef(
-        0,
-        2,
-        12
-      ),
+      new BufferRef(0, 2, 12),
       "base"
     );
     var offsetFrame = new RobotFrame(RobotMessageType.CameraFrame, MessagePack.encode(offsetMetadata), 0, [padded]);
@@ -7635,11 +6932,7 @@ class RobotWorldTests {
       2,
       2,
       PixelFormat.RGB8,
-      new BufferRef(
-        0,
-        8,
-        12
-      )
+      new BufferRef(0, 8, 12)
     );
     throws(
       function() RobotProtocol.decodeCameraFrame(new RobotFrame(
@@ -7661,11 +6954,7 @@ class RobotWorldTests {
       2,
       2,
       PixelFormat.RGB8,
-      new BufferRef(
-        1,
-        0,
-        12
-      )
+      new BufferRef(1, 0, 12)
     );
     throws(
       function() RobotProtocol.decodeCameraFrame(new RobotFrame(
@@ -7687,11 +6976,7 @@ class RobotWorldTests {
       2,
       2,
       PixelFormat.RGB8,
-      new BufferRef(
-        0,
-        0,
-        11
-      )
+      new BufferRef(0, 0, 11)
     );
     throws(
       function() RobotProtocol.decodeCameraFrame(new RobotFrame(
@@ -8070,11 +7355,7 @@ class RobotWorldTests {
           ProcessEventValue.Digital(true),
           ProcessHoldPolicy.RestoreOnResume
         ),
-        new ProcessTimedEvent(
-          Int64.ofInt(300000000),
-          "sprayer.flow",
-          ProcessEventValue.Digital(false)
-        )
+        new ProcessTimedEvent(Int64.ofInt(300000000), "sprayer.flow", ProcessEventValue.Digital(false))
       ]
     );
     runtime.submitPlan(plan, 1);
@@ -8144,16 +7425,8 @@ class RobotWorldTests {
         null,
         true,
         [
-          new ProcessTimedEvent(
-            Int64.ofInt(50000000),
-            "sprayer.flow",
-            ProcessEventValue.Digital(true)
-          ),
-          new ProcessTimedEvent(
-            Int64.ofInt(50000000),
-            "tool.vacuum",
-            ProcessEventValue.Digital(true)
-          )
+          new ProcessTimedEvent(Int64.ofInt(50000000), "sprayer.flow", ProcessEventValue.Digital(true)),
+          new ProcessTimedEvent(Int64.ofInt(50000000), "tool.vacuum", ProcessEventValue.Digital(true))
         ]
       ),
       1
@@ -8233,11 +7506,7 @@ class RobotWorldTests {
       "door-cylinder",
       drive.extensionForce(),
       drive.ratedSpeed,
-      Transmission.SimpleTransmission(
-        joint.id,
-        1.0,
-        0.0
-      )
+      Transmission.SimpleTransmission(joint.id, 1.0, 0.0)
     );
     actuator.drive = drive;
     model.addActuator(actuator);
@@ -8256,11 +7525,7 @@ class RobotWorldTests {
       "vise-cylinder",
       viseDrive.extensionForce(),
       viseDrive.ratedSpeed,
-      Transmission.SimpleTransmission(
-        viseJoint.id,
-        1.0,
-        0.0
-      )
+      Transmission.SimpleTransmission(viseJoint.id, 1.0, 0.0)
     );
     viseActuator.drive = viseDrive;
     model.addActuator(viseActuator);
@@ -8299,18 +7564,9 @@ class RobotWorldTests {
         Int64.ofInt(blueprint.calibrationRevision),
         RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
       | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
+      [0.0, 0.0],
+      [0.0, 0.0],
+      [0.0, 0.0],
       [segment],
       null,
       null,
@@ -8319,16 +7575,8 @@ class RobotWorldTests {
       null,
       true,
       [
-        new ProcessTimedEvent(
-          Int64.ofInt(20000000),
-          "door-valve/coilA",
-          ProcessEventValue.Digital(true)
-        ),
-        new ProcessTimedEvent(
-          Int64.ofInt(20000000),
-          "vise-valve/coilA",
-          ProcessEventValue.Digital(true)
-        )
+        new ProcessTimedEvent(Int64.ofInt(20000000), "door-valve/coilA", ProcessEventValue.Digital(true)),
+        new ProcessTimedEvent(Int64.ofInt(20000000), "vise-valve/coilA", ProcessEventValue.Digital(true))
       ]
     ),
       1
@@ -8382,18 +7630,9 @@ class RobotWorldTests {
           Int64.ofInt(blueprint.revision),
           Int64.ofInt(blueprint.calibrationRevision),
           RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-          [
-            0.0,
-            0.0
-          ],
-          [
-            0.0,
-            0.0
-          ],
-          [
-            0.0,
-            0.0
-          ],
+          [0.0, 0.0],
+          [0.0, 0.0],
+          [0.0, 0.0],
           [moving],
           null,
           null,
@@ -8480,11 +7719,7 @@ class RobotWorldTests {
       "spindle-drive",
       5.0,
       20.0,
-      Transmission.SimpleTransmission(
-        spindleJoint.id,
-        1.0,
-        0.0
-      )
+      Transmission.SimpleTransmission(spindleJoint.id, 1.0, 0.0)
     );
     spindleActuator.drive = new ServoDrive(2.0, 5.0, 10.0, 20.0, 0.001, 1000.0);
     spindleActuator.processVelocity = new ProcessVelocityDrive("spindle.speed", "spindle.direction", 1.0);
@@ -8552,15 +7787,8 @@ class RobotWorldTests {
       "discrete-process-sensors",
       runtime,
       "discrete-process-sensors",
-      [
-        "base",
-        "carriage",
-        "spindle"
-      ],
-      [
-        "slide",
-        "spindle"
-      ]
+      ["base", "carriage", "spindle"],
+      ["slide", "spindle"]
     );
     function value(snapshot:RobotSnapshot, id:String):Float {
       for (index in 0...snapshot.sensors.length) {
@@ -8613,18 +7841,9 @@ class RobotWorldTests {
         Int64.ofInt(blueprint.calibrationRevision),
         RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE
       | RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS,
-      [
-        0.27,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0
-      ],
+      [0.27, 0.0],
+      [0.0, 0.0],
+      [0.0, 0.0],
       [spinSegment],
       null,
       null,
@@ -8633,21 +7852,9 @@ class RobotWorldTests {
       null,
       true,
       [
-        new ProcessTimedEvent(
-          Int64.ofInt(0),
-          "spindle.speed",
-          ProcessEventValue.Analog(5.0)
-        ),
-        new ProcessTimedEvent(
-          Int64.ofInt(0),
-          "spindle.direction",
-          ProcessEventValue.Analog(1.0)
-        ),
-        new ProcessTimedEvent(
-          Int64.ofInt(200000000),
-          "spindle.speed",
-          ProcessEventValue.Analog(8.0)
-        )
+        new ProcessTimedEvent(Int64.ofInt(0), "spindle.speed", ProcessEventValue.Analog(5.0)),
+        new ProcessTimedEvent(Int64.ofInt(0), "spindle.direction", ProcessEventValue.Analog(1.0)),
+        new ProcessTimedEvent(Int64.ofInt(200000000), "spindle.speed", ProcessEventValue.Analog(8.0))
       ]
     ),
       4
@@ -8772,33 +7979,9 @@ class RobotWorldTests {
   static function testSensorAndClockContracts():Void {
     var input = [0.0, 0.0, 0.0, 0.0, 0.0, 9.81];
     var sourceFrames = [
-      new SensorFrame(
-        "enc",
-        "joint_encoder",
-        "base",
-        Int64.ofInt(2),
-        Int64.ofInt(3),
-        [],
-        Int64.ofInt(4)
-      ),
-      new SensorFrame(
-        "imu",
-        "imu",
-        "base",
-        Int64.ofInt(2),
-        Int64.ofInt(3),
-        input,
-        Int64.ofInt(4)
-      ),
-      new SensorFrame(
-        "lidar",
-        "lidar",
-        "base",
-        Int64.ofInt(2),
-        Int64.ofInt(3),
-        [for (_ in 0...8) 2.0],
-        Int64.ofInt(4)
-      )
+      new SensorFrame("enc", "joint_encoder", "base", Int64.ofInt(2), Int64.ofInt(3), [], Int64.ofInt(4)),
+      new SensorFrame("imu", "imu", "base", Int64.ofInt(2), Int64.ofInt(3), input, Int64.ofInt(4)),
+      new SensorFrame("lidar", "lidar", "base", Int64.ofInt(2), Int64.ofInt(3), [for (_ in 0...8) 2.0], Int64.ofInt(4))
     ];
     var snapshot = new robotkit.runtime.RobotSnapshot(
       Int64.ofInt(1),
@@ -9197,20 +8380,14 @@ class RobotWorldTests {
       simulation.addRobot(blueprint),
       "simulated A",
       ["base", "tool", "wrist"],
-      [
-        "shoulder",
-        "wrist"
-      ]
+      ["shoulder", "wrist"]
     );
     var second = new SimulatedRobot(
       "sim-b",
       simulation.addRobot(blueprint),
       "simulated B",
       ["base", "tool", "wrist"],
-      [
-        "shoulder",
-        "wrist"
-      ]
+      ["shoulder", "wrist"]
     );
     var remote = new RemoteRobot("remote-c");
     var world = new RobotWorld();
@@ -9222,13 +8399,7 @@ class RobotWorldTests {
     try world.submit(
       "sim-a",
       RobotCommand.JointTargets(
-        [
-          robotkit.core.JointTarget.position(0, 0.1),
-          robotkit.core.JointTarget.effort(
-            0,
-            2.0
-          )
-        ],
+        [robotkit.core.JointTarget.position(0, 0.1), robotkit.core.JointTarget.effort(0, 2.0)],
         null
       )
     ) catch (_:Dynamic) duplicateRejected = true;
@@ -9236,13 +8407,7 @@ class RobotWorldTests {
     world.submit(
       "sim-a",
       RobotCommand.JointTargets(
-        [
-          robotkit.core.JointTarget.position(0, 0.4),
-          robotkit.core.JointTarget.position(
-            1,
-            -0.2
-          )
-        ],
+        [robotkit.core.JointTarget.position(0, 0.4), robotkit.core.JointTarget.position(1, -0.2)],
         null
       )
     );
@@ -9366,14 +8531,7 @@ class RobotWorldTests {
         [0.0],
         [0.0],
         [0.0],
-        [new TrajectorySegment(
-          Int64.ofInt(0),
-          Int64.ofInt(200000000),
-          [[
-            0.0,
-            0.5
-          ]]
-        )]
+        [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]
       ),
       1
     );
@@ -9394,13 +8552,7 @@ class RobotWorldTests {
     var planPath = '/tmp/robotkit-${Sys.getPid()}-plan-session.mcap';
     var writer = new McapRobotRecording(planPath, 1024 * 1024);
     var recorded = new RecordingRobot(
-      new SimulatedRobot(
-        "plan-session",
-        planRuntime,
-        model.name,
-        ["base", "tool"],
-        ["shoulder"]
-      ),
+      new SimulatedRobot("plan-session", planRuntime, model.name, ["base", "tool"], ["shoulder"]),
       writer
     );
     var plan = new robotkit.execution.ExecutionPlanSubmission(
@@ -9411,14 +8563,7 @@ class RobotWorldTests {
       [0.0],
       [0.0],
       [0.0],
-      [new TrajectorySegment(
-        Int64.ofInt(0),
-        Int64.ofInt(200000000),
-        [[
-          0.0,
-          0.5
-        ]]
-      )],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])],
       null,
       null,
       [0.0001],
@@ -9487,11 +8632,7 @@ class RobotWorldTests {
       "second",
       40.0,
       0.3,
-      Transmission.SimpleTransmission(
-        joint.id,
-        -1.0,
-        0.0
-      )
+      Transmission.SimpleTransmission(joint.id, -1.0, 0.0)
     ));
     model.materializeLimits();
     var limits = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()).joints[0];
@@ -9595,11 +8736,7 @@ private class FakeRobot implements Robot {
       robotkit.core.JointTargetMode.Effort
     ],
     robotkit.core.ExecutionCapabilities.unavailable(),
-    new robotkit.core.TimingCapabilities(
-      false,
-      false,
-      trajectorykit.validation.ValidationGuarantee.Unchecked
-    )
+    new robotkit.core.TimingCapabilities(false, false, trajectorykit.validation.ValidationGuarantee.Unchecked)
   );
   public function snapshot():RobotSnapshot return new RobotSnapshot(
     logicalId,

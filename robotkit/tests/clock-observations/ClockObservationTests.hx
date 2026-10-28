@@ -75,17 +75,8 @@ class ClockObservationTests {
       "base",
       "base",
       0,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     ));
     blueprint.sensors.push(new RobotRuntimeSensorBlueprint(
       "external",
@@ -93,17 +84,8 @@ class ClockObservationTests {
       "tool",
       "tool",
       1,
-      [
-        0.0,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0]
     ));
     var options:Null<VirtualDeviceOptions> = null;
     if (device) {

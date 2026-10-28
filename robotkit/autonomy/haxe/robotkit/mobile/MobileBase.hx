@@ -28,10 +28,7 @@ class MobileBase {
   public static function fromRobot(robot:Robot,
     model:RobotModel, profile:robotkit.profile.RobotProfile):MobileBase return fromBlueprint(
       robot,
-      RobotRuntimeCompiler.compile(
-        model,
-        profile
-      )
+      RobotRuntimeCompiler.compile(model, profile)
     );
 
   /** Builds the mobile view from a previously compiled robot blueprint. */
@@ -92,10 +89,8 @@ class MobileBase {
       var left = blueprint.joints[differential.leftWheelJoint].maxRate;
       var right = blueprint.joints[differential.rightWheelJoint].maxRate;
       if (left != null || right != null) result.velocityEnvelope = new UnicycleEnvelope(
-        Math.min(
-          left == null ? Math.POSITIVE_INFINITY : left,
-          right == null ? Math.POSITIVE_INFINITY : right
-        ) * differential.wheelRadius,
+        Math.min(left == null ? Math.POSITIVE_INFINITY : left,
+        right == null ? Math.POSITIVE_INFINITY : right) * differential.wheelRadius,
         differential.trackWidth
       );
     }

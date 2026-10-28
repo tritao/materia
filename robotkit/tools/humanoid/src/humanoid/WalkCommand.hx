@@ -17,12 +17,7 @@ class WalkCommand {
       model: args[0],
       spec: args[1],
       seconds: Std.parseFloat(args[2]),
-      commands: [{
-        from: 0.0,
-        vx: Std.parseFloat(args[3]),
-        vy: Std.parseFloat(args[4]),
-        wz: Std.parseFloat(args[5])
-      }],
+      commands: [{from: 0.0, vx: Std.parseFloat(args[3]), vy: Std.parseFloat(args[4]), wz: Std.parseFloat(args[5])}],
       pushes: [],
       record: null,
       truthObservations: false,
@@ -35,11 +30,7 @@ class WalkCommand {
         case "--push":
           scenario.pushes.push({
             at: Std.parseFloat(args[i + 1]),
-            force: [
-              Std.parseFloat(args[i + 2]),
-              Std.parseFloat(args[i + 3]),
-              0.0
-            ],
+            force: [Std.parseFloat(args[i + 2]), Std.parseFloat(args[i + 3]), 0.0],
             duration: Std.parseFloat(args[i + 4])
           });
           i += 5;

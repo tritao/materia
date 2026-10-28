@@ -249,12 +249,10 @@ class CellCollisionSnapshot {
       result.physical.set(
         id,
         {
-          points: movesWithPrimary ? robotkit.collision.CollisionClearance.placed(
-            observation.points,
-            relocation
-          ) : observation.points.copy(),
-          fixed : observation.fixed
-        }
+          points: movesWithPrimary ? robotkit.collision.CollisionClearance.placed(observation.points,
+        relocation) : observation.points.copy(),
+        fixed : observation.fixed
+      }
       );
     }
     return result;
@@ -325,17 +323,8 @@ class CellCollisionSnapshot {
         var points = robotkit.collision.CollisionClearance.placed(
           vertices,
           Transform3.fromArrays(
-            [
-              body.pose.x,
-              body.pose.y,
-              body.pose.z
-            ],
-            [
-              body.pose.qx,
-              body.pose.qy,
-              body.pose.qz,
-              body.pose.qw
-            ]
+            [body.pose.x, body.pose.y, body.pose.z],
+            [body.pose.qx, body.pose.qy, body.pose.qz, body.pose.qw]
           )
         );
         var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
@@ -403,12 +392,7 @@ class CellCollisionSnapshot {
       var scale = part.metresPerUnit, frame = part.frame;
       var at = root.inverse().compose(Transform3.fromArrays(
         [frame.x * scale, frame.y * scale, frame.z * scale],
-        [
-          frame.qx,
-          frame.qy,
-          frame.qz,
-          frame.qw
-        ]
+        [frame.qx, frame.qy, frame.qz, frame.qw]
       ));
       var posed:AssemblyFrame = {
         x: at.translation.x / scale,

@@ -121,11 +121,7 @@ class ImageDetectionLifter implements Perception {
         observation.pipelineId + "/" + Std.string(index),
         box.label,
         box.score,
-        new Pose2(
-          point.x,
-          point.y,
-          0
-        ),
+        new Pose2(point.x, point.y, 0),
         frameId,
         observation.sequence,
         observation.sourceTimestampNs,

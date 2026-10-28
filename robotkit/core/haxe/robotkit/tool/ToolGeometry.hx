@@ -40,11 +40,7 @@ class ToolGeometry {
     }
     return {
       centre: new Vec3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2),
-      halfExtents: new Vec3(
-        (hi[0] - lo[0]) / 2,
-        (hi[1] - lo[1]) / 2,
-        (hi[2] - lo[2]) / 2
-      )
+      halfExtents: new Vec3((hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2)
     };
   }
 }
