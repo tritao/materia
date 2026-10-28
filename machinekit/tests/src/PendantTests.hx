@@ -172,10 +172,10 @@ class PendantTests {
       ids.indexOf(id) >= 0,
       "Missing member " + id + " in " + ids.join(", ")
     );
-    check(ids.length == 69, "Sixty-nine members, twenty-five of them hardware: " + ids.length);
+    check(ids.length == 73, "Seventy-three members, twenty-five of them hardware: " + ids.length);
     check(
-      ids.indexOf("fasteners/display-clamp") >= 0 && ids.indexOf("fasteners/display-screw-2") >= 0,
-      "The display's clamp hardware"
+      ids.indexOf("fasteners/display-frame") >= 0 && ids.indexOf("fasteners/display-screw-4") >= 0,
+      "The display's frame hardware"
     );
     // Hardware: an insert and a screw in each post and standoff, sized from the pilot holes the shell is cut with.
     check(
@@ -212,8 +212,8 @@ class PendantTests {
     var purchases = 0;
     for (line in bom.lines()) purchases += line.quantity;
     check(
-      purchases == 40,
-      "Forty purchases (plate, shell, board, twelve controls, twelve inserts and screws, the display clamp and its fixings): "
+      purchases == 44,
+      "Forty purchases (plate, shell, board, twelve controls, twelve inserts and screws, the display frame and its fixings): "
       + purchases + " " + [for (l in bom.lines()) l.partNumber + " x" + l.quantity].join(", ")
     );
 

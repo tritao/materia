@@ -14,8 +14,9 @@ import machinekit.component.ComponentRecipeSupport as R;
  * circuit board sits 2.4 mm behind the glass, and the module is 4.0 mm thick over all. Behind the board are the 7-pin
  * 2.54 right-angle header, the 1.25 mm 7-pin connector, the flex-circuit connector and the flex circuit itself, which
  * folds from the glass round the board's lower edge. The board's four plain 2.5 mm holes lie under the glass and cannot be
- * used, so the module is held by a printed clamp bar across the back of the board, with M2.5 screws from behind into
- * heat-set inserts in two bosses on the plate's back.
+ * used to fasten it. The module is held by a printed frame over the board's edge strip (open at the bottom for the flex
+ * circuit), screwed from behind into heat-set inserts in four bosses on the plate's back just outside the corners; four
+ * pegs on the frame go through the board's holes to locate it.
  */
 class OledModule extends HmiPart {
   static var recipe:Null<ComponentType>;
@@ -41,7 +42,17 @@ class OledModule extends HmiPart {
   /** Clamp bar bosses: just outside the board's edges, in the strip above the flex connector. */
   static inline var CLAMP_X:Float = 34.5;
   static inline var CLAMP_THICKNESS:Float = 2.5;
-  static inline var CLAMP_WIDTH:Float = 4.25;
+  /** The frame's rails over the board's back edge: side rails and top and bottom rails (to the opening's edge). */
+  static inline var RAIL_SIDE:Float = 3.15;
+  static inline var RAIL_END:Float = 4.55;
+  /** The ears' rows, from the board's centre line. */
+  static inline var CLAMP_ROW:Float = 17.3;
+  static inline var EAR_WIDTH:Float = 4.25;
+  /** The flex circuit passes through the bottom rail here (half width), and small parts under it need this relief. */
+  static inline var FLEX_OPENING:Float = 8.5;
+  static inline var RELIEF_FROM:Float = -24.2;
+  static inline var RELIEF_TO:Float = -13.2;
+  static inline var RELIEF_DEPTH:Float = 1.3;
   static inline var CLAMP_HOLE:Float = 2.7;
   /** Locating pegs through the board's upper holes: 2.4 mm in the 2.7 mm holes, ending 0.7 mm short of the glass. */
   static inline var PEG_DIAMETER:Float = 2.4;
@@ -62,10 +73,10 @@ class OledModule extends HmiPart {
     positive(["panelThickness", "massGrams"]);
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     var insert = ThreadedInsert.m2_5Short();
-    // The glass covers the board's own holes, so the board is held by a clamp bar across its back, screwed into two bosses
-    // on the plate's back just outside the module's left and right edges.
-    var bosses = [for (sx in [-1.0, 1.0]) {
-      x:sx * CLAMP_X, y:clampY(),
+    // The glass covers the board's own holes, so the board is held by a frame over its back, screwed into four bosses on the
+    // plate's back just outside the corners.
+    var bosses = [for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+      x:sx * CLAMP_X, y:boardCentre() + sy * CLAMP_ROW,
         diameter:BOSS_DIAMETER, height:PCB_DEPTH, pilotDiameter:insert.pilotDiameter, pilotDepth:insert.pilotDepth
     }
     ];
@@ -83,12 +94,10 @@ class OledModule extends HmiPart {
     declareMass(n("massGrams") / 1000.0, new Vector(0, -ACTIVE_OFFSET, -n("panelThickness") - PCB_DEPTH / 2));
   }
 
-  /** What is behind the plate, seen from the front: the board and the clamp bosses, hanging below the window's centre. */
+  /** What is behind the plate, seen from the front: the board, its flex circuit and the frame's bosses, below the window's centre. */
   static function rearBody():Footprint {
-    var top = Math.max(boardCentre() + PCB_HEIGHT / 2, clampY() + BOSS_DIAMETER / 2);
-    // The flex circuit wraps round the board's lower edge, a little beyond it.
-    var bottom = boardCentre() - PCB_HEIGHT / 2 - 0.5;
-    return Shifted(Rect(2 * (CLAMP_X + BOSS_DIAMETER / 2), top - bottom), 0.0, (top + bottom) / 2);
+    var half = Math.max(PCB_HEIGHT / 2 + 0.5, CLAMP_ROW + BOSS_DIAMETER / 2);
+    return Shifted(Rect(2 * (CLAMP_X + BOSS_DIAMETER / 2), 2 * half), 0.0, boardCentre());
   }
 
   public static function recipeType():ComponentType {
@@ -97,8 +106,6 @@ class OledModule extends HmiPart {
   }
   override public function componentType():Null<ComponentType> return recipeType();
 
-  /** The clamp bar's centre line, in the strip between the flex connector and the board's top edge. */
-  static function clampY():Float return boardCentre() + 17.3;
 
   /** The glass's centre, and the board's, below the active area's. */
   static function boardCentre():Float return -ACTIVE_OFFSET;
@@ -108,51 +115,80 @@ class OledModule extends HmiPart {
   function boardFront():Float return glassFront() - bossHeight();
   function boardBack():Float return glassFront() - PCB_DEPTH;
 
-  /** Two inserts in the bosses, the printed clamp bar across the board's back, and two screws from behind. */
+  /** The printed frame, four inserts in the bosses and four screws from behind. */
   override public function hardware():Array<PanelHardware> {
     var insert = ThreadedInsert.m2_5Short();
     var screw = ButtonHeadScrew.m2_5(5.0);
-    var bar = new PanelSolid("DISPLAY-CLAMP", "display clamp bar", clampBar, "PA12 nylon");
-    var result:Array<PanelHardware> = [new PanelHardware("clamp", bar, 0.0, clampY(), boardBack() - CLAMP_THICKNESS)];
+    var frame = new PanelSolid("DISPLAY-FRAME", "display frame", clampFrame, "PA12 nylon");
+    var result:Array<PanelHardware> = [new PanelHardware(
+      "frame",
+      frame,
+      0.0,
+      boardCentre(),
+      boardBack() - CLAMP_THICKNESS
+    )];
     var i = 0;
-    for (sx in [-1.0, 1.0]) {
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
       i++;
-      result.push(new PanelHardware('insert-$i', insert, sx * CLAMP_X, clampY(), boardBack(), true));
-      result.push(new PanelHardware('screw-$i', screw, sx * CLAMP_X, clampY(), boardBack() - CLAMP_THICKNESS, true));
+      var y = boardCentre() + sy * CLAMP_ROW;
+      result.push(new PanelHardware('insert-$i', insert, sx * CLAMP_X, y, boardBack(), true));
+      result.push(new PanelHardware('screw-$i', screw, sx * CLAMP_X, y, boardBack() - CLAMP_THICKNESS, true));
     }
     return result;
   }
 
   /**
-   * The clamp bar in its own frame: its origin on the bar's centre line at its underside; its top lies on the board's back.
-   * Two pegs rise from it through the board's upper holes and stop short of the glass, which covers the holes, so they
-   * locate the board and the screws at the bar's ends clamp it.
+   * The frame in its own frame: its origin on the board's centre at the frame's underside; its top lies on the board's back.
+   * It presses the board's edge strip (open at the bottom so the flex circuit passes, relieved over the small parts there),
+   * has an ear at each corner for the screws, and four pegs that go through the board's holes and stop short of the glass,
+   * which covers them. The pegs locate the board; the screws clamp it.
    */
-  function clampBar():Part {
-    var pieces:Array<Part> = [box(2 * CLAMP_X, CLAMP_WIDTH, CLAMP_THICKNESS, 0.0, 0.0, 0.0)];
-    var pegY = HOLE_DY - (clampY() - boardCentre());
-    for (sx in [-1.0, 1.0]) {
-      pieces.push(Part.cylinderSpan(BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, 0.0));
-      pieces.push(Part.cylinderSpan(PEG_PAD / 2, 0.0, CLAMP_THICKNESS, sx * HOLE_DX, pegY));
+  function clampFrame():Part {
+    var halfW = PCB_WIDTH / 2, halfH = PCB_HEIGHT / 2;
+    var pieces:Array<Part> = [];
+    // The ring: the board's outline less the opening.
+    var outer = box(PCB_WIDTH, PCB_HEIGHT, CLAMP_THICKNESS, 0.0, 0.0, 0.0);
+    var opening = box(PCB_WIDTH - 2 * RAIL_SIDE, PCB_HEIGHT - 2 * RAIL_END, CLAMP_THICKNESS + 2.0, 0.0, 0.0, -1.0);
+    pieces.push(outer.subtract(opening));
+    outer.close();
+    opening.close();
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) {
+      // An ear: a web out from the rail to a boss-sized pad around the screw.
+      var webX = (halfW + CLAMP_X) / 2;
+      pieces.push(box(CLAMP_X - halfW + 1.0, EAR_WIDTH, CLAMP_THICKNESS, sx * webX, sy * CLAMP_ROW, 0.0));
+      pieces.push(Part.cylinderSpan(BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, sy * CLAMP_ROW));
+      // A peg through the board's hole, on a pad that fills the corner of the opening.
+      pieces.push(Part.cylinderSpan(PEG_PAD / 2, 0.0, CLAMP_THICKNESS, sx * HOLE_DX, sy * HOLE_DY));
       pieces.push(Part.cylinderSpan(
         PEG_DIAMETER / 2,
         CLAMP_THICKNESS,
         CLAMP_THICKNESS + PCB_THICKNESS + PEG_CLEARANCE,
         sx * HOLE_DX,
-        pegY
+        sy * HOLE_DY
       ));
     }
     var plain = Solids.union(pieces);
-    var holes = [for (sx in [-1.0, 1.0]) Part.cylinderSpan(
+    var tools:Array<Part> = [];
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) tools.push(Part.cylinderSpan(
       CLAMP_HOLE / 2,
       -1.0,
       CLAMP_THICKNESS + 1.0,
       sx * CLAMP_X,
-      0.0
-    )];
-    var result = plain.subtractAll(holes);
+      sy * CLAMP_ROW
+    ));
+    // The flex circuit passes through the bottom rail; small parts under it get a shallow relief.
+    tools.push(box(2 * FLEX_OPENING, RAIL_END + 1.0, CLAMP_THICKNESS + 2.0, 0.0, -halfH + RAIL_END / 2 - 0.5, -1.0));
+    tools.push(box(
+      RELIEF_TO - RELIEF_FROM,
+      RAIL_END + 1.0,
+      RELIEF_DEPTH + 1.0,
+      (RELIEF_FROM + RELIEF_TO) / 2,
+      -halfH + RAIL_END / 2 - 0.5,
+      CLAMP_THICKNESS - RELIEF_DEPTH
+    ));
+    var result = plain.subtractAll(tools);
     plain.close();
-    for (h in holes) h.close();
+    for (t in tools) t.close();
     return result;
   }
 
