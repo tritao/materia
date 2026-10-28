@@ -30,26 +30,10 @@ class PathsVsTrajectories {
     var result = {
       figure: "paths-vs-trajectories",
       generator: "docs/figures/src/PathsVsTrajectories.hx",
-      units: {
-        position: "m",
-        velocity: "m/s",
-        acceleration: "m/s²",
-        jerk: "m/s³",
-        time: "s"
-      },
-      limits: {
-        velocity: MAX_VELOCITY,
-        acceleration: MAX_ACCELERATION,
-        jerk: MAX_JERK
-      },
-      start: [
-        RADIUS,
-        0.0
-      ],
-      end: [
-        0.0,
-        RADIUS
-      ],
+      units: {position: "m", velocity: "m/s", acceleration: "m/s²", jerk: "m/s³", time: "s"},
+      limits: {velocity: MAX_VELOCITY, acceleration: MAX_ACCELERATION, jerk: MAX_JERK},
+      start: [RADIUS, 0.0],
+      end: [0.0, RADIUS],
       methods: [
         method(
           "toppra",
@@ -57,12 +41,7 @@ class PathsVsTrajectories {
           "Follows the fixed arc; fastest timing within velocity and acceleration limits.",
           path.trajectory
         ),
-        method(
-          "ruckig",
-          "Free move (Ruckig)",
-          "Chooses its own straight route; jerk-limited.",
-          free
-        )
+        method("ruckig", "Free move (Ruckig)", "Chooses its own straight route; jerk-limited.", free)
       ]
     };
     path.trajectory.dispose();
@@ -100,17 +79,7 @@ class PathsVsTrajectories {
       label: label,
       summary: summary,
       duration: DocsFigures.round(duration),
-      columns: [
-        "t",
-        "x",
-        "y",
-        "vx",
-        "vy",
-        "ax",
-        "ay",
-        "jx",
-        "jy"
-      ],
+      columns: ["t", "x", "y", "vx", "vy", "ax", "ay", "jx", "jy"],
       samples: samples
     };
   }

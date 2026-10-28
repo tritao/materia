@@ -289,16 +289,8 @@ class DocsComponents {
         .firstIndex...range.firstIndex + range.indexCount) faceTriangles.push(mesh.indices.getInt32(index * 4));
       var frame = new Plane(
         new Vector(thread.origin[0], thread.origin[1], thread.origin[2]),
-        new Vector(
-          thread.xDirection[0],
-          thread.xDirection[1],
-          thread.xDirection[2]
-        ),
-        new Vector(
-          thread.direction[0],
-          thread.direction[1],
-          thread.direction[2]
-        )
+        new Vector(thread.xDirection[0], thread.xDirection[1], thread.xDirection[2]),
+        new Vector(thread.direction[0], thread.direction[1], thread.direction[2])
       );
       var unwrapped = ThreadSurface.unwrap(
         thread.faceName,
@@ -323,13 +315,7 @@ class DocsComponents {
           Png.rgba(
             ThreadTexture.SIZE,
             ThreadTexture.SIZE,
-            ThreadTexture.pixels(
-              thread.spec,
-              normal
-            ).sub(
-              0,
-              ThreadTexture.SIZE * ThreadTexture.SIZE * 4
-            )
+            ThreadTexture.pixels(thread.spec, normal).sub(0, ThreadTexture.SIZE * ThreadTexture.SIZE * 4)
           )
         );
       }

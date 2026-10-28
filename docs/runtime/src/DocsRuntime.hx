@@ -108,15 +108,7 @@ class DocsRuntime {
       200.0,
       5e-6,
       holding,
-      new TorqueSpeedCurve(
-        [0.0, corner, corner * 2, corner * 4],
-        [
-          holding,
-          holding,
-          holding / 2,
-          holding / 4
-        ]
-      )
+      new TorqueSpeedCurve([0.0, corner, corner * 2, corner * 4], [holding, holding, holding / 2, holding / 4])
     );
     model.addActuator(motor);
     return model;
