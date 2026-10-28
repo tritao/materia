@@ -70,40 +70,16 @@ import haxeon.ui.widgets.text.Text;
     var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("SCENE"))];
     if (app.simulation.isActive()) rows.push(new KeyedView(
       "simulation-hint",
-      new Text(
-        SIMULATION_LOCK_HINT,
-        null,
-        app.appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0)
-      )
+      new Text(SIMULATION_LOCK_HINT, null, app.appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));
     return new Column("hierarchy-panel", rows.concat([new KeyedView(
       "actions",
       new Row(
         "scene-object-actions",
         [
-          new KeyedView(
-            "add",
-            addButton
-          ),
-          new KeyedView(
-            "duplicate",
-            app.sceneAction(
-              "scene-duplicate",
-              "scene.duplicate",
-              "",
-              IconName.Copy
-            )
-          ),
-          new KeyedView(
-            "delete",
-            app.sceneAction(
-              "scene-delete",
-              "scene.delete",
-              "",
-              IconName.Trash
-            )
-          )
+          new KeyedView("add", addButton),
+          new KeyedView("duplicate", app.sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
+          new KeyedView("delete", app.sceneAction("scene-delete", "scene.delete", "", IconName.Trash))
         ],
         ReferenceEditorApp.actionRowStyle()
       )

@@ -187,10 +187,7 @@ class MachineAngleControl implements View {
     canvas.strokeTransient(marks.build(), tokens.mutedText, 1);
     var a = (value % 360) * Math.PI / 180;
     canvas.strokeTransient(
-      new PathBuilder().moveTo(cx, cy).lineTo(
-        cx + (r - 7) * Math.sin(a),
-        cy - (r - 7) * Math.cos(a)
-      ).build(),
+      new PathBuilder().moveTo(cx, cy).lineTo(cx + (r - 7) * Math.sin(a), cy - (r - 7) * Math.cos(a)).build(),
       ink,
       3
     );

@@ -69,11 +69,7 @@ import haxeon.ui.properties.PropertyValue;
       green: 0.7,
       blue: 0.7,
       visible: true,
-      worker: {
-        asset: DEFAULT_ASSET,
-        job: '{"version":1,"loop":false,"steps":[]}',
-        zones: []
-      }
+      worker: {asset: DEFAULT_ASSET, job: '{"version":1,"loop":false,"steps":[]}', zones: []}
     };
   }
 
@@ -183,17 +179,11 @@ import haxeon.ui.properties.PropertyValue;
     options.options = [
       new PropertyOption("right", "Right"),
       new PropertyOption("left", "Left"),
-      new PropertyOption(
-        "both",
-        "Both"
-      )
+      new PropertyOption("both", "Both")
     ];
     result.push(new PropertyDescriptor(prefix + 'worker-step-$index-hand',
       "Hand", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
-        parsed(
-          scene,
-          id
-        ).steps[index],
+        parsed(scene, id).steps[index],
         "hand"
       )), function(
         _,
@@ -496,10 +486,7 @@ import haxeon.ui.properties.PropertyValue;
     )];
     result.push(new PropertyDescriptor(prefix + 'worker-step-$index-action',
       "Action", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
-        parsed(
-          scene,
-          id
-        ).steps[index],
+        parsed(scene, id).steps[index],
         "action"
       )), function(
         _,
@@ -517,13 +504,7 @@ import haxeon.ui.properties.PropertyValue;
       mode.options = [new PropertyOption("object", "Object"), new PropertyOption("point", "Point")];
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-target-mode',
         "Target type", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.hasField(
-          Reflect.field(
-            parsed(
-              scene,
-              id
-            ).steps[index],
-            "target"
-          ),
+          Reflect.field(parsed(scene, id).steps[index], "target"),
           "object"
         ) ? "object" : "point"), function(
           _,
@@ -540,13 +521,7 @@ import haxeon.ui.properties.PropertyValue;
       if (objectId != null) {
         result.push(new PropertyDescriptor(prefix + 'worker-step-$index-target-object',
           "Target object", PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
-            Reflect.field(
-              parsed(
-                scene,
-                id
-              ).steps[index],
-              "target"
-            ),
+            Reflect.field(parsed(scene, id).steps[index], "target"),
             "object"
           )), function(
             _,
@@ -562,10 +537,7 @@ import haxeon.ui.properties.PropertyValue;
           anchor.options = [
             new PropertyOption("top", "Top"),
             new PropertyOption("front", "Front"),
-            new PropertyOption(
-              "center",
-              "Center"
-            )
+            new PropertyOption("center", "Center")
           ];
           result.push(new PropertyDescriptor(prefix + 'worker-step-$index-anchor',
             "Anchor", PropertyType.Enum, function(_) {
@@ -607,10 +579,7 @@ import haxeon.ui.properties.PropertyValue;
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-$field',
         action == "pick" ? "Pick object" : "Place onto",
         PropertyType.Enum, function(_) return PropertyValue.Enum(Reflect.field(
-          parsed(
-            scene,
-            id
-          ).steps[index],
+          parsed(scene, id).steps[index],
           field
         )), function(
           _,
@@ -639,10 +608,7 @@ import haxeon.ui.properties.PropertyValue;
       duration.step = 0.1;
       result.push(new PropertyDescriptor(prefix + 'worker-step-$index-seconds',
         "Seconds", PropertyType.Float, function(_) return PropertyValue.Float(Reflect.field(
-          parsed(
-            scene,
-            id
-          ).steps[index],
+          parsed(scene, id).steps[index],
           "seconds"
         )), function(
           _,
@@ -658,10 +624,7 @@ import haxeon.ui.properties.PropertyValue;
     }
     if (action == "playClip") result.push(new PropertyDescriptor(prefix + 'worker-step-$index-clip',
       "Clip", PropertyType.Text, function(_) return PropertyValue.Text(Reflect.field(
-        parsed(
-          scene,
-          id
-        ).steps[index],
+        parsed(scene, id).steps[index],
         "clip"
       )), function(
         _,

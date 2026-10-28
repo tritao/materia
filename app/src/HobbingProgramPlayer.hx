@@ -100,11 +100,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var frame = placement.worldPose(config.stock);
     frontDirection = AssemblyRobot.rotate(
       [frame.qx, frame.qy, frame.qz, frame.qw],
-      [
-        -Math.cos(offsets[5]),
-        Math.sin(offsets[5]),
-        0
-      ]
+      [-Math.cos(offsets[5]), Math.sin(offsets[5]), 0]
     );
     var component = definition.occurrences.filter(o -> o.id == config.stock)[0].definition;
     var c = project.assemblyPreviewCenter(component);
@@ -136,10 +132,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       config.axes[1],
       config.axes[2],
       0.02,
-      new ToolpathChannels(
-        "",
-        spindleName
-      )
+      new ToolpathChannels("", spindleName)
     );
     spindleAtSpeedChannel = binding.channels.spindleAtSpeed;
     binding.spindleJointId = config.axes[4];
@@ -186,25 +179,10 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     var hc = config.handling;
     var handlingSpan = toolpathkit.path.Provenance.cam(0, "loading clearance");
     withdrawal = hc == null ? null : new ToolpathLowering(binding).lower([
-      toolpathkit.path.ToolpathOp.SetSetup(
-        "hobber-axes",
-        handlingSpan
-      ),
-      toolpathkit.path.ToolpathOp.PositionJoint(
-        config.axes[0],
-        hc.retractX / 1000 - offsets[0],
-        handlingSpan
-      ),
-      toolpathkit.path.ToolpathOp.PositionJoint(
-        config.axes[2],
-        -offsets[2],
-        handlingSpan
-      ),
-      toolpathkit.path.ToolpathOp.PositionJoint(
-        config.axes[1],
-        -offsets[1],
-        handlingSpan
-      ),
+      toolpathkit.path.ToolpathOp.SetSetup("hobber-axes", handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[0], hc.retractX / 1000 - offsets[0], handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[2], -offsets[2], handlingSpan),
+      toolpathkit.path.ToolpathOp.PositionJoint(config.axes[1], -offsets[1], handlingSpan),
       toolpathkit.path.ToolpathOp.End(handlingSpan)
     ]).program;
     if (hc != null) {
@@ -493,12 +471,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     // Sensors are safe to read on the UI owner while physics runs in the background.
     // The cup rotates only about C; paused inspection uses the authored scene frame.
     var local = physicalPresentation ? [-front * Math.cos(c), front * Math.sin(c), 0.0] : AssemblyRobot.rotate(
-      [
-        -q[0],
-        -q[1],
-        -q[2],
-        q[3]
-      ],
+      [-q[0], -q[1], -q[2], q[3]],
       [for (v in frontDirection) v * front]
     );
     var stockId = "project:" + config.stock, geometry = stock.geometry(blank);
@@ -506,11 +479,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     project.scene.setRuntimeGeometryPartTransform(
       stockId,
       0,
-      nativekit.scene.Transform.identity().translated(
-        local[0] / 1000,
-        local[1] / 1000,
-        lift / 1000
-      )
+      nativekit.scene.Transform.identity().translated(local[0] / 1000, local[1] / 1000, lift / 1000)
     );
     if (handling != null) {
       var clamp = handling.displayedClamp();
@@ -524,33 +493,11 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
               {r: inner, z: 0.0},
               {r: outer, z: 0.0},
               {r: outer, z: h.length},
-              {
-                r: inner,
-                z: h.length
-              },
-              {
-                r: inner,
-                z: 0.0
-              }
+              {r: inner, z: h.length},
+              {r: inner, z: 0.0}
             ],
-            (
-              x,
-              y,
-              z
-            ) -> [
-              x / 1000 - sleeveCenter[0],
-              y / 1000 - sleeveCenter[1],
-              z / 1000 - sleeveCenter[2]
-            ],
-            (
-              x,
-              y,
-              z
-            ) -> [
-              x,
-              y,
-              z
-            ]
+            (x, y, z) -> [x / 1000 - sleeveCenter[0], y / 1000 - sleeveCenter[1], z / 1000 - sleeveCenter[2]],
+            (x, y, z) -> [x, y, z]
           );
           project.scene.setRuntimeGeometryParts("project:" + h.sleeve, 1, [0 => sleeve]);
           sleeveInstalled = true;
@@ -562,13 +509,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
         project.scene.setRuntimeGeometryPartTransform(
           "project:" + h.sleeve,
           0,
-          nativekit.scene.Transform.identity().set(
-            0,
-            scale
-          ).set(
-            5,
-            scale
-          ).translated(
+          nativekit.scene.Transform.identity().set(0, scale).set(5, scale).translated(
             (scale - 1) * sleeveCenter[0],
             (scale - 1) * sleeveCenter[1],
             0

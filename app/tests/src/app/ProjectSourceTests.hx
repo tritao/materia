@@ -230,18 +230,9 @@ typedef CubeRun = {
     simulation.addRobotAtPose(
       RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()),
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
+      [0.0, 0.0, 0.0, 1.0],
       null,
-      [enabled ? [
-        0.5,
-        0.5,
-        0.5
-      ] : null]
+      [enabled ? [0.5, 0.5, 0.5] : null]
     );
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -271,12 +262,7 @@ typedef CubeRun = {
     simulation.addRobotAtPose(
       RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()),
       [0.0, 0.0, 0.0],
-      [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      [0.0, 0.0, 0.0, 1.0]
     );
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -301,17 +287,8 @@ typedef CubeRun = {
       var simulation = simulationHarness.simulation;
       simulation.addRobotAtPose(
         RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()),
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ]
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
       );
       var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -359,17 +336,8 @@ typedef CubeRun = {
       var simulation = simulationHarness.simulation;
       simulation.addRobotAtPose(
         RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()),
-        [
-          0.0,
-          0.0,
-          0.0
-        ],
-        [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ]
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
       );
       var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
@@ -662,11 +630,7 @@ typedef CubeRun = {
     var deviceModel = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
     deviceModel.switches.resize(0);
     var extruder = PrintProgramPlayer.extruderOnDevice(
-      DeviceBinding.bind(
-        deviceModel,
-        robotkit.device.DeviceLayout.forActuators(deviceModel),
-        40000
-      ),
+      DeviceBinding.bind(deviceModel, robotkit.device.DeviceLayout.forActuators(deviceModel), 40000),
       "e"
     );
     check(extruder.feed == -1, 'the extruder motor steps down as it pushes filament: feed ${extruder.feed}');
@@ -798,13 +762,7 @@ typedef CubeRun = {
         var wanted = item.initialPose, got = placement.worldPose(item.id);
         authored = Math.max(
           authored,
-          Math.max(
-            Math.abs(got.x - wanted.x),
-            Math.max(
-              Math.abs(got.y - wanted.y),
-              Math.abs(got.z - wanted.z)
-            )
-          )
+          Math.max(Math.abs(got.x - wanted.x), Math.max(Math.abs(got.y - wanted.y), Math.abs(got.z - wanted.z)))
         );
         authoredTurn = Math.max(
           authoredTurn,
@@ -828,15 +786,7 @@ typedef CubeRun = {
       var opened = new Map<String, {position:Array<Float>, rotation:Array<Float>}>();
       for (record in session.scene.records()) opened.set(
         record.id,
-        {
-          position: [record.x, record.y, record.z],
-          rotation: record.rotation == null ? [
-            0.0,
-            0,
-            0,
-            1
-          ] : record.rotation
-        }
+        {position: [record.x, record.y, record.z], rotation: record.rotation == null ? [0.0, 0, 0, 1] : record.rotation}
       );
       var structure = printerFrameDeparture(opened);
       Sys
@@ -1427,10 +1377,7 @@ typedef CubeRun = {
       {shaped: false, detune: 1.0},
       {shaped: true, detune: 1.0},
       {shaped: true, detune: 0.9},
-      {
-        shaped: true,
-        detune: 1.1
-      }
+      {shaped: true, detune: 1.1}
     ];
     for (variant in variants) {
       var generated = MateriaProjectRunner.loadProject(manifest);
@@ -2259,20 +2206,8 @@ typedef CubeRun = {
     active.stop();
     var box = active.createObject(
       nativekit.sim.MotionType.Dynamic,
-      nativekit.sim.SimShape.box(
-        half[0],
-        half[1],
-        half[2]
-      ),
-      new nativekit.sim.SimPose(
-        spot.x,
-        spot.y,
-        half[2] + 0.05,
-        0,
-        0,
-        0,
-        1
-      ),
+      nativekit.sim.SimShape.box(half[0], half[1], half[2]),
+      new nativekit.sim.SimPose(spot.x, spot.y, half[2] + 0.05, 0, 0, 0, 1),
       2.0
     );
     var dropped = active.simulationTime();
@@ -2667,11 +2602,7 @@ typedef CubeRun = {
           var targetYaw:Float = step.yaw == null ? 0.0 : step.yaw;
           var angle = new robotkit.spatial.Quat(box.rotation[0],
             box.rotation[1], box.rotation[2], box.rotation[3]).angularDistance(robotkit.spatial.Quat.fromAxisAngle(
-              new robotkit.spatial.Vec3(
-                0,
-                0,
-                1
-              ),
+              new robotkit.spatial.Vec3(0, 0, 1),
               targetYaw
             ));
           check(angle <= 2 * Math.PI / 180, "picker carton is within 2 degrees of its slot");
@@ -2752,14 +2683,8 @@ typedef CubeRun = {
   static function checkCartesianAnalyticExamples(root:String):Void {
     for (fixture in [
       {example: "gantry-picker", file: "materia.project.json"},
-      {
-        example: "gantry-picker",
-        file: "materia.yaw.project.json"
-      },
-      {
-        example: "gantry-welder",
-        file: "materia.project.json"
-      }
+      {example: "gantry-picker", file: "materia.yaw.project.json"},
+      {example: "gantry-welder", file: "materia.project.json"}
     ]) {
       var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + fixture.example + "/" + fixture.file);
       var generated = MateriaProjectRunner.loadProject(manifest);
@@ -2800,23 +2725,13 @@ typedef CubeRun = {
             for (policy in [
               motionkit.path.OrientationPolicy.Fixed,
               motionkit.path.OrientationPolicy.FreeAboutTool,
-              motionkit.path.OrientationPolicy.Cone(
-                axis,
-                0.1
-              )
+              motionkit.path.OrientationPolicy.Cone(axis, 0.1)
             ]) checkNativeCandidateSet(
               numeric,
               target,
               q,
               policy,
-              sampler.sample(
-                target,
-                q,
-                policy,
-                4,
-                1,
-                4
-              )
+              sampler.sample(target, q, policy, 4, 1, 4)
             );
           }
 
@@ -2897,24 +2812,13 @@ typedef CubeRun = {
             for (policy in [
               motionkit.path.OrientationPolicy.Fixed,
               motionkit.path.OrientationPolicy.FreeAboutTool,
-              motionkit.path.OrientationPolicy.Cone(
-                axis,
-                0.1
-              )
+              motionkit.path.OrientationPolicy.Cone(axis, 0.1)
             ]) checkNativeCandidateSet(
               numeric,
               target,
               q,
               policy,
-              sampler.sample(
-                target,
-                q,
-                policy,
-                [],
-                4,
-                1,
-                4
-              )
+              sampler.sample(target, q, policy, [], 4, 1, 4)
             );
           }
 
@@ -3088,19 +2992,11 @@ typedef CubeRun = {
     task.steps = [task.steps[0]];
     var start = materia.assembly.AssemblyFrames.compose(
       initial.worldPose("toolFlange"),
-      materia.assembly.AssemblyFrames.translation(
-        0,
-        0,
-        150
-      )
+      materia.assembly.AssemblyFrames.translation(0, 0, 150)
     );
     var finish = materia.assembly.AssemblyFrames.compose(
       ending.worldPose("toolFlange"),
-      materia.assembly.AssemblyFrames.translation(
-        0,
-        0,
-        150
-      )
+      materia.assembly.AssemblyFrames.translation(0, 0, 150)
     );
     for (held in [true, false]) {
       var point = held ? start : finish;
@@ -3155,24 +3051,11 @@ typedef CubeRun = {
     if (flange.length != 1) throw "Held-clearance fixture needs one flange hull";
     var link = flange[0].link, pose = mission.simulation.linkPose(mission.robotIndex, link);
     var carrier = new robotkit.spatial.Transform3(
-      new robotkit.spatial.Vec3(
-        pose.position[0],
-        pose.position[1],
-        pose.position[2]
-      ),
-      new robotkit.spatial.Quat(
-        pose.rotation[0],
-        pose.rotation[1],
-        pose.rotation[2],
-        pose.rotation[3]
-      )
+      new robotkit.spatial.Vec3(pose.position[0], pose.position[1], pose.position[2]),
+      new robotkit.spatial.Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3])
     );
     var relative = carrier.inverse().compose(new robotkit.spatial.Transform3(
-      new robotkit.spatial.Vec3(
-        start.x * 0.001,
-        start.y * 0.001,
-        start.z * 0.001
-      ),
+      new robotkit.spatial.Vec3(start.x * 0.001, start.y * 0.001, start.z * 0.001),
       robotkit.spatial.Quat.identity()
     ));
     if (nested) {
@@ -3193,11 +3076,7 @@ typedef CubeRun = {
       }
       checkLeaf(mission.cellCollisionSnapshot([], forced));
       var parentRelative = carrier.inverse().compose(new robotkit.spatial.Transform3(
-        new robotkit.spatial.Vec3(
-          start.x * 0.001 - 0.08,
-          start.y * 0.001,
-          start.z * 0.001
-        ),
+        new robotkit.spatial.Vec3(start.x * 0.001 - 0.08, start.y * 0.001, start.z * 0.001),
         robotkit.spatial.Quat.identity()
       ));
       mission.simulation.holdObjectOnLink(
@@ -3707,25 +3586,13 @@ typedef CubeRun = {
       var delta = AssemblyFrames.compose(movedFrame, AssemblyFrames.inverse(nominal));
       for (rootId in fixtureRoots) displaced.setRootPose(
         rootId,
-        AssemblyFrames.compose(
-          delta,
-          original.worldPose(rootId)
-        )
+        AssemblyFrames.compose(delta, original.worldPose(rootId))
       );
       generated.assemblyState = displaced.record();
       var knownPose = displaced.worldPose(job.frame), scale = generated.metresPerUnit;
       var knownWork = new robotkit.spatial.Transform3(
-        new robotkit.spatial.Vec3(
-          knownPose.x * scale,
-          knownPose.y * scale,
-          knownPose.z * scale
-        ),
-        new robotkit.spatial.Quat(
-          knownPose.qx,
-          knownPose.qy,
-          knownPose.qz,
-          knownPose.qw
-        )
+        new robotkit.spatial.Vec3(knownPose.x * scale, knownPose.y * scale, knownPose.z * scale),
+        new robotkit.spatial.Quat(knownPose.qx, knownPose.qy, knownPose.qz, knownPose.qw)
       );
 
       var session = new ProjectDocumentSession(null, false), simulation = new ApplicationSimulation(new RobotWorld());
@@ -4038,34 +3905,15 @@ typedef CubeRun = {
     var state = setup.work();
     var reference = new robotkit.spatial.Transform3(
       new robotkit.spatial.Vec3(state.head.x, state.head.y, state.head.z),
-      new robotkit.spatial.Quat(
-        state.head.qx,
-        state.head.qy,
-        state.head.qz,
-        state.head.qw
-      )
+      new robotkit.spatial.Quat(state.head.qx, state.head.qy, state.head.qz, state.head.qw)
     );
     var screwPose = new robotkit.spatial.Transform3(
-      new robotkit.spatial.Vec3(
-        state.screwPose.x,
-        state.screwPose.y,
-        state.screwPose.z
-      ),
-      new robotkit.spatial.Quat(
-        state.screwPose.qx,
-        state.screwPose.qy,
-        state.screwPose.qz,
-        state.screwPose.qw
-      )
+      new robotkit.spatial.Vec3(state.screwPose.x, state.screwPose.y, state.screwPose.z),
+      new robotkit.spatial.Quat(state.screwPose.qx, state.screwPose.qy, state.screwPose.qz, state.screwPose.qw)
     );
     var actual = new robotkit.spatial.Transform3(
       new robotkit.spatial.Vec3(pose.x, pose.y, pose.z),
-      new robotkit.spatial.Quat(
-        pose.qx,
-        pose.qy,
-        pose.qz,
-        pose.qw
-      )
+      new robotkit.spatial.Quat(pose.qx, pose.qy, pose.qz, pose.qw)
     );
     var lead = actual.compose(screwPose.inverse().compose(reference))
       .transformPoint(reference.inverse().transformPoint(robotkit.spatial.Vec3.fromArray(state.engagementPoint)));
@@ -4716,10 +4564,7 @@ typedef CubeRun = {
           var supply = cast(driver.supply, processkit.simulation.VirtualNutrunnerSupply);
           var vacuum = supply.controls().vacuum;
           var common = new processkit.screwdriving.ScrewdriverProcessDevice(
-            new processkit.screwdriving.ChannelScrewdriverOutputs(
-              driver.runtime,
-              driver.channels
-            ),
+            new processkit.screwdriving.ChannelScrewdriverOutputs(driver.runtime, driver.channels),
             driver,
             driver.channels,
             job.slot
@@ -4995,16 +4840,8 @@ typedef CubeRun = {
     var path = new motionkit.path.PosePath(
       motionkit.robot.HandlingPlanRunner.FRAME,
       [new motionkit.path.PoseLine(
-        new motionkit.path.PoseWaypoint(
-          start,
-          0.002,
-          0.02
-        ),
-        new motionkit.path.PoseWaypoint(
-          stop,
-          0.002,
-          0.02
-        ),
+        new motionkit.path.PoseWaypoint(start, 0.002, 0.02),
+        new motionkit.path.PoseWaypoint(stop, 0.002, 0.02),
         motionkit.path.OrientationPolicy.FreeAboutTool,
         0.1,
         0.08
@@ -5027,12 +4864,7 @@ typedef CubeRun = {
       3,
       8,
       true,
-      [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(
-        0,
-        rail.lower,
-        rail.upper,
-        cells
-      )]
+      [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0, rail.lower, rail.upper, cells)]
     );
     var coordinated = motion.compiler.withJointPathPlanner(new motionkit.robot.StructuredJointPathPlanner(
       kinematics.manipulator,
@@ -5051,10 +4883,7 @@ typedef CubeRun = {
       motion.robot,
       coordinated,
       _ -> null,
-      () -> ({
-        events: [],
-        overflow: false
-      }),
+      () -> ({events: [], overflow: false}),
       motion.jointIndices
     );
     motion.run(new motionkit.program.MotionProgram([motionkit.program.MotionOp.FollowPath(
@@ -5074,10 +4903,7 @@ typedef CubeRun = {
       var along = Math.max(0.0, Math.min(2.6, tip.x - start.x));
       worst = Math.max(
         worst,
-        Math.sqrt(Math.pow(tip.x - start.x - along, 2) + Math.pow(tip.y - start.y, 2) + Math.pow(
-          tip.z - start.z,
-          2
-        ))
+        Math.sqrt(Math.pow(tip.x - start.x - along, 2) + Math.pow(tip.y - start.y, 2) + Math.pow(tip.z - start.z, 2))
       );
       for (index in 1...7) {
         var bound = kinematics.manipulator.group.limitsOf(index);
@@ -5402,10 +5228,7 @@ typedef CubeRun = {
       maxArmStepRadians : example == "track-arm" ? armJump : null,
       seamErrorMetres : strayed,
       wireErrorRadians : wireError,
-      legsMillimetres : [for (entry in beads.beads) entry.bead.meanLeg(
-        0.3,
-        0.7
-      ) * 1000],
+      legsMillimetres : [for (entry in beads.beads) entry.bead.meanLeg(0.3, 0.7) * 1000],
       lengthsMillimetres : [for (entry in beads.beads) entry.bead.extent() * 1000]
     }));
     simulation.clear();
@@ -5892,10 +5715,7 @@ typedef CubeRun = {
         runtime.submitTargets(
           [
             robotkit.core.JointTarget.position(zIndex, requestedZ),
-            robotkit.core.JointTarget.position(
-              motorIndex,
-              motorTarget
-            )
+            robotkit.core.JointTarget.position(motorIndex, motorTarget)
           ],
           1
         );
@@ -6476,13 +6296,7 @@ typedef CubeRun = {
         identity,
         0,
         false,
-        [
-          {time: 0.0, position: 0.0},
-          {
-            time: 0.5,
-            position: 10.0
-          }
-        ],
+        [{time: 0.0, position: 0.0}, {time: 0.5, position: 10.0}],
         "mill/screwX-turn"
       ),
       new RobotMotionTrack(
@@ -6490,14 +6304,8 @@ typedef CubeRun = {
         0,
         false,
         [
-          {
-            time: 0.0,
-            position: -relation.offset / relation.ratio
-          },
-          {
-            time: 0.5,
-            position: (10.0 - relation.offset) / relation.ratio
-          }
+          {time: 0.0, position: -relation.offset / relation.ratio},
+          {time: 0.5, position: (10.0 - relation.offset) / relation.ratio}
         ],
         "mill/x"
       )
@@ -6610,13 +6418,7 @@ typedef CubeRun = {
       wires,
       () -> now,
       (controller, channel) -> channel == alarmBit && alarmOutput,
-      (
-        _controller,
-        _channel,
-        _on,
-        _sequence,
-        _stamp
-      ) -> {}
+      (_controller, _channel, _on, _sequence, _stamp) -> {}
     );
     alarmBus.feed();
     alarmOutput = true;
@@ -6896,27 +6698,9 @@ typedef CubeRun = {
       loop: true,
       steps: [
         {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
-        {
-          kind: "place",
-          at: {
-            occurrence: "arm/padPlace",
-            connector: "top"
-          }
-        },
-        {
-          kind: "pick",
-          at: {
-            occurrence: "arm/workpiece",
-            connector: "top"
-          }
-        },
-        {
-          kind: "place",
-          at: {
-            occurrence: "arm/padPick",
-            connector: "top"
-          }
-        }
+        {kind: "place", at: {occurrence: "arm/padPlace", connector: "top"}},
+        {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
+        {kind: "place", at: {occurrence: "arm/padPick", connector: "top"}}
       ]
     }];
     var generated = new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
@@ -7028,27 +6812,13 @@ typedef CubeRun = {
           );
           var link_T_tcp = new robotkit.spatial.Transform3(
             new robotkit.spatial.Vec3(toolTip.x, toolTip.y, toolTip.z),
-            new robotkit.spatial.Quat(
-              toolTip.qx,
-              toolTip.qy,
-              toolTip.qz,
-              toolTip.qw
-            )
+            new robotkit.spatial.Quat(toolTip.qx, toolTip.qy, toolTip.qz, toolTip.qw)
           );
           var tcp = world_T_link.compose(link_T_tcp);
           var objectPose = mission.simulation.objectPose(workpiece);
           var world_T_object = new robotkit.spatial.Transform3(
-            new robotkit.spatial.Vec3(
-              objectPose.x,
-              objectPose.y,
-              objectPose.z
-            ),
-            new robotkit.spatial.Quat(
-              objectPose.qx,
-              objectPose.qy,
-              objectPose.qz,
-              objectPose.qw
-            )
+            new robotkit.spatial.Vec3(objectPose.x, objectPose.y, objectPose.z),
+            new robotkit.spatial.Quat(objectPose.qx, objectPose.qy, objectPose.qz, objectPose.qw)
           );
           var relative = tcp.inverse().compose(world_T_object);
           if (gripStart == null) gripStart = relative;
@@ -8245,12 +8015,7 @@ typedef CubeRun = {
       }
       var blankBeforeDrop = robotkit.spatial.Transform3.fromArrays(
         [beforeDrop.x, beforeDrop.y, beforeDrop.z],
-        [
-          beforeDrop.qx,
-          beforeDrop.qy,
-          beforeDrop.qz,
-          beforeDrop.qw
-        ]
+        [beforeDrop.qx, beforeDrop.qy, beforeDrop.qz, beforeDrop.qw]
       );
       var gripperToBlank = gripperTcpPose().inverse().compose(blankBeforeDrop);
       mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, false);
@@ -8408,11 +8173,7 @@ typedef CubeRun = {
       // cylinder must meet real contact and fail to reach the open limit switch.
       var doorStop = jammedSession.createObject(
         nativekit.sim.MotionType.Static,
-        nativekit.sim.SimShape.box(
-          stopHalf[0],
-          stopHalf[1],
-          stopHalf[2]
-        ),
+        nativekit.sim.SimShape.box(stopHalf[0], stopHalf[1], stopHalf[2]),
         new nativekit.sim.SimPose(
           stopCenter[0],
           stopCenter[1],
@@ -8921,31 +8682,17 @@ typedef CubeRun = {
       var stroke = new TrajectorySegment(
         Int64.ofInt(0),
         Int64.fromFloat(finalTick * 10000000.0),
-        [
-          [0.0, 0.0],
-          [
-            0.0,
-            0.0
-          ]
-        ]
+        [[0.0, 0.0], [0.0, 0.0]]
       );
       var events = [
         new ProcessTimedEvent(Int64.ofInt(10000000), doorDrive.channelA, ProcessEventValue.Digital(true)),
-        new ProcessTimedEvent(
-          Int64.ofInt(10000000),
-          viseDrive.channelA,
-          ProcessEventValue.Digital(true)
-        ),
+        new ProcessTimedEvent(Int64.ofInt(10000000), viseDrive.channelA, ProcessEventValue.Digital(true)),
         new ProcessTimedEvent(
           Int64.fromFloat(reverseTick * 10000000.0),
           doorDrive.channelA,
           ProcessEventValue.Digital(false)
         ),
-        new ProcessTimedEvent(
-          Int64.fromFloat(reverseTick * 10000000.0),
-          doorChannelB,
-          ProcessEventValue.Digital(true)
-        )
+        new ProcessTimedEvent(Int64.fromFloat(reverseTick * 10000000.0), doorChannelB, ProcessEventValue.Digital(true))
       ];
       runtime.submitPlan(
         new ExecutionPlanSubmission(
@@ -8953,18 +8700,9 @@ typedef CubeRun = {
           Int64.ofInt(blueprint.revision),
           Int64.ofInt(blueprint.calibrationRevision),
           RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
-          [
-            0.0,
-            0.0
-          ],
-          [
-            0.0,
-            0.0
-          ],
-          [
-            0.0,
-            0.0
-          ],
+          [0.0, 0.0],
+          [0.0, 0.0],
+          [0.0, 0.0],
           [stroke],
           null,
           null,
@@ -9157,14 +8895,8 @@ typedef CubeRun = {
         [id],
         joint.limits.lower,
         joint.limits.upper,
-        Math.min(
-          0.1,
-          limits.requireVelocity()
-        ),
-        Math.min(
-          0.5,
-          limits.requireAcceleration()
-        ),
+        Math.min(0.1, limits.requireVelocity()),
+        Math.min(0.5, limits.requireAcceleration()),
         joint.limits.lower
       ));
     }
@@ -9885,11 +9617,7 @@ typedef CubeRun = {
     var grab = materia.assembly.AssemblyFrames.transformPoint(pose, 5, 0, 15);
     var drag = session.beginAssemblyDrag(
       "project:pin",
-      [
-        grab.x * metresPerUnit,
-        grab.y * metresPerUnit,
-        grab.z * metresPerUnit
-      ]
+      [grab.x * metresPerUnit, grab.y * metresPerUnit, grab.z * metresPerUnit]
     );
     check(drag != null, "a mated pin can be dragged");
     var dx = grab.x - 30, dy = grab.y - 20, turn = 0.8;
@@ -10052,17 +9780,11 @@ typedef CubeRun = {
     for (occurrence in definition.occurrences) {
       if (occurrence.id.indexOf("-punch-") >= 0 && !StringTools.endsWith(occurrence.id, "-clamp")) punchTip = Math.min(
         punchTip,
-        initial.worldConnector(
-          occurrence.id,
-          "contact"
-        ).z
+        initial.worldConnector(occurrence.id, "contact").z
       );
       if (occurrence.id.indexOf("-die-") >= 0) dieTop = Math.max(
         dieTop,
-        initial.worldConnector(
-          occurrence.id,
-          "contact"
-        ).z
+        initial.worldConnector(occurrence.id, "contact").z
       );
     }
     var toolGap = (punchTip - dieTop) * generated.metresPerUnit;
@@ -10109,22 +9831,14 @@ typedef CubeRun = {
       var unknown:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {
         durationSec: 1,
         loop: false,
-        events: [{
-          timeSec: 0,
-          channel: "absent",
-          value: false
-        }]
+        events: [{timeSec: 0, channel: "absent", value: false}]
       };
       rejectDigital(() -> {var invalid = new MachineDigitalProgramPlayer(unknown, robot);
       }, "unknown output channel");
       var unsafe:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {
         durationSec: 1,
         loop: false,
-        events: [{
-          timeSec: 0,
-          channel: "ramValve/coilA",
-          value: true
-        }]
+        events: [{timeSec: 0, channel: "ramValve/coilA", value: true}]
       };
       rejectDigital(() -> {var invalid = new MachineDigitalProgramPlayer(unsafe, robot);
       }, "unsafe terminal coil output");
@@ -10135,11 +9849,7 @@ typedef CubeRun = {
       var analog:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {
         durationSec: 1,
         loop: false,
-        events: [{
-          timeSec: 0,
-          channel: "test-analog",
-          value: false
-        }]
+        events: [{timeSec: 0, channel: "test-analog", value: false}]
       };
       rejectDigital(() -> {var invalid = new MachineDigitalProgramPlayer(analog, robot);
       }, "non-digital output channel");
@@ -10152,11 +9862,7 @@ typedef CubeRun = {
       var held:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {
         durationSec: 1,
         loop: false,
-        events: [{
-          timeSec: 0,
-          channel: "test-held",
-          value: false
-        }]
+        events: [{timeSec: 0, channel: "test-held", value: false}]
       };
       rejectDigital(() -> {var invalid = new MachineDigitalProgramPlayer(held, robot);
       }, "output retained on stop");
@@ -10366,10 +10072,7 @@ typedef CubeRun = {
       checkPressController
     ), suite(
       "sheet-press",
-      root -> PressBrakeSimulationChecks.run(
-        root,
-        true
-      )
+      root -> PressBrakeSimulationChecks.run(root, true)
     ), suite(
       "screwdriver-simulation",
       _ -> ScrewdriverSimulationTests.run()
@@ -10381,20 +10084,13 @@ typedef CubeRun = {
       root -> checkScrewdrivingOne(root)
     ), suite(
       "screwdriver-virtual",
-      root -> checkScrewdrivingOne(
-        root,
-        true
-      )
+      root -> checkScrewdrivingOne(root, true)
     ), suite(
       "screwdriver-assembly",
       root -> checkScrewdrivingAssembly(root)
     ), focused(
       "screwdriver-assembly-deterministic-damaged",
-      root -> checkScrewdrivingAssembly(
-        root,
-        ApplicationSimulation.DETERMINISTIC,
-        true
-      )
+      root -> checkScrewdrivingAssembly(root, ApplicationSimulation.DETERMINISTIC, true)
     ), suite(
       "screwdriver-required",
       RequiredFasteningTests.run
@@ -10439,10 +10135,7 @@ typedef CubeRun = {
       root -> checkGantryPicker(root)
     ), suite(
       "gantry-yaw",
-      root -> checkGantryPicker(
-        root,
-        true
-      )
+      root -> checkGantryPicker(root, true)
     ), suite(
       "gantry-welder",
       checkGantryWelder
@@ -10461,19 +10154,13 @@ typedef CubeRun = {
         root -> checkHobberInteractive(root)
       ), suite(
         "flexspline-hobber-loading",
-        root -> checkHobberInteractive(
-          root,
-          true
-        )
+        root -> checkHobberInteractive(root, true)
       ), suite(
         "bench-mill",
         root -> checkBenchMill(root)
       ), focused(
         "bench-mill-fine",
-        root -> checkBenchMill(
-          root,
-          0.005
-        )
+        root -> checkBenchMill(root, 0.005)
       ), suite(
         "enclosed-mill",
         checkEnclosedMillProject
@@ -10488,10 +10175,7 @@ typedef CubeRun = {
         checkTendingRobotInterface
       ), suite(
         "tending",
-        root -> checkMachineTending(
-          root,
-          TendingCheck.Production
-        )
+        root -> checkMachineTending(root, TendingCheck.Production)
       ), suite(
         "sheet-router",
         checkSheetRouter
@@ -10514,15 +10198,7 @@ typedef CubeRun = {
     // The short cube's ideal print, then SmallTab and the short cube on MuJoCo against their ideal prints (RF3).
     suite(
       "printer-cube-short-physical",
-      root -> checkPrinterPhysical(
-        root,
-        checkPrinterCube(
-          root,
-          "cube-short",
-          4.0,
-          true
-        )
-      )
+      root -> checkPrinterPhysical(root, checkPrinterCube(root, "cube-short", 4.0, true))
     ), suite(
       "printer-shaping",
       checkPrinterShaping
@@ -10552,28 +10228,16 @@ typedef CubeRun = {
       checkBackgroundLaunch
     ), focused(
       "mobile-welder-registration-boundary",
-      root -> MobileWelderTests.runRegistration(
-        root,
-        true
-      )
+      root -> MobileWelderTests.runRegistration(root, true)
     ), focused(
       "mobile-welder-registration-boundary-mujoco",
-      root -> MobileWelderTests.runRegistration(
-        root,
-        true,
-        false,
-        ApplicationSimulation.MUJOCO
-      )
+      root -> MobileWelderTests.runRegistration(root, true, false, ApplicationSimulation.MUJOCO)
     ), focused(
       "mobile-welder-registration",
       root -> MobileWelderTests.runRegistration(root)
     ), focused(
       "mobile-welder-voltage-cutoff",
-      root -> MobileWelderTests.runRegistration(
-        root,
-        false,
-        true
-      )
+      root -> MobileWelderTests.runRegistration(root, false, true)
     ), focused(
       "mobile-welder-wire-clearance",
       MobileWelderTests.runWireClearance
@@ -10585,24 +10249,13 @@ typedef CubeRun = {
       root -> MobileWelderTests.runMission(root)
     ), focused(
       "mobile-welder-mission-mujoco",
-      root -> MobileWelderTests.runMission(
-        root,
-        ApplicationSimulation.MUJOCO
-      )
+      root -> MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO)
     ), focused(
       "mobile-welder-energy",
-      root -> MobileWelderTests.runMission(
-        root,
-        ApplicationSimulation.MUJOCO,
-        true
-      )
+      root -> MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO, true)
     ), focused(
       "mobile-welder-energy-test-backend",
-      root -> MobileWelderTests.runMission(
-        root,
-        ApplicationSimulation.DETERMINISTIC,
-        true
-      )
+      root -> MobileWelderTests.runMission(root, ApplicationSimulation.DETERMINISTIC, true)
     ), focused(
       "mobile-welder-joint-handoff",
       MobileWelderTests.runJointHandoff
@@ -10611,20 +10264,10 @@ typedef CubeRun = {
       MobileWelderTests.run
     ), focused(
       "printer-cube",
-      root -> checkPrinterCube(
-        root,
-        "cube",
-        20.0,
-        false
-      )
+      root -> checkPrinterCube(root, "cube", 20.0, false)
     ), focused(
       "printer-cube-short",
-      root -> checkPrinterCube(
-        root,
-        "cube-short",
-        4.0,
-        true
-      )
+      root -> checkPrinterCube(root, "cube-short", 4.0, true)
     ), focused(
       "printer-sag",
       checkPrinterSag
@@ -10633,19 +10276,11 @@ typedef CubeRun = {
       root -> checkPrinterTab(
         root,
         ApplicationSimulation.MUJOCO,
-        checkPrinterTab(
-          root,
-          ApplicationSimulation.DETERMINISTIC
-        )
+        checkPrinterTab(root, ApplicationSimulation.DETERMINISTIC)
       )
     ), focused(
       "track-weld",
-      root -> checkWholeWeldment(
-        root,
-        ApplicationSimulation.MUJOCO,
-        "track MuJoCo",
-        "track-arm"
-      )
+      root -> checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm")
     ), focused("gantry-starts", root -> {checkGantryPicker(
       root,
       false,
@@ -10673,52 +10308,31 @@ typedef CubeRun = {
       _ -> TendingCyclePlan.TendingCyclePlanChecks.run()
     ), focused(
       "tending-route",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.Route
-      )
+      root -> checkMachineTending(root, TendingCheck.Route)
     ), focused(
       "tending-realtime-route",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.RealtimeRoute
-      )
+      root -> checkMachineTending(root, TendingCheck.RealtimeRoute)
     ), focused(
       "tending-performance",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.Performance
-      )
+      root -> checkMachineTending(root, TendingCheck.Performance)
     ), focused(
       "tending-interactive",
       checkTendingInteractive
     ), focused(
       "tending-reach",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.Reach
-      )
+      root -> checkMachineTending(root, TendingCheck.Reach)
     ), focused(
       "tending-vise",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.Vise
-      )
+      root -> checkMachineTending(root, TendingCheck.Vise)
     ), focused(
       "tending-exchange",
-      root -> checkMachineTending(
-        root,
-        TendingCheck.Exchange
-      )
+      root -> checkMachineTending(root, TendingCheck.Exchange)
     ), focused(
       "identity",
       checkEnclosedCabinetIdentity
     ), focused(
       "clearance-retained",
-      root -> checkHeldJointSceneClearance(
-        root,
-        true
-      )
+      root -> checkHeldJointSceneClearance(root, true)
     ), focused(
       "welder-plate",
       checkFarPlateWeld
@@ -10736,33 +10350,16 @@ typedef CubeRun = {
     checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
     }), group("mill", ["bench-mill", "enclosed-mill", "interface"]), group(
       "printer",
-      [
-        "printer-stiffness",
-        "printer-project",
-        "printer-shaping",
-        "printer-mirror",
-        "printer-frame"
-      ]
+      ["printer-stiffness", "printer-project", "printer-shaping", "printer-mirror", "printer-frame"]
     ), group(
       "mobile",
-      [
-        "mobile-base",
-        "mobile-mission",
-        "mobile-obstacle",
-        "overlay-edge"
-      ]
+      ["mobile-base", "mobile-mission", "mobile-obstacle", "overlay-edge"]
     ), group(
       "router",
-      [
-        "cnc-router",
-        "belts"
-      ]
+      ["cnc-router", "belts"]
     ), group(
       "screwdriver-process",
-      [
-        "screwdriver-simulation",
-        "screwdriver-equipment"
-      ]
+      ["screwdriver-simulation", "screwdriver-equipment"]
     ), group(
       "screwdriver",
       [
@@ -10827,12 +10424,7 @@ typedef CubeRun = {
       null,
       false,
       null,
-      [
-        1.0,
-        2.0,
-        3.0,
-        4.0
-      ]
+      [1.0, 2.0, 3.0, 4.0]
     );
     check(
       explicitStops.controlAcceleration.get(3) == 4.0,

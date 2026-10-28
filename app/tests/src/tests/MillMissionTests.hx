@@ -164,10 +164,7 @@ class MillMissionTests {
       );
       var panel = uiEditor.ui.submit(
         new MissionPanel().build(controller, uiEditor.appearance.theme.tokens),
-        new haxeon.ui.LayoutFrame(
-          800,
-          600
-        )
+        new haxeon.ui.LayoutFrame(800, 600)
       );
       check(
         find(panel, "Machine bearing block") && !find(panel, "This project has no mission."),
@@ -176,10 +173,7 @@ class MillMissionTests {
       var cncPanel = new app.editor.CncPanel();
       var preview = uiEditor.ui.submit(
         cncPanel.build(simulation, uiEditor.appearance.theme.tokens, null, session),
-        new haxeon.ui.LayoutFrame(
-          800,
-          600
-        )
+        new haxeon.ui.LayoutFrame(800, 600)
       );
       var job = session.cncJob;
       if (job == null) throw "Missing CNC source";
@@ -194,10 +188,7 @@ class MillMissionTests {
       job.source = replacement.join("\n");
       var changed = uiEditor.ui.submit(
         cncPanel.build(simulation, uiEditor.appearance.theme.tokens, null, session),
-        new haxeon.ui.LayoutFrame(
-          800,
-          600
-        )
+        new haxeon.ui.LayoutFrame(800, 600)
       );
       check(
         find(changed, "    1  ; Changed preview"),
@@ -205,16 +196,8 @@ class MillMissionTests {
       );
       job.source = originalSource;
       var empty = uiEditor.ui.submit(
-        cncPanel.build(
-          simulation,
-          uiEditor.appearance.theme.tokens,
-          null,
-          uiEditor.session
-        ),
-        new haxeon.ui.LayoutFrame(
-          800,
-          600
-        )
+        cncPanel.build(simulation, uiEditor.appearance.theme.tokens, null, uiEditor.session),
+        new haxeon.ui.LayoutFrame(800, 600)
       );
       check(
         find(empty, "This project has no machining or print program.") && !find(empty, "Ready · Play to start"),

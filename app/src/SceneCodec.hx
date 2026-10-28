@@ -60,10 +60,7 @@ class SceneCodec {
       "appearance", "materialId"].indexOf(name) < 0 && (name != "worker" || object.worker != null)) Reflect.setField(
         result,
         name,
-        Reflect.field(
-          object,
-          name
-        )
+        Reflect.field(object, name)
       );
     Reflect.setField(result, "materialId", id);
     var visual:Dynamic = {};
@@ -72,11 +69,7 @@ class SceneCodec {
       || Math.abs(object.green - color[1]) > 1e-6 || Math.abs(object.blue - color[2]) > 1e-6) Reflect.setField(
         visual,
         "baseColor",
-        [
-          object.red,
-          object.green,
-          object.blue
-        ]
+        [object.red, object.green, object.blue]
       );
     var appearance = object.appearance == null ? Appearances.neutral() : object.appearance;
     if (appearance.finish != id) Reflect.setField(visual, "finish", appearance.finish);
@@ -187,10 +180,7 @@ class SceneCodec {
         targetId: id,
         property: stringField(item, "property"),
         kind: kind,
-        value: Reflect.field(
-          item,
-          "value"
-        )
+        value: Reflect.field(item, "value")
       });
     }
     var removedIds:Array<String> = [];
@@ -221,10 +211,7 @@ class SceneCodec {
           targetId: stringField(edit, "targetId"),
           property: stringField(edit, "property"),
           kind: editKind,
-          value: Reflect.field(
-            edit,
-            "value"
-          )
+          value: Reflect.field(edit, "value")
         });
       }
       instanceRecords.push({sourceId: sourceId, id: id, overrides: instanceEdits});
@@ -376,10 +363,7 @@ class SceneCodec {
           || channel < 0 || channel > 1) throw "Invalid scene material color";
       }
       var appearance:Appearance = {
-        finish: visual == null || !Reflect.hasField(visual, "finish") ? materialId : stringField(
-          visual,
-          "finish"
-        ),
+        finish: visual == null || !Reflect.hasField(visual, "finish") ? materialId : stringField(visual, "finish"),
         metallic : visual == null ? material.visual.metallic : optionalBounded(
           visual,
           "metallic",
@@ -438,57 +422,21 @@ class SceneCodec {
         label: stringField(value, "label"),
         type: kind,
         x: bounded(value, "x", -1000000, 1000000),
-        y: bounded(
-          value,
-          "y",
-          -1000000,
-          1000000
-        ),
-        z: kind == "human-worker" ? 0.0 : bounded(
-          value,
-          "z",
-          -1000000,
-          1000000
-        ),
-        width : bounded(
-          value,
-          "width",
-          0.000001,
-          1000000
-        ),
-        height : bounded(
-          value,
-          "height",
-          0.000001,
-          1000000
-        ),
-        depth : optionalBounded(
-          value,
-          "depth",
-          0.000001,
-          1000000,
-          0.1
-        ),
+        y: bounded(value, "y", -1000000, 1000000),
+        z: kind == "human-worker" ? 0.0 : bounded(value, "z", -1000000, 1000000),
+        width : bounded(value, "width", 0.000001, 1000000),
+        height : bounded(value, "height", 0.000001, 1000000),
+        depth : optionalBounded(value, "depth", 0.000001, 1000000, 0.1),
         collisionEnabled : kind == "human-worker" ? false : collisionEnabled,
         dynamicBody : kind == "human-worker" ? false : dynamicBody,
-        mass : optionalBounded(
-          value,
-          "mass",
-          0.000001,
-          1000000,
-          1.0
-        ),
+        mass : optionalBounded(value, "mass", 0.000001, 1000000, 1.0),
         red : color[0],
         green : color[1],
         blue : color[2],
         appearance : appearance,
         materialId : materialId,
         visible : visibleValue,
-        hiddenBy : optionalTextArray(
-          value,
-          "hiddenBy",
-          256
-        ),
+        hiddenBy : optionalTextArray(value, "hiddenBy", 256),
         rotation : kind == "human-worker" ? workerYawRotation(optionalRotation(value)) : optionalRotation(value),
         cadGraph : cadGraph,
         meshSnapshot : meshSnapshot,

@@ -81,12 +81,7 @@ class MachineProgramPlayer implements SessionMember {
       velocities,
       accelerations,
       jerks,
-      StartTolerances.uniform(
-        indices.length,
-        tolerance,
-        0.02,
-        0.02
-      )
+      StartTolerances.uniform(indices.length, tolerance, 0.02, 0.02)
     );
     compiler.motorSpace = MotorSpaceConstraints.of(robot.model, authored.axes, 0.95);
     compiler.planCheck = new PlanCheck(robot.model, authored.axes);

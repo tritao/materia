@@ -161,11 +161,7 @@ class SceneCollision {
         item.id,
         body,
         CollisionPose.translation(box.offset[0], box.offset[1], box.offset[2]),
-        CollisionGeometry.Box(
-          box.half[0],
-          box.half[1],
-          box.half[2]
-        ),
+        CollisionGeometry.Box(box.half[0], box.half[1], box.half[2]),
         0.0,
         "box"
       );
@@ -216,15 +212,7 @@ class SceneCollision {
         id,
         0,
         false,
-        new CollisionPose(
-          frame.x * scale,
-          frame.y * scale,
-          frame.z * scale,
-          frame.qx,
-          frame.qy,
-          frame.qz,
-          frame.qw
-        )
+        new CollisionPose(frame.x * scale, frame.y * scale, frame.z * scale, frame.qx, frame.qy, frame.qz, frame.qw)
       );
       for (index in 0...pieces.length) description.addObject(
         '$id#$index',
@@ -290,11 +278,7 @@ class SceneCollision {
       var live = simulated.get(item.id);
       current.setBodyPose(
         built.bodies[index],
-        live == null ? posed(item, bodyCentres[index]) : placed(
-          live.position,
-          live.rotation,
-          bodyCentres[index]
-        )
+        live == null ? posed(item, bodyCentres[index]) : placed(live.position, live.rotation, bodyCentres[index])
       );
     }
     var closest = new Map<String, SceneCollisionPair>();
@@ -331,11 +315,7 @@ class SceneCollision {
    * part frame (the centre less the preview centre, rotated).
    */
   static function posed(item:EditorSceneObject, centre:Null<Array<Float>>):CollisionPose return placed(
-    [
-      item.x,
-      item.y,
-      item.z
-    ],
+    [item.x, item.y, item.z],
     item.rotation,
     centre
   );
@@ -360,21 +340,13 @@ class SceneCollision {
   static function boxOf(scene:EditorScene, item:EditorSceneObject): {offset: Array<Float>, half: Array<Float>} {
     if (!scene.isCadPart(item.id)) return {
       offset: [0.0, 0.0, 0.0],
-      half: [
-        item.width / 2.0,
-        item.height / 2.0,
-        item.depth / 2.0
-      ]
+      half: [item.width / 2.0, item.height / 2.0, item.depth / 2.0]
     };
     var bounds = scene.cadSession(item.id).collisionBounds;
     if (bounds == null) throw "CAD collision bounds are unavailable for: " + item.id;
     return {
       offset: [bounds.center.x, bounds.center.y, bounds.center.z],
-      half: [
-        bounds.halfExtents.x,
-        bounds.halfExtents.y,
-        bounds.halfExtents.z
-      ]
+      half: [bounds.halfExtents.x, bounds.halfExtents.y, bounds.halfExtents.z]
     };
   }
 }

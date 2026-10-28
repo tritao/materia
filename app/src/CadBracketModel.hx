@@ -262,26 +262,10 @@ class CadBracketModel implements CadSessionModel {
     var points = [
       new SketchPoint("p0", anchorX, anchorZ),
       new SketchPoint("p1", anchorX + width, anchorZ),
-      new SketchPoint(
-        "p2",
-        anchorX + width,
-        anchorZ + wall
-      ),
-      new SketchPoint(
-        "p3",
-        anchorX + wall,
-        anchorZ + wall
-      ),
-      new SketchPoint(
-        "p4",
-        anchorX + wall,
-        anchorZ + height
-      ),
-      new SketchPoint(
-        "p5",
-        anchorX,
-        anchorZ + height
-      )
+      new SketchPoint("p2", anchorX + width, anchorZ + wall),
+      new SketchPoint("p3", anchorX + wall, anchorZ + wall),
+      new SketchPoint("p4", anchorX + wall, anchorZ + height),
+      new SketchPoint("p5", anchorX, anchorZ + height)
     ];
     for (point in points) sketch.addPoint(point);
     for (index in 0...points.length) sketch.addEntity(SketchEntity.line(

@@ -89,13 +89,8 @@ private typedef ThreadGroup = {
           var material = owner.scene.createMaterial();
           owner.scene.setMaterialData(
             material,
-            ScenePresentation.materialFor(
-              item.red,
-              item.green,
-              item.blue,
-              item.appearance,
-              item.kind
-            ).setBaseColorTexture(
+            ScenePresentation.materialFor(item.red,
+            item.green, item.blue, item.appearance, item.kind).setBaseColorTexture(
               pair.color,
               sampler
             ).setNormalTexture(pair.normal)

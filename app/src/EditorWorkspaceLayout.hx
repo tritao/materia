@@ -23,13 +23,7 @@ class EditorWorkspaceLayout {
       DockSplitAxis.Horizontal,
       0.725,
       DockNode.Panel("perspective"),
-      DockNode.Tabs(
-        [
-          "inspector",
-          "machine-control"
-        ],
-        "inspector"
-      )
+      DockNode.Tabs(["inspector", "machine-control"], "inspector")
     );
     var main = DockNode.Split(DockSplitAxis.Vertical, 0.76, upper, DockNode.Tabs(["console", "telemetry"], "console"));
     return DockNode.Split(
@@ -46,27 +40,14 @@ class EditorWorkspaceLayout {
       DockSplitAxis.Vertical,
       0.68,
       DockNode.Panel("perspective"),
-      DockNode.Tabs(
-        [
-          "console",
-          "telemetry"
-        ],
-        "console"
-      )
+      DockNode.Tabs(["console", "telemetry"], "console")
     );
     return DockNode.Split(
       DockSplitAxis.Horizontal,
       0.74,
       main,
       DockNode.Tabs(
-        hasMission ? [
-          "mission",
-          "sensors",
-          "cnc",
-          "machine-control",
-          "inspector",
-          "hierarchy"
-        ] : [
+        hasMission ? ["mission", "sensors", "cnc", "machine-control", "inspector", "hierarchy"] : [
           "sensors",
           "cnc",
           "machine-control",

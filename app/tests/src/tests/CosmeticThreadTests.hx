@@ -167,12 +167,10 @@ import nativekit.scene.Transform;
     check(minimum == 245 && maximum == 255, "roots are slightly darker than the part colour");
     check(
       !sameBytes(
-        CosmeticThreadTexture.pixels(
-          new ThreadSpec("TR6x1", 6, 1, 1, RightHand, false, null, Trapezoidal).data(),
-          true
-        ),
-        normal
-      ),
+        CosmeticThreadTexture.pixels(new ThreadSpec("TR6x1",
+      6, 1, 1, RightHand, false, null, Trapezoidal).data(), true),
+      normal
+    ),
       "trapezoidal flanks differ from metric flanks"
     );
   }
@@ -359,12 +357,7 @@ import nativekit.scene.Transform;
       var pose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
         id: "thread",
         position: [2, 3, 4],
-        rotation: [
-          0,
-          0,
-          0,
-          1
-        ]
+        rotation: [0, 0, 0, 1]
       };
       var camera = new PerspectiveCamera();
       camera.frame(2, 3, 3.985, 0.04, 0.04, 0.05, 4.0 / 3.0);
@@ -397,22 +390,7 @@ import nativekit.scene.Transform;
         null,
         null,
         -1,
-        [new app.SceneCollision.SceneCollisionPair(
-          "thread",
-          "environment",
-          -0.001,
-          [
-            0,
-            0,
-            0
-          ],
-          [
-            0,
-            0,
-            0
-          ],
-          true
-        )]
+        [new app.SceneCollision.SceneCollisionPair("thread", "environment", -0.001, [0, 0, 0], [0, 0, 0], true)]
       );
       check(
         diagnostic.diagnosticTintValues().length == 1 && diagnostic.materialOverrideValues().length == 0,

@@ -238,17 +238,8 @@ class SimulatedTools implements SessionMember {
         contactLinks,
         candidate.id,
         new Transform3(
-          new Vec3(
-            sensorFrame.x,
-            sensorFrame.y,
-            sensorFrame.z
-          ),
-          new Quat(
-            sensorFrame.qx,
-            sensorFrame.qy,
-            sensorFrame.qz,
-            sensorFrame.qw
-          )
+          new Vec3(sensorFrame.x, sensorFrame.y, sensorFrame.z),
+          new Quat(sensorFrame.qx, sensorFrame.qy, sensorFrame.qz, sensorFrame.qw)
         )
       );
       forceTorqueProbes.push(probe);
@@ -261,11 +252,7 @@ class SimulatedTools implements SessionMember {
       part.linkIndex,
       feed,
       spindle,
-      [
-        tip.x,
-        tip.y,
-        tip.z
-      ],
+      [tip.x, tip.y, tip.z],
       toolAxisLocal,
       {
         start: tool.channel,

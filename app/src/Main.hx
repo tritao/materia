@@ -373,10 +373,7 @@ class Main {
         world = new RobotWorld();
         var remote = new RemoteRobot(
           "warehouse/forklift-17",
-          new robotkit.auth.ClientCredentials(
-            Sys.getEnv("ROBOTKIT_IDENTITY"),
-            Sys.getEnv("ROBOTKIT_TOKEN")
-          )
+          new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"), Sys.getEnv("ROBOTKIT_TOKEN"))
         );
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, context.events);
@@ -1028,20 +1025,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var shell = new AppShell(
       "reference-editor-shell",
       new Stack("overlay-host", layers),
-      new RetainedView(
-        "editor-top-bar",
-        function(_) return topBar(),
-        function() return topBarRevisionKey()
-      ),
+      new RetainedView("editor-top-bar", function(_) return topBar(), function() return topBarRevisionKey()),
       null,
       null,
       shellStyle,
       null,
-      new RetainedView(
-        "editor-status-bar",
-        function(_) return statusBar(),
-        function() return statusBarRevisionKey()
-      )
+      new RetainedView("editor-status-bar", function(_) return statusBar(), function() return statusBarRevisionKey())
     );
     var windowLayers:Array<StackChild> = [new StackChild(
       "shell",
@@ -1794,10 +1783,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       [
         new KeyedView("file", fileBar(compact)),
         new KeyedView("divider", divider),
-        new KeyedView(
-          "context",
-          contextBar(compact)
-        )
+        new KeyedView("context", contextBar(compact))
       ],
       stack
     );
@@ -1819,49 +1805,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
     var items:Array<KeyedView> = [
-      new KeyedView(
-        "brand",
-        new Text(
-          "MATERIA",
-          titleStyle,
-          appearance.theme.text,
-          TextStyleOverride.text(
-            13.0,
-            0.5
-          )
-        )
-      ),
-      new KeyedView(
-        "new",
-        toolbarAction(
-          "toolbar-new",
-          "editor.new",
-          "New",
-          IconName.NewFile,
-          compact
-        )
-      ),
-      new KeyedView(
-        "open",
-        toolbarAction(
-          "toolbar-open",
-          "editor.open",
-          "Open",
-          IconName.FolderOpen,
-          compact
-        )
-      ),
-      new KeyedView(
-        "save",
-        toolbarAction(
-          "toolbar-save",
-          "editor.save",
-          "Save",
-          IconName.Save,
-          compact,
-          true
-        )
-      )
+      new KeyedView("brand", new Text("MATERIA", titleStyle, appearance.theme.text, TextStyleOverride.text(13.0, 0.5))),
+      new KeyedView("new", toolbarAction("toolbar-new", "editor.new", "New", IconName.NewFile, compact)),
+      new KeyedView("open", toolbarAction("toolbar-open", "editor.open", "Open", IconName.FolderOpen, compact)),
+      new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
     ];
     if (!minimal) {
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
@@ -1892,10 +1839,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (loading != null) {
         items.push(new KeyedView(
           "spinner",
-          new haxeon.ui.widgets.controls.Spinner(
-            "project-loading-spinner",
-            loading.title
-          )
+          new haxeon.ui.widgets.controls.Spinner("project-loading-spinner", loading.title)
         ));
         text = (viewportWidth >= 700 ? shortenLabel(loading.title,
           viewportWidth >= 1000 ? 30 : 20) + " · " : "") + shortenLabel(
@@ -1926,44 +1870,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     var items:Array<KeyedView> = [
       new KeyedView("modes", modeSwitcher(compact)),
-      new KeyedView(
-        "space",
-        new Spacer(
-          "context-space",
-          LayoutAxis.grow(),
-          LayoutAxis.fixed(1.0)
-        )
-      ),
-      new KeyedView(
-        "transport",
-        transportGroup(compact)
-      ),
-      new KeyedView(
-        "space-end",
-        new Spacer(
-          "context-space-end",
-          LayoutAxis.grow(),
-          LayoutAxis.fixed(1.0)
-        )
-      ),
-      new KeyedView(
-        "frame",
-        toolbarAction(
-          "toolbar-frame",
-          "scene.frame-selected",
-          "Frame",
-          IconName.Inspect,
-          compact
-        )
-      )
+      new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+      new KeyedView("transport", transportGroup(compact)),
+      new KeyedView("space-end", new Spacer("context-space-end", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+      new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))
     ];
     return new Row(
       "editor-context-bar",
       items,
-      toolbarRowStyle(
-        CONTEXT_BAR_HEIGHT,
-        simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar
-      )
+      toolbarRowStyle(CONTEXT_BAR_HEIGHT, simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar)
     );
   }
 
@@ -1998,19 +1913,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       [
         new KeyedView(
           "spinner",
-          new haxeon.ui.widgets.controls.Spinner(
-            "simulation-stop-spinner",
-            "Stopping simulation"
-          )
+          new haxeon.ui.widgets.controls.Spinner("simulation-stop-spinner", "Stopping simulation")
         ),
         new KeyedView(
           "status",
-          new Text(
-            "Stopping simulation…",
-            null,
-            appearance.theme.tokens.textSecondary,
-            TextStyleOverride.text(12.0)
-          )
+          new Text("Stopping simulation…", null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
         )
       ],
       style
@@ -2024,10 +1931,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         [
           new KeyedView(
             "spinner",
-            new haxeon.ui.widgets.controls.Spinner(
-              "simulation-build-spinner",
-              "Preparing simulation"
-            )
+            new haxeon.ui.widgets.controls.Spinner("simulation-build-spinner", "Preparing simulation")
           ),
           new KeyedView(
             "status",
@@ -2038,10 +1942,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
               TextStyleOverride.text(12.0)
             )
           ),
-          new KeyedView(
-            "cancel",
-            cancel
-          )
+          new KeyedView("cancel", cancel)
         ],
         style
       );
@@ -2146,15 +2047,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "simulation-state",
       [
         new KeyedView("dot", dot),
-        new KeyedView(
-          "text",
-          new Text(
-            text,
-            null,
-            tokens.text,
-            TextStyleOverride.text(12.0)
-          )
-        )
+        new KeyedView("text", new Text(text, null, tokens.text, TextStyleOverride.text(12.0)))
       ],
       chip
     );
@@ -2236,23 +2129,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView(
         "selection",
         new Text(
-          shortenLabel(
-            left,
-            viewportWidth < 700.0 ? 20 : 48
-          ),
+          shortenLabel(left, viewportWidth < 700.0 ? 20 : 48),
           null,
           simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
           TextStyleOverride.text(12.0)
         )
       ),
-      new KeyedView(
-        "space",
-        new Spacer(
-          "status-space",
-          LayoutAxis.grow(),
-          LayoutAxis.fixed(1.0)
-        )
-      )
+      new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
     ];
     var mates = session.assemblyMateStatus();
     if (mates != null) {
@@ -2278,12 +2161,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ));
     items.push(new KeyedView(
       "runtime",
-      new Text(
-        right,
-        null,
-        appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0)
-      )
+      new Text(right, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));
     return new Row("editor-status-bar", items, style);
   }
@@ -2354,13 +2232,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePanelContents = [new DockPanelContent(
       "start",
       function(_) return StartPanel.build(this),
-      function(
-        _,
-        width
-      ) return StartPanel.build(
-        this,
-        width
-      )
+      function(_, width) return StartPanel.build(this, width)
     ), new DockPanelContent(
       "hierarchy",
       function(_) return hierarchyPanel(),
@@ -2415,11 +2287,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       )
     ), new DockPanelContent(
       "project",
-      function(_) return app.editor.ProjectVariantView.build(
-        projectVariants,
-        appearance.theme.tokens,
-        "project-panel"
-      )
+      function(_) return app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "project-panel")
     ), new DockPanelContent("mission",
       function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
       workspace.open("cnc", "inspector");
@@ -2554,16 +2422,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
               new Tabs(
                 "editor-settings-tabs",
                 [
-                  new TabItem(
-                    "general",
-                    "General",
-                    panel
-                  ),
-                  new TabItem(
-                    "shortcuts",
-                    "Shortcuts",
-                    shortcutsPanel == null ? new Text("") : shortcutsPanel
-                  )
+                  new TabItem("general", "General", panel),
+                  new TabItem("shortcuts", "Shortcuts", shortcutsPanel == null ? new Text("") : shortcutsPanel)
                 ],
                 settingsTab,
                 showSettingsTab,
@@ -2578,17 +2438,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
             body
           )
         ),
-        new KeyedView(
-          "actions",
-          new Row(
-            "editor-settings-actions",
-            [new KeyedView(
-              "close",
-              close
-            )],
-            closeRow
-          )
-        )
+        new KeyedView("actions", new Row("editor-settings-actions", [new KeyedView("close", close)], closeRow))
       ],
       actionColumnStyle()
     );
@@ -2597,13 +2447,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "Editor Settings",
       content,
       closeSettings,
-      Math.max(
-        360.0,
-        Math.min(
-          960.0,
-          viewportWidth - 80.0
-        )
-      )
+      Math.max(360.0, Math.min(960.0, viewportWidth - 80.0))
     );
   }
 
@@ -2623,19 +2467,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
           new Row(
             "rename-actions",
             [
-              new KeyedView(
-                "save",
-                confirm
-              ),
-              new KeyedView(
-                "cancel",
-                new Button(
-                  "Cancel",
-                  null,
-                  function() renameId = null,
-                  "rename-cancel"
-                )
-              )
+              new KeyedView("save", confirm),
+              new KeyedView("cancel", new Button("Cancel", null, function() renameId = null, "rename-cancel"))
             ],
             actionRowStyle()
           )
@@ -2648,10 +2481,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   static function textLines(key:String, lines:Array<String>):View return new Column(
     key,
-    [for (index in 0...lines.length) new KeyedView(
-      "line:" + index,
-      new Text(lines[index])
-    )]
+    [for (index in 0...lines.length) new KeyedView("line:" + index, new Text(lines[index]))]
   );
 
   static function actionRowStyle():LayoutStyle {
@@ -2694,33 +2524,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     };
     var controls:Array<KeyedView> = [new KeyedView(
       "frame",
-      viewportToolbarAction(
-        "viewport-frame",
-        "scene.frame-selected",
-        "Frame",
-        IconName.Inspect,
-        compact
-      )
+      viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact)
     )];
     controls.push(new KeyedView(
       "fit-all",
-      viewportToolbarAction(
-        "viewport-fit-all",
-        "scene.fit-all",
-        "Fit",
-        IconName.Inspect,
-        compact
-      )
+      viewportToolbarAction("viewport-fit-all", "scene.fit-all", "Fit", IconName.Inspect, compact)
     ));
     if (!tiny) controls.push(new KeyedView(
       "reset",
-      viewportToolbarAction(
-        "viewport-reset",
-        "scene.reset-perspective",
-        "Reset",
-        IconName.Cube,
-        compact
-      )
+      viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)
     ));
     if (mode == EditorMode.Simulate) {
       var cameraButton = new Button("Camera", null, openInspectionCamera, "viewport-inspection-camera");
@@ -2732,23 +2544,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("group-divider", groupDivider));
     controls.push(new KeyedView(
       "grid",
-      viewportToolbarAction(
-        "viewport-grid",
-        "scene.toggle-grid",
-        "Grid",
-        IconName.Grid,
-        compact
-      )
+      viewportToolbarAction("viewport-grid", "scene.toggle-grid", "Grid", IconName.Grid, compact)
     ));
     controls.push(new KeyedView(
       "snap",
-      viewportToolbarAction(
-        "viewport-snap",
-        "scene.toggle-grid-snap",
-        "Snap",
-        IconName.Magnet,
-        compact
-      )
+      viewportToolbarAction("viewport-snap", "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)
     ));
     controls.push(new KeyedView("options", options));
     var visibility = new Button(compact ? "" : "Visibility", null, null, "viewport-visibility");
@@ -2784,21 +2584,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (mateMessage != null) dragMessage = mateMessage;
     if (dragMessage != null) controls.push(new KeyedView(
       "assembly-drag-status",
-      new Text(
-        dragMessage,
-        null,
-        appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0)
-      )
+      new Text(dragMessage, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));
     else if (collisionSummary != null) controls.push(new KeyedView(
       "collision-status",
-      new Text(
-        collisionSummary,
-        null,
-        appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0)
-      )
+      new Text(collisionSummary, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))
     ));
     var barStyle = new LayoutStyle();
     barStyle.width = LayoutAxis.grow();
@@ -2835,13 +2625,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     };
     var layers = [
       new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
-      new StackChild(
-        "view-angle",
-        viewAngle,
-        10.0,
-        10.0,
-        1
-      )
+      new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
     ];
     var missionState = missionController.snapshot(), variantState = projectVariants.snapshot();
     var sceneControls:Array<KeyedView> = [];
@@ -2858,11 +2642,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ));
     if (variantState.variants.length > 0 || variantState.error != null) sceneControls.push(new KeyedView(
       "project",
-      app.editor.ProjectVariantView.build(
-        projectVariants,
-        appearance.theme.tokens,
-        "viewport-project"
-      )
+      app.editor.ProjectVariantView.build(projectVariants, appearance.theme.tokens, "viewport-project")
     ));
     if (missionState.hasWork) sceneControls.push(new KeyedView("mission",
       app.editor.MissionStatusView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
@@ -2880,11 +2660,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var width = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
       layers.push(new StackChild(
         "project-controls",
-        new Column(
-          "viewport-project-controls",
-          sceneControls,
-          overlayStyle
-        ),
+        new Column("viewport-project-controls", sceneControls, overlayStyle),
         10,
         54,
         2,
@@ -2898,10 +2674,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       layers.push(new StackChild(
         "inspection-camera-overlay",
         inspectionCamera.build(this, true),
-        Math.max(
-          10,
-          (availableWidth > 0 ? availableWidth : 400) - cameraWidth - 10
-        ),
+        Math.max(10, (availableWidth > 0 ? availableWidth : 400) - cameraWidth - 10),
         54,
         3,
         LayoutAxis.fixed(cameraWidth),
@@ -2913,15 +2686,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),
-      new KeyedView(
-        "canvas",
-        new SizedBox(
-          "viewport-canvas-slot",
-          canvas,
-          LayoutAxis.grow(),
-          LayoutAxis.grow()
-        )
-      )
+      new KeyedView("canvas", new SizedBox("viewport-canvas-slot", canvas, LayoutAxis.grow(), LayoutAxis.grow()))
     ];
     if (hobberControls != null) viewportRows.insert(1, new KeyedView("machine-scenario", hobberControls));
     return new Column("perspective-with-toolbar", viewportRows, panelStyle);
@@ -3087,18 +2852,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       action: Remove(
         select,
         {
-          path: [
-            {
-              x: 0,
-              y: 0,
-              z: 0
-            },
-            {
-              x: direction.x * distance,
-              y: direction.y * distance,
-              z: direction.z * distance
-            }
-          ],
+          path: [{x: 0, y: 0, z: 0}, {x: direction.x * distance, y: direction.y * distance, z: direction.z * distance}],
           evidence: Illustrative
         }
       )
@@ -3150,12 +2904,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       for (index in 0...stale.length) rows.push(new KeyedView("stale:" + index, new Text(stale[index])));
       rows.push(new KeyedView(
         "stale-discard",
-        sceneAction(
-          "stale-discard-command",
-          "editor.discard-stale-edits",
-          "Discard stale edits",
-          IconName.Trash
-        )
+        sceneAction("stale-discard-command", "editor.discard-stale-edits", "Discard stale edits", IconName.Trash)
       ));
     }
     var logStyle = fillStyle();
@@ -3186,18 +2935,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "console-header",
         [
           new KeyedView("heading", sectionHeading("CONSOLE")),
-          new KeyedView(
-            "space",
-            new Spacer(
-              "console-header-space",
-              LayoutAxis.grow(),
-              LayoutAxis.fixed(1.0)
-            )
-          ),
-          new KeyedView(
-            "copy-all",
-            copyAll
-          )
+          new KeyedView("space", new Spacer("console-header-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+          new KeyedView("copy-all", copyAll)
         ],
         headerStyle
       )
@@ -3253,10 +2992,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "editor.settings",
       "Editor Settings...",
       openSettings,
-      new Shortcut(
-        UiKey.Comma,
-        UiModifier.Control
-      ),
+      new Shortcut(UiKey.Comma, UiModifier.Control),
       function() return !documents.blocked()
     ));
     SceneViewCommands.install(this);
@@ -3275,10 +3011,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "editor.mode." + target.id,
         target.label + " mode",
         function() switchMode(target),
-        new Shortcut(
-          target == EditorMode.Design ? 49 : 50,
-          UiModifier.Control
-        ),
+        new Shortcut(target == EditorMode.Design ? 49 : 50, UiModifier.Control),
         function() return !documents.blocked(),
         function() return mode == target
       ));
@@ -3344,15 +3077,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     "bim-model-editor",
     session.bim,
     session.document,
-    function(
-      label,
-      change,
-      undo
-    ) session.applyBimEdit(
-      label,
-      change,
-      undo
-    )
+    function(label, change, undo) session.applyBimEdit(label, change, undo)
   );
 
   function refreshScriptMaterialization(message:String):Void {
@@ -3422,27 +3147,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       buttons.push(new KeyedView("save", save));
       buttons.push(new KeyedView(
         "discard",
-        new Button(
-          "Discard",
-          null,
-          function() documents.resolve("discard"),
-          "document-confirm-discard"
-        )
+        new Button("Discard", null, function() documents.resolve("discard"), "document-confirm-discard")
       ));
       buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-confirm-cancel")));
     }
     var content = new Column(
       "document-message",
-      [
-        new KeyedView("message", new Text(message)),
-        new KeyedView(
-          "buttons",
-          new Row(
-            "document-actions",
-            buttons
-          )
-        )
-      ],
+      [new KeyedView("message", new Text(message)), new KeyedView("buttons", new Row("document-actions", buttons))],
       style
     );
     var dialog = new Dialog("document-confirmation", title, content, dismiss, 520.0);
@@ -3509,14 +3220,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (id != null && scene.object(id) != null) scene.setColour(
         id,
         Reflect.field(colour, "r"),
-        Reflect.field(
-          colour,
-          "g"
-        ),
-        Reflect.field(
-          colour,
-          "b"
-        )
+        Reflect.field(colour, "g"),
+        Reflect.field(colour, "b")
       );
     }
   }
@@ -3530,12 +3235,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     lastSemanticAction = {action: action, data: data};
     try File.appendContent(
       semanticRecordPath,
-      Json.stringify({
-        kind: "action",
-        at: Sys.time(),
-        action: action,
-        data: data
-      }) + "\n"
+      Json.stringify({kind: "action", at: Sys.time(), action: action, data: data}) + "\n"
     ) catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
   }
 

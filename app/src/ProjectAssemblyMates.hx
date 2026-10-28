@@ -209,12 +209,7 @@ class ProjectAssemblyMates {
     var result = AssemblyMateSolver.solve(definition, state);
     return {
       result: result,
-      state: AssemblyMateSolver.merge(
-        definition,
-        state,
-        result.rootPoses,
-        result.jointCoordinates
-      )
+      state: AssemblyMateSolver.merge(definition, state, result.rootPoses, result.jointCoordinates)
     };
   }
 

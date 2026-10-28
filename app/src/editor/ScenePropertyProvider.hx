@@ -84,11 +84,7 @@ import haxeon.ui.properties.PropertyValue;
     var initialColour = scene.requiredObject(id);
     colourSnapshots.set(
       EditorScene.encodeColour(initialColour.red, initialColour.green, initialColour.blue),
-      [
-        initialColour.red,
-        initialColour.green,
-        initialColour.blue
-      ]
+      [initialColour.red, initialColour.green, initialColour.blue]
     );
     result.push(new PropertyDescriptor(prefix + "colour", "Colour", PropertyType.Text, function(_) {
       var item = scene.requiredObject(id);
@@ -103,11 +99,7 @@ import haxeon.ui.properties.PropertyValue;
           var current = scene.requiredObject(id);
           colourSnapshots.set(
             EditorScene.encodeColour(current.red, current.green, current.blue),
-            [
-              current.red,
-              current.green,
-              current.blue
-            ]
+            [current.red, current.green, current.blue]
           );
           scene.setColour(id, channels[0], channels[1], channels[2]);
         default:

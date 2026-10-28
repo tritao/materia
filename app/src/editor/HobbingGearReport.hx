@@ -30,16 +30,8 @@ class HobbingGearReport implements View {
     if (data.failure != null) rows.push(text("failure", data.failure, tokens.danger));
     var summary:Array<KeyedView> = [
       text("cycle", 'Cycle  ${n(data.seconds)} s', tokens.textPrimary),
-      text(
-        "sync",
-        'Sync error  ${n(data.syncArcsec)} arcsec',
-        tokens.textPrimary
-      ),
-      text(
-        "contacts",
-        'Fixture contacts  ${data.contacts}',
-        data.contacts > 0 ? tokens.danger : tokens.textPrimary
-      ),
+      text("sync", 'Sync error  ${n(data.syncArcsec)} arcsec', tokens.textPrimary),
+      text("contacts", 'Fixture contacts  ${data.contacts}', data.contacts > 0 ? tokens.danger : tokens.textPrimary),
       text(
         "load",
         'Estimated cutting load  ${Math.round(data.cutting)} N · ${Math.round(data.power)} W',
@@ -52,11 +44,7 @@ class HobbingGearReport implements View {
       new Column(
         "quality-status",
         [
-          text(
-            "qualification",
-            data.quality(),
-            tokens.textPrimary
-          ),
+          text("qualification", data.quality(), tokens.textPrimary),
           text(
             "reason",
             data.measurement == null ? (data.inspectionFailure != null ? data.inspectionFailure
@@ -71,10 +59,7 @@ class HobbingGearReport implements View {
     var measured = data.measurement;
     var inspection = context.resourceState(
       context.id("inspection"),
-      function() return {
-        measurement: measured,
-        revision: 1
-      },
+      function() return {measurement: measured, revision: 1},
       _ -> {}
     );
     if (inspection.value.measurement != measured) {
@@ -85,36 +70,18 @@ class HobbingGearReport implements View {
       var plots = [
         new KeyedView(
           "profile",
-          plot(
-            "profile",
-            "Profile",
-            "Roll [mm]",
-            measured.profiles,
-            tokens,
-            inspection.value.revision
-          )
+          plot("profile", "Profile", "Roll [mm]", measured.profiles, tokens, inspection.value.revision)
         ),
         new KeyedView(
           "lead",
-          plot(
-            "lead",
-            "Lead",
-            "Axial position [mm]",
-            measured.helices,
-            tokens,
-            inspection.value.revision
-          )
+          plot("lead", "Lead", "Axial position [mm]", measured.helices, tokens, inspection.value.revision)
         )
       ];
       var plotsStyle = flow();
       plotsStyle.childGap = 12;
       rows.push(new KeyedView(
         "plots",
-        wide.value ? new Row("plots-wide", plots, plotsStyle) : new Column(
-          "plots-stacked",
-          plots,
-          plotsStyle
-        )
+        wide.value ? new Row("plots-wide", plots, plotsStyle) : new Column("plots-stacked", plots, plotsStyle)
       ));
       rows.push(text(
         "warning-count",
@@ -128,11 +95,7 @@ class HobbingGearReport implements View {
           rows,
           name,
           '$name (${warnings.length})',
-          [for (i in 0...warnings.length) text(
-            'warning-$i',
-            "• " + warnings[i],
-            tokens.textPrimary
-          )],
+          [for (i in 0...warnings.length) text('warning-$i', "• " + warnings[i], tokens.textPrimary)],
           tokens
         );
       }
@@ -146,19 +109,15 @@ class HobbingGearReport implements View {
         text(
           "forces",
           '${Math.round(data.cutting)} N cutting · ${Math.round(data.radial)} N radial · ${Math.round(data.power)} W',
-          tokens
-      .textPrimary
-    ),
-      text(
-        "torques",
-        'B torque ${n(data.hobTorque)} Nm · C torque bound ${n(data.tableTorque)} Nm',
-        tokens.textPrimary
-      ),
-      text(
-        "basis",
-        data.materialBasis,
-        tokens.textSecondary
-      ),
+          tokens.textPrimary
+        ),
+        text(
+          "torques",
+          'B torque ${n(data.hobTorque)} Nm · C torque bound ${n(data.tableTorque)} Nm',
+          tokens.textPrimary
+        ),
+        text("basis",
+      data.materialBasis, tokens.textSecondary),
       text(
         "limits",
         "Kienzle window estimates; effective edge width 1 mm assumed. Overlap summed; instantaneous peaks unresolved. Requires cutting-test calibration at the stated hardness.",
@@ -173,11 +132,7 @@ class HobbingGearReport implements View {
       "run-details",
       "Run details",
       [
-        text(
-          "windows",
-          '${data.windows} gash windows · ${data.poses} poses',
-          tokens.textPrimary
-        ),
+        text("windows", '${data.windows} gash windows · ${data.poses} poses', tokens.textPrimary),
         text(
           "memory",
           'Peak ${data.buffered} buffered samples · ${data.stockKiB} KiB retained stock and force data',
@@ -277,11 +232,7 @@ class HobbingGearReport implements View {
     ));
     children.push(new KeyedView(
       "table-header",
-      sampleRow(
-        "sample-header",
-        ["x [mm]", "Raw [µm]", "Filtered [µm]"],
-        tokens.textSecondary
-      )
+      sampleRow("sample-header", ["x [mm]", "Raw [µm]", "Filtered [µm]"], tokens.textSecondary)
     ));
     var lastTrace = "";
     for (r in records.slice(current * 24, (current + 1) * 24)) {
@@ -292,15 +243,7 @@ class HobbingGearReport implements View {
       }
       children.push(new KeyedView(
         'sample-${r.kind}-${t.tooth}-${t.flank}-$i',
-        sampleRow(
-          'sample-$i',
-          [
-            n(t.x[i]),
-            n(t.raw[i]),
-            n(t.filtered[i])
-          ],
-          tokens.textPrimary
-        )
+        sampleRow('sample-$i', [n(t.x[i]), n(t.raw[i]), n(t.filtered[i])], tokens.textPrimary)
       ));
     }
     var previous = new Button("Previous", null, () -> page.update(current - 1), "samples-previous");
@@ -309,17 +252,7 @@ class HobbingGearReport implements View {
     next.enabled = current < pages - 1;
     children.push(new KeyedView(
       "pagination",
-      new Row(
-        "sample-pages",
-        [
-          new KeyedView("previous", previous),
-          new KeyedView(
-            "next",
-            next
-          )
-        ],
-        flow()
-      )
+      new Row("sample-pages", [new KeyedView("previous", previous), new KeyedView("next", next)], flow())
     ));
     rows.push(new KeyedView("samples", new Column("sample-table", children, card(tokens))));
   }
@@ -347,10 +280,7 @@ class HobbingGearReport implements View {
       var series = new PlotSeries(
         'tooth-${t.tooth}-flank-${t.flank}',
         'Tooth ${t.tooth}, flank ${t.flank}',
-        flankColor(
-          t.flank,
-          tokens
-        ),
+        flankColor(t.flank, tokens),
         2
       );
       series.setPoints([for (i in 0...t.x.length) new PlotPoint(t.x[i], t.filtered[i])]);
@@ -374,10 +304,7 @@ class HobbingGearReport implements View {
     for (t in selected) children.push(text(
       'legend-${t.tooth}-${t.flank}',
       'Tooth ${t.tooth} · flank ${t.flank} · total ${n(t.total)} µm',
-      flankColor(
-        t.flank,
-        tokens
-      )
+      flankColor(t.flank, tokens)
     ));
     return new Column(id + "-card", children, card(tokens));
   }

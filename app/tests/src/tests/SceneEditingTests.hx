@@ -366,23 +366,17 @@ import materia.project.MaterialLibrary;
     );
     check(
       camera.projectSegmentWithMatrix(
-        camera.viewProjection(
-          1.0,
-          Math.max(0.001, camera.distance / 10000.0),
-          Math.max(
-            100.0,
-            camera.distance * 100.0
-          )
-        ),
-        farX,
-        farY,
-        farZ,
-        farX - backward[0],
-        farY - backward[1],
-        farZ - backward[2],
-        800,
-        600
-      ) != null,
+        camera.viewProjection(1.0,
+      Math.max(0.001, camera.distance / 10000.0), Math.max(100.0, camera.distance * 100.0)),
+      farX,
+      farY,
+      farZ,
+      farX - backward[0],
+      farY - backward[1],
+      farZ - backward[2],
+      800,
+      600
+    ) != null,
       "overlay projection retains grid lines beyond scene geometry"
     );
     var eye = camera.eyePosition();
@@ -583,15 +577,7 @@ import materia.project.MaterialLibrary;
       var probe = [0.75, -0.25, 1.0];
       var expected = app.AssemblyRobot.rotate(
         pose.rotation,
-        app.AssemblyRobot.rotate(
-          [
-            offset.qx,
-            offset.qy,
-            offset.qz,
-            offset.qw
-          ],
-          probe
-        )
+        app.AssemblyRobot.rotate([offset.qx, offset.qy, offset.qz, offset.qw], probe)
       );
       var actual = app.AssemblyRobot.rotate(composed.rotation, probe);
       for (axis in 0...3) {
@@ -640,12 +626,7 @@ import materia.project.MaterialLibrary;
     var pose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
       id: "tower",
       position: [3.0, 2.0, 1.5],
-      rotation: [
-        0.0,
-        0.0,
-        Math.sin(half),
-        Math.cos(half)
-      ]
+      rotation: [0.0, 0.0, Math.sin(half), Math.cos(half)]
     };
     near(
       scene.info("tower").worldTransform().element(12),
@@ -682,17 +663,8 @@ import materia.project.MaterialLibrary;
     );
     var movedPose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
       id: "tower",
-      position: [
-        30.0,
-        20.0,
-        15.0
-      ],
-      rotation: [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ]
+      position: [30.0, 20.0, 15.0],
+      rotation: [0.0, 0.0, 0.0, 1.0]
     };
     var nextView = scene.configureRenderView(new SceneView(), perspective.viewProjection(4.0 / 3.0), [movedPose]);
     check(
@@ -1024,12 +996,7 @@ import materia.project.MaterialLibrary;
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, carriage, -0.5, 0.5);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, forksLink, 0.0, 0.8);
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential(
-        "joint/left",
-        "joint/right",
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Differential("joint/left", "joint/right", 0.1, 0.5),
       1.0,
       1.5,
       0.8,
@@ -1069,13 +1036,7 @@ import materia.project.MaterialLibrary;
       && forkConfig.spreadJointId == "joint/spread", "save and reopen retain drive geometry and named fork axes");
     authored.profile.forkMechanism = null;
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann(
-        "joint/tilt",
-        "joint/left",
-        1.2,
-        0.1,
-        0.5
-      ),
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left", 1.2, 0.1, 0.5),
       1.0,
       1.5
     );
@@ -1088,15 +1049,7 @@ import materia.project.MaterialLibrary;
         false;
     }, "save and reopen retain Ackermann steering roles and dimensions");
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(
-        [
-          "joint/left",
-          "joint/right",
-          "joint/tilt"
-        ],
-        0.1,
-        0.3
-      ),
+      RobotDriveConfiguration.Holonomic(["joint/left", "joint/right", "joint/tilt"], 0.1, 0.3),
       1.0,
       1.5
     );
@@ -1357,12 +1310,7 @@ import materia.project.MaterialLibrary;
       type: "revolute",
       parentId: "base",
       childId: "arm",
-      limits: {
-        lower: -1.0,
-        upper: 1.0,
-        velocity: 2.0,
-        effort: 3.0
-      },
+      limits: {lower: -1.0, upper: 1.0, velocity: 2.0, effort: 3.0},
       drive: null
     }];
     var legacyRecord:Dynamic = {
@@ -2039,12 +1987,7 @@ import materia.project.MaterialLibrary;
       var pose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
         id: "preview",
         position: [5.0, 0.0, 0.0],
-        rotation: [
-          0.0,
-          0.0,
-          Math.sin(half),
-          Math.cos(half)
-        ]
+        rotation: [0.0, 0.0, Math.sin(half), Math.cos(half)]
       };
       var moved = new PerspectiveCamera();
       moved.frame(5.0, 0.0, 0.0, 0.4, 0.4, 0.2, 4.0 / 3.0);

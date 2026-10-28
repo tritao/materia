@@ -21,10 +21,7 @@ import haxeon.ui.widgets.text.Text;
     for (choice in [
       {id: "idle", label: "Idle / doors"},
       {id: "cutting", label: "Cutting"},
-      {
-        id: "loading",
-        label: "Load / cut / unload"
-      }
+      {id: "loading", label: "Load / cut / unload"}
     ]) {
       var id = choice.id;
       var button = new Button(choice.label, null, () -> {app.simulation.selectHobbingScenario(app.session, id);

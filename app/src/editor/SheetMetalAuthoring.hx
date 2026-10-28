@@ -63,22 +63,13 @@ class SheetMetalAuthoring {
       var stock = SheetMaterial.fromDefinition(
         definition,
         number(thickness, "Thickness"),
-        defaults.grain ? number(
-          grainDegrees,
-          "Rolling direction"
-        ) * Math.PI / 180 : null
+        defaults.grain ? number(grainDegrees, "Rolling direction") * Math.PI / 180 : null
       );
       if (StringTools.trim(kFactor).length == 0) return stock;
       return new SheetMaterial(
         stock.id,
         stock.thickness,
-        BendRule.KFactor(new KFactorTable(
-          [0],
-          [number(
-            kFactor,
-            "ANSI K factor"
-          )]
-        )),
+        BendRule.KFactor(new KFactorTable([0], [number(kFactor, "ANSI K factor")])),
         stock.mechanical,
         stock.defaultRadiusRatio,
         stock.minRadiusRatio,
@@ -88,13 +79,7 @@ class SheetMetalAuthoring {
     return new SheetMaterial(
       materialId,
       number(thickness, "Thickness"),
-      BendRule.KFactor(new KFactorTable(
-        [0],
-        [number(
-          kFactor,
-          "ANSI K factor"
-        )]
-      )),
+      BendRule.KFactor(new KFactorTable([0], [number(kFactor, "ANSI K factor")])),
       definition == null ? null : definition.mechanical
     );
   }

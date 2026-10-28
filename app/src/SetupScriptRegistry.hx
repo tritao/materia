@@ -11,11 +11,7 @@ class SetupScriptRegistry {
     var result = new Map<String, ScriptPackageIdentity>();
     result.set(
       TwoRobotSetupScript.REFERENCE,
-      {
-        packageId: "materia.examples",
-        packageVersion: "1",
-        sourceSha256: TWO_ROBOT_SOURCE_SHA256
-      }
+      {packageId: "materia.examples", packageVersion: "1", sourceSha256: TWO_ROBOT_SOURCE_SHA256}
     );
     return result;
   }

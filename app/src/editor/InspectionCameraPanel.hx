@@ -46,16 +46,7 @@ import haxeon.ui.widgets.text.Text;
       }, "inspection-dock-here");
       return new Column(
         "inspection-overlay-notice",
-        [
-          new KeyedView(
-            "notice",
-            new Text("Camera is shown in the main viewport.")
-          ),
-          new KeyedView(
-            "dock",
-            dock
-          )
-        ],
+        [new KeyedView("notice", new Text("Camera is shown in the main viewport.")), new KeyedView("dock", dock)],
         style
       );
     }
@@ -84,21 +75,12 @@ import haxeon.ui.widgets.text.Text;
     );
     rows.push(new KeyedView(
       "views",
-      PresentationControls.build(
-        viewport,
-        () -> app.invalidateView(),
-        "inspection-views"
-      )
+      PresentationControls.build(viewport, () -> app.invalidateView(), "inspection-views")
     ));
     var tools:Array<KeyedView> = [];
     function action(id:String, label:String, fn:Void -> Void):Void tools.push(new KeyedView(
       id,
-      new Button(
-        label,
-        null,
-        fn,
-        "inspection-" + id
-      )
+      new Button(label, null, fn, "inspection-" + id)
     ));
     action("zoom-in", "Zoom +", () -> {zoom = Math.max(0.2, viewport.presentationZoom() / 1.4);
     viewport.setPresentationZoom(zoom);

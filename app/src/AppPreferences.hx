@@ -40,10 +40,7 @@ class AppPreferences {
     var directory = PreferencesPath.directory(workspacePath);
     return new AppPreferences(
       PreferencesPath.join([directory, "settings.json"]),
-      PreferencesPath.join([
-        directory,
-        "preferences.json"
-      ])
+      PreferencesPath.join([directory, "preferences.json"])
     );
   }
 

@@ -69,11 +69,7 @@ class ProjectDocumentTests {
     var bimProject = session.bim.cad.allElements()[0];
     var bimName = BimInspectorDescriptors.forElement(
       bimProject,
-      function(label, change, undo) session.applyBimEdit(
-        label,
-        change,
-        undo
-      )
+      function(label, change, undo) session.applyBimEdit(label, change, undo)
     )[2];
     bimName.write(new CommandContext(), PropertyValue.Text("Renamed Project"));
     check(
@@ -139,15 +135,8 @@ class ProjectDocumentTests {
       var custom:materia.project.MaterialDef = {
         id: "user-copper",
         name: "Copper",
-        visual: {
-          baseColor: [0.7, 0.35, 0.2],
-          metallic: 0.9,
-          roughness: 0.3
-        },
-        physical: {
-          density: 8960,
-          spec: "C110"
-        }
+        visual: {baseColor: [0.7, 0.35, 0.2], metallic: 0.9, roughness: 0.3},
+        physical: {density: 8960, spec: "C110"}
       };
       var withCustom = SceneCodec.encode(scene, null, null, null, null, null, [custom]);
       check(

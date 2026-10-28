@@ -138,10 +138,7 @@ import sys.FileSystem;
       "robot-welder-weave",
       "robot-welder-multipass"
     ]) check(
-      find(
-        root,
-        "start-open-example:" + id
-      ) != null,
+      find(root, "start-open-example:" + id) != null,
       "family exposes " + id + " directly"
     );
     check(find(root, "start-examples-back") == null, "examples have no drill-down navigation");

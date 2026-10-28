@@ -160,10 +160,7 @@ class ScriptOwnership {
     document.apply(new EditOperation(
       "Revert " + property,
       function() overrides.remove(k),
-      function() overrides.set(
-        k,
-        cast before
-      )
+      function() overrides.set(k, cast before)
     ));
     refreshDiagnostics();
     return true;

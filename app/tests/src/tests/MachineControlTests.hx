@@ -47,12 +47,7 @@ import materia.assembly.AssemblyFrames;
       "axis",
       {x: 1, y: 0, z: 0},
       0,
-      {
-        lower: unit == "mm" ? -100 : -0.1,
-        upper : unit == "mm" ? 100 : 0.1,
-        velocity : null,
-        effort : null
-      }
+      {lower: unit == "mm" ? -100 : -0.1, upper : unit == "mm" ? 100 : 0.1, velocity : null, effort : null}
     );
     model.mateOnAxis("screw-turn", "continuous", "base", "axis", "screw", "axis", {x: 0, y: 0, z: 1});
     model.mateOnAxis(
@@ -64,12 +59,7 @@ import materia.assembly.AssemblyFrames;
       "axis",
       {x: 0, y: 0, z: 1},
       0,
-      {
-        lower: -Math.PI / 2,
-        upper: Math.PI / 2,
-        velocity: null,
-        effort: null
-      }
+      {lower: -Math.PI / 2, upper: Math.PI / 2, velocity: null, effort: null}
     );
     model.mateOnAxis("spindle/rotor-turn", "continuous", "base", "axis", "rotor", "axis", {x: 0, y: 0, z: 1});
     model.couple("drive", "x", "screw-turn", unit == "mm" ? Math.PI * 2 / 5 : Math.PI * 2 / 0.005);
@@ -479,30 +469,13 @@ import materia.assembly.AssemblyFrames;
         {
           id: "spindle/rotor-turn",
           label: "Spindle rotation scrubber",
-          parts: [
-            "rotor",
-            "holder",
-            "tool",
-            "motorShaft",
-            "spindlePulley",
-            "motorPulley"
-          ]
+          parts: ["rotor", "holder", "tool", "motorShaft", "spindlePulley", "motorPulley"]
         },
-        {
-          id: "spindle/drawbar-release",
-          label: "spindle/drawbar-release position (mm)",
-          parts: [
-            "drawbar",
-            "gripper"
-          ]
-        },
+        {id: "spindle/drawbar-release", label: "spindle/drawbar-release position (mm)", parts: ["drawbar", "gripper"]},
         {
           id: "spindle/pistonRod-release",
           label: "spindle/pistonRod-release position (mm)",
-          parts: [
-            "pistonRod",
-            "piston"
-          ]
+          parts: ["pistonRod", "piston"]
         }
       ]) {
         var sectionRoot = editor.ui.submit(panel.build(editor), frame), inspect = findControl(

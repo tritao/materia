@@ -99,11 +99,7 @@ class PreparedSceneCodec {
       for (values in [
         part.geometry.minimum,
         part.geometry.maximum,
-        [
-          part.physical.volume,
-          part.physical.density,
-          errorRatio
-        ],
+        [part.physical.volume, part.physical.density, errorRatio],
         part.physical.centerOfMass,
         part.physical.inertia,
         hull

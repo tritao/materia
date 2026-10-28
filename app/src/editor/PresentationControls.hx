@@ -121,16 +121,13 @@ class PresentationControls {
             new Text(
               frame.evidence,
               null,
-              frame.evidence == "Failed" ? haxeon.ui.Color.fromBytes(
-                180,
-                35,
-                24
-              ) : frame.evidence == "Stale" ? haxeon.ui.Color.fromBytes(
-                148,
-                98,
-                0
-              ) : null
-            )
+              frame.evidence == "Failed" ? haxeon.ui.Color.fromBytes(180,
+            35, 24) : frame.evidence == "Stale" ? haxeon.ui.Color.fromBytes(
+              148,
+              98,
+              0
+            ) : null
+          )
           ));
         } else rows.push(new KeyedView("complete", new Text("Procedure complete")));
       }

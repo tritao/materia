@@ -70,10 +70,7 @@ class AppSettings {
     lighting.options = [
       new PropertyOption("studio", "Studio"),
       new PropertyOption("soft", "Soft"),
-      new PropertyOption(
-        "contrast",
-        "Contrast"
-      )
+      new PropertyOption("contrast", "Contrast")
     ];
     registry.define(LIGHTING, PropertyType.Enum, PropertyValue.Enum("studio"), lighting);
 

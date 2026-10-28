@@ -60,10 +60,7 @@ class HumanWorkforce implements SessionMember {
     session:SimSession,
     scene:EditorScene,
     environment:Array<SceneObjectData>,
-    objectsById:Map<
-      String,
-      SimObject
-  >,
+    objectsById:Map<String, SimObject>,
     robotIds:Array<String>,
     robotModels:Array<RobotModel>,
     simulation:Simulation
@@ -109,15 +106,7 @@ class HumanWorkforce implements SessionMember {
         session,
         character,
         proxy,
-        new SimPose(
-          record.x,
-          record.y,
-          0.0,
-          rotation[0],
-          rotation[1],
-          rotation[2],
-          rotation[3]
-        )
+        new SimPose(record.x, record.y, 0.0, rotation[0], rotation[1], rotation[2], rotation[3])
       );
       entry.worker = worker;
       for (zoneId in data.zones) {

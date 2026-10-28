@@ -13,37 +13,12 @@ class HobbingCupDisplay {
         {r: outer, z: band},
         {r: outer, z: height},
         {r: 0.0, z: height},
-        {
-          r: 0.0,
-          z: height - end
-        },
-        {
-          r: inner,
-          z: height - end
-        },
-        {
-          r: inner,
-          z: band
-        }
+        {r: 0.0, z: height - end},
+        {r: inner, z: height - end},
+        {r: inner, z: band}
       ],
-      (
-        x,
-        y,
-        z
-      ) -> [
-        x / 1000 - center[0],
-        y / 1000 - center[1],
-        z / 1000 - center[2]
-      ],
-      (
-        x,
-        y,
-        z
-      ) -> [
-        x,
-        y,
-        z
-      ],
+      (x, y, z) -> [x / 1000 - center[0], y / 1000 - center[1], z / 1000 - center[2]],
+      (x, y, z) -> [x, y, z],
       256
     );
     var colors = geometry.stream(6);

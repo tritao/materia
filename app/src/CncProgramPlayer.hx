@@ -126,18 +126,9 @@ class CncProgramPlayer extends ToolpathPlayer {
     var channels = channelsFor(job);
     var result = [
       new ProcessChannelDeclaration(channels.spindleSpeed, ProcessEventValue.Analog(0.0)),
-      new ProcessChannelDeclaration(
-        channels.spindleDirection,
-        ProcessEventValue.Analog(0.0)
-      ),
-      new ProcessChannelDeclaration(
-        channels.coolantMist,
-        ProcessEventValue.Digital(false)
-      ),
-      new ProcessChannelDeclaration(
-        channels.coolantFlood,
-        ProcessEventValue.Digital(false)
-      )
+      new ProcessChannelDeclaration(channels.spindleDirection, ProcessEventValue.Analog(0.0)),
+      new ProcessChannelDeclaration(channels.coolantMist, ProcessEventValue.Digital(false)),
+      new ProcessChannelDeclaration(channels.coolantFlood, ProcessEventValue.Digital(false))
     ];
     if (interfaceManaged) result.push(new ProcessChannelDeclaration(
       RobotInterfaceChannels.alarmCodeChannel(job.channelScope),
@@ -370,12 +361,7 @@ class CncProgramPlayer extends ToolpathPlayer {
     }
     var binding = new ToolpathMotionBinding(
       machine,
-      new MotionSystemBlueprint(
-        planning.model,
-        robot.blueprint,
-        axes,
-        session.fixedTimestep()
-      )
+      new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep())
     );
     // Drive-qualified jobs check torque and drive stretch on every plan. Explicit kinematic
     // previews retain commanded travel/rate limits without claiming motor-load qualification.
@@ -531,23 +517,14 @@ class CncProgramPlayer extends ToolpathPlayer {
     slip = new StepperSlip(
       robot.robot.description().couplings,
       axisJoint,
-      (joint, offset) -> simulation.setJointSlip(
-        robotIndex,
-        joint,
-        offset
-      )
+      (joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset)
     );
     newHoming = () -> {var hasHomes = false;
     for (contact in robot.blueprint.switches) if (contact.role == "home") hasHomes = true;
     if (!hasHomes) return null;
     var view = new MotionSystem(
       robot.robot,
-      new MotionSystemBlueprint(
-        machineModel,
-        robot.blueprint,
-        axes,
-        session.fixedTimestep()
-      )
+      new MotionSystemBlueprint(machineModel, robot.blueprint, axes, session.fixedTimestep())
     );
     view.configureRuntimeHoming(robot.runtime, () -> {slip.rebaseAfterHoming();
     encoders.reset(robot.runtime.snapshot().q.toArray());

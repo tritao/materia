@@ -39,83 +39,31 @@ class SheetMachiningTests {
     var job:materia.project.SceneArtifact.SceneArtifactMachining = {
       programFile: "programs/doors.nc",
       programSha256: SceneArtifactProgram.digest(source),
-      axes: [
-        "x",
-        "y",
-        "z"
-      ],
+      axes: ["x", "y", "z"],
       spindle: "spindle",
       channelScope: "router",
-      workOffset: [
-        0,
-        0,
-        0
-      ],
-      workOffsets: [{
-        number: 55,
-        offset: [
-          0.1,
-          0.2,
-          0.3
-        ]
-      }],
+      workOffset: [0, 0, 0],
+      workOffsets: [{number: 55, offset: [0.1, 0.2, 0.3]}],
       stockSpacing: 0.001,
       tools: [{
         number: 1,
         length: 0.12,
-        profile: [
-          [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.003,
-            0.0
-          ],
-          [
-            0.0,
-            0.0,
-            0.003,
-            0.0,
-            0.003,
-            0.02
-          ]
-        ]
+        profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]
       }],
       stocks: ["blank"],
-      targets: [{
-        id: "door",
-        part: "finished",
-        stock: "blank",
-        position: [
-          0.1,
-          0.2,
-          0.3
-        ],
-        angle: Math.PI / 2
-      }]
+      targets: [{id: "door", part: "finished", stock: "blank", position: [0.1, 0.2, 0.3], angle: Math.PI / 2}]
     };
     var artifact:materia.project.SceneArtifact.SceneArtifactData = {
       lengthUnit: "mm",
       metresPerUnit: 0.001,
-      parts: [
-        part("raw"),
-        part("finished")
-      ],
+      parts: [part("raw"), part("finished")],
       machining: job,
       assemblyDefinition: {
         schemaVersion: AssemblyDefinitionCodec.VERSION,
         id: "router",
         lengthUnit: "mm",
-        definitions: [{
-          id: "raw",
-          connectors: []
-        }],
-        occurrences: [{
-          id: "blank",
-          definition: "raw",
-          initialPose: f
-        }],
+        definitions: [{id: "raw", connectors: []}],
+        occurrences: [{id: "blank", definition: "raw", initialPose: f}],
         joints: []
       }
     };

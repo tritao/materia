@@ -111,13 +111,7 @@ import app.CadDocumentSession;
           prepared.createdMaterials.push(material);
           owner.scene.setMaterialData(
             material,
-            ScenePresentation.materialFor(
-              record.red,
-              record.green,
-              record.blue,
-              record.appearance,
-              record.type
-            )
+            ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance, record.type)
           );
           owner.failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
@@ -127,12 +121,7 @@ import app.CadDocumentSession;
           prepared.transaction.setMaterial(node, material);
           prepared.transaction.setTransform(
             node,
-            EditorScene.objectTransform(
-              record.x,
-              record.y,
-              record.z,
-              record.rotation
-            )
+            EditorScene.objectTransform(record.x, record.y, record.z, record.rotation)
           );
           prepared.bridgeEntries.set(record.id, new EditorSceneRuntimeObject(node, geometry, material));
           prepared.nodeEntries.set(SceneBridge.nodeKey(node), record.id);
@@ -191,10 +180,7 @@ import app.CadDocumentSession;
           if (item.visible != record.visible || !SceneVisibility.same(item.hiddenBy,
             record.hiddenBy)) prepared.transaction.setVisibility(
               runtime.node,
-              SceneVisibility.shown(
-                record.visible,
-                record.hiddenBy
-              )
+              SceneVisibility.shown(record.visible, record.hiddenBy)
             );
           if (item.x != record.x || item.y != record.y || item.z != record.z || !EditorScene.sameRotation(
             item.rotation,
@@ -202,12 +188,7 @@ import app.CadDocumentSession;
           )) {
             prepared.transaction.setTransform(
               runtime.node,
-              EditorScene.objectTransform(
-                record.x,
-                record.y,
-                record.z,
-                record.rotation
-              )
+              EditorScene.objectTransform(record.x, record.y, record.z, record.rotation)
             );
             prepared.changedBounds.push(runtime.node);
           }
@@ -257,13 +238,7 @@ import app.CadDocumentSession;
             prepared.createdMaterials.push(material);
             owner.scene.setMaterialData(
               material,
-              ScenePresentation.materialFor(
-                record.red,
-                record.green,
-                record.blue,
-                record.appearance,
-                record.type
-              )
+              ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance, record.type)
             );
             prepared.transaction.setMaterial(runtime.node, material);
             prepared.retiredMaterials.push(runtime.material);
@@ -400,18 +375,9 @@ private class PreparedSceneEdit {
   public function new(
     transaction:Transaction,
     objects:Array<EditorSceneObject>,
-    bridgeEntries:Map<
-      String,
-      EditorSceneRuntimeObject
-  >,
-    nodeEntries:Map<
-      String,
-      String
-  >,
-    cadSessions:Map<
-      String,
-      CadDocumentSession
-  >
+    bridgeEntries:Map<String, EditorSceneRuntimeObject>,
+    nodeEntries:Map<String, String>,
+    cadSessions:Map<String, CadDocumentSession>
   ) {
     this.transaction = transaction;
     this.objects = objects;

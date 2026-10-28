@@ -339,14 +339,8 @@ class EditorScene {
   public function new(
     ?data:Array<SceneObjectData>,
     ?sharedDocument:EditorDocument,
-    ?loadProfilePhases:Map<
-      String,
-      Float
-  >,
-    ?generatedGeometry:Map<
-      String,
-      GeometryData
-  >
+    ?loadProfilePhases:Map<String, Float>,
+    ?generatedGeometry:Map<String, GeometryData>
   ) {
     this.loadProfilePhases = loadProfilePhases;
     this.generatedGeometry = generatedGeometry == null ? new Map() : generatedGeometry;
@@ -670,10 +664,7 @@ class EditorScene {
     return document.apply(new EditOperation(
       "Edit worker",
       function() replaceObjects(after, id),
-      function() replaceObjects(
-        before,
-        id
-      ),
+      function() replaceObjects(before, id),
       null,
       null,
       null,
@@ -696,10 +687,7 @@ class EditorScene {
     return document.apply(new EditOperation(
       "Rotate worker",
       function() replaceObjects(after, id),
-      function() replaceObjects(
-        before,
-        id
-      ),
+      function() replaceObjects(before, id),
       null,
       null,
       null,
@@ -919,18 +907,9 @@ class EditorScene {
       for (field in [
         {name: "offset", label: "Flange offset"},
         {name: "gap1", label: "Start gap"},
-        {
-          name: "gap2",
-          label: "End gap"
-        },
-        {
-          name: "extend1",
-          label: "Start extension"
-        },
-        {
-          name: "extend2",
-          label: "End extension"
-        }
+        {name: "gap2", label: "End gap"},
+        {name: "extend1", label: "Start extension"},
+        {name: "extend2", label: "End extension"}
       ]) fields.push({
         name: "sheet." + field.name,
         label: field.label,
@@ -1206,18 +1185,12 @@ class EditorScene {
     if (selectedCadEdgeIndex >= 0
       && selectedCadEdgeIndex < shape.subshapeCount(CadKit.ShapeKind.Edge)) return elementLabel(
         selectedId,
-        shape.elementName(
-          CadKit.ShapeKind.Edge,
-          selectedCadEdgeIndex
-        )
+        shape.elementName(CadKit.ShapeKind.Edge, selectedCadEdgeIndex)
       );
     if (selectedCadFaceIndex >= 0
       && selectedCadFaceIndex < shape.subshapeCount(CadKit.ShapeKind.Face)) return elementLabel(
         selectedId,
-        shape.elementName(
-          CadKit.ShapeKind.Face,
-          selectedCadFaceIndex
-        )
+        shape.elementName(CadKit.ShapeKind.Face, selectedCadFaceIndex)
       );
     return null;
   }
@@ -1574,16 +1547,8 @@ class EditorScene {
     pendingChoice = null;
     return document.apply(new EditOperation(
       label,
-      function() runCadEdit(
-        id,
-        offeringChoice(id, label, redo, undo),
-        undo
-      ),
-      function() runCadEdit(
-        id,
-        undo,
-        redo
-      )
+      function() runCadEdit(id, offeringChoice(id, label, redo, undo), undo),
+      function() runCadEdit(id, undo, redo)
     ));
   }
 
@@ -1627,10 +1592,7 @@ class EditorScene {
     if (choice == null) return null;
     return {
       message: choice.message,
-      candidates: [for (candidate in choice.candidates) candidateText(
-        choice.id,
-        candidate
-      )]
+      candidates: [for (candidate in choice.candidates) candidateText(choice.id, candidate)]
     };
   }
 
@@ -1859,10 +1821,7 @@ class EditorScene {
   public function configureAssemblyOccurrences(
     occurrenceIds:Array<String>,
     propertyProvider:Null<String -> Array<PropertyDescriptor>>,
-    ?dragProvider:(
-      String,
-      Array<Float>
-    ) -> Null<SceneAssemblyDrag>
+    ?dragProvider:(String, Array<Float>) -> Null<SceneAssemblyDrag>
   ):Void {
     assemblyDragProvider = dragProvider;
     kinematicOccurrences.clear();
@@ -1968,12 +1927,7 @@ class EditorScene {
     try {
       for (update in changed) transaction.setTransform(
         update.runtime.node,
-        objectTransform(
-          update.x,
-          update.y,
-          update.z,
-          update.rotation
-        )
+        objectTransform(update.x, update.y, update.z, update.rotation)
       );
       transaction.commit();
     } catch (error:Dynamic) {
@@ -2139,11 +2093,7 @@ class EditorScene {
       y,
       z
     ) : poseTransform(
-      [
-        x,
-        y,
-        z
-      ],
+      [x, y, z],
       rotation
     );
 
@@ -2289,21 +2239,13 @@ class EditorScene {
       runCadEdit(
         id,
         function(session) applyConstrainedSketchSnapshot(session, featureId, afterSketch),
-        function(session) applyConstrainedSketchSnapshot(
-          session,
-          featureId,
-          beforeSketch
-        )
+        function(session) applyConstrainedSketchSnapshot(session, featureId, beforeSketch)
       );
     }, function() {
       runCadEdit(
         id,
         function(session) applyConstrainedSketchSnapshot(session, featureId, beforeSketch),
-        function(session) applyConstrainedSketchSnapshot(
-          session,
-          featureId,
-          afterSketch
-        )
+        function(session) applyConstrainedSketchSnapshot(session, featureId, afterSketch)
       );
     }
     );
@@ -2500,11 +2442,7 @@ class EditorScene {
     var recorded = document.record(new EditOperation(
       "Move object",
       function() setPositionXY(id, toX, toY),
-      function() setPositionXY(
-        id,
-        fromX,
-        fromY
-      )
+      function() setPositionXY(id, fromX, fromY)
     ));
     if (recorded) noteSemanticAction("drag.commit", {id: id, from: [fromX, fromY], to: [toX, toY]});
     return recorded;
@@ -2527,11 +2465,7 @@ class EditorScene {
     return document.apply(new EditOperation(
       "Nudge object",
       function() setPositionXY(item.id, toX, toY),
-      function() setPositionXY(
-        item.id,
-        fromX,
-        fromY
-      )
+      function() setPositionXY(item.id, fromX, fromY)
     ));
   }
 
@@ -2571,16 +2505,8 @@ class EditorScene {
       applyCadEdit(
         id,
         "Edit CAD dimensions",
-        function(session) session.model.setSceneDimensions(
-          width,
-          height,
-          chosenDepth
-        ),
-        function(session) session.model.setSceneDimensions(
-          before.width,
-          before.height,
-          before.depth
-        )
+        function(session) session.model.setSceneDimensions(width, height, chosenDepth),
+        function(session) session.model.setSceneDimensions(before.width, before.height, before.depth)
       );
       return;
     }

@@ -355,23 +355,15 @@ class ProjectDocumentSession {
   public function openGeneratedScene(
     data:Array<SceneObjectData>,
     ?manifestPath:String,
-    ?geometryBySnapshot:Map<
-      String,
-      GeometryData
-  >,
+    ?geometryBySnapshot:Map<String, GeometryData>,
     ?assemblyDefinition:AssemblyDefinition,
     ?assemblyState:AssemblyStateRecord,
-    ?localCentersByDefinition:Map<
-      String,
-      Array<Float>>,
-      metresPerUnit:Float = 1.0,
-      ?physical:AssemblyPhysicalData,
-      ?recipeText:String,
-      ?motions:Array<RobotMotionTrack>,
-      ?faceDescriptors:Map<
-        String,
-        String
-  >,
+    ?localCentersByDefinition:Map<String, Array<Float>>,
+    metresPerUnit:Float = 1.0,
+    ?physical:AssemblyPhysicalData,
+    ?recipeText:String,
+    ?motions:Array<RobotMotionTrack>,
+    ?faceDescriptors:Map<String, String>,
     ?cnc:CncJob,
     ?mobile:SceneArtifactMobileBase,
     ?work:Array<SceneArtifactMission>,
@@ -582,28 +574,17 @@ class ProjectDocumentSession {
     target.configureAssemblyOccurrences(
       ids,
       function(id) return assemblyPropertiesForOccurrence(id),
-      function(
-        id,
-        point
-      ) return beginAssemblyDrag(
-        id,
-        point
-      )
+      function(id, point) return beginAssemblyDrag(id, point)
     );
   }
 
   function installAssemblyRuntime(
     definition:Null<AssemblyDefinition>,
     state:Null<AssemblyState>,
-    centers:Null<Map<
-      String,
-      Array<Float>>>,
-      metresPerUnit:Float,
-      ?dependentJointIds:Array<String>,
-      ?faceDescriptors:Map<
-        String,
-        String
-  >,
+    centers:Null<Map<String, Array<Float>>>,
+    metresPerUnit:Float,
+    ?dependentJointIds:Array<String>,
+    ?faceDescriptors:Map<String, String>,
     ?mates:ProjectAssemblyMates,
     ?generated:AssemblyDefinition,
     ?mateProblem:String
@@ -644,10 +625,7 @@ class ProjectDocumentSession {
   static function overlayDefinition(
     generated:Null<AssemblyDefinition>,
     overlay:ProjectAssemblyMates,
-    descriptors:Null<Map<
-      String,
-      String
-  >>
+    descriptors:Null<Map<String, String>>
   ): {
     definition: Null<AssemblyDefinition>,
     overlay: ProjectAssemblyMates,
@@ -740,18 +718,8 @@ class ProjectDocumentSession {
     };
     document.apply(new EditOperation(
       "Make the mates of " + occurrence.id + " a joint",
-      function() setAssemblyStructure(
-        after,
-        afterDefinition,
-        afterState,
-        initialAfter
-      ),
-      function() setAssemblyStructure(
-        overlayBefore,
-        definitionBefore,
-        before,
-        initialBefore
-      )
+      function() setAssemblyStructure(after, afterDefinition, afterState, initialAfter),
+      function() setAssemblyStructure(overlayBefore, definitionBefore, before, initialBefore)
     ));
     return jointId;
   }
@@ -836,10 +804,7 @@ class ProjectDocumentSession {
       kind,
       mateOccurrence(definition, first).id,
       firstConnector,
-      mateOccurrence(
-        definition,
-        second
-      ).id,
+      mateOccurrence(definition, second).id,
       secondConnector,
       value
     );
@@ -858,11 +823,7 @@ class ProjectDocumentSession {
     return document.apply(new EditOperation(
       "Remove mate " + id,
       function() setMates(after, afterResult, null),
-      function() setMates(
-        before,
-        beforeResult,
-        null
-      )
+      function() setMates(before, beforeResult, null)
     ));
   }
 
@@ -926,11 +887,7 @@ class ProjectDocumentSession {
       firstConnector: firstConnector,
       second: second,
       secondConnector: secondConnector,
-      axis: {
-        x: 0,
-        y: 0,
-        z: 1
-      }
+      axis: {x: 0, y: 0, z: 1}
     };
     if (value != null) mate.value = value;
     var after = overlay.withMate(mate), generated = generatedAssemblyDefinition;
@@ -989,10 +946,7 @@ class ProjectDocumentSession {
         if (element.kind != "instance" || identity == null || identity.value != occurrenceId) continue;
         result = result.concat(BimInspectorDescriptors.forInstanceInputs(
           cast element,
-          function(label, change, undo) applyRecipeEdit(
-            label,
-            change
-          )
+          function(label, change, undo) applyRecipeEdit(label, change)
         ));
         break;
       }
@@ -1292,11 +1246,7 @@ class ProjectDocumentSession {
         definition,
         state.record(),
         occurrence,
-        new kinematicskit.Vector3(
-          local.x,
-          local.y,
-          local.z
-        )
+        new kinematicskit.Vector3(local.x, local.y, local.z)
       ) catch (_:Dynamic) null;
       if (mateDrag != null) return new ProjectMateDrag(this, mateDrag, state.record(), unit);
     }
@@ -1306,11 +1256,7 @@ class ProjectDocumentSession {
       null,
       assemblyDependentJointIds(),
       false,
-      new kinematicskit.Vector3(
-        local.x,
-        local.y,
-        local.z
-      )
+      new kinematicskit.Vector3(local.x, local.y, local.z)
     ) catch (_:Dynamic) null;
     if (drag == null) return null;
     return new ProjectAssemblyDrag(this, drag, state.record(), unit);
@@ -1336,12 +1282,7 @@ class ProjectDocumentSession {
         x: world.x * assemblyMetresPerUnit,
         y: world.y * assemblyMetresPerUnit,
         z: world.z * assemblyMetresPerUnit,
-        rotation: [
-          pose.qx,
-          pose.qy,
-          pose.qz,
-          pose.qw
-        ]
+        rotation: [pose.qx, pose.qy, pose.qz, pose.qw]
       });
     }
     scene.setAssemblyOccurrenceTransforms(transforms);
@@ -1455,12 +1396,7 @@ class ProjectDocumentSession {
         x: world.x * assemblyMetresPerUnit,
         y: world.y * assemblyMetresPerUnit,
         z: world.z * assemblyMetresPerUnit,
-        rotation: [
-          pose.qx,
-          pose.qy,
-          pose.qz,
-          pose.qw
-        ]
+        rotation: [pose.qx, pose.qy, pose.qz, pose.qw]
       });
     }
     var nextRecord = candidate.record();
@@ -1701,10 +1637,7 @@ class ProjectDocumentSession {
     projectBaseline = generated.objects;
     installAssemblyRuntime(
       generated.assemblyDefinition,
-      generated.assemblyDefinition == null ? null : new AssemblyState(
-        generated.assemblyDefinition,
-        stateRecord
-      ),
+      generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
       generated.localCentersByDefinition,
       generated.metresPerUnit,
       saved.record.assemblyDependentJoints,
@@ -1763,10 +1696,7 @@ class ProjectDocumentSession {
       );
     var record:ProjectSceneRecord = {
       version: projectVariant == null ? 1 : 2,
-      reference : relativeReference(
-        destination,
-        reference
-      ),
+      reference : relativeReference(destination, reference),
       overrides : overrides,
       removed : removed,
       instances : instances,
@@ -1872,10 +1802,8 @@ class ProjectDocumentSession {
       result.push({
         targetId: id,
         property: property,
-        kind: property == "hiddenBy" ? "text-list" : property == "rotation" ? "vector" : Std.isOfType(
-          value,
-          Bool
-        ) ? "boolean" : Std.isOfType(
+        kind: property == "hiddenBy" ? "text-list" : property == "rotation" ? "vector" : Std.isOfType(value,
+        Bool) ? "boolean" : Std.isOfType(
           value,
           String
         ) ? "text" : "number",
@@ -1887,11 +1815,7 @@ class ProjectDocumentSession {
         targetId: id,
         property: "visual.baseColor",
         kind: "vector",
-        value: [
-          item.red,
-          item.green,
-          item.blue
-        ]
+        value: [item.red, item.green, item.blue]
       });
     var appearance = item.appearance == null ? Appearances.neutral() : item.appearance;
     var baselineAppearance = source.appearance == null ? Appearances.neutral() : source.appearance;
@@ -2012,18 +1936,9 @@ class ProjectDocumentSession {
     Reflect.setField(value, "meshSnapshot", "_");
     var rawAppearance:Dynamic = Reflect.field(value, "appearance");
     var appearance:Appearance = rawAppearance == null ? Appearances.neutral() : {
-      finish : Reflect.field(
-        rawAppearance,
-        "finish"
-      ),
-      metallic : Reflect.field(
-        rawAppearance,
-        "metallic"
-      ),
-      roughness : Reflect.field(
-        rawAppearance,
-        "roughness"
-      )
+      finish : Reflect.field(rawAppearance, "finish"),
+      metallic : Reflect.field(rawAppearance, "metallic"),
+      roughness : Reflect.field(rawAppearance, "roughness")
     };
     var rawRotation:Dynamic = Reflect.field(value, "rotation");
     var rotation:Null<Array<Float>> = null;
@@ -2038,70 +1953,22 @@ class ProjectDocumentSession {
     var candidate:SceneObjectData = {
       id: Reflect.field(value, "id"),
       type: Reflect.field(value, "type"),
-      label: Reflect.field(
-        value,
-        "label"
-      ),
-      x: Reflect.field(
-        value,
-        "x"
-      ),
-      y: Reflect.field(
-        value,
-        "y"
-      ),
-      z: Reflect.field(
-        value,
-        "z"
-      ),
-      width: Reflect.field(
-        value,
-        "width"
-      ),
-      height: Reflect.field(
-        value,
-        "height"
-      ),
-      depth: Reflect.field(
-        value,
-        "depth"
-      ),
-      collisionEnabled: Reflect.field(
-        value,
-        "collisionEnabled"
-      ),
-      dynamicBody: Reflect.field(
-        value,
-        "dynamicBody"
-      ),
-      mass: Reflect.field(
-        value,
-        "mass"
-      ),
-      red: Reflect.field(
-        value,
-        "red"
-      ),
-      green: Reflect.field(
-        value,
-        "green"
-      ),
-      blue: Reflect.field(
-        value,
-        "blue"
-      ),
-      visible: Reflect.field(
-        value,
-        "visible"
-      ),
-      hiddenBy: Reflect.field(
-        value,
-        "hiddenBy"
-      ),
-      materialId: Reflect.field(
-        value,
-        "materialId"
-      ),
+      label: Reflect.field(value, "label"),
+      x: Reflect.field(value, "x"),
+      y: Reflect.field(value, "y"),
+      z: Reflect.field(value, "z"),
+      width: Reflect.field(value, "width"),
+      height: Reflect.field(value, "height"),
+      depth: Reflect.field(value, "depth"),
+      collisionEnabled: Reflect.field(value, "collisionEnabled"),
+      dynamicBody: Reflect.field(value, "dynamicBody"),
+      mass: Reflect.field(value, "mass"),
+      red: Reflect.field(value, "red"),
+      green: Reflect.field(value, "green"),
+      blue: Reflect.field(value, "blue"),
+      visible: Reflect.field(value, "visible"),
+      hiddenBy: Reflect.field(value, "hiddenBy"),
+      materialId: Reflect.field(value, "materialId"),
       appearance: appearance,
       rotation: rotation,
       cadGraph: null,
@@ -2112,10 +1979,7 @@ class ProjectDocumentSession {
       format: SceneCodec.FORMAT,
       version: SceneCodec.VERSION,
       materials: Json.parse(JsonWire.encode(MaterialLibrary.all().concat(materials))),
-      objects: [SceneCodec.encodeObject(
-        candidate,
-        materials
-      )]
+      objects: [SceneCodec.encodeObject(candidate, materials)]
     }))[0];
     result.meshSnapshot = snapshot;
     return result;
@@ -2191,9 +2055,6 @@ class ProjectDocumentSession {
 
   static function createDocument():EditorDocument return new EditorDocument(
     "project",
-    new EditHistory(
-      MAX_HISTORY_OPERATIONS,
-      MAX_HISTORY_ESTIMATED_BYTES
-    )
+    new EditHistory(MAX_HISTORY_OPERATIONS, MAX_HISTORY_ESTIMATED_BYTES)
   );
 }

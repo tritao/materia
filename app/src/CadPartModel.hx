@@ -65,10 +65,7 @@ class CadPartModel implements CadSessionModel {
     return {
       width: Math.max(bounds.halfExtents.x * 2, 0.000001),
       height: Math.max(bounds.halfExtents.y * 2, 0.000001),
-      depth: Math.max(
-        bounds.halfExtents.z * 2,
-        0.000001
-      )
+      depth: Math.max(bounds.halfExtents.z * 2, 0.000001)
     };
   }
 

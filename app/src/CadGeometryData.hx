@@ -20,16 +20,8 @@ class CadThreadGeometry {
         (source.origin[1] - center[1]) * scale,
         (source.origin[2] - center[2]) * scale
       ),
-      new Vector(
-        source.xDirection[0],
-        source.xDirection[1],
-        source.xDirection[2]
-      ),
-      new Vector(
-        source.direction[0],
-        source.direction[1],
-        source.direction[2]
-      )
+      new Vector(source.xDirection[0], source.xDirection[1], source.xDirection[2]),
+      new Vector(source.direction[0], source.direction[1], source.direction[2])
     );
     length = source.length * scale;
     pitch = source.spec.pitch * CadSceneGeometry.METRES_PER_MILLIMETRE;

@@ -50,30 +50,13 @@ class TelemetryPanel {
     var physicsStatus = frame == null ? "Physics snapshot unavailable"
       : "Physics step " + frame.revision + " · time " + Std.string(frame.simulationTime) + " s";
     var rows:Array<KeyedView> = [
-      new KeyedView(
-        "heading",
-        new Text(
-          "TELEMETRY",
-          null,
-          textSecondary,
-          TextStyleOverride.text(
-            11.0,
-            0.8
-          )
-        )
-      ),
-      new KeyedView(
-        "plot",
-        plot
-      ),
+      new KeyedView("heading", new Text("TELEMETRY", null, textSecondary, TextStyleOverride.text(11.0, 0.8))),
+      new KeyedView("plot", plot),
       new KeyedView(
         "caption",
         new Text(demo ? "Demo frame time · GPU submission" : "Telemetry is available when a runtime is active")
       ),
-      new KeyedView(
-        "physics-revision",
-        new Text(physicsStatus)
-      )
+      new KeyedView("physics-revision", new Text(physicsStatus))
     ];
     if (simulation != null) for (id in simulation.humanWorkerIds()) {
       var worker = simulation.humanWorker(id);

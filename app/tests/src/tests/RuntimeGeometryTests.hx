@@ -80,12 +80,7 @@ import nativekit.scene.Transform;
       var pose:app.ApplicationSimulation.SimulationPoseVisual = {
         id: "stock",
         position: [1, 2, 0],
-        rotation: [
-          0,
-          0,
-          Math.sin(half),
-          Math.cos(half)
-        ]
+        rotation: [0, 0, Math.sin(half), Math.cos(half)]
       };
       var projection = Transform.identity().set(0, 0.1).set(5, 0.1).set(10, 0.1);
       var rest = scene.configureRenderView(new SceneView(), projection, null, null, -1, null, false);
@@ -93,12 +88,8 @@ import nativekit.scene.Transform;
       var view = scene.configureRenderView(new SceneView(), projection, [pose], null, -1, null, false);
       check(
         hit(scene, view, 1, 2.3) == "stock",
-        "stock chunks follow owner translation and rotation: hit=" + hit(
-          scene,
-          view,
-          1,
-          2.3
-        ) + ", overrides=" + view.poseOverrideCount()
+        "stock chunks follow owner translation and rotation: hit=" + hit(scene,
+        view, 1, 2.3) + ", overrides=" + view.poseOverrideCount()
       );
       check(hit(scene, view, 0.3, 0) == "scene", "stock chunks leave the saved position");
       scene.setRuntimeGeometryParts("stock", 2, [0 => poseTriangle(0.5), 1 => poseTriangle(-0.3)]);
@@ -210,20 +201,7 @@ import nativekit.scene.Transform;
       var posed = scene.configureRenderView(
         new nativekit.scene.SceneView(),
         nativekit.scene.Transform.identity(),
-        [{
-          id: id,
-          position: [
-            0.5,
-            0,
-            0
-          ],
-          rotation: [
-            0.0,
-            0,
-            0,
-            1
-          ]
-        }]
+        [{id: id, position: [0.5, 0, 0], rotation: [0.0, 0, 0, 1]}]
       );
       var hit = scene.pickHitRayWithView(posed, 0.662, 0.002, 1, 0, 0, -1);
       check(

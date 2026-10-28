@@ -32,18 +32,9 @@ import haxeon.ui.core.UiModifier;
       app.runSceneEdit(
         "Could not create sheet flange",
         function() return app.scene.createSheetFlange(
-          SheetMetalAuthoring.number(
-            input.length,
-            "Flange length"
-          ),
-          SheetMetalAuthoring.number(
-            input.angleDegrees,
-            "Bend angle"
-          ) * Math.PI / 180,
-          SheetMetalAuthoring.number(
-            input.radius,
-            "Inner radius"
-          )
+          SheetMetalAuthoring.number(input.length, "Flange length"),
+          SheetMetalAuthoring.number(input.angleDegrees, "Bend angle") * Math.PI / 180,
+          SheetMetalAuthoring.number(input.radius, "Inner radius")
         )
       );
     }, null, function() return app.canEditObjects() && app.scene.canCreateSheetFlange()));
@@ -101,10 +92,7 @@ import haxeon.ui.core.UiModifier;
           "Move job step down";
       }, function() app.runSceneEdit(
         "Could not edit worker job",
-        function() return HumanWorkerKind.command(
-          app.scene,
-          selected
-        )
+        function() return HumanWorkerKind.command(app.scene, selected)
       ), null, function() {
         var selectedObject = app.scene.object(app.scene.selectedId);
         return app.canEditObjects() && selectedObject != null && selectedObject.kind == HumanWorkerKind.KIND;

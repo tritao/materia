@@ -500,15 +500,7 @@ class ApplicationSimulation {
         var created = createdSpace.session.createObject(
           object.dynamicBody ? MotionType.Dynamic : MotionType.Static,
           shape,
-          new SimPose(
-            centerX,
-            centerY,
-            centerZ,
-            rotation[0],
-            rotation[1],
-            rotation[2],
-            rotation[3]
-          ),
+          new SimPose(centerX, centerY, centerZ, rotation[0], rotation[1], rotation[2], rotation[3]),
           object.dynamicBody ? object.mass : 0.0,
           !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id
           == "project:" + part.id) part].length == 1 ? restContactGroup : null,
@@ -1062,11 +1054,7 @@ class ApplicationSimulation {
       linkIndex: part.linkIndex,
       offset: AssemblyFrames.compose(
         part.offset,
-        AssemblyFrames.translation(
-          part.center[0],
-          part.center[1],
-          part.center[2]
-        )
+        AssemblyFrames.translation(part.center[0], part.center[1], part.center[2])
       )
     };
   }
@@ -1501,12 +1489,7 @@ class ApplicationSimulation {
         orderedEnvironment.push({
           id: object.id,
           position: [pose.x, pose.y, pose.z],
-          rotation: [
-            pose.qx,
-            pose.qy,
-            pose.qz,
-            pose.qw
-          ]
+          rotation: [pose.qx, pose.qy, pose.qz, pose.qw]
         });
       }
       frame.dispose();

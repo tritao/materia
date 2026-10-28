@@ -124,11 +124,7 @@ class ProjectUiExtension {
     if (lines != null) for (index in 0...lines.length) {
       if (buttons.length > 0 && actionAfter == index) rows.push(new KeyedView(
         "actions",
-        new Row(
-          "project-ui-actions",
-          buttons,
-          ReferenceEditorApp.actionRowStyle()
-        )
+        new Row("project-ui-actions", buttons, ReferenceEditorApp.actionRowStyle())
       ));
       var line = lines[index];
       rows.push(new KeyedView("line-" + index, new Text(Std.string(Reflect.field(line, "text")))));
@@ -136,11 +132,7 @@ class ProjectUiExtension {
     if (buttons.length > 0 && (lines == null
       || actionAfter == null || actionAfter < 0 || actionAfter >= lines.length)) rows.push(new KeyedView(
         "actions",
-        new Row(
-          "project-ui-actions",
-          buttons,
-          ReferenceEditorApp.actionRowStyle()
-        )
+        new Row("project-ui-actions", buttons, ReferenceEditorApp.actionRowStyle())
       ));
     return new Column("project-ui-panel", rows);
   }

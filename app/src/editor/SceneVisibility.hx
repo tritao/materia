@@ -36,10 +36,8 @@ typedef VisibilityState = {
   public static function rebind(
     scene:EditorScene,
     groups:Map<String, Array<String>>,
-    ?legacyGroups:Map<
-      String,
-      Array<String>>
-    ):Void {
+    ?legacyGroups:Map<String, Array<String>>
+  ):Void {
     var active:Map<String, Bool> = [];
     for (item in scene.items()) for (key in item.hiddenBy) if (groups.exists(key)) active.set(key, true);
     // Old body and Parts keys do not identify authored assemblies. Preserve their
@@ -128,10 +126,7 @@ typedef VisibilityState = {
     try {
       for (state in states) if (scene.object(state.id) != null) transaction.setVisibility(
         scene.runtimeFor(state.id).node,
-        shown(
-          state.visible,
-          state.hiddenBy
-        )
+        shown(state.visible, state.hiddenBy)
       );
       changes = transaction.commitWithChanges();
     } catch (error:Dynamic) {

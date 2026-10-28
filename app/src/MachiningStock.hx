@@ -72,14 +72,8 @@ class MachiningStock {
     spacing:Float,
     stockPart:SimulationAssemblyPart,
     spindlePart:SimulationAssemblyPart,
-    ?targetMesh: {
-      positions: Array<Float>,
-      indices: Array<Int>
-    },
-    ?stockMesh: {
-      positions: Array<Float>,
-      indices: Array<Int>
-    }
+    ?targetMesh: {positions: Array<Float>, indices: Array<Int>},
+    ?stockMesh: {positions: Array<Float>, indices: Array<Int>}
   ) {
     this.stockPart = stockPart;
     this.spindlePart = spindlePart;

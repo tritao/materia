@@ -44,12 +44,7 @@ class SimulatedBlowFeed implements ScrewFeederDevice implements SimulationStepOb
     var receiver = parts.get("project:" + definition.receiver).pose(), part = parts.get("project:" + identity);
     var live = new Transform3(
       Vec3.fromArray(receiver.position),
-      new Quat(
-        receiver.rotation[0],
-        receiver.rotation[1],
-        receiver.rotation[2],
-        receiver.rotation[3]
-      )
+      new Quat(receiver.rotation[0], receiver.rotation[1], receiver.rotation[2], receiver.rotation[3])
     );
     var body = live.compose(socket).compose(ScrewScenePlan.frame(job.socket).inverse()).compose(new Transform3(
       Vec3.fromArray(part.center),

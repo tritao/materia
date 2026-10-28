@@ -29,32 +29,10 @@ class PinPlatePreview {
           schemaVersion: AssemblyDefinitionCodec.VERSION,
           id: "pin-plate",
           lengthUnit: "mm",
-          definitions: [
-            {
-              id: "plate",
-              connectors: []
-            },
-            {
-              id: "pin",
-              connectors: []
-            }
-          ],
+          definitions: [{id: "plate", connectors: []}, {id: "pin", connectors: []}],
           occurrences: [
-            {
-              id: "plate",
-              definition: "plate",
-              initialPose: AssemblyFrames.identity(),
-              grounded: true
-            },
-            {
-              id: "pin",
-              definition: "pin",
-              initialPose: AssemblyFrames.translation(
-                120,
-                -40,
-                75
-              )
-            }
+            {id: "plate", definition: "plate", initialPose: AssemblyFrames.identity(), grounded: true},
+            {id: "pin", definition: "pin", initialPose: AssemblyFrames.translation(120, -40, 75)}
           ],
           joints: []
         }

@@ -155,30 +155,9 @@ import sys.FileSystem;
   static function legacyVisibility():Void {
     for (saved in [
       {key: "project:base", hidden: ["base", "cover", "bracket", "slide", "tool"]},
-      {
-        key: "parts:base",
-        hidden: [
-          "cover",
-          "bracket"
-        ]
-      },
-      {
-        key: "parts:scene:machine",
-        hidden: [
-          "base",
-          "cover",
-          "bracket",
-          "slide",
-          "tool"
-        ]
-      },
-      {
-        key: "parts:parts:base:machine",
-        hidden: [
-          "cover",
-          "bracket"
-        ]
-      }
+      {key: "parts:base", hidden: ["cover", "bracket"]},
+      {key: "parts:scene:machine", hidden: ["base", "cover", "bracket", "slide", "tool"]},
+      {key: "parts:parts:base:machine", hidden: ["cover", "bracket"]}
     ]) {
       var records = data();
       records[0].hiddenBy = [saved.key];
@@ -536,11 +515,7 @@ import sys.FileSystem;
     );
     var view = new haxeon.ui.widgets.layout.Column("visibility-panel", [new haxeon.ui.widgets.KeyedView(
       "search",
-      new haxeon.ui.widgets.controls.SearchField(
-        "search",
-        "",
-        _ -> {}
-      )
+      new haxeon.ui.widgets.controls.SearchField("search", "", _ -> {})
     ), new haxeon.ui.widgets.KeyedView("tree",
       new HierarchyTreeView(tree, () -> {if (tree.selectedKey != null) model.toggleVisibility(tree.selectedKey);
     }))], style);
@@ -609,11 +584,7 @@ import sys.FileSystem;
     var assembly = new machinekit.assembly.MachineAssembly();
     for (id in ["base", "cover", "bracket", "slide", "tool", "other"]) assembly.addComponent(
       id,
-      new machinekit.milling.MillPanel(
-        100,
-        100,
-        100
-      )
+      new machinekit.milling.MillPanel(100, 100, 100)
     );
     assembly.addMate("cover-fixed", "fixed", "base", "mount", "cover", "mount");
     assembly.addMate("bracket-fixed", "fixed", "base", "mount", "bracket", "mount");
@@ -621,10 +592,7 @@ import sys.FileSystem;
     assembly.addMate("tool-fixed", "fixed", "slide", "mount", "tool", "mount");
     File.saveBytes(
       artifact,
-      materia.project.SceneArtifact.encode(machinekit.assembly.AssemblyPreview.scene(
-        assembly,
-        "visibility-test"
-      ))
+      materia.project.SceneArtifact.encode(machinekit.assembly.AssemblyPreview.scene(assembly, "visibility-test"))
     );
     var session = new ProjectDocumentSession(), reopened = new ProjectDocumentSession();
     function cleanup():Void {

@@ -37,11 +37,7 @@ import robotkit.skill.SkillStatus;
       );
       var shifted = before.compose(new robotkit.spatial.Transform3(
         new robotkit.spatial.Vec3(0.012, -0.009, 0),
-        robotkit.spatial.Quat.fromRollPitchYaw(
-          0,
-          0,
-          0.025
-        )
+        robotkit.spatial.Quat.fromRollPitchYaw(0, 0, 0.025)
       ));
       physics.placeRobotBase(mission.robotIndex, shifted.translation.toArray(), shifted.rotation.toArray());
       mission.robot.robot.stop(robotkit.core.StopMode.Normal);
@@ -63,12 +59,7 @@ import robotkit.skill.SkillStatus;
       var nominal = job.nominal;
       var workPose = new robotkit.spatial.Transform3(
         new robotkit.spatial.Vec3(nominal.x, nominal.y, nominal.z),
-        new robotkit.spatial.Quat(
-          nominal.qx,
-          nominal.qy,
-          nominal.qz,
-          nominal.qw
-        )
+        new robotkit.spatial.Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)
       );
       var rootInverse = shifted.inverse();
       var selected:Null<Array<Float>> = null, nearest = Math.POSITIVE_INFINITY;
@@ -85,10 +76,7 @@ import robotkit.skill.SkillStatus;
         var candidate = analytic.solvePose(
           motionkit.kinematics.Pose3.fromArrays(point.toArray(), rotation.toArray()),
           seed,
-          new motionkit.kinematics.IkTolerance(
-            job.measurementError / 2,
-            1e-5
-          )
+          new motionkit.kinematics.IkTolerance(job.measurementError / 2, 1e-5)
         );
         var distance = point.sub(seedPose.translation).norm();
         if (candidate != null && distance < nearest) {
@@ -106,10 +94,7 @@ import robotkit.skill.SkillStatus;
       for (index in 0...indices.length) positions[indices[index]] = q[index];
       physics.setJointPositions(mission.robotIndex, positions);
       mission.robot.robot.submit(robotkit.core.RobotCommand.JointTargets(
-        [for (index in 0...indices.length) robotkit.core.JointTarget.position(
-          indices[index],
-          q[index]
-        )],
+        [for (index in 0...indices.length) robotkit.core.JointTarget.position(indices[index], q[index])],
         null
       ));
       // Step physics and its sensor observers directly; do not start the pending findWork skill.
@@ -140,11 +125,7 @@ import robotkit.skill.SkillStatus;
         actualSensorTip: actual.toArray(),
         sensorFkError: tip.sub(actual).norm(),
         touch: welder.reading().touch,
-        groundDistance: welder.work.distance(
-          actualWorld.x,
-          actualWorld.y,
-          actualWorld.z
-        ),
+        groundDistance: welder.work.distance(actualWorld.x, actualWorld.y, actualWorld.z),
         wireObject: wire.object,
         clearance: planner.violation(q)
       };
@@ -200,11 +181,7 @@ import robotkit.skill.SkillStatus;
           if (mission.stepIndex == 1 && !injected) {
             var base = physics.linkPose(mission.robotIndex, 0);
             var old = new robotkit.spatial.Transform3(
-              new robotkit.spatial.Vec3(
-                base.position[0],
-                base.position[1],
-                base.position[2]
-              ),
+              new robotkit.spatial.Vec3(base.position[0], base.position[1], base.position[2]),
               robotkit.spatial.Quat.fromArray(base.rotation)
             );
             var error = new robotkit.spatial.Transform3(
@@ -397,10 +374,7 @@ import robotkit.skill.SkillStatus;
     var first:materia.project.SceneArtifact.SceneArtifactMissionStep = {
       kind: "moveJoints",
       at: tool.contact,
-      joints: [{
-        joint: "robot/arm/j1",
-        position: 0.2
-      }]
+      joints: [{joint: "robot/arm/j1", position: 0.2}]
     };
     generated.missions = [{steps: [first]}];
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
@@ -452,14 +426,7 @@ import robotkit.skill.SkillStatus;
         execute(
           simulation,
           mission,
-          mission.jointMove({
-            kind: "moveJoints",
-            at: tool.contact,
-            joints: [{
-              joint: "robot/arm/j1",
-              position: 0.0
-            }]
-          })
+          mission.jointMove({kind: "moveJoints", at: tool.contact, joints: [{joint: "robot/arm/j1", position: 0.0}]})
         );
         if (Math.abs(mission.robot.robot.snapshot().positions.get(indices[0]))
           > 0.005) throw "Reacquired joint owner missed its target";

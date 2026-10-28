@@ -81,24 +81,9 @@ class VisibilityPanel implements TreeViewModel {
         new KeyedView("title", new Text("Component visibility")),
         new KeyedView(
           "actions",
-          new Row(
-            "visibility-actions",
-            [
-              new KeyedView(
-                "show",
-                show
-              ),
-              new KeyedView(
-                "isolate",
-                isolate
-              )
-            ]
-          )
+          new Row("visibility-actions", [new KeyedView("show", show), new KeyedView("isolate", isolate)])
         ),
-        new KeyedView(
-          "components",
-          list
-        )
+        new KeyedView("components", list)
       ],
       body
     );

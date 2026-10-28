@@ -261,10 +261,7 @@ class PickPlaceFastenTests {
         qz: frame.rotation[2],
         qw: frame.rotation[3]
       },
-      handling.assemblyParts.connectorFrame(
-        seat.id,
-        "seat"
-      )
+      handling.assemblyParts.connectorFrame(seat.id, "seat")
     );
     var dx = actual.position[0] - target.x, dy = actual.position[1] - target.y, dz = actual.position[2] - target.z;
     var error = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -308,11 +305,7 @@ class PickPlaceFastenTests {
       ):Void {
         var body = AssemblyFrames.compose(
           origin,
-          AssemblyFrames.translation(
-            part.center[0],
-            part.center[1],
-            part.center[2]
-          )
+          AssemblyFrames.translation(part.center[0], part.center[1], part.center[2])
         );
         part.freeBody().teleport(new nativekit.sim.SimPose(body.x, body.y, body.z, body.qx, body.qy, body.qz, body.qw));
       }
@@ -320,14 +313,7 @@ class PickPlaceFastenTests {
       var housingSeat = mission.assemblyParts.connectorFrame(plate.id, "housingSeat");
       stage(
         housing,
-        AssemblyFrames.compose(
-          seat,
-          AssemblyFrames.translation(
-            housingSeat.x,
-            housingSeat.y,
-            housingSeat.z
-          )
-        )
+        AssemblyFrames.compose(seat, AssemblyFrames.translation(housingSeat.x, housingSeat.y, housingSeat.z))
       );
       plate.retainRigid(housing.freeBody());
       for (job in jobs) {

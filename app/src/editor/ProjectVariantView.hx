@@ -51,20 +51,11 @@ class ProjectVariantView {
     }
     if (state.summary != "") rows.push(new KeyedView(
       "summary",
-      new Text(
-        state.summary,
-        null,
-        tokens.textSecondary,
-        TextStyleOverride.paragraph(TextWrap.WordCharacter)
-      )
+      new Text(state.summary, null, tokens.textSecondary, TextStyleOverride.paragraph(TextWrap.WordCharacter))
     ));
     if (state.simulationActive) rows.push(new KeyedView(
       "locked",
-      new Text(
-        "Stop simulation to change the project selection.",
-        null,
-        tokens.textSecondary
-      )
+      new Text("Stop simulation to change the project selection.", null, tokens.textSecondary)
     ));
     if (state.loading) {
       var progressStyle = new LayoutStyle();
@@ -76,21 +67,10 @@ class ProjectVariantView {
         new Row(
           key + "-progress",
           [
-            new KeyedView(
-              "spinner",
-              new Spinner(
-                key + "-spinner",
-                "Loading project selection"
-              )
-            ),
+            new KeyedView("spinner", new Spinner(key + "-spinner", "Loading project selection")),
             new KeyedView(
               "status",
-              new Text(
-                state.status,
-                null,
-                tokens.accent,
-                TextStyleOverride.paragraph(TextWrap.WordCharacter)
-              )
+              new Text(state.status, null, tokens.accent, TextStyleOverride.paragraph(TextWrap.WordCharacter))
             )
           ],
           progressStyle

@@ -112,11 +112,7 @@ class ProjectArtifactLoader {
       geometryKeyByDefinition.set(component.id, geometryKey);
       localCentersByDefinition.set(
         component.id,
-        [
-          (minimum[0] + maximum[0]) * 0.5,
-          (minimum[1] + maximum[1]) * 0.5,
-          (minimum[2] + maximum[2]) * 0.5
-        ]
+        [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5]
       );
       physicalParts.push(part.physical);
     }
@@ -200,18 +196,10 @@ class ProjectArtifactLoader {
       localCentersByDefinition : localCentersByDefinition,
       faceDescriptorsByDefinition : faceDescriptorsByDefinition,
       metresPerUnit : scale,
-      physical : {
-        metresPerUnit : scale,
-        parts : physicalParts
-      },
+      physical : {metresPerUnit : scale, parts : physicalParts},
       recipeDocument : artifact.recipeDocument,
       recipeDiagnostics : artifact.recipeDiagnostics,
-      cncJob : machiningJob(
-        artifact,
-        records,
-        scale,
-        programReader
-      ),
+      cncJob : machiningJob(artifact, records, scale, programReader),
       mobileBase : artifact.mobileBase,
       missions : artifact.missions,
       robotTools : artifact.robotTools,
@@ -338,17 +326,8 @@ class ProjectArtifactLoader {
     definitionId:String,
     pose:Null<AssemblyFrame>,
     useCount:Null<Int>,
-    boundsByDefinition:Map<
-      String,
-      {
-        minimum:Array<Float>,
-        maximum:Array<Float>
-      }
-  >,
-    geometryKeyByDefinition:Map<
-      String,
-      String
-  >,
+    boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}>,
+    geometryKeyByDefinition:Map<String, String>,
     scale:Float
   ):Void {
     var bounds = boundsByDefinition.get(definitionId);
@@ -377,18 +356,9 @@ class ProjectArtifactLoader {
       x: center.x * scale,
       y: center.y * scale,
       z: center.z * scale,
-      width: Math.max(
-        0.000001,
-        (maximum[0] - minimum[0]) * scale
-      ),
-      height: Math.max(
-        0.000001,
-        (maximum[1] - minimum[1]) * scale
-      ),
-      depth: Math.max(
-        0.000001,
-        (maximum[2] - minimum[2]) * scale
-      ),
+      width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
+      height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
+      depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
       collisionEnabled: true,
       dynamicBody: false,
       mass: mass,
@@ -399,12 +369,7 @@ class ProjectArtifactLoader {
       materialId: component.materialId,
       visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),
-      rotation: pose == null ? null : [
-        pose.qx,
-        pose.qy,
-        pose.qz,
-        pose.qw
-      ]
+      rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]
     });
   }
 

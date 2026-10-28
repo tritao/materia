@@ -50,10 +50,7 @@ class BimEditorProjectionTests {
       "Ground",
       building.id,
       new ElementReference(model.cad.id, base.id),
-      new ElementReference(
-        model.cad.id,
-        top.id
-      )
+      new ElementReference(model.cad.id, top.id)
     );
     var space = model.createSpace("Lobby", storey.id);
     var wall = model.createWall("Wall", 5000, 200, 3000);
@@ -134,27 +131,11 @@ class BimEditorProjectionTests {
       "Typed controls",
       "app.test.controls",
       [
-        DefinitionInput.boolean(
-          "enabled",
-          true
-        ),
-        DefinitionInput.integer(
-          "count",
-          2
-        ),
-        DefinitionInput.token(
-          "detail",
-          "preview",
-          [
-            "preview",
-            "envelope"
-          ]
-        )
+        DefinitionInput.boolean("enabled", true),
+        DefinitionInput.integer("count", 2),
+        DefinitionInput.token("detail", "preview", ["preview", "envelope"])
       ],
-      [new DefinitionOutput(
-        "body",
-        DefinitionOutput.Geometry
-      )]
+      [new DefinitionOutput("body", DefinitionOutput.Geometry)]
     );
     var typedDescriptors = BimInspectorDescriptors.forDefinition(typedDefinition);
     var boolInput = descriptor(typedDescriptors, ":input:enabled");

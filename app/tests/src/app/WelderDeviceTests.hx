@@ -80,14 +80,8 @@ class WelderDeviceTests {
       1,
       2,
       4,
-      new ModbusRegister(
-        201,
-        0.1
-      ),
-      new ModbusRegister(
-        202,
-        0.01
-      ),
+      new ModbusRegister(201, 0.1),
+      new ModbusRegister(202, 0.01),
       new ModbusRegister(203),
       103,
       1000
@@ -108,11 +102,7 @@ class WelderDeviceTests {
         return new ModbusWelderSupply(
           owner,
           welder.runtime,
-          {
-            arc: welder.arcChannel,
-            wireSpeed: welder.wireSpeedChannel,
-            voltage: welder.voltageChannel
-          },
+          {arc: welder.arcChannel, wireSpeed: welder.wireSpeedChannel, voltage: welder.voltageChannel},
           welder.sensorId,
           clock,
           hardware.grounded

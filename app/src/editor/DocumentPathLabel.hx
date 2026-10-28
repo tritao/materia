@@ -43,10 +43,7 @@ class DocumentPathLabel implements View {
     displayed.value,
     textStyle,
     context.theme.tokens.textSecondary,
-    TextStyleOverride.combine(
-      textOverride,
-      TextStyleOverride.paragraph(TextWrap.None)
-    )
+    TextStyleOverride.combine(textOverride, TextStyleOverride.paragraph(TextWrap.None))
   ).build(context);
   root.add(inlineText);
   var popupStyle = new LayoutStyle();
@@ -70,10 +67,7 @@ class DocumentPathLabel implements View {
       value,
       popupTextStyle,
       null,
-      TextStyleOverride.combine(
-        textOverride,
-        TextStyleOverride.paragraph(TextWrap.WordCharacter)
-      )
+      TextStyleOverride.combine(textOverride, TextStyleOverride.paragraph(TextWrap.WordCharacter))
     ).build(context)
   ));
   root.add(popup);
@@ -162,10 +156,7 @@ class DocumentPathLabel implements View {
   }
   var bounds = root.globalBounds(), popupWidth = Math.min(
     cache.fullWidth + 16,
-    Math.max(
-      1,
-      context.environment.width - 16
-    )
+    Math.max(1, context.environment.width - 16)
   );
   var popupX = Math.max(8 - bounds.x, Math.min(0, context.environment.width - 8 - bounds.x - popupWidth));
   var show = truncated && (interaction.value.hovered || interaction.value.focused);

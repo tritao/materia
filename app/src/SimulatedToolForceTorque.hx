@@ -57,12 +57,7 @@ class SimulatedToolForceTorque implements SimulationStepObserver {
     var link = simulation.linkPose(robotIndex, sensorLinkIndex);
     var worldLink = new Transform3(
       new Vec3(link.position[0], link.position[1], link.position[2]),
-      new Quat(
-        link.rotation[0],
-        link.rotation[1],
-        link.rotation[2],
-        link.rotation[3]
-      )
+      new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
     );
     var worldSensor = worldLink.compose(linkFromSensor);
     var forceWorld = Vec3.zero();
@@ -94,14 +89,7 @@ class SimulatedToolForceTorque implements SimulationStepObserver {
     }
     runtime.publishSensorFrame(
       sensorId,
-      [
-        wrench.force.x,
-        wrench.force.y,
-        wrench.force.z,
-        wrench.torque.x,
-        wrench.torque.y,
-        wrench.torque.z
-      ],
+      [wrench.force.x, wrench.force.y, wrench.force.z, wrench.torque.x, wrench.torque.y, wrench.torque.z],
       nextSequence,
       jointTime,
       runtime.sourceClockId

@@ -79,10 +79,8 @@ class ScriptedSetupTests {
     var overridden = session.refreshScriptOverrides();
     var overriddenLidar:Sensor = overridden.sensors.selected();
     check(
-      overriddenLidar.updateRate == 33.0 && ownership.sensorRateOrigin(
-        overridden.sensors.robotId,
-        overriddenLidar.id
-      ) == "override",
+      overriddenLidar.updateRate == 33.0 && ownership.sensorRateOrigin(overridden.sensors.robotId,
+      overriddenLidar.id) == "override",
       "stable-ID sensor rate override materializes independently of script data"
     );
     var sensorTarget = overridden.sensors.robotId + "/" + overriddenLidar.id;

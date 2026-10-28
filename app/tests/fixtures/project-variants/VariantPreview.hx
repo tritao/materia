@@ -22,18 +22,8 @@ class VariantPreview {
         dynamicParts: [],
         motions: [],
         sources: {
-          features: [{
-            id: "fixture-body",
-            label: "Fixture body",
-            occurrence: "machine",
-            faces: [],
-            whole: true
-          }],
-          members: [{
-            occurrence: "machine",
-            sources: ["fixture-body"],
-            shared: false
-          }]
+          features: [{id: "fixture-body", label: "Fixture body", occurrence: "machine", faces: [], whole: true}],
+          members: [{occurrence: "machine", sources: ["fixture-body"], shared: false}]
         },
         navigation: [{
           occurrence: "machine",
@@ -45,10 +35,7 @@ class VariantPreview {
         schemaVersion : AssemblyDefinitionCodec.VERSION,
         id : "variant-fixture",
         lengthUnit : "mm",
-        definitions : [{
-          id : "machine",
-          connectors : []
-        }],
+        definitions : [{id : "machine", connectors : []}],
         occurrences : [{
           id : "machine",
           definition : "machine",

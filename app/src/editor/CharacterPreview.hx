@@ -127,10 +127,7 @@ class CharacterPreview implements SessionParticipant {
       rest.dispose();
       measuredProxy = HumanBodyProxy.standard(
         measuredPose,
-        HumanDescription.measure(
-          measuredPose,
-          bounds[5] - bounds[2]
-        )
+        HumanDescription.measure(measuredPose, bounds[5] - bounds[2])
       );
     }
     restPose = measuredPose;

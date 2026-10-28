@@ -49,10 +49,7 @@ import sys.io.AtomicFile;
         "sheet-workflow-error",
         [
           new KeyedView("heading", new Text("SHEET CUTTING PLAN")),
-          new KeyedView(
-            "error",
-            new Text("Could not open sheet records: " + Std.string(error))
-          )
+          new KeyedView("error", new Text("Could not open sheet records: " + Std.string(error)))
         ]
       );
     }
@@ -60,14 +57,8 @@ import sys.io.AtomicFile;
     if (inventory.record.plans.length == 0) return new Column(
       "sheet-workflow-empty",
       [
-        new KeyedView(
-          "heading",
-          new Text("SHEET CUTTING PLAN")
-        ),
-        new KeyedView(
-          "empty",
-          new Text("This project has no cutting plans.")
-        )
+        new KeyedView("heading", new Text("SHEET CUTTING PLAN")),
+        new KeyedView("empty", new Text("This project has no cutting plans."))
       ]
     );
     var selectedPlanId = app.sheetPlanSelection;
@@ -144,10 +135,7 @@ import sys.io.AtomicFile;
         app,
         "Allocate",
         "sheet-allocate",
-        function() inventory.allocate(
-          selectedPieceId,
-          selectedPlanId
-        ),
+        function() inventory.allocate(selectedPieceId, selectedPlanId),
         canAllocate
       )
     ), new KeyedView(
@@ -156,10 +144,7 @@ import sys.io.AtomicFile;
         app,
         "Release",
         "sheet-release",
-        function() inventory.cancelAllocation(
-          selectedPieceId,
-          selectedPlanId
-        ),
+        function() inventory.cancelAllocation(selectedPieceId, selectedPlanId),
         canRelease
       )
     )], ReferenceEditorApp.actionRowStyle())));
@@ -178,11 +163,7 @@ import sys.io.AtomicFile;
     ));
     if (validation != null) planningChildren.push(new KeyedView(
       "layout-preview",
-      new Text(layoutPreview(
-        selectedPlan,
-        stockSpec,
-        selectedPieceId == "" ? null : inventory.piece(selectedPieceId)
-      ))
+      new Text(layoutPreview(selectedPlan, stockSpec, selectedPieceId == "" ? null : inventory.piece(selectedPieceId)))
     ));
     for (placement in selectedPlan.placements) planningChildren.push(new KeyedView(
       "placement-line-" + placement.id,
@@ -197,20 +178,10 @@ import sys.io.AtomicFile;
     }
     )), new KeyedView(
       "refresh",
-      button(
-        app,
-        "Refresh references",
-        "sheet-refresh",
-        function() inventory.revalidatePlan(selectedPlanId)
-      )
+      button(app, "Refresh references", "sheet-refresh", function() inventory.revalidatePlan(selectedPlanId))
     ), new KeyedView(
       "save",
-      button(
-        app,
-        "Save",
-        "sheet-save",
-        function() inventory.save()
-      )
+      button(app, "Save", "sheet-save", function() inventory.save())
     ), new KeyedView("export", button(app, "Export CSV + SVG", "sheet-export", function() {
       var current = inventory.preview(selectedPlanId, selectedPieceId);
       if (!current.valid) throw "Fix plan validation messages before exporting";
@@ -267,20 +238,8 @@ import sys.io.AtomicFile;
         selectedPlanId,
         "placement:" + placementId + ":x",
         placementId + " X",
-        function(current) return placementValue(
-          current,
-          placementId,
-          "x"
-        ),
-        function(
-          current,
-          value
-        ) setPlacement(
-          current,
-          placementId,
-          "x",
-          value
-        ),
+        function(current) return placementValue(current, placementId, "x"),
+        function(current, value) setPlacement(current, placementId, "x", value),
         selectedPlan.lengthUnit,
         0,
         1
@@ -291,20 +250,8 @@ import sys.io.AtomicFile;
         selectedPlanId,
         "placement:" + placementId + ":y",
         placementId + " Y",
-        function(current) return placementValue(
-          current,
-          placementId,
-          "y"
-        ),
-        function(
-          current,
-          value
-        ) setPlacement(
-          current,
-          placementId,
-          "y",
-          value
-        ),
+        function(current) return placementValue(current, placementId, "y"),
+        function(current, value) setPlacement(current, placementId, "y", value),
         selectedPlan.lengthUnit,
         0,
         1
@@ -315,20 +262,8 @@ import sys.io.AtomicFile;
         selectedPlanId,
         "placement:" + placementId + ":width",
         placementId + " blank width",
-        function(current) return placementValue(
-          current,
-          placementId,
-          "width"
-        ),
-        function(
-          current,
-          value
-        ) setPlacement(
-          current,
-          placementId,
-          "width",
-          value
-        ),
+        function(current) return placementValue(current, placementId, "width"),
+        function(current, value) setPlacement(current, placementId, "width", value),
         selectedPlan.lengthUnit,
         0.001,
         1
@@ -339,20 +274,8 @@ import sys.io.AtomicFile;
         selectedPlanId,
         "placement:" + placementId + ":height",
         placementId + " blank height",
-        function(current) return placementValue(
-          current,
-          placementId,
-          "height"
-        ),
-        function(
-          current,
-          value
-        ) setPlacement(
-          current,
-          placementId,
-          "height",
-          value
-        ),
+        function(current) return placementValue(current, placementId, "height"),
+        function(current, value) setPlacement(current, placementId, "height", value),
         selectedPlan.lengthUnit,
         0.001,
         1
@@ -386,18 +309,8 @@ import sys.io.AtomicFile;
         selectedPlanId,
         "cut:" + cutId + ":position",
         "Cut " + (index + 1) + " position",
-        function(current) return cutPosition(
-          current,
-          cutId
-        ),
-        function(
-          current,
-          value
-        ) setCutPosition(
-          current,
-          cutId,
-          value
-        ),
+        function(current) return cutPosition(current, cutId),
+        function(current, value) setCutPosition(current, cutId, value),
         selectedPlan.lengthUnit,
         0.001,
         1
@@ -407,37 +320,14 @@ import sys.io.AtomicFile;
         new Row(
           "cut-order-row-" + cutId,
           [
-            new KeyedView(
-              "cut-id",
-              new Text((index + 1) + " · " + cutId)
-            ),
+            new KeyedView("cut-id", new Text((index + 1) + " · " + cutId)),
             new KeyedView(
               "move-up",
-              button(
-                app,
-                "↑",
-                "sheet-cut-up-" + cutId,
-                function() moveCut(
-                  inventory,
-                  selectedPlanId,
-                  cutIndex,
-                  -1
-                )
-              )
+              button(app, "↑", "sheet-cut-up-" + cutId, function() moveCut(inventory, selectedPlanId, cutIndex, -1))
             ),
             new KeyedView(
               "move-down",
-              button(
-                app,
-                "↓",
-                "sheet-cut-down-" + cutId,
-                function() moveCut(
-                  inventory,
-                  selectedPlanId,
-                  cutIndex,
-                  1
-                )
-              )
+              button(app, "↓", "sheet-cut-down-" + cutId, function() moveCut(inventory, selectedPlanId, cutIndex, 1))
             )
           ],
           ReferenceEditorApp.actionRowStyle()
@@ -522,10 +412,7 @@ import sys.io.AtomicFile;
       "kerf",
       "Saw kerf",
       function(current) return current.kerf,
-      function(
-        current,
-        value
-      ) current.kerf = value,
+      function(current, value) current.kerf = value,
       selectedPlan.lengthUnit,
       0.001,
       0.1
@@ -537,10 +424,7 @@ import sys.io.AtomicFile;
       "edgeMargin",
       "Edge margin",
       function(current) return current.edgeMargin,
-      function(
-        current,
-        value
-      ) current.edgeMargin = value,
+      function(current, value) current.edgeMargin = value,
       selectedPlan.lengthUnit,
       0,
       1
@@ -590,29 +474,11 @@ import sys.io.AtomicFile;
     ];
     if (app.sheetOperationsExpanded) operationsSection.push(new KeyedView(
       "operations-content",
-      new Column(
-        "sheet-operations-content",
-        operationsChildren,
-        sectionStyle()
-      )
+      new Column("sheet-operations-content", operationsChildren, sectionStyle())
     ));
     var children:Array<KeyedView> = [
-      new KeyedView(
-        "cut-planning-section",
-        new Column(
-          "sheet-cut-planning",
-          planningChildren,
-          sectionStyle()
-        )
-      ),
-      new KeyedView(
-        "operations-section",
-        new Column(
-          "sheet-operations",
-          operationsSection,
-          sectionStyle()
-        )
-      )
+      new KeyedView("cut-planning-section", new Column("sheet-cut-planning", planningChildren, sectionStyle())),
+      new KeyedView("operations-section", new Column("sheet-operations", operationsSection, sectionStyle()))
     ];
     var contentStyle = sectionStyle();
     var scrollStyle = ReferenceEditorApp.fillStyle();
@@ -703,10 +569,7 @@ import sys.io.AtomicFile;
     id:String,
     label:String,
     read:SheetCutPlan -> Float,
-    write:(
-      SheetCutPlan,
-      Float
-    ) -> Void,
+    write:(SheetCutPlan, Float) -> Void,
     unit:String,
     minimum:Float,
     step:Float

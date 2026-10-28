@@ -53,10 +53,7 @@ class MateriaProjectRunner {
       kind: "requires-project-code",
       projectPath: manifestPath,
       entrypoint: entryId,
-      module: fieldText(
-        entry,
-        "module"
-      ),
+      module: fieldText(entry, "module"),
       reconcilesSavedRecipe: reconcilesSavedRecipe
     };
   }
@@ -196,10 +193,7 @@ class MateriaProjectRunner {
       manifestPath,
       haxeonManifest,
       fieldText(entry, "module"),
-      fieldText(
-        entry,
-        "function"
-      ),
+      fieldText(entry, "function"),
       haxe,
       home,
       tools,
@@ -443,14 +437,7 @@ class MateriaProjectRunner {
   ):Void {
     runProjectTool(
       "MateriaProjectModuleBuild",
-      [
-        manifest,
-        module,
-        functionName,
-        outputPrefix,
-        home,
-        documentInput ? "true" : "false"
-      ],
+      [manifest, module, functionName, outputPrefix, home, documentInput ? "true" : "false"],
       haxe,
       home,
       tools,
@@ -481,19 +468,7 @@ class MateriaProjectRunner {
     ]);
     if (toolDirectory == null || !ensureCacheDirectory(toolDirectory)) return runCommand(
       haxe,
-      [
-        "--cwd",
-        home,
-        "-cp",
-        ProjectPath.join([
-          home,
-          "src"
-        ]),
-        "-cp",
-        tools,
-        "--run",
-        mainClass
-      ].concat(arguments),
+      ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools, "--run", mainClass].concat(arguments),
       description,
       control
     );
@@ -522,18 +497,7 @@ class MateriaProjectRunner {
         try {
           runCommand(
             haxe,
-            [
-              "--cwd",
-              home,
-              "-cp",
-              ProjectPath.join([home, "src"]),
-              "-cp",
-              tools,
-              "-main",
-              mainClass,
-              "-hl",
-              temporary
-            ],
+            ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools, "-main", mainClass, "-hl", temporary],
             "Could not build " + mainClass,
             control
           );

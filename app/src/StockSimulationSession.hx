@@ -92,15 +92,7 @@ class StockSimulationSession {
     // where cut stock and the finished part's mesh could disagree about which side it is on.
     var lattice = StockLattice.covering(-width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2, SPACING);
     timeline = new StockTimeline(
-      Stock.box(
-        lattice,
-        -width / 2,
-        -height / 2,
-        -depth / 2,
-        width / 2,
-        height / 2,
-        depth / 2
-      ),
+      Stock.box(lattice, -width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2),
       moves,
       250
     );
@@ -137,22 +129,13 @@ class StockSimulationSession {
       0,
       stock.tilesX(),
       stock.tilesY(),
-      BySource(
-        operationColour,
-        UNTOUCHED
-      )
+      BySource(operationColour, UNTOUCHED)
     ) : stock.contour(
       0,
       0,
       stock.tilesX(),
       stock.tilesY(),
-      ByDeviation(
-        target,
-        TOLERANCE,
-        ON_TARGET,
-        LEFTOVER,
-        GOUGE
-      )
+      ByDeviation(target, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE)
     );
     var geometry = new GeometryData();
     geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
@@ -316,33 +299,16 @@ class StockSimulationSession {
     var holes = [
       new Point3(inset, inset, 0),
       new Point3(width - inset, inset, 0),
-      new Point3(
-        width - inset,
-        height - inset,
-        0
-      ),
-      new Point3(
-        inset,
-        height - inset,
-        0
-      )
+      new Point3(width - inset, height - inset, 0),
+      new Point3(inset, height - inset, 0)
     ];
     var mm = 1000.0;
     function rectangle(r:Array<Float>):Curve return Curve.polyline(
       [
         new Vector(r[0] * mm, r[1] * mm),
-        new Vector(
-          r[2] * mm,
-          r[1] * mm
-        ),
-        new Vector(
-          r[2] * mm,
-          r[3] * mm
-        ),
-        new Vector(
-          r[0] * mm,
-          r[3] * mm
-        )
+        new Vector(r[2] * mm, r[1] * mm),
+        new Vector(r[2] * mm, r[3] * mm),
+        new Vector(r[0] * mm, r[3] * mm)
       ],
       true
     );

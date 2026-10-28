@@ -20,11 +20,7 @@ class CutterGeometry {
   public static function revolved(
     profile:CutterProfile,
     place:(Float, Float, Float) -> Array<Float>,
-    turn:(
-      Float,
-      Float,
-      Float
-    ) -> Array<Float>
+    turn:(Float, Float, Float) -> Array<Float>
   ):GeometryData {
     // The half-section from the tip up its side, closed across the top back to the axis.
     var section:Array<{r:Float, z:Float}> = [{r: 0.0, z: 0.0}];
@@ -51,11 +47,7 @@ class CutterGeometry {
   public static function sectionGeometry(
     section:Array<{r:Float, z:Float}>,
     place:(Float, Float, Float) -> Array<Float>,
-    turn:(
-      Float,
-      Float,
-      Float
-    ) -> Array<Float>,
+    turn:(Float, Float, Float) -> Array<Float>,
     sides:Int = SIDES
   ):GeometryData {
     // Each section edge has its own normals; no smoothing across physical corners.

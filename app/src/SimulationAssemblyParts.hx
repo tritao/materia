@@ -46,11 +46,7 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
     var live = simulation.objectPose(body);
     return AssemblyRobot.compose(
       {position: [live.x, live.y, live.z], rotation: [live.qx, live.qy, live.qz, live.qw]},
-      AssemblyFrames.translation(
-        -center[0],
-        -center[1],
-        -center[2]
-      )
+      AssemblyFrames.translation(-center[0], -center[1], -center[2])
     );
   }
 
@@ -106,24 +102,8 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
     if (parent == null) throw 'Assembly occurrence "$id" lost its fastening carrier';
     var p = parent.position, q = parent.rotation;
     var relative = AssemblyFrames.compose(
-      AssemblyFrames.inverse({
-        x: p[0],
-        y: p[1],
-        z: p[2],
-        qx: q[0],
-        qy: q[1],
-        qz: q[2],
-        qw: q[3]
-      }),
-      {
-        x: world.x,
-        y: world.y,
-        z: world.z,
-        qx: world.qx,
-        qy: world.qy,
-        qz: world.qz,
-        qw: world.qw
-      }
+      AssemblyFrames.inverse({x: p[0], y: p[1], z: p[2], qx: q[0], qy: q[1], qz: q[2], qw: q[3]}),
+      {x: world.x, y: world.y, z: world.z, qx: world.qx, qy: world.qy, qz: world.qz, qw: world.qw}
     );
     var pose = new SimPose(relative.x, relative.y, relative.z, relative.qx, relative.qy, relative.qz, relative.qw);
     if (member != null) simulation.holdObjectOnLink(body, member.robotIndex, member.linkIndex, pose);

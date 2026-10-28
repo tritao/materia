@@ -263,10 +263,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
         low,
         high,
         centerMetres,
-        Math.max(
-          stockSpacing,
-          Math.sqrt((high[0] - low[0]) * (high[1] - low[1]) / STOCK_RAYS)
-        ),
+        Math.max(stockSpacing, Math.sqrt((high[0] - low[0]) * (high[1] - low[1]) / STOCK_RAYS)),
         filament,
         lag,
         featureAt
@@ -306,11 +303,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
     slip = new StepperSlip(
       robot.robot.description().couplings,
       axisJoint,
-      (joint, offset) -> simulation.setJointSlip(
-        robotIndex,
-        joint,
-        offset
-      )
+      (joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset)
     );
     // The printer starts referenced: there is no homing to run.
     newHoming = () -> null;
@@ -460,11 +453,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
       heightAt(currentLine),
       session.fixedTimestep(),
       at.op,
-      provenance == null ? new Provenance(
-        0,
-        0,
-        0
-      ) : provenance
+      provenance == null ? new Provenance(0, 0, 0) : provenance
     );
     depositSeconds += Sys.time() - clock;
   }
@@ -528,10 +517,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
         var length = GeometryTools.length(geometry);
         for (step in 0...Std.int(Math.ceil(length / 0.0005)) + 1) include(GeometryTools.pointAt(
           geometry,
-          Math.min(
-            length,
-            step * 0.0005
-          )
+          Math.min(length, step * 0.0005)
         ));
       case _:
     }

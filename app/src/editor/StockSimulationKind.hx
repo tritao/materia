@@ -70,10 +70,7 @@ class StockSimulationKind implements ObjectKindProvider {
     var colouring = options(false);
     colouring.options = [
       new PropertyOption("operation", "Operation"),
-      new PropertyOption(
-        "deviation",
-        "Deviation from part"
-      )
+      new PropertyOption("deviation", "Deviation from part")
     ];
     colouring.validator = function(_, value) return switch value {
       case PropertyValue.Enum("operation" | "deviation"):
@@ -136,10 +133,7 @@ class StockSimulationKind implements ObjectKindProvider {
       label,
       PropertyType.Text,
       function(_) return PropertyValue.Text(text()),
-      function(
-        _,
-        _
-      ) throw label + " is read-only",
+      function(_, _) throw label + " is read-only",
       settings
     );
   }

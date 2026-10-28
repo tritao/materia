@@ -144,11 +144,7 @@ class PressBrakeSimulationChecks {
         bend.id,
         tooling,
         installed,
-        new BendOrientation(
-          true,
-          false,
-          0
-        ),
+        new BendOrientation(true, false, 0),
         Transform3.identity(),
         7850
       ) : null;
@@ -195,11 +191,7 @@ class PressBrakeSimulationChecks {
             bend.id,
             tooling,
             installed,
-            new BendOrientation(
-              true,
-              false,
-              0
-            )
+            new BendOrientation(true, false, 0)
           );
           check(
             Math.abs(part.measuredAngle(bend.id) - contact.evaluation.bend(bend.id).angle) <= Math.PI / 1800,

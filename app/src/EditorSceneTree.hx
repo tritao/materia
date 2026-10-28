@@ -170,11 +170,7 @@ import materia.assembly.AssemblyDefinition;
     return {
       shown: count > 0,
       mixed: count > 0 && count < members.length,
-      own: visibilityGroup(key) ? !SceneVisibility.groupHidden(
-        scene,
-        key,
-        members
-      ) : item != null && item.visible
+      own: visibilityGroup(key) ? !SceneVisibility.groupHidden(scene, key, members) : item != null && item.visible
     };
   }
   public function toggleVisibility(key:String):Bool {

@@ -38,10 +38,7 @@ class MachineControlModel {
         value: (value == null ? joint.defaultValue : value) * factor,
         minimum : joint.limits.lower == null ? null : joint.limits.lower * factor,
         maximum : joint.limits.upper == null ? null : joint.limits.upper * factor,
-        initial : session.initialJointCoordinate(
-          joint.id,
-          joint.defaultValue
-        ) * factor,
+        initial : session.initialJointCoordinate(joint.id, joint.defaultValue) * factor,
         unit : linear ? "mm" : "deg",
         step : linear ? 0.1 : 1.0,
         factor : factor,
@@ -79,12 +76,7 @@ class MachineControlModel {
   public static function set(session:ProjectDocumentSession,
     id:String, value:Float, editable:Bool):Bool return session.setAssemblyJointCoordinate(
       id,
-      nativePosition(
-        session,
-        id,
-        value,
-        editable
-      )
+      nativePosition(session, id, value, editable)
     );
 
   public static function nativePosition(session:ProjectDocumentSession, id:String, value:Float, editable:Bool):Float {

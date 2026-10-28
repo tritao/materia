@@ -76,10 +76,7 @@ class ScrewdriverSimulationTests {
       event("program", Analog(2)),
       event("start", Digital(true)),
       event("reverse", Digital(true)),
-      event(
-        "vacuum",
-        Digital(true)
-      )
+      event("vacuum", Digital(true))
     ]);
     check(
       device.slot == 2 && device.running && device.reversing && device.held,
@@ -153,22 +150,13 @@ class ScrewdriverSimulationTests {
       var placed = @:privateAccess SimulatedScrewdriver.turnedPose(
         seated,
         seated.compose(bodyToHead).translation,
-        [
-          axis.x,
-          axis.y,
-          axis.z
-        ],
+        [axis.x, axis.y, axis.z],
         reading.angle,
         advance
       );
       var actualHead = new Transform3(
         new Vec3(placed.x, placed.y, placed.z),
-        new Quat(
-          placed.qx,
-          placed.qy,
-          placed.qz,
-          placed.qw
-        )
+        new Quat(placed.qx, placed.qy, placed.qz, placed.qw)
       ).compose(bodyToHead);
       check(
         Math.abs(actualHead.translation.sub(plane).dot(axis)) < 1e-12,
@@ -261,11 +249,7 @@ class ScrewdriverSimulationTests {
       var bodies = [base, arm, slide, carrier, fixtureLink];
       for (i in 0...bodies.length) bodies[i].collisionShapes.push(new CollisionShape(
         Box(0.001, 0.001, 0.001),
-        [
-          0,
-          (i - 2) * 0.01,
-          0
-        ]
+        [0, (i - 2) * 0.01, 0]
       ));
       var travel = model.addJoint(new Joint("travel", JointType.Prismatic, base, arm));
       travel.axis = [1, 0, 0];
@@ -303,16 +287,8 @@ class ScrewdriverSimulationTests {
       var clamped = harness.spawnBox([0.03, 0.03, 0.101], [0.0001, 0.0001, 0.0001], true, 0.01);
       var freeFixture = harness.space.session.createObject(
         nativekit.sim.MotionType.Kinematic,
-        nativekit.sim.SimShape.box(
-          0.001,
-          0.001,
-          0.001
-        ),
-        new SimPose(
-          0.02,
-          0.01,
-          0.1
-        ),
+        nativekit.sim.SimShape.box(0.001, 0.001, 0.001),
+        new SimPose(0.02, 0.01, 0.1),
         0
       );
       var channels:ScrewdriverChannelNames = {
@@ -352,11 +328,7 @@ class ScrewdriverSimulationTests {
           robotIndex: 0,
           linkIndex: 4,
           offset: materia.assembly.AssemblyFrames.identity(),
-          center: [
-            0.0,
-            0.0,
-            0.0
-          ]
+          center: [0.0, 0.0, 0.0]
         },
         null
       );
@@ -380,29 +352,13 @@ class ScrewdriverSimulationTests {
           threadLeadMm: 1,
           physicalThreadMaxForceN: 200,
           physicalThreadStiffnessNPerM: 1.0e7,
-          connection: {
-            fastening: "transport-probe",
-            member: "work-fixture",
-            face: "bore"
-          },
+          connection: {fastening: "transport-probe", member: "work-fixture", face: "bore"},
           work: () -> ({
             head: head,
             screwPose: body,
-            engagementPoint: [
-              0.02,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.02,
-              0.0,
-              0.1
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.02, 0.0, 0.1],
+            hole: [0.02, 0.0, 0.1],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         }
@@ -506,30 +462,14 @@ class ScrewdriverSimulationTests {
           hand: 1,
           fixture: fixture,
           clamped: clamped,
-          connection: {
-            fastening: "transport-probe",
-            member: "work-fixture",
-            face: "bore"
-          },
+          connection: {fastening: "transport-probe", member: "work-fixture", face: "bore"},
           retightening: true,
           work: () -> ({
             head: head,
             screwPose: body,
-            engagementPoint: [
-              0.02,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.02,
-              0.0,
-              0.1
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.02, 0.0, 0.1],
+            hole: [0.02, 0.0, 0.1],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         };
@@ -605,33 +545,21 @@ class ScrewdriverSimulationTests {
         var alias = fixtureObject != null ? new SimulationAssemblyPart(
           "another-member",
           harness.simulation,
-          [
-            0.0,
-            0.0,
-            0.0
-          ],
+          [0.0, 0.0, 0.0],
           [],
           null,
           fixtureObject
         ) : new SimulationAssemblyPart(
           "another-member",
           harness.simulation,
-          [
-            0.0,
-            0.0,
-            0.0
-          ],
+          [0.0, 0.0, 0.0],
           [],
           {
             id : "another-member",
             robotIndex : 0,
             linkIndex : 4,
             offset : materia.assembly.AssemblyFrames.identity(),
-            center : [
-              0.0,
-              0.0,
-              0.0
-            ]
+            center : [0.0, 0.0, 0.0]
           },
           null
         );
@@ -893,21 +821,9 @@ class ScrewdriverSimulationTests {
           work: () -> ({
             head: head,
             screwPose: bodyPose,
-            engagementPoint: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.0, 0.0, 0.1],
+            hole: [0.0, 0.0, 0.1],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         }
@@ -1017,21 +933,9 @@ class ScrewdriverSimulationTests {
           work: () -> ({
             head: head,
             screwPose: bodyPose,
-            engagementPoint: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.0, 0.0, 0.1],
+            hole: [0.0, 0.0, 0.1],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         }
@@ -1060,21 +964,9 @@ class ScrewdriverSimulationTests {
           work: () -> ({
             head: head,
             screwPose: bodyPose,
-            engagementPoint: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.0,
-              0.0,
-              0.07
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.0, 0.0, 0.1],
+            hole: [0.0, 0.0, 0.07],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         }
@@ -1132,21 +1024,9 @@ class ScrewdriverSimulationTests {
           work: () -> ({
             head: head,
             screwPose: bodyPose,
-            engagementPoint: [
-              0.0,
-              0.0,
-              0.1
-            ],
-            hole: [
-              0.01,
-              0.0,
-              0.1
-            ],
-            direction: [
-              0.0,
-              0.0,
-              1.0
-            ],
+            engagementPoint: [0.0, 0.0, 0.1],
+            hole: [0.01, 0.0, 0.1],
+            direction: [0.0, 0.0, 1.0],
             damagedLeadIn: false
           })
         }

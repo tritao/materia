@@ -45,12 +45,7 @@ class MissionStatusView {
     ));
     if (showSteps != null) rows.push(new KeyedView(
       "steps",
-      new Button(
-        state.mission == null ? "Show mission" : "Show steps",
-        null,
-        showSteps,
-        key + "-steps"
-      )
+      new Button(state.mission == null ? "Show mission" : "Show steps", null, showSteps, key + "-steps")
     ));
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();

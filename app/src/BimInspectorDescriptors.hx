@@ -117,11 +117,7 @@ class BimInspectorDescriptors {
       if (before == null) instance.removeOverride(input.name);
       else if (input.isNumeric()) instance.setOverride(
         input.name,
-        UnitConversion.fromCanonical(
-          before,
-          input.kind,
-          input.unit
-        ),
+        UnitConversion.fromCanonical(before, input.kind, input.unit),
         input.unit
       );
       else instance.setTypedOverride(input.name, before);
@@ -155,11 +151,7 @@ class BimInspectorDescriptors {
     apply(edit, "Set " + input.name, function() writeDefinitionInput(definition, input, value, true), function() {
       if (input.isNumeric()) definition.setDefault(
         input.name,
-        UnitConversion.fromCanonical(
-          before,
-          input.kind,
-          input.unit
-        ),
+        UnitConversion.fromCanonical(before, input.kind, input.unit),
         input.unit
       );
       else definition.setTypedDefault(input.name, before);
@@ -259,13 +251,7 @@ class BimInspectorDescriptors {
       schema.name,
       editorType,
       function(_) return editableValue(schema),
-      function(
-        _,
-        value
-      ) write(edited(
-        schema,
-        value
-      )),
+      function(_, value) write(edited(schema, value)),
       options
     );
   }

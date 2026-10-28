@@ -62,14 +62,7 @@ private typedef SourceFaceEntry = {id:String, snapshot:String, node:NodeId, face
             edit.commit();
             entries.set(
               key,
-              {
-                id: id,
-                snapshot: item.meshSnapshot,
-                node: node,
-                face: face,
-                owned: face >= 0,
-                geometry: geometry
-              }
+              {id: id, snapshot: item.meshSnapshot, node: node, face: face, owned: face >= 0, geometry: geometry}
             );
           } catch (error:Dynamic) {
             edit.dispose();

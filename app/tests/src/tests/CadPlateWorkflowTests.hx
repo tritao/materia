@@ -738,11 +738,7 @@ class CadPlateWorkflowTests {
         var d = owner.document;
         var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
         var tool = d.add(new cadkit.parametric.features.TransformFeature(
-          d.add(new cadkit.parametric.features.BoxFeature(
-            4,
-            60,
-            30
-          )),
+          d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
           -50,
           -10,
           -5
@@ -842,11 +838,7 @@ class CadPlateWorkflowTests {
         var d = owner.document;
         var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
         var tool = d.add(new cadkit.parametric.features.TransformFeature(
-          d.add(new cadkit.parametric.features.BoxFeature(
-            4,
-            60,
-            30
-          )),
+          d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
           -50,
           -10,
           -5

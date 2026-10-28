@@ -193,10 +193,7 @@ class SensorConfiguration {
     for (field in Reflect.fields(value)) if (field != "name") Reflect.setField(
       result,
       field,
-      withoutNames(Reflect.field(
-        value,
-        field
-      ))
+      withoutNames(Reflect.field(value, field))
     );
     return result;
   }
@@ -341,10 +338,7 @@ class SensorConfiguration {
     robotId: id,
     model: haxe.Json.parse(RobotModelCodec.encode(value.model).toString()),
     profile: robotkit.profile.RobotProfileCodec.toRecord(value.profile),
-    pose: {
-      position: robotPosition(id),
-      rotation: robotRotation(id)
-    }
+    pose: {position: robotPosition(id), rotation: robotRotation(id)}
   };
 
   function captureCurrent():Void {
@@ -407,14 +401,8 @@ class SensorConfiguration {
     robotId = requiredString(data, "robotId");
     if (Reflect.field(data, "schemaVersion") != 1) throw "Unsupported robot authoring schema version";
     active = new robotkit.model.RobotDefinition(
-      RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(Reflect.field(
-        data,
-        "model"
-      )))),
-      robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(
-        data,
-        "profile"
-      ))
+      RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(Reflect.field(data, "model")))),
+      robotkit.profile.RobotProfileCodec.fromRecord(Reflect.field(data, "profile"))
     );
     var pose:Dynamic = Reflect.field(data, "pose");
     var loadedPosition = vector(pose, "position", 3);
@@ -574,21 +562,8 @@ class SensorConfiguration {
       "mount-mode",
       "Mount ownership",
       function() return mountMode(owner, sensor),
-      function(value) setMountMode(
-        owner,
-        sensor,
-        value
-      ),
-      [
-        new PropertyOption(
-          "shared",
-          "Shared frame"
-        ),
-        new PropertyOption(
-          "independent",
-          "Independent frame"
-        )
-      ],
+      function(value) setMountMode(owner, sensor, value),
+      [new PropertyOption("shared", "Shared frame"), new PropertyOption("independent", "Independent frame")],
       "Mount"
     ));
     result.push(choice(
@@ -596,15 +571,8 @@ class SensorConfiguration {
       "link",
       "Mounted link",
       function() return sensorLink(owner, sensor).id,
-      function(value) setSensorLink(
-        owner,
-        sensor,
-        value
-      ),
-      [for (link in owner.links) new PropertyOption(
-        link.id,
-        link.name
-      )],
+      function(value) setSensorLink(owner, sensor, value),
+      [for (link in owner.links) new PropertyOption(link.id, link.name)],
       "Mount"
     ));
     var frame = sensor.frame;

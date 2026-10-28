@@ -66,14 +66,7 @@ class SceneTreeRow implements View {
         "eye",
         new Tooltip(
           "eye-tip:" + key,
-          new VisibilityEye(
-            "eye:" + key,
-            hint,
-            ownVisible,
-            visible,
-            mixed,
-            toggle
-          ),
+          new VisibilityEye("eye:" + key, hint, ownVisible, visible, mixed, toggle),
           new Text(hint)
         )
       ));

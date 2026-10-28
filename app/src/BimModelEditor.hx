@@ -76,11 +76,7 @@ class BimModelEditor implements View {
     var toolbar = new Row(key + ":tree-mode",
       [new KeyedView("spatial", modeButton("Spatial", false, context)), new KeyedView(
         "types",
-        modeButton(
-          "Types",
-          true,
-          context
-        )
+        modeButton("Types", true, context)
       ), new KeyedView("undo", new IconButton(key + ":undo", IconName.Undo, "Undo BIM", function() {
       if (projectDocument == null) model.undo();
       else projectDocument.undo();

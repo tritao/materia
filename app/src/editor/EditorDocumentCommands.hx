@@ -30,40 +30,28 @@ import haxeon.ui.core.UiModifier;
       "editor.new",
       "New",
       function() app.documents.requestNew(),
-      new Shortcut(
-        78,
-        UiModifier.Control
-      ),
+      new Shortcut(78, UiModifier.Control),
       function() return !app.documents.blocked()
     ));
     app.commands.register(new Command(
       "editor.open",
       "Open",
       function() app.documents.requestOpen(),
-      new Shortcut(
-        79,
-        UiModifier.Control
-      ),
+      new Shortcut(79, UiModifier.Control),
       function() return !app.documents.blocked()
     ));
     app.commands.register(new Command(
       "editor.save",
       "Save",
       function() app.documents.save(),
-      new Shortcut(
-        UiKey.S,
-        UiModifier.Control
-      ),
+      new Shortcut(UiKey.S, UiModifier.Control),
       function() return !app.documents.blocked()
     ));
     app.commands.register(new Command(
       "editor.save-as",
       "Save As",
       function() app.documents.save(true),
-      new Shortcut(
-        UiKey.S,
-        UiModifier.Control | UiModifier.Shift
-      ),
+      new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift),
       function() return !app.documents.blocked()
     ));
     app.commands.register(new Command("editor.discard-stale-edits", "Discard stale edits", function() {

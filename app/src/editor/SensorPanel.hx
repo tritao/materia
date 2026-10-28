@@ -118,14 +118,8 @@ import haxeon.ui.widgets.text.Text;
       [
         new KeyedView("add-lidar", addLidar),
         new KeyedView("add-imu", addImu),
-        new KeyedView(
-          "add-camera",
-          addCamera
-        ),
-        new KeyedView(
-          "remove",
-          removeSensor
-        )
+        new KeyedView("add-camera", addCamera),
+        new KeyedView("remove", removeSensor)
       ],
       actionRowStyle()
     );
@@ -146,51 +140,11 @@ import haxeon.ui.widgets.text.Text;
       new Row(
         "sensor-playback-actions",
         [
-          new KeyedView(
-            "run",
-            new Button(
-              "Run",
-              null,
-              function() commands.execute("sim.play"),
-              "sensor-run"
-            )
-          ),
-          new KeyedView(
-            "pause",
-            new Button(
-              "Pause",
-              null,
-              function() commands.execute("sim.pause"),
-              "sensor-pause"
-            )
-          ),
-          new KeyedView(
-            "step",
-            new Button(
-              "Step",
-              null,
-              function() commands.execute("sim.step"),
-              "sensor-step"
-            )
-          ),
-          new KeyedView(
-            "reset",
-            new Button(
-              "Reset",
-              null,
-              function() commands.execute("sim.reset"),
-              "sensor-reset"
-            )
-          ),
-          new KeyedView(
-            "design",
-            new Button(
-              "Stop",
-              null,
-              function() commands.execute("sim.stop"),
-              "sensor-design"
-            )
-          )
+          new KeyedView("run", new Button("Run", null, function() commands.execute("sim.play"), "sensor-run")),
+          new KeyedView("pause", new Button("Pause", null, function() commands.execute("sim.pause"), "sensor-pause")),
+          new KeyedView("step", new Button("Step", null, function() commands.execute("sim.step"), "sensor-step")),
+          new KeyedView("reset", new Button("Reset", null, function() commands.execute("sim.reset"), "sensor-reset")),
+          new KeyedView("design", new Button("Stop", null, function() commands.execute("sim.stop"), "sensor-design"))
         ],
         actionRowStyle()
       )
@@ -221,10 +175,7 @@ import haxeon.ui.widgets.text.Text;
       new KeyedView(
         "apply-state",
         new Text(
-          simulation.pending(
-            sensors,
-            scene
-          ) ? "Pending changes · rebuild required" : "Configuration applied",
+          simulation.pending(sensors, scene) ? "Pending changes · rebuild required" : "Configuration applied",
           null,
           appearance.theme.tokens.textSecondary,
           TextStyleOverride.text(12.0)
@@ -238,64 +189,22 @@ import haxeon.ui.widgets.text.Text;
         "ownership",
         ownership == null ? new Text("Origin: document") : textLines(
           "script-origin",
-          [
-            "Origin: script",
-            ownership.reference,
-            'configuration v${ownership.configurationVersion}'
-          ]
+          ["Origin: script", ownership.reference, 'configuration v${ownership.configurationVersion}']
         )
       ),
-      new KeyedView(
-        "robots-heading",
-        spacedHeading("ROBOTS")
-      ),
-      new KeyedView(
-        "robots",
-        new Column(
-          "sensor-robots",
-          robotRows,
-          listStyle()
-        )
-      ),
-      new KeyedView(
-        "backend-heading",
-        spacedHeading("PHYSICS · " + simulation.userBackendName().toUpperCase())
-      ),
-      new KeyedView(
-        "backend-actions",
-        backendActions
-      ),
-      new KeyedView(
-        "devices-heading",
-        spacedHeading("DEVICES")
-      ),
-      new KeyedView(
-        "actions",
-        actions
-      ),
-      new KeyedView(
-        "list",
-        new Column(
-          "sensor-list",
-          rows,
-          listStyle()
-        )
-      ),
-      new KeyedView(
-        "runtime-heading",
-        spacedHeading("SIMULATION")
-      ),
-      new KeyedView(
-        "runtime-actions",
-        runtimeActions
-      )
+      new KeyedView("robots-heading", spacedHeading("ROBOTS")),
+      new KeyedView("robots", new Column("sensor-robots", robotRows, listStyle())),
+      new KeyedView("backend-heading", spacedHeading("PHYSICS · " + simulation.userBackendName().toUpperCase())),
+      new KeyedView("backend-actions", backendActions),
+      new KeyedView("devices-heading", spacedHeading("DEVICES")),
+      new KeyedView("actions", actions),
+      new KeyedView("list", new Column("sensor-list", rows, listStyle())),
+      new KeyedView("runtime-heading", spacedHeading("SIMULATION")),
+      new KeyedView("runtime-actions", runtimeActions)
     ];
     if (simulation.collisionWarnings.length > 0) content.push(new KeyedView(
       "collision-warnings",
-      textLines(
-        "collision-warnings",
-        simulation.collisionWarnings
-      )
+      textLines("collision-warnings", simulation.collisionWarnings)
     ));
     if (ownership != null) {
       var overrideLabel = ownership.overridesEnabled ? "Disable overrides" : "Enable overrides";
@@ -325,13 +234,7 @@ import haxeon.ui.widgets.text.Text;
           "simulation-origins",
           textLines(
             "script-simulation-origins",
-            ownership.propertyOrigins(
-              ScriptOwnership.SIMULATION_TARGET,
-              [
-                "backend",
-                "timestep"
-              ]
-            )
+            ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET, ["backend", "timestep"])
           )
         )
       );
@@ -341,13 +244,7 @@ import haxeon.ui.widgets.text.Text;
           "robot-origins",
           textLines(
             "script-robot-origins",
-            ["Robot pose"].concat(ownership.propertyOrigins(
-              sensors.robotId,
-              [
-                "position",
-                "rotation"
-              ]
-            ))
+            ["Robot pose"].concat(ownership.propertyOrigins(sensors.robotId, ["position", "rotation"]))
           )
         )
       );
@@ -378,10 +275,7 @@ import haxeon.ui.widgets.text.Text;
           "sensor-origin",
           textLines(
             "script-sensor-origins",
-            ["Value origins"].concat(ownership.propertyOrigins(
-              sensorTarget,
-              sensorProperties
-            ))
+            ["Value origins"].concat(ownership.propertyOrigins(sensorTarget, sensorProperties))
           )
         ));
         var decreaseRate = new Button("Rate -1 Hz", null, function() {
@@ -407,14 +301,8 @@ import haxeon.ui.widgets.text.Text;
           "script-rate-actions",
           [
             new KeyedView("decrease", decreaseRate),
-            new KeyedView(
-              "increase",
-              increaseRate
-            ),
-            new KeyedView(
-              "revert",
-              revertRate
-            )
+            new KeyedView("increase", increaseRate),
+            new KeyedView("revert", revertRate)
           ]
         );
         content.push(new KeyedView("rate-actions", rateActions));
@@ -454,10 +342,7 @@ import haxeon.ui.widgets.text.Text;
     ));
     if (ownership != null && ownership.diagnostics.length > 0) content.push(new KeyedView(
       "script-diagnostics",
-      textLines(
-        "script-diagnostic-lines",
-        ownership.diagnostics
-      )
+      textLines("script-diagnostic-lines", ownership.diagnostics)
     ));
     var contentStyle = new LayoutStyle();
     contentStyle.width = LayoutAxis.stretch();

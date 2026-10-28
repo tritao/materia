@@ -149,11 +149,7 @@ class WeldBeads implements SessionMember {
           for (index in 0...Std.int(points.length / 3)) {
             var point = AssemblyRobot.rotate(
               frame.rotation,
-              [
-                points[3 * index],
-                points[3 * index + 1],
-                points[3 * index + 2]
-              ]
+              [points[3 * index], points[3 * index + 1], points[3 * index + 2]]
             );
             for (axis in 0...3) world.push(point[axis] + frame.position[axis]);
           }
@@ -209,10 +205,7 @@ class WeldBeads implements SessionMember {
       timestep,
       reading.arc,
       welder.wireSpeed(),
-      intoFrame(
-        frameOf(entry),
-        welder.tip()
-      )
+      intoFrame(frameOf(entry), welder.tip())
     );
     for (seam in beads) if (seam.step == index) {
       var changed = seam.bead.takeChanges();
@@ -257,13 +250,7 @@ class WeldBeads implements SessionMember {
         var last = Std.int(Math.min(seam.bead.count - 1, seam.dirtyTo + 1) / CHUNK);
         for (chunk in first...last + 1) changed.set(
           seam.firstPart + chunk,
-          chunkGeometry(
-            seam.bead,
-            chunk,
-            frame,
-            pose,
-            host.part.center
-          )
+          chunkGeometry(seam.bead, chunk, frame, pose, host.part.center)
         );
         seam.dirtyFrom = seam.bead.count;
         seam.dirtyTo = -1;
@@ -291,10 +278,7 @@ class WeldBeads implements SessionMember {
     bead:WeldBead,
     chunk:Int,
     frame: {position: Array<Float>, rotation: Array<Float>},
-    pose: {
-      position: Array<Float>,
-      rotation: Array<Float>
-    },
+    pose: {position: Array<Float>, rotation: Array<Float>},
     center:Array<Float>
   ):GeometryData {
     var first = chunk * CHUNK, end = Std.int(Math.min(bead.count, first + CHUNK));
@@ -309,10 +293,7 @@ class WeldBeads implements SessionMember {
     }
     function turn(direction:Array<Float>):Array<Float> return AssemblyRobot.rotate(
       inverse,
-      AssemblyRobot.rotate(
-        frame.rotation,
-        direction
-      )
+      AssemblyRobot.rotate(frame.rotation, direction)
     );
     function leg(station:Int):Float return station < 0 || station >= bead.count ? 0.0 : bead.leg(station);
     // The leg of the section at the boundary before station `j`.

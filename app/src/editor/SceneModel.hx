@@ -57,10 +57,7 @@ typedef SceneRecordChange = {
       label: source.label + " copy",
       type: source.type,
       x: Math.min(1000000, source.x + 0.25),
-      y: Math.min(
-        1000000,
-        source.y + 0.25
-      ),
+      y: Math.min(1000000, source.y + 0.25),
       z: source.z,
       width: source.width,
       height: source.height,

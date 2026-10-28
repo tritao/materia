@@ -20,15 +20,9 @@ class EditorWorkspaceLayoutTests {
             DockSplitAxis.Horizontal,
             centerRatio,
             DockNode.Panel("perspective"),
-            DockNode.Tabs(
-              right,
-              "inspector"
-            )
+            DockNode.Tabs(right, "inspector")
           ),
-          DockNode.Tabs(
-            bottom,
-            "console"
-          )
+          DockNode.Tabs(bottom, "console")
         )
       ):
         if (Math.abs(leftRatio - 0.20) > 0.001 || Math.abs((1.0 - leftRatio) * centerRatio - 0.58) > 0.001
@@ -57,13 +51,7 @@ class EditorWorkspaceLayoutTests {
       workspace.setDefaultLayout(DockNode.Split(
         DockSplitAxis.Horizontal,
         0.75,
-        DockNode.Tabs(
-          [
-            "viewport",
-            "perspective"
-          ],
-          active
-        ),
+        DockNode.Tabs(["viewport", "perspective"], active),
         DockNode.Panel("inspector")
       ));
       workspace.activate(active);

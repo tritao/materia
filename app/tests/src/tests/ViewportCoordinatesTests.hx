@@ -67,15 +67,8 @@ import haxeon.ui.widgets.layout.Spacer;
     var definition:materia.assembly.AssemblyDefinition = {
       schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION,
       id: "section-test",
-      definitions: [{
-        id: "part",
-        connectors: []
-      }],
-      occurrences: [{
-        id: "part",
-        definition: "part",
-        initialPose: materia.assembly.AssemblyFrames.identity()
-      }],
+      definitions: [{id: "part", connectors: []}],
+      occurrences: [{id: "part", definition: "part", initialPose: materia.assembly.AssemblyFrames.identity()}],
       joints: []
     };
     var record = materia.presentation.Presentations.assembled(definition);
@@ -171,44 +164,17 @@ import haxeon.ui.widgets.layout.Spacer;
     var row = new Row(
       "docked-row",
       [
-        new KeyedView(
-          "left",
-          new Spacer(
-            "hierarchy",
-            LayoutAxis.fixed(300),
-            LayoutAxis.grow()
-          )
-        ),
-        new KeyedView(
-          "viewport",
-          viewport
-        ),
-        new KeyedView(
-          "right",
-          new Spacer(
-            "inspector",
-            LayoutAxis.fixed(200),
-            LayoutAxis.grow()
-          )
-        )
+        new KeyedView("left", new Spacer("hierarchy", LayoutAxis.fixed(300), LayoutAxis.grow())),
+        new KeyedView("viewport", viewport),
+        new KeyedView("right", new Spacer("inspector", LayoutAxis.fixed(200), LayoutAxis.grow()))
       ],
       fill()
     );
     var layout = new Column(
       "docked-column",
       [
-        new KeyedView(
-          "toolbar",
-          new Spacer(
-            "toolbar",
-            LayoutAxis.grow(),
-            LayoutAxis.fixed(80)
-          )
-        ),
-        new KeyedView(
-          "body",
-          row
-        )
+        new KeyedView("toolbar", new Spacer("toolbar", LayoutAxis.grow(), LayoutAxis.fixed(80))),
+        new KeyedView("body", row)
       ],
       fill()
     );

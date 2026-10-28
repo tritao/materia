@@ -45,24 +45,10 @@ class ProjectLoadingTests {
       schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION,
       id: "shared-fixture",
       lengthUnit: "mm",
-      definitions: [{
-        id: "body",
-        connectors: [{
-          name: "pin",
-          frame: frame
-        }]
-      }],
+      definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
       occurrences: [
-        {
-          id: "base",
-          definition: "body",
-          initialPose: frame
-        },
-        {
-          id: "arm",
-          definition: "body",
-          initialPose: frame
-        }
+        {id: "base", definition: "body", initialPose: frame},
+        {id: "arm", definition: "body", initialPose: frame}
       ],
       joints: [{
         id: "slide",
@@ -72,17 +58,8 @@ class ProjectLoadingTests {
         parentConnector: "pin",
         child: "arm",
         childConnector: "pin",
-        axis: {
-          x: 1.0,
-          y: 0.0,
-          z: 0.0
-        },
-        limits: {
-          lower: -10.0,
-          upper: 10.0,
-          velocity: null,
-          effort: null
-        },
+        axis: {x: 1.0, y: 0.0, z: 0.0},
+        limits: {lower: -10.0, upper: 10.0, velocity: null, effort: null},
         defaultValue: 0.0
       }]
     };
@@ -99,14 +76,8 @@ class ProjectLoadingTests {
     var saved:materia.assembly.AssemblyDefinition.AssemblyStateRecord = {
       schemaVersion: materia.assembly.AssemblyDefinitionCodec.VERSION,
       definition: definition.id,
-      jointCoordinates: [{
-        joint: "slide",
-        value: 2.0
-      }],
-      rootPoses: [{
-        occurrence: "base",
-        pose: root
-      }]
+      jointCoordinates: [{joint: "slide", value: 2.0}],
+      rootPoses: [{occurrence: "base", pose: root}]
     };
     var first = cadkit.modeling.AssemblyState.fromModel(model, saved);
     var second = cadkit.modeling.AssemblyState.fromModel(model, saved);
@@ -217,10 +188,7 @@ class ProjectLoadingTests {
         format: "materia.project",
         version: 1,
         defaultEntrypoint: "preview",
-        build: {
-          system: "haxeon",
-          manifest: "haxeon.json"
-        },
+        build: {system: "haxeon", manifest: "haxeon.json"},
         entrypoints: {preview: entry}
       };
       File.saveContent(manifest, Json.stringify(project));
@@ -276,10 +244,7 @@ class ProjectLoadingTests {
           artifact.metresPerUnit
         );
         check(
-          sameBytes(expected.positions, item.geometry.positions) && sameBytes(
-            expected.normals,
-            item.geometry.normals
-          ),
+          sameBytes(expected.positions, item.geometry.positions) && sameBytes(expected.normals, item.geometry.normals),
           "cached packed streams match fresh conversion byte for byte"
         );
       }

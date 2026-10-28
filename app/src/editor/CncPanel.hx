@@ -72,10 +72,7 @@ class CncPanel {
         player == null ? (print != null ? "PRINT PROGRAM" : "CNC PROGRAM") : player.title(),
         null,
         tokens.textSecondary,
-        TextStyleOverride.text(
-          11.0,
-          0.8
-        )
+        TextStyleOverride.text(11.0, 0.8)
       )
     );
     var link = new KeyedView("printer", new Text(printer == null ? "" : "Printer: " + printer));
@@ -133,17 +130,7 @@ class CncPanel {
       "buttons",
       new Row(
         "cnc-buttons",
-        [
-          new KeyedView("hold", hold),
-          new KeyedView(
-            "resume",
-            resume
-          ),
-          new KeyedView(
-            "restart",
-            restart
-          )
-        ],
+        [new KeyedView("hold", hold), new KeyedView("resume", resume), new KeyedView("restart", restart)],
         buttonsStyle
       )
     );
@@ -165,17 +152,7 @@ class CncPanel {
       );
       items.push(new KeyedView(
         "recovery-actions",
-        new Row(
-          "cnc-recovery",
-          [
-            new KeyedView("reset", reset),
-            new KeyedView(
-              "details",
-              details
-            )
-          ],
-          buttonsStyle
-        )
+        new Row("cnc-recovery", [new KeyedView("reset", reset), new KeyedView("details", details)], buttonsStyle)
       ));
       if (errorDetails) items.push(new KeyedView("error-details", new Text(failure)));
     }

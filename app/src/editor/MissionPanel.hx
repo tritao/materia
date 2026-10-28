@@ -56,12 +56,7 @@ class MissionPanel {
       items.push(new KeyedView("machining-status", new Text(state.machiningStatus)));
       if (showProgram != null) items.push(new KeyedView(
         "program",
-        new Button(
-          "Open CNC program",
-          null,
-          showProgram,
-          "mission-cnc-program"
-        )
+        new Button("Open CNC program", null, showProgram, "mission-cnc-program")
       ));
       items.push(new KeyedView(
         "machining-task",

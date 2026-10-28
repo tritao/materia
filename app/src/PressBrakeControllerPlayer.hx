@@ -123,12 +123,7 @@ class PressBrakeControllerPlayer implements SessionMember {
       point.push(step.gaugeRmm * 0.001);
     }
     axes = new MachineProgramPlayer(
-      {
-        axes: ids,
-        waypoints: [point],
-        loop: false,
-        positionTolerance: authored.positionToleranceMm * 0.001
-      },
+      {axes: ids, waypoints: [point], loop: false, positionTolerance: authored.positionToleranceMm * 0.001},
       robot,
       session
     );

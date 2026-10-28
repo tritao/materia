@@ -36,23 +36,13 @@ import sys.FileSystem;
     var tokens = app.appearance.theme.tokens;
     var rows:Array<KeyedView> = [new KeyedView(
       "title",
-      new Text(
-        "Start",
-        null,
-        tokens.text,
-        TextStyleOverride.text(22.0)
-      )
+      new Text("Start", null, tokens.text, TextStyleOverride.text(22.0))
     )];
     var loading = app.startLoading;
     if (loading != null) rows.push(new KeyedView("loading", loadingRow(app, loading)));
     else if (app.startFailure != null) rows.push(new KeyedView(
       "failure",
-      new Text(
-        app.startFailure,
-        null,
-        tokens.danger,
-        TextStyleOverride.text(13.0)
-      )
+      new Text(app.startFailure, null, tokens.danger, TextStyleOverride.text(13.0))
     ));
 
     rows.push(new KeyedView("new-heading", app.sectionHeading("NEW FILE")));
@@ -152,12 +142,7 @@ import sys.FileSystem;
       if (categoryFamilies.length == 0) continue;
       if (browser.category == "All") rows.push(new KeyedView(
         "category-heading:" + category,
-        new Text(
-          category,
-          null,
-          tokens.text,
-          TextStyleOverride.text(18.0)
-        )
+        new Text(category, null, tokens.text, TextStyleOverride.text(18.0))
       ));
       var singles:Array<KeyedView> = [];
       var groupedFamilies:Array<ExampleFamily> = [];
@@ -172,31 +157,16 @@ import sys.FileSystem;
       }
       if (singles.length > 0) rows.push(new KeyedView(
         "singles:" + category,
-        cardGrid(
-          "singles:" + category,
-          singles,
-          columns
-        )
+        cardGrid("singles:" + category, singles, columns)
       ));
       for (family in groupedFamilies) {
         rows.push(new KeyedView(
           "family-heading:" + family.id,
-          new Text(
-            family.title,
-            null,
-            tokens.textSecondary,
-            TextStyleOverride.text(14.0)
-          )
+          new Text(family.title, null, tokens.textSecondary, TextStyleOverride.text(14.0))
         ));
         var variants = [for (entry in family.examples) new KeyedView(
           entry.id,
-          exampleCard(
-            app,
-            family,
-            entry,
-            cardWidth,
-            true
-          )
+          exampleCard(app, family, entry, cardWidth, true)
         )];
         rows.push(new KeyedView("family:" + family.id, cardGrid("family:" + family.id, variants, columns)));
       }
@@ -269,24 +239,8 @@ import sys.FileSystem;
       new Row(
         "example-action:" + entry.id,
         [
-          new KeyedView(
-            "label",
-            new Text(
-              actionLabel,
-              null,
-              tokens.accent,
-              TextStyleOverride.text(12.0)
-            )
-          ),
-          new KeyedView(
-            "icon",
-            new Icon(
-              "example-action-icon:" + entry.id,
-              IconName.ArrowRight,
-              12.0,
-              tokens.accent
-            )
-          )
+          new KeyedView("label", new Text(actionLabel, null, tokens.accent, TextStyleOverride.text(12.0))),
+          new KeyedView("icon", new Icon("example-action-icon:" + entry.id, IconName.ArrowRight, 12.0, tokens.accent))
         ],
         actionStyle
       )
@@ -305,25 +259,8 @@ import sys.FileSystem;
     button.labelView = new Column(
       "example-content:" + entry.id,
       [
-        new KeyedView(
-          "preview",
-          StartExamplePreview.build(
-            family,
-            tokens.accent,
-            Math.max(
-              1.0,
-              width - 24.0
-            )
-          )
-        ),
-        new KeyedView(
-          "details",
-          new Column(
-            "example-details:" + entry.id,
-            details,
-            detailsStyle
-          )
-        )
+        new KeyedView("preview", StartExamplePreview.build(family, tokens.accent, Math.max(1.0, width - 24.0))),
+        new KeyedView("details", new Column("example-details:" + entry.id, details, detailsStyle))
       ],
       labelStyle
     );
@@ -340,11 +277,7 @@ import sys.FileSystem;
       rowStyle.childGap = 10.0;
       rows.push(new KeyedView(
         "row:" + index,
-        new Row(
-          key + ":row:" + index,
-          cards.slice(index, index + columns),
-          rowStyle
-        )
+        new Row(key + ":row:" + index, cards.slice(index, index + columns), rowStyle)
       ));
       index += columns;
     }
@@ -366,22 +299,8 @@ import sys.FileSystem;
     rowStyle.childAlignY = LayoutAlignmentY.Center;
     rowStyle.childGap = 10.0;
     var items:Array<KeyedView> = [
-      new KeyedView(
-        "spinner",
-        new Spinner(
-          "start-loading-spinner",
-          "Opening " + entry.title
-        )
-      ),
-      new KeyedView(
-        "text",
-        new Text(
-          text,
-          null,
-          tokens.accent,
-          TextStyleOverride.text(13.0)
-        )
-      )
+      new KeyedView("spinner", new Spinner("start-loading-spinner", "Opening " + entry.title)),
+      new KeyedView("text", new Text(text, null, tokens.accent, TextStyleOverride.text(13.0)))
     ];
     if (status != null) {
       var cancel = new Button("Cancel", null, function() app.cancelExampleLoad(), "start-cancel-load");
@@ -428,21 +347,11 @@ import sys.FileSystem;
     var secondary = app.appearance.theme.tokens.textSecondary;
     var result:Array<KeyedView> = [for (index in 0...lines.length) new KeyedView(
       "line:" + index,
-      new Text(
-        lines[index],
-        null,
-        secondary,
-        TextStyleOverride.text(12.0)
-      )
+      new Text(lines[index], null, secondary, TextStyleOverride.text(12.0))
     )];
     if (tag != null) result.push(new KeyedView(
       "tag",
-      new Text(
-        tag,
-        null,
-        app.appearance.theme.tokens.accent,
-        TextStyleOverride.text(11.0)
-      )
+      new Text(tag, null, app.appearance.theme.tokens.accent, TextStyleOverride.text(11.0))
     ));
     return result;
   }

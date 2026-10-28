@@ -31,26 +31,10 @@ class EnclosureGuardPanel {
       "enclosure-preview",
       [
         new KeyedView("heading", new Text("ENCLOSURE · DESIGN PREVIEW")),
-        new KeyedView(
-          "status",
-          new Text('Door ${opened?"open":closed?"closed":"partly open"}')
-        ),
+        new KeyedView("status", new Text('Door ${opened?"open":closed?"closed":"partly open"}')),
         new KeyedView(
           "actions",
-          new Row(
-            "guard-preview-actions",
-            [
-              new KeyedView(
-                "open",
-                open
-              ),
-              new KeyedView(
-                "close",
-                close
-              )
-            ],
-            style
-          )
+          new Row("guard-preview-actions", [new KeyedView("open", open), new KeyedView("close", close)], style)
         ),
         new KeyedView(
           "hint",
@@ -80,40 +64,11 @@ class EnclosureGuardPanel {
     action("Reset guard", "guard-reset", s.canReset, guard.resetGuard);
     var rows:Array<KeyedView> = [
       new KeyedView("heading", new Text("ENCLOSURE · SIMULATION")),
-      new KeyedView(
-        "status",
-        new Text(s.message)
-      ),
-      new KeyedView(
-        "door-feedback",
-        new Text(s.doorMessage)
-      ),
-      new KeyedView(
-        "motion-feedback",
-        new Text(s.motionMessage)
-      ),
-      new KeyedView(
-        "door-actions",
-        new Row(
-          "guard-door-actions",
-          controls.slice(
-            0,
-            2
-          ),
-          style
-        )
-      ),
-      new KeyedView(
-        "cut-actions",
-        new Row(
-          "guard-cut-actions",
-          controls.slice(
-            2,
-            4
-          ),
-          style
-        )
-      )
+      new KeyedView("status", new Text(s.message)),
+      new KeyedView("door-feedback", new Text(s.doorMessage)),
+      new KeyedView("motion-feedback", new Text(s.motionMessage)),
+      new KeyedView("door-actions", new Row("guard-door-actions", controls.slice(0, 2), style)),
+      new KeyedView("cut-actions", new Row("guard-cut-actions", controls.slice(2, 4), style))
     ];
     if (s.canResume) {
       rows.push(new KeyedView("resume", new Button("Resume simulation", null, simulation.start, "guard-resume")));

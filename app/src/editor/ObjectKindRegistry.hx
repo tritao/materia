@@ -13,54 +13,12 @@ import haxeon.ui.properties.PropertyDescriptor;
 /** The single list of kinds known to the editor. */
 class ObjectKindRegistry {
   static final providers:Array<ObjectKindProvider> = [
-    new BuiltinObjectKind(
-      "rectangle",
-      "Primitive",
-      "Rectangle",
-      "scene.create",
-      false,
-      false
-    ),
-    new BuiltinObjectKind(
-      "cad-part",
-      "CAD",
-      "Empty CAD part",
-      "scene.create-part",
-      true,
-      true
-    ),
-    new BuiltinObjectKind(
-      "cad-plate",
-      "CAD",
-      "Mounting plate",
-      "scene.create-plate",
-      true,
-      true
-    ),
-    new BuiltinObjectKind(
-      "cad-bracket",
-      "CAD",
-      "L bracket",
-      "scene.create-bracket",
-      true,
-      true
-    ),
-    new BuiltinObjectKind(
-      "cad-step",
-      "Import",
-      "STEP part",
-      "scene.import-step",
-      true,
-      true
-    ),
-    new BuiltinObjectKind(
-      "cad-preview",
-      "",
-      "Generated CAD preview",
-      "",
-      false,
-      true
-    ),
+    new BuiltinObjectKind("rectangle", "Primitive", "Rectangle", "scene.create", false, false),
+    new BuiltinObjectKind("cad-part", "CAD", "Empty CAD part", "scene.create-part", true, true),
+    new BuiltinObjectKind("cad-plate", "CAD", "Mounting plate", "scene.create-plate", true, true),
+    new BuiltinObjectKind("cad-bracket", "CAD", "L bracket", "scene.create-bracket", true, true),
+    new BuiltinObjectKind("cad-step", "Import", "STEP part", "scene.import-step", true, true),
+    new BuiltinObjectKind("cad-preview", "", "Generated CAD preview", "", false, true),
     new StockSimulationKind(),
     new HumanWorkerKind()
   ];
@@ -201,10 +159,7 @@ class ObjectKindRegistry {
           "wall",
           "Wall thickness",
           function(model) return model.wallThickness(),
-          function(value) scene.setBracketWallThickness(
-            id,
-            value
-          ),
+          function(value) scene.setBracketWallThickness(id, value),
           prefix
         ));
         result.push(scene.bracketProperty(
@@ -212,10 +167,7 @@ class ObjectKindRegistry {
           "hole-radius",
           "Hole radius",
           function(model) return model.holeRadius(),
-          function(value) scene.setBracketHoleRadius(
-            id,
-            value
-          ),
+          function(value) scene.setBracketHoleRadius(id, value),
           prefix
         ));
       default:

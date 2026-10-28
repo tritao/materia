@@ -527,16 +527,8 @@ private typedef InputProbe = {
       var nextX = 0.25 + (cycle % 2) * 0.01;
       candidate.document.apply(new EditOperation(
         "Stress move " + cycle,
-        function() candidate.setPositionXY(
-          "stress-9999",
-          nextX,
-          position.y
-        ),
-        function() candidate.setPositionXY(
-          "stress-9999",
-          fromX,
-          position.y
-        )
+        function() candidate.setPositionXY("stress-9999", nextX, position.y),
+        function() candidate.setPositionXY("stress-9999", fromX, position.y)
       ));
       previousX = nextX;
     }
@@ -749,23 +741,12 @@ private typedef InputProbe = {
     measurePrimitive(
       "new RenderNode",
       n,
-      function(i) new RenderNode(
-        new haxeon.ui.core.WidgetId(i + 1),
-        LayoutVisualKind.Box,
-        null
-      )
+      function(i) new RenderNode(new haxeon.ui.core.WidgetId(i + 1), LayoutVisualKind.Box, null)
     );
     measurePrimitive(
       "new StyleTarget",
       n,
-      function(i) new haxeon.ui.style.StyleTarget(
-        "button",
-        "k",
-        "k",
-        ["a"],
-        ["button"],
-        0
-      )
+      function(i) new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0)
     );
     var target = new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
     measurePrimitive(
@@ -793,10 +774,7 @@ private typedef InputProbe = {
     measurePrimitive(
       "new Semantics",
       n,
-      function(i) new haxeon.ui.semantics.Semantics(
-        haxeon.ui.semantics.AccessibilityRole.Button,
-        "x"
-      )
+      function(i) new haxeon.ui.semantics.Semantics(haxeon.ui.semantics.AccessibilityRole.Button, "x")
     );
     measurePrimitive("Text widget build", n, function(i) {
       ctx.beginFrame();

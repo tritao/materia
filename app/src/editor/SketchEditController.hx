@@ -51,10 +51,7 @@ import cadkit.sketch.SolvedSketch;
     var minY = Math.min(startY, endY), maxY = Math.max(startY, endY);
     if (maxX - minX < 0.000001 || maxY - minY < 0.000001 || Math.max(
       Math.max(Math.abs(minX), Math.abs(maxX)),
-      Math.max(
-        Math.abs(minY),
-        Math.abs(maxY)
-      )
+      Math.max(Math.abs(minY), Math.abs(maxY))
     ) > 1000000.0) return false;
     var sketch = draft.sketch.snapshot();
     var prefixIndex = 1;

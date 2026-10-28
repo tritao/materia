@@ -60,27 +60,10 @@ import haxeon.ui.widgets.text.TextField;
           "assembly-summary",
           new Text("Assembly · " + group.count + " part occurrences · " + group.shown + " shown")
         ),
-        new KeyedView(
-          "assembly-path",
-          new Text(group.path == "" ? "Root assembly" : group.path)
-        ),
-        new KeyedView(
-          "frame",
-          sceneAction(
-            "assembly-frame",
-            "scene.frame-selected",
-            "Frame assembly",
-            null
-          )
-        ),
-        new KeyedView(
-          "visibility",
-          visibility
-        ),
-        new KeyedView(
-          "isolate",
-          isolate
-        )
+        new KeyedView("assembly-path", new Text(group.path == "" ? "Root assembly" : group.path)),
+        new KeyedView("frame", sceneAction("assembly-frame", "scene.frame-selected", "Frame assembly", null)),
+        new KeyedView("visibility", visibility),
+        new KeyedView("isolate", isolate)
       ];
       return new Column("inspector-assembly", rows, style);
     }
@@ -88,10 +71,7 @@ import haxeon.ui.widgets.text.TextField;
     if (selected == null) {
       var emptyRows:Array<KeyedView> = [
         new KeyedView("heading", sectionHeading("INSPECTOR")),
-        new KeyedView(
-          "hint",
-          new Text("Select an object to edit its properties.")
-        )
+        new KeyedView("hint", new Text("Select an object to edit its properties."))
       ];
       var sheetWorkflow = SheetWorkflowPanel.build(app);
       var projectPanel = app.projectUiPanel();
@@ -136,10 +116,7 @@ import haxeon.ui.widgets.text.TextField;
         + " · " + joint.type + " · " + joint.parentConnector + " → " + joint.childConnector);
       if (jointLines.length > 0) rows.push(new KeyedView(
         "assembly-joints",
-        textLines(
-          "assembly-joint-lines",
-          jointLines
-        )
+        textLines("assembly-joint-lines", jointLines)
       ));
     }
     if (StringTools.startsWith(selected.id, "project:")) {
@@ -242,29 +219,15 @@ import haxeon.ui.widgets.text.TextField;
       var sketchTools:Array<KeyedView> = [];
       if (scene.canAddSketchDraftRectangle()) sketchTools.push(new KeyedView(
         "add-rectangle",
-        sceneAction(
-          "add-sketch-rectangle",
-          "scene.add-sketch-rectangle",
-          "Add rectangle",
-          IconName.Plus
-        )
+        sceneAction("add-sketch-rectangle", "scene.add-sketch-rectangle", "Add rectangle", IconName.Plus)
       ));
       if (scene.canClearSketchDraft()) sketchTools.push(new KeyedView(
         "clear-sketch",
-        sceneAction(
-          "clear-sketch-draft",
-          "scene.clear-sketch-draft",
-          "Clear sketch",
-          IconName.Close
-        )
+        sceneAction("clear-sketch-draft", "scene.clear-sketch-draft", "Clear sketch", IconName.Close)
       ));
       if (sketchTools.length > 0) rows.push(new KeyedView(
         "sketch-draft-tools",
-        new Row(
-          "sketch-draft-tools-row",
-          sketchTools,
-          actionRowStyle()
-        )
+        new Row("sketch-draft-tools-row", sketchTools, actionRowStyle())
       ));
       rows.push(new KeyedView(
         "sketch-draft-actions",
@@ -273,22 +236,9 @@ import haxeon.ui.widgets.text.TextField;
           [
             new KeyedView(
               "apply",
-              sceneAction(
-                "apply-sketch-draft",
-                "scene.apply-sketch",
-                "Apply sketch",
-                IconName.Save
-              )
+              sceneAction("apply-sketch-draft", "scene.apply-sketch", "Apply sketch", IconName.Save)
             ),
-            new KeyedView(
-              "cancel",
-              sceneAction(
-                "cancel-sketch-draft",
-                "scene.cancel-sketch",
-                "Cancel",
-                IconName.Close
-              )
-            )
+            new KeyedView("cancel", sceneAction("cancel-sketch-draft", "scene.cancel-sketch", "Cancel", IconName.Close))
           ],
           actionRowStyle()
         )
@@ -296,12 +246,7 @@ import haxeon.ui.widgets.text.TextField;
     } else if (scene.canBeginSelectedSketchEdit()) {
       rows.push(new KeyedView(
         "sketch-edit-action",
-        sceneAction(
-          "edit-selected-sketch",
-          "scene.edit-sketch",
-          "Edit sketch",
-          IconName.Inspect
-        )
+        sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)
       ));
     }
     // An edit waiting for the user to say which element a reference means (TN7).
@@ -329,10 +274,7 @@ import haxeon.ui.widgets.text.TextField;
           new Button("Use " + issue.candidates[candidate], null, function() {
           app.runSceneEdit(
             "Could not repair reference",
-            function() app.scene.repairSelectedReference(
-              referenceIndex,
-              candidate
-            )
+            function() app.scene.repairSelectedReference(referenceIndex, candidate)
           );
           app.commands.refresh();
         }, "repair-reference-" + referenceIndex + "-" + candidate)));
@@ -380,52 +322,27 @@ import haxeon.ui.widgets.text.TextField;
         case "scene.create-sketch":
           rows.push(new KeyedView(
             "create-sketch",
-            sceneAction(
-              "create-constrained-sketch",
-              commandId,
-              "Create sketch",
-              IconName.Plus
-            )
+            sceneAction("create-constrained-sketch", commandId, "Create sketch", IconName.Plus)
           ));
         case "scene.create-face-sketch":
           rows.push(new KeyedView(
             "create-face-sketch",
-            sceneAction(
-              "create-face-sketch",
-              commandId,
-              "Sketch on face",
-              IconName.Plus
-            )
+            sceneAction("create-face-sketch", commandId, "Sketch on face", IconName.Plus)
           ));
         case "scene.create-extrusion":
           rows.push(new KeyedView(
             "create-extrusion",
-            sceneAction(
-              "create-extrusion",
-              commandId,
-              "Extrude",
-              IconName.Plus
-            )
+            sceneAction("create-extrusion", commandId, "Extrude", IconName.Plus)
           ));
         case "scene.create-sheet-base":
           rows.push(new KeyedView(
             "create-sheet-base",
-            sceneAction(
-              "create-sheet-base",
-              commandId,
-              "Create sheet base",
-              IconName.Plus
-            )
+            sceneAction("create-sheet-base", commandId, "Create sheet base", IconName.Plus)
           ));
         case "scene.create-sheet-flange":
           rows.push(new KeyedView(
             "create-sheet-flange",
-            sceneAction(
-              "create-sheet-flange",
-              commandId,
-              "Create edge flange",
-              IconName.Plus
-            )
+            sceneAction("create-sheet-flange", commandId, "Create edge flange", IconName.Plus)
           ));
         case "scene.export-sheet-dxf", "scene.export-sheet-svg":
           rows.push(new KeyedView(
@@ -442,52 +359,27 @@ import haxeon.ui.widgets.text.TextField;
         case "scene.create-vertical-fillet":
           rows.push(new KeyedView(
             "create-vertical-fillet",
-            sceneAction(
-              "create-vertical-fillet",
-              commandId,
-              "Fillet vertical edges",
-              IconName.Plus
-            )
+            sceneAction("create-vertical-fillet", commandId, "Fillet vertical edges", IconName.Plus)
           ));
         case "scene.worker-add-step":
           rows.push(new KeyedView(
             "worker-add-step",
-            sceneAction(
-              "worker-add-step",
-              commandId,
-              "Add step",
-              IconName.Plus
-            )
+            sceneAction("worker-add-step", commandId, "Add step", IconName.Plus)
           ));
         case "scene.worker-remove-step":
           rows.push(new KeyedView(
             "worker-remove-step",
-            sceneAction(
-              "worker-remove-step",
-              commandId,
-              "Remove step",
-              IconName.Close
-            )
+            sceneAction("worker-remove-step", commandId, "Remove step", IconName.Close)
           ));
         case "scene.worker-step-up":
           rows.push(new KeyedView(
             "worker-step-up",
-            sceneAction(
-              "worker-step-up",
-              commandId,
-              "Move step up",
-              IconName.Plus
-            )
+            sceneAction("worker-step-up", commandId, "Move step up", IconName.Plus)
           ));
         case "scene.worker-step-down":
           rows.push(new KeyedView(
             "worker-step-down",
-            sceneAction(
-              "worker-step-down",
-              commandId,
-              "Move step down",
-              IconName.Plus
-            )
+            sceneAction("worker-step-down", commandId, "Move step down", IconName.Plus)
           ));
         default:
       }
@@ -499,14 +391,7 @@ import haxeon.ui.widgets.text.TextField;
           "script-object-origins",
           ["Script-owned"].concat(ownership.propertyOrigins(
             selected.id,
-            [
-              "position",
-              "dimensions",
-              "mass",
-              "collisionEnabled",
-              "dynamicBody",
-              "visible"
-            ]
+            ["position", "dimensions", "mass", "collisionEnabled", "dynamicBody", "visible"]
           ))
         )
       ));

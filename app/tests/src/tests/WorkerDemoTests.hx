@@ -74,10 +74,7 @@ class WorkerDemoTests {
       if (firstLink == null) firstLink = link.copy();
       linkTravel = Math.max(
         linkTravel,
-        Math.sqrt(Math.pow(link[0] - firstLink[0], 2) + Math.pow(
-          link[1] - firstLink[1],
-          2
-        ) + Math.pow(
+        Math.sqrt(Math.pow(link[0] - firstLink[0], 2) + Math.pow(link[1] - firstLink[1], 2) + Math.pow(
           link[2] - firstLink[2],
           2
         ) + Math.pow(
@@ -178,11 +175,7 @@ class WorkerDemoTests {
       || cleanedWorker.zones.indexOf("missing-zone") >= 0) throw "Dangling zone remained selected";
     try editor.scene.setWorkerData(
       "worker-demo",
-      {
-        asset: "animkit/assets/props/wrench.glb",
-        job: original.job,
-        zones: original.zones
-      }
+      {asset: "animkit/assets/props/wrench.glb", job: original.job, zones: original.zones}
     ) catch (error:Dynamic) throw 'Bad asset edit failed: $error';
     var failedPreview = scene.snapshot();
     var failedPreviewNodes = failedPreview.nodeCount();
@@ -332,20 +325,7 @@ class WorkerDemoTests {
       robotId: "arm",
       joint: 0,
       loop: true,
-      keys: [
-        {
-          time: 0.0,
-          position: 0.0
-        },
-        {
-          time: 1.0,
-          position: 0.6
-        },
-        {
-          time: 2.0,
-          position: 0.0
-        }
-      ]
+      keys: [{time: 0.0, position: 0.0}, {time: 1.0, position: 0.6}, {time: 2.0, position: 0.0}]
     }]);
     if (tracks.length != 1 || Math.abs(tracks[0].sample(0.5) - 0.3) > 1e-9
       || Math.abs(tracks[0].sample(2.5) - 0.3) > 1e-9 || app.RobotMotionTrack.decode([tracks[0].record()]).length
@@ -356,16 +336,7 @@ class WorkerDemoTests {
       robotId: "arm",
       joint: 0,
       loop: true,
-      keys: [
-        {
-          time: 0.0,
-          position: 0.0
-        },
-        {
-          time: 0.0,
-          position: 1.0
-        }
-      ]
+      keys: [{time: 0.0, position: 0.0}, {time: 0.0, position: 1.0}]
     }]) catch (_:Dynamic) rejected = true;
     if (!rejected) throw "Robot motion accepted non-increasing key times";
   }

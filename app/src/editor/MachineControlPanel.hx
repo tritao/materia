@@ -141,13 +141,7 @@ import haxeon.ui.widgets.text.TextField;
         "cup-actions",
         new Row(
           "cup-actions",
-          [
-            new KeyedView("continue", resume),
-            new KeyedView(
-              "section",
-              section
-            )
-          ],
+          [new KeyedView("continue", resume), new KeyedView("section", section)],
           ReferenceEditorApp.actionRowStyle()
         )
       ));
@@ -166,13 +160,7 @@ import haxeon.ui.widgets.text.TextField;
         "section",
         new Row(
           "machine-section",
-          [
-            new KeyedView("close", close),
-            new KeyedView(
-              "flip",
-              flip
-            )
-          ],
+          [new KeyedView("close", close), new KeyedView("flip", flip)],
           ReferenceEditorApp.actionRowStyle()
         )
       ));
@@ -326,13 +314,7 @@ import haxeon.ui.widgets.text.TextField;
             "angle",
             new Row(
               "machine-angle:" + id,
-              [
-                new KeyedView("dial", dial),
-                new KeyedView(
-                  "strip",
-                  strip
-                )
-              ],
+              [new KeyedView("dial", dial), new KeyedView("strip", strip)],
               ReferenceEditorApp.actionRowStyle()
             )
           ));
@@ -348,10 +330,7 @@ import haxeon.ui.widgets.text.TextField;
             axis.value,
             minimum,
             maximum,
-            Math.min(
-              axis.step,
-              (maximum - minimum) / 1000
-            ),
+            Math.min(axis.step, (maximum - minimum) / 1000),
             preview,
             begin,
             finish
@@ -363,10 +342,7 @@ import haxeon.ui.widgets.text.TextField;
         var field = new TextField(
           "machine-axis-value:" + id,
           drafts.exists(id) ? drafts.get(id) : position,
-          value -> drafts.set(
-            id,
-            value
-          )
+          value -> drafts.set(id, value)
         );
         field.label = rotary ? title + " (deg)" : "Position (" + axis.unit + ")";
         field.enabled = editable;
@@ -402,17 +378,8 @@ import haxeon.ui.widgets.text.TextField;
               "machine-angle-value:" + id,
               [
                 new KeyedView("field", field),
-                new KeyedView(
-                  "unit",
-                  new Text(
-                    "°",
-                    unitStyle
-                  )
-                ),
-                new KeyedView(
-                  "apply",
-                  apply
-                )
+                new KeyedView("unit", new Text("°", unitStyle)),
+                new KeyedView("apply", apply)
               ],
               ReferenceEditorApp.actionRowStyle()
             )
@@ -445,11 +412,7 @@ import haxeon.ui.widgets.text.TextField;
         if (maximum != null) button("max", "Max", maximum);
         controls.push(new KeyedView(
           "buttons",
-          new Row(
-            "machine-axis-buttons:" + id,
-            buttons,
-            ReferenceEditorApp.actionRowStyle()
-          )
+          new Row("machine-axis-buttons:" + id, buttons, ReferenceEditorApp.actionRowStyle())
         ));
         rows.push(new KeyedView(id, new Column("machine-axis:" + id, controls, style)));
       }

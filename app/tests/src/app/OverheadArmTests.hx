@@ -150,16 +150,8 @@ import motionkit.path.PoseMath;
     var path = new motionkit.path.PosePath(
       motionkit.robot.HandlingPlanRunner.FRAME,
       [new motionkit.path.PoseLine(
-        new motionkit.path.PoseWaypoint(
-          start,
-          0.002,
-          0.02
-        ),
-        new motionkit.path.PoseWaypoint(
-          stop,
-          0.002,
-          0.02
-        ),
+        new motionkit.path.PoseWaypoint(start, 0.002, 0.02),
+        new motionkit.path.PoseWaypoint(stop, 0.002, 0.02),
         motionkit.path.OrientationPolicy.FreeAboutTool,
         0.1,
         0.08
@@ -210,10 +202,7 @@ import motionkit.path.PoseMath;
       motion.robot,
       compiler,
       _ -> null,
-      () -> ({
-        events: [],
-        overflow: false
-      }),
+      () -> ({events: [], overflow: false}),
       motion.jointIndices
     );
     var numericBefore = solver.manipulator.numericSolveCount();
@@ -248,10 +237,8 @@ import motionkit.path.PoseMath;
         );
         worst = Math.max(
           worst,
-          Math.sqrt(Math.pow(tip.x - start.x - t * delta[0], 2) + Math.pow(
-            tip.y - start.y - t * delta[1],
-            2
-          ) + Math.pow(
+          Math.sqrt(Math.pow(tip.x - start.x - t * delta[0],
+          2) + Math.pow(tip.y - start.y - t * delta[1], 2) + Math.pow(
             tip.z - start.z - t * delta[2],
             2
           ))

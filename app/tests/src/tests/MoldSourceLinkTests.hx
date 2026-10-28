@@ -31,33 +31,12 @@ import materia.project.SceneArtifact;
       motions: [],
       sources: {
         features: [
-          {
-            id: "seat",
-            label: "Rail seat",
-            occurrence: "casting",
-            faces: [face],
-            whole: false
-          },
-          {
-            id: "whole-casting",
-            label: "Casting",
-            occurrence: "casting",
-            faces: [],
-            whole: true
-          }
+          {id: "seat", label: "Rail seat", occurrence: "casting", faces: [face], whole: false},
+          {id: "whole-casting", label: "Casting", occurrence: "casting", faces: [], whole: true}
         ],
-        members: [{
-          occurrence: "former",
-          sources: ["seat"],
-          shared: false
-        }]
+        members: [{occurrence: "former", sources: ["seat"], shared: false}]
       },
-      navigation: [{
-        occurrence: "casting",
-        label: "Back to Machine",
-        variant: "machine",
-        target: "frame/casting"
-      }]
+      navigation: [{occurrence: "casting", label: "Back to Machine", variant: "machine", target: "frame/casting"}]
     };
     var bytes = SceneArtifact.encode(artifact), session = new app.ProjectDocumentSession(null, false);
     session.openGeneratedProject(new app.ProjectArtifactLoader().load(bytes), "/tmp/mold-source-links.mtrg");

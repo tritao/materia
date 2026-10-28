@@ -92,14 +92,8 @@ class AssemblyRobot {
     jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>,
     warnings:Array<String>,
     mobile:Null<MobileBase>,
-    toolFrames:Map<
-      String,
-      robotkit.model.Frame
-  >,
-    missionFrames:Map<
-      String,
-      robotkit.model.Frame
-  >,
+    toolFrames:Map<String, robotkit.model.Frame>,
+    missionFrames:Map<String, robotkit.model.Frame>,
     heaters:Null<robotkit.runtime.VirtualHeaters>
   ) {
     this.heaters = heaters;
@@ -131,10 +125,7 @@ class AssemblyRobot {
     position: Array<Float>,
     rotation: Array<Float>
   } return compose(
-    simulation.linkPose(
-      part.robotIndex,
-      part.linkIndex
-    ),
+    simulation.linkPose(part.robotIndex, part.linkIndex),
     part.offset
   );
 
@@ -574,10 +565,7 @@ class AssemblyRobot {
     for (tool in session.robotTools) if (control == null
       || converted.partLinks.get(tool.contact.occurrence) != null) toolFrames.set(
         tool.contact.occurrence,
-        mountFrame(
-          tool.contact.occurrence + " contact",
-          tool.contact
-        )
+        mountFrame(tool.contact.occurrence + " contact", tool.contact)
       );
     // Each scanner scans from its mount connector.
     for (scanner in session.robotSensors) {
@@ -731,11 +719,7 @@ class AssemblyRobot {
       processkit.simulation.VirtualWelderSupply.configure(
         device,
         blueprint,
-        {
-          arc: torch.channel,
-          wireSpeed: welding.wireSpeedChannel,
-          voltage: welding.voltageChannel
-        },
+        {arc: torch.channel, wireSpeed: welding.wireSpeedChannel, voltage: welding.voltageChannel},
         welding.efficiency
       );
     }
@@ -783,10 +767,7 @@ class AssemblyRobot {
       null,
       null,
       true,
-      simulationExcludes(
-        converted.model,
-        simulationShapes
-      ),
+      simulationExcludes(converted.model, simulationShapes),
       restContactGroup
     );
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset
@@ -811,10 +792,7 @@ class AssemblyRobot {
       } else candidate.setPowerUpOffsets(robotIndex, base);
     }
     var robot = new SimulatedRobot(
-      idFor(
-        assembly,
-        control == null || session.controllers.length == 1 ? null : control.id
-      ),
+      idFor(assembly, control == null || session.controllers.length == 1 ? null : control.id),
       runtime,
       converted.model.name,
       [for (link in converted.model.links) link.id],

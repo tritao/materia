@@ -566,12 +566,7 @@ class MissionPlayer implements SessionMember {
       var initial = simulation.linkPose(robotIndex, 0);
       poses.push(new Transform3(
         new Vec3(initial.position[0], initial.position[1], initial.position[2]),
-        new Quat(
-          initial.rotation[0],
-          initial.rotation[1],
-          initial.rotation[2],
-          initial.rotation[3]
-        )
+        new Quat(initial.rotation[0], initial.rotation[1], initial.rotation[2], initial.rotation[3])
       ).toPose2());
       var margin = robotkit.navigation.FloorMap.navigationMargin(footprint.radius, 0.3, RESOLUTION);
       var map = new Costmap2(floorPlan(obstacles, poses, margin), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
@@ -593,11 +588,7 @@ class MissionPlayer implements SessionMember {
           LidarObstaclePerception.fromSensor(sensor, SCAN_RADIUS),
           localization,
           null,
-          LidarMapFilter.fromSensor(
-            map.grid,
-            sensor,
-            MAP_TOLERANCE
-          ),
+          LidarMapFilter.fromSensor(map.grid, sensor, MAP_TOLERANCE),
           LidarFreeSpace.fromSensor(sensor)
         );
         guard = new MotionGuard(
@@ -744,17 +735,8 @@ class MissionPlayer implements SessionMember {
       if (observed == null) throw "Contact registration requires an initialized map pose estimate";
       var nominal = job.nominal;
       var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
-        new Vec3(
-          nominal.x,
-          nominal.y,
-          nominal.z
-        ),
-        new Quat(
-          nominal.qx,
-          nominal.qy,
-          nominal.qz,
-          nominal.qw
-        )
+        new Vec3(nominal.x, nominal.y, nominal.z),
+        new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)
       ));
       var scene = weldCollisionScene(arm, tool.contact.occurrence, metal);
       var tip = weldKinematics.tip;
@@ -762,19 +744,7 @@ class MissionPlayer implements SessionMember {
         scene,
         arm,
         robot.model.links[weldKinematics.link].id,
-        new Transform3(
-          new Vec3(
-            tip.x,
-            tip.y,
-            tip.z
-          ),
-          new Quat(
-            tip.qx,
-            tip.qy,
-            tip.qz,
-            tip.qw
-          )
-        ),
+        new Transform3(new Vec3(tip.x, tip.y, tip.z), new Quat(tip.qx, tip.qy, tip.qz, tip.qw)),
         torch.wireDiameterMm * 0.001,
         torch.stickoutMm * 0.001,
         scene.memberObjects(tool.members),
@@ -801,10 +771,7 @@ class MissionPlayer implements SessionMember {
         probes,
         channels,
         sensorId,
-        () -> new motionkit.robot.ServoSession(
-          robot.robot,
-          arm
-        ),
+        () -> new motionkit.robot.ServoSession(robot.robot, arm),
         null,
         processkit.tool.WeldSensor.KIND,
         robot.rootLink
@@ -842,18 +809,9 @@ class MissionPlayer implements SessionMember {
         sensorKind = "tool_contact";
         safeOutputs = [
           MotionOp.SetOutput(tool.channel, EventValue.Digital(false)),
-          MotionOp.SetOutput(
-            capability.directionChannel,
-            EventValue.Digital(false)
-          ),
-          MotionOp.SetOutput(
-            capability.programChannel,
-            EventValue.Analog(0.0)
-          ),
-          MotionOp.SetOutput(
-            capability.vacuumChannel,
-            EventValue.Digital(false)
-          )
+          MotionOp.SetOutput(capability.directionChannel, EventValue.Digital(false)),
+          MotionOp.SetOutput(capability.programChannel, EventValue.Analog(0.0)),
+          MotionOp.SetOutput(capability.vacuumChannel, EventValue.Digital(false))
         ];
       }
       if (sensorId.length == 0
@@ -909,17 +867,8 @@ class MissionPlayer implements SessionMember {
       if (observed == null) throw "Contact registration requires an initialized map pose estimate";
       var nominal = job.nominal;
       var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
-        new Vec3(
-          nominal.x,
-          nominal.y,
-          nominal.z
-        ),
-        new Quat(
-          nominal.qx,
-          nominal.qy,
-          nominal.qz,
-          nominal.qw
-        )
+        new Vec3(nominal.x, nominal.y, nominal.z),
+        new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)
       ));
       var planningArm = selectedArm;
       if (selectedTool.kind == "screwdriver") {
@@ -953,19 +902,7 @@ class MissionPlayer implements SessionMember {
           scene,
           probeArm,
           robot.model.links[kinematics.link].id,
-          new Transform3(
-            new Vec3(
-              tcp.x,
-              tcp.y,
-              tcp.z
-            ),
-            new Quat(
-              tcp.qx,
-              tcp.qy,
-              tcp.qz,
-              tcp.qw
-            )
-          ),
+          new Transform3(new Vec3(tcp.x, tcp.y, tcp.z), new Quat(tcp.qx, tcp.qy, tcp.qz, tcp.qw)),
           capability.wireDiameterMm * 0.001,
           capability.stickoutMm * 0.001,
           scene.memberObjects(selectedTool.members),
@@ -993,10 +930,7 @@ class MissionPlayer implements SessionMember {
         probes,
         selectedChannels,
         selectedSensor,
-        () -> new motionkit.robot.ServoSession(
-          robot.robot,
-          probeArm
-        ),
+        () -> new motionkit.robot.ServoSession(robot.robot, probeArm),
         null,
         selectedKind,
         robot.rootLink,
@@ -1057,15 +991,9 @@ class MissionPlayer implements SessionMember {
       robot.robot.id(),
       robot.model,
       robot.shapes,
-      [for (index in 0...robot.model.links.length) linkPose(
-        robotIndex,
-        index
-      )],
+      [for (index in 0...robot.model.links.length) linkPose(robotIndex, index)],
       toolMembers,
-      robotkit.kinematics.RobotKinematics.observedState(
-        robot.model,
-        robot.robot.snapshot().positions.toArray()
-      )
+      robotkit.kinematics.RobotKinematics.observedState(robot.model, robot.robot.snapshot().positions.toArray())
     );
     var heldCarriers = new Map<String, String>();
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
@@ -1098,10 +1026,7 @@ class MissionPlayer implements SessionMember {
         other.robot.id(),
         other.model,
         other.shapes,
-        [for (link in 0...other.model.links.length) linkPose(
-          index,
-          link
-        )]
+        [for (link in 0...other.model.links.length) linkPose(index, link)]
       );
     }
     for (entry in objects) if (StringTools.startsWith(entry.id, "project:")) {
@@ -1133,15 +1058,7 @@ class MissionPlayer implements SessionMember {
       captured.object(
         name,
         [vertices],
-        new Transform3(
-          new Vec3(pose.x, pose.y, pose.z),
-          new Quat(
-            pose.qx,
-            pose.qy,
-            pose.qz,
-            pose.qw
-          )
-        ),
+        new Transform3(new Vec3(pose.x, pose.y, pose.z), new Quat(pose.qx, pose.qy, pose.qz, pose.qw)),
         carrier(entry),
         entry.object.motion == nativekit.sim.MotionType.Static ? CollisionOwner.Fixture : CollisionOwner.Loose
       );
@@ -1217,13 +1134,7 @@ class MissionPlayer implements SessionMember {
         physical.upperLimit,
         physical.maxRate,
         physical.maxAcceleration,
-        Math.max(
-          physical.lowerLimit,
-          Math.min(
-            physical.upperLimit,
-            0.0
-          )
-        ),
+        Math.max(physical.lowerLimit, Math.min(physical.upperLimit, 0.0)),
         [1.0],
         [0.0]
       ));
@@ -1240,11 +1151,7 @@ class MissionPlayer implements SessionMember {
     var slip = new StepperSlip(
       robot.robot.description().couplings,
       axisJoints,
-      (joint, offset) -> simulation.setJointSlip(
-        robotIndex,
-        joint,
-        offset
-      )
+      (joint, offset) -> simulation.setJointSlip(robotIndex, joint, offset)
     );
     homingEncoders = encoders;
     homingSlip = slip;
@@ -1384,10 +1291,7 @@ class MissionPlayer implements SessionMember {
           var message = Std.string(error);
           failMission(
             'step $stepIndex (${activeStep.kind}) could not be planned: $message',
-            alarmForFailure(
-              activeStep,
-              message
-            )
+            alarmForFailure(activeStep, message)
           );
           return;
         }
@@ -2228,14 +2132,8 @@ class MissionPlayer implements SessionMember {
             () -> graspPoint(at, channel),
             tool.sensor,
             graspThreshold(tool),
-            handlingOrientation(
-              step,
-              channel
-            ),
-            handlingApproach(
-              step,
-              channel
-            )
+            handlingOrientation(step, channel),
+            handlingApproach(step, channel)
           )
         );
       case "place":
@@ -2256,25 +2154,15 @@ class MissionPlayer implements SessionMember {
             () -> placeContact(at, step.yaw, channel),
             tool.sensor,
             graspThreshold(tool),
-            handlingOrientation(
-              step,
-              channel
-            ),
-            handlingApproach(
-              step,
-              channel
-            )
+            handlingOrientation(step, channel),
+            handlingApproach(step, channel)
           )
         );
       case "weld":
         var weld = step.weld;
         if (weld == null) throw "Weld mission step has no weld definition";
         return new processkit.skill.WeldPasses(
-          [for (pass in weld.passes)() -> weldPassSkill(
-            weld,
-            pass,
-            configurationFor(step)
-          )],
+          [for (pass in weld.passes)() -> weldPassSkill(weld, pass, configurationFor(step))],
           [for (pass in weld.passes) pass.interpassDwell]
         );
       case "screw":
@@ -2289,10 +2177,7 @@ class MissionPlayer implements SessionMember {
         if (factory == null) throw "Contact mission has no registration runner";
         return new processkit.skill.FindContactWork(
           () -> factory(job),
-          (registration) -> acceptRegisteredWork(
-            job,
-            registration
-          )
+          (registration) -> acceptRegisteredWork(job, registration)
         );
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
@@ -2334,12 +2219,7 @@ class MissionPlayer implements SessionMember {
     var pose = part.pose();
     return new Transform3(
       Vec3.fromArray(pose.position),
-      new Quat(
-        pose.rotation[0],
-        pose.rotation[1],
-        pose.rotation[2],
-        pose.rotation[3]
-      )
+      new Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3])
     );
   }
 
@@ -2427,21 +2307,11 @@ class MissionPlayer implements SessionMember {
     var sensorFrame:Frame = cast mountedSensorFrame;
     var sensorPose = new Transform3(
       new Vec3(sensorFrame.position[0], sensorFrame.position[1], sensorFrame.position[2]),
-      new Quat(
-        sensorFrame.rotation[0],
-        sensorFrame.rotation[1],
-        sensorFrame.rotation[2],
-        sensorFrame.rotation[3]
-      )
+      new Quat(sensorFrame.rotation[0], sensorFrame.rotation[1], sensorFrame.rotation[2], sensorFrame.rotation[3])
     );
     var tcpPose = new Transform3(
       new Vec3(tcp.position[0], tcp.position[1], tcp.position[2]),
-      new Quat(
-        tcp.rotation[0],
-        tcp.rotation[1],
-        tcp.rotation[2],
-        tcp.rotation[3]
-      )
+      new Quat(tcp.rotation[0], tcp.rotation[1], tcp.rotation[2], tcp.rotation[3])
     );
     var tcpFromSensor = ForceGuidedScrewEntry.sensorTransformAtTcp(sensorPose, tcpPose);
     // The feed slide is a spring while the arm searches; the controller measures the tip through it.
@@ -2453,11 +2323,7 @@ class MissionPlayer implements SessionMember {
     if (feedJoint < 0) throw 'Fastening "${job.fastening}" force search lost its feed slide';
     var feed = {
       joint: feedJoint,
-      axisAtTcp: processkit.screwdriving.ScrewdriverArmKinematics.feedAxisAtTip(
-        robot.model,
-        tcp.id,
-        capacity.feedJoint
-      )
+      axisAtTcp: processkit.screwdriving.ScrewdriverArmKinematics.feedAxisAtTip(robot.model, tcp.id, capacity.feedJoint)
     };
     return (plan:ScrewPlan) -> {if (plan == null
       || plan.fastening != job.fastening) throw "Force search received a different CAD fastening plan";
@@ -2650,12 +2516,7 @@ class MissionPlayer implements SessionMember {
       0.2,
       0.00005,
       0.02,
-      new IkTolerance(
-        0.00005,
-        0.001,
-        300,
-        0.03
-      )
+      new IkTolerance(0.00005, 0.001, 300, 0.03)
     );
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
@@ -2686,10 +2547,7 @@ class MissionPlayer implements SessionMember {
         escape = {
           screw: job.screw,
           link: spindle[0].child.id,
-          contacts: job.delivery == Presented ? [
-            job.presenter,
-            job.frame
-          ] : [job.frame]
+          contacts: job.delivery == Presented ? [job.presenter, job.frame] : [job.frame]
         };
       }
       var physicalThreadAttached = driver.physicalThreadAttached();
@@ -2828,12 +2686,7 @@ class MissionPlayer implements SessionMember {
     var worldFromRoot = Transform3.fromPose2(estimate.pose);
     registeredWork.set(
       job.frame,
-      {
-        world: worldFromRoot.compose(measured),
-        rootWork: measured,
-        envelope: envelope,
-        measurements: measurements
-      }
+      {world: worldFromRoot.compose(measured), rootWork: measured, envelope: envelope, measurements: measurements}
     );
   }
 
@@ -2846,16 +2699,7 @@ class MissionPlayer implements SessionMember {
     setJointTargets(q, step.joints, context);
     return new MotionProgramSkill(
       context.motion,
-      new MotionProgram([MotionOp.MoveJ(
-        MoveTarget.JointTarget(q),
-        new MotionOptions(
-          0,
-          0,
-          0,
-          true
-        ),
-        Blend.ExactStop
-      )])
+      new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(0, 0, 0, true), Blend.ExactStop)])
     );
   }
 
@@ -2939,12 +2783,7 @@ class MissionPlayer implements SessionMember {
         velocities,
         accelerations,
         jerks,
-        StartTolerances.uniform(
-          count,
-          0.005,
-          0.02,
-          0.2
-        )
+        StartTolerances.uniform(count, 0.005, 0.02, 0.2)
       );
       motion = new ManipulatorMotion(
         robot.robot,
@@ -3027,11 +2866,7 @@ class MissionPlayer implements SessionMember {
     arm:Manipulator,
     reference:Array<Float>,
     snapshot:CellCollisionSnapshot,
-    ?escape: {
-      screw: String,
-      link: String,
-      contacts: Array<String>
-    },
+    ?escape: {screw: String, link: String, contacts: Array<String>},
     ?contactScrew:String
   ): {
     planner: MotionPlanner,
@@ -3145,15 +2980,8 @@ class MissionPlayer implements SessionMember {
           first: build.objects[pair.first],
           second: build.objects[pair.second],
           margin: margin,
-          air: scene.description.marginBetweenObjects(
-            pair.first,
-            pair.second
-          ),
-          contact: scene.description.marginBetweenObjects(
-            pair.first,
-            pair.second,
-            true
-          )
+          air: scene.description.marginBetweenObjects(pair.first, pair.second),
+          contact: scene.description.marginBetweenObjects(pair.first, pair.second, true)
         });
       }
       collisionSpace.depthLimit = 20;
@@ -3296,12 +3124,7 @@ class MissionPlayer implements SessionMember {
     var live = assemblyParts.get("project:" + weld.frame).pose();
     return new Transform3(
       new Vec3(live.position[0], live.position[1], live.position[2]),
-      new Quat(
-        live.rotation[0],
-        live.rotation[1],
-        live.rotation[2],
-        live.rotation[3]
-      )
+      new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])
     );
   }
 

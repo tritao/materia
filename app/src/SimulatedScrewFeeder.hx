@@ -43,12 +43,7 @@ class SimulatedScrewFeeder implements SimulationStepObserver implements ScrewFee
       (id) -> {var part = parts.get("project:" + id), nest = parts.get("project:" + definition.presenter).pose();
     var frame = new Transform3(
       Vec3.fromArray(nest.position),
-      new Quat(
-        nest.rotation[0],
-        nest.rotation[1],
-        nest.rotation[2],
-        nest.rotation[3]
-      )
+      new Quat(nest.rotation[0], nest.rotation[1], nest.rotation[2], nest.rotation[3])
     );
     var target = frame.compose(ScrewScenePlan.frame(definition.deposit)).compose(new Transform3(
       Vec3.fromArray(part.center),

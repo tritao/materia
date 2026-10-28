@@ -97,32 +97,15 @@ class SketchDraftCodec {
     var plane = new Plane(origin, xDirection, normal);
     var settings = new SolverSettings(
       positiveField(settingsRecord, "tolerance"),
-      positiveField(
-        settingsRecord,
-        "rankTolerance"
-      ),
-      boundedInteger(
-        settingsRecord,
-        "maxIterations",
-        1,
-        10000
-      ),
-      positiveField(
-        settingsRecord,
-        "initialDamping"
-      )
+      positiveField(settingsRecord, "rankTolerance"),
+      boundedInteger(settingsRecord, "maxIterations", 1, 10000),
+      positiveField(settingsRecord, "initialDamping")
     );
     var sketch = new ConstrainedSketch(plane, units, settings);
     for (record in arrayField(source, "points")) sketch.addPoint(new SketchPoint(
       stringField(record, "id"),
-      numberField(
-        record,
-        "x"
-      ),
-      numberField(
-        record,
-        "y"
-      )
+      numberField(record, "x"),
+      numberField(record, "y")
     ));
     for (record in arrayField(source, "entities")) {
       var id = stringField(record, "id"), kind = stringField(record, "kind");
@@ -146,22 +129,10 @@ class SketchDraftCodec {
       var constraint = SketchConstraint.raw(
         stringField(record, "id"),
         stringField(record, "kind"),
-        stringField(
-          record,
-          "first"
-        ),
-        optionalString(
-          record,
-          "second"
-        ),
-        optionalString(
-          record,
-          "third"
-        ),
-        numberField(
-          record,
-          "value"
-        )
+        stringField(record, "first"),
+        optionalString(record, "second"),
+        optionalString(record, "third"),
+        numberField(record, "value")
       );
       var reference:Null<Bool> = Reflect.field(record, "reference");
       sketch.addConstraint(reference == true ? constraint.asReference() : constraint);

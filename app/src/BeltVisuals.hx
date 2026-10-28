@@ -82,16 +82,8 @@ class BeltVisuals {
           y: connector.frame.y * scale,
           z: connector.frame.z * scale,
           frame: BeltDisplay.emptyFrame(),
-          world: {
-            x: 0,
-            y: 0,
-            z: 0
-          },
-          local: {
-            x: 0,
-            y: 0,
-            z: 0
-          },
+          world: {x: 0, y: 0, z: 0},
+          local: {x: 0, y: 0, z: 0},
           currentX: 0,
           currentY: 0
         });

@@ -47,12 +47,7 @@ class SimulatedToolContact implements SimulationStepObserver {
     var link = simulation.linkPose(robotIndex, linkIndex);
     var worldLink = new Transform3(
       new Vec3(link.position[0], link.position[1], link.position[2]),
-      new Quat(
-        link.rotation[0],
-        link.rotation[1],
-        link.rotation[2],
-        link.rotation[3]
-      )
+      new Quat(link.rotation[0], link.rotation[1], link.rotation[2], link.rotation[3])
     );
     var worldTcp = worldLink.compose(tcp);
     var touching = false;
