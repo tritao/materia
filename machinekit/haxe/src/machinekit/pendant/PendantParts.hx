@@ -28,6 +28,16 @@ class PendantParts {
   public static function eStopCompact(x:Float, y:Float):PendantControl
     return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 25.0, 18.7, 40.0, "assumed");
 
+  /**
+   * The AliExpress E-stop (item 1005002447999037, 2.55 EUR for the 1NC variant): a Schneider XB2-ES542
+   * style, 40 mm twist-release mushroom, snap-on ZB2-BE102C contact block. The listing gives the block
+   * as 29.4 x 29.2 x 14.8 mm and the weight as 60 g. The depth behind the panel and the height above it
+   * are my estimates from the product photos scaled to the block (about 46 and 35 mm); the listing's
+   * "29 x 30 x 68.5 mm" does not say what it measures. Measure on arrival.
+   */
+  public static function eStopGeneric(x:Float, y:Float):PendantControl
+    return new PendantControl("estop", EStop, x, y, Circle(22.3), Circle(40.0), 35.0, 46.0, 60.0, "assumed");
+
   /** Panel rotary switch with a knob (assumed: 10 mm bush hole, 25 mm knob, 25 mm body). */
   public static function rotary(id:String, x:Float, y:Float):PendantControl
     return new PendantControl(id, Rotary, x, y, Circle(10.2), Circle(25.0), 18.0, 25.0, 25.0, "assumed");

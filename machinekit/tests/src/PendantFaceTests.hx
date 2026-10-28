@@ -31,6 +31,10 @@ class PendantFaceTests {
     var standard = PendantParts.eStopCompact(-85.0, 30.0);
     var deep = new PendantControl("estop", EStop, standard.x, standard.y, standard.cutout, standard.keepOut, 25.0, 57.0, 60.0, "assumed");
     check(hasProblem(face.withControl(deep), "estop reaches 57 mm"), "A standard E-stop with its contact block is too deep for the case");
+    var generic = PendantParts.eStopGeneric(-85.0, 30.0);
+    check(hasProblem(face.withControl(generic), "estop reaches 46 mm"), "The cheap XB2-style E-stop is too deep for a 30 mm case");
+    var roomy = new PendantFace(220.0, 110.0, 3.0, 3.0, 48.0, [for (c in face.controls) c.id == "estop" ? generic : c]);
+    check(roomy.problems().length == 0 && roomy.overallHeight() == 48.0 + 3.0 + 41.0, "With a 48 mm case it fits: " + roomy.problems().join(" | "));
     var thick = new PendantFace(220.0, 110.0, 4.0, 3.0, 30.0, face.controls);
     check(hasProblem(thick, "wheel studs allow"), "A face plate thicker than the studs allow");
     check(PendantFace.gapBetween(wheel, face.control("estop")) > 5.0, "Wheel and E-stop gap");
