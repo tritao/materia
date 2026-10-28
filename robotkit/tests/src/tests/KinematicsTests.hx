@@ -18,8 +18,6 @@ import kinematicskit.KinematicSnapshot;
 import kinematicskit.KinematicState;
 import robotkit.kinematics.RobotKinematics;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.JointGroup;
-import robotkit.manipulation.IKResult;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;

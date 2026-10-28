@@ -24,7 +24,6 @@ import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
 import robotkit.protocol.JointTargetValue;
 import robotkit.protocol.JointTargets;
-import robotkit.protocol.RobotCapabilities;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;

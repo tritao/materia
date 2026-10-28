@@ -14,7 +14,6 @@ import robotkit.collision.RobotCollision;
 import robotkit.collision.RobotCollision.RobotCollisionOptions;
 import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Transform3;
-import robotkit.spatial.Vec3;
 
 /** Ownership is independent of a hull's name and its pose in a snapshot. */
 enum CollisionOwner {

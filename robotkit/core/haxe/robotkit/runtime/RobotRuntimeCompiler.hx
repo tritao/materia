@@ -11,7 +11,6 @@ import robotkit.spatial.Vec3;
 import robotkit.model.CollisionApproximation;
 import robotkit.profile.RobotDriveConfiguration;
 import robotkit.profile.RobotForkConfiguration;
-import robotkit.profile.RobotMobileConfiguration;
 import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.Transmission;
 import robotkit.execution.ProcessChannelDeclaration;

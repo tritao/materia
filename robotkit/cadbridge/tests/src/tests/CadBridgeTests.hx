@@ -52,7 +52,6 @@ import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
-import machinekit.robotics.ParallelGripperBody;
 import machinekit.robotics.ParallelGripperSpec;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;

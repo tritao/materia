@@ -1,7 +1,6 @@
 package robotkit.skill;
 
 import robotkit.material.Forks;
-import robotkit.material.LoadState;
 import robotkit.material.Payload;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.NavigationGoal;

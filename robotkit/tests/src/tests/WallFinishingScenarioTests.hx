@@ -38,8 +38,6 @@ import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
-import robotkit.mobile.Twist2;
-import robotkit.mobile.Footprint;
 import robotkit.localization.SimulationTruthLocalization;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.Navigator;

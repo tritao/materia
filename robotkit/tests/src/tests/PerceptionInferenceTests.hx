@@ -4,7 +4,6 @@ import haxe.Int64;
 import haxe.io.Bytes;
 import robotkit.deployment.SerialDeployment;
 import robotkit.inference.InferenceSession;
-import robotkit.streams.ImageDetection;
 import robotkit.streams.ImageDetectionObservation;
 import robotkit.inference.ObjectDetectorPipeline;
 import robotkit.perception.PerceptionHost;

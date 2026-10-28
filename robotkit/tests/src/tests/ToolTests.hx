@@ -21,7 +21,6 @@ import robotkit.tool.Tool;
 import robotkit.tool.MassProperties;
 import robotkit.tool.WorkpieceLoad;
 import robotkit.model.CollisionShape;
-import robotkit.tool.ToolGeometry;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SuctionGrip;
 import robotkit.tool.SuctionMotionSample;

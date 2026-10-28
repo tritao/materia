@@ -14,14 +14,12 @@ import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.JointGroup;
 import robotkit.tool.Tool;
 import robotkit.model.CollisionShape;
 import robotkit.tool.ToolGeometry;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
-import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
 import processkit.skill.DigTrench;
@@ -30,14 +28,12 @@ import processkit.skill.DumpAt;
 import processkit.work.HeightMap;
 import processkit.work.EarthworkRegion;
 import processkit.work.DigCyclePlanner;
-import processkit.work.DigCyclePlan;
 import processkit.work.Point2;
 import processkit.work.BucketSweep;
 import processkit.path.Toolpath;
 import processkit.path.ToolpathPoint;
 import robotkit.simulation.SimulatedRobot;
 import robotkit.core.RobotCommand;
-import robotkit.core.RobotSnapshot;
 
 /**
  * M12 acceptance tests for the simulated excavator: the 4-DOF

@@ -9,7 +9,6 @@ import processkit.work.Polygon2;
 import processkit.work.Point2;
 import processkit.work.DeviationMap;
 import robotkit.perception.PlaneFit;
-import robotkit.perception.PlaneEstimate;
 import robotkit.perception.SeededRandom;
 import processkit.perception.SimulatedSurfaceScanner;
 import processkit.perception.SurfaceRegistration;

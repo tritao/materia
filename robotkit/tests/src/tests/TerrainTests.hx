@@ -1,9 +1,7 @@
 package tests;
 
 import processkit.work.HeightMap;
-import processkit.work.VolumeResult;
 import processkit.work.BucketSweep;
-import processkit.work.BucketSweepResult;
 import processkit.work.EarthworkRegion;
 import processkit.work.Point2;
 import processkit.work.Polygon2;

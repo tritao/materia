@@ -9,7 +9,6 @@ import robotkit.core.RobotFault;
 import robotkit.core.RobotId;
 import robotkit.core.RobotSnapshot;
 import robotkit.core.RobotStatus;
-import robotkit.core.SensorFrame;
 import robotkit.core.StopMode;
 import robotkit.execution.ProcessChannelDeclaration;
 import robotkit.runtime.RuntimeRobotAdapter;

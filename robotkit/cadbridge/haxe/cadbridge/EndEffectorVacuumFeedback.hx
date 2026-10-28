@@ -10,7 +10,6 @@ import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationStepObserver;
 import robotkit.tool.SimulatedVacuum;
 import robotkit.model.CollisionShape;
-import robotkit.tool.ToolGeometry;
 import robotkit.tool.ToolRuntimeSelection;
 
 /** Deterministic pressure feedback from simulation contact on one cup piece.

@@ -4,7 +4,6 @@ import cadbridge.BeltResonanceCalibration;
 import ResonanceTests;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
-import cadkit.modeling.AssemblyModel;
 import machinekit.assembly.AssemblyPreview;
 import materia.project.SceneArtifact;
 import robotkit.model.DriveLoads;
