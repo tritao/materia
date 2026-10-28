@@ -55,39 +55,11 @@ class HumanDescription {
       stature,
       distance(rest, UpperArmL, UpperArmR),
       distance(rest, ThighL, ThighR),
-      distance(
-        rest,
-        Pelvis,
-        Neck
-      ),
-      bilateral(
-        rest,
-        UpperArmL,
-        ForearmL,
-        UpperArmR,
-        ForearmR
-      ),
-      bilateral(
-        rest,
-        ForearmL,
-        HandL,
-        ForearmR,
-        HandR
-      ),
-      bilateral(
-        rest,
-        ThighL,
-        ShinL,
-        ThighR,
-        ShinR
-      ),
-      bilateral(
-        rest,
-        ShinL,
-        FootL,
-        ShinR,
-        FootR
-      )
+      distance(rest, Pelvis, Neck),
+      bilateral(rest, UpperArmL, ForearmL, UpperArmR, ForearmR),
+      bilateral(rest, ForearmL, HandL, ForearmR, HandR),
+      bilateral(rest, ThighL, ShinL, ThighR, ShinR),
+      bilateral(rest, ShinL, FootL, ShinR, FootR)
     );
   }
 

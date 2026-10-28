@@ -83,14 +83,7 @@ class HumanCharacter {
     kneelDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("pickup_kneeling"), true);
     hands = [
       HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
-      HumanHand.find(
-        asset,
-        this.rig,
-        instance,
-        HumanBone.HandR,
-        RIGHT_FINGERS,
-        pose
-      )
+      HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)
     ];
     model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
   }
@@ -143,15 +136,7 @@ class HumanCharacter {
       rig.joint(bones[1]),
       rig.joint(bones[2]),
       target,
-      pole != null ? pole : arm ? [
-        0.0,
-        0.0,
-        0.0
-      ] : [
-        1.0,
-        0.0,
-        0.0
-      ],
+      pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0],
       weight,
       1.0,
       arm ? 0.0 : 1.0

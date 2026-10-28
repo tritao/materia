@@ -24,10 +24,7 @@ class WorkerResetTests {
 
   static function gap(a:Array<Float>, b:Array<Float>):Float return Math.max(
     Math.abs(a[0] - b[0]),
-    Math.max(
-      Math.abs(a[1] - b[1]),
-      Math.abs(a[2] - b[2])
-    )
+    Math.max(Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]))
   );
 
   /** Runs `resetAt` ticks, resets, and checks the rerun against a fresh run. */

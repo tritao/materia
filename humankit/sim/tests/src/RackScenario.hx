@@ -106,34 +106,20 @@ class RackScenario {
     var part = session.createObject(
       MotionType.Dynamic,
       SimShape.box(half[0], half[1], half[2]),
-      new SimPose(
-        partStart[0],
-        partStart[1],
-        partStart[2]
-      ),
+      new SimPose(partStart[0], partStart[1], partStart[2]),
       0.1
     );
     session.createObject(
       MotionType.Static,
       SimShape.box(top, top, 0.05),
-      yawPose(
-        partStart[0],
-        partStart[1],
-        surface - 0.05,
-        layout.yaw
-      )
+      yawPose(partStart[0], partStart[1], surface - 0.05, layout.yaw)
     );
     session.createObject(MotionType.Static, SimShape.box(4.0, 4.0, 0.1), new SimPose(0.0, 0.0, -0.05));
     var placePoint = [tableXY[0], tableXY[1], surface + partHalf];
     var tableObject = session.createObject(
       MotionType.Static,
       SimShape.box(top, top, 0.05),
-      yawPose(
-        placePoint[0],
-        placePoint[1],
-        surface - 0.05,
-        layout.yaw
-      )
+      yawPose(placePoint[0], placePoint[1], surface - 0.05, layout.yaw)
     );
     var targets = new JobTargets();
     var rackBox:HumanTargetBox = {

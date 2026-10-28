@@ -273,10 +273,7 @@ class HumanJobSpec {
   }
 
   static function point(value:Dynamic, field:String, label:String):Array<Float> return pointValue(
-    Reflect.field(
-      value,
-      field
-    ),
+    Reflect.field(value, field),
     '$label.$field'
   );
 

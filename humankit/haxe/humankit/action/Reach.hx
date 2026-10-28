@@ -48,10 +48,7 @@ class Reach extends HumanActionBase {
     setWeight(0.0);
     var wrist = worker.wristWorld(limb), goal = modelSpace ? worker.toWorld(target) : target;
     seconds = worker.blendSeconds(
-      Math.sqrt(Math.pow(wrist[0] - goal[0], 2) + Math.pow(wrist[1] - goal[1], 2) + Math.pow(
-        wrist[2] - goal[2],
-        2
-      )),
+      Math.sqrt(Math.pow(wrist[0] - goal[0], 2) + Math.pow(wrist[1] - goal[1], 2) + Math.pow(wrist[2] - goal[2], 2)),
       ramp
     );
   }

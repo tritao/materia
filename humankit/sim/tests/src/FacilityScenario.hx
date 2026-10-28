@@ -89,24 +89,8 @@ class FacilityScenario {
       "floor",
       "map",
       new Pose2(0.9, -0.2),
-      [new RackSlot(
-        "part",
-        new RackSlotPose(
-          0,
-          0,
-          slotPoint[2]
-        ),
-        modelled ? [
-          0.04,
-          0.04,
-          0.04
-        ] : null
-      )],
-      modelled ? new Surface(
-        0.2,
-        0.2,
-        surface
-      ) : null
+      [new RackSlot("part", new RackSlotPose(0, 0, slotPoint[2]), modelled ? [0.04, 0.04, 0.04] : null)],
+      modelled ? new Surface(0.2, 0.2, surface) : null
     );
     // The table lies 0.65 m ahead of where the worker stands, along the lane's last leg.
     var facing = Math.atan2(leg[1], leg[0]);
@@ -116,12 +100,7 @@ class FacilityScenario {
       "floor",
       "map",
       new Pose2(stand[0], stand[1], facing),
-      modelled ? new Surface(
-        0.2,
-        0.2,
-        surface,
-        0.65
-      ) : null
+      modelled ? new Surface(0.2, 0.2, surface, 0.65) : null
     );
     facility.addRack(rack);
     facility.addStation(table);
@@ -132,39 +111,19 @@ class FacilityScenario {
     var part = session.createObject(
       MotionType.Dynamic,
       SimShape.box(0.04, 0.04, 0.04),
-      new SimPose(
-        0.9,
-        -0.2,
-        surface + 0.04
-      ),
+      new SimPose(0.9, -0.2, surface + 0.04),
       0.1
     );
     session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05), new SimPose(0.9, -0.2, surface - 0.05));
     session.createObject(
       MotionType.Static,
       SimShape.box(0.2, 0.2, 0.05),
-      new SimPose(
-        station[0],
-        station[1],
-        surface - 0.05
-      )
+      new SimPose(station[0], station[1], surface - 0.05)
     );
     session.createObject(MotionType.Static, SimShape.box(6, 6, 0.1), new SimPose(0, 0, -0.05));
     var surfaces:Array<HumanTargetBox> = [
       {center: [0.9, -0.2, surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0},
-      {
-        center: [
-          station[0],
-          station[1],
-          surface - 0.05
-        ],
-        halfExtents: [
-          0.2,
-          0.2,
-          0.05
-        ],
-        yaw: 0.0
-      }
+      {center: [station[0], station[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0}
     ];
     var partBox:HumanTargetBox = {center: slotPoint, halfExtents: [0.04, 0.04, 0.04], yaw: 0.0};
     var fetch = FacilityJobs.fetch(facility, "rack", "part");

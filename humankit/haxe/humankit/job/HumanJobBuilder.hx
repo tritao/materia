@@ -85,14 +85,8 @@ class HumanJobBuilder {
             var root = body.rootTransform();
             var dx = root[12] - point[0], dy = root[13] - point[1];
             var candidates = Math.abs(dx) >= Math.abs(dy) ? [[root[12], root[13] + 0.8], [root[12], root[13] - 0.8]] : [
-              [
-                root[12] + 0.8,
-                root[13]
-              ],
-              [
-                root[12] - 0.8,
-                root[13]
-              ]
+              [root[12] + 0.8, root[13]],
+              [root[12] - 0.8, root[13]]
             ];
             var a = Math.pow(candidates[0][0] - held.center[0], 2) + Math.pow(candidates[0][1] - held.center[1], 2);
             var b = Math.pow(candidates[1][0] - held.center[0], 2) + Math.pow(candidates[1][1] - held.center[1], 2);

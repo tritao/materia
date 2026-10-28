@@ -73,11 +73,7 @@ class HumanSimTests {
     var part = session.createObject(
       MotionType.Dynamic,
       SimShape.box(partHalf, partHalf, partHalf),
-      new SimPose(
-        partStart[0],
-        partStart[1],
-        partStart[2]
-      ),
+      new SimPose(partStart[0], partStart[1], partStart[2]),
       0.1
     );
     var robot = session.createActor([SimShape.sphere(0.05)], [new SimPose(3.0, 0.0, 1.5)]);
@@ -85,32 +81,20 @@ class HumanSimTests {
     session.createObject(
       MotionType.Static,
       SimShape.box(0.2, 0.2, 0.05),
-      new SimPose(
-        partStart[0],
-        partStart[1],
-        surface - 0.05
-      )
+      new SimPose(partStart[0], partStart[1], surface - 0.05)
     );
     session.createObject(MotionType.Static, SimShape.box(4.0, 4.0, 0.1), new SimPose(0.0, 0.0, -0.05));
     var placePoint = [partStart[0] + 1.0, partStart[1], surface + partHalf];
     var table = session.createObject(
       MotionType.Static,
       SimShape.box(0.2, 0.2, 0.05),
-      new SimPose(
-        placePoint[0],
-        placePoint[1],
-        surface - 0.05
-      )
+      new SimPose(placePoint[0], placePoint[1], surface - 0.05)
     );
     var targets = new JobTargets();
     targets.boxes.set("part", {center: partStart.copy(), halfExtents: [partHalf, partHalf, partHalf], yaw: 0.0});
     targets.boxes.set(
       "table",
-      {
-        center: [placePoint[0], placePoint[1], surface - 0.05],
-        halfExtents: [0.2, 0.2, 0.05],
-        yaw: 0.0
-      }
+      {center: [placePoint[0], placePoint[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0}
     );
     var objectsById:Map<String, nativekit.sim.SimObject> = new Map();
     objectsById.set("part", part);
@@ -380,14 +364,7 @@ class HumanSimTests {
       "floor",
       "map",
       new Pose2(0.9, -0.2),
-      [new RackSlot(
-        "part",
-        new RackSlotPose(
-          0,
-          0,
-          1.15
-        )
-      )]
+      [new RackSlot("part", new RackSlotPose(0, 0, 1.15))]
     );
     var table = new Station("table", "Table", "floor", "map", new Pose2(1.9, -0.2));
     facility.addRack(rack);

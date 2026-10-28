@@ -260,10 +260,7 @@ class HumanKitTests {
         human.advance(step == 0 ? 0.0 : asset.clipDurations[asset.clipIndex(name)] / 10.0);
         low = Math.min(
           low,
-          Math.min(
-            human.pose.bonePosition(HumanBone.FootL)[2],
-            human.pose.bonePosition(HumanBone.FootR)[2]
-          )
+          Math.min(human.pose.bonePosition(HumanBone.FootL)[2], human.pose.bonePosition(HumanBone.FootR)[2])
         );
         pelvis += human.pose.bonePosition(HumanBone.Pelvis)[2] / 10.0;
       }
@@ -665,11 +662,7 @@ class HumanKitTests {
         var tip = asset.jointIndex('Middle4.$side') * 64, wrist = asset.jointIndex('Wrist.$side') * 64;
         return distance(
           [matrices.getFloat(tip + 48), matrices.getFloat(tip + 52), matrices.getFloat(tip + 56)],
-          [
-            matrices.getFloat(wrist + 48),
-            matrices.getFloat(wrist + 52),
-            matrices.getFloat(wrist + 56)
-          ]
+          [matrices.getFloat(wrist + 48), matrices.getFloat(wrist + 52), matrices.getFloat(wrist + 56)]
         );
       };
       human.setHandCurl(hand, 0.0);
@@ -720,14 +713,8 @@ class HumanKitTests {
         > 0.006) throw 'Finger $finger of the $hand hand is ${body.fingerDepth(hand, finger)} m deep, not 0.05';
       // Fingers of different lengths close by different amounts to the same depth.
       var spread = Math.max(Math.max(medium[1], medium[2]), Math.max(medium[3], medium[4])) - Math.min(
-        Math.min(
-          medium[1],
-          medium[2]
-        ),
-        Math.min(
-          medium[3],
-          medium[4]
-        )
+        Math.min(medium[1], medium[2]),
+        Math.min(medium[3], medium[4])
       );
       if (spread < 0.02) throw 'Every finger of the $hand hand closed alike to one depth: $medium';
       // A thin object is pinched: only the thumb and index close on it.
@@ -1227,27 +1214,8 @@ class HumanKitTests {
       "floor",
       "map",
       new Pose2(2, 1, Math.PI / 2),
-      [new RackSlot(
-        "B3",
-        new RackSlotPose(
-          0.25,
-          0,
-          1.2
-        ),
-        [
-          0.05,
-          0.04,
-          0.03
-        ]
-      )],
-      new Surface(
-        0.3,
-        0.2,
-        1.1,
-        0.1,
-        0.0,
-        0.25
-      )
+      [new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2), [0.05, 0.04, 0.03])],
+      new Surface(0.3, 0.2, 1.1, 0.1, 0.0, 0.25)
     );
     // A station's table lies ahead of where the worker stands.
     var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1, 0.0), new Surface(0.2, 0.2, 1.0, 0.65));
@@ -1300,14 +1268,7 @@ class HumanKitTests {
       "floor",
       "map",
       new Pose2(2, 1, Math.PI / 2),
-      [new RackSlot(
-        "B3",
-        new RackSlotPose(
-          0.25,
-          0,
-          1.2
-        )
-      )]
+      [new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2))]
     );
     var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1));
     facility.addStation(dock);
@@ -1425,10 +1386,7 @@ class HumanKitTests {
     var pick = new Pick(pickPoint, [ArmR], 0.25);
     var placePoint = [1.7, -0.15, pickPoint[2]];
     var job = new HumanJob(body).add(approach).add(pick).add(new Carry(HumanCarryPosture.RightHand)).add(new WalkTo(
-      [
-        1.2,
-        0.0
-      ],
+      [1.2, 0.0],
       1.0
     )).add(new ApproachFor(
       placePoint,
@@ -1591,10 +1549,7 @@ class HumanKitTests {
     var x = [m[0], m[1], m[2]], y = [m[4], m[5], m[6]], z = [m[8], m[9], m[10]];
     if (Math.abs(Mat4.dot(x,
       x) - 1) > 1e-4 || Math.abs(Mat4.dot(y, y) - 1) > 1e-4 || Math.abs(Mat4.dot(x, y)) > 1e-4 || Mat4.dot(
-        Mat4.cross(
-          x,
-          y
-        ),
+        Mat4.cross(x, y),
         z
       ) < 0.999) throw '$label is not a rigid right-handed frame';
   }

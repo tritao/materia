@@ -28,42 +28,9 @@ class FacilitySweepTests {
 
   public static function run():Void {
     var layouts:Array<{name:String, station:Array<Float>, via:Array<Array<Float>>}> = [
-      {
-        name: "straight",
-        station: [
-          2.55,
-          -0.2
-        ],
-        via: []
-      },
-      {
-        name: "corner",
-        station: [
-          2.2,
-          1.2
-        ],
-        via: [[
-          0.9,
-          1.2
-        ]]
-      },
-      {
-        name: "u-turn",
-        station: [
-          -1.6,
-          -0.2
-        ],
-        via: [
-          [
-            0.9,
-            1.0
-          ],
-          [
-            -0.9,
-            1.0
-          ]
-        ]
-      }
+      {name: "straight", station: [2.55, -0.2], via: []},
+      {name: "corner", station: [2.2, 1.2], via: [[0.9, 1.2]]},
+      {name: "u-turn", station: [-1.6, -0.2], via: [[0.9, 1.0], [-0.9, 1.0]]}
     ];
     var failures:Array<String> = [], report:Array<String> = [], runs = 0;
     for (layout in layouts) for (surface in surfaces) {

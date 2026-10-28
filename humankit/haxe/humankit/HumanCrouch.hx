@@ -78,10 +78,7 @@ class HumanCrouch {
             var before = (heights[0] - heights[sample - 1]) / drop;
             if (dropped > before + 1e-12) moment = sample - 1 + Math.max(
               0.0,
-              Math.min(
-                1.0,
-                (depth - before) / (dropped - before)
-              )
+              Math.min(1.0, (depth - before) / (dropped - before))
             );
           }
           break;

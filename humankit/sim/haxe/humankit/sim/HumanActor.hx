@@ -23,20 +23,14 @@ class HumanActor {
     this.proxy = proxy;
     actor = session.createActor(
       [for (capsule in proxy.capsules) SimShape.capsule(capsule.radius, capsule.length)],
-      simPoses(proxy.place(
-        pose,
-        root
-      ))
+      simPoses(proxy.place(pose, root))
     );
   }
 
   /** Where the body is at simulation time `time`. */
   public function pushPose(time:Float, pose:HumanPose, root:Array<Float>):Void actor.pushKeyframe(
     time,
-    simPoses(proxy.place(
-      pose,
-      root
-    ))
+    simPoses(proxy.place(pose, root))
   );
 
   public function dispose():Void actor.dispose();

@@ -28,10 +28,8 @@ class PressSweepTests {
           == humankit.HumanLimb.ArmL ? HumanBone.HandL : HumanBone.HandR));
         closest = Math.min(
           closest,
-          Math.sqrt(Math.pow(wrist[0] - scenario.pressPoint[0], 2) + Math.pow(
-            wrist[1] - scenario.pressPoint[1],
-            2
-          ) + Math.pow(
+          Math.sqrt(Math.pow(wrist[0] - scenario.pressPoint[0],
+          2) + Math.pow(wrist[1] - scenario.pressPoint[1], 2) + Math.pow(
             wrist[2] - scenario.pressPoint[2],
             2
           ))

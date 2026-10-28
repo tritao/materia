@@ -42,14 +42,7 @@ class HumanBodyView {
       capsule.length)].concat([for (pair in bones) GeometryData.box(
         BONE_THICKNESS,
         BONE_THICKNESS,
-        Math.max(
-          distance(
-            rest,
-            pair[0],
-            pair[1]
-          ),
-          1e-3
-        )
+        Math.max(distance(rest, pair[0], pair[1]), 1e-3)
       )]);
     var geometries = scene.createGeometryBatch(shapes);
     var transaction = scene.beginTransaction();
@@ -86,10 +79,7 @@ class HumanBodyView {
     var placements = proxy.place(pose);
     for (index in 0...capsuleNodes.length) transaction.setTransform(
       capsuleNodes[index],
-      transform(
-        placements[index].center,
-        placements[index].rotation
-      )
+      transform(placements[index].center, placements[index].rotation)
     );
     for (index in 0...boneNodes.length) {
       var from = pose.bonePosition(bones[index][0]), to = pose.bonePosition(bones[index][1]);
@@ -97,13 +87,7 @@ class HumanBodyView {
       var center = [(from[0] + to[0]) * 0.5, (from[1] + to[1]) * 0.5, (from[2] + to[2]) * 0.5];
       transaction.setTransform(
         boneNodes[index],
-        transform(
-          center,
-          HumanBodyProxy.rotationFromZ(Mat4.normalize(Mat4.subtract(
-            to,
-            from
-          )))
-        )
+        transform(center, HumanBodyProxy.rotationFromZ(Mat4.normalize(Mat4.subtract(to, from))))
       );
     }
     transaction.commit();
@@ -119,20 +103,8 @@ class HumanBodyView {
     for (chain in [
       [Chest, UpperArmL, ForearmL, HandL, MiddleL],
       [Chest, UpperArmR, ForearmR, HandR, MiddleR],
-      [
-        Pelvis,
-        ThighL,
-        ShinL,
-        FootL,
-        ToeTipL
-      ],
-      [
-        Pelvis,
-        ThighR,
-        ShinR,
-        FootR,
-        ToeTipR
-      ]
+      [Pelvis, ThighL, ShinL, FootL, ToeTipL],
+      [Pelvis, ThighR, ShinR, FootR, ToeTipR]
     ]) {
       var present = [for (bone in chain) if (rig.has(bone)) bone];
       for (index in 1...present.length) pairs.push([present[index - 1], present[index]]);

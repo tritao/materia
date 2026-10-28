@@ -46,15 +46,7 @@ class PressScenario {
     session.createObject(
       MotionType.Static,
       SimShape.box(halfThickness, 0.12, 0.08),
-      new SimPose(
-        center[0],
-        center[1],
-        center[2],
-        0.0,
-        0.0,
-        Math.sin(yaw * 0.5),
-        Math.cos(yaw * 0.5)
-      )
+      new SimPose(center[0], center[1], center[2], 0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5))
     );
     session.createObject(MotionType.Static, SimShape.box(6, 6, 0.1), new SimPose(0, 0, -0.05));
     var targets = new JobTargets();

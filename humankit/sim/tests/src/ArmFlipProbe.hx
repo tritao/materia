@@ -39,13 +39,7 @@ class ArmFlipProbe {
       var upper = Mat4.subtract(shoulder, elbow), lower = Mat4.subtract(hand, elbow);
       var angle = Math.acos(Math.max(
         -1.0,
-        Math.min(
-          1.0,
-          Mat4.dot(upper, lower) / Math.max(
-            1e-9,
-            len(upper) * len(lower)
-          )
-        )
+        Math.min(1.0, Mat4.dot(upper, lower) / Math.max(1e-9, len(upper) * len(lower)))
       )) * 180.0 / Math.PI;
       var across = Mat4.cross(Mat4.subtract(elbow, shoulder), lower);
       var normal = angle < 175.0 && len(across) > 1e-9 ? Mat4.normalize(across) : null;
