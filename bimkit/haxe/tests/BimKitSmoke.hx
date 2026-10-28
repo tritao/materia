@@ -5,8 +5,6 @@ import bimkit.BimSchema;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Placement;
-import cadkit.parametric.Document;
-import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Feature;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.EvaluationContext;

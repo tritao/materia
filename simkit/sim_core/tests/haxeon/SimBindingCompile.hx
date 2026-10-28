@@ -1,5 +1,4 @@
 import nativekit.scene.Scene;
-import nativekit.sim.SimWorld;
 import nativekit.sim.SimWorldOptions;
 import nativekit.sim.Joint;
 

@@ -1,10 +1,7 @@
 import ConstrainedSlottedBracket;
 // Root same-package modules needed by this standalone Haxeon compilation entry.
-import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.EvaluationCancelled;
-import cadkit.parametric.features.ConstrainedSketchSupportFaceChange;
 import cadkit.sketch.ConstrainedSketch;
-import cadkit.sketch.ProfileError;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
