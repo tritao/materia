@@ -9,7 +9,8 @@ class PendantConfig {
   public var index:Int = 0;
   public var text:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   public var reserved:Array<Int> = [0, 0];
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {
@@ -19,7 +20,8 @@ class PendantConfig {
     if (index < 0 || index > 11) throw "PendantConfig.index violates its constraint";
     var textEnd = 0;
     while (textEnd < text.length && text[textEnd] != 0) textEnd++;
-    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32 || text[i] > 126) : text[i] != 0) throw "PendantConfig.text violates its constraint";
+    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32
+      || text[i] > 126) : text[i] != 0) throw "PendantConfig.text violates its constraint";
     for (v in reserved) if (v != 0) throw "PendantConfig.reserved violates its constraint";
   }
 

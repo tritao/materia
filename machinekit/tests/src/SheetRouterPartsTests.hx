@@ -50,14 +50,35 @@ class SheetRouterPartsTests {
       ControlCabinet.recipeType(),
       LevelingFoot.recipeType()
     ];
-    var direct:Array<AssumedCatalogComponent> = [new PlanetaryReducer(),new CableChain(),new BrakeServo(),
-      new HelicalRack(),new HelicalPinion(),new PreloadedPinionMount(),new AtcSpindle(),new ToolHolder(),new Collet(),
-      new ToolFork(),new ToolRack(),new ToolLengthSetter(),new DustShoe(),new VacuumTable(),new Spoilboard(),
-      new VacuumBlower(),new VacuumZoneValve(),new Vfd(),new BrakeResistor(),new Contactor(),new CircuitBreaker(),
-      new SafetyRelay(),new ControlCabinet(),new LevelingFoot()];
-    for(part in direct) {
-      var copy=part.componentType().create(part.values());
-      check(part.designation==copy.designation,'direct constructor identity '+part.designation);
+    var direct:Array<AssumedCatalogComponent> = [
+      new PlanetaryReducer(),
+      new CableChain(),
+      new BrakeServo(),
+      new HelicalRack(),
+      new HelicalPinion(),
+      new PreloadedPinionMount(),
+      new AtcSpindle(),
+      new ToolHolder(),
+      new Collet(),
+      new ToolFork(),
+      new ToolRack(),
+      new ToolLengthSetter(),
+      new DustShoe(),
+      new VacuumTable(),
+      new Spoilboard(),
+      new VacuumBlower(),
+      new VacuumZoneValve(),
+      new Vfd(),
+      new BrakeResistor(),
+      new Contactor(),
+      new CircuitBreaker(),
+      new SafetyRelay(),
+      new ControlCabinet(),
+      new LevelingFoot()
+    ];
+    for (part in direct) {
+      var copy = part.componentType().create(part.values());
+      check(part.designation == copy.designation, 'direct constructor identity ' + part.designation);
     }
     var registry = MachineKitComponents.standard();
     for (type in types) {
@@ -67,7 +88,7 @@ class SheetRouterPartsTests {
       var assumed:AssumedCatalogComponent = cast p;
       check(assumed.ratingsBasis == Assumed, 'assumed ' + type.id);
       check(p.connectors().length > 0, 'frames ' + type.id);
-      Sys.println('SR1 geometry: '+type.id);
+      Sys.println('SR1 geometry: ' + type.id);
       var g = p.geometry();
       check(g.valid(), 'valid geometry ' + type.id);
       check(g.volume() > 0, 'nonempty ' + type.id);
@@ -104,9 +125,12 @@ class SheetRouterPartsTests {
     near(reducer.jointTorque(2), 9.5, 1e-9, 'reducer output torque');
     near(reducer.backlashRadians(), Math.PI / 2160, 1e-12, 'arcmin to rad');
     near(reducer.outputDeflection(12), 0.001, 1e-12, 'torsional deflection');
-    for (profile in['HGH20CA', 'HGH25CA']) {
-      var spec=LinearRailSystem.catalog().get(profile),rating=LinearRailSystem.rating(spec);
-      check(rating.source=='Vallder' && !rating.original && rating.staticLoad>0 && spec.ratings.length==3,'sourced rail ratings '+profile);
+    for (profile in ['HGH20CA', 'HGH25CA']) {
+      var spec = LinearRailSystem.catalog().get(profile), rating = LinearRailSystem.rating(spec);
+      check(
+        rating.source == 'Vallder' && !rating.original && rating.staticLoad > 0 && spec.ratings.length == 3,
+        'sourced rail ratings ' + profile
+      );
       var rail = LinearRailSystem.forProfile(profile, 1000, 2);
       check(rail.bom().lines().length == 2, 'rail/block BOM ' + profile);
       for (entry in rail.components()) {
@@ -121,7 +145,7 @@ class SheetRouterPartsTests {
     check(largeBrake.motorDrive().actuator("motor", "joint", 400, 1).drive == "servo", '750 W drive available');
     var chain = new CableChain();
     var developed = chain.developedLength();
-    for (pos in[0.0, 700.0, 1400.0, 2800.0]) {
+    for (pos in [0.0, 700.0, 1400.0, 2800.0]) {
       var path = chain.path(pos);
       var endpoint = path[path.length - 1];
       var frame = chain.movingFrame(pos);
@@ -134,17 +158,29 @@ class SheetRouterPartsTests {
       }
       near(measured, developed, 0.1, 'constant chain length across travel');
     }
-    for(position in [0.0,2800.0]) {
-      var posed=chain.geometryAt(position);check(posed.valid(),'chain endpoint geometry '+position);posed.close();
+    for (position in [0.0, 2800.0]) {
+      var posed = chain.geometryAt(position);
+      check(posed.valid(), 'chain endpoint geometry ' + position);
+      posed.close();
     }
-    var clearance=chain.geometry(Envelope);check(clearance.valid(),'chain travel envelope');clearance.close();
+    var clearance = chain.geometry(Envelope);
+    check(clearance.valid(), 'chain travel envelope');
+    clearance.close();
     reject(() -> chain.path(2801), 'chain travel exceeded');
     reject(() -> new CableChain(new ComponentValues().setNumber('fillArea', 1000)), 'chain fill exceeded');
-    near(new ToolHolder().connector('fork').frame.z,-8,1e-9,'fork supports flange underside');
-    var holder=new ToolHolder(),collet=new Collet(),h=holder.geometry(),c=collet.geometry();
-    var placed=c.translated(new cadkit.modeling.Vector(0,0,holder.connector('collet').frame.z-collet.connector('holder').frame.z));c.close();
-    var overlap=h.intersect(placed);check(overlap.isEmpty(),'ER32 collet fits holder seat without interference');
-    overlap.close();h.close();placed.close();
+    near(new ToolHolder().connector('fork').frame.z, -8, 1e-9, 'fork supports flange underside');
+    var holder = new ToolHolder(), collet = new Collet(), h = holder.geometry(), c = collet.geometry();
+    var placed = c.translated(new cadkit.modeling.Vector(
+      0,
+      0,
+      holder.connector('collet').frame.z - collet.connector('holder').frame.z
+    ));
+    c.close();
+    var overlap = h.intersect(placed);
+    check(overlap.isEmpty(), 'ER32 collet fits holder seat without interference');
+    overlap.close();
+    h.close();
+    placed.close();
     var toolRack = new ToolRack(), setter = new ToolLengthSetter();
     near(toolRack.pocketFrame(7).x - toolRack.pocketFrame(0).x, 770, 1e-9, 'fork pitch frames');
     near(setter.connector('trigger').frame.z, 57.5, 1e-9, 'setter trigger frame');
@@ -154,24 +190,52 @@ class SheetRouterPartsTests {
     var vacuum = new VacuumTable();
     check(vacuum.zoneCount() == 6, 'six isolated zones');
     check(vacuum.zoneValve(0).port('outlet').kind == Vacuum, 'zone isolation valve');
-    var parts:Array<{id:String,part:AssumedCatalogComponent}> = [{id:'spindle',part:spindle},{id:'vfd',part:new Vfd()},
-      {id:'rack',part:toolRack},{id:'vacuum',part:vacuum},{id:'setter',part:setter}];
-    for(i in 0...vacuum.zoneCount()) parts.push({id:'zone'+i,part:vacuum.zoneValve(i)});
-    var cabinet=ControlCabinet.forParts(parts);
-    check(cabinet.parameterCount('inputs')==23 && cabinet.parameterCount('outputs')==12 && cabinet.parameterCount('analogOutputs')==1,
-      'cabinet counts each physical I/O owner once');
-    var straightPinion=new SpurGear(2,20,20),straightRack=new Rack(2,20,20);
-    near(straightPinion.pitchDiameter,40,1e-9,'existing spur pitch unchanged');
-    near(Rack.relation(straightPinion,straightRack,1).ratio,0.05,1e-12,'existing straight-rack relation unchanged');
-    for(profile in ['MGN12C','MGN12H','MGN9C','HGH15CA'])
-      check(LinearRailSystem.catalog().exists(profile),'existing rail row retained '+profile);
-    near(new Spoilboard().permeabilityM2(),1e-12,1e-20,'spoilboard SI permeability');
-    reject(()->new AtcSpindle(new ComponentValues().setNumber('releaseBore',32)),'undersized release cylinder');
-    reject(()->new PlanetaryReducer(new ComponentValues().setNumber('efficiency',1.1)),'reducer efficiency above one');
-    reject(()->new VacuumTable(new ComponentValues().setInteger('columns',0)),'empty vacuum zone layout');
-    reject(()->new ToolHolder(new ComponentValues().setNumber('colletBore',50)),'holder collet bore consumes wall');
-    reject(() -> ControlCabinet.forParts([{id: 'same', part: spindle}, {id: 'same', part: setter}
-    ]), 'duplicate cabinet ids');
+    var parts:Array<{id:String, part:AssumedCatalogComponent}> = [
+      {id: 'spindle', part: spindle},
+      {
+        id: 'vfd',
+        part: new Vfd()
+      },
+      {
+        id: 'rack',
+        part: toolRack
+      },
+      {
+        id: 'vacuum',
+        part: vacuum
+      },
+      {
+        id: 'setter',
+        part: setter
+      }
+    ];
+    for (i in 0...vacuum.zoneCount()) parts.push({id: 'zone' + i, part: vacuum.zoneValve(i)});
+    var cabinet = ControlCabinet.forParts(parts);
+    check(
+      cabinet.parameterCount('inputs') == 23
+      && cabinet.parameterCount('outputs') == 12 && cabinet.parameterCount('analogOutputs') == 1,
+      'cabinet counts each physical I/O owner once'
+    );
+    var straightPinion = new SpurGear(2, 20, 20), straightRack = new Rack(2, 20, 20);
+    near(straightPinion.pitchDiameter, 40, 1e-9, 'existing spur pitch unchanged');
+    near(Rack.relation(straightPinion,
+      straightRack, 1).ratio, 0.05, 1e-12, 'existing straight-rack relation unchanged');
+    for (profile in ['MGN12C', 'MGN12H', 'MGN9C', 'HGH15CA']) check(
+      LinearRailSystem.catalog().exists(profile),
+      'existing rail row retained ' + profile
+    );
+    near(new Spoilboard().permeabilityM2(), 1e-12, 1e-20, 'spoilboard SI permeability');
+    reject(() -> new AtcSpindle(new ComponentValues().setNumber('releaseBore', 32)), 'undersized release cylinder');
+    reject(
+      () -> new PlanetaryReducer(new ComponentValues().setNumber('efficiency', 1.1)),
+      'reducer efficiency above one'
+    );
+    reject(() -> new VacuumTable(new ComponentValues().setInteger('columns', 0)), 'empty vacuum zone layout');
+    reject(() -> new ToolHolder(new ComponentValues().setNumber('colletBore', 50)), 'holder collet bore consumes wall');
+    reject(
+      () -> ControlCabinet.forParts([{id: 'same', part: spindle}, {id: 'same', part: setter}]),
+      'duplicate cabinet ids'
+    );
     Sys.println('Sheet router SR1 parts: ' + assertions + ' assertions passed');
   }
 }

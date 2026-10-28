@@ -26,12 +26,11 @@ class CompiledPendant {
     this.reasonTexts = reasonTexts.copy();
     this.labels = labels.copy();
     var h = -2128831035; // 0x811C9DC5
-    for (record in [profile].concat(reasons).concat(labels))
-      for (i in 0...record.length) {
-        h = h ^ record.get(i);
-        // h * 0x01000193 spelled with shifts, so 32-bit wrap-around does not depend on Int multiplication.
-        h = (h << 24) + (h << 8) + (h << 7) + (h << 4) + (h << 1) + h;
-      }
+    for (record in [profile].concat(reasons).concat(labels)) for (i in 0...record.length) {
+      h = h ^ record.get(i);
+      // h * 0x01000193 spelled with shifts, so 32-bit wrap-around does not depend on Int multiplication.
+      h = (h << 24) + (h << 8) + (h << 7) + (h << 4) + (h << 1) + h;
+    }
     this.digest = h;
   }
 }

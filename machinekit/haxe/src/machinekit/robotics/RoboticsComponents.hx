@@ -4,25 +4,25 @@ import machinekit.component.ComponentRegistry;
 
 /** The robotics package's component recipes. */
 class RoboticsComponents {
-	public static function register(registry:ComponentRegistry):Void {
-		registry.register(GearedArmJoint.recipeType());
-		registry.register(CobotJoint.moduleRecipeType());
-		registry.register(RobotFlange.recipeType());
-		registry.register(ToolServiceModule.recipeType());
-		registry.register(FairinoDualToolAdapter.recipeType());
-		registry.register(EndEffectorPlate.recipeType());
-		registry.register(Pedestal.recipeType());
-		registry.register(FrameBar.recipeType());
-		registry.register(ArmJoint.recipeType());
-		registry.register(ArmLink.recipeType());
-		registry.register(ArmWristFork.recipeType());
-		registry.register(ParallelGripperBody.recipeType());
-		registry.register(ParallelGripperJaw.recipeType());
-		registry.register(ParallelGripperFinger.recipeType());
-		registry.registerFamily(OffsetGripperFinger.family());
-		registry.register(ToolChangerMaster.recipeType());
-		registry.register(ToolChangerTool.recipeType());
-		registry.register(BayonetChangerMaster.recipeType());
-		registry.register(BayonetChangerTool.recipeType());
-	}
+  public static function register(registry:ComponentRegistry):Void {
+    registry.register(GearedArmJoint.recipeType());
+    registry.register(CobotJoint.moduleRecipeType());
+    registry.register(RobotFlange.recipeType());
+    registry.register(ToolServiceModule.recipeType());
+    registry.register(FairinoDualToolAdapter.recipeType());
+    registry.register(EndEffectorPlate.recipeType());
+    registry.register(Pedestal.recipeType());
+    registry.register(FrameBar.recipeType());
+    registry.register(ArmJoint.recipeType());
+    registry.register(ArmLink.recipeType());
+    registry.register(ArmWristFork.recipeType());
+    registry.register(ParallelGripperBody.recipeType());
+    registry.register(ParallelGripperJaw.recipeType());
+    registry.register(ParallelGripperFinger.recipeType());
+    registry.registerFamily(OffsetGripperFinger.family());
+    registry.register(ToolChangerMaster.recipeType());
+    registry.register(ToolChangerTool.recipeType());
+    registry.register(BayonetChangerMaster.recipeType());
+    registry.register(BayonetChangerTool.recipeType());
+  }
 }

@@ -8,39 +8,117 @@ import machinekit.motion.ServoMotor;
 /** Assumed compact 2.2 kW / 8000 rpm motor, including its mounting flange.
  * This is not the much larger motor in the Automation Technology kit. */
 class Bt30SpindleMotor extends ServoMotor {
-	static var recipe:Null<ComponentType>;
-	public static function recipeType():ComponentType {
-		if (recipe==null) recipe=new ComponentType("machinekit.milling.bt30-spindle-motor-study",[],v->new Bt30SpindleMotor()); return recipe;
-	}
-	public function new() {
-		var speed=8000*2*Math.PI/60,torque=2200/speed;
-		super({designation:"ASSUMED-BT30-MOTOR-2200W",ratedTorque:torque,peakTorque:2*torque,ratedSpeed:speed,maxSpeed:speed,
-			rotorInertia:0.002,encoderCounts:4096,bodyDiameter:90,bodyLength:160,shaftDiameter:20,shaftLength:30,
-			electrical:ServoMotor.acWinding(torque,speed)},Assumed);
-	}
-	override public function componentType():Null<ComponentType> return recipeType();
-	override public function values():ComponentValues return new ComponentValues().setToken("material",materialSpec());
-	override public function mounting():machinekit.motion.MotorFlange return {
-		face:110,flangeThickness:10,pilotDiameter:40,pilotHeight:2,holeDiameter:5.5,
-		holes:[{x:-30,y:-30},{x:30,y:-30},{x:30,y:30},{x:-30,y:30}]};
-	/** Continuous axial envelope, retaining the narrower body above its flange. */
-	override public function axialEnvelope(minOffset:Float,maxOffset:Float,includeShaft:Bool=false):Part {
-		if (!Math.isFinite(minOffset) || !Math.isFinite(maxOffset) || minOffset>maxOffset) throw "Invalid motor axial envelope";
-		var parts=[Part.cylinderSpan(rating.bodyDiameter/2,-rating.bodyLength+minOffset,maxOffset),
-			Part.box(110,110,10+maxOffset-minOffset).translated(new Vector(0,0,-10+minOffset)),
-			Part.cylinderSpan(20,minOffset,2+maxOffset)];
-		if (includeShaft) parts.push(Part.cylinderSpan(rating.shaftDiameter/2,minOffset,rating.shaftLength+maxOffset));
-		return Solids.union(parts);
-	}
+  static var recipe:Null<ComponentType>;
+  public static function recipeType():ComponentType {
+    if (recipe == null) recipe = new ComponentType(
+      "machinekit.milling.bt30-spindle-motor-study",
+      [],
+      v -> new Bt30SpindleMotor()
+    );
+    return recipe;
+  }
+  public function new() {
+    var speed = 8000 * 2 * Math.PI / 60, torque = 2200 / speed;
+    super(
+      {
+        designation: "ASSUMED-BT30-MOTOR-2200W",
+        ratedTorque: torque,
+        peakTorque: 2 * torque,
+        ratedSpeed: speed,
+        maxSpeed: speed,
+        rotorInertia: 0.002,
+        encoderCounts: 4096,
+        bodyDiameter: 90,
+        bodyLength: 160,
+        shaftDiameter: 20,
+        shaftLength: 30,
+        electrical: ServoMotor.acWinding(
+          torque,
+          speed
+        )
+      },
+      Assumed
+    );
+  }
+  override public function componentType():Null<ComponentType> return recipeType();
+  override public function values():ComponentValues return new ComponentValues().setToken("material", materialSpec());
+  override public function mounting():machinekit.motion.MotorFlange return {
+    face: 110,
+    flangeThickness: 10,
+    pilotDiameter: 40,
+    pilotHeight: 2,
+    holeDiameter: 5.5,
+    holes: [
+      {
+        x: -30,
+        y: -30
+      },
+      {
+        x: 30,
+        y: -30
+      },
+      {
+        x: 30,
+        y: 30
+      },
+      {
+        x: -30,
+        y: 30
+      }
+    ]
+  };
+  /** Continuous axial envelope, retaining the narrower body above its flange. */
+  override public function axialEnvelope(minOffset:Float, maxOffset:Float, includeShaft:Bool = false):Part {
+    if (!Math.isFinite(minOffset)
+      || !Math.isFinite(maxOffset) || minOffset > maxOffset) throw "Invalid motor axial envelope";
+    var parts = [
+      Part.cylinderSpan(rating.bodyDiameter / 2, -rating.bodyLength + minOffset, maxOffset),
+      Part.box(
+        110,
+        110,
+        10 + maxOffset - minOffset
+      ).translated(new Vector(
+        0,
+        0,
+        -10 + minOffset
+      )),
+      Part.cylinderSpan(
+        20,
+        minOffset,
+        2 + maxOffset
+      )
+    ];
+    if (includeShaft) parts.push(Part.cylinderSpan(rating.shaftDiameter / 2,
+      minOffset, rating.shaftLength + maxOffset));
+    return Solids.union(parts);
+  }
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return withFlange(super.geometry(detail));
+  override public function geometry(detail:ComponentDetail = Preview):Part return withFlange(super.geometry(detail));
 
-	/** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
-	override public function massGeometry():Null<Part> return withFlange(super.massGeometry());
+  /** Mass of the base motor's body with this flange and pilot, as before the body was drawn in detail. */
+  override public function massGeometry():Null<Part> return withFlange(super.massGeometry());
 
-	function withFlange(base:Part):Part {
-		var tools=[]; for (x in [-30.0,30.0]) for (y in [-30.0,30.0]) tools.push(Part.cylinderSpan(2.1,-8,1,x,y));
-		return Solids.cut(Solids.union([base,Part.box(110,110,10).translated(new Vector(0,0,-10)),
-			Solids.cut(Part.cylinderSpan(20,0,2),[Part.cylinderSpan(10.5,-1,3)])]),tools);
-	}
+  function withFlange(base:Part):Part {
+    var tools = [];
+    for (x in [-30.0, 30.0]) for (y in [-30.0, 30.0]) tools.push(Part.cylinderSpan(2.1, -8, 1, x, y));
+    return Solids.cut(
+      Solids.union([
+        base,
+        Part.box(110, 110, 10).translated(new Vector(0, 0, -10)),
+        Solids.cut(
+          Part.cylinderSpan(
+            20,
+            0,
+            2
+          ),
+          [Part.cylinderSpan(
+            10.5,
+            -1,
+            3
+          )]
+        )
+      ]),
+      tools
+    );
+  }
 }

@@ -8,13 +8,20 @@ import machinekit.robotics.GripFacet;
 
 /** One digital control of an end effector: the channel that works it and the inlet it drives. */
 enum EndEffectorControl {
-	Gripper(channel:String, member:String, openPort:String, closePort:String);
-	Vacuum(channel:String, member:String, inletPort:String);
-	Lock(channel:String, member:String, inletPort:String);
-	/** An arc torch's trigger: the channel that lights its arc and the control inlet it drives. */
-	Arc(channel:String, member:String, controlPort:String);
-	/** Start, reverse, program selection and vacuum are worked by the screwdriving process. */
-	Driver(channel:String, directionChannel:String, programChannel:String, vacuumChannel:String, member:String, controlPort:String);
+  Gripper(channel:String, member:String, openPort:String, closePort:String);
+  Vacuum(channel:String, member:String, inletPort:String);
+  Lock(channel:String, member:String, inletPort:String);
+  /** An arc torch's trigger: the channel that lights its arc and the control inlet it drives. */
+  Arc(channel:String, member:String, controlPort:String);
+  /** Start, reverse, program selection and vacuum are worked by the screwdriving process. */
+  Driver(
+    channel:String,
+    directionChannel:String,
+    programChannel:String,
+    vacuumChannel:String,
+    member:String,
+    controlPort:String
+  );
 }
 
 /** Where a suction cup meets what it holds: its member and its contact connector. */
@@ -22,10 +29,16 @@ typedef SuctionContact = {member:String, connector:String};
 
 /** Physical jaws, their grasp-state switch, and the connector at the finger workspace. */
 typedef GripperContact = {
-	member:String, connector:String, sensor:String,
-	padMembers:Array<String>, envelopeMembers:Array<String>,
-	minimumPartWidthMm:Float, nominalPartWidthMm:Float, maximumPartWidthMm:Float, fingerLengthMm:Float,
-	fingerPadFrictionCoefficient:Float
+  member:String,
+  connector:String,
+  sensor:String,
+  padMembers:Array<String>,
+  envelopeMembers:Array<String>,
+  minimumPartWidthMm:Float,
+  nominalPartWidthMm:Float,
+  maximumPartWidthMm:Float,
+  fingerLengthMm:Float,
+  fingerPadFrictionCoefficient:Float
 };
 
 /**
@@ -39,8 +52,14 @@ typedef GripperContact = {
  * `tcpConnector` is the wire tip.
  */
 typedef ArcTorchControl = {
-	member:String, channel:String, wireSpeedChannel:String, voltageChannel:String, sensor:String,
-	controlPort:String, tcpConnector:String, stickoutMm:Float
+  member:String,
+  channel:String,
+  wireSpeedChannel:String,
+  voltageChannel:String,
+  sensor:String,
+  controlPort:String,
+  tcpConnector:String,
+  stickoutMm:Float
 };
 
 /**
@@ -49,10 +68,23 @@ typedef ArcTorchControl = {
  * is an integral analogue slot number, with zero meaning no selected program.
  */
 typedef ScrewdriverControl = {
-	member:String, channel:String, directionChannel:String, programChannel:String, vacuumChannel:String,
-	sensor:String, controlPort:String, tcpConnector:String, bitMember:String, feedJoint:String, spindleJoint:String,
-	strokeEncoder:String, bit:materia.project.SceneArtifact.SceneArtifactScrewdriverBit,
-	maxTorque:Float, maxSpeed:Float, strokeMm:Float, springRate:Float
+  member:String,
+  channel:String,
+  directionChannel:String,
+  programChannel:String,
+  vacuumChannel:String,
+  sensor:String,
+  controlPort:String,
+  tcpConnector:String,
+  bitMember:String,
+  feedJoint:String,
+  spindleJoint:String,
+  strokeEncoder:String,
+  bit:materia.project.SceneArtifact.SceneArtifactScrewdriverBit,
+  maxTorque:Float,
+  maxSpeed:Float,
+  strokeMm:Float,
+  springRate:Float
 };
 
 /**
@@ -66,151 +98,195 @@ typedef ScrewdriverControl = {
  * depends on one.
  */
 class EndEffectorControls {
-	public final controls:Array<EndEffectorControl>;
-	public final vacuumSensor:Null<String>;
-	public final suctions:Array<SuctionContact>;
-	public final grippers:Array<GripperContact>;
-	public final arcs:Array<ArcTorchControl>;
-	public final drivers:Array<ScrewdriverControl>;
+  public final controls:Array<EndEffectorControl>;
+  public final vacuumSensor:Null<String>;
+  public final suctions:Array<SuctionContact>;
+  public final grippers:Array<GripperContact>;
+  public final arcs:Array<ArcTorchControl>;
+  public final drivers:Array<ScrewdriverControl>;
 
-	function new(controls:Array<EndEffectorControl>, vacuumSensor:Null<String>, suctions:Array<SuctionContact>,
-			grippers:Array<GripperContact>, arcs:Array<ArcTorchControl>, drivers:Array<ScrewdriverControl>) {
-		this.controls = controls;
-		this.vacuumSensor = vacuumSensor;
-		this.suctions = suctions;
-		this.grippers = grippers;
-		this.arcs = arcs;
-		this.drivers = drivers;
-	}
+  function new(
+    controls:Array<EndEffectorControl>,
+    vacuumSensor:Null<String>,
+    suctions:Array<SuctionContact>,
+    grippers:Array<GripperContact>,
+    arcs:Array<ArcTorchControl>,
+    drivers:Array<ScrewdriverControl>
+  ) {
+    this.controls = controls;
+    this.vacuumSensor = vacuumSensor;
+    this.suctions = suctions;
+    this.grippers = grippers;
+    this.arcs = arcs;
+    this.drivers = drivers;
+  }
 
-	/** The first arc torch's channel, or null when the effector has none. */
-	public function arcChannel():Null<String> return arcs.length == 0 ? null : arcs[0].channel;
+  /** The first arc torch's channel, or null when the effector has none. */
+  public function arcChannel():Null<String> return arcs.length == 0 ? null : arcs[0].channel;
 
-	/** The vacuum control's channel, or null when the effector has none. */
-	public function vacuumChannel():Null<String> {
-		for (control in controls) switch control {
-			case Vacuum(channel, _, _): return channel;
-			case _:
-		}
-		return null;
-	}
+  /** The vacuum control's channel, or null when the effector has none. */
+  public function vacuumChannel():Null<String> {
+    for (control in controls) switch control {
+      case Vacuum(channel, _, _):
+        return channel;
+      case _:
+    }
+    return null;
+  }
 
-	/** A physical gripper's logical close channel, by its assembly member ID. */
-	public function gripperChannel(member:String):Null<String> {
-		for (control in controls) switch control {
-			case Gripper(channel, owner, _, _) if (owner == member): return channel;
-			case _:
-		}
-		return null;
-	}
+  /** A physical gripper's logical close channel, by its assembly member ID. */
+  public function gripperChannel(member:String):Null<String> {
+    for (control in controls) switch control {
+      case Gripper(channel, owner, _, _) if (owner == member):
+        return channel;
+      case _:
+    }
+    return null;
+  }
 
-	public static function derive(configuration:EndEffector, prefix:String):EndEffectorControls {
-		if (configuration == null) throw "End effector configuration is required";
-		var controls:Array<EndEffectorControl> = [];
-		var suctions:Array<SuctionContact> = [];
-		var grippers:Array<GripperContact> = [];
-		var arcs:Array<ArcTorchControl> = [];
-		var drivers:Array<ScrewdriverControl> = [];
-		var sensorId:Null<String> = null;
-		var occurrences = materia.assembly.AssemblyDefinitionFlattener.flatten(configuration.definition()).occurrences;
-		var hasVacuum = false, hasLock = false;
-		var hasExplicitVacuumValve = false;
-		for (member in configuration.components()) if (machinekit.pneumatic.VacuumValveFacet.of(member.component) != null)
-			hasExplicitVacuumValve = true;
-		for (member in configuration.components()) for (facet in member.component.facets()) {
-			var name = '$prefix/${member.id}';
-			if (Std.isOfType(facet, GripFacet)) {
-				var grip:GripFacet = cast facet;
-				if (grip.openPort == grip.closePort) throw "Ambiguous gripper runtime ports";
-				requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
-				requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
-				controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
-				var owners = [for (occurrence in occurrences) if (occurrence.id == member.id) occurrence];
-				if (owners.length != 1) throw "Gripper contact lost its CAD occurrence";
-				var scope = owners[0].includePath == null ? "" : owners[0].includePath;
-				var pads = [for (pad in grip.padMembers) scope.length == 0 ? pad : scope + "/" + pad];
-				var envelope = [for (occurrence in occurrences)
-					if ((occurrence.includePath == null ? "" : occurrence.includePath) == scope) occurrence.id];
-				for (pad in pads) if (envelope.indexOf(pad) < 0) throw 'Gripper has no CAD contact member "$pad"';
-				var sensorParts:Array<String> = [];
-				if (prefix != null && prefix.length > 0) sensorParts.push(prefix);
-				if (scope.length > 0) sensorParts.push(scope);
-				sensorParts.push(grip.graspSensor);
-				grippers.push({member: member.id, connector: grip.contactConnector, sensor: sensorParts.join("/"),
-					padMembers: pads, envelopeMembers: envelope,
-					minimumPartWidthMm: grip.minimumPartWidthMm, nominalPartWidthMm: grip.nominalPartWidthMm,
-					maximumPartWidthMm: grip.maximumPartWidthMm, fingerLengthMm: grip.fingerLengthMm,
-					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient});
-			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumActuatorFacet)) {
-				var actuator:machinekit.pneumatic.VacuumActuatorFacet = cast facet;
-				if (hasExplicitVacuumValve) continue;
-				if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-				requireInlet(configuration, member.id, actuator.inletPort, [PortKind.Pneumatic, PortKind.Signal]);
-				controls.push(Vacuum('$name.enable', member.id, actuator.inletPort));
-				hasVacuum = true;
-			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumValveFacet)) {
-				var valve:machinekit.pneumatic.VacuumValveFacet = cast facet;
-				if (hasVacuum) throw "Ambiguous vacuum runtime ports";
-				requireInlet(configuration, member.id, valve.controlPort, [PortKind.Signal]);
-				controls.push(Vacuum('$name.enable', member.id, valve.controlPort));
-				hasVacuum = true;
-			} else if (Std.isOfType(facet, ChangerLockFacet)) {
-				var lock:ChangerLockFacet = cast facet;
-				if (hasLock) throw "Ambiguous changer-lock runtime ports";
-				requireInlet(configuration, member.id, lock.inletPort, [PortKind.Pneumatic]);
-				controls.push(Lock('$name.lock', member.id, lock.inletPort));
-				hasLock = true;
-			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumPressureSensorFacet)) {
-				var sensor:machinekit.pneumatic.VacuumPressureSensorFacet = cast facet;
-				if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
-				requireInlet(configuration, member.id, sensor.vacuumPort, [PortKind.Vacuum]);
-				var signal = member.component.port(sensor.signalPort);
-				if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
-					throw 'Pressure sensor "$name" needs a signal supply';
-				sensorId = '$name.${sensor.signalPort}';
-			} else if (Std.isOfType(facet, machinekit.pneumatic.SuctionFacet)) {
-				var suction:machinekit.pneumatic.SuctionFacet = cast facet;
-				suctions.push({member: member.id, connector: suction.contactConnector});
-			} else if (Std.isOfType(facet, machinekit.screwdriving.ScrewdriverFacet)) {
-				var driver:machinekit.screwdriving.ScrewdriverFacet = cast facet;
-				requireInlet(configuration, member.id, driver.controlPort, [PortKind.Signal]);
-				if (drivers.length > 0) throw "Ambiguous screwdriver runtime ports";
-				var bitMembers = [for (candidate in configuration.components()) if (candidate.component == driver.bit) candidate.id];
-				if (bitMembers.length != 1) throw 'Screwdriver "${member.id}" lost its unique CAD bit occurrence';
-				var scope = name.substr(0, name.lastIndexOf("/") + 1);
-				controls.push(Driver('$name.drive', '$name.direction', '$name.program', '$name.vacuum', member.id, driver.controlPort));
-				drivers.push({member: member.id, channel: '$name.drive', directionChannel: '$name.direction',
-					programChannel: '$name.program', vacuumChannel: '$name.vacuum', sensor: '$name.screwdriver',
-					controlPort: driver.controlPort, tcpConnector: driver.tcpConnector, bitMember: bitMembers[0],
-					feedJoint: scope + driver.feedJoint, spindleJoint: scope + driver.spindleJoint, strokeEncoder: scope + driver.strokeEncoder,
-					bit: driver.bit.driveData(), maxTorque: driver.maxTorque, maxSpeed: driver.maxSpeed,
-					strokeMm: driver.strokeMm, springRate: driver.springRate});
-			} else if (Std.isOfType(facet, machinekit.welding.ArcTorchFacet)) {
-				var torch:machinekit.welding.ArcTorchFacet = cast facet;
-				requireInlet(configuration, member.id, torch.controlPort, [PortKind.Signal]);
-				if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
-				controls.push(Arc('$name.arc', member.id, torch.controlPort));
-				arcs.push({member: member.id, channel: '$name.arc', wireSpeedChannel: '$name.wire_speed',
-					voltageChannel: '$name.voltage', sensor: '$name.weld', controlPort: torch.controlPort,
-					tcpConnector: torch.tcpConnector, stickoutMm: torch.stickoutMm});
-			}
-		}
-		if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";
-		if (drivers.length > 0 && (arcs.length > 0 || grippers.length > 0 || suctions.length > 0))
-			throw "A screwdriver cannot share its mounted end effector with another process tool";
-		return new EndEffectorControls(controls, sensorId, suctions, grippers, arcs, drivers);
-	}
+  public static function derive(configuration:EndEffector, prefix:String):EndEffectorControls {
+    if (configuration == null) throw "End effector configuration is required";
+    var controls:Array<EndEffectorControl> = [];
+    var suctions:Array<SuctionContact> = [];
+    var grippers:Array<GripperContact> = [];
+    var arcs:Array<ArcTorchControl> = [];
+    var drivers:Array<ScrewdriverControl> = [];
+    var sensorId:Null<String> = null;
+    var occurrences = materia.assembly.AssemblyDefinitionFlattener.flatten(configuration.definition()).occurrences;
+    var hasVacuum = false, hasLock = false;
+    var hasExplicitVacuumValve = false;
+    for (member in configuration.components()) if (machinekit.pneumatic.VacuumValveFacet.of(member.component)
+      != null) hasExplicitVacuumValve = true;
+    for (member in configuration.components()) for (facet in member.component.facets()) {
+      var name = '$prefix/${member.id}';
+      if (Std.isOfType(facet, GripFacet)) {
+        var grip:GripFacet = cast facet;
+        if (grip.openPort == grip.closePort) throw "Ambiguous gripper runtime ports";
+        requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
+        requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
+        controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
+        var owners = [for (occurrence in occurrences) if (occurrence.id == member.id) occurrence];
+        if (owners.length != 1) throw "Gripper contact lost its CAD occurrence";
+        var scope = owners[0].includePath == null ? "" : owners[0].includePath;
+        var pads = [for (pad in grip.padMembers) scope.length == 0 ? pad : scope + "/" + pad];
+        var envelope = [for (occurrence in occurrences) if ((occurrence.includePath
+          == null ? "" : occurrence.includePath) == scope) occurrence.id];
+        for (pad in pads) if (envelope.indexOf(pad) < 0) throw 'Gripper has no CAD contact member "$pad"';
+        var sensorParts:Array<String> = [];
+        if (prefix != null && prefix.length > 0) sensorParts.push(prefix);
+        if (scope.length > 0) sensorParts.push(scope);
+        sensorParts.push(grip.graspSensor);
+        grippers.push({
+          member: member.id,
+          connector: grip.contactConnector,
+          sensor: sensorParts.join("/"),
+          padMembers: pads,
+          envelopeMembers: envelope,
+          minimumPartWidthMm: grip.minimumPartWidthMm,
+          nominalPartWidthMm: grip.nominalPartWidthMm,
+          maximumPartWidthMm: grip.maximumPartWidthMm,
+          fingerLengthMm: grip.fingerLengthMm,
+          fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient
+        });
+      } else if (Std.isOfType(facet, machinekit.pneumatic.VacuumActuatorFacet)) {
+        var actuator:machinekit.pneumatic.VacuumActuatorFacet = cast facet;
+        if (hasExplicitVacuumValve) continue;
+        if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+        requireInlet(configuration, member.id, actuator.inletPort, [PortKind.Pneumatic, PortKind.Signal]);
+        controls.push(Vacuum('$name.enable', member.id, actuator.inletPort));
+        hasVacuum = true;
+      } else if (Std.isOfType(facet, machinekit.pneumatic.VacuumValveFacet)) {
+        var valve:machinekit.pneumatic.VacuumValveFacet = cast facet;
+        if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+        requireInlet(configuration, member.id, valve.controlPort, [PortKind.Signal]);
+        controls.push(Vacuum('$name.enable', member.id, valve.controlPort));
+        hasVacuum = true;
+      } else if (Std.isOfType(facet, ChangerLockFacet)) {
+        var lock:ChangerLockFacet = cast facet;
+        if (hasLock) throw "Ambiguous changer-lock runtime ports";
+        requireInlet(configuration, member.id, lock.inletPort, [PortKind.Pneumatic]);
+        controls.push(Lock('$name.lock', member.id, lock.inletPort));
+        hasLock = true;
+      } else if (Std.isOfType(facet, machinekit.pneumatic.VacuumPressureSensorFacet)) {
+        var sensor:machinekit.pneumatic.VacuumPressureSensorFacet = cast facet;
+        if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
+        requireInlet(configuration, member.id, sensor.vacuumPort, [PortKind.Vacuum]);
+        var signal = member.component.port(sensor.signalPort);
+        if (signal.role != PortRole.Supply
+          || signal.kind != PortKind.Signal) throw 'Pressure sensor "$name" needs a signal supply';
+        sensorId = '$name.${sensor.signalPort}';
+      } else if (Std.isOfType(facet, machinekit.pneumatic.SuctionFacet)) {
+        var suction:machinekit.pneumatic.SuctionFacet = cast facet;
+        suctions.push({member: member.id, connector: suction.contactConnector});
+      } else if (Std.isOfType(facet, machinekit.screwdriving.ScrewdriverFacet)) {
+        var driver:machinekit.screwdriving.ScrewdriverFacet = cast facet;
+        requireInlet(configuration, member.id, driver.controlPort, [PortKind.Signal]);
+        if (drivers.length > 0) throw "Ambiguous screwdriver runtime ports";
+        var bitMembers = [for (candidate in configuration.components()) if (candidate.component
+          == driver.bit) candidate.id];
+        if (bitMembers.length != 1) throw 'Screwdriver "${member.id}" lost its unique CAD bit occurrence';
+        var scope = name.substr(0, name.lastIndexOf("/") + 1);
+        controls.push(Driver(
+          '$name.drive',
+          '$name.direction',
+          '$name.program',
+          '$name.vacuum',
+          member.id,
+          driver.controlPort
+        ));
+        drivers.push({
+          member: member.id,
+          channel: '$name.drive',
+          directionChannel: '$name.direction',
+          programChannel: '$name.program',
+          vacuumChannel: '$name.vacuum',
+          sensor: '$name.screwdriver',
+          controlPort: driver.controlPort,
+          tcpConnector: driver.tcpConnector,
+          bitMember: bitMembers[0],
+          feedJoint: scope + driver.feedJoint,
+          spindleJoint: scope + driver.spindleJoint,
+          strokeEncoder: scope + driver.strokeEncoder,
+          bit: driver.bit.driveData(),
+          maxTorque: driver.maxTorque,
+          maxSpeed: driver.maxSpeed,
+          strokeMm: driver.strokeMm,
+          springRate: driver.springRate
+        });
+      } else if (Std.isOfType(facet, machinekit.welding.ArcTorchFacet)) {
+        var torch:machinekit.welding.ArcTorchFacet = cast facet;
+        requireInlet(configuration, member.id, torch.controlPort, [PortKind.Signal]);
+        if (arcs.length > 0) throw "Ambiguous arc torch runtime ports";
+        controls.push(Arc('$name.arc', member.id, torch.controlPort));
+        arcs.push({
+          member: member.id,
+          channel: '$name.arc',
+          wireSpeedChannel: '$name.wire_speed',
+          voltageChannel: '$name.voltage',
+          sensor: '$name.weld',
+          controlPort: torch.controlPort,
+          tcpConnector: torch.tcpConnector,
+          stickoutMm: torch.stickoutMm
+        });
+      }
+    }
+    if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";
+    if (drivers.length > 0 && (arcs.length > 0 || grippers.length > 0
+      || suctions.length > 0)) throw "A screwdriver cannot share its mounted end effector with another process tool";
+    return new EndEffectorControls(controls, sensorId, suctions, grippers, arcs, drivers);
+  }
 
-	static function requireInlet(configuration:EndEffector, instanceId:String, portName:String, allowed:Array<PortKind>):Void {
-		for (member in configuration.components()) if (member.id == instanceId) {
-			var port = member.component.port(portName);
-			if (port.role != PortRole.Consumer) throw 'Control port "$instanceId/$portName" must be a consumer';
-			for (kind in allowed) if (port.kind == kind) {
-				configuration.upstream(instanceId, portName);
-				return;
-			}
-			throw 'Control port "$instanceId/$portName" has the wrong service kind';
-		}
-		throw 'Unknown control member "$instanceId"';
-	}
+  static function requireInlet(configuration:EndEffector,
+    instanceId:String, portName:String, allowed:Array<PortKind>):Void {
+    for (member in configuration.components()) if (member.id == instanceId) {
+      var port = member.component.port(portName);
+      if (port.role != PortRole.Consumer) throw 'Control port "$instanceId/$portName" must be a consumer';
+      for (kind in allowed) if (port.kind == kind) {
+        configuration.upstream(instanceId, portName);
+        return;
+      }
+      throw 'Control port "$instanceId/$portName" has the wrong service kind';
+    }
+    throw 'Unknown control member "$instanceId"';
+  }
 }

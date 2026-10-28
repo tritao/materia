@@ -22,8 +22,16 @@ class OperatorProfile {
   public final hasDoor:Bool;
   public final jogRules:Array<JogRule>;
 
-  public function new(name:String, axes:Array<OperatorAxis>, pendantAxes:Array<Null<String>>,
-      keys:Array<OperatorKey>, modes:Array<OperatorMode>, hasSpindle:Bool, hasDoor:Bool, jogRules:Array<JogRule>) {
+  public function new(
+    name:String,
+    axes:Array<OperatorAxis>,
+    pendantAxes:Array<Null<String>>,
+    keys:Array<OperatorKey>,
+    modes:Array<OperatorMode>,
+    hasSpindle:Bool,
+    hasDoor:Bool,
+    jogRules:Array<JogRule>
+  ) {
     requireId(name, "profile name");
     if (axes == null || axes.length == 0) throw "A profile needs at least one axis";
     var ids:Array<String> = [];
@@ -84,7 +92,8 @@ class OperatorProfile {
 
   /** Printable ASCII only, since the pendant OLED has one small font. */
   public static function requireLabel(value:Dynamic, max:Int, what:String):Void {
-    if (!Std.isOfType(value, String) || (value:String).length == 0 || (value:String).length > max) throw 'Invalid $what';
+    if (!Std.isOfType(value,
+      String) || (value:String).length == 0 || (value:String).length > max) throw 'Invalid $what';
     for (i in 0...(value:String).length) {
       var c = (value:String).charCodeAt(i);
       if (c < 32 || c > 126) throw 'Invalid $what: printable ASCII only';
@@ -93,7 +102,6 @@ class OperatorProfile {
 
   static function requireUnique<T>(values:Array<T>, what:String):Void {
     if (values == null || values.length == 0) throw 'A profile needs at least one $what';
-    for (i in 0...values.length) for (j in i + 1...values.length)
-      if (values[i] == values[j]) throw 'Duplicate $what';
+    for (i in 0...values.length) for (j in i + 1...values.length) if (values[i] == values[j]) throw 'Duplicate $what';
   }
 }

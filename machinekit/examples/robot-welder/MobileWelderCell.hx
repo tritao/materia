@@ -19,27 +19,52 @@ class MobileWelderCell extends MachineAssembly {
     robot = new MobileWeldingRobot();
     work = new WeldingWorkpiece();
     var carrierRadius = Math.sqrt(Math.pow(robot.length, 2) + Math.pow(robot.width, 2)) / 2;
-    var chargerRadius = Math.sqrt(Math.pow(BatteryCharger.DEFAULT_LENGTH, 2) +
-      Math.pow(BatteryCharger.DEFAULT_WIDTH, 2)) / 2;
+    var chargerRadius = Math.sqrt(Math.pow(BatteryCharger.DEFAULT_LENGTH,
+      2) + Math.pow(BatteryCharger.DEFAULT_WIDTH, 2)) / 2;
     var dockStandoff = carrierRadius + chargerRadius + 300;
     charger = new BatteryCharger(robot.battery.nominalVolts, 3000, dockStandoff);
     tableTop = RobotArm.TABLE_TOP + MobileBase.DECK_Z + MobileBase.DECK_THICKNESS;
     include("robot", robot, MobileBaseCell.floorFrame(ORIGIN));
-    addComponent("floor", new RoomBlock(8000, 6000, 50, "painted steel", "Floor"), AssemblyFrames.translation(0, 0, -50));
+    addComponent(
+      "floor",
+      new RoomBlock(8000, 6000, 50, "painted steel", "Floor"),
+      AssemblyFrames.translation(0, 0, -50)
+    );
     addComponent("table", new ArmTable(300, 900, tableTop), AssemblyFrames.translation(2000, 0, 0));
     include("work", work);
-    addComponent("charger", charger, AssemblyFrames.translation(ORIGIN.x, ORIGIN.y + dockStandoff,
-      charger.height / 2));
-    var desired:materia.assembly.AssemblyRecord.AssemblyFrame = {x: 2000, y: -150, z: tableTop,
-      qx: 0, qy: 0, qz: Math.sin(Math.PI / 4), qw: Math.cos(Math.PI / 4)};
+    addComponent("charger", charger, AssemblyFrames.translation(ORIGIN.x, ORIGIN.y + dockStandoff, charger.height / 2));
+    var desired:materia.assembly.AssemblyRecord.AssemblyFrame = {
+      x: 2000,
+      y: -150,
+      z: tableTop,
+      qx: 0,
+      qy: 0,
+      qz: Math.sin(Math.PI / 4),
+      qw: Math.cos(Math.PI / 4)
+    };
     var tableFrame = solvedPoses().get("table");
-    var seat = AssemblyFrames.compose(AssemblyFrames.inverse(tableFrame),
-      AssemblyFrames.compose(desired, memberConnectorFrame("work/basePlate", "base")));
+    var seat = AssemblyFrames.compose(
+      AssemblyFrames.inverse(tableFrame),
+      AssemblyFrames.compose(
+        desired,
+        memberConnectorFrame(
+          "work/basePlate",
+          "base"
+        )
+      )
+    );
     addMemberConnector("table", "weldmentSeat", seat);
     addMate("work-mount", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
     addComponent("clamp", new WorkClamp());
-    addMemberConnector("work/basePlate", "clampSeat", Solids.axial(WeldingCell.CLAMP_X, WeldingCell.CLAMP_Y,
-      WeldingWorkpiece.PLATE_THICKNESS));
+    addMemberConnector(
+      "work/basePlate",
+      "clampSeat",
+      Solids.axial(
+        WeldingCell.CLAMP_X,
+        WeldingCell.CLAMP_Y,
+        WeldingWorkpiece.PLATE_THICKNESS
+      )
+    );
     addMate("work-clamp", "fixed", "work/basePlate", "clampSeat", "clamp", "contact");
     connectPorts("work-lead", "robot", "workLead", "clamp", "lead");
     var control = robot.port("control", "robot");

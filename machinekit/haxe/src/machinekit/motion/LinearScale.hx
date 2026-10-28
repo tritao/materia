@@ -28,10 +28,14 @@ class LinearScale extends MachineComponent implements EncoderPart {
 
   public function new(length:Float, countsPerMillimetre:Float, absolute:Bool = false, hasIndex:Bool = true) {
     if (!(length > 0) || !Math.isFinite(length)) throw "Linear scale needs a positive length";
-    if (!(countsPerMillimetre > 0) || !Math.isFinite(countsPerMillimetre)) throw "Linear scale needs a positive resolution";
-    super('SCALE-${Dimension.format(countsPerMillimetre)}${absolute ? "A" : "I"}${hasIndex ? "Z" : ""}-${Dimension.format(length)}',
+    if (!(countsPerMillimetre > 0)
+      || !Math.isFinite(countsPerMillimetre)) throw "Linear scale needs a positive resolution";
+    super(
+      'SCALE-${Dimension.format(countsPerMillimetre)}${absolute ? "A" : "I"}${hasIndex ? "Z" : ""}-${Dimension.format(length)}',
       'Linear scale, ${Dimension.format(countsPerMillimetre)} counts per mm, ${Dimension.format(length)} mm, ${absolute ? "absolute" : "incremental"}'
-      + (hasIndex ? " with reference mark" : ""), "aluminium 6061");
+      + (hasIndex ? " with reference mark" : ""),
+      "aluminium 6061"
+    );
     this.length = length;
     this.countsPerMillimetre = countsPerMillimetre;
     this.absolute = absolute;
@@ -43,23 +47,65 @@ class LinearScale extends MachineComponent implements EncoderPart {
   static var recipeTypeCache:Null<ComponentType>;
 
   public static function recipeType():ComponentType {
-    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.motion.linear-scale", [ComponentRecipeSupport.length("length", 300), ComponentRecipeSupport.scalar("countsPerMillimetre", 200),
-      ComponentRecipeSupport.flag("absolute", false), ComponentRecipeSupport.flag("index", true)],
-      v -> new LinearScale(v.number("length"), v.number("countsPerMillimetre"), v.boolean("absolute"),
-      	v.boolean("index")), true);
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.motion.linear-scale",
+      [
+        ComponentRecipeSupport.length(
+          "length",
+          300
+        ),
+        ComponentRecipeSupport.scalar(
+          "countsPerMillimetre",
+          200
+        ),
+        ComponentRecipeSupport.flag(
+          "absolute",
+          false
+        ),
+        ComponentRecipeSupport.flag(
+          "index",
+          true
+        )
+      ],
+      v -> new LinearScale(
+        v.number("length"),
+        v.number("countsPerMillimetre"),
+        v.boolean("absolute"),
+        v.boolean("index")
+      ),
+      true
+    );
     return recipeTypeCache;
   }
 
-  override public function componentType():Null<ComponentType>
-    return Std.isExactType(this, LinearScale) ? recipeType() : null;
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    LinearScale) ? recipeType() : null;
 
-  override public function values():machinekit.component.ComponentValues
-    return new machinekit.component.ComponentValues().setNumber("length", length)
-      .setNumber("countsPerMillimetre", countsPerMillimetre).setBoolean("absolute", absolute)
-      .setBoolean("index", hasIndex).setToken("material", materialSpec());
+  override public function values():machinekit
+    .component.ComponentValues return new machinekit.component.ComponentValues().setNumber(
+      "length",
+      length
+    ).setNumber(
+      "countsPerMillimetre",
+      countsPerMillimetre
+    ).setBoolean(
+      "absolute",
+      absolute
+    ).setBoolean(
+      "index",
+      hasIndex
+    ).setToken(
+      "material",
+      materialSpec()
+    );
 
   public function encoder(id:String, joint:String):AssemblyEncoder {
-    var result:AssemblyEncoder = {id: id, joint: joint, kind: absolute ? "absolute" : "incremental", counts: countsPerMillimetre};
+    var result:AssemblyEncoder = {
+      id: id,
+      joint: joint,
+      kind: absolute ? "absolute" : "incremental",
+      counts : countsPerMillimetre
+    };
     if (hasIndex) result.index = true;
     return result;
   }
@@ -70,16 +116,67 @@ class LinearScale extends MachineComponent implements EncoderPart {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (detail == Envelope) return strip();
     var half = WIDTH / 2, thick = THICKNESS / 2, c = 0.4, track = 2.0, depth = 0.1;
-    return Solids.named(Part.prism([new Vector(-half, -thick), new Vector(half, -thick), new Vector(half, thick - c),
-      new Vector(half - c, thick), new Vector(track, thick), new Vector(track, thick - depth), new Vector(-track, thick - depth),
-      new Vector(-track, thick), new Vector(-half + c, thick), new Vector(-half, thick - c)], 0, length), "strip");
+    return Solids.named(
+      Part.prism(
+        [
+          new Vector(-half, -thick),
+          new Vector(half, -thick),
+          new Vector(half, thick - c),
+          new Vector(
+            half - c,
+            thick
+          ),
+          new Vector(
+            track,
+            thick
+          ),
+          new Vector(
+            track,
+            thick - depth
+          ),
+          new Vector(
+            -track,
+            thick - depth
+          ),
+          new Vector(
+            -track,
+            thick
+          ),
+          new Vector(
+            -half + c,
+            thick
+          ),
+          new Vector(
+            -half,
+            thick - c
+          )
+        ],
+        0,
+        length
+      ),
+      "strip"
+    );
   }
 
   override public function massGeometry():Null<Part> return strip();
 
   function strip():Part {
     var half = WIDTH / 2, thick = THICKNESS / 2;
-    return Solids.named(Part.prism([new Vector(-half, -thick), new Vector(half, -thick), new Vector(half, thick),
-      new Vector(-half, thick)], 0, length), "strip");
+    return Solids.named(
+      Part.prism(
+        [
+          new Vector(-half, -thick),
+          new Vector(half, -thick),
+          new Vector(half, thick),
+          new Vector(
+            -half,
+            thick
+          )
+        ],
+        0,
+        length
+      ),
+      "strip"
+    );
   }
 }

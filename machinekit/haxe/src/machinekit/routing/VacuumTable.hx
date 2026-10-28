@@ -13,14 +13,38 @@ class VacuumTable extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 1600),
     P.length("length", 2600),
-    P.length("height", 50),
-    P.length("wall", 15),
-    P.count("columns", 2),
-    P.count("rows", 3),
-    P.length("gridPitch", 50),
-    P.length("grooveWidth", 6),
-    P.length("grooveDepth", 5),
-    P.length("zonePortDiameter", 50)
+    P.length(
+      "height",
+      50
+    ),
+    P.length(
+      "wall",
+      15
+    ),
+    P.count(
+      "columns",
+      2
+    ),
+    P.count(
+      "rows",
+      3
+    ),
+    P.length(
+      "gridPitch",
+      50
+    ),
+    P.length(
+      "grooveWidth",
+      6
+    ),
+    P.length(
+      "grooveDepth",
+      5
+    ),
+    P.length(
+      "zonePortDiameter",
+      50
+    )
   ];
   public function new(?v:ComponentValues) {
     super("vacuum-table", "zoned vacuum plenum table", "aluminium 6061", inputs(), v);
@@ -34,22 +58,26 @@ class VacuumTable extends AssumedCatalogComponent {
       n("width") / parameterCount("columns") > 2 * n("wall") && n("length") / parameterCount("rows") > 2 * n("wall"),
       "zone walls consume plenum"
     );
-    require(n("zonePortDiameter")<Math.min(n("width")/parameterCount("columns")-2*n("wall"),n("length")/parameterCount("rows")-2*n("wall")),
-      "vacuum port crosses zone walls");
+    require(
+      n("zonePortDiameter") < Math.min(
+        n("width") / parameterCount("columns") - 2 * n("wall"),
+        n("length") / parameterCount("rows") - 2 * n("wall")
+      ),
+      "vacuum port crosses zone walls"
+    );
     zoneValve(0);
     addConnector("mount", Mount, F.translation(0, 0, 0));
     addConnector("top", Face, F.translation(0, 0, n("height")));
     for (i in 0...zoneCount()) {
-      addConnector("zone" +(i + 1), Mount, zoneFrame(i));
+      addConnector("zone" + (i + 1), Mount, zoneFrame(i));
       addPort({
-        name: "zone" +(i + 1),
+        name: "zone" + (i + 1),
         kind: Vacuum,
         role: Consumer,
         iface: Thread("G2"),
         required: true,
-        connector: "zone" +(i + 1)
-      }
-      );
+        connector: "zone" + (i + 1)
+      });
     }
   }
   public static function recipeType():ComponentType {
@@ -78,13 +106,13 @@ class VacuumTable extends AssumedCatalogComponent {
       var nx = Std.int((w - 2 * margin) / n("gridPitch")), ny = Std.int((l - 2 * margin) / n("gridPitch"));
       for (ix in 0...nx) {
         var blank = Part.box(gw, l - 2 * margin, n("grooveDepth") + 1);
-        var cut = blank.translated(new Vector(f.x +(ix -(nx - 1) / 2) * n("gridPitch"), f.y, z));
+        var cut = blank.translated(new Vector(f.x + (ix - (nx - 1) / 2) * n("gridPitch"), f.y, z));
         blank.close();
         owned.push(cut);
       }
       for (iy in 0...ny) {
         var blank = Part.box(w - 2 * margin, gw, n("grooveDepth") + 1);
-        var cut = blank.translated(new Vector(f.x, f.y +(iy -(ny - 1) / 2) * n("gridPitch"), z));
+        var cut = blank.translated(new Vector(f.x, f.y + (iy - (ny - 1) / 2) * n("gridPitch"), z));
         blank.close();
         owned.push(cut);
       }
@@ -92,8 +120,7 @@ class VacuumTable extends AssumedCatalogComponent {
       owned.push(Part.cylinderSpan(n("zonePortDiameter") / 2, -1, n("height") + 1, f.x, f.y));
     }
     return Solids.cut(base, owned.slice(1));
-    }
-    );
+    });
   }
   /** Separate catalogue parts so the machine's BOM includes every valve. */
   public function zoneValve(index:Int):VacuumZoneValve {
@@ -111,9 +138,9 @@ class VacuumTable extends AssumedCatalogComponent {
     );
   }
   override public function io():MachineIo return {
-    inputs:[for (i in 0...zoneCount()) "zone" +(i + 1) + "_pressure_ok"],
-    outputs:[],
-    analogOutputs:[]
+    inputs: [for (i in 0...zoneCount()) "zone" + (i + 1) + "_pressure_ok"],
+    outputs: [],
+    analogOutputs: []
   };
 
 }

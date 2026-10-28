@@ -6,9 +6,9 @@ package machinekit.component;
  * the component core; look one up with that class's `of`.
  */
 interface ComponentFacet {
-	/** Throws when `component` lacks a port or connector this facet names, or a value is out of range. */
-	function check(component:MachineComponent):Void;
+  /** Throws when `component` lacks a port or connector this facet names, or a value is out of range. */
+  function check(component:MachineComponent):Void;
 
-	/** The facet and its values in words, for diagnostics and comparisons. */
-	function describe():String;
+  /** The facet and its values in words, for diagnostics and comparisons. */
+  function describe():String;
 }

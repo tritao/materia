@@ -42,26 +42,41 @@ class PrinterAxes {
   /** `shaped` plans with the printer's input shapers, as the app does; without it the motion is as the planner times it. */
   public function new(?pressureAdvance:Float = 0.0, ?shaped:Bool = false) {
     var scene = SceneArtifact.decode(CoreXyPrinterPreview.printer());
-    var job = scene.printing,definition = scene.assemblyDefinition;
-    if (job == null || job.shaping == null || definition == null) throw "the printer example states no shaped print job";
+    var job = scene.printing, definition = scene.assemblyDefinition;
+    if (job == null
+      || job.shaping == null || definition == null) throw "the printer example states no shaped print job";
     shaping = job.shaping;
     var physical = AssemblyPhysicalPartView.fromSceneArtifact(scene);
-    var placement = new cadkit.modeling.AssemblyState(definition,scene.assemblyState);
-    var model = AssemblySimulationBridge.toRobotModel(definition,physical,scene.assemblyState).model;
-    var planning = DeviceBinding.planningModel(model,job.controller.stepTickHz);
-    var runtime = robotkit.runtime.RobotRuntimeCompiler.compile(planning,new robotkit.profile.RobotProfile());
-    var configured = new toolpathkit.motion.PrintingMotionBinding(job,{
-      definition:definition,initialPositions:[for(id in job.axes)placement.joint(id)],metresPerUnit:physical.metresPerUnit,
-      model:planning,runtime:runtime,fixedTimestepSeconds:0.01,channels:new toolpathkit.motion.ToolpathChannels(""),
-      steady:new SteadyLoads()},pressureAdvance,shaped);
+    var placement = new cadkit.modeling.AssemblyState(definition, scene.assemblyState);
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState).model;
+    var planning = DeviceBinding.planningModel(model, job.controller.stepTickHz);
+    var runtime = robotkit.runtime.RobotRuntimeCompiler.compile(planning, new robotkit.profile.RobotProfile());
+    var configured = new toolpathkit.motion.PrintingMotionBinding(
+      job,
+      {
+        definition: definition,
+        initialPositions: [for (id in job.axes) placement.joint(id)],
+        metresPerUnit: physical.metresPerUnit,
+        model: planning,
+        runtime: runtime,
+        fixedTimestepSeconds: 0.01,
+        channels: new toolpathkit.motion.ToolpathChannels(""),
+        steady: new SteadyLoads()
+      },
+      pressureAdvance,
+      shaped
+    );
     blueprint = configured.blueprint;
-    for (axis in blueprint.axes) { speed.push(axis.maxVelocity); acceleration.push(axis.maxAcceleration); }
+    for (axis in blueprint.axes) {
+      speed.push(axis.maxVelocity);
+      acceleration.push(axis.maxAcceleration);
+    }
     printer = configured.printer;
     controller = configured.gcodeController();
     binding = configured.binding;
-    ids = [for(joint in planning.joints)joint.id];
+    ids = [for (joint in planning.joints) joint.id];
     this.planning = planning;
-    start = stateAt(0.0,0.0,0.01);
+    start = stateAt(0.0, 0.0, 0.01);
   }
 
   public final planning:robotkit.model.RobotModel;
@@ -70,10 +85,10 @@ class PrinterAxes {
   /** Every joint's value with the nozzle at (x, y, z) of the bed's frame, each coupled joint where its leaders put it. */
   public function stateAt(x:Float, y:Float, z:Float):Array<Float> {
     var q = [for (_ in ids) 0.0];
-    binding.solver.x.writeLogicalPosition(q,x);
-    binding.solver.y.writeLogicalPosition(q,y);
-    binding.solver.z.writeLogicalPosition(q,z);
-    binding.solver.completeDerived(q,true);
+    binding.solver.x.writeLogicalPosition(q, x);
+    binding.solver.y.writeLogicalPosition(q, y);
+    binding.solver.z.writeLogicalPosition(q, z);
+    binding.solver.completeDerived(q, true);
     return q;
   }
 }
@@ -106,14 +121,16 @@ class TimedSink implements ProgramSink {
   /** How many segments are shorter than 0.1, 0.5, 1, 2 and 4 ms. */
   public final shorter:Array<Int> = [0, 0, 0, 0, 0];
 
-  public function new() {}
+  public function new() {
+  }
 
   public function reset():Void last = Sys.cpuTime();
 
   public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void {
     var now = Sys.cpuTime();
     wall.push(now - last);
-    if (trace) Sys.println('TRACE plan ${run.length} op $opIndex: ${Math.round(plan.durationSeconds * 1000)} ms of motion, path ${Math.round(length * 1e5) / 100} mm, planned in ${Math.round((now - last) * 1000)} ms');
+    if (trace) Sys
+      .println('TRACE plan ${run.length} op $opIndex: ${Math.round(plan.durationSeconds * 1000)} ms of motion, path ${Math.round(length * 1e5) / 100} mm, planned in ${Math.round((now - last) * 1000)} ms');
     last = now;
     run.push(plan.durationSeconds);
     var durations = plan.segmentDurations();
@@ -121,9 +138,11 @@ class TimedSink implements ProgramSink {
       var durationNs = haxe.Int64.ofInt(0);
       for (index in 0...durations.length()) durationNs += durations.get(index);
       // Exact evidence for matched native-provider runs, without decimal rounding.
-      Sys.println("PRINTING_PLAN_TIME " + haxe.Json.stringify({op:opIndex,
-        nanoseconds:haxe.Int64.toStr(durationNs),
-        seconds:plan.durationSeconds}));
+      Sys.println("PRINTING_PLAN_TIME " + haxe.Json.stringify({
+        op: opIndex,
+        nanoseconds: haxe.Int64.toStr(durationNs),
+        seconds: plan.durationSeconds
+      }));
     }
     segments += durations.length();
     for (index in 0...durations.length()) {
@@ -142,20 +161,27 @@ class TimedSink implements ProgramSink {
 
 /** Scalar-only consumer for bounded-memory stream acceptance. */
 class StreamClockSink implements ProgramSink {
-  public var nanoseconds:Int64=Int64.ofInt(0);
-  public var plans:Int=0;
-  public var peakHeap:Float=0;
-  public var notes:Int=0;
-  public function new() {}
+  public var nanoseconds:Int64 = Int64.ofInt(0);
+  public var plans:Int = 0;
+  public var peakHeap:Float = 0;
+  public var notes:Int = 0;
+  public function new() {
+  }
   public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void {
-    var starts=plan.segmentStarts(),durations=plan.segmentDurations(),last=durations.length()-1;
-    nanoseconds=Int64.add(nanoseconds,Int64.add(starts.get(last),durations.get(last)));
-    plans++;peakHeap=Math.max(peakHeap,hl.Gc.heapBytes());
+    var starts = plan.segmentStarts(), durations = plan.segmentDurations(), last = durations.length() - 1;
+    nanoseconds = Int64.add(nanoseconds, Int64.add(starts.get(last), durations.get(last)));
+    plans++;
+    peakHeap = Math.max(peakHeap, hl.Gc.heapBytes());
     plan.dispose();
   }
-  public function barrier(barrier:ProgramBarrier):Void {}
-  public function note(text:String):Void {notes++;Sys.println("STREAM_NOTE "+text);}
-  public function finish(nextPlanId:Int64):Void {}
+  public function barrier(barrier:ProgramBarrier):Void {
+  }
+  public function note(text:String):Void {
+    notes++;
+    Sys.println("STREAM_NOTE " + text);
+  }
+  public function finish(nextPlanId:Int64):Void {
+  }
 }
 
 /**
@@ -178,16 +204,19 @@ class PrintingBenchmark {
     var ops:Array<ToolpathOp> = [];
     for (op in program.ops) {
       switch op {
-        case Move(_, _, _, _, _), MachineMove(_, _, _, _, _), SetSetup(_, _): ops.push(op);
-        case Layer(_, _, _): if (layers >= 0 && ++seen > layers) break;
+        case Move(_, _, _, _, _), MachineMove(_, _, _, _, _), SetSetup(_, _):
+          ops.push(op);
+        case Layer(_, _, _):
+          if (layers >= 0 &&++ seen > layers) break;
         case _:
       }
     }
-    return new ToolpathProgram(ops,program.tools,program.setups);
+    return new ToolpathProgram(ops, program.tools, program.setups);
   }
 
   /** What a load came to: the numbers `report` prints. */
-  static function report(name:String, machine:PrinterAxes, program:ToolpathProgram, sliceSeconds:Float):BenchmarkResult {
+  static function report(name:String,
+    machine:PrinterAxes, program:ToolpathProgram, sliceSeconds:Float):BenchmarkResult {
     var moves = motionOnly(program);
     var moveCount = moves.ops.length;
     var estimate = PrintTimeEstimate.estimate(moves, machine.speed, machine.acceleration);
@@ -203,21 +232,28 @@ class PrintingBenchmark {
     var compileBeganWall = Sys.time();
     sink.reset();
     var failure:Null<String> = null;
-    var budgetsBefore=machine.binding.compiler.mergeBudgetRefusals;
+    var budgetsBefore = machine.binding.compiler.mergeBudgetRefusals;
     var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
     try {
-      while (compilation.step()) {}
-    } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
+      while (compilation.step()) {
+      }
+    } catch (error:Dynamic) {
+      failure = Std.string(error);
+      compilation.dispose();
+    }
     var compileSeconds = Sys.cpuTime() - compileBegan;
     var compileElapsed = Sys.time() - compileBeganWall;
-    var unproved=machine.binding.compiler.mergeBudgetRefusals-budgetsBefore;
-    if(unproved>0 && failure==null)failure='$unproved sections have no proven remaining merge budget';
+    var unproved = machine.binding.compiler.mergeBudgetRefusals - budgetsBefore;
+    if (unproved > 0 && failure == null) failure = '$unproved sections have no proven remaining merge budget';
     var planned = 0.0;
     for (seconds in sink.run) planned += seconds;
     // The worst stretch of 10 s of print time: the plans in it, and what they cost to plan.
     var worstRatio = Math.POSITIVE_INFINITY, worstAt = 0.0;
     var cumulativeRun = [0.0], cumulativeWall = [0.0];
-    for (i in 0...sink.run.length) { cumulativeRun.push(cumulativeRun[i] + sink.run[i]); cumulativeWall.push(cumulativeWall[i] + sink.wall[i]); }
+    for (i in 0...sink.run.length) {
+      cumulativeRun.push(cumulativeRun[i] + sink.run[i]);
+      cumulativeWall.push(cumulativeWall[i] + sink.wall[i]);
+    }
     var window = 10.0;
     if (planned >= window) {
       var first = 0;
@@ -227,27 +263,49 @@ class PrintingBenchmark {
         if (span < window) continue;
         var cost = cumulativeWall[last] - cumulativeWall[first];
         var ratio = span / Math.max(cost, 1e-9);
-        if (ratio < worstRatio) { worstRatio = ratio; worstAt = cumulativeRun[first]; }
+        if (ratio < worstRatio) {
+          worstRatio = ratio;
+          worstAt = cumulativeRun[first];
+        }
       }
     }
     var stops = [for (reason in lowered.stops.keys()) '$reason ${lowered.stops.get(reason)}'];
     stops.sort(Reflect.compare);
     var notes = sink.blocks.notes.length;
     Sys.println('printing benchmark: $name');
-    Sys.println('  slicing: ${Math.round(sliceSeconds * 1000)} ms; $moveCount moves, ${estimate.segments} segments for the estimate');
+    Sys
+      .println('  slicing: ${Math.round(sliceSeconds * 1000)} ms; $moveCount moves, ${estimate.segments} segments for the estimate');
     Sys.println('  lowering: ${Math.round(loweringSeconds * 1000)} ms to ${motion.ops.length} path ops');
-    if (failure != null) Sys.println('  PLANNING FAILED after ${sink.run.length} plans (${Math.round(planned * 10) / 10} s planned): $failure');
-    Sys.println('  planned: ${Math.round(planned * 10) / 10} s in ${sink.run.length} timing sections (plans); estimate lower bound ${Math.round(estimate.seconds * 10) / 10} s, ' +
-      'planned is ${Math.round((planned / estimate.seconds - 1.0) * 1000) / 10} % above it');
-    Sys.println('  planning: ${Math.round(compileSeconds * 100) / 100} s of processor time, ${Math.round(planned / compileSeconds * 100) / 100}x real time overall' +
-      (worstRatio < Math.POSITIVE_INFINITY ? ', worst 10 s window ${Math.round(worstRatio * 100) / 100}x (from print time ${Math.round(worstAt * 10) / 10} s)' : ', print shorter than 10 s'));
+    if (failure != null) Sys
+      .println('  PLANNING FAILED after ${sink.run.length} plans (${Math.round(planned * 10) / 10} s planned): $failure');
+    Sys
+      .println('  planned: ${Math.round(planned * 10) / 10} s in ${sink.run.length} timing sections (plans); estimate lower bound ${Math.round(estimate.seconds * 10) / 10} s, '
+      + 'planned is ${Math.round((planned / estimate.seconds - 1.0) * 1000) / 10} % above it');
+    Sys
+      .println('  planning: ${Math.round(compileSeconds * 100) / 100} s of processor time, ${Math.round(planned / compileSeconds * 100) / 100}x real time overall'
+      + (worstRatio < Math.POSITIVE_INFINITY
+      ? ', worst 10 s window ${Math.round(worstRatio * 100) / 100}x (from print time ${Math.round(worstAt * 10) / 10} s)'
+      : ', print shorter than 10 s'));
     Sys.println('  planning elapsed: ${Math.round(compileElapsed * 1000) / 1000} s');
     Sys.println('  exact stops by reason: ${stops.length == 0 ? "none" : stops.join(", ")}; $notes planner notes');
-    Sys.println('  memory: managed heap peak ${Math.round(sink.peakHeap / 1048576)} MB (${Math.round(heapBefore / 1048576)} MB before planning), ' +
-      '${Math.round((hl.Gc.totalAllocated() - allocatedBefore) / 1048576)} MB allocated while planning');
+    Sys
+      .println('  memory: managed heap peak ${Math.round(sink.peakHeap / 1048576)} MB (${Math.round(heapBefore / 1048576)} MB before planning), '
+      + '${Math.round((hl.Gc.totalAllocated() - allocatedBefore) / 1048576)} MB allocated while planning');
     sink.blocks.dispose();
-    return {failure: failure, planned: planned, reference: estimate.seconds, cpuSeconds: compileSeconds, elapsedSeconds: compileElapsed,
-      overall: planned / Math.max(compileSeconds, 1e-9), worstWindow: worstRatio, sections: sink.run.length, segments: sink.segments};
+    return {
+      failure: failure,
+      planned: planned,
+      reference: estimate.seconds,
+      cpuSeconds: compileSeconds,
+      elapsedSeconds: compileElapsed,
+      overall: planned / Math.max(
+        compileSeconds,
+        1e-9
+      ),
+      worstWindow: worstRatio,
+      sections: sink.run.length,
+      segments: sink.segments
+    };
   }
 
   /**
@@ -270,14 +328,18 @@ class PrintingBenchmark {
     var failures:Array<String> = [];
     if (result.failure != null) failures.push("planning failed: " + result.failure);
     if (result.overall < 2.0) failures.push('planning is ${result.overall}x real time overall, below 2x');
-    if (result.worstWindow < 2.0) failures.push('planning is ${result.worstWindow}x real time over its worst 10 s, below 2x');
-    if (result.planned > 1.15 * result.reference) failures.push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
+    if (result.worstWindow
+      < 2.0) failures.push('planning is ${result.worstWindow}x real time over its worst 10 s, below 2x');
+    if (result.planned > 1.15 * result.reference) failures
+      .push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
     // A long smooth path is timed in windows that carry their boundary speeds; lowering those speeds costs time, and
     // lowering them to zero rests the machine where the path was cut. The gate's windows keep their first speeds.
     var timing = Std.downcast(machine.binding.compiler.timing, motionkit.planner.ToppraPathTiming);
     if (timing != null) {
-      Sys.println('  windows: ${timing.windowedPaths} paths timed in windows, boundary speeds lowered ${timing.boundaryLowerings} times');
-      if (timing.boundaryLowerings > 0) failures.push('window boundary speeds were lowered ${timing.boundaryLowerings} times');
+      Sys
+        .println('  windows: ${timing.windowedPaths} paths timed in windows, boundary speeds lowered ${timing.boundaryLowerings} times');
+      if (timing.boundaryLowerings
+        > 0) failures.push('window boundary speeds were lowered ${timing.boundaryLowerings} times');
     }
     Sys.println(failures.length == 0 ? "PRINTING GATE PASSED" : "PRINTING GATE FAILED: " + failures.join("; "));
     if (failures.length > 0) Sys.exit(1);
@@ -291,23 +353,61 @@ class PrintingBenchmark {
    */
   /** Filtering a job for timing must retain its selected work-coordinate frame. */
   static function setupChecks(machine:PrinterAxes):Void {
-    var tag=new toolpathkit.path.Provenance(1,1,0);
-    var source=new ToolpathProgram([
-      ToolpathOp.SetSetup("offset",tag),
-      ToolpathOp.Move(Cut,toolpathkit.path.PathGeometry.Line(new toolpathkit.path.Point3(0.01,0.01,0.01),
-        new toolpathkit.path.Point3(0.02,0.01,0.01)),0.02,0,tag)],new toolpathkit.tool.ToolLibrary(),[
-      new toolpathkit.setup.Setup("1",new toolpathkit.path.Point3(0,0,0)),
-      new toolpathkit.setup.Setup("offset",new toolpathkit.path.Point3(0.1,0.1,0))]);
-    var lowered=ToolpathMotion.lower(motionOnly(source),machine.binding.machine);
-    var motion=lowered.program;
-    if(motion==null)throw "Offset setup did not lower";
-    var end=machine.stateAt(0.11,0.11,0.01);
-    var compiled=machine.binding.compiler.compile(motion,end,Int64.ofInt(1));
-    for(block in compiled.blocks)for(plan in block.plans)end=plan.evaluate(plan.durationSeconds).positions;
-    var pose=machine.binding.solver.forward(end);
+    var tag = new toolpathkit.path.Provenance(1, 1, 0);
+    var source = new ToolpathProgram(
+      [
+        ToolpathOp.SetSetup("offset", tag),
+        ToolpathOp.Move(
+          Cut,
+          toolpathkit.path.PathGeometry.Line(
+            new toolpathkit.path.Point3(
+              0.01,
+              0.01,
+              0.01
+            ),
+            new toolpathkit.path.Point3(
+              0.02,
+              0.01,
+              0.01
+            )
+          ),
+          0.02,
+          0,
+          tag
+        )
+      ],
+      new toolpathkit.tool.ToolLibrary(),
+      [
+        new toolpathkit.setup.Setup(
+          "1",
+          new toolpathkit.path.Point3(
+            0,
+            0,
+            0
+          )
+        ),
+        new toolpathkit.setup.Setup(
+          "offset",
+          new toolpathkit.path.Point3(
+            0.1,
+            0.1,
+            0
+          )
+        )
+      ]
+    );
+    var lowered = ToolpathMotion.lower(motionOnly(source), machine.binding.machine);
+    var motion = lowered.program;
+    if (motion == null) throw "Offset setup did not lower";
+    var end = machine.stateAt(0.11, 0.11, 0.01);
+    var compiled = machine.binding.compiler.compile(motion, end, Int64.ofInt(1));
+    for (block in compiled.blocks) for (plan in block.plans) end = plan.evaluate(plan.durationSeconds).positions;
+    var pose = machine.binding.solver.forward(end);
     compiled.dispose();
-    check(Math.abs(pose.x-0.12)<1e-9 && Math.abs(pose.y-0.11)<1e-9 && Math.abs(pose.z-0.01)<1e-9,
-      "Timing-only job lost its selected work offset");
+    check(
+      Math.abs(pose.x - 0.12) < 1e-9 && Math.abs(pose.y - 0.11) < 1e-9 && Math.abs(pose.z - 0.01) < 1e-9,
+      "Timing-only job lost its selected work offset"
+    );
     Sys.println("setups: timing-only job preserves its work-coordinate selection");
   }
 
@@ -318,15 +418,40 @@ class PrintingBenchmark {
     machine.binding.compiler.planCheck = new motionkit.robot.PlanCheck(model, ids, options);
     var motors = ["pulleyA-turn", "pulleyB-turn"];
     var rates = [for (id in motors) model.coupledLimits(id, null, true).requireVelocity()];
-    var origin = new toolpathkit.path.Point3(0,0,0);
+    var origin = new toolpathkit.path.Point3(0, 0, 0);
     var report:Array<String> = [];
     var seconds = new Map<String, Float>();
-    for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}, {name: "135", dx: -1.0, dy: 1.0}]) {
+    for (move in [
+      {name: "x", dx: 1.0, dy: 0.0},
+      {name: "y", dx: 0.0, dy: 1.0},
+      {name: "45", dx: 1.0, dy: 1.0},
+      {
+        name: "135",
+        dx: -1.0,
+        dy: 1.0
+      }
+    ]) {
       var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
       var from = new toolpathkit.path.Point3(0.11 - 0.05 * move.dx / length, 0.11 - 0.05 * move.dy / length, 0.01);
       var to = new toolpathkit.path.Point3(0.11 + 0.05 * move.dx / length, 0.11 + 0.05 * move.dy / length, 0.01);
-      var program = new ToolpathProgram([ToolpathOp.Move(Cut, toolpathkit.path.PathGeometry.Line(from, to), 1.0, 0.0001,
-        new toolpathkit.path.Provenance(1, 1, 0))], new toolpathkit.tool.ToolLibrary(), [new toolpathkit.setup.Setup("1", origin)]);
+      var program = new ToolpathProgram(
+        [ToolpathOp.Move(
+          Cut,
+          toolpathkit.path.PathGeometry.Line(from, to),
+          1.0,
+          0.0001,
+          new toolpathkit.path.Provenance(
+            1,
+            1,
+            0
+          )
+        )],
+        new toolpathkit.tool.ToolLibrary(),
+        [new toolpathkit.setup.Setup(
+          "1",
+          origin
+        )]
+      );
       var lowered = ToolpathMotion.lower(program, machine.binding.machine);
       var motion = lowered.program;
       if (motion == null) throw "the diagonal move lowers to nothing";
@@ -344,16 +469,21 @@ class PrintingBenchmark {
         var checked = plan.checked;
         if (checked != null) {
           worstTorque = Math.max(worstTorque, checked.worstTorqueRatio);
-          for (finding in checked.diagnostics) if (finding.kind != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) {
+          for (finding in checked.diagnostics) if (finding.kind
+            != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) {
             findings++;
             report.push('${move.name}: ${finding.describe(0)}');
           }
         }
       }
-      for (i in 0...2) check(peak[i] <= rates[i] * 1.001, '${move.name}: ${motors[i]} turns ${peak[i]} rad/s, its limit is ${rates[i]}');
+      for (i in 0...2) check(
+        peak[i] <= rates[i] * 1.001,
+        '${move.name}: ${motors[i]} turns ${peak[i]} rad/s, its limit is ${rates[i]}'
+      );
       check(findings == 0, '${move.name}: the plan check finds ${report.join("; ")}');
       seconds.set(move.name, duration);
-      Sys.println('motors: ${move.name} move ${Math.round(duration * 1000)} ms, motors at most ${Math.round(peak[0])} and ${Math.round(peak[1])} rad/s of ${Math.round(rates[0])}, worst torque ${Math.round(worstTorque * 100)} %');
+      Sys
+        .println('motors: ${move.name} move ${Math.round(duration * 1000)} ms, motors at most ${Math.round(peak[0])} and ${Math.round(peak[1])} rad/s of ${Math.round(rates[0])}, worst torque ${Math.round(worstTorque * 100)} %');
       compiled.dispose();
     }
     machine.binding.compiler.planCheck = null;
@@ -362,10 +492,15 @@ class PrintingBenchmark {
   /**
    * What an axis rings at: the mass it moves on the stiffness of its belts, from the drive model, as a frequency (Hz).
    */
-  static function resonance(machine:PrinterAxes, axis:String):{mass:Float, stiffness:Float, frequency:Float} {
+  static function resonance(machine:PrinterAxes, axis:String): {mass: Float, stiffness: Float, frequency: Float} {
     var load = robotkit.model.DriveLoads.forAxis(machine.planning, axis, new SteadyLoads());
-    if (load == null || !(load.stiffness > 0.0) || !(load.mass > 0.0)) throw 'axis $axis has no belt stiffness and mass to resonate with';
-    return {mass: load.mass, stiffness: load.stiffness, frequency: Math.sqrt(load.stiffness / load.mass) / (2.0 * Math.PI)};
+    if (load == null || !(load.stiffness > 0.0)
+      || !(load.mass > 0.0)) throw 'axis $axis has no belt stiffness and mass to resonate with';
+    return {
+      mass: load.mass,
+      stiffness: load.stiffness,
+      frequency: Math.sqrt(load.stiffness / load.mass) / (2.0 * Math.PI)
+    };
   }
 
   /**
@@ -398,7 +533,7 @@ class PrintingBenchmark {
    */
   static function shapingChecks(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
     var shaped = new PrinterAxes(0.0, true);
-    var origin = new toolpathkit.path.Point3(0,0,0);
+    var origin = new toolpathkit.path.Point3(0, 0, 0);
     var ids = [for (joint in machine.planning.joints) joint.id];
     var resonances = new Map<String, {mass:Float, stiffness:Float, frequency:Float}>();
     var tails = new Map<String, Float>();
@@ -406,12 +541,18 @@ class PrintingBenchmark {
       var found = resonance(machine, data.axis);
       resonances.set(data.axis, found);
       var ratio = data.frequency / found.frequency;
-      check(Math.abs(ratio - 1.0) < 0.1, 'the ${data.axis} shaper says ${data.frequency} Hz, the model gives ${found.frequency} Hz (${found.mass} kg on ${found.stiffness} N/m)');
-      var upper = [for (load in robotkit.model.DriveLoads.stiffest(machine.planning,null,[data.axis])) load][0];
-      var upperHz = Math.sqrt(upper.stiffness/upper.mass)/(2*Math.PI);
-      var shaper = InputShaper.named(data.kind,data.frequency,data.damping);
-      check(Math.abs(data.frequency/upperHz-1.0)<0.1,"fixed tuning covers the stiffest travel pose too");
-      check(shaper.impulses.residualBound(0.9*found.frequency,1.1*upperHz,data.damping)<=0.2,"fixed tuning covers the continuous resonance band and uncertainty");
+      check(
+        Math.abs(ratio - 1.0) < 0.1,
+        'the ${data.axis} shaper says ${data.frequency} Hz, the model gives ${found.frequency} Hz (${found.mass} kg on ${found.stiffness} N/m)'
+      );
+      var upper = [for (load in robotkit.model.DriveLoads.stiffest(machine.planning, null, [data.axis])) load][0];
+      var upperHz = Math.sqrt(upper.stiffness / upper.mass) / (2 * Math.PI);
+      var shaper = InputShaper.named(data.kind, data.frequency, data.damping);
+      check(Math.abs(data.frequency / upperHz - 1.0) < 0.1, "fixed tuning covers the stiffest travel pose too");
+      check(
+        shaper.impulses.residualBound(0.9 * found.frequency, 1.1 * upperHz, data.damping) <= 0.2,
+        "fixed tuning covers the continuous resonance band and uncertainty"
+      );
       tails.set(data.axis, shaper.impulses.tail());
     }
     var report:Array<String> = [];
@@ -420,33 +561,62 @@ class PrintingBenchmark {
       var from = new toolpathkit.path.Point3(0.11 - 0.025 * move.dx / length, 0.11 - 0.025 * move.dy / length, 0.01);
       var to = new toolpathkit.path.Point3(0.11 + 0.025 * move.dx / length, 0.11 + 0.025 * move.dy / length, 0.01);
       function plans(axes:PrinterAxes):ExecutionPlan {
-        var program = new ToolpathProgram([ToolpathOp.Move(Cut, toolpathkit.path.PathGeometry.Line(from, to), 1.0, 0.0001,
-          new toolpathkit.path.Provenance(1, 1, 0))], new toolpathkit.tool.ToolLibrary(), [new toolpathkit.setup.Setup("1", origin)]);
+        var program = new ToolpathProgram(
+          [ToolpathOp.Move(
+            Cut,
+            toolpathkit.path.PathGeometry.Line(from, to),
+            1.0,
+            0.0001,
+            new toolpathkit.path.Provenance(
+              1,
+              1,
+              0
+            )
+          )],
+          new toolpathkit.tool.ToolLibrary(),
+          [new toolpathkit.setup.Setup(
+            "1",
+            origin
+          )]
+        );
         var lowered = ToolpathMotion.lower(program, axes.binding.machine);
         if (lowered.program == null) throw "the step move lowers to nothing";
-        var compiled = axes.binding.compiler.compile(lowered.program, axes.stateAt(from.x, from.y, 0.01), Int64.ofInt(1));
+        var compiled = axes.binding.compiler.compile(
+          lowered.program,
+          axes.stateAt(from.x, from.y, 0.01),
+          Int64.ofInt(1)
+        );
         var found:Array<ExecutionPlan> = [];
         for (block in compiled.blocks) for (plan in block.plans) found.push(plan);
         if (found.length != 1) throw 'the ${move.name} step move plans as ${found.length} plans, not one';
         return found[0];
       }
       var plain = plans(machine), cut = plans(shaped);
-      var line = '${move.name}: ${Math.round(plain.durationSeconds * 1000)} ms plain (${plain.segmentDurations().length()} segments), ${Math.round(cut.durationSeconds * 1000)} ms shaped (${cut.segmentDurations().length()} segments)';
+      var line =
+        '${move.name}: ${Math.round(plain.durationSeconds * 1000)} ms plain (${plain.segmentDurations().length()} segments), ${Math.round(cut.durationSeconds * 1000)} ms shaped (${cut.segmentDurations().length()} segments)';
       var longest = 0.0;
       for (data in machine.shaping) {
         var tail = tails.get(data.axis);
         if (tail != null) longest = Math.max(longest, tail);
       }
-      check(Math.abs(cut.durationSeconds - plain.durationSeconds - longest) < 0.003,
-        '${move.name}: the shaped plan runs ${cut.durationSeconds - plain.durationSeconds} s longer, the shaper tail is $longest s');
+      check(
+        Math.abs(cut.durationSeconds - plain.durationSeconds - longest) < 0.003,
+        '${move.name}: the shaped plan runs ${cut.durationSeconds - plain.durationSeconds} s longer, the shaper tail is $longest s'
+      );
       // Shaping blends delayed copies of the plan's motion, so it keeps the axes within the limits the plan was timed for
       // (exactly, as `testShapedTrajectoryIsTheWeightedSumOfDelays` shows; the plan's merged segments follow within a tenth of a percent).
       for (step in 0...Math.ceil(cut.durationSeconds / 0.0005) + 1) {
         var state = cut.evaluate(Math.min(cut.durationSeconds, step * 0.0005));
         for (i in 0...2) {
           var id = i == 0 ? "x" : "y";
-          check(Math.abs(state.velocities[ids.indexOf(id)]) <= machine.speed[i] * 1.001, '${move.name}: shaping raised $id velocity to ${state.velocities[ids.indexOf(id)]} over ${machine.speed[i]}');
-          check(Math.abs(state.accelerations[ids.indexOf(id)]) <= machine.acceleration[i] * 1.001, '${move.name}: shaping raised $id acceleration to ${state.accelerations[ids.indexOf(id)]} over ${machine.acceleration[i]}');
+          check(
+            Math.abs(state.velocities[ids.indexOf(id)]) <= machine.speed[i] * 1.001,
+            '${move.name}: shaping raised $id velocity to ${state.velocities[ids.indexOf(id)]} over ${machine.speed[i]}'
+          );
+          check(
+            Math.abs(state.accelerations[ids.indexOf(id)]) <= machine.acceleration[i] * 1.001,
+            '${move.name}: shaping raised $id acceleration to ${state.accelerations[ids.indexOf(id)]} over ${machine.acceleration[i]}'
+          );
         }
       }
       // What the carriage is left shaking with, each axis on its own resonance and at 10 % off it.
@@ -454,29 +624,40 @@ class PrintingBenchmark {
         var found = resonances.get(data.axis);
         if (found == null) throw 'no resonance for ${data.axis}';
         var joint = ids.indexOf(data.axis);
-        var moved = Math.abs(plain.evaluate(plain.durationSeconds).positions[joint] - plain.evaluate(0.0).positions[joint]);
+        var moved = Math.abs(plain.evaluate(plain.durationSeconds).positions[joint]
+          - plain.evaluate(0.0).positions[joint]);
         if (moved < 1e-4) continue;
         for (error in [0.0, -0.1, 0.1]) {
           var stiffness = found.stiffness * (1.0 + error) * (1.0 + error);
           var before = residualVibration(plain, joint, found.mass, stiffness, data.damping);
           var after = residualVibration(cut, joint, found.mass, stiffness, data.damping);
-          check(before > 1e-6, '${move.name}: the unshaped move does not excite the ${data.axis} resonance (${before} m)');
-          check(after * 5.0 <= before, '${move.name}: ${data.axis} resonance ${Math.round(error * 100)} % off: residual ${after * 1e6} um shaped, ${before * 1e6} um plain, under 5x');
-          if (error == 0.0) line += '; ${data.axis} rings ${Math.round(before * 1e6)} -> ${Math.round(after * 1e6)} um (${Math.round(before / Math.max(after, 1e-12) * 10) / 10}x)';
+          check(
+            before > 1e-6,
+            '${move.name}: the unshaped move does not excite the ${data.axis} resonance (${before} m)'
+          );
+          check(
+            after * 5.0 <= before,
+            '${move.name}: ${data.axis} resonance ${Math.round(error * 100)} % off: residual ${after * 1e6} um shaped, ${before * 1e6} um plain, under 5x'
+          );
+          if (error == 0.0) line +=
+            '; ${data.axis} rings ${Math.round(before * 1e6)} -> ${Math.round(after * 1e6)} um (${Math.round(before / Math.max(after, 1e-12) * 10) / 10}x)';
         }
       }
       report.push(line);
       plain.dispose();
       cut.dispose();
     }
-    check(machine.binding.compiler.mergeRefusals == 0 && shaped.binding.compiler.mergeRefusals == 0,
-      'the step moves keep their merged form: ${machine.binding.compiler.lastMergeRefusal} ${shaped.binding.compiler.lastMergeRefusal}');
+    check(
+      machine.binding.compiler.mergeRefusals == 0 && shaped.binding.compiler.mergeRefusals == 0,
+      'the step moves keep their merged form: ${machine.binding.compiler.lastMergeRefusal} ${shaped.binding.compiler.lastMergeRefusal}'
+    );
     for (line in report) Sys.println('shaping: $line');
     for (data in machine.shaping) {
       var found = resonances.get(data.axis);
       if (found == null) throw 'no resonance for ${data.axis}';
-      Sys.println('shaping: ${data.axis} ${data.kind} at ${data.frequency} Hz, damping ${data.damping}; the model gives ${Math.round(found.frequency * 10) / 10} Hz ' +
-        '(${Math.round(found.mass * 1000) / 1000} kg on ${Math.round(found.stiffness)} N/m)');
+      Sys
+        .println('shaping: ${data.axis} ${data.kind} at ${data.frequency} Hz, damping ${data.damping}; the model gives ${Math.round(found.frequency * 10) / 10} Hz '
+        + '(${Math.round(found.mass * 1000) / 1000} kg on ${Math.round(found.stiffness)} N/m)');
     }
     // A job pays the tail at every stop: the calibration cube's planned time with and without shaping.
     var part = TestParts.calibrationCube();
@@ -485,8 +666,9 @@ class PrintingBenchmark {
     var plainResult = report0("cube without shaping", machine, sliced.program);
     var shapedResult = report0("cube shaped", shaped, sliced.program);
     var growth = shapedResult.planned / plainResult.planned - 1.0;
-    Sys.println('shaping: the cube plans in ${Math.round(plainResult.planned * 10) / 10} s plain and ${Math.round(shapedResult.planned * 10) / 10} s shaped in ${shapedResult.sections} sections (${Math.round(growth * 1000) / 10} % longer); ' +
-      'segments: ${plainResult.segments} plain (${Math.round(plainResult.segments / plainResult.planned)} a second), ${shapedResult.segments} shaped (${Math.round(shapedResult.segments / shapedResult.planned)} a second)');
+    Sys
+      .println('shaping: the cube plans in ${Math.round(plainResult.planned * 10) / 10} s plain and ${Math.round(shapedResult.planned * 10) / 10} s shaped in ${shapedResult.sections} sections (${Math.round(growth * 1000) / 10} % longer); '
+      + 'segments: ${plainResult.segments} plain (${Math.round(plainResult.segments / plainResult.planned)} a second), ${shapedResult.segments} shaped (${Math.round(shapedResult.segments / shapedResult.planned)} a second)');
     check(shapedResult.failure == null, "the shaped cube plans: " + shapedResult.failure);
     check(growth < 0.05, 'shaping makes the cube ${growth * 100} % longer, over 5 %');
   }
@@ -502,7 +684,8 @@ class PrintingBenchmark {
         for (bin in 0...3) if (length < [0.0001, 0.00025, 0.0005][bin]) authored[bin]++;
       case _:
     }
-    Sys.println('  $name: authored moves shorter than 0.1 / 0.25 / 0.5 mm: ${authored.join(" / ")} of ${moves.ops.length}');
+    Sys
+      .println('  $name: authored moves shorter than 0.1 / 0.25 / 0.5 mm: ${authored.join(" / ")} of ${moves.ops.length}');
     var lowered = ToolpathMotion.lower(moves, machine.binding.machine);
     var motion = lowered.program;
     if (motion == null) throw '$name has no motion';
@@ -512,15 +695,31 @@ class PrintingBenchmark {
     var cpuBegan = Sys.cpuTime(), elapsedBegan = Sys.time();
     var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
     try {
-      while (compilation.step()) {}
-    } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
+      while (compilation.step()) {
+      }
+    } catch (error:Dynamic) {
+      failure = Std.string(error);
+      compilation.dispose();
+    }
     var cpuSeconds = Sys.cpuTime() - cpuBegan, elapsedSeconds = Sys.time() - elapsedBegan;
     var planned = 0.0;
     for (seconds in sink.run) planned += seconds;
     sink.blocks.dispose();
-    Sys.println('  $name: planning ${Math.round(elapsedSeconds * 1000) / 1000} s elapsed, ${Math.round(cpuSeconds * 1000) / 1000} s processor time');
-    Sys.println('  $name: segments shorter than 0.1 / 0.5 / 1 / 2 / 4 ms: ${sink.shorter.join(" / ")} of ${sink.segments}');
-    return {failure: failure, planned: planned, reference: 0.0, cpuSeconds: cpuSeconds, elapsedSeconds: elapsedSeconds, overall: 0.0, worstWindow: 0.0, sections: sink.run.length, segments: sink.segments};
+    Sys
+      .println('  $name: planning ${Math.round(elapsedSeconds * 1000) / 1000} s elapsed, ${Math.round(cpuSeconds * 1000) / 1000} s processor time');
+    Sys
+      .println('  $name: segments shorter than 0.1 / 0.5 / 1 / 2 / 4 ms: ${sink.shorter.join(" / ")} of ${sink.segments}');
+    return {
+      failure: failure,
+      planned: planned,
+      reference: 0.0,
+      cpuSeconds: cpuSeconds,
+      elapsedSeconds: elapsedSeconds,
+      overall: 0.0,
+      worstWindow: 0.0,
+      sections: sink.run.length,
+      segments: sink.segments
+    };
   }
 
   /**
@@ -538,21 +737,37 @@ class PrintingBenchmark {
     if (motion == null) throw "the tab lowers to nothing";
     var targets = 0, waits = 0, offsets = 0, driven = 0;
     for (op in motion.ops) switch op {
-      case SetOutput(channel, _) if (StringTools.startsWith(channel, "heater.")): targets++;
-      case WaitInput(channel, _, _) if (channel == "heater.hotend.at_temperature" || channel == "heater.bed.at_temperature"): waits++;
-      case MoveJ(JointOffset(_, _), _, _): offsets++;
-      case FollowPath(path, _, _, _) if (path.drive != null): driven++;
+      case SetOutput(channel, _) if (StringTools.startsWith(channel, "heater.")):
+        targets++;
+      case WaitInput(channel,
+        _, _) if (channel == "heater.hotend.at_temperature" || channel == "heater.bed.at_temperature"):
+        waits++;
+      case MoveJ(JointOffset(_, _), _, _):
+        offsets++;
+      case FollowPath(path, _, _, _) if (path.drive != null):
+        driven++;
       case _:
     }
-    check(targets >= 2 && waits == 2, 'the job heats the bed and the hotend and waits for both: $targets targets, $waits waits');
-    check(offsets >= 2 && driven >= 3, 'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths');
+    check(
+      targets >= 2 && waits == 2,
+      'the job heats the bed and the hotend and waits for both: $targets targets, $waits waits'
+    );
+    check(
+      offsets >= 2 && driven >= 3,
+      'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths'
+    );
     var refusals = machine.binding.compiler.mergeRefusals;
     var budgetRefusals = machine.binding.compiler.mergeBudgetRefusals;
     var compiled = machine.binding.compiler.compile(motion, machine.start, Int64.ofInt(1));
     // Retractions are joint moves, which are never merged: not merging them is not a refusal.
-    check(machine.binding.compiler.mergeRefusals == refusals,
-      'the tab keeps every merged plan: ${machine.binding.compiler.mergeRefusals - refusals} refused (${machine.binding.compiler.lastMergeRefusal})');
-    check(machine.binding.compiler.mergeBudgetRefusals==budgetRefusals,"Every tab section has a proven remaining merge budget");
+    check(
+      machine.binding.compiler.mergeRefusals == refusals,
+      'the tab keeps every merged plan: ${machine.binding.compiler.mergeRefusals - refusals} refused (${machine.binding.compiler.lastMergeRefusal})'
+    );
+    check(
+      machine.binding.compiler.mergeBudgetRefusals == budgetRefusals,
+      "Every tab section has a proven remaining merge budget"
+    );
     var extruder = machine.printer.extruderIndex, taken = 0.0;
     var shortest = 1e9, under = 0, total = 0, seconds = 0.0, plans = 0;
     var all:Array<Float> = [];
@@ -561,35 +776,53 @@ class PrintingBenchmark {
       plans++;
       for (i in 0...durations.length()) {
         var ms = Int64.toInt(durations.get(i)) / 1e6;
-        total++; shortest = Math.min(shortest, ms); seconds += ms / 1000; all.push(ms);
+        total++;
+        shortest = Math.min(shortest, ms);
+        seconds += ms / 1000;
+        all.push(ms);
         if (ms < 1.0) under++;
       }
     }
     all.sort(Reflect.compare);
-    Sys.println('segments: $total in $plans plans over ${seconds} s, shortest ${shortest} ms, median ${all[all.length >> 1]} ms, 90th ${all[Std.int(all.length * 0.9)]} ms, $under under 1 ms');
+    Sys
+      .println('segments: $total in $plans plans over ${seconds} s, shortest ${shortest} ms, median ${all[all.length >> 1]} ms, 90th ${all[Std.int(all.length * 0.9)]} ms, $under under 1 ms');
     for (block in compiled.blocks) for (plan in block.plans) {
       taken += plan.evaluate(plan.durationSeconds).positions[extruder] - plan.evaluate(0.0).positions[extruder];
     }
     var filament = sliced.program.depositedVolume() / machine.printer.filamentArea();
-    for (op in sliced.program.ops) switch op { case FilamentMove(length, _, _): filament += length; case _: }
+    for (op in sliced.program.ops) switch op {
+      case FilamentMove(length, _, _):
+        filament += length;
+      case _:
+    }
     var expected = machine.printer.radians(filament);
-    Sys.println('extruder: the joint turns ${Math.round(taken * 1000) / 1000} rad for ${Math.round(expected * 1000) / 1000} rad of filament (${Math.round((taken / expected - 1) * 1e5) / 1e3} %)');
-    check(Math.abs(taken / expected - 1.0) < 0.002, 'the extruder takes what the program lays: $taken against $expected rad');
+    Sys
+      .println('extruder: the joint turns ${Math.round(taken * 1000) / 1000} rad for ${Math.round(expected * 1000) / 1000} rad of filament (${Math.round((taken / expected - 1) * 1e5) / 1e3} %)');
+    check(
+      Math.abs(taken / expected - 1.0) < 0.002,
+      'the extruder takes what the program lays: $taken against $expected rad'
+    );
     // The app plans on the planner thread, through `forWorker`: a worker plans what the compiler itself plans, pressure
     // advance and shaping included (a worker once planned every print without its pressure advance).
-    var workerCompiler=machine.binding.compiler.forWorker();
+    var workerCompiler = machine.binding.compiler.forWorker();
     var worker = workerCompiler.compile(motion, machine.start, Int64.ofInt(1));
-    check(workerCompiler.mergeBudgetRefusals==0,"Worker retains every tab budget proof");
+    check(workerCompiler.mergeBudgetRefusals == 0, "Worker retains every tab budget proof");
     var workerPlans = [for (block in worker.blocks) for (plan in block.plans) plan];
     var directPlans = [for (block in compiled.blocks) for (plan in block.plans) plan];
-    check(workerPlans.length == directPlans.length, 'a worker makes the same plans: ${workerPlans.length} against ${directPlans.length}');
+    check(
+      workerPlans.length == directPlans.length,
+      'a worker makes the same plans: ${workerPlans.length} against ${directPlans.length}'
+    );
     var differs = 0.0;
     for (index in 0...directPlans.length) {
       var direct = directPlans[index], fromWorker = workerPlans[index];
       differs = Math.max(differs, Math.abs(direct.durationSeconds - fromWorker.durationSeconds));
       for (step in 0...9) {
         var at = Math.min(direct.durationSeconds, fromWorker.durationSeconds) * step / 8;
-        differs = Math.max(differs, Math.abs(direct.evaluate(at).positions[extruder] - fromWorker.evaluate(at).positions[extruder]));
+        differs = Math.max(
+          differs,
+          Math.abs(direct.evaluate(at).positions[extruder] - fromWorker.evaluate(at).positions[extruder])
+        );
       }
     }
     check(differs < 1e-9, 'a worker plans the extruder exactly as the compiler does: $differs');
@@ -618,92 +851,139 @@ class PrintingBenchmark {
    * First-motion startup runs the native simulation. The scalar drain then checks
    * every window without retaining a whole-program plan or timing history.
    */
-  static function streamingProgram(machine:PrinterAxes, settings:SlicerSettings,
-      profile:PrinterProfile, scale:Int):motionkit.program.MotionProgram {
-    var gear=Sys.getEnv("PRINTING_BENCHMARK_ONLY")=="stream-gear";
-    var part=gear ? new SpurGear(1.5,40,8).geometry() : TestParts.calibrationCube(20*scale);
-    var sliced=Slicer.slice(part,settings,profile,gear ? "stream-gear" : "stream-cube");part.close();
-    var lowered=ToolpathMotion.lower(motionOnly(sliced.program),machine.binding.machine);
-    if (lowered.program==null) throw "Stream acceptance produced no motion";
+  static function streamingProgram(machine:PrinterAxes,
+    settings:SlicerSettings, profile:PrinterProfile, scale:Int):motionkit.program.MotionProgram {
+    var gear = Sys.getEnv("PRINTING_BENCHMARK_ONLY") == "stream-gear";
+    var part = gear ? new SpurGear(1.5, 40, 8).geometry() : TestParts.calibrationCube(20 * scale);
+    var sliced = Slicer.slice(part, settings, profile, gear ? "stream-gear" : "stream-cube");
+    part.close();
+    var lowered = ToolpathMotion.lower(motionOnly(sliced.program), machine.binding.machine);
+    if (lowered.program == null) throw "Stream acceptance produced no motion";
     return lowered.program;
   }
 
   static function streamingAcceptance(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
-    var value=Sys.getEnv("PRINTING_BENCHMARK_SCALE");
-    var scale=value==null ? 1 : Std.parseInt(value);
-    if (scale!=1 && scale!=4 && scale!=8) throw "Stream cube scale must be 1, 4 or 8";
-    var program=streamingProgram(machine,settings,profile,scale);
-    var bounded=Sys.getEnv("PRINTING_BENCHMARK_WINDOW_SECONDS")!="whole";
-    machine.binding.compiler.maximumPathPlanSeconds=bounded ? motionkit.robot.ManipulatorMotion.LOOKAHEAD_SECONDS : null;
+    var value = Sys.getEnv("PRINTING_BENCHMARK_SCALE");
+    var scale = value == null ? 1 : Std.parseInt(value);
+    if (scale != 1 && scale != 4 && scale != 8) throw "Stream cube scale must be 1, 4 or 8";
+    var program = streamingProgram(machine, settings, profile, scale);
+    var bounded = Sys.getEnv("PRINTING_BENCHMARK_WINDOW_SECONDS") != "whole";
+    machine.binding.compiler.maximumPathPlanSeconds = bounded
+      ? motionkit.robot.ManipulatorMotion.LOOKAHEAD_SECONDS : null;
     var firstMotion:Null<Float> = null;
     var firstCommand:Null<Float> = null, firstAdmission:Null<Float> = null;
-    if (Sys.getEnv("PRINTING_BENCHMARK_FIRST_MOTION")=="1") {
-      var dt=machine.blueprint.fixedTimestepSeconds;
-      var harness=new robotkit.runtime.SimulationHarness(dt);
-      var runtime=harness.simulation.addRobot(machine.blueprint.runtime);
-      var robot=new robotkit.simulation.SimulatedRobot("stream-printer",runtime,machine.planning.name,
-        [for (link in machine.planning.links) link.name],[for (joint in machine.planning.joints) joint.name]);
-      var motion=new motionkit.robot.ManipulatorMotion(robot,machine.binding.compiler,_ -> null,() -> runtime.pollEvents());
-      var tick=0;
+    if (Sys.getEnv("PRINTING_BENCHMARK_FIRST_MOTION") == "1") {
+      var dt = machine.blueprint.fixedTimestepSeconds;
+      var harness = new robotkit.runtime.SimulationHarness(dt);
+      var runtime = harness.simulation.addRobot(machine.blueprint.runtime);
+      var robot = new robotkit.simulation.SimulatedRobot(
+        "stream-printer",
+        runtime,
+        machine.planning.name,
+        [for (link in machine.planning.links) link.name],
+        [for (joint in machine.planning.joints) joint.name]
+      );
+      var motion = new motionkit.robot.ManipulatorMotion(
+        robot,
+        machine.binding.compiler,
+        _ -> null,
+        () -> runtime.pollEvents()
+      );
+      var tick = 0;
       // Match the planner's initial pose through the ordinary command path;
       // teleporting physics does not update the runtime's commanded setpoint.
-      var began=0.0;
+      var began = 0.0;
       try {
-      var homing=new motionkit.robot.MotionSystem(robot,machine.blueprint);
-      homing.configureRuntimeHoming(runtime,() -> {},harness.simulation.homingSides(0));
-      harness.step(Int64.ofInt(++tick));homing.home();
-      while (homing.homingStatus()!="Complete" && tick<60000) {
-        harness.step(Int64.ofInt(++tick));homing.update(dt);
-      }
-      if (homing.homingStatus()!="Complete") throw "Startup homing failed: "+homing.homingStatus();
-      var referenced=runtime.snapshot();
-      var executionBinding=new ToolpathMotionBinding(machine.binding.machine,machine.blueprint,
-        referenced.modelRevision,referenced.calibrationRevision);
-      executionBinding.compiler.maximumPathPlanSeconds=machine.binding.compiler.maximumPathPlanSeconds;
-      motion=new motionkit.robot.ManipulatorMotion(robot,executionBinding.compiler,_ -> null,() -> runtime.pollEvents());
-      var positionDeadline=tick+10000;
-      motion.run(new motionkit.program.MotionProgram([motionkit.program.MotionOp.MoveJ(
-        motionkit.program.MoveTarget.JointTarget(machine.start),new motionkit.MotionOptions(),
-        motionkit.program.Blend.ExactStop)]));
-      while (motion.running && tick<positionDeadline) {motion.update(dt);harness.step(Int64.ofInt(++tick));}
-      if (!motion.completed || motion.failure!=null) throw "Startup positioning failed: "+motion.failure;
-      for (_ in 0...100) harness.step(Int64.ofInt(++tick));
-      began=Sys.time();
-        motion.run(program,false);
-        while (firstMotion==null && Sys.time()-began<30) {
+        var homing = new motionkit.robot.MotionSystem(robot, machine.blueprint);
+        homing.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+        harness.step(Int64.ofInt(++ tick));
+        homing.home();
+        while (homing.homingStatus() != "Complete" && tick < 60000) {
+          harness.step(Int64.ofInt(++ tick));
+          homing.update(dt);
+        }
+        if (homing.homingStatus() != "Complete") throw "Startup homing failed: " + homing.homingStatus();
+        var referenced = runtime.snapshot();
+        var executionBinding = new ToolpathMotionBinding(
+          machine.binding.machine,
+          machine.blueprint,
+          referenced.modelRevision,
+          referenced.calibrationRevision
+        );
+        executionBinding.compiler.maximumPathPlanSeconds = machine.binding.compiler.maximumPathPlanSeconds;
+        motion = new motionkit.robot.ManipulatorMotion(
+          robot,
+          executionBinding.compiler,
+          _ -> null,
+          () -> runtime.pollEvents()
+        );
+        var positionDeadline = tick + 10000;
+        motion.run(new motionkit.program.MotionProgram([motionkit.program.MotionOp.MoveJ(
+          motionkit.program.MoveTarget.JointTarget(machine.start),
+          new motionkit.MotionOptions(),
+          motionkit.program.Blend.ExactStop
+        )]));
+        while (motion.running && tick < positionDeadline) {
+          motion.update(dt);
+          harness.step(Int64.ofInt(++ tick));
+        }
+        if (!motion.completed || motion.failure != null) throw "Startup positioning failed: " + motion.failure;
+        for (_ in 0...100) harness.step(Int64.ofInt(++ tick));
+        began = Sys.time();
+        motion.run(program, false);
+        while (firstMotion == null && Sys.time() - began < 30) {
           motion.update(dt);
           // Submission is the planning/executor latency; observed movement also includes runtime stepping.
           if (firstCommand == null && (@:privateAccess motion.startedPlans) > 0) firstCommand = Sys.time() - began;
-          harness.step(Int64.ofInt(++tick));
-          if (motion.failure!=null) throw motion.failure;
-          var snapshot=robot.snapshot(),moved=false;
-          if (firstAdmission == null && (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0))
-            firstAdmission = Sys.time() - began;
-          for (joint in 0...machine.start.length)
-            if (Math.abs(snapshot.setpointPositions.get(joint)-machine.start[joint])>1e-12) moved=true;
-          if (snapshot.trajectoryActive && moved) firstMotion=Sys.time()-began;
+          harness.step(Int64.ofInt(++ tick));
+          if (motion.failure != null) throw motion.failure;
+          var snapshot = robot.snapshot(), moved = false;
+          if (firstAdmission == null
+            && (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0)) firstAdmission = Sys.time() - began;
+          for (joint in 0...machine.start.length) if (Math.abs(snapshot.setpointPositions.get(joint)
+            - machine.start[joint]) > 1e-12) moved = true;
+          if (snapshot.trajectoryActive && moved) firstMotion = Sys.time() - began;
           else Sys.sleep(0.001);
         }
-        if (firstMotion==null) throw "No first motion within the startup deadline";
+        if (firstMotion == null) throw "No first motion within the startup deadline";
         motion.stop();
-        while (motion.running && Sys.time()-began<35) {
-          motion.update(dt);harness.step(Int64.ofInt(++tick));
+        while (motion.running && Sys.time() - began < 35) {
+          motion.update(dt);
+          harness.step(Int64.ofInt(++ tick));
         }
-        if (motion.failure!=null || motion.running) throw "Startup probe failed to stop cleanly: "+motion.failure;
-        if (motion.shutdownPlanning()!=0) throw "Startup probe retained a planner worker";
+        if (motion.failure != null || motion.running) throw "Startup probe failed to stop cleanly: " + motion.failure;
+        if (motion.shutdownPlanning() != 0) throw "Startup probe retained a planner worker";
       } catch (error:Dynamic) {
-        motion.shutdownPlanning();harness.dispose();throw error;
+        motion.shutdownPlanning();
+        harness.dispose();
+        throw error;
       }
       harness.dispose();
     }
-    var sink=new StreamClockSink(),began=Sys.time(),cpu=Sys.cpuTime();
-    var work=machine.binding.compiler.begin(program,machine.start,Int64.ofInt(1),0,1.0,sink);
-    try {while (work.step()) {}} catch (error:Dynamic) {work.dispose();throw error;}
+    var sink = new StreamClockSink(), began = Sys.time(), cpu = Sys.cpuTime();
+    var work = machine.binding.compiler.begin(program, machine.start, Int64.ofInt(1), 0, 1.0, sink);
+    try {
+      while (work.step()) {
+      }
+    } catch (error:Dynamic) {
+      work.dispose();
+      throw error;
+    }
     work.dispose();
-    Sys.println("PRINTING_STREAM_ACCEPTANCE "+haxe.Json.stringify({load:Sys.getEnv("PRINTING_BENCHMARK_ONLY"),scale:scale,bounded:bounded,
-      firstCommandSeconds:firstCommand,firstAdmissionSeconds:firstAdmission,
-      firstMotionSeconds:firstMotion,planningSeconds:Sys.time()-began,planningCpuSeconds:Sys.cpuTime()-cpu,
-      plannedNanoseconds:Int64.toStr(sink.nanoseconds),plans:sink.plans,notes:sink.notes,peakManagedBytes:sink.peakHeap}));
+    Sys.println("PRINTING_STREAM_ACCEPTANCE " + haxe.Json.stringify({
+      load: Sys.getEnv("PRINTING_BENCHMARK_ONLY"),
+      scale: scale,
+      bounded: bounded,
+      firstCommandSeconds: firstCommand,
+      firstAdmissionSeconds: firstAdmission,
+      firstMotionSeconds: firstMotion,
+      planningSeconds: Sys.time() - began,
+      planningCpuSeconds: Sys.cpuTime() - cpu,
+      plannedNanoseconds: Int64.toStr(sink.nanoseconds),
+      plans: sink.plans,
+      notes: sink.notes,
+      peakManagedBytes: sink.peakHeap
+    }));
   }
 
   static function mainLoads():Void {
@@ -711,23 +991,33 @@ class PrintingBenchmark {
     var machine = new PrinterAxes();
     for (axis in machine.blueprint.axes) Sys.println('  axis ${axis.id}: ${axis.lowerLimit} .. ${axis.upperLimit}');
     Sys.println('  joints: ${[for (joint in machine.planning.joints) joint.id].join(", ")}');
-    Sys.println('printer axes: x ${Math.round(machine.speed[0] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[0] * 100) / 100} m/s2, ' +
-      'y ${Math.round(machine.speed[1] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[1] * 100) / 100} m/s2, ' +
-      'z ${Math.round(machine.speed[2] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[2] * 100) / 100} m/s2');
+    Sys
+      .println('printer axes: x ${Math.round(machine.speed[0] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[0] * 100) / 100} m/s2, '
+      + 'y ${Math.round(machine.speed[1] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[1] * 100) / 100} m/s2, '
+      + 'z ${Math.round(machine.speed[2] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[2] * 100) / 100} m/s2');
     var settings = new SlicerSettings();
     var profile = PrinterProfile.bed220();
-    if (only=="stream-cube" || only=="stream-gear") {streamingAcceptance(machine,settings,profile);return;}
+    if (only == "stream-cube" || only == "stream-gear") {
+      streamingAcceptance(machine, settings, profile);
+      return;
+    }
     // Without a named load the run is the gate, which the suites run; the loads are for measuring.
     if (only == null && Sys.getEnv("PRINTING_BENCHMARK_GCODE") == null || only == "gate") {
       gate(machine, settings, profile);
       return;
     }
     if (only == "tab" || only == "cubes") {
-      var sliced = Slicer.slice(only == "tab" ? TestParts.smallTab() : TestParts.calibrationCube(), settings, profile, "tab");
+      var sliced = Slicer.slice(
+        only == "tab" ? TestParts.smallTab() : TestParts.calibrationCube(),
+        settings,
+        profile,
+        "tab"
+      );
       var shaped = new PrinterAxes(0.04, true), plain = new PrinterAxes(0.04, false);
       var a = report0("tab plain", plain, sliced.program), b = report0("tab shaped", shaped, sliced.program);
-      Sys.println('tab: ${Math.round(a.planned * 1000) / 1000} s plain with ${a.segments} segments (${Math.round(a.segments / a.planned)} a second), ' +
-        '${Math.round(b.planned * 1000) / 1000} s shaped with ${b.segments} (${Math.round(b.segments / b.planned)} a second); merge refusals ${plain.binding.compiler.mergeRefusals} (${plain.binding.compiler.lastMergeRefusal}) and ${shaped.binding.compiler.mergeRefusals} (${shaped.binding.compiler.lastMergeRefusal})');
+      Sys
+        .println('tab: ${Math.round(a.planned * 1000) / 1000} s plain with ${a.segments} segments (${Math.round(a.segments / a.planned)} a second), '
+        + '${Math.round(b.planned * 1000) / 1000} s shaped with ${b.segments} (${Math.round(b.segments / b.planned)} a second); merge refusals ${plain.binding.compiler.mergeRefusals} (${plain.binding.compiler.lastMergeRefusal}) and ${shaped.binding.compiler.mergeRefusals} (${shaped.binding.compiler.lastMergeRefusal})');
       return;
     }
     if (only == "shaping") {
@@ -738,16 +1028,31 @@ class PrintingBenchmark {
     function sliceNamed(name:String, part:cadkit.modeling.Part):camkit.additive.Slicer.SliceResult {
       var sliced = Slicer.slice(part, settings, profile, name);
       part.close();
-      if (dump != null)
-        sys.io.File.saveContent('$dump/$name.gcode', PrinterWriter.write(sliced.program, machine.controller, PrinterFlavour.Klipper));
+      if (dump != null) sys.io.File.saveContent(
+        '$dump/$name.gcode',
+        PrinterWriter.write(
+          sliced.program,
+          machine.controller,
+          PrinterFlavour.Klipper
+        )
+      );
       return sliced;
     }
     /** G-code written earlier (`PRINTING_BENCHMARK_DUMP`) stands in for slicing: `PRINTING_BENCHMARK_GCODE=file`. */
     var file = Sys.getEnv("PRINTING_BENCHMARK_GCODE");
     if (file != null) {
       var began = Sys.time();
-      var read = CncCompiler.compileDetailed(sys.io.File.getContent(file), machine.controller, new toolpathkit.path.Point3(0.0, 0.0, 0.01));
-      for (item in read.diagnostics) if (item.severity == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code: " + item.message;
+      var read = CncCompiler.compileDetailed(
+        sys.io.File.getContent(file),
+        machine.controller,
+        new toolpathkit.path.Point3(
+          0.0,
+          0.0,
+          0.01
+        )
+      );
+      for (item in read.diagnostics) if (item.severity
+        == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code: " + item.message;
       report(file, machine, read.program, Sys.time() - began);
       return;
     }
@@ -765,8 +1070,10 @@ class PrintingBenchmark {
       var text = PrinterWriter.write(sliced.program, controller, PrinterFlavour.Klipper);
       var began = Sys.time();
       var read = CncCompiler.compileDetailed(text, machine.controller, new toolpathkit.path.Point3(0.0, 0.0, 0.01));
-      for (item in read.diagnostics) if (item.severity == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code round trip: " + item.message;
-      Sys.println('  G-code: ${text.split("\n").length} lines, read back in ${Math.round((Sys.time() - began) * 1000)} ms');
+      for (item in read.diagnostics) if (item.severity
+        == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code round trip: " + item.message;
+      Sys
+        .println('  G-code: ${text.split("\n").length} lines, read back in ${Math.round((Sys.time() - began) * 1000)} ms');
       report("test tower from G-code", machine, read.program, Sys.time() - began);
     }
   }

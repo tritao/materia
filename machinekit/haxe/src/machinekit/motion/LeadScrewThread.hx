@@ -7,104 +7,120 @@ import cadkit.threads.ThreadSpec;
  * that a diameter/pitch combination is listed in a particular edition of a thread standard.
  */
 enum LeadScrewThreadFamily {
-	MetricTrapezoidal;
-	Acme;
-	/** Recirculating ball race; pitch is the axial lead for a single start. */
-	Ball;
+  MetricTrapezoidal;
+  Acme;
+  /** Recirculating ball race; pitch is the axial lead for a single start. */
+  Ball;
 }
 
 enum LeadScrewHand {
-	RightHand;
-	LeftHand;
+  RightHand;
+  LeftHand;
 }
 
 class LeadScrewThread {
-	/** Assumed rolling efficiency for the generic ball-race family. */
-	public static inline var BALL_EFFICIENCY:Float = 0.9;
-	public final family:LeadScrewThreadFamily;
-	public final screwDiameter:Float;
-	public final pitch:Float;
-	public final starts:Int;
-	public final hand:LeadScrewHand;
-	/** Positive axial distance per revolution, independent of handedness. */
-	public final lead:Float;
-	public final designation:String;
-	/** Explicit catalogue or assumed race root, mm; required for ball screws. */
-	public final raceRootDiameter:Null<Float>;
+  /** Assumed rolling efficiency for the generic ball-race family. */
+  public static inline var BALL_EFFICIENCY:Float = 0.9;
+  public final family:LeadScrewThreadFamily;
+  public final screwDiameter:Float;
+  public final pitch:Float;
+  public final starts:Int;
+  public final hand:LeadScrewHand;
+  /** Positive axial distance per revolution, independent of handedness. */
+  public final lead:Float;
+  public final designation:String;
+  /** Explicit catalogue or assumed race root, mm; required for ball screws. */
+  public final raceRootDiameter:Null<Float>;
 
-	public function new(family:LeadScrewThreadFamily, screwDiameter:Float, pitch:Float,
-			starts:Int = 1, hand:LeadScrewHand = RightHand, ?raceRootDiameter:Float) {
-		if (family == null) throw "Lead screw thread needs a family";
-		if (!(screwDiameter > 0) || !Math.isFinite(screwDiameter))
-			throw "Lead screw thread needs a positive screw diameter";
-		if (!(pitch > 0) || !Math.isFinite(pitch)) throw "Lead screw thread needs a positive pitch";
-		if (family == Ball && (raceRootDiameter == null || !Math.isFinite(raceRootDiameter) ||
-			!(raceRootDiameter > 0 && raceRootDiameter < screwDiameter)))
-			throw "Ball race needs an explicit positive root smaller than its nominal diameter";
-		if (family != Ball && raceRootDiameter != null) throw "Only a ball race has a stated race root";
-		if (starts < 1) throw "Lead screw thread needs at least one start";
-		if (hand == null) throw "Lead screw thread needs a hand";
-		var calculatedLead = pitch * starts;
-		if (!Math.isFinite(calculatedLead)) throw "Lead screw thread lead is too large";
-		this.family = family;
-		this.screwDiameter = screwDiameter;
-		this.pitch = pitch;
-		this.starts = starts;
-		this.hand = hand;
-		this.raceRootDiameter = raceRootDiameter;
-		lead = calculatedLead;
-		var familyCode = family == MetricTrapezoidal ? "TR" : family == Acme ? "ACME" : "BALL";
-		var handCode = hand == RightHand ? "RH" : "LH";
-		designation = '${familyCode}-D${Dimension.format(screwDiameter)}-P${Dimension.format(pitch)}-S$starts-$handCode';
-	}
+  public function new(
+    family:LeadScrewThreadFamily,
+    screwDiameter:Float,
+    pitch:Float,
+    starts:Int = 1,
+    hand:LeadScrewHand = RightHand,
+    ?raceRootDiameter:Float
+  ) {
+    if (family == null) throw "Lead screw thread needs a family";
+    if (!(screwDiameter > 0)
+      || !Math.isFinite(screwDiameter)) throw "Lead screw thread needs a positive screw diameter";
+    if (!(pitch > 0) || !Math.isFinite(pitch)) throw "Lead screw thread needs a positive pitch";
+    if (family == Ball
+      && (raceRootDiameter == null || !Math.isFinite(raceRootDiameter) || !(raceRootDiameter > 0 && raceRootDiameter
+      < screwDiameter))) throw "Ball race needs an explicit positive root smaller than its nominal diameter";
+    if (family != Ball && raceRootDiameter != null) throw "Only a ball race has a stated race root";
+    if (starts < 1) throw "Lead screw thread needs at least one start";
+    if (hand == null) throw "Lead screw thread needs a hand";
+    var calculatedLead = pitch * starts;
+    if (!Math.isFinite(calculatedLead)) throw "Lead screw thread lead is too large";
+    this.family = family;
+    this.screwDiameter = screwDiameter;
+    this.pitch = pitch;
+    this.starts = starts;
+    this.hand = hand;
+    this.raceRootDiameter = raceRootDiameter;
+    lead = calculatedLead;
+    var familyCode = family == MetricTrapezoidal ? "TR" : family == Acme ? "ACME" : "BALL";
+    var handCode = hand == RightHand ? "RH" : "LH";
+    designation = '${familyCode}-D${Dimension.format(screwDiameter)}-P${Dimension.format(pitch)}-S$starts-$handCode';
+  }
 
-	/** Signed nut travel for one positive screw revolution about the screw's +Z axis.
+  /** Signed nut travel for one positive screw revolution about the screw's +Z axis.
 	 * A right-hand thread moves the nut toward -Z; a left-hand thread moves it toward +Z.
 	 */
-	public function signedLead():Float
-		return hand == RightHand ? -lead : lead;
+  public function signedLead():Float return hand == RightHand ? -lead : lead;
 
-	/** The common face-thread value retains this family's profile and positive lead. */
-	public function threadSpec(internal:Bool = false):ThreadSpec {
-		var profile = switch family {
-			case MetricTrapezoidal: materia.project.ThreadSpecData.ThreadProfile.Trapezoidal;
-			case Acme: materia.project.ThreadSpecData.ThreadProfile.Acme;
-			case Ball: materia.project.ThreadSpecData.ThreadProfile.Ball;
-		};
-		return new ThreadSpec(designation, screwDiameter, pitch, starts,
-			hand == RightHand ? materia.project.ThreadSpecData.ThreadHand.RightHand : materia.project.ThreadSpecData.ThreadHand.LeftHand,
-			internal, "nominal", profile);
-	}
+  /** The common face-thread value retains this family's profile and positive lead. */
+  public function threadSpec(internal:Bool = false):ThreadSpec {
+    var profile = switch family {
+      case MetricTrapezoidal:
+        materia.project.ThreadSpecData.ThreadProfile.Trapezoidal;
+      case Acme:
+        materia.project.ThreadSpecData.ThreadProfile.Acme;
+      case Ball:
+        materia.project.ThreadSpecData.ThreadProfile.Ball;
+    };
+    return new ThreadSpec(
+      designation,
+      screwDiameter,
+      pitch,
+      starts,
+      hand == RightHand
+      ? materia.project.ThreadSpecData.ThreadHand.RightHand : materia.project.ThreadSpecData.ThreadHand.LeftHand,
+      internal,
+      "nominal",
+      profile
+    );
+  }
 
-	/**
+  /**
 	 * Share of the motor's work that reaches the nut when the screw drives it: tan λ / tan(λ + φ'),
 	 * with λ the lead angle at the pitch diameter and φ' the friction angle on the 15° flanks of a
 	 * trapezoidal or Acme thread. `friction` is the nut's sliding friction coefficient; 0.1 is
 	 * typical of a greased bronze or plastic nut on steel.
 	 */
-	public function efficiency(friction:Float = 0.1):Float {
-		if (!(friction >= 0) || !Math.isFinite(friction)) throw "Lead screw friction must be non-negative";
-		if (family == Ball) return BALL_EFFICIENCY;
-		var pitchDiameter = screwDiameter - pitch / 2;
-		var leadAngle = Math.atan(lead / (Math.PI * pitchDiameter));
-		var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
-		return Math.tan(leadAngle) / Math.tan(leadAngle + frictionAngle);
-	}
+  public function efficiency(friction:Float = 0.1):Float {
+    if (!(friction >= 0) || !Math.isFinite(friction)) throw "Lead screw friction must be non-negative";
+    if (family == Ball) return BALL_EFFICIENCY;
+    var pitchDiameter = screwDiameter - pitch / 2;
+    var leadAngle = Math.atan(lead / (Math.PI * pitchDiameter));
+    var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
+    return Math.tan(leadAngle) / Math.tan(leadAngle + frictionAngle);
+  }
 
-	/**
+  /**
 	 * Diameter at the bottom of the thread, mm, which sets how the screw bends. Metric trapezoidal
 	 * (ISO 2904): the nominal diameter less the pitch and twice the crest clearance, 0.25 mm up to a
 	 * 5 mm pitch, 0.5 mm to 12 mm and 1 mm above (Tr10 x 2: 7.5 mm). Acme: the diameter less the
 	 * pitch, which is close for a 29 degree thread with its crest clearance.
 	 */
-	public function rootDiameter():Float {
-		if (family == Ball) {
-			var root = raceRootDiameter;
-			if (root == null) throw "Ball race root is missing";
-			return root;
-		}
-		if (family == Acme) return screwDiameter - pitch;
-		var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
-		return screwDiameter - pitch - 2 * clearance;
-	}
+  public function rootDiameter():Float {
+    if (family == Ball) {
+      var root = raceRootDiameter;
+      if (root == null) throw "Ball race root is missing";
+      return root;
+    }
+    if (family == Acme) return screwDiameter - pitch;
+    var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
+    return screwDiameter - pitch - 2 * clearance;
+  }
 }

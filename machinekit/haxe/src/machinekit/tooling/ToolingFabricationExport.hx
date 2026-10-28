@@ -22,593 +22,877 @@ import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.Segment;
 
 enum abstract HardwareClassification(String) to String {
-	var NonHardware = "non-hardware";
-	var SupportedHardware = "supported-hardware";
-	var UnsupportedHardware = "unsupported-hardware";
+  var NonHardware = "non-hardware";
+  var SupportedHardware = "supported-hardware";
+  var UnsupportedHardware = "unsupported-hardware";
 }
 
 typedef HardwareDimensions = {
-	var classification:HardwareClassification;
-	var lengthMm:Null<Float>;
-	var diameterMm:Null<Float>;
+  var classification:HardwareClassification;
+  var lengthMm:Null<Float>;
+  var diameterMm:Null<Float>;
 }
 
 /** Lists and shop-review drawings from neutral records. No alternative SVG/DXF writers. */
 class ToolingFabricationExport {
-	public static function classify(component:machinekit.component.MachineComponent):HardwareDimensions {
-		if (Std.isOfType(component, ToolingPanel)
-			|| Std.isOfType(component, ToolingVolume)
-			|| Std.isOfType(component, ToolingBlock)
-			|| Std.isOfType(component, machinekit.structural.CastInsert))
-			return {classification: NonHardware, lengthMm: null, diameterMm: null};
-		if (Std.isOfType(component, machinekit.standard.SocketHeadCapScrew)) {
-			var screw:machinekit.standard.SocketHeadCapScrew = cast component;
-			return {classification: SupportedHardware, lengthMm: screw.length, diameterMm: screw.diameter};
-		}
-		if (Std.isOfType(component,machinekit.standard.HexFlangeBolt)) {
-			var bolt:machinekit.standard.HexFlangeBolt=cast component;
-			return {classification:SupportedHardware,lengthMm:bolt.length,diameterMm:bolt.thread.majorDiameter};
-		}
-		if (Std.isOfType(component, machinekit.standard.FlatWasher)) {
-			var washer:machinekit.standard.FlatWasher = cast component;
-			return {classification: SupportedHardware, lengthMm: washer.thickness, diameterMm: washer.outerDiameter};
-		}
-		if (Std.isOfType(component, machinekit.standard.HexNut)) {
-			var nut:machinekit.standard.HexNut = cast component;
-			return {classification: SupportedHardware, lengthMm: nut.height, diameterMm: null};
-		}
-		if (Std.isOfType(component, machinekit.standard.SocketSetScrew)) {
-			var plug:machinekit.standard.SocketSetScrew = cast component;
-			return {classification: SupportedHardware, lengthMm: plug.length, diameterMm: plug.thread.majorDiameter};
-		}
-		if (Std.isOfType(component, ToolingPin))
-			return {classification: SupportedHardware, lengthMm: component.parameterNumber("length"),
-				diameterMm: Math.max(component.parameterNumber("diameter"), component.parameterNumber("headDiameter"))};
-		return {classification: UnsupportedHardware, lengthMm: null, diameterMm: null};
-	}
+  public static function classify(component:machinekit.component.MachineComponent):HardwareDimensions {
+    if (Std.isOfType(component, ToolingPanel) || Std.isOfType(component, ToolingVolume) || Std.isOfType(
+      component,
+      ToolingBlock
+    ) || Std.isOfType(
+      component,
+      machinekit.structural.CastInsert
+    )) return {
+      classification: NonHardware,
+      lengthMm: null,
+      diameterMm: null
+    };
+    if (Std.isOfType(component, machinekit.standard.SocketHeadCapScrew)) {
+      var screw:machinekit.standard.SocketHeadCapScrew = cast component;
+      return {classification: SupportedHardware, lengthMm: screw.length, diameterMm: screw.diameter};
+    }
+    if (Std.isOfType(component, machinekit.standard.HexFlangeBolt)) {
+      var bolt:machinekit.standard.HexFlangeBolt = cast component;
+      return {classification: SupportedHardware, lengthMm: bolt.length, diameterMm: bolt.thread.majorDiameter};
+    }
+    if (Std.isOfType(component, machinekit.standard.FlatWasher)) {
+      var washer:machinekit.standard.FlatWasher = cast component;
+      return {classification: SupportedHardware, lengthMm: washer.thickness, diameterMm: washer.outerDiameter};
+    }
+    if (Std.isOfType(component, machinekit.standard.HexNut)) {
+      var nut:machinekit.standard.HexNut = cast component;
+      return {classification: SupportedHardware, lengthMm: nut.height, diameterMm: null};
+    }
+    if (Std.isOfType(component, machinekit.standard.SocketSetScrew)) {
+      var plug:machinekit.standard.SocketSetScrew = cast component;
+      return {classification: SupportedHardware, lengthMm: plug.length, diameterMm: plug.thread.majorDiameter};
+    }
+    if (Std.isOfType(component, ToolingPin)) return {
+      classification: SupportedHardware,
+      lengthMm: component.parameterNumber("length"),
+      diameterMm: Math.max(
+        component.parameterNumber("diameter"),
+        component.parameterNumber("headDiameter")
+      )
+    };
+    return {classification: UnsupportedHardware, lengthMm: null, diameterMm: null};
+  }
 
-	static function text(dir:String, name:String, s:String):Void
-		sys.io.File.saveContent(dir + "/" + name, s);
+  static function text(dir:String, name:String, s:String):Void sys.io.File.saveContent(dir + "/" + name, s);
 
-	static function data(dir:String, name:String, v:Dynamic):Void
-		text(dir, name, materia.tooling.ToolingCodec.canonical(v) + "\n");
+  static function data(dir:String, name:String, v:Dynamic):Void text(
+    dir,
+    name,
+    materia.tooling.ToolingCodec.canonical(v) + "\n"
+  );
 
-	static function drawing(dir:String, name:String, d:Drawing2D):Void {
-		text(dir, name + ".svg", Svg.write(d));
-		text(dir, name + ".dxf", Dxf.write(d));
-	}
+  static function drawing(dir:String, name:String, d:Drawing2D):Void {
+    text(dir, name + ".svg", Svg.write(d));
+    text(dir, name + ".dxf", Dxf.write(d));
+  }
 
-	public static function panels(p:CastingMoldPlan, f:FabricationPlan):Array<PanelPlan> {
-		var result = [for (m in p.panels.members.concat(p.supportPanels)) m.panel].concat([f.coupon.receiver, f.coupon.plug, f.locatorCoupon.fixed, f.locatorCoupon.moving]);
-		result.sort((a, b) -> Reflect.compare(a.id, b.id));
-		return result;
-	}
+  public static function panels(p:CastingMoldPlan, f:FabricationPlan):Array<PanelPlan> {
+    var result = [for (m in p.panels.members.concat(p.supportPanels)) m.panel].concat([
+      f.coupon.receiver,
+      f.coupon.plug,
+      f.locatorCoupon.fixed,
+      f.locatorCoupon.moving
+    ]);
+    result.sort((a, b) -> Reflect.compare(a.id, b.id));
+    return result;
+  }
 
-	static function insertManufacturing(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
-		var checks:Array<materia.tooling.ToolingValidation> = [];
-		var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];
-		var operationRows:Array<Array<String>> = [["insert_id","sequence","operation_id","stage","kind","source_ids","process_reference","machining_holes_json","method"]];
-		var budgetRows:Array<Array<String>> = [["insert_id","hole_id","component","connector","route","status",
-			"clearance_diameter_mm","bolt_diameter_mm","datum_distance_mm","placement_offset_mm","placement_angle_rad",
-			"assembly_adjustment_mm","cure_bow_mm","machining_error_mm","pitch_accumulation_mm","required_margin_mm",
-			"precast_margin_mm","transfer_margin_mm","missing_inputs","clearance_reference"]];
-		function optional(value:Null<Float>):String return value==null ? "" : Std.string(value);
-		function inputText(value:materia.casting.CastingInput.CastingTextInput):String return switch value {
-			case Known(text):text;case Unresolved(_):"";
-		};
-		function input(value:materia.casting.CastingInput):String return switch value {
-			case Known(number):Std.string(number);
-			case Unresolved(_):"";
-		};
-		var inspectionRows:Array<Array<String>> = [["insert_id","inspection_kind","source_id","stage","limit_declared","tolerance_mm","execution_status"]];
-		var bomRows:Array<Array<String>> = [["insert_id","part_number","procurement_kind","process","material_grade","quantity"]];
-		for (insert in p.document.input.inserts.concat([for (row in p.document.input.postCureInserts) row.insert])) switch insert.origin {
-			case Catalogue(_):
-			case Fabricated(_):
-				var job=materia.tooling.casting.InsertManufacturingPlan.build(insert);
-				jobs.push(job);
-				var sheet=InsertDrawing.review(insert);
-				drawing(dir,materia.tooling.ToolingIds.derive("insert-",insert.id),sheet.drawing);
-				checks.push(sheet.validation);
-				var part=ToolingInsertCad.serviceComponent(insert),item=part.bom;
-				if (item.manufacturingProcess==null) throw "Made insert BOM lacks its manufacturing process: "+insert.id;
-				bomRows.push([insert.id,item.partNumber,"Make",item.manufacturingProcess,job.specification.material.grade,"1"]);
-				for (index in 0...job.operations.length) {
-					var operation=job.operations[index];
-					var stage=operation.stage==materia.tooling.casting.InsertManufacturingPlan.InsertOperationStage.BeforeCasting
-						? materia.casting.InsertStages.InsertStage.BeforeCasting : materia.casting.InsertStages.InsertStage.Service;
-					var machiningHoles=materia.casting.InsertStages.holes(
-						{body:insert.body,holes:insert.holes,origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces},stage)
-						.filter(hole -> operation.sourceIds.indexOf(hole.id)>=0);
-					operationRows.push([insert.id,Std.string(index+1),operation.id,operation.stage,operation.kind,
-						operation.sourceIds.join(";"),inputText(job.specification.processReference),
-						haxe.Json.stringify(materia.casting.InsertHole.InsertHoleCodec.snapshot(machiningHoles)),
-						materia.tooling.casting.InsertManufacturingPlan.instructions(operation).join(" ")]);
-				}
-				for (report in job.holeBudgets) {
-					var requirement=job.specification.mountingRequirements.filter(row -> row.holeId==report.holeId)[0];
-					var budget=requirement.budget;
-					budgetRows.push([insert.id,report.holeId,report.componentPath,report.connectorId,
-						report.route==null ? "" : report.route,report.status,input(budget.clearanceDiameterMm),
-						Std.string(budget.boltDiameterMm),Std.string(budget.distanceFromDatumMm),input(budget.placementOffsetMm),
-						input(budget.placementAngleRad),input(budget.assemblyAdjustmentMm),input(budget.cureBowMm),
-						input(budget.machiningErrorMm),input(budget.pitchAccumulationMm),input(budget.requiredMarginMm),
-						optional(report.beforeCastingMarginMm),optional(report.transferMarginMm),report.missingInputs.join(";"),
-						inputText(requirement.clearanceReference)]);
-				}
-				for (inspection in job.inspectionRequirements) {
-					inspectionRows.push([insert.id,inspection.kind,inspection.sourceIds.join(";"),inspection.stage,Std.string(inspection.declared),
-						inspection.toleranceMm==null ? "" : Std.string(inspection.toleranceMm),"pending"]);
-				}
-		}
-		data(dir,"insert-manufacturing.json",{format:"materia.tooling.insert-manufacturing",version:5,
-			sourceFingerprint:f.sourceFingerprint,inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),jobs:[for (job in jobs) materia.tooling.casting.InsertManufacturingPlan.record(job)]});
-		data(dir,"bed-rebate-seals.json",{sourceFingerprint:f.sourceFingerprint,
-			seals:[for (seal in p.seals) {id:seal.volume.id,panelId:seal.panelId,insertId:seal.insertId,
-				materialSpec:seal.materialSpec,geometry:materia.tooling.casting.MoldRegions.MoldVolumeRecords.record(seal.volume),
-				sequence:["Route the receiver rebate and source fixing clearances.",
-					"Dry-fit the protected insert or datum; protect screw and pin access, then fill the modeled external clearance and cutter-relief region with the compatible closure compound.",
-					"Cure the closure attached to the bed, remove and inspect the receiver fit, then apply the declared release system.",
-					"Keep all insert and anchor bonding faces clean. Compatibility and reuse require the declared coupon."]} ]});
-		data(dir,"post-cure-bonded-inserts.json",{sourceFingerprint:f.sourceFingerprint,
-			installations:[for (row in p.document.input.postCureInserts) {
-				insertId:row.insert.id,pose:row.insert.pose,
-				receiver:row.bond.receiver,adhesive:materia.casting.CastingInput.CastingInputs.textRecord(row.bond.adhesive),
-				sequence:["After casting cure, drill the declared flat-bottom blind receiver in the casting datum frame.",
-					"Clean and prepare both bonding surfaces; keep the service thread clean.",
-					"Bond the steel insert at the declared service position; cure the adhesive before loading the hatch."]
-			}]});
-		text(dir,"insert-operations.csv",ToolingFabrication.csv(operationRows));
-		text(dir,"insert-hole-budgets.csv",ToolingFabrication.csv(budgetRows));
-		text(dir,"insert-inspections.csv",ToolingFabrication.csv(inspectionRows));
-		text(dir,"insert-make-bom.csv",ToolingFabrication.csv(bomRows));
-		return checks;
-	}
+  static function insertManufacturing(p:CastingMoldPlan,
+    f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
+    var checks:Array<materia.tooling.ToolingValidation> = [];
+    var jobs:Array<materia.tooling.casting.InsertManufacturingPlan.InsertManufacturingJob> = [];
+    var operationRows:Array<Array<String>> = [[
+      "insert_id",
+      "sequence",
+      "operation_id",
+      "stage",
+      "kind",
+      "source_ids",
+      "process_reference",
+      "machining_holes_json",
+      "method"
+    ]];
+    var budgetRows:Array<Array<String>> = [[
+      "insert_id",
+      "hole_id",
+      "component",
+      "connector",
+      "route",
+      "status",
+      "clearance_diameter_mm",
+      "bolt_diameter_mm",
+      "datum_distance_mm",
+      "placement_offset_mm",
+      "placement_angle_rad",
+      "assembly_adjustment_mm",
+      "cure_bow_mm",
+      "machining_error_mm",
+      "pitch_accumulation_mm",
+      "required_margin_mm",
+      "precast_margin_mm",
+      "transfer_margin_mm",
+      "missing_inputs",
+      "clearance_reference"
+    ]];
+    function optional(value:Null<Float>):String return value == null ? "" : Std.string(value);
+    function inputText(value:materia.casting.CastingInput.CastingTextInput):String return switch value {
+      case Known(text):
+        text;
+      case Unresolved(_):
+        "";
+    };
+    function input(value:materia.casting.CastingInput):String return switch value {
+      case Known(number):
+        Std.string(number);
+      case Unresolved(_):
+        "";
+    };
+    var inspectionRows:Array<Array<String>> = [[
+      "insert_id",
+      "inspection_kind",
+      "source_id",
+      "stage",
+      "limit_declared",
+      "tolerance_mm",
+      "execution_status"
+    ]];
+    var bomRows:Array<Array<String>> = [[
+      "insert_id",
+      "part_number",
+      "procurement_kind",
+      "process",
+      "material_grade",
+      "quantity"
+    ]];
+    for (insert in p
+      .document.input.inserts.concat([for (row in p.document.input.postCureInserts) row.insert])) switch insert.origin {
+      case Catalogue(_):
+      case Fabricated(_):
+        var job = materia.tooling.casting.InsertManufacturingPlan.build(insert);
+        jobs.push(job);
+        var sheet = InsertDrawing.review(insert);
+        drawing(dir, materia.tooling.ToolingIds.derive("insert-", insert.id), sheet.drawing);
+        checks.push(sheet.validation);
+        var part = ToolingInsertCad.serviceComponent(insert), item = part.bom;
+        if (item.manufacturingProcess == null) throw "Made insert BOM lacks its manufacturing process: " + insert.id;
+        bomRows.push([
+          insert.id,
+          item.partNumber,
+          "Make",
+          item.manufacturingProcess,
+          job.specification.material.grade,
+          "1"
+        ]);
+        for (index in 0...job.operations.length) {
+          var operation = job.operations[index];
+          var stage = operation.stage
+            == materia.tooling.casting.InsertManufacturingPlan.InsertOperationStage.BeforeCasting
+            ? materia.casting.InsertStages.InsertStage.BeforeCasting : materia.casting.InsertStages.InsertStage.Service;
+          var machiningHoles = materia.casting.InsertStages.holes(
+            {
+              body: insert.body,
+              holes: insert.holes,
+              origin: insert.origin,
+              anchorage: insert.anchorage,
+              interfaces: insert.interfaces
+            },
+            stage
+          ).filter(hole -> operation.sourceIds.indexOf(hole.id) >= 0);
+          operationRows.push([
+            insert.id,
+            Std.string(index + 1),
+            operation.id,
+            operation.stage,
+            operation.kind,
+            operation.sourceIds.join(";"),
+            inputText(job.specification.processReference),
+            haxe.Json.stringify(materia.casting.InsertHole.InsertHoleCodec.snapshot(machiningHoles)),
+            materia.tooling.casting.InsertManufacturingPlan.instructions(operation).join(" ")
+          ]);
+        }
+        for (report in job.holeBudgets) {
+          var requirement = job.specification.mountingRequirements.filter(row -> row.holeId == report.holeId)[0];
+          var budget = requirement.budget;
+          budgetRows.push([
+            insert.id,
+            report.holeId,
+            report.componentPath,
+            report.connectorId,
+            report.route == null ? "" : report.route,
+            report.status,
+            input(budget.clearanceDiameterMm),
+            Std.string(budget.boltDiameterMm),
+            Std.string(budget.distanceFromDatumMm),
+            input(budget.placementOffsetMm),
+            input(budget.placementAngleRad),
+            input(budget.assemblyAdjustmentMm),
+            input(budget.cureBowMm),
+            input(budget.machiningErrorMm),
+            input(budget.pitchAccumulationMm),
+            input(budget.requiredMarginMm),
+            optional(report.beforeCastingMarginMm),
+            optional(report.transferMarginMm),
+            report.missingInputs.join(";"),
+            inputText(requirement.clearanceReference)
+          ]);
+        }
+        for (inspection in job.inspectionRequirements) {
+          inspectionRows.push([
+            insert.id,
+            inspection.kind,
+            inspection.sourceIds.join(";"),
+            inspection.stage,
+            Std.string(inspection.declared),
+            inspection.toleranceMm == null ? "" : Std.string(inspection.toleranceMm),
+            "pending"
+          ]);
+        }
+    }
+    data(
+      dir,
+      "insert-manufacturing.json",
+      {
+        format: "materia.tooling.insert-manufacturing",
+        version: 5,
+        sourceFingerprint: f.sourceFingerprint,
+        inputFingerprint: ToolingCodec.inputFingerprint(p.document.input),
+        jobs: [for (job in jobs) materia.tooling.casting.InsertManufacturingPlan.record(job)]
+      }
+    );
+    data(dir, "bed-rebate-seals.json", {sourceFingerprint: f.sourceFingerprint, seals: [for (seal in p.seals) {
+      id:seal.volume.id, panelId:seal.panelId, insertId:seal.insertId, materialSpec:seal.materialSpec,
+        geometry:materia.tooling.casting.MoldRegions.MoldVolumeRecords.record(seal.volume), sequence:[
+          "Route the receiver rebate and source fixing clearances.",
+          "Dry-fit the protected insert or datum; protect screw and pin access, then fill the modeled external clearance and cutter-relief region with the compatible closure compound.",
+          "Cure the closure attached to the bed, remove and inspect the receiver fit, then apply the declared release system.",
+          "Keep all insert and anchor bonding faces clean. Compatibility and reuse require the declared coupon."
+        ]
+    }
+    ]});
+    data(dir, "post-cure-bonded-inserts.json",
+      {sourceFingerprint: f.sourceFingerprint, installations: [for (row in p.document.input.postCureInserts) {
+      insertId:row.insert.id, pose:row.insert.pose, receiver:row.bond.receiver,
+        adhesive:materia.casting.CastingInput.CastingInputs.textRecord(row.bond.adhesive), sequence:[
+          "After casting cure, drill the declared flat-bottom blind receiver in the casting datum frame.",
+          "Clean and prepare both bonding surfaces; keep the service thread clean.",
+          "Bond the steel insert at the declared service position; cure the adhesive before loading the hatch."
+        ]
+    }
+    ]});
+    text(dir, "insert-operations.csv", ToolingFabrication.csv(operationRows));
+    text(dir, "insert-hole-budgets.csv", ToolingFabrication.csv(budgetRows));
+    text(dir, "insert-inspections.csv", ToolingFabrication.csv(inspectionRows));
+    text(dir, "insert-make-bom.csv", ToolingFabrication.csv(bomRows));
+    return checks;
+  }
 
-	public static function insertAnchorageReport(p:CastingMoldPlan,sourceFingerprint:String,spec:materia.tooling.export.FabricationSpec):Dynamic {
-		var nativeChecks=InsertAnchorGeometry.review(p.document.input,spec.mixBearingStressMPa,spec.mixTensileStrengthMPa)
-			.concat(InsertAnchorGeometry.reviewMold(p));
-		var checks:Array<materia.tooling.ToolingValidation> = [];
-		for (insert in p.document.input.inserts) checks=checks.concat(materia.casting.InsertAnchorage.InsertAnchorageChecks.check(insert));
-		for (record in nativeChecks) checks.push({rule:record.rule,affectedIds:record.affectedIds.copy(),
-			status:record.status,severity:record.severity,message:record.message,evidence:record.evidence.copy()});
-		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
-		return {format:"materia.tooling.insert-anchorage",version:4,sourceFingerprint:sourceFingerprint,
-			materialInputs:{mixBearingStressMPa:spec.mixBearingStressMPa,mixTensileStrengthMPa:spec.mixTensileStrengthMPa},
-			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
-			inserts:[for (insert in p.document.input.inserts) {id:insert.id,pose:materia.assembly.AssemblyFrames.compose(materia.assembly.AssemblyFrames.identity(),insert.pose),
-				spec:materia.casting.InsertSpec.InsertSpecCodec.record({body:insert.body,holes:insert.holes,
-					origin:insert.origin,anchorage:insert.anchorage,interfaces:insert.interfaces})}],validation:checks};
-	}
+  public static function insertAnchorageReport(
+    p:CastingMoldPlan,
+    sourceFingerprint:String,
+    spec:materia.tooling.export.FabricationSpec
+  ):Dynamic {
+    var nativeChecks = InsertAnchorGeometry.review(
+      p.document.input,
+      spec.mixBearingStressMPa,
+      spec.mixTensileStrengthMPa
+    ).concat(InsertAnchorGeometry.reviewMold(p));
+    var checks:Array<materia.tooling.ToolingValidation> = [];
+    for (insert in p.document.input.inserts) checks =
+      checks.concat(materia.casting.InsertAnchorage.InsertAnchorageChecks.check(insert));
+    for (record in nativeChecks) checks.push({
+      rule: record.rule,
+      affectedIds: record.affectedIds.copy(),
+      status: record.status,
+      severity: record.severity,
+      message: record.message,
+      evidence: record.evidence.copy()
+    });
+    checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
+    return {format: "materia.tooling.insert-anchorage",
+      version: 4, sourceFingerprint: sourceFingerprint, materialInputs: {
+        mixBearingStressMPa: spec.mixBearingStressMPa,
+        mixTensileStrengthMPa: spec.mixTensileStrengthMPa
+      }, inputFingerprint: ToolingCodec.inputFingerprint(p.document.input),
+      inserts: [for (insert in p.document.input.inserts) {
+      id:insert.id, pose:materia.assembly.AssemblyFrames.compose(
+        materia.assembly.AssemblyFrames.identity(),
+        insert.pose
+      ), spec:materia.casting.InsertSpec.InsertSpecCodec.record({
+        body: insert.body,
+        holes: insert.holes,
+        origin: insert.origin,
+        anchorage: insert.anchorage,
+        interfaces: insert.interfaces
+      })
+    }
+    ], validation:checks};
+  }
 
-	public static function foundationJointReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
-		var checks=materia.tooling.casting.FoundationJointQualification.analyze(p.document.input,p.options.foundationJointProcesses)
-			.concat(FoundationJointCad.review(p.document.input));
-		var missing=materia.tooling.casting.FoundationJointQualification.missingSource(p.document.input);
-		if (missing!=null) checks.push(missing);
-		checks.sort((a,b) -> Reflect.compare(a.rule,b.rule));
-		return {format:"materia.tooling.foundation-joints",version:1,sourceFingerprint:sourceFingerprint,
-			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),processes:p.options.foundationJointProcesses,validation:checks};
-	}
-	static function foundationJoints(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
-		var report=foundationJointReport(p,f.sourceFingerprint);
-		data(dir,"foundation-joints.json",report);
-		var rows:Array<Array<String>> = [["instance_id","design_id","lower_body","upper_body","route","gap_mm","gap_tolerance_mm","cure_order","qualification"]];
-		var hardware:Array<Array<String>> = [["member","part_number","kind","thread","diameter_mm","pitch_mm","length_mm","threaded_length_mm","qualification"]];
-		var sequence:Array<Array<String>> = [["instance_id","step","operation","qualification"]];
-		var context=p.document.input.interfaceContext;
-		if (context!=null) {
-			for (instance in context.foundationJoints) {
-				var joint=instance.joint;
-				rows.push([instance.id,joint.id,joint.lowerBody,joint.upperBody,(joint.route:String),Std.string(joint.gapMm),
-					Std.string(joint.gapToleranceMm),"cure-before-final-torque","pending"]);
-				var operations=["Locate the source seats and install the declared anchors without final torque.",
-					"Set the declared gap with the source jacking screws and verify the joint relationship.",
-					"Apply the qualified grout or replication compound using the approved process.",
-					"Record the required cure evidence before releasing final torque.","Apply and inspect the approved final torque after cure release."];
-				for (i in 0...operations.length) sequence.push([instance.id,Std.string(i+1),operations[i],"pending"]);
-			}
-			for (screw in context.jointSources.screws) hardware.push([screw.member,screw.partNumber,(screw.kind:String),screw.thread.designation,
-				Std.string(screw.thread.majorDiameter),Std.string(screw.thread.pitch),Std.string(screw.shankLength),Std.string(screw.threadedLength),"pending"]);
-		}
-		text(dir,"foundation-joints.csv",ToolingFabrication.csv(rows));
-		text(dir,"foundation-joint-hardware.csv",ToolingFabrication.csv(hardware));
-		text(dir,"foundation-joint-sequence.csv",ToolingFabrication.csv(sequence));
-		return cast report.validation;
-	}
+  public static function foundationJointReport(p:CastingMoldPlan, sourceFingerprint:String):Dynamic {
+    var checks = materia.tooling.casting.FoundationJointQualification.analyze(
+      p.document.input,
+      p.options.foundationJointProcesses
+    ).concat(FoundationJointCad.review(p.document.input));
+    var missing = materia.tooling.casting.FoundationJointQualification.missingSource(p.document.input);
+    if (missing != null) checks.push(missing);
+    checks.sort((a, b) -> Reflect.compare(a.rule, b.rule));
+    return {
+      format: "materia.tooling.foundation-joints",
+      version: 1,
+      sourceFingerprint: sourceFingerprint,
+      inputFingerprint: ToolingCodec.inputFingerprint(p.document.input),
+      processes: p.options.foundationJointProcesses,
+      validation: checks
+    };
+  }
+  static function foundationJoints(p:CastingMoldPlan,
+    f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
+    var report = foundationJointReport(p, f.sourceFingerprint);
+    data(dir, "foundation-joints.json", report);
+    var rows:Array<Array<String>> = [[
+      "instance_id",
+      "design_id",
+      "lower_body",
+      "upper_body",
+      "route",
+      "gap_mm",
+      "gap_tolerance_mm",
+      "cure_order",
+      "qualification"
+    ]];
+    var hardware:Array<Array<String>> = [[
+      "member",
+      "part_number",
+      "kind",
+      "thread",
+      "diameter_mm",
+      "pitch_mm",
+      "length_mm",
+      "threaded_length_mm",
+      "qualification"
+    ]];
+    var sequence:Array<Array<String>> = [["instance_id", "step", "operation", "qualification"]];
+    var context = p.document.input.interfaceContext;
+    if (context != null) {
+      for (instance in context.foundationJoints) {
+        var joint = instance.joint;
+        rows.push([
+          instance.id,
+          joint.id,
+          joint.lowerBody,
+          joint.upperBody,
+          (joint.route:String),
+          Std.string(joint.gapMm),
+          Std.string(joint.gapToleranceMm),
+          "cure-before-final-torque",
+          "pending"
+        ]);
+        var operations = [
+          "Locate the source seats and install the declared anchors without final torque.",
+          "Set the declared gap with the source jacking screws and verify the joint relationship.",
+          "Apply the qualified grout or replication compound using the approved process.",
+          "Record the required cure evidence before releasing final torque.",
+          "Apply and inspect the approved final torque after cure release."
+        ];
+        for (i in 0...operations.length) sequence.push([instance.id, Std.string(i + 1), operations[i], "pending"]);
+      }
+      for (screw in context.jointSources.screws) hardware.push([
+        screw.member,
+        screw.partNumber,
+        (screw.kind:String),
+        screw.thread.designation,
+        Std.string(screw.thread.majorDiameter),
+        Std.string(screw.thread.pitch),
+        Std.string(screw.shankLength),
+        Std.string(screw.threadedLength),
+        "pending"
+      ]);
+    }
+    text(dir, "foundation-joints.csv", ToolingFabrication.csv(rows));
+    text(dir, "foundation-joint-hardware.csv", ToolingFabrication.csv(hardware));
+    text(dir, "foundation-joint-sequence.csv", ToolingFabrication.csv(sequence));
+    return cast report.validation;
+  }
 
-	public static function replicationReport(p:CastingMoldPlan,sourceFingerprint:String):Dynamic {
-		var jigs=p.options.replicationJigs;
-		return {format:"materia.tooling.replication-jigs",version:1,sourceFingerprint:sourceFingerprint,
-			inputFingerprint:ToolingCodec.inputFingerprint(p.document.input),
-			jigs:materia.tooling.casting.ReplicationJig.ReplicationJigCodec.records(jigs),
-			validation:materia.tooling.casting.ReplicationJigs.analyze(p.document.input,jigs,p.options.precision)
-				.concat(ReplicationContactCad.review(p.document.input,jigs))};
-	}
+  public static function replicationReport(p:CastingMoldPlan, sourceFingerprint:String):Dynamic {
+    var jigs = p.options.replicationJigs;
+    return {
+      format: "materia.tooling.replication-jigs",
+      version: 1,
+      sourceFingerprint: sourceFingerprint,
+      inputFingerprint: ToolingCodec.inputFingerprint(p.document.input),
+      jigs: materia.tooling.casting.ReplicationJig.ReplicationJigCodec.records(jigs),
+      validation: materia.tooling.casting.ReplicationJigs.analyze(
+        p.document.input,
+        jigs,
+        p.options.precision
+      ).concat(ReplicationContactCad.review(
+        p.document.input,
+        jigs
+      ))
+    };
+  }
 
-	static function replication(p:CastingMoldPlan,f:FabricationPlan,dir:String):Array<materia.tooling.ToolingValidation> {
-		var jigs=p.options.replicationJigs,context=p.document.input.interfaceContext;
-		var report=replicationReport(p,f.sourceFingerprint);
-		var reportChecks:Array<materia.tooling.ToolingValidation> =cast report.validation;
-		var cadChecks=reportChecks.filter(check -> StringTools.startsWith(check.rule,"tooling.replication.cad."));
-		var jigChecks=reportChecks.filter(check -> !StringTools.startsWith(check.rule,"tooling.replication.cad."));
-		data(dir,"replication-jigs.json",report);
-		var inventory:Array<Array<String>> = [["jig_id","master_id","item_kind","item_id","reference","quantity_per_jig","qualification"]];
-		for (jig in jigs) {
-			inventory.push([jig.id,"","rigid-frame",jig.id,jig.frameReference,"1","pending"]);
-			for (master in jig.masters) {
-				inventory.push([jig.id,master.id,(master.kind:String),master.id,
-					master.inspectionReference==null ? "" : master.inspectionReference,"1","pending"]);
-				for (jack in master.jacks) {
-					inventory.push([jig.id,master.id,"jack",jack.id,"","1","pending"]);
-					inventory.push([jig.id,master.id,"jack-lock",jack.id,jack.lockReference==null ? "" : jack.lockReference,"1","pending"]);
-				}
-			}
-		}
-		var geometryRows:Array<Array<String>> = [["jig_id","relationship_instance","definition_id","rule","status","nominal_bound","physical_qualification"]];
-		for (jig in jigs) {
-			var instruments:Map<String,Bool> = [];
-			if (context!=null) for (instance in context.relationships) {
-				var rule=materia.tooling.casting.ReplicationRelationships.ruleId(instance.id,jig.id);
-				var checks=jigChecks.filter(check -> check.rule==rule);
-				if (checks.length!=1) continue;
-				geometryRows.push([jig.id,instance.id,instance.relationship.id,rule,(checks[0].status:String),checks[0].message,"pending"]);
-				var instrument:Null<String>=switch instance.relationship.metrology.instrumentReference {
-					case Known(value):value;case Unresolved(_):null;
-				};
-				if (instrument!=null && !instruments.exists(instrument)) {
-					instruments.set(instrument,true);
-					inventory.push([jig.id,"","metrology-instrument","instrument-"+haxe.crypto.Sha256.encode(instrument),instrument,"1","pending"]);
-				}
-			}
-		}
-		text(dir,"replication-relationships.csv",ToolingFabrication.csv(geometryRows));
-		text(dir,"replication-items.csv",ToolingFabrication.csv(inventory));
-		return cadChecks;
-	}
+  static function replication(p:CastingMoldPlan,
+    f:FabricationPlan, dir:String):Array<materia.tooling.ToolingValidation> {
+    var jigs = p.options.replicationJigs, context = p.document.input.interfaceContext;
+    var report = replicationReport(p, f.sourceFingerprint);
+    var reportChecks:Array<materia.tooling.ToolingValidation> = cast report.validation;
+    var cadChecks = reportChecks.filter(check -> StringTools.startsWith(check.rule, "tooling.replication.cad."));
+    var jigChecks = reportChecks.filter(check -> !StringTools.startsWith(check.rule, "tooling.replication.cad."));
+    data(dir, "replication-jigs.json", report);
+    var inventory:Array<Array<String>> = [[
+      "jig_id",
+      "master_id",
+      "item_kind",
+      "item_id",
+      "reference",
+      "quantity_per_jig",
+      "qualification"
+    ]];
+    for (jig in jigs) {
+      inventory.push([jig.id, "", "rigid-frame", jig.id, jig.frameReference, "1", "pending"]);
+      for (master in jig.masters) {
+        inventory.push([
+          jig.id,
+          master.id,
+          (master.kind:String),
+          master.id,
+          master.inspectionReference == null ? "" : master.inspectionReference,
+          "1",
+          "pending"
+        ]);
+        for (jack in master.jacks) {
+          inventory.push([jig.id, master.id, "jack", jack.id, "", "1", "pending"]);
+          inventory.push([
+            jig.id,
+            master.id,
+            "jack-lock",
+            jack.id,
+            jack.lockReference == null ? "" : jack.lockReference,
+            "1",
+            "pending"
+          ]);
+        }
+      }
+    }
+    var geometryRows:Array<Array<String>> = [[
+      "jig_id",
+      "relationship_instance",
+      "definition_id",
+      "rule",
+      "status",
+      "nominal_bound",
+      "physical_qualification"
+    ]];
+    for (jig in jigs) {
+      var instruments:Map<String, Bool> = [];
+      if (context != null) for (instance in context.relationships) {
+        var rule = materia.tooling.casting.ReplicationRelationships.ruleId(instance.id, jig.id);
+        var checks = jigChecks.filter(check -> check.rule == rule);
+        if (checks.length != 1) continue;
+        geometryRows.push([
+          jig.id,
+          instance.id,
+          instance.relationship.id,
+          rule,
+          (checks[0].status:String),
+          checks[0].message,
+          "pending"
+        ]);
+        var instrument:Null<String> = switch instance.relationship.metrology.instrumentReference {
+          case Known(value):
+            value;
+          case Unresolved(_):
+            null;
+        };
+        if (instrument != null && !instruments.exists(instrument)) {
+          instruments.set(instrument, true);
+          inventory.push([
+            jig.id,
+            "",
+            "metrology-instrument",
+            "instrument-" + haxe.crypto.Sha256.encode(instrument),
+            instrument,
+            "1",
+            "pending"
+          ]);
+        }
+      }
+    }
+    text(dir, "replication-relationships.csv", ToolingFabrication.csv(geometryRows));
+    text(dir, "replication-items.csv", ToolingFabrication.csv(inventory));
+    return cadChecks;
+  }
 
-	/** Manual breakup does not claim an intact removal vector. */
-	public static function coreSupportRecords(cores:Array<CastingMoldCore>,
-			panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>):Array<Dynamic> {
-		var records:Array<Dynamic>=[];
-		for(core in cores){
-			var removal=MoldCores.removal(core);
-			if(!core.support.breakoutAfterLift)
-				records.push({coreId:core.id,featureId:core.featureId,support:core.support,
-					removal:removal,withdrawal:MoldCores.withdrawal(core,panels)});
-			else records.push({coreId:core.id,featureId:core.featureId,support:core.support,removal:removal});
-		}
-		return records;
-	}
+  /** Manual breakup does not claim an intact removal vector. */
+  public static function coreSupportRecords(
+    cores:Array<CastingMoldCore>,
+    panels:Array<materia.tooling.panel.PanelAssemblyPlan.PanelPlacement>
+  ):Array<Dynamic> {
+    var records:Array<Dynamic> = [];
+    for (core in cores) {
+      var removal = MoldCores.removal(core);
+      if (!core.support.breakoutAfterLift) records.push({
+        coreId: core.id,
+        featureId: core.featureId,
+        support: core.support,
+        removal: removal,
+        withdrawal: MoldCores.withdrawal(
+          core,
+          panels
+        )
+      });
+      else records.push({coreId: core.id, featureId: core.featureId, support: core.support, removal: removal});
+    }
+    return records;
+  }
 
-	public static function write(p:CastingMoldPlan, f:FabricationPlan, dir:String,
-			?formerReport:FormerShopExport.FormerShopReport):Array<materia.tooling.ToolingValidation> {
-		var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
-		var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
-		if (f.sourceFingerprint != materia.tooling.casting.CastingMoldPlanner.fingerprint(p))
-			throw "Stale fabrication plan";
-		sys.FileSystem.createDirectory(dir);
-		var formerShop=formerReport==null ? FormerShopExport.build(p) : formerReport;
-		FormerShopExport.applyValidation(formerShop,f,p);
-		FormerShopExport.write(formerShop,dir);
-		var chemical=f.validation.filter(row -> row.rule=="fabrication.materials.compatibility");
-		if (chemical.length!=1) throw "Missing single-source chemical compatibility check";
-		classificationChecks=classificationChecks.concat(ToolingReleaseExport.write(p,formerShop,dir,chemical[0]));
-		classificationChecks=classificationChecks.concat(insertManufacturing(p,f,dir)).concat(replication(p,f,dir));
-		var sectionReview=ToolingSectionReview.build(p);
-		for (entry in sectionReview.sheets) drawing(dir,ToolingSectionReview.filename(entry.id),entry.sheet.drawing);
-		data(dir,"tooling-section-drawings.json",ToolingSectionReview.record(sectionReview,f.sourceFingerprint));
-		classificationChecks=classificationChecks.concat(sectionReview.validation);
-		classificationChecks=classificationChecks.concat(foundationJoints(p,f,dir));
-		var anchorReport=insertAnchorageReport(p,f.sourceFingerprint,f.spec);
-		data(dir,"insert-anchorage.json",anchorReport);
-		classificationChecks=classificationChecks.concat(cast anchorReport.validation);
-		data(dir,"shop-inputs.json",FabricationSpecs.copy(f.spec));
-		data(dir, "load-estimates.json", f.loads);
-		data(dir, "panel-blank-requirements.json", f.panelRequirements);
-		data(dir, "sheet-stock.json", f.sheetStock);
-		data(dir, "blank-layout.json", {
-			kind: "bounding-blank-shelves",
-			inventoryConsumed: false,
-			contourNesting: false,
-			sheetWidthMm: p.document.recipe.panel.width,
-			sheetHeightMm: p.document.recipe.panel.height,
-			placements: f.blankPlacements
-		});
-		var blankRows = [
-			[
-				"panel_id",
-				"revision",
-				"quantity",
-				"material",
-				"thickness_mm",
-				"blank_width_mm",
-				"blank_height_mm",
-				"source_min_x_mm",
-				"source_min_y_mm",
-				"blank_margin_mm"
-			]
-		];
-		var operations = [
-			[
-				"panel_id",
-				"operation_id",
-				"kind",
-				"side",
-				"setup_id",
-				"depth_mm",
-				"through",
-				"tool_diameter_mm",
-				"access_via"
-			]
-		];
-		for (panel in panels(p, f)) {
-			var requirement = f.panelRequirements.filter(r -> r.partId == panel.id)[0];
-			var b = CastingProfileGeometry.bounds(PanelContours.outside(panel));
-			blankRows.push([
-				panel.id,
-				Std.string(panel.revision),
-				"1",
-				panel.stock.materialSpec,
-				Std.string(panel.stock.measuredThickness),
-				Std.string(requirement.blankWidth),
-				Std.string(requirement.blankHeight),
-				Std.string(b.x),
-				Std.string(b.y),
-				Std.string(f.spec.blankMarginMm)
-			]);
-			var rows = [operations[0]];
-			var sorted = panel.operations.copy();
-			sorted.sort((a, b) -> Reflect.compare(a.id, b.id));
-			for (op in sorted) {
-				var row = [
-					panel.id,
-					op.id,
-					(op.kind : String),
-					(op.side : String),
-					op.setupId,
-					Std.string(op.depth),
-					Std.string(op.through),
-					Std.string(op.toolDiameter),
-					op.accessVia == null ? "" : op.accessVia
-				];
-				operations.push(row);
-				rows.push(row);
-			}
-			text(dir, panel.id + ".operations.csv", ToolingFabrication.csv(rows));
-		}
-		text(dir, "panel-blanks.csv", ToolingFabrication.csv(blankRows));
-		text(dir, "panel-operations.csv", ToolingFabrication.csv(operations));
-		for (panel in [f.coupon.receiver, f.coupon.plug, f.locatorCoupon.fixed, f.locatorCoupon.moving]) {
-			var base = PanelDrawing.drawing(panel), entities = base.entities();
-			entities.push(Label(Text, new Point2(0, -22), 3, "FIT COUPON: measure stock and fit before using full mold panels"));
-			drawing(dir, panel.id, new Drawing2D(entities));
-			text(dir, panel.id + ".panel.json", PanelCodec.encode(panel));
-			var part = ToolingPanel.fromPlan(panel).geometry();
-			try
-				part.shape.exportStep(dir + "/" + panel.id + ".step")
-			catch (e:Dynamic) {
-				part.close();
-				throw e;
-			}
-			part.close();
-		}
-		var sheets = [for (v in f.blankPlacements) v.sheet];
-		var count = 0;
-		for (n in sheets)
-			count = Std.int(Math.max(count, n));
-		for (sheet in 1...(count + 1)) {
-			var entities:Array<DrawingEntity> = [];
-			function rectangle(x:Float, y:Float, w:Float, h:Float):Void {
-				for (edge in PanelContours.rectangle(x, y, w, h))
-					entities.push(Curve(Outline, Segment.line(new Point2(edge.start.x, edge.start.y), new Point2(edge.end.x, edge.end.y))));
-			}
-			rectangle(0, 0, p.document.recipe.panel.width, p.document.recipe.panel.height);
-			for (v in f.blankPlacements)
-				if (v.sheet == sheet) {
-					rectangle(v.xMm, v.yMm, v.widthMm, v.heightMm);
-					entities.push(Label(Text, new Point2(v.xMm + 3, v.yMm + 6), 3, v.panelId + " R" + v.rotationDegrees));
-				}
-			entities.push(Label(Text, new Point2(0, -12), 5,
-				"REVIEW ONLY: rectangular blanks, kerf " + f.spec.blankKerfMm + " mm; routing separate; no inventory allocation"));
-			drawing(dir, "blank-sheet-" + sheet, new Drawing2D(entities));
-		}
-		var coreRows = [
-			[
-				"core_id",
-				"feature_id",
-				"layer",
-				"width_mm",
-				"depth_mm",
-				"height_mm",
-				"adhesive_mm",
-				"covering_mm",
-				"consumption"
-			]
-		];
-		for (c in p.cores) {
-			var jobs=MoldCores.cuttingJobs(c);
-			for (index in 0...jobs.length) {
-				var b = jobs[index].cutting.block;
-				coreRows.push([
-					c.id,
-					c.featureId,
-					index<c.layers.length ? Std.string(index+1) : "foot",
-					Std.string(b.width),
-					Std.string(b.depth),
-					Std.string(b.height),
-					Std.string(c.support.adhesiveThickness),
-					Std.string(c.coveringThickness),
-					"per-casting"
-				]);
-			}
-		}
-		for (core in p.cores) for (job in MoldCores.cuttingJobs(core))
-			data(dir,job.id+".cutting.json",MoldCores.cuttingJobRecord(core,job.cutting));
-		text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
-		var volumeRows = [
-			[
-				"member_id",
-				"material",
-				"piece",
-				"width_mm",
-				"depth_mm",
-				"height_mm",
-				"reusable"
-			]
-		];
-		for (volume in [for (v in p.formers) v.volume].concat(MoldFixtures.allVolumes(p)))
-			for (index in 0...volume.pieces.length) {
-				var b = volume.pieces[index];
-				volumeRows.push([
-					volume.id,
-					(volume.material : String),
-					Std.string(index + 1),
-					Std.string(b.width),
-					Std.string(b.depth),
-					Std.string(b.height),
-					"true"
-				]);
-			}
-		text(dir, "former-fixture-pieces.csv", ToolingFabrication.csv(volumeRows));
+  public static function write(
+    p:CastingMoldPlan,
+    f:FabricationPlan,
+    dir:String,
+    ?formerReport:FormerShopExport.FormerShopReport
+  ):Array<materia.tooling.ToolingValidation> {
+    var classificationChecks:Array<materia.tooling.ToolingValidation> = [];
+    var unknown:Array<{memberId:String, typeId:Null<String>}> = [];
+    if (f.sourceFingerprint
+      != materia.tooling.casting.CastingMoldPlanner.fingerprint(p)) throw "Stale fabrication plan";
+    sys.FileSystem.createDirectory(dir);
+    var formerShop = formerReport == null ? FormerShopExport.build(p) : formerReport;
+    FormerShopExport.applyValidation(formerShop, f, p);
+    FormerShopExport.write(formerShop, dir);
+    var chemical = f.validation.filter(row -> row.rule == "fabrication.materials.compatibility");
+    if (chemical.length != 1) throw "Missing single-source chemical compatibility check";
+    classificationChecks = classificationChecks.concat(ToolingReleaseExport.write(p, formerShop, dir, chemical[0]));
+    classificationChecks = classificationChecks.concat(insertManufacturing(p, f, dir)).concat(replication(p, f, dir));
+    var sectionReview = ToolingSectionReview.build(p);
+    for (entry in sectionReview.sheets) drawing(dir, ToolingSectionReview.filename(entry.id), entry.sheet.drawing);
+    data(dir, "tooling-section-drawings.json", ToolingSectionReview.record(sectionReview, f.sourceFingerprint));
+    classificationChecks = classificationChecks.concat(sectionReview.validation);
+    classificationChecks = classificationChecks.concat(foundationJoints(p, f, dir));
+    var anchorReport = insertAnchorageReport(p, f.sourceFingerprint, f.spec);
+    data(dir, "insert-anchorage.json", anchorReport);
+    classificationChecks = classificationChecks.concat(cast anchorReport.validation);
+    data(dir, "shop-inputs.json", FabricationSpecs.copy(f.spec));
+    data(dir, "load-estimates.json", f.loads);
+    data(dir, "panel-blank-requirements.json", f.panelRequirements);
+    data(dir, "sheet-stock.json", f.sheetStock);
+    data(
+      dir,
+      "blank-layout.json",
+      {
+        kind: "bounding-blank-shelves",
+        inventoryConsumed: false,
+        contourNesting: false,
+        sheetWidthMm: p.document.recipe.panel.width,
+        sheetHeightMm: p.document.recipe.panel.height,
+        placements: f.blankPlacements
+      }
+    );
+    var blankRows = [[
+      "panel_id",
+      "revision",
+      "quantity",
+      "material",
+      "thickness_mm",
+      "blank_width_mm",
+      "blank_height_mm",
+      "source_min_x_mm",
+      "source_min_y_mm",
+      "blank_margin_mm"
+    ]];
+    var operations = [[
+      "panel_id",
+      "operation_id",
+      "kind",
+      "side",
+      "setup_id",
+      "depth_mm",
+      "through",
+      "tool_diameter_mm",
+      "access_via"
+    ]];
+    for (panel in panels(p, f)) {
+      var requirement = f.panelRequirements.filter(r -> r.partId == panel.id)[0];
+      var b = CastingProfileGeometry.bounds(PanelContours.outside(panel));
+      blankRows.push([
+        panel.id,
+        Std.string(panel.revision),
+        "1",
+        panel.stock.materialSpec,
+        Std.string(panel.stock.measuredThickness),
+        Std.string(requirement.blankWidth),
+        Std.string(requirement.blankHeight),
+        Std.string(b.x),
+        Std.string(b.y),
+        Std.string(f.spec.blankMarginMm)
+      ]);
+      var rows = [operations[0]];
+      var sorted = panel.operations.copy();
+      sorted.sort((a, b) -> Reflect.compare(a.id, b.id));
+      for (op in sorted) {
+        var row = [
+          panel.id,
+          op.id,
+          (op.kind:String),
+          (op.side:String),
+          op.setupId,
+          Std.string(op.depth),
+          Std.string(op.through),
+          Std.string(op.toolDiameter),
+          op.accessVia == null ? "" : op.accessVia
+        ];
+        operations.push(row);
+        rows.push(row);
+      }
+      text(dir, panel.id + ".operations.csv", ToolingFabrication.csv(rows));
+    }
+    text(dir, "panel-blanks.csv", ToolingFabrication.csv(blankRows));
+    text(dir, "panel-operations.csv", ToolingFabrication.csv(operations));
+    for (panel in [f.coupon.receiver, f.coupon.plug, f.locatorCoupon.fixed, f.locatorCoupon.moving]) {
+      var base = PanelDrawing.drawing(panel), entities = base.entities();
+      entities.push(Label(
+        Text,
+        new Point2(0, -22),
+        3,
+        "FIT COUPON: measure stock and fit before using full mold panels"
+      ));
+      drawing(dir, panel.id, new Drawing2D(entities));
+      text(dir, panel.id + ".panel.json", PanelCodec.encode(panel));
+      var part = ToolingPanel.fromPlan(panel).geometry();
+      try part.shape.exportStep(dir + "/" + panel.id + ".step") catch (e:Dynamic) {
+        part.close();
+        throw e;
+      }
+      part.close();
+    }
+    var sheets = [for (v in f.blankPlacements) v.sheet];
+    var count = 0;
+    for (n in sheets) count = Std.int(Math.max(count, n));
+    for (sheet in 1...(count + 1)) {
+      var entities:Array<DrawingEntity> = [];
+      function rectangle(x:Float, y:Float, w:Float, h:Float):Void {
+        for (edge in PanelContours.rectangle(x, y, w, h)) entities.push(Curve(
+          Outline,
+          Segment.line(
+            new Point2(
+              edge.start.x,
+              edge.start.y
+            ),
+            new Point2(
+              edge.end.x,
+              edge.end.y
+            )
+          )
+        ));
+      }
+      rectangle(0, 0, p.document.recipe.panel.width, p.document.recipe.panel.height);
+      for (v in f.blankPlacements) if (v.sheet == sheet) {
+        rectangle(v.xMm, v.yMm, v.widthMm, v.heightMm);
+        entities.push(Label(Text, new Point2(v.xMm + 3, v.yMm + 6), 3, v.panelId + " R" + v.rotationDegrees));
+      }
+      entities.push(Label(
+        Text,
+        new Point2(0, -12),
+        5,
+        "REVIEW ONLY: rectangular blanks, kerf " + f.spec.blankKerfMm + " mm; routing separate; no inventory allocation"
+      ));
+      drawing(dir, "blank-sheet-" + sheet, new Drawing2D(entities));
+    }
+    var coreRows = [[
+      "core_id",
+      "feature_id",
+      "layer",
+      "width_mm",
+      "depth_mm",
+      "height_mm",
+      "adhesive_mm",
+      "covering_mm",
+      "consumption"
+    ]];
+    for (c in p.cores) {
+      var jobs = MoldCores.cuttingJobs(c);
+      for (index in 0...jobs.length) {
+        var b = jobs[index].cutting.block;
+        coreRows.push([
+          c.id,
+          c.featureId,
+          index < c.layers.length ? Std.string(index + 1) : "foot",
+          Std.string(b.width),
+          Std.string(b.depth),
+          Std.string(b.height),
+          Std.string(c.support.adhesiveThickness),
+          Std.string(c.coveringThickness),
+          "per-casting"
+        ]);
+      }
+    }
+    for (core in p.cores) for (job in MoldCores.cuttingJobs(core)) data(
+      dir,
+      job.id + ".cutting.json",
+      MoldCores.cuttingJobRecord(
+        core,
+        job.cutting
+      )
+    );
+    text(dir, "eps-layers.csv", ToolingFabrication.csv(coreRows));
+    var volumeRows = [["member_id", "material", "piece", "width_mm", "depth_mm", "height_mm", "reusable"]];
+    for (volume in [for (v in p
+      .formers) v.volume].concat(MoldFixtures.allVolumes(p))) for (index in 0...volume.pieces.length) {
+      var b = volume.pieces[index];
+      volumeRows.push([
+        volume.id,
+        (volume.material:String),
+        Std.string(index + 1),
+        Std.string(b.width),
+        Std.string(b.depth),
+        Std.string(b.height),
+        "true"
+      ]);
+    }
+    text(dir, "former-fixture-pieces.csv", ToolingFabrication.csv(volumeRows));
 
-		var hardwareRows = [
-			[
-				"id",
-				"part_number",
-				"component_type",
-				"outside_diameter_mm",
-				"actual_length_mm",
-				"planned_grip_or_length_mm",
-				"quantity",
-				"reusable"
-			]
-		];
-		var bill = new machinekit.component.Bom(),
-			assembly = CastingMoldCad.assembly(p);
-		var members = assembly.components();
-		members.sort((a, b) -> Reflect.compare(a.id, b.id));
-		for (member in members) {
-			var component = member.component, dimensions = classify(component);
-			if (dimensions.classification == NonHardware)
-				continue;
-			if (dimensions.classification == UnsupportedHardware) {
-				var type = component.componentType();
-				unknown.push({memberId: member.id, typeId: type == null ? null : type.id});
-				classificationChecks.push(materia.tooling.export.ToolingLoads.check("fabrication.hardware." + member.id, [member.id],
-					materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
-					"Unclassified hardware type is retained in the BOM; dimensions and procurement require an explicit handler.", []));
-			}
-			var length = dimensions.lengthMm == null ? "" : Std.string(dimensions.lengthMm),
-				diameter = dimensions.diameterMm == null ? "" : Std.string(dimensions.diameterMm);
-			var planned = p.hardware.filter(h -> h.id == member.id),
-				item = component.bom;
-			bill.addComponent(component);
-			hardwareRows.push([
-				member.id,
-				item.partNumber,
-				item.typeId == null ? "" : item.typeId,
-				diameter,
-				length,
-				planned.length == 0 ? "" : Std.string(planned[0].length),
-				Std.string(item.quantity),
-				"true"
-			]);
-		}
-		text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
-		data(dir, "planned-hardware.json", p.hardware);
-		data(dir, "core-units.json", p.coreUnits);
-		data(dir,"eps-supports.json",coreSupportRecords(p.cores,p.panels.members.concat(p.supportPanels)));
-		data(dir, "hardware-unsupported.json", unknown);
-		var lines = bill.lines();
-		lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
-		data(dir, "hardware-bom.json", lines);
-		var bomRows = [["part_number", "description", "material", "quantity"]];
-		for (line in lines)
-			bomRows.push([
-				line.partNumber,
-				line.description,
-				line.material == null ? "" : line.material,
-				Std.string(line.quantity)
-			]);
-		text(dir, "hardware-bom.csv", ToolingFabrication.csv(bomRows));
+    var hardwareRows = [[
+      "id",
+      "part_number",
+      "component_type",
+      "outside_diameter_mm",
+      "actual_length_mm",
+      "planned_grip_or_length_mm",
+      "quantity",
+      "reusable"
+    ]];
+    var bill = new machinekit.component.Bom(), assembly = CastingMoldCad.assembly(p);
+    var members = assembly.components();
+    members.sort((a, b) -> Reflect.compare(a.id, b.id));
+    for (member in members) {
+      var component = member.component, dimensions = classify(component);
+      if (dimensions.classification == NonHardware) continue;
+      if (dimensions.classification == UnsupportedHardware) {
+        var type = component.componentType();
+        unknown.push({memberId: member.id, typeId: type == null ? null : type.id});
+        classificationChecks.push(materia.tooling.export.ToolingLoads.check(
+          "fabrication.hardware." + member.id,
+          [member.id],
+          materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Unsupported,
+          "Unclassified hardware type is retained in the BOM; dimensions and procurement require an explicit handler.",
+          []
+        ));
+      }
+      var length = dimensions.lengthMm == null ? "" : Std.string(dimensions.lengthMm),
+        diameter = dimensions.diameterMm == null ? "" : Std.string(dimensions.diameterMm);
+      var planned = p.hardware.filter(h -> h.id == member.id), item = component.bom;
+      bill.addComponent(component);
+      hardwareRows.push([
+        member.id,
+        item.partNumber,
+        item.typeId == null ? "" : item.typeId,
+        diameter,
+        length,
+        planned.length == 0 ? "" : Std.string(planned[0].length),
+        Std.string(item.quantity),
+        "true"
+      ]);
+    }
+    text(dir, "hardware.csv", ToolingFabrication.csv(hardwareRows));
+    data(dir, "planned-hardware.json", p.hardware);
+    data(dir, "core-units.json", p.coreUnits);
+    data(dir, "eps-supports.json", coreSupportRecords(p.cores, p.panels.members.concat(p.supportPanels)));
+    data(dir, "hardware-unsupported.json", unknown);
+    var lines = bill.lines();
+    lines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+    data(dir, "hardware-bom.json", lines);
+    var bomRows = [["part_number", "description", "material", "quantity"]];
+    for (line in lines) bomRows.push([
+      line.partNumber,
+      line.description,
+      line.material == null ? "" : line.material,
+      Std.string(line.quantity)
+    ]);
+    text(dir, "hardware-bom.csv", ToolingFabrication.csv(bomRows));
 
-		var insertRows = [
-			[
-				"insert_id",
-				"role",
-				"finish",
-				"width_mm",
-				"depth_mm",
-				"height_mm",
-				"holes_json",
-				"quantity",
-				"consumption"
-			]
-		];
-		for (i in p.document.input.inserts) {
-			// Stock/listing dimensions only. The delivered source and native CAD
-			// retain the full round/catalogue body instead of this local bound.
-			var region=materia.casting.CastingRegion.Placed({
-				solid:materia.casting.CastingFeature.CastingGeometrySolid.Insert(i.body),
-				pose:materia.assembly.AssemblyFrames.identity()});
-			var dimensions=materia.tooling.casting.MoldRegions.exactBounds(region,i.id);
-			insertRows.push([
-				i.id,
-				(i.role : String),
-				(i.finish : String),
-				Std.string(dimensions.width),
-				Std.string(dimensions.depth),
-				Std.string(dimensions.height),
-				ToolingCodec.canonical(i.holes),
-				"1",
-				"per-casting"
-			]);
-		}
-		text(dir, "embedded-inserts.csv", ToolingFabrication.csv(insertRows));
-		data(dir, "replacement-groups.json", f.replacementGroups);
+    var insertRows = [[
+      "insert_id",
+      "role",
+      "finish",
+      "width_mm",
+      "depth_mm",
+      "height_mm",
+      "holes_json",
+      "quantity",
+      "consumption"
+    ]];
+    for (i in p.document.input.inserts) {
+      // Stock/listing dimensions only. The delivered source and native CAD
+      // retain the full round/catalogue body instead of this local bound.
+      var region = materia.casting.CastingRegion.Placed({
+        solid: materia.casting.CastingFeature.CastingGeometrySolid.Insert(i.body),
+        pose: materia.assembly.AssemblyFrames.identity()
+      });
+      var dimensions = materia.tooling.casting.MoldRegions.exactBounds(region, i.id);
+      insertRows.push([
+        i.id,
+        (i.role:String),
+        (i.finish:String),
+        Std.string(dimensions.width),
+        Std.string(dimensions.depth),
+        Std.string(dimensions.height),
+        ToolingCodec.canonical(i.holes),
+        "1",
+        "per-casting"
+      ]);
+    }
+    text(dir, "embedded-inserts.csv", ToolingFabrication.csv(insertRows));
+    data(dir, "replacement-groups.json", f.replacementGroups);
 
-		var trial = [
-			[
-				"fabrication_input_fingerprint",
-				"recipe_id",
-				"recipe_revision",
-				"stock_measured_mm",
-				"coupon_clearance_mm",
-				"measured_slot_mm",
-				"measured_tab_mm",
-				"fit_observation",
-				"pin_alignment_error_mm",
-				"core_method",
-				"core_slip_mm",
-				"operator",
-				"machine",
-				"tool",
-				"evidence_reference"
-			]
-		];
-		for (clearance in f.coupon.clearances)
-			trial.push([
-				f.fingerprint,
-				p.document.recipe.id,
-				Std.string(p.document.recipe.revision),
-				"",
-				Std.string(clearance),
-				"",
-				"",
-				"",
-				"",
-				"",
-				"",
-				"",
-				"",
-				"",
-				""
-			]);
-		text(dir, "coupon-trial.csv", ToolingFabrication.csv(trial));
-		text(dir, "coupon-instructions.md",
-			"# Fit and restraint trial\n\nREVIEW ONLY. This record does not qualify the full mold.\n\nFabrication input: " + f.fingerprint +
-			"\n\n1. Measure stock thickness at several locations and retain the supplier/tool references.\n2. Cut the receiver and plug from the same stock, face and tools as the planned panels. Slots fit-0 onward correspond to the ordered clearances in fabrication-plan.json.\n3. Record slot/tab dimensions and fit, with repeatable insertion and withdrawal. Record pin alignment separately using the planned round/slot locator pair.\n4. Trial both a glued bed socket and a bridge/carrier where the source cavity permits; record core movement under a measured load at least equal to its reported design uplift. Adhesive, EPS bearing, joint strength and cure exposure need their own evidence.\n5. Enter observations in coupon-trial.csv and revise the recipe explicitly. A successful coupon alone does not release the full mold.\n");
-		return classificationChecks;
-	}
+    var trial = [[
+      "fabrication_input_fingerprint",
+      "recipe_id",
+      "recipe_revision",
+      "stock_measured_mm",
+      "coupon_clearance_mm",
+      "measured_slot_mm",
+      "measured_tab_mm",
+      "fit_observation",
+      "pin_alignment_error_mm",
+      "core_method",
+      "core_slip_mm",
+      "operator",
+      "machine",
+      "tool",
+      "evidence_reference"
+    ]];
+    for (clearance in f.coupon.clearances) trial.push([
+      f.fingerprint,
+      p.document.recipe.id,
+      Std.string(p.document.recipe.revision),
+      "",
+      Std.string(clearance),
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]);
+    text(dir, "coupon-trial.csv", ToolingFabrication.csv(trial));
+    text(
+      dir,
+      "coupon-instructions.md",
+      "# Fit and restraint trial\n\nREVIEW ONLY. This record does not qualify the full mold.\n\nFabrication input: "
+      + f.fingerprint
+      + "\n\n1. Measure stock thickness at several locations and retain the supplier/tool references.\n2. Cut the receiver and plug from the same stock, face and tools as the planned panels. Slots fit-0 onward correspond to the ordered clearances in fabrication-plan.json.\n3. Record slot/tab dimensions and fit, with repeatable insertion and withdrawal. Record pin alignment separately using the planned round/slot locator pair.\n4. Trial both a glued bed socket and a bridge/carrier where the source cavity permits; record core movement under a measured load at least equal to its reported design uplift. Adhesive, EPS bearing, joint strength and cure exposure need their own evidence.\n5. Enter observations in coupon-trial.csv and revise the recipe explicitly. A successful coupon alone does not release the full mold.\n"
+    );
+    return classificationChecks;
+  }
 }

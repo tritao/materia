@@ -15,194 +15,313 @@ import machinekit.component.ComponentType;
 
 /** A maker's stock hose, sold by length: its tube sizes and mass per metre. */
 typedef HoseStockRow = {
-	var maker:String;
-	var designation:String;
-	var label:String;
-	var outerDiameterMm:Float;
-	var innerDiameterMm:Float;
-	var massPerMetreKg:Float;
-	var material:String;
+  var maker:String;
+  var designation:String;
+  var label:String;
+  var outerDiameterMm:Float;
+  var innerDiameterMm:Float;
+  var massPerMetreKg:Float;
+  var material:String;
 }
 
 /** One cut hose with an authored centreline in its member frame (millimetres): cut from a maker's stock
  * (`stock`) or from custom tube sizes. The solid envelope follows the route; mass follows centreline length. */
 class RoutedHose extends MachineComponent {
-	public static inline var CUSTOM = "custom";
-	static var table:Null<Catalog<HoseStockRow>>;
+  public static inline var CUSTOM = "custom";
+  static var table:Null<Catalog<HoseStockRow>>;
 
-	public static function catalog():Catalog<HoseStockRow> {
-		if (table == null) table = new Catalog("hose stock", row -> row.designation, [{
-			maker: "Schmalz", designation: "10.07.09.00001", label: "VSL 4-2 PU MI-TR",
-			outerDiameterMm: 4, innerDiameterMm: 2, massPerMetreKg: 0.011, material: "polyurethane PU"
-		}], _ -> ({
-			source: "https://www.schmalz.co.jp/en-jp/products/vacuum-technology-for-automation-301607/vacuum-components-301608/filters-and-connections-308965/hoses-and-connections-309034/vacuum-compressed-air-hoses-vsl-309035/10.07.09.00001",
-			standard: null, standardEdition: null, dimensionKind: Nominal,
-			conformance: NominalEnvelope,
-			verifiedFields: ["outerDiameterMm", "innerDiameterMm", "massPerMetreKg"]
-		}));
-		return table;
-	}
+  public static function catalog():Catalog<HoseStockRow> {
+    if (table == null) table = new Catalog(
+      "hose stock",
+      row -> row.designation,
+      [{
+        maker: "Schmalz",
+        designation: "10.07.09.00001",
+        label: "VSL 4-2 PU MI-TR",
+        outerDiameterMm: 4,
+        innerDiameterMm: 2,
+        massPerMetreKg: 0.011,
+        material: "polyurethane PU"
+      }],
+      _ -> ({
+        source: "https://www.schmalz.co.jp/en-jp/products/vacuum-technology-for-automation-301607/vacuum-components-301608/filters-and-connections-308965/hoses-and-connections-309034/vacuum-compressed-air-hoses-vsl-309035/10.07.09.00001",
+        standard: null,
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope,
+        verifiedFields: [
+          "outerDiameterMm",
+          "innerDiameterMm",
+          "massPerMetreKg"
+        ]
+      })
+    );
+    return table;
+  }
 
-	/** A cut of stock `designation` along `route`; its part number is the stock and cut length. */
-	public static function stock(designation:String, route:Array<Vector>, serviceKind:PortKind = Vacuum):RoutedHose {
-		var row = catalog().get(designation), length = 0.0;
-		if (route != null) for (i in 0...route.length - 1)
-			if (route[i] != null && route[i + 1] != null) length += route[i + 1].subtract(route[i]).length();
-		return new RoutedHose('${row.designation}-L${Dimension.format(length)}', route, row.outerDiameterMm, row.innerDiameterMm, row.massPerMetreKg,
-			serviceKind, row.material, false, row);
-	}
+  /** A cut of stock `designation` along `route`; its part number is the stock and cut length. */
+  public static function stock(designation:String, route:Array<Vector>, serviceKind:PortKind = Vacuum):RoutedHose {
+    var row = catalog().get(designation), length = 0.0;
+    if (route != null) for (i in 0...route.length - 1) if (route[i] != null
+      && route[i + 1] != null) length += route[i + 1].subtract(route[i]).length();
+    return new RoutedHose(
+      '${row.designation}-L${Dimension.format(length)}',
+      route,
+      row.outerDiameterMm,
+      row.innerDiameterMm,
+      row.massPerMetreKg,
+      serviceKind,
+      row.material,
+      false,
+      row
+    );
+  }
 
-	/** The stock it is cut from, or null for a custom hose. */
-	public final stockRow:Null<HoseStockRow>;
-	static inline var COLLISION_SIDES:Int = 12;
-	public final route:Array<Vector>;
-	public final outerDiameterMm:Float;
-	public final innerDiameterMm:Float;
-	public final lengthMm:Float;
-	public final massPerMetreKg:Float;
-	public final serviceKind:PortKind;
+  /** The stock it is cut from, or null for a custom hose. */
+  public final stockRow:Null<HoseStockRow>;
+  static inline var COLLISION_SIDES:Int = 12;
+  public final route:Array<Vector>;
+  public final outerDiameterMm:Float;
+  public final innerDiameterMm:Float;
+  public final lengthMm:Float;
+  public final massPerMetreKg:Float;
+  public final serviceKind:PortKind;
 
-	public function new(designation:String, route:Array<Vector>, outerDiameterMm:Float,
-			innerDiameterMm:Float, massPerMetreKg:Float, serviceKind:PortKind = Vacuum,
-			material:String = "polyurethane PU", codeOnly:Bool = true, ?stockRow:HoseStockRow) {
-		if (route == null || route.length < 2 || !Math.isFinite(outerDiameterMm) ||
-			outerDiameterMm <= 0 || !Math.isFinite(innerDiameterMm) || innerDiameterMm <= 0 ||
-			innerDiameterMm >= outerDiameterMm || !Math.isFinite(massPerMetreKg) ||
-			massPerMetreKg <= 0 ||
-			(serviceKind != Vacuum && serviceKind != Pneumatic && serviceKind != ScrewFeed))
-			throw "Routed hose needs a route, wall thickness, mass per metre and fluid service";
-		var copied:Array<Vector> = [];
-		for (point in route) {
-			if (point == null || !Math.isFinite(point.x) || !Math.isFinite(point.y) ||
-				!Math.isFinite(point.z)) throw "Routed hose points must be finite";
-			copied.push(new Vector(point.x, point.y, point.z));
-		}
-		var length = 0.0;
-		for (i in 0...copied.length - 1) {
-			var segment = copied[i + 1].subtract(copied[i]);
-			var extent = segment.length();
-			if (!(extent > 0)) throw "Routed hose has a zero-length segment";
-			length += extent;
-		}
-		super(designation, 'Routed ${serviceKind == Vacuum ? "vacuum" : serviceKind == Pneumatic ? "air" : "screw delivery"} hose, ${Math.round(length)} mm cut',
-			material, codeOnly);
-		this.route = copied;
-		this.stockRow = stockRow;
-		this.outerDiameterMm = outerDiameterMm;
-		this.innerDiameterMm = innerDiameterMm;
-		this.lengthMm = length;
-		this.massPerMetreKg = massPerMetreKg;
-		this.serviceKind = serviceKind;
-		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addConnector("start", Mount, Solids.axial(copied[0].x, copied[0].y, copied[0].z));
-		var end = copied[copied.length - 1];
-		addConnector("end", Mount, Solids.axial(end.x, end.y, end.z));
-		addPort({name: "input", kind: serviceKind, role: Consumer,
-			iface: PushIn(outerDiameterMm), required: true, connector: "start"});
-		addPort({name: "output", kind: serviceKind, role: Supply,
-			iface: PushIn(outerDiameterMm), required: false, connector: "end"});
-		addBridge("input", "output");
-		var weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
-		for (i in 0...copied.length - 1) {
-			var a = copied[i], b = copied[i + 1];
-			var fraction = b.subtract(a).length() / length;
-			weightedX += fraction * (a.x + b.x) / 2;
-			weightedY += fraction * (a.y + b.y) / 2;
-			weightedZ += fraction * (a.z + b.z) / 2;
-		}
-		var mass = massPerMetreKg * length / 1000;
-		var tensor = InertiaTensor.zero();
-		for (i in 0...copied.length - 1) {
-			var a = copied[i], b = copied[i + 1], delta = b.subtract(a);
-			var segmentLength = delta.length(), segmentMass = mass * segmentLength / length;
-			var ux = delta.x / segmentLength, uy = delta.y / segmentLength, uz = delta.z / segmentLength;
-			var radius = outerDiameterMm / 2;
-			var perpendicular = segmentMass * (segmentLength * segmentLength / 12 + radius * radius / 4);
-			var parallel = segmentMass * radius * radius / 2;
-			var difference = parallel - perpendicular;
-			var centreX = (a.x + b.x) / 2 - weightedX;
-			var centreY = (a.y + b.y) / 2 - weightedY;
-			var centreZ = (a.z + b.z) / 2 - weightedZ;
-			tensor = tensor.add(new InertiaTensor(perpendicular + difference * ux * ux,
-				difference * ux * uy, difference * ux * uz,
-				perpendicular + difference * uy * uy, difference * uy * uz,
-				perpendicular + difference * uz * uz)
-				.shifted(segmentMass, centreX, centreY, centreZ));
-		}
-		declareMass(mass, new Vector(weightedX, weightedY, weightedZ), tensor);
-		// The CAD union follows the routed centreline, but a single convex hull of
-		// the whole hose would fill the empty space inside every bend. Keep one
-		// conservative capsule hull per straight tube segment for collision use.
-		addFacet(new CollisionHullFacet(segmentCollisionHulls(copied, outerDiameterMm / 2)));
-	}
+  public function new(
+    designation:String,
+    route:Array<Vector>,
+    outerDiameterMm:Float,
+    innerDiameterMm:Float,
+    massPerMetreKg:Float,
+    serviceKind:PortKind = Vacuum,
+    material:String = "polyurethane PU",
+    codeOnly:Bool = true,
+    ?stockRow:HoseStockRow
+  ) {
+    if (route == null || route.length < 2 || !Math.isFinite(outerDiameterMm) || outerDiameterMm <= 0
+      || !Math.isFinite(innerDiameterMm) || innerDiameterMm <= 0 || innerDiameterMm >= outerDiameterMm
+      || !Math.isFinite(massPerMetreKg) || massPerMetreKg <= 0 || (serviceKind != Vacuum && serviceKind != Pneumatic
+      && serviceKind != ScrewFeed)) throw "Routed hose needs a route, wall thickness, mass per metre and fluid service";
+    var copied:Array<Vector> = [];
+    for (point in route) {
+      if (point == null || !Math.isFinite(point.x)
+        || !Math.isFinite(point.y) || !Math.isFinite(point.z)) throw "Routed hose points must be finite";
+      copied.push(new Vector(point.x, point.y, point.z));
+    }
+    var length = 0.0;
+    for (i in 0...copied.length - 1) {
+      var segment = copied[i + 1].subtract(copied[i]);
+      var extent = segment.length();
+      if (!(extent > 0)) throw "Routed hose has a zero-length segment";
+      length += extent;
+    }
+    super(
+      designation,
+      'Routed ${serviceKind == Vacuum ? "vacuum" : serviceKind == Pneumatic ? "air" : "screw delivery"} hose, ${Math.round(length)} mm cut',
+      material,
+      codeOnly
+    );
+    this.route = copied;
+    this.stockRow = stockRow;
+    this.outerDiameterMm = outerDiameterMm;
+    this.innerDiameterMm = innerDiameterMm;
+    this.lengthMm = length;
+    this.massPerMetreKg = massPerMetreKg;
+    this.serviceKind = serviceKind;
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("start", Mount, Solids.axial(copied[0].x, copied[0].y, copied[0].z));
+    var end = copied[copied.length - 1];
+    addConnector("end", Mount, Solids.axial(end.x, end.y, end.z));
+    addPort({
+      name: "input",
+      kind: serviceKind,
+      role: Consumer,
+      iface: PushIn(outerDiameterMm),
+      required: true,
+      connector: "start"
+    });
+    addPort({
+      name: "output",
+      kind: serviceKind,
+      role: Supply,
+      iface: PushIn(outerDiameterMm),
+      required: false,
+      connector: "end"
+    });
+    addBridge("input", "output");
+    var weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
+    for (i in 0...copied.length - 1) {
+      var a = copied[i], b = copied[i + 1];
+      var fraction = b.subtract(a).length() / length;
+      weightedX += fraction * (a.x + b.x) / 2;
+      weightedY += fraction * (a.y + b.y) / 2;
+      weightedZ += fraction * (a.z + b.z) / 2;
+    }
+    var mass = massPerMetreKg * length / 1000;
+    var tensor = InertiaTensor.zero();
+    for (i in 0...copied.length - 1) {
+      var a = copied[i], b = copied[i + 1], delta = b.subtract(a);
+      var segmentLength = delta.length(), segmentMass = mass * segmentLength / length;
+      var ux = delta.x / segmentLength, uy = delta.y / segmentLength, uz = delta.z / segmentLength;
+      var radius = outerDiameterMm / 2;
+      var perpendicular = segmentMass * (segmentLength * segmentLength / 12 + radius * radius / 4);
+      var parallel = segmentMass * radius * radius / 2;
+      var difference = parallel - perpendicular;
+      var centreX = (a.x + b.x) / 2 - weightedX;
+      var centreY = (a.y + b.y) / 2 - weightedY;
+      var centreZ = (a.z + b.z) / 2 - weightedZ;
+      tensor = tensor.add(new InertiaTensor(
+        perpendicular + difference * ux * ux,
+        difference * ux * uy,
+        difference * ux * uz,
+        perpendicular + difference * uy * uy,
+        difference * uy * uz,
+        perpendicular + difference * uz * uz
+      ).shifted(
+        segmentMass,
+        centreX,
+        centreY,
+        centreZ
+      ));
+    }
+    declareMass(mass, new Vector(weightedX, weightedY, weightedZ), tensor);
+    // The CAD union follows the routed centreline, but a single convex hull of
+    // the whole hose would fill the empty space inside every bend. Keep one
+    // conservative capsule hull per straight tube segment for collision use.
+    addFacet(new CollisionHullFacet(segmentCollisionHulls(copied, outerDiameterMm / 2)));
+  }
 
-	static function segmentCollisionHulls(route:Array<Vector>, radius:Float):Array<Array<Float>> {
-		var expanded = radius / Math.cos(Math.PI / COLLISION_SIDES);
-		var result:Array<Array<Float>> = [];
-		for (i in 0...route.length - 1) {
-			var start = route[i], end = route[i + 1];
-			var direction = end.subtract(start).normalized();
-			var reference = Math.abs(direction.z) < 0.9 ? Vector.Z() : Vector.X();
-			var u = direction.cross(reference).normalized();
-			var v = direction.cross(u).normalized();
-			var first = start.subtract(direction.scale(radius));
-			var last = end.add(direction.scale(radius));
-			var hull:Array<Float> = [];
-			for (centre in [first, last]) for (side in 0...COLLISION_SIDES) {
-				var angle = 2 * Math.PI * side / COLLISION_SIDES;
-				var point = centre.add(u.scale(expanded * Math.cos(angle))).add(v.scale(expanded * Math.sin(angle)));
-				hull.push(point.x); hull.push(point.y); hull.push(point.z);
-			}
-			result.push(hull);
-		}
-		return result;
-	}
+  static function segmentCollisionHulls(route:Array<Vector>, radius:Float):Array<Array<Float>> {
+    var expanded = radius / Math.cos(Math.PI / COLLISION_SIDES);
+    var result:Array<Array<Float>> = [];
+    for (i in 0...route.length - 1) {
+      var start = route[i], end = route[i + 1];
+      var direction = end.subtract(start).normalized();
+      var reference = Math.abs(direction.z) < 0.9 ? Vector.Z() : Vector.X();
+      var u = direction.cross(reference).normalized();
+      var v = direction.cross(u).normalized();
+      var first = start.subtract(direction.scale(radius));
+      var last = end.add(direction.scale(radius));
+      var hull:Array<Float> = [];
+      for (centre in [first, last]) for (side in 0...COLLISION_SIDES) {
+        var angle = 2 * Math.PI * side / COLLISION_SIDES;
+        var point = centre.add(u.scale(expanded * Math.cos(angle))).add(v.scale(expanded * Math.sin(angle)));
+        hull.push(point.x);
+        hull.push(point.y);
+        hull.push(point.z);
+      }
+      result.push(hull);
+    }
+    return result;
+  }
 
-	static var recipeTypeCache:Null<ComponentType>;
+  static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [
-			ComponentRecipeSupport.choice("stock", [CUSTOM].concat(catalog().designations()), CUSTOM),
-			ComponentRecipeSupport.text("designation", "HOSE"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
-			ComponentRecipeSupport.length("outerDiameterMm", 4), ComponentRecipeSupport.length("innerDiameterMm", 2), ComponentRecipeSupport.scalar("massPerMetreKg", 0.01),
-			ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic", "ScrewFeed"], "Vacuum")],
-			v -> {
-				var service = v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service") == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed;
-				// Stock sets the tube and part number; only the route and service are the cut's own.
-				return v.token("stock") != CUSTOM ? stock(v.token("stock"), ComponentRecipeSupport.route(v.token("route")), service)
-					: new RoutedHose(v.token("designation"), ComponentRecipeSupport.route(v.token("route")), v.number("outerDiameterMm"),
-						v.number("innerDiameterMm"), v.number("massPerMetreKg"), service, "polyurethane PU", false);
-			}, true, false, ["route"]);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [
+      ComponentRecipeSupport.choice(
+        "stock",
+        [CUSTOM].concat(catalog().designations()),
+        CUSTOM
+      ),
+      ComponentRecipeSupport.text(
+        "designation",
+        "HOSE"
+      ),
+      ComponentRecipeSupport.text(
+        "route",
+        ComponentRecipeSupport.defaultRoute()
+      ),
+      ComponentRecipeSupport.length(
+        "outerDiameterMm",
+        4
+      ),
+      ComponentRecipeSupport.length(
+        "innerDiameterMm",
+        2
+      ),
+      ComponentRecipeSupport.scalar(
+        "massPerMetreKg",
+        0.01
+      ),
+      ComponentRecipeSupport.choice(
+        "service",
+        [
+          "Vacuum",
+          "Pneumatic",
+          "ScrewFeed"
+        ],
+        "Vacuum"
+      )
+    ], v -> {var service = v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service")
+      == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed;
+    // Stock sets the tube and part number; only the route and service are the cut's own.
+    return v.token("stock") != CUSTOM ? stock(v.token("stock"),
+      ComponentRecipeSupport.route(v.token("route")), service) : new RoutedHose(
+        v.token("designation"),
+        ComponentRecipeSupport.route(v.token("route")),
+        v.number("outerDiameterMm"),
+        v.number("innerDiameterMm"),
+        v.number("massPerMetreKg"),
+        service,
+        "polyurethane PU",
+        false
+      );
+    }, true, false, ["route"]);
+    return recipeTypeCache;
+  }
 
-	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<ComponentType>
-		return Std.isExactType(this, RoutedHose) ? recipeType() : null;
+  /** Subclasses must declare their own recipe and saved values. */
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    RoutedHose) ? recipeType() : null;
 
-	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues()
-			.setToken("stock", stockRow == null ? CUSTOM : stockRow.designation).setToken("designation", designation)
-			.setToken("route", ComponentRecipeSupport.routeText(route))
-			.setNumber("outerDiameterMm", outerDiameterMm).setNumber("innerDiameterMm", innerDiameterMm)
-			.setNumber("massPerMetreKg", massPerMetreKg).setToken("service", Std.string(serviceKind)).setToken("material", materialSpec());
+  override public function values():machinekit
+    .component.ComponentValues return new machinekit.component.ComponentValues().setToken(
+      "stock",
+      stockRow == null ? CUSTOM : stockRow.designation
+    ).setToken(
+      "designation",
+      designation
+    ).setToken(
+      "route",
+      ComponentRecipeSupport.routeText(route)
+    ).setNumber(
+      "outerDiameterMm",
+      outerDiameterMm
+    ).setNumber(
+      "innerDiameterMm",
+      innerDiameterMm
+    ).setNumber(
+      "massPerMetreKg",
+      massPerMetreKg
+    ).setToken(
+      "service",
+      Std.string(serviceKind)
+    ).setToken(
+      "material",
+      materialSpec()
+    );
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var pieces:Array<Part> = [];
-		return Solids.building(pieces, tracked -> {
-			var radius = outerDiameterMm / 2;
-			for (i in 0...route.length - 1) {
-				var delta = route[i + 1].subtract(route[i]);
-				var direction = delta.normalized();
-				// Overlap segments at bends, but stop flush at the authored ports.
-				// Extending the first/last end buries the hose in its connected component.
-				var before = i == 0 ? 0.0 : radius;
-				var after = i == route.length - 2 ? 0.0 : radius;
-				tracked.push(Part.cylinderAlong(radius, route[i].subtract(direction.scale(before)),
-					direction, delta.length() + before + after));
-			}
-			return Solids.union(tracked);
-		});
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var pieces:Array<Part> = [];
+    return Solids.building(pieces, tracked -> {var radius = outerDiameterMm / 2;
+    for (i in 0...route.length - 1) {
+      var delta = route[i + 1].subtract(route[i]);
+      var direction = delta.normalized();
+      // Overlap segments at bends, but stop flush at the authored ports.
+      // Extending the first/last end buries the hose in its connected component.
+      var before = i == 0 ? 0.0 : radius;
+      var after = i == route.length - 2 ? 0.0 : radius;
+      tracked.push(Part.cylinderAlong(
+        radius,
+        route[i].subtract(direction.scale(before)),
+        direction,
+        delta.length() + before + after
+      ));
+    }
+    return Solids.union(tracked);
+    });
+  }
 }

@@ -15,305 +15,573 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.milling.MillPedestal;
 import machinekit.milling.MillSupportTray;
 
-typedef MillBounds = {var low:Array<Float>; var high:Array<Float>;}
+typedef MillBounds = {
+  var low:Array<Float>;
+  var high:Array<Float>;
+}
 
 /** The tending mill: the bare machine on its stand, with a preset vise and convex enclosure panels. */
 class EnclosedBenchMill extends MachineAssembly {
-	public final mill:BenchMill;
-	/** Whether a seated reference workpiece is part of the machine assembly. Tended stock is free. */
-	public final includesWorkpiece:Bool;
-	public final standHeight:Float = 750;
-	public final trayThickness:Float = 2;
-	public final panelThickness:Float = 2;
-	public final openingWidth:Float = 600;
-	public final openingHeight:Float = 500;
-	public final openingSillBelowRetractedHead:Float = 400;
-	public final doorStroke:Float;
-	public final envelope:MillBounds;
-	public final opening:AssemblyFrame;
-	public final loadPosition:Array<Float>;
-	public final floorOffset:Float;
-	public final panelIds:Array<String> = [];
-	public final doorIds:Array<String> = [];
-	public final standIds:Array<String> = [];
-	/** Controller inputs `input1` to `inputN` carry this machine's own field heads. */
-	public final fieldInputCount:Int;
-	final poses = new Map<String, AssemblyFrame>();
+  public final mill:BenchMill;
+  /** Whether a seated reference workpiece is part of the machine assembly. Tended stock is free. */
+  public final includesWorkpiece:Bool;
+  public final standHeight:Float = 750;
+  public final trayThickness:Float = 2;
+  public final panelThickness:Float = 2;
+  public final openingWidth:Float = 600;
+  public final openingHeight:Float = 500;
+  public final openingSillBelowRetractedHead:Float = 400;
+  public final doorStroke:Float;
+  public final envelope:MillBounds;
+  public final opening:AssemblyFrame;
+  public final loadPosition:Array<Float>;
+  public final floorOffset:Float;
+  public final panelIds:Array<String> = [];
+  public final doorIds:Array<String> = [];
+  public final standIds:Array<String> = [];
+  /** Controller inputs `input1` to `inputN` carry this machine's own field heads. */
+  public final fieldInputCount:Int;
+  final poses = new Map<String, AssemblyFrame>();
 
-	public function new(includesWorkpiece:Bool = true) {
-		super();
-		doorStroke = openingWidth + 10;
-		this.includesWorkpiece = includesWorkpiece;
-		mill = new BenchMill(true, includesWorkpiece);
-		floorOffset = standHeight + trayThickness;
-		envelope = sweptBounds(mill);
-		var left = envelope.low[0] - 30;
-		var right = Math.max(envelope.high[0] + 30, openingWidth / 2 + doorStroke + 20);
-		var front = envelope.low[1] - 30;
-		var back = envelope.high[1] + 30;
-		var bottom = floorOffset;
-		var top = floorOffset + envelope.high[2] + 30;
-		var coreModel = new AssemblyModel("mm"); mill.addTo(coreModel, "");
-		var retracted = new AssemblyState(coreModel.definition("mill-door-head"));
-		retracted.setJoint("z", mill.specs[2].upper);
-		var headBottom = retracted.worldPose("head").z;
-		// Keep the sill at its established load-access height and raise the header
-		// to clear the cobot's upper-arm envelope at the enclosure plane.
-		opening = AssemblyFrames.translation(0, front,
-			floorOffset + headBottom - openingSillBelowRetractedHead);
-		var width = right - left, depth = back - front;
-		var centreX = (left + right) / 2, centreY = (front + back) / 2;
-		panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
-		include("mill", mill, AssemblyFrames.translation(0, 0, floorOffset));
-		exposePort("mains", "mill/powerSupply", "mains");
-		// Mineral-cast shell carries a steel cap; small feet are recessed under its corners.
-		var deckThickness = 8.0, footHeight = 35.0;
-		var pedestalHeight = standHeight - deckThickness - footHeight;
-		var pedestal = new MillPedestal(width, depth, pedestalHeight);
-		include("stand", pedestal,
-			AssemblyFrames.translation(centreX, centreY, footHeight));
-		poses.set("stand/casting", AssemblyFrames.translation(centreX, centreY, footHeight));
-		poses.set("stand/cap", AssemblyFrames.translation(centreX, centreY, standHeight - 20));
-		addMemberConnector("chipTray", "castingSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")),
-			AssemblyFrames.compose(poses.get("stand/casting"), pedestal.body.connector("mount").frame)));
-		addMate("stand-on-tray", "fixed", "chipTray", "castingSeat", "stand/casting", "mount");
-		standIds.push("stand/cap");
-		standIds.push("stand/casting");
-		addMemberConnector("stand/cap", "millSeat", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("stand/cap")),
-			AssemblyFrames.translation(0, 0, floorOffset)));
-		addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());
-		addMate("mill-on-stand", "fixed", "stand/cap", "millSeat", "mill/base", "standSeat");
-		// Steel strips pass through sealed tray slots and bear on the bed's 25 mm side rims.
-		for (side in [-1, 1]) {
-			var id = side < 0 ? "standSeatLeft" : "standSeatRight";
-			fixed(id, new MillPanel(25, 550, trayThickness),
-				AssemblyFrames.translation(side * 247.5, 0, standHeight), "stand/cap");
-			standIds.push(id);
-		}
+  public function new(includesWorkpiece:Bool = true) {
+    super();
+    doorStroke = openingWidth + 10;
+    this.includesWorkpiece = includesWorkpiece;
+    mill = new BenchMill(true, includesWorkpiece);
+    floorOffset = standHeight + trayThickness;
+    envelope = sweptBounds(mill);
+    var left = envelope.low[0] - 30;
+    var right = Math.max(envelope.high[0] + 30, openingWidth / 2 + doorStroke + 20);
+    var front = envelope.low[1] - 30;
+    var back = envelope.high[1] + 30;
+    var bottom = floorOffset;
+    var top = floorOffset + envelope.high[2] + 30;
+    var coreModel = new AssemblyModel("mm");
+    mill.addTo(coreModel, "");
+    var retracted = new AssemblyState(coreModel.definition("mill-door-head"));
+    retracted.setJoint("z", mill.specs[2].upper);
+    var headBottom = retracted.worldPose("head").z;
+    // Keep the sill at its established load-access height and raise the header
+    // to clear the cobot's upper-arm envelope at the enclosure plane.
+    opening = AssemblyFrames.translation(0, front, floorOffset + headBottom - openingSillBelowRetractedHead);
+    var width = right - left, depth = back - front;
+    var centreX = (left + right) / 2, centreY = (front + back) / 2;
+    panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
+    include("mill", mill, AssemblyFrames.translation(0, 0, floorOffset));
+    exposePort("mains", "mill/powerSupply", "mains");
+    // Mineral-cast shell carries a steel cap; small feet are recessed under its corners.
+    var deckThickness = 8.0, footHeight = 35.0;
+    var pedestalHeight = standHeight - deckThickness - footHeight;
+    var pedestal = new MillPedestal(width, depth, pedestalHeight);
+    include("stand", pedestal, AssemblyFrames.translation(centreX, centreY, footHeight));
+    poses.set("stand/casting", AssemblyFrames.translation(centreX, centreY, footHeight));
+    poses.set("stand/cap", AssemblyFrames.translation(centreX, centreY, standHeight - 20));
+    addMemberConnector(
+      "chipTray",
+      "castingSeat",
+      AssemblyFrames.compose(
+        AssemblyFrames.inverse(poses.get("chipTray")),
+        AssemblyFrames.compose(
+          poses.get("stand/casting"),
+          pedestal.body.connector("mount").frame
+        )
+      )
+    );
+    addMate("stand-on-tray", "fixed", "chipTray", "castingSeat", "stand/casting", "mount");
+    standIds.push("stand/cap");
+    standIds.push("stand/casting");
+    addMemberConnector(
+      "stand/cap",
+      "millSeat",
+      AssemblyFrames.compose(
+        AssemblyFrames.inverse(poses.get("stand/cap")),
+        AssemblyFrames.translation(
+          0,
+          0,
+          floorOffset
+        )
+      )
+    );
+    addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());
+    addMate("mill-on-stand", "fixed", "stand/cap", "millSeat", "mill/base", "standSeat");
+    // Steel strips pass through sealed tray slots and bear on the bed's 25 mm side rims.
+    for (side in [-1, 1]) {
+      var id = side < 0 ? "standSeatLeft" : "standSeatRight";
+      fixed(
+        id,
+        new MillPanel(25, 550, trayThickness),
+        AssemblyFrames.translation(side * 247.5, 0, standHeight),
+        "stand/cap"
+      );
+      standIds.push(id);
+    }
 
-		fixed("standServicePanel", new MillPanel(400, 4, 420, "painted steel"),
-			AssemblyFrames.translation(centreX, front - 2, footHeight + 130), "stand/casting");
-		standIds.push("standServicePanel");
-		for (xi in [-1, 1]) for (yi in [-1, 1]) {
-			var id = 'standFoot${xi + 1}${yi + 1}';
-			fixed(id, new MillPanel(100, 100, footHeight),
-				AssemblyFrames.translation(centreX + xi * (width / 2 - 100),
-					centreY + yi * (depth / 2 - 100), 0), "stand/casting");
-			standIds.push(id);
-		}
-		panel("enclosureLeft", panelThickness, depth, top - bottom, left - panelThickness / 2, centreY, bottom);
-		panel("enclosureRight", panelThickness, depth, top - bottom, right + panelThickness / 2, centreY, bottom);
-		panel("enclosureBack", width, panelThickness, top - bottom, centreX, back + panelThickness / 2, bottom);
-		panel("enclosureRoof", width, depth, panelThickness, centreX, centreY, top);
-		panel("frontLeft", -openingWidth / 2 - left, panelThickness, top - bottom,
-			(left - openingWidth / 2) / 2, front, bottom);
-		panel("frontRight", right - openingWidth / 2, panelThickness, top - bottom,
-			(right + openingWidth / 2) / 2, front, bottom);
-		panel("frontBottom", openingWidth, panelThickness, opening.z - bottom, 0, front, bottom);
-		panel("frontTop", openingWidth, panelThickness, top - opening.z - openingHeight,
-			0, front, opening.z + openingHeight);
-		var rail = new MillPanel(doorStroke + openingWidth + 20, 20, 12, "aluminium 6061");
-		var railPose = AssemblyFrames.translation(doorStroke / 2, front - 16, opening.z + openingHeight + 24);
-		fixed("doorRail", rail, railPose, "chipTray");
-		var sliderPose = AssemblyFrames.translation(0, railPose.y, railPose.z + rail.height);
-		var slider = new MillPanel(40, 20, 16, "aluminium 6061");
-		addComponent("doorSlider", slider, sliderPose);
-		poses.set("doorSlider", sliderPose);
-		addMemberConnector("doorRail", "slide", AssemblyFrames.compose(AssemblyFrames.inverse(railPose), sliderPose));
-		addMemberConnector("doorSlider", "slide", AssemblyFrames.identity());
-		var doorCylinder = new PneumaticCylinder("ISO6432", 25, doorStroke, 300);
-		addMateOnAxis("door", "prismatic", "doorRail", "slide", "doorSlider", "slide", {x: 1, y: 0, z: 0}, 0,
-			{lower: 0, upper: doorStroke, velocity: null, effort: null,
-				overtravel: doorCylinder.endStopCompliance});
-		var frameWidth = 25.0, leafDepth = 4.0, leafY = front - 10;
-		doorPanel("doorLeft", frameWidth, leafDepth, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
-		doorPanel("doorRight", frameWidth, leafDepth, openingHeight, (openingWidth - frameWidth) / 2, leafY, opening.z);
-		doorPanel("doorBottom", openingWidth - 2 * frameWidth, leafDepth, frameWidth, 0, leafY, opening.z);
-		doorPanel("doorTop", openingWidth - 2 * frameWidth, leafDepth, frameWidth, 0, leafY, opening.z + openingHeight - frameWidth);
-		doorPanel("doorWindow", openingWidth - 2 * frameWidth, leafDepth, openingHeight - 2 * frameWidth,
-			0, leafY, opening.z + frameWidth, "polycarbonate");
-		// A closed cabinet is six panels too; it keeps its real material mass.
-		var cabinetX = right + 120, cabinetY = back - 100, cabinetZ = standHeight;
-		panel("cabinetLeft", 2, 200, 300, cabinetX - 100, cabinetY, cabinetZ, false);
-		panel("cabinetRight", 2, 200, 300, cabinetX + 100, cabinetY, cabinetZ, false);
-		panel("cabinetFront", 200, 2, 300, cabinetX, cabinetY - 100, cabinetZ, false);
-		panel("cabinetBack", 200, 2, 300, cabinetX, cabinetY + 100, cabinetZ, false);
-		panel("cabinetBottom", 200, 200, 2, cabinetX, cabinetY, cabinetZ, false);
-		panel("cabinetTop", 200, 200, 2, cabinetX, cabinetY, cabinetZ + 300, false);
-		// The cabinet has its own floor-supported welded tube legs.
-		for (x in [-1, 1]) for (y in [-1, 1])
-			fixed('cabinetLeg${x + 1}${y + 1}', new machinekit.structural.RectTubeMember(30, 30, 2, cabinetZ),
-				AssemblyFrames.translation(cabinetX + x * 80, cabinetY + y * 80, 0), "cabinetBottom");
-		fixed("cncController", new machinekit.control.CncController(4, 16, 16, 4),
-			AssemblyFrames.translation(cabinetX, cabinetY, cabinetZ + 10), "chipTray");
-		for (axis in ["X", "Y", "Z"])
-			connectPorts('cnc-$axis-drive', "cncController", 'axis${axis == "X" ? 1 : axis == "Y" ? 2 : 3}',
-				'mill/motor${axis}Driver', "bus");
-		connectPorts("cnc-spindle-drive", "cncController", "axis4", "mill/spindleMotorDriver", "bus");
-		addMemberConnector("chipTray", "doorOpening", AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("chipTray")), opening));
-		exposeConnector("doorOpening", "chipTray", "doorOpening");
-		// The door cylinder uses the real guided-member connector as its piston endpoint.
-		// The vise owns its cylinder, body and rod; this enclosure only routes air to it.
-		var mountState = state();
-		var doorTip = mountState.worldConnector("doorSlider", "slide");
-		var quarter = Math.sqrt(0.5);
-		var doorAxis:AssemblyFrame = {x: 0, y: 0, z: 0, qx: 0, qy: quarter, qz: 0, qw: quarter};
-		var doorPose:AssemblyFrame = {x: doorTip.x - doorCylinder.bodyLength - doorCylinder.stemLength,
-			y: doorTip.y, z: doorTip.z, qx: doorAxis.qx, qy: doorAxis.qy, qz: doorAxis.qz, qw: doorAxis.qw};
-		addComponent("doorCylinder", doorCylinder, doorPose);
-		fixed("doorCylinderRod", doorCylinder.movingRod(), {x: doorTip.x, y: doorTip.y, z: doorTip.z,
-			qx: doorAxis.qx, qy: doorAxis.qy, qz: doorAxis.qz, qw: doorAxis.qw}, "doorSlider");
-		var vise = mill.vise;
-		if (vise == null) throw "Enclosed bench mill needs a pneumatic vise";
-		// One FRL and the existing two-outlet manifold supply both double-solenoid valves.
-		var serviceX = cabinetX, serviceY = cabinetY;
-		addComponent("airSupply", new AirSupply(600000), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 12));
-		addComponent("airManifold", new PneumaticManifold(3), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 125));
-		addComponent("doorValve", new SolenoidValve(true, false), AssemblyFrames.translation(serviceX - 48, serviceY, cabinetZ + 180));
-		addComponent("viseValve", new SolenoidValve(true, true), AssemblyFrames.translation(serviceX + 48, serviceY, cabinetZ + 180));
-		var hose:BomItem = {partNumber: "REF-PNEU-HOSE-6MM", description: "Assumed 6 mm polyurethane air hose",
-			quantity: 1, material: "polyurethane PU"};
-		connectPorts("supply-to-manifold", "airSupply", "air", "airManifold", "input", hose);
-		connectPorts("manifold-to-door-valve", "airManifold", "out1", "doorValve", "P", hose);
-		connectPorts("manifold-to-vise-valve", "airManifold", "out2", "viseValve", "P", hose);
-		connectPorts("door-extend-line", "doorValve", "A", "doorCylinder", "A", hose);
-		connectPorts("door-retract-line", "doorValve", "B", "doorCylinder", "B", hose);
-		var viseAirA = vise.port("airA", "mill/vise");
-		var viseAirB = vise.port("airB", "mill/vise");
-		connectPorts("vise-extend-line", "viseValve", "A", viseAirA.instanceId, viseAirA.portName, hose);
-		connectPorts("vise-retract-line", "viseValve", "B", viseAirB.instanceId, viseAirB.portName, hose);
-		connectPorts("door-coil-a", "cncController", "valve1", "doorValve", "coilA");
-		connectPorts("door-coil-b", "cncController", "valve2", "doorValve", "coilB");
-		connectPorts("vise-coil-a", "cncController", "valve3", "viseValve", "coilA");
-		connectPorts("vise-coil-b", "cncController", "valve4", "viseValve", "coilB");
-		addCylinder("door-cylinder", "door", "doorCylinder", "doorValve");
-		addCylinder("vise-cylinder", "mill/vise/jaw", "mill/vise/cylinder", "viseValve");
-		addSwitch("door-closed", "door", {lower: -doorCylinder.endStopCompliance, upper: 5,
-			velocity: null, effort: null}, 2);
-		addSwitch("door-open", "door", {lower: doorStroke - 5, upper: doorStroke, velocity: null, effort: null}, 2);
-		addSwitch("vise-open", "mill/vise/jaw", {lower: 0, upper: 0.5, velocity: null, effort: null}, 0.25);
-		addSwitch("vise-clamped", "mill/vise/jaw", {lower: vise.grippedPosition - 0.5,
-			upper: vise.grippedPosition + 0.5, velocity: null, effort: null}, 0.25);
-		addPresence("stock-present", "mill/vise/datum", 25);
-		// The robot zone covers what the door moves through and what it encloses: the enclosure with
-		// the leaves' plane across their whole travel, and the carriage's path along its rail above
-		// the opening. The fixed rail itself is no hazard, so it stays outside the field.
-		function box(low:Array<Float>, high:Array<Float>):RobotZoneBox return {
-			x: (low[0] + high[0]) / 2, y: (low[1] + high[1]) / 2, z: (low[2] + high[2]) / 2,
-			halfX: (high[0] - low[0]) / 2, halfY: (high[1] - low[1]) / 2, halfZ: (high[2] - low[2]) / 2
-		};
-		var enclosed = box([left - panelThickness, leafY - leafDepth / 2, bottom],
-			[right + panelThickness, back + panelThickness, top + panelThickness]);
-		var carriage = box([-slider.width / 2, sliderPose.y - slider.depth / 2, sliderPose.z],
-			[doorStroke + slider.width / 2, sliderPose.y + slider.depth / 2, sliderPose.z + slider.height]);
-		addMemberConnector("chipTray", "robotZone", AssemblyFrames.inverse(poses.get("chipTray")));
-		addRobotZone("robot-zone", "chipTray/robotZone", [enclosed, carriage]);
-		var zoneFront = enclosed.y - enclosed.halfY, zoneTop = enclosed.z + enclosed.halfZ;
-		// The logical switch and its field head share an ID; each head has a real cabinet input wire.
-		var viseDatum = state().worldConnector("mill/vise/body", "datum");
-		var heads = [
-			{id: "door-closed", kind: "reed", x: -doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18},
-			{id: "door-open", kind: "reed", x: doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18},
-			{id: "vise-open", kind: "reed", x: viseDatum.x - 40, y: viseDatum.y, z: viseDatum.z + 30},
-			{id: "vise-clamped", kind: "reed", x: viseDatum.x - 25, y: viseDatum.y, z: viseDatum.z + 30},
-			{id: "stock-present", kind: "presence", x: viseDatum.x, y: viseDatum.y - 30, z: viseDatum.z + 30},
-			// The scanner watches the zone from the enclosure's top front corner, outside the door's travel.
-			{id: "robot-zone", kind: "scanner", x: left - 40, y: Math.min(zoneFront, carriage.y - carriage.halfY) - 20, z: zoneTop}
-		];
-		for (i in 0...heads.length) {
-			var head = heads[i];
-			fixed(head.id, new DigitalSensor(head.kind), AssemblyFrames.translation(head.x, head.y, head.z), "chipTray");
-			connectPorts('sensor-${head.id}', head.id, "signal", "cncController", 'input${i + 1}');
-		}
-		fieldInputCount = heads.length;
-		loadPosition = nearestLoadPosition();
-	}
+    fixed(
+      "standServicePanel",
+      new MillPanel(400, 4, 420, "painted steel"),
+      AssemblyFrames.translation(
+        centreX,
+        front - 2,
+        footHeight + 130
+      ),
+      "stand/casting"
+    );
+    standIds.push("standServicePanel");
+    for (xi in [-1, 1]) for (yi in [-1, 1]) {
+      var id = 'standFoot${xi + 1}${yi + 1}';
+      fixed(
+        id,
+        new MillPanel(100, 100, footHeight),
+        AssemblyFrames.translation(
+          centreX + xi * (width / 2 - 100),
+          centreY + yi * (depth / 2 - 100),
+          0
+        ),
+        "stand/casting"
+      );
+      standIds.push(id);
+    }
+    panel("enclosureLeft", panelThickness, depth, top - bottom, left - panelThickness / 2, centreY, bottom);
+    panel("enclosureRight", panelThickness, depth, top - bottom, right + panelThickness / 2, centreY, bottom);
+    panel("enclosureBack", width, panelThickness, top - bottom, centreX, back + panelThickness / 2, bottom);
+    panel("enclosureRoof", width, depth, panelThickness, centreX, centreY, top);
+    panel(
+      "frontLeft",
+      -openingWidth / 2 - left,
+      panelThickness,
+      top - bottom,
+      (left - openingWidth / 2) / 2,
+      front,
+      bottom
+    );
+    panel(
+      "frontRight",
+      right - openingWidth / 2,
+      panelThickness,
+      top - bottom,
+      (right + openingWidth / 2) / 2,
+      front,
+      bottom
+    );
+    panel("frontBottom", openingWidth, panelThickness, opening.z - bottom, 0, front, bottom);
+    panel(
+      "frontTop",
+      openingWidth,
+      panelThickness,
+      top - opening.z - openingHeight,
+      0,
+      front,
+      opening.z + openingHeight
+    );
+    var rail = new MillPanel(doorStroke + openingWidth + 20, 20, 12, "aluminium 6061");
+    var railPose = AssemblyFrames.translation(doorStroke / 2, front - 16, opening.z + openingHeight + 24);
+    fixed("doorRail", rail, railPose, "chipTray");
+    var sliderPose = AssemblyFrames.translation(0, railPose.y, railPose.z + rail.height);
+    var slider = new MillPanel(40, 20, 16, "aluminium 6061");
+    addComponent("doorSlider", slider, sliderPose);
+    poses.set("doorSlider", sliderPose);
+    addMemberConnector("doorRail", "slide", AssemblyFrames.compose(AssemblyFrames.inverse(railPose), sliderPose));
+    addMemberConnector("doorSlider", "slide", AssemblyFrames.identity());
+    var doorCylinder = new PneumaticCylinder("ISO6432", 25, doorStroke, 300);
+    addMateOnAxis(
+      "door",
+      "prismatic",
+      "doorRail",
+      "slide",
+      "doorSlider",
+      "slide",
+      {x: 1, y: 0, z: 0},
+      0,
+      {
+        lower: 0,
+        upper: doorStroke,
+        velocity: null,
+        effort: null,
+        overtravel: doorCylinder.endStopCompliance
+      }
+    );
+    var frameWidth = 25.0, leafDepth = 4.0, leafY = front - 10;
+    doorPanel("doorLeft", frameWidth, leafDepth, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
+    doorPanel("doorRight", frameWidth, leafDepth, openingHeight, (openingWidth - frameWidth) / 2, leafY, opening.z);
+    doorPanel("doorBottom", openingWidth - 2 * frameWidth, leafDepth, frameWidth, 0, leafY, opening.z);
+    doorPanel(
+      "doorTop",
+      openingWidth - 2 * frameWidth,
+      leafDepth,
+      frameWidth,
+      0,
+      leafY,
+      opening.z + openingHeight - frameWidth
+    );
+    doorPanel(
+      "doorWindow",
+      openingWidth - 2 * frameWidth,
+      leafDepth,
+      openingHeight - 2 * frameWidth,
+      0,
+      leafY,
+      opening.z + frameWidth,
+      "polycarbonate"
+    );
+    // A closed cabinet is six panels too; it keeps its real material mass.
+    var cabinetX = right + 120, cabinetY = back - 100, cabinetZ = standHeight;
+    panel("cabinetLeft", 2, 200, 300, cabinetX - 100, cabinetY, cabinetZ, false);
+    panel("cabinetRight", 2, 200, 300, cabinetX + 100, cabinetY, cabinetZ, false);
+    panel("cabinetFront", 200, 2, 300, cabinetX, cabinetY - 100, cabinetZ, false);
+    panel("cabinetBack", 200, 2, 300, cabinetX, cabinetY + 100, cabinetZ, false);
+    panel("cabinetBottom", 200, 200, 2, cabinetX, cabinetY, cabinetZ, false);
+    panel("cabinetTop", 200, 200, 2, cabinetX, cabinetY, cabinetZ + 300, false);
+    // The cabinet has its own floor-supported welded tube legs.
+    for (x in [-1, 1]) for (y in [-1, 1]) fixed(
+      'cabinetLeg${x + 1}${y + 1}',
+      new machinekit.structural.RectTubeMember(
+        30,
+        30,
+        2,
+        cabinetZ
+      ),
+      AssemblyFrames.translation(
+        cabinetX + x * 80,
+        cabinetY + y * 80,
+        0
+      ),
+      "cabinetBottom"
+    );
+    fixed(
+      "cncController",
+      new machinekit.control.CncController(4, 16, 16, 4),
+      AssemblyFrames.translation(
+        cabinetX,
+        cabinetY,
+        cabinetZ + 10
+      ),
+      "chipTray"
+    );
+    for (axis in ["X", "Y", "Z"]) connectPorts(
+      'cnc-$axis-drive',
+      "cncController",
+      'axis${axis == "X" ? 1 : axis == "Y" ? 2 : 3}',
+      'mill/motor${axis}Driver',
+      "bus"
+    );
+    connectPorts("cnc-spindle-drive", "cncController", "axis4", "mill/spindleMotorDriver", "bus");
+    addMemberConnector(
+      "chipTray",
+      "doorOpening",
+      AssemblyFrames.compose(
+        AssemblyFrames.inverse(poses.get("chipTray")),
+        opening
+      )
+    );
+    exposeConnector("doorOpening", "chipTray", "doorOpening");
+    // The door cylinder uses the real guided-member connector as its piston endpoint.
+    // The vise owns its cylinder, body and rod; this enclosure only routes air to it.
+    var mountState = state();
+    var doorTip = mountState.worldConnector("doorSlider", "slide");
+    var quarter = Math.sqrt(0.5);
+    var doorAxis:AssemblyFrame = {x: 0, y: 0, z: 0, qx: 0, qy: quarter, qz: 0, qw: quarter};
+    var doorPose:AssemblyFrame = {
+      x: doorTip.x - doorCylinder.bodyLength - doorCylinder.stemLength,
+      y: doorTip.y,
+      z: doorTip.z,
+      qx: doorAxis.qx,
+      qy: doorAxis.qy,
+      qz: doorAxis.qz,
+      qw: doorAxis.qw
+    };
+    addComponent("doorCylinder", doorCylinder, doorPose);
+    fixed(
+      "doorCylinderRod",
+      doorCylinder.movingRod(),
+      {
+        x: doorTip.x,
+        y: doorTip.y,
+        z: doorTip.z,
+        qx: doorAxis.qx,
+        qy: doorAxis.qy,
+        qz: doorAxis.qz,
+        qw: doorAxis.qw
+      },
+      "doorSlider"
+    );
+    var vise = mill.vise;
+    if (vise == null) throw "Enclosed bench mill needs a pneumatic vise";
+    // One FRL and the existing two-outlet manifold supply both double-solenoid valves.
+    var serviceX = cabinetX, serviceY = cabinetY;
+    addComponent("airSupply", new AirSupply(600000), AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 12));
+    addComponent(
+      "airManifold",
+      new PneumaticManifold(3),
+      AssemblyFrames.translation(serviceX, serviceY, cabinetZ + 125)
+    );
+    addComponent(
+      "doorValve",
+      new SolenoidValve(true, false),
+      AssemblyFrames.translation(
+        serviceX - 48,
+        serviceY,
+        cabinetZ + 180
+      )
+    );
+    addComponent(
+      "viseValve",
+      new SolenoidValve(true, true),
+      AssemblyFrames.translation(
+        serviceX + 48,
+        serviceY,
+        cabinetZ + 180
+      )
+    );
+    var hose:BomItem = {
+      partNumber: "REF-PNEU-HOSE-6MM",
+      description: "Assumed 6 mm polyurethane air hose",
+      quantity: 1,
+      material: "polyurethane PU"
+    };
+    connectPorts("supply-to-manifold", "airSupply", "air", "airManifold", "input", hose);
+    connectPorts("manifold-to-door-valve", "airManifold", "out1", "doorValve", "P", hose);
+    connectPorts("manifold-to-vise-valve", "airManifold", "out2", "viseValve", "P", hose);
+    connectPorts("door-extend-line", "doorValve", "A", "doorCylinder", "A", hose);
+    connectPorts("door-retract-line", "doorValve", "B", "doorCylinder", "B", hose);
+    var viseAirA = vise.port("airA", "mill/vise");
+    var viseAirB = vise.port("airB", "mill/vise");
+    connectPorts("vise-extend-line", "viseValve", "A", viseAirA.instanceId, viseAirA.portName, hose);
+    connectPorts("vise-retract-line", "viseValve", "B", viseAirB.instanceId, viseAirB.portName, hose);
+    connectPorts("door-coil-a", "cncController", "valve1", "doorValve", "coilA");
+    connectPorts("door-coil-b", "cncController", "valve2", "doorValve", "coilB");
+    connectPorts("vise-coil-a", "cncController", "valve3", "viseValve", "coilA");
+    connectPorts("vise-coil-b", "cncController", "valve4", "viseValve", "coilB");
+    addCylinder("door-cylinder", "door", "doorCylinder", "doorValve");
+    addCylinder("vise-cylinder", "mill/vise/jaw", "mill/vise/cylinder", "viseValve");
+    addSwitch(
+      "door-closed",
+      "door",
+      {lower: -doorCylinder.endStopCompliance, upper: 5, velocity: null, effort: null},
+      2
+    );
+    addSwitch("door-open", "door", {lower: doorStroke - 5, upper: doorStroke, velocity: null, effort: null}, 2);
+    addSwitch("vise-open", "mill/vise/jaw", {lower: 0, upper: 0.5, velocity: null, effort: null}, 0.25);
+    addSwitch(
+      "vise-clamped",
+      "mill/vise/jaw",
+      {
+        lower: vise.grippedPosition - 0.5,
+        upper: vise.grippedPosition + 0.5,
+        velocity: null,
+        effort: null
+      },
+      0.25
+    );
+    addPresence("stock-present", "mill/vise/datum", 25);
+    // The robot zone covers what the door moves through and what it encloses: the enclosure with
+    // the leaves' plane across their whole travel, and the carriage's path along its rail above
+    // the opening. The fixed rail itself is no hazard, so it stays outside the field.
+    function box(low:Array<Float>, high:Array<Float>):RobotZoneBox return {
+      x: (low[0] + high[0]) / 2,
+      y: (low[1] + high[1]) / 2,
+      z: (low[2] + high[2]) / 2,
+      halfX: (high[0] - low[0]) / 2,
+      halfY: (high[1] - low[1]) / 2,
+      halfZ: (high[2] - low[2]) / 2
+    };
+    var enclosed = box(
+      [left - panelThickness, leafY - leafDepth / 2, bottom],
+      [
+        right + panelThickness,
+        back + panelThickness,
+        top + panelThickness
+      ]
+    );
+    var carriage = box(
+      [-slider.width / 2, sliderPose.y - slider.depth / 2, sliderPose.z],
+      [
+        doorStroke + slider.width / 2,
+        sliderPose.y + slider.depth / 2,
+        sliderPose.z + slider.height
+      ]
+    );
+    addMemberConnector("chipTray", "robotZone", AssemblyFrames.inverse(poses.get("chipTray")));
+    addRobotZone("robot-zone", "chipTray/robotZone", [enclosed, carriage]);
+    var zoneFront = enclosed.y - enclosed.halfY, zoneTop = enclosed.z + enclosed.halfZ;
+    // The logical switch and its field head share an ID; each head has a real cabinet input wire.
+    var viseDatum = state().worldConnector("mill/vise/body", "datum");
+    var heads = [{id: "door-closed", kind: "reed", x: -doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18}, {
+      id: "door-open",
+      kind: "reed",
+      x: doorStroke / 2,
+      y: railPose.y - 25,
+      z: railPose.z + 18
+    }, {
+      id: "vise-open",
+      kind: "reed",
+      x: viseDatum.x - 40,
+      y: viseDatum.y,
+      z: viseDatum.z + 30
+    }, {
+      id: "vise-clamped",
+      kind: "reed",
+      x: viseDatum.x - 25,
+      y: viseDatum.y,
+      z: viseDatum.z + 30
+    }, {
+      id: "stock-present",
+      kind: "presence",
+      x: viseDatum.x,
+      y: viseDatum.y - 30,
+      z: viseDatum.z + 30
+    },
+    // The scanner watches the zone from the enclosure's top front corner, outside the door's travel.
+    {
+      id: "robot-zone",
+      kind: "scanner",
+      x: left - 40,
+      y: Math.min(zoneFront, carriage.y - carriage.halfY) - 20,
+      z: zoneTop
+    }];
+    for (i in 0...heads.length) {
+      var head = heads[i];
+      fixed(head.id, new DigitalSensor(head.kind), AssemblyFrames.translation(head.x, head.y, head.z), "chipTray");
+      connectPorts('sensor-${head.id}', head.id, "signal", "cncController", 'input${i + 1}');
+    }
+    fieldInputCount = heads.length;
+    loadPosition = nearestLoadPosition();
+  }
 
-	function panel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, enclosure:Bool = true):Void {
-		var pose = AssemblyFrames.translation(x, y, z), part:MachineComponent = id == "chipTray" ? new MillSupportTray(new machinekit.component.ComponentValues().setNumber("width", w)
-			.setNumber("depth", d).setNumber("height", h).setNumber("millX", -x).setNumber("millY", -y)) : new MillPanel(w, d, h);
-		if (id == "chipTray") { addComponent(id, part, pose); poses.set(id, pose); }
-		else fixed(id, part, pose, "chipTray");
-		if (enclosure) panelIds.push(id);
-	}
-	function doorPanel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, material:String = "steel"):Void {
-		fixed(id, new MillPanel(w, d, h, material), AssemblyFrames.translation(x, y, z), "doorSlider");
-		doorIds.push(id);
-	}
-	function fixed(id:String, part:MachineComponent, pose:AssemblyFrame, parent:String):Void {
-		addComponent(id, part, pose); poses.set(id, pose);
-		addMemberConnector(parent, '$id-seat', AssemblyFrames.compose(AssemblyFrames.inverse(poses.get(parent)), pose));
-		addMemberConnector(id, "seat", AssemblyFrames.identity());
-		addMate('$id-mount', "fixed", parent, '$id-seat', id, "seat");
-	}
-	public function state():AssemblyState {
-		var model = new AssemblyModel("mm"); addTo(model, "");
-		return new AssemblyState(model.definition("enclosed-bench-mill"));
-	}
+  function panel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, enclosure:Bool = true):Void {
+    var pose = AssemblyFrames.translation(x, y, z), part:MachineComponent = id
+      == "chipTray" ? new MillSupportTray(new machinekit.component.ComponentValues().setNumber(
+        "width",
+        w
+      ).setNumber(
+        "depth",
+        d
+      ).setNumber(
+        "height",
+        h
+      ).setNumber(
+        "millX",
+        -x
+      ).setNumber(
+        "millY",
+        -y
+      )) : new MillPanel(
+        w,
+        d,
+        h
+      );
+    if (id == "chipTray") {
+      addComponent(id, part, pose);
+      poses.set(id, pose);
+    } else fixed(id, part, pose, "chipTray");
+    if (enclosure) panelIds.push(id);
+  }
+  function doorPanel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, material:String = "steel"):Void {
+    fixed(id, new MillPanel(w, d, h, material), AssemblyFrames.translation(x, y, z), "doorSlider");
+    doorIds.push(id);
+  }
+  function fixed(id:String, part:MachineComponent, pose:AssemblyFrame, parent:String):Void {
+    addComponent(id, part, pose);
+    poses.set(id, pose);
+    addMemberConnector(parent, '$id-seat', AssemblyFrames.compose(AssemblyFrames.inverse(poses.get(parent)), pose));
+    addMemberConnector(id, "seat", AssemblyFrames.identity());
+    addMate('$id-mount', "fixed", parent, '$id-seat', id, "seat");
+  }
+  public function state():AssemblyState {
+    var model = new AssemblyModel("mm");
+    addTo(model, "");
+    return new AssemblyState(model.definition("enclosed-bench-mill"));
+  }
 
-	/** Bring the vise to the doorway beside the retracted head, within the real table travels. */
-	function nearestLoadPosition():Array<Float> {
-		var state = state();
-		for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
-		var zero = state.worldConnector("mill/vise/body", "seat");
-		var vise = mill.vise;
-		if (vise == null) throw "Loading needs a preset vise";
-		var clearance = robotkit.collision.CollisionClearance.MARGIN * 1000;
-		var head = state.worldPose("mill/head");
-		var separation = mill.head.width / 2 + vise.body.width / 2 + clearance;
-		var targetXs = Math.abs(opening.x - head.x) >= separation ? [opening.x]
-			: [head.x - separation, head.x + separation];
-		var best:Null<Array<Float>> = null, bestDistance = Math.POSITIVE_INFINITY;
-		var trials:Array<String> = [];
-		for (targetX in targetXs) {
-			for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
-			var result:Array<Float> = [];
-			for (spec in mill.specs) {
-				if (spec.id == "z") { result.push(spec.upper); continue; }
-				state.setJoint("mill/" + spec.id, 1);
-				var shifted = state.worldConnector("mill/vise/body", "seat");
-				state.setJoint("mill/" + spec.id, 0);
-				var dx = shifted.x - zero.x, dy = shifted.y - zero.y, dz = shifted.z - zero.z;
-				var value = ((targetX - zero.x) * dx + (opening.y - zero.y) * dy + (opening.z - zero.z) * dz) /
-					(dx * dx + dy * dy + dz * dz);
-				result.push(Math.max(spec.lower, Math.min(spec.upper, value)));
-			}
-			for (index in 0...mill.specs.length) state.setJoint("mill/" + mill.specs[index].id, result[index]);
-			var seat = state.worldConnector("mill/vise/body", "seat");
-			trials.push('target=$targetX seat=${seat.x}/${seat.y} axes=$result');
-			if (Math.abs(seat.x - head.x) < separation - 1e-6 ||
-				Math.abs(seat.x - opening.x) + vise.body.width / 2 + clearance > openingWidth / 2) continue;
-			var distance = Math.pow(seat.x - opening.x, 2) + Math.pow(seat.y - opening.y, 2);
-			if (distance < bestDistance) { best = result; bestDistance = distance; }
-		}
-		if (best == null) throw 'The table cannot load the vise beside the head through the doorway: zero=${zero.x}/${zero.y}, head=${head.x}, separation=$separation, opening=${opening.x}/$openingWidth; ${trials.join("; ")}';
-		return best;
-	}
+  /** Bring the vise to the doorway beside the retracted head, within the real table travels. */
+  function nearestLoadPosition():Array<Float> {
+    var state = state();
+    for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
+    var zero = state.worldConnector("mill/vise/body", "seat");
+    var vise = mill.vise;
+    if (vise == null) throw "Loading needs a preset vise";
+    var clearance = robotkit.collision.CollisionClearance.MARGIN * 1000;
+    var head = state.worldPose("mill/head");
+    var separation = mill.head.width / 2 + vise.body.width / 2 + clearance;
+    var targetXs = Math.abs(opening.x - head.x) >= separation ? [opening.x] : [head.x - separation,
+      head.x + separation];
+    var best:Null<Array<Float>> = null, bestDistance = Math.POSITIVE_INFINITY;
+    var trials:Array<String> = [];
+    for (targetX in targetXs) {
+      for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
+      var result:Array<Float> = [];
+      for (spec in mill.specs) {
+        if (spec.id == "z") {
+          result.push(spec.upper);
+          continue;
+        }
+        state.setJoint("mill/" + spec.id, 1);
+        var shifted = state.worldConnector("mill/vise/body", "seat");
+        state.setJoint("mill/" + spec.id, 0);
+        var dx = shifted.x - zero.x, dy = shifted.y - zero.y, dz = shifted.z - zero.z;
+        var value = ((targetX
+          - zero.x) * dx + (opening.y - zero.y) * dy + (opening.z - zero.z) * dz) / (dx * dx + dy * dy + dz * dz);
+        result.push(Math.max(spec.lower, Math.min(spec.upper, value)));
+      }
+      for (index in 0...mill.specs.length) state.setJoint("mill/" + mill.specs[index].id, result[index]);
+      var seat = state.worldConnector("mill/vise/body", "seat");
+      trials.push('target=$targetX seat=${seat.x}/${seat.y} axes=$result');
+      if (Math.abs(seat.x - head.x) < separation - 1e-6
+        || Math.abs(seat.x - opening.x) + vise.body.width / 2 + clearance > openingWidth / 2) continue;
+      var distance = Math.pow(seat.x - opening.x, 2) + Math.pow(seat.y - opening.y, 2);
+      if (distance < bestDistance) {
+        best = result;
+        bestDistance = distance;
+      }
+    }
+    if (best
+      == null) throw 'The table cannot load the vise beside the head through the doorway: zero=${zero.x}/${zero.y}, head=${head.x}, separation=$separation, opening=${opening.x}/$openingWidth; ${trials.join("; ")}';
+    return best;
+  }
 
-	/** Local geometry is read once; FK supplies its bounds at every travel corner. */
-	static function sweptBounds(mill:BenchMill):MillBounds {
-		var model = new AssemblyModel("mm"); mill.addTo(model, "");
-		var state = new AssemblyState(model.definition("mill-envelope"));
-		var parts = [for (entry in mill.components()) {
-			var part = entry.component.geometry(), bounds = part.shape.bounds();
-			var lo = bounds.get_min(), hi = bounds.get_max();
-			var record = {id: entry.id, low: [lo.get_x(), lo.get_y(), lo.get_z()], high: [hi.get_x(), hi.get_y(), hi.get_z()]};
-			part.close(); record;
-		}];
-		var result:MillBounds = {low: [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY],
-			high: [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY]};
-		for (x in [mill.specs[0].lower, mill.specs[0].upper]) for (y in [mill.specs[1].lower, mill.specs[1].upper])
-			for (z in [mill.specs[2].lower, mill.specs[2].upper]) {
-				state.setJoint("x", x); state.setJoint("y", y); state.setJoint("z", z);
-				for (part in parts) {
-					var pose = state.worldPose(part.id);
-					for (x in [part.low[0], part.high[0]]) for (y in [part.low[1], part.high[1]]) for (z in [part.low[2], part.high[2]]) {
-						var p = AssemblyFrames.transformPoint(pose, x, y, z), values = [p.x, p.y, p.z];
-						for (axis in 0...3) { result.low[axis] = Math.min(result.low[axis], values[axis]);
-							result.high[axis] = Math.max(result.high[axis], values[axis]); }
-					}
-				}
-			}
-		return result;
-	}
+  /** Local geometry is read once; FK supplies its bounds at every travel corner. */
+  static function sweptBounds(mill:BenchMill):MillBounds {
+    var model = new AssemblyModel("mm");
+    mill.addTo(model, "");
+    var state = new AssemblyState(model.definition("mill-envelope"));
+    var parts = [for (entry in mill.components()) {
+      var part = entry.component.geometry(), bounds = part.shape.bounds();
+      var lo = bounds.get_min(), hi = bounds.get_max();
+      var record = {id: entry.id,
+        low: [lo.get_x(), lo.get_y(), lo.get_z()], high: [hi.get_x(), hi.get_y(), hi.get_z()]};
+      part.close();
+      record;
+    }
+    ];
+    var result:MillBounds = {
+      low: [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY],
+      high: [
+        Math.NEGATIVE_INFINITY,
+        Math.NEGATIVE_INFINITY,
+        Math.NEGATIVE_INFINITY
+      ]
+    };
+    for (x in [mill.specs[0].lower,
+      mill.specs[0].upper]) for (y in [mill.specs[1].lower, mill.specs[1].upper]) for (z in [
+        mill.specs[2].lower,
+        mill.specs[2].upper
+      ]) {
+      state.setJoint("x", x);
+      state.setJoint("y", y);
+      state.setJoint("z", z);
+      for (part in parts) {
+        var pose = state.worldPose(part.id);
+        for (x in [part.low[0], part.high[0]]) for (y in [part.low[1], part.high[1]]) for (z in [
+          part.low[2],
+          part.high[2]
+        ]) {
+          var p = AssemblyFrames.transformPoint(pose, x, y, z), values = [p.x, p.y, p.z];
+          for (axis in 0...3) {
+            result.low[axis] = Math.min(result.low[axis], values[axis]);
+            result.high[axis] = Math.max(result.high[axis], values[axis]);
+          }
+        }
+      }
+    }
+    return result;
+  }
 }

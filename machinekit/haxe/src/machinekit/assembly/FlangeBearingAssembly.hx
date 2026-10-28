@@ -19,49 +19,86 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * `'<id>-bearing'`) stay reachable for mating a shaft through it.
  */
 class FlangeBearingAssembly extends MachineAssembly {
-	public static inline var ENGAGEMENT_DIAMETERS:Float = 1.5;
+  public static inline var ENGAGEMENT_DIAMETERS:Float = 1.5;
 
-	public final housing:FlangeBearingHousing;
-	public final bearing:DeepGrooveBearing;
-	public final screw:SocketHeadCapScrew;
+  public final housing:FlangeBearingHousing;
+  public final bearing:DeepGrooveBearing;
+  public final screw:SocketHeadCapScrew;
 
-	/**
+  /**
 	 * `bearingFitted` false leaves the bore empty, as a housing is fastened before a later station presses its
 	 * bearing in; the housing stays sized for that bearing.
 	 */
-	public function new(bearing:DeepGrooveBearing, bearingFitted:Bool = true) {
-		super();
-		this.bearing = bearing;
-		housing = new FlangeBearingHousing(bearing);
-		var diameter = housing.mountScrewPart(10).diameter;
-		screw = housing.mountScrewPart(standardScrewLength(housing.depth + ENGAGEMENT_DIAMETERS * diameter));
-		addComponent("housing", housing);
-		exposeConnector("housingBore", "housing", "bore");
-		if (bearingFitted) {
-			addComponent("bearing", bearing);
-			addMate("bearing-seat", "fixed", "housing", "bore", "bearing", "axis");
-			exposeConnector("bearingAxis", "bearing", "axis");
-			exposeConnector("bearingFront", "bearing", "front");
-			exposeConnector("bearingBack", "bearing", "back");
-		}
-		for (i in 1...5) {
-			var bolt = housing.connector('bolt$i').frame;
-			addMemberConnector("housing", 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + housing.depth,
-				qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw});
-			addComponent('screw$i', screw);
-			addMate('screw$i-seat', "fixed", "housing", 'bolt${i}Head', 'screw$i', "head");
-			exposeConnector('screw${i}Tip', 'screw$i', "tip");
-		}
-	}
+  public function new(bearing:DeepGrooveBearing, bearingFitted:Bool = true) {
+    super();
+    this.bearing = bearing;
+    housing = new FlangeBearingHousing(bearing);
+    var diameter = housing.mountScrewPart(10).diameter;
+    screw = housing.mountScrewPart(standardScrewLength(housing.depth + ENGAGEMENT_DIAMETERS * diameter));
+    addComponent("housing", housing);
+    exposeConnector("housingBore", "housing", "bore");
+    if (bearingFitted) {
+      addComponent("bearing", bearing);
+      addMate("bearing-seat", "fixed", "housing", "bore", "bearing", "axis");
+      exposeConnector("bearingAxis", "bearing", "axis");
+      exposeConnector("bearingFront", "bearing", "front");
+      exposeConnector("bearingBack", "bearing", "back");
+    }
+    for (i in 1...5) {
+      var bolt = housing.connector('bolt$i').frame;
+      addMemberConnector(
+        "housing",
+        'bolt${i}Head',
+        {
+          x: bolt.x,
+          y: bolt.y,
+          z: bolt.z + housing.depth,
+          qx: bolt.qx,
+          qy: bolt.qy,
+          qz: bolt.qz,
+          qw: bolt.qw
+        }
+      );
+      addComponent('screw$i', screw);
+      addMate('screw$i-seat', "fixed", "housing", 'bolt${i}Head', 'screw$i', "head");
+      exposeConnector('screw${i}Tip', 'screw$i', "tip");
+    }
+  }
 
-	/** Shortest ISO 4762 preferred length at least `minimum` millimetres. */
-	public static function standardScrewLength(minimum:Float):Float {
-		var lengths:Array<Float> = [6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0,
-			65.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 180.0, 200.0];
-		for (length in lengths)
-			if (length >= minimum - 1e-9) return length;
-		throw 'No standard socket head cap screw is at least ${Math.ceil(minimum)} mm long';
-	}
+  /** Shortest ISO 4762 preferred length at least `minimum` millimetres. */
+  public static function standardScrewLength(minimum:Float):Float {
+    var lengths:Array<Float> = [
+      6.0,
+      8.0,
+      10.0,
+      12.0,
+      16.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      80.0,
+      90.0,
+      100.0,
+      110.0,
+      120.0,
+      130.0,
+      140.0,
+      150.0,
+      160.0,
+      180.0,
+      200.0
+    ];
+    for (length in lengths) if (length >= minimum - 1e-9) return length;
+    throw 'No standard socket head cap screw is at least ${Math.ceil(minimum)} mm long';
+  }
 
-	public function bom():Bom return billOfMaterials();
+  public function bom():Bom return billOfMaterials();
 }

@@ -5,76 +5,98 @@ import machinekit.motion.ServoMotor;
 
 /** Mill drive parts use the existing transmission resolver and survive recipe reconstruction. */
 class MillPartTests {
-	static function near(actual:Float, expected:Float, label:String):Void {
-		if (!(Math.abs(actual - expected) < 1e-8)) throw '$label: $actual != $expected';
-	}
-	public static function run():Void {
-		var screw = BallScrew.sfu1605(400), nut = new BallNut();
-		var relation = LeadScrew.relation(screw, nut, 1);
-		near(relation.ratio, -2 * Math.PI / 5, "SFU1605 radians per millimetre");
-		near(relation.efficiency, 0.9, "Ball nut efficiency");
-		near(nut.backlash(), 0, "Preloaded reversal clearance");
-		near(new BallNut(false).backlash(), 0.01, "Unpreloaded reference clearance");
-		near(nut.rotationFor(-5), 2 * Math.PI, "Ball nut signed travel");
-		near(screw.axialStiffness(), 200000 * Math.PI * 13 * 13 / 1600, "Shaft axial stiffness");
-		near(new BallScrew(200).axialStiffness(), 2 * screw.axialStiffness(), "Shorter shaft stiffness");
-		// The coupling carries it in the linear axis's units, N/m (it once took the N/mm value as N/m: a thousand times soft).
-		var journalEA = 200000 * Math.PI * 12 * 12 / 4, raceEA = 200000 * Math.PI * 13 * 13 / 4;
-		near(screw.axialComplianceBetween(37.5,200),12.5/journalEA+150/raceEA,"actual shaft path integrates its journal and race");
-		near(screw.axialComplianceBetween(200,37.5),screw.axialComplianceBetween(37.5,200),"shaft path is independent of direction");
-		var stiffness = relation.stiffness;
-		// The shaft, the preloaded nut (300 N/um) and the support bearings (200 N/um) are springs in series, in N/m.
-		var series = 1.0 / (1.0 / screw.axialStiffness() + 1.0 / 200000.0 + 1.0 / 300000.0);
-		near(stiffness == null ? 0 : stiffness, series * 1000, "a ball screw coupling's stiffness is in N/m, with the nut and bearings in series");
-		if (!((stiffness == null ? 0 : stiffness) < screw.axialStiffness() * 1000 * 0.8)) throw "the nut and bearings make the drive softer than its shaft alone";
-		if (relation.assumptions().filter(a -> a.label.indexOf("ball screw drive stiffness") >= 0).length != 1)
-			throw "A ball screw's stiffness is stated as assumed (shaft, nut and bearings), not as rigid";
-		var rebuilt:BallScrew = cast screw.componentType().create(screw.values());
-		near(rebuilt.criticalSpeed(Fixed, Simple), screw.criticalSpeed(Fixed, Simple), "Rebuilt support speed");
-		var rebuiltNut:BallNut = cast nut.componentType().create(nut.values());
-		near(rebuiltNut.connector("mountFace").frame.z, 45, "Catalogue flange face");
-		near(rebuiltNut.flangeDiameter, 48, "Rebuilt flange diameter");
-		var fixed = machinekit.motion.ScrewSupportUnit.bk12(), floating = machinekit.motion.ScrewSupportUnit.bf12();
-		if (fixed.support != Fixed || floating.support != Simple) throw "BK/BF support conditions";
-		var rebuiltSupport:machinekit.motion.ScrewSupportUnit = cast floating.componentType().create(floating.values());
-		if (rebuiltSupport.support != Simple) throw "Support recipe must retain floating bearing";
-		near(fixed.connector("mount").frame.y, -25, "Support foot frame");
-		var rail = machinekit.motion.LinearRailSystem.forProfile("HGH15CA", 400, 2);
-		near(rail.stroke, 400 - 40 - 61.4, "Rail room defines travel");
-		near(rail.blocks[0].connector("mount1").frame.y, 13, "HGR15 block mounting plane");
-		var verified = machinekit.motion.LinearRailSystem.catalog().metadata("HGH15CA").verifiedFields;
-		if (verified == null || verified.indexOf("blockHoleSpacingAlong") < 0 || verified.indexOf("ratings") < 0)
-			throw "HG rows are checked against the supplier table";
-		var spindle = new machinekit.milling.SpindleCartridge();
-		near(spindle.connector("gaugeLine").frame.z, 0, "Spindle gauge line");
-		near(spindle.connector("pulley").frame.z, machinekit.milling.SpindleCartridge.LENGTH, "Spindle pulley seat");
-		var spindleMotor = new machinekit.milling.SpindleMotor();
-		near(spindleMotor.rating.ratedTorque * spindleMotor.rating.ratedSpeed, 1100, "Spindle power");
-		for (kind in [machinekit.milling.MillCasting.MillCastingKind.Base,
-			machinekit.milling.MillCasting.MillCastingKind.Column, machinekit.milling.MillCasting.MillCastingKind.Saddle,
-			machinekit.milling.MillCasting.MillCastingKind.Table, machinekit.milling.MillCasting.MillCastingKind.Head]) {
-			var casting = new machinekit.milling.MillCasting(kind);
-			var mass = casting.massProperties();
-			var expectedMass = switch kind {
-				case Base: 58.6401;
-				case Column: 50.9425;
-				case Saddle: 25.4801;
-				case Table: 11.7125;
-				case Head: 33.2253;
-			};
-			if (!Math.isFinite(mass.mass) || Math.abs(mass.mass - expectedMass) > 0.01 || mass.inertia == null)
-				throw 'Mill casting $kind mass ${mass.mass} kg differs from its checked design ($expectedMass kg)';
-			near(casting.connector("top").frame.z, casting.height, "Casting top frame");
-			var rebuiltCasting = casting.componentType().create(casting.values());
-			near(rebuiltCasting.massProperties().mass, mass.mass, "Rebuilt casting mass");
-			Sys.println('mill casting ${kind}: ${mass.mass} kg');
-		}
-		for (watts in [400, 750]) {
-			var motor = ServoMotor.model('GENERIC-SERVO-${watts}W');
-			near(motor.rating.ratedTorque * motor.rating.ratedSpeed, watts, "Servo rated power");
-			var restoredMotor:ServoMotor = cast motor.componentType().create(motor.values());
-			near(restoredMotor.rating.ratedTorque, motor.rating.ratedTorque, "Rebuilt servo rated torque");
-			if (motor.actuator("motor", "axis", 48, 0.5).assumed == null) throw "Generic servo must declare assumed ratings";
-		}
-	}
+  static function near(actual:Float, expected:Float, label:String):Void {
+    if (!(Math.abs(actual - expected) < 1e-8)) throw '$label: $actual != $expected';
+  }
+  public static function run():Void {
+    var screw = BallScrew.sfu1605(400), nut = new BallNut();
+    var relation = LeadScrew.relation(screw, nut, 1);
+    near(relation.ratio, -2 * Math.PI / 5, "SFU1605 radians per millimetre");
+    near(relation.efficiency, 0.9, "Ball nut efficiency");
+    near(nut.backlash(), 0, "Preloaded reversal clearance");
+    near(new BallNut(false).backlash(), 0.01, "Unpreloaded reference clearance");
+    near(nut.rotationFor(-5), 2 * Math.PI, "Ball nut signed travel");
+    near(screw.axialStiffness(), 200000 * Math.PI * 13 * 13 / 1600, "Shaft axial stiffness");
+    near(new BallScrew(200).axialStiffness(), 2 * screw.axialStiffness(), "Shorter shaft stiffness");
+    // The coupling carries it in the linear axis's units, N/m (it once took the N/mm value as N/m: a thousand times soft).
+    var journalEA = 200000 * Math.PI * 12 * 12 / 4, raceEA = 200000 * Math.PI * 13 * 13 / 4;
+    near(
+      screw.axialComplianceBetween(37.5, 200),
+      12.5 / journalEA + 150 / raceEA,
+      "actual shaft path integrates its journal and race"
+    );
+    near(
+      screw.axialComplianceBetween(200, 37.5),
+      screw.axialComplianceBetween(37.5, 200),
+      "shaft path is independent of direction"
+    );
+    var stiffness = relation.stiffness;
+    // The shaft, the preloaded nut (300 N/um) and the support bearings (200 N/um) are springs in series, in N/m.
+    var series = 1.0 / (1.0 / screw.axialStiffness() + 1.0 / 200000.0 + 1.0 / 300000.0);
+    near(
+      stiffness == null ? 0 : stiffness,
+      series * 1000,
+      "a ball screw coupling's stiffness is in N/m, with the nut and bearings in series"
+    );
+    if (!((stiffness == null ? 0 : stiffness)
+      < screw.axialStiffness() * 1000 * 0.8)) throw "the nut and bearings make the drive softer than its shaft alone";
+    if (relation.assumptions().filter(a -> a.label.indexOf("ball screw drive stiffness")
+      >= 0).length != 1) throw "A ball screw's stiffness is stated as assumed (shaft, nut and bearings), not as rigid";
+    var rebuilt:BallScrew = cast screw.componentType().create(screw.values());
+    near(rebuilt.criticalSpeed(Fixed, Simple), screw.criticalSpeed(Fixed, Simple), "Rebuilt support speed");
+    var rebuiltNut:BallNut = cast nut.componentType().create(nut.values());
+    near(rebuiltNut.connector("mountFace").frame.z, 45, "Catalogue flange face");
+    near(rebuiltNut.flangeDiameter, 48, "Rebuilt flange diameter");
+    var fixed = machinekit.motion.ScrewSupportUnit.bk12(), floating = machinekit.motion.ScrewSupportUnit.bf12();
+    if (fixed.support != Fixed || floating.support != Simple) throw "BK/BF support conditions";
+    var rebuiltSupport:machinekit.motion.ScrewSupportUnit = cast floating.componentType().create(floating.values());
+    if (rebuiltSupport.support != Simple) throw "Support recipe must retain floating bearing";
+    near(fixed.connector("mount").frame.y, -25, "Support foot frame");
+    var rail = machinekit.motion.LinearRailSystem.forProfile("HGH15CA", 400, 2);
+    near(rail.stroke, 400 - 40 - 61.4, "Rail room defines travel");
+    near(rail.blocks[0].connector("mount1").frame.y, 13, "HGR15 block mounting plane");
+    var verified = machinekit.motion.LinearRailSystem.catalog().metadata("HGH15CA").verifiedFields;
+    if (verified == null || verified.indexOf("blockHoleSpacingAlong") < 0
+      || verified.indexOf("ratings") < 0) throw "HG rows are checked against the supplier table";
+    var spindle = new machinekit.milling.SpindleCartridge();
+    near(spindle.connector("gaugeLine").frame.z, 0, "Spindle gauge line");
+    near(spindle.connector("pulley").frame.z, machinekit.milling.SpindleCartridge.LENGTH, "Spindle pulley seat");
+    var spindleMotor = new machinekit.milling.SpindleMotor();
+    near(spindleMotor.rating.ratedTorque * spindleMotor.rating.ratedSpeed, 1100, "Spindle power");
+    for (kind in [
+      machinekit.milling.MillCasting.MillCastingKind.Base,
+      machinekit.milling.MillCasting.MillCastingKind.Column,
+      machinekit.milling.MillCasting.MillCastingKind.Saddle,
+      machinekit.milling.MillCasting.MillCastingKind.Table,
+      machinekit.milling.MillCasting.MillCastingKind.Head
+    ]) {
+      var casting = new machinekit.milling.MillCasting(kind);
+      var mass = casting.massProperties();
+      var expectedMass = switch kind {
+        case Base:
+          58.6401;
+        case Column:
+          50.9425;
+        case Saddle:
+          25.4801;
+        case Table:
+          11.7125;
+        case Head:
+          33.2253;
+      };
+      if (!Math.isFinite(mass.mass) || Math.abs(mass.mass - expectedMass) > 0.01 || mass.inertia
+        == null) throw 'Mill casting $kind mass ${mass.mass} kg differs from its checked design ($expectedMass kg)';
+      near(casting.connector("top").frame.z, casting.height, "Casting top frame");
+      var rebuiltCasting = casting.componentType().create(casting.values());
+      near(rebuiltCasting.massProperties().mass, mass.mass, "Rebuilt casting mass");
+      Sys.println('mill casting ${kind}: ${mass.mass} kg');
+    }
+    for (watts in [400, 750]) {
+      var motor = ServoMotor.model('GENERIC-SERVO-${watts}W');
+      near(motor.rating.ratedTorque * motor.rating.ratedSpeed, watts, "Servo rated power");
+      var restoredMotor:ServoMotor = cast motor.componentType().create(motor.values());
+      near(restoredMotor.rating.ratedTorque, motor.rating.ratedTorque, "Rebuilt servo rated torque");
+      if (motor.actuator("motor", "axis", 48, 0.5).assumed == null) throw "Generic servo must declare assumed ratings";
+    }
+  }
 }

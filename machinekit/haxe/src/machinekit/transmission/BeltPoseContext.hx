@@ -8,27 +8,30 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 
 /** One uncoupled, unbounded pose copy shared by pose-dependent transmissions in a rebuild. */
 class BeltPoseContext {
-	public final definition:AssemblyDefinition;
-	public final state:AssemblyState;
+  public final definition:AssemblyDefinition;
+  public final state:AssemblyState;
 
-	public function new(mechanical:AssemblyDefinition) {
-		definition = JsonWire.decode(JsonWire.encode(mechanical));
-		definition.couplings = [];
-		definition.actuators = [];
-		definition.encoders = [];
-		definition.elasticNetworks = null;
-		for (joint in definition.joints) {
-			joint.limits.lower = null;
-			joint.limits.upper = null;
-			// Mechanical stops require bounded travel and belong to the source machine, not this probe copy.
-			joint.stop = null;
-		}
-		state = new AssemblyState(definition);
-	}
+  public function new(mechanical:AssemblyDefinition) {
+    definition = JsonWire.decode(JsonWire.encode(mechanical));
+    definition.couplings = [];
+    definition.actuators = [];
+    definition.encoders = [];
+    definition.elasticNetworks = null;
+    for (joint in definition.joints) {
+      joint.limits.lower = null;
+      joint.limits.upper = null;
+      // Mechanical stops require bounded travel and belong to the source machine, not this probe copy.
+      joint.stop = null;
+    }
+    state = new AssemblyState(definition);
+  }
 
-	/** Every source starts at the same authored zero pose. */
-	public function reset():Void {
-		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree && joint.type != AssemblyJointType.Fixed)
-			state.setJoint(joint.id, joint.defaultValue);
-	}
+  /** Every source starts at the same authored zero pose. */
+  public function reset():Void {
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree
+      && joint.type != AssemblyJointType.Fixed) state.setJoint(
+        joint.id,
+        joint.defaultValue
+      );
+  }
 }

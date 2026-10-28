@@ -21,80 +21,146 @@ import machinekit.component.Solids;
  * Connectors: `front`, `back` (faces) and `axis` (mid-thickness), all with +Y along +Z.
  */
 class FlatWasher extends MachineComponent {
-	static var table:Null<Catalog<FlatWasherSpec>>;
+  static var table:Null<Catalog<FlatWasherSpec>>;
 
-	public final spec:FlatWasherSpec;
-	public var innerDiameter(get, never):Float;
-	public var outerDiameter(get, never):Float;
-	public var thickness(get, never):Float;
+  public final spec:FlatWasherSpec;
+  public var innerDiameter(get, never):Float;
+  public var outerDiameter(get, never):Float;
+  public var thickness(get, never):Float;
 
-	static function rows():Array<FlatWasherSpec>
-		return [
-			{size: "M3", innerDiameter: 3.2, outerDiameter: 7, thickness: 0.5},
-			{size: "M4", innerDiameter: 4.3, outerDiameter: 9, thickness: 0.8},
-			{size: "M5", innerDiameter: 5.3, outerDiameter: 10, thickness: 1.0},
-			{size: "M6", innerDiameter: 6.4, outerDiameter: 12, thickness: 1.6},
-			{size: "M8", innerDiameter: 8.4, outerDiameter: 16, thickness: 1.6},
-			{size: "M10", innerDiameter: 10.5, outerDiameter: 20, thickness: 2.0},
-			{size: "M12", innerDiameter: 13, outerDiameter: 24, thickness: 2.5},
-		];
+  static function rows():Array<FlatWasherSpec> return [
+    {
+      size: "M3",
+      innerDiameter: 3.2,
+      outerDiameter: 7,
+      thickness: 0.5
+    },
+    {
+      size: "M4",
+      innerDiameter: 4.3,
+      outerDiameter: 9,
+      thickness: 0.8
+    },
+    {
+      size: "M5",
+      innerDiameter: 5.3,
+      outerDiameter: 10,
+      thickness: 1.0
+    },
+    {
+      size: "M6",
+      innerDiameter: 6.4,
+      outerDiameter: 12,
+      thickness: 1.6
+    },
+    {
+      size: "M8",
+      innerDiameter: 8.4,
+      outerDiameter: 16,
+      thickness: 1.6
+    },
+    {
+      size: "M10",
+      innerDiameter: 10.5,
+      outerDiameter: 20,
+      thickness: 2.0
+    },
+    {
+      size: "M12",
+      innerDiameter: 13,
+      outerDiameter: 24,
+      thickness: 2.5
+    },
+  ];
 
-	public static function catalog():Catalog<FlatWasherSpec> {
-		if (table == null)
-			table = new Catalog("flat washer size", spec -> spec.size, rows(), _ -> ({source: "https://www.bossard.com/eshop/global-en/washers/washers-flat-without-chamfer/flat-washers-without-chamfer/p/713/", standard: "ISO 7089",
-				standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
-				sources: ["https://5.imimg.com/data5/LQ/IQ/BZ/SELLER-10566774/bossard-3092280-washers-and-securing-element.pdf"],
-				verifiedFields: ["innerDiameter", "outerDiameter", "thickness"]}));
-		return table;
-	}
+  public static function catalog():Catalog<FlatWasherSpec> {
+    if (table == null) table = new Catalog(
+      "flat washer size",
+      spec -> spec.size,
+      rows(),
+      _ -> ({
+        source: "https://www.bossard.com/eshop/global-en/washers/washers-flat-without-chamfer/flat-washers-without-chamfer/p/713/",
+        standard: "ISO 7089",
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope,
+        sources: ["https://5.imimg.com/data5/LQ/IQ/BZ/SELLER-10566774/bossard-3092280-washers-and-securing-element.pdf"],
+        verifiedFields: [
+          "innerDiameter",
+          "outerDiameter",
+          "thickness"
+        ]
+      })
+    );
+    return table;
+  }
 
-	public static function metric(size:String):FlatWasher
-		return new FlatWasher(catalog().get(size));
+  public static function metric(size:String):FlatWasher return new FlatWasher(catalog().get(size));
 
-	public static function custom(spec:FlatWasherSpec):FlatWasher
-		return new FlatWasher(spec, true);
+  public static function custom(spec:FlatWasherSpec):FlatWasher return new FlatWasher(spec, true);
 
-	private function new(spec:FlatWasherSpec, codeOnly:Bool = false) {
-		if (!(spec.innerDiameter > 0) || !(spec.outerDiameter > spec.innerDiameter) || !(spec.thickness > 0))
-			throw 'Flat washer ${spec.size} has inconsistent dimensions';
-		var designation = 'ISO7089-${spec.size}';
-		var customName = '${spec.size}-ID${Dimension.format(spec.innerDiameter)}-OD${Dimension.format(spec.outerDiameter)}-T${Dimension.format(spec.thickness)}';
-		super(codeOnly ? customDesignation(customName) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
-		this.spec = spec;
-		addConnector("front", Face, Solids.axial(0, 0, 0));
-		addConnector("axis", Axis, Solids.axial(0, 0, spec.thickness / 2));
-		addConnector("back", Face, Solids.axial(0, 0, spec.thickness));
-	}
+  private function new(spec:FlatWasherSpec, codeOnly:Bool = false) {
+    if (!(spec.innerDiameter > 0) || !(spec.outerDiameter > spec.innerDiameter)
+      || !(spec.thickness > 0)) throw 'Flat washer ${spec.size} has inconsistent dimensions';
+    var designation = 'ISO7089-${spec.size}';
+    var customName =
+      '${spec.size}-ID${Dimension.format(spec.innerDiameter)}-OD${Dimension.format(spec.outerDiameter)}-T${Dimension.format(spec.thickness)}';
+    super(codeOnly ? customDesignation(customName) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
+    this.spec = spec;
+    addConnector("front", Face, Solids.axial(0, 0, 0));
+    addConnector("axis", Axis, Solids.axial(0, 0, spec.thickness / 2));
+    addConnector("back", Face, Solids.axial(0, 0, spec.thickness));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	/** Dimensioned from the standard and datasheets cited above. */
-	override public function geometryFidelity():machinekit.component.GeometryFidelity
-		return machinekit.component.GeometryFidelity.Datasheet;
+  /** Dimensioned from the standard and datasheets cited above. */
+  override public function geometryFidelity():machinekit
+    .component.GeometryFidelity return machinekit.component.GeometryFidelity.Datasheet;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, thickness), "body"),
-			[Solids.named(Part.cylinderSpan(innerDiameter / 2, -0.1, thickness + 0.1), "bore")]);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
+    Solids.named(
+      Part.cylinderSpan(
+        outerDiameter / 2,
+        0,
+        thickness
+      ),
+      "body"
+    ),
+    [Solids.named(
+      Part.cylinderSpan(
+        innerDiameter / 2,
+        -0.1,
+        thickness + 0.1
+      ),
+      "bore"
+    )]
+  );
 
-	function get_innerDiameter():Float return spec.innerDiameter;
-	function get_outerDiameter():Float return spec.outerDiameter;
-	function get_thickness():Float return spec.thickness;
+  function get_innerDiameter():Float return spec.innerDiameter;
+  function get_outerDiameter():Float return spec.outerDiameter;
+  function get_thickness():Float return spec.thickness;
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.standard.flat-washer",
-			[ComponentRecipeSupport.catalog("size", FlatWasher.catalog(), "M5")],
-			v -> FlatWasher.metric(v.token("size")),
-			true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.standard.flat-washer",
+      [ComponentRecipeSupport.catalog(
+        "size",
+        FlatWasher.catalog(),
+        "M5"
+      )],
+      v -> FlatWasher.metric(v.token("size")),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues().set("size", Token(this.spec.size)).setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().set("size", Token(this.spec.size)).setToken("material", materialSpec());
+  }
 
 }

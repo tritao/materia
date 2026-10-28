@@ -6,10 +6,10 @@ package machinekit.motion;
  * kg m², full-step angle in degrees.
  */
 typedef StepperMotorRating = {
-	var designation:String;
-	var holdingTorque:Float;
-	var ratedCurrent:Float;
-	var phaseInductance:Float;
-	var rotorInertia:Float;
-	var stepAngle:Float;
+  var designation:String;
+  var holdingTorque:Float;
+  var ratedCurrent:Float;
+  var phaseInductance:Float;
+  var rotorInertia:Float;
+  var stepAngle:Float;
 }

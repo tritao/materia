@@ -2,8 +2,11 @@ package machinekit.transmission;
 
 /** A display mesh along the posed pitch line; phase is belt travel in millimetres. */
 class TimingBeltMesh {
-  public static function build(belt:TimingBelt, phase:Float = 0.0, toothSide:Int = 1, ?thickness:Float):{
-      positions:Array<Float>, normals:Array<Float>, indices:Array<Int>} {
+  public static function build(belt:TimingBelt, phase:Float = 0.0, toothSide:Int = 1, ?thickness:Float): {
+    positions: Array<Float>,
+    normals: Array<Float>,
+    indices: Array<Int>
+  } {
     if (!Math.isFinite(phase) || (toothSide != 1 && toothSide != -1)) throw "Invalid belt mesh phase or tooth side";
     var band = thickness == null ? belt.thickness : thickness;
     if (!Math.isFinite(band) || band <= 0.0) throw "Invalid belt mesh thickness";
@@ -28,32 +31,44 @@ class TimingBeltMesh {
     function ring(distance:Float, depth:Float):Array<Array<Float>> {
       var p = belt.pointAt(distance), nx = -p.dy * toothSide, ny = p.dx * toothSide;
       var back = -band * 0.35, front = depth;
-      return [[p.x + nx * back, p.y + ny * back, 0.0],
+      return [
+        [p.x + nx * back, p.y + ny * back, 0.0],
         [p.x + nx * front, p.y + ny * front, 0.0],
-        [p.x + nx * front, p.y + ny * front, belt.width],
-        [p.x + nx * back, p.y + ny * back, belt.width]];
+        [
+          p.x + nx * front,
+          p.y + ny * front,
+          belt.width
+        ],
+        [
+          p.x + nx * back,
+          p.y + ny * back,
+          belt.width
+        ]
+      ];
     }
     // Material teeth travel with phase. Sample each tooth's flanks and land, plus the closing seam.
     var distances:Array<Float> = [0.0];
     var first = Math.floor(-phase / toothPitch) - 1;
     var last = Math.ceil((belt.length - phase) / toothPitch) + 1;
-    for (tooth in Std.int(first)...Std.int(last) + 1)
-      for (fraction in [0.0, 0.2, 0.35, 0.65, 0.8]) {
-        var distance = phase + (tooth + fraction) * toothPitch;
-        if (distance > 1e-8 && distance < belt.length - 1e-8) distances.push(distance);
-      }
+    for (tooth in Std.int(first)...Std.int(last) + 1) for (fraction in [0.0, 0.2, 0.35, 0.65, 0.8]) {
+      var distance = phase + (tooth + fraction) * toothPitch;
+      if (distance > 1e-8 && distance < belt.length - 1e-8) distances.push(distance);
+    }
     distances.push(belt.length);
     distances.sort(Reflect.compare);
     function depth(distance:Float):Float {
       var fraction = (distance - phase) / toothPitch;
       fraction -= Math.floor(fraction);
-      var height = fraction < 0.2 || fraction > 0.8 ? 0.0 :
-        fraction < 0.35 ? (fraction - 0.2) / 0.15 : fraction <= 0.65 ? 1.0 : (0.8 - fraction) / 0.15;
+      var height = fraction < 0.2 || fraction
+        > 0.8 ? 0.0 : fraction < 0.35 ? (fraction - 0.2) / 0.15 : fraction <= 0.65 ? 1.0 : (0.8 - fraction) / 0.15;
       return band * (0.1 + 0.55 * height);
     }
     for (i in 1...distances.length) {
       var a = ring(distances[i - 1], depth(distances[i - 1])), b = ring(distances[i], depth(distances[i]));
-      for (side in 0...4) { var next = (side + 1) % 4; face([a[side], b[side], b[next], a[next]]); }
+      for (side in 0...4) {
+        var next = (side + 1) % 4;
+        face([a[side], b[side], b[next], a[next]]);
+      }
     }
     return {positions: positions, normals: normals, indices: indices};
   }

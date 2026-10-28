@@ -11,15 +11,21 @@ import machinekit.component.Solids;
  * surface's normal along +Z. The mass is that of the marker; the deposit adds none to the simulation.
  */
 class PrintedPart extends MachineComponent {
-	public static inline var MARKER:Float = 1.0;
+  public static inline var MARKER:Float = 1.0;
 
-	public function new() {
-		super("PRINTED-PART", "The part being printed", "plastic", true);
-		addConnector("origin", Face, Solids.axial(0, 0, 0));
-	}
+  public function new() {
+    super("PRINTED-PART", "The part being printed", "plastic", true);
+    addConnector("origin", Face, Solids.axial(0, 0, 0));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(MARKER, MARKER, MARKER * 0.2), "marker");
+  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.named(
+    Part.box(
+      MARKER,
+      MARKER,
+      MARKER * 0.2
+    ),
+    "marker"
+  );
 }

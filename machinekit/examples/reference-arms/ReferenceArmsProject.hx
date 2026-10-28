@@ -9,13 +9,13 @@ class ReferenceArmsProject {
     var robot = new ReferenceRobot(ReferenceAssetLocation.DIRECTORY + "/" + id);
     var scene = robot.scene;
     var state = new cadkit.modeling.AssemblyState(scene.assemblyDefinition);
-    var ready = [0.0,-1,1.3,-1.5,-1,0];
+    var ready = [0.0, -1, 1.3, -1.5, -1, 0];
     var index = 0;
     for (joint in robot.manifest.joints) if (joint.type != "fixed") {
       var value = ready[index++];
-      if (joint.limits.lower != null && value < joint.limits.lower || joint.limits.upper != null && value > joint.limits.upper)
-        value = 0.0;
-      state.setJoint(joint.id,value);
+      if (joint.limits.lower != null
+        && value < joint.limits.lower || joint.limits.upper != null && value > joint.limits.upper) value = 0.0;
+      state.setJoint(joint.id, value);
     }
     scene.assemblyState = state.record();
     return scene;

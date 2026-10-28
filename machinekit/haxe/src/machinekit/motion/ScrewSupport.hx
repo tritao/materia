@@ -7,7 +7,7 @@ package machinekit.motion;
  * no bearing is `Free`.
  */
 @:wire enum ScrewSupport {
-	@:id(1) Free;
-	@:id(2) Simple;
-	@:id(3) Fixed;
+  @:id(1) Free;
+  @:id(2) Simple;
+  @:id(3) Fixed;
 }

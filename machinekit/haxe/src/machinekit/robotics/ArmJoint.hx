@@ -26,77 +26,161 @@ import machinekit.component.ComponentType;
  * `MachineAssembly.addMotor` puts its servo on the joint it turns, usually through a `Gearbox`.
  */
 class ArmJoint extends MachineComponent implements MotorDrive {
-	public final diameter:Float;
-	public final length:Float;
-	public final flange:Null<RobotFlange>;
-	/** The servo motor inside the module, or null when it is only a housing. */
-	public final servo:Null<ServoMotor>;
+  public final diameter:Float;
+  public final length:Float;
+  public final flange:Null<RobotFlange>;
+  /** The servo motor inside the module, or null when it is only a housing. */
+  public final servo:Null<ServoMotor>;
 
-	public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, variant:String = "") {
-		if (!Math.isFinite(diameter) || !Math.isFinite(length) || !(diameter > 0) || !(length > 0))
-			throw "Arm joint needs a positive diameter and length";
-		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
-		var base = flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}';
-		super((servo == null ? base : '$base-${servo.designation}') + variant, 'Arm joint module, $text mm' +
-			(servo == null ? "" : ' with ${servo.designation}'), "steel 12.9", true);
-		this.servo = servo;
-		this.diameter = diameter;
-		this.length = length;
-		this.flange = flange;
-		addConnector("stator", Mount, Solids.axial(0, 0, 0));
-		if (flange == null) {
-			addConnector("rotor", Mount, Solids.axial(0, 0, length));
-		} else {
-			if (!(diameter >= flange.flangeDiameter + 2)) throw "Arm joint is too narrow for its tool flange";
-			addConnector("tool", Mount, flange.pinAlignedFrame(length + flange.thickness));
-		}
-	}
+  public function new(diameter:Float, length:Float, ?flange:RobotFlange, ?servo:ServoMotor, variant:String = "") {
+    if (!Math.isFinite(diameter) || !Math.isFinite(length)
+      || !(diameter > 0) || !(length > 0)) throw "Arm joint needs a positive diameter and length";
+    var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
+    var base = flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}';
+    super(
+      (servo == null ? base : '$base-${servo.designation}') + variant,
+      'Arm joint module, $text mm' + (servo == null ? "" : ' with ${servo.designation}'),
+      "steel 12.9",
+      true
+    );
+    this.servo = servo;
+    this.diameter = diameter;
+    this.length = length;
+    this.flange = flange;
+    addConnector("stator", Mount, Solids.axial(0, 0, 0));
+    if (flange == null) {
+      addConnector("rotor", Mount, Solids.axial(0, 0, length));
+    } else {
+      if (!(diameter >= flange.flangeDiameter + 2)) throw "Arm joint is too narrow for its tool flange";
+      addConnector("tool", Mount, flange.pinAlignedFrame(length + flange.thickness));
+    }
+  }
 
-	static var recipeTypeCache:Null<ComponentType>;
+  static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.arm-joint", [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 70), ComponentRecipeSupport.length("flangePitchCircle", 0),
-			ComponentRecipeSupport.choice("servo", ["none"].concat([for (rating in machinekit.motion.ServoMotor.ratings()) rating.designation]), "none"),
-			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed", "measured"], "assumed")],
-			v -> new ArmJoint(v.number("diameter"), v.number("length"),
-				v.number("flangePitchCircle") > 0 ? new machinekit.robotics.RobotFlange(v.number("flangePitchCircle")) : null,
-				v.token("servo") == "none" ? null : machinekit.motion.ServoMotor.model(v.token("servo"), machinekit.motion.ServoMotor.basisFromToken(v.token("servoBasis")))), true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.robotics.arm-joint",
+      [
+        ComponentRecipeSupport.length(
+          "diameter",
+          100
+        ),
+        ComponentRecipeSupport.length(
+          "length",
+          70
+        ),
+        ComponentRecipeSupport.length(
+          "flangePitchCircle",
+          0
+        ),
+        ComponentRecipeSupport.choice(
+          "servo",
+          ["none"].concat([for (rating in machinekit.motion.ServoMotor.ratings()) rating.designation]),
+          "none"
+        ),
+        ComponentRecipeSupport.choice(
+          "servoBasis",
+          [
+            "derived",
+            "catalog",
+            "stated",
+            "assumed",
+            "measured"
+          ],
+          "assumed"
+        )
+      ],
+      v -> new ArmJoint(
+        v.number("diameter"),
+        v.number("length"),
+        v.number("flangePitchCircle") > 0 ? new machinekit.robotics.RobotFlange(v.number("flangePitchCircle")) : null,
+        v.token("servo") == "none" ? null : machinekit.motion.ServoMotor.model(
+          v.token("servo"),
+          machinekit.motion.ServoMotor.basisFromToken(v.token("servoBasis"))
+        )
+      ),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<ComponentType>
-		return Std.isExactType(this, ArmJoint) ? recipeType() : null;
+  /** Subclasses must declare their own recipe and saved values. */
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    ArmJoint) ? recipeType() : null;
 
-	override public function values():ComponentValues
-		return new ComponentValues().setNumber("diameter", diameter).setNumber("length", length)
-			.setNumber("flangePitchCircle", flange == null ? 0 : flange.spec.pitchCircle)
-			.setToken("servo", servo == null ? "none" : servo.designation)
-			.setToken("servoBasis", servo == null ? "assumed" : servo.basisToken())
-			.setToken("material", materialSpec());
+  override public function values():ComponentValues return new ComponentValues().setNumber("diameter",
+    diameter).setNumber(
+      "length",
+      length
+    ).setNumber(
+      "flangePitchCircle",
+      flange == null ? 0 : flange.spec.pitchCircle
+    ).setToken(
+      "servo",
+      servo == null ? "none" : servo.designation
+    ).setToken(
+      "servoBasis",
+      servo == null ? "assumed" : servo.basisToken()
+    ).setToken(
+      "material",
+      materialSpec()
+    );
 
-	override public function motorDrive():Null<MotorDrive> return servo == null ? null : this;
-	public function electricalRating():Null<machinekit.motion.ServoElectricalRating> return servo == null ? null : servo.electricalRating();
+  override public function motorDrive():Null<MotorDrive> return servo == null ? null : this;
+  public function electricalRating():Null<machinekit.motion.ServoElectricalRating
+    > return servo == null ? null : servo.electricalRating();
 
-	/** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */
-	public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
-		var motor = servo;
-		if (motor == null) throw 'Arm joint "$designation" has no servo to drive a joint';
-		return motor.actuator(id, joint, volts, margin, current);
-	}
+  /** The servo inside the module as an actuator on joint `joint`; a module with no servo is not a motor. */
+  public function actuator(id:String, joint:String, volts:Float, margin:Float, ?current:Float):AssemblyActuator {
+    var motor = servo;
+    if (motor == null) throw 'Arm joint "$designation" has no servo to drive a joint';
+    return motor.actuator(id, joint, volts, margin, current);
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	/**
+  /**
 	 * The stator flange, the housing, and the output disc turning on its bearing above a narrow running gap.
 	 * Envelope detail is the housing's cylinder, which also sets the mass.
 	 */
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		if (detail == Envelope || length < 20) return Part.cylinderSpan(diameter / 2, 0, length);
-		var r = diameter / 2;
-		return Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: 6.0}, {r: 0.94 * r, z: 7.0}, {r: 0.94 * r, z: length - 8},
-			{r: 0.6 * r, z: length - 8}, {r: 0.6 * r, z: length - 7}, {r: 0.85 * r, z: length - 7}, {r: 0.85 * r, z: length}, {r: 0.0, z: length}]), "housing");
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    if (detail == Envelope || length < 20) return Part.cylinderSpan(diameter / 2, 0, length);
+    var r = diameter / 2;
+    return Solids.named(
+      Part.revolve([
+        {r: 0.0, z: 0.0},
+        {r: r, z: 0.0},
+        {r: r, z: 6.0},
+        {r: 0.94 * r, z: 7.0},
+        {
+          r: 0.94 * r,
+          z: length - 8
+        },
+        {
+          r: 0.6 * r,
+          z: length - 8
+        },
+        {
+          r: 0.6 * r,
+          z: length - 7
+        },
+        {
+          r: 0.85 * r,
+          z: length - 7
+        },
+        {
+          r: 0.85 * r,
+          z: length
+        },
+        {
+          r: 0.0,
+          z: length
+        }
+      ]),
+      "housing"
+    );
+  }
 
-	override public function massGeometry():Null<Part> return geometry(Envelope);
+  override public function massGeometry():Null<Part> return geometry(Envelope);
 }

@@ -6,37 +6,79 @@ import machinekit.component.ComponentRecipeSupport as P;
 
 /** Rotary table housing. Reference row is Assumed; dimensions are simplified envelopes. */
 class TableHousing extends MachineComponent {
-  public static function parameters():Array<ComponentParameter>return EngineeringMetadata.parameters().concat([
-    P.quantity("outside",180,"mm"),
-    P.quantity("bore",80,"mm"),
-    P.quantity("height",80,"mm"),P.quantity("bearingSeat",120,"mm"),P.quantity("bearingWidth",16,"mm")]);
+  public static function parameters():Array<ComponentParameter> return EngineeringMetadata.parameters().concat([
+    P.quantity(
+      "outside",
+      180,
+      "mm"
+    ),
+    P.quantity(
+      "bore",
+      80,
+      "mm"
+    ),
+    P.quantity(
+      "height",
+      80,
+      "mm"
+    ),
+    P.quantity(
+      "bearingSeat",
+      120,
+      "mm"
+    ),
+    P.quantity(
+      "bearingWidth",
+      16,
+      "mm"
+    )
+  ]);
   static var recipe:Null<ComponentType>;
   public static function recipeType():ComponentType {
-    if(recipe==null)recipe=new ComponentType("machinekit.hobbing.table-housing",parameters(),v -> new TableHousing(v));
+    if (recipe == null) recipe = new ComponentType(
+      "machinekit.hobbing.table-housing",
+      parameters(),
+      v -> new TableHousing(v)
+    );
     return recipe;
   }
-  public static function catalog():machinekit.catalog.Catalog<ComponentValues>
-    return EngineeringMetadata.assumedCatalog("Rotary table housing","TABLE-HOUSING-180",parameters(),"machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)");
+  public static function catalog():machinekit.catalog.Catalog<ComponentValues
+    > return EngineeringMetadata.assumedCatalog(
+      "Rotary table housing",
+      "TABLE-HOUSING-180",
+      parameters(),
+      "machinekit/examples/flexspline-hobber/PLAN.md (assumed reference design)"
+    );
   public function new(?overrides:ComponentValues) {
-    var v=P.resolve(parameters(),overrides);
-    super("TABLE-HOUSING-180","Rotary table housing (reference envelope)","cast iron",false,v);
-    if(v.get("material")!=null)setMaterial(v.token("material"));
+    var v = P.resolve(parameters(), overrides);
+    super("TABLE-HOUSING-180", "Rotary table housing (reference envelope)", "cast iron", false, v);
+    if (v.get("material") != null) setMaterial(v.token("material"));
     ComponentEnvelopes.validateAnnular(v);
-    addConnector("mount",Mount,Solids.axial(0,0,0));
-    addConnector("axis",Axis,Solids.axial(0,0,0));
-    addConnector("top",Mount,Solids.axial(0,0,parameterNumber("height")));
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("axis", Axis, Solids.axial(0, 0, 0));
+    addConnector("top", Mount, Solids.axial(0, 0, parameterNumber("height")));
     addFacet(new EngineeringMetadata(v));
-    addFacet(PrecisionErrors.fromValues(v,[]));
+    addFacet(PrecisionErrors.fromValues(v, []));
 
   }
   override public function hasGeometry():Bool return true;
-  override public function geometry(detail:ComponentDetail=Preview):cadkit.modeling.Part
-    {
-    var tools=[cadkit.modeling.Part.cylinderSpan(75,-0.1,45),cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat")/2,45,45+parameterNumber("bearingWidth"))];
-    if(parameterNumber("bearingSeat")>120)tools.push(cadkit.modeling.Part.cylinderSpan(parameterNumber("bearingSeat")/2,45+parameterNumber("bearingWidth"),parameterNumber("height")+0.1));
-    return Solids.cut(ComponentEnvelopes.annular(values()),tools);
+  override public function geometry(detail:ComponentDetail = Preview):cadkit.modeling.Part {
+    var tools = [
+      cadkit.modeling.Part.cylinderSpan(75, -0.1, 45),
+      cadkit.modeling.Part.cylinderSpan(
+        parameterNumber("bearingSeat") / 2,
+        45,
+        45 + parameterNumber("bearingWidth")
+      )
+    ];
+    if (parameterNumber("bearingSeat") > 120) tools.push(cadkit.modeling.Part.cylinderSpan(
+      parameterNumber("bearingSeat") / 2,
+      45 + parameterNumber("bearingWidth"),
+      parameterNumber("height") + 0.1
+    ));
+    return Solids.cut(ComponentEnvelopes.annular(values()), tools);
   }
-  override public function componentType():Null<ComponentType>return recipeType();
+  override public function componentType():Null<ComponentType> return recipeType();
 
 
 }

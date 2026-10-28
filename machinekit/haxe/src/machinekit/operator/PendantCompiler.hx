@@ -17,7 +17,8 @@ class PendantCompiler {
   public static inline final UNUSED:Int = 255;
   public static inline final MAX_RULES:Int = 8;
 
-  public static function compile(p:OperatorProfile, stepUnits:Array<Int>, timeoutMs:Int, hostTimeoutMs:Int):CompiledPendant {
+  public static function compile(p:OperatorProfile,
+    stepUnits:Array<Int>, timeoutMs:Int, hostTimeoutMs:Int):CompiledPendant {
     if (p == null) throw "A profile is required";
     if (stepUnits == null || stepUnits.length != 3) throw "Three step sizes are required";
     for (u in stepUnits) if (u <= 0) throw "Step sizes must be positive";
@@ -83,7 +84,14 @@ class PendantCompiler {
 
   /** The bit in the controller's active-condition mask; matches OperatorCondition in operator.wire.idl. */
   static function conditionId(c:OperatorCondition):Int return switch c {
-    case GearboxEngaged: 0; case DoorOpen: 1; case SpindleRunning: 2; case ProgramRunning: 3;
+    case GearboxEngaged:
+      0;
+    case DoorOpen:
+      1;
+    case SpindleRunning:
+      2;
+    case ProgramRunning:
+      3;
   };
 
   static function fill(target:Array<Int>, text:String):Void {

@@ -18,20 +18,99 @@ class OledModule extends HmiPart {
 
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
-    R.length("windowWidth", 56), R.length("windowHeight", 28), R.length("bezelMargin", 3),
-    R.length("glassWidth", 62), R.length("glassHeight", 34), R.length("glassThickness", 1.5),
-    R.length("pcbWidth", 70), R.length("pcbHeight", 40), R.length("pcbThickness", 1.6),
-    R.length("panelThickness", 3), R.length("standoffGap", 2), R.length("behindDepth", 12),
-    R.length("headerWidth", 10.5), R.length("headerHeight", 2.5),
-    R.scalar("massGrams", 30, 1)
+    R.length(
+      "windowWidth",
+      56
+    ),
+    R.length(
+      "windowHeight",
+      28
+    ),
+    R.length(
+      "bezelMargin",
+      3
+    ),
+    R.length(
+      "glassWidth",
+      62
+    ),
+    R.length(
+      "glassHeight",
+      34
+    ),
+    R.length(
+      "glassThickness",
+      1.5
+    ),
+    R.length(
+      "pcbWidth",
+      70
+    ),
+    R.length(
+      "pcbHeight",
+      40
+    ),
+    R.length(
+      "pcbThickness",
+      1.6
+    ),
+    R.length(
+      "panelThickness",
+      3
+    ),
+    R.length(
+      "standoffGap",
+      2
+    ),
+    R.length(
+      "behindDepth",
+      12
+    ),
+    R.length(
+      "headerWidth",
+      10.5
+    ),
+    R.length(
+      "headerHeight",
+      2.5
+    ),
+    R.scalar(
+      "massGrams",
+      30,
+      1
+    )
   ];
 
   public function new(?v:ComponentValues) {
     super("hmi-oled-module", "2.42 in 128x64 OLED module", "ABS black", inputs(), v);
-    positive(["windowWidth", "windowHeight", "glassWidth", "glassHeight", "glassThickness", "pcbWidth", "pcbHeight", "pcbThickness", "panelThickness", "standoffGap", "behindDepth", "headerWidth", "headerHeight", "massGrams"]);
-    require(n("windowWidth") <= n("glassWidth") && n("windowHeight") <= n("glassHeight"), "the glass is larger than the viewing window");
-    require(n("glassWidth") <= n("pcbWidth") && n("glassHeight") <= n("pcbHeight"), "the carrier is larger than the glass");
-    require(n("behindDepth") > n("panelThickness") + n("glassThickness") + n("standoffGap") + n("pcbThickness"), "the header has room behind the carrier");
+    positive([
+      "windowWidth",
+      "windowHeight",
+      "glassWidth",
+      "glassHeight",
+      "glassThickness",
+      "pcbWidth",
+      "pcbHeight",
+      "pcbThickness",
+      "panelThickness",
+      "standoffGap",
+      "behindDepth",
+      "headerWidth",
+      "headerHeight",
+      "massGrams"
+    ]);
+    require(
+      n("windowWidth") <= n("glassWidth") && n("windowHeight") <= n("glassHeight"),
+      "the glass is larger than the viewing window"
+    );
+    require(
+      n("glassWidth") <= n("pcbWidth") && n("glassHeight") <= n("pcbHeight"),
+      "the carrier is larger than the glass"
+    );
+    require(
+      n("behindDepth") > n("panelThickness") + n("glassThickness") + n("standoffGap") + n("pcbThickness"),
+      "the header has room behind the carrier"
+    );
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, -behindFace() / 2));
@@ -44,7 +123,10 @@ class OledModule extends HmiPart {
   override public function componentType():Null<ComponentType> return recipeType();
 
   function panelCutout():Footprint return Rect(n("windowWidth"), n("windowHeight"));
-  function panelKeepOut():Footprint return Rect(n("windowWidth") + 2 * n("bezelMargin"), n("windowHeight") + 2 * n("bezelMargin"));
+  function panelKeepOut():Footprint return Rect(
+    n("windowWidth") + 2 * n("bezelMargin"),
+    n("windowHeight") + 2 * n("bezelMargin")
+  );
   function aboveFace():Float return 0.0;
   function behindFace():Float return n("behindDepth");
   function rearBody():Footprint return Rect(n("pcbWidth"), n("pcbHeight"));
@@ -55,12 +137,27 @@ class OledModule extends HmiPart {
     parts.push(Solids.named(box(n("glassWidth"), n("glassHeight"), g, 0.0, 0.0, -t - g), "glass"));
     var pcbTop = -t - g - gap;
     parts.push(Solids.named(box(n("pcbWidth"), n("pcbHeight"), p, 0.0, 0.0, pcbTop - p), "pcb"));
-    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0])
-      parts.push(Part.cylinderSpan(2.0, pcbTop, -t - g, sx * (n("glassWidth") / 2 - 3.0), sy * (n("glassHeight") / 2 - 3.0)));
+    for (sx in [-1.0, 1.0]) for (sy in [-1.0, 1.0]) parts.push(Part.cylinderSpan(
+      2.0,
+      pcbTop,
+      -t - g,
+      sx * (n("glassWidth") / 2 - 3.0),
+      sy * (n("glassHeight") / 2 - 3.0)
+    ));
     // The header stands on the back of the carrier down to the module's full depth, near the bottom edge.
     var headerTop = pcbTop - p;
     var headerDepth = headerTop + n("behindDepth");
-    parts.push(Solids.named(box(n("headerWidth"), n("headerHeight"), headerDepth, 0.0, -n("pcbHeight") / 2 + 4.0, -n("behindDepth")), "header"));
+    parts.push(Solids.named(
+      box(
+        n("headerWidth"),
+        n("headerHeight"),
+        headerDepth,
+        0.0,
+        -n("pcbHeight") / 2 + 4.0,
+        -n("behindDepth")
+      ),
+      "header"
+    ));
     return Solids.union(parts);
   }
 

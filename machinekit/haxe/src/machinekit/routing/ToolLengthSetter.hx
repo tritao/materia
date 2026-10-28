@@ -13,8 +13,15 @@ class ToolLengthSetter extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("diameter", 40),
     P.length("height", 60),
-    P.length("stroke", 5),
-    P.quantity("repeatability", 0.005, "mm")
+    P.length(
+      "stroke",
+      5
+    ),
+    P.quantity(
+      "repeatability",
+      0.005,
+      "mm"
+    )
   ];
   public function new(?v:ComponentValues) {
     super("tool-length-setter", "tool length setter", "steel", inputs(), v);
@@ -36,16 +43,46 @@ class ToolLengthSetter extends AssumedCatalogComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     var r = n("diameter") / 2, h = n("height");
     if (detail == Envelope) return massGeometry();
-    return Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: r, z: 0.0}, {r: r, z: 0.5 * h}, {r: 0.85 * r, z: 0.55 * h}, {r: 0.75 * r, z: 0.55 * h},
-      {r: 0.75 * r, z: 0.9 * h}, {r: 0.45 * r, z: 0.9 * h}, {r: 0.45 * r, z: h}, {r: 0.0, z: h}]), "setter");
+    return Solids.named(
+      Part.revolve([
+        {r: 0.0, z: 0.0},
+        {r: r, z: 0.0},
+        {r: r, z: 0.5 * h},
+        {r: 0.85 * r, z: 0.55 * h},
+        {
+          r: 0.75 * r,
+          z: 0.55 * h
+        },
+        {
+          r: 0.75 * r,
+          z: 0.9 * h
+        },
+        {
+          r: 0.45 * r,
+          z: 0.9 * h
+        },
+        {
+          r: 0.45 * r,
+          z: h
+        },
+        {
+          r: 0.0,
+          z: h
+        }
+      ]),
+      "setter"
+    );
   }
 
-  override public function massGeometry():Null<Part> return Solids.named(Part.cylinder(n("diameter") / 2, n("height")), "setter");
+  override public function massGeometry():Null<Part> return Solids.named(
+    Part.cylinder(n("diameter") / 2, n("height")),
+    "setter"
+  );
   public function triggerFrame():materia.assembly.AssemblyRecord.AssemblyFrame return Solids.axial(
     0,
     0,
     n("height") - n("stroke") / 2
   );
-  override public function io():MachineIo return {inputs:["trigger"], outputs:["air_blast"], analogOutputs:[]};
+  override public function io():MachineIo return {inputs: ["trigger"], outputs: ["air_blast"], analogOutputs: []};
 
 }

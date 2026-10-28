@@ -22,78 +22,152 @@ import machinekit.component.Solids;
  * `front`, `back` (faces) and `axis` (mid-width), all with +Y along +Z.
  */
 class ShaftCollar extends MachineComponent {
-	static var table:Null<Catalog<ShaftCollarSpec>>;
+  static var table:Null<Catalog<ShaftCollarSpec>>;
 
-	public final spec:ShaftCollarSpec;
-	public var boreDiameter(get, never):Float;
-	public var width(get, never):Float;
+  public final spec:ShaftCollarSpec;
+  public var boreDiameter(get, never):Float;
+  public var width(get, never):Float;
 
-	static function rows():Array<ShaftCollarSpec>
-		return [
-			{boreDiameter: 5, outerDiameter: 12, width: 8, setScrew: "M3"},
-			{boreDiameter: 6, outerDiameter: 14, width: 9, setScrew: "M4"},
-			{boreDiameter: 8, outerDiameter: 16, width: 11, setScrew: "M4"},
-			{boreDiameter: 10, outerDiameter: 22, width: 13, setScrew: "M5"},
-			{boreDiameter: 12, outerDiameter: 25, width: 15, setScrew: "M5"},
-			{boreDiameter: 15, outerDiameter: 28, width: 17, setScrew: "M6"},
-			{boreDiameter: 17, outerDiameter: 32, width: 19, setScrew: "M6"},
-			{boreDiameter: 20, outerDiameter: 35, width: 21, setScrew: "M6"},
-			{boreDiameter: 25, outerDiameter: 40, width: 23, setScrew: "M8"},
-		];
+  static function rows():Array<ShaftCollarSpec> return [
+    {boreDiameter: 5, outerDiameter: 12, width: 8, setScrew: "M3"},
+    {
+      boreDiameter: 6,
+      outerDiameter: 14,
+      width: 9,
+      setScrew: "M4"
+    },
+    {
+      boreDiameter: 8,
+      outerDiameter: 16,
+      width: 11,
+      setScrew: "M4"
+    },
+    {
+      boreDiameter: 10,
+      outerDiameter: 22,
+      width: 13,
+      setScrew: "M5"
+    },
+    {
+      boreDiameter: 12,
+      outerDiameter: 25,
+      width: 15,
+      setScrew: "M5"
+    },
+    {
+      boreDiameter: 15,
+      outerDiameter: 28,
+      width: 17,
+      setScrew: "M6"
+    },
+    {
+      boreDiameter: 17,
+      outerDiameter: 32,
+      width: 19,
+      setScrew: "M6"
+    },
+    {
+      boreDiameter: 20,
+      outerDiameter: 35,
+      width: 21,
+      setScrew: "M6"
+    },
+    {
+      boreDiameter: 25,
+      outerDiameter: 40,
+      width: 23,
+      setScrew: "M8"
+    },
+  ];
 
-	public static function catalog():Catalog<ShaftCollarSpec> {
-		if (table == null)
-			table = new Catalog("shaft collar bore diameter", spec -> Dimension.format(spec.boreDiameter), rows(), _ -> ({source: "MachineKit generic preview dimensions", standard: null,
-				standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation}));
-		return table;
-	}
+  public static function catalog():Catalog<ShaftCollarSpec> {
+    if (table == null) table = new Catalog(
+      "shaft collar bore diameter",
+      spec -> Dimension.format(spec.boreDiameter),
+      rows(),
+      _ -> ({
+        source: "MachineKit generic preview dimensions",
+        standard: null,
+        standardEdition: null,
+        dimensionKind: Unverified,
+        conformance: GenericApproximation
+      })
+    );
+    return table;
+  }
 
-	/** Collar for exactly `boreDiameter`; throws when the catalog has no such size. */
-	public static function forShaft(boreDiameter:Float):ShaftCollar
-		return new ShaftCollar(catalog().get(Dimension.format(boreDiameter)));
+  /** Collar for exactly `boreDiameter`; throws when the catalog has no such size. */
+  public static function forShaft(boreDiameter:Float):ShaftCollar return new ShaftCollar(catalog()
+    .get(Dimension.format(boreDiameter)));
 
-	public static function custom(spec:ShaftCollarSpec):ShaftCollar
-		return new ShaftCollar(spec, true);
+  public static function custom(spec:ShaftCollarSpec):ShaftCollar return new ShaftCollar(spec, true);
 
-	private function new(spec:ShaftCollarSpec, codeOnly:Bool = false) {
-		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.width > 0))
-			throw 'Shaft collar for ${Dimension.format(spec.boreDiameter)} mm shaft has inconsistent dimensions';
-		var bore = Dimension.format(spec.boreDiameter);
-		var designation = 'COLLAR-$bore';
-		var customName = '$bore-OD${Dimension.format(spec.outerDiameter)}-W${Dimension.format(spec.width)}-SS${spec.setScrew}';
-		super(codeOnly ? customDesignation(customName) : designation,
-			'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw', "steel", codeOnly);
-		this.spec = spec;
-		addConnector("front", Face, Solids.axial(0, 0, 0));
-		addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));
-		addConnector("back", Face, Solids.axial(0, 0, spec.width));
-	}
+  private function new(spec:ShaftCollarSpec, codeOnly:Bool = false) {
+    if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.width
+      > 0)) throw 'Shaft collar for ${Dimension.format(spec.boreDiameter)} mm shaft has inconsistent dimensions';
+    var bore = Dimension.format(spec.boreDiameter);
+    var designation = 'COLLAR-$bore';
+    var customName =
+      '$bore-OD${Dimension.format(spec.outerDiameter)}-W${Dimension.format(spec.width)}-SS${spec.setScrew}';
+    super(
+      codeOnly ? customDesignation(customName) : designation,
+      'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw',
+      "steel",
+      codeOnly
+    );
+    this.spec = spec;
+    addConnector("front", Face, Solids.axial(0, 0, 0));
+    addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));
+    addConnector("back", Face, Solids.axial(0, 0, spec.width));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Solids.named(Part.cylinderSpan(spec.outerDiameter / 2, 0, spec.width), "body"),
-			[Solids.named(Part.cylinderSpan(spec.boreDiameter / 2, -0.1, spec.width + 0.1), "bore")]);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Solids.cut(
+    Solids.named(
+      Part.cylinderSpan(
+        spec.outerDiameter / 2,
+        0,
+        spec.width
+      ),
+      "body"
+    ),
+    [Solids.named(
+      Part.cylinderSpan(
+        spec.boreDiameter / 2,
+        -0.1,
+        spec.width + 0.1
+      ),
+      "bore"
+    )]
+  );
 
-	function get_boreDiameter():Float return spec.boreDiameter;
-	function get_width():Float return spec.width;
+  function get_boreDiameter():Float return spec.boreDiameter;
+  function get_width():Float return spec.width;
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.standard.shaft-collar",
-			[ComponentRecipeSupport.catalog("bore", ShaftCollar.catalog(), "8")],
-			v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
-			true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.standard.shaft-collar",
+      [ComponentRecipeSupport.catalog(
+        "bore",
+        ShaftCollar.catalog(),
+        "8"
+      )],
+      v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues().set("bore", Token(Dimension.format(this.spec.boreDiameter)))
-			.setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().set("bore", Token(Dimension.format(this.spec.boreDiameter))).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

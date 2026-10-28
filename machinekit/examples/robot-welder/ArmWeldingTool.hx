@@ -14,34 +14,46 @@ import machinekit.welding.WeldingTorchNozzle;
  * `torchWire` and `torchControl`.
  */
 class ArmWeldingTool implements ArmTool {
-	/** The torch's inlets, as the tool and the arm name them. */
-	static final INLETS:Array<{tool:String, arm:String}> = [
-		{tool: "power", arm: "torchPower"}, {tool: "gas", arm: "torchGas"},
-		{tool: "wire", arm: "torchWire"}, {tool: "control", arm: "torchControl"}];
+  /** The torch's inlets, as the tool and the arm name them. */
+  static final INLETS:Array<{tool:String, arm:String}> = [
+    {tool: "power", arm: "torchPower"},
+    {
+      tool: "gas",
+      arm: "torchGas"
+    },
+    {
+      tool: "wire",
+      arm: "torchWire"
+    },
+    {
+      tool: "control",
+      arm: "torchControl"
+    }
+  ];
 
-	public final bendDegrees:Float;
+  public final bendDegrees:Float;
 
-	public function new(bendDegrees:Float = 45) {
-		this.bendDegrees = bendDegrees;
-	}
+  public function new(bendDegrees:Float = 45) {
+    this.bendDegrees = bendDegrees;
+  }
 
-	public function build(flange:RobotFlange):EndEffector {
-		var result = new EndEffector();
-		result.addComponent("plate", new EndEffectorPlate(flange));
-		result.addComponent("torch", new WeldingTorch(bendDegrees));
-		result.addComponent("neck", new WeldingTorchNeck(bendDegrees));
-		result.addComponent("nozzle", new WeldingTorchNozzle(bendDegrees));
-		result.mount("plate", "robot");
-		result.addMate("torch-mate", "fixed", "plate", "tool", "torch", "robot");
-		result.addMate("neck-mate", "fixed", "torch", "neck", "neck", "base");
-		result.addMate("nozzle-mate", "fixed", "neck", "nozzle", "nozzle", "base");
-		for (inlet in INLETS) result.exposePort(inlet.tool, "torch", inlet.tool);
-		result.workingFrame("tcp", "torch", "tcp", true);
-		return result;
-	}
+  public function build(flange:RobotFlange):EndEffector {
+    var result = new EndEffector();
+    result.addComponent("plate", new EndEffectorPlate(flange));
+    result.addComponent("torch", new WeldingTorch(bendDegrees));
+    result.addComponent("neck", new WeldingTorchNeck(bendDegrees));
+    result.addComponent("nozzle", new WeldingTorchNozzle(bendDegrees));
+    result.mount("plate", "robot");
+    result.addMate("torch-mate", "fixed", "plate", "tool", "torch", "robot");
+    result.addMate("neck-mate", "fixed", "torch", "neck", "neck", "base");
+    result.addMate("nozzle-mate", "fixed", "neck", "nozzle", "nozzle", "base");
+    for (inlet in INLETS) result.exposePort(inlet.tool, "torch", inlet.tool);
+    result.workingFrame("tcp", "torch", "tcp", true);
+    return result;
+  }
 
-	public function expose(arm:MachineAssembly):Void {
-		arm.exposeConnector("toolTcp", "tool/torch", "tcp");
-		for (inlet in INLETS) arm.exposePort(inlet.arm, "tool/torch", inlet.tool);
-	}
+  public function expose(arm:MachineAssembly):Void {
+    arm.exposeConnector("toolTcp", "tool/torch", "tcp");
+    for (inlet in INLETS) arm.exposePort(inlet.arm, "tool/torch", inlet.tool);
+  }
 }

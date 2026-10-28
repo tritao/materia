@@ -24,92 +24,196 @@ import machinekit.component.Solids;
  * keyway connector shares this convention, so mating the two with a fixed joint seats the key flush.
  */
 class ParallelKey extends MachineComponent {
-	static var table:Null<Catalog<ParallelKeySpec>>;
+  static var table:Null<Catalog<ParallelKeySpec>>;
 
-	public final spec:ParallelKeySpec;
-	public final length:Float;
+  public final spec:ParallelKeySpec;
+  public final length:Float;
 
-	static function rows():Array<ParallelKeySpec>
-		return [
-			{minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 1.2, hubDepth: 1.0},
-			{minShaft: 8, maxShaft: 10, width: 3, height: 3, shaftDepth: 1.8, hubDepth: 1.4},
-			{minShaft: 10, maxShaft: 12, width: 4, height: 4, shaftDepth: 2.5, hubDepth: 1.8},
-			{minShaft: 12, maxShaft: 17, width: 5, height: 5, shaftDepth: 3.0, hubDepth: 2.3},
-			{minShaft: 17, maxShaft: 22, width: 6, height: 6, shaftDepth: 3.5, hubDepth: 2.8},
-			{minShaft: 22, maxShaft: 30, width: 8, height: 7, shaftDepth: 4.0, hubDepth: 3.3},
-			{minShaft: 30, maxShaft: 38, width: 10, height: 8, shaftDepth: 5.0, hubDepth: 3.3},
-		];
+  static function rows():Array<ParallelKeySpec> return [
+    {
+      minShaft: 6,
+      maxShaft: 8,
+      width: 2,
+      height: 2,
+      shaftDepth: 1.2,
+      hubDepth: 1.0
+    },
+    {
+      minShaft: 8,
+      maxShaft: 10,
+      width: 3,
+      height: 3,
+      shaftDepth: 1.8,
+      hubDepth: 1.4
+    },
+    {
+      minShaft: 10,
+      maxShaft: 12,
+      width: 4,
+      height: 4,
+      shaftDepth: 2.5,
+      hubDepth: 1.8
+    },
+    {
+      minShaft: 12,
+      maxShaft: 17,
+      width: 5,
+      height: 5,
+      shaftDepth: 3.0,
+      hubDepth: 2.3
+    },
+    {
+      minShaft: 17,
+      maxShaft: 22,
+      width: 6,
+      height: 6,
+      shaftDepth: 3.5,
+      hubDepth: 2.8
+    },
+    {
+      minShaft: 22,
+      maxShaft: 30,
+      width: 8,
+      height: 7,
+      shaftDepth: 4.0,
+      hubDepth: 3.3
+    },
+    {
+      minShaft: 30,
+      maxShaft: 38,
+      width: 10,
+      height: 8,
+      shaftDepth: 5.0,
+      hubDepth: 3.3
+    },
+  ];
 
-	public static function catalog():Catalog<ParallelKeySpec> {
-		if (table == null)
-			table = new Catalog("parallel key", spec -> '${spec.width}x${spec.height}', rows(), _ -> ({source: "https://www.opac.net/pdf/DIN%206885%20G.pdf", standard: "DIN 6885-1",
-				standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope}));
-		return table;
-	}
+  public static function catalog():Catalog<ParallelKeySpec> {
+    if (table == null) table = new Catalog(
+      "parallel key",
+      spec -> '${spec.width}x${spec.height}',
+      rows(),
+      _ -> ({
+        source: "https://www.opac.net/pdf/DIN%206885%20G.pdf",
+        standard: "DIN 6885-1",
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope
+      })
+    );
+    return table;
+  }
 
-	public static function metric(size:String, length:Float):ParallelKey
-		return new ParallelKey(catalog().get(size), length);
+  public static function metric(size:String, length:Float):ParallelKey return new ParallelKey(
+    catalog().get(size),
+    length
+  );
 
-	public static function custom(spec:ParallelKeySpec, length:Float):ParallelKey
-		return new ParallelKey(spec, length, true);
+  public static function custom(spec:ParallelKeySpec, length:Float):ParallelKey return new ParallelKey(
+    spec,
+    length,
+    true
+  );
 
-	/** Key sized for the smallest DIN 6885-1 range that covers `shaftDiameter`. */
-	public static function forShaft(shaftDiameter:Float, length:Float):ParallelKey {
-		if (!(shaftDiameter > 0)) throw "Key needs a positive shaft diameter";
-		for (designation in catalog().designations()) {
-			var spec = catalog().get(designation);
-			if (shaftDiameter >= spec.minShaft && shaftDiameter <= spec.maxShaft) return new ParallelKey(spec, length);
-		}
-		throw 'No DIN 6885-1 key fits shaft diameter $shaftDiameter';
-	}
+  /** Key sized for the smallest DIN 6885-1 range that covers `shaftDiameter`. */
+  public static function forShaft(shaftDiameter:Float, length:Float):ParallelKey {
+    if (!(shaftDiameter > 0)) throw "Key needs a positive shaft diameter";
+    for (designation in catalog().designations()) {
+      var spec = catalog().get(designation);
+      if (shaftDiameter >= spec.minShaft && shaftDiameter <= spec.maxShaft) return new ParallelKey(spec, length);
+    }
+    throw 'No DIN 6885-1 key fits shaft diameter $shaftDiameter';
+  }
 
-	private function new(spec:ParallelKeySpec, length:Float, codeOnly:Bool = false) {
-		if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
-		if (spec == null || !Math.isFinite(spec.minShaft) || !Math.isFinite(spec.maxShaft) ||
-			!(spec.minShaft > 0) || !(spec.maxShaft >= spec.minShaft) ||
-			!(spec.width > 0) || !(spec.height > 0) || !(spec.shaftDepth > 0) || !(spec.hubDepth > 0) ||
-			!(spec.shaftDepth <= spec.height) || !(spec.hubDepth <= spec.height))
-			throw "Parallel key specification has inconsistent DIN 6885 dimensions";
-		var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
-		var designation = 'DIN6885-B-${size}x${Dimension.format(length)}';
-		var customName = '${size}x${Dimension.format(length)}-S${Dimension.format(spec.minShaft)}-${Dimension.format(spec.maxShaft)}' +
-			'-D${Dimension.format(spec.shaftDepth)}x${Dimension.format(spec.hubDepth)}';
-		super(codeOnly ? customDesignation(customName) : designation,
-			'Form B parallel key $size, ${Dimension.format(length)} mm long', "steel C45", codeOnly);
-		this.spec = spec;
-		this.length = length;
-		addConnector("seat", Face, Solids.axial(0, 0, length / 2));
-	}
+  private function new(spec:ParallelKeySpec, length:Float, codeOnly:Bool = false) {
+    if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
+    if (spec == null || !Math.isFinite(spec.minShaft)
+      || !Math.isFinite(spec.maxShaft) || !(spec.minShaft > 0) || !(spec.maxShaft >= spec.minShaft) || !(spec.width > 0)
+      || !(spec.height > 0) || !(spec.shaftDepth > 0) || !(spec.hubDepth > 0) || !(spec.shaftDepth <= spec.height)
+      || !(spec.hubDepth <= spec.height)) throw "Parallel key specification has inconsistent DIN 6885 dimensions";
+    var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
+    var designation = 'DIN6885-B-${size}x${Dimension.format(length)}';
+    var customName =
+      '${size}x${Dimension.format(length)}-S${Dimension.format(spec.minShaft)}-${Dimension.format(spec.maxShaft)}'
+      + '-D${Dimension.format(spec.shaftDepth)}x${Dimension.format(spec.hubDepth)}';
+    super(
+      codeOnly ? customDesignation(customName) : designation,
+      'Form B parallel key $size, ${Dimension.format(length)} mm long',
+      "steel C45",
+      codeOnly
+    );
+    this.spec = spec;
+    this.length = length;
+    addConnector("seat", Face, Solids.axial(0, 0, length / 2));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	/** Dimensioned from the standard and datasheets cited above. */
-	override public function geometryFidelity():machinekit.component.GeometryFidelity
-		return machinekit.component.GeometryFidelity.Datasheet;
+  /** Dimensioned from the standard and datasheets cited above. */
+  override public function geometryFidelity():machinekit
+    .component.GeometryFidelity return machinekit.component.GeometryFidelity.Datasheet;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.prism([
-			new Vector(-spec.width / 2, 0), new Vector(spec.width / 2, 0),
-			new Vector(spec.width / 2, spec.height), new Vector(-spec.width / 2, spec.height),
-		], 0, length);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.prism(
+    [
+      new Vector(
+        -spec.width / 2,
+        0
+      ),
+      new Vector(
+        spec.width / 2,
+        0
+      ),
+      new Vector(
+        spec.width / 2,
+        spec.height
+      ),
+      new Vector(
+        -spec.width / 2,
+        spec.height
+      ),
+    ],
+    0,
+    length
+  );
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.standard.parallel-key",
-			[ComponentRecipeSupport.catalog("size", ParallelKey.catalog(), "2x2"), ComponentRecipeSupport.length("length", 10)],
-			v -> ParallelKey.metric(v.token("size"), v.number("length")),
-			true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.standard.parallel-key",
+      [
+        ComponentRecipeSupport.catalog(
+          "size",
+          ParallelKey.catalog(),
+          "2x2"
+        ),
+        ComponentRecipeSupport.length(
+          "length",
+          10
+        )
+      ],
+      v -> ParallelKey.metric(
+        v.token("size"),
+        v.number("length")
+      ),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues()
-				.set("size", Token('${Dimension.format(this.spec.width)}x${Dimension.format(this.spec.height)}'))
-				.set("length", Number(this.length)).setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().set(
+      "size",
+      Token('${Dimension.format(this.spec.width)}x${Dimension.format(this.spec.height)}')
+    ).set(
+      "length",
+      Number(this.length)
+    ).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

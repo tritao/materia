@@ -12,331 +12,340 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
-	final facetList:Array<ComponentFacet> = [];
+  final facetList:Array<ComponentFacet> = [];
 
-	/** The typed facts this part states about itself; look one kind up with its class's `of`. */
-	public function facets():Array<ComponentFacet> return facetList.copy();
+  /** The typed facts this part states about itself; look one kind up with its class's `of`. */
+  public function facets():Array<ComponentFacet> return facetList.copy();
 
-	public function coupling():Null<CouplingFacet> return CouplingFacet.of(this);
+  public function coupling():Null<CouplingFacet> return CouplingFacet.of(this);
 
-	/** Typed electrical endpoints, absent on unrelated components. */
-	public function motorDrive():Null<machinekit.motion.MotorDrive> return null;
-	public function axisMotor():Null<machinekit.motion.AxisMotor> return null;
-	public function reducerSpec():Null<machinekit.motion.ReducerSpec> return null;
-	public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
-	public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
-	public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec> return null;
-	/** Explicit contact assumptions for this part's generated simulation hull. */
-	public function simulationContact():Null<materia.project.SceneContactSurface> return null;
+  /** Typed electrical endpoints, absent on unrelated components. */
+  public function motorDrive():Null<machinekit.motion.MotorDrive> return null;
+  public function axisMotor():Null<machinekit.motion.AxisMotor> return null;
+  public function reducerSpec():Null<machinekit.motion.ReducerSpec> return null;
+  public function motorDriver():Null<machinekit.motion.MotorDriver> return null;
+  public function electricalSource():Null<machinekit.motion.ElectricalSource> return null;
+  public function motorBrakeSpec():Null<machinekit.motion.MotorBrakeSpec> return null;
+  /** Explicit contact assumptions for this part's generated simulation hull. */
+  public function simulationContact():Null<materia.project.SceneContactSurface> return null;
 
-	/** Typed fluid model when this component is a cylinder. */
-	public function cylinderSpec():Null<machinekit.fluid.CylinderSpec> return null;
+  /** Typed fluid model when this component is a cylinder. */
+  public function cylinderSpec():Null<machinekit.fluid.CylinderSpec> return null;
 
-	/** Typed fluid model when this component is a directional valve. */
-	public function valveSpec():Null<machinekit.fluid.ValveSpec> return null;
+  /** Typed fluid model when this component is a directional valve. */
+  public function valveSpec():Null<machinekit.fluid.ValveSpec> return null;
 
-	/** Typed pressure data when this component supplies a fluid service. */
-	public function pressureSource():Null<machinekit.fluid.PressureSource> return null;
+  /** Typed pressure data when this component supplies a fluid service. */
+  public function pressureSource():Null<machinekit.fluid.PressureSource> return null;
 
-	function addFacet(facet:ComponentFacet):Void {
-		if (facet == null) throw 'Null facet on "$designation"';
-		facet.check(this);
-		if (Std.isOfType(facet, CouplingFacet) && coupling() != null) throw 'Duplicate coupling capability on "$designation"';
-		facetList.push(facet);
-	}
+  function addFacet(facet:ComponentFacet):Void {
+    if (facet == null) throw 'Null facet on "$designation"';
+    facet.check(this);
+    if (Std.isOfType(facet,
+      CouplingFacet) && coupling() != null) throw 'Duplicate coupling capability on "$designation"';
+    facetList.push(facet);
+  }
 
-	public final designation:String;
-	/** Physical material changes go through setMaterial, so mechanically typed parts can enforce their class. */
-	public var materialId(default, null):String;
-	/** True when this component was built from explicit, non-catalog specifications. */
-	public final codeOnly:Bool;
-	public var bom(get, never):BomItem;
-	public final description:String;
-	var cachedBom:Null<BomItem>;
-	final recipeInputs:Null<ComponentValues>;
-	static var nextInstanceId = 0;
+  public final designation:String;
+  /** Physical material changes go through setMaterial, so mechanically typed parts can enforce their class. */
+  public var materialId(default, null):String;
+  /** True when this component was built from explicit, non-catalog specifications. */
+  public final codeOnly:Bool;
+  public var bom(get, never):BomItem;
+  public final description:String;
+  var cachedBom:Null<BomItem>;
+  final recipeInputs:Null<ComponentValues>;
+  static var nextInstanceId = 0;
 
-	/** Tells this component from every other, including ones built from the same recipe. */
-	public final instanceId:Int;
+  /** Tells this component from every other, including ones built from the same recipe. */
+  public final instanceId:Int;
 
-	var manufacturingMaterial:Null<String>;
-	var cachedMass:Null<MassProperties>;
-	var cachedMassMaterialId:Null<String>;
-	var declaredMass:Null<MassProperties>;
-	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
-	public var type(get, never):Null<ComponentType>;
-	final connectorList:Array<Connector> = [];
-	final portList:Array<ComponentPort> = [];
-	final bridgeList:Array<PortBridge> = [];
-	final conversionList:Array<PortBridge> = [];
+  var manufacturingMaterial:Null<String>;
+  var cachedMass:Null<MassProperties>;
+  var cachedMassMaterialId:Null<String>;
+  var declaredMass:Null<MassProperties>;
+  /** Null for code-only parts and assemblies outside the v1 recipe registry. */
+  public var type(get, never):Null<ComponentType>;
+  final connectorList:Array<Connector> = [];
+  final portList:Array<ComponentPort> = [];
+  final bridgeList:Array<PortBridge> = [];
+  final conversionList:Array<PortBridge> = [];
 
-	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false, ?recipeValues:ComponentValues) {
-		recipeInputs = recipeValues == null ? null : recipeValues.copy();
-		instanceId = nextInstanceId++;
-		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
-		this.designation = designation;
-		materialId = MaterialLibrary.fromSpec(material);
-		this.codeOnly = codeOnly;
-		this.description = description;
-	}
+  function new(
+    designation:String,
+    description:String,
+    ?material:String,
+    codeOnly:Bool = false,
+    ?recipeValues:ComponentValues
+  ) {
+    recipeInputs = recipeValues == null ? null : recipeValues.copy();
+    instanceId = nextInstanceId++;
+    if (designation == null || designation.length == 0) throw "Machine component needs a designation";
+    this.designation = designation;
+    materialId = MaterialLibrary.fromSpec(material);
+    this.codeOnly = codeOnly;
+    this.description = description;
+  }
 
-	public static function customDesignation(designation:String):String
-		return StringTools.startsWith(designation, "CUSTOM-") ? designation : 'CUSTOM-$designation';
+  public static function customDesignation(designation:String):String return StringTools.startsWith(
+    designation,
+    "CUSTOM-"
+  ) ? designation : 'CUSTOM-$designation';
 
-	public function materialSpec():String return MaterialLibrary.require(materialId).physical.spec;
+  public function materialSpec():String return MaterialLibrary.require(materialId).physical.spec;
 
-	/** Factories lock a process-specific material without changing ordinary component recipes. */
-	public function lockManufacturingMaterial(spec:String):Void {
-		if (spec == null || spec != materialSpec() || (manufacturingMaterial != null && manufacturingMaterial != spec))
-			throw "Manufacturing material lock differs from component material";
-		manufacturingMaterial=spec;
-	}
+  /** Factories lock a process-specific material without changing ordinary component recipes. */
+  public function lockManufacturingMaterial(spec:String):Void {
+    if (spec == null || spec != materialSpec() || (manufacturingMaterial != null
+      && manufacturingMaterial != spec)) throw "Manufacturing material lock differs from component material";
+    manufacturingMaterial = spec;
+  }
 
-	public function setMaterial(spec:String):Void {
-		if (manufacturingMaterial != null && spec != manufacturingMaterial)
-			throw "Select a manufacturing variant to change this material";
-		materialId = MaterialLibrary.fromSpec(spec);
-		cachedBom = null;
-		cachedMass = null;
-		cachedMassMaterialId = null;
-	}
+  public function setMaterial(spec:String):Void {
+    if (manufacturingMaterial != null
+      && spec != manufacturingMaterial) throw "Select a manufacturing variant to change this material";
+    materialId = MaterialLibrary.fromSpec(spec);
+    cachedBom = null;
+    cachedMass = null;
+    cachedMassMaterialId = null;
+  }
 
-	function get_bom():BomItem {
-		if (cachedBom != null) return cachedBom;
-		var recipe = type;
-		var valuesKey = recipe == null ? null : recipe.bomKey(values());
-		cachedBom = {partNumber: recipe == null ? designation : recipe.partNumber(this),
-			description: description, quantity: 1,
-			material: MaterialLibrary.require(materialId).physical.spec,
-			typeId: recipe == null ? null : recipe.id, valuesKey: valuesKey};
-		if (recipe != null && recipe.manufacturingFamily != null) {
-			var family=recipe.manufacturingFamily;
-			var variant=family.variant(values().token(family.variantParameter));
-			cachedBom.familyId=family.id;cachedBom.manufacturingVariant=variant.id;cachedBom.manufacturingProcess=variant.process;
-		}
-		return cachedBom;
-	}
+  function get_bom():BomItem {
+    if (cachedBom != null) return cachedBom;
+    var recipe = type;
+    var valuesKey = recipe == null ? null : recipe.bomKey(values());
+    cachedBom = {
+      partNumber: recipe == null ? designation : recipe.partNumber(this),
+      description : description,
+      quantity : 1,
+      material : MaterialLibrary.require(materialId).physical.spec,
+      typeId : recipe == null ? null : recipe.id,
+      valuesKey : valuesKey
+    };
+    if (recipe != null && recipe.manufacturingFamily != null) {
+      var family = recipe.manufacturingFamily;
+      var variant = family.variant(values().token(family.variantParameter));
+      cachedBom.familyId = family.id;
+      cachedBom.manufacturingVariant = variant.id;
+      cachedBom.manufacturingProcess = variant.process;
+    }
+    return cachedBom;
+  }
 
-	/**
+  /**
 	 * How this part is best looked at on its own, when its shape alone does not say (see `ComponentView.derive`);
 	 * null leaves the choice to its bounds.
 	 */
-	public function presentationView():Null<ComponentView>
-		return null;
+  public function presentationView():Null<ComponentView> return null;
 
-	public function hasGeometry():Bool {
-		try {
-			var part = geometry(Preview);
-			part.close();
-			return true;
-		} catch (_:NoGeometry) return false;
-	}
+  public function hasGeometry():Bool {
+    try {
+      var part = geometry(Preview);
+      part.close();
+      return true;
+    } catch (_:NoGeometry) return false;
+  }
 
-	public function geometry(detail:ComponentDetail = Preview):Part
-		throw new NoGeometry(designation);
+  public function geometry(detail:ComponentDetail = Preview):Part throw new NoGeometry(designation);
 
-	/**
+  /**
 	 * Names the geometry `geometry(detail)` builds, for a cache of it: the same for every component made from the same recipe
 	 * inputs and material, which build the same shape, and for a component without a recipe (nothing says which components are
 	 * alike) its own.
 	 */
-	public function geometryKey(detail:ComponentDetail = Preview):String {
-		var recipe = type, suffix = materialId + "|" + Std.string(detail);
-		return recipe == null ? "instance|" + instanceId + "|" + suffix : recipe.id + "|" + recipe.key(values()) + "|" + suffix;
-	}
+  public function geometryKey(detail:ComponentDetail = Preview):String {
+    var recipe = type, suffix = materialId + "|" + Std.string(detail);
+    return recipe
+      == null ? "instance|" + instanceId + "|" + suffix : recipe.id + "|" + recipe.key(values()) + "|" + suffix;
+  }
 
-	/**
+  /**
 	 * How faithful the preview is. Derived where the geometry shows it: a preview that is one primitive solid (six
 	 * faces or fewer: a box, a cylinder, a ring or a tube) is a placeholder of the part's size, `Envelope`; any other
 	 * is `Nominal`. Parts dimensioned from a cited standard or datasheet declare `Datasheet`, imports of supplier CAD
 	 * `Supplier`.
 	 */
-	public function geometryFidelity():GeometryFidelity {
-		var preview:Part;
-		try
-			preview = geometry(Preview)
-		catch (_:NoGeometry)
-			return GeometryFidelity.Envelope;
-		var faces = preview.shape.subshapeCount(CadKit.ShapeKind.Face);
-		preview.close();
-		return faces <= 6 ? GeometryFidelity.Envelope : GeometryFidelity.Nominal;
-	}
+  public function geometryFidelity():GeometryFidelity {
+    var preview:Part;
+    try preview = geometry(Preview) catch (_:NoGeometry) return GeometryFidelity.Envelope;
+    var faces = preview.shape.subshapeCount(CadKit.ShapeKind.Face);
+    preview.close();
+    return faces <= 6 ? GeometryFidelity.Envelope : GeometryFidelity.Nominal;
+  }
 
-	/**
+  /**
 	 * A purchased part whose housing is mostly air and electronics, not solid material, returns its product
 	 * class's assumed effective density (kg/m³, `EffectiveDensities`): its mass is then its envelope's volume at
 	 * that density, independent of the drawn preview and of its housing material. Null computes mass from the
 	 * preview shape and the material's density.
 	 */
-	function effectiveDensity():Null<Float>
-		return null;
+  function effectiveDensity():Null<Float> return null;
 
-	/**
+  /**
 	 * A simplified solid standing in for the part's mass, at its material's density, when the drawn preview should
 	 * not decide it (a motor drawn in detail keeps the mass of its body); null uses the preview. The caller owns the
 	 * returned part.
 	 */
-	public function massGeometry():Null<Part>
-		return null;
+  public function massGeometry():Null<Part> return null;
 
-	/** The preview shape supplies volume and centroid; its density is kg/m³. */
-	public function massProperties():MassProperties {
-		if (declaredMass != null) return declaredMass;
-		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
-		var effective = effectiveDensity();
-		var basis:ComponentDetail = effective == null ? Preview : Envelope;
-		var modelled = effective == null ? massGeometry() : null;
-		var recipe = type, shareKey = recipe == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
-		if (shareKey != null) {
-			var known = recipe.knownMass(shareKey);
-			if (known != null) {
-				if (modelled != null) modelled.close();
-				cachedMass = known;
-				cachedMassMaterialId = materialId;
-				return known;
-			}
-		}
-		var part:Part;
-		if (modelled != null) {
-			part = modelled;
-		} else {
-			try part = geometry(basis) catch (_:NoGeometry)
-				throw 'Component "$designation" has no geometry or declared mass';
-		}
-		try {
-			var physical = part.massProperties();
-			var density = effective == null ? MaterialLibrary.require(materialId).physical.density : effective;
-			var mass = physical.volume * 1e-9 * density;
-			cachedMass = new MassProperties(mass, physical.centerOfMass,
-				effective != null ? EffectiveDensity(effective) : modelled != null ? Modelled : Computed(Preview),
-				physical.inertiaAtDensity(density * 1e-9));
-			cachedMassMaterialId = materialId;
-		} catch (error:Dynamic) {
-			part.close();
-			throw error;
-		}
-		part.close();
-		if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
-		return cachedMass;
-	}
+  /** The preview shape supplies volume and centroid; its density is kg/m³. */
+  public function massProperties():MassProperties {
+    if (declaredMass != null) return declaredMass;
+    if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
+    var effective = effectiveDensity();
+    var basis:ComponentDetail = effective == null ? Preview : Envelope;
+    var modelled = effective == null ? massGeometry() : null;
+    var recipe = type, shareKey = recipe == null ? null : geometryKey(basis) + (modelled == null ? "" : "|mass-model");
+    if (shareKey != null) {
+      var known = recipe.knownMass(shareKey);
+      if (known != null) {
+        if (modelled != null) modelled.close();
+        cachedMass = known;
+        cachedMassMaterialId = materialId;
+        return known;
+      }
+    }
+    var part:Part;
+    if (modelled != null) {
+      part = modelled;
+    } else {
+      try part = geometry(basis) catch (_:NoGeometry) throw 'Component "$designation" has no geometry or declared mass';
+    }
+    try {
+      var physical = part.massProperties();
+      var density = effective == null ? MaterialLibrary.require(materialId).physical.density : effective;
+      var mass = physical.volume * 1e-9 * density;
+      cachedMass = new MassProperties(
+        mass,
+        physical.centerOfMass,
+        effective != null ? EffectiveDensity(effective) : modelled != null ? Modelled : Computed(Preview),
+        physical.inertiaAtDensity(density * 1e-9)
+      );
+      cachedMassMaterialId = materialId;
+    } catch (error:Dynamic) {
+      part.close();
+      throw error;
+    }
+    part.close();
+    if (shareKey != null) recipe.rememberMass(shareKey, cachedMass);
+    return cachedMass;
+  }
 
-	/** Vendor mass overrides the geometry estimate, including after material changes. */
-	function declareMass(kg:Float, centreOfMass:Vector, ?inertia:InertiaTensor):Void {
-		if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
-		if (centreOfMass == null || !Math.isFinite(centreOfMass.x) ||
-			!Math.isFinite(centreOfMass.y) || !Math.isFinite(centreOfMass.z))
-			throw 'Component "$designation" needs a finite declared centre of mass';
-		declaredMass = new MassProperties(kg, centreOfMass, Declared, inertia);
-	}
+  /** Vendor mass overrides the geometry estimate, including after material changes. */
+  function declareMass(kg:Float, centreOfMass:Vector, ?inertia:InertiaTensor):Void {
+    if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
+    if (centreOfMass == null || !Math.isFinite(centreOfMass.x) || !Math.isFinite(centreOfMass.y)
+      || !Math.isFinite(centreOfMass.z)) throw 'Component "$designation" needs a finite declared centre of mass';
+    declaredMass = new MassProperties(kg, centreOfMass, Declared, inertia);
+  }
 
-	public function toolSpecs():Array<ToolSpec> return [];
+  public function toolSpecs():Array<ToolSpec> return [];
 
-	public function tool(name:String, values:ComponentValues):Part {
-		for (spec in toolSpecs()) if (spec.name == name) return buildTool(name, spec.resolve(values));
-		throw 'Unknown tool "$name" for "$designation"';
-	}
+  public function tool(name:String, values:ComponentValues):Part {
+    for (spec in toolSpecs()) if (spec.name == name) return buildTool(name, spec.resolve(values));
+    throw 'Unknown tool "$name" for "$designation"';
+  }
 
-	function buildTool(name:String, values:ComponentValues):Part
-		throw 'Unknown tool "$name" for "$designation"';
+  function buildTool(name:String, values:ComponentValues):Part throw 'Unknown tool "$name" for "$designation"';
 
-	public function componentType():Null<ComponentType> return null;
+  public function componentType():Null<ComponentType> return null;
 
-	function get_type():Null<ComponentType> return componentType();
+  function get_type():Null<ComponentType> return componentType();
 
-	/** Snapshot of constructor inputs, with the current physical material. Existing components
+  /** Snapshot of constructor inputs, with the current physical material. Existing components
 	 * may continue to compute their own values by overriding this method.
 	 */
-	public function values():ComponentValues {
-		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
-		var result = new ComponentValues(), recipe = componentType();
-		for (name in recipeInputs.names()) if (name != "material") result.set(name, recipeInputs.get(name));
-		if (recipe == null || recipe.materialEditable) result.setToken("material", materialSpec());
-		return result;
-	}
+  public function values():ComponentValues {
+    if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+    var result = new ComponentValues(), recipe = componentType();
+    for (name in recipeInputs.names()) if (name != "material") result.set(name, recipeInputs.get(name));
+    if (recipe == null || recipe.materialEditable) result.setToken("material", materialSpec());
+    return result;
+  }
 
-	/** Typed access to stored recipe inputs; geometry remains the component's responsibility. */
-	public function parameterNumber(name:String):Float {
-		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
-		return recipeInputs.number(name);
-	}
-	public function parameterToken(name:String):String {
-		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
-		return recipeInputs.token(name);
-	}
-	public function parameterCount(name:String):Int {
-		if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
-		return recipeInputs.integer(name);
-	}
+  /** Typed access to stored recipe inputs; geometry remains the component's responsibility. */
+  public function parameterNumber(name:String):Float {
+    if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+    return recipeInputs.number(name);
+  }
+  public function parameterToken(name:String):String {
+    if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+    return recipeInputs.token(name);
+  }
+  public function parameterCount(name:String):Int {
+    if (recipeInputs == null) throw 'Component "$designation" has no recipe values';
+    return recipeInputs.integer(name);
+  }
 
-	public function connectors():Array<Connector>
-		return connectorList.copy();
+  public function connectors():Array<Connector> return connectorList.copy();
 
-	public function connector(name:String):Connector {
-		for (connector in connectorList) if (connector.name == name) return connector;
-		throw 'Missing connector "$designation/$name"';
-	}
+  public function connector(name:String):Connector {
+    for (connector in connectorList) if (connector.name == name) return connector;
+    throw 'Missing connector "$designation/$name"';
+  }
 
-	public function ports():Array<ComponentPort> return portList.copy();
+  public function ports():Array<ComponentPort> return portList.copy();
 
-	public function hasPort(name:String):Bool {
-		for (entry in portList) if (entry.name == name) return true;
-		return false;
-	}
+  public function hasPort(name:String):Bool {
+    for (entry in portList) if (entry.name == name) return true;
+    return false;
+  }
 
-	public function port(name:String):ComponentPort {
-		for (entry in portList) if (entry.name == name) return entry;
-		throw 'Missing port "$designation/$name"';
-	}
+  public function port(name:String):ComponentPort {
+    for (entry in portList) if (entry.name == name) return entry;
+    throw 'Missing port "$designation/$name"';
+  }
 
-	public function bridges():Array<PortBridge> return bridgeList.copy();
-	public function conversions():Array<PortBridge> return conversionList.copy();
+  public function bridges():Array<PortBridge> return bridgeList.copy();
+  public function conversions():Array<PortBridge> return conversionList.copy();
 
-	/** Adds an instance with every connector frame so it can be mated by name. */
-	public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
-		model.add(id, pose);
-		for (connector in connectorList) model.connector(id, connector.name, connector.frame);
-	}
+  /** Adds an instance with every connector frame so it can be mated by name. */
+  public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
+    model.add(id, pose);
+    for (connector in connectorList) model.connector(id, connector.name, connector.frame);
+  }
 
-	function addConnector(name:String, role:ConnectorRole, frame:AssemblyFrame):Void {
-		for (existing in connectorList) if (existing.name == name)
-			throw 'Duplicate connector "$designation/$name"';
-		connectorList.push({name: name, role: role, frame: frame});
-	}
+  function addConnector(name:String, role:ConnectorRole, frame:AssemblyFrame):Void {
+    for (existing in connectorList) if (existing.name == name) throw 'Duplicate connector "$designation/$name"';
+    connectorList.push({name: name, role: role, frame: frame});
+  }
 
-	function addPort(entry:ComponentPort):Void {
-		if (entry == null || entry.name == null || entry.name.length == 0 || entry.kind == null ||
-			entry.role == null || entry.iface == null) throw 'Invalid port on "$designation"';
-		switch entry.iface {
-			case PushIn(tubeOd): if (!Math.isFinite(tubeOd) || tubeOd <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
-			case Thread(name): if (name == null || name.length == 0) throw 'Invalid port interface "$designation/${entry.name}"';
-			case Plug(name, pins): if (name == null || name.length == 0 || pins <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
-			case Coupling(key, channel): if (key == null || key.length == 0 || channel <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
-			case Unspecified:
-		}
-		for (existing in portList) if (existing.name == entry.name)
-			throw 'Duplicate port "$designation/${entry.name}"';
-		if (entry.connector != null) connector(entry.connector);
-		portList.push(entry);
-	}
+  function addPort(entry:ComponentPort):Void {
+    if (entry == null || entry.name == null || entry.name.length == 0
+      || entry.kind == null || entry.role == null || entry.iface == null) throw 'Invalid port on "$designation"';
+    switch entry.iface {
+      case PushIn(tubeOd):
+        if (!Math.isFinite(tubeOd) || tubeOd <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+      case Thread(name):
+        if (name == null || name.length == 0) throw 'Invalid port interface "$designation/${entry.name}"';
+      case Plug(name, pins):
+        if (name == null || name.length == 0 || pins <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+      case Coupling(key, channel):
+        if (key == null || key.length == 0 || channel <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+      case Unspecified:
+    }
+    for (existing in portList) if (existing.name == entry.name) throw 'Duplicate port "$designation/${entry.name}"';
+    if (entry.connector != null) connector(entry.connector);
+    portList.push(entry);
+  }
 
-	function addBridge(from:String, to:String):Void {
-		var input = port(from), output = port(to);
-		if (from == to || input.kind != output.kind)
-			throw 'Port bridge "$designation/$from->$to" needs distinct ports of the same kind';
-		if (input.role == Supply)
-			throw 'Port bridge "$designation/$from->$to" cannot use a Supply inlet';
-		for (existing in bridgeList) if (existing.from == from && existing.to == to)
-			throw 'Duplicate port bridge "$designation/$from->$to"';
-		bridgeList.push({from: from, to: to});
-	}
+  function addBridge(from:String, to:String):Void {
+    var input = port(from), output = port(to);
+    if (from == to
+      || input.kind != output.kind) throw 'Port bridge "$designation/$from->$to" needs distinct ports of the same kind';
+    if (input.role == Supply) throw 'Port bridge "$designation/$from->$to" cannot use a Supply inlet';
+    for (existing in bridgeList) if (existing.from == from
+      && existing.to == to) throw 'Duplicate port bridge "$designation/$from->$to"';
+    bridgeList.push({from: from, to: to});
+  }
 
-	/** Declare a service conversion, such as pneumatic air producing vacuum. */
-	function addConversion(from:String, to:String):Void {
-		var input = port(from), output = port(to);
-		if (from == to || input.role != Consumer || output.role != Supply)
-			throw 'Port conversion "$designation/$from->$to" needs a Consumer input and Supply output';
-		for (existing in conversionList) if (existing.to == to)
-			throw 'Port conversion "$designation/$to" has multiple inputs';
-		conversionList.push({from: from, to: to});
-	}
+  /** Declare a service conversion, such as pneumatic air producing vacuum. */
+  function addConversion(from:String, to:String):Void {
+    var input = port(from), output = port(to);
+    if (from == to || input.role != Consumer || output.role
+      != Supply) throw 'Port conversion "$designation/$from->$to" needs a Consumer input and Supply output';
+    for (existing in conversionList) if (existing.to
+      == to) throw 'Port conversion "$designation/$to" has multiple inputs';
+    conversionList.push({from: from, to: to});
+  }
 }

@@ -27,8 +27,8 @@ class MobileWeldingRobot extends MobileBase {
     var storage = pack == null ? new BatteryPack(48, 25000, 1000, 600, 180, 230, 4) : pack;
     var supply = powerSource == null ? new WeldingPowerSource() : powerSource;
     var conversion = powerInverter == null ? new Inverter(48, 230, 10000, 600, 400, 300, 45) : powerInverter;
-    if (storage.nominalVolts != conversion.inputVolts || storage.outlets < 4)
-      throw "The mobile welding pack must match the inverter and supply four branches";
+    if (storage.nominalVolts != conversion.inputVolts
+      || storage.outlets < 4) throw "The mobile welding pack must match the inverter and supply four branches";
     var weldingArm = new RobotArm(false, new ArmWeldingTool());
     // The isolated 48 V branch supports the low-voltage arm windings and regeneration.
     var armConversion = new IsolatedDcConverter(storage.nominalVolts, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500);
@@ -45,13 +45,28 @@ class MobileWeldingRobot extends MobileBase {
     var top = DECK_Z + DECK_THICKNESS;
     addComponent("source", source, AssemblyFrames.translation(equipmentX, -inverter.width / 2 - EQUIPMENT_GAP, top));
     addComponent("inverter", inverter, AssemblyFrames.translation(equipmentX, source.depth / 2 + EQUIPMENT_GAP, top));
-    addComponent("cylinder", cylinder, AssemblyFrames.translation(equipmentX - source.width / 2 - EQUIPMENT_GAP -
-      GasCylinder.DIAMETER / 2, 0, top));
+    addComponent(
+      "cylinder",
+      cylinder,
+      AssemblyFrames.translation(
+        equipmentX - source.width / 2 - EQUIPMENT_GAP - GasCylinder.DIAMETER / 2,
+        0,
+        top
+      )
+    );
     // All carried equipment is attached to the deck in the robot's mate tree.
     for (name in ["source", "inverter", "cylinder"]) {
       var poses = solvedPoses();
-      var local = AssemblyFrames.compose(AssemblyFrames.inverse(poses.get("deck")),
-        AssemblyFrames.compose(poses.get(name), memberConnectorFrame(name, "base")));
+      var local = AssemblyFrames.compose(
+        AssemblyFrames.inverse(poses.get("deck")),
+        AssemblyFrames.compose(
+          poses.get(name),
+          memberConnectorFrame(
+            name,
+            "base"
+          )
+        )
+      );
       addMemberConnector("deck", name, local);
       addMate('$name-mount', "fixed", "deck", name, name, "base");
     }
@@ -80,16 +95,29 @@ class MobileWeldingRobot extends MobileBase {
   }
 
   /** Rear equipment plus the forward arm bay determine the plate, rather than a fixed part name. */
-  public static function payloadLayout(pack:BatteryPack, source:WeldingPowerSource, inverter:Inverter):MobileBaseLayout {
+  public static function payloadLayout(pack:BatteryPack,
+    source:WeldingPowerSource, inverter:Inverter):MobileBaseLayout {
     var gap = EQUIPMENT_GAP;
     var equipmentX = -pack.length / 2 - MobileBase.WHEEL_DIAMETER / 2 - gap;
-    var halfLength = Math.max(pack.length + MobileBase.WHEEL_DIAMETER / 2 + 2 * gap,
-      -equipmentX + source.width / 2 + gap + GasCylinder.DIAMETER + gap);
+    var halfLength = Math.max(
+      pack.length + MobileBase.WHEEL_DIAMETER / 2 + 2 * gap,
+      -equipmentX + source.width / 2 + gap + GasCylinder.DIAMETER + gap
+    );
     halfLength = Math.max(halfLength, -equipmentX + inverter.length / 2 + gap);
-    var plateWidth = Math.max(MobileBase.WIDTH, Math.max(pack.width + 2 * gap,
-      source.depth + inverter.width + 3 * gap));
-    return {length: 2 * halfLength, width: plateWidth, payloadX: halfLength - 300,
-      batteryX: equipmentX, battery: pack,
-      driveSupply: new IsolatedDcConverter(pack.nominalVolts, 48, 30, 2)};
+    var plateWidth = Math.max(MobileBase.WIDTH,
+      Math.max(pack.width + 2 * gap, source.depth + inverter.width + 3 * gap));
+    return {
+      length: 2 * halfLength,
+      width: plateWidth,
+      payloadX: halfLength - 300,
+      batteryX: equipmentX,
+      battery: pack,
+      driveSupply: new IsolatedDcConverter(
+        pack.nominalVolts,
+        48,
+        30,
+        2
+      )
+    };
   }
 }

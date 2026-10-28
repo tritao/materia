@@ -9,30 +9,46 @@ import machinekit.component.Solids;
  * on the axis.
  */
 class FlatBar implements StructuralProfile {
-	public final designation:String;
-	public final description:String;
-	public final width:Float;
-	public final thickness:Float;
+  public final designation:String;
+  public final description:String;
+  public final width:Float;
+  public final thickness:Float;
 
-	public function new(width:Float, thickness:Float) {
-		if (!(width > 0) || !(thickness > 0)) throw "Flat bar needs a positive width and thickness";
-		this.width = width;
-		this.thickness = thickness;
-		var size = '${Dimension.format(width)}x${Dimension.format(thickness)}';
-		designation = 'FLAT-$size';
-		description = 'Flat bar $size';
-	}
+  public function new(width:Float, thickness:Float) {
+    if (!(width > 0) || !(thickness > 0)) throw "Flat bar needs a positive width and thickness";
+    this.width = width;
+    this.thickness = thickness;
+    var size = '${Dimension.format(width)}x${Dimension.format(thickness)}';
+    designation = 'FLAT-$size';
+    description = 'Flat bar $size';
+  }
 
-	public function geometry(length:Float):Part {
-		if (!(length > 0)) throw "Flat bar needs a positive length";
-		return Part.prism([
-			new Vector(-width / 2, -thickness / 2), new Vector(width / 2, -thickness / 2),
-			new Vector(width / 2, thickness / 2), new Vector(-width / 2, thickness / 2),
-		], 0, length);
-	}
+  public function geometry(length:Float):Part {
+    if (!(length > 0)) throw "Flat bar needs a positive length";
+    return Part.prism(
+      [
+        new Vector(-width / 2, -thickness / 2),
+        new Vector(width / 2, -thickness / 2),
+        new Vector(
+          width / 2,
+          thickness / 2
+        ),
+        new Vector(
+          -width / 2,
+          thickness / 2
+        ),
+      ],
+      0,
+      length
+    );
+  }
 
-	public function profileDesignation():String return designation;
-	public function profileDescription():String return description;
-	public function sectionBounds():SectionBounds
-		return {minX: -width / 2, maxX: width / 2, minY: -thickness / 2, maxY: thickness / 2};
+  public function profileDesignation():String return designation;
+  public function profileDescription():String return description;
+  public function sectionBounds():SectionBounds return {
+    minX: -width / 2,
+    maxX: width / 2,
+    minY: -thickness / 2,
+    maxY: thickness / 2
+  };
 }

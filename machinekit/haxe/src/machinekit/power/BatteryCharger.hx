@@ -27,18 +27,36 @@ class BatteryCharger extends MachineComponent {
   public final dockPositionToleranceMm:Float;
   public final dockHeadingToleranceRad:Float;
 
-  public function new(nominalVolts:Float, outputWatts:Float, dockStandoff:Float,
-      length:Float = DEFAULT_LENGTH, width:Float = DEFAULT_WIDTH,
-      height:Float = DEFAULT_HEIGHT, massKg:Float = DEFAULT_MASS_KG,
-      dockPositionToleranceMm:Float = 15, dockHeadingToleranceRad:Float = 0.02) {
-    for (value in [nominalVolts, outputWatts, dockStandoff, length, width, height, massKg,
-        dockPositionToleranceMm, dockHeadingToleranceRad])
-      if (!Math.isFinite(value) || value <= 0)
-        throw "Battery charger ratings, docking tolerances, standoff, dimensions and mass must be finite and positive";
-    if (dockHeadingToleranceRad >= Math.PI / 2)
-      throw "Battery charger heading tolerance must be less than 90 degrees";
-    super('CHARGER-${Dimension.format(nominalVolts)}V-${Dimension.format(outputWatts)}W',
-      "Floor mounted mobile battery charger", "painted steel", true);
+  public function new(
+    nominalVolts:Float,
+    outputWatts:Float,
+    dockStandoff:Float,
+    length:Float = DEFAULT_LENGTH,
+    width:Float = DEFAULT_WIDTH,
+    height:Float = DEFAULT_HEIGHT,
+    massKg:Float = DEFAULT_MASS_KG,
+    dockPositionToleranceMm:Float = 15,
+    dockHeadingToleranceRad:Float = 0.02
+  ) {
+    for (value in [
+      nominalVolts,
+      outputWatts,
+      dockStandoff,
+      length,
+      width,
+      height,
+      massKg,
+      dockPositionToleranceMm,
+      dockHeadingToleranceRad
+    ]) if (!Math.isFinite(value) || value
+      <= 0) throw "Battery charger ratings, docking tolerances, standoff, dimensions and mass must be finite and positive";
+    if (dockHeadingToleranceRad >= Math.PI / 2) throw "Battery charger heading tolerance must be less than 90 degrees";
+    super(
+      'CHARGER-${Dimension.format(nominalVolts)}V-${Dimension.format(outputWatts)}W',
+      "Floor mounted mobile battery charger",
+      "painted steel",
+      true
+    );
     this.nominalVolts = nominalVolts;
     this.outputWatts = outputWatts;
     this.length = length;
@@ -47,8 +65,7 @@ class BatteryCharger extends MachineComponent {
     this.massKg = massKg;
     this.dockPositionToleranceMm = dockPositionToleranceMm;
     this.dockHeadingToleranceRad = dockHeadingToleranceRad;
-    dockApproach = {x: -dockStandoff, y: 0, z: 0, qx: 0, qy: 0,
-      qz: Math.sin(Math.PI / 4), qw: Math.cos(Math.PI / 4)};
+    dockApproach = {x: -dockStandoff, y: 0, z: 0, qx: 0, qy: 0, qz: Math.sin(Math.PI / 4), qw: Math.cos(Math.PI / 4)};
     addConnector("base", Mount, Solids.axial(0, 0, 0));
     addConnector("dock", Mount, dockApproach);
     addPort({name: "grid", kind: ElectricalPower, role: Consumer, iface: Unspecified, required: false});

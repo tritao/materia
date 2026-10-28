@@ -2,8 +2,8 @@ package machinekit.motion;
 
 /** Generic nut families; their allowances are assumptions, not vendor ratings. */
 enum LeadScrewNutKind {
-	PlainBronze;
-	AntiBacklash;
-	BallNut;
-	PreloadedBallNut;
+  PlainBronze;
+  AntiBacklash;
+  BallNut;
+  PreloadedBallNut;
 }

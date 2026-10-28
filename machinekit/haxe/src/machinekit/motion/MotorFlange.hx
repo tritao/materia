@@ -8,14 +8,14 @@ package machinekit.motion;
  * clearance and the mount is tapped). Null flange data means the interface has not been specified.
  */
 typedef MotorFlange = {
-	var face:Float;
-	var flangeThickness:Float;
-	var pilotDiameter:Float;
-	var pilotHeight:Float;
-	var holeDiameter:Float;
-	var holes:Array<{x:Float, y:Float}>;
-	@:optional var thread:String;
-	/** The screw size its holes take, where the maker states it (a drilled NEMA flange's M5). */
-	@:optional var screw:String;
-	@:optional var threadDepth:Float;
+  var face:Float;
+  var flangeThickness:Float;
+  var pilotDiameter:Float;
+  var pilotHeight:Float;
+  var holeDiameter:Float;
+  var holes:Array<{x:Float, y:Float}>;
+  @:optional var thread:String;
+  /** The screw size its holes take, where the maker states it (a drilled NEMA flange's M5). */
+  @:optional var screw:String;
+  @:optional var threadDepth:Float;
 }

@@ -16,13 +16,22 @@ class EnclosureKitPreview {
     function panel(id:String, width:Float, pose:AssemblyFrame):Void {
       var part = new EnclosurePanel(width, 800);
       result.addComponent(id, part, pose);
-      result.addMemberConnector("frame/post00", id, AssemblyFrames.compose(AssemblyFrames.inverse(root),
-        AssemblyFrames.compose(pose, part.connector("mount").frame)));
-      result.addMate(id+"-mount", "fixed", "frame/post00", id, id, "mount");
+      result.addMemberConnector(
+        "frame/post00",
+        id,
+        AssemblyFrames.compose(
+          AssemblyFrames.inverse(root),
+          AssemblyFrames.compose(
+            pose,
+            part.connector("mount").frame
+          )
+        )
+      );
+      result.addMate(id + "-mount", "fixed", "frame/post00", id, id, "mount");
     }
     panel("back", 1000, AssemblyFrames.translation(0, 320, 0));
-    panel("left", 600, AssemblyFrames.fromRotationMatrix(-520, 0, 0, [0,-1,0, 1,0,0, 0,0,1]));
-    panel("right", 600, AssemblyFrames.fromRotationMatrix(520, 0, 0, [0,-1,0, 1,0,0, 0,0,1]));
+    panel("left", 600, AssemblyFrames.fromRotationMatrix(-520, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]));
+    panel("right", 600, AssemblyFrames.fromRotationMatrix(520, 0, 0, [0, -1, 0, 1, 0, 0, 0, 0, 1]));
     panel("frontLeft", 250, AssemblyFrames.translation(-375, -320, 0));
     panel("frontRight", 250, AssemblyFrames.translation(375, -320, 0));
     var pose = AssemblyFrames.translation(0, -350, 0);
@@ -31,7 +40,10 @@ class EnclosureKitPreview {
     result.addMate("door-mount", "fixed", "frame/post00", "door", "door/rail", "mount");
     return result;
   }
-  public static function preview():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(assembly(), "enclosure-kit"));
+  public static function preview():haxe.io.Bytes return SceneArtifact.encode(AssemblyPreview.scene(
+    assembly(),
+    "enclosure-kit"
+  ));
   public static function main():Void {
     var bytes = preview();
     var root = Sys.getCwd();

@@ -28,221 +28,578 @@ import machinekit.component.Solids;
  * Hole tools share the convention: the seat surface is z=0 and material lies at z<0.
  */
 class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
-	static var table:Null<Catalog<MetricScrewSpec>>;
+  static var table:Null<Catalog<MetricScrewSpec>>;
 
-	public final spec:MetricScrewSpec;
-	public final length:Float;
-	public final propertyClass:PropertyClass;
-	public final drive:ScrewDrive;
-	public final thread:ThreadSpec;
-	public var diameter(get, never):Float;
-	public var pitch(get, never):Float;
-	/** Threaded length measured from the tip. */
-	public var threadLength(get, never):Float;
+  public final spec:MetricScrewSpec;
+  public final length:Float;
+  public final propertyClass:PropertyClass;
+  public final drive:ScrewDrive;
+  public final thread:ThreadSpec;
+  public var diameter(get, never):Float;
+  public var pitch(get, never):Float;
+  /** Threaded length measured from the tip. */
+  public var threadLength(get, never):Float;
 
-	static function rows():Array<MetricScrewSpec>
-		return [
-			row("M3", 3, 0.5, 5.5, 3, 2.5, 1.3, 18, 2.5, 3.2, 3.4, 3.6, 6.5, 3.4),
-			row("M4", 4, 0.7, 7, 4, 3, 2, 20, 3.3, 4.3, 4.5, 4.8, 8, 4.4),
-			row("M5", 5, 0.8, 8.5, 5, 4, 2.5, 22, 4.2, 5.3, 5.5, 5.8, 10, 5.4),
-			row("M6", 6, 1.0, 10, 6, 5, 3, 24, 5.0, 6.4, 6.6, 7, 11, 6.4),
-			row("M8", 8, 1.25, 13, 8, 6, 4, 28, 6.8, 8.4, 9, 10, 15, 8.6),
-			row("M10", 10, 1.5, 16, 10, 8, 5, 32, 8.5, 10.5, 11, 12, 18, 10.6),
-			row("M12", 12, 1.75, 18, 12, 10, 6, 36, 10.2, 13, 13.5, 14.5, 20, 12.6),
-			row("M14", 14, 2.0, 21, 14, 12, 7, 40, 12.0, 15, 15.5, 16.5, 24, 14.6),
-			row("M16", 16, 2.0, 24, 16, 14, 8, 44, 14.0, 17, 17.5, 18.5, 26, 16.6),
-			row("M20", 20, 2.5, 30, 20, 17, 10, 52, 17.5, 21, 22, 24, 33, 20.6),
-		];
+  static function rows():Array<MetricScrewSpec> return [
+    row(
+      "M3",
+      3,
+      0.5,
+      5.5,
+      3,
+      2.5,
+      1.3,
+      18,
+      2.5,
+      3.2,
+      3.4,
+      3.6,
+      6.5,
+      3.4
+    ),
+    row(
+      "M4",
+      4,
+      0.7,
+      7,
+      4,
+      3,
+      2,
+      20,
+      3.3,
+      4.3,
+      4.5,
+      4.8,
+      8,
+      4.4
+    ),
+    row(
+      "M5",
+      5,
+      0.8,
+      8.5,
+      5,
+      4,
+      2.5,
+      22,
+      4.2,
+      5.3,
+      5.5,
+      5.8,
+      10,
+      5.4
+    ),
+    row(
+      "M6",
+      6,
+      1.0,
+      10,
+      6,
+      5,
+      3,
+      24,
+      5.0,
+      6.4,
+      6.6,
+      7,
+      11,
+      6.4
+    ),
+    row(
+      "M8",
+      8,
+      1.25,
+      13,
+      8,
+      6,
+      4,
+      28,
+      6.8,
+      8.4,
+      9,
+      10,
+      15,
+      8.6
+    ),
+    row(
+      "M10",
+      10,
+      1.5,
+      16,
+      10,
+      8,
+      5,
+      32,
+      8.5,
+      10.5,
+      11,
+      12,
+      18,
+      10.6
+    ),
+    row(
+      "M12",
+      12,
+      1.75,
+      18,
+      12,
+      10,
+      6,
+      36,
+      10.2,
+      13,
+      13.5,
+      14.5,
+      20,
+      12.6
+    ),
+    row(
+      "M14",
+      14,
+      2.0,
+      21,
+      14,
+      12,
+      7,
+      40,
+      12.0,
+      15,
+      15.5,
+      16.5,
+      24,
+      14.6
+    ),
+    row(
+      "M16",
+      16,
+      2.0,
+      24,
+      16,
+      14,
+      8,
+      44,
+      14.0,
+      17,
+      17.5,
+      18.5,
+      26,
+      16.6
+    ),
+    row(
+      "M20",
+      20,
+      2.5,
+      30,
+      20,
+      17,
+      10,
+      52,
+      17.5,
+      21,
+      22,
+      24,
+      33,
+      20.6
+    ),
+  ];
 
-	public static function catalog():Catalog<MetricScrewSpec> {
-		if (table == null)
-			table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
-				case "M5": ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					sources: ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf?context=bWFzdGVyfHJvb3R8MjAxMTYxfGFwcGxpY2F0aW9uL3BkZnxhR1UyTDJoaU1pODVNamc1TURNd05UTXpNVFV3TDFSbFkyaHVhWE5qYUdVdFNHbHVkMlZwYzJVdFUyTm9jbUYxWW1WdUxVMTFkSFJsY201ZlJVNHVjR1JtfDNkOGZmNzZiMzAyMDRjZGQzMzIzZWIzNGEzY2I5NjA0MzkxNjY2ZTdkMDNmZjU2NDg2YWY3N2YyODUxZmFlMTA"],
-					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
-						"tapDrill", "clearanceFine", "clearanceMedium", "counterboreDiameter"]});
-				case "M14": ({source: "https://www.accu.co.uk/metric-cap-head-screws/3248-SSC-M14-65-A4", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
-						"clearanceCoarse", "counterboreDiameter", "counterboreDepth"]});
-				case "M16": ({source: "https://www.accu.co.uk/metric-cap-head-screws/3260-SSC-M16-65-A4", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
-						"clearanceCoarse", "counterboreDiameter", "counterboreDepth"]});
-				case "M20": ({source: "https://www.accu.co.uk/metric-cap-head-screws/15854-SSC-M20-75-A2", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
-						"clearanceCoarse", "counterboreDiameter", "counterboreDepth"]});
-				default: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope})
-			});
-		return table;
-	}
+  public static function catalog():Catalog<MetricScrewSpec> {
+    if (table == null) table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
+      case "M5":
+        ({
+          source: "https://www.accu.co.uk/api/product-datasheet?id=652689",
+          standard: "ISO 4762",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: NominalEnvelope,
+          sources: ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf?context=bWFzdGVyfHJvb3R8MjAxMTYxfGFwcGxpY2F0aW9uL3BkZnxhR1UyTDJoaU1pODVNamc1TURNd05UTXpNVFV3TDFSbFkyaHVhWE5qYUdVdFNHbHVkMlZwYzJVdFUyTm9jbUYxWW1WdUxVMTFkSFJsY201ZlJVNHVjR1JtfDNkOGZmNzZiMzAyMDRjZGQzMzIzZWIzNGEzY2I5NjA0MzkxNjY2ZTdkMDNmZjU2NDg2YWY3N2YyODUxZmFlMTA"],
+          verifiedFields: [
+            "diameter",
+            "pitch",
+            "headDiameter",
+            "headHeight",
+            "socketSize",
+            "socketDepth",
+            "threadLength",
+            "tapDrill",
+            "clearanceFine",
+            "clearanceMedium",
+            "counterboreDiameter"
+          ]
+        });
+      case "M14":
+        ({
+          source: "https://www.accu.co.uk/metric-cap-head-screws/3248-SSC-M14-65-A4",
+          standard: "ISO 4762",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: NominalEnvelope,
+          verifiedFields: [
+            "diameter",
+            "pitch",
+            "headDiameter",
+            "headHeight",
+            "socketSize",
+            "socketDepth",
+            "threadLength",
+            "clearanceCoarse",
+            "counterboreDiameter",
+            "counterboreDepth"
+          ]
+        });
+      case "M16":
+        ({
+          source: "https://www.accu.co.uk/metric-cap-head-screws/3260-SSC-M16-65-A4",
+          standard: "ISO 4762",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: NominalEnvelope,
+          verifiedFields: [
+            "diameter",
+            "pitch",
+            "headDiameter",
+            "headHeight",
+            "socketSize",
+            "socketDepth",
+            "threadLength",
+            "clearanceCoarse",
+            "counterboreDiameter",
+            "counterboreDepth"
+          ]
+        });
+      case "M20":
+        ({
+          source: "https://www.accu.co.uk/metric-cap-head-screws/15854-SSC-M20-75-A2",
+          standard: "ISO 4762",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: NominalEnvelope,
+          verifiedFields: [
+            "diameter",
+            "pitch",
+            "headDiameter",
+            "headHeight",
+            "socketSize",
+            "socketDepth",
+            "threadLength",
+            "clearanceCoarse",
+            "counterboreDiameter",
+            "counterboreDepth"
+          ]
+        });
+      default:
+        ({
+          source: "MachineKit embedded nominal table; source verification pending",
+          standard: "ISO 4762",
+          standardEdition: null,
+          dimensionKind: Unverified,
+          conformance: NominalEnvelope
+        })
+    }
+    );
+    return table;
+  }
 
-	public static function metric(size:String, length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew
-		return new SocketHeadCapScrew(catalog().get(size), length, propertyClass);
+  public static function metric(size:String,
+    length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew return new SocketHeadCapScrew(
+      catalog().get(size),
+      length,
+      propertyClass
+    );
 
-	public static function custom(spec:MetricScrewSpec, length:Float,
-			propertyClass:PropertyClass = Steel129):SocketHeadCapScrew
-		return new SocketHeadCapScrew(spec, length, propertyClass, true);
+  public static function custom(spec:MetricScrewSpec,
+    length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew return new SocketHeadCapScrew(
+      spec,
+      length,
+      propertyClass,
+      true
+    );
 
-	private function new(spec:MetricScrewSpec, length:Float, propertyClass:PropertyClass = Steel129,
-			codeOnly:Bool = false) {
-		if (!(length > 0) || !Math.isFinite(length)) throw 'Screw ${spec.size} needs a positive length';
-		if (propertyClass == null) throw 'Screw ${spec.size} needs a property class';
-		if (!(spec.diameter > 0) || !(spec.headDiameter > spec.diameter) || !(spec.headHeight > spec.socketDepth)
-			|| !(spec.socketSize > 0) || !(spec.socketDepth > 0) || !(spec.threadLength > 0)
-			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter)
-			|| !(spec.counterboreDiameter > spec.headDiameter) || !(spec.counterboreDepth > spec.headHeight))
-			throw 'Screw ${spec.size} has inconsistent dimensions';
-		var name = '${spec.size}x${Dimension.format(length)}';
-		var material = PropertyClasses.material(propertyClass);
-		var materialSuffix = propertyClass == Steel129 ? "" : '-' + PropertyClasses.token(propertyClass);
-		var designation = 'ISO4762-$name$materialSuffix';
-		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}' +
-			'-HD${Dimension.format(spec.headDiameter)}x${Dimension.format(spec.headHeight)}-S${Dimension.format(spec.socketSize)}x${Dimension.format(spec.socketDepth)}' +
-			'-TL${Dimension.format(spec.threadLength)}-TD${Dimension.format(spec.tapDrill)}' +
-			'-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}' +
-			'-CB${Dimension.format(spec.counterboreDiameter)}x${Dimension.format(spec.counterboreDepth)}' +
-			'-L${Dimension.format(length)}-M${StringTools.replace(material, " ", "-")}';
-		super(codeOnly ? customDesignation(customName) : designation,
-			'Socket head cap screw $name$materialSuffix', material, codeOnly);
-		this.spec = spec;
-		this.length = length;
-		this.propertyClass = propertyClass;
-		drive = HexSocket(spec.socketSize);
-		thread = FastenerThreads.metric(spec.diameter, spec.pitch);
-		addConnector("head", Face, Solids.axial(0, 0, 0));
-		addConnector("tip", Face, Solids.axial(0, 0, -length));
-		var floor = driveFrame().z;
-		var plainStart = -length + threadLength;
-		// Teeth are semantic, not collision geometry. Use the standard thread-root
-		// envelope where a screw must enter its mating tap-drill bore.
-		var pieces = [machinekit.component.CollisionHullFacet.cylinder(thread.externalMinorDiameter()/2,-length,plainStart)];
-		if (plainStart < 0) pieces.push(machinekit.component.CollisionHullFacet.cylinder(diameter/2,plainStart,0));
-		pieces = pieces.concat([
-			machinekit.component.CollisionHullFacet.cylinder(spec.headDiameter/2,0,floor)]);
-		var part = geometry(Preview);
-		try pieces = pieces.concat(machinekit.component.CollisionHullFacet.fromExtrusion(part,floor,spec.headHeight).hulls)
-		catch (error:Dynamic) { part.close(); throw error; }
-		part.close();
-		addFacet(new machinekit.component.CollisionHullFacet(pieces));
-	}
+  private function new(
+    spec:MetricScrewSpec,
+    length:Float,
+    propertyClass:PropertyClass = Steel129,
+    codeOnly:Bool = false
+  ) {
+    if (!(length > 0) || !Math.isFinite(length)) throw 'Screw ${spec.size} needs a positive length';
+    if (propertyClass == null) throw 'Screw ${spec.size} needs a property class';
+    if (!(spec.diameter > 0) || !(spec.headDiameter > spec.diameter) || !(spec.headHeight > spec.socketDepth)
+      || !(spec.socketSize > 0) || !(spec.socketDepth > 0) || !(spec.threadLength > 0) || !(spec.tapDrill
+      < spec.diameter) || !(spec.clearanceFine > spec.diameter) || !(spec.counterboreDiameter > spec.headDiameter)
+      || !(spec.counterboreDepth > spec.headHeight)) throw 'Screw ${spec.size} has inconsistent dimensions';
+    var name = '${spec.size}x${Dimension.format(length)}';
+    var material = PropertyClasses.material(propertyClass);
+    var materialSuffix = propertyClass == Steel129 ? "" : '-' + PropertyClasses.token(propertyClass);
+    var designation = 'ISO4762-$name$materialSuffix';
+    var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}'
+      + '-HD${Dimension.format(spec.headDiameter)}x${Dimension.format(spec.headHeight)}-S${Dimension.format(spec.socketSize)}x${Dimension.format(spec.socketDepth)}'
+      + '-TL${Dimension.format(spec.threadLength)}-TD${Dimension.format(spec.tapDrill)}'
+      + '-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}'
+      + '-CB${Dimension.format(spec.counterboreDiameter)}x${Dimension.format(spec.counterboreDepth)}'
+      + '-L${Dimension.format(length)}-M${StringTools.replace(material, " ", "-")}';
+    super(
+      codeOnly ? customDesignation(customName) : designation,
+      'Socket head cap screw $name$materialSuffix',
+      material,
+      codeOnly
+    );
+    this.spec = spec;
+    this.length = length;
+    this.propertyClass = propertyClass;
+    drive = HexSocket(spec.socketSize);
+    thread = FastenerThreads.metric(spec.diameter, spec.pitch);
+    addConnector("head", Face, Solids.axial(0, 0, 0));
+    addConnector("tip", Face, Solids.axial(0, 0, -length));
+    var floor = driveFrame().z;
+    var plainStart = -length + threadLength;
+    // Teeth are semantic, not collision geometry. Use the standard thread-root
+    // envelope where a screw must enter its mating tap-drill bore.
+    var pieces = [machinekit.component.CollisionHullFacet.cylinder(
+      thread.externalMinorDiameter() / 2,
+      -length,
+      plainStart
+    )];
+    if (plainStart < 0) pieces.push(machinekit.component.CollisionHullFacet.cylinder(diameter / 2, plainStart, 0));
+    pieces = pieces.concat([machinekit.component.CollisionHullFacet.cylinder(spec.headDiameter / 2, 0, floor)]);
+    var part = geometry(Preview);
+    try pieces = pieces.concat(machinekit.component.CollisionHullFacet.fromExtrusion(part,
+      floor, spec.headHeight).hulls) catch (error:Dynamic) {
+      part.close();
+      throw error;
+    }
+    part.close();
+    addFacet(new machinekit.component.CollisionHullFacet(pieces));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	public function bearingFrame():materia.assembly.AssemblyRecord.AssemblyFrame
-		return {x:0,y:0,z:0,qx:1,qy:0,qz:0,qw:0};
-	public function headClearanceRadius():Float return spec.headDiameter/2;
-	public function headBearingRadius():Float return spec.headDiameter/2;
-	public function screwDrive():ScrewDrive return drive;
-	public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame
-		return {x:0,y:0,z:spec.headHeight-spec.socketDepth,qx:1,qy:0,qz:0,qw:0};
-	public function threadSpec():ThreadSpec return thread;
-	public function fastenerClass():PropertyClass return propertyClass;
-	public function shankLength():Float return length;
-	public function threadedLength():Float return threadLength;
-	public function tightening():TighteningTableRow return FastenerTightening.forThread(thread, propertyClass);
+  public function bearingFrame():materia.assembly.AssemblyRecord.AssemblyFrame return {
+    x: 0,
+    y: 0,
+    z: 0,
+    qx: 1,
+    qy: 0,
+    qz: 0,
+    qw: 0
+  };
+  public function headClearanceRadius():Float return spec.headDiameter / 2;
+  public function headBearingRadius():Float return spec.headDiameter / 2;
+  public function screwDrive():ScrewDrive return drive;
+  public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame return {
+    x: 0,
+    y: 0,
+    z: spec.headHeight - spec.socketDepth,
+    qx: 1,
+    qy: 0,
+    qz: 0,
+    qw: 0
+  };
+  public function threadSpec():ThreadSpec return thread;
+  public function fastenerClass():PropertyClass return propertyClass;
+  public function shankLength():Float return length;
+  public function threadedLength():Float return threadLength;
+  public function tightening():TighteningTableRow return FastenerTightening.forThread(thread, propertyClass);
 
-	override public function setMaterial(spec:String):Void {
-		if (spec != PropertyClasses.material(propertyClass))
-			throw 'Fastener $designation material is determined by property class ${PropertyClasses.token(propertyClass)}';
-		super.setMaterial(spec);
-	}
+  override public function setMaterial(spec:String):Void {
+    if (spec != PropertyClasses
+      .material(propertyClass)) throw 'Fastener $designation material is determined by property class ${PropertyClasses.token(propertyClass)}';
+    super.setMaterial(spec);
+  }
 
-	/** Dimensioned from the standard and datasheets cited above. */
-	override public function geometryFidelity():machinekit.component.GeometryFidelity
-		return machinekit.component.GeometryFidelity.Datasheet;
+  /** Dimensioned from the standard and datasheets cited above. */
+  override public function geometryFidelity():machinekit
+    .component.GeometryFidelity return machinekit.component.GeometryFidelity.Datasheet;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var head = Solids.named(Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight), "head");
-		var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
-		var threaded = new Part(Threads.attach(shank.shape, "shank:cyl.side", thread, AxisMaximum, threadLength, length - threadLength));
-		shank.close();
-		var body = Solids.union([head, threaded]);
-		if (detail == Envelope) return body;
-		var top = spec.headHeight;
-		var socket = Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), driveFrame().z, top + 0.1),
-			"socket");
-		return Solids.cut(body, [socket]);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var head = Solids.named(Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight), "head");
+    var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
+    var threaded = new Part(Threads.attach(
+      shank.shape,
+      "shank:cyl.side",
+      thread,
+      AxisMaximum,
+      threadLength,
+      length - threadLength
+    ));
+    shank.close();
+    var body = Solids.union([head, threaded]);
+    if (detail == Envelope) return body;
+    var top = spec.headHeight;
+    var socket = Solids.named(
+      Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), driveFrame().z, top + 0.1),
+      "socket"
+    );
+    return Solids.cut(body, [socket]);
+  }
 
-	public function clearanceDiameter(fit:ClearanceFit = Medium):Float {
-		return switch (fit) {
-			case Fine: spec.clearanceFine;
-			case Medium: spec.clearanceMedium;
-			case Coarse: spec.clearanceCoarse;
-		}
-	}
+  public function clearanceDiameter(fit:ClearanceFit = Medium):Float {
+    return switch (fit) {
+      case Fine:
+        spec.clearanceFine;
+      case Medium:
+        spec.clearanceMedium;
+      case Coarse:
+        spec.clearanceCoarse;
+    }
+  }
 
-	/** Through-hole tool from z=0 down to z=-depth. */
-	public function clearanceHole(depth:Float, fit:ClearanceFit = Medium):Part
-		return Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0);
+  /** Through-hole tool from z=0 down to z=-depth. */
+  public function clearanceHole(depth:Float, fit:ClearanceFit = Medium):Part return Part.cylinderSpan(
+    clearanceDiameter(fit) / 2,
+    -depth,
+    0
+  );
 
-	/** Tap-drill tool from z=0 down to z=-depth; the named bore carries its internal thread. */
-	public function tapHole(depth:Float):Part
-		return Threads.tappedBore(thread.mating(), spec.tapDrill, depth);
+  /** Tap-drill tool from z=0 down to z=-depth; the named bore carries its internal thread. */
+  public function tapHole(depth:Float):Part return Threads.tappedBore(thread.mating(), spec.tapDrill, depth);
 
-	/** Counterbored through-hole tool. The screw's `head` sits at z=-counterboreDepth. */
-	public function counterboreHole(depth:Float, fit:ClearanceFit = Medium):Part {
-		if (!(depth > spec.counterboreDepth)) throw 'Counterbore for ${spec.size} needs depth over ${spec.counterboreDepth}';
-		return Solids.union([
-			Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0),
-			Part.cylinderSpan(spec.counterboreDiameter / 2, -spec.counterboreDepth, 0),
-		]);
-	}
+  /** Counterbored through-hole tool. The screw's `head` sits at z=-counterboreDepth. */
+  public function counterboreHole(depth:Float, fit:ClearanceFit = Medium):Part {
+    if (!(depth
+      > spec.counterboreDepth)) throw 'Counterbore for ${spec.size} needs depth over ${spec.counterboreDepth}';
+    return Solids.union([
+      Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0),
+      Part.cylinderSpan(
+        spec.counterboreDiameter / 2,
+        -spec.counterboreDepth,
+        0
+      ),
+    ]);
+  }
 
-	function get_diameter():Float return spec.diameter;
-	function get_pitch():Float return spec.pitch;
-	function get_threadLength():Float return Math.min(length, spec.threadLength);
+  function get_diameter():Float return spec.diameter;
+  function get_pitch():Float return spec.pitch;
+  function get_threadLength():Float return Math.min(length, spec.threadLength);
 
-	override public function toolSpecs():Array<ToolSpec> return [
-		new ToolSpec("clearanceHole", [ComponentRecipeSupport.toolDepth(length),
-			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")]),
-		new ToolSpec("tapHole", [ComponentRecipeSupport.toolDepth(length)]),
-		new ToolSpec("counterboreHole", [ComponentRecipeSupport.toolDepth(Math.max(length, spec.counterboreDepth + 1)),
-			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])
-	];
+  override public function toolSpecs():Array<ToolSpec> return [
+    new ToolSpec(
+      "clearanceHole",
+      [
+        ComponentRecipeSupport.toolDepth(length),
+        ComponentRecipeSupport.choice(
+          "fit",
+          [
+            "Fine",
+            "Medium",
+            "Coarse"
+          ],
+          "Medium"
+        )
+      ]
+    ),
+    new ToolSpec(
+      "tapHole",
+      [ComponentRecipeSupport.toolDepth(length)]
+    ),
+    new ToolSpec(
+      "counterboreHole",
+      [
+        ComponentRecipeSupport.toolDepth(Math.max(
+          length,
+          spec.counterboreDepth + 1
+        )),
+        ComponentRecipeSupport.choice(
+          "fit",
+          [
+            "Fine",
+            "Medium",
+            "Coarse"
+          ],
+          "Medium"
+        )
+      ]
+    )
+  ];
 
-	override function buildTool(name:String, values:ComponentValues):Part {
-		var depth = values.number("depth");
-		return switch name {
-			case "clearanceHole": clearanceHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
-			case "tapHole": tapHole(depth);
-			case "counterboreHole": counterboreHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
-			default: super.buildTool(name, values);
-		};
-	}
+  override function buildTool(name:String, values:ComponentValues):Part {
+    var depth = values.number("depth");
+    return switch name {
+      case "clearanceHole":
+        clearanceHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+      case "tapHole":
+        tapHole(depth);
+      case "counterboreHole":
+        counterboreHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+      default:
+        super.buildTool(name, values);
+    };
+  }
 
-	static function row(size:String, diameter:Float, pitch:Float, headDiameter:Float, headHeight:Float,
-			socketSize:Float, socketDepth:Float, threadLength:Float, tapDrill:Float, fine:Float,
-			medium:Float, coarse:Float, counterboreDiameter:Float, counterboreDepth:Float):MetricScrewSpec {
-		return {size: size, diameter: diameter, pitch: pitch, headDiameter: headDiameter,
-			headHeight: headHeight, socketSize: socketSize, socketDepth: socketDepth,
-			threadLength: threadLength, tapDrill: tapDrill, clearanceFine: fine,
-			clearanceMedium: medium, clearanceCoarse: coarse,
-			counterboreDiameter: counterboreDiameter, counterboreDepth: counterboreDepth};
-	}
+  static function row(
+    size:String,
+    diameter:Float,
+    pitch:Float,
+    headDiameter:Float,
+    headHeight:Float,
+    socketSize:Float,
+    socketDepth:Float,
+    threadLength:Float,
+    tapDrill:Float,
+    fine:Float,
+    medium:Float,
+    coarse:Float,
+    counterboreDiameter:Float,
+    counterboreDepth:Float
+  ):MetricScrewSpec {
+    return {
+      size: size,
+      diameter: diameter,
+      pitch: pitch,
+      headDiameter: headDiameter,
+      headHeight: headHeight,
+      socketSize: socketSize,
+      socketDepth: socketDepth,
+      threadLength: threadLength,
+      tapDrill: tapDrill,
+      clearanceFine: fine,
+      clearanceMedium: medium,
+      clearanceCoarse: coarse,
+      counterboreDiameter: counterboreDiameter,
+      counterboreDepth: counterboreDepth
+    };
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.standard.socket-head-cap-screw",
-			[ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
-				ComponentRecipeSupport.choice("propertyClass", PropertyClasses.tokens(), "12.9")],
-			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
-			true, true, null, false);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.standard.socket-head-cap-screw",
+      [
+        ComponentRecipeSupport.catalog(
+          "size",
+          SocketHeadCapScrew.catalog(),
+          "M5"
+        ),
+        ComponentRecipeSupport.length(
+          "length",
+          20
+        ),
+        ComponentRecipeSupport.choice(
+          "propertyClass",
+          PropertyClasses.tokens(),
+          "12.9"
+        )
+      ],
+      v -> SocketHeadCapScrew.metric(
+        v.token("size"),
+        v.number("length"),
+        PropertyClasses.parse(v.token("propertyClass"))
+      ),
+      true,
+      true,
+      null,
+      false
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues().set("size", Token(this.spec.size))
-				.set("length", Number(this.length))
-				.set("propertyClass", Token(PropertyClasses.token(propertyClass)));
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().set("size", Token(this.spec.size)).set("length", Number(this.length)).set(
+      "propertyClass",
+      Token(PropertyClasses.token(propertyClass))
+    );
+  }
 
 }

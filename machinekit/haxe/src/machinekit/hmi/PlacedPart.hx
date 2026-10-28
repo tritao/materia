@@ -22,7 +22,11 @@ class PlacedPart {
     var facet = PanelMountFacet.of(part);
     if (facet == null) throw 'Placed part $id (${part.designation}) does not state a panel mount';
     if (!Math.isFinite(x) || !Math.isFinite(y)) throw 'Placed part $id has a non-finite position';
-    this.id = id; this.part = part; this.mount = facet; this.x = x; this.y = y;
+    this.id = id;
+    this.part = part;
+    this.mount = facet;
+    this.x = x;
+    this.y = y;
   }
 
   /** The same part at another position. */

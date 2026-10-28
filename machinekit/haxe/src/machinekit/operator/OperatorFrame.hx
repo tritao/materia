@@ -41,7 +41,10 @@ class OperatorFrame {
 
   public function encode():Bytes {
     var out = Bytes.alloc(HEADER_SIZE + payload.length + 4);
-    out.set(0, 0x4F); out.set(1, 0x50); out.set(2, 0x52); out.set(3, 0x31); // "OPR1"
+    out.set(0, 0x4F);
+    out.set(1, 0x50);
+    out.set(2, 0x52);
+    out.set(3, 0x31); // "OPR1"
     out.set(4, type);
     out.set(5, 0);
     out.set(6, payload.length & 0xFF);
@@ -54,7 +57,8 @@ class OperatorFrame {
 
   public static function decode(input:Bytes):OperatorFrame {
     if (input == null || input.length < HEADER_SIZE + 4) throw "Operator frame is too short";
-    if (input.get(0) != 0x4F || input.get(1) != 0x50 || input.get(2) != 0x52 || input.get(3) != 0x31) throw "Bad operator frame marker";
+    if (input.get(0) != 0x4F
+      || input.get(1) != 0x50 || input.get(2) != 0x52 || input.get(3) != 0x31) throw "Bad operator frame marker";
     if (input.get(5) != 0) throw "Operator frame reserved byte is set";
     var length = input.get(6) | (input.get(7) << 8);
     if (input.length != HEADER_SIZE + length + 4) throw "Operator frame length mismatch";

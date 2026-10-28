@@ -11,8 +11,8 @@ interface WeldProbeUncertainty {
 
 /** Bind observed uncertainty without making CAD geometry depend on a runtime registration implementation. */
 class WeldProbeObservedBounds implements WeldProbeUncertainty {
-  final bounds:WeldProbeFace->Vector->WeldProbeRegionBounds;
-  public function new(bounds:WeldProbeFace->Vector->WeldProbeRegionBounds) {
+  final bounds:WeldProbeFace -> Vector -> WeldProbeRegionBounds;
+  public function new(bounds:WeldProbeFace -> Vector -> WeldProbeRegionBounds) {
     if (bounds == null) throw "Observed probe uncertainty needs a region provider";
     this.bounds = bounds;
   }

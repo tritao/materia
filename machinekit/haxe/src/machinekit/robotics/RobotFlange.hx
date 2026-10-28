@@ -26,11 +26,11 @@ import machinekit.standard.SocketHeadCapScrew;
  * diameter d2, and locating pin diameter d7, in millimetres.
  */
 typedef RobotFlangeSpec = {
-	var pitchCircle:Float;
-	var boltCount:Int;
-	var screw:String;
-	var pilotDiameter:Float;
-	var pinDiameter:Float;
+  var pitchCircle:Float;
+  var boltCount:Int;
+  var screw:String;
+  var pilotDiameter:Float;
+  var pinDiameter:Float;
 }
 
 /** Robot tool flange using the ISO 9409-1 bolt pattern: a round plate with a centring pilot, a bolt circle, and a
@@ -52,174 +52,301 @@ typedef RobotFlangeSpec = {
  * the face; `mountingCutout` is the matching tool in that part's frame.
  */
 class RobotFlange extends MachineComponent {
-	static var table:Null<Catalog<RobotFlangeSpec>>;
-	static inline var MIN_WEB:Float = 1.0;
+  static var table:Null<Catalog<RobotFlangeSpec>>;
+  static inline var MIN_WEB:Float = 1.0;
 
-	public final spec:RobotFlangeSpec;
-	public final flangeDiameter:Float;
-	public final thickness:Float;
-	public final pilotDiameter:Float;
-	public final pilotHeight:Float;
-	public final boltCircleDiameter:Float;
-	public final boltCount:Int;
-	public final mountScrew:String;
-	public final pinDiameter:Float;
+  public final spec:RobotFlangeSpec;
+  public final flangeDiameter:Float;
+  public final thickness:Float;
+  public final pilotDiameter:Float;
+  public final pilotHeight:Float;
+  public final boltCircleDiameter:Float;
+  public final boltCount:Int;
+  public final mountScrew:String;
+  public final pinDiameter:Float;
 
-	static function rows():Array<RobotFlangeSpec>
-		return [
-			row(31.5, 4, "M5", 20, 5),
-			row(40, 4, "M6", 25, 6),
-			row(50, 4, "M6", 31.5, 6),
-			row(63, 4, "M6", 40, 6),
-			row(80, 6, "M8", 50, 8),
-			row(100, 6, "M8", 63, 8),
-			row(125, 6, "M10", 80, 10),
-			row(160, 6, "M10", 100, 10),
-		];
+  static function rows():Array<RobotFlangeSpec> return [
+    row(31.5, 4, "M5", 20, 5),
+    row(40, 4, "M6", 25, 6),
+    row(
+      50,
+      4,
+      "M6",
+      31.5,
+      6
+    ),
+    row(
+      63,
+      4,
+      "M6",
+      40,
+      6
+    ),
+    row(
+      80,
+      6,
+      "M8",
+      50,
+      8
+    ),
+    row(
+      100,
+      6,
+      "M8",
+      63,
+      8
+    ),
+    row(
+      125,
+      6,
+      "M10",
+      80,
+      10
+    ),
+    row(
+      160,
+      6,
+      "M10",
+      100,
+      10
+    ),
+  ];
 
-	/** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
-	public static function catalog():Catalog<RobotFlangeSpec> {
-		if (table == null)
-			table = new Catalog("ISO 9409-1 flange size", spec -> Dimension.format(spec.pitchCircle), rows(), _ -> ({
-				source: "https://www.iso.org/standard/36578.html", standard: "ISO 9409-1", standardEdition: "2004",
-				dimensionKind: Nominal, conformance: GenericApproximation,
-				verifiedFields: ["pitchCircle", "boltCount", "screw", "pilotDiameter", "pinDiameter"]}));
-		return table;
-	}
+  /** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
+  public static function catalog():Catalog<RobotFlangeSpec> {
+    if (table == null) table = new Catalog(
+      "ISO 9409-1 flange size",
+      spec -> Dimension.format(spec.pitchCircle),
+      rows(),
+      _ -> ({
+        source: "https://www.iso.org/standard/36578.html",
+        standard: "ISO 9409-1",
+        standardEdition: "2004",
+        dimensionKind: Nominal,
+        conformance: GenericApproximation,
+        verifiedFields: [
+          "pitchCircle",
+          "boltCount",
+          "screw",
+          "pilotDiameter",
+          "pinDiameter"
+        ]
+      })
+    );
+    return table;
+  }
 
-	/** `pitchCircleDiameter` selects the ISO 9409-1 size; `boltCount` overrides its bolt count. */
-	public function new(pitchCircleDiameter:Float, ?boltCount:Int) {
-		if (!(pitchCircleDiameter > 0)) throw "Robot flange needs a positive diameter";
-		var spec = catalog().get(Dimension.format(pitchCircleDiameter));
-		var count:Int = boltCount == null ? spec.boltCount : boltCount;
-		if (count < 3) throw "Robot flange needs at least 3 bolts";
-		var screw = SocketHeadCapScrew.metric(spec.screw, 10);
-		var radius = spec.pitchCircle / 2;
-		// The pin sits half a bolt spacing from its neighbours: its hole must clear theirs, and
-		// adjacent screw heads must clear each other.
-		var pinToBolt = 2 * radius * Math.sin(Math.PI / (2 * count));
-		var boltToBolt = 2 * radius * Math.sin(Math.PI / count);
-		if (!(pinToBolt >= (screw.clearanceDiameter(Medium) + spec.pinDiameter) / 2 + MIN_WEB) ||
-			!(boltToBolt >= screw.spec.headDiameter + MIN_WEB))
-			throw 'Robot flange ${Dimension.format(spec.pitchCircle)} has too many bolts for its pitch circle';
-		var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
-		var standardPattern = count == spec.boltCount;
-		super(standardPattern ? 'ISO9409-STYLE-$size' : 'FLANGE-$size',
-			standardPattern ? 'Robot flange with ISO 9409-1-$size bolt pattern and raised pilot' : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
-			"steel");
-		this.spec = spec;
-		this.boltCount = count;
-		mountScrew = spec.screw;
-		boltCircleDiameter = spec.pitchCircle;
-		pilotDiameter = spec.pilotDiameter;
-		pinDiameter = spec.pinDiameter;
-		flangeDiameter = spec.pitchCircle + 2 * screw.spec.headDiameter;
-		thickness = 1.5 * screw.diameter;
-		pilotHeight = 0.5 * screw.diameter;
-		addConnector("face", Face, pinAlignedFrame(0));
-		addFacet(new RobotFlangeFacet("face"));
-		var i = 1;
-		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
-		var pin = pinPoint();
-		addConnector("pin", Mount, Solids.axial(pin.x, pin.y, 0));
-	}
+  /** `pitchCircleDiameter` selects the ISO 9409-1 size; `boltCount` overrides its bolt count. */
+  public function new(pitchCircleDiameter:Float, ?boltCount:Int) {
+    if (!(pitchCircleDiameter > 0)) throw "Robot flange needs a positive diameter";
+    var spec = catalog().get(Dimension.format(pitchCircleDiameter));
+    var count:Int = boltCount == null ? spec.boltCount : boltCount;
+    if (count < 3) throw "Robot flange needs at least 3 bolts";
+    var screw = SocketHeadCapScrew.metric(spec.screw, 10);
+    var radius = spec.pitchCircle / 2;
+    // The pin sits half a bolt spacing from its neighbours: its hole must clear theirs, and
+    // adjacent screw heads must clear each other.
+    var pinToBolt = 2 * radius * Math.sin(Math.PI / (2 * count));
+    var boltToBolt = 2 * radius * Math.sin(Math.PI / count);
+    if (!(pinToBolt >= (screw.clearanceDiameter(Medium) + spec.pinDiameter) / 2 + MIN_WEB)
+      || !(boltToBolt >= screw.spec.headDiameter
+      + MIN_WEB)) throw 'Robot flange ${Dimension.format(spec.pitchCircle)} has too many bolts for its pitch circle';
+    var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
+    var standardPattern = count == spec.boltCount;
+    super(
+      standardPattern ? 'ISO9409-STYLE-$size' : 'FLANGE-$size',
+      standardPattern ? 'Robot flange with ISO 9409-1-$size bolt pattern and raised pilot'
+      : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
+      "steel"
+    );
+    this.spec = spec;
+    this.boltCount = count;
+    mountScrew = spec.screw;
+    boltCircleDiameter = spec.pitchCircle;
+    pilotDiameter = spec.pilotDiameter;
+    pinDiameter = spec.pinDiameter;
+    flangeDiameter = spec.pitchCircle + 2 * screw.spec.headDiameter;
+    thickness = 1.5 * screw.diameter;
+    pilotHeight = 0.5 * screw.diameter;
+    addConnector("face", Face, pinAlignedFrame(0));
+    addFacet(new RobotFlangeFacet("face"));
+    var i = 1;
+    for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
+    var pin = pinPoint();
+    addConnector("pin", Mount, Solids.axial(pin.x, pin.y, 0));
+  }
 
-	/** Bolt centres on the mounting face, counter-clockwise from angle 0. */
-	public function boltPattern():Array<{x:Float, y:Float}> {
-		var r = boltCircleDiameter / 2;
-		return [for (i in 0...boltCount) {
-			var angle = 2 * Math.PI * i / boltCount;
-			{x: r * Math.cos(angle), y: r * Math.sin(angle)};
-		}];
-	}
+  /** Bolt centres on the mounting face, counter-clockwise from angle 0. */
+  public function boltPattern():Array<{x:Float, y:Float}> {
+    var r = boltCircleDiameter / 2;
+    return [for (i in 0...boltCount) {
+      var angle = 2 * Math.PI * i / boltCount;
+      {
+        x:r * Math.cos(angle), y:r * Math.sin(angle)
+      };
+    }
+    ];
+  }
 
-	/** Locating pin position on the pitch circle, half a bolt spacing from the first bolt. */
-	public function pinPoint():{x:Float, y:Float} {
-		var r = boltCircleDiameter / 2, angle = Math.PI / boltCount;
-		return {x: r * Math.cos(angle), y: r * Math.sin(angle)};
-	}
+  /** Locating pin position on the pitch circle, half a bolt spacing from the first bolt. */
+  public function pinPoint(): {x: Float, y: Float} {
+    var r = boltCircleDiameter / 2, angle = Math.PI / boltCount;
+    return {x: r * Math.cos(angle), y: r * Math.sin(angle)};
+  }
 
-	/** Connector +X points from the flange centre toward its locating pin. */
-	public function pinAlignedFrame(z:Float):AssemblyFrame
-		return AssemblyFrames.compose(Solids.axial(0, 0, z), AssemblyFrames.turnY(Math.PI / boltCount));
+  /** Connector +X points from the flange centre toward its locating pin. */
+  public function pinAlignedFrame(z:Float):AssemblyFrame return AssemblyFrames.compose(
+    Solids.axial(0, 0, z),
+    AssemblyFrames.turnY(Math.PI / boltCount)
+  );
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var boss = Solids.named(Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight), "pilot");
-		var body = Solids.union([Solids.named(Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), "flange"), boss]);
-		if (detail == Envelope) return body;
-		var screw = mountScrewPart(10);
-		var pin = pinPoint();
-		var tools = [Solids.named(Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y), "pin")];
-		var bolt = 1;
-		for (point in boltPattern())
-			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y),
-				"bolt" + bolt++));
-		return Solids.cut(body, tools);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var boss = Solids.named(Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight), "pilot");
+    var body = Solids.union([Solids.named(Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), "flange"), boss]);
+    if (detail == Envelope) return body;
+    var screw = mountScrewPart(10);
+    var pin = pinPoint();
+    var tools = [Solids.named(Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y), "pin")];
+    var bolt = 1;
+    for (point in boltPattern()) tools.push(Solids.named(
+      Part.cylinderSpan(
+        screw.clearanceDiameter(Medium) / 2,
+        -thickness - 0.1,
+        0.1,
+        point.x,
+        point.y
+      ),
+      "bolt" + bolt++
+    ));
+    return Solids.cut(body, tools);
+  }
 
-	/** Screw that fits the flange's bolt circle. */
-	public function mountScrewPart(length:Float):SocketHeadCapScrew
-		return SocketHeadCapScrew.metric(mountScrew, length);
+  /** Screw that fits the flange's bolt circle. */
+  public function mountScrewPart(length:Float):SocketHeadCapScrew return SocketHeadCapScrew.metric(mountScrew, length);
 
-	/** Depth of the pilot recess `mountingCutout` cuts: the pilot height plus `pilotClearance`. */
-	public function pilotRecessDepth(pilotClearance:Float = 0.2):Float
-		return pilotHeight + pilotClearance;
+  /** Depth of the pilot recess `mountingCutout` cuts: the pilot height plus `pilotClearance`. */
+  public function pilotRecessDepth(pilotClearance:Float = 0.2):Float return pilotHeight + pilotClearance;
 
-	/** Cutting tool for a part mated to `face`, in that part's frame (mating face at z=0, material
+  /** Cutting tool for a part mated to `face`, in that part's frame (mating face at z=0, material
 	 * toward +Z, `depth` deep): a blind pilot recess `pilotRecessDepth` deep and `pilotClearance`
 	 * over the pilot diameter, plus bolt and pin clearance holes through `depth`. Every tool
 	 * overshoots the mating face by 0.1, and the holes overshoot `depth` by 0.1, so no cut face is
 	 * coplanar with the part's faces.
 	 */
-	public function mountingCutout(depth:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
-		if (!(depth > pilotRecessDepth(pilotClearance)))
-			throw "Robot flange mounting cutout must be deeper than the pilot recess";
-		var screw = mountScrewPart(10);
-		var pin = pinPoint();
-		// Named like the flange's own bodies, so the faces a cutout leaves in a mating part stay distinguishable.
-		var tools = [
-			Solids.named(Part.cylinderSpan((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)), "pilot"),
-			Solids.named(Part.cylinderSpan((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y), "pin"),
-		];
-		var bolt = 1;
-		for (point in boltPattern())
-			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y), "bolt" + bolt++));
-		return Solids.union(tools);
-	}
+  public function mountingCutout(depth:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
+    if (!(depth
+      > pilotRecessDepth(pilotClearance))) throw "Robot flange mounting cutout must be deeper than the pilot recess";
+    var screw = mountScrewPart(10);
+    var pin = pinPoint();
+    // Named like the flange's own bodies, so the faces a cutout leaves in a mating part stay distinguishable.
+    var tools = [
+      Solids.named(
+        Part.cylinderSpan(
+          (pilotDiameter + pilotClearance) / 2,
+          -0.1,
+          pilotRecessDepth(pilotClearance)
+        ),
+        "pilot"
+      ),
+      Solids.named(
+        Part.cylinderSpan(
+          (pinDiameter + pilotClearance) / 2,
+          -0.1,
+          depth + 0.1,
+          pin.x,
+          pin.y
+        ),
+        "pin"
+      ),
+    ];
+    var bolt = 1;
+    for (point in boltPattern()) tools.push(Solids.named(
+      Part.cylinderSpan(
+        screw.clearanceDiameter(fit) / 2,
+        -0.1,
+        depth + 0.1,
+        point.x,
+        point.y
+      ),
+      "bolt" + bolt++
+    ));
+    return Solids.union(tools);
+  }
 
-	static function row(pitchCircle:Float, boltCount:Int, screw:String, pilotDiameter:Float,
-			pinDiameter:Float):RobotFlangeSpec
-		return {pitchCircle: pitchCircle, boltCount: boltCount, screw: screw, pilotDiameter: pilotDiameter,
-			pinDiameter: pinDiameter};
+  static function row(pitchCircle:Float,
+    boltCount:Int, screw:String, pilotDiameter:Float, pinDiameter:Float):RobotFlangeSpec return {
+      pitchCircle: pitchCircle,
+      boltCount: boltCount,
+      screw: screw,
+      pilotDiameter: pilotDiameter,
+      pinDiameter: pinDiameter
+    };
 
-	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("mountingCutout", [
-		ComponentRecipeSupport.toolDepth(pilotRecessDepth() + 1),
-		ComponentRecipeSupport.length("pilotClearance", 0.2),
-		ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])];
+  override public function toolSpecs():Array<ToolSpec> return [new ToolSpec(
+    "mountingCutout",
+    [
+      ComponentRecipeSupport.toolDepth(pilotRecessDepth() + 1),
+      ComponentRecipeSupport.length(
+        "pilotClearance",
+        0.2
+      ),
+      ComponentRecipeSupport.choice(
+        "fit",
+        [
+          "Fine",
+          "Medium",
+          "Coarse"
+        ],
+        "Medium"
+      )
+    ]
+  )];
 
-	override function buildTool(name:String, values:ComponentValues):Part {
-		if (name == "mountingCutout") return mountingCutout(values.number("depth"),
-			values.number("pilotClearance"), ComponentRecipeSupport.clearanceFit(values.token("fit")));
-		return super.buildTool(name, values);
-	}
+  override function buildTool(name:String, values:ComponentValues):Part {
+    if (name == "mountingCutout") return mountingCutout(
+      values.number("depth"),
+      values.number("pilotClearance"),
+      ComponentRecipeSupport.clearanceFit(values.token("fit"))
+    );
+    return super.buildTool(name, values);
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.robotics.robot-flange",
-			[ComponentRecipeSupport.length("pitchCircleDiameter", 40), ComponentRecipeSupport.count("boltCount", 4)],
-			v -> new RobotFlange(v.number("pitchCircleDiameter"), v.integer("boltCount")));
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.robotics.robot-flange",
+      [
+        ComponentRecipeSupport.length(
+          "pitchCircleDiameter",
+          40
+        ),
+        ComponentRecipeSupport.count(
+          "boltCount",
+          4
+        )
+      ],
+      v -> new RobotFlange(
+        v.number("pitchCircleDiameter"),
+        v.integer("boltCount")
+      )
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, RobotFlange) ? recipeType() : null;
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    RobotFlange) ? recipeType() : null;
 
-	override public function values():ComponentValues {
-		return new ComponentValues().setNumber("pitchCircleDiameter", this.spec.pitchCircle)
-				.setInteger("boltCount", this.boltCount).setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().setNumber("pitchCircleDiameter", this.spec.pitchCircle).setInteger(
+      "boltCount",
+      this.boltCount
+    ).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

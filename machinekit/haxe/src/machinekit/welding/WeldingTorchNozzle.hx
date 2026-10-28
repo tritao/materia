@@ -15,19 +15,31 @@ import machinekit.component.Solids;
  * CAD frame: the nozzle's base at the origin, the tip pointing along +Z. Connector `base`.
  */
 class WeldingTorchNozzle extends MachineComponent {
-	public function new(bendDegrees:Float = 45) {
-		super('WELD-TORCH-NOZZLE-${Dimension.format(bendDegrees)}DEG', 'Robot MIG torch gas nozzle and contact tip', "brass", true);
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-		declareMass(WeldingTorch.NOZZLE_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NOZZLE_LENGTH));
-	}
+  public function new(bendDegrees:Float = 45) {
+    super(
+      'WELD-TORCH-NOZZLE-${Dimension.format(bendDegrees)}DEG',
+      'Robot MIG torch gas nozzle and contact tip',
+      "brass",
+      true
+    );
+    addConnector("base", Mount, Solids.axial(0, 0, 0));
+    declareMass(WeldingTorch.NOZZLE_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NOZZLE_LENGTH));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var nozzle = WeldingTorch.NOZZLE_LENGTH;
-		return Solids.union([
-			Solids.named(Part.cylinderSpan(WeldingTorch.NOZZLE_R, 0, nozzle), "nozzle"),
-			Solids.named(Part.cylinderSpan(WeldingTorch.TIP_R, nozzle, nozzle + WeldingTorch.TIP_PROTRUSION), "tip")
-		]);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var nozzle = WeldingTorch.NOZZLE_LENGTH;
+    return Solids.union([
+      Solids.named(Part.cylinderSpan(WeldingTorch.NOZZLE_R, 0, nozzle), "nozzle"),
+      Solids.named(
+        Part.cylinderSpan(
+          WeldingTorch.TIP_R,
+          nozzle,
+          nozzle + WeldingTorch.TIP_PROTRUSION
+        ),
+        "tip"
+      )
+    ]);
+  }
 }

@@ -19,13 +19,14 @@ import materia.units.LengthUnit;
  * `shareDefinitions` keeps the connectors of all of them on it.
  */
 class AssemblyPreview {
-	/** Scene of `assembly` in millimetres, with its joints and initial pose; `assemblyId` names the definition. */
-	public static function scene(assembly:MachineAssembly, assemblyId:String, maxGeometricFaces:Int = 0):SceneArtifactData {
-        if(maxGeometricFaces<0)throw "Preview geometric-face limit must be nonnegative";
-		assembly.validate();
-		var model = new AssemblyModel("mm");
-		assembly.addTo(model, "");
-		var parts:Array<SceneArtifactPart> = [];
+  /** Scene of `assembly` in millimetres, with its joints and initial pose; `assemblyId` names the definition. */
+  public static function scene(assembly:MachineAssembly,
+    assemblyId:String, maxGeometricFaces:Int = 0):SceneArtifactData {
+    if (maxGeometricFaces < 0) throw "Preview geometric-face limit must be nonnegative";
+    assembly.validate();
+    var model = new AssemblyModel("mm");
+    assembly.addTo(model, "");
+    var parts:Array<SceneArtifactPart> = [];
     var machineMotion = movingBelts(assembly);
     var contacts:Array<materia.project.SceneArtifact.SceneArtifactHullContact> = [];
     for (entry in assembly.components()) {
@@ -33,223 +34,339 @@ class AssemblyPreview {
       if (surface != null) contacts.push({occurrence: entry.id, surface: surface});
     }
     if (contacts.length > 0) machineMotion.contacts = contacts;
-		var definitionByOccurrence = new Map<String, String>();
-		var definition = model.definition(assemblyId);
-		var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id => item];
-		var definitionByDesignation = new Map<String, Array<String>>();
-		for (entry in assembly.components()) {
-            if(Sys.getEnv("MACHINEKIT_PREVIEW_TRACE")=="1") {Sys.println("Assembly preview mass: "+entry.id);Sys.stdout().flush();}
-			var collision = machinekit.component.CollisionHullFacet.of(entry.component);
-			var mass = entry.component.massProperties();
-			var inertia = mass.inertia;
-			var inertiaKey:Null<Array<Float>> = inertia == null ? null :
-				[inertia.xx, inertia.xy, inertia.xz, inertia.yy, inertia.yz, inertia.zz];
-			var declared = switch mass.source { case Declared: true; case EffectiveDensity(_): true; case Modelled: true; case Computed(_): false; };
-			var massKey = haxe.Json.stringify({mass: mass.mass,
-				centre: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
-				inertia: inertiaKey, declared: declared});
-			var designationKey = entry.component.designation + "|" + entry.component.materialId + "|" + massKey +
-				(collision == null ? "" : haxe.Json.stringify(collision.hulls));
-			var candidates = definitionByDesignation.get(designationKey);
-			var component = definitions.get(entry.id);
-			if (component == null) throw 'Preview has no definition for "${entry.id}"';
-			var definitionId:Null<String> = null;
-			if (candidates != null) for (candidate in candidates) {
-				var owner = definitions.get(candidate);
-				if (owner == null) throw 'Preview lost shared definition "$candidate"';
-				var compatible = true;
-				for (connector in component.connectors) for (existing in owner.connectors)
-					if (connector.name == existing.name && !sameFrame(connector.frame, existing.frame)) compatible = false;
-				if (compatible) {definitionId = candidate; break;}
-			}
-			if (definitionId == null) {
-				definitionId = entry.id;
-				if (candidates == null) {candidates = []; definitionByDesignation.set(designationKey, candidates);}
-				candidates.push(definitionId);
-                if(Sys.getEnv("MACHINEKIT_PREVIEW_TRACE")=="1") {Sys.println("Assembly preview mesh: "+entry.id);Sys.stdout().flush();}
-				var rendered = part(definitionId, entry.component.designation,
-					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId, null,
-					mass,maxGeometricFaces);
+    var definitionByOccurrence = new Map<String, String>();
+    var definition = model.definition(assemblyId);
+    var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id = > item];
+    var definitionByDesignation = new Map<String, Array<String>>();
+    for (entry in assembly.components()) {
+      if (Sys.getEnv("MACHINEKIT_PREVIEW_TRACE") == "1") {
+        Sys.println("Assembly preview mass: " + entry.id);
+        Sys.stdout().flush();
+      }
+      var collision = machinekit.component.CollisionHullFacet.of(entry.component);
+      var mass = entry.component.massProperties();
+      var inertia = mass.inertia;
+      var inertiaKey:Null<Array<Float>> = inertia == null ? null : [
+        inertia.xx,
+        inertia.xy,
+        inertia.xz,
+        inertia.yy,
+        inertia.yz,
+        inertia.zz
+      ];
+      var declared = switch mass.source {
+        case Declared:
+          true;
+        case EffectiveDensity(_):
+          true;
+        case Modelled:
+          true;
+        case Computed(_):
+          false;
+      };
+      var massKey = haxe.Json.stringify({
+        mass: mass.mass,
+        centre: [
+          mass.centreOfMass.x,
+          mass.centreOfMass.y,
+          mass.centreOfMass.z
+        ],
+        inertia: inertiaKey,
+        declared: declared
+      });
+      var designationKey = entry.component.designation + "|" + entry.component.materialId + "|" + massKey + (collision
+        == null ? "" : haxe.Json.stringify(collision.hulls));
+      var candidates = definitionByDesignation.get(designationKey);
+      var component = definitions.get(entry.id);
+      if (component == null) throw 'Preview has no definition for "${entry.id}"';
+      var definitionId:Null<String> = null;
+      if (candidates != null) for (candidate in candidates) {
+        var owner = definitions.get(candidate);
+        if (owner == null) throw 'Preview lost shared definition "$candidate"';
+        var compatible = true;
+        for (connector in component.connectors) for (existing in owner.connectors) if (connector.name == existing.name
+          && !sameFrame(
+            connector.frame,
+            existing.frame
+          )) compatible = false;
+        if (compatible) {
+          definitionId = candidate;
+          break;
+        }
+      }
+      if (definitionId == null) {
+        definitionId = entry.id;
+        if (candidates == null) {
+          candidates = [];
+          definitionByDesignation.set(designationKey, candidates);
+        }
+        candidates.push(definitionId);
+        if (Sys.getEnv("MACHINEKIT_PREVIEW_TRACE") == "1") {
+          Sys.println("Assembly preview mesh: " + entry.id);
+          Sys.stdout().flush();
+        }
+        var rendered = part(
+          definitionId,
+          entry.component.designation,
+          entry.component.geometry(ComponentDetail.Preview),
+          entry.component.materialId,
+          null,
+          mass,
+          maxGeometricFaces
+        );
         if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
           var belt:machinekit.transmission.TimingBelt = cast entry.component;
           var moving = [for (value in machineMotion.belts) if (value.occurrence == entry.id) value];
-          displayBelt(rendered, belt, moving.length == 0 ? belt.wraps()[0].side :
-            moving[0].wraps[moving[0].driverWrap].side);
+          displayBelt(
+            rendered,
+            belt,
+            moving.length == 0 ? belt.wraps()[0].side : moving[0].wraps[moving[0].driverWrap].side
+          );
         }
-        var display=machinekit.component.ComponentDisplayMesh.of(entry.component);
-        if(display!=null)displayMesh(rendered,display.build());
+        var display = machinekit.component.ComponentDisplayMesh.of(entry.component);
+        if (display != null) displayMesh(rendered, display.build());
         parts.push(rendered);
-			}
-			definitionByOccurrence.set(entry.id, definitionId);
-			// Accumulate connector names while choosing candidates: a later occurrence must also agree with
-			// connectors contributed by an earlier sharer, not just those of the original component.
-			var owner = definitions.get(definitionId);
-			if (owner != null && owner != component) for (connector in component.connectors)
-				if (owner.connectors.filter(existing -> existing.name == connector.name).length == 0)
-					owner.connectors.push(connector);
-		}
-		var state = model.initialState(assemblyId).record();
-		preserveOwnership(definition, assembly.derived().definition);
-		shareDefinitions(definition, definitionByOccurrence);
-		var cell = ControllerWiring.of(assembly, definition);
-		var result:SceneArtifactData = {lengthUnit: "mm", metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assemblyDefinition: definition, assemblyState: state, machineMotion: machineMotion};
-		if (cell != null) {
-			result.controllers = cell.controllers;
-			result.signals = cell.signals;
-		}
-		return result;
-	}
+      }
+      definitionByOccurrence.set(entry.id, definitionId);
+      // Accumulate connector names while choosing candidates: a later occurrence must also agree with
+      // connectors contributed by an earlier sharer, not just those of the original component.
+      var owner = definitions.get(definitionId);
+      if (owner != null && owner
+        != component) for (connector in component.connectors) if (owner.connectors.filter(existing -> existing.name
+        == connector.name).length == 0) owner.connectors.push(connector);
+    }
+    var state = model.initialState(assemblyId).record();
+    preserveOwnership(definition, assembly.derived().definition);
+    shareDefinitions(definition, definitionByOccurrence);
+    var cell = ControllerWiring.of(assembly, definition);
+    var result:SceneArtifactData = {
+      lengthUnit: "mm",
+      metresPerUnit: LengthUnit.metresPerUnit("mm"),
+      parts: parts,
+      assemblyDefinition: definition,
+      assemblyState: state,
+      machineMotion: machineMotion
+    };
+    if (cell != null) {
+      result.controllers = cell.controllers;
+      result.signals = cell.signals;
+    }
+    return result;
+  }
 
   static function displayBelt(part:SceneArtifactPart, belt:machinekit.transmission.TimingBelt, side:Int):Void {
     var mesh = machinekit.transmission.TimingBeltMesh.build(belt, 0.0, side);
-    displayMesh(part,mesh);
+    displayMesh(part, mesh);
   }
 
-  static function displayMesh(part:SceneArtifactPart,mesh:machinekit.component.ComponentDisplayMesh.ComponentDisplayMeshData):Void {
-    var vertices = haxe.io.Bytes.alloc(mesh.positions.length * 8), normals = haxe.io.Bytes.alloc(mesh.normals.length * 8);
+  static function displayMesh(
+    part:SceneArtifactPart,
+    mesh:machinekit.component.ComponentDisplayMesh.ComponentDisplayMeshData
+  ):Void {
+    var vertices = haxe.io.Bytes.alloc(mesh.positions.length * 8),
+      normals = haxe.io.Bytes.alloc(mesh.normals.length * 8);
     var indices = haxe.io.Bytes.alloc(mesh.indices.length * 4);
     for (i in 0...mesh.positions.length) vertices.setDouble(i * 8, mesh.positions[i]);
     for (i in 0...mesh.normals.length) normals.setDouble(i * 8, mesh.normals[i]);
     for (i in 0...mesh.indices.length) indices.setInt32(i * 4, mesh.indices[i]);
-    part.vertexCount = Std.int(mesh.positions.length / 3); part.indexCount = mesh.indices.length;
-    part.vertices = vertices; part.normals = normals; part.indices = indices;
-    part.faceRanges = []; part.faceDescriptors = null; part.edgeSegments = null; part.edgeIds = null;
+    part.vertexCount = Std.int(mesh.positions.length / 3);
+    part.indexCount = mesh.indices.length;
+    part.vertices = vertices;
+    part.normals = normals;
+    part.indices = indices;
+    part.faceRanges = [];
+    part.faceDescriptors = null;
+    part.edgeSegments = null;
+    part.edgeIds = null;
     part.threads = new Array<materia.project.ThreadRenderData>();
   }
 
-	static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
-		var flat = assembly.derived();
-		var belts:Array<materia.project.SceneArtifact.SceneArtifactBeltVisual> = [];
-		for (path in flat.beltPaths) {
-			if (!flat.hasMember(path.belt) || !Std.isOfType(flat.member(path.belt), machinekit.transmission.TimingBelt)) continue;
-			var belt:machinekit.transmission.TimingBelt = cast flat.member(path.belt);
-			var wraps = belt.wraps(), driver = -1, driverJoint = "";
-			for (i in 0...path.wraps.length) for (motor in flat.motors)
-				for (joint in flat.definition.joints)
-					if (joint.id == motor.joint && joint.child == path.wraps[i].instanceId) { driver = i; driverJoint = motor.joint; }
-			if (driver < 0) continue;
-			belts.push({occurrence: path.belt, pitch: belt.pitch, width: belt.width, thickness: belt.thickness,
-				driverJoint: driverJoint, driverWrap: driver,
-				driverSign: machinekit.transmission.BeltStretch.axisSign(assembly.definition(),
-					new cadkit.modeling.AssemblyState(assembly.definition()), path.belt, driverJoint, path.wraps[driver].instanceId),
-				wraps: [for (i in 0...path.wraps.length) {occurrence: path.wraps[i].instanceId,
-					connector: path.wraps[i].connectorName, radius: wraps[i].radius, side: wraps[i].side}]});
-		}
-		var chains:Array<materia.project.SceneArtifact.SceneArtifactCableChainVisual>=[];
-        for(entry in assembly.components())if(Std.isOfType(entry.component,machinekit.gantry.GantryCableChain)) {
-            var routed:machinekit.gantry.GantryCableChain=cast entry.component,chain=routed.chain;
-            var slash=entry.id.lastIndexOf("/"),prefix=slash<0?"":entry.id.substr(0,slash+1);
-            chains.push({occurrence:entry.id,fixed:{occurrence:prefix+routed.fixedHost,connector:routed.endConnector},
-                moving:{occurrence:prefix+routed.movingHost,connector:routed.endConnector},axisJoint:prefix+routed.axis,
-                bendRadius:chain.n("bendRadius"),innerWidth:chain.n("innerWidth"),innerHeight:chain.n("innerHeight"),
-                wall:chain.n("wall"),travel:chain.n("travel")});
-        }
-        return {belts: belts,cableChains:chains};
-	}
+  static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
+    var flat = assembly.derived();
+    var belts:Array<materia.project.SceneArtifact.SceneArtifactBeltVisual> = [];
+    for (path in flat.beltPaths) {
+      if (!flat.hasMember(path.belt) || !Std.isOfType(flat.member(path.belt),
+        machinekit.transmission.TimingBelt)) continue;
+      var belt:machinekit.transmission.TimingBelt = cast flat.member(path.belt);
+      var wraps = belt.wraps(), driver = -1, driverJoint = "";
+      for (i in 0...path.wraps.length) for (motor in flat.motors) for (joint in flat.definition.joints) if (joint.id
+        == motor.joint && joint.child == path.wraps[i].instanceId) {
+        driver = i;
+        driverJoint = motor.joint;
+      }
+      if (driver < 0) continue;
+      belts.push({occurrence: path.belt, pitch: belt.pitch, width: belt.width, thickness: belt.thickness,
+        driverJoint: driverJoint, driverWrap: driver, driverSign: machinekit.transmission.BeltStretch.axisSign(
+          assembly.definition(),
+          new cadkit.modeling.AssemblyState(assembly.definition()),
+          path.belt,
+          driverJoint,
+          path.wraps[driver].instanceId
+        ), wraps: [for (i in 0...path.wraps.length) {
+        occurrence:path.wraps[i].instanceId,
+          connector:path.wraps[i].connectorName, radius:wraps[i].radius, side:wraps[i].side
+      }
+      ]});
+    }
+    var chains:Array<materia.project.SceneArtifact.SceneArtifactCableChainVisual> = [];
+    for (entry in assembly.components()) if (Std.isOfType(entry.component, machinekit.gantry.GantryCableChain)) {
+      var routed:machinekit.gantry.GantryCableChain = cast entry.component, chain = routed.chain;
+      var slash = entry.id.lastIndexOf("/"), prefix = slash < 0 ? "" : entry.id.substr(0, slash + 1);
+      chains.push({
+        occurrence: entry.id,
+        fixed: {occurrence: prefix + routed.fixedHost, connector: routed.endConnector},
+        moving: {
+          occurrence: prefix + routed.movingHost,
+          connector: routed.endConnector
+        },
+        axisJoint: prefix + routed.axis,
+        bendRadius: chain.n("bendRadius"),
+        innerWidth: chain.n("innerWidth"),
+        innerHeight: chain.n("innerHeight"),
+        wall: chain.n("wall"),
+        travel: chain.n("travel")
+      });
+    }
+    return {belts: belts, cableChains: chains};
+  }
 
-	/** Preserve include scopes and component metadata from the flattened export. */
-	public static function preserveOwnership(definition:AssemblyDefinition, source:AssemblyDefinition):Void {
-		for (occurrence in definition.occurrences) for (original in source.occurrences)
-			if (original.id == occurrence.id) {
-				occurrence.includePath = original.includePath;
-				for (entry in source.definitions) if (entry.id == original.definition)
-					for (target in definition.definitions) if (target.id == occurrence.definition) {
-						target.robotFlangeConnector = entry.robotFlangeConnector;
-						if (entry.collisionHulls != null) target.collisionHulls = [for (hull in entry.collisionHulls) hull.copy()];
-					}
-			}
-		for (joint in definition.joints) for (original in source.joints)
-			if (original.id == joint.id) joint.includePath = original.includePath;
-	}
+  /** Preserve include scopes and component metadata from the flattened export. */
+  public static function preserveOwnership(definition:AssemblyDefinition, source:AssemblyDefinition):Void {
+    for (occurrence in definition.occurrences) for (original in source.occurrences) if (original.id == occurrence.id) {
+      occurrence.includePath = original.includePath;
+      for (entry in source.definitions) if (entry.id
+        == original.definition) for (target in definition.definitions) if (target.id == occurrence.definition) {
+        target.robotFlangeConnector = entry.robotFlangeConnector;
+        if (entry.collisionHulls != null) target.collisionHulls = [for (hull in entry.collisionHulls) hull.copy()];
+      }
+    }
+    for (joint in definition.joints) for (original in source.joints) if (original.id
+      == joint.id) joint.includePath = original.includePath;
+  }
 
-	/**
+  /**
 	 * Points every occurrence at its shared definition (`definitionByOccurrence`; an occurrence missing
 	 * from it keeps its own) and drops the definitions nothing points at any more. A kept definition
 	 * takes the connectors of every occurrence that shares it; two occurrences may name the same
 	 * connector only with the same frame, since the scene holds one frame per name.
 	 */
-	public static function shareDefinitions(definition:AssemblyDefinition, definitionByOccurrence:Map<String, String>):Void {
-		function sharedId(id:String):String {
-			var shared = definitionByOccurrence.get(id);
-			return shared == null ? id : shared;
-		}
-		var kept = new Map<String, AssemblyComponentDefinition>();
-		for (component in definition.definitions) if (sharedId(component.id) == component.id) kept.set(component.id, component);
-		for (component in definition.definitions) {
-			var owner = kept.get(sharedId(component.id));
-			if (owner == null) throw 'Shared definition "${sharedId(component.id)}" is not in the assembly';
-			if (owner == component) continue;
-			for (connector in component.connectors) {
-				var existing = [for (candidate in owner.connectors) if (candidate.name == connector.name) candidate];
-				if (existing.length == 0) owner.connectors.push(connector);
-				else if (!sameFrame(existing[0].frame, connector.frame))
-					throw 'Occurrences sharing "${owner.id}" give connector "${connector.name}" different frames';
-			}
-		}
-		definition.definitions = [for (component in definition.definitions) if (kept.exists(component.id)) component];
-		for (occurrence in definition.occurrences) occurrence.definition = sharedId(occurrence.id);
-	}
+  public static function shareDefinitions(definition:AssemblyDefinition,
+    definitionByOccurrence:Map<String, String>):Void {
+    function sharedId(id:String):String {
+      var shared = definitionByOccurrence.get(id);
+      return shared == null ? id : shared;
+    }
+    var kept = new Map<String, AssemblyComponentDefinition>();
+    for (component in definition.definitions) if (sharedId(component.id) == component.id) kept.set(
+      component.id,
+      component
+    );
+    for (component in definition.definitions) {
+      var owner = kept.get(sharedId(component.id));
+      if (owner == null) throw 'Shared definition "${sharedId(component.id)}" is not in the assembly';
+      if (owner == component) continue;
+      for (connector in component.connectors) {
+        var existing = [for (candidate in owner.connectors) if (candidate.name == connector.name) candidate];
+        if (existing.length == 0) owner.connectors.push(connector);
+        else if (!sameFrame(existing[0].frame, connector
+          .frame)) throw 'Occurrences sharing "${owner.id}" give connector "${connector.name}" different frames';
+      }
+    }
+    definition.definitions = [for (component in definition.definitions) if (kept.exists(component.id)) component];
+    for (occurrence in definition.occurrences) occurrence.definition = sharedId(occurrence.id);
+  }
 
-	/**
+  /**
 	 * One scene part: tessellated mesh, material colour and mass properties. Closes `part`. The mesh
 	 * `maxGeometricFaces` bounds automatic face-mate descriptors (0 keeps all); explicit
      * assembly connectors and the complete mesh remain available. The mesh
 	 * deviates from the solid by a small fraction of its size, or by at most `deflection` (in the part's
 	 * units) when given, for a mesh that is measured against rather than only looked at.
 	 */
-	public static function part(id:String, name:String, part:Part, materialId:String,
-			?deflection:Float, ?massProperties:MassProperties, maxGeometricFaces:Int = 0):SceneArtifactPart {
-		var material = MaterialLibrary.require(materialId);
-		var color = material.visual.baseColor;
-		try {
-			var physical = part.massProperties();
-			var mesh = deflection == null ? part.shape.tessellateRelative() : part.shape.tessellate(deflection);
-			var mass = massProperties == null ? physical.volume * 1e-9 * material.physical.density : massProperties.mass;
-			var centre = massProperties == null ? physical.centerOfMass : massProperties.centreOfMass;
-			// A declared mass without its own tensor uses the CAD shape's distribution, scaled to
-			// that mass. Explicit component inertia is already in kg mm².
-			var tensor = massProperties == null || massProperties.inertia == null
-				? physical.inertia.scaled(mass / physical.volume * Math.pow(LengthUnit.metresPerUnit("mm"), 2))
-				: massProperties.inertia.scaled(Math.pow(LengthUnit.metresPerUnit("mm"), 2));
-			var result:SceneArtifactPart = {
-				id: id, name: name, closed:part.shape.hasSolidBoundary(), red: color[0], green: color[1], blue: color[2],
-				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
-				materialDensity: material.physical.density, materialSpec: material.physical.spec,
-				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
-				volume: physical.volume,
-				centerOfMass: [centre.x, centre.y, centre.z], inertia: [physical.inertia.xx, physical.inertia.xy,
-					physical.inertia.xz, physical.inertia.xy, physical.inertia.yy, physical.inertia.yz,
-					physical.inertia.xz, physical.inertia.yz, physical.inertia.zz],
-				physicalMassKg: mass,
-				physicalMassDeclared: massProperties != null && switch massProperties.source {
-					case Declared: true;
-					case EffectiveDensity(_): true;
-					case Modelled: true;
-					case Computed(_): false;
-				},
-				physicalInertiaKgM2: [tensor.xx, tensor.xy, tensor.xz, tensor.xy, tensor.yy, tensor.yz,
-					tensor.xz, tensor.yz, tensor.zz],
-				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
-				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
-				faceDescriptors: maxGeometricFaces>0&&part.shape.subshapeCount(CadKit.ShapeKind.Face)>maxGeometricFaces ? null : cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
-				threads: Threads.renderData(part.shape),
-				faceRanges: [for (range in mesh.faceRanges) {
-					faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
-				}]
-			};
-			part.close();
-			return result;
-		} catch (error:Dynamic) {
-			part.close();
-			throw error;
-		}
-	}
+  public static function part(
+    id:String,
+    name:String,
+    part:Part,
+    materialId:String,
+    ?deflection:Float,
+    ?massProperties:MassProperties,
+    maxGeometricFaces:Int = 0
+  ):SceneArtifactPart {
+    var material = MaterialLibrary.require(materialId);
+    var color = material.visual.baseColor;
+    try {
+      var physical = part.massProperties();
+      var mesh = deflection == null ? part.shape.tessellateRelative() : part.shape.tessellate(deflection);
+      var mass = massProperties == null ? physical.volume * 1e-9 * material.physical.density : massProperties.mass;
+      var centre = massProperties == null ? physical.centerOfMass : massProperties.centreOfMass;
+      // A declared mass without its own tensor uses the CAD shape's distribution, scaled to
+      // that mass. Explicit component inertia is already in kg mm².
+      var tensor = massProperties == null
+        || massProperties.inertia == null ? physical.inertia.scaled(mass / physical.volume * Math.pow(
+          LengthUnit.metresPerUnit("mm"),
+          2
+        )) : massProperties.inertia.scaled(Math.pow(
+          LengthUnit.metresPerUnit("mm"),
+          2
+        ));
+      var result:SceneArtifactPart = {id: id, name: name, closed: part.shape.hasSolidBoundary(),
+        red: color[0], green: color[1], blue: color[2], appearance: MaterialLibrary.appearance(materialId),
+        materialId: materialId, materialDensity: material.physical.density, materialSpec: material.physical.spec,
+        vertexCount: mesh.vertexCount, indexCount: mesh.indexCount, volume: physical.volume, centerOfMass: [
+          centre.x,
+          centre.y,
+          centre.z
+        ], inertia: [
+          physical.inertia.xx,
+          physical.inertia.xy,
+          physical.inertia.xz,
+          physical.inertia.xy,
+          physical.inertia.yy,
+          physical.inertia.yz,
+          physical.inertia.xz,
+          physical.inertia.yz,
+          physical.inertia.zz
+        ], physicalMassKg: mass, physicalMassDeclared: massProperties != null && switch massProperties.source {
+        case Declared:
+          true;
+        case EffectiveDensity(_):
+          true;
+        case Modelled:
+          true;
+        case Computed(_):
+          false;
+      }, physicalInertiaKgM2:[
+        tensor.xx,
+        tensor.xy,
+        tensor.xz,
+        tensor.xy,
+        tensor.yy,
+        tensor.yz,
+        tensor.xz,
+        tensor.yz,
+        tensor.zz
+      ], vertices:mesh.vertices, normals:mesh.normals, indices:mesh.indices, edgeSegments:mesh.edgeSegments,
+        edgeIds:mesh.edgeIds, faceDescriptors:maxGeometricFaces > 0 && part.shape.subshapeCount(CadKit.ShapeKind.Face)
+        > maxGeometricFaces ? null : cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
+        threads : Threads.renderData(part.shape), faceRanges : [for (range in mesh.faceRanges) {
+        faceIndex:range.faceIndex, firstIndex:range.firstIndex, indexCount:range.indexCount
+      }
+      ]};
+      part.close();
+      return result;
+    } catch (error:Dynamic) {
+      part.close();
+      throw error;
+    }
+  }
 
-	static function sameFrame(a:materia.assembly.AssemblyRecord.AssemblyFrame, b:materia.assembly.AssemblyRecord.AssemblyFrame):Bool {
-		var tolerance = 1e-9;
-		return Math.abs(a.x - b.x) <= tolerance && Math.abs(a.y - b.y) <= tolerance && Math.abs(a.z - b.z) <= tolerance &&
-			Math.abs(a.qx - b.qx) <= tolerance && Math.abs(a.qy - b.qy) <= tolerance && Math.abs(a.qz - b.qz) <= tolerance &&
-			Math.abs(a.qw - b.qw) <= tolerance;
-	}
+  static function sameFrame(
+    a:materia.assembly.AssemblyRecord.AssemblyFrame,
+    b:materia.assembly.AssemblyRecord.AssemblyFrame
+  ):Bool {
+    var tolerance = 1e-9;
+    return Math.abs(a.x - b.x) <= tolerance
+      && Math.abs(a.y - b.y) <= tolerance && Math.abs(a.z - b.z) <= tolerance && Math.abs(a.qx - b.qx) <= tolerance
+      && Math.abs(a.qy - b.qy) <= tolerance && Math.abs(a.qz - b.qz) <= tolerance && Math.abs(a.qw - b.qw) <= tolerance;
+  }
 }

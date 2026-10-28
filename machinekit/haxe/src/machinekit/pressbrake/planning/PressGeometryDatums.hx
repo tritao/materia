@@ -4,17 +4,17 @@ package machinekit.pressbrake.planning;
  * side frame throat, and fingers/tool segments contact connectors.
  */
 typedef PressGeometryDatums = {
-	final bed:String;
-	final ram:String;
-	final throat:String;
-	final fingers:Array<String>;
-	final ramJoint:String;
-	final gaugeXJoint:String;
-	final gaugeRJoint:Null<String>;
-	final tools:Array<PressToolDatum>;
-	final frames:Array<PressMemberVolume>;
-	final fixedMembers:Array<String>;
-	final ramMembers:Array<String>;
-	final gaugeXMembers:Array<String>;
-	final gaugeXRMembers:Array<String>;
+  final bed:String;
+  final ram:String;
+  final throat:String;
+  final fingers:Array<String>;
+  final ramJoint:String;
+  final gaugeXJoint:String;
+  final gaugeRJoint:Null<String>;
+  final tools:Array<PressToolDatum>;
+  final frames:Array<PressMemberVolume>;
+  final fixedMembers:Array<String>;
+  final ramMembers:Array<String>;
+  final gaugeXMembers:Array<String>;
+  final gaugeXRMembers:Array<String>;
 }

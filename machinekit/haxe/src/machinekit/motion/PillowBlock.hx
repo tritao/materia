@@ -29,147 +29,295 @@ import materia.assembly.AssemblyFrames;
  * `axis` at the shaft centre, `input`/`output` at the housing ends, `base` on the mounting face,
  * and `bolt1`/`bolt2` at the two mounting-hole centres. */
 class PillowBlock extends MachineComponent {
-	static var table:Null<Catalog<PillowBlockSpec>>;
+  static var table:Null<Catalog<PillowBlockSpec>>;
 
-	public final spec:PillowBlockSpec;
-	public final bearing:DeepGrooveBearing;
-	public final boreDiameter:Float;
-	public final baseWidth:Float;
-	public final length:Float;
-	public final shaftHeight:Float;
-	public final baseHeight:Float;
-	public final overallHeight:Float;
-	public final boltSpacing:Float;
-	public final mountHoleDiameter:Float;
-	public final mountScrew:String;
+  public final spec:PillowBlockSpec;
+  public final bearing:DeepGrooveBearing;
+  public final boreDiameter:Float;
+  public final baseWidth:Float;
+  public final length:Float;
+  public final shaftHeight:Float;
+  public final baseHeight:Float;
+  public final overallHeight:Float;
+  public final boltSpacing:Float;
+  public final mountHoleDiameter:Float;
+  public final mountScrew:String;
 
-	static function rows():Array<PillowBlockSpec>
-		return [
-			{designation: "UCP204", family: "KOYO UCP", bearingDesignation: "6204", boreDiameter: 20,
-				baseWidth: 38, length: 127, shaftHeight: 33.3, baseHeight: 16, overallHeight: 64.5,
-				boltSpacing: 95, mountHoleDiameter: 13, mountScrew: "M10"},
-			{designation: "UCP205", family: "KOYO UCP", bearingDesignation: "6205", boreDiameter: 25,
-				baseWidth: 38, length: 140, shaftHeight: 36.5, baseHeight: 16, overallHeight: 70,
-				boltSpacing: 105, mountHoleDiameter: 13, mountScrew: "M10"},
-			{designation: "UCP206", family: "KOYO UCP", bearingDesignation: "6206", boreDiameter: 30,
-				baseWidth: 48, length: 165, shaftHeight: 42.9, baseHeight: 17, overallHeight: 84,
-				boltSpacing: 121, mountHoleDiameter: 17, mountScrew: "M14"},
-			{designation: "UCP207", family: "KOYO UCP", bearingDesignation: "6207", boreDiameter: 35,
-				baseWidth: 48, length: 167, shaftHeight: 47.6, baseHeight: 18, overallHeight: 95,
-				boltSpacing: 127, mountHoleDiameter: 17, mountScrew: "M14"},
-			{designation: "UCP208", family: "KOYO UCP", bearingDesignation: "6208", boreDiameter: 40,
-				baseWidth: 54, length: 184, shaftHeight: 49.2, baseHeight: 18, overallHeight: 98,
-				boltSpacing: 137, mountHoleDiameter: 17, mountScrew: "M14"},
-			{designation: "UCP209", family: "KOYO UCP", bearingDesignation: "6209", boreDiameter: 45,
-				baseWidth: 54, length: 190, shaftHeight: 54, baseHeight: 20, overallHeight: 106,
-				boltSpacing: 146, mountHoleDiameter: 17, mountScrew: "M14"},
-			{designation: "UCP210", family: "KOYO UCP", bearingDesignation: "6210", boreDiameter: 50,
-				baseWidth: 60, length: 206, shaftHeight: 57.2, baseHeight: 21, overallHeight: 113,
-				boltSpacing: 159, mountHoleDiameter: 20, mountScrew: "M16"},
-			{designation: "UCP211", family: "KOYO UCP", bearingDesignation: "6211", boreDiameter: 55,
-				baseWidth: 60, length: 219, shaftHeight: 63.5, baseHeight: 23, overallHeight: 125,
-				boltSpacing: 171, mountHoleDiameter: 20, mountScrew: "M16"},
-			{designation: "UCP212", family: "KOYO UCP", bearingDesignation: "6212", boreDiameter: 60,
-				baseWidth: 70, length: 241, shaftHeight: 69.8, baseHeight: 25, overallHeight: 138,
-				boltSpacing: 184, mountHoleDiameter: 20, mountScrew: "M16"},
-			{designation: "UCP213", family: "KOYO UCP", bearingDesignation: "6213", boreDiameter: 65,
-				baseWidth: 70, length: 265, shaftHeight: 76.2, baseHeight: 27, overallHeight: 150,
-				boltSpacing: 203, mountHoleDiameter: 25, mountScrew: "M20"}
-		];
+  static function rows():Array<PillowBlockSpec> return [
+    {
+      designation: "UCP204",
+      family: "KOYO UCP",
+      bearingDesignation: "6204",
+      boreDiameter: 20,
+      baseWidth: 38,
+      length: 127,
+      shaftHeight: 33.3,
+      baseHeight: 16,
+      overallHeight: 64.5,
+      boltSpacing: 95,
+      mountHoleDiameter: 13,
+      mountScrew: "M10"
+    },
+    {
+      designation: "UCP205",
+      family: "KOYO UCP",
+      bearingDesignation: "6205",
+      boreDiameter: 25,
+      baseWidth: 38,
+      length: 140,
+      shaftHeight: 36.5,
+      baseHeight: 16,
+      overallHeight: 70,
+      boltSpacing: 105,
+      mountHoleDiameter: 13,
+      mountScrew: "M10"
+    },
+    {
+      designation: "UCP206",
+      family: "KOYO UCP",
+      bearingDesignation: "6206",
+      boreDiameter: 30,
+      baseWidth: 48,
+      length: 165,
+      shaftHeight: 42.9,
+      baseHeight: 17,
+      overallHeight: 84,
+      boltSpacing: 121,
+      mountHoleDiameter: 17,
+      mountScrew: "M14"
+    },
+    {
+      designation: "UCP207",
+      family: "KOYO UCP",
+      bearingDesignation: "6207",
+      boreDiameter: 35,
+      baseWidth: 48,
+      length: 167,
+      shaftHeight: 47.6,
+      baseHeight: 18,
+      overallHeight: 95,
+      boltSpacing: 127,
+      mountHoleDiameter: 17,
+      mountScrew: "M14"
+    },
+    {
+      designation: "UCP208",
+      family: "KOYO UCP",
+      bearingDesignation: "6208",
+      boreDiameter: 40,
+      baseWidth: 54,
+      length: 184,
+      shaftHeight: 49.2,
+      baseHeight: 18,
+      overallHeight: 98,
+      boltSpacing: 137,
+      mountHoleDiameter: 17,
+      mountScrew: "M14"
+    },
+    {
+      designation: "UCP209",
+      family: "KOYO UCP",
+      bearingDesignation: "6209",
+      boreDiameter: 45,
+      baseWidth: 54,
+      length: 190,
+      shaftHeight: 54,
+      baseHeight: 20,
+      overallHeight: 106,
+      boltSpacing: 146,
+      mountHoleDiameter: 17,
+      mountScrew: "M14"
+    },
+    {
+      designation: "UCP210",
+      family: "KOYO UCP",
+      bearingDesignation: "6210",
+      boreDiameter: 50,
+      baseWidth: 60,
+      length: 206,
+      shaftHeight: 57.2,
+      baseHeight: 21,
+      overallHeight: 113,
+      boltSpacing: 159,
+      mountHoleDiameter: 20,
+      mountScrew: "M16"
+    },
+    {
+      designation: "UCP211",
+      family: "KOYO UCP",
+      bearingDesignation: "6211",
+      boreDiameter: 55,
+      baseWidth: 60,
+      length: 219,
+      shaftHeight: 63.5,
+      baseHeight: 23,
+      overallHeight: 125,
+      boltSpacing: 171,
+      mountHoleDiameter: 20,
+      mountScrew: "M16"
+    },
+    {
+      designation: "UCP212",
+      family: "KOYO UCP",
+      bearingDesignation: "6212",
+      boreDiameter: 60,
+      baseWidth: 70,
+      length: 241,
+      shaftHeight: 69.8,
+      baseHeight: 25,
+      overallHeight: 138,
+      boltSpacing: 184,
+      mountHoleDiameter: 20,
+      mountScrew: "M16"
+    },
+    {
+      designation: "UCP213",
+      family: "KOYO UCP",
+      bearingDesignation: "6213",
+      boreDiameter: 65,
+      baseWidth: 70,
+      length: 265,
+      shaftHeight: 76.2,
+      baseHeight: 27,
+      overallHeight: 150,
+      boltSpacing: 203,
+      mountHoleDiameter: 25,
+      mountScrew: "M20"
+    }
+  ];
 
-	/** Koyo/JTEKT UCP204–UCP213 product dimensions, with the generated solids treated as nominal envelopes. */
-	public static function catalog():Catalog<PillowBlockSpec> {
-		if (table == null)
-			table = new Catalog("pillow block unit", spec -> spec.designation, rows(), spec -> ({
-				source: 'https://koyo.jtekt.co.jp/en/products/detail/print.php?pno=${spec.designation}',
-				standard: "JIS", standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
-				verifiedFields: ["boreDiameter", "baseWidth", "length", "shaftHeight", "baseHeight", "overallHeight",
-					"boltSpacing", "mountHoleDiameter", "mountScrew"]
-			}));
-		return table;
-	}
+  /** Koyo/JTEKT UCP204–UCP213 product dimensions, with the generated solids treated as nominal envelopes. */
+  public static function catalog():Catalog<PillowBlockSpec> {
+    if (table == null) table = new Catalog(
+      "pillow block unit",
+      spec -> spec.designation,
+      rows(),
+      spec -> ({
+        source: 'https://koyo.jtekt.co.jp/en/products/detail/print.php?pno=${spec.designation}',
+        standard: "JIS",
+        standardEdition: null,
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope,
+        verifiedFields: [
+          "boreDiameter",
+          "baseWidth",
+          "length",
+          "shaftHeight",
+          "baseHeight",
+          "overallHeight",
+          "boltSpacing",
+          "mountHoleDiameter",
+          "mountScrew"
+        ]
+      })
+    );
+    return table;
+  }
 
-	public static function metric(designation:String):PillowBlock
-		return new PillowBlock(catalog().get(designation));
+  public static function metric(designation:String):PillowBlock return new PillowBlock(catalog().get(designation));
 
-	public static function custom(spec:PillowBlockSpec):PillowBlock
-		return new PillowBlock(spec, true);
+  public static function custom(spec:PillowBlockSpec):PillowBlock return new PillowBlock(spec, true);
 
-	private function new(spec:PillowBlockSpec, codeOnly:Bool = false) {
-		if (!(spec.boreDiameter > 0) || !(spec.baseWidth > 0) || !(spec.length > 0) ||
-			!(spec.shaftHeight > spec.baseHeight) || !(spec.overallHeight > spec.shaftHeight) ||
-			!(spec.boltSpacing > 0) || spec.boltSpacing >= spec.length || !(spec.mountHoleDiameter > 0) || spec.mountScrew == null)
-			throw 'Pillow block profile "${spec.designation}" has invalid dimensions';
-		bearing = DeepGrooveBearing.metric(spec.bearingDesignation);
-		if (Math.abs(bearing.bore - spec.boreDiameter) > 1e-9)
-			throw 'Pillow block bearing "${spec.bearingDesignation}" bore does not match ${spec.boreDiameter} mm';
-		var customName = '${spec.family}-${spec.designation}-${spec.bearingDesignation}-B${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.baseWidth)}x${Dimension.format(spec.length)}' +
-			'-H${Dimension.format(spec.shaftHeight)}x${Dimension.format(spec.baseHeight)}x${Dimension.format(spec.overallHeight)}' +
-			'-P${Dimension.format(spec.boltSpacing)}-D${Dimension.format(spec.mountHoleDiameter)}-M${spec.mountScrew}';
-		super(codeOnly ? customDesignation(customName) : spec.designation,
-			'${spec.family} base-mounted pillow block unit', "cast iron", codeOnly);
-		this.spec = spec;
-		boreDiameter = spec.boreDiameter;
-		baseWidth = spec.baseWidth;
-		length = spec.length;
-		shaftHeight = spec.shaftHeight;
-		baseHeight = spec.baseHeight;
-		overallHeight = spec.overallHeight;
-		boltSpacing = spec.boltSpacing;
-		mountHoleDiameter = spec.mountHoleDiameter;
-		mountScrew = spec.mountScrew;
-		addConnector("axis", Axis, Solids.axial(0, shaftHeight, 0));
-		addConnector("input", Shaft, Solids.axial(0, shaftHeight, -baseWidth / 2));
-		addConnector("output", Shaft, Solids.axial(0, shaftHeight, baseWidth / 2));
-		addConnector("base", Mount, AssemblyFrames.alongY(0, 0, 0, 0, 1, 0));
-		addConnector("bolt1", Mount, AssemblyFrames.alongY(-boltSpacing / 2, 0, 0, 0, 1, 0));
-		addConnector("bolt2", Mount, AssemblyFrames.alongY(boltSpacing / 2, 0, 0, 0, 1, 0));
-	}
+  private function new(spec:PillowBlockSpec, codeOnly:Bool = false) {
+    if (!(spec.boreDiameter > 0) || !(spec.baseWidth > 0)
+      || !(spec.length > 0) || !(spec.shaftHeight > spec.baseHeight) || !(spec.overallHeight > spec.shaftHeight)
+      || !(spec.boltSpacing > 0) || spec.boltSpacing >= spec.length || !(spec.mountHoleDiameter > 0)
+      || spec.mountScrew == null) throw 'Pillow block profile "${spec.designation}" has invalid dimensions';
+    bearing = DeepGrooveBearing.metric(spec.bearingDesignation);
+    if (Math.abs(bearing.bore - spec.boreDiameter)
+      > 1e-9) throw 'Pillow block bearing "${spec.bearingDesignation}" bore does not match ${spec.boreDiameter} mm';
+    var customName =
+      '${spec.family}-${spec.designation}-${spec.bearingDesignation}-B${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.baseWidth)}x${Dimension.format(spec.length)}'
+      + '-H${Dimension.format(spec.shaftHeight)}x${Dimension.format(spec.baseHeight)}x${Dimension.format(spec.overallHeight)}'
+      + '-P${Dimension.format(spec.boltSpacing)}-D${Dimension.format(spec.mountHoleDiameter)}-M${spec.mountScrew}';
+    super(
+      codeOnly ? customDesignation(customName) : spec.designation,
+      '${spec.family} base-mounted pillow block unit',
+      "cast iron",
+      codeOnly
+    );
+    this.spec = spec;
+    boreDiameter = spec.boreDiameter;
+    baseWidth = spec.baseWidth;
+    length = spec.length;
+    shaftHeight = spec.shaftHeight;
+    baseHeight = spec.baseHeight;
+    overallHeight = spec.overallHeight;
+    boltSpacing = spec.boltSpacing;
+    mountHoleDiameter = spec.mountHoleDiameter;
+    mountScrew = spec.mountScrew;
+    addConnector("axis", Axis, Solids.axial(0, shaftHeight, 0));
+    addConnector("input", Shaft, Solids.axial(0, shaftHeight, -baseWidth / 2));
+    addConnector("output", Shaft, Solids.axial(0, shaftHeight, baseWidth / 2));
+    addConnector("base", Mount, AssemblyFrames.alongY(0, 0, 0, 0, 1, 0));
+    addConnector("bolt1", Mount, AssemblyFrames.alongY(-boltSpacing / 2, 0, 0, 0, 1, 0));
+    addConnector("bolt2", Mount, AssemblyFrames.alongY(boltSpacing / 2, 0, 0, 0, 1, 0));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var base = Solids.named(Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center), "base");
-		var barrelRadius = overallHeight - shaftHeight;
-		var barrel = Solids.named(Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight), "barrel");
-		var body = Solids.union([base, barrel]);
-		var boreTool = Solids.named(Part.cylinderSpan(bearing.outside / 2, -baseWidth / 2 - 0.1, baseWidth / 2 + 0.1, 0, shaftHeight), "bore");
-		if (detail == Envelope) return Solids.cut(body, [boreTool]);
-		var tools = [boreTool];
-		var bolt = 1;
-		for (x in [-boltSpacing / 2, boltSpacing / 2])
-			tools.push(Solids.named(Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, x, 0), "bolt" + bolt++));
-		return Solids.cut(body, tools);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var base = Solids.named(Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center), "base");
+    var barrelRadius = overallHeight - shaftHeight;
+    var barrel = Solids.named(Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight), "barrel");
+    var body = Solids.union([base, barrel]);
+    var boreTool = Solids.named(
+      Part.cylinderSpan(
+        bearing.outside / 2,
+        -baseWidth / 2 - 0.1,
+        baseWidth / 2 + 0.1,
+        0,
+        shaftHeight
+      ),
+      "bore"
+    );
+    if (detail == Envelope) return Solids.cut(body, [boreTool]);
+    var tools = [boreTool];
+    var bolt = 1;
+    for (x in [-boltSpacing / 2, boltSpacing / 2]) tools.push(Solids.named(
+      Part.cylinderAlongY(
+        mountHoleDiameter / 2,
+        -0.1,
+        baseHeight + 0.1,
+        x,
+        0
+      ),
+      "bolt" + bolt++
+    ));
+    return Solids.cut(body, tools);
+  }
 
-	/** Socket-head mounting screw sized for this unit's base holes. */
-	public function mountScrewPart(length:Float):SocketHeadCapScrew
-		return SocketHeadCapScrew.metric(mountScrew, length);
+  /** Socket-head mounting screw sized for this unit's base holes. */
+  public function mountScrewPart(length:Float):SocketHeadCapScrew return SocketHeadCapScrew.metric(mountScrew, length);
 
-	/** Returns this unit's BOM, optionally including its two mounting screws. */
-	public function billOfMaterials(includeMountingScrews:Bool = false, screwLength:Float = 40):Bom {
-		var result = new Bom();
-		result.addComponent(this);
-		if (includeMountingScrews) result.addComponent(mountScrewPart(screwLength), 2);
-		return result;
-	}
+  /** Returns this unit's BOM, optionally including its two mounting screws. */
+  public function billOfMaterials(includeMountingScrews:Bool = false, screwLength:Float = 40):Bom {
+    var result = new Bom();
+    result.addComponent(this);
+    if (includeMountingScrews) result.addComponent(mountScrewPart(screwLength), 2);
+    return result;
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.motion.pillow-block",
-			[ComponentRecipeSupport.catalog("designation", PillowBlock.catalog(), "UCP204")],
-			v -> PillowBlock.metric(v.token("designation")),
-			true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.motion.pillow-block",
+      [ComponentRecipeSupport.catalog(
+        "designation",
+        PillowBlock.catalog(),
+        "UCP204"
+      )],
+      v -> PillowBlock.metric(v.token("designation")),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues().setToken("designation", this.spec.designation)
-			.setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().setToken("designation", this.spec.designation).setToken("material", materialSpec());
+  }
 
 }

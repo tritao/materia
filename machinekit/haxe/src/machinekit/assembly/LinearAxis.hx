@@ -33,86 +33,170 @@ import machinekit.component.ComponentType;
 
 /** Block riding the lead screw. CAD frame: bore centred, spanning z=0..length. */
 class Carriage extends MachineComponent {
-	public final boreDiameter:Float;
-	public final width:Float;
-	public final length:Float;
-	public final guideSpacing:Float;
-	public final guideSeatDiameter:Float;
-	public final guideSeatFit:BearingHousingFit;
-	/** Carriage-side mounting frame for a profile rail block, when this carriage uses one. */
-	public final railMountY:Float;
-	public final hasRailMount:Bool;
-	public final nut:LeadScrewNut;
+  public final boreDiameter:Float;
+  public final width:Float;
+  public final length:Float;
+  public final guideSpacing:Float;
+  public final guideSeatDiameter:Float;
+  public final guideSeatFit:BearingHousingFit;
+  /** Carriage-side mounting frame for a profile rail block, when this carriage uses one. */
+  public final railMountY:Float;
+  public final hasRailMount:Bool;
+  public final nut:LeadScrewNut;
 
-	public function new(boreDiameter:Float, width:Float, length:Float, guideSpacing:Float, guideSeatDiameter:Float,
-			nut:LeadScrewNut, guideSeatFit:BearingHousingFit = Slip, ?railMountY:Float) {
-		var bore = Dimension.format(boreDiameter), widthText = Dimension.format(width), lengthText = Dimension.format(length);
-		super('CARRIAGE-D$bore-${widthText}x$lengthText-G${Dimension.format(guideSpacing)}-${nut.designation}', 'Lead-screw carriage ${widthText}x${widthText}x$lengthText',
-			"aluminium 6061");
-		this.boreDiameter = boreDiameter;
-		this.width = width;
-		this.length = length;
-		this.guideSpacing = guideSpacing;
-		this.guideSeatDiameter = guideSeatDiameter;
-		this.guideSeatFit = guideSeatFit;
-		this.railMountY = railMountY == null ? 0 : railMountY;
-		this.hasRailMount = railMountY != null;
-		this.nut = nut;
-		addConnector("bore", Axis, Solids.axial(0, 0, length / 2));
-		addConnector("nutMount", Face, Solids.axial(0, 0, 0));
-		addConnector("guideA", Axis, Solids.axial(-guideSpacing, 0, length / 2));
-		addConnector("guideB", Axis, Solids.axial(guideSpacing, 0, length / 2));
-		if (hasRailMount)
-			addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
-	}
+  public function new(
+    boreDiameter:Float,
+    width:Float,
+    length:Float,
+    guideSpacing:Float,
+    guideSeatDiameter:Float,
+    nut:LeadScrewNut,
+    guideSeatFit:BearingHousingFit = Slip,
+    ?railMountY:Float
+  ) {
+    var bore = Dimension.format(boreDiameter),
+      widthText = Dimension.format(width), lengthText = Dimension.format(length);
+    super(
+      'CARRIAGE-D$bore-${widthText}x$lengthText-G${Dimension.format(guideSpacing)}-${nut.designation}',
+      'Lead-screw carriage ${widthText}x${widthText}x$lengthText',
+      "aluminium 6061"
+    );
+    this.boreDiameter = boreDiameter;
+    this.width = width;
+    this.length = length;
+    this.guideSpacing = guideSpacing;
+    this.guideSeatDiameter = guideSeatDiameter;
+    this.guideSeatFit = guideSeatFit;
+    this.railMountY = railMountY == null ? 0 : railMountY;
+    this.hasRailMount = railMountY != null;
+    this.nut = nut;
+    addConnector("bore", Axis, Solids.axial(0, 0, length / 2));
+    addConnector("nutMount", Face, Solids.axial(0, 0, 0));
+    addConnector("guideA", Axis, Solids.axial(-guideSpacing, 0, length / 2));
+    addConnector("guideB", Axis, Solids.axial(guideSpacing, 0, length / 2));
+    if (hasRailMount) addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
+  }
 
-	static var recipeTypeCache:Null<ComponentType>;
+  static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.assembly.carriage", [ComponentRecipeSupport.length("boreDiameter", 8), ComponentRecipeSupport.length("width", 70),
-			ComponentRecipeSupport.length("length", 50), ComponentRecipeSupport.length("guideSpacing", 25), ComponentRecipeSupport.length("guideSeatDiameter", 12),
-			ComponentRecipeSupport.choice("guideSeatFit", ["Slip", "Transition", "Interference"], "Slip"),
-			ComponentRecipeSupport.flag("hasRailMount", false), ComponentRecipeSupport.scalar("railMountY", 0),
-			ComponentRecipeSupport.count("nutBoltCount", 4)].concat(ComponentRecipeSupport.threadParameters()),
-			v -> new Carriage(v.number("boreDiameter"), v.number("width"), v.number("length"),
-				v.number("guideSpacing"), v.number("guideSeatDiameter"),
-				new machinekit.motion.LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("nutBoltCount")),
-				ComponentRecipeSupport.fit(v.token("guideSeatFit")),
-				v.boolean("hasRailMount") ? v.number("railMountY") : null), true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.assembly.carriage",
+      [
+        ComponentRecipeSupport.length(
+          "boreDiameter",
+          8
+        ),
+        ComponentRecipeSupport.length(
+          "width",
+          70
+        ),
+        ComponentRecipeSupport.length(
+          "length",
+          50
+        ),
+        ComponentRecipeSupport.length(
+          "guideSpacing",
+          25
+        ),
+        ComponentRecipeSupport.length(
+          "guideSeatDiameter",
+          12
+        ),
+        ComponentRecipeSupport.choice(
+          "guideSeatFit",
+          [
+            "Slip",
+            "Transition",
+            "Interference"
+          ],
+          "Slip"
+        ),
+        ComponentRecipeSupport.flag(
+          "hasRailMount",
+          false
+        ),
+        ComponentRecipeSupport.scalar(
+          "railMountY",
+          0
+        ),
+        ComponentRecipeSupport.count(
+          "nutBoltCount",
+          4
+        )
+      ].concat(ComponentRecipeSupport.threadParameters()),
+      v -> new Carriage(
+        v.number("boreDiameter"),
+        v.number("width"),
+        v.number("length"),
+        v.number("guideSpacing"),
+        v.number("guideSeatDiameter"),
+        new machinekit.motion.LeadScrewNut(
+          ComponentRecipeSupport.thread(v),
+          v.integer("nutBoltCount")
+        ),
+        ComponentRecipeSupport.fit(v.token("guideSeatFit")),
+        v.boolean("hasRailMount") ? v.number("railMountY") : null
+      ),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	/** Subclasses must declare their own recipe and saved values. */
-	override public function componentType():Null<ComponentType>
-		return Std.isExactType(this, Carriage) ? recipeType() : null;
+  /** Subclasses must declare their own recipe and saved values. */
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    Carriage) ? recipeType() : null;
 
-	override public function values():machinekit.component.ComponentValues {
-		var values = ComponentRecipeSupport.threadValues(nut.thread);
-		values.setNumber("boreDiameter", boreDiameter).setNumber("width", width)
-			.setNumber("length", length).setNumber("guideSpacing", guideSpacing)
-			.setNumber("guideSeatDiameter", guideSeatDiameter)
-			.setToken("guideSeatFit", Std.string(guideSeatFit))
-			.setBoolean("hasRailMount", hasRailMount).setNumber("railMountY", railMountY)
-			.setInteger("nutBoltCount", nut.boltCount);
-		return values.setToken("material", materialSpec());
-	}
+  override public function values():machinekit.component.ComponentValues {
+    var values = ComponentRecipeSupport.threadValues(nut.thread);
+    values.setNumber("boreDiameter", boreDiameter).setNumber("width", width).setNumber("length", length).setNumber(
+      "guideSpacing",
+      guideSpacing
+    ).setNumber(
+      "guideSeatDiameter",
+      guideSeatDiameter
+    ).setToken(
+      "guideSeatFit",
+      Std.string(guideSeatFit)
+    ).setBoolean(
+      "hasRailMount",
+      hasRailMount
+    ).setNumber(
+      "railMountY",
+      railMountY
+    ).setInteger(
+      "nutBoltCount",
+      nut.boltCount
+    );
+    return values.setToken("material", materialSpec());
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Solids.named(Part.box(width, width, length), "body");
-		if (detail == Envelope) return body;
-		var tools = [Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore")];
-		if (!hasRailMount) {
-			tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, -guideSpacing), "guide.left"));
-			tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, guideSpacing), "guide.right"));
-		}
-		var mountHoleRadius = nut.mountScrewPart(10).clearanceDiameter(Medium) / 2;
-		var bolt = 1;
-		for (point in nut.boltPattern())
-			tools.push(Solids.named(Part.cylinderSpan(mountHoleRadius, -0.1, length + 0.1, point.x, point.y), "nutbolt" + bolt++));
-		return Solids.cut(body, tools);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var body = Solids.named(Part.box(width, width, length), "body");
+    if (detail == Envelope) return body;
+    var tools = [Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore")];
+    if (!hasRailMount) {
+      tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2,
+        -0.1, length + 0.1, -guideSpacing), "guide.left"));
+      tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2,
+        -0.1, length + 0.1, guideSpacing), "guide.right"));
+    }
+    var mountHoleRadius = nut.mountScrewPart(10).clearanceDiameter(Medium) / 2;
+    var bolt = 1;
+    for (point in nut.boltPattern()) tools.push(Solids.named(
+      Part.cylinderSpan(
+        mountHoleRadius,
+        -0.1,
+        length + 0.1,
+        point.x,
+        point.y
+      ),
+      "nutbolt" + bolt++
+    ));
+    return Solids.cut(body, tools);
+  }
 }
 
 /** Parametric lead-screw axis. The screw rotates through a coupling; a separate prismatic
@@ -128,239 +212,317 @@ class Carriage extends MachineComponent {
  * mounting structure and screw bearing closure remain outside this kinematic preview.
  */
 class LinearAxis extends MachineAssembly {
-	/** Axial gap between the coupling's end and flange bearing A's housing. */
-	public static inline var COUPLING_GAP:Float = 2;
-	/** Gap between the rail and the widest part around the screw. */
-	public static inline var RAIL_GAP:Float = 5;
+  /** Axial gap between the coupling's end and flange bearing A's housing. */
+  public static inline var COUPLING_GAP:Float = 2;
+  /** Gap between the rail and the widest part around the screw. */
+  public static inline var RAIL_GAP:Float = 5;
 
-	public final motor:NemaStepper;
-	public final coupling:ShaftCoupling;
-	public final screw:LeadScrew;
-	public final nut:LeadScrewNut;
-	public final guideRodA:SteppedShaft;
-	public final guideRodB:SteppedShaft;
-	public final guideBearingA:LinearBearing;
-	public final guideBearingB:LinearBearing;
-	/** Round-rod guide retained for the default axis and for source compatibility. */
-	public final guideSystem:LinearGuideSystem;
-	/** Profile-rail guide selected by `forRailProfile`; null for the round-rod default. */
-	public final railGuide:Null<LinearRailSystem>;
-	/** World-z offset of the profile rail's axis connector from the screw input. */
-	public final railGuideOffset:Float;
-	public final guideSpacing:Float;
-	public final bearing:DeepGrooveBearing;
-	public final carriage:Carriage;
-	public final flangeBearingA:FlangeBearingAssembly;
-	public final flangeBearingB:FlangeBearingAssembly;
-	public final rail:RectTube;
-	public final frame:FrameAssembly;
-	public final stroke:Float;
-	public final margin:Float;
-	public final length:Float;
-	/** World z of the screw's input end, with the motor at the identity pose. */
-	public final screwStart:Float;
-	/** Flange bearing centres, measured from the screw's input end. */
-	public final bearingAPosition:Float;
-	public final bearingBPosition:Float;
-	/** Carriage joint limits: bore centre measured from the screw's input end. */
-	public final travelMin:Float;
-	public final travelMax:Float;
+  public final motor:NemaStepper;
+  public final coupling:ShaftCoupling;
+  public final screw:LeadScrew;
+  public final nut:LeadScrewNut;
+  public final guideRodA:SteppedShaft;
+  public final guideRodB:SteppedShaft;
+  public final guideBearingA:LinearBearing;
+  public final guideBearingB:LinearBearing;
+  /** Round-rod guide retained for the default axis and for source compatibility. */
+  public final guideSystem:LinearGuideSystem;
+  /** Profile-rail guide selected by `forRailProfile`; null for the round-rod default. */
+  public final railGuide:Null<LinearRailSystem>;
+  /** World-z offset of the profile rail's axis connector from the screw input. */
+  public final railGuideOffset:Float;
+  public final guideSpacing:Float;
+  public final bearing:DeepGrooveBearing;
+  public final carriage:Carriage;
+  public final flangeBearingA:FlangeBearingAssembly;
+  public final flangeBearingB:FlangeBearingAssembly;
+  public final rail:RectTube;
+  public final frame:FrameAssembly;
+  public final stroke:Float;
+  public final margin:Float;
+  public final length:Float;
+  /** World z of the screw's input end, with the motor at the identity pose. */
+  public final screwStart:Float;
+  /** Flange bearing centres, measured from the screw's input end. */
+  public final bearingAPosition:Float;
+  public final bearingBPosition:Float;
+  /** Carriage joint limits: bore centre measured from the screw's input end. */
+  public final travelMin:Float;
+  public final travelMax:Float;
 
-	/** `bearingDesignation` defaults to the first catalog deep groove bearing whose bore equals
+  /** `bearingDesignation` defaults to the first catalog deep groove bearing whose bore equals
 	 * `screwDiameter` (6000 for 10 mm); a given bearing must match the screw diameter. `margin` is
 	 * the clearance between the carriage at either travel limit and the adjacent flange bearing.
 	 * The default screw is right-hand Tr10 × 2, single-start. Other diameters require `thread`.
 	 */
-	public function new(motorFrame:Int = 23, screwDiameter:Float = 10, stroke:Float = 200,
-			?bearingDesignation:String, margin:Float = 30, ?thread:LeadScrewThread, ?railProfile:String) {
-		super();
-		if (!(screwDiameter > 0)) throw "Linear axis needs a positive screw diameter";
-		if (!(stroke > 0)) throw "Linear axis needs a positive stroke";
-		if (!(margin > 0)) throw "Linear axis needs a positive end margin";
-		this.stroke = stroke;
-		this.margin = margin;
-		motor = NemaStepper.frame(motorFrame);
-		bearing = bearingDesignation == null ? matchingBearing(screwDiameter) : DeepGrooveBearing.metric(bearingDesignation);
-		if (!(Math.abs(bearing.bore - screwDiameter) < 1e-9))
-			throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
-		flangeBearingA = new FlangeBearingAssembly(bearing);
-		flangeBearingB = new FlangeBearingAssembly(bearing);
-		coupling = new ShaftCoupling(motor.variant.shaftDiameter, screwDiameter);
-		if (thread == null && screwDiameter != 10)
-			throw "Linear axis needs an explicit thread for a nondefault screw diameter";
-		var threadSpec = thread == null ? new LeadScrewThread(MetricTrapezoidal, 10, 2) : thread;
-		if (Math.abs(threadSpec.screwDiameter - screwDiameter) > 1e-9)
-			throw "Linear axis thread diameter must match the screw diameter";
-		nut = new LeadScrewNut(threadSpec);
-		var profileSpec = railProfile == null ? null : LinearRailSystem.catalog().get(railProfile);
-		var guideBearingSpec = LinearBearing.metric("LM8UU");
-		guideSpacing = Math.max(Math.max(25, screwDiameter * 2.5),
-			flangeBearingA.housing.face / 2 + guideBearingSpec.boreDiameter / 2 + RAIL_GAP);
-		var guideSeatFit = BearingHousingFit.Slip;
-		var guideSeatDiameter = guideBearingSpec.housingSeatDiameter(guideSeatFit);
-		var carriageWidth = 2 * (guideSpacing + guideSeatDiameter / 2 + 5);
-		if (profileSpec != null)
-			carriageWidth = Math.max(carriageWidth, profileSpec.blockWidth + 10);
-		var carriageLength = Math.max(screwDiameter * 6, guideBearingSpec.length + 4);
-		if (profileSpec != null)
-			carriageLength = Math.max(carriageLength, profileSpec.blockLength + 4);
-		carriage = new Carriage(screwDiameter, carriageWidth, carriageLength,
-			guideSpacing, guideSeatDiameter, nut, guideSeatFit,
-			profileSpec == null ? null : -(carriageWidth / 2 + profileSpec.blockHeight));
-		if (!(margin > Math.max(flangeBearingA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
-			throw "Linear axis end margin must clear the flange housing screw heads and lead nut";
-		var depth = flangeBearingA.housing.depth;
-		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
-		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
-		travelMax = travelMin + stroke;
-		bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
-		length = bearingBPosition + depth / 2;
-		screwStart = motor.connector("shaftTip").frame.z;
-		screw = new LeadScrew(threadSpec, length);
-		if (profileSpec == null) {
-			guideSystem = new LinearGuideSystem("LM8UU", guideSpacing, length, BearingShaftFit.Slip, guideSeatFit);
-			guideSystem.validateCarriage(carriage.width, carriage.length);
-			guideRodA = guideSystem.rodA;
-			guideRodB = guideSystem.rodB;
-			guideBearingA = guideSystem.bearingA;
-			guideBearingB = guideSystem.bearingB;
-			railGuide = null;
-			railGuideOffset = 0;
-		} else {
-			// Keep the existing round-guide fields populated for source compatibility. The selected
-			// rail guide is the assembly/BOM path whenever `railGuide` is non-null.
-			guideSystem = new LinearGuideSystem("LM8UU", guideSpacing, length, BearingShaftFit.Slip, guideSeatFit);
-			guideRodA = guideSystem.rodA;
-			guideRodB = guideSystem.rodB;
-			guideBearingA = guideSystem.bearingA;
-			guideBearingB = guideSystem.bearingB;
-			railGuide = LinearRailSystem.forProfile(railProfile,
-				stroke + 2 * profileSpec.railEndMargin + profileSpec.blockLength);
-			railGuideOffset = travelMin - railGuide.travelMin;
-		}
-		rail = new RectTube(Math.max(20, screwDiameter * 2), Math.max(15, screwDiameter * 1.5), 2);
-		var housing = flangeBearingA.housing;
-		var screwHeadReach = housing.boltSpacing / 2 + flangeBearingA.screw.spec.headDiameter / 2;
-		var reach = Math.max(Math.max(housing.face / 2, screwHeadReach), Math.max(carriage.width, coupling.outerDiameter) / 2);
-		if (profileSpec != null)
-			reach = Math.max(reach, -carriage.railMountY + profileSpec.railHeight);
-		var railY = -(reach + RAIL_GAP + rail.height / 2);
-		frame = new FrameAssembly();
-		frame.point("railStart", 0, railY, screwStart);
-		frame.point("railEnd", 0, railY, screwStart + length);
-		frame.member("rail", "railStart", "railEnd", rail);
-		var sectionArea = rail.width * rail.height -
-			(rail.width - 2 * rail.wall) * (rail.height - 2 * rail.wall);
-		addBomItem(railBomItem(), 1, machinekit.assembly.MachineAssembly.AssemblyBomMass.Point(
-			sectionArea * length * 1e-9 * 7850,
-			new cadkit.modeling.Vector(0, railY, screwStart + length / 2)));
-		configureAssembly();
-	}
+  public function new(
+    motorFrame:Int = 23,
+    screwDiameter:Float = 10,
+    stroke:Float = 200,
+    ?bearingDesignation:String,
+    margin:Float = 30,
+    ?thread:LeadScrewThread,
+    ?railProfile:String
+  ) {
+    super();
+    if (!(screwDiameter > 0)) throw "Linear axis needs a positive screw diameter";
+    if (!(stroke > 0)) throw "Linear axis needs a positive stroke";
+    if (!(margin > 0)) throw "Linear axis needs a positive end margin";
+    this.stroke = stroke;
+    this.margin = margin;
+    motor = NemaStepper.frame(motorFrame);
+    bearing = bearingDesignation
+      == null ? matchingBearing(screwDiameter) : DeepGrooveBearing.metric(bearingDesignation);
+    if (!(Math.abs(bearing.bore - screwDiameter)
+      < 1e-9)) throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
+    flangeBearingA = new FlangeBearingAssembly(bearing);
+    flangeBearingB = new FlangeBearingAssembly(bearing);
+    coupling = new ShaftCoupling(motor.variant.shaftDiameter, screwDiameter);
+    if (thread == null
+      && screwDiameter != 10) throw "Linear axis needs an explicit thread for a nondefault screw diameter";
+    var threadSpec = thread == null ? new LeadScrewThread(MetricTrapezoidal, 10, 2) : thread;
+    if (Math.abs(threadSpec.screwDiameter - screwDiameter)
+      > 1e-9) throw "Linear axis thread diameter must match the screw diameter";
+    nut = new LeadScrewNut(threadSpec);
+    var profileSpec = railProfile == null ? null : LinearRailSystem.catalog().get(railProfile);
+    var guideBearingSpec = LinearBearing.metric("LM8UU");
+    guideSpacing = Math.max(
+      Math.max(25, screwDiameter * 2.5),
+      flangeBearingA.housing.face / 2 + guideBearingSpec.boreDiameter / 2 + RAIL_GAP
+    );
+    var guideSeatFit = BearingHousingFit.Slip;
+    var guideSeatDiameter = guideBearingSpec.housingSeatDiameter(guideSeatFit);
+    var carriageWidth = 2 * (guideSpacing + guideSeatDiameter / 2 + 5);
+    if (profileSpec != null) carriageWidth = Math.max(carriageWidth, profileSpec.blockWidth + 10);
+    var carriageLength = Math.max(screwDiameter * 6, guideBearingSpec.length + 4);
+    if (profileSpec != null) carriageLength = Math.max(carriageLength, profileSpec.blockLength + 4);
+    carriage = new Carriage(
+      screwDiameter,
+      carriageWidth,
+      carriageLength,
+      guideSpacing,
+      guideSeatDiameter,
+      nut,
+      guideSeatFit,
+      profileSpec == null ? null : -(carriageWidth / 2 + profileSpec.blockHeight)
+    );
+    if (!(margin > Math.max(flangeBearingA.screw.spec.headHeight, nut.bodyLength
+      + nut.flangeThickness))) throw "Linear axis end margin must clear the flange housing screw heads and lead nut";
+    var depth = flangeBearingA.housing.depth;
+    bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
+    travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
+    travelMax = travelMin + stroke;
+    bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
+    length = bearingBPosition + depth / 2;
+    screwStart = motor.connector("shaftTip").frame.z;
+    screw = new LeadScrew(threadSpec, length);
+    if (profileSpec == null) {
+      guideSystem = new LinearGuideSystem("LM8UU", guideSpacing, length, BearingShaftFit.Slip, guideSeatFit);
+      guideSystem.validateCarriage(carriage.width, carriage.length);
+      guideRodA = guideSystem.rodA;
+      guideRodB = guideSystem.rodB;
+      guideBearingA = guideSystem.bearingA;
+      guideBearingB = guideSystem.bearingB;
+      railGuide = null;
+      railGuideOffset = 0;
+    } else {
+      // Keep the existing round-guide fields populated for source compatibility. The selected
+      // rail guide is the assembly/BOM path whenever `railGuide` is non-null.
+      guideSystem = new LinearGuideSystem("LM8UU", guideSpacing, length, BearingShaftFit.Slip, guideSeatFit);
+      guideRodA = guideSystem.rodA;
+      guideRodB = guideSystem.rodB;
+      guideBearingA = guideSystem.bearingA;
+      guideBearingB = guideSystem.bearingB;
+      railGuide = LinearRailSystem.forProfile(
+        railProfile,
+        stroke + 2 * profileSpec.railEndMargin + profileSpec.blockLength
+      );
+      railGuideOffset = travelMin - railGuide.travelMin;
+    }
+    rail = new RectTube(Math.max(20, screwDiameter * 2), Math.max(15, screwDiameter * 1.5), 2);
+    var housing = flangeBearingA.housing;
+    var screwHeadReach = housing.boltSpacing / 2 + flangeBearingA.screw.spec.headDiameter / 2;
+    var reach = Math.max(
+      Math.max(housing.face / 2, screwHeadReach),
+      Math.max(carriage.width, coupling.outerDiameter) / 2
+    );
+    if (profileSpec != null) reach = Math.max(reach, -carriage.railMountY + profileSpec.railHeight);
+    var railY = -(reach + RAIL_GAP + rail.height / 2);
+    frame = new FrameAssembly();
+    frame.point("railStart", 0, railY, screwStart);
+    frame.point("railEnd", 0, railY, screwStart + length);
+    frame.member("rail", "railStart", "railEnd", rail);
+    var sectionArea = rail.width * rail.height - (rail.width - 2 * rail.wall) * (rail.height - 2 * rail.wall);
+    addBomItem(
+      railBomItem(),
+      1,
+      machinekit.assembly.MachineAssembly.AssemblyBomMass.Point(
+        sectionArea * length * 1e-9 * 7850,
+        new cadkit.modeling.Vector(
+          0,
+          railY,
+          screwStart + length / 2
+        )
+      )
+    );
+    configureAssembly();
+  }
 
-	/** Construct an axis whose carriage is supported by a catalog-backed profile rail. The
+  /** Construct an axis whose carriage is supported by a catalog-backed profile rail. The
 	 * ordinary constructor keeps the LM8UU round-rod guide for compatibility. */
-	public static function forRailProfile(designation:String, motorFrame:Int = 23, screwDiameter:Float = 10,
-			stroke:Float = 200, ?bearingDesignation:String, margin:Float = 30, ?thread:LeadScrewThread):LinearAxis
-		return new LinearAxis(motorFrame, screwDiameter, stroke, bearingDesignation, margin, thread, designation);
+  public static function forRailProfile(
+    designation:String,
+    motorFrame:Int = 23,
+    screwDiameter:Float = 10,
+    stroke:Float = 200,
+    ?bearingDesignation:String,
+    margin:Float = 30,
+    ?thread:LeadScrewThread
+  ):LinearAxis return new LinearAxis(
+    motorFrame,
+    screwDiameter,
+    stroke,
+    bearingDesignation,
+    margin,
+    thread,
+    designation
+  );
 
-	static function matchingBearing(bore:Float):DeepGrooveBearing {
-		for (designation in DeepGrooveBearing.catalog().designations())
-			if (Math.abs(DeepGrooveBearing.catalog().get(designation).bore - bore) < 1e-9)
-				return DeepGrooveBearing.metric(designation);
-		throw 'No catalog deep groove bearing has a ${Dimension.format(bore)} mm bore to match the screw';
-	}
+  static function matchingBearing(bore:Float):DeepGrooveBearing {
+    for (designation in DeepGrooveBearing.catalog().designations()) if (Math.abs(DeepGrooveBearing
+      .catalog().get(designation).bore - bore) < 1e-9) return DeepGrooveBearing.metric(designation);
+    throw 'No catalog deep groove bearing has a ${Dimension.format(bore)} mm bore to match the screw';
+  }
 
-	/** Compatibility model using the unprefixed ids. */
-	public function assembly():AssemblyModel {
-		var model = new AssemblyModel();
-		addTo(model, "");
-		return model;
-	}
+  /** Compatibility model using the unprefixed ids. */
+  public function assembly():AssemblyModel {
+    var model = new AssemblyModel();
+    addTo(model, "");
+    return model;
+  }
 
-	function configureAssembly():Void {
-		addComponent("motor", motor);
-		addComponent("coupling", coupling);
-		addComponent("screw", screw);
-		addComponent("carriage", carriage);
-		addComponent("leadNut", nut);
-		addMate("coupling", "continuous", "motor", "shaftTip", "coupling", "axis");
-		addMate("coupling-screw", "fixed", "coupling", "axis", "screw", "input");
-		addMateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore",
-			{x: 0, y: 1, z: 0}, travelMin,
-			// The carriage can pass either end of its stroke by the end margin before it meets a bearing housing.
-			{lower: travelMin, upper: travelMax, velocity: null, effort: null, overtravel: margin});
-		// The screw's thread sets the ratio: the carriage moves along the screw's turning axis.
-		addTransmission("lead-screw", "carriage-slide", "coupling", Transmission.LeadScrew("screw", "leadNut"), Same, travelMin);
-		addMate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
-		exposeConnector("motorShaft", "motor", "shaftTip");
-		exposeConnector("carriageBore", "carriage", "bore");
-		exposeConnector("screwOutput", "screw", "output");
-		if (railGuide == null) {
-			addComponent("guideBearingA", guideBearingA);
-			addComponent("guideBearingB", guideBearingB);
-			addMate("guide-bearing-a", "fixed", "carriage", "guideA", "guideBearingA", "axis");
-			addMate("guide-bearing-b", "fixed", "carriage", "guideB", "guideBearingB", "axis");
-			var poseGuideA:AssemblyFrame = {x: -guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
-			var poseGuideB:AssemblyFrame = {x: guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
-			addComponent("guideRodA", guideRodA, poseGuideA);
-			addComponent("guideRodB", guideRodB, poseGuideB);
-			exposeConnector("guideA", "guideRodA", "input");
-			exposeConnector("guideB", "guideRodB", "input");
-		} else {
-			var profileRailPose:AssemblyFrame = {x: 0, y: carriage.railMountY, z: screwStart + railGuideOffset,
-				qx: 0, qy: 0, qz: 0, qw: 1};
-			addComponent("profileRail", railGuide.rail, profileRailPose);
-			for (i in 0...railGuide.blocks.length) {
-				var blockId = 'profileBlock${i + 1}';
-				addComponent(blockId, railGuide.blocks[i]);
-				addMate('profile-block-carriage-$i', "fixed", "carriage", "railMount", blockId, "rail");
-				addConstraintOnAxis('profile-block-rail-$i', "prismatic", "profileRail", "axis", blockId, "rail",
-					{x: 0, y: 1, z: 0});
-			}
-		}
-		var depth = flangeBearingA.housing.depth;
-		// Housing A: mounting face (local z=0) toward the motor.
-		var poseA:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingAPosition - depth / 2, qx: 0, qy: 0, qz: 0, qw: 1};
-		// Housing B: turned half a turn about X so its mounting face points at the far end.
-		var poseB:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingBPosition + depth / 2, qx: 1, qy: 0, qz: 0, qw: 0};
-		addFlangeAssembly("flangeA", flangeBearingA, poseA);
-		addFlangeAssembly("flangeB", flangeBearingB, poseB);
-	}
+  function configureAssembly():Void {
+    addComponent("motor", motor);
+    addComponent("coupling", coupling);
+    addComponent("screw", screw);
+    addComponent("carriage", carriage);
+    addComponent("leadNut", nut);
+    addMate("coupling", "continuous", "motor", "shaftTip", "coupling", "axis");
+    addMate("coupling-screw", "fixed", "coupling", "axis", "screw", "input");
+    addMateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore", {x: 0, y: 1, z: 0}, travelMin,
+    // The carriage can pass either end of its stroke by the end margin before it meets a bearing housing.
+    {lower: travelMin, upper: travelMax, velocity: null, effort: null, overtravel: margin});
+    // The screw's thread sets the ratio: the carriage moves along the screw's turning axis.
+    addTransmission(
+      "lead-screw",
+      "carriage-slide",
+      "coupling",
+      Transmission.LeadScrew("screw", "leadNut"),
+      Same,
+      travelMin
+    );
+    addMate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
+    exposeConnector("motorShaft", "motor", "shaftTip");
+    exposeConnector("carriageBore", "carriage", "bore");
+    exposeConnector("screwOutput", "screw", "output");
+    if (railGuide == null) {
+      addComponent("guideBearingA", guideBearingA);
+      addComponent("guideBearingB", guideBearingB);
+      addMate("guide-bearing-a", "fixed", "carriage", "guideA", "guideBearingA", "axis");
+      addMate("guide-bearing-b", "fixed", "carriage", "guideB", "guideBearingB", "axis");
+      var poseGuideA:AssemblyFrame = {x: -guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
+      var poseGuideB:AssemblyFrame = {x: guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
+      addComponent("guideRodA", guideRodA, poseGuideA);
+      addComponent("guideRodB", guideRodB, poseGuideB);
+      exposeConnector("guideA", "guideRodA", "input");
+      exposeConnector("guideB", "guideRodB", "input");
+    } else {
+      var profileRailPose:AssemblyFrame = {
+        x: 0,
+        y: carriage.railMountY,
+        z: screwStart + railGuideOffset,
+        qx: 0,
+        qy: 0,
+        qz: 0,
+        qw: 1
+      };
+      addComponent("profileRail", railGuide.rail, profileRailPose);
+      for (i in 0...railGuide.blocks.length) {
+        var blockId = 'profileBlock${i + 1}';
+        addComponent(blockId, railGuide.blocks[i]);
+        addMate('profile-block-carriage-$i', "fixed", "carriage", "railMount", blockId, "rail");
+        addConstraintOnAxis(
+          'profile-block-rail-$i',
+          "prismatic",
+          "profileRail",
+          "axis",
+          blockId,
+          "rail",
+          {
+            x: 0,
+            y: 1,
+            z: 0
+          }
+        );
+      }
+    }
+    var depth = flangeBearingA.housing.depth;
+    // Housing A: mounting face (local z=0) toward the motor.
+    var poseA:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingAPosition - depth / 2, qx: 0, qy: 0, qz: 0, qw: 1};
+    // Housing B: turned half a turn about X so its mounting face points at the far end.
+    var poseB:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingBPosition + depth / 2, qx: 1, qy: 0, qz: 0, qw: 0};
+    addFlangeAssembly("flangeA", flangeBearingA, poseA);
+    addFlangeAssembly("flangeB", flangeBearingB, poseB);
+  }
 
-	function addFlangeAssembly(prefix:String, flange:FlangeBearingAssembly, pose:AssemblyFrame):Void {
-		var housingId = '$prefix-housing', bearingId = '$prefix-bearing';
-		addComponent(housingId, flange.housing, pose);
-		addComponent(bearingId, flange.bearing);
-		addMate('$prefix-bearing-seat', "fixed", housingId, "bore", bearingId, "axis");
-		exposeConnector('$prefix-bearingAxis', bearingId, "axis");
-		for (i in 1...5) {
-			var bolt = flange.housing.connector('bolt$i').frame;
-			addMemberConnector(housingId, 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + flange.housing.depth,
-				qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw});
-			var screwId = '$prefix-screw$i';
-			addComponent(screwId, flange.screw);
-			addMate('$screwId-seat', "fixed", housingId, 'bolt${i}Head', screwId, "head");
-		}
-	}
+  function addFlangeAssembly(prefix:String, flange:FlangeBearingAssembly, pose:AssemblyFrame):Void {
+    var housingId = '$prefix-housing', bearingId = '$prefix-bearing';
+    addComponent(housingId, flange.housing, pose);
+    addComponent(bearingId, flange.bearing);
+    addMate('$prefix-bearing-seat', "fixed", housingId, "bore", bearingId, "axis");
+    exposeConnector('$prefix-bearingAxis', bearingId, "axis");
+    for (i in 1...5) {
+      var bolt = flange.housing.connector('bolt$i').frame;
+      addMemberConnector(
+        housingId,
+        'bolt${i}Head',
+        {
+          x: bolt.x,
+          y: bolt.y,
+          z: bolt.z + flange.housing.depth,
+          qx: bolt.qx,
+          qy: bolt.qy,
+          qz: bolt.qz,
+          qw: bolt.qw
+        }
+      );
+      var screwId = '$prefix-screw$i';
+      addComponent(screwId, flange.screw);
+      addMate('$screwId-seat', "fixed", housingId, 'bolt${i}Head', screwId, "head");
+    }
+  }
 
-	/** Set travel from the carriage's lower limit; AssemblyState propagates the screw coupling. */
-	public function setTravel(state:AssemblyState, travel:Float, prefix:String = ""):Void {
-		if (!Math.isFinite(travel) || travel < 0 || travel > stroke)
-			throw "Linear axis travel is outside its stroke";
-		state.setJoint(MachineAssembly.join(prefix, "carriage-slide"), travelMin + travel);
-		state.forwardKinematics();
-	}
+  /** Set travel from the carriage's lower limit; AssemblyState propagates the screw coupling. */
+  public function setTravel(state:AssemblyState, travel:Float, prefix:String = ""):Void {
+    if (!Math.isFinite(travel) || travel < 0 || travel > stroke) throw "Linear axis travel is outside its stroke";
+    state.setJoint(MachineAssembly.join(prefix, "carriage-slide"), travelMin + travel);
+    state.forwardKinematics();
+  }
 
-	/** The rail as a BOM line: its profile cut to the screw length. */
-	public function railBomItem():BomItem {
-		var lengthText = Dimension.format(length);
-		return {partNumber: '${rail.designation}-L$lengthText', description: '${rail.description}, $lengthText mm long',
-			quantity: 1, material: "steel"};
-	}
+  /** The rail as a BOM line: its profile cut to the screw length. */
+  public function railBomItem():BomItem {
+    var lengthText = Dimension.format(length);
+    return {
+      partNumber: '${rail.designation}-L$lengthText',
+      description: '${rail.description}, $lengthText mm long',
+      quantity: 1,
+      material: "steel"
+    };
+  }
 
-	public function bom():Bom return billOfMaterials();
+  public function bom():Bom return billOfMaterials();
 
-	/** Instance id to component, for geometry generation by a preview or exporter. Excludes the
+  /** Instance id to component, for geometry generation by a preview or exporter. Excludes the
 	 * frame rail, which is generated through `frame.geometry("rail")` instead.
 	 */
 }

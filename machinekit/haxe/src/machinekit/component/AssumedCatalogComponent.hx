@@ -11,17 +11,11 @@ class AssumedCatalogComponent extends MachineComponent {
     label:String, material:String, parameters:Array<ComponentParameter>, ?inputs:ComponentValues) {
     var v = ComponentRecipeSupport.resolve(parameters, inputs);
     if (v.get("material") == null) v.setToken("material", material);
-    super(
-      ComponentRecipeSupport.designationFor(id, "assumed", v),
-      "Assumed " + label,
-      v.token("material"),
-      false,
-      v
-    );
+    super(ComponentRecipeSupport.designationFor(id, "assumed", v), "Assumed " + label, v.token("material"), false, v);
     assumedInputs = v.copy();
   }
   public function flag(name:String):Bool return assumedInputs.boolean(name);
-  public function io():MachineIo return {inputs:[], outputs:[], analogOutputs:[]};
+  public function io():MachineIo return {inputs: [], outputs: [], analogOutputs: []};
   public function n(name:String):Float return parameterNumber(name);
   public function positive(names:Array<String>):Void {
     for (name in names) if (!Math.isFinite(n(name))

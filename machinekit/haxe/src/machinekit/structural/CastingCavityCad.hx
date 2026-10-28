@@ -17,91 +17,100 @@ import materia.casting.CastingPrism;
  * cut/body expressions. This is the shared CAD backend, not local cut clipping.
  */
 class CastingCavityCad {
-	/** Numerical contact thresholds in mm²/mm³, not fabrication allowances. */
-	static inline var CONTACT_AREA = 1e-8;
-	static inline var CONTACT_VOLUME = 1e-8;
+  /** Numerical contact thresholds in mm²/mm³, not fabrication allowances. */
+  static inline var CONTACT_AREA = 1e-8;
+  static inline var CONTACT_VOLUME = 1e-8;
 
-	/** Exact physical drilling tool, shared by source and installed views. */
-	public static function receiver(hole:materia.casting.InsertHole):Part {
-		return Scope.run(scope -> {
-			var local=scope.own(Part.cylinder(hole.diameter/2,hole.depth));
-			return scope.own(PosedParts.moved(local,hole.frame));
-		});
-	}
+  /** Exact physical drilling tool, shared by source and installed views. */
+  public static function receiver(hole:materia.casting.InsertHole):Part {
+    return Scope.run(scope -> {var local = scope.own(Part.cylinder(hole.diameter / 2, hole.depth));
+    return scope.own(PosedParts.moved(local, hole.frame));
+    });
+  }
 
-	public static function prism(prism:CastingPrism):Part {
-		return Scope.run(scope -> {
-			var local = scope.own(Part.prism([for (point in prism.profile) new Vector(point.x, point.y)], 0, prism.height));
-			return scope.own(PosedParts.moved(local, prism.pose));
-		});
-	}
+  public static function prism(prism:CastingPrism):Part {
+    return Scope.run(scope -> {var local = scope.own(Part.prism(
+      [for (point in prism.profile) new Vector(
+        point.x,
+        point.y
+      )],
+      0,
+      prism.height
+    ));
+    return scope.own(PosedParts.moved(local, prism.pose));
+    });
+  }
 
-	static function cut(feature:CastingFeature,body:Array<CastingPrism>):Part
-		return CastingRegionCad.part(CastingCavities.cutRegion(body,feature));
+  static function cut(feature:CastingFeature,
+    body:Array<CastingPrism>):Part return CastingRegionCad.part(CastingCavities.cutRegion(
+      body,
+      feature
+    ));
 
-	static function union(prisms:Array<CastingPrism>):Part {
-		return Scope.run(scope -> {
-			var parts = [for (prism in prisms) scope.own(CastingCavityCad.prism(prism))];
-			return scope.own(Part.fuseAll(parts));
-		});
-	}
+  static function union(prisms:Array<CastingPrism>):Part {
+    return Scope.run(scope -> {var parts = [for (prism in prisms) scope.own(CastingCavityCad.prism(prism))];
+    return scope.own(Part.fuseAll(parts));
+    });
+  }
 
-	public static function part(cavity:FinishedCastingCavity):Part {
-		return switch cavity.geometry {
-			case Prisms(pieces): union(pieces);
-			case UnsupportedGeometry(reason): throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
-			case SolidIntersection(body, feature, features):
-				Scope.run(scope -> {
-					var envelope = scope.own(union(body)), tool = scope.own(cut(feature,body));
-					var common = scope.own(new Model(envelope.shape.common(tool.shape)));
-					if (common.shape.volume() <= CONTACT_VOLUME)
-						throw "Casting feature does not reach body: " + feature.id;
-					var finished = scope.own(new Part(common.shape.cloneShape()));
-					validateOpenings(scope, body, feature, features, envelope, tool, finished);
-					return finished;
-				});
-		};
-	}
+  public static function part(cavity:FinishedCastingCavity):Part {
+    return switch cavity.geometry {
+      case Prisms(pieces):
+        union(pieces);
+      case UnsupportedGeometry(reason):
+        throw "Unsupported casting cavity geometry: " + cavity.featureId + ": " + reason;
+      case SolidIntersection(body, feature, features):
+        Scope.run(scope -> {var envelope = scope.own(union(body)), tool = scope.own(cut(feature, body));
+        var common = scope.own(new Model(envelope.shape.common(tool.shape)));
+        if (common.shape.volume() <= CONTACT_VOLUME) throw "Casting feature does not reach body: " + feature.id;
+        var finished = scope.own(new Part(common.shape.cloneShape()));
+        validateOpenings(scope, body, feature, features, envelope, tool, finished);
+        return finished;
+        });
+    };
+  }
 
-	static function validateOpenings(scope:Scope, body:Array<CastingPrism>, feature:CastingFeature,
-			features:Array<CastingFeature>, envelope:Part, tool:Part, finished:Part):Void {
-		var reached = new Map<String, Bool>(), declared = new Map<String, Bool>();
-		var throughFeatures:Array<Model> = [];
-		for (opening in feature.openings) {
-			if (opening.kind == BodyFace) {
-				declared.set(opening.target, true);
-				continue;
-			}
-			var candidates = features.filter(other -> other.id == opening.target);
-			var meets = false;
-			for (other in candidates) {
-				var otherCut = scope.own(cut(other,body));
-				var otherRegion = scope.own(new Model(envelope.shape.common(otherCut.shape)));
-				throughFeatures.push(otherRegion);
-				var common = scope.own(new Model(finished.shape.common(otherRegion.shape)));
-				if (common.shape.area() > CONTACT_AREA) meets = true;
-			}
-			if (!meets)
-				throw "Unreached declared feature opening: " + feature.id + " " + opening.target;
-		}
-		for (face in CastingCavities.boundary(body)) {
-			var points = [for (point in face.points) new Vector(point.x, point.y, point.z)];
-			var normal = CastingCavities.bodyFaceNormal(body, face.id);
-			var plane = new Plane(points[0], points[1].subtract(points[0]), new Vector(normal.x, normal.y, normal.z));
-			var wire = scope.own(Curve.polyline(points, true));
-			var surface = scope.own(Sketch.face(wire, [], plane));
-			var opening = scope.own(new Model(surface.shape.common(tool.shape)));
-			if (opening.shape.area() <= CONTACT_AREA) continue;
-			reached.set(face.id, true);
-			if (declared.exists(face.id)) continue;
-			var remaining:Model = opening;
-			for (other in throughFeatures)
-				remaining = scope.own(new Model(remaining.shape.cut(other.shape)));
-			if (remaining.shape.area() > CONTACT_AREA)
-				throw "Undeclared casting breakout: " + feature.id + " " + face.id;
-		}
-		for (id in declared.keys())
-			if (!reached.exists(id))
-				throw "Unreached declared opening: " + feature.id + " " + id;
-	}
+  static function validateOpenings(
+    scope:Scope,
+    body:Array<CastingPrism>,
+    feature:CastingFeature,
+    features:Array<CastingFeature>,
+    envelope:Part,
+    tool:Part,
+    finished:Part
+  ):Void {
+    var reached = new Map<String, Bool>(), declared = new Map<String, Bool>();
+    var throughFeatures:Array<Model> = [];
+    for (opening in feature.openings) {
+      if (opening.kind == BodyFace) {
+        declared.set(opening.target, true);
+        continue;
+      }
+      var candidates = features.filter(other -> other.id == opening.target);
+      var meets = false;
+      for (other in candidates) {
+        var otherCut = scope.own(cut(other, body));
+        var otherRegion = scope.own(new Model(envelope.shape.common(otherCut.shape)));
+        throughFeatures.push(otherRegion);
+        var common = scope.own(new Model(finished.shape.common(otherRegion.shape)));
+        if (common.shape.area() > CONTACT_AREA) meets = true;
+      }
+      if (!meets) throw "Unreached declared feature opening: " + feature.id + " " + opening.target;
+    }
+    for (face in CastingCavities.boundary(body)) {
+      var points = [for (point in face.points) new Vector(point.x, point.y, point.z)];
+      var normal = CastingCavities.bodyFaceNormal(body, face.id);
+      var plane = new Plane(points[0], points[1].subtract(points[0]), new Vector(normal.x, normal.y, normal.z));
+      var wire = scope.own(Curve.polyline(points, true));
+      var surface = scope.own(Sketch.face(wire, [], plane));
+      var opening = scope.own(new Model(surface.shape.common(tool.shape)));
+      if (opening.shape.area() <= CONTACT_AREA) continue;
+      reached.set(face.id, true);
+      if (declared.exists(face.id)) continue;
+      var remaining:Model = opening;
+      for (other in throughFeatures) remaining = scope.own(new Model(remaining.shape.cut(other.shape)));
+      if (remaining.shape.area() > CONTACT_AREA) throw "Undeclared casting breakout: " + feature.id + " " + face.id;
+    }
+    for (id in declared.keys()) if (!reached.exists(id)) throw "Unreached declared opening: " + feature.id + " " + id;
+  }
 }

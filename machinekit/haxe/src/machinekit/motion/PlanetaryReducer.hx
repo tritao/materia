@@ -13,16 +13,53 @@ class PlanetaryReducer extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.scalar("ratio", 5, 1),
     P.scalar("efficiency", 0.95, 0, 1),
-    P.length("diameter", 80),
-    P.length("length", 100),
-    P.length("bore", 19),
-    P.quantity("backlash", 5, "arcmin"),
-    P.quantity("torsionalStiffness", 12000, "N m/rad"),
-    P.quantity("ratedOutputTorque", 80, "N m"),
-    P.quantity("peakOutputTorque", 160, "N m"),
-    P.quantity("axialLoad", 1500, "N"),
-    P.quantity("radialLoad", 2000, "N"),
-    P.quantity("inputInertia", 0.00002, "kg m2")
+    P.length(
+      "diameter",
+      80
+    ),
+    P.length(
+      "length",
+      100
+    ),
+    P.length(
+      "bore",
+      19
+    ),
+    P.quantity(
+      "backlash",
+      5,
+      "arcmin"
+    ),
+    P.quantity(
+      "torsionalStiffness",
+      12000,
+      "N m/rad"
+    ),
+    P.quantity(
+      "ratedOutputTorque",
+      80,
+      "N m"
+    ),
+    P.quantity(
+      "peakOutputTorque",
+      160,
+      "N m"
+    ),
+    P.quantity(
+      "axialLoad",
+      1500,
+      "N"
+    ),
+    P.quantity(
+      "radialLoad",
+      2000,
+      "N"
+    ),
+    P.quantity(
+      "inputInertia",
+      0.00002,
+      "kg m2"
+    )
   ];
   public function new(?v:ComponentValues) {
     super("planetary-reducer", "planetary reducer", "aluminium 6061", inputs(), v);
@@ -59,9 +96,32 @@ class PlanetaryReducer extends AssumedCatalogComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (detail == Envelope) return envelope();
     var d = n("diameter"), l = n("length"), adapter = l * 0.25, flange = l * 0.12;
-    return Solids.named(RoundHousing.part([
-      {z0: 0, z1: adapter, diameter: d * 0.96}, {z0: adapter, z1: l - flange, diameter: d * 0.86}, {z0: l - flange, z1: l, diameter: d}
-    ], n("bore"), 2, 4, d * 0.8, Math.max(3, d * 0.07)), "housing");
+    return Solids.named(
+      RoundHousing.part(
+        [
+          {z0: 0, z1: adapter, diameter: d * 0.96},
+          {
+            z0: adapter,
+            z1: l - flange,
+            diameter: d * 0.86
+          },
+          {
+            z0: l - flange,
+            z1: l,
+            diameter: d
+          }
+        ],
+        n("bore"),
+        2,
+        4,
+        d * 0.8,
+        Math.max(
+          3,
+          d * 0.07
+        )
+      ),
+      "housing"
+    );
   }
 
   /** Its mass is that of the plain bored housing (the drawn steps and holes do not set it). */
@@ -81,12 +141,18 @@ class PlanetaryReducer extends AssumedCatalogComponent {
     );
   }
   override public function reducerSpec():Null<ReducerSpec> return {
-    ratio:n("ratio"),efficiency:n("efficiency"),inputInertia:n("inputInertia"),inertiaAssumed:true,assumed:true,
-    diameter:n("diameter"),length:n("length"),bore:n("bore")
+    ratio: n("ratio"),
+    efficiency: n("efficiency"),
+    inputInertia: n("inputInertia"),
+    inertiaAssumed: true,
+    assumed: true,
+    diameter: n("diameter"),
+    length: n("length"),
+    bore: n("bore")
   };
   public function jointTorque(motorTorque:Float):Float return motorTorque * n("ratio") * n("efficiency");
   public function jointSpeed(motorSpeed:Float):Float return motorSpeed / n("ratio");
-  public function backlashRadians():Float return n("backlash") * Math.PI /(180 * 60);
+  public function backlashRadians():Float return n("backlash") * Math.PI / (180 * 60);
   /** SI torsional stiffness on the reducer output shaft. */
   public function outputDeflection(torque:Float):Float return torque / n("torsionalStiffness");
 }

@@ -13,9 +13,18 @@ class ToolFork extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 80),
     P.length("depth", 100),
-    P.length("thickness", 12),
-    P.length("gripDiameter", 40),
-    P.length("clearance", 0.5)
+    P.length(
+      "thickness",
+      12
+    ),
+    P.length(
+      "gripDiameter",
+      40
+    ),
+    P.length(
+      "clearance",
+      0.5
+    )
   ];
   public function new(?v:ComponentValues) {
     super("tool-fork", "open ISO30 rack fork", "PA12 nylon", inputs(), v);

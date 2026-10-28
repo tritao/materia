@@ -15,7 +15,8 @@ class PendantProfile {
   public var step_units:Array<Int> = [0, 0, 0];
   public var timeout_ms:Int = 0;
   public var host_timeout_ms:Int = 0;
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {

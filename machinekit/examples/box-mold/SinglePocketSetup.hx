@@ -10,108 +10,200 @@ import materia.tooling.panel.PanelJoints;
 
 /** Independent casting study; dimensions come from this foundation instance via the adapter. */
 class SinglePocketSetup {
-	public static function foundation(bedCore:Bool = false):MineralFoundation
-		return new MineralFoundation(new ComponentValues().setNumber("width", 240)
-			.setNumber("depth", 180)
-			.setNumber("height", 100)
-			.setToken("features", CastingPatterns.encode([CastingPatterns.box("pocket",materia.casting.CastingFeature.CastingFeatureKind.Lightening,[CastingPatterns.face(bedCore?"body.z-max":"body.z-min")], 100, 80, 61, 0, 0, bedCore ? 40 : -1)])),
-			[
-				{
-					id: "seat",
-					openings: [CastingPatterns.face("body.z-max")],
-					part: new CastInsert(CastInsert.precastHoles(CastInsert.boxValues(40,35,15),
-						machinekit.structural.InsertHoles.tappedBlind(machinekit.structural.InsertHoles.metricThread(
-							machinekit.standard.FastenerThreads.coarse(6).mating()),15)).setToken("role","guide-seat")),
-					pose: F.translation(80, 0, 85)
-				}
-			]);
+  public static function foundation(bedCore:Bool = false):MineralFoundation return new MineralFoundation(
+    new ComponentValues().setNumber(
+      "width",
+      240
+    ).setNumber(
+      "depth",
+      180
+    ).setNumber(
+      "height",
+      100
+    ).setToken(
+      "features",
+      CastingPatterns.encode([CastingPatterns.box(
+        "pocket",
+        materia.casting.CastingFeature.CastingFeatureKind.Lightening,
+        [CastingPatterns.face(bedCore ? "body.z-max" : "body.z-min")],
+        100,
+        80,
+        61,
+        0,
+        0,
+        bedCore ? 40 : -1
+      )])
+    ),
+    [{
+      id : "seat",
+      openings : [CastingPatterns.face("body.z-max")],
+      part : new CastInsert(CastInsert.precastHoles(
+        CastInsert.boxValues(
+          40,
+          35,
+          15
+        ),
+        machinekit.structural.InsertHoles.tappedBlind(
+          machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(6).mating()),
+          15
+        )
+      ).setToken(
+        "role",
+        "guide-seat"
+      )),
+      pose : F.translation(
+        80,
+        0,
+        85
+      )
+    }]
+  );
 
-	public static function document(thickness:Float = 18, quarterTurn:Bool = false, bedCore:Bool = false):ToolingDocument {
-		var input = FoundationToolingAdapter.snapshot(foundation(bedCore), bedCore ? "single-pocket-bed-study" : "single-pocket-study", 1),
-			stock = PanelJoints.stock(thickness);
-		stock.materialSpec = "coated particleboard";
-		var formerStocks=[stock];
-		if (stock.measuredThickness<25) {
-			var thicker=materia.tooling.ToolingCodec.stockSnapshot(stock);
-			thicker.nominalThickness=25;thicker.measuredThickness=25;
-			formerStocks.push(thicker);
-		}
-		return {
-			input: input,
-			setup: {
-				id: quarterTurn ? "inverted-quarter-turn" : "inverted",
-				revision: 1,
-				sourceFingerprint: ToolingCodec.inputFingerprint(input),
-				fillHeightMm: 100,
-				freeboardMm: 0,
-				sourceToMold: F.fromRotationMatrix(0, 0, 100, quarterTurn ? [0, -1, 0, -1, 0, 0, 0, 0, -1] : [1, 0, 0, 0, -1, 0, 0, 0, -1])
-			},
-			recipe: {
-				former:{pocketScrew:{diameterMm:4,lengthMm:30,jigAngleDegrees:15,edgeDistanceMm:20,maximumPitchMm:100},stocks:formerStocks,finishingStockMm:0.5,toleranceMm:0.1,cutters:[
-					{id:"former-straight-6",tipDiameterMm:6,taperDegrees:0,fluteLengthMm:30,stickOutMm:35},
-					{id:"former-taper-3deg-6",tipDiameterMm:6,taperDegrees:3,fluteLengthMm:30,stickOutMm:35}
-				]},
-				featureRules: materia.tooling.casting.CastingStrategies.standardRules(),
-				id: "box-mold-study",
-				revision: 1,
-				panel: stock,
-				core: {
-					materialSpec: "EPS grade pending",
-					width: 1000,
-					depth: 500,
-					height: 100,
-					densityKgM3: null,
-					compressionStrengthPa: null,
-					compressionStrainFraction: null,
-					maximumTemperatureC: null,
-					evidence: []
-				},
-				jointLiningAllowance: 0.0,
-				jointMachiningAllowance: 0.05,
-				coreWireAxis: materia.tooling.ToolingRecipe.CoreWireAxis.Y,
-				adhesiveLineThickness: 0.2,
-				mixDensityKgM3: 2400,
-				steelDensityKgM3: 7850,
-				handlingLoadFactor: 1.5,
-				hardware: {
-					plugDepth: 5,
-					plugMaterial: "steel",
-					sealMargin: 3,
-					sealMaterial: "pending compatible sealing compound",
-					minimumBridgeWidth: 80,
-					locatingPinDiameter: 6,
-					supportScrewDiameter: 6,
-					supportClearanceDiameter: 7,
-					secondaryPinTravel: 2,
-					padDepth: 54,
-					labelOffset: 8,
-					datumThickness: 8,
-					datumPostWidth: 20,
-					formerFlangeThickness: 12,
-					formerFlangeMargin: 10,
-					fixturePinDiameter: 3,
-					fixturePinEmbed: 3,
-					fixtureReceiver:materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
-					fixturePinSpacing: 8,
-					fixtureSlotToolDiameter: 3
-				},
-				jointClearance: 0.2,
-				linerThickness: 0.1,
-				routerDiameter: 6,
-				minimumLigament: 2,
-				resinSpec: "pending resin selection",
-				releaseSystem: materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(2,5,1,materia.tooling.ReleaseSystem.EPSCoveringKind.Tape),
-				adhesiveSpec: "pending EPS compatible adhesive",
-				processEvidence: [],
-				designReview: {
-					minimumCornerRadiusMm: null,
-					minimumInsertCoverMm: null,
-					minimumInsertEdgeMm: null,
-					minimumFixingAccessMm: null,
-					minimumLiftingPoints: null,
-					removalClearanceMm: null
-				}
-			}
-		};
-	}
+  public static function document(thickness:Float = 18,
+    quarterTurn:Bool = false, bedCore:Bool = false):ToolingDocument {
+    var input = FoundationToolingAdapter.snapshot(
+      foundation(bedCore),
+      bedCore ? "single-pocket-bed-study" : "single-pocket-study",
+      1
+    ), stock = PanelJoints.stock(thickness);
+    stock.materialSpec = "coated particleboard";
+    var formerStocks = [stock];
+    if (stock.measuredThickness < 25) {
+      var thicker = materia.tooling.ToolingCodec.stockSnapshot(stock);
+      thicker.nominalThickness = 25;
+      thicker.measuredThickness = 25;
+      formerStocks.push(thicker);
+    }
+    return {
+      input: input,
+      setup: {
+        id: quarterTurn ? "inverted-quarter-turn" : "inverted",
+        revision : 1,
+        sourceFingerprint : ToolingCodec.inputFingerprint(input),
+        fillHeightMm : 100,
+        freeboardMm : 0,
+        sourceToMold : F.fromRotationMatrix(
+          0,
+          0,
+          100,
+          quarterTurn ? [
+            0,
+            -1,
+            0,
+            -1,
+            0,
+            0,
+            0,
+            0,
+            -1
+          ] : [
+            1,
+            0,
+            0,
+            0,
+            -1,
+            0,
+            0,
+            0,
+            -1
+          ]
+        )
+      },
+      recipe : {
+        former : {
+          pocketScrew : {
+            diameterMm : 4,
+            lengthMm : 30,
+            jigAngleDegrees : 15,
+            edgeDistanceMm : 20,
+            maximumPitchMm : 100
+          },
+          stocks : formerStocks,
+          finishingStockMm : 0.5,
+          toleranceMm : 0.1,
+          cutters : [
+            {
+              id : "former-straight-6",
+              tipDiameterMm : 6,
+              taperDegrees : 0,
+              fluteLengthMm : 30,
+              stickOutMm : 35
+            },
+            {
+              id : "former-taper-3deg-6",
+              tipDiameterMm : 6,
+              taperDegrees : 3,
+              fluteLengthMm : 30,
+              stickOutMm : 35
+            }
+          ]
+        },
+        featureRules : materia.tooling.casting.CastingStrategies.standardRules(),
+        id : "box-mold-study",
+        revision : 1,
+        panel : stock,
+        core : {
+          materialSpec : "EPS grade pending",
+          width : 1000,
+          depth : 500,
+          height : 100,
+          densityKgM3 : null,
+          compressionStrengthPa : null,
+          compressionStrainFraction : null,
+          maximumTemperatureC : null,
+          evidence : []
+        },
+        jointLiningAllowance : 0.0,
+        jointMachiningAllowance : 0.05,
+        coreWireAxis : materia.tooling.ToolingRecipe.CoreWireAxis.Y,
+        adhesiveLineThickness : 0.2,
+        mixDensityKgM3 : 2400,
+        steelDensityKgM3 : 7850,
+        handlingLoadFactor : 1.5,
+        hardware : {
+          plugDepth : 5,
+          plugMaterial : "steel",
+          sealMargin : 3,
+          sealMaterial : "pending compatible sealing compound",
+          minimumBridgeWidth : 80,
+          locatingPinDiameter : 6,
+          supportScrewDiameter : 6,
+          supportClearanceDiameter : 7,
+          secondaryPinTravel : 2,
+          padDepth : 54,
+          labelOffset : 8,
+          datumThickness : 8,
+          datumPostWidth : 20,
+          formerFlangeThickness : 12,
+          formerFlangeMargin : 10,
+          fixturePinDiameter : 3,
+          fixturePinEmbed : 3,
+          fixtureReceiver : materia.tooling.ToolingRecipe.FixtureReceiver.IndependentDatums,
+          fixturePinSpacing : 8,
+          fixtureSlotToolDiameter : 3
+        },
+        jointClearance : 0.2,
+        linerThickness : 0.1,
+        routerDiameter : 6,
+        minimumLigament : 2,
+        resinSpec : "pending resin selection",
+        releaseSystem : materia.tooling.ReleaseSystem.ReleaseSystems.unresolved(
+          2,
+          5,
+          1,
+          materia.tooling.ReleaseSystem.EPSCoveringKind.Tape
+        ),
+        adhesiveSpec : "pending EPS compatible adhesive",
+        processEvidence : [],
+        designReview : {
+          minimumCornerRadiusMm : null,
+          minimumInsertCoverMm : null,
+          minimumInsertEdgeMm : null,
+          minimumFixingAccessMm : null,
+          minimumLiftingPoints : null,
+          removalClearanceMm : null
+        }
+      }
+    };
+  }
 }

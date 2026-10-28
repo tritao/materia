@@ -16,72 +16,77 @@ class CastingAggregateReview {
     var args = Sys.args(), out = args.length == 0 ? "machinekit/examples/casting-shop/build/aggregate-review" : args[0];
     machinekit.tooling.ToolingFiles.directory(out);
     var only = args.length > 1 ? args[1] : null;
-    if (only != null &&["base",
+    if (only != null && ["base",
       "column", "plinth", "hobber-column"].indexOf(only) < 0) throw "Unknown casting selector: " + only;
     var frame = MillProject.smallFrame();
-    var entries = [{id: "base", document: MillMoldSetup.document(frame), options: MillMoldSetup.options(frame)}, {
-      id: "column",
-      document: MillMoldSetup.document(
-        frame,
-        CastingShopRecipe.BOARD_THICKNESS_MM,
-        MillMoldSetup.MillMoldCasting.Column
-      ),
-      options: MillMoldSetup.options(
-        frame,
-        MillMoldSetup.MillMoldCasting.Column
-      )
-    }
+    var entries = [
+      {id: "base", document: MillMoldSetup.document(frame), options: MillMoldSetup.options(frame)},
+      {
+        id: "column",
+        document: MillMoldSetup.document(
+          frame,
+          CastingShopRecipe.BOARD_THICKNESS_MM,
+          MillMoldSetup.MillMoldCasting.Column
+        ),
+        options: MillMoldSetup.options(
+          frame,
+          MillMoldSetup.MillMoldCasting.Column
+        )
+      }
     ];
     if (only == null || only == "plinth") {
       var source = new machinekit.hobbing.MineralCastBed(), document = HobberMoldSetup.document(source);
-      entries.push({id: "plinth", document: document, options: HobberMoldSetup.options(document.input)}
-      );
+      entries.push({id: "plinth", document: document, options: HobberMoldSetup.options(document.input)});
     }
     if (only == null || only == "hobber-column") {
       var source = new machinekit.hobbing.MineralCastColumn(), document = HobberMoldSetup.document(
         source,
         HobberMoldSetup.HobberMoldCasting.Column
       );
-      entries.push({id: "hobber-column", document: document, options: HobberMoldSetup.options(document.input)}
-      );
+      entries.push({id: "hobber-column", document: document, options: HobberMoldSetup.options(document.input)});
     }
-    var summary:Array<Dynamic>=[],allRows:Array<Array<String>>=[],allWitnesses:Array<Array<String>>=[];
+    var summary:Array<Dynamic> = [], allRows:Array<Array<String>> = [], allWitnesses:Array<Array<String>> = [];
     for (entry in entries) if (only == null || entry.id == only) {
       Sys.println("START aggregate source " + entry.id);
       var plan = CastingMoldCad.plan(entry.document, entry.options), spec = CastingShopRecipe.process(
         plan.document.recipe,
         "aggregate-source-review"
       );
-      var fabrication=CastingShopRecipe.fabrication();
-      var process=CastingProcessAnalysis.analyze(plan,spec,fabrication.gravityMps2,fabrication,
-        machinekit.tooling.CastingFillAnalysis.fromPlan,CastingWallReview.fromPlan);
-      var report=process.aggregate,dir=out+"/"+entry.id;
-      if(report==null)throw "Missing classified aggregate report";
+      var fabrication = CastingShopRecipe.fabrication();
+      var process = CastingProcessAnalysis.analyze(
+        plan,
+        spec,
+        fabrication.gravityMps2,
+        fabrication,
+        machinekit.tooling.CastingFillAnalysis.fromPlan,
+        CastingWallReview.fromPlan
+      );
+      var report = process.aggregate, dir = out + "/" + entry.id;
+      if (report == null) throw "Missing classified aggregate report";
       machinekit.tooling.ToolingFiles.directory(dir);
       var rows = ToolingProcessExport.writeAggregate(plan, report, dir);
-      if(allRows.length==0)allRows.push(rows.groups[0]);
-      for(index in 1...rows.groups.length)allRows.push(rows.groups[index]);
-      if(allWitnesses.length==0)allWitnesses.push(rows.witnesses[0]);
-      for(index in 1...rows.witnesses.length)allWitnesses.push(rows.witnesses[index]);
-      summary.push({
-        id: entry.id,
-        sourceFingerprint: report.sourceFingerprint,
-        failingPairs:report.groups.filter(group->group.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length,
-        classes:[for(kind in materia.tooling.process.AggregateGate.kinds()){
-          kind:kind,pairs:report.groups.filter(group->group.kind==kind).length,
-          failingPairs:report.groups.filter(group->group.kind==kind && group.status==materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length}],
-        validation: report.validation
+      if (allRows.length == 0) allRows.push(rows.groups[0]);
+      for (index in 1...rows.groups.length) allRows.push(rows.groups[index]);
+      if (allWitnesses.length == 0) allWitnesses.push(rows.witnesses[0]);
+      for (index in 1...rows.witnesses.length) allWitnesses.push(rows.witnesses[index]);
+      summary.push({id: entry.id,
+        sourceFingerprint: report.sourceFingerprint, failingPairs: report.groups.filter(group -> group.status
+        == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length,
+        classes: [for (kind in materia.tooling.process.AggregateGate.kinds()) {
+        kind:kind, pairs:report.groups.filter(group -> group.kind == kind).length,
+          failingPairs:report.groups.filter(group -> group.kind == kind
+          && group.status == materia.tooling.ToolingDiagnostic.ToolingCheckStatus.Fail).length
       }
-      );
+      ], validation:report.validation});
       if (entry.id == "base") aft(plan, frame, dir);
       Sys.println("DONE aggregate source " + entry.id + ": " + report.failures.length + " failing locations");
     }
     sys.io.File.saveContent(out + "/summary.json", ToolingCodec.canonical(summary) + "\n");
+    sys.io.File.saveContent(out + "/aggregate-groups.csv", materia.tooling.export.ToolingFabrication.csv(allRows));
     sys.io.File.saveContent(
-      out + "/aggregate-groups.csv",
-      materia.tooling.export.ToolingFabrication.csv(allRows)
+      out + "/aggregate-witnesses.csv",
+      materia.tooling.export.ToolingFabrication.csv(allWitnesses)
     );
-    sys.io.File.saveContent(out+"/aggregate-witnesses.csv",materia.tooling.export.ToolingFabrication.csv(allWitnesses));
   }
 
   static function aft(plan:CastingMoldPlan, frame:BenchMillFrame, dir:String):Void {
@@ -100,7 +105,7 @@ class CastingAggregateReview {
       var source = scope.own(machinekit.assembly.PosedParts.moved(molded, inverse));
       var clip = scope.own(machinekit.tooling.ToolingBlock.placedBox(region)),
         actual = scope.own(source.intersect(clip));
-      var cuts:Array < Box3 >=[];
+      var cuts:Array<Box3> = [];
       for (obstacle in CastingWallReview.sourceObstacles(plan, scope)) {
         var b = obstacle.box;
         cuts.push(materia.tooling.casting.CastingMoldPlanner.box(
@@ -119,7 +124,7 @@ class CastingAggregateReview {
       }
       // Obstacle bounds only propose a conservative inner certificate. A native
       // Boolean proves it is contained in the actual aft region before credit.
-      var cells = BoxAlgebra.coalesce(BoxAlgebra.subtract([region], cuts)), best:Null < Box3 >= null, lower = 0.0;
+      var cells = BoxAlgebra.coalesce(BoxAlgebra.subtract([region], cuts)), best:Null<Box3> = null, lower = 0.0;
       for (cell in cells) {
         var diameter = Math.min(cell.width, Math.min(cell.depth, cell.height));
         if (diameter > lower) {

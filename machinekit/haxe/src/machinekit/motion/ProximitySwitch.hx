@@ -27,14 +27,36 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public final spec:ProximitySwitchSpec;
 
   public static function catalog():Catalog<ProximitySwitchSpec> {
-    if (table == null) table = new Catalog("assumed inductive switch", s -> s.designation, [
-      {designation: "GENERIC-INDUCTIVE-M8", diameter: 8.0, length: 30.0,
-        sensingDistance: 2.0, hysteresis: 0.2, repeatability: 0.02},
-      {designation: "GENERIC-INDUCTIVE-M12", diameter: 12.0, length: 40.0,
-        sensingDistance: 4.0, hysteresis: 0.4, repeatability: 0.04}
-    ], _ -> ({source: "Authored generic sensor design assumptions; no vendor verification",
-      standard: null, standardEdition: null, dimensionKind: Unverified,
-      conformance: GenericApproximation, verifiedFields: []}));
+    if (table == null) table = new Catalog(
+      "assumed inductive switch",
+      s -> s.designation,
+      [
+        {
+          designation: "GENERIC-INDUCTIVE-M8",
+          diameter: 8.0,
+          length: 30.0,
+          sensingDistance: 2.0,
+          hysteresis: 0.2,
+          repeatability: 0.02
+        },
+        {
+          designation: "GENERIC-INDUCTIVE-M12",
+          diameter: 12.0,
+          length: 40.0,
+          sensingDistance: 4.0,
+          hysteresis: 0.4,
+          repeatability: 0.04
+        }
+      ],
+      _ -> ({
+        source: "Authored generic sensor design assumptions; no vendor verification",
+        standard: null,
+        standardEdition: null,
+        dimensionKind: Unverified,
+        conformance: GenericApproximation,
+        verifiedFields: []
+      })
+    );
     return table;
   }
 
@@ -52,15 +74,24 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   public function switchHysteresis():Float return spec.hysteresis;
   public function switchRepeatability():Float return spec.repeatability;
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.motion.proximity-switch", [
-      ComponentRecipeSupport.catalog("designation", catalog(), "GENERIC-INDUCTIVE-M8")
-    ], v -> new ProximitySwitch(v.token("designation")));
+    if (recipe == null) recipe = new ComponentType(
+      "machinekit.motion.proximity-switch",
+      [ComponentRecipeSupport.catalog(
+        "designation",
+        catalog(),
+        "GENERIC-INDUCTIVE-M8"
+      )],
+      v -> new ProximitySwitch(v.token("designation"))
+    );
     return recipe;
   }
-  override public function componentType():Null<ComponentType>
-    return Std.isExactType(this, ProximitySwitch) ? recipeType() : null;
-  override public function values():ComponentValues
-    return new ComponentValues().setToken("designation", designation).setToken("material", materialSpec());
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    ProximitySwitch) ? recipeType() : null;
+  override public function values():ComponentValues return new ComponentValues().setToken("designation",
+    designation).setToken(
+      "material",
+      materialSpec()
+    );
   override public function hasGeometry():Bool return true;
   /**
    * The envelope is the barrel's cylinder. The preview has a connector end at the mount (z = 0), a fine-pitch
@@ -69,17 +100,27 @@ class ProximitySwitch extends MachineComponent implements SwitchPart {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (detail == Envelope) return envelope();
     var d = spec.diameter, l = spec.length, connector = l * 0.22, cap = l * 0.08;
-    return Solids.building([], owned -> {
-      var plug = Solids.named(Part.cylinderSpan(d * 0.4, 0, connector * 0.6), "connector");
-      var collar = Solids.named(Part.cylinderSpan(d * 0.46, connector * 0.6, connector), "collar");
-      var barrel = Solids.named(Part.cylinderSpan(d / 2, connector, l - cap), "barrel");
-      var face = Solids.named(Part.cylinderSpan(d * 0.45, l - cap, l), "sensing-face");
-      for (part in [plug, collar, barrel, face]) owned.push(part);
-      var threaded = new Part(cadkit.threads.Threads.attach(barrel.shape, "barrel:cyl.side",
-        machinekit.standard.FastenerThreads.metric(d, 1), cadkit.threads.ThreadedFace.ThreadStart.AxisMinimum, l - cap - connector));
-      barrel.close();
-      owned.push(threaded);
-      return Solids.union([plug, collar, threaded, face]);
+    return Solids.building([], owned -> {var plug = Solids.named(
+      Part.cylinderSpan(d * 0.4, 0, connector * 0.6),
+      "connector"
+    );
+    var collar = Solids.named(Part.cylinderSpan(d * 0.46, connector * 0.6, connector), "collar");
+    var barrel = Solids.named(Part.cylinderSpan(d / 2, connector, l - cap), "barrel");
+    var face = Solids.named(Part.cylinderSpan(d * 0.45, l - cap, l), "sensing-face");
+    for (part in [plug, collar, barrel, face]) owned.push(part);
+    var threaded = new Part(cadkit.threads.Threads.attach(
+      barrel.shape,
+      "barrel:cyl.side",
+      machinekit.standard.FastenerThreads.metric(
+        d,
+        1
+      ),
+      cadkit.threads.ThreadedFace.ThreadStart.AxisMinimum,
+      l - cap - connector
+    ));
+    barrel.close();
+    owned.push(threaded);
+    return Solids.union([plug, collar, threaded, face]);
     });
   }
 

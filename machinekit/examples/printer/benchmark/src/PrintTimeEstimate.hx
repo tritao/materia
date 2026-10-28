@@ -28,8 +28,15 @@ class PrintTimeEstimate {
   static inline var CHORD_SAGITTA:Float = 0.01e-3;
 
   /** Segments of the program's moves: their count, and in `seconds` the time. */
-  public static function estimate(program:ToolpathProgram, axisSpeed:Array<Float>, axisAcceleration:Array<Float>,
-      ?junctionDeviation:Float = JUNCTION_DEVIATION):{seconds:Float, segments:Int} {
+  public static function estimate(
+    program:ToolpathProgram,
+    axisSpeed:Array<Float>,
+    axisAcceleration:Array<Float>,
+    ?junctionDeviation:Float = JUNCTION_DEVIATION
+  ): {
+    seconds: Float,
+    segments: Int
+  } {
     var segments = segmentsOf(program, axisSpeed, axisAcceleration);
     var n = segments.length;
     if (n == 0) return {seconds: 0.0, segments: 0};
@@ -37,7 +44,10 @@ class PrintTimeEstimate {
     var junction = [for (_ in 0...(n + 1)) 0.0];
     for (i in 1...n) {
       var before = segments[i - 1], after = segments[i];
-      var cosTheta = Math.max(-1.0, Math.min(1.0, -(before.ux * after.ux + before.uy * after.uy + before.uz * after.uz)));
+      var cosTheta = Math.max(
+        -1.0,
+        Math.min(1.0, -(before.ux * after.ux + before.uy * after.uy + before.uz * after.uz))
+      );
       var limit = Math.min(before.speed, after.speed);
       if (cosTheta > -0.999999) {
         var sinHalf = Math.sqrt(0.5 * (1.0 - cosTheta));
@@ -48,11 +58,16 @@ class PrintTimeEstimate {
     }
     var i = n - 1;
     while (i >= 0) {
-      junction[i] = Math.min(junction[i], Math.sqrt(junction[i + 1] * junction[i + 1] + 2.0 * segments[i].acceleration * segments[i].length));
+      junction[i] = Math.min(
+        junction[i],
+        Math.sqrt(junction[i + 1] * junction[i + 1] + 2.0 * segments[i].acceleration * segments[i].length)
+      );
       i--;
     }
-    for (i in 0...n)
-      junction[i + 1] = Math.min(junction[i + 1], Math.sqrt(junction[i] * junction[i] + 2.0 * segments[i].acceleration * segments[i].length));
+    for (i in 0...n) junction[i + 1] = Math.min(
+      junction[i + 1],
+      Math.sqrt(junction[i] * junction[i] + 2.0 * segments[i].acceleration * segments[i].length)
+    );
     var seconds = 0.0;
     for (i in 0...n) {
       var segment = segments[i], entry = junction[i], exit = junction[i + 1], a = segment.acceleration;
@@ -61,14 +76,15 @@ class PrintTimeEstimate {
       var accelerating = (peak * peak - entry * entry) / (2.0 * a), braking = (peak * peak - exit * exit) / (2.0 * a);
       var cruise = Math.max(0.0, segment.length - accelerating - braking);
       var taken = (peak - entry) / a + (peak - exit) / a + (cruise > 0.0 ? cruise / peak : 0.0);
-      if (!Math.isFinite(taken))
-        throw 'estimate: segment $i of $n takes $taken s (length ${segment.length}, entry $entry, exit $exit, peak $peak, speed ${segment.speed}, acceleration $a)';
+      if (!Math
+        .isFinite(taken)) throw 'estimate: segment $i of $n takes $taken s (length ${segment.length}, entry $entry, exit $exit, peak $peak, speed ${segment.speed}, acceleration $a)';
       seconds += taken;
     }
     return {seconds: seconds, segments: n};
   }
 
-  static function segmentsOf(program:ToolpathProgram, axisSpeed:Array<Float>, axisAcceleration:Array<Float>):Array<Segment> {
+  static function segmentsOf(program:ToolpathProgram,
+    axisSpeed:Array<Float>, axisAcceleration:Array<Float>):Array<Segment> {
     var result:Array<Segment> = [];
     function add(from:toolpathkit.path.Point3, to:toolpathkit.path.Point3, feed:Float):Void {
       var dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
@@ -80,15 +96,16 @@ class PrintTimeEstimate {
         speed = Math.min(speed, axisSpeed[axis] / Math.abs(u[axis]));
         acceleration = Math.min(acceleration, axisAcceleration[axis] / Math.abs(u[axis]));
       }
-      if (!(speed > 0.0) || !Math.isFinite(acceleration) || !(acceleration > 0.0))
-        throw 'estimate: a segment of ${length} m has speed $speed and acceleration $acceleration';
+      if (!(speed > 0.0) || !Math.isFinite(acceleration) || !(acceleration
+        > 0.0)) throw 'estimate: a segment of ${length} m has speed $speed and acceleration $acceleration';
       result.push({length: length, ux: u[0], uy: u[1], uz: u[2], speed: speed, acceleration: acceleration});
     }
     for (op in program.ops) switch op {
       case Move(_, geometry, feed, _, _):
         var length = GeometryTools.length(geometry);
         var pieces = switch geometry {
-          case Line(_, _): 1;
+          case Line(_, _):
+            1;
           case Arc(_, radius, _, sweep), Circular(_, radius, _, sweep, _, _):
             var step = 2.0 * Math.acos(Math.max(0.0, 1.0 - CHORD_SAGITTA / radius));
             Std.int(Math.max(1, Math.ceil(Math.abs(sweep) / Math.max(step, 1e-3))));

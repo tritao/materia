@@ -11,9 +11,20 @@ class VacuumZoneValve extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("bore", 50),
     P.length("length", 120),
-    P.length("diameter", 90),
-    P.quantity("ratedVacuum", 40000, "Pa"),
-    P.quantity("flow", 300, "m3/h")
+    P.length(
+      "diameter",
+      90
+    ),
+    P.quantity(
+      "ratedVacuum",
+      40000,
+      "Pa"
+    ),
+    P.quantity(
+      "flow",
+      300,
+      "m3/h"
+    )
   ];
   public function new(?v:ComponentValues) {
     super("vacuum-zone-valve", "vacuum zone isolation valve", "aluminium 6061", inputs(), v);
@@ -21,12 +32,9 @@ class VacuumZoneValve extends AssumedCatalogComponent {
     require(n("bore") < n("diameter"), "bore consumes valve body");
     addConnector("inlet", Mount, Solids.axial(0, 0, 0));
     addConnector("outlet", Mount, Solids.axial(0, 0, n("length")));
-    addPort({name: "inlet", kind: Vacuum, role: Consumer, iface: Thread("G2"), required: true, connector: "inlet"}
-    );
-    addPort({name: "outlet", kind: Vacuum, role: Supply, iface: Thread("G2"), required: true, connector: "outlet"}
-    );
-    addPort({name: "actuator", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true}
-    );
+    addPort({name: "inlet", kind: Vacuum, role: Consumer, iface: Thread("G2"), required: true, connector: "inlet"});
+    addPort({name: "outlet", kind: Vacuum, role: Supply, iface: Thread("G2"), required: true, connector: "outlet"});
+    addPort({name: "actuator", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
     addBridge("inlet", "outlet");
   }
   public static function recipeType():ComponentType {
@@ -42,23 +50,54 @@ class VacuumZoneValve extends AssumedCatalogComponent {
   override public function geometry(detail:ComponentDetail = Preview):Part {
     if (detail == Envelope) return envelope();
     var r = n("diameter") / 2, l = n("length"), flange = Math.min(0.18 * l, 12);
-    var body = Solids.named(Part.revolve([{r: n("bore") / 2, z: 0.0}, {r: r, z: 0.0}, {r: r, z: flange}, {r: 0.72 * r, z: flange}, {r: 0.72 * r, z: l - flange},
-      {r: r, z: l - flange}, {r: r, z: l}, {r: n("bore") / 2, z: l}]), "valve-body");
+    var body = Solids.named(
+      Part.revolve([
+        {r: n("bore") / 2, z: 0.0},
+        {r: r, z: 0.0},
+        {r: r, z: flange},
+        {
+          r: 0.72 * r,
+          z: flange
+        },
+        {
+          r: 0.72 * r,
+          z: l - flange
+        },
+        {
+          r: r,
+          z: l - flange
+        },
+        {
+          r: r,
+          z: l
+        },
+        {
+          r: n("bore") / 2,
+          z: l
+        }
+      ]),
+      "valve-body"
+    );
     var bolts = (r + n("bore") / 2) / 2 + (r - n("bore") / 2) * 0.2;
-    return Solids.cut(body, [for (i in 0...4) Solids.named(Part.cylinderSpan(Math.min(3.0, (r - n("bore") / 2) * 0.15), -0.1, l + 0.1,
-      bolts * Math.cos(Math.PI / 4 + i * Math.PI / 2), bolts * Math.sin(Math.PI / 4 + i * Math.PI / 2)), "bolt")]);
+    return Solids.cut(
+      body,
+      [for (i in 0...4) Solids.named(
+        Part.cylinderSpan(
+          Math.min(3.0, (r - n("bore") / 2) * 0.15),
+          -0.1,
+          l + 0.1,
+          bolts * Math.cos(Math.PI / 4 + i * Math.PI / 2),
+          bolts * Math.sin(Math.PI / 4 + i * Math.PI / 2)
+        ),
+        "bolt"
+      )]
+    );
   }
 
   override public function massGeometry():Null<Part> return envelope();
 
   function envelope():Part return Solids.cut(
-    Solids.named(
-      Part.cylinder(
-        n("diameter") / 2,
-        n("length")
-      ),
-      "valve-body"
-    ),
+    Solids.named(Part.cylinder(n("diameter") / 2, n("length")), "valve-body"),
     [Solids.named(
       Part.cylinderSpan(
         n("bore") / 2,
@@ -68,5 +107,5 @@ class VacuumZoneValve extends AssumedCatalogComponent {
       "flow-bore"
     )]
   );
-  override public function io():MachineIo return {inputs:[], outputs:["open"], analogOutputs:[]};
+  override public function io():MachineIo return {inputs: [], outputs: ["open"], analogOutputs: []};
 }

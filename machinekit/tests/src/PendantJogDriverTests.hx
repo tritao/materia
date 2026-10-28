@@ -6,7 +6,8 @@ import machinekit.operator.wire.PendantRefusal;
 
 private class Recorder implements JogSink {
   public var jogs:Array<String> = [];
-  public function new() {}
+  public function new() {
+  }
   public function jog(axisId:String, delta:Float):Void jogs.push(axisId + ":" + Math.round(delta * 1e6) / 1e6);
 }
 
@@ -17,14 +18,24 @@ class PendantJogDriverTests {
     if (!failed) throw 'Expected rejection: $message';
   }
   /** An event as the controller would send it: through the generated codec, constraints and all. */
-  static function event(sequence:Int, axis:Int, distance:Int, authority = true, refusal = 0, reason = 0, pressed = 0):PendantEvent {
+  static function event(sequence:Int,
+    axis:Int, distance:Int, authority = true, refusal = 0, reason = 0, pressed = 0):PendantEvent {
     var e = new PendantEvent();
-    e.sequence = sequence; e.axis = axis; e.distance = distance; e.flags = authority ? 1 : 0;
-    e.refusal = refusal; e.reason = reason; e.pressed = pressed;
+    e.sequence = sequence;
+    e.axis = axis;
+    e.distance = distance;
+    e.flags = authority ? 1 : 0;
+    e.refusal = refusal;
+    e.reason = reason;
+    e.pressed = pressed;
     return PendantEvent.decode(e.encode());
   }
-  static function driver(profile:OperatorProfile, texts:Array<String>, sink:JogSink):PendantJogDriver
-    return new PendantJogDriver(profile, texts, sink);
+  static function driver(profile:OperatorProfile,
+    texts:Array<String>, sink:JogSink):PendantJogDriver return new PendantJogDriver(
+      profile,
+      texts,
+      sink
+    );
 
   public static function run():Void {
     var drill = ReferenceOperatorProfiles.drillTap();
@@ -70,9 +81,11 @@ class PendantJogDriverTests {
 
     // Malformed events are protocol errors, not silently dropped.
     rejects("unknown axis", () -> d.accept(event(9, 40, 0), 5.0));
-    rejects("move without axis", () -> {
-      var e = new PendantEvent(); e.sequence = 10; e.axis = 255; e.distance = 5;
-      d.accept(PendantEvent.decode(e.encode()), 5.0);
+    rejects("move without axis", () -> {var e = new PendantEvent();
+    e.sequence = 10;
+    e.axis = 255;
+    e.distance = 5;
+    d.accept(PendantEvent.decode(e.encode()), 5.0);
     });
     rejects("move with a refusal", () -> d.accept(event(11, 2, 5, true, PendantRefusal.busy), 5.0));
     rejects("rule text out of range", () -> d.accept(event(12, 2, 0, true, PendantRefusal.rule, 3), 5.0));

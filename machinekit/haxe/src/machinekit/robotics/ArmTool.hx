@@ -7,7 +7,7 @@ import machinekit.assembly.MachineAssembly;
  * effector as `tool`, so `expose` names its members `tool/<member>`.
  */
 interface ArmTool {
-	function build(flange:RobotFlange):EndEffector;
-	/** Publishes the tool's connectors and the service inlets that must be supplied from outside. */
-	function expose(arm:MachineAssembly):Void;
+  function build(flange:RobotFlange):EndEffector;
+  /** Publishes the tool's connectors and the service inlets that must be supplied from outside. */
+  function expose(arm:MachineAssembly):Void;
 }

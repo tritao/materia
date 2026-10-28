@@ -26,7 +26,9 @@ class TendingReachInputs {
     assembly = TendingReach.armAssembly(source);
     var mill = cache.scene("reach-mill", () -> AssemblyPreview.scene(this.cell, "reach-mill"));
     var arm = cache.scene("reach-arm", () -> AssemblyPreview.scene(assembly, "reach-arm"));
-    millScene = mill.data; millBytes = mill.bytes;
-    armScene = arm.data; armBytes = arm.bytes;
+    millScene = mill.data;
+    millBytes = mill.bytes;
+    armScene = arm.data;
+    armBytes = arm.bytes;
   }
 }

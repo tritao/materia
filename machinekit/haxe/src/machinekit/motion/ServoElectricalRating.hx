@@ -5,8 +5,8 @@ package machinekit.motion;
  * Phase resistance is ohms, and mechanical efficiency excludes copper loss.
  */
 typedef ServoElectricalRating = {
-	var torqueConstant:Float;
-	var backEmfConstant:Float;
-	var phaseResistance:Float;
-	var mechanicalEfficiency:Float;
+  var torqueConstant:Float;
+  var backEmfConstant:Float;
+  var phaseResistance:Float;
+  var mechanicalEfficiency:Float;
 }

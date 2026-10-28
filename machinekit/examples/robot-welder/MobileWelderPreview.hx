@@ -35,28 +35,57 @@ class MobileWelderPreview {
     // Reserve 20% of the drive effort; this heavy payload cannot use the light base's acceleration.
     var mass = robot.massProperties().mass;
     var acceleration = 0.8 * 2 * robot.wheelTorque() / (robot.wheel.radius / 1000) / mass;
-    var mobile:SceneArtifact.SceneArtifactMobileBase = {robot: "robot", leftWheel: "robot/wheel_l", rightWheel: "robot/wheel_r",
-      wheelRadius: robot.wheel.radius / 1000, trackWidth: robot.trackWidth() / 1000,
-      maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED, maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
-      maxLinearAcceleration: Math.min(MobileBase.MAX_LINEAR_ACCELERATION, acceleration),
-      maxAngularAcceleration: Math.min(MobileBase.MAX_ANGULAR_ACCELERATION,
-        acceleration * 6 * robot.trackWidth() / 1000 / (Math.pow(robot.length / 1000, 2) + Math.pow(robot.width / 1000, 2))),
-      footprintLength: robot.length / 1000, footprintWidth: robot.width / 1000,
-      origin: {x: MobileWelderCell.ORIGIN.x / 1000, y: MobileWelderCell.ORIGIN.y / 1000, yaw: MobileWelderCell.ORIGIN.yaw}};
+    var mobile:SceneArtifact.SceneArtifactMobileBase = {
+      robot: "robot",
+      leftWheel: "robot/wheel_l",
+      rightWheel: "robot/wheel_r",
+      wheelRadius: robot.wheel.radius / 1000,
+      trackWidth: robot.trackWidth() / 1000,
+      maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED,
+      maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
+      maxLinearAcceleration: Math.min(
+        MobileBase.MAX_LINEAR_ACCELERATION,
+        acceleration
+      ),
+      maxAngularAcceleration: Math.min(
+        MobileBase.MAX_ANGULAR_ACCELERATION,
+        acceleration * 6 * robot.trackWidth() / 1000 / (Math.pow(
+          robot.length / 1000,
+          2
+        ) + Math.pow(
+          robot.width / 1000,
+          2
+        ))
+      ),
+      footprintLength: robot.length / 1000,
+      footprintWidth: robot.width / 1000,
+      origin: {
+        x: MobileWelderCell.ORIGIN.x / 1000,
+        y: MobileWelderCell.ORIGIN.y / 1000,
+        yaw: MobileWelderCell.ORIGIN.yaw
+      }
+    };
     var storage:BatteryStorage = cast BatteryStorage.of(robot.battery);
     var chargerPose = cell.solvedPoses().get("charger");
     var dock = materia.assembly.AssemblyFrames.compose(chargerPose, cell.charger.dockApproach);
-    var dockYaw = Math.atan2(2 * (dock.qw * dock.qz + dock.qx * dock.qy),
-      1 - 2 * (dock.qy * dock.qy + dock.qz * dock.qz));
+    var dockYaw = Math.atan2(
+      2 * (dock.qw * dock.qz + dock.qx * dock.qy),
+      1 - 2 * (dock.qy * dock.qy + dock.qz * dock.qz)
+    );
     var driveSupply = robot.driveSupply;
     if (driveSupply == null) throw "The mobile welder needs a modeled drive supply";
     mobile.energy = {
-      initialChargeFraction: 1.0, batteryOccurrence: "robot/battery", nominalVolts: storage.nominalVolts,
-      capacityWh: storage.capacityWh, fullVoltage: storage.fullVoltage,
-      emptyVoltage: storage.emptyVoltage, cutoffVoltage: storage.cutoffVoltage,
+      initialChargeFraction: 1.0,
+      batteryOccurrence: "robot/battery",
+      nominalVolts: storage.nominalVolts,
+      capacityWh: storage.capacityWh,
+      fullVoltage: storage.fullVoltage,
+      emptyVoltage: storage.emptyVoltage,
+      cutoffVoltage: storage.cutoffVoltage,
       internalResistanceOhms: storage.internalResistanceOhms,
       maxDischargeCurrentA: storage.maxDischargeCurrentA,
-      maxChargePowerW: storage.maxChargePowerW, chargeEfficiency: storage.chargeEfficiency,
+      maxChargePowerW: storage.maxChargePowerW,
+      chargeEfficiency: storage.chargeEfficiency,
       inverterContinuousWatts: robot.inverter.continuousWatts,
       inverterEfficiency: robot.inverter.efficiency,
       armSupplyEfficiency: robot.armSupply.efficiency,
@@ -66,10 +95,16 @@ class MobileWelderPreview {
       driveMotorEfficiency: MobileWeldingRobot.DRIVE_MOTOR_EFFICIENCY,
       driveGearEfficiency: MobileBase.WHEEL_GEARBOX.efficiency,
       computerLoadWatts: MobileWeldingRobot.COMPUTER_LOAD_WATTS,
-      chargerOccurrence: "charger", chargerPowerWatts: cell.charger.outputWatts,
-      dockPose: {x: dock.x / 1000, y: dock.y / 1000, yaw: dockYaw},
+      chargerOccurrence: "charger",
+      chargerPowerWatts: cell.charger.outputWatts,
+      dockPose: {
+        x: dock.x / 1000,
+        y: dock.y / 1000,
+        yaw: dockYaw
+      },
       dockPositionToleranceMeters: cell.charger.dockPositionToleranceMm / 1000,
-      dockHeadingToleranceRadians: cell.charger.dockHeadingToleranceRad};
+      dockHeadingToleranceRadians: cell.charger.dockHeadingToleranceRad
+    };
     scene.mobileBase = mobile;
     return scene;
   }

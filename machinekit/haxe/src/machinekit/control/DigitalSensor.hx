@@ -10,36 +10,53 @@ import machinekit.component.Solids;
 
 /** A field switch, presence head or safety area scanner with one digital output terminal. */
 class DigitalSensor extends MachineComponent {
-	public static inline final BODY_WIDTH:Float = 12;
-	public static inline final BODY_DEPTH:Float = 8;
-	public static inline final BODY_HEIGHT:Float = 20;
-	public final kind:String;
-	static var recipe:Null<ComponentType>;
+  public static inline final BODY_WIDTH:Float = 12;
+  public static inline final BODY_DEPTH:Float = 8;
+  public static inline final BODY_HEIGHT:Float = 20;
+  public final kind:String;
+  static var recipe:Null<ComponentType>;
 
-	public function new(kind:String = "reed") {
-		if (kind != "reed" && kind != "presence" && kind != "scanner") throw 'Unknown digital sensor kind "$kind"';
-		super('DIGITAL-SENSOR-${kind.toUpperCase()}', '$kind digital sensor', "plastic", true);
-		this.kind = kind;
-		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addPort({name: "signal", kind: Signal, role: Supply, iface: Unspecified, required: true});
-	}
+  public function new(kind:String = "reed") {
+    if (kind != "reed" && kind != "presence" && kind != "scanner") throw 'Unknown digital sensor kind "$kind"';
+    super('DIGITAL-SENSOR-${kind.toUpperCase()}', '$kind digital sensor', "plastic", true);
+    this.kind = kind;
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addPort({name: "signal", kind: Signal, role: Supply, iface: Unspecified, required: true});
+  }
 
-	public static function recipeType():ComponentType {
-		if (recipe == null) recipe = new ComponentType("machinekit.control.digital-sensor", [
-			ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")
-		], v -> new DigitalSensor(v.token("kind")));
-		return recipe;
-	}
+  public static function recipeType():ComponentType {
+    if (recipe == null) recipe = new ComponentType(
+      "machinekit.control.digital-sensor",
+      [ComponentRecipeSupport.choice(
+        "kind",
+        [
+          "reed",
+          "presence",
+          "scanner"
+        ],
+        "reed"
+      )],
+      v -> new DigitalSensor(v.token("kind"))
+    );
+    return recipe;
+  }
 
-	override public function componentType():Null<ComponentType> return recipeType();
-	override public function values():ComponentValues
-		return new ComponentValues().setToken("kind", kind).setToken("material", materialSpec());
-	override public function hasGeometry():Bool return true;
-	/** A chamfered head on its mounting plate, its connector terminals at one end (`DeviceHousing.panelModule`). */
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return detail == Envelope ? envelope() : machinekit.power.DeviceHousing.panelModule(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT, {terminals: 3});
+  override public function componentType():Null<ComponentType> return recipeType();
+  override public function values():ComponentValues return new ComponentValues().setToken("kind", kind).setToken(
+    "material",
+    materialSpec()
+  );
+  override public function hasGeometry():Bool return true;
+  /** A chamfered head on its mounting plate, its connector terminals at one end (`DeviceHousing.panelModule`). */
+  override public function geometry(detail:ComponentDetail = Preview):Part return detail
+    == Envelope ? envelope() : machinekit.power.DeviceHousing.panelModule(
+      BODY_WIDTH,
+      BODY_DEPTH,
+      BODY_HEIGHT,
+      {terminals : 3}
+    );
 
-	override public function massGeometry():Null<Part> return envelope();
+  override public function massGeometry():Null<Part> return envelope();
 
-	function envelope():Part return Solids.named(Part.box(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT), "sensor-head");
+  function envelope():Part return Solids.named(Part.box(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT), "sensor-head");
 }

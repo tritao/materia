@@ -21,8 +21,9 @@ class MobileWelderStationTests {
     }
     var seamCount = 0;
     for (_ in seams.keys()) seamCount++;
-    if (stations == 0 || registrations != stations || seamCount != 10)
-      throw 'Mobile station plan has $stations stations, $registrations registrations and $seamCount seams';
-    Sys.println('Mobile station plan: $stations stations, $seamCount unique CAD seams and checked registration returns');
+    if (stations == 0 || registrations != stations || seamCount
+      != 10) throw 'Mobile station plan has $stations stations, $registrations registrations and $seamCount seams';
+    Sys
+      .println('Mobile station plan: $stations stations, $seamCount unique CAD seams and checked registration returns');
   }
 }

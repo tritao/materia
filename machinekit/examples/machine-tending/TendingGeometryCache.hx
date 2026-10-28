@@ -22,7 +22,8 @@ class TendingGeometryCache {
     if (Sys.systemName() != "Linux" || Sys.args().indexOf("--no-geometry-cache") >= 0) return null;
     try {
       var program = Sys.programPath();
-      if (!StringTools.endsWith(program, ".hl") || !FileSystem.exists(program)) throw 'No stable bytecode file: $program';
+      if (!StringTools.endsWith(program,
+        ".hl") || !FileSystem.exists(program)) throw 'No stable bytecode file: $program';
       var paths = [FileSystem.fullPath(program), FileSystem.fullPath(Sys.executablePath())];
       // Some supported runtimes treat procfs's reported zero size as an empty
       // file. Resolve "self" in this process before the streaming reader starts.
@@ -30,7 +31,8 @@ class TendingGeometryCache {
       if (mapsPath.indexOf("/proc/self/") >= 0) throw "Cannot resolve process identity";
       var reader = sys.io.Process.run("cat", [mapsPath]);
       var maps = reader.readStdout();
-      var readStatus = reader.exitCode(); reader.close();
+      var readStatus = reader.exitCode();
+      reader.close();
       if (readStatus != 0) throw "Cannot read loaded native libraries";
       for (line in maps.split("\n")) {
         var start = line.indexOf("/");
@@ -41,7 +43,7 @@ class TendingGeometryCache {
         if (paths.indexOf(path) < 0) paths.push(path);
       }
       if (paths.length <= 2) throw "Cannot discover loaded native libraries";
-      paths.sort((a,b) -> a < b ? -1 : a > b ? 1 : 0);
+      paths.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
       // Native hashing avoids copying hundreds of megabytes through the VM.
       var key = contentKey(paths);
       var root = Sys.getEnv("XDG_CACHE_HOME");
@@ -60,7 +62,8 @@ class TendingGeometryCache {
   static function contentKey(paths:Array<String>):String {
     var hash = sys.io.Process.run("sha256sum", paths);
     var identity = hash.readStdout();
-    var status = hash.exitCode(); hash.close();
+    var status = hash.exitCode();
+    hash.close();
     if (status != 0 || identity.split("\n").length != paths.length + 1) throw "Cannot hash loaded code";
     return Sha256.encode(identity);
   }
@@ -73,12 +76,13 @@ class TendingGeometryCache {
     if (!FileSystem.exists(path)) throw "Cannot create geometry cache directory";
   }
 
-  public function scene(name:String, build:Void -> SceneArtifactData):{data:SceneArtifactData, bytes:Bytes} {
+  public function scene(name:String, build:Void -> SceneArtifactData): {data: SceneArtifactData, bytes: Bytes} {
     var path = directory == null ? null : directory + "/" + name + ".scene";
     return artifact(path, build);
   }
 
-  static function artifact(path:Null<String>, build:Void -> SceneArtifactData):{data:SceneArtifactData, bytes:Bytes} {
+  static function artifact(path:Null<String>,
+    build:Void -> SceneArtifactData): {data: SceneArtifactData, bytes: Bytes} {
     if (path != null && FileSystem.exists(path)) {
       try {
         var packed = File.getBytes(path);
@@ -87,7 +91,7 @@ class TendingGeometryCache {
         for (i in 0...32) if (packed.get(i) != digest.get(i)) throw "Cached scene digest mismatch";
         var data = SceneArtifact.decode(bytes);
         Sys.println('Reach geometry: reused ${haxe.io.Path.withoutDirectory(path)}');
-        return {data:data, bytes:bytes};
+        return {data: data, bytes: bytes};
       } catch (_:Dynamic) {
         // Corrupt/truncated cache entries are disposable; regenerate from source.
       }
@@ -97,13 +101,14 @@ class TendingGeometryCache {
       try {
         ensureDirectory(haxe.io.Path.directory(path));
         var packed = Bytes.alloc(32 + bytes.length), digest = Sha256.make(bytes);
-        packed.blit(0, digest, 0, 32); packed.blit(32, bytes, 0, bytes.length);
+        packed.blit(0, digest, 0, 32);
+        packed.blit(32, bytes, 0, bytes.length);
         // A partially written entry is detected by its digest by any other reader.
         File.saveBytes(path, packed);
       } catch (_:Dynamic) {
         // Read-only/full cache storage must not prevent validation.
       }
     }
-    return {data:data, bytes:bytes};
+    return {data: data, bytes: bytes};
   }
 }

@@ -26,92 +26,134 @@ import machinekit.standard.SocketHeadCapScrew;
  * bearing, and `bolt1`..`bolt4` (mount), all with +Y along +Z.
  */
 class FlangeBearingHousing extends MachineComponent {
-	public final bearing:DeepGrooveBearing;
-	public final face:Float;
-	public final depth:Float;
-	public final boltSpacing:Float;
-	public final mountScrew:String;
-	public final fit:BearingHousingFit;
-	public final allowance:Float;
+  public final bearing:DeepGrooveBearing;
+  public final face:Float;
+  public final depth:Float;
+  public final boltSpacing:Float;
+  public final mountScrew:String;
+  public final fit:BearingHousingFit;
+  public final allowance:Float;
 
-	public function new(bearing:DeepGrooveBearing, fit:BearingHousingFit = Slip) {
-		var wall = Math.max(6, bearing.outside * 0.2);
-		var depth = bearing.width + wall;
-		var mountScrew = bearing.bore <= 12 ? "M5" : bearing.bore <= 20 ? "M6" : "M8";
-		// Bolts sit mid-wall on the diagonal; the face grows so each screw head keeps 1 mm of edge.
-		var boltSpacing = bearing.outside + wall;
-		var edge = Math.max(wall / 2, SocketHeadCapScrew.catalog().get(mountScrew).headDiameter / 2 + 1);
-		var face = boltSpacing + 2 * edge;
-		super('PILLOWBLOCK-${bearing.designation}', 'Flange bearing housing for ${bearing.designation}', "cast iron");
-		this.bearing = bearing;
-		this.face = face;
-		this.depth = depth;
-		this.boltSpacing = boltSpacing;
-		this.mountScrew = mountScrew;
-		this.fit = fit;
-		this.allowance = BearingFit.housingAllowance(fit, bearing.outside);
-		addConnector("bore", Axis, Solids.axial(0, 0, depth / 2));
-		var i = 1;
-		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
-		// A single convex hull would fill the bearing bore and all four bolt
-		// clearances, making seated screws collide with the housing in simulation.
-		var collision = geometry(Preview);
-		try addFacet(machinekit.component.CollisionHullFacet.fromExtrusion(collision, 0, depth))
-		catch (error:Dynamic) { collision.close(); throw error; }
-		collision.close();
-	}
+  public function new(bearing:DeepGrooveBearing, fit:BearingHousingFit = Slip) {
+    var wall = Math.max(6, bearing.outside * 0.2);
+    var depth = bearing.width + wall;
+    var mountScrew = bearing.bore <= 12 ? "M5" : bearing.bore <= 20 ? "M6" : "M8";
+    // Bolts sit mid-wall on the diagonal; the face grows so each screw head keeps 1 mm of edge.
+    var boltSpacing = bearing.outside + wall;
+    var edge = Math.max(wall / 2, SocketHeadCapScrew.catalog().get(mountScrew).headDiameter / 2 + 1);
+    var face = boltSpacing + 2 * edge;
+    super('PILLOWBLOCK-${bearing.designation}', 'Flange bearing housing for ${bearing.designation}', "cast iron");
+    this.bearing = bearing;
+    this.face = face;
+    this.depth = depth;
+    this.boltSpacing = boltSpacing;
+    this.mountScrew = mountScrew;
+    this.fit = fit;
+    this.allowance = BearingFit.housingAllowance(fit, bearing.outside);
+    addConnector("bore", Axis, Solids.axial(0, 0, depth / 2));
+    var i = 1;
+    for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
+    // A single convex hull would fill the bearing bore and all four bolt
+    // clearances, making seated screws collide with the housing in simulation.
+    var collision = geometry(Preview);
+    try addFacet(machinekit.component.CollisionHullFacet.fromExtrusion(collision, 0, depth)) catch (error:Dynamic) {
+      collision.close();
+      throw error;
+    }
+    collision.close();
+  }
 
-	/** Bolt centres on the mounting face, counter-clockwise from (+,+). */
-	public function boltPattern():Array<{x:Float, y:Float}> {
-		var h = boltSpacing / 2;
-		return [{x: h, y: h}, {x: -h, y: h}, {x: -h, y: -h}, {x: h, y: -h}];
-	}
+  /** Bolt centres on the mounting face, counter-clockwise from (+,+). */
+  public function boltPattern():Array<{x:Float, y:Float}> {
+    var h = boltSpacing / 2;
+    return [{x: h, y: h}, {x: -h, y: h}, {x: -h, y: -h}, {x: h, y: -h}];
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Solids.named(Part.box(face, face, depth), "body");
-		var boreTool = Solids.named(Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1), "bore");
-		if (detail == Envelope) return Solids.cut(body, [boreTool]);
-		var screw = mountScrewPart(10);
-		var tools = [boreTool];
-		var bolt = 1;
-		for (point in boltPattern())
-			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y),
-				"bolt" + bolt++));
-		return Solids.cut(body, tools);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var body = Solids.named(Part.box(face, face, depth), "body");
+    var boreTool = Solids.named(Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1), "bore");
+    if (detail == Envelope) return Solids.cut(body, [boreTool]);
+    var screw = mountScrewPart(10);
+    var tools = [boreTool];
+    var bolt = 1;
+    for (point in boltPattern()) tools.push(Solids.named(
+      Part.cylinderSpan(
+        screw.clearanceDiameter(Medium) / 2,
+        -0.1,
+        depth + 0.1,
+        point.x,
+        point.y
+      ),
+      "bolt" + bolt++
+    ));
+    return Solids.cut(body, tools);
+  }
 
-	/** Screw that fits the housing's mounting holes. */
-	public function mountScrewPart(length:Float):SocketHeadCapScrew
-		return SocketHeadCapScrew.metric(mountScrew, length);
+  /** Screw that fits the housing's mounting holes. */
+  public function mountScrewPart(length:Float):SocketHeadCapScrew return SocketHeadCapScrew.metric(mountScrew, length);
 
-	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("bearingSeat", [
-		ComponentRecipeSupport.toolDepth(bearing.width)])];
+  override public function toolSpecs():Array<ToolSpec> return [new ToolSpec(
+    "bearingSeat",
+    [ComponentRecipeSupport.toolDepth(bearing.width)]
+  )];
 
-	override function buildTool(name:String, values:ComponentValues):Part {
-		if (name == "bearingSeat") return bearing.housingSeat(values.number("depth"), fit);
-		return super.buildTool(name, values);
-	}
+  override function buildTool(name:String, values:ComponentValues):Part {
+    if (name == "bearingSeat") return bearing.housingSeat(values.number("depth"), fit);
+    return super.buildTool(name, values);
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.motion.flange-bearing-housing",
-			[ComponentRecipeSupport.catalog("bearing", DeepGrooveBearing.catalog(), "608"), ComponentRecipeSupport.flag("shielded", true),
-				ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")],
-			v -> new FlangeBearingHousing(DeepGrooveBearing.metric(v.token("bearing"), v.boolean("shielded")),
-				ComponentRecipeSupport.fit(v.token("fit"))));
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.motion.flange-bearing-housing",
+      [
+        ComponentRecipeSupport.catalog(
+          "bearing",
+          DeepGrooveBearing.catalog(),
+          "608"
+        ),
+        ComponentRecipeSupport.flag(
+          "shielded",
+          true
+        ),
+        ComponentRecipeSupport.choice(
+          "fit",
+          [
+            "Slip",
+            "Transition",
+            "Interference"
+          ],
+          "Slip"
+        )
+      ],
+      v -> new FlangeBearingHousing(
+        DeepGrooveBearing.metric(
+          v.token("bearing"),
+          v.boolean("shielded")
+        ),
+        ComponentRecipeSupport.fit(v.token("fit"))
+      )
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, FlangeBearingHousing) ? recipeType() : null;
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    FlangeBearingHousing) ? recipeType() : null;
 
-	override public function values():ComponentValues {
-		return new ComponentValues().setToken("bearing", this.bearing.spec.designation)
-				.setBoolean("shielded", this.bearing.shielded)
-				.setToken("fit", Std.string(this.fit)).setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().setToken("bearing", this.bearing.spec.designation).setBoolean(
+      "shielded",
+      this.bearing.shielded
+    ).setToken(
+      "fit",
+      Std.string(this.fit)
+    ).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

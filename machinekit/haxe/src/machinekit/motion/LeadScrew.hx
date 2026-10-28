@@ -20,105 +20,122 @@ import machinekit.component.Solids;
  * the flank profile, reliefs and machined ends are not generated.
  */
 class LeadScrew extends MachineComponent {
-	/** A screw lies along its axis (+Z), whatever its length. */
-	override public function presentationView():Null<machinekit.component.ComponentView>
-		return machinekit.component.ComponentView.lengthAlongZ();
+  /** A screw lies along its axis (+Z), whatever its length. */
+  override public function presentationView():Null<machinekit.component.ComponentView
+    > return machinekit.component.ComponentView.lengthAlongZ();
 
-	/** The damping of a steel screw drive, as a ratio of critical damping (assumed: a ball screw shaft rings a little). */
-	public static inline var ASSUMED_DAMPING_RATIO:Float = 0.03;
+  /** The damping of a steel screw drive, as a ratio of critical damping (assumed: a ball screw shaft rings a little). */
+  public static inline var ASSUMED_DAMPING_RATIO:Float = 0.03;
 
-	/** Resolve the coupling from these parts. */
-	public static function relation(screw:LeadScrew, nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
-		if (screw.thread.designation != nut.thread.designation) throw new machinekit.transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
-		// A coupling's stiffness is in the leader's units, the linear axis's: N/m, where the shaft's is stated in N/mm.
-		var result = new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
-			nut.efficiency(), screw.thread.family == Ball ? screw.supportedStiffness(nut) * 1000 : null, nut.backlash(), nut.drag());
-		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed,
-			screw.thread.family == Ball ? "ball screw drive stiffness (shaft, nut and support bearings in series)" : "rigid");
-		if (screw.thread.family == Ball) {
-			result.dampingRatio = ASSUMED_DAMPING_RATIO;
-			result.setBasis("dampingRatio", machinekit.transmission.ValueBasis.Assumed, "steel screw damping");
-		}
-		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, screw.thread.family == Ball ? "ball screw efficiency" : "nut friction");
-		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
-		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
-		return result;
-	}
+  /** Resolve the coupling from these parts. */
+  public static function relation(screw:LeadScrew,
+    nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
+    if (screw.thread.designation != nut.thread.designation) throw new machinekit
+      .transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
+    // A coupling's stiffness is in the leader's units, the linear axis's: N/m, where the shaft's is stated in N/mm.
+    var result = new machinekit.transmission.TransmissionRelation(
+      2 * Math.PI * alignment / screw.thread.signedLead(),
+      nut.efficiency(),
+      screw.thread.family == Ball ? screw.supportedStiffness(nut) * 1000 : null,
+      nut.backlash(),
+      nut.drag()
+    );
+    result.setBasis(
+      "stiffness",
+      machinekit.transmission.ValueBasis.Assumed,
+      screw.thread.family == Ball ? "ball screw drive stiffness (shaft, nut and support bearings in series)" : "rigid"
+    );
+    if (screw.thread.family == Ball) {
+      result.dampingRatio = ASSUMED_DAMPING_RATIO;
+      result.setBasis("dampingRatio", machinekit.transmission.ValueBasis.Assumed, "steel screw damping");
+    }
+    result.setBasis(
+      "efficiency",
+      machinekit.transmission.ValueBasis.Assumed,
+      screw.thread.family == Ball ? "ball screw efficiency" : "nut friction"
+    );
+    result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
+    result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
+    return result;
+  }
 
-	/** Assumed axial stiffness of the fixed end's support bearings (an angular-contact pair, preloaded), N/mm: about 200 N/um. */
-	public static inline var SUPPORT_BEARING_STIFFNESS:Float = 200000;
+  /** Assumed axial stiffness of the fixed end's support bearings (an angular-contact pair, preloaded), N/mm: about 200 N/um. */
+  public static inline var SUPPORT_BEARING_STIFFNESS:Float = 200000;
 
-	/**
+  /**
 	 * What the drive gives against axial force, N/mm: the shaft, the nut and the support bearings in series (each a spring
 	 * the force passes through, so the compliances add). The nut and bearing values are catalogue-typical and assumed.
 	 */
-	public function supportedStiffness(nut:LeadScrewNut):Float {
-		var compliance = 1.0 / axialStiffness() + 1.0 / SUPPORT_BEARING_STIFFNESS;
-		var nutStiffness = nut.axialStiffness();
-		if (nutStiffness != null) compliance += 1.0 / nutStiffness;
-		return 1.0 / compliance;
-	}
+  public function supportedStiffness(nut:LeadScrewNut):Float {
+    var compliance = 1.0 / axialStiffness() + 1.0 / SUPPORT_BEARING_STIFFNESS;
+    var nutStiffness = nut.axialStiffness();
+    if (nutStiffness != null) compliance += 1.0 / nutStiffness;
+    return 1.0 / compliance;
+  }
 
-	/** Shaft-only axial stiffness, N/mm, from the race root and full shaft length.
+  /** Shaft-only axial stiffness, N/mm, from the race root and full shaft length.
 	 * Nut and support compliance must be supplied by a measured transmission override.
 	 */
-	/** The diameter a coupling grips at the input end: the screw itself, unless the end is turned down. */
-	public function inputDiameter():Float return thread.screwDiameter;
+  /** The diameter a coupling grips at the input end: the screw itself, unless the end is turned down. */
+  public function inputDiameter():Float return thread.screwDiameter;
 
-	public function axialStiffness():Float {
-		var root = thread.rootDiameter();
-		return YOUNGS_MODULUS / 1e6 * Math.PI * root * root / (4 * totalLength);
-	}
+  public function axialStiffness():Float {
+    var root = thread.rootDiameter();
+    return YOUNGS_MODULUS / 1e6 * Math.PI * root * root / (4 * totalLength);
+  }
 
-	/** Axial rigidity EA at a shaft station, N. */
-	public function axialRigidityAt(position:Float):Float
-		return YOUNGS_MODULUS/1e6*Math.PI*thread.rootDiameter()*thread.rootDiameter()/4.0;
+  /** Axial rigidity EA at a shaft station, N. */
+  public function axialRigidityAt(position:Float):Float return YOUNGS_MODULUS
+    / 1e6 * Math.PI * thread.rootDiameter() * thread.rootDiameter() / 4.0;
 
-	/** Shaft compliance between physical bearing/nut stations, mm/N. */
-	public function axialComplianceBetween(from:Float, to:Float):Float {
-		if (!Math.isFinite(from) || !Math.isFinite(to) || Math.min(from,to)<0 || Math.max(from,to)>totalLength)
-			throw "Axial load path must lie on the screw shaft";
-		return Math.abs(to-from)/axialRigidityAt((from+to)*0.5);
-	}
+  /** Shaft compliance between physical bearing/nut stations, mm/N. */
+  public function axialComplianceBetween(from:Float, to:Float):Float {
+    if (!Math.isFinite(from) || !Math.isFinite(to) || Math.min(from,
+      to) < 0 || Math.max(from, to) > totalLength) throw "Axial load path must lie on the screw shaft";
+    return Math.abs(to - from) / axialRigidityAt((from + to) * 0.5);
+  }
 
-	public final thread:LeadScrewThread;
-	public final totalLength:Float;
-	final hasCustomDesignation:Bool;
+  public final thread:LeadScrewThread;
+  public final totalLength:Float;
+  final hasCustomDesignation:Bool;
 
-	/** A supplier-specific end profile may provide its own BOM designation. */
-	public function new(thread:LeadScrewThread, length:Float, ?designation:String) {
-		if (thread == null) throw "Lead screw needs a thread specification";
-		if (!(length > 0) || !Math.isFinite(length)) throw "Lead screw needs a positive length";
-		super(designation ?? 'LEADSCREW-${thread.designation}-L${Dimension.format(length)}',
-			'Lead screw ${thread.designation}, ${Dimension.format(length)} mm long', "steel");
-		this.thread = thread;
-		hasCustomDesignation = designation != null;
-		totalLength = length;
-		addConnector("input", Axis, Solids.axial(0, 0, 0));
-		addConnector("output", Axis, Solids.axial(0, 0, length));
-	}
+  /** A supplier-specific end profile may provide its own BOM designation. */
+  public function new(thread:LeadScrewThread, length:Float, ?designation:String) {
+    if (thread == null) throw "Lead screw needs a thread specification";
+    if (!(length > 0) || !Math.isFinite(length)) throw "Lead screw needs a positive length";
+    super(
+      designation ?? 'LEADSCREW-${thread.designation}-L${Dimension.format(length)}',
+      'Lead screw ${thread.designation}, ${Dimension.format(length)} mm long',
+      "steel"
+    );
+    this.thread = thread;
+    hasCustomDesignation = designation != null;
+    totalLength = length;
+    addConnector("input", Axis, Solids.axial(0, 0, 0));
+    addConnector("output", Axis, Solids.axial(0, 0, length));
+  }
 
-	/** Young's modulus of steel, Pa. */
-	public static inline var YOUNGS_MODULUS:Float = 200e9;
-	/** Density of steel, kg/m³. */
-	public static inline var DENSITY:Float = 7850;
+  /** Young's modulus of steel, Pa. */
+  public static inline var YOUNGS_MODULUS:Float = 200e9;
+  /** Density of steel, kg/m³. */
+  public static inline var DENSITY:Float = 7850;
 
-	/**
+  /**
 	 * Eigenvalue (lambda) of a uniform beam's first bending mode for the two ends' supports, from
 	 * the standard Euler-Bernoulli beam results: fixed-free 1.875, simple-simple pi, fixed-simple
 	 * 3.927, fixed-fixed 4.730. Two free ends leave nothing to hold the screw.
 	 */
-	public static function bendingEigenvalue(near:ScrewSupport, far:ScrewSupport):Float {
-		var fixed = (near == Fixed ? 1 : 0) + (far == Fixed ? 1 : 0);
-		var simple = (near == Simple ? 1 : 0) + (far == Simple ? 1 : 0);
-		if (fixed == 2) return 4.730040745;
-		if (fixed == 1 && simple == 1) return 3.926602312;
-		if (fixed == 1) return 1.875104069;
-		if (simple == 2) return Math.PI;
-		throw "A lead screw needs at least one held end";
-	}
+  public static function bendingEigenvalue(near:ScrewSupport, far:ScrewSupport):Float {
+    var fixed = (near == Fixed ? 1 : 0) + (far == Fixed ? 1 : 0);
+    var simple = (near == Simple ? 1 : 0) + (far == Simple ? 1 : 0);
+    if (fixed == 2) return 4.730040745;
+    if (fixed == 1 && simple == 1) return 3.926602312;
+    if (fixed == 1) return 1.875104069;
+    if (simple == 2) return Math.PI;
+    throw "A lead screw needs at least one held end";
+  }
 
-	/**
+  /**
 	 * Speed, in rad/s, below which the screw is kept from whipping: `margin` of its first bending
 	 * speed, omega = lambda^2 / L^2 * sqrt(E I / (rho A)) = lambda^2 d_r / (4 L^2) * sqrt(E / rho)
 	 * for a solid round section of root diameter d_r. `unsupported` is the longest stretch between
@@ -126,40 +143,54 @@ class LeadScrew extends MachineComponent {
 	 * the one that counts). The usual margin is 80% of the critical speed. The root diameter
 	 * ignores the thread's flanks, which add stiffness: this is conservative.
 	 */
-	public function criticalSpeed(near:ScrewSupport, far:ScrewSupport, ?unsupported:Float, margin:Float = 0.8):Float {
-		var length = (unsupported == null ? totalLength : unsupported) / 1000;
-		if (!(length > 0) || !(margin > 0 && margin <= 1)) throw "Critical speed needs a positive length and a margin in (0, 1]";
-		var lambda = bendingEigenvalue(near, far);
-		var root = thread.rootDiameter() / 1000;
-		return margin * lambda * lambda * root / (4 * length * length) * Math.sqrt(YOUNGS_MODULUS / DENSITY);
-	}
+  public function criticalSpeed(near:ScrewSupport, far:ScrewSupport, ?unsupported:Float, margin:Float = 0.8):Float {
+    var length = (unsupported == null ? totalLength : unsupported) / 1000;
+    if (!(length > 0)
+      || !(margin > 0 && margin <= 1)) throw "Critical speed needs a positive length and a margin in (0, 1]";
+    var lambda = bendingEigenvalue(near, far);
+    var root = thread.rootDiameter() / 1000;
+    return margin * lambda * lambda * root / (4 * length * length) * Math.sqrt(YOUNGS_MODULUS / DENSITY);
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var shaft = Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
-		try {
-			var result = new Part(Threads.attach(shaft.shape, "cyl.side", thread.threadSpec(), AxisMinimum));
-			shaft.close();
-			return result;
-		} catch (error:Dynamic) { shaft.close(); throw error; }
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var shaft = Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
+    try {
+      var result = new Part(Threads.attach(shaft.shape, "cyl.side", thread.threadSpec(), AxisMinimum));
+      shaft.close();
+      return result;
+    } catch (error:Dynamic) {
+      shaft.close();
+      throw error;
+    }
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.motion.lead-screw",
-			ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length("length", 100)]),
-			v -> new LeadScrew(ComponentRecipeSupport.thread(v), v.number("length")));
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.motion.lead-screw",
+      ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.length(
+        "length",
+        100
+      )]),
+      v -> new LeadScrew(
+        ComponentRecipeSupport.thread(v),
+        v.number("length")
+      )
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrew) && !hasCustomDesignation ? recipeType() : null;
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    LeadScrew) && !hasCustomDesignation ? recipeType() : null;
 
-	override public function values():ComponentValues {
-		return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength)
-			.setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

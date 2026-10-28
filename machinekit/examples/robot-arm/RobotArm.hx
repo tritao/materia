@@ -27,56 +27,65 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 /** Work table: a slab on four legs, standing on the floor (z=0) with its top at `height`. The origin
  * is the centre of the footprint. */
 class ArmTable extends MachineComponent {
-	public final width:Float;
-	public final depth:Float;
-	public final height:Float;
-	public final thickness:Float;
+  public final width:Float;
+  public final depth:Float;
+  public final height:Float;
+  public final thickness:Float;
 
-	public function new(width:Float, depth:Float, height:Float, thickness:Float = 30) {
-		if (!(width > 0) || !(depth > 0) || !(thickness > 0) || !(height > thickness) || width < 200 || depth < 200)
-			throw "Table needs positive dimensions and legs under its top";
-		super('TABLE-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
-			"Work table", "steel", true);
-		this.width = width;
-		this.depth = depth;
-		this.height = height;
-		this.thickness = thickness;
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-	}
+  public function new(width:Float, depth:Float, height:Float, thickness:Float = 30) {
+    if (!(width > 0) || !(depth > 0) || !(thickness > 0) || !(height > thickness)
+      || width < 200 || depth < 200) throw "Table needs positive dimensions and legs under its top";
+    super(
+      'TABLE-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+      "Work table",
+      "steel",
+      true
+    );
+    this.width = width;
+    this.depth = depth;
+    this.height = height;
+    this.thickness = thickness;
+    addConnector("base", Mount, Solids.axial(0, 0, 0));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var parts = [Part.box(width, depth, thickness).translated(new Vector(0, 0, height - thickness))];
-		var leg = 40.0, inset = 30.0;
-		for (sx in [-1, 1]) for (sy in [-1, 1])
-			parts.push(Part.box(leg, leg, height - thickness)
-				.translated(new Vector(sx * (width / 2 - inset - leg / 2), sy * (depth / 2 - inset - leg / 2), 0)));
-		return Solids.union(parts);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var parts = [Part.box(width, depth, thickness).translated(new Vector(0, 0, height - thickness))];
+    var leg = 40.0, inset = 30.0;
+    for (sx in [-1, 1]) for (sy in [-1, 1]) parts.push(Part.box(leg, leg, height - thickness).translated(new Vector(
+      sx * (width / 2 - inset - leg / 2),
+      sy * (depth / 2 - inset - leg / 2),
+      0
+    )));
+    return Solids.union(parts);
+  }
 }
 
 /** A plain block standing on its base (z=0), centred on its origin. */
 class ArmBlock extends MachineComponent {
-	public final width:Float;
-	public final depth:Float;
-	public final height:Float;
+  public final width:Float;
+  public final depth:Float;
+  public final height:Float;
 
-	public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
-		if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Block needs positive dimensions";
-		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
-			name, material, true);
-		this.width = width;
-		this.depth = depth;
-		this.height = height;
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-		addConnector("top", Mount, Solids.axial(0, 0, height));
-	}
+  public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+    if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Block needs positive dimensions";
+    super(
+      '${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+      name,
+      material,
+      true
+    );
+    this.width = width;
+    this.depth = depth;
+    this.height = height;
+    addConnector("base", Mount, Solids.axial(0, 0, 0));
+    addConnector("top", Mount, Solids.axial(0, 0, height));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, height);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);
 }
 
 /**
@@ -84,13 +93,13 @@ class ArmBlock extends MachineComponent {
  * gearbox. Compilation derives speed and torque limits from the current drive members.
  */
 typedef ArmJointSpec = {
-	var id:String;
-	var lower:Float;
-	var upper:Float;
-	var initial:Float;
-	/** The generic servo (`ServoMotor.ratings()`) inside the joint module. */
-	var servo:String;
-	var gearbox:Gearbox;
+  var id:String;
+  var lower:Float;
+  var upper:Float;
+  var initial:Float;
+  /** The generic servo (`ServoMotor.ratings()`) inside the joint module. */
+  var servo:String;
+  var gearbox:Gearbox;
 }
 
 /** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in a shoulder/elbow layout with a spherical wrist.
@@ -106,142 +115,229 @@ typedef ArmJointSpec = {
  * (-Y). Without, it is the arm alone, to stand on something else by its pedestal's `floor`.
  */
 class RobotArm extends MachineAssembly {
-	public static inline var PEDESTAL_HEIGHT:Float = 300;
-	/** Work cell in front of the arm (-Y), in millimetres from the pedestal axis and the floor. */
-	public static inline var TABLE_TOP:Float = 250;
-	public static inline var TABLE_CENTRE_Y:Float = -650;
-	public static inline var WORKPIECE_WIDTH:Float = 60;
-	public static inline var WORKPIECE_HEIGHT:Float = 50;
-	public static inline var PAD_HEIGHT:Float = 2;
-	/** Two pads, side by side; the workpiece starts on the first and is carried to the second and back. */
-	public static inline var PICK_X:Float = -150;
-	public static inline var PLACE_X:Float = 150;
-	public static inline var WORK_Y:Float = -600;
+  public static inline var PEDESTAL_HEIGHT:Float = 300;
+  /** Work cell in front of the arm (-Y), in millimetres from the pedestal axis and the floor. */
+  public static inline var TABLE_TOP:Float = 250;
+  public static inline var TABLE_CENTRE_Y:Float = -650;
+  public static inline var WORKPIECE_WIDTH:Float = 60;
+  public static inline var WORKPIECE_HEIGHT:Float = 50;
+  public static inline var PAD_HEIGHT:Float = 2;
+  /** Two pads, side by side; the workpiece starts on the first and is carried to the second and back. */
+  public static inline var PICK_X:Float = -150;
+  public static inline var PLACE_X:Float = 150;
+  public static inline var WORK_Y:Float = -600;
 
-	public final cls:IndustrialArmClass;
-	public final reference:IndustrialArmReference.IndustrialArmReferenceRow;
-	public final flange = new RobotFlange(63);
-	public final pedestal:Pedestal;
-	public final toolFlange = new RobotFlange(31.5);
-	public final tool:EndEffector;
-	public final joints:Array<ArmJoint>;
-	public final links:Array<MachineComponent>;
-	public final specs:Array<ArmJointSpec>;
-	/**
+  public final cls:IndustrialArmClass;
+  public final reference:IndustrialArmReference.IndustrialArmReferenceRow;
+  public final flange = new RobotFlange(63);
+  public final pedestal:Pedestal;
+  public final toolFlange = new RobotFlange(31.5);
+  public final tool:EndEffector;
+  public final joints:Array<ArmJoint>;
+  public final links:Array<MachineComponent>;
+  public final specs:Array<ArmJointSpec>;
+  /**
 	 * Efficiency of every joint's gearbox. Assumption: 0.85, about a strain-wave (harmonic) gearhead's
 	 * efficiency at speed; makers quote 0.7 to 0.9.
 	 */
-	public static inline var GEARBOX_EFFICIENCY:Float = 0.85;
+  public static inline var GEARBOX_EFFICIENCY:Float = 0.85;
 
-	/** A joint's position bounds and the source drive parts. */
-	static function spec(id:String, lower:Float, upper:Float, initial:Float, servo:String, ratio:Float):ArmJointSpec {
-		var gearbox = new Gearbox(ratio, GEARBOX_EFFICIENCY, 60, 40, 8, true);
-		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox};
-	}
+  /** A joint's position bounds and the source drive parts. */
+  static function spec(id:String, lower:Float, upper:Float, initial:Float, servo:String, ratio:Float):ArmJointSpec {
+    var gearbox = new Gearbox(ratio, GEARBOX_EFFICIENCY, 60, 40, 8, true);
+    return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox};
+  }
 
-	public function new(withCell:Bool = true, ?armTool:ArmTool, cls:IndustrialArmClass = Reach900, invertedMount:Bool = false) {
-		super();
-		this.cls = cls;
-		reference = IndustrialArmReference.of(cls);
-		if (armTool == null) armTool = new ArmSuctionTool();
-		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
-		var pi = Math.PI;
-		// The gearbox ratios are assumptions chosen so each joint's top speed lands where this arm's speeds were
-		// before they came from drives (2 to 4 rad/s), and the servo is the smallest generic one that carries the
-		// joint's torque: the shoulder and elbow 200 W, the wrist 50 W. j3 turns about -X, so a positive j3
-		// folds the forearm the opposite way from a positive j2.
-		// Limits are taken from the selected arm class. The elbow's connector
-		// sets the horizontal zero; its starting coordinate preserves the former
-		// physical ready pose so cell fixtures need not move without reach evidence.
-		var initial = [0.0, 0.4, pi / 2 - 1.4, 0.0, pi - 1.8, 0.0];
-		// A ceiling-mounted arm turns its tool over so the saved ready pose
-		// still approaches a workpiece from above. Geometry and limits stay shared.
-		if (invertedMount) initial[4] -= pi;
-		var ratios = [250.0, 250.0, 220.0, 175.0, 175.0, 130.0];
-		specs = [for (i in 0...6) spec('j${i + 1}', reference.lowerDegrees[i] * pi / 180,
-			reference.upperDegrees[i] * pi / 180, initial[i], i < 3 ? "GENERIC-LV-SERVO-200W" : "GENERIC-LV-SERVO-50W", ratios[i])];
-		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint {
-			var source = specs[index].gearbox;
-			var gear = new Gearbox(source.ratio, source.efficiency, diameter * 0.6, length * 0.5, 8, true);
-			specs[index].gearbox = gear;
-			return new GearedArmJoint(diameter, length, gear.diameter + 1, gear.length + 1,
-				flange, ServoMotor.model(specs[index].servo));
-		}
-		var j1 = housing(0, 100, 70), j2 = housing(1, 100, 90), j3 = housing(2, 80, 90);
-		var j4 = housing(3, 70, 60), j5 = housing(4, 60, 70), j6 = housing(5, 55, 40, toolFlange);
-		joints = [j1, j2, j3, j4, j5, j6];
-		links = [
-			new ArmLink(reference.turret, 90, 5, 100, PlusZ, PlusX, j2.length),
-			new ArmLink(reference.upperArm, 80, 5, 100, PlusX, MinusX, j3.length),
-			new ArmLink(reference.forearm, 70, 4, 80, MinusX, PlusZ, j4.length),
-			new ArmLink(reference.wristBody, 60, 4, 70, PlusZ, PlusX, j5.length),
-			new ArmWristFork(reference.hand, j5.length)
-		];
-		addComponent("pedestal", pedestal);
-		addComponent("baseFlange", flange);
-		addMate("base-flange", "fixed", "pedestal", "top", "baseFlange", "face");
-		// The flange turns over on the pedestal, so its plate top is the flange's z=-thickness face
-		// looking along local -Z.
-		addMemberConnector("baseFlange", "plateTop", AssemblyFrames.alongY(0, 0, -flange.thickness, 0, 0, -1));
-		addComponent("joint1", j1);
-		addMate("base-joint1", "fixed", "baseFlange", "plateTop", "joint1", "stator");
-		var linkNames = ["turret", "upperArm", "forearm", "wristBody", "hand"];
-		for (i in 0...5) {
-			addComponent(linkNames[i], links[i]);
-			var start = "start";
-			if (i == 2) {
-				start = "industrialStart";
-				addMemberConnector(linkNames[i], start, AssemblyFrames.compose(links[i].connector("start").frame,
-					AssemblyFrames.turnY(pi / 2)));
-			}
-			revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], start);
-			addComponent('joint${i + 2}', joints[i + 1]);
-			addMate('${linkNames[i]}-joint${i + 2}', "fixed", linkNames[i], "end", 'joint${i + 2}', "stator");
-		}
-		addComponent("toolFlange", toolFlange);
-		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
-		addComponent("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(75), 6, 180, 80, 60, 2500));
-		addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
-		addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
-		// Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
-		for (index in 0...6) {
-			var driver = 'driver${index + 1}';
-			addComponent(driver, new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)));
-			addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
-			addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
-			connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");
-			var gearbox = 'gearbox${index + 1}';
-			addComponent(gearbox, specs[index].gearbox);
-			addMate('$gearbox-mount', "fixed", 'joint${index + 1}', "gearbox", gearbox, "input");
-			addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', driver, 0.5, gearbox);
-		}
-		tool = armTool.build(toolFlange);
-		include("tool", tool);
-		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
-		exposeConnector("toolFace", "toolFlange", "face");
-		armTool.expose(this);
-		exposeConnector("floor", "pedestal", "floor");
-		if (withCell) addCell();
-	}
+  public function new(
+    withCell:Bool = true,
+    ?armTool:ArmTool,
+    cls:IndustrialArmClass = Reach900,
+    invertedMount:Bool = false
+  ) {
+    super();
+    this.cls = cls;
+    reference = IndustrialArmReference.of(cls);
+    if (armTool == null) armTool = new ArmSuctionTool();
+    pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
+    var pi = Math.PI;
+    // The gearbox ratios are assumptions chosen so each joint's top speed lands where this arm's speeds were
+    // before they came from drives (2 to 4 rad/s), and the servo is the smallest generic one that carries the
+    // joint's torque: the shoulder and elbow 200 W, the wrist 50 W. j3 turns about -X, so a positive j3
+    // folds the forearm the opposite way from a positive j2.
+    // Limits are taken from the selected arm class. The elbow's connector
+    // sets the horizontal zero; its starting coordinate preserves the former
+    // physical ready pose so cell fixtures need not move without reach evidence.
+    var initial = [0.0, 0.4, pi / 2 - 1.4, 0.0, pi - 1.8, 0.0];
+    // A ceiling-mounted arm turns its tool over so the saved ready pose
+    // still approaches a workpiece from above. Geometry and limits stay shared.
+    if (invertedMount) initial[4] -= pi;
+    var ratios = [250.0, 250.0, 220.0, 175.0, 175.0, 130.0];
+    specs = [for (i in 0...6) spec(
+      'j${i + 1}',
+      reference.lowerDegrees[i] * pi / 180,
+      reference.upperDegrees[i] * pi / 180,
+      initial[i],
+      i < 3 ? "GENERIC-LV-SERVO-200W" : "GENERIC-LV-SERVO-50W",
+      ratios[i]
+    )];
+    function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint {
+      var source = specs[index].gearbox;
+      var gear = new Gearbox(source.ratio, source.efficiency, diameter * 0.6, length * 0.5, 8, true);
+      specs[index].gearbox = gear;
+      return new GearedArmJoint(
+        diameter,
+        length,
+        gear.diameter + 1,
+        gear.length + 1,
+        flange,
+        ServoMotor.model(specs[index].servo)
+      );
+    }
+    var j1 = housing(0, 100, 70), j2 = housing(1, 100, 90), j3 = housing(2, 80, 90);
+    var j4 = housing(3, 70, 60), j5 = housing(4, 60, 70), j6 = housing(5, 55, 40, toolFlange);
+    joints = [j1, j2, j3, j4, j5, j6];
+    links = [
+      new ArmLink(reference.turret, 90, 5, 100, PlusZ, PlusX, j2.length),
+      new ArmLink(
+        reference.upperArm,
+        80,
+        5,
+        100,
+        PlusX,
+        MinusX,
+        j3.length
+      ),
+      new ArmLink(
+        reference.forearm,
+        70,
+        4,
+        80,
+        MinusX,
+        PlusZ,
+        j4.length
+      ),
+      new ArmLink(
+        reference.wristBody,
+        60,
+        4,
+        70,
+        PlusZ,
+        PlusX,
+        j5.length
+      ),
+      new ArmWristFork(
+        reference.hand,
+        j5.length
+      )
+    ];
+    addComponent("pedestal", pedestal);
+    addComponent("baseFlange", flange);
+    addMate("base-flange", "fixed", "pedestal", "top", "baseFlange", "face");
+    // The flange turns over on the pedestal, so its plate top is the flange's z=-thickness face
+    // looking along local -Z.
+    addMemberConnector("baseFlange", "plateTop", AssemblyFrames.alongY(0, 0, -flange.thickness, 0, 0, -1));
+    addComponent("joint1", j1);
+    addMate("base-joint1", "fixed", "baseFlange", "plateTop", "joint1", "stator");
+    var linkNames = ["turret", "upperArm", "forearm", "wristBody", "hand"];
+    for (i in 0...5) {
+      addComponent(linkNames[i], links[i]);
+      var start = "start";
+      if (i == 2) {
+        start = "industrialStart";
+        addMemberConnector(
+          linkNames[i],
+          start,
+          AssemblyFrames.compose(
+            links[i].connector("start").frame,
+            AssemblyFrames.turnY(pi / 2)
+          )
+        );
+      }
+      revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], start);
+      addComponent('joint${i + 2}', joints[i + 1]);
+      addMate('${linkNames[i]}-joint${i + 2}', "fixed", linkNames[i], "end", 'joint${i + 2}', "stator");
+    }
+    addComponent("toolFlange", toolFlange);
+    revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+    addComponent(
+      "powerSupply",
+      new PowerSupply(
+        new machinekit.power.DcVoltage(48),
+        new machinekit.power.DcCurrent(75),
+        6,
+        180,
+        80,
+        60,
+        2500
+      )
+    );
+    addMemberConnector("pedestal", "powerSupply", Solids.axial(-300, 0, 0));
+    addMate("powerSupply-mount", "fixed", "pedestal", "powerSupply", "powerSupply", "mount");
+    // Each joint's servo, through its gearbox, drives it: the limits above are what the drives deliver.
+    for (index in 0...6) {
+      var driver = 'driver${index + 1}';
+      addComponent(driver, new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)));
+      addMemberConnector("pedestal", driver, Solids.axial(300, (index - 2.5) * 70, 0));
+      addMate('$driver-mount', "fixed", "pedestal", driver, driver, "mount");
+      connectPorts('$driver-power', "powerSupply", 'power${index + 1}', driver, "power");
+      var gearbox = 'gearbox${index + 1}';
+      addComponent(gearbox, specs[index].gearbox);
+      addMate('$gearbox-mount', "fixed", 'joint${index + 1}', "gearbox", gearbox, "input");
+      addMotor('drive_${specs[index].id}', specs[index].id, 'joint${index + 1}', driver, 0.5, gearbox);
+    }
+    tool = armTool.build(toolFlange);
+    include("tool", tool);
+    addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
+    exposeConnector("toolFace", "toolFlange", "face");
+    armTool.expose(this);
+    exposeConnector("floor", "pedestal", "floor");
+    if (withCell) addCell();
+  }
 
-	/**
+  /**
 	 * Table, two pads and a workpiece in the arm's reach. The table and pads are fixed roots; the
 	 * project's `dynamicParts` frees the workpiece so the suction cup can carry it.
 	 */
-	function addCell():Void {
-		function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
-		addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
-		var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad");
-		addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));
-		addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
-		addComponent("workpiece", new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood",
-			"Workpiece"), at(PICK_X, WORK_Y, TABLE_TOP + PAD_HEIGHT));
-	}
+  function addCell():Void {
+    function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
+    addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
+    var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad");
+    addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));
+    addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
+    addComponent(
+      "workpiece",
+      new ArmBlock(
+        WORKPIECE_WIDTH,
+        WORKPIECE_WIDTH,
+        WORKPIECE_HEIGHT,
+        "birch plywood",
+        "Workpiece"
+      ),
+      at(
+        PICK_X,
+        WORK_Y,
+        TABLE_TOP + PAD_HEIGHT
+      )
+    );
+  }
 
-	function revolute(spec:ArmJointSpec, housing:String, rotorConnector:String, child:String,
-			childConnector:String):Void {
-		addMateOnAxis(spec.id, "revolute", housing, rotorConnector, child, childConnector,
-			{x: 0, y: 1, z: 0}, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: null, effort: null});
-	}
+  function revolute(spec:ArmJointSpec,
+    housing:String, rotorConnector:String, child:String, childConnector:String):Void {
+    addMateOnAxis(
+      spec.id,
+      "revolute",
+      housing,
+      rotorConnector,
+      child,
+      childConnector,
+      {x: 0, y: 1, z: 0},
+      spec.initial,
+      {
+        lower: spec.lower,
+        upper: spec.upper,
+        velocity: null,
+        effort: null
+      }
+    );
+  }
 }

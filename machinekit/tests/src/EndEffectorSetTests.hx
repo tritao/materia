@@ -17,218 +17,216 @@ import haxeon.Equality;
 import haxeon.wire.JsonWire;
 
 private class TestChangerMaster extends MachineComponent {
-	public function new() {
-		super("TEST-MASTER", "Test changer master", "steel", true);
-		addConnector("mount", Mount, AssemblyFrames.identity());
-		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
-		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
-		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
-		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
-		addBridge("airIn", "airOut");
-		declareMass(5, new Vector(), InertiaTensor.zero());
-	}
+  public function new() {
+    super("TEST-MASTER", "Test changer master", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
+    addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
+    addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+    addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
+    addBridge("airIn", "airOut");
+    declareMass(5, new Vector(), InertiaTensor.zero());
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
 private class CoupledMaster extends MachineComponent {
-	public function new(duplicate:Bool = false) {
-		super("COUPLED-MASTER", "Coupled master", "steel", true);
-		addConnector("mount", Mount, AssemblyFrames.identity());
-		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
-		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
-		addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
-		if (duplicate) addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
-		declareMass(5, new Vector(), InertiaTensor.zero());
-	}
-	override public function hasGeometry():Bool return true;
+  public function new(duplicate:Bool = false) {
+    super("COUPLED-MASTER", "Coupled master", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
+    addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+    addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
+    if (duplicate) addFacet(new machinekit.component.CouplingFacet("test:master", "couple"));
+    declareMass(5, new Vector(), InertiaTensor.zero());
+  }
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
 private class CoupledPlate extends MachineComponent {
-	public function new() {
-		super("COUPLED-PLATE", "Coupled plate", "steel", true);
-		addConnector("mount", Mount, AssemblyFrames.identity());
-		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
-		addFacet(new machinekit.component.CouplingFacet("test:tool", "mount"));
-		declareMass(1, new Vector(), InertiaTensor.zero());
-	}
-	override public function hasGeometry():Bool return true;
+  public function new() {
+    super("COUPLED-PLATE", "Coupled plate", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
+    addFacet(new machinekit.component.CouplingFacet("test:tool", "mount"));
+    declareMass(1, new Vector(), InertiaTensor.zero());
+  }
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
 private class TestChangerPlate extends MachineComponent {
-	public function new(mass:Float, reach:Float, extraPort:Bool = false) {
-		super("TEST-TOOL-PLATE", "Test tool plate", "steel", true);
-		addConnector("mount", Mount, AssemblyFrames.identity());
-		addConnector("cup", Mount, AssemblyFrames.translation(0, reach, 0));
-		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
-		addPort({name: "vacuum", kind: Vacuum, role: Supply, iface: Unspecified, required: false});
-		addConversion("airIn", "vacuum");
-		if (extraPort) addPort({name: "aux", kind: Signal, role: Consumer,
-			iface: Unspecified, required: true});
-		declareMass(mass, new Vector(), InertiaTensor.zero());
-	}
+  public function new(mass:Float, reach:Float, extraPort:Bool = false) {
+    super("TEST-TOOL-PLATE", "Test tool plate", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addConnector("cup", Mount, AssemblyFrames.translation(0, reach, 0));
+    addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
+    addPort({name: "vacuum", kind: Vacuum, role: Supply, iface: Unspecified, required: false});
+    addConversion("airIn", "vacuum");
+    if (extraPort) addPort({name: "aux", kind: Signal, role: Consumer, iface: Unspecified, required: true});
+    declareMass(mass, new Vector(), InertiaTensor.zero());
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
 private class TestChangerCup extends MachineComponent {
-	public function new() {
-		super("TEST-CUP", "Test suction cup", "rubber", true);
-		addConnector("mount", Mount, AssemblyFrames.identity());
-		addConnector("contact", Face, AssemblyFrames.translation(0, 5, 0));
-		addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: Unspecified, required: true});
-		declareMass(0.5, new Vector(), InertiaTensor.zero());
-	}
+  public function new() {
+    super("TEST-CUP", "Test suction cup", "rubber", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addConnector("contact", Face, AssemblyFrames.translation(0, 5, 0));
+    addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: Unspecified, required: true});
+    declareMass(0.5, new Vector(), InertiaTensor.zero());
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
 class EndEffectorSetTests {
-	static function close(actual:Float, expected:Float, label:String):Void
-		if (Math.abs(actual - expected) > 1e-6) throw '$label: expected $expected, got $actual';
+  static function close(actual:Float, expected:Float,
+    label:String):Void if (Math.abs(actual - expected) > 1e-6) throw '$label: expected $expected, got $actual';
 
-	static function fails(action:() -> Void, fragment:String):Void {
-		try action() catch (e:Dynamic) {
-			if (Std.string(e).indexOf(fragment) < 0) throw 'Expected "$fragment", got $e';
-			return;
-		}
-		throw 'Expected failure containing "$fragment"';
-	}
+  static function fails(action:() -> Void, fragment:String):Void {
+    try action() catch (e:Dynamic) {
+      if (Std.string(e).indexOf(fragment) < 0) throw 'Expected "$fragment", got $e';
+      return;
+    }
+    throw 'Expected failure containing "$fragment"';
+  }
 
-	static function tool(mass:Float, reach:Float, extraPort:Bool = false):EndEffector {
-		var result = new EndEffector();
-		result.addComponent("plate", new TestChangerPlate(mass, reach, extraPort));
-		result.addComponent("cup", new TestChangerCup());
-		result.mount("plate", "mount");
-		result.addMate("cup-mate", "fixed", "plate", "cup", "cup", "mount");
-		result.connectPorts("vacuum-line", "plate", "vacuum", "cup", "vacuum");
-		result.exposePort("air", "plate", "airIn");
-		if (extraPort) result.exposePort("aux", "plate", "aux");
-		result.workingFrame("contact", "cup", "contact", true);
-		return result;
-	}
+  static function tool(mass:Float, reach:Float, extraPort:Bool = false):EndEffector {
+    var result = new EndEffector();
+    result.addComponent("plate", new TestChangerPlate(mass, reach, extraPort));
+    result.addComponent("cup", new TestChangerCup());
+    result.mount("plate", "mount");
+    result.addMate("cup-mate", "fixed", "plate", "cup", "cup", "mount");
+    result.connectPorts("vacuum-line", "plate", "vacuum", "cup", "vacuum");
+    result.exposePort("air", "plate", "airIn");
+    if (extraPort) result.exposePort("aux", "plate", "aux");
+    result.workingFrame("contact", "cup", "contact", true);
+    return result;
+  }
 
-	static function genericTool(channels:Int, diameter:Float):EndEffector {
-		var result = new EndEffector();
-		result.addComponent("half", new ToolChangerTool(channels, diameter));
-		result.mount("half", "master");
-		result.exposePort("air", "half", "airIn1");
-		return result;
-	}
+  static function genericTool(channels:Int, diameter:Float):EndEffector {
+    var result = new EndEffector();
+    result.addComponent("half", new ToolChangerTool(channels, diameter));
+    result.mount("half", "master");
+    result.exposePort("air", "half", "airIn1");
+    return result;
+  }
 
-	static function coupledTool():EndEffector {
-		var result = new EndEffector();
-		result.addComponent("plate", new CoupledPlate());
-		result.mount("plate", "mount");
-		result.exposePort("air", "plate", "airIn");
-		return result;
-	}
+  static function coupledTool():EndEffector {
+    var result = new EndEffector();
+    result.addComponent("plate", new CoupledPlate());
+    result.mount("plate", "mount");
+    result.exposePort("air", "plate", "airIn");
+    return result;
+  }
 
-	public static function run():Void {
-		fails(() -> new CoupledMaster(true), "Duplicate coupling capability");
-		var emptySet = new EndEffectorSet();
-		var emptyFindings = emptySet.check().items;
-		if (emptyFindings.length != 2 || emptyFindings[0].code != "eoat.missing-mount" ||
-			emptyFindings[1].code != "changer.missing")
-			throw "End effector set diagnostics must report mount and changer faults";
+  public static function run():Void {
+    fails(() -> new CoupledMaster(true), "Duplicate coupling capability");
+    var emptySet = new EndEffectorSet();
+    var emptyFindings = emptySet.check().items;
+    if (emptyFindings.length != 2 || emptyFindings[0].code != "eoat.missing-mount" || emptyFindings[1].code
+      != "changer.missing") throw "End effector set diagnostics must report mount and changer faults";
 
-		var sxtSet = new EndEffectorSet();
-		sxtSet.addComponent("master", new BayonetChangerMaster("10.07.13.00013"));
-		sxtSet.mount("master", "robot");
-		sxtSet.exposePort("robotAir", "master", "airIn1");
-		sxtSet.exposePort("coupledAir", "master", "airOut1");
-		sxtSet.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
-		var sxtTool = new EndEffector();
-		sxtTool.addComponent("half", new BayonetChangerTool("10.07.13.00018"));
-		sxtTool.mount("half", "master");
-		sxtTool.exposePort("air", "half", "airIn1");
-		sxtSet.addTool("manual", sxtTool);
-		var savedSxt = sxtSet.encode();
-		var rebuiltSxt = EndEffectorSet.decode(savedSxt);
-		if (!Equality.equals(sxtSet.describe(), rebuiltSxt.describe()))
-			throw "SXT changer description changed after wire round trip";
-		sxtTool.addComponent("late", new BayonetChangerTool("10.07.13.00018"));
-		if (sxtSet.configuration("manual").components().length != 2)
-			throw "Changer retained a mutable tool builder";
-		var coupledSxt = sxtSet.configuration("manual");
-		if (coupledSxt.upstream("tool/half", "airOut1").port.instanceId != "robot/master" ||
-			coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1 ||
-			coupledSxt.billOfMaterials().quantity("10.07.13.00018") != 1)
-			throw "SXT catalog halves must couple and bridge the keyed air passage";
-		var gripper = new ParallelGripper(new ParallelGripperSpec(40, 60, 60, 16));
-		if (gripper.validate().length != 0 || gripper.spec.totalJawTravel != 32 ||
-			gripper.spec.ratedGripForce <= 0 || gripper.port("airA").instanceId != "cylinder" ||
-			gripper.port("airA").portName != "A" ||
-			gripper.components().filter(entry -> entry.id == "jawLeft" || entry.id == "jawRight").length != 2)
-			throw "Parallel gripper must validate with its mirrored jaws and exposed cylinder ports";
-		var body = new ParallelGripperBody(new ParallelGripperSpec(40, 60, 60, 16));
-		var preview = body.geometry(Preview), previewBox = preview.shape.bounds();
-		close(previewBox.get_max().get_x() - previewBox.get_min().get_x(), gripper.spec.bodyWidth,
-			"gripper housing width derived from its cylinder envelope");
-		preview.close();
-		var set = new EndEffectorSet();
-		set.addComponent("master", new TestChangerMaster());
-		set.mount("master", "mount");
-		set.exposePort("air", "master", "airIn");
-		set.exposePort("coupleAir", "master", "airOut");
-		set.exposePort("lock", "master", "lock");
-		set.changer("changer", "master", "couple", [{robot: "coupleAir", tool: "air"}]);
-		set.addTool("short", tool(1, 20));
-		set.addTool("long", tool(2, 40));
-		var short = set.configuration("short"), long = set.configuration("long");
-		close(short.massPropertiesAtMount().mass, 6.5, "short mass");
-		close(long.massPropertiesAtMount().mass, 7.5, "long mass");
-		close(short.mountTFrame("contact").raw().y, 35, "short contact");
-		close(long.mountTFrame("contact").raw().y, 55, "long contact");
-		if (short.primaryFrame != "contact" || short.billOfMaterials().quantity("TEST-CUP") != 1 ||
-			short.billOfMaterials().quantity("TEST-MASTER") != 1)
-			throw "Configuration did not preserve selected frame and BOM";
-		if (short.portNames().indexOf("air") < 0 || short.portNames().indexOf("lock") < 0 ||
-			short.portNames().indexOf("coupleAir") >= 0)
-			throw "Configuration has the wrong robot-side interface";
-		var upstream = short.upstream("tool/cup", "vacuum");
-		if (upstream.port.instanceId != "robot/master" || upstream.port.portName != "airIn" || !upstream.external)
-			throw 'Wrong changer upstream: ${upstream.port.instanceId}/${upstream.port.portName}';
-		if (short.components().length != 3 || long.components().length != 3)
-			throw "Configuration contains inactive components";
-		set.addTool("unmapped", tool(1, 20, true));
-		fails(() -> set.configuration("unmapped"), "Required consumer port");
-		var missingPort = new EndEffector();
-		missingPort.addComponent("plate", new TestChangerPlate(1, 20));
-		missingPort.mount("plate", "mount");
-		fails(() -> set.addTool("missing-port", missingPort), "does not expose mapped port");
-		fails(() -> set.configuration("missing"), "Unknown changer tool");
+    var sxtSet = new EndEffectorSet();
+    sxtSet.addComponent("master", new BayonetChangerMaster("10.07.13.00013"));
+    sxtSet.mount("master", "robot");
+    sxtSet.exposePort("robotAir", "master", "airIn1");
+    sxtSet.exposePort("coupledAir", "master", "airOut1");
+    sxtSet.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+    var sxtTool = new EndEffector();
+    sxtTool.addComponent("half", new BayonetChangerTool("10.07.13.00018"));
+    sxtTool.mount("half", "master");
+    sxtTool.exposePort("air", "half", "airIn1");
+    sxtSet.addTool("manual", sxtTool);
+    var savedSxt = sxtSet.encode();
+    var rebuiltSxt = EndEffectorSet.decode(savedSxt);
+    if (!Equality.equals(sxtSet.describe(),
+      rebuiltSxt.describe())) throw "SXT changer description changed after wire round trip";
+    sxtTool.addComponent("late", new BayonetChangerTool("10.07.13.00018"));
+    if (sxtSet.configuration("manual").components().length != 2) throw "Changer retained a mutable tool builder";
+    var coupledSxt = sxtSet.configuration("manual");
+    if (coupledSxt.upstream("tool/half",
+      "airOut1").port.instanceId != "robot/master" || coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1
+      || coupledSxt.billOfMaterials().quantity("10.07.13.00018")
+      != 1) throw "SXT catalog halves must couple and bridge the keyed air passage";
+    var gripper = new ParallelGripper(new ParallelGripperSpec(40, 60, 60, 16));
+    if (gripper.validate().length != 0 || gripper.spec.totalJawTravel != 32 || gripper.spec.ratedGripForce <= 0
+      || gripper.port("airA").instanceId != "cylinder" || gripper.port("airA").portName != "A"
+      || gripper.components().filter(entry -> entry.id == "jawLeft" || entry.id == "jawRight").length
+      != 2) throw "Parallel gripper must validate with its mirrored jaws and exposed cylinder ports";
+    var body = new ParallelGripperBody(new ParallelGripperSpec(40, 60, 60, 16));
+    var preview = body.geometry(Preview), previewBox = preview.shape.bounds();
+    close(
+      previewBox.get_max().get_x() - previewBox.get_min().get_x(),
+      gripper.spec.bodyWidth,
+      "gripper housing width derived from its cylinder envelope"
+    );
+    preview.close();
+    var set = new EndEffectorSet();
+    set.addComponent("master", new TestChangerMaster());
+    set.mount("master", "mount");
+    set.exposePort("air", "master", "airIn");
+    set.exposePort("coupleAir", "master", "airOut");
+    set.exposePort("lock", "master", "lock");
+    set.changer("changer", "master", "couple", [{robot: "coupleAir", tool: "air"}]);
+    set.addTool("short", tool(1, 20));
+    set.addTool("long", tool(2, 40));
+    var short = set.configuration("short"), long = set.configuration("long");
+    close(short.massPropertiesAtMount().mass, 6.5, "short mass");
+    close(long.massPropertiesAtMount().mass, 7.5, "long mass");
+    close(short.mountTFrame("contact").raw().y, 35, "short contact");
+    close(long.mountTFrame("contact").raw().y, 55, "long contact");
+    if (short.primaryFrame != "contact"
+      || short.billOfMaterials().quantity("TEST-CUP") != 1 || short.billOfMaterials().quantity("TEST-MASTER")
+      != 1) throw "Configuration did not preserve selected frame and BOM";
+    if (short.portNames().indexOf("air") < 0 || short.portNames().indexOf("lock") < 0
+      || short.portNames().indexOf("coupleAir") >= 0) throw "Configuration has the wrong robot-side interface";
+    var upstream = short.upstream("tool/cup", "vacuum");
+    if (upstream.port.instanceId != "robot/master" || upstream.port.portName != "airIn"
+      || !upstream.external) throw 'Wrong changer upstream: ${upstream.port.instanceId}/${upstream.port.portName}';
+    if (short.components().length != 3
+      || long.components().length != 3) throw "Configuration contains inactive components";
+    set.addTool("unmapped", tool(1, 20, true));
+    fails(() -> set.configuration("unmapped"), "Required consumer port");
+    var missingPort = new EndEffector();
+    missingPort.addComponent("plate", new TestChangerPlate(1, 20));
+    missingPort.mount("plate", "mount");
+    fails(() -> set.addTool("missing-port", missingPort), "does not expose mapped port");
+    fails(() -> set.configuration("missing"), "Unknown changer tool");
 
-		var generic = new EndEffectorSet();
-		generic.addComponent("master", new ToolChangerMaster(1, 60));
-		generic.mount("master", "robot");
-		generic.exposePort("coupledAir", "master", "airOut1");
-		generic.changer("coupling", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
-		generic.addTool("matching", genericTool(1, 60));
-		if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
-		fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
-		fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
-		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching coupling interface");
-		var wrongConnector = new EndEffectorSet();
-		wrongConnector.addComponent("master", new ToolChangerMaster(1, 60));
-		fails(() -> wrongConnector.changer("coupling", "master", "robot", []), "coupling connector");
+    var generic = new EndEffectorSet();
+    generic.addComponent("master", new ToolChangerMaster(1, 60));
+    generic.mount("master", "robot");
+    generic.exposePort("coupledAir", "master", "airOut1");
+    generic.changer("coupling", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+    generic.addTool("matching", genericTool(1, 60));
+    if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
+    fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
+    fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
+    fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching coupling interface");
+    var wrongConnector = new EndEffectorSet();
+    wrongConnector.addComponent("master", new ToolChangerMaster(1, 60));
+    fails(() -> wrongConnector.changer("coupling", "master", "robot", []), "coupling connector");
 
-		var custom = new EndEffectorSet();
-		custom.addComponent("master", new CoupledMaster());
-		custom.mount("master", "mount");
-		custom.exposePort("coupledAir", "master", "airOut");
-		custom.changer("coupling", "master", "couple", [{robot: "coupledAir", tool: "air"}]);
-		fails(() -> custom.addTool("wrong-key", coupledTool()), "does not fit");
-		fails(() -> custom.addTool("mixed", tool(1, 20)), "matching coupling interface");
-	}
+    var custom = new EndEffectorSet();
+    custom.addComponent("master", new CoupledMaster());
+    custom.mount("master", "mount");
+    custom.exposePort("coupledAir", "master", "airOut");
+    custom.changer("coupling", "master", "couple", [{robot: "coupledAir", tool: "air"}]);
+    fails(() -> custom.addTool("wrong-key", coupledTool()), "does not fit");
+    fails(() -> custom.addTool("mixed", tool(1, 20)), "matching coupling interface");
+  }
 }

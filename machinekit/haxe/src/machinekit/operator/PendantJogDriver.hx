@@ -36,8 +36,14 @@ class PendantJogDriver {
    * With no event for `authorityTimeoutSeconds` the pendant no longer holds authority, as on the
    * controller, where the lease has lapsed.
    */
-  public function new(profile:OperatorProfile, reasonTexts:Array<String>, sink:JogSink, authorityTimeoutSeconds:Float = 0.25) {
-    if (profile == null || reasonTexts == null || sink == null) throw "A pendant jog driver needs a profile, texts and a sink";
+  public function new(
+    profile:OperatorProfile,
+    reasonTexts:Array<String>,
+    sink:JogSink,
+    authorityTimeoutSeconds:Float = 0.25
+  ) {
+    if (profile == null
+      || reasonTexts == null || sink == null) throw "A pendant jog driver needs a profile, texts and a sink";
     if (!Math.isFinite(authorityTimeoutSeconds) || authorityTimeoutSeconds <= 0) throw "Timeout must be positive";
     this.profile = profile;
     this.reasonTexts = reasonTexts.copy();
@@ -56,8 +62,8 @@ class PendantJogDriver {
       if (event.axis >= profile.axes.length) throw "PendantEvent names an axis the profile does not have";
       axisId = profile.axes[event.axis].id;
     }
-    if (event.distance != 0 && (axisId == null || event.refusal != PendantRefusal.none))
-      throw "PendantEvent carries a move without an axis, or with a refusal";
+    if (event.distance != 0 && (axisId == null
+      || event.refusal != PendantRefusal.none)) throw "PendantEvent carries a move without an axis, or with a refusal";
     lastSequence = event.sequence;
     lastSeen = now;
     holds = (event.flags & 1) != 0;

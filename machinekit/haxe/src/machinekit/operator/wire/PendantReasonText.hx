@@ -8,7 +8,8 @@ class PendantReasonText {
   public var index:Int = 0;
   public var text:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   public var reserved:Array<Int> = [0, 0];
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {
@@ -17,7 +18,8 @@ class PendantReasonText {
     if (index < 0 || index > 7) throw "PendantReasonText.index violates its constraint";
     var textEnd = 0;
     while (textEnd < text.length && text[textEnd] != 0) textEnd++;
-    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32 || text[i] > 126) : text[i] != 0) throw "PendantReasonText.text violates its constraint";
+    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32
+      || text[i] > 126) : text[i] != 0) throw "PendantReasonText.text violates its constraint";
     for (v in reserved) if (v != 0) throw "PendantReasonText.reserved violates its constraint";
   }
 

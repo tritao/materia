@@ -4,13 +4,13 @@ package machinekit.standard;
  * follow ISO 273.
  */
 typedef HexBoltSpec = {
-	var size:String;
-	var diameter:Float;
-	var pitch:Float;
-	var acrossFlats:Float;
-	var headHeight:Float;
-	var tapDrill:Float;
-	var clearanceFine:Float;
-	var clearanceMedium:Float;
-	var clearanceCoarse:Float;
+  var size:String;
+  var diameter:Float;
+  var pitch:Float;
+  var acrossFlats:Float;
+  var headHeight:Float;
+  var tapDrill:Float;
+  var clearanceFine:Float;
+  var clearanceMedium:Float;
+  var clearanceCoarse:Float;
 }

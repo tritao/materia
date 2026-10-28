@@ -4,7 +4,13 @@ package machinekit.control.erob;
 interface ERobDriveInterface {
   function configure(joints:Int):Void;
   function command(timeSeconds:Float, position:Array<Float>, velocity:Array<Float>, torqueNm:Array<Float>):Void;
-  function feedback():{timeSeconds:Float,position:Array<Float>,velocity:Array<Float>,torqueNm:Array<Float>,enabled:Bool};
+  function feedback(): {
+    timeSeconds: Float,
+    position: Array<Float>,
+    velocity: Array<Float>,
+    torqueNm: Array<Float>,
+    enabled: Bool
+  };
   function stop():Void;
   function close():Void;
 }

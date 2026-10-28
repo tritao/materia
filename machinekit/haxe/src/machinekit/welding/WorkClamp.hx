@@ -20,28 +20,32 @@ import machinekit.component.Solids;
  * of the work lead from the power source.
  */
 class WorkClamp extends MachineComponent {
-	public final width:Float;
-	public final depth:Float;
-	public final height:Float;
-	public final ratedCurrentA:Float;
+  public final width:Float;
+  public final depth:Float;
+  public final height:Float;
+  public final ratedCurrentA:Float;
 
-	public function new(ratedCurrentA:Float = 300, width:Float = 36, depth:Float = 24, height:Float = 20) {
-		if (!(ratedCurrentA > 0) || !(width > 0) || !(depth > 0) || !(height > 0))
-			throw "Work clamp needs a positive rating and dimensions";
-		super('WELD-WORK-CLAMP-MAGNETIC-${Dimension.format(ratedCurrentA)}A',
-			'Magnetic work clamp, ${Dimension.format(ratedCurrentA)} A', "steel", true);
-		this.ratedCurrentA = ratedCurrentA;
-		this.width = width;
-		this.depth = depth;
-		this.height = height;
-		addConnector("contact", Mount, Solids.axial(0, 0, 0));
-		addPort({name: "lead", kind: ElectricalPower, role: Consumer, iface: WeldingInterfaces.weldCable(), required: true});
-		addFacet(new WorkReturnFacet("lead", "contact"));
-		declareMass(2.4, new Vector(0, 0, 0.4 * height));
-	}
+  public function new(ratedCurrentA:Float = 300, width:Float = 36, depth:Float = 24, height:Float = 20) {
+    if (!(ratedCurrentA > 0)
+      || !(width > 0) || !(depth > 0) || !(height > 0)) throw "Work clamp needs a positive rating and dimensions";
+    super(
+      'WELD-WORK-CLAMP-MAGNETIC-${Dimension.format(ratedCurrentA)}A',
+      'Magnetic work clamp, ${Dimension.format(ratedCurrentA)} A',
+      "steel",
+      true
+    );
+    this.ratedCurrentA = ratedCurrentA;
+    this.width = width;
+    this.depth = depth;
+    this.height = height;
+    addConnector("contact", Mount, Solids.axial(0, 0, 0));
+    addPort({name: "lead",
+      kind: ElectricalPower, role: Consumer, iface: WeldingInterfaces.weldCable(), required: true});
+    addFacet(new WorkReturnFacet("lead", "contact"));
+    declareMass(2.4, new Vector(0, 0, 0.4 * height));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, height);
+  override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(width, depth, height);
 }

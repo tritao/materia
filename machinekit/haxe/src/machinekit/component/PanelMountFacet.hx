@@ -25,19 +25,36 @@ class PanelMountFacet implements ComponentFacet {
   /** "vendor-drawing", "listing", "measured" or "assumed". */
   public final source:String;
 
-  public function new(cutout:Footprint, keepOut:Footprint, holes:Array<{x:Float, y:Float, diameter:Float}>, above:Float, behind:Float,
-      body:Footprint, maxPanelThickness:Float, source:String) {
-    this.cutout = cutout; this.keepOut = keepOut; this.holes = holes.copy(); this.above = above; this.behind = behind;
-    this.body = body; this.maxPanelThickness = maxPanelThickness; this.source = source;
+  public function new(
+    cutout:Footprint,
+    keepOut:Footprint,
+    holes:Array<{x:Float, y:Float, diameter:Float}>,
+    above:Float,
+    behind:Float,
+    body:Footprint,
+    maxPanelThickness:Float,
+    source:String
+  ) {
+    this.cutout = cutout;
+    this.keepOut = keepOut;
+    this.holes = holes.copy();
+    this.above = above;
+    this.behind = behind;
+    this.body = body;
+    this.maxPanelThickness = maxPanelThickness;
+    this.source = source;
   }
 
   public function check(component:MachineComponent):Void {
     var name = component.designation;
-    for (v in [above, behind, maxPanelThickness]) if (!Math.isFinite(v) && v != maxPanelThickness) throw '$name has a non-finite panel mount value';
-    if (above < 0 || !(behind > 0) || !(maxPanelThickness > 0)) throw '$name needs a height above of zero or more and a positive depth and panel limit';
+    for (v in [above, behind, maxPanelThickness]) if (!Math.isFinite(v)
+      && v != maxPanelThickness) throw '$name has a non-finite panel mount value';
+    if (above < 0 || !(behind > 0) || !(maxPanelThickness
+      > 0)) throw '$name needs a height above of zero or more and a positive depth and panel limit';
     for (f in [cutout, keepOut, body]) if (!(FootprintGeometry.area(f) > 0)) throw '$name has an empty panel footprint';
     for (h in holes) if (!(h.diameter > 0) || !Math.isFinite(h.x + h.y)) throw '$name has a bad panel hole';
-    if (["vendor-drawing", "listing", "measured", "assumed"].indexOf(source) < 0) throw '$name has an unknown data source $source';
+    if (["vendor-drawing",
+      "listing", "measured", "assumed"].indexOf(source) < 0) throw '$name has an unknown data source $source';
   }
 
   public function describe():String return 'panel mount, ${above} above, ${behind} behind, from $source';

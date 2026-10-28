@@ -13,13 +13,15 @@ class PendantEvent {
   public var refusal:Int = 0;
   public var reason:Int = 0;
   public var reserved:Int = 0;
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {
     if ((flags & ~3) != 0) throw "PendantEvent.flags violates its constraint";
     if ((pressed & ~63) != 0) throw "PendantEvent.pressed violates its constraint";
-    if (!(refusal == 0 || refusal == 1 || refusal == 2 || refusal == 3 || refusal == 4 || refusal == 5 || refusal == 6)) throw "PendantEvent.refusal violates its constraint";
+    if (!(refusal == 0 || refusal == 1 || refusal == 2 || refusal == 3
+      || refusal == 4 || refusal == 5 || refusal == 6)) throw "PendantEvent.refusal violates its constraint";
     if (reason < 0 || reason > 7) throw "PendantEvent.reason violates its constraint";
     if (reserved != 0) throw "PendantEvent.reserved violates its constraint";
   }

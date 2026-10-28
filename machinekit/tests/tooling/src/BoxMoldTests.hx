@@ -14,198 +14,271 @@ import machinekit.component.ComponentValues;
 import materia.assembly.AssemblyFrames as F;
 
 class BoxMoldTests {
-	static var assertions = 0;
+  static var assertions = 0;
 
-	static function check(ok:Bool, label:String):Void {
-		assertions++;
-		if (!ok)
-			throw label;
-	}
+  static function check(ok:Bool, label:String):Void {
+    assertions++;
+    if (!ok) throw label;
+  }
 
-	static function rejects(fn:Void->Void, label:String, ?expected:String):Void {
-		var caught = false, message="";
-		try
-			fn()
-		catch (e:Dynamic) {
-			caught = true;message=Std.string(e);
-			Sys.println("Expected rejection: " + message);
-		}
-		check(caught && (expected==null || message.indexOf(expected)>=0), label+"; got "+message);
-	}
+  static function rejects(fn:Void -> Void, label:String, ?expected:String):Void {
+    var caught = false, message = "";
+    try fn() catch (e:Dynamic) {
+      caught = true;
+      message = Std.string(e);
+      Sys.println("Expected rejection: " + message);
+    }
+    check(caught && (expected == null || message.indexOf(expected) >= 0), label + "; got " + message);
+  }
 
-	public static function main():Void run();
+  public static function main():Void run();
 
-	static function finishedCore():Void {
-		var cutting=CoreSupports.cutting({x:-17,y:12,z:4,width:40,depth:30,height:20},
-			materia.tooling.ToolingRecipe.CoreWireAxis.Z);
-		cutting.solid=materia.casting.CastingRegion.Placed({
-			solid:materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(16,20)),
-			pose:F.translation(20,15,0)});
-		var scope=new cadkit.modeling.Scope();
-		try {
-			var actual=scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("circular-core",cutting).geometry());
-			var world=scope.own(PosedParts.moved(actual,cutting.stockToMold));
-			var cylinder=scope.own(cadkit.modeling.Part.cylinder(8,20));
-			var expected=scope.own(cylinder.translated(new cadkit.modeling.Vector(3,27,4)));
-			var missing=scope.own(expected.subtractAll([world]));
-			var excess=scope.own(world.subtractAll([expected]));
-			check(missing.volume()+excess.volume()<1e-7,
-				"finished circular foam follows its stock frame and never becomes its rectangular cutting blank");
-			var sourcePose=F.fromRotationMatrix(3,27,4,[0,0,1,1,0,0,0,1,0]);
-			var posedCylinder=scope.own(PosedParts.moved(cylinder,sourcePose));
-			for (axis in [materia.tooling.ToolingRecipe.CoreWireAxis.X,
-				materia.tooling.ToolingRecipe.CoreWireAxis.Y,materia.tooling.ToolingRecipe.CoreWireAxis.Z]) {
-				var record=CoreSupports.prismCutting(materia.casting.CastingProfiles.circle(0,0,8),20,sourcePose,axis);
-				var local=scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("posed-circular-core",record).geometry());
-				var posed=scope.own(PosedParts.moved(local,record.stockToMold));
-				var absent=scope.own(posedCylinder.subtractAll([posed]));
-				var added=scope.own(posed.subtractAll([posedCylinder]));
-				check(absent.volume()+added.volume()<1e-7,
-					"exact curved core geometry is invariant under stock wire-axis selection: "+axis);
-			}
-			scope.close();
-		} catch (error:Dynamic) {scope.close();throw error;}
-	}
+  static function finishedCore():Void {
+    var cutting = CoreSupports.cutting(
+      {x: -17, y: 12, z: 4, width: 40, depth: 30, height: 20},
+      materia.tooling.ToolingRecipe.CoreWireAxis.Z
+    );
+    cutting.solid = materia.casting.CastingRegion.Placed({
+      solid: materia.casting.CastingFeature.CastingGeometrySolid.Cut(materia.casting.CastingSolid.Cylinder(
+        16,
+        20
+      )),
+      pose: F.translation(
+        20,
+        15,
+        0
+      )
+    });
+    var scope = new cadkit.modeling.Scope();
+    try {
+      var actual = scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("circular-core", cutting).geometry());
+      var world = scope.own(PosedParts.moved(actual, cutting.stockToMold));
+      var cylinder = scope.own(cadkit.modeling.Part.cylinder(8, 20));
+      var expected = scope.own(cylinder.translated(new cadkit.modeling.Vector(3, 27, 4)));
+      var missing = scope.own(expected.subtractAll([world]));
+      var excess = scope.own(world.subtractAll([expected]));
+      check(
+        missing.volume() + excess.volume() < 1e-7,
+        "finished circular foam follows its stock frame and never becomes its rectangular cutting blank"
+      );
+      var sourcePose = F.fromRotationMatrix(3, 27, 4, [0, 0, 1, 1, 0, 0, 0, 1, 0]);
+      var posedCylinder = scope.own(PosedParts.moved(cylinder, sourcePose));
+      for (axis in [
+        materia.tooling.ToolingRecipe.CoreWireAxis.X,
+        materia.tooling.ToolingRecipe.CoreWireAxis.Y,
+        materia.tooling.ToolingRecipe.CoreWireAxis.Z
+      ]) {
+        var record = CoreSupports.prismCutting(materia.casting.CastingProfiles.circle(0, 0, 8), 20, sourcePose, axis);
+        var local = scope.own(machinekit.tooling.ToolingVolume.fromCoreCutting("posed-circular-core",
+          record).geometry());
+        var posed = scope.own(PosedParts.moved(local, record.stockToMold));
+        var absent = scope.own(posedCylinder.subtractAll([posed]));
+        var added = scope.own(posed.subtractAll([posedCylinder]));
+        check(
+          absent.volume() + added.volume() < 1e-7,
+          "exact curved core geometry is invariant under stock wire-axis selection: " + axis
+        );
+      }
+      scope.close();
+    } catch (error:Dynamic) {
+      scope.close();
+      throw error;
+    }
+  }
 
-	public static function run():Void {
-		finishedCore();
-		var hole = SinglePocketSetup.document().input.inserts[0].holes[0];
-		var protection = machinekit.tooling.ToolingPin.boreMask(hole, 5);
-		check(Std.isOfType(protection, machinekit.standard.SocketSetScrew), "tapped-hole protection is standard threaded hardware");
-		var plug:machinekit.standard.SocketSetScrew = cast protection;
-		check(plug.thread.majorDiameter == (cast hole.thread : materia.casting.InsertHole.InsertThread).majorDiameter && plug.thread.pitch == (cast hole.thread : materia.casting.InsertHole.InsertThread).pitch && !plug.thread.internal,
-			"plug carries the mating source thread, rather than a smooth tap-drill pin");
-		var shape = plug.geometry();
-		check(shape.shape.threadedFaces().length == 1, "plug CAD retains its external thread attribute");
-		// The flat point, at z = -length in the screw's frame (socket at the origin), must stay solid.
-		var end = cadkit.modeling.Part.cylinderSpan(1, -plug.length, -plug.length + plug.thread.pitch / 2);
-		var leak = end.subtract(shape);
-		var leakVolume = leak.volume();
-		leak.close(); end.close(); shape.close();
-		check(leakVolume < 1e-7, "driving socket leaves a solid resin-sealing end");
-		for (t in [18.0, 17.8])
-			for (rotated in [false, true])
-				for (bed in [false, true]) {
-					var d = SinglePocketSetup.document(t, rotated, bed),
-						p = CastingMoldPlanner.planSinglePocket(d),
-						report = CastingMoldCad.review(p);
-					var local = SinglePocketSetup.foundation(bed).body.geometry(),
-						original = PosedParts.moved(local, d.setup.sourceToMold);
-					local.close();
-					var actual = CastingMoldCad.reconstructed(p),
-						missing = original.subtractAll([actual]),
-						excess = actual.subtractAll([original]);
-					check(missing.volume() + excess.volume() < 1e-5, "actual foundation CAD matches mold reconstruction");
-					missing.close();
-					excess.close();
-					original.close();
-					actual.close();
-					check(report.symmetricDifferenceMm3 < 1e-5, "casting symmetric difference");
-					check(report.validation.filter(row -> StringTools.startsWith(row.rule,"tooling.cad.") && row.status=="pass").length==4,
-						"single-pocket case reports the same four actual CAD checks through the common API");
-					check(p.panels.members.length == 5 && p.cores.length == 1 && p.fixtures.length == 1, "complete box kit");
-					check(Math.abs(MoldCores.singleBox(p.cores[0].cavity,p.cores[0].id).height - 60) < 1e-6, "finished cavity derives from the declared cut and body");
-					var c = p.cores[0];
-					check(Math.abs(MoldCores.singleBox(c.foamEnvelope,c.id).width + 2 * c.coveringThickness - MoldCores.singleBox(c.cavity,c.id).width) < 1e-8, "covering is included in cavity size");
-					check(c.layers[0].wireDirection.y == 1 && c.layers[0].block.depth == MoldCores.singleBox(c.foamEnvelope,c.id).depth, "ruled block wire definition");
-					check(p.panels.members[0].panel.stock.measuredThickness == t, "measured thickness preserved");
-					check(Math.abs(p.cavity.width - (rotated ? 180 : 240)) < 1e-6, "setup rotates cavity and all tooling");
-					check(report.assembly.assemblyOrder[0] == "bed", "bed installs before supported members");
-					check(report.assembly.removalOrder.length == (bed ? 7 : 9) && report.demolding.removalOrder.length == (bed ? 7 : 10),
-						"support geometry participates in graphs");
-					check(p.cores[0].support.kind == (bed ? CoreSupportKind.RoutedSocket : CoreSupportKind.Bridge), "support selected from opening");
-					check(p.supportPanels.length == (bed ? 0 : 4), "support templates realized");
-					if (bed) {
-						var foot = p.cores[0].support.foot;
-						check(foot != null && foot.foam.z < p.cavity.z, "locating foot embedded below bed without extending cavity");
-						check(report.demolding.removalOrder.indexOf("bed") < report.demolding.removalOrder.indexOf(p.cores[0].id),
-							"bed released before foot withdrawal");
-					} else {
-						check(report.assemblyGroups.length == 1 && report.assemblyGroups[0].members.indexOf("core-pocket") >= 0,
-							"prebonded hanging unit installed together");
-						check(report.permanentGroups.length == 1
-							&& report.demolding.removalOrder.indexOf("core-pocket-bridge-carrier") < report.demolding.removalOrder.indexOf("core-pocket"),
-							"bonded fixture removed as one unit before core");
-						check(report.demolding.removalOrder.indexOf("core-pocket") < report.demolding.removalOrder.indexOf("cured-casting"),
-							"suspended core removed before lifting casting");
-					}
-					var saved = CastingMoldCad.assembly(p).encode(),
-						restored = MachineAssembly.decode(saved);
-					restored.validate();
-					check(restored.encode() == saved, "saved recipes restore complete assembly");
-					check(report.validation.length > 0 && !report.fabrication.ready, "physical qualification pending");
-				}
-		var metric = SinglePocketSetup.document();
-		// The M8 blind policy needs thicker stock than the M6 example.
-		var metricInsert = metric.input.inserts[0];
-		var insertSize = InsertBodies.box(metricInsert.body, metricInsert.id);
-		metricInsert.body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(insertSize.width, insertSize.depth, 20));
-		metricInsert.pose.z -= 5;
-		for (feature in metric.input.features)
-			if (feature.owner == metricInsert.id) {
-				feature.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(metricInsert.body);
-				feature.geometry.pose.z = metricInsert.pose.z;
-			}
-		var threadChoice = machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(8).mating());
-		var blindPattern = machinekit.structural.InsertHoles.tappedBlind(threadChoice, InsertBodies.height(metric.input.inserts[0].body));
-		metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(blindPattern);
-		metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
-		metric.recipe.hardware.supportScrewDiameter = 8;
-		metric.recipe.hardware.supportClearanceDiameter = 9;
-		var selected = CastingMoldPlanner.planSinglePocket(metric);
-		var hardware = BoxMoldCad.assembly(selected);
-		var screws = 0;
-		for (row in hardware.components())
-			if (Std.isOfType(row.component, machinekit.standard.SocketHeadCapScrew)) {
-				var screw:machinekit.standard.SocketHeadCapScrew = cast row.component;
-				check(screw.diameter == 8, "CAD hardware follows recipe M8 selection");
-				screws++;
-			}
-		check(screws == 3, "insert screw and both bridge screws use selected diameter");
-		var p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
-		p.openings = p.openings.filter(x -> x.operationId != "insert-fixing-fixing");
-		rejects(() -> BoxMoldCad.penetrations(p), "unclassified hole fails");
-		p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
-		MoldOpenings.sourceProtection(p,"insert-fixing-fixing").sealMargin = 19;
-		rejects(() -> BoxMoldCad.penetrations(p), "seal margin fails");
-		p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
-		p.panels.members.filter(m -> m.panel.id == "south")[0].withdrawal = {x: 0, y: 1, z: 0};
-		p.panels.members.filter(m -> m.panel.id == "north")[0].withdrawal = {x: 0, y: -1, z: 0};
-		rejects(() -> BoxMoldCad.review(p), "trapped opposite walls rejected");
-		var d = SinglePocketSetup.document();
-		var badBed = CastingMoldPlanner.planSinglePocket(d);
-		badBed.cores[0].support.kind = CoreSupportKind.RoutedSocket;
-		rejects(() -> CastingMoldPlanner.validate(badBed), "bed support cannot bridge a solid casting floor","Core support disagrees with opening");
-		d = SinglePocketSetup.document(18, false, true);
-		var badBridge = CastingMoldPlanner.planSinglePocket(d);
-		badBridge.cores[0].support.kind = CoreSupportKind.Bridge;
-		rejects(() -> CastingMoldPlanner.validate(badBridge), "bridge cannot pass through a closed casting top","Core support disagrees with opening");
-		var deepSocket = CastingMoldPlanner.planSinglePocket(d);
-		deepSocket.cores[0].support.embedDepth = 18;
-		rejects(() -> CastingMoldPlanner.validate(deepSocket), "socket cannot consume bed stock","Locating foot does not match support");
-		p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
-		var missingCore = p.cores[0];
-		var narrowedCavity = MoldCores.singleBox(missingCore.cavity,missingCore.id);
-		var narrowedFoam = MoldCores.singleBox(missingCore.foamEnvelope,missingCore.id);
-		narrowedCavity.width -= 2;
-		narrowedFoam.width -= 2;
-		missingCore.cavity = materia.tooling.casting.MoldRegions.box(narrowedCavity);
-		missingCore.foamEnvelope = materia.tooling.casting.MoldRegions.box(narrowedFoam);
-		missingCore.layers[0] = CoreSupports.cutting(narrowedFoam,p.document.recipe.coreWireAxis);
-		rejects(() -> BoxMoldCad.review(p), "missing core geometry rejected");
-		p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
-		var wall = p.panels.members.filter(m -> m.panel.id == "south")[0];
-		wall.pose.y -= 0.5;
-		var joint = p.panels.joints.filter(j -> j.movingId == "south")[0];
-		joint.fixedFrame = F.compose(F.inverse(p.panels.members[0].pose), wall.pose);
-		rejects(() -> BoxMoldCad.review(p), "open wall seam rejected by solid coverage");
-		var block = new ToolingBlock(new ComponentValues().setNumber("width", 20)
-			.setNumber("depth", 30)
-			.setNumber("height", 40)
-			.setToken("material", "EPS tooling"));
-		var native = block.geometry();
-		check(Math.abs(native.volume() - 24000) < 1e-6, "core block CAD volume");
-		native.close();
-		Sys.println('BoxMoldTests: $assertions assertions passed');
-	}
+  public static function run():Void {
+    finishedCore();
+    var hole = SinglePocketSetup.document().input.inserts[0].holes[0];
+    var protection = machinekit.tooling.ToolingPin.boreMask(hole, 5);
+    check(
+      Std.isOfType(protection, machinekit.standard.SocketSetScrew),
+      "tapped-hole protection is standard threaded hardware"
+    );
+    var plug:machinekit.standard.SocketSetScrew = cast protection;
+    check(
+      plug.thread.majorDiameter == (cast hole.thread:materia.casting.InsertHole.InsertThread).majorDiameter
+      && plug.thread.pitch == (cast hole.thread:materia.casting.InsertHole.InsertThread).pitch && !plug.thread.internal,
+      "plug carries the mating source thread, rather than a smooth tap-drill pin"
+    );
+    var shape = plug.geometry();
+    check(shape.shape.threadedFaces().length == 1, "plug CAD retains its external thread attribute");
+    // The flat point, at z = -length in the screw's frame (socket at the origin), must stay solid.
+    var end = cadkit.modeling.Part.cylinderSpan(1, -plug.length, -plug.length + plug.thread.pitch / 2);
+    var leak = end.subtract(shape);
+    var leakVolume = leak.volume();
+    leak.close();
+    end.close();
+    shape.close();
+    check(leakVolume < 1e-7, "driving socket leaves a solid resin-sealing end");
+    for (t in [18.0, 17.8]) for (rotated in [false, true]) for (bed in [false, true]) {
+      var d = SinglePocketSetup.document(t,
+        rotated, bed), p = CastingMoldPlanner.planSinglePocket(d), report = CastingMoldCad.review(p);
+      var local = SinglePocketSetup.foundation(bed).body.geometry(), original = PosedParts.moved(
+        local,
+        d.setup.sourceToMold
+      );
+      local.close();
+      var actual = CastingMoldCad.reconstructed(p),
+        missing = original.subtractAll([actual]), excess = actual.subtractAll([original]);
+      check(missing.volume() + excess.volume() < 1e-5, "actual foundation CAD matches mold reconstruction");
+      missing.close();
+      excess.close();
+      original.close();
+      actual.close();
+      check(report.symmetricDifferenceMm3 < 1e-5, "casting symmetric difference");
+      check(
+        report.validation.filter(row -> StringTools.startsWith(row.rule,
+        "tooling.cad.") && row.status == "pass").length == 4,
+        "single-pocket case reports the same four actual CAD checks through the common API"
+      );
+      check(p.panels.members.length == 5 && p.cores.length == 1 && p.fixtures.length == 1, "complete box kit");
+      check(
+        Math.abs(MoldCores.singleBox(p.cores[0].cavity, p.cores[0].id).height - 60) < 1e-6,
+        "finished cavity derives from the declared cut and body"
+      );
+      var c = p.cores[0];
+      check(
+        Math.abs(MoldCores.singleBox(c.foamEnvelope, c.id).width + 2 * c.coveringThickness - MoldCores.singleBox(
+          c.cavity,
+          c.id
+        ).width) < 1e-8,
+        "covering is included in cavity size"
+      );
+      check(
+        c.layers[0].wireDirection.y == 1 && c.layers[0].block.depth == MoldCores.singleBox(c.foamEnvelope, c.id).depth,
+        "ruled block wire definition"
+      );
+      check(p.panels.members[0].panel.stock.measuredThickness == t, "measured thickness preserved");
+      check(Math.abs(p.cavity.width - (rotated ? 180 : 240)) < 1e-6, "setup rotates cavity and all tooling");
+      check(report.assembly.assemblyOrder[0] == "bed", "bed installs before supported members");
+      check(
+        report.assembly.removalOrder.length == (bed ? 7 : 9) && report.demolding.removalOrder.length == (bed ? 7 : 10),
+        "support geometry participates in graphs"
+      );
+      check(
+        p.cores[0].support.kind == (bed ? CoreSupportKind.RoutedSocket : CoreSupportKind.Bridge),
+        "support selected from opening"
+      );
+      check(p.supportPanels.length == (bed ? 0 : 4), "support templates realized");
+      if (bed) {
+        var foot = p.cores[0].support.foot;
+        check(foot != null && foot.foam.z < p.cavity.z, "locating foot embedded below bed without extending cavity");
+        check(
+          report.demolding.removalOrder.indexOf("bed") < report.demolding.removalOrder.indexOf(p.cores[0].id),
+          "bed released before foot withdrawal"
+        );
+      } else {
+        check(
+          report.assemblyGroups.length == 1 && report.assemblyGroups[0].members.indexOf("core-pocket") >= 0,
+          "prebonded hanging unit installed together"
+        );
+        check(
+          report.permanentGroups.length == 1 && report.demolding.removalOrder.indexOf("core-pocket-bridge-carrier")
+          < report.demolding.removalOrder.indexOf("core-pocket"),
+          "bonded fixture removed as one unit before core"
+        );
+        check(
+          report.demolding.removalOrder.indexOf("core-pocket") < report.demolding.removalOrder.indexOf("cured-casting"),
+          "suspended core removed before lifting casting"
+        );
+      }
+      var saved = CastingMoldCad.assembly(p).encode(), restored = MachineAssembly.decode(saved);
+      restored.validate();
+      check(restored.encode() == saved, "saved recipes restore complete assembly");
+      check(report.validation.length > 0 && !report.fabrication.ready, "physical qualification pending");
+    }
+    var metric = SinglePocketSetup.document();
+    // The M8 blind policy needs thicker stock than the M6 example.
+    var metricInsert = metric.input.inserts[0];
+    var insertSize = InsertBodies.box(metricInsert.body, metricInsert.id);
+    metricInsert.body = materia.casting.InsertSpec.InsertBody.Primitive(materia.casting.CastingSolid.Box(
+      insertSize.width,
+      insertSize.depth,
+      20
+    ));
+    metricInsert.pose.z -= 5;
+    for (feature in metric.input.features) if (feature.owner == metricInsert.id) {
+      feature.geometry.solid = materia.casting.CastingFeature.CastingGeometrySolid.Insert(metricInsert.body);
+      feature.geometry.pose.z = metricInsert.pose.z;
+    }
+    var threadChoice =
+      machinekit.structural.InsertHoles.metricThread(machinekit.standard.FastenerThreads.coarse(8).mating());
+    var blindPattern = machinekit.structural.InsertHoles.tappedBlind(
+      threadChoice,
+      InsertBodies.height(metric.input.inserts[0].body)
+    );
+    metric.input.inserts[0].holes = machinekit.structural.InsertHoles.records(blindPattern);
+    metric.setup.sourceFingerprint = materia.tooling.ToolingCodec.inputFingerprint(metric.input);
+    metric.recipe.hardware.supportScrewDiameter = 8;
+    metric.recipe.hardware.supportClearanceDiameter = 9;
+    var selected = CastingMoldPlanner.planSinglePocket(metric);
+    var hardware = BoxMoldCad.assembly(selected);
+    var screws = 0;
+    for (row in hardware.components()) if (Std.isOfType(row.component, machinekit.standard.SocketHeadCapScrew)) {
+      var screw:machinekit.standard.SocketHeadCapScrew = cast row.component;
+      check(screw.diameter == 8, "CAD hardware follows recipe M8 selection");
+      screws++;
+    }
+    check(screws == 3, "insert screw and both bridge screws use selected diameter");
+    var p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
+    p.openings = p.openings.filter(x -> x.operationId != "insert-fixing-fixing");
+    rejects(() -> BoxMoldCad.penetrations(p), "unclassified hole fails");
+    p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
+    MoldOpenings.sourceProtection(p, "insert-fixing-fixing").sealMargin = 19;
+    rejects(() -> BoxMoldCad.penetrations(p), "seal margin fails");
+    p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
+    p.panels.members.filter(m -> m.panel.id == "south")[0].withdrawal = {x: 0, y: 1, z: 0};
+    p.panels.members.filter(m -> m.panel.id == "north")[0].withdrawal = {x: 0, y: -1, z: 0};
+    rejects(() -> BoxMoldCad.review(p), "trapped opposite walls rejected");
+    var d = SinglePocketSetup.document();
+    var badBed = CastingMoldPlanner.planSinglePocket(d);
+    badBed.cores[0].support.kind = CoreSupportKind.RoutedSocket;
+    rejects(
+      () -> CastingMoldPlanner.validate(badBed),
+      "bed support cannot bridge a solid casting floor",
+      "Core support disagrees with opening"
+    );
+    d = SinglePocketSetup.document(18, false, true);
+    var badBridge = CastingMoldPlanner.planSinglePocket(d);
+    badBridge.cores[0].support.kind = CoreSupportKind.Bridge;
+    rejects(
+      () -> CastingMoldPlanner.validate(badBridge),
+      "bridge cannot pass through a closed casting top",
+      "Core support disagrees with opening"
+    );
+    var deepSocket = CastingMoldPlanner.planSinglePocket(d);
+    deepSocket.cores[0].support.embedDepth = 18;
+    rejects(
+      () -> CastingMoldPlanner.validate(deepSocket),
+      "socket cannot consume bed stock",
+      "Locating foot does not match support"
+    );
+    p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
+    var missingCore = p.cores[0];
+    var narrowedCavity = MoldCores.singleBox(missingCore.cavity, missingCore.id);
+    var narrowedFoam = MoldCores.singleBox(missingCore.foamEnvelope, missingCore.id);
+    narrowedCavity.width -= 2;
+    narrowedFoam.width -= 2;
+    missingCore.cavity = materia.tooling.casting.MoldRegions.box(narrowedCavity);
+    missingCore.foamEnvelope = materia.tooling.casting.MoldRegions.box(narrowedFoam);
+    missingCore.layers[0] = CoreSupports.cutting(narrowedFoam, p.document.recipe.coreWireAxis);
+    rejects(() -> BoxMoldCad.review(p), "missing core geometry rejected");
+    p = CastingMoldPlanner.planSinglePocket(SinglePocketSetup.document());
+    var wall = p.panels.members.filter(m -> m.panel.id == "south")[0];
+    wall.pose.y -= 0.5;
+    var joint = p.panels.joints.filter(j -> j.movingId == "south")[0];
+    joint.fixedFrame = F.compose(F.inverse(p.panels.members[0].pose), wall.pose);
+    rejects(() -> BoxMoldCad.review(p), "open wall seam rejected by solid coverage");
+    var block = new ToolingBlock(new ComponentValues().setNumber("width", 20).setNumber("depth", 30).setNumber(
+      "height",
+      40
+    ).setToken(
+      "material",
+      "EPS tooling"
+    ));
+    var native = block.geometry();
+    check(Math.abs(native.volume() - 24000) < 1e-6, "core block CAD volume");
+    native.close();
+    Sys.println('BoxMoldTests: $assertions assertions passed');
+  }
 }

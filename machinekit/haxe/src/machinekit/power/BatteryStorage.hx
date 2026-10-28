@@ -18,20 +18,33 @@ class BatteryStorage implements ComponentFacet {
   public final maxChargePowerW:Float;
   public final chargeEfficiency:Float;
 
-  public function new(nominalVolts:Float, capacityWh:Float, ?fullVoltage:Float,
-      ?emptyVoltage:Float, ?cutoffVoltage:Float, internalResistanceOhms:Float = 0.02,
-      maxDischargeCurrentA:Float = 250.0, maxChargePowerW:Float = 5000.0,
-      chargeEfficiency:Float = 0.95) {
+  public function new(
+    nominalVolts:Float,
+    capacityWh:Float,
+    ?fullVoltage:Float,
+    ?emptyVoltage:Float,
+    ?cutoffVoltage:Float,
+    internalResistanceOhms:Float = 0.02,
+    maxDischargeCurrentA:Float = 250.0,
+    maxChargePowerW:Float = 5000.0,
+    chargeEfficiency:Float = 0.95
+  ) {
     var full = fullVoltage == null ? nominalVolts * 1.1375 : fullVoltage;
     var empty = emptyVoltage == null ? nominalVolts * 0.8333333333333334 : emptyVoltage;
     var cutoff = cutoffVoltage == null ? nominalVolts * 0.875 : cutoffVoltage;
-    for (value in [nominalVolts, capacityWh, full, empty, cutoff,
-        internalResistanceOhms, maxDischargeCurrentA, maxChargePowerW])
-      if (!Math.isFinite(value) || value <= 0) throw "Battery storage ratings must be finite and positive";
-    if (full <= nominalVolts || nominalVolts <= empty || cutoff <= empty ||
-        cutoff >= full || !Math.isFinite(chargeEfficiency) ||
-        chargeEfficiency <= 0 || chargeEfficiency > 1)
-      throw "Battery voltage curve, cutoff and charge efficiency are invalid";
+    for (value in [
+      nominalVolts,
+      capacityWh,
+      full,
+      empty,
+      cutoff,
+      internalResistanceOhms,
+      maxDischargeCurrentA,
+      maxChargePowerW
+    ]) if (!Math.isFinite(value) || value <= 0) throw "Battery storage ratings must be finite and positive";
+    if (full <= nominalVolts || nominalVolts <= empty
+      || cutoff <= empty || cutoff >= full || !Math.isFinite(chargeEfficiency) || chargeEfficiency <= 0
+      || chargeEfficiency > 1) throw "Battery voltage curve, cutoff and charge efficiency are invalid";
     this.nominalVolts = nominalVolts;
     this.capacityWh = capacityWh;
     this.fullVoltage = full;
@@ -47,8 +60,8 @@ class BatteryStorage implements ComponentFacet {
     for (port in component.ports()) if (port.kind == ElectricalPower && port.role == Supply) supply = true;
     if (!supply) throw "Battery storage needs an electrical supply port";
   }
-  public function describe():String return 'battery storage $nominalVolts V, $capacityWh Wh, ' +
-    '$emptyVoltage-$fullVoltage V, $cutoffVoltage V cutoff';
+  public function describe():String return 'battery storage $nominalVolts V, $capacityWh Wh, '
+    + '$emptyVoltage-$fullVoltage V, $cutoffVoltage V cutoff';
   public static function of(component:MachineComponent):Null<BatteryStorage> {
     for (facet in component.facets()) if (Std.isOfType(facet, BatteryStorage)) return cast facet;
     return null;

@@ -13,12 +13,30 @@ class ToolRack extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.count("pockets", 8),
     P.length("pitch", 110),
-    P.length("depth", 140),
-    P.length("height", 80),
-    P.length("forkHeight", 100),
-    P.length("coverStroke", 180),
-    P.length("coverBore", 25),
-    P.length("wall", 4)
+    P.length(
+      "depth",
+      140
+    ),
+    P.length(
+      "height",
+      80
+    ),
+    P.length(
+      "forkHeight",
+      100
+    ),
+    P.length(
+      "coverStroke",
+      180
+    ),
+    P.length(
+      "coverBore",
+      25
+    ),
+    P.length(
+      "wall",
+      4
+    )
   ];
   public function new(?v:ComponentValues) {
     super("tool-rack", "linear covered tool rack", "steel", inputs(), v);
@@ -28,10 +46,9 @@ class ToolRack extends AssumedCatalogComponent {
     coverCylinder();
     require(n("forkHeight") >= n("height"), "fork pockets below rack base");
     addConnector("mount", Mount, F.translation(0, 0, 0));
-    for (i in 0...parameterCount("pockets")) addConnector("pocket" +(i + 1), Mount, pocketFrame(i));
+    for (i in 0...parameterCount("pockets")) addConnector("pocket" + (i + 1), Mount, pocketFrame(i));
     addConnector("cover", Mount, F.translation(0, 0, n("height")));
-    addPort({name: "cover_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true}
-    );
+    addPort({name: "cover_air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType("machinekit.routing.tool-rack", inputs(), v -> new ToolRack(v));
@@ -55,13 +72,13 @@ class ToolRack extends AssumedCatalogComponent {
     );
   public function pocketFrame(index:Int):materia.assembly.AssemblyRecord.AssemblyFrame {
     require(index >= 0 && index < parameterCount("pockets"), "pocket index outside rack");
-    return Solids.axial((index -(parameterCount("pockets") - 1) / 2) * n("pitch"), 0, n("forkHeight"));
+    return Solids.axial((index - (parameterCount("pockets") - 1) / 2) * n("pitch"), 0, n("forkHeight"));
   }
   override public function io():MachineIo return {
-    inputs:["cover_open",
-    "cover_closed"].concat([for (i in 0...parameterCount("pockets")) "pocket" +(i + 1) + "_occupied"]),
-    outputs:["cover"],
-    analogOutputs:[]
+    inputs: ["cover_open",
+    "cover_closed"].concat([for (i in 0...parameterCount("pockets")) "pocket" + (i + 1) + "_occupied"]),
+    outputs: ["cover"],
+    analogOutputs: []
   };
 
 }

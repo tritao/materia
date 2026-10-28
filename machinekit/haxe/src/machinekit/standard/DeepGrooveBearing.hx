@@ -22,11 +22,11 @@ import machinekit.standard.BearingFit.BearingShaftFit;
 
 /** ISO 15 boundary dimensions in millimetres; `chamfer` is the minimum corner radius r_s. */
 typedef DeepGrooveBearingSpec = {
-	var designation:String;
-	var bore:Float;
-	var outside:Float;
-	var width:Float;
-	var chamfer:Float;
+  var designation:String;
+  var bore:Float;
+  var outside:Float;
+  var width:Float;
+  var chamfer:Float;
 }
 
 /** Radial ball bearing with exact boundary dimensions and simplified rings (no balls or cage).
@@ -34,179 +34,442 @@ typedef DeepGrooveBearingSpec = {
  * Connectors: `front`, `back` (faces) and `axis` (mid-width), all with +Y along +Z.
  */
 class DeepGrooveBearing extends MachineComponent {
-	static var table:Null<Catalog<DeepGrooveBearingSpec>>;
+  static var table:Null<Catalog<DeepGrooveBearingSpec>>;
 
-	public final spec:DeepGrooveBearingSpec;
-	public final shielded:Bool;
-	public var bore(get, never):Float;
-	public var outside(get, never):Float;
-	public var width(get, never):Float;
+  public final spec:DeepGrooveBearingSpec;
+  public final shielded:Bool;
+  public var bore(get, never):Float;
+  public var outside(get, never):Float;
+  public var width(get, never):Float;
 
-	static function rows():Array<DeepGrooveBearingSpec>
-		return [
-			{designation: "625", bore: 5, outside: 16, width: 5, chamfer: 0.3},
-			{designation: "626", bore: 6, outside: 19, width: 6, chamfer: 0.3},
-			{designation: "608", bore: 8, outside: 22, width: 7, chamfer: 0.3},
-			{designation: "6000", bore: 10, outside: 26, width: 8, chamfer: 0.3},
-			{designation: "6001", bore: 12, outside: 28, width: 8, chamfer: 0.3},
-			{designation: "6002", bore: 15, outside: 32, width: 9, chamfer: 0.3},
-			{designation: "6003", bore: 17, outside: 35, width: 10, chamfer: 0.3},
-			{designation: "6004", bore: 20, outside: 42, width: 12, chamfer: 0.6},
-			{designation: "6200", bore: 10, outside: 30, width: 9, chamfer: 0.6},
-			{designation: "6201", bore: 12, outside: 32, width: 10, chamfer: 0.6},
-			{designation: "6202", bore: 15, outside: 35, width: 11, chamfer: 0.6},
-			{designation: "6203", bore: 17, outside: 40, width: 12, chamfer: 0.6},
-			{designation: "6204", bore: 20, outside: 47, width: 14, chamfer: 1.0},
-			{designation: "6205", bore: 25, outside: 52, width: 15, chamfer: 1.0},
-			{designation: "6206", bore: 30, outside: 62, width: 16, chamfer: 1.0},
-			{designation: "6207", bore: 35, outside: 72, width: 17, chamfer: 1.1},
-			{designation: "6208", bore: 40, outside: 80, width: 18, chamfer: 1.1},
-			{designation: "6209", bore: 45, outside: 85, width: 19, chamfer: 1.1},
-			{designation: "6210", bore: 50, outside: 90, width: 20, chamfer: 1.1},
-			{designation: "6211", bore: 55, outside: 100, width: 21, chamfer: 1.5},
-			{designation: "6212", bore: 60, outside: 110, width: 22, chamfer: 1.5},
-			{designation: "6213", bore: 65, outside: 120, width: 23, chamfer: 1.5},
-		];
+  static function rows():Array<DeepGrooveBearingSpec> return [
+    {
+      designation: "625",
+      bore: 5,
+      outside: 16,
+      width: 5,
+      chamfer: 0.3
+    },
+    {
+      designation: "626",
+      bore: 6,
+      outside: 19,
+      width: 6,
+      chamfer: 0.3
+    },
+    {
+      designation: "608",
+      bore: 8,
+      outside: 22,
+      width: 7,
+      chamfer: 0.3
+    },
+    {
+      designation: "6000",
+      bore: 10,
+      outside: 26,
+      width: 8,
+      chamfer: 0.3
+    },
+    {
+      designation: "6001",
+      bore: 12,
+      outside: 28,
+      width: 8,
+      chamfer: 0.3
+    },
+    {
+      designation: "6002",
+      bore: 15,
+      outside: 32,
+      width: 9,
+      chamfer: 0.3
+    },
+    {
+      designation: "6003",
+      bore: 17,
+      outside: 35,
+      width: 10,
+      chamfer: 0.3
+    },
+    {
+      designation: "6004",
+      bore: 20,
+      outside: 42,
+      width: 12,
+      chamfer: 0.6
+    },
+    {
+      designation: "6200",
+      bore: 10,
+      outside: 30,
+      width: 9,
+      chamfer: 0.6
+    },
+    {
+      designation: "6201",
+      bore: 12,
+      outside: 32,
+      width: 10,
+      chamfer: 0.6
+    },
+    {
+      designation: "6202",
+      bore: 15,
+      outside: 35,
+      width: 11,
+      chamfer: 0.6
+    },
+    {
+      designation: "6203",
+      bore: 17,
+      outside: 40,
+      width: 12,
+      chamfer: 0.6
+    },
+    {
+      designation: "6204",
+      bore: 20,
+      outside: 47,
+      width: 14,
+      chamfer: 1.0
+    },
+    {
+      designation: "6205",
+      bore: 25,
+      outside: 52,
+      width: 15,
+      chamfer: 1.0
+    },
+    {
+      designation: "6206",
+      bore: 30,
+      outside: 62,
+      width: 16,
+      chamfer: 1.0
+    },
+    {
+      designation: "6207",
+      bore: 35,
+      outside: 72,
+      width: 17,
+      chamfer: 1.1
+    },
+    {
+      designation: "6208",
+      bore: 40,
+      outside: 80,
+      width: 18,
+      chamfer: 1.1
+    },
+    {
+      designation: "6209",
+      bore: 45,
+      outside: 85,
+      width: 19,
+      chamfer: 1.1
+    },
+    {
+      designation: "6210",
+      bore: 50,
+      outside: 90,
+      width: 20,
+      chamfer: 1.1
+    },
+    {
+      designation: "6211",
+      bore: 55,
+      outside: 100,
+      width: 21,
+      chamfer: 1.5
+    },
+    {
+      designation: "6212",
+      bore: 60,
+      outside: 110,
+      width: 22,
+      chamfer: 1.5
+    },
+    {
+      designation: "6213",
+      bore: 65,
+      outside: 120,
+      width: 23,
+      chamfer: 1.5
+    },
+  ];
 
-	public static function catalog():Catalog<DeepGrooveBearingSpec> {
-		if (table == null)
-			table = new Catalog("deep groove bearing", spec -> spec.designation, rows(), _ -> ({
-				source: "https://www.skf.com/binaries/pub12/Images/0901d196807026e8-100-700_SKF_bearings_and_mounted_products_2018_tcm_12-314117.pdf",
-				standard: "ISO 15", standardEdition: "2017", dimensionKind: Nominal, conformance: NominalEnvelope,
-				verifiedFields: ["bore", "outside", "width", "chamfer"]}));
-		return table;
-	}
+  public static function catalog():Catalog<DeepGrooveBearingSpec> {
+    if (table == null) table = new Catalog(
+      "deep groove bearing",
+      spec -> spec.designation,
+      rows(),
+      _ -> ({
+        source: "https://www.skf.com/binaries/pub12/Images/0901d196807026e8-100-700_SKF_bearings_and_mounted_products_2018_tcm_12-314117.pdf",
+        standard: "ISO 15",
+        standardEdition: "2017",
+        dimensionKind: Nominal,
+        conformance: NominalEnvelope,
+        verifiedFields: [
+          "bore",
+          "outside",
+          "width",
+          "chamfer"
+        ]
+      })
+    );
+    return table;
+  }
 
-	/** `designation` is the basic series number; shielded bearings add the "-2Z" suffix. */
-	public static function metric(designation:String, shielded:Bool = true):DeepGrooveBearing
-		return new DeepGrooveBearing(catalog().get(designation), shielded);
+  /** `designation` is the basic series number; shielded bearings add the "-2Z" suffix. */
+  public static function metric(designation:String,
+    shielded:Bool = true):DeepGrooveBearing return new DeepGrooveBearing(
+      catalog().get(designation),
+      shielded
+    );
 
-	/** Build a bearing from explicit, unverified dimensions without assigning a catalog recipe. */
-	public static function custom(spec:DeepGrooveBearingSpec, shielded:Bool = true):DeepGrooveBearing
-		return new DeepGrooveBearing(spec, shielded, true);
+  /** Build a bearing from explicit, unverified dimensions without assigning a catalog recipe. */
+  public static function custom(spec:DeepGrooveBearingSpec,
+    shielded:Bool = true):DeepGrooveBearing return new DeepGrooveBearing(
+      spec,
+      shielded,
+      true
+    );
 
-	private function new(spec:DeepGrooveBearingSpec, shielded:Bool = true, codeOnly:Bool = false) {
-		var section = (spec.outside - spec.bore) / 2;
-		if (!(spec.bore > 0) || !(spec.outside > spec.bore) || !(spec.width > 0) ||
-			!(spec.chamfer >= 0) || spec.chamfer >= 0.3 * section || 2 * spec.chamfer >= Math.min(spec.width, section))
-			throw 'Invalid deep groove bearing "${spec.designation}"';
-		var designation = spec.designation + (shielded ? "-2Z" : "");
-		var customName = '${spec.designation}-D${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}-C${Dimension.format(spec.chamfer)}' +
-			(shielded ? "-2Z" : "-OPEN");
-		super(codeOnly ? customDesignation(customName) : designation,
-			'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} ' +
-			'${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
-			"bearing steel", codeOnly);
-		this.spec = spec;
-		this.shielded = shielded;
-		addConnector("front", Face, Solids.axial(0, 0, 0));
-		addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));
-		addConnector("back", Face, Solids.axial(0, 0, spec.width));
-	}
+  private function new(spec:DeepGrooveBearingSpec, shielded:Bool = true, codeOnly:Bool = false) {
+    var section = (spec.outside - spec.bore) / 2;
+    if (!(spec.bore > 0) || !(spec.outside > spec.bore)
+      || !(spec.width > 0) || !(spec.chamfer >= 0) || spec.chamfer >= 0.3 * section || 2 * spec.chamfer >= Math.min(
+        spec.width,
+        section
+      )) throw 'Invalid deep groove bearing "${spec.designation}"';
+    var designation = spec.designation + (shielded ? "-2Z" : "");
+    var customName =
+      '${spec.designation}-D${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}-C${Dimension.format(spec.chamfer)}'
+      + (shielded ? "-2Z" : "-OPEN");
+    super(
+      codeOnly ? customDesignation(customName) : designation,
+      'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} '
+      + '${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
+      "bearing steel",
+      codeOnly
+    );
+    this.spec = spec;
+    this.shielded = shielded;
+    addConnector("front", Face, Solids.axial(0, 0, 0));
+    addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));
+    addConnector("back", Face, Solids.axial(0, 0, spec.width));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	/** Dimensioned from the standard and datasheets cited above. */
-	override public function geometryFidelity():machinekit.component.GeometryFidelity
-		return machinekit.component.GeometryFidelity.Datasheet;
+  /** Dimensioned from the standard and datasheets cited above. */
+  override public function geometryFidelity():machinekit
+    .component.GeometryFidelity return machinekit.component.GeometryFidelity.Datasheet;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var ri = bore / 2, ro = outside / 2, b = width;
-		if (detail == Envelope)
-			return Part.revolve([{r: ri, z: 0}, {r: ro, z: 0}, {r: ro, z: b}, {r: ri, z: b}]);
-		// Ring shoulders at 30% of the section height; the recess shows the shield or ball gap.
-		var c = spec.chamfer, section = ro - ri;
-		var a = ri + 0.3 * section, o = ro - 0.3 * section;
-		var e = shielded ? Math.min(0.5, 0.06 * b) : 0.2 * b;
-		var rings = Solids.named(Part.revolve([
-			{r: ri + c, z: 0}, {r: a, z: 0}, {r: a, z: e}, {r: o, z: e}, {r: o, z: 0},
-			{r: ro - c, z: 0}, {r: ro, z: c}, {r: ro, z: b - c}, {r: ro - c, z: b},
-			{r: o, z: b}, {r: o, z: b - e}, {r: a, z: b - e}, {r: a, z: b},
-			{r: ri + c, z: b}, {r: ri, z: b - c}, {r: ri, z: c},
-		]), "rings");
-		if (!shielded) return rings;
-		// The enclosed raceway approximates the unmodelled ball and cage space while
-		// retaining one connected solid for preview and downstream shape consumers.
-		var start = Math.max(e + 0.1, 0.15 * b);
-		var cavity = Solids.named(Part.revolve([
-			{r: a, z: start}, {r: o, z: start}, {r: o, z: b - start}, {r: a, z: b - start}
-		]), "cavity");
-		return Solids.cut(rings, [cavity]);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var ri = bore / 2, ro = outside / 2, b = width;
+    if (detail == Envelope) return Part.revolve([{r: ri, z: 0}, {r: ro, z: 0}, {r: ro, z: b}, {r: ri, z: b}]);
+    // Ring shoulders at 30% of the section height; the recess shows the shield or ball gap.
+    var c = spec.chamfer, section = ro - ri;
+    var a = ri + 0.3 * section, o = ro - 0.3 * section;
+    var e = shielded ? Math.min(0.5, 0.06 * b) : 0.2 * b;
+    var rings = Solids.named(
+      Part.revolve([
+        {r: ri + c, z: 0},
+        {r: a, z: 0},
+        {r: a, z: e},
+        {r: o, z: e},
+        {r: o, z: 0},
+        {
+          r: ro - c,
+          z: 0
+        },
+        {
+          r: ro,
+          z: c
+        },
+        {
+          r: ro,
+          z: b - c
+        },
+        {
+          r: ro - c,
+          z: b
+        },
+        {
+          r: o,
+          z: b
+        },
+        {
+          r: o,
+          z: b - e
+        },
+        {
+          r: a,
+          z: b - e
+        },
+        {
+          r: a,
+          z: b
+        },
+        {
+          r: ri + c,
+          z: b
+        },
+        {
+          r: ri,
+          z: b - c
+        },
+        {
+          r: ri,
+          z: c
+        },
+      ]),
+      "rings"
+    );
+    if (!shielded) return rings;
+    // The enclosed raceway approximates the unmodelled ball and cage space while
+    // retaining one connected solid for preview and downstream shape consumers.
+    var start = Math.max(e + 0.1, 0.15 * b);
+    var cavity = Solids.named(
+      Part.revolve([
+        {r: a, z: start},
+        {r: o, z: start},
+        {r: o, z: b - start},
+        {
+          r: a,
+          z: b - start
+        }
+      ]),
+      "cavity"
+    );
+    return Solids.cut(rings, [cavity]);
+  }
 
-	/** Two thin annular shields seated inside the front and back ring recesses.
+  /** Two thin annular shields seated inside the front and back ring recesses.
 	 * Kept separate so preview renderers can assign a different surface finish.
 	 */
-	public function shieldGeometry():Part {
-		if (!shielded) throw "Open bearings have no shields";
-		var section = (outside - bore) / 2;
-		var inner = bore / 2 + 0.3 * section;
-		var outer = outside / 2 - 0.3 * section;
-		var recess = Math.min(0.5, 0.06 * width);
-		var front = Part.revolve([
-			{r: inner, z: recess * 0.25}, {r: outer, z: recess * 0.25},
-			{r: outer, z: recess * 0.7}, {r: inner, z: recess * 0.7}
-		]);
-		var back = Part.revolve([
-			{r: inner, z: width - recess * 0.7}, {r: outer, z: width - recess * 0.7},
-			{r: outer, z: width - recess * 0.25}, {r: inner, z: width - recess * 0.25}
-		]);
-		return Solids.union([front, back]);
-	}
+  public function shieldGeometry():Part {
+    if (!shielded) throw "Open bearings have no shields";
+    var section = (outside - bore) / 2;
+    var inner = bore / 2 + 0.3 * section;
+    var outer = outside / 2 - 0.3 * section;
+    var recess = Math.min(0.5, 0.06 * width);
+    var front = Part.revolve([
+      {r: inner, z: recess * 0.25},
+      {r: outer, z: recess * 0.25},
+      {r: outer, z: recess * 0.7},
+      {
+        r: inner,
+        z: recess * 0.7
+      }
+    ]);
+    var back = Part.revolve([
+      {r: inner, z: width - recess * 0.7},
+      {r: outer, z: width - recess * 0.7},
+      {
+        r: outer,
+        z: width - recess * 0.25
+      },
+      {
+        r: inner,
+        z: width - recess * 0.25
+      }
+    ]);
+    return Solids.union([front, back]);
+  }
 
-	/** Cutting tool for a housing bore, using a named fit and a diametral allowance. */
-	public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
-		var length = depth == null ? width : depth;
-		return housingSeatAllowance(length, BearingFit.housingAllowance(fit, outside));
-	}
+  /** Cutting tool for a housing bore, using a named fit and a diametral allowance. */
+  public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
+    var length = depth == null ? width : depth;
+    return housingSeatAllowance(length, BearingFit.housingAllowance(fit, outside));
+  }
 
-	/** Housing seat tool with an explicit diametral allowance for drawing-specific fits. */
-	public function housingSeatAllowance(?depth:Float, allowance:Float):Part {
-		var length = depth == null ? width : depth;
-		if (!(length > 0) || !Math.isFinite(length)) throw "Bearing housing seat depth must be positive";
-		if (!(outside + allowance > bore)) throw "Bearing housing seat allowance leaves no bearing wall";
-		return Part.cylinderSpan((outside + allowance) / 2, 0, length);
-	}
+  /** Housing seat tool with an explicit diametral allowance for drawing-specific fits. */
+  public function housingSeatAllowance(?depth:Float, allowance:Float):Part {
+    var length = depth == null ? width : depth;
+    if (!(length > 0) || !Math.isFinite(length)) throw "Bearing housing seat depth must be positive";
+    if (!(outside + allowance > bore)) throw "Bearing housing seat allowance leaves no bearing wall";
+    return Part.cylinderSpan((outside + allowance) / 2, 0, length);
+  }
 
-	/** Shaft journal diameter for a named fit; allowance is diametral. */
-	public function journalDiameter(fit:BearingShaftFit = Slip):Float
-		return journalDiameterAllowance(BearingFit.shaftAllowance(fit, bore));
+  /** Shaft journal diameter for a named fit; allowance is diametral. */
+  public function journalDiameter(fit:BearingShaftFit =
+    Slip):Float return journalDiameterAllowance(BearingFit.shaftAllowance(
+      fit,
+      bore
+    ));
 
-	/** Shaft journal diameter with an explicit diametral allowance. */
-	public function journalDiameterAllowance(allowance:Float):Float {
-		if (!(bore + allowance > 0)) throw "Bearing journal allowance leaves no shaft diameter";
-		return bore + allowance;
-	}
+  /** Shaft journal diameter with an explicit diametral allowance. */
+  public function journalDiameterAllowance(allowance:Float):Float {
+    if (!(bore + allowance > 0)) throw "Bearing journal allowance leaves no shaft diameter";
+    return bore + allowance;
+  }
 
-	function get_bore():Float return spec.bore;
-	function get_outside():Float return spec.outside;
-	function get_width():Float return spec.width;
+  function get_bore():Float return spec.bore;
+  function get_outside():Float return spec.outside;
+  function get_width():Float return spec.width;
 
-	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("bearingSeat", [
-		ComponentRecipeSupport.toolDepth(width),
-		ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")])];
+  override public function toolSpecs():Array<ToolSpec> return [new ToolSpec(
+    "bearingSeat",
+    [
+      ComponentRecipeSupport.toolDepth(width),
+      ComponentRecipeSupport.choice(
+        "fit",
+        [
+          "Slip",
+          "Transition",
+          "Interference"
+        ],
+        "Slip"
+      )
+    ]
+  )];
 
-	override function buildTool(name:String, values:ComponentValues):Part {
-		if (name == "bearingSeat") return housingSeat(values.number("depth"), ComponentRecipeSupport.fit(values.token("fit")));
-		return super.buildTool(name, values);
-	}
+  override function buildTool(name:String, values:ComponentValues):Part {
+    if (name == "bearingSeat") return housingSeat(
+      values.number("depth"),
+      ComponentRecipeSupport.fit(values.token("fit"))
+    );
+    return super.buildTool(name, values);
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.standard.deep-groove-bearing",
-			[ComponentRecipeSupport.catalog("designation", DeepGrooveBearing.catalog(), "608"), ComponentRecipeSupport.flag("shielded", true)],
-			v -> DeepGrooveBearing.metric(v.token("designation"), v.boolean("shielded")),
-			true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.standard.deep-groove-bearing",
+      [
+        ComponentRecipeSupport.catalog(
+          "designation",
+          DeepGrooveBearing.catalog(),
+          "608"
+        ),
+        ComponentRecipeSupport.flag(
+          "shielded",
+          true
+        )
+      ],
+      v -> DeepGrooveBearing.metric(
+        v.token("designation"),
+        v.boolean("shielded")
+      ),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
+  override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
-	override public function values():ComponentValues {
-		return new ComponentValues().set("designation", Token(this.spec.designation))
-				.set("shielded", Boolean(this.shielded)).setToken("material", materialSpec());
-	}
+  override public function values():ComponentValues {
+    return new ComponentValues().set("designation", Token(this.spec.designation)).set(
+      "shielded",
+      Boolean(this.shielded)
+    ).setToken(
+      "material",
+      materialSpec()
+    );
+  }
 
 }

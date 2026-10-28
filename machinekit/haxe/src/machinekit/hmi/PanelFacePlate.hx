@@ -22,11 +22,23 @@ class PanelFacePlate {
     try {
       for (c in face.controls) {
         tools.push(FootprintGeometry.solid(c.cutout(), c.x, c.y, -1.0, face.thickness + 1.0));
-        for (hole in c.holes()) tools.push(FootprintGeometry.solid(Circle(hole.diameter), c.x + hole.x, c.y + hole.y, -1.0, face.thickness + 1.0));
+        for (hole in c.holes()) tools.push(FootprintGeometry.solid(
+          Circle(hole.diameter),
+          c.x + hole.x,
+          c.y + hole.y,
+          -1.0,
+          face.thickness + 1.0
+        ));
       }
       if (fasteners != null) for (screw in fasteners) {
         tools.push(FootprintGeometry.solid(Circle(SCREW_HOLE), screw.x, screw.y, -1.0, face.thickness + 1.0));
-        tools.push(Part.cylinderSpan(COUNTERBORE / 2, face.thickness - COUNTERBORE_DEPTH, face.thickness + 1.0, screw.x, screw.y));
+        tools.push(Part.cylinderSpan(
+          COUNTERBORE / 2,
+          face.thickness - COUNTERBORE_DEPTH,
+          face.thickness + 1.0,
+          screw.x,
+          screw.y
+        ));
       }
       var result = plate.subtractAll(tools);
       plate.close();

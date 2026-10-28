@@ -13,13 +13,33 @@ class MobileWelderChecks {
     if (!defaultBase.hasPort("compressedAir")) throw "Suction tool services must still pass through";
     var welding = new RobotArm(false, new ArmWeldingTool());
     welding.replaceComponent("powerSupply", new IsolatedDcConverter(48, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500));
-    var robot = new MobileBase(welding, 48, {length: 2400, width: 1000, payloadX: 700,
-      batteryX: -600, battery: new BatteryPack(48, 25000, 1000, 600, 180, 230, 4)});
-    if (robot.hasPort("compressedAir") || !robot.hasPort("torchPower")) throw "Base must expose the actual tool services";
+    var robot = new MobileBase(
+      welding,
+      48,
+      {
+        length: 2400,
+        width: 1000,
+        payloadX: 700,
+        batteryX: -600,
+        battery: new BatteryPack(
+          48,
+          25000,
+          1000,
+          600,
+          180,
+          230,
+          4
+        )
+      }
+    );
+    if (robot.hasPort("compressedAir")
+      || !robot.hasPort("torchPower")) throw "Base must expose the actual tool services";
     robot.connectPorts("arm-pack", "battery", "power3", "arm/powerSupply", "dc");
-    if (robot.upstream("arm/driver1", "power").port.instanceId != "battery") throw "Arm power must trace to the floating pack";
+    if (robot.upstream("arm/driver1",
+      "power").port.instanceId != "battery") throw "Arm power must trace to the floating pack";
     if (robot.length != 2400 || robot.width != 1000) throw "Payload platform dimensions were lost";
-    if (Math.abs(robot.trackWidth() - defaultBase.trackWidth()) > 1e-6) throw "Changing deck dimensions must preserve the drive geometry";
+    if (Math.abs(robot.trackWidth() - defaultBase.trackWidth())
+      > 1e-6) throw "Changing deck dimensions must preserve the drive geometry";
     var carrier = new MobileWeldingRobot();
     var diagnostics = carrier.check();
     diagnostics.throwIfErrors();
@@ -27,12 +47,14 @@ class MobileWelderChecks {
     if (carrier.upstreamChain("source", "mains").indexOf("inverter/mains") < 0) throw "Welder bypasses inverter";
     for (driver in ["driverLeft", "driverRight"]) {
       var trace = carrier.upstreamChain(driver, "power");
-      if (trace.indexOf("driveSupply/dc") < 0 || trace.indexOf("battery/power1") < 0)
-        throw 'Wheel driver $driver bypasses the isolated drive supply';
+      if (trace.indexOf("driveSupply/dc") < 0
+        || trace.indexOf("battery/power1") < 0) throw 'Wheel driver $driver bypasses the isolated drive supply';
     }
-    if (carrier.driveSupply == null || carrier.driveSupply.voltage.volts() != 48) throw "Drive supply rating is missing";
+    if (carrier.driveSupply == null
+      || carrier.driveSupply.voltage.volts() != 48) throw "Drive supply rating is missing";
     var parents = carrier.mateParents();
-    for (name in ["source", "inverter", "cylinder"]) if (parents.get(name) != "deck") throw 'Equipment $name is not carried';
+    for (name in ["source",
+      "inverter", "cylinder"]) if (parents.get(name) != "deck") throw 'Equipment $name is not carried';
     var poses = carrier.solvedPoses();
     var parts = new PosedParts();
     var placed:Array<{id:String, part:Part, box:machinekit.assembly.PosedParts.PartBox}> = [];
@@ -41,12 +63,17 @@ class MobileWelderChecks {
         var part = parts.posed(member.component, poses.get(member.id));
         placed.push({id: member.id, part: part, box: PosedParts.boxOf(part)});
       }
-      for (equipment in placed) if (["battery", "source", "inverter", "cylinder", "computerSupply", "driveSupply"].indexOf(equipment.id) >= 0) {
-        if (equipment.box.minX < -carrier.length / 2 - 1e-6 || equipment.box.maxX > carrier.length / 2 + 1e-6 ||
-            equipment.box.minY < -carrier.width / 2 - 1e-6 || equipment.box.maxY > carrier.width / 2 + 1e-6)
-          throw 'Equipment ${equipment.id} overhangs the platform footprint';
-        for (other in placed) if (other.id != equipment.id && PosedParts.commonVolume(equipment.part, equipment.box, other.part, other.box) > 1)
-          throw 'Equipment ${equipment.id} intersects ${other.id}';
+      for (equipment in placed) if (["battery",
+        "source", "inverter", "cylinder", "computerSupply", "driveSupply"].indexOf(equipment.id) >= 0) {
+        if (equipment.box.minX < -carrier.length / 2 - 1e-6 || equipment.box.maxX > carrier.length / 2 + 1e-6
+          || equipment.box.minY < -carrier.width / 2 - 1e-6 || equipment.box.maxY
+          > carrier.width / 2 + 1e-6) throw 'Equipment ${equipment.id} overhangs the platform footprint';
+        for (other in placed) if (other.id != equipment.id && PosedParts.commonVolume(
+          equipment.part,
+          equipment.box,
+          other.part,
+          other.box
+        ) > 1) throw 'Equipment ${equipment.id} intersects ${other.id}';
       }
     } catch (error:Dynamic) {
       for (entry in placed) entry.part.close();
@@ -56,40 +83,55 @@ class MobileWelderChecks {
     for (entry in placed) entry.part.close();
     parts.close();
     var mass = carrier.massProperties();
-    if (mass.unaccounted.length != 0 || mass.mass < 230 + 55 + 45 + 75) throw "Carried equipment mass is not accounted for";
+    if (mass.unaccounted.length != 0
+      || mass.mass < 230 + 55 + 45 + 75) throw "Carried equipment mass is not accounted for";
     Sys.println('Carried mass ${Math.round(mass.mass * 10) / 10} kg; equipment footprint and clearance passed');
     var scene = SceneArtifact.decode(MobileWelderPreview.cell());
     var drive:materia.project.SceneArtifact.SceneArtifactMobileBase = cast scene.mobileBase;
-    if (scene.mobileBase == null || scene.robotTools == null || scene.robotTools.length != 1 ||
-        scene.robotTools[0].kind != "torch" || scene.mobileBase.footprintLength != carrier.length / 1000)
-      throw "The mobile scene lost its CAD drive or torch";
+    if (scene.mobileBase == null || scene.robotTools == null
+      || scene.robotTools.length != 1 || scene.robotTools[0].kind != "torch" || scene.mobileBase.footprintLength
+      != carrier.length / 1000) throw "The mobile scene lost its CAD drive or torch";
     var definition:materia.assembly.AssemblyDefinition = cast scene.assemblyDefinition;
     var count = materia.assembly.AssemblyDefinitionFlattener.flatten(definition).occurrences.length;
     var physical = AssemblyPhysicalPartView.fromSceneArtifact(scene);
-    var converted = AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState, null, null, scene.mobileBase);
-    if (converted.partLinks.exists("work/basePlate") || !converted.partLinks.exists("robot/basePlate"))
-      throw "Stationary welded surroundings must stay outside the mobile robot model";
-    if (materia.assembly.AssemblyDefinitionFlattener.flatten(definition).occurrences.length != count)
-      throw "Robot selection must not mutate the source CAD assembly";
+    var converted = AssemblySimulationBridge.toRobotModel(
+      definition,
+      physical,
+      scene.assemblyState,
+      null,
+      null,
+      scene.mobileBase
+    );
+    if (converted.partLinks.exists("work/basePlate") || !converted.partLinks
+      .exists("robot/basePlate")) throw "Stationary welded surroundings must stay outside the mobile robot model";
+    if (materia.assembly.AssemblyDefinitionFlattener.flatten(definition).occurrences.length
+      != count) throw "Robot selection must not mutate the source CAD assembly";
     var rejected = false;
-    try AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState, ["work/upright"], null, scene.mobileBase)
-      catch (_:Dynamic) rejected = true;
+    try AssemblySimulationBridge.toRobotModel(
+      definition,
+      physical,
+      scene.assemblyState,
+      ["work/upright"],
+      null,
+      scene.mobileBase
+    ) catch (_:Dynamic) rejected = true;
     if (!rejected) throw "A genuinely dynamic part must still reject a fixed joint";
     var wrong:materia.project.SceneArtifact.SceneArtifactMobileBase = cast scene.mobileBase;
     var wanted = wrong.robot;
     wrong.robot = "robot/arm";
     rejected = false;
-    try AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState, null, null, wrong)
-      catch (_:Dynamic) rejected = true;
+    try AssemblySimulationBridge.toRobotModel(definition,
+      physical, scene.assemblyState, null, null, wrong) catch (_:Dynamic) rejected = true;
     wrong.robot = wanted;
     if (!rejected) throw "A robot selection must reject joints crossing its boundary";
     var torch:materia.project.SceneArtifact.SceneArtifactTorch = cast scene.robotTools[0].torch;
-    if (torch.groundedWork.indexOf("work/basePlate") < 0 ||
-        torch.groundedWork.indexOf("robot/basePlate") >= 0)
-      throw "The work clamp must ground the work, not the floating chassis";
-    if (drive.maxLinearAcceleration >= MobileBase.MAX_LINEAR_ACCELERATION)
-      throw "Heavy payload acceleration must follow the available drive effort and carried mass";
-    Sys.println('Mobile scene: ${Math.round(drive.maxLinearAcceleration * 1000) / 1000} m/s2, independently grounded work');
-    Sys.println('Mobile payload layout and tool service checks passed; welding platform ${carrier.length} x ${carrier.width} mm');
+    if (torch.groundedWork.indexOf("work/basePlate") < 0 || torch.groundedWork.indexOf("robot/basePlate")
+      >= 0) throw "The work clamp must ground the work, not the floating chassis";
+    if (drive.maxLinearAcceleration >= MobileBase
+      .MAX_LINEAR_ACCELERATION) throw "Heavy payload acceleration must follow the available drive effort and carried mass";
+    Sys
+      .println('Mobile scene: ${Math.round(drive.maxLinearAcceleration * 1000) / 1000} m/s2, independently grounded work');
+    Sys
+      .println('Mobile payload layout and tool service checks passed; welding platform ${carrier.length} x ${carrier.width} mm');
   }
 }

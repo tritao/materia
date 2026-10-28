@@ -16,23 +16,34 @@ import machinekit.component.Solids;
  * neck's end, where `WeldingTorchNozzle` is mated).
  */
 class WeldingTorchNeck extends MachineComponent {
-	public final bendDegrees:Float;
+  public final bendDegrees:Float;
 
-	public function new(bendDegrees:Float = 45) {
-		super('WELD-TORCH-NECK-${Dimension.format(bendDegrees)}DEG', 'Robot MIG torch swan neck, ${Dimension.format(bendDegrees)} degrees',
-			"brass", true);
-		this.bendDegrees = bendDegrees;
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-		addConnector("nozzle", Mount, Solids.axial(0, 0, WeldingTorch.NECK_LENGTH));
-		declareMass(WeldingTorch.NECK_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NECK_LENGTH));
-	}
+  public function new(bendDegrees:Float = 45) {
+    super(
+      'WELD-TORCH-NECK-${Dimension.format(bendDegrees)}DEG',
+      'Robot MIG torch swan neck, ${Dimension.format(bendDegrees)} degrees',
+      "brass",
+      true
+    );
+    this.bendDegrees = bendDegrees;
+    addConnector("base", Mount, Solids.axial(0, 0, 0));
+    addConnector("nozzle", Mount, Solids.axial(0, 0, WeldingTorch.NECK_LENGTH));
+    declareMass(WeldingTorch.NECK_MASS, new Vector(0, 0, 0.5 * WeldingTorch.NECK_LENGTH));
+  }
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		return Solids.union([
-			Solids.named(Part.sphere(WeldingTorch.NECK_R), "elbow"),
-			Solids.named(Part.cylinderSpan(WeldingTorch.NECK_R, 0, WeldingTorch.NECK_LENGTH), "neck")
-		]);
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    return Solids.union([
+      Solids.named(Part.sphere(WeldingTorch.NECK_R), "elbow"),
+      Solids.named(
+        Part.cylinderSpan(
+          WeldingTorch.NECK_R,
+          0,
+          WeldingTorch.NECK_LENGTH
+        ),
+        "neck"
+      )
+    ]);
+  }
 }

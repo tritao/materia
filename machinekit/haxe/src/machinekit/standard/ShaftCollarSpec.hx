@@ -4,8 +4,8 @@ package machinekit.standard;
  * its hole is not modelled, matching the project's semantic (not geometric) thread convention.
  */
 typedef ShaftCollarSpec = {
-	var boreDiameter:Float;
-	var outerDiameter:Float;
-	var width:Float;
-	var setScrew:String;
+  var boreDiameter:Float;
+  var outerDiameter:Float;
+  var width:Float;
+  var setScrew:String;
 }

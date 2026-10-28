@@ -8,69 +8,81 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * axis so the teeth interleave.
  */
 class GearPair extends MachineAssembly {
-	/** Assumed power efficiency of a single lubricated spur mesh. */
-	public static inline var DEFAULT_EFFICIENCY:Float = 0.98;
+  /** Assumed power efficiency of a single lubricated spur mesh. */
+  public static inline var DEFAULT_EFFICIENCY:Float = 0.98;
 
-	/** Resolve the coupling from these parts. */
-	public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation {
-		var result = new TransmissionRelation(-alignment * driver.teeth / driven.teeth, DEFAULT_EFFICIENCY,
-			null, mesh(driver, driven).backlash / (driver.pitchDiameter / 2));
-		result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
-		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
-		return result;
-	}
+  /** Resolve the coupling from these parts. */
+  public static function relation(driver:SpurGear, driven:SpurGear, alignment:Float):TransmissionRelation {
+    var result = new TransmissionRelation(
+      -alignment * driver.teeth / driven.teeth,
+      DEFAULT_EFFICIENCY,
+      null,
+      mesh(
+        driver,
+        driven
+      ).backlash / (driver.pitchDiameter / 2)
+    );
+    result.setBasis("efficiency", ValueBasis.Assumed, "gear efficiency");
+    result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
+    return result;
+  }
 
-	public final a:SpurGear;
-	public final b:SpurGear;
-	public final centerDistance:Float;
-	/** Derived operating pressure angle after the profile-shift centre-distance change. */
-	public final operatingPressureAngle:Float;
-	/** Sum of the two gears' tangential backlash allowances. */
-	public final backlash:Float;
-	/** Sum of the two gears' profile-shift coefficients. */
-	public final profileShiftSum:Float;
-	/** Rotation of `b` about its +Z axis, radians, in `0 <= angle < 2*pi/b.teeth`. */
-	public final bRotation:Float;
+  public final a:SpurGear;
+  public final b:SpurGear;
+  public final centerDistance:Float;
+  /** Derived operating pressure angle after the profile-shift centre-distance change. */
+  public final operatingPressureAngle:Float;
+  /** Sum of the two gears' tangential backlash allowances. */
+  public final backlash:Float;
+  /** Sum of the two gears' profile-shift coefficients. */
+  public final profileShiftSum:Float;
+  /** Rotation of `b` about its +Z axis, radians, in `0 <= angle < 2*pi/b.teeth`. */
+  public final bRotation:Float;
 
-	public static function mesh(a:SpurGear, b:SpurGear):GearPair
-		return new GearPair(a, b);
+  public static function mesh(a:SpurGear, b:SpurGear):GearPair return new GearPair(a, b);
 
-	function new(a:SpurGear, b:SpurGear) {
-		super();
-		this.a = a;
-		this.b = b;
-		var distance = a.centerDistance(b);
-		var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
-		if (!(distance > baseRadiusSum + 1e-10))
-			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
-		centerDistance = distance;
-		operatingPressureAngle = Math.acos(baseRadiusSum / distance);
-		backlash = a.backlash + b.backlash;
-		profileShiftSum = a.profileShift + b.profileShift;
-		// `SpurGear` centres a tooth on local angle 0, so `a` has a tooth pointing at the mesh
-		// point (+X). `b` sees the mesh point at its local angle pi and must present a tooth
-		// space there; spaces sit half a pitch from teeth, so the turn t satisfies
-		// t + (k + 1/2) * 2pi/z_b = pi, i.e. t = pi - pi/z_b (mod 2pi/z_b): zero for odd z_b and
-		// half a tooth pitch (pi/z_b) for even z_b.
-		var step = 2 * Math.PI / b.teeth;
-		var turn = Math.PI - Math.PI / b.teeth;
-		turn -= step * Math.ffloor(turn / step + 1e-9);
-		bRotation = turn < 1e-9 ? 0.0 : turn;
-		addComponent("a", a);
-		addComponent("b", b, pose());
-		exposeConnector("inputAxis", "a", "axis");
-		exposeConnector("outputAxis", "b", "axis");
-		exposeConnector("inputPitch", "a", "pitch");
-		exposeConnector("outputPitch", "b", "pitch");
-	}
+  function new(a:SpurGear, b:SpurGear) {
+    super();
+    this.a = a;
+    this.b = b;
+    var distance = a.centerDistance(b);
+    var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
+    if (!(distance > baseRadiusSum + 1e-10)) throw new machinekit
+      .transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
+    centerDistance = distance;
+    operatingPressureAngle = Math.acos(baseRadiusSum / distance);
+    backlash = a.backlash + b.backlash;
+    profileShiftSum = a.profileShift + b.profileShift;
+    // `SpurGear` centres a tooth on local angle 0, so `a` has a tooth pointing at the mesh
+    // point (+X). `b` sees the mesh point at its local angle pi and must present a tooth
+    // space there; spaces sit half a pitch from teeth, so the turn t satisfies
+    // t + (k + 1/2) * 2pi/z_b = pi, i.e. t = pi - pi/z_b (mod 2pi/z_b): zero for odd z_b and
+    // half a tooth pitch (pi/z_b) for even z_b.
+    var step = 2 * Math.PI / b.teeth;
+    var turn = Math.PI - Math.PI / b.teeth;
+    turn -= step * Math.ffloor(turn / step + 1e-9);
+    bRotation = turn < 1e-9 ? 0.0 : turn;
+    addComponent("a", a);
+    addComponent("b", b, pose());
+    exposeConnector("inputAxis", "a", "axis");
+    exposeConnector("outputAxis", "b", "axis");
+    exposeConnector("inputPitch", "a", "pitch");
+    exposeConnector("outputPitch", "b", "pitch");
+  }
 
-	/** Gear ratio, driven teeth over driving teeth: `b.teeth / a.teeth`. */
-	public function ratio():Float
-		return b.teeth / a.teeth;
+  /** Gear ratio, driven teeth over driving teeth: `b.teeth / a.teeth`. */
+  public function ratio():Float return b.teeth / a.teeth;
 
-	/** World pose for `b` when `a` sits at the identity pose: translated to the centre distance
+  /** World pose for `b` when `a` sits at the identity pose: translated to the centre distance
 	 * and turned by `bRotation` about +Z.
 	 */
-	public function pose():AssemblyFrame
-		return {x: centerDistance, y: 0, z: 0, qx: 0, qy: 0, qz: Math.sin(bRotation / 2), qw: Math.cos(bRotation / 2)};
+  public function pose():AssemblyFrame return {
+    x: centerDistance,
+    y: 0,
+    z: 0,
+    qx: 0,
+    qy: 0,
+    qz: Math.sin(bRotation / 2),
+    qw: Math.cos(bRotation / 2)
+  };
 }

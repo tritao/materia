@@ -5,185 +5,194 @@ import materia.project.MaterialLibrary;
 
 /** Stable recipe for one kind of single part. */
 class ComponentType {
-	public final id:String;
-	public var manufacturingFamily(default, null):Null<ComponentFamily>;
+  public final id:String;
+  public var manufacturingFamily(default, null):Null<ComponentFamily>;
 
-	/** False when a typed mechanical input already determines the material. */
-	public final materialEditable:Bool;
+  /** False when a typed mechanical input already determines the material. */
+  public final materialEditable:Bool;
 
-	final inputs:Array<ComponentParameter>;
-	final build:ComponentValues->MachineComponent;
-	/** The generator before the material input is applied: what material these inputs give by themselves. */
-	final naturalBuild:ComponentValues->MachineComponent;
-	final keepDesignation:Bool;
-	final materialInDesignation:Bool;
-	final defaultMaterial:String;
-	final bomExcludedInputs:Array<String>;
+  final inputs:Array<ComponentParameter>;
+  final build:ComponentValues -> MachineComponent;
+  /** The generator before the material input is applied: what material these inputs give by themselves. */
+  final naturalBuild:ComponentValues -> MachineComponent;
+  final keepDesignation:Bool;
+  final materialInDesignation:Bool;
+  final defaultMaterial:String;
+  final bomExcludedInputs:Array<String>;
 
-	/** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
-	static inline final MASS_MEMO_LIMIT = 1024;
+  /** Most mass properties kept per recipe; past it the memo is emptied and each is computed again on its next use. */
+  static inline final MASS_MEMO_LIMIT = 1024;
 
-	final massMemo:Map<String, MassProperties> = [];
-	var massMemoCount = 0;
+  final massMemo:Map<String, MassProperties> = [];
+  var massMemoCount = 0;
 
-	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent, keepDesignation:Bool = false,
-			materialInDesignation:Bool = false, ?bomExcludedInputs:Array<String>, materialEditable:Bool = true, ?metadataInputs:ComponentValues) {
-		if (id == null || id.length == 0 || inputs == null || build == null)
-			throw "Incomplete component type";
-		this.id = id;
-		this.materialEditable = materialEditable;
-		this.keepDesignation = keepDesignation;
-		this.materialInDesignation = materialInDesignation;
-		this.bomExcludedInputs = bomExcludedInputs == null ? [] : bomExcludedInputs.copy();
-		var seen:Map<String, Bool> = [];
-		for (input in inputs) {
-			if (seen.exists(input.name))
-				throw 'Duplicate component input "${input.name}"';
-			seen.set(input.name, true);
-		}
-		var baseline = new ComponentValues();
-		// Required inputs can have a representative metadata instance without becoming defaults.
-		for (input in inputs) {
-			var sample = metadataInputs == null ? null : metadataInputs.get(input.name);
-			baseline.set(input.name, sample == null ? input.defaultValue : sample);
-		}
-		var sourceBuild = build;
-		var defaultComponent = sourceBuild(baseline);
-		defaultMaterial = defaultComponent.materialSpec();
-		this.inputs = inputs.copy();
-		if (!materialEditable && seen.exists("material"))
-			throw 'Derived material on "$id" cannot also be an input';
-		if (materialEditable && !seen.exists("material"))
-			this.inputs.push(new ComponentParameter("material", Choice(MaterialLibrary.specs()), Token(defaultMaterial)));
-		else if (materialEditable) {
-			var declared = switch this.inputs[seenIndex(this.inputs, "material")].defaultValue {
-				case Token(spec): spec;
-				default: "";
-			};
-			if (declared != defaultMaterial)
-				throw 'Component type "$id" material default differs from its generator';
-		}
-		naturalBuild = sourceBuild;
-		this.build = values -> {
-			var component = sourceBuild(values);
-			// A material left at the recipe's default keeps the model's own: a catalogue row's product material.
-			if (materialEditable && values.token("material") != defaultMaterial)
-				component.setMaterial(values.token("material"));
-			return component;
-		};
-	}
+  public function new(
+    id:String,
+    inputs:Array<ComponentParameter>,
+    build:ComponentValues -> MachineComponent,
+    keepDesignation:Bool = false,
+    materialInDesignation:Bool = false,
+    ?bomExcludedInputs:Array<String>,
+    materialEditable:Bool = true,
+    ?metadataInputs:ComponentValues
+  ) {
+    if (id == null || id.length == 0 || inputs == null || build == null) throw "Incomplete component type";
+    this.id = id;
+    this.materialEditable = materialEditable;
+    this.keepDesignation = keepDesignation;
+    this.materialInDesignation = materialInDesignation;
+    this.bomExcludedInputs = bomExcludedInputs == null ? [] : bomExcludedInputs.copy();
+    var seen:Map<String, Bool> = [];
+    for (input in inputs) {
+      if (seen.exists(input.name)) throw 'Duplicate component input "${input.name}"';
+      seen.set(input.name, true);
+    }
+    var baseline = new ComponentValues();
+    // Required inputs can have a representative metadata instance without becoming defaults.
+    for (input in inputs) {
+      var sample = metadataInputs == null ? null : metadataInputs.get(input.name);
+      baseline.set(input.name, sample == null ? input.defaultValue : sample);
+    }
+    var sourceBuild = build;
+    var defaultComponent = sourceBuild(baseline);
+    defaultMaterial = defaultComponent.materialSpec();
+    this.inputs = inputs.copy();
+    if (!materialEditable && seen.exists("material")) throw 'Derived material on "$id" cannot also be an input';
+    if (materialEditable && !seen.exists("material")) this.inputs.push(new ComponentParameter(
+      "material",
+      Choice(MaterialLibrary.specs()),
+      Token(defaultMaterial)
+    ));
+    else if (materialEditable) {
+      var declared = switch this.inputs[seenIndex(this.inputs, "material")].defaultValue {
+        case Token(spec):
+          spec;
+        default:
+          "";
+      };
+      if (declared != defaultMaterial) throw 'Component type "$id" material default differs from its generator';
+    }
+    naturalBuild = sourceBuild;
+    this.build = values -> {var component = sourceBuild(values);
+    // A material left at the recipe's default keeps the model's own: a catalogue row's product material.
+    if (materialEditable
+      && values.token("material") != defaultMaterial) component.setMaterial(values.token("material"));
+    return component;
+    };
+  }
 
-	public function parameters():Array<ComponentParameter>
-		return inputs.copy();
+  public function parameters():Array<ComponentParameter> return inputs.copy();
 
-	public function label():String {
-		var words = id.split(".").pop().split("-").join(" ");
-		return words.substr(0, 1).toUpperCase() + words.substr(1);
-	}
+  public function label():String {
+    var words = id.split(".").pop().split("-").join(" ");
+    return words.substr(0, 1).toUpperCase() + words.substr(1);
+  }
 
-	public function matches(component:MachineComponent):Bool
-		return component.componentType() == this;
+  public function matches(component:MachineComponent):Bool return component.componentType() == this;
 
-	public function defaults():ComponentValues
-		return resolve(null);
+  public function defaults():ComponentValues return resolve(null);
 
-	public function resolve(?overrides:ComponentValues):ComponentValues
-		return ComponentRecipeSupport.resolve(inputs, overrides, false);
+  public function resolve(?overrides:ComponentValues):ComponentValues return ComponentRecipeSupport.resolve(
+    inputs,
+    overrides,
+    false
+  );
 
-	public function attachFamily(family:ComponentFamily):Void {
-		if (family.recipe != this || manufacturingFamily != null)
-			throw "Recipe already belongs to a manufacturing family";
-		manufacturingFamily = family;
-	}
+  public function attachFamily(family:ComponentFamily):Void {
+    if (family.recipe != this || manufacturingFamily != null) throw "Recipe already belongs to a manufacturing family";
+    manufacturingFamily = family;
+  }
 
-	public function create(?values:ComponentValues):MachineComponent {
-		var resolved = resolve(values), component = build(resolved);
-		if (manufacturingFamily != null) {
-			var variant = manufacturingFamily.variant(resolved.token(manufacturingFamily.variantParameter));
-			if (component.materialSpec() != variant.material)
-				throw "Component material differs from manufacturing variant";
-			component.lockManufacturingMaterial(variant.material);
-		}
-		return component;
-	}
+  public function create(?values:ComponentValues):MachineComponent {
+    var resolved = resolve(values), component = build(resolved);
+    if (manufacturingFamily != null) {
+      var variant = manufacturingFamily.variant(resolved.token(manufacturingFamily.variantParameter));
+      if (component.materialSpec() != variant.material) throw "Component material differs from manufacturing variant";
+      component.lockManufacturingMaterial(variant.material);
+    }
+    return component;
+  }
 
-	public function valuesOf(component:MachineComponent):ComponentValues {
-		if (!matches(component))
-			throw 'Component is not type "$id"';
-		return component.values();
-	}
+  public function valuesOf(component:MachineComponent):ComponentValues {
+    if (!matches(component)) throw 'Component is not type "$id"';
+    return component.values();
+  }
 
-	public function key(values:ComponentValues):String
-		return keyFor(values, false);
+  public function key(values:ComponentValues):String return keyFor(values, false);
 
-	/**
+  /**
 	 * Mass properties already computed for a component of this type, by its `MachineComponent.geometryKey(Preview)`. They come
 	 * from cutting and integrating real solids, and each machine compile builds new component instances, so a per-instance
 	 * cache never hit across compiles. `MassProperties` never changes, so one value can be shared by every such component.
 	 */
-	public function knownMass(key:String):Null<MassProperties>
-		return massMemo.get(key);
+  public function knownMass(key:String):Null<MassProperties> return massMemo.get(key);
 
-	public function rememberMass(key:String, mass:MassProperties):Void {
-		if (massMemoCount >= MASS_MEMO_LIMIT) {
-			massMemo.clear();
-			massMemoCount = 0;
-		}
-		massMemo.set(key, mass);
-		massMemoCount++;
-	}
+  public function rememberMass(key:String, mass:MassProperties):Void {
+    if (massMemoCount >= MASS_MEMO_LIMIT) {
+      massMemo.clear();
+      massMemoCount = 0;
+    }
+    massMemo.set(key, mass);
+    massMemoCount++;
+  }
 
-	/** BOM identity omits recipe inputs that only place or route a physical part. */
-	public function bomKey(values:ComponentValues):String
-		return keyFor(values, true);
+  /** BOM identity omits recipe inputs that only place or route a physical part. */
+  public function bomKey(values:ComponentValues):String return keyFor(values, true);
 
-	function keyFor(values:ComponentValues, bom:Bool):String {
-		var parts:Array<String> = [];
-		for (input in inputs) {
-			if (bom && bomExcludedInputs.indexOf(input.name) >= 0)
-				continue;
-			var value = values == null ? null : values.get(input.name);
-			if (value == null)
-				value = input.defaultValue;
-			if (input.name == "material" && switch value {
-					case Token(spec): spec == defaultMaterial;
-					default: false;
-				})
-				continue;
-			var text = switch value {
-				case Unset: "unset";
-				case Number(number): switch input.type {
-						case Scalar: Std.string(Math.fround(number * 1e9) / 1e9);
-						case Length: Dimension.format(number);
-						case Angle: Std.string(Math.fround(number * 1e9) / 1e9);
-						default: Std.string(number);
-					};
-				case Integer(value): Std.string(value);
-				case Boolean(value): value ? "true" : "false";
-				case Token(value): value;
-				case null: throw 'Missing component input "${input.name}"';
-			};
-			parts.push('${input.name}:${text.length}:$text');
-		}
-		return id + "|" + parts.join("|");
-	}
+  function keyFor(values:ComponentValues, bom:Bool):String {
+    var parts:Array<String> = [];
+    for (input in inputs) {
+      if (bom && bomExcludedInputs.indexOf(input.name) >= 0) continue;
+      var value = values == null ? null : values.get(input.name);
+      if (value == null) value = input.defaultValue;
+      if (input.name == "material" && switch value {
+        case Token(spec):
+          spec == defaultMaterial;
+        default:
+          false;
+      }
+      ) continue;
+      var text = switch value {
+        case Unset:
+          "unset";
+        case Number(number):
+          switch input.type {
+            case Scalar:
+              Std.string(Math.fround(number * 1e9) / 1e9);
+            case Length:
+              Dimension.format(number);
+            case Angle:
+              Std.string(Math.fround(number * 1e9) / 1e9);
+            default:
+              Std.string(number);
+          };
+        case Integer(value):
+          Std.string(value);
+        case Boolean(value):
+          value ? "true" : "false";
+        case Token(value):
+          value;
+        case null:
+          throw 'Missing component input "${input.name}"';
+      };
+      parts.push('${input.name}:${text.length}:$text');
+    }
+    return id + "|" + parts.join("|");
+  }
 
-	/** The designation stays the part number while the material is the one these inputs give by themselves. */
-	public function partNumber(component:MachineComponent):String
-		return keepDesignation && (materialInDesignation || component.materialSpec() == naturalMaterial(component))
-			? component.designation : key(valuesOf(component));
+  /** The designation stays the part number while the material is the one these inputs give by themselves. */
+  public function partNumber(component:MachineComponent):String return keepDesignation && (materialInDesignation
+    || component.materialSpec() == naturalMaterial(component)) ? component.designation : key(valuesOf(component));
 
-	function naturalMaterial(component:MachineComponent):String {
-		if (component.materialSpec() == defaultMaterial) return defaultMaterial;
-		var values = valuesOf(component), inputs = new ComponentValues();
-		for (name in values.names()) if (name != "material") inputs.set(name, values.get(name));
-		return naturalBuild(resolve(inputs)).materialSpec();
-	}
+  function naturalMaterial(component:MachineComponent):String {
+    if (component.materialSpec() == defaultMaterial) return defaultMaterial;
+    var values = valuesOf(component), inputs = new ComponentValues();
+    for (name in values.names()) if (name != "material") inputs.set(name, values.get(name));
+    return naturalBuild(resolve(inputs)).materialSpec();
+  }
 
-	static function seenIndex(inputs:Array<ComponentParameter>, name:String):Int {
-		for (i in 0...inputs.length)
-			if (inputs[i].name == name)
-				return i;
-		return -1;
-	}
+  static function seenIndex(inputs:Array<ComponentParameter>, name:String):Int {
+    for (i in 0...inputs.length) if (inputs[i].name == name) return i;
+    return -1;
+  }
 }

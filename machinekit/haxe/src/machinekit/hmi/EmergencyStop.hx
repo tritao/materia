@@ -18,32 +18,137 @@ class EmergencyStop extends HmiPart {
   static var recipe:Null<ComponentType>;
 
   static function inputs():Array<ComponentParameter> return [
-    R.catalog("model", ControlCatalogs.eStops(), ControlCatalogs.XB2),
+    R.catalog(
+      "model",
+      ControlCatalogs.eStops(),
+      ControlCatalogs.XB2
+    ),
     HmiPart.basisParameter("stated"),
-    R.length("headDiameter", 40), R.length("collarDiameter", 30), R.length("collarHeight", 9), R.length("headHeight", 22),
-    R.length("panelHole", 22.3), R.length("panelThickness", 3),
-    R.length("nutDiameter", 30), R.length("nutThickness", 5),
-    R.length("baseWidth", 42), R.length("baseDepth", 30), R.length("baseLength", 11),
-    R.length("blockWidth", 29), R.length("blockThickness", 14.8), R.length("blockLength", 24), R.count("blocks", 1),
-    R.scalar("massGrams", 52.4, 1)
+    R.length(
+      "headDiameter",
+      40
+    ),
+    R.length(
+      "collarDiameter",
+      30
+    ),
+    R.length(
+      "collarHeight",
+      9
+    ),
+    R.length(
+      "headHeight",
+      22
+    ),
+    R.length(
+      "panelHole",
+      22.3
+    ),
+    R.length(
+      "panelThickness",
+      3
+    ),
+    R.length(
+      "nutDiameter",
+      30
+    ),
+    R.length(
+      "nutThickness",
+      5
+    ),
+    R.length(
+      "baseWidth",
+      42
+    ),
+    R.length(
+      "baseDepth",
+      30
+    ),
+    R.length(
+      "baseLength",
+      11
+    ),
+    R.length(
+      "blockWidth",
+      29
+    ),
+    R.length(
+      "blockThickness",
+      14.8
+    ),
+    R.length(
+      "blockLength",
+      24
+    ),
+    R.count(
+      "blocks",
+      1
+    ),
+    R.scalar(
+      "massGrams",
+      52.4,
+      1
+    )
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-emergency-stop", "twist-release emergency stop with " + (v == null || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)", "ABS red", inputs(), ControlCatalogs.withModel(ControlCatalogs.eStops(), ControlCatalogs.XB2, v));
-    positive(["headDiameter", "collarDiameter", "collarHeight", "headHeight", "panelHole", "panelThickness", "nutDiameter", "nutThickness",
-      "baseWidth", "baseDepth", "baseLength", "blockWidth", "blockThickness", "blockLength", "massGrams"]);
-    require(n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"), "the head is wider than its collar and the collar wider than the opening");
+    super(
+      "hmi-emergency-stop",
+      "twist-release emergency stop with " + (v == null
+      || v.get("blocks") == null ? 1 : v.integer("blocks")) + " NC contact block(s)",
+      "ABS red",
+      inputs(),
+      ControlCatalogs.withModel(
+        ControlCatalogs.eStops(),
+        ControlCatalogs.XB2,
+        v
+      )
+    );
+    positive([
+      "headDiameter",
+      "collarDiameter",
+      "collarHeight",
+      "headHeight",
+      "panelHole",
+      "panelThickness",
+      "nutDiameter",
+      "nutThickness",
+      "baseWidth",
+      "baseDepth",
+      "baseLength",
+      "blockWidth",
+      "blockThickness",
+      "blockLength",
+      "massGrams"
+    ]);
+    require(
+      n("collarDiameter") < n("headDiameter") && n("panelHole") < n("collarDiameter"),
+      "the head is wider than its collar and the collar wider than the opening"
+    );
     require(count("blocks") >= 1 && count("blocks") <= 3, "one to three contact blocks");
-    require(n("blockThickness") * count("blocks") <= n("baseDepth") + 1e-9 && n("blockWidth") <= n("baseWidth"), "the blocks fit the base");
+    require(
+      n("blockThickness") * count("blocks") <= n("baseDepth") + 1e-9 && n("blockWidth") <= n("baseWidth"),
+      "the blocks fit the base"
+    );
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
     // One NC dry contact per block, to be wired into the safety chain.
-    for (i in 1...count("blocks") + 1) addPort({name: "nc" + i, kind: Signal, role: Passive, iface: Plug("dry-contact", 2), required: true});
+    for (i in 1...count("blocks") + 1) addPort({
+      name: "nc" + i,
+      kind: Signal,
+      role: Passive,
+      iface: Plug(
+        "dry-contact",
+        2
+      ),
+      required: true
+    });
     declareMass(n("massGrams") / 1000.0, new Vector(0, 0, (aboveFace() - behindFace()) / 2));
   }
 
   public static function recipeType():ComponentType {
-    if (recipe == null) recipe = new ComponentType("machinekit.hmi.emergency-stop", inputs(), v -> new EmergencyStop(v));
+    if (recipe == null) recipe = new ComponentType("machinekit.hmi.emergency-stop",
+      inputs(), v -> new EmergencyStop(v));
     return recipe;
   }
   override public function componentType():Null<ComponentType> return recipeType();
@@ -57,32 +162,61 @@ class EmergencyStop extends HmiPart {
   /** The black operator (stem, ring nut, base and contact blocks) and the red mushroom head on its collar. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [
-      new DeviceBodySpec("operator", "emergency stop operator and contact blocks", "ABS black", function() {
-        var parts:Array<Part> = [Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem")];
-        parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
-        var base = Part.box(n("baseWidth"), n("baseDepth"), n("baseLength"));
-        parts.push(Solids.named(drop(base, -t - nut - n("baseLength")), "base"));
-        // Contact blocks side by side across the base's depth, centred.
-        var blockCount = count("blocks");
-        for (i in 0...blockCount) {
-          var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
-          var y = (i - (blockCount - 1) / 2) * n("blockThickness");
-          var moved = block.translated(new Vector(0, y, -t - nut - n("baseLength") - n("blockLength")));
-          block.close();
-          parts.push(Solids.named(moved, "block" + (i + 1)));
-        }
-        return Solids.union(parts);
-      }),
-      new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
-        var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
-        return Solids.named(Part.revolve([
-          {r: 0.0, z: 0.0}, {r: n("collarDiameter") / 2, z: 0.0}, {r: n("collarDiameter") / 2, z: c},
-          {r: h - 1.5, z: c + 1.5}, {r: h, z: c + 4.0}, {r: h, z: above - 3.0}, {r: h - 3.0, z: above - 0.6},
-          {r: h - 8.0, z: above}, {r: 0.0, z: above}
-        ]), "head");
-      })
-    ];
+    return [new DeviceBodySpec("operator", "emergency stop operator and contact blocks", "ABS black", function() {
+      var parts:Array<Part> = [Solids.named(Part.cylinderSpan(n("panelHole") / 2, -t - nut, 0.0), "stem")];
+      parts.push(Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"));
+      var base = Part.box(n("baseWidth"), n("baseDepth"), n("baseLength"));
+      parts.push(Solids.named(drop(base, -t - nut - n("baseLength")), "base"));
+      // Contact blocks side by side across the base's depth, centred.
+      var blockCount = count("blocks");
+      for (i in 0...blockCount) {
+        var block = Part.box(n("blockWidth"), n("blockThickness"), n("blockLength"));
+        var y = (i - (blockCount - 1) / 2) * n("blockThickness");
+        var moved = block.translated(new Vector(0, y, -t - nut - n("baseLength") - n("blockLength")));
+        block.close();
+        parts.push(Solids.named(moved, "block" + (i + 1)));
+      }
+      return Solids.union(parts);
+    }
+    ), new DeviceBodySpec("head", "emergency stop mushroom head", materialSpec(), function() {
+      var above = aboveFace(), c = n("collarHeight"), h = n("headDiameter") / 2;
+      return Solids.named(
+        Part.revolve([
+          {r: 0.0, z: 0.0},
+          {r: n("collarDiameter") / 2, z: 0.0},
+          {
+            r: n("collarDiameter") / 2,
+            z: c
+          },
+          {
+            r: h - 1.5,
+            z: c + 1.5
+          },
+          {
+            r: h,
+            z: c + 4.0
+          },
+          {
+            r: h,
+            z: above - 3.0
+          },
+          {
+            r: h - 3.0,
+            z: above - 0.6
+          },
+          {
+            r: h - 8.0,
+            z: above
+          },
+          {
+            r: 0.0,
+            z: above
+          }
+        ]),
+        "head"
+      );
+    }
+    )];
   }
 
   static function drop(part:Part, z:Float):Part {

@@ -8,7 +8,8 @@ class OperatorState {
   public var sequence:Int = 0;
   public var jog_allowed:Int = 0;
   public var reserved:Int = 0;
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {

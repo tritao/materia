@@ -25,223 +25,294 @@ import materia.project.MaterialLibrary;
  * than a fillet. Tooth counts whose selected profile shift still requires undercut are rejected.
  */
 class SpurGear extends MachineComponent {
-	public static inline var STANDARD_PRESSURE_ANGLE:Float = 0.3490658503988659; // 20 degrees
-	/** Accepted pressure-angle range, 14.5 to 25 degrees: the standard involute systems. */
-	public static inline var MIN_PRESSURE_ANGLE:Float = 0.25307274153917777; // 14.5 degrees
-	public static inline var MAX_PRESSURE_ANGLE:Float = 0.4363323129985824; // 25 degrees
+  public static inline var STANDARD_PRESSURE_ANGLE:Float = 0.3490658503988659; // 20 degrees
+  /** Accepted pressure-angle range, 14.5 to 25 degrees: the standard involute systems. */
+  public static inline var MIN_PRESSURE_ANGLE:Float = 0.25307274153917777; // 14.5 degrees
+  public static inline var MAX_PRESSURE_ANGLE:Float = 0.4363323129985824; // 25 degrees
 
-	/** Involute points each flank spline passes through. */
-	static inline var FLANK_SAMPLES:Int = 6;
+  /** Involute points each flank spline passes through. */
+  static inline var FLANK_SAMPLES:Int = 6;
 
-	public final moduleSize:Float;
-	public final teeth:Int;
-	public final pressureAngle:Float;
-	public final faceWidth:Float;
-	/** Profile-shift coefficient x, in module units. */
-	public final profileShift:Float;
-	/** Tangential backlash allowance at the pitch circle, in millimetres. */
-	public final backlash:Float;
-	/** Shaft bore diameter; zero leaves the original solid gear blank. */
-	public final boreDiameter:Float;
+  public final moduleSize:Float;
+  public final teeth:Int;
+  public final pressureAngle:Float;
+  public final faceWidth:Float;
+  /** Profile-shift coefficient x, in module units. */
+  public final profileShift:Float;
+  /** Tangential backlash allowance at the pitch circle, in millimetres. */
+  public final backlash:Float;
+  /** Shaft bore diameter; zero leaves the original solid gear blank. */
+  public final boreDiameter:Float;
 
-	public final pitchDiameter:Float;
-	public final baseDiameter:Float;
-	public final outsideDiameter:Float;
-	public final rootDiameter:Float;
-	public final tipToothThickness:Float;
+  public final pitchDiameter:Float;
+  public final baseDiameter:Float;
+  public final outsideDiameter:Float;
+  public final rootDiameter:Float;
+  public final tipToothThickness:Float;
 
-	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE,
-			profileShift:Float = 0, backlash:Float = 0, boreDiameter:Float = 0) {
-		if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
-		if (teeth < 6) throw "Spur gear needs at least 6 teeth";
-		if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
-		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
-		if (!Math.isFinite(profileShift) || profileShift <= -1 || profileShift >= 1.25)
-			throw "Spur gear profile shift must be finite and between -1 and 1.25";
-		if (!Math.isFinite(backlash) || backlash < 0) throw "Spur gear backlash must be finite and non-negative";
-		if (profileShift < minimumProfileShift(teeth, pressureAngle) - 1e-10)
-			throw profileShift == 0 ? "Unshifted spur gear would require undercut; use a positive profile shift or more teeth" :
-				"Spur gear profile shift is insufficient to avoid undercut";
-		var pitchDiameter = moduleSize * teeth;
-		var baseDiameter = pitchDiameter * Math.cos(pressureAngle);
-		var outsideDiameter = pitchDiameter + 2 * moduleSize * (1 + profileShift);
-		var rootDiameter = pitchDiameter - 2 * moduleSize * (1.25 - profileShift);
-		if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
-		var toothThickness = Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
-		if (!(toothThickness > 0)) throw "Spur gear backlash leaves no tooth thickness";
-		if (!Math.isFinite(boreDiameter) || boreDiameter < 0 || boreDiameter >= rootDiameter)
-			throw "Spur gear bore must be non-negative and leave material inside the tooth roots";
-		var tipToothThickness = outsideDiameter * (toothThickness / pitchDiameter
-			+ involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
-			- involuteRollAngle(outsideDiameter / 2, baseDiameter / 2));
-		if (!Math.isFinite(tipToothThickness) || tipToothThickness < 0.25 * moduleSize)
-			throw "Spur gear tip tooth thickness must be at least 0.25 module";
-		var moduleText = Dimension.format(moduleSize);
-		var shiftSuffix = profileShift == 0 ? "" : '-X${Dimension.format(profileShift)}';
-		var backlashSuffix = backlash == 0 ? "" : '-B${Dimension.format(backlash)}';
-		var boreSuffix = boreDiameter == 0 ? "" : "-D" + Dimension.format(boreDiameter);
-		var designation = 'SPUR-M$moduleText-${teeth}T$shiftSuffix$backlashSuffix$boreSuffix';
-		var description = 'Spur gear module $moduleText, ${teeth} teeth${profileShift == 0 ? "" : ", profile shift ${Dimension.format(profileShift)}"}${backlash == 0 ? "" : ", backlash ${Dimension.format(backlash)} mm"}';
-		super(designation, description, "steel");
-		this.moduleSize = moduleSize;
-		this.teeth = teeth;
-		this.pressureAngle = pressureAngle;
-		this.faceWidth = faceWidth;
-		this.profileShift = profileShift;
-		this.backlash = backlash;
-		this.boreDiameter = boreDiameter;
-		this.pitchDiameter = pitchDiameter;
-		this.baseDiameter = baseDiameter;
-		this.outsideDiameter = outsideDiameter;
-		this.rootDiameter = rootDiameter;
-		this.tipToothThickness = tipToothThickness;
-		addConnector("axis", ConnectorRole.Axis, Solids.axial(0, 0, faceWidth / 2));
-		addConnector("pitch", ConnectorRole.Pitch, Solids.axial(0, -pitchDiameter / 2, faceWidth / 2));
-	}
+  public function new(
+    moduleSize:Float,
+    teeth:Int,
+    faceWidth:Float,
+    pressureAngle:Float = STANDARD_PRESSURE_ANGLE,
+    profileShift:Float = 0,
+    backlash:Float = 0,
+    boreDiameter:Float = 0
+  ) {
+    if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
+    if (teeth < 6) throw "Spur gear needs at least 6 teeth";
+    if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
+    if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+    if (!Math.isFinite(profileShift) || profileShift <= -1
+      || profileShift >= 1.25) throw "Spur gear profile shift must be finite and between -1 and 1.25";
+    if (!Math.isFinite(backlash) || backlash < 0) throw "Spur gear backlash must be finite and non-negative";
+    if (profileShift < minimumProfileShift(teeth, pressureAngle) - 1e-10) throw profileShift
+      == 0 ? "Unshifted spur gear would require undercut; use a positive profile shift or more teeth"
+      : "Spur gear profile shift is insufficient to avoid undercut";
+    var pitchDiameter = moduleSize * teeth;
+    var baseDiameter = pitchDiameter * Math.cos(pressureAngle);
+    var outsideDiameter = pitchDiameter + 2 * moduleSize * (1 + profileShift);
+    var rootDiameter = pitchDiameter - 2 * moduleSize * (1.25 - profileShift);
+    if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
+    var toothThickness = Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
+    if (!(toothThickness > 0)) throw "Spur gear backlash leaves no tooth thickness";
+    if (!Math.isFinite(boreDiameter) || boreDiameter < 0 || boreDiameter
+      >= rootDiameter) throw "Spur gear bore must be non-negative and leave material inside the tooth roots";
+    var tipToothThickness = outsideDiameter * (toothThickness / pitchDiameter + involuteRollAngle(
+      pitchDiameter / 2,
+      baseDiameter / 2
+    ) - involuteRollAngle(
+      outsideDiameter / 2,
+      baseDiameter / 2
+    ));
+    if (!Math.isFinite(tipToothThickness)
+      || tipToothThickness < 0.25 * moduleSize) throw "Spur gear tip tooth thickness must be at least 0.25 module";
+    var moduleText = Dimension.format(moduleSize);
+    var shiftSuffix = profileShift == 0 ? "" : '-X${Dimension.format(profileShift)}';
+    var backlashSuffix = backlash == 0 ? "" : '-B${Dimension.format(backlash)}';
+    var boreSuffix = boreDiameter == 0 ? "" : "-D" + Dimension.format(boreDiameter);
+    var designation = 'SPUR-M$moduleText-${teeth}T$shiftSuffix$backlashSuffix$boreSuffix';
+    var description =
+      'Spur gear module $moduleText, ${teeth} teeth${profileShift == 0 ? "" : ", profile shift ${Dimension.format(profileShift)}"}${backlash == 0 ? "" : ", backlash ${Dimension.format(backlash)} mm"}';
+    super(designation, description, "steel");
+    this.moduleSize = moduleSize;
+    this.teeth = teeth;
+    this.pressureAngle = pressureAngle;
+    this.faceWidth = faceWidth;
+    this.profileShift = profileShift;
+    this.backlash = backlash;
+    this.boreDiameter = boreDiameter;
+    this.pitchDiameter = pitchDiameter;
+    this.baseDiameter = baseDiameter;
+    this.outsideDiameter = outsideDiameter;
+    this.rootDiameter = rootDiameter;
+    this.tipToothThickness = tipToothThickness;
+    addConnector("axis", ConnectorRole.Axis, Solids.axial(0, 0, faceWidth / 2));
+    addConnector("pitch", ConnectorRole.Pitch, Solids.axial(0, -pitchDiameter / 2, faceWidth / 2));
+  }
 
-	/** Conservative no-undercut full-depth limit: ceil(2 / sin(pressureAngle)^2). */
-	public static function minimumUnshiftedTeeth(pressureAngle:Float):Int {
-		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
-		var sine = Math.sin(pressureAngle);
-		return Math.ceil(2 / (sine * sine));
-	}
+  /** Conservative no-undercut full-depth limit: ceil(2 / sin(pressureAngle)^2). */
+  public static function minimumUnshiftedTeeth(pressureAngle:Float):Int {
+    if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+    var sine = Math.sin(pressureAngle);
+    return Math.ceil(2 / (sine * sine));
+  }
 
-	/** Conservative minimum profile shift coefficient for a full-depth gear with this tooth count. */
-	public static function minimumProfileShift(teeth:Int, pressureAngle:Float = STANDARD_PRESSURE_ANGLE):Float {
-		if (teeth < 1) throw "Spur gear needs a positive tooth count";
-		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
-		return 1 - teeth * Math.pow(Math.sin(pressureAngle), 2) / 2;
-	}
+  /** Conservative minimum profile shift coefficient for a full-depth gear with this tooth count. */
+  public static function minimumProfileShift(teeth:Int, pressureAngle:Float = STANDARD_PRESSURE_ANGLE):Float {
+    if (teeth < 1) throw "Spur gear needs a positive tooth count";
+    if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+    return 1 - teeth * Math.pow(Math.sin(pressureAngle), 2) / 2;
+  }
 
-	/** True for pressure angles within `MIN_PRESSURE_ANGLE`..`MAX_PRESSURE_ANGLE` (radians). */
-	public static function validPressureAngle(angle:Float):Bool
-		return angle >= MIN_PRESSURE_ANGLE - 1e-12 && angle <= MAX_PRESSURE_ANGLE + 1e-12;
+  /** True for pressure angles within `MIN_PRESSURE_ANGLE`..`MAX_PRESSURE_ANGLE` (radians). */
+  public static function validPressureAngle(angle:Float):Bool return angle >= MIN_PRESSURE_ANGLE - 1e-12
+    && angle <= MAX_PRESSURE_ANGLE + 1e-12;
 
-	/** Centre distance to mesh with `other`, including the sum of both profile shifts. Both gears
+  /** Centre distance to mesh with `other`, including the sum of both profile shifts. Both gears
 	 * must share a module and pressure angle. Backlash changes tooth thickness, not centre distance.
 	 */
-	public function centerDistance(other:SpurGear):Float {
-		if (moduleSize != other.moduleSize) throw new machinekit.transmission.TransmissionDesignError("Meshing gears have different modules; update the driven gear to match the driver");
-		if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10)
-			throw new machinekit.transmission.TransmissionDesignError("Meshing gears have different pressure angles; update the driven gear to match the driver");
-		var teethSum = teeth + other.teeth;
-		var shiftedInvolute = involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
-			+ 2 * (profileShift + other.profileShift) * Math.tan(pressureAngle) / teethSum;
-		if (shiftedInvolute < -1e-12 || !Math.isFinite(shiftedInvolute))
-			throw new machinekit.transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
-		var operatingAngle = solveInvolute(shiftedInvolute);
-		return (pitchDiameter + other.pitchDiameter) / 2 * Math.cos(pressureAngle) / Math.cos(operatingAngle);
-	}
+  public function centerDistance(other:SpurGear):Float {
+    if (moduleSize != other.moduleSize) throw new machinekit.transmission
+      .TransmissionDesignError("Meshing gears have different modules; update the driven gear to match the driver");
+    if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10) throw new machinekit.transmission
+      .TransmissionDesignError("Meshing gears have different pressure angles; update the driven gear to match the driver");
+    var teethSum = teeth + other.teeth;
+    var shiftedInvolute = involuteRollAngle(pitchDiameter / 2,
+      baseDiameter / 2) + 2 * (profileShift + other.profileShift) * Math.tan(pressureAngle) / teethSum;
+    if (shiftedInvolute < -1e-12 || !Math.isFinite(shiftedInvolute)) throw new machinekit
+      .transmission.TransmissionDesignError("Gear profile shifts cannot mesh; choose compatible profile shifts");
+    var operatingAngle = solveInvolute(shiftedInvolute);
+    return (pitchDiameter + other.pitchDiameter) / 2 * Math.cos(pressureAngle) / Math.cos(operatingAngle);
+  }
 
-	/** Solve tan(angle)-angle = value on [0, pi/2) with safeguarded Newton steps. */
-	static function solveInvolute(value:Float):Float {
-		if (value <= 0) return 0;
-		var lower = 0.0, upper = Math.PI / 2 - 1e-8, angle = STANDARD_PRESSURE_ANGLE;
-		for (_ in 0...64) {
-			var tangent = Math.tan(angle), error = tangent - angle - value;
-			if (Math.abs(error) <= 1e-14) return angle;
-			if (error < 0) {
-				lower = angle;
-			} else {
-				upper = angle;
-			}
-			var derivative = tangent * tangent;
-			var next = derivative > 1e-14 ? angle - error / derivative : (lower + upper) / 2;
-			if (!Math.isFinite(next) || next <= lower || next >= upper)
-				next = (lower + upper) / 2;
-			angle = next;
-		}
-		return angle;
-	}
+  /** Solve tan(angle)-angle = value on [0, pi/2) with safeguarded Newton steps. */
+  static function solveInvolute(value:Float):Float {
+    if (value <= 0) return 0;
+    var lower = 0.0, upper = Math.PI / 2 - 1e-8, angle = STANDARD_PRESSURE_ANGLE;
+    for (_ in 0...64) {
+      var tangent = Math.tan(angle), error = tangent - angle - value;
+      if (Math.abs(error) <= 1e-14) return angle;
+      if (error < 0) {
+        lower = angle;
+      } else {
+        upper = angle;
+      }
+      var derivative = tangent * tangent;
+      var next = derivative > 1e-14 ? angle - error / derivative : (lower + upper) / 2;
+      if (!Math.isFinite(next) || next <= lower || next >= upper) next = (lower + upper) / 2;
+      angle = next;
+    }
+    return angle;
+  }
 
-	/** Tooth thickness measured along the pitch circle after profile shift and backlash. */
-	public function pitchToothThickness():Float
-		return Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
+  /** Tooth thickness measured along the pitch circle after profile shift and backlash. */
+  public function pitchToothThickness():Float return Math.PI
+    * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 
-	override public function hasGeometry():Bool return true;
+  override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = outline().extrude(0, faceWidth);
-		if (boreDiameter == 0) return body;
-		return Solids.building([body], owned -> {
-			var bore = Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, faceWidth + 0.1), "bore");
-			owned.push(bore);
-			return Solids.cut(body, [bore]);
-		});
-	}
+  override public function geometry(detail:ComponentDetail = Preview):Part {
+    var body = outline().extrude(0, faceWidth);
+    if (boreDiameter == 0) return body;
+    return Solids.building([body], owned -> {var bore = Solids.named(
+      Part.cylinderSpan(
+        boreDiameter / 2,
+        -0.1,
+        faceWidth + 0.1
+      ),
+      "bore"
+    );
+    owned.push(bore);
+    return Solids.cut(body, [bore]);
+    });
+  }
 
-	private static var recipeTypeCache:Null<ComponentType>;
+  private static var recipeTypeCache:Null<ComponentType>;
 
-	public static function recipeType():ComponentType {
-		if (recipeTypeCache == null)
-			recipeTypeCache = new ComponentType("machinekit.transmission.spur-gear", [
-				ComponentRecipeSupport.length("moduleSize", 2), ComponentRecipeSupport.count("teeth", 20),
-				ComponentRecipeSupport.length("faceWidth", 10),
-				new ComponentParameter("pressureAngle", Angle, Number(STANDARD_PRESSURE_ANGLE), "rad",
-					MIN_PRESSURE_ANGLE, MAX_PRESSURE_ANGLE),
-				ComponentRecipeSupport.scalar("profileShift", 0, -0.999, 1.249),
-				ComponentRecipeSupport.length("backlash", 0), ComponentRecipeSupport.length("boreDiameter", 0)
-			], v -> new SpurGear(v.number("moduleSize"), v.integer("teeth"), v.number("faceWidth"),
-				v.number("pressureAngle"), v.number("profileShift"), v.number("backlash"), v.number("boreDiameter")), true);
-		return recipeTypeCache;
-	}
+  public static function recipeType():ComponentType {
+    if (recipeTypeCache == null) recipeTypeCache = new ComponentType(
+      "machinekit.transmission.spur-gear",
+      [
+        ComponentRecipeSupport.length(
+          "moduleSize",
+          2
+        ),
+        ComponentRecipeSupport.count(
+          "teeth",
+          20
+        ),
+        ComponentRecipeSupport.length(
+          "faceWidth",
+          10
+        ),
+        new ComponentParameter(
+          "pressureAngle",
+          Angle,
+          Number(STANDARD_PRESSURE_ANGLE),
+          "rad",
+          MIN_PRESSURE_ANGLE,
+          MAX_PRESSURE_ANGLE
+        ),
+        ComponentRecipeSupport.scalar(
+          "profileShift",
+          0,
+          -0.999,
+          1.249
+        ),
+        ComponentRecipeSupport.length(
+          "backlash",
+          0
+        ),
+        ComponentRecipeSupport.length(
+          "boreDiameter",
+          0
+        )
+      ],
+      v -> new SpurGear(
+        v.number("moduleSize"),
+        v.integer("teeth"),
+        v.number("faceWidth"),
+        v.number("pressureAngle"),
+        v.number("profileShift"),
+        v.number("backlash"),
+        v.number("boreDiameter")
+      ),
+      true
+    );
+    return recipeTypeCache;
+  }
 
-	override public function componentType():Null<ComponentType> return Std.isExactType(this, SpurGear) ? recipeType() : null;
+  override public function componentType():Null<ComponentType> return Std.isExactType(this,
+    SpurGear) ? recipeType() : null;
 
-	override public function values():ComponentValues return new ComponentValues()
-		.setNumber("moduleSize", moduleSize).setInteger("teeth", teeth).setNumber("faceWidth", faceWidth)
-		.setNumber("pressureAngle", pressureAngle).setNumber("profileShift", profileShift)
-		.setNumber("backlash", backlash).setNumber("boreDiameter", boreDiameter).setToken("material", materialSpec());
+  override public function values():ComponentValues return new ComponentValues().setNumber("moduleSize",
+    moduleSize).setInteger(
+      "teeth",
+      teeth
+    ).setNumber(
+      "faceWidth",
+      faceWidth
+    ).setNumber(
+      "pressureAngle",
+      pressureAngle
+    ).setNumber(
+      "profileShift",
+      profileShift
+    ).setNumber(
+      "backlash",
+      backlash
+    ).setNumber(
+      "boreDiameter",
+      boreDiameter
+    ).setToken(
+      "material",
+      materialSpec()
+    );
 
-	/**
+  /**
 	 * Full-gear outline as one closed loop, one tooth centred on each multiple of 2*pi/teeth: each flank a spline
 	 * through its involute, the tip an arc on the outside circle, the space between teeth an arc on the root
 	 * circle (joined to the flanks by radial lines where the root lies inside the base circle).
 	 */
-	function outline():ToothOutline {
-		var rb = baseDiameter / 2, rp = pitchDiameter / 2, ra = outsideDiameter / 2, rf = rootDiameter / 2;
-		var rStart = Math.max(rb, rf);
-		var halfToothAngle = pitchToothThickness() / (2 * rp);
-		var tPitch = Math.sqrt(Math.pow(rp / rb, 2) - 1);
-		var involuteAnglePitch = tPitch - Math.atan2(tPitch, 1);
-		var angleStep = 2 * Math.PI / teeth;
-		inline function polar(r:Float, angle:Float):Vector
-			return new Vector(r * Math.cos(angle), r * Math.sin(angle));
-		function rightFlank(center:Float):Array<Vector>
-			return [
-				for (s in 0...FLANK_SAMPLES) {
-					var r = rStart + (ra - rStart) * s / (FLANK_SAMPLES - 1);
-					polar(r, center - halfToothAngle + (involuteRollAngle(r, rb) - involuteAnglePitch));
-				}
-			];
-		var result = new ToothOutline(), firstStart = rightFlank(0)[0];
-		for (i in 0...teeth) {
-			var center = i * angleStep;
-			var right = rightFlank(center);
-			if (i == 0)
-				right[0] = firstStart;
-			var left = [
-				for (s in 0...FLANK_SAMPLES) {
-					var r = rStart + (ra - rStart) * (FLANK_SAMPLES - 1 - s) / (FLANK_SAMPLES - 1);
-					polar(r, center + halfToothAngle - (involuteRollAngle(r, rb) - involuteAnglePitch));
-				}
-			];
-			result.spline(right).arc(right[right.length - 1], polar(ra, center), left[0]).spline(left);
-			var next = i == teeth - 1 ? firstStart : rightFlank(center + angleStep)[0];
-			var gap = center + angleStep / 2;
-			if (rf < rStart) {
-				var rootA = polar(rf, center + halfToothAngle + involuteAnglePitch);
-				var rootB = polar(rf, center + angleStep - halfToothAngle - involuteAnglePitch);
-				result.line(left[left.length - 1], rootA).arc(rootA, polar(rf, gap), rootB).line(rootB, next);
-			} else
-				result.arc(left[left.length - 1], polar(rf, gap), next);
-		}
-		return result;
-	}
+  function outline():ToothOutline {
+    var rb = baseDiameter / 2, rp = pitchDiameter / 2, ra = outsideDiameter / 2, rf = rootDiameter / 2;
+    var rStart = Math.max(rb, rf);
+    var halfToothAngle = pitchToothThickness() / (2 * rp);
+    var tPitch = Math.sqrt(Math.pow(rp / rb, 2) - 1);
+    var involuteAnglePitch = tPitch - Math.atan2(tPitch, 1);
+    var angleStep = 2 * Math.PI / teeth;
+    inline function polar(r:Float, angle:Float):Vector return new Vector(r * Math.cos(angle), r * Math.sin(angle));
+    function rightFlank(center:Float):Array<Vector> return [for (s in 0...FLANK_SAMPLES) {
+      var r = rStart + (ra - rStart) * s / (FLANK_SAMPLES - 1);
+      polar(r, center - halfToothAngle + (involuteRollAngle(r, rb) - involuteAnglePitch));
+    }
+    ];
+    var result = new ToothOutline(), firstStart = rightFlank(0)[0];
+    for (i in 0...teeth) {
+      var center = i * angleStep;
+      var right = rightFlank(center);
+      if (i == 0) right[0] = firstStart;
+      var left = [for (s in 0...FLANK_SAMPLES) {
+        var r = rStart + (ra - rStart) * (FLANK_SAMPLES - 1 - s) / (FLANK_SAMPLES - 1);
+        polar(r, center + halfToothAngle - (involuteRollAngle(r, rb) - involuteAnglePitch));
+      }
+      ];
+      result.spline(right).arc(right[right.length - 1], polar(ra, center), left[0]).spline(left);
+      var next = i == teeth - 1 ? firstStart : rightFlank(center + angleStep)[0];
+      var gap = center + angleStep / 2;
+      if (rf < rStart) {
+        var rootA = polar(rf, center + halfToothAngle + involuteAnglePitch);
+        var rootB = polar(rf, center + angleStep - halfToothAngle - involuteAnglePitch);
+        result.line(left[left.length - 1], rootA).arc(rootA, polar(rf, gap), rootB).line(rootB, next);
+      } else result.arc(left[left.length - 1], polar(rf, gap), next);
+    }
+    return result;
+  }
 
-	/** Involute roll angle (t - atan t) of the point at radius `r` on a circle of base radius `rb`. */
-	static function involuteRollAngle(r:Float, rb:Float):Float {
-		var t = r > rb ? Math.sqrt(Math.pow(r / rb, 2) - 1) : 0;
-		return t - Math.atan2(t, 1);
-	}
+  /** Involute roll angle (t - atan t) of the point at radius `r` on a circle of base radius `rb`. */
+  static function involuteRollAngle(r:Float, rb:Float):Float {
+    var t = r > rb ? Math.sqrt(Math.pow(r / rb, 2) - 1) : 0;
+    return t - Math.atan2(t, 1);
+  }
 }

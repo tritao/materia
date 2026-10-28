@@ -13,8 +13,15 @@ class Spoilboard extends AssumedCatalogComponent {
   static function inputs():Array<ComponentParameter> return [
     P.length("width", 1600),
     P.length("length", 2600),
-    P.length("thickness", 25),
-    P.quantity("permeability", 0.000001, "mm2")
+    P.length(
+      "thickness",
+      25
+    ),
+    P.quantity(
+      "permeability",
+      0.000001,
+      "mm2"
+    )
   ];
   public function new(?v:ComponentValues) {
     super("spoilboard", "bleeder spoilboard", "MDF", inputs(), v);

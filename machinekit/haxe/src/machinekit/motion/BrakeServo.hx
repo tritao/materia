@@ -12,10 +12,25 @@ class BrakeServo extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.choice("power", ["400", "750"], "400"),
-    P.quantity("brakeTorque", 2.5, "N m"),
-    P.length("brakeLength", 35),
-    P.quantity("releaseDelay", 0.05, "s"),
-    P.quantity("applicationDelay", 0.03, "s")
+    P.quantity(
+      "brakeTorque",
+      2.5,
+      "N m"
+    ),
+    P.length(
+      "brakeLength",
+      35
+    ),
+    P.quantity(
+      "releaseDelay",
+      0.05,
+      "s"
+    ),
+    P.quantity(
+      "applicationDelay",
+      0.03,
+      "s"
+    )
   ];
   public function new(?v:ComponentValues) {
     super("brake-servo", "AC servo with spring-applied holding brake", "aluminium 6061", inputs(), v);
@@ -51,8 +66,8 @@ class BrakeServo extends AssumedCatalogComponent {
   }
   public final motor:ServoMotor;
   override public function axisMotor():Null<AxisMotor> {
-    var face=AxisMotor.of(motor);
-    return new AxisMotor(this,face.flange,face.shaftDiameter,face.shaftLength,depth->face.mountingCutout(depth));
+    var face = AxisMotor.of(motor);
+    return new AxisMotor(this, face.flange, face.shaftDiameter, face.shaftLength, depth -> face.mountingCutout(depth));
   }
   override public function motorDrive():Null<MotorDrive> return motor;
   override public function motorBrakeSpec():Null<MotorBrakeSpec> return new BrakeServoSpec(this);

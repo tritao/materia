@@ -9,7 +9,8 @@ class PendantOutput {
   public var lease:Int = 0;
   public var text:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   public var reserved:Int = 0;
-  public function new() {}
+  public function new() {
+  }
 
   /** Constraints declared in the schema; checked on encode and decode. */
   public function check():Void {
@@ -18,7 +19,8 @@ class PendantOutput {
     if (!(lease == 0 || lease == 1 || lease == 2)) throw "PendantOutput.lease violates its constraint";
     var textEnd = 0;
     while (textEnd < text.length && text[textEnd] != 0) textEnd++;
-    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32 || text[i] > 126) : text[i] != 0) throw "PendantOutput.text violates its constraint";
+    for (i in 0...text.length) if (i < textEnd ? (text[i] < 32
+      || text[i] > 126) : text[i] != 0) throw "PendantOutput.text violates its constraint";
     if (reserved != 0) throw "PendantOutput.reserved violates its constraint";
   }
 

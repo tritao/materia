@@ -25,30 +25,45 @@ class HmiPart extends MachineComponent {
   public final basis:ValueBasis;
   final stored:ComponentValues;
 
-  function new(id:String, label:String, material:String, parameters:Array<ComponentParameter>, ?inputs:ComponentValues) {
+  function new(id:String,
+    label:String, material:String, parameters:Array<ComponentParameter>, ?inputs:ComponentValues) {
     var v = ComponentRecipeSupport.resolve(parameters, inputs);
     if (v.get("material") == null) v.setToken("material", material);
     var tag = v.token("basis");
     super(ComponentRecipeSupport.designationFor(id, tag, v), label, v.token("material"), false, v);
     stored = v.copy();
     basis = switch tag {
-      case "catalog": Catalog;
-      case "stated": Stated;
-      case "measured": Measured;
-      case _: Assumed;
+      case "catalog":
+        Catalog;
+      case "stated":
+        Stated;
+      case "measured":
+        Measured;
+      case _:
+        Assumed;
     };
   }
 
   /** The provenance input every part declares. */
-  public static function basisParameter(value:String = "assumed"):ComponentParameter
-    return ComponentRecipeSupport.choice("basis", ["catalog", "stated", "assumed", "measured"], value);
+  public static function basisParameter(value:String =
+    "assumed"):ComponentParameter return ComponentRecipeSupport.choice(
+      "basis",
+      [
+        "catalog",
+        "stated",
+        "assumed",
+        "measured"
+      ],
+      value
+    );
 
   public function n(name:String):Float return parameterNumber(name);
   public function flag(name:String):Bool return stored.boolean(name);
   /** An integer input (a count). */
   public function count(name:String):Int return stored.integer(name);
   public function positive(names:Array<String>):Void {
-    for (name in names) if (!Math.isFinite(n(name)) || n(name) <= 0) throw designation + ": " + name + " must be finite and positive";
+    for (name in names) if (!Math.isFinite(n(name))
+      || n(name) <= 0) throw designation + ": " + name + " must be finite and positive";
   }
   public function require(ok:Bool, message:String):Void {
     if (!ok) throw designation + ": " + message;
@@ -91,26 +106,69 @@ class HmiPart extends MachineComponent {
     for (i in 0...specs.length) {
       var spec = specs[i];
       var name = i == 0 ? designation : designation + "-" + spec.id.toUpperCase();
-      assembly.addComponent(spec.id, new DeviceBody(name, spec.label, spec.material, spec.build, this, i == 0,
-        n("massGrams") / 1000.0 * volumes[i] / total, centres[i]));
+      assembly.addComponent(
+        spec.id,
+        new DeviceBody(
+          name,
+          spec.label,
+          spec.material,
+          spec.build,
+          this,
+          i == 0,
+          n("massGrams") / 1000.0 * volumes[i] / total,
+          centres[i]
+        )
+      );
     }
     for (joint in joints()) {
       assembly.addMemberConnector(joint.parent, joint.id + "-fixed", AssemblyFrames.identity());
       assembly.addMemberConnector(joint.child, joint.id + "-turning", AssemblyFrames.identity());
-      assembly.addMateOnAxis(joint.id, joint.kind, joint.parent, joint.id + "-fixed", joint.child, joint.id + "-turning", {x: 0, y: 0, z: 1}, 0);
+      assembly.addMateOnAxis(
+        joint.id,
+        joint.kind,
+        joint.parent,
+        joint.id + "-fixed",
+        joint.child,
+        joint.id + "-turning",
+        {
+          x: 0,
+          y: 0,
+          z: 1
+        },
+        0
+      );
     }
     return assembly;
   }
 
   public function dataSource():String return switch basis {
-    case Catalog: "vendor-drawing";
-    case Stated: "listing";
-    case Measured: "measured";
-    case _: "assumed";
+    case Catalog:
+      "vendor-drawing";
+    case Stated:
+      "listing";
+    case Measured:
+      "measured";
+    case _:
+      "assumed";
   };
 
   /** States how the part is fixed to a panel (see PanelMountFacet), from the part's own numbers. */
-  function mount(cutout:Footprint, keepOut:Footprint, holes:Array<{x:Float, y:Float, diameter:Float}>, above:Float, behind:Float, body:Footprint,
-      maxPanelThickness:Float = 1e9):Void
-    addFacet(new PanelMountFacet(cutout, keepOut, holes, above, behind, body, maxPanelThickness, dataSource()));
+  function mount(
+    cutout:Footprint,
+    keepOut:Footprint,
+    holes:Array<{x:Float, y:Float, diameter:Float}>,
+    above:Float,
+    behind:Float,
+    body:Footprint,
+    maxPanelThickness:Float = 1e9
+  ):Void addFacet(new PanelMountFacet(
+    cutout,
+    keepOut,
+    holes,
+    above,
+    behind,
+    body,
+    maxPanelThickness,
+    dataSource()
+  ));
 }

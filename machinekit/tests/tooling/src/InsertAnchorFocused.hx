@@ -1,1 +1,3 @@
-class InsertAnchorFocused {public static function main():Void InsertAnchorTests.run();}
+class InsertAnchorFocused {
+  public static function main():Void InsertAnchorTests.run();
+}

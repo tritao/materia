@@ -12,19 +12,39 @@ class CircuitBreaker extends AssumedCatalogComponent {
   static var recipe:Null<ComponentType>;
   static function inputs():Array<ComponentParameter> return [
     P.quantity("ratedCurrent", 32, "A"),
-    P.quantity("ratedVoltage", 400, "V"),
-    P.quantity("breakingCapacity", 6000, "A"),
-    P.count("poles", 3),
-    P.length("poleWidth", 18),
-    P.length("depth", 75),
-    P.length("height", 90)
+    P.quantity(
+      "ratedVoltage",
+      400,
+      "V"
+    ),
+    P.quantity(
+      "breakingCapacity",
+      6000,
+      "A"
+    ),
+    P.count(
+      "poles",
+      3
+    ),
+    P.length(
+      "poleWidth",
+      18
+    ),
+    P.length(
+      "depth",
+      75
+    ),
+    P.length(
+      "height",
+      90
+    )
   ];
   public function new(?v:ComponentValues) {
     super("circuit-breaker", "three-pole circuit breaker", "device housing", inputs(), v);
     positive(["ratedCurrent", "ratedVoltage", "breakingCapacity", "poleWidth", "depth", "height"]);
     require(parameterCount("poles") > 0, "breaker needs poles");
     addConnector("din", Mount, F.translation(0, 0, 0));
-    for (name in["line", "load"]) addPort({
+    for (name in ["line", "load"]) addPort({
       name: name,
       kind: ElectricalPower,
       role: name == "line" ? Consumer : Supply,
@@ -33,8 +53,7 @@ class CircuitBreaker extends AssumedCatalogComponent {
         parameterCount("poles")
       ),
       required : true
-    }
-    );
+    });
   }
   public static function recipeType():ComponentType {
     if (recipe == null) recipe = new ComponentType(
@@ -46,8 +65,7 @@ class CircuitBreaker extends AssumedCatalogComponent {
   }
   override public function componentType():Null<ComponentType> return recipeType();
   /** A housing, not a solid block: mass from the envelope at an assumed effective density. */
-  override function effectiveDensity():Null<Float>
-    return machinekit.component.EffectiveDensities.DinRailSwitchgear;
+  override function effectiveDensity():Null<Float> return machinekit.component.EffectiveDensities.DinRailSwitchgear;
 
   override public function presentationView():Null<machinekit.component.ComponentView> return DinRailDevice.view();
 

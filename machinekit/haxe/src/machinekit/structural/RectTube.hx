@@ -9,36 +9,52 @@ import machinekit.component.Solids;
  * local +Z from z=0 to z=`length`, cross-section centred on the axis.
  */
 class RectTube implements StructuralProfile {
-	public final designation:String;
-	public final description:String;
-	public final width:Float;
-	public final height:Float;
-	public final wall:Float;
+  public final designation:String;
+  public final description:String;
+  public final width:Float;
+  public final height:Float;
+  public final wall:Float;
 
-	public function new(width:Float, height:Float, wall:Float) {
-		if (!(width > 0) || !(height > 0) || !(wall > 0)) throw "Rect tube needs a positive width, height, and wall";
-		if (!(2 * wall < Math.min(width, height))) throw "Rect tube wall is too thick for its section";
-		this.width = width;
-		this.height = height;
-		this.wall = wall;
-		var size = '${Dimension.format(width)}x${Dimension.format(height)}x${Dimension.format(wall)}';
-		designation = 'RECT-$size';
-		description = 'Rectangular tube $size';
-	}
+  public function new(width:Float, height:Float, wall:Float) {
+    if (!(width > 0) || !(height > 0) || !(wall > 0)) throw "Rect tube needs a positive width, height, and wall";
+    if (!(2 * wall < Math.min(width, height))) throw "Rect tube wall is too thick for its section";
+    this.width = width;
+    this.height = height;
+    this.wall = wall;
+    var size = '${Dimension.format(width)}x${Dimension.format(height)}x${Dimension.format(wall)}';
+    designation = 'RECT-$size';
+    description = 'Rectangular tube $size';
+  }
 
-	public function geometry(length:Float):Part {
-		if (!(length > 0)) throw "Rect tube needs a positive length";
-		var outer = Solids.named(Part.prism(rectangle(width, height), 0, length), "outer");
-		var inner = Solids.named(Part.prism(rectangle(width - 2 * wall, height - 2 * wall), -0.1, length + 0.1), "bore");
-		return Solids.cut(outer, [inner]);
-	}
+  public function geometry(length:Float):Part {
+    if (!(length > 0)) throw "Rect tube needs a positive length";
+    var outer = Solids.named(Part.prism(rectangle(width, height), 0, length), "outer");
+    var inner = Solids.named(Part.prism(rectangle(width - 2 * wall, height - 2 * wall), -0.1, length + 0.1), "bore");
+    return Solids.cut(outer, [inner]);
+  }
 
-	public function profileDesignation():String return designation;
-	public function profileDescription():String return description;
-	public function sectionBounds():SectionBounds
-		return {minX: -width / 2, maxX: width / 2, minY: -height / 2, maxY: height / 2};
+  public function profileDesignation():String return designation;
+  public function profileDescription():String return description;
+  public function sectionBounds():SectionBounds return {
+    minX: -width / 2,
+    maxX: width / 2,
+    minY: -height / 2,
+    maxY: height / 2
+  };
 
-	static function rectangle(width:Float, height:Float):Array<Vector>
-		return [new Vector(-width / 2, -height / 2), new Vector(width / 2, -height / 2),
-			new Vector(width / 2, height / 2), new Vector(-width / 2, height / 2)];
+  static function rectangle(width:Float, height:Float):Array<Vector> return [
+    new Vector(-width / 2, -height / 2),
+    new Vector(
+      width / 2,
+      -height / 2
+    ),
+    new Vector(
+      width / 2,
+      height / 2
+    ),
+    new Vector(
+      -width / 2,
+      height / 2
+    )
+  ];
 }

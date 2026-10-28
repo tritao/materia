@@ -22,9 +22,20 @@ class WeldProbeFace {
   public final u:Vector;
   public final v:Vector;
 
-  public function new(member:String, face:String, target:Bool, normal:Vector, centre:Vector, chords:Array<Array<Vector>>) {
-    this.member = member; this.face = face; this.target = target;
-    this.normal = normal.normalized(); this.centre = centre; this.chords = chords;
+  public function new(
+    member:String,
+    face:String,
+    target:Bool,
+    normal:Vector,
+    centre:Vector,
+    chords:Array<Array<Vector>>
+  ) {
+    this.member = member;
+    this.face = face;
+    this.target = target;
+    this.normal = normal.normalized();
+    this.centre = centre;
+    this.chords = chords;
     u = this.normal.cross(Math.abs(this.normal.z) < 0.9 ? Vector.Z() : Vector.X()).normalized();
     v = this.normal.cross(u).normalized();
   }
@@ -34,7 +45,8 @@ class WeldProbeFace {
 
   /** Even-odd contours include all holes. A positive inset keeps probes off every boundary. */
   public function contains(point:Vector, inset:Float = 0):Bool {
-    if (point == null || !Math.isFinite(inset) || inset < 0) throw "Probe-face containment needs a point and finite nonnegative inset";
+    if (point == null
+      || !Math.isFinite(inset) || inset < 0) throw "Probe-face containment needs a point and finite nonnegative inset";
     if (Math.abs(normal.dot(point) - offset()) > 1e-5) return false;
     var x = point.dot(u), y = point.dot(v), inside = false;
     var nearest = Math.POSITIVE_INFINITY;
@@ -52,12 +64,12 @@ class WeldProbeFace {
 
   /** Conservatively contain a complete rectangular uncertainty patch, including holes and concavities. */
   public function containsRegion(point:Vector, halfU:Float, halfV:Float, inset:Float = 0):Bool {
-    if (!Math.isFinite(halfU) || halfU < 0 || !Math.isFinite(halfV) || halfV < 0 || !Math.isFinite(inset) || inset < 0)
-      throw "Probe-region extents must be finite and nonnegative";
+    if (!Math.isFinite(halfU) || halfU < 0 || !Math.isFinite(halfV)
+      || halfV < 0 || !Math.isFinite(inset) || inset < 0) throw "Probe-region extents must be finite and nonnegative";
     if (!contains(point, inset)) return false;
     var extentU = halfU + inset, extentV = halfV + inset;
-    for (su in [-1, 1]) for (sv in [-1, 1])
-      if (!contains(point.add(u.scale(su * extentU)).add(v.scale(sv * extentV)))) return false;
+    for (su in [-1,
+      1]) for (sv in [-1, 1]) if (!contains(point.add(u.scale(su * extentU)).add(v.scale(sv * extentV)))) return false;
     // A hole or concave boundary can enter the patch even if all four corners are material.
     for (chord in chords) {
       var a = chord[0].subtract(point), b = chord[1].subtract(point);
@@ -70,7 +82,8 @@ class WeldProbeFace {
           if (Math.abs(starts[axis]) > extents[axis]) crossing = false;
         } else {
           var first = (-extents[axis] - starts[axis]) / delta, last = (extents[axis] - starts[axis]) / delta;
-          lo = Math.max(lo, Math.min(first, last)); hi = Math.min(hi, Math.max(first, last));
+          lo = Math.max(lo, Math.min(first, last));
+          hi = Math.min(hi, Math.max(first, last));
         }
       }
       if (crossing && lo <= hi) return false;
@@ -80,19 +93,21 @@ class WeldProbeFace {
 
   /** A finite search lattice comes from face bounds, never authored weldment coordinates. */
   public function samples(divisions:Int = 9, inset:Float = 1):Array<Vector> {
-    if (divisions < 1 || divisions > 65 || !Math.isFinite(inset) || inset < 0)
-      throw "Probe-face samples need bounded divisions and a finite nonnegative inset";
+    if (divisions < 1 || divisions > 65 || !Math.isFinite(inset)
+      || inset < 0) throw "Probe-face samples need bounded divisions and a finite nonnegative inset";
     var lowU = Math.POSITIVE_INFINITY, highU = Math.NEGATIVE_INFINITY;
     var lowV = Math.POSITIVE_INFINITY, highV = Math.NEGATIVE_INFINITY;
     for (chord in chords) for (point in chord) {
-      lowU = Math.min(lowU, point.dot(u)); highU = Math.max(highU, point.dot(u));
-      lowV = Math.min(lowV, point.dot(v)); highV = Math.max(highV, point.dot(v));
+      lowU = Math.min(lowU, point.dot(u));
+      highU = Math.max(highU, point.dot(u));
+      lowV = Math.min(lowV, point.dot(v));
+      highV = Math.max(highV, point.dot(v));
     }
     var points:Array<Vector> = [];
     if (chords.length == 0) return points;
     for (i in 0...divisions) for (j in 0...divisions) {
-      var point = u.scale(lowU + (highU - lowU) * (i + 0.5) / divisions)
-        .add(v.scale(lowV + (highV - lowV) * (j + 0.5) / divisions)).add(normal.scale(offset()));
+      var point = u.scale(lowU + (highU - lowU) * (i
+        + 0.5) / divisions).add(v.scale(lowV + (highV - lowV) * (j + 0.5) / divisions)).add(normal.scale(offset()));
       if (contains(point, inset)) points.push(point);
     }
     return points;
@@ -107,19 +122,39 @@ class WeldProbeGeometry {
   /** Persist CAD-derived boundaries in metres; no live work pose or contact result is included. */
   public function contactFaces(metresPerUnit:Float):Array<SceneContactFace> {
     if (!Math.isFinite(metresPerUnit) || !(metresPerUnit > 0)) throw "Contact faces need a positive CAD unit scale";
-    function point(value:Vector):Array<Float> return [value.x * metresPerUnit, value.y * metresPerUnit, value.z * metresPerUnit];
-    return [for (face in faces) {member: face.member, face: face.face, target: face.target,
-      normal: [face.normal.x, face.normal.y, face.normal.z], centre: point(face.centre),
-      chords: [for (edge in face.chords) [for (vertex in edge) point(vertex)]]}];
+    function point(value:Vector):Array<Float> return [
+      value.x * metresPerUnit,
+      value.y * metresPerUnit,
+      value.z * metresPerUnit
+    ];
+    return [for (face in faces) {
+      member:face.member, face:face.face, target:face.target, normal:[face.normal.x, face.normal.y, face.normal.z],
+        centre:point(face.centre), chords:[for (edge in face.chords)[for (vertex in edge) point(vertex)]]
+    }
+    ];
   }
 
   /** Reconstruct polygonal probe geometry from a validated contact job, without reopening CAD solids. */
   public static function fromContactFaces(faces:Array<SceneContactFace>, metresPerUnit:Float):WeldProbeGeometry {
-    if (faces == null || !Math.isFinite(metresPerUnit) || !(metresPerUnit > 0)) throw "Contact faces need a positive CAD unit scale";
-    function point(value:Array<Float>):Vector return new Vector(value[0] / metresPerUnit, value[1] / metresPerUnit, value[2] / metresPerUnit);
-    return new WeldProbeGeometry([for (face in faces) new WeldProbeFace(face.member, face.face, face.target,
-      new Vector(face.normal[0], face.normal[1], face.normal[2]), point(face.centre),
-      [for (edge in face.chords) [for (vertex in edge) point(vertex)]])]);
+    if (faces == null
+      || !Math.isFinite(metresPerUnit) || !(metresPerUnit > 0)) throw "Contact faces need a positive CAD unit scale";
+    function point(value:Array<Float>):Vector return new Vector(
+      value[0] / metresPerUnit,
+      value[1] / metresPerUnit,
+      value[2] / metresPerUnit
+    );
+    return new WeldProbeGeometry([for (face in faces) new WeldProbeFace(
+      face.member,
+      face.face,
+      face.target,
+      new Vector(
+        face.normal[0],
+        face.normal[1],
+        face.normal[2]
+      ),
+      point(face.centre),
+      [for (edge in face.chords)[for (vertex in edge) point(vertex)]]
+    )]);
   }
 
   /** Borrowed parts already posed in a common reference frame. Curved boundaries are deliberately unsupported. */
@@ -132,8 +167,14 @@ class WeldProbeGeometry {
         var polygonal = true;
         for (loop in face.loops) for (edge in loop) if (!solid.edges[edge].line) polygonal = false;
         if (!polygonal) throw 'Contact probe geometry requires polygonal solids: "$member" has a curved boundary';
-        if (face.chords.length > 0)
-          faces.push(new WeldProbeFace(member, face.name, targets.indexOf(member) >= 0, face.normal, face.centre, face.chords));
+        if (face.chords.length > 0) faces.push(new WeldProbeFace(
+          member,
+          face.name,
+          targets.indexOf(member) >= 0,
+          face.normal,
+          face.centre,
+          face.chords
+        ));
       }
     }
     faces.sort((a, b) -> Reflect.compare(a.name(), b.name()));
@@ -141,8 +182,12 @@ class WeldProbeGeometry {
   }
 
   /** Collect actual B-rep faces in the weldment frame, with optional table/clamp obstruction geometry. */
-  public static function findIn(assembly:MachineAssembly, weldment:Weldment, poses:Map<String, AssemblyFrame>,
-      ?obstacles:Array<String>):WeldProbeGeometry {
+  public static function findIn(
+    assembly:MachineAssembly,
+    weldment:Weldment,
+    poses:Map<String, AssemblyFrame>,
+    ?obstacles:Array<String>
+  ):WeldProbeGeometry {
     var reference = poses.get(weldment.reference);
     if (reference == null) throw 'Probe geometry has no weldment reference "${weldment.reference}"';
     var inverse = AssemblyFrames.inverse(reference);
@@ -154,14 +199,28 @@ class WeldProbeGeometry {
         var pose = poses.get(entry.id);
         if (pose == null) throw 'Probe geometry has no pose for "${entry.id}"';
         var relative = AssemblyFrames.compose(inverse, pose);
-        var x = AssemblyFrames.transformVector(relative, 1, 0, 0), z = AssemblyFrames.transformVector(relative, 0, 0, 1);
+        var x = AssemblyFrames.transformVector(relative,
+          1, 0, 0), z = AssemblyFrames.transformVector(relative, 0, 0, 1);
         var local = entry.component.geometry(ComponentDetail.Preview);
         var placed:Part;
-        try placed = local.placed(new Location(new Plane(new Vector(relative.x, relative.y, relative.z),
-          new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z)))) catch (error:Dynamic) {
-          local.close(); throw error;
+        try placed = local.placed(new Location(new Plane(
+          new Vector(relative.x, relative.y, relative.z),
+          new Vector(
+            x.x,
+            x.y,
+            x.z
+          ),
+          new Vector(
+            z.x,
+            z.y,
+            z.z
+          )
+        ))) catch (error:Dynamic) {
+          local.close();
+          throw error;
         }
-        local.close(); parts.set(entry.id, placed);
+        local.close();
+        parts.set(entry.id, placed);
       }
       for (member in members) if (!parts.exists(member)) throw 'Probe geometry has no solid for "$member"';
       var result = of(parts, weldment.members);
@@ -174,8 +233,14 @@ class WeldProbeGeometry {
   }
 
   /** Conservative obstruction mask over a full uncertain approach prism, rather than its centre ray. */
-  public function exposedRegion(face:WeldProbeFace, point:Vector, halfU:Float, halfV:Float,
-      approach:Float, inset:Float = 1):Bool {
+  public function exposedRegion(
+    face:WeldProbeFace,
+    point:Vector,
+    halfU:Float,
+    halfV:Float,
+    approach:Float,
+    inset:Float = 1
+  ):Bool {
     if (!Math.isFinite(approach) || !(approach > 0)) throw "Probe-region visibility needs a positive finite approach";
     if (!face.target || !face.containsRegion(point, halfU, halfV, inset)) return false;
     for (other in faces) if (other != face) {
@@ -184,12 +249,15 @@ class WeldProbeGeometry {
       var lowN = Math.POSITIVE_INFINITY, highN = Math.NEGATIVE_INFINITY;
       for (chord in other.chords) for (vertex in chord) {
         var delta = vertex.subtract(point);
-        lowU = Math.min(lowU, delta.dot(face.u)); highU = Math.max(highU, delta.dot(face.u));
-        lowV = Math.min(lowV, delta.dot(face.v)); highV = Math.max(highV, delta.dot(face.v));
-        lowN = Math.min(lowN, delta.dot(face.normal)); highN = Math.max(highN, delta.dot(face.normal));
+        lowU = Math.min(lowU, delta.dot(face.u));
+        highU = Math.max(highU, delta.dot(face.u));
+        lowV = Math.min(lowV, delta.dot(face.v));
+        highV = Math.max(highV, delta.dot(face.v));
+        lowN = Math.min(lowN, delta.dot(face.normal));
+        highN = Math.max(highN, delta.dot(face.normal));
       }
-      if (highN < -1e-5 || lowN > approach || lowU > halfU + inset || highU < -halfU - inset ||
-          lowV > halfV + inset || highV < -halfV - inset) continue;
+      if (highN < -1e-5 || lowN > approach
+        || lowU > halfU + inset || highU < -halfU - inset || lowV > halfV + inset || highV < -halfV - inset) continue;
       if (highN > 1e-5 || other.normal.dot(face.normal) < -0.9) return false;
     }
     return true;

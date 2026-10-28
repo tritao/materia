@@ -13,9 +13,15 @@ class BatteryReading {
   public final remainingEnergyWattHours:Float;
   public final sourceTimestampNs:Int64;
 
-  public function new(batteryId:String, chargeFraction:Float, voltageVolts:Float,
-      currentAmps:Float, temperatureCelsius:Float, remainingEnergyWattHours:Float,
-      sourceTimestampNs:Int64) {
+  public function new(
+    batteryId:String,
+    chargeFraction:Float,
+    voltageVolts:Float,
+    currentAmps:Float,
+    temperatureCelsius:Float,
+    remainingEnergyWattHours:Float,
+    sourceTimestampNs:Int64
+  ) {
     this.batteryId = batteryId;
     this.chargeFraction = chargeFraction;
     this.voltageVolts = voltageVolts;

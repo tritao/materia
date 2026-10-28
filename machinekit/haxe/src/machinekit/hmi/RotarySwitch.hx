@@ -19,17 +19,70 @@ class RotarySwitch extends HmiPart {
   static function inputs():Array<ComponentParameter> return [
     HmiPart.basisParameter("assumed"),
     R.count("positions", 12),
-    R.length("knobDiameter", 25), R.length("knobHeight", 18),
-    R.length("bushDiameter", 10), R.length("panelThickness", 3), R.length("nutDiameter", 14), R.length("nutThickness", 2),
-    R.length("bodyDiameter", 30), R.length("behindDepth", 25),
-    R.scalar("massGrams", 25, 1)
+    R.length(
+      "knobDiameter",
+      25
+    ),
+    R.length(
+      "knobHeight",
+      18
+    ),
+    R.length(
+      "bushDiameter",
+      10
+    ),
+    R.length(
+      "panelThickness",
+      3
+    ),
+    R.length(
+      "nutDiameter",
+      14
+    ),
+    R.length(
+      "nutThickness",
+      2
+    ),
+    R.length(
+      "bodyDiameter",
+      30
+    ),
+    R.length(
+      "behindDepth",
+      25
+    ),
+    R.scalar(
+      "massGrams",
+      25,
+      1
+    )
   ];
 
   public function new(?v:ComponentValues) {
-    super("hmi-rotary-switch", "rotary switch with knob, " + (v == null || v.get("positions") == null ? 12 : v.integer("positions")) + " positions", "ABS black", inputs(), v);
-    positive(["knobDiameter", "knobHeight", "bushDiameter", "panelThickness", "nutDiameter", "nutThickness", "bodyDiameter", "behindDepth", "massGrams"]);
+    super(
+      "hmi-rotary-switch",
+      "rotary switch with knob, " + (v == null
+      || v.get("positions") == null ? 12 : v.integer("positions")) + " positions",
+      "ABS black",
+      inputs(),
+      v
+    );
+    positive([
+      "knobDiameter",
+      "knobHeight",
+      "bushDiameter",
+      "panelThickness",
+      "nutDiameter",
+      "nutThickness",
+      "bodyDiameter",
+      "behindDepth",
+      "massGrams"
+    ]);
     require(count("positions") >= 2 && count("positions") <= 24, "two to 24 positions");
-    require(n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"), "the nut is wider than the bush and narrower than the knob");
+    require(
+      n("bushDiameter") < n("nutDiameter") && n("nutDiameter") < n("knobDiameter"),
+      "the nut is wider than the bush and narrower than the knob"
+    );
     require(n("behindDepth") > n("panelThickness") + n("nutThickness"), "the body has room behind the nut");
     addConnector("panel", Mount, Solids.axial(0, 0, 0));
     mount(panelCutout(), panelKeepOut(), [], aboveFace(), behindFace(), rearBody(), 1e9);
@@ -51,21 +104,55 @@ class RotarySwitch extends HmiPart {
   /** The switch (bush, nut, body) and the knob that turns on it. */
   override public function bodies():Null<Array<DeviceBodySpec>> {
     var t = n("panelThickness"), nut = n("nutThickness");
-    return [
-      new DeviceBodySpec("switch", "rotary switch body", "ABS black", function() {
-        return Solids.union([
-          Solids.named(Part.cylinderSpan(n("bushDiameter") / 2, -t - nut, 0.0), "bush"),
-          Solids.named(Part.cylinderSpan(n("nutDiameter") / 2, -t - nut, -t), "nut"),
-          Solids.named(Part.cylinderSpan(n("bodyDiameter") / 2, -n("behindDepth"), -t - nut), "body")
-        ]);
-      }),
-      new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
-        var r = n("knobDiameter") / 2, k = n("knobHeight");
-        return Solids.named(Part.revolve([{r: 0.0, z: 0.0}, {r: r - 1.0, z: 0.0}, {r: r, z: 1.0}, {r: r, z: k - 2.0}, {r: r - 2.0, z: k}, {r: 0.0, z: k}]), "knob");
-      })
-    ];
+    return [new DeviceBodySpec("switch", "rotary switch body", "ABS black", function() {
+      return Solids.union([
+        Solids.named(Part.cylinderSpan(n("bushDiameter") / 2, -t - nut, 0.0), "bush"),
+        Solids.named(
+          Part.cylinderSpan(
+            n("nutDiameter") / 2,
+            -t - nut,
+            -t
+          ),
+          "nut"
+        ),
+        Solids.named(
+          Part.cylinderSpan(
+            n("bodyDiameter") / 2,
+            -n("behindDepth"),
+            -t - nut
+          ),
+          "body"
+        )
+      ]);
+    }
+    ), new DeviceBodySpec("knob", "rotary switch knob", materialSpec(), function() {
+      var r = n("knobDiameter") / 2, k = n("knobHeight");
+      return Solids.named(
+        Part.revolve([
+          {r: 0.0, z: 0.0},
+          {r: r - 1.0, z: 0.0},
+          {r: r, z: 1.0},
+          {r: r, z: k - 2.0},
+          {
+            r: r - 2.0,
+            z: k
+          },
+          {
+            r: 0.0,
+            z: k
+          }
+        ]),
+        "knob"
+      );
+    }
+    )];
   }
 
   /** The knob turns on the switch. It is free here; the switch's detents belong to the controller's reading of it. */
-  override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec("position", Continuous, "switch", "knob")];
+  override public function joints():Array<DeviceJointSpec> return [new DeviceJointSpec(
+    "position",
+    Continuous,
+    "switch",
+    "knob"
+  )];
 }
