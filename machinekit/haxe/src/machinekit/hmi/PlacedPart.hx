@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 /**
  * A part at a position on a panel. The panel layout asks the part for everything else (footprints, heights,
  * mass, provenance), so there is one source for each number. Coordinates are millimetres from the panel

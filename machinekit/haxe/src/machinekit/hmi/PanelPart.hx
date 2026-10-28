@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 /**
  * What a part on the panel says about itself to the layout. The part's frame has its origin at the
  * centre of the panel's front face, +z toward the operator: it stands `aboveFace()` out and reaches

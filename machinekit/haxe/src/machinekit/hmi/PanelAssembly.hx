@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 
@@ -54,9 +56,6 @@ class PanelAssembly {
     return Math.abs(a.x - b.x) < ea + eb && Math.abs(a.y - b.y) < ea + eb;
   }
 
-  static function extent(c:PlacedPart):Float {
-    var keep = switch c.keepOut() { case Circle(d): d / 2; case Rect(w, h): Math.max(w, h) / 2; case _: 0.0; };
-    var body = switch c.body() { case Circle(d): d / 2; case Rect(w, h): Math.max(w, h) / 2; case _: 0.0; };
-    return Math.max(keep, body);
-  }
+  static function extent(c:PlacedPart):Float
+    return Math.max(FootprintGeometry.maxRadius(c.keepOut()), FootprintGeometry.maxRadius(c.body()));
 }

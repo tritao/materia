@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 import machinekit.component.AssumedCatalogComponent;
 import machinekit.component.ComponentParameter;
 import machinekit.component.ComponentRecipeSupport;

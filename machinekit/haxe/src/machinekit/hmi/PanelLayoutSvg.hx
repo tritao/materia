@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 /** A mark to draw over the layout: a round or rectangular feature at a position, millimetres from the panel centre. */
 typedef SvgMark = {
   var x:Float;

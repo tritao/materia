@@ -1,5 +1,7 @@
 package machinekit.pendant;
 
+import cadkit.modeling.RoundedRectangle;
+import cadkit.modeling.FootprintGeometry;
 import machinekit.hmi.*;
 
 import cadkit.modeling.Part;
@@ -65,8 +67,8 @@ class PendantCase {
 
   static function free(face:PanelLayout, x:Float, y:Float, taken:Array<{x:Float, y:Float}>):Bool {
     for (c in face.controls) {
-      if (PanelLayout.distanceToFootprint(c.keepOut(), c.x, c.y, x, y) < COUNTERBORE_HEAD() + HEAD_CLEARANCE - 0.0) return false;
-      if (PanelLayout.distanceToFootprint(c.body(), c.x, c.y, x, y) < POST_DIAMETER / 2 + BODY_CLEARANCE) return false;
+      if (FootprintGeometry.distanceTo(c.keepOut(), c.x, c.y, x, y) < COUNTERBORE_HEAD() + HEAD_CLEARANCE - 0.0) return false;
+      if (FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, y) < POST_DIAMETER / 2 + BODY_CLEARANCE) return false;
       for (h in c.holes()) if (Math.sqrt((c.x + h.x - x) * (c.x + h.x - x) + (c.y + h.y - y) * (c.y + h.y - y)) < POST_DIAMETER / 2 + 2.0) return false;
     }
     for (t in taken) if (Math.sqrt((t.x - x) * (t.x - x) + (t.y - y) * (t.y - y)) < POST_DIAMETER + 4.0) return false;
@@ -79,7 +81,7 @@ class PendantCase {
   static function cableClear(face:PanelLayout, x:Float, z:Float):Bool {
     for (c in face.controls) {
       if (c.behind() < -z - CABLE_HOLE / 2) continue;
-      if (PanelLayout.distanceToFootprint(c.body(), c.x, c.y, x, -face.height / 2 + face.wall) < CABLE_HOLE / 2 + BODY_CLEARANCE) return false;
+      if (FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, -face.height / 2 + face.wall) < CABLE_HOLE / 2 + BODY_CLEARANCE) return false;
     }
     return true;
   }
@@ -100,8 +102,8 @@ class PendantCase {
   /** The shell: a rounded box open at the top, with the posts and the cable hole. */
   public function shell():Part {
     var depth = outerDepth();
-    var outer = PanelOutline.box(face.width, face.height, PanelFacePlate.CORNER_RADIUS, -depth, 0.0);
-    var cavity = PanelOutline.box(face.width - 2 * face.wall, face.height - 2 * face.wall,
+    var outer = RoundedRectangle.box(face.width, face.height, PanelFacePlate.CORNER_RADIUS, -depth, 0.0);
+    var cavity = RoundedRectangle.box(face.width - 2 * face.wall, face.height - 2 * face.wall,
       PanelFacePlate.CORNER_RADIUS - face.wall, -face.caseInnerDepth, 1.0);
     var tools:Array<Part> = [cavity];
     var hole = Part.cylinderAlongY(CABLE_HOLE / 2, -face.height / 2 - 1.0, -face.height / 2 + face.wall + 1.0, cableX, cableZ);

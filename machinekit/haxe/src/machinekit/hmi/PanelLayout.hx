@@ -1,5 +1,7 @@
 package machinekit.hmi;
 
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 /**
  * A panel (a pendant face, a door panel) and what sits on it. `problems()` is the layout check: every
  * part inside the usable face with an edge margin, no two parts closer than the minimum gap, the
@@ -76,7 +78,7 @@ class PanelLayout {
     var found:Array<String> = [];
     var hw = usableHalfWidth(), hh = usableHalfHeight();
     for (c in controls) {
-      var half = halfSize(c.keepOut());
+      var half = FootprintGeometry.halfExtent(c.keepOut());
       if (Math.abs(c.x) + half.x > hw + 1e-9 || Math.abs(c.y) + half.y > hh + 1e-9)
         found.push('${c.id} does not fit inside the usable face (needs x within ${fmt(hw)}, y within ${fmt(hh)} with its keep-out)');
       for (hole in c.holes()) {
@@ -86,7 +88,7 @@ class PanelLayout {
       }
     }
     for (c in controls) {
-      var half = halfSize(c.body());
+      var half = FootprintGeometry.halfExtent(c.body());
       if (Math.abs(c.x) + half.x > width / 2 - wall + 1e-9 || Math.abs(c.y) + half.y > height / 2 - wall + 1e-9)
         found.push('the body of ${c.id} reaches into the case wall');
     }
@@ -109,43 +111,13 @@ class PanelLayout {
     return found;
   }
 
-  static function halfSize(f:Footprint):{x:Float, y:Float} return switch f {
-    case Circle(d): {x: d / 2, y: d / 2};
-    case Rect(w, h): {x: w / 2, y: h / 2};
-  };
+  /** Gap between the keep-outs of two parts (negative when they overlap). */
+  public static function gapBetween(a:PlacedPart, b:PlacedPart):Float
+    return FootprintGeometry.gap(a.keepOut(), a.x, a.y, b.keepOut(), b.x, b.y);
 
-  /** Distance from a point to the edge of a footprint centred at (fx, fy), negative inside it. */
-  public static function distanceToFootprint(f:Footprint, fx:Float, fy:Float, px:Float, py:Float):Float return switch f {
-    case Circle(d): Math.sqrt(sq(px - fx) + sq(py - fy)) - d / 2;
-    case Rect(w, h):
-      var dx = Math.abs(px - fx) - w / 2, dy = Math.abs(py - fy) - h / 2;
-      dx > 0 || dy > 0 ? Math.sqrt(sq(Math.max(dx, 0.0)) + sq(Math.max(dy, 0.0))) : Math.max(dx, dy);
-    case _: throw "Unknown footprint";
-  };
+  /** Gap between the rear bodies of two parts (negative when they overlap). */
+  public static function bodyGapBetween(a:PlacedPart, b:PlacedPart):Float
+    return FootprintGeometry.gap(a.body(), a.x, a.y, b.body(), b.x, b.y);
 
-  /** Gap between two footprints (negative when they overlap). */
-  public static function gapBetween(a:PlacedPart, b:PlacedPart):Float return footprintGap(a.keepOut(), a.x, a.y, b.keepOut(), b.x, b.y);
-
-  /** Gap between the rear bodies of two controls (negative when they overlap). */
-  public static function bodyGapBetween(a:PlacedPart, b:PlacedPart):Float return footprintGap(a.body(), a.x, a.y, b.body(), b.x, b.y);
-
-  static function footprintGap(fa:Footprint, ax:Float, ay:Float, fb:Footprint, bx:Float, by:Float):Float {
-    return switch [fa, fb] {
-      case [Circle(da), Circle(db)]: Math.sqrt(sq(ax - bx) + sq(ay - by)) - da / 2 - db / 2;
-      case [Circle(d), Rect(w, h)]: circleToRect(ax, ay, d / 2, bx, by, w, h);
-      case [Rect(w, h), Circle(d)]: circleToRect(bx, by, d / 2, ax, ay, w, h);
-      case [Rect(wa, ha), Rect(wb, hb)]:
-        var gx = Math.abs(ax - bx) - (wa + wb) / 2, gy = Math.abs(ay - by) - (ha + hb) / 2;
-        gx > 0 && gy > 0 ? Math.sqrt(gx * gx + gy * gy) : Math.max(gx, gy);
-      case _: throw "Unknown footprint";
-    };
-  }
-
-  static function circleToRect(cx:Float, cy:Float, r:Float, rx:Float, ry:Float, w:Float, h:Float):Float {
-    var dx = Math.max(Math.abs(cx - rx) - w / 2, 0.0), dy = Math.max(Math.abs(cy - ry) - h / 2, 0.0);
-    return Math.sqrt(dx * dx + dy * dy) - r;
-  }
-
-  static function sq(v:Float):Float return v * v;
   static function fmt(v:Float):String return Std.string(Math.round(v * 10) / 10);
 }

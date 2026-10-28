@@ -5,6 +5,8 @@ import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
 import machinekit.hmi.*;
 
 class HmiPartsTests {
@@ -16,12 +18,6 @@ class HmiPartsTests {
     check(failed, 'Expected rejection: $message');
   }
 
-  static function halfExtent(f:Footprint):{x:Float, y:Float} return switch f {
-    case Circle(d): {x: d / 2, y: d / 2};
-    case Rect(w, h): {x: w / 2, y: h / 2};
-    case _: {x: 0.0, y: 0.0};
-  };
-
   /** One part's solid against what it says about itself. */
   static function checkPart(part:HmiPart, name:String):Void {
     var solid = part.geometry(Preview);
@@ -30,7 +26,7 @@ class HmiPartsTests {
     if (part.aboveFace() > 0) near(b.get_max().get_z(), part.aboveFace(), '$name height above the face');
     else check(b.get_max().get_z() <= 1e-9, '$name stays behind the face');
     near(b.get_min().get_z(), -part.behindFace(), '$name depth behind the face');
-    var keep = halfExtent(part.panelKeepOut()), body = halfExtent(part.rearBody()), cut = halfExtent(part.panelCutout());
+    var keep = FootprintGeometry.halfExtent(part.panelKeepOut()), body = FootprintGeometry.halfExtent(part.rearBody()), cut = FootprintGeometry.halfExtent(part.panelCutout());
     var hx = Math.max(keep.x, Math.max(body.x, cut.x)), hy = Math.max(keep.y, Math.max(body.y, cut.y));
     check(Math.max(Math.abs(b.get_min().get_x()), Math.abs(b.get_max().get_x())) <= hx + 1e-6, '$name plan width inside its footprints');
     check(Math.max(Math.abs(b.get_min().get_y()), Math.abs(b.get_max().get_y())) <= hy + 1e-6, '$name plan depth inside its footprints');

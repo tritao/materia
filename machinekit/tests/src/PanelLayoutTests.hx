@@ -1,4 +1,7 @@
 import machinekit.component.ComponentValues;
+import cadkit.modeling.Footprint;
+import cadkit.modeling.FootprintGeometry;
+import cadkit.modeling.RoundedRectangle;
 import machinekit.hmi.*;
 
 class PanelLayoutTests {
@@ -54,10 +57,10 @@ class PanelLayoutTests {
     var plate = PanelFacePlate.part(layout);
     var removed = 0.0;
     for (c in layout.controls) {
-      removed += switch c.cutout() { case Circle(d): Math.PI * d * d / 4; case Rect(w, h): w * h; case _: 0.0; };
+      removed += FootprintGeometry.area(c.cutout());
       for (hole in c.holes()) removed += Math.PI * hole.diameter * hole.diameter / 4;
     }
-    var expected = (PanelOutline.area(160.0, 100.0, PanelFacePlate.CORNER_RADIUS) - removed) * 3.0;
+    var expected = (RoundedRectangle.area(160.0, 100.0, PanelFacePlate.CORNER_RADIUS) - removed) * 3.0;
     check(plate.solidCount() == 1, "One solid");
     check(Math.abs(plate.volume() - expected) / expected < 1e-3, 'Plate volume ${plate.volume()} vs $expected');
     // No part overlaps another or the plate.
