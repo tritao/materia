@@ -20,7 +20,7 @@ Nucleo is powered over USB; the 24 V path is rehearsed separately.
 | 3 | **Rotary switch, 3 position**, panel mount | 2 | 1 pole 3 throw (x1, x10, x100). | `3 position rotary switch 1P3T panel mount` | As above. |
 | 4 | **Illuminated momentary buttons**, 12 to 16 mm | 8 (+3 spare) | 6 with LEDs: green, yellow, red for the fixed keys and 3 neutral for F1 to F3, with LEDs for 5 V or 12 V with a series resistor. Plus 1 plain momentary for wheel enable (no LED). | `16mm momentary push button LED 5V`, `12mm illuminated momentary pushbutton` | LED forward voltage and current; contact bounce; the feel through a glove. |
 | 5 | **Emergency stop**, 22 mm, with 1 NC contact block | 1 | Latching, twist or pull release, NC contact block. A branded, standards-marked part is worth the price even for a bench. | `22mm emergency stop mushroom latching 1NC`, `E-stop 22mm contact block NC` | Mounting hole size and depth; contact block rating; that it fits the case thickness. |
-| 6 | **OLED module**, 128x64, I2C, 3.3 V | 2 | SSD1306 or SH1106, 0.96 to 1.3 in. | `1.3 inch OLED 128x64 I2C SH1106`, `0.96 OLED SSD1306 I2C` | I2C address; supply current; contrast; does it read at arm's length. |
+| 6 | **OLED module**, 128x64, 2.42 in, I2C | 2 | SSD1309 class, 3.3 V, I2C (many modules have a solder-pad or resistor choice between I2C and SPI; confirm it ships in, or can be set to, I2C). Active area about 55x27 mm (from memory, check the listing). | `2.42 inch OLED 128x64 I2C SSD1309`, `2.42 OLED 128x64 IIC` | I2C address (often 0x3C or 0x3D, set by a pad); supply current; contrast; legibility at arm's length; whether the window leaves room for the controls on the face. |
 | 7 | **CAN-FD transceiver breakout**, 3.3 V logic | 2 | TJA1051, TCAN1042 or MCP2562FD class. Not a classic-CAN-only part. | `TJA1051 breakout`, `TCAN1042 breakout`, `MCP2562FD breakout` | 3.3 V logic compatible; 120 ohm termination jumper or solder pad. |
 | 8 | **USB-CAN FD adapter** | 1 | gs_usb or candleLight firmware, CAN FD capable. | `CANable 2.0`, `candleLight FD USB CAN` | Shows up as a `can0` interface and does 2 Mbit/s data phase. |
 | 9 | **120 ohm resistors**, 1/4 W | 4 | Bus termination at both ends. | any | Measure about 60 ohm across the bus with both ends fitted. |
@@ -52,7 +52,7 @@ ladder on one ADC pin or an I/O expander would replace the 12 axis-switch inputs
 
 1. The MPG: output type, supply, feel, detent. This sets the input stage on the board.
 2. Read the 12-position switch on 12 GPIOs now; decide ladder or GPIO for the board later.
-3. OLED: legibility, dim and blank behaviour, contrast at the handheld distance.
+3. OLED (2.42 in): legibility, dim and blank behaviour, contrast at the handheld distance, and the face size it forces on the case.
 4. The connector and cable: price, pin numbering, and noise on a 5 m run at 2 Mbit/s data phase.
 5. A rough control layout on a flat board, then a printed mock-up with the real parts.
 

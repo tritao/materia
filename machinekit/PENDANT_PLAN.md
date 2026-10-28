@@ -15,7 +15,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 2. **One SKU.** The pendant has no per-machine wiring or labels. The selector positions are
    printed as numbers; what each means comes from the machine profile (CC0), sent by the host and
    shown by name on the OLED.
-3. **Small display.** A monochrome OLED (128×64, I2C, about 1" to 1.3") shows text only. No
+3. **Small display.** A monochrome OLED (128×64, I2C, 2.42") shows text only. No
    graphic UI and no touch. The main HMI already shows the DRO and program, and a second UI on
    the pendant would duplicate it.
 4. **Small MCU.** An STM32G0B1-class part with FDCAN and an encoder timer. The Nucleo-G474 is the
@@ -34,7 +34,7 @@ Numbers and part families below are targets or unchecked suggestions unless stat
 | Wheel enable | Plain hold button | Wheel counts are accepted only while it is held. A guard against bumps, not a safety function. |
 | Buttons | 6 with LEDs | **Fixed (3):** Start, Hold, Stop/Reset, with standard icons, the same on every machine. **User keys F1 to F3 (3):** the function comes from the machine profile and the OLED's bottom line shows the current names next to the keys, so the one SKU needs no relabelling. Default profile assignment: F1 door open/close, F2 spindle jog (manual, hold-to-run), F3 work light or MQL toggle; the router can use F3 for the vacuum table. Unused keys stay dark. |
 | E-stop | Bought 22 mm mushroom, NC contact block | In the v1 chain. |
-| Display | 128×64 mono OLED | Text only; footprint for a one-character display as an option. |
+| Display | 128×64 mono OLED, 2.42 in (SSD1309 class), I2C | Text only; about 21 columns by 8 rows. The 2.42 in size is chosen over 1.3 in for legibility at handheld distance, at the cost of a larger face; the bench confirms it. Footprint for a one-character display as an option. |
 
 An endless rotary encoder for the axis was considered and rejected: the selection would live only
 in firmware and on the OLED, so a display fault would leave the operator jogging blind, and the
