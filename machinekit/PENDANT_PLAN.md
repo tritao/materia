@@ -72,7 +72,7 @@ its own pendant. If the OLED proves troublesome, the switch and the HMI still wo
 - The case has a blanked mounting hole for a 3-position enabling switch. The certified upgrade
   fills the hole and wires the four reserved pins, with no new pendant.
 
-## Protocol (draft; defined with CC1)
+## Protocol (payloads implemented in `PendantWire`; CAN identifiers are placeholders)
 
 CAN-FD frames, at most 64 bytes. These are small pendant messages, not RKD6 frames, which can be
 several KB. Values are placeholders.
@@ -83,6 +83,10 @@ several KB. Values are placeholders.
 | `PENDANT_CONFIG` | cabinet controller to pendant | Axis names for the profile (short strings, up to about 12), step labels. |
 | `PENDANT_OUTPUT` | cabinet controller to pendant | LED states, status line text, refusal code, lease state. |
 
+- Payload layouts are in `machinekit/haxe/src/machinekit/operator/PendantWire.hx`: STATE is 7 bytes
+  (padded to 8), CONFIG one label per frame (kind, index, 12 text bytes; padded to 16), OUTPUT LEDs,
+  lease state and a 21-character status line (padded to 24). The decoder accepts only the exact
+  length, zero padding and zero reserved bits, and `PendantWireTests` pin the byte layout.
 - Sequence numbers reject stale and duplicate frames.
 - Heartbeat loss at the cabinet controller ends the pendant's lease and stops motion. A heartbeat
   loss at the pendant lights a fault LED.
