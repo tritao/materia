@@ -3,7 +3,7 @@
 //! reserved zero, little-endian payload length, payload, then CRC-32/IEEE over everything before
 //! it (the same CRC as the RKD6 frames). Mirrors `OperatorFrame` in machinekit.operator.
 
-use crate::pendant_wire::{OperatorMessage, OperatorState, PendantConfig, PendantProfile, PendantReasonText};
+use crate::pendant_wire::{OperatorMessage, OperatorState, PendantConfig, PendantEvent, PendantProfile, PendantReasonText};
 
 pub const MARKER: [u8; 4] = *b"OPR1";
 pub const HEADER_SIZE: usize = 8;
@@ -29,6 +29,7 @@ pub fn payload_size(kind: u8) -> Option<usize> {
         k if k == OperatorMessage::ReasonText as u8 => Some(PendantReasonText::SIZE),
         k if k == OperatorMessage::Config as u8 => Some(PendantConfig::SIZE),
         k if k == OperatorMessage::State as u8 => Some(OperatorState::SIZE),
+        k if k == OperatorMessage::Event as u8 => Some(PendantEvent::SIZE),
         _ => None,
     }
 }
@@ -115,6 +116,13 @@ mod tests {
         let (kind, body) = decode(&state_frame).unwrap();
         assert_eq!(kind, OperatorMessage::State as u8);
         assert_eq!(OperatorState::decode(body).unwrap(), OperatorState { sequence: 7, jog_allowed: 1, reserved: 0 });
+
+        let event_frame = frame("event-move ");
+        let (kind, body) = decode(&event_frame).unwrap();
+        assert_eq!(kind, OperatorMessage::Event as u8);
+        let event = PendantEvent::decode(body).unwrap();
+        assert_eq!((event.sequence, event.axis, event.flags, event.distance, event.pressed, event.refusal),
+            (9, 2, 1, -50, 8, 6));
 
         let profile_frame = frame("profile-hobber ");
         let (kind, body) = decode(&profile_frame).unwrap();

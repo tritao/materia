@@ -3,6 +3,7 @@ package machinekit.operator;
 import haxe.io.Bytes;
 import machinekit.operator.wire.OperatorState;
 import machinekit.operator.wire.PendantConfig;
+import machinekit.operator.wire.PendantEvent;
 import machinekit.operator.wire.PendantProfile;
 import machinekit.operator.wire.PendantReasonText;
 
@@ -16,6 +17,8 @@ class OperatorFrame {
   public static inline final REASON_TEXT:Int = 2;
   public static inline final CONFIG:Int = 3;
   public static inline final STATE:Int = 4;
+  /** Controller to host; the others travel host to controller. */
+  public static inline final EVENT:Int = 5;
   public static inline final HEADER_SIZE:Int = 8;
 
   public final type:Int;
@@ -31,6 +34,7 @@ class OperatorFrame {
     case 2: PendantReasonText.SIZE;
     case 3: PendantConfig.SIZE;
     case 4: OperatorState.SIZE;
+    case 5: PendantEvent.SIZE;
     case _: throw "Unknown operator message type";
   };
 

@@ -107,6 +107,14 @@ several KB. Values are placeholders.
   always blocks the pendant. The host sends only intent, `OperatorState.jog_allowed` about every
   100 ms; `HostLink` treats a missing or stale state as "not allowed", the same fail-safe as the
   pendant lease.
+- **Jog execution.** The host plans jog segments (`purpose = 1`, already in RKD6) and the device
+  executes them. `machinekit/cabinet_node` (`OperatorService`, `enforce_jog`) gates them: a jog may
+  run while the pendant holds authority, or with its switch OFF while the host's `OperatorState`
+  allows it. When that stops being true, and the moment a pendant that held authority loses it, an
+  executing jog is stopped with the existing `StopReason::Stop`; programs and homing are untouched.
+  Pendant decisions go back to the host as `PendantEvent` frames. `cabinet_node/tests/jog_lease.rs`
+  runs this against the real `ScheduledCore`: the lease lapsing stops a jog within 10 ms of the
+  50 ms timeout, even when the host still allows jogging.
 - The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
   `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
   rules in Rust.

@@ -30,6 +30,19 @@ pub enum OperatorMessage {
     ReasonText = 2,
     Config = 3,
     State = 4,
+    Event = 5,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendantRefusal {
+    None = 0,
+    NotJogMode = 1,
+    NoAxis = 2,
+    ChainOpen = 3,
+    Busy = 4,
+    ReleaseKeys = 5,
+    Rule = 6,
 }
 
 #[repr(u8)]
@@ -492,6 +505,96 @@ impl OperatorState {
     pub fn check(&self) -> Result<(), Error> {
         if !(0..=1).contains(&self.jog_allowed) { return Err(Error::Constraint("OperatorState.jog_allowed")); }
         if self.reserved != 0 { return Err(Error::Constraint("OperatorState.reserved")); }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PendantEvent {
+    pub sequence: u16,
+    pub axis: u8,
+    pub flags: u8,
+    pub distance: i32,
+    pub pressed: u8,
+    pub refusal: u8,
+    pub reason: u8,
+    pub reserved: u8,
+}
+
+impl PendantEvent {
+    pub const SIZE: usize = 12;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        self.check()?;
+        let mut offset = 0usize;
+        out[offset..offset + 2].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 2;
+        out[offset..offset + 1].copy_from_slice(&self.axis.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.flags.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 4].copy_from_slice(&self.distance.to_le_bytes());
+        offset += 4;
+        out[offset..offset + 1].copy_from_slice(&self.pressed.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.refusal.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.reason.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.reserved.to_le_bytes());
+        offset += 1;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(&input[offset..offset + 2]);
+        let sequence = u16::from_le_bytes(bytes);
+        offset += 2;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let axis = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let flags = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(&input[offset..offset + 4]);
+        let distance = i32::from_le_bytes(bytes);
+        offset += 4;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let pressed = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let refusal = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let reason = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let reserved = u8::from_le_bytes(bytes);
+        offset += 1;
+        let _ = offset;
+        let value = Self { sequence, axis, flags, distance, pressed, refusal, reason, reserved };
+        value.check()?;
+        Ok(value)
+    }
+
+    /// Constraints declared in the schema; checked on encode and decode.
+    pub fn check(&self) -> Result<(), Error> {
+        if self.flags & !3u8 != 0 { return Err(Error::Constraint("PendantEvent.flags")); }
+        if self.pressed & !63u8 != 0 { return Err(Error::Constraint("PendantEvent.pressed")); }
+        if !matches!(self.refusal, 0 | 1 | 2 | 3 | 4 | 5 | 6) { return Err(Error::Constraint("PendantEvent.refusal")); }
+        if !(0..=7).contains(&self.reason) { return Err(Error::Constraint("PendantEvent.reason")); }
+        if self.reserved != 0 { return Err(Error::Constraint("PendantEvent.reserved")); }
         Ok(())
     }
 }

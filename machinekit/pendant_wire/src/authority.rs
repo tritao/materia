@@ -10,7 +10,7 @@
 //!
 //! Axes are profile indices and conditions are bits of a mask, so no strings reach the controller.
 
-use crate::pendant_wire::{OperatorCondition, OperatorState, PendantState};
+use crate::pendant_wire::{OperatorCondition, OperatorState, PendantEvent, PendantRefusal, PendantState};
 use crate::{FLAG_CHAIN_CLOSED, FLAG_WHEEL_ENABLE};
 
 pub const BUTTON_START: u8 = 1;
@@ -194,6 +194,31 @@ pub fn digest(records: &[&[u8]]) -> u32 {
         }
     }
     h
+}
+
+impl Output {
+    /// The controller's report of this decision to the host.
+    pub fn to_event(&self, sequence: u16) -> PendantEvent {
+        let (refusal, reason) = match self.refusal {
+            Refusal::None => (PendantRefusal::None, 0),
+            Refusal::NotJogMode => (PendantRefusal::NotJogMode, 0),
+            Refusal::NoAxis => (PendantRefusal::NoAxis, 0),
+            Refusal::ChainOpen => (PendantRefusal::ChainOpen, 0),
+            Refusal::Busy => (PendantRefusal::Busy, 0),
+            Refusal::ReleaseKeys => (PendantRefusal::ReleaseKeys, 0),
+            Refusal::Rule(reason) => (PendantRefusal::Rule, reason),
+        };
+        PendantEvent {
+            sequence,
+            axis: self.movement.map_or(UNUSED, |m| m.axis),
+            flags: self.authority as u8 | (self.spindle_jog as u8) << 1,
+            distance: self.movement.map_or(0, |m| m.distance),
+            pressed: self.pressed,
+            refusal: refusal as u8,
+            reason,
+            reserved: 0,
+        }
+    }
 }
 
 pub struct Authority<'a> {

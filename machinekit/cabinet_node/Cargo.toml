@@ -1,0 +1,11 @@
+[package]
+name = "cabinet-node"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+pendant-wire = { path = "../pendant_wire" }
+robotkit-device-protocol = { path = "../../robotkit/device_protocol" }

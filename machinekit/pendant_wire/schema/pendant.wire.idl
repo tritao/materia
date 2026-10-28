@@ -25,6 +25,19 @@ enum OperatorMessage : u8 {
     reason_text = 2
     config = 3
     state = 4
+    # Controller to host; the others travel host to controller.
+    event = 5
+}
+
+# Why the pendant refused to jog, as the controller reports it to the host.
+enum PendantRefusal : u8 {
+    none = 0
+    not_jog_mode = 1
+    no_axis = 2
+    chain_open = 3
+    busy = 4
+    release_keys = 5
+    rule = 6
 }
 
 enum ConfigKind : u8 {
@@ -99,5 +112,23 @@ packed PendantReasonText endian little {
 packed OperatorState endian little {
     sequence : u16
     jog_allowed : u8 range 0..1
+    reserved : u8 zero
+}
+
+# Controller to host for every accepted pendant frame: what the pendant asked for and what the
+# controller decided. The host plans jog segments from `distance`; it never decides authority.
+packed PendantEvent endian little {
+    sequence : u16
+    # Profile axis index of the move; 255 when there is none.
+    axis : u8
+    # Bit 0 the pendant holds jog authority, bit 1 spindle jog held.
+    flags : u8 mask 0x03
+    # Wheel travel in the controller's integer position units; 0 without a move.
+    distance : i32
+    # Buttons newly pressed in this frame, PendantState bit order.
+    pressed : u8 mask 0x3F
+    refusal : PendantRefusal
+    # Rule reason id when refusal is rule, else zero.
+    reason : u8 range 0..7
     reserved : u8 zero
 }

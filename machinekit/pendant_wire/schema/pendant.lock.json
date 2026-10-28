@@ -38,9 +38,22 @@
       "underlying": "u8",
       "values": {
         "config": 3,
+        "event": 5,
         "profile": 1,
         "reason_text": 2,
         "state": 4
+      }
+    },
+    "PendantRefusal": {
+      "underlying": "u8",
+      "values": {
+        "busy": 4,
+        "chain_open": 3,
+        "no_axis": 2,
+        "none": 0,
+        "not_jog_mode": 1,
+        "release_keys": 5,
+        "rule": 6
       }
     }
   },
@@ -104,6 +117,60 @@
         }
       ],
       "size": 16
+    },
+    "PendantEvent": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "axis",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "mask": 3,
+          "name": "flags",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "distance",
+          "type": "i32"
+        },
+        {
+          "length": 1,
+          "mask": 63,
+          "name": "pressed",
+          "type": "u8"
+        },
+        {
+          "enum": "PendantRefusal",
+          "length": 1,
+          "name": "refusal",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reason",
+          "range": [
+            0,
+            7
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8",
+          "zero": true
+        }
+      ],
+      "size": 12
     },
     "PendantOutput": {
       "endian": "little",
