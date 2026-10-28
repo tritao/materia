@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 /** The single saved operator profile format. Other schema versions are rejected. */
 class OperatorProfileCodec {
   static final FIELDS:Array<String> = ["schemaVersion", "name", "cabinet", "axes", "pendantAxes", "keys", "modes", "pages",
-    "hasSpindle", "guard", "conditions", "jogRules"];
+    "hasSpindle", "guard", "jogRules"];
 
   public static function encode(profile:OperatorProfile):Bytes
     return Bytes.ofString(Json.stringify(toRecord(profile)));
@@ -23,8 +23,7 @@ class OperatorProfileCodec {
       pages:[for (g in p.pages) pageName(g)],
       hasSpindle:p.hasSpindle,
       guard:p.guard == null ? null : {setupSpeedLimit:p.guard.setupSpeedLimit, timeoutSeconds:p.guard.timeoutSeconds},
-      conditions:p.conditions.copy(),
-      jogRules:[for (r in p.jogRules) {axis:r.axis, blockedWhen:r.blockedWhen, reason:r.reason}]
+      jogRules:[for (r in p.jogRules) {axis:r.axis, blockedWhen:conditionName(r.blockedWhen), reason:r.reason}]
     };
   }
 
@@ -48,8 +47,7 @@ class OperatorProfileCodec {
       [for (g in list(value, "pages")) readPage(name(g))],
       flag(value, "hasSpindle"),
       guardRecord == null ? null : new OperatorGuard(number(guardRecord, "setupSpeedLimit"), number(guardRecord, "timeoutSeconds")),
-      [for (c in list(value, "conditions")) name(c)],
-      [for (r in list(value, "jogRules")) new JogRule(text(r, "axis"), text(r, "blockedWhen"), text(r, "reason"))]);
+      [for (r in list(value, "jogRules")) new JogRule(text(r, "axis"), readCondition(text(r, "blockedWhen")), text(r, "reason"))]);
   }
 
   static function actionName(a:KeyAction):String return switch a {
@@ -60,6 +58,15 @@ class OperatorProfileCodec {
     case "unused": Unused; case "door-toggle": DoorToggle; case "spindle-jog": SpindleJog;
     case "work-light": WorkLight; case "mist": Mist; case "vacuum": Vacuum;
     case _: throw "Invalid OperatorProfile key action";
+  };
+  static function conditionName(c:OperatorCondition):String return switch c {
+    case GearboxEngaged: "gearbox-engaged"; case DoorOpen: "door-open";
+    case SpindleRunning: "spindle-running"; case ProgramRunning: "program-running";
+  };
+  static function readCondition(s:String):OperatorCondition return switch s {
+    case "gearbox-engaged": GearboxEngaged; case "door-open": DoorOpen;
+    case "spindle-running": SpindleRunning; case "program-running": ProgramRunning;
+    case _: throw "Invalid OperatorProfile condition";
   };
   static function modeName(m:OperatorMode):String return switch m { case Auto: "auto"; case Mdi: "mdi"; case Jog: "jog"; };
   static function readMode(s:String):OperatorMode return switch s {

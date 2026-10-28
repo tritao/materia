@@ -16,6 +16,24 @@ pub enum LeaseState {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OperatorCondition {
+    GearboxEngaged = 0,
+    DoorOpen = 1,
+    SpindleRunning = 2,
+    ProgramRunning = 3,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OperatorMessage {
+    Profile = 1,
+    ReasonText = 2,
+    Config = 3,
+    State = 4,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigKind {
     Axis = 0,
     Key = 1,
@@ -244,10 +262,11 @@ pub struct PendantProfile {
     pub spindle_key: u8,
     pub step_units: [i32; 3],
     pub timeout_ms: u16,
+    pub host_timeout_ms: u16,
 }
 
 impl PendantProfile {
-    pub const SIZE: usize = 52;
+    pub const SIZE: usize = 54;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -280,6 +299,8 @@ impl PendantProfile {
             offset += 4;
         }
         out[offset..offset + 2].copy_from_slice(&self.timeout_ms.to_le_bytes());
+        offset += 2;
+        out[offset..offset + 2].copy_from_slice(&self.host_timeout_ms.to_le_bytes());
         offset += 2;
         Ok(offset)
     }
@@ -338,8 +359,12 @@ impl PendantProfile {
         bytes.copy_from_slice(&input[offset..offset + 2]);
         let timeout_ms = u16::from_le_bytes(bytes);
         offset += 2;
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(&input[offset..offset + 2]);
+        let host_timeout_ms = u16::from_le_bytes(bytes);
+        offset += 2;
         let _ = offset;
-        let value = Self { axes, rule_count, rule_axis, rule_condition, rule_reason, has_spindle, spindle_key, step_units, timeout_ms };
+        let value = Self { axes, rule_count, rule_axis, rule_condition, rule_reason, has_spindle, spindle_key, step_units, timeout_ms, host_timeout_ms };
         value.check()?;
         Ok(value)
     }
@@ -347,10 +372,11 @@ impl PendantProfile {
     /// Constraints declared in the schema; checked on encode and decode.
     pub fn check(&self) -> Result<(), Error> {
         if !(0..=8).contains(&self.rule_count) { return Err(Error::Constraint("PendantProfile.rule_count")); }
-        if self.rule_condition.iter().any(|&v| !(0..=31).contains(&v)) { return Err(Error::Constraint("PendantProfile.rule_condition")); }
+        if self.rule_condition.iter().any(|&v| !(0..=3).contains(&v)) { return Err(Error::Constraint("PendantProfile.rule_condition")); }
         if self.rule_reason.iter().any(|&v| !(0..=7).contains(&v)) { return Err(Error::Constraint("PendantProfile.rule_reason")); }
         if !(0..=1).contains(&self.has_spindle) { return Err(Error::Constraint("PendantProfile.has_spindle")); }
         if !(1..=1000).contains(&self.timeout_ms) { return Err(Error::Constraint("PendantProfile.timeout_ms")); }
+        if !(1..=5000).contains(&self.host_timeout_ms) { return Err(Error::Constraint("PendantProfile.host_timeout_ms")); }
         Ok(())
     }
 }
@@ -414,6 +440,58 @@ impl PendantReasonText {
         if !(0..=7).contains(&self.index) { return Err(Error::Constraint("PendantReasonText.index")); }
         if { let end = self.text.iter().position(|&b| b == 0).unwrap_or(self.text.len()); self.text[..end].iter().any(|&b| !(32..=126).contains(&b)) || self.text[end..].iter().any(|&b| b != 0) } { return Err(Error::Constraint("PendantReasonText.text")); }
         if self.reserved.iter().any(|&v| v != 0) { return Err(Error::Constraint("PendantReasonText.reserved")); }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OperatorState {
+    pub sequence: u16,
+    pub jog_allowed: u8,
+    pub reserved: u8,
+}
+
+impl OperatorState {
+    pub const SIZE: usize = 4;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        self.check()?;
+        let mut offset = 0usize;
+        out[offset..offset + 2].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 2;
+        out[offset..offset + 1].copy_from_slice(&self.jog_allowed.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.reserved.to_le_bytes());
+        offset += 1;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(&input[offset..offset + 2]);
+        let sequence = u16::from_le_bytes(bytes);
+        offset += 2;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let jog_allowed = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let reserved = u8::from_le_bytes(bytes);
+        offset += 1;
+        let _ = offset;
+        let value = Self { sequence, jog_allowed, reserved };
+        value.check()?;
+        Ok(value)
+    }
+
+    /// Constraints declared in the schema; checked on encode and decode.
+    pub fn check(&self) -> Result<(), Error> {
+        if !(0..=1).contains(&self.jog_allowed) { return Err(Error::Constraint("OperatorState.jog_allowed")); }
+        if self.reserved != 0 { return Err(Error::Constraint("OperatorState.reserved")); }
         Ok(())
     }
 }

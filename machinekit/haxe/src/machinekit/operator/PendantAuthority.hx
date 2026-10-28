@@ -45,7 +45,7 @@ class PendantAuthority {
     }
   }
 
-  public function accept(state:PendantState, now:Float, mode:OperatorMode, active:Array<String>):Null<PendantOutput> {
+  public function accept(state:PendantState, now:Float, mode:OperatorMode, active:Array<OperatorCondition>):Null<PendantOutput> {
     tick(now);
     if (lastSequence >= 0) {
       var ahead = (state.sequence - lastSequence + PendantState.SEQUENCE_MODULUS) % PendantState.SEQUENCE_MODULUS;

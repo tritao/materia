@@ -10,7 +10,7 @@
 //!
 //! Axes are profile indices and conditions are bits of a mask, so no strings reach the controller.
 
-use crate::pendant_wire::PendantState;
+use crate::pendant_wire::{OperatorCondition, OperatorState, PendantState};
 use crate::{FLAG_CHAIN_CLOSED, FLAG_WHEEL_ENABLE};
 
 pub const BUTTON_START: u8 = 1;
@@ -18,6 +18,9 @@ pub const BUTTON_HOLD: u8 = 2;
 pub const BUTTON_STOP: u8 = 4;
 pub const BUTTON_F1: u8 = 8;
 pub const UNUSED: u8 = 0xFF;
+
+/// The bit of an OperatorCondition in the active-condition mask the controller builds itself.
+pub const fn condition_bit(c: OperatorCondition) -> u32 { 1 << c as u8 }
 
 /// Refuse jogging `axis` while bit `condition` of the active mask is set; `reason` is a profile text id.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +49,8 @@ pub enum Refusal {
     NotJogMode,
     NoAxis,
     ChainOpen,
+    /// A program is running; the pendant never jogs then, whatever the profile says.
+    Busy,
     ReleaseKeys,
     Rule(u8),
 }
@@ -92,6 +97,7 @@ pub struct CompiledProfile {
     spindle_key: Option<u8>,
     step_units: [i32; 3],
     timeout_us: u64,
+    host_timeout_us: u64,
     reasons: [[u8; 21]; 8],
 }
 
@@ -115,7 +121,8 @@ impl CompiledProfile {
         };
         Ok(CompiledProfile {
             pendant_axes: r.axes, rules, rule_count: count, has_spindle, spindle_key, step_units: r.step_units,
-            timeout_us: r.timeout_ms as u64 * 1000, reasons: [[0; 21]; 8],
+            timeout_us: r.timeout_ms as u64 * 1000, host_timeout_us: r.host_timeout_ms as u64 * 1000,
+            reasons: [[0; 21]; 8],
         })
     }
 
@@ -134,11 +141,46 @@ impl CompiledProfile {
         }
     }
 
+    /// How long an OperatorState stays fresh; give it to `HostLink::new`.
+    pub fn host_timeout_us(&self) -> u64 { self.host_timeout_us }
+
     pub fn config(&self) -> Config<'_> {
         Config {
             pendant_axes: self.pendant_axes, rules: &self.rules[..self.rule_count], has_spindle: self.has_spindle,
             spindle_key: self.spindle_key, step_units: self.step_units, timeout_us: self.timeout_us,
         }
+    }
+}
+
+/// What the host has said it allows. The host sends only intent (`jog_allowed`); machine facts come
+/// from the controller. No fresh state means "not allowed", the same fail-safe as the pendant lease.
+pub struct HostLink {
+    timeout_us: u64,
+    last_sequence: Option<u16>,
+    last_seen: u64,
+    jog_allowed: bool,
+}
+
+impl HostLink {
+    pub fn new(timeout_us: u64) -> Self {
+        HostLink { timeout_us, last_sequence: None, last_seen: 0, jog_allowed: false }
+    }
+
+    /// False when the state was stale or a duplicate and changed nothing.
+    pub fn accept(&mut self, s: &OperatorState, now_us: u64) -> bool {
+        if let Some(last) = self.last_sequence {
+            let ahead = s.sequence.wrapping_sub(last);
+            if ahead == 0 || ahead >= 0x8000 { return false; }
+        }
+        self.last_sequence = Some(s.sequence);
+        self.last_seen = now_us;
+        self.jog_allowed = s.jog_allowed == 1;
+        true
+    }
+
+    /// The `jog_mode` argument of `Authority::accept`.
+    pub fn jog_allowed(&self, now_us: u64) -> bool {
+        self.jog_allowed && self.last_sequence.is_some() && now_us.wrapping_sub(self.last_seen) <= self.timeout_us
     }
 }
 
@@ -211,6 +253,9 @@ impl<'a> Authority<'a> {
         }
         let mut refusal = Refusal::None;
         let mut movement = None;
+        if authority && active & condition_bit(OperatorCondition::ProgramRunning) != 0 {
+            return Some(Output { movement: None, refusal: Refusal::Busy, authority, spindle_jog: false, pressed });
+        }
         if s.position != 0 {
             let axis = self.cfg.pendant_axes[s.position as usize - 1];
             if !jog_mode {
@@ -436,5 +481,36 @@ mod tests {
         bad[36] = 0; // spindle key without a spindle
         assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::SpindleKey);
         assert!(CompiledProfile::from_record(&good[..51]).is_err());
+    }
+
+    #[test]
+    fn host_link_fails_safe_when_stale() {
+        let mut h = HostLink::new(250_000);
+        assert!(!h.jog_allowed(0));
+        let allow = |sequence| OperatorState { sequence, jog_allowed: 1, reserved: 0 };
+        assert!(h.accept(&allow(1), 0));
+        assert!(h.jog_allowed(200_000));
+        assert!(!h.jog_allowed(300_000));
+        assert!(!h.accept(&allow(1), 310_000), "duplicate");
+        assert!(h.accept(&allow(2), 310_000));
+        assert!(h.jog_allowed(320_000));
+        assert!(h.accept(&OperatorState { sequence: 3, jog_allowed: 0, reserved: 0 }, 330_000));
+        assert!(!h.jog_allowed(340_000), "the host withdrew permission");
+        for (i, sequence) in [30_000u16, 60_000, 0xFFFF, 0].into_iter().enumerate() {
+            assert!(h.accept(&allow(sequence), 350_000 + i as u64), "sequence {sequence}");
+        }
+    }
+
+    #[test]
+    fn a_running_program_blocks_the_pendant_whatever_the_profile_says() {
+        let (mut a, mut b) = (Authority::new(DRILL), Bench::new());
+        let f = b.frame(3, 0, true, 0, 1, true);
+        a.accept(&f, 0, true, 0);
+        let f = b.frame(3, 4, true, 0, 1, true);
+        let busy = condition_bit(OperatorCondition::ProgramRunning);
+        let out = a.accept(&f, b.nx(10), true, busy).unwrap();
+        assert_eq!((out.movement, out.refusal, out.spindle_jog), (None, Refusal::Busy, false));
+        let f = b.frame(3, 4, true, 0, 1, true);
+        assert!(a.accept(&f, b.nx(10), true, 0).unwrap().movement.is_some());
     }
 }

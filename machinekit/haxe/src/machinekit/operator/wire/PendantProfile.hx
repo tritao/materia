@@ -4,7 +4,7 @@ import haxe.io.Bytes;
 
 /** Generated from pendant_wire/schema/pendant.wire.idl. Do not edit by hand. */
 class PendantProfile {
-  public static inline final SIZE:Int = 52;
+  public static inline final SIZE:Int = 54;
   public var axes:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   public var rule_count:Int = 0;
   public var rule_axis:Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -14,6 +14,7 @@ class PendantProfile {
   public var spindle_key:Int = 0;
   public var step_units:Array<Int> = [0, 0, 0];
   public var timeout_ms:Int = 0;
+  public var host_timeout_ms:Int = 0;
   public function new() {}
 
   /** Constraints declared in the schema; checked on encode and decode. */
@@ -24,10 +25,11 @@ class PendantProfile {
     if (rule_reason.length != 8) throw "PendantProfile.rule_reason has the wrong length";
     if (step_units.length != 3) throw "PendantProfile.step_units has the wrong length";
     if (rule_count < 0 || rule_count > 8) throw "PendantProfile.rule_count violates its constraint";
-    for (v in rule_condition) if (v < 0 || v > 31) throw "PendantProfile.rule_condition violates its constraint";
+    for (v in rule_condition) if (v < 0 || v > 3) throw "PendantProfile.rule_condition violates its constraint";
     for (v in rule_reason) if (v < 0 || v > 7) throw "PendantProfile.rule_reason violates its constraint";
     if (has_spindle < 0 || has_spindle > 1) throw "PendantProfile.has_spindle violates its constraint";
     if (timeout_ms < 1 || timeout_ms > 1000) throw "PendantProfile.timeout_ms violates its constraint";
+    if (host_timeout_ms < 1 || host_timeout_ms > 5000) throw "PendantProfile.host_timeout_ms violates its constraint";
   }
 
   public function encode():Bytes {
@@ -66,11 +68,14 @@ class PendantProfile {
     out.set(offset + 0, (timeout_ms >> 0) & 0xFF);
     out.set(offset + 1, (timeout_ms >> 8) & 0xFF);
     offset += 2;
+    out.set(offset + 0, (host_timeout_ms >> 0) & 0xFF);
+    out.set(offset + 1, (host_timeout_ms >> 8) & 0xFF);
+    offset += 2;
     return out;
   }
 
   public static function decode(input:Bytes):PendantProfile {
-    if (input == null || input.length != SIZE) throw "PendantProfile must be 52 bytes";
+    if (input == null || input.length != SIZE) throw "PendantProfile must be 54 bytes";
     var value = new PendantProfile();
     var offset = 0;
     for (i in 0...11) {
@@ -122,6 +127,11 @@ class PendantProfile {
     timeout_msRaw |= input.get(offset + 0) << 0;
     timeout_msRaw |= input.get(offset + 1) << 8;
     value.timeout_ms = timeout_msRaw;
+    offset += 2;
+    var host_timeout_msRaw = 0;
+    host_timeout_msRaw |= input.get(offset + 0) << 0;
+    host_timeout_msRaw |= input.get(offset + 1) << 8;
+    value.host_timeout_ms = host_timeout_msRaw;
     offset += 2;
     value.check();
     return value;

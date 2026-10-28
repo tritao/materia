@@ -97,6 +97,16 @@ several KB. Values are placeholders.
   `pendant_wire/src/authority.rs` decodes them. `pendant_wire/vectors/profiles.txt` holds the
   compiled reference profiles; the Haxe tests assert the compiler produces them byte for byte and the
   Rust tests decode them, run the jog scenarios on them and recompute the digests.
+- **Operator channel.** Host to controller messages (profile, reason texts, labels, `OperatorState`)
+  travel in their own frame (`OPR1` marker, type, length, CRC-32; `operator_frame.rs` and the Haxe
+  `OperatorFrame`, checked against `vectors/frames.txt`) beside the RKD6 motion protocol, whose wire
+  revision stays untouched.
+- **Who owns what.** Machine facts are evaluated by the controller, never sent by the host: jog rules
+  name a closed `OperatorCondition` set (gearbox engaged, door open, spindle running, program
+  running), each a fixed bit in the mask the controller builds from its own state. A running program
+  always blocks the pendant. The host sends only intent, `OperatorState.jog_allowed` about every
+  100 ms; `HostLink` treats a missing or stale state as "not allowed", the same fail-safe as the
+  pendant lease.
 - The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
   `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
   rules in Rust.

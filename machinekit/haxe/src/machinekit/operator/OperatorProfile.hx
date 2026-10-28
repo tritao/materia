@@ -23,13 +23,11 @@ class OperatorProfile {
   public final hasSpindle:Bool;
   /** Null when the machine has no enclosure. */
   public final guard:Null<OperatorGuard>;
-  /** Service conditions the jog rules may name, such as "gearbox-engaged". */
-  public final conditions:Array<String>;
   public final jogRules:Array<JogRule>;
 
   public function new(name:String, cabinet:String, axes:Array<OperatorAxis>, pendantAxes:Array<Null<String>>,
       keys:Array<OperatorKey>, modes:Array<OperatorMode>, pages:Array<OperatorPage>, hasSpindle:Bool,
-      guard:Null<OperatorGuard>, conditions:Array<String>, jogRules:Array<JogRule>) {
+      guard:Null<OperatorGuard>, jogRules:Array<JogRule>) {
     requireId(name, "profile name");
     requireId(cabinet, "cabinet");
     if (axes == null || axes.length == 0) throw "A profile needs at least one axis";
@@ -55,16 +53,9 @@ class OperatorProfile {
     requireUnique(modes, "mode");
     requireUnique(pages, "page");
     if (mapped.length > 0 && !modes.contains(Jog)) throw "A pendant with axes needs the Jog mode";
-    var known:Array<String> = [];
-    for (condition in conditions) {
-      requireId(condition, "condition");
-      if (known.contains(condition)) throw "Conditions must be unique";
-      known.push(condition);
-    }
     for (rule in jogRules) {
       if (rule == null) throw "Missing jog rule";
       if (!ids.contains(rule.axis)) throw 'Jog rule names unknown axis ${rule.axis}';
-      if (!known.contains(rule.blockedWhen)) throw 'Jog rule names undeclared condition ${rule.blockedWhen}';
     }
     this.name = name;
     this.cabinet = cabinet;
@@ -75,7 +66,6 @@ class OperatorProfile {
     this.pages = pages.copy();
     this.hasSpindle = hasSpindle;
     this.guard = guard;
-    this.conditions = conditions.copy();
     this.jogRules = jogRules.copy();
   }
 
@@ -92,7 +82,7 @@ class OperatorProfile {
   }
 
   /** The rule that refuses jogging `axisId` under `active` conditions, or null when jogging is allowed. */
-  public function jogRefusal(axisId:String, active:Array<String>):Null<JogRule> {
+  public function jogRefusal(axisId:String, active:Array<OperatorCondition>):Null<JogRule> {
     for (rule in jogRules) if (rule.axis == axisId && active.contains(rule.blockedWhen)) return rule;
     return null;
   }

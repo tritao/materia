@@ -8,6 +8,7 @@
 extern crate std;
 
 pub mod authority;
+pub mod operator_frame;
 pub mod pendant_wire;
 
 use pendant_wire::{ConfigKind, PendantConfig, PendantOutput, PendantState};

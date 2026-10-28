@@ -18,7 +18,7 @@ class PendantAuthorityTests {
 
   public static function run():Void {
     seq = 0;
-    var a = authority(), none:Array<String> = [];
+    var a = authority(), none:Array<OperatorCondition> = [];
     // The first enabled frame never jogs, the next one does: no jump from counts before enabling.
     var out = got(a.accept(frame(3, 7), t, Jog, none));
     if (out.move != null || !out.authority) throw "First frame must not move";
@@ -49,10 +49,10 @@ class PendantAuthorityTests {
 
     // Hobber jog rule.
     var h = authority(ReferenceOperatorProfiles.hobber()); t = 0.0; seq = 0;
-    h.accept(frame(5), t, Jog, ["gearbox-engaged"]);
-    out = got(h.accept(frame(5, 3), nx(), Jog, ["gearbox-engaged"]));
+    h.accept(frame(5), t, Jog, [GearboxEngaged]);
+    out = got(h.accept(frame(5, 3), nx(), Jog, [GearboxEngaged]));
     if (out.move != null || out.refusal != "Gearbox engaged") throw "Gearbox rule";
-    out = got(h.accept(frame(3, 3), nx(), Jog, ["gearbox-engaged"]));
+    out = got(h.accept(frame(3, 3), nx(), Jog, [GearboxEngaged]));
     var z = out.move;
     if (z == null || z.axis != "z") throw "Z stays jogable";
 

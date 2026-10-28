@@ -24,10 +24,54 @@
         "lost": 2,
         "no_lease": 0
       }
+    },
+    "OperatorCondition": {
+      "underlying": "u8",
+      "values": {
+        "door_open": 1,
+        "gearbox_engaged": 0,
+        "program_running": 3,
+        "spindle_running": 2
+      }
+    },
+    "OperatorMessage": {
+      "underlying": "u8",
+      "values": {
+        "config": 3,
+        "profile": 1,
+        "reason_text": 2,
+        "state": 4
+      }
     }
   },
   "messages": {},
   "packed_structs": {
+    "OperatorState": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "jog_allowed",
+          "range": [
+            0,
+            1
+          ],
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8",
+          "zero": true
+        }
+      ],
+      "size": 4
+    },
     "PendantConfig": {
       "endian": "little",
       "fields": [
@@ -118,7 +162,7 @@
           "name": "rule_condition",
           "range": [
             0,
-            31
+            3
           ],
           "type": "u8"
         },
@@ -158,9 +202,18 @@
             1000
           ],
           "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "host_timeout_ms",
+          "range": [
+            1,
+            5000
+          ],
+          "type": "u16"
         }
       ],
-      "size": 52
+      "size": 54
     },
     "PendantReasonText": {
       "endian": "little",
