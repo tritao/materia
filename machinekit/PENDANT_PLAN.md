@@ -143,6 +143,12 @@ Rules the controller enforces (the lease, hold-to-run, jog refusals, fail-safe d
 The wire schema, the controller-side code, the host link and how it is tested are described in
 `operator_link/README.md`.
 
+## Suppliers
+
+For the switches, buttons and E-stop: Zhejiang Jiushi Electronics Co., Ltd. first, then Zhejiang Ninuo
+Electrical Co., Ltd. (what Ninuo makes is unconfirmed). Details and what to ask for are in
+`PENDANT_BENCH_PARTS.md`.
+
 ## Face model
 
 `machinekit/haxe/src/machinekit/pendant/` models the top face: each bought part as a `PendantControl`

@@ -13,6 +13,25 @@ Nucleo-G474RE (owned) wired by jumpers to the controls on a flat board, a CAN-FD
 USB-CAN adapter to a PC or Pi. Firmware speaks the `PENDANT_*` frames from `operator_link`. The
 Nucleo is powered over USB; the 24 V path is rehearsed separately.
 
+## Suppliers
+
+Chosen by you, in order of preference:
+
+1. **Zhejiang Jiushi Electronics Co., Ltd.** (preferred). The XB2 E-stop drawing and the linked listing
+   are theirs (watermarked "jiushi electronics"). A web search found them on Alibaba with XB2 latching
+   E-stops (XB2-BT42 push-pull, 1NC, IP65) and describing high-current, micro-travel and emergency-stop
+   push buttons; I did not find an official catalogue.
+2. **Zhejiang Ninuo Electrical Co., Ltd.** A web search found nothing on this company, so what it
+   makes is unconfirmed. Ask for its catalogue before assuming any part.
+
+What to source from them for the pendant: the 22 mm E-stop (Jiushi, item 5), and the illuminated or plain
+momentary buttons and the 3-position step switch if their catalogues have 16 mm or 22 mm versions
+(items 3 and 4; ask Jiushi first, then Ninuo). The electronics (OLED, CAN transceiver, USB-CAN adapter,
+buck module, logic analyzer), the 12-position rotary switch and the Vallder wheel are not from them.
+For one unit buy from their AliExpress store; Alibaba direct has minimum orders (a Jiushi E-stop listing
+there shows 20 pieces). Ask each for the catalogue PDF with dimensions and the contact and mounting
+details before adding a part to the model.
+
 ## Order list
 
 | # | Part | Qty | Ask for | Search terms | Check on arrival |
