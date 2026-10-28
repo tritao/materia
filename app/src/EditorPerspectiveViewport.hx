@@ -1538,7 +1538,10 @@ class EditorPerspectiveViewport implements View {
         }
       }
       if (navigationMode == 1 || navigationMode == 2 || navigationMode == 8) host.requestFrame();
-      if (navigationMode != 4 && navigationMode != 8) updateHover(event.localX, event.localY);
+      // Hover follows the cursor only when nothing is being dragged: under a drag the part being moved is the subject, and
+      // whatever slides beneath the cursor must not flicker or cost a pick per move.
+      if (navigationMode == 3 || navigationMode == 4 || navigationMode == 5 || navigationMode == 6 || navigationMode == 8 || navigationMode == 9) clearHover();
+      else updateHover(event.localX, event.localY);
       event.preventDefault(); event.stopPropagation();
     });
     node.on(UiEventKind.HoverEnter, function(event:UiEvent) {
