@@ -43,6 +43,10 @@ class OledModule extends HmiPart {
   static inline var CLAMP_THICKNESS:Float = 2.5;
   static inline var CLAMP_WIDTH:Float = 4.25;
   static inline var CLAMP_HOLE:Float = 2.7;
+  /** Locating pegs through the board's upper holes: 2.4 mm in the 2.7 mm holes, ending 0.7 mm short of the glass. */
+  static inline var PEG_DIAMETER:Float = 2.4;
+  static inline var PEG_PAD:Float = 5.0;
+  static inline var PEG_CLEARANCE:Float = 0.7;
   static inline var HEADER_PITCH:Float = 2.54;
   static inline var HEADER_PINS:Int = 7;
   static inline var CONNECTOR_HEIGHT:Float = 3.4;
@@ -119,10 +123,25 @@ class OledModule extends HmiPart {
     return result;
   }
 
-  /** The clamp bar in its own frame: its origin on the bar's centre line at its underside; its top lies on the board's back. */
+  /**
+   * The clamp bar in its own frame: its origin on the bar's centre line at its underside; its top lies on the board's back.
+   * Two pegs rise from it through the board's upper holes and stop short of the glass, which covers the holes, so they
+   * locate the board and the screws at the bar's ends clamp it.
+   */
   function clampBar():Part {
     var pieces:Array<Part> = [box(2 * CLAMP_X, CLAMP_WIDTH, CLAMP_THICKNESS, 0.0, 0.0, 0.0)];
-    for (sx in [-1.0, 1.0]) pieces.push(Part.cylinderSpan(BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, 0.0));
+    var pegY = HOLE_DY - (clampY() - boardCentre());
+    for (sx in [-1.0, 1.0]) {
+      pieces.push(Part.cylinderSpan(BOSS_DIAMETER / 2, 0.0, CLAMP_THICKNESS, sx * CLAMP_X, 0.0));
+      pieces.push(Part.cylinderSpan(PEG_PAD / 2, 0.0, CLAMP_THICKNESS, sx * HOLE_DX, pegY));
+      pieces.push(Part.cylinderSpan(
+        PEG_DIAMETER / 2,
+        CLAMP_THICKNESS,
+        CLAMP_THICKNESS + PCB_THICKNESS + PEG_CLEARANCE,
+        sx * HOLE_DX,
+        pegY
+      ));
+    }
     var plain = Solids.union(pieces);
     var holes = [for (sx in [-1.0, 1.0]) Part.cylinderSpan(
       CLAMP_HOLE / 2,
