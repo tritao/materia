@@ -16,18 +16,9 @@ class HB4ConvergenceProbe {
     // Worst lead circle at levels 1, 2 and 3, plus the worst profile circle at level 3.
     var coordinates = [
       {r: cross.stocks[1].grid.radius(1), z: cross.stocks[1].grid.z(186)},
-      {
-        r: cross.stocks[1].grid.radius(1),
-        z: cross.stocks[1].grid.z(83)
-      },
-      {
-        r: cross.stocks[1].grid.radius(1),
-        z: cross.stocks[1].grid.z(81)
-      },
-      {
-        r: cross.stocks[0].grid.radius(63),
-        z: cross.stocks[0].grid.z(0)
-      }
+      {r: cross.stocks[1].grid.radius(1), z: cross.stocks[1].grid.z(83)},
+      {r: cross.stocks[1].grid.radius(1), z: cross.stocks[1].grid.z(81)},
+      {r: cross.stocks[0].grid.radius(63), z: cross.stocks[0].grid.z(0)}
     ];
     cross.dispose();
     var stocks:Array<RingStock> = [];

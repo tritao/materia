@@ -51,12 +51,7 @@ class StockComponents {
     regionAt:Null<Float -> Float -> Int> = null
   ):Array<StockComponent> return fromRows(
     stock.grid,
-    row -> stock.rays(
-      0,
-      row,
-      stock.grid.countU,
-      1
-    ),
+    row -> stock.rays(0, row, stock.grid.countU, 1),
     supportPlaneZ,
     tolerance,
     regionCount,

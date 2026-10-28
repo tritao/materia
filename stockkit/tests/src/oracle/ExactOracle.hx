@@ -128,11 +128,7 @@ class ExactOracle {
       Path(geometries[index]),
       Cut,
       index,
-      new Provenance(
-        index + 1,
-        1,
-        0
-      )
+      new Provenance(index + 1, 1, 0)
     )];
   }
 
@@ -310,19 +306,10 @@ class ExactOracle {
         case Line(r0, z0, r1, z1, _):
           if (Math.abs(r1 - r0) > 1e-15 || Math.abs(z1 - z0) > 1e-15) add(reversed ? Curve.line(
             at(sign * r1, z1),
-            at(
-              sign * r0,
-              z0
-            )
+            at(sign * r0, z0)
           ) : Curve.line(
-            at(
-              sign * r0,
-              z0
-            ),
-            at(
-              sign * r1,
-              z1
-            )
+            at(sign * r0, z0),
+            at(sign * r1, z1)
           ));
         case Arc(cr, cz, r0, z0, r1, z1, _):
           var radius = Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz));
@@ -330,18 +317,9 @@ class ExactOracle {
           var m = Math.sqrt(mr * mr + mz * mz);
           var midR = cr + radius * mr / m, midZ = cz + radius * mz / m;
           add(reversed ? Curve.arc(at(sign * r1, z1), at(sign * midR, midZ), at(sign * r0, z0)) : Curve.arc(
-            at(
-              sign * r0,
-              z0
-            ),
-            at(
-              sign * midR,
-              midZ
-            ),
-            at(
-              sign * r1,
-              z1
-            )
+            at(sign * r0, z0),
+            at(sign * midR, midZ),
+            at(sign * r1, z1)
           ));
       }
     }

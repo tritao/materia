@@ -57,45 +57,19 @@ class ChainFixtures {
     // those tools use the smallest corners it accepts.
     return [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02), depth: 0.002, corners: [r, 1.5 * r], weight: 9.4},
-      {
-        name: "ball",
-        profile: CutterProfile.ball(
-          2 * r,
-          0.02
-        ),
-        depth: 0.004,
-        corners: [
-          1.01 * r,
-          1.5 * r
-        ],
-        weight: 7.5
-      },
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02), depth: 0.004, corners: [1.01 * r, 1.5 * r], weight: 7.5},
       {
         name: "bull-nose",
-        profile: CutterProfile.bullNose(
-          2 * r,
-          0.001,
-          0.02
-        ),
+        profile: CutterProfile.bullNose(2 * r, 0.001, 0.02),
         depth: 0.002,
-        corners: [
-          1.01 * r,
-          1.5 * r
-        ],
+        corners: [1.01 * r, 1.5 * r],
         weight: 13.5
       },
       {
         name: "V-bit",
-        profile: CutterProfile.vee(
-          2 * r,
-          Math.PI / 2,
-          0.02
-        ),
+        profile: CutterProfile.vee(2 * r, Math.PI / 2, 0.02),
         depth: 0.002,
-        corners: [
-          r,
-          1.5 * r
-        ],
+        corners: [r, 1.5 * r],
         weight: 5.3
       }
     ];
@@ -104,11 +78,7 @@ class ChainFixtures {
   static function origins():Array<Vector> return [
     new Vector(0, 0, 0),
     new Vector(0.0137, -0.0213, 0.0041),
-    new Vector(
-      0.25,
-      0.1,
-      -0.05
-    )
+    new Vector(0.25, 0.1, -0.05)
   ];
 
   static function runTool(tool:ChainTool):Void {
@@ -134,69 +104,13 @@ class ChainFixtures {
     function p(x:Float, y:Float):Point3 return new Point3(x0 + x, y0 + y, z);
     var moves:Array<PathGeometry> = [
       Line(p(corner, 0), p(corner + a, 0)),
-      Arc(
-        p(corner + a, corner),
-        corner,
-        -Math.PI / 2,
-        Math.PI / 2
-      ),
-      Line(
-        p(
-          2 * corner + a,
-          corner
-        ),
-        p(
-          2 * corner + a,
-          corner + b
-        )
-      ),
-      Arc(
-        p(
-          corner + a,
-          corner + b
-        ),
-        corner,
-        0,
-        Math.PI / 2
-      ),
-      Line(
-        p(
-          corner + a,
-          2 * corner + b
-        ),
-        p(
-          corner,
-          2 * corner + b
-        )
-      ),
-      Arc(
-        p(
-          corner,
-          corner + b
-        ),
-        corner,
-        Math.PI / 2,
-        Math.PI / 2
-      ),
-      Line(
-        p(
-          0,
-          corner + b
-        ),
-        p(
-          0,
-          corner
-        )
-      ),
-      Arc(
-        p(
-          corner,
-          corner
-        ),
-        corner,
-        Math.PI,
-        Math.PI / 2
-      )
+      Arc(p(corner + a, corner), corner, -Math.PI / 2, Math.PI / 2),
+      Line(p(2 * corner + a, corner), p(2 * corner + a, corner + b)),
+      Arc(p(corner + a, corner + b), corner, 0, Math.PI / 2),
+      Line(p(corner + a, 2 * corner + b), p(corner, 2 * corner + b)),
+      Arc(p(corner, corner + b), corner, Math.PI / 2, Math.PI / 2),
+      Line(p(0, corner + b), p(0, corner)),
+      Arc(p(corner, corner), corner, Math.PI, Math.PI / 2)
     ];
     var length = 2 * a + 2 * b + 2 * Math.PI * corner;
     var cut = profile.below(depth);
@@ -211,25 +125,8 @@ class ChainFixtures {
     var moves:Array<PathGeometry> = [
       Line(p(0, 0), p(a, 0)),
       Arc(p(a, corner), corner, -Math.PI / 2, Math.PI / 2),
-      Arc(
-        p(
-          a + 2 * corner,
-          corner
-        ),
-        corner,
-        Math.PI,
-        -Math.PI / 2
-      ),
-      Line(
-        p(
-          a + 2 * corner,
-          2 * corner
-        ),
-        p(
-          2 * a + 2 * corner,
-          2 * corner
-        )
-      )
+      Arc(p(a + 2 * corner, corner), corner, Math.PI, -Math.PI / 2),
+      Line(p(a + 2 * corner, 2 * corner), p(2 * a + 2 * corner, 2 * corner))
     ];
     var length = 2 * a + Math.PI * corner;
     var cut = profile.below(depth);

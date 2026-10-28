@@ -46,13 +46,7 @@ class OracleFixtures {
       new Vector(-0.01, 0.01, -0.001),
       new Vector(1, 0, 0),
       0.06,
-      [
-        {enter: 0.01, exit: 0.01 + a.x - r},
-        {
-          enter: 0.01 + b.x + r,
-          exit: 0.05
-        }
-      ],
+      [{enter: 0.01, exit: 0.01 + a.x - r}, {enter: 0.01 + b.x + r, exit: 0.05}],
       "flat slot walls"
     );
     flat.stock.close();
@@ -69,10 +63,7 @@ class OracleFixtures {
       new Vector(0.02, 0.01 + offset, 0.05),
       new Vector(0, 0, -1),
       0.1,
-      [{
-        enter: 0.05 + d - r + Math.sqrt(r * r - offset * offset),
-        exit: 0.05 + STOCK_Z
-      }],
+      [{enter: 0.05 + d - r + Math.sqrt(r * r - offset * offset), exit: 0.05 + STOCK_Z}],
       "ball slot floor follows the ball"
     );
     ball.stock.close();
@@ -100,14 +91,7 @@ class OracleFixtures {
     // Plunge from above the stock: only the part below the top is removed.
     var plunge = removal(
       CutterProfile.flat(2 * r, 0.02),
-      [Line(
-        new Point3(0.02, 0.01, 0.001),
-        new Point3(
-          0.02,
-          0.01,
-          -0.003
-        )
-      )],
+      [Line(new Point3(0.02, 0.01, 0.001), new Point3(0.02, 0.01, -0.003))],
       "plunge"
     );
     relative(plunge.removed, Math.PI * r * r * 0.003, "plunge removes a cylinder");
@@ -128,10 +112,7 @@ class OracleFixtures {
       new Vector(0.02, 0.01 + rho, 0.05),
       new Vector(0, 0, -1),
       0.1,
-      [{
-        enter: 0.05 + d,
-        exit: 0.05 + STOCK_Z
-      }],
+      [{enter: 0.05 + d, exit: 0.05 + STOCK_Z}],
       "ball arc floor at its apex"
     );
     arc.stock.close();
@@ -139,12 +120,7 @@ class OracleFixtures {
     // Full circle: the section revolved all the way round, with no caps.
     var circle = removal(
       CutterProfile.ball(2 * r, 0.02),
-      [Arc(
-        new Point3(0.02, 0.01, -d),
-        rho,
-        Math.PI / 2,
-        -2 * Math.PI
-      )],
+      [Arc(new Point3(0.02, 0.01, -d), rho, Math.PI / 2, -2 * Math.PI)],
       "ball full circle"
     );
     Assert.near(
@@ -173,11 +149,7 @@ class OracleFixtures {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     // One 2 mm level: a 10% ramp would need 20 mm, longer than the first
@@ -213,13 +185,7 @@ class OracleFixtures {
       new Vector(0.02, -0.01, -0.001),
       new Vector(0, 1, 0),
       0.04,
-      [
-        {enter: 0.01, exit: 0.015},
-        {
-          enter: 0.025,
-          exit: 0.03
-        }
-      ],
+      [{enter: 0.01, exit: 0.015}, {enter: 0.025, exit: 0.03}],
       "pocket walls on the contour"
     );
     result.stock.close();
@@ -236,10 +202,7 @@ class OracleFixtures {
 
   static function removal(profile:CutterProfile,
     moves:Array<PathGeometry>, label:String): {stock: Part, removed: Float} return removalOf(
-      ExactOracle.pathMoves(
-        profile,
-        moves
-      ),
+      ExactOracle.pathMoves(profile, moves),
       label
     );
 
@@ -270,10 +233,7 @@ class OracleFixtures {
     origin:Vector,
     direction:Vector,
     length:Float,
-    expected:Array<{
-      enter:Float,
-      exit:Float
-    }>,
+    expected:Array<{enter:Float, exit:Float}>,
     message:String
   ):Void {
     var actual = ExactOracle.rayIntervals(stock, origin, direction, length);

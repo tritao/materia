@@ -327,11 +327,7 @@ class Stock {
         case _:
       }
       if (rayColors != null) check(
-        StockKitNative.sk_mesh_color_by_ray(
-          handle,
-          StockKitNativeConstants.SK_AXIS_Z,
-          rayColors
-        ),
+        StockKitNative.sk_mesh_color_by_ray(handle, StockKitNativeConstants.SK_AXIS_Z, rayColors),
         "mesh.colorByRay"
       );
       else if (palette != null) check(

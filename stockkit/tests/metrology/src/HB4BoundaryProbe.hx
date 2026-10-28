@@ -12,12 +12,7 @@ private typedef BoundaryProbeInput = {
   zLow:Float,
   zHigh:Float,
   passes:Array<Int>,
-  expected:Array<{
-    lo:Float,
-    hi:Float,
-    loPass:Int,
-    hiPass:Int
-  }>,
+  expected:Array<{lo:Float, hi:Float, loPass:Int, hiPass:Int}>,
   source:String
 };
 

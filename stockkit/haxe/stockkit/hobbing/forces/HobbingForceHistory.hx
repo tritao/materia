@@ -90,14 +90,8 @@ class HobbingForceHistory {
       radialMinN: min,
       radialPeakN: max,
       radialRangeN: max - min,
-      radialStdDevN: Math.sqrt(Math.max(
-        0,
-        square / (end - start) - mean * mean
-      )),
-      radialPeakDeviationFromMeanN: Math.max(
-        max - mean,
-        mean - min
-      ),
+      radialStdDevN: Math.sqrt(Math.max(0, square / (end - start) - mean * mean)),
+      radialPeakDeviationFromMeanN: Math.max(max - mean, mean - min),
       activeSeconds: activeTime,
       activeMeanRadialN: activeTime > 0 ? integral / activeTime : 0,
       perPassRadialMinN : count > 0 ? passMin : 0,

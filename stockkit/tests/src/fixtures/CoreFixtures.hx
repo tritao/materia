@@ -49,11 +49,7 @@ class CoreFixtures {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     var program = new CamJob(0.005,
@@ -169,11 +165,7 @@ class CoreFixtures {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     // 3 mm of flutes on a 6 mm shank, then a 20 mm holder 10 mm above the tip.
     var profile = CutterProfile.flat(0.004, 0.003).withShank(0.004, 0.007).withHolder(0.02, 0.03);
@@ -224,11 +216,7 @@ class CoreFixtures {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     var program = new CamJob(0.005,
@@ -298,13 +286,7 @@ class CoreFixtures {
       0,
       stock.tilesX(),
       stock.tilesY(),
-      ByDeviation(
-        target,
-        0.00005,
-        0x00FF00FF,
-        0xFFFF00FF,
-        gougeColor
-      )
+      ByDeviation(target, 0.00005, 0x00FF00FF, 0xFFFF00FF, gougeColor)
     );
     var wall = 0, floor = 0;
     for (v in 0...surface.vertexCount) {
@@ -333,38 +315,10 @@ class CoreFixtures {
     var ramp:PathGeometry = Line(new Point3(0.008, 0.007, 0.001), new Point3(0.032, 0.013, -0.004));
     for (tool in [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
-      {
-        name: "ball",
-        profile: CutterProfile.ball(
-          2 * r,
-          0.02
-        )
-      },
-      {
-        name: "bull-nose",
-        profile: CutterProfile.bullNose(
-          2 * r,
-          0.001,
-          0.02
-        )
-      },
-      {
-        name: "V-bit",
-        profile: CutterProfile.vee(
-          2 * r,
-          Math.PI / 2,
-          0.02
-        )
-      },
-      {
-        name: "tapered ball",
-        profile: CutterProfile.taperedBall(
-          0.002,
-          10 * Math.PI / 180,
-          2 * r,
-          0.02
-        )
-      }
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
+      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02)},
+      {name: "V-bit", profile: CutterProfile.vee(2 * r, Math.PI / 2, 0.02)},
+      {name: "tapered ball", profile: CutterProfile.taperedBall(0.002, 10 * Math.PI / 180, 2 * r, 0.02)}
     ]) sampled(
       tool.profile,
       [ramp],
@@ -402,11 +356,7 @@ class CoreFixtures {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     var program = new CamJob(0.005,
@@ -469,31 +419,8 @@ class CoreFixtures {
     var tool = Tool.shaped(1, 0.0, CutterProfile.flat(0.006, 0.02));
     var span = new Provenance(1, 1, 0);
     var moves = [
-      new CutMove(
-        tool,
-        Path(Line(new Point3(0.01, 0.01, -0.002), new Point3(0.03, 0.01, -0.002))),
-        Cut,
-        0,
-        span
-      ),
-      new CutMove(
-        tool,
-        Path(Line(
-          new Point3(
-            0.02,
-            0.002,
-            -0.001
-          ),
-          new Point3(
-            0.02,
-            0.018,
-            -0.001
-          )
-        )),
-        Rapid,
-        1,
-        span
-      )
+      new CutMove(tool, Path(Line(new Point3(0.01, 0.01, -0.002), new Point3(0.03, 0.01, -0.002))), Cut, 0, span),
+      new CutMove(tool, Path(Line(new Point3(0.02, 0.002, -0.001), new Point3(0.02, 0.018, -0.001))), Rapid, 1, span)
     ];
     var lattice = new StockLattice(0, 0, -STOCK_Z + 0.00025, 0.0005, 81, 41, 20);
     var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
@@ -569,68 +496,15 @@ class CoreFixtures {
     var r = 0.003;
     var moves:Array<PathGeometry> = [
       Line(new Point3(0.008, 0.006, -0.004), new Point3(0.033, 0.013, -0.004)),
-      Circular(
-        new Point3(
-          0.02,
-          0.01,
-          -0.003
-        ),
-        0.006,
-        0.4,
-        3.9,
-        XY,
-        0
-      ),
-      Circular(
-        new Point3(
-          0.02,
-          0.01,
-          -0.003
-        ),
-        0.002,
-        -1.0,
-        -2 * Math.PI,
-        XY,
-        0
-      ),
-      Line(
-        new Point3(
-          0.02,
-          0.011,
-          0.001
-        ),
-        new Point3(
-          0.02,
-          0.011,
-          -0.006
-        )
-      )
+      Circular(new Point3(0.02, 0.01, -0.003), 0.006, 0.4, 3.9, XY, 0),
+      Circular(new Point3(0.02, 0.01, -0.003), 0.002, -1.0, -2 * Math.PI, XY, 0),
+      Line(new Point3(0.02, 0.011, 0.001), new Point3(0.02, 0.011, -0.006))
     ];
     for (tool in [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
-      {
-        name: "ball",
-        profile: CutterProfile.ball(
-          2 * r,
-          0.02
-        )
-      },
-      {
-        name: "bull-nose",
-        profile: CutterProfile.bullNose(
-          2 * r,
-          0.001,
-          0.02
-        )
-      },
-      {
-        name: "V-bit",
-        profile: CutterProfile.vee(
-          2 * r,
-          60 * Math.PI / 180,
-          0.02
-        )
-      }
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
+      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02)},
+      {name: "V-bit", profile: CutterProfile.vee(2 * r, 60 * Math.PI / 180, 0.02)}
     ]) horizontal(
       tool.profile,
       moves,

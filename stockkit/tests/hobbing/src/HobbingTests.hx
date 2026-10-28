@@ -80,28 +80,8 @@ class HobbingTests {
     }, "reversing master is not silently scheduled");
     var accelerating = new HobbingMotion([
       new HobbingKeyframe(0, new HobbingAxes(40, 0, 0, 0, 0, 0)),
-      new HobbingKeyframe(
-        0.01,
-        new HobbingAxes(
-          40,
-          0,
-          0,
-          0,
-          Math.PI,
-          0.1
-        )
-      ),
-      new HobbingKeyframe(
-        0.03,
-        new HobbingAxes(
-          40,
-          0,
-          0,
-          0,
-          2 * Math.PI,
-          0.2
-        )
-      )
+      new HobbingKeyframe(0.01, new HobbingAxes(40, 0, 0, 0, Math.PI, 0.1)),
+      new HobbingKeyframe(0.03, new HobbingAxes(40, 0, 0, 0, 2 * Math.PI, 0.2))
     ]);
     near(accelerating.timeAtMaster(1.5 * Math.PI), 0.02, 1e-15, "event timing follows varying master speed");
     Sys.println('hobbing schedule: ${events.length} exact events, $between between ticks');

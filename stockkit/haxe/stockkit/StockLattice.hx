@@ -64,14 +64,8 @@ class StockLattice {
       minZ - spacing / 2,
       spacing,
       cells(minX, maxX),
-      cells(
-        minY,
-        maxY
-      ),
-      cells(
-        minZ,
-        maxZ
-      ),
+      cells(minY, maxY),
+      cells(minZ, maxZ),
       triDexel
     );
   }

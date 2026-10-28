@@ -76,13 +76,7 @@ class SampledReferenceFixtures {
       circle,
       c.y,
       c.z + 0.002,
-      [
-        {lo: c.x - ring - R, hi: c.x - ring + R},
-        {
-          lo: c.x + ring - R,
-          hi: c.x + ring + R
-        }
-      ],
+      [{lo: c.x - ring - R, hi: c.x - ring + R}, {lo: c.x + ring - R, hi: c.x + ring + R}],
       "X ray through a flat full circle's centre"
     );
     bracketsAlong(
@@ -91,13 +85,7 @@ class SampledReferenceFixtures {
       circle,
       c.x,
       c.z + 0.002,
-      [
-        {lo: c.y - ring - R, hi: c.y - ring + R},
-        {
-          lo: c.y + ring - R,
-          hi: c.y + ring + R
-        }
-      ],
+      [{lo: c.y - ring - R, hi: c.y - ring + R}, {lo: c.y + ring - R, hi: c.y + ring + R}],
       "Y ray through a flat full circle's centre"
     );
 
@@ -118,10 +106,7 @@ class SampledReferenceFixtures {
       helix,
       0.01,
       -0.0015,
-      [{
-        lo: 0.02 - 0.001 - R,
-        hi: 0.02 + 0.001 + R
-      }],
+      [{lo: 0.02 - 0.001 - R, hi: 0.02 + 0.001 + R}],
       "X ray through a helix axis"
     );
 
@@ -184,42 +169,15 @@ class SampledReferenceFixtures {
     var concave = new CutterProfile([
       Line(0, 0, 0.002, 0, Cutting),
       Arc(0.003, 0, 0.002, 0, 0.003, 0.001, Cutting),
-      Line(
-        0.003,
-        0.001,
-        0.003,
-        0.004,
-        Cutting
-      ),
-      Line(
-        0.003,
-        0.004,
-        0.005,
-        0.004,
-        Shank
-      ),
-      Line(
-        0.005,
-        0.004,
-        0.005,
-        0.008,
-        Shank
-      )
+      Line(0.003, 0.001, 0.003, 0.004, Cutting),
+      Line(0.003, 0.004, 0.005, 0.004, Shank),
+      Line(0.005, 0.004, 0.005, 0.008, Shank)
     ]);
     var profiles = [
       concave,
       CutterProfile.bullNose(2 * R, 0.001, 0.006).withShank(0.004, 0.003),
-      CutterProfile.taperedBall(
-        0.002,
-        20 * Math.PI / 180,
-        2 * R,
-        0.008
-      ),
-      CutterProfile.vee(
-        2 * R,
-        Math.PI / 2,
-        0.005
-      )
+      CutterProfile.taperedBall(0.002, 20 * Math.PI / 180, 2 * R, 0.008),
+      CutterProfile.vee(2 * R, Math.PI / 2, 0.005)
     ];
     var seed = 12345.0;
     function random():Float {
@@ -257,12 +215,7 @@ class SampledReferenceFixtures {
           }
           var distance = Math.min(
             distanceTo(polygon, x - a.x, y - a.y, z - a.z),
-            distanceTo(
-              polygon,
-              x - b.x,
-              y - b.y,
-              z - b.z
-            )
+            distanceTo(polygon, x - b.x, y - b.y, z - b.z)
           );
           var xRay = SampledReference.sweepAlong(X, profile, move, y, z, 1);
           var yRay = SampledReference.sweepAlong(Y, profile, move, x, z, 1);
@@ -350,30 +303,10 @@ class SampledReferenceFixtures {
     var ramp:PathGeometry = Line(new Point3(0.01, 0.01, 0.0), new Point3(0.03, 0.015, -0.002));
     var arc:PathGeometry = Arc(new Point3(0.02, 0.01, -0.001), 0.002, 0.3, 2.5);
     var cases:Array<{move:PathGeometry, axis:ReferenceAxis, u:Float, v:Float}> = [
-      {
-        move: ramp,
-        axis: X,
-        u: 0.0125,
-        v: -0.001
-      },
-      {
-        move: ramp,
-        axis: Y,
-        u: 0.021,
-        v: -0.0005
-      },
-      {
-        move: arc,
-        axis: X,
-        u: 0.0115,
-        v: -0.0005
-      },
-      {
-        move: arc,
-        axis: Y,
-        u: 0.019,
-        v: 0.0
-      }
+      {move: ramp, axis: X, u: 0.0125, v: -0.001},
+      {move: ramp, axis: Y, u: 0.021, v: -0.0005},
+      {move: arc, axis: X, u: 0.0115, v: -0.0005},
+      {move: arc, axis: Y, u: 0.019, v: 0.0}
     ];
     for (fixture in cases) {
       var previous = Math.POSITIVE_INFINITY;
@@ -430,10 +363,7 @@ class SampledReferenceFixtures {
     Assert.check(
       SampledReference.contains(grazing.inner, grazing.inner, grazing.outer, SLACK) && SampledReference.contains(
         [],
-        [{
-          lo: -depth,
-          hi: -depth + 0.02
-        }],
+        [{lo: -depth, hi: -depth + 0.02}],
         grazing.outer,
         SLACK
       ),
@@ -538,59 +468,13 @@ class SampledReferenceFixtures {
     var cases:Array<{name:String, moves:Array<PathGeometry>, rays:Array<{x:Float, y:Float}>}> = [
       {
         name: "ball slot",
-        moves: [Line(
-          new Point3(
-            0.01,
-            0.01,
-            -0.004
-          ),
-          new Point3(
-            0.03,
-            0.01,
-            -0.004
-          )
-        )],
-        rays: [
-          {
-            x: 0.02,
-            y: 0.012
-          },
-          {
-            x: 0.0315,
-            y: 0.0105
-          },
-          {
-            x: 0.02,
-            y: 0.0129
-          }
-        ]
+        moves: [Line(new Point3(0.01, 0.01, -0.004), new Point3(0.03, 0.01, -0.004))],
+        rays: [{x: 0.02, y: 0.012}, {x: 0.0315, y: 0.0105}, {x: 0.02, y: 0.0129}]
       },
       {
         name: "ball arc",
-        moves: [Arc(
-          new Point3(
-            0.02,
-            0.01,
-            -0.004
-          ),
-          0.005,
-          0,
-          Math.PI
-        )],
-        rays: [
-          {
-            x: 0.02,
-            y: 0.015
-          },
-          {
-            x: 0.0245,
-            y: 0.0115
-          },
-          {
-            x: 0.0172,
-            y: 0.0131
-          }
-        ]
+        moves: [Arc(new Point3(0.02, 0.01, -0.004), 0.005, 0, Math.PI)],
+        rays: [{x: 0.02, y: 0.015}, {x: 0.0245, y: 0.0115}, {x: 0.0172, y: 0.0131}]
       }
     ];
     for (fixture in cases) {

@@ -43,18 +43,9 @@ class HobbingMotion {
       mix(a.axes.x, b.axes.x),
       mix(a.axes.y, b.axes.y),
       mix(a.axes.z, b.axes.z),
-      mix(
-        a.axes.a,
-        b.axes.a
-      ),
-      mix(
-        a.axes.b,
-        b.axes.b
-      ),
-      mix(
-        a.axes.c,
-        b.axes.c
-      ),
+      mix(a.axes.a, b.axes.a),
+      mix(a.axes.b, b.axes.b),
+      mix(a.axes.c, b.axes.c),
       offset
     );
   }

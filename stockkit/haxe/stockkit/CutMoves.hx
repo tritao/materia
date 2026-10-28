@@ -31,11 +31,7 @@ class CutMoves {
             tool,
             Path(GeometryOffset.translate(
               geometry,
-              [
-                origin.x - stockOrigin.x,
-                origin.y - stockOrigin.y,
-                origin.z - stockOrigin.z + frame.tipShift()
-              ]
+              [origin.x - stockOrigin.x, origin.y - stockOrigin.y, origin.z - stockOrigin.z + frame.tipShift()]
             )),
             kind,
             index,

@@ -32,41 +32,14 @@ class CutMoveTests {
       height,
       new CutterProfile([
         Line(0, 0, flat, 0, Cutting),
-        Arc(
-          flat,
-          radius,
-          flat,
-          0,
-          flat + radius,
-          radius,
-          Cutting
-        ),
-        Arc(
-          flat,
-          radius,
-          flat + radius,
-          radius,
-          flat,
-          height,
-          Cutting
-        )
+        Arc(flat, radius, flat, 0, flat + radius, radius, Cutting),
+        Arc(flat, radius, flat + radius, radius, flat, height, Cutting)
       ])
     );
     var source = Provenance.cam(1);
     function laid(z:Float, from:Float, to:Float):stockkit.CutMove return new stockkit.CutMove(
       bead,
-      Path(Line(
-        new Point3(
-          from,
-          0.0,
-          z
-        ),
-        new Point3(
-          to,
-          0.0,
-          z
-        )
-      )),
+      Path(Line(new Point3(from, 0.0, z), new Point3(to, 0.0, z))),
       Cut,
       0,
       source
@@ -99,51 +72,13 @@ class CutMoveTests {
       [
         Move(Rapid, Line(start, end), 0, 0, source),
         ToolChange(8, source),
-        ToolLengthOffset(
-          8,
-          0.003,
-          source
-        ),
-        Move(
-          Ramp,
-          Line(
-            start,
-            end
-          ),
-          0.001,
-          0,
-          source
-        ),
-        Move(
-          Retract,
-          Line(
-            end,
-            start
-          ),
-          0,
-          0,
-          source
-        ),
-        MachineMove(
-          Rapid,
-          Line(
-            start,
-            end
-          ),
-          0,
-          0,
-          source
-        )
+        ToolLengthOffset(8, 0.003, source),
+        Move(Ramp, Line(start, end), 0.001, 0, source),
+        Move(Retract, Line(end, start), 0, 0, source),
+        MachineMove(Rapid, Line(start, end), 0, 0, source)
       ],
       library,
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     );
     var moves = CutMoves.fromProgram(program);
     Assert.check(
@@ -169,41 +104,12 @@ class CutMoveTests {
       [
         ToolChange(8, source),
         ToolLengthOffset(8, 0.003, source),
-        Move(
-          Ramp,
-          Line(
-            start,
-            end
-          ),
-          0.001,
-          0,
-          source
-        ),
-        ToolLengthOffset(
-          0,
-          0.0,
-          source
-        ),
-        Move(
-          Ramp,
-          Line(
-            start,
-            end
-          ),
-          0.001,
-          0,
-          source
-        )
+        Move(Ramp, Line(start, end), 0.001, 0, source),
+        ToolLengthOffset(0, 0.0, source),
+        Move(Ramp, Line(start, end), 0.001, 0, source)
       ],
       measured,
-      [new Setup(
-        "1",
-        new Point3(
-          0,
-          0,
-          0
-        )
-      )]
+      [new Setup("1", new Point3(0, 0, 0))]
     ));
     switch [matched[0].motion, matched[1].motion] {
       case [Path(Line(a, _)), Path(Line(b, _))]:
@@ -215,55 +121,12 @@ class CutMoveTests {
     var placed = new ToolpathProgram(
       [
         ToolChange(8, source),
-        Move(
-          Cut,
-          Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
-          0.01,
-          0,
-          source
-        ),
-        SetSetup(
-          "2",
-          source
-        ),
-        Move(
-          Cut,
-          Line(
-            new Point3(
-              0,
-              0,
-              0
-            ),
-            new Point3(
-              0.01,
-              0,
-              0
-            )
-          ),
-          0.01,
-          0,
-          source
-        )
+        Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, source),
+        SetSetup("2", source),
+        Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, source)
       ],
       library,
-      [
-        new Setup(
-          "1",
-          new Point3(
-            0,
-            0,
-            0
-          )
-        ),
-        new Setup(
-          "2",
-          new Point3(
-            0.1,
-            0,
-            0
-          )
-        )
-      ]
+      [new Setup("1", new Point3(0, 0, 0)), new Setup("2", new Point3(0.1, 0, 0))]
     );
     var placedMoves = CutMoves.fromProgram(placed);
     switch [placedMoves[0].motion, placedMoves[1].motion] {
@@ -307,11 +170,7 @@ class CutMoveTests {
       new Point3(0.01, 0.005, 0),
       new Point3(0.03, 0.005, 0),
       new Point3(0.03, 0.015, 0),
-      new Point3(
-        0.01,
-        0.015,
-        0
-      )
+      new Point3(0.01, 0.015, 0)
     ]);
     var small = new Tool(2, 0.0, 0.002);
     var large = Tool.shaped(3, 0.0, CutterProfile.bullNose(0.006, 0.001, 0.02));
@@ -337,11 +196,7 @@ class CutMoveTests {
     var rejected = false;
     try new CamJob(0.005, 12000).pocket(contour, small, -0.002, 0.01, 0.0015, 0.001).profile(
       contour,
-      new Tool(
-        2,
-        0.0,
-        0.004
-      ),
+      new Tool(2, 0.0, 0.004),
       -0.003,
       0.01
     ) catch (_:Dynamic) rejected = true;

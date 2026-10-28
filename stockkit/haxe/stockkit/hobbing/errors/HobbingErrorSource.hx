@@ -95,18 +95,7 @@ class HobbingErrorSource {
       "encoder-eccentricity",
       part,
       'single readhead first-order e/R sine: e=$e mm, R=$radius mm; inverse servo angle error',
-      (
-        t,
-        a
-      ) -> new HobbingAxes(
-        a.x,
-        a.y,
-        a.z,
-        a.a,
-        a.b,
-        a.c - e / radius * Math.sin(a.c),
-        a.offset
-      )
+      (t, a) -> new HobbingAxes(a.x, a.y, a.z, a.a, a.b, a.c - e / radius * Math.sin(a.c), a.offset)
     );
   }
   public static function graduation(part:String, peak:Float, order:Int):HobbingErrorSource {
@@ -116,18 +105,7 @@ class HobbingErrorSource {
       "encoder-graduation",
       part,
       'assumed peak $peak rad, harmonic $order; not a measured error map',
-      (
-        t,
-        a
-      ) -> new HobbingAxes(
-        a.x,
-        a.y,
-        a.z,
-        a.a,
-        a.b,
-        a.c - peak * Math.sin(order * a.c),
-        a.offset
-      )
+      (t, a) -> new HobbingAxes(a.x, a.y, a.z, a.a, a.b, a.c - peak * Math.sin(order * a.c), a.offset)
     );
   }
   public static function measuredSync(part:String, error:Float -> Float, basis:String):HobbingErrorSource {
@@ -135,15 +113,7 @@ class HobbingErrorSource {
       "sync",
       part,
       "measured HB7 C-minus-baseline following error: " + basis,
-      (t, a) -> new HobbingAxes(
-        a.x,
-        a.y,
-        a.z,
-        a.a,
-        a.b,
-        a.c + error(t),
-        a.offset
-      )
+      (t, a) -> new HobbingAxes(a.x, a.y, a.z, a.a, a.b, a.c + error(t), a.offset)
     );
   }
   /** Diagnostic latency model. A runtime study should instead supply the measured

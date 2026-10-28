@@ -30,10 +30,7 @@ class SheetPreviewChecks {
     worker.wait();
     var updates = worker.take();
     check(
-      updates.length == 1 && updates[0].chunks.length == preview.chunksX * preview.chunksY && same(
-        updates[0],
-        preview
-      ),
+      updates.length == 1 && updates[0].chunks.length == preview.chunksX * preview.chunksY && same(updates[0], preview),
       "worker matches all synchronous contour streams"
     );
     var tool = new Tool(3, 0.06, 0.006, null, 0.04, 0.06);
@@ -43,11 +40,7 @@ class SheetPreviewChecks {
       Path(Line(new Point3(0.01, 0.01, 0.002), new Point3(0.025, 0.01, 0.002))),
       Cut,
       0,
-      new Provenance(
-        1,
-        1,
-        1
-      )
+      new Provenance(1, 1, 1)
     )]);
     var changed = preview.update();
     check(

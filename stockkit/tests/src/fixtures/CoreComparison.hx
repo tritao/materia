@@ -60,11 +60,7 @@ class CoreComparison {
       var expected = [for (span in ExactOracle.rayIntervals(
         oracle,
         new Vector(start[0], start[1], start[2]),
-        new Vector(
-          direction[0],
-          direction[1],
-          direction[2]
-        ),
+        new Vector(direction[0], direction[1], direction[2]),
         length
       )) {
         lo:before + span.enter, hi:before + span.exit

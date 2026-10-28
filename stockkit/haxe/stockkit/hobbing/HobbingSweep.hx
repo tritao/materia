@@ -85,13 +85,8 @@ class HobbingSweep {
           if (pass.gash >= hob.gashes) throw "scheduled gash is outside tool";
           var poses = sample(axesAt, pass.start, pass.end, pass.center, stepTolerance, maxTimeStep, motionKnots);
           check(
-            StockKitNative.sk_ring_stock_sweep_rake(
-              stock.borrowForSweep(),
-              owner.borrow(),
-              pass.gash,
-              pass.pass,
-              poses
-            ),
+            StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(),
+            owner.borrow(), pass.gash, pass.pass, poses),
             "rake sweep"
           );
           poseCount += poses.length;
@@ -279,23 +274,12 @@ class HobbingSweep {
         i += 2;
       }
       if (i < stocks.length) check(
-        StockKitNative.sk_ring_stock_sweep_rake(
-          stocks[i].borrowForSweep(),
-          owner.borrow(),
-          pass.gash,
-          pass.pass,
-          poses
-        ),
+        StockKitNative.sk_ring_stock_sweep_rake(stocks[i].borrowForSweep(),
+        owner.borrow(), pass.gash, pass.pass, poses),
         "rake sweep"
       );
     } else for (stock in stocks) check(
-      StockKitNative.sk_ring_stock_sweep_rake(
-        stock.borrowForSweep(),
-        owner.borrow(),
-        pass.gash,
-        pass.pass,
-        poses
-      ),
+      StockKitNative.sk_ring_stock_sweep_rake(stock.borrowForSweep(), owner.borrow(), pass.gash, pass.pass, poses),
       "rake sweep"
     );
     return poses.length;
@@ -355,10 +339,7 @@ class HobbingSweep {
       for (k in a + 1...b) {
         var p = points[k], t = length == 0 ? 0 : Math.max(
           0,
-          Math.min(
-            1,
-            ((p.x - first.x) * dx + (p.y - first.y) * dy + (p.z - first.z) * dz) / length
-          )
+          Math.min(1, ((p.x - first.x) * dx + (p.y - first.y) * dy + (p.z - first.z) * dz) / length)
         );
         var ex = p.x - first.x - t * dx,
           ey = p.y - first.y - t * dy, ez = p.z - first.z - t * dz, d = Math.sqrt(ex * ex + ey * ey + ez * ez);

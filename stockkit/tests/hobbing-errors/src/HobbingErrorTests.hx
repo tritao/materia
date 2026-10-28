@@ -22,14 +22,8 @@ class HobbingErrorTests {
     stock.dispose();
     var sources = [
       HobbingErrorSource.workEccentricity("mandrel", "mandrel", 0.004),
-      HobbingErrorSource.hobRadial(
-        "arbor",
-        0.004
-      ),
-      HobbingErrorSource.hobAxial(
-        "arbor",
-        0.004
-      )
+      HobbingErrorSource.hobRadial("arbor", 0.004),
+      HobbingErrorSource.hobAxial("arbor", 0.004)
     ];
     var job = new HobbingErrorJob(
       spec,
@@ -43,10 +37,7 @@ class HobbingErrorTests {
       -6,
       6,
       tolerance,
-      new GearInspection(
-        spec,
-        spec.pitchRadius()
-      ),
+      new GearInspection(spec, spec.pitchRadius()),
       null,
       threads
     );
@@ -161,19 +152,9 @@ class HobbingErrorTests {
     blank.dispose();
     var sources = [
       HobbingErrorSource.workEccentricity("mandrel", "mandrel", 0.004),
-      HobbingErrorSource.hobRadial(
-        "arbor",
-        0.004
-      ),
-      HobbingErrorSource.hobAxial(
-        "arbor",
-        0.004
-      ),
-      HobbingErrorSource.profile(
-        "hob",
-        0.001,
-        hob.axialPitch
-      )
+      HobbingErrorSource.hobRadial("arbor", 0.004),
+      HobbingErrorSource.hobAxial("arbor", 0.004),
+      HobbingErrorSource.profile("hob", 0.001, hob.axialPitch)
     ];
     var scenarios:Array<Array<String>> = [[], [for (source in sources) source.id]];
     for (enabled in scenarios) {
@@ -221,10 +202,7 @@ class HobbingErrorTests {
         .length) if (pair.a[i].filtered[j] != pair.b[i].filtered[j]) throw "inspection cross changes a measured trace";
       for (pair in [
         {a: dense.thickness, b: sparse.thickness},
-        {
-          a: dense.radialMeasurements,
-          b: sparse.radialMeasurements
-        }
+        {a: dense.radialMeasurements, b: sparse.radialMeasurements}
       ]) for (i in 0...pair.a.length) if (pair.a[i] != pair.b[i]) throw "inspection cross changes thickness or runout";
       check(true, "all profile/lead/thickness/runout traces identical, baseline and combined warped cutter");
     }
@@ -532,11 +510,7 @@ class HobbingErrorTests {
     );
     var budget = new ErrorBudget([
       {id: "mandrel", part: "mandrel", basis: "test eccentricity"},
-      {
-        id: "lead",
-        part: "test support",
-        basis: "test twist"
-      }
+      {id: "lead", part: "test support", basis: "test twist"}
     ], ids -> {return GearMeasurement.fromRings(
       new SyntheticGearRings(
         spec,
@@ -556,11 +530,7 @@ class HobbingErrorTests {
     check(budget.report().indexOf("test eccentricity") >= 0, "report retains assumptions");
     var nonlinear = new ErrorBudget([
       {id: "a", part: "fixture", basis: "test"},
-      {
-        id: "b",
-        part: "fixture",
-        basis: "test"
-      }
+      {id: "b", part: "fixture", basis: "test"}
     ], ids -> {var twist = ids.length + (ids.length == 2 ? 3 : 0);
     return GearMeasurement.fromRings(new SyntheticGearRings(spec, control, 0, 0, twist, 65, 65), spec, inspection);
     });
@@ -570,20 +540,7 @@ class HobbingErrorTests {
     );
     var interpolated = new HobbingMotion([
       new HobbingKeyframe(0, axis),
-      new HobbingKeyframe(
-        1,
-        mandrel.apply(
-          1,
-          new HobbingAxes(
-            46,
-            0,
-            4,
-            0,
-            1,
-            0
-          )
-        )
-      )
+      new HobbingKeyframe(1, mandrel.apply(1, new HobbingAxes(46, 0, 4, 0, 1, 0)))
     ]);
     near(
       interpolated.at(0.5).pose().get_translation(0),

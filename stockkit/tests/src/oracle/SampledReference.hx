@@ -183,23 +183,11 @@ class SampledReference {
   **/
   public static function contains(inner:Array<Span>,
     candidate:Array<Span>, outer:Array<Span>, slack:Float):Bool return subset(
-      erode(
-        inner,
-        slack
-      ),
-      dilate(
-        candidate,
-        slack
-      )
+      erode(inner, slack),
+      dilate(candidate, slack)
     ) && subset(
-      erode(
-        candidate,
-        slack
-      ),
-      dilate(
-        outer,
-        slack
-      )
+      erode(candidate, slack),
+      dilate(outer, slack)
     );
 
   /** Total length of a set of spans. */

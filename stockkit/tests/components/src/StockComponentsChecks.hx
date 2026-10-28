@@ -16,11 +16,7 @@ class StockComponentsChecks {
     -1,
     -1,
     [0, 0, -1],
-    [
-      0,
-      0,
-      1
-    ]
+    [0, 0, 1]
   );
   static function scan(rows:Array<Array<Array<StockInterval>>>):Array<StockComponent> {
     var grid = new StockGrid(Z, 0.5, 0.5, 1, rows[0].length, rows.length);
@@ -64,21 +60,10 @@ class StockComponentsChecks {
     var moves:Array<CutMove> = [];
     for (i in 0...4) moves.push(new CutMove(
       tool,
-      Path(Line(
-        new Point3(xy[i][0], xy[i][1], bottom),
-        new Point3(
-          xy[i + 1][0],
-          xy[i + 1][1],
-          bottom
-        )
-      )),
+      Path(Line(new Point3(xy[i][0], xy[i][1], bottom), new Point3(xy[i + 1][0], xy[i + 1][1], bottom))),
       Cut,
       i,
-      new Provenance(
-        40 + i,
-        1,
-        1
-      )
+      new Provenance(40 + i, 1, 1)
     ));
     stock.cut(moves);
   }
