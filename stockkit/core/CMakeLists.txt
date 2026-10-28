@@ -18,9 +18,10 @@ else()
 endif()
 
 add_library(stockkit_core ${SK_LIBRARY_TYPE}
-    src/rake.cpp
-    src/ring.cpp
     src/api.cpp
+    src/ring/api_ring.cpp
+    src/ring/rake.cpp
+    src/ring/ring.cpp
     src/contour.cpp
     src/mesh.cpp
     src/pool.cpp
@@ -33,6 +34,7 @@ add_library(stockkit_core ${SK_LIBRARY_TYPE}
 target_compile_definitions(stockkit_core PRIVATE SK_UNIFORM_TILES=$<BOOL:${SK_UNIFORM_TILES}>)
 target_compile_features(stockkit_core PUBLIC c_std_11 PRIVATE cxx_std_17)
 target_include_directories(stockkit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(stockkit_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 find_package(Threads REQUIRED)
 target_link_libraries(stockkit_core PRIVATE Threads::Threads)
 set_target_properties(stockkit_core PROPERTIES

@@ -70,9 +70,9 @@ Roughly in priority order.
 
 See [`docs/RING.md`](docs/RING.md) and [`docs/HOBBING.md`](docs/HOBBING.md).
 
-- [ ] Move the ring C++ (`ring.cpp`, `rake.cpp`) and its part of `api.cpp` and
-  `stockkit.h` into their own files, so the Cartesian and ring paths are
-  separate in the native core too.
+- [ ] Split `core/include/stockkit.h` (ring and rake declarations) and
+  `core/tests/core_tests.cpp` (1,590 lines) by topic; the implementation
+  already lives in `core/src/ring/`.
 - [ ] Decide whether `stockkit.ring` and `stockkit.hobbing` become their own
   package (depending on StockKit and GearKit) so CAM users no longer pull in
   GearKit.

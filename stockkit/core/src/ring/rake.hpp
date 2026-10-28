@@ -1,5 +1,5 @@
 #pragma once
-#include "ring.hpp"
+#include "ring/ring.hpp"
 #include <array>
 #include <vector>
 
