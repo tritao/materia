@@ -15,27 +15,40 @@ import nativekit.sim.SimShape;
  * one per tick, for the tick about to complete.
  */
 class HumanActor {
-	public final actor:SimActor;
-	public final proxy:HumanBodyProxy;
+  public final actor:SimActor;
+  public final proxy:HumanBodyProxy;
 
-	/** Joins a stopped session with the body at a pose, through a root transform. */
-	public function new(session:SimSession, proxy:HumanBodyProxy, pose:HumanPose, root:Array<Float>) {
-		this.proxy = proxy;
-		actor = session.createActor([for (capsule in proxy.capsules) SimShape.capsule(capsule.radius, capsule.length)],
-			simPoses(proxy.place(pose, root)));
-	}
+  /** Joins a stopped session with the body at a pose, through a root transform. */
+  public function new(session:SimSession, proxy:HumanBodyProxy, pose:HumanPose, root:Array<Float>) {
+    this.proxy = proxy;
+    actor = session.createActor(
+      [for (capsule in proxy.capsules) SimShape.capsule(capsule.radius, capsule.length)],
+      simPoses(proxy.place(
+        pose,
+        root
+      ))
+    );
+  }
 
-	/** Where the body is at simulation time `time`. */
-	public function pushPose(time:Float, pose:HumanPose, root:Array<Float>):Void
-		actor.pushKeyframe(time, simPoses(proxy.place(pose, root)));
+  /** Where the body is at simulation time `time`. */
+  public function pushPose(time:Float, pose:HumanPose, root:Array<Float>):Void actor.pushKeyframe(
+    time,
+    simPoses(proxy.place(
+      pose,
+      root
+    ))
+  );
 
-	public function dispose():Void
-		actor.dispose();
+  public function dispose():Void actor.dispose();
 
-	static function simPoses(placements:Array<CapsulePlacement>):Array<SimPose>
-		return [
-			for (placement in placements)
-				new SimPose(placement.center[0], placement.center[1], placement.center[2], placement.rotation[0],
-					placement.rotation[1], placement.rotation[2], placement.rotation[3])
-		];
+  static function simPoses(placements:Array<CapsulePlacement
+    >):Array<SimPose> return [for (placement in placements) new SimPose(
+      placement.center[0],
+      placement.center[1],
+      placement.center[2],
+      placement.rotation[0],
+      placement.rotation[1],
+      placement.rotation[2],
+      placement.rotation[3]
+    )];
 }

@@ -12,131 +12,132 @@ import nativekit.sim.SimSession;
  * `check` when the job is done; a scenario says which surfaces there are and which hand works.
  */
 class JobGate {
-    /**
+  /**
      * Belly clearance allowed: a few millimetres, the walker's stopping precision; and more where the lean
      * is at its limit and cannot make up the whole reach, as at a surface low enough to need a crouch,
      * which a worker does not do. The rack sweep measured 3 to 4 cm there for either hand.
      */
-    public static inline var CLEARANCE = -0.01;
-    public static inline var CAPPED_CLEARANCE = -0.05;
-    static inline var BELLY_FRONT = 0.12;
+  public static inline var CLEARANCE = -0.01;
+  public static inline var CAPPED_CLEARANCE = -0.05;
+  static inline var BELLY_FRONT = 0.12;
 
-    public final quality:MotionQuality = new MotionQuality();
-    /** The body's feet, balance and jerk over the run; see `Naturalness`. */
-    public final naturalness:humankit.quality.Naturalness = new humankit.quality.Naturalness();
-    /**
+  public final quality:MotionQuality = new MotionQuality();
+  /** The body's feet, balance and jerk over the run; see `Naturalness`. */
+  public final naturalness:humankit.quality.Naturalness = new humankit.quality.Naturalness();
+  /**
      * The furthest a planted foot may slide, and the least margin the centre of mass may keep inside the feet, in metres.
      * Measured on the sweeps with the bundled worker: 0.05 m of slide and a mass on the edge of its feet; the library
      * character slides further (0.23 m) where it crouches and turns, so its sweep sets its own.
      */
-    public var slideLimit:Float = 0.10;
-    public var supportLimit:Float = -0.10;
-    public var clearance(default, null):Float = Math.POSITIVE_INFINITY;
-    public var lean(default, null):Float = 0.0;
-    final worker:HumanWorker;
-    final session:SimSession;
-    final surfaces:Array<HumanTargetBox>;
-    final limbs:Array<HumanLimb>;
-    /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
-    var gripped:Bool = false;
-    var lastHeading:Null<Float> = null;
-    /** The document step that was running at each sample, so a finding can say where in the job it happened. */
-    final steps:Array<Int> = [];
-    /** What the worker was doing at each sample: approach, pick, place, walk, ... and whether it was crouched or walking. */
-    final phases:Array<String> = [];
+  public var slideLimit:Float = 0.10;
+  public var supportLimit:Float = -0.10;
+  public var clearance(default, null):Float = Math.POSITIVE_INFINITY;
+  public var lean(default, null):Float = 0.0;
+  final worker:HumanWorker;
+  final session:SimSession;
+  final surfaces:Array<HumanTargetBox>;
+  final limbs:Array<HumanLimb>;
+  /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
+  var gripped:Bool = false;
+  var lastHeading:Null<Float> = null;
+  /** The document step that was running at each sample, so a finding can say where in the job it happened. */
+  final steps:Array<Int> = [];
+  /** What the worker was doing at each sample: approach, pick, place, walk, ... and whether it was crouched or walking. */
+  final phases:Array<String> = [];
 
-    /** `limbs` are the hands that do the work: one for a one-handed job, both for a two-handed one. */
-    public function new(worker:HumanWorker, session:SimSession, limbs:Array<HumanLimb>, surfaces:Array<HumanTargetBox>) {
-        this.worker = worker;
-        this.session = session;
-        this.limbs = limbs;
-        this.surfaces = surfaces;
+  /** `limbs` are the hands that do the work: one for a one-handed job, both for a two-handed one. */
+  public function new(worker:HumanWorker, session:SimSession, limbs:Array<HumanLimb>, surfaces:Array<HumanTargetBox>) {
+    this.worker = worker;
+    this.session = session;
+    this.limbs = limbs;
+    this.surfaces = surfaces;
+  }
+
+  /** What the worker was doing at a sample, for a report. */
+  public function phaseAt(sample:Int):String return sample >= 1 && sample <= phases.length ? phases[sample - 1] : "?";
+
+  /** The document step running at a sample (1-based, as `MotionQuality` counts), or -1. */
+  public function stepAt(sample:Int):Int return sample >= 1 && sample <= steps.length ? steps[sample - 1] : -1;
+
+  public function sample():Void {
+    var body = worker.body, pose = body.character.pose;
+    // A turn clip turns the body in model space and the root takes the turn up at its end, a jump of the whole pose
+    // in the model's frame that is no motion of the arms; the root turning by more than a procedural turn can in one tick marks it.
+    var root = body.rootTransform(), heading = Math.atan2(root[1], root[0]);
+    if (lastHeading != null && Math.abs(Math.atan2(Math.sin(heading - lastHeading),
+      Math.cos(heading - lastHeading))) > 0.3) quality.breakContinuity();
+    lastHeading = heading;
+    quality.sample(pose, session.fixedTimestep());
+    naturalness.sample(body, session.fixedTimestep());
+    var step = worker.currentStep();
+    steps.push(step == null ? -1 : step);
+    phases.push(worker.currentActionLabel() + (body.walker.isWalking()
+      ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched"
+      : "") + (body.kneelAmount() > 0.02 ? "+kneeling" : "") + (body.walker.isTurning() ? "+turning" : ""));
+    lean = Math.max(lean, body.character.spineLean());
+    if (body.grip) gripped = true;
+    // Only while reaching for the part, or holding it to place it: walking back past a surface after
+    // the hand lets go is not standing at it.
+    var reaching = false;
+    for (limb in limbs) if (body.reachWeight(limb) > 0.0) reaching = true;
+    if (!reaching || !(!gripped || body.grip)) return;
+    var belly = pose.bonePosition(HumanBone.Spine);
+    var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
+    for (surface in surfaces) {
+      // A belly held above the surface's top overhangs it; only one within the surface's height has to stay clear.
+      var posture = body.posture;
+      if (front[2] - posture.bellyHalfHeight
+        > surface.center[2] + surface.halfExtents[2] + posture.slabMargin) continue;
+      clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
     }
+  }
 
-    /** What the worker was doing at a sample, for a report. */
-    public function phaseAt(sample:Int):String
-        return sample >= 1 && sample <= phases.length ? phases[sample - 1] : "?";
-
-    /** The document step running at a sample (1-based, as `MotionQuality` counts), or -1. */
-    public function stepAt(sample:Int):Int
-        return sample >= 1 && sample <= steps.length ? steps[sample - 1] : -1;
-
-    public function sample():Void {
-        var body = worker.body, pose = body.character.pose;
-        // A turn clip turns the body in model space and the root takes the turn up at its end, a jump of the whole pose
-        // in the model's frame that is no motion of the arms; the root turning by more than a procedural turn can in one tick marks it.
-        var root = body.rootTransform(), heading = Math.atan2(root[1], root[0]);
-        if (lastHeading != null && Math.abs(Math.atan2(Math.sin(heading - lastHeading), Math.cos(heading - lastHeading))) > 0.3) quality.breakContinuity();
-        lastHeading = heading;
-        quality.sample(pose, session.fixedTimestep());
-        naturalness.sample(body, session.fixedTimestep());
-        var step = worker.currentStep();
-        steps.push(step == null ? -1 : step);
-        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.kneelAmount() > 0.02 ? "+kneeling" : "") + (body.walker.isTurning() ? "+turning" : ""));
-        lean = Math.max(lean, body.character.spineLean());
-        if (body.grip) gripped = true;
-        // Only while reaching for the part, or holding it to place it: walking back past a surface after
-        // the hand lets go is not standing at it.
-        var reaching = false;
-        for (limb in limbs) if (body.reachWeight(limb) > 0.0) reaching = true;
-        if (!reaching || !(!gripped || body.grip)) return;
-        var belly = pose.bonePosition(HumanBone.Spine);
-        var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
-        for (surface in surfaces) {
-            // A belly held above the surface's top overhangs it; only one within the surface's height has to stay clear.
-            var posture = body.posture;
-            if (front[2] - posture.bellyHalfHeight > surface.center[2] + surface.halfExtents[2] + posture.slabMargin) continue;
-            clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
-        }
-    }
-
-    /**
+  /**
      * Appends to `failures` every rule the run broke, each naming `label`. With `posture` off, the rules on
      * where the elbows and belly end up are left to the caller, for a run known to need a crouch the body
      * does not do; the motion limits still apply.
      */
-    public function check(label:String, failures:Array<String>, posture:Bool = true, ?minElbow:Float):Void {
-        var elbowLimit = minElbow == null ? MotionQualityTests.MIN_ELBOW_ANGLE : minElbow;
-        for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
-            var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
-            if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN)
-                failures.push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt} (${phaseAt(arm.planeTurnAt)})');
-            if (arm.maxHandSpeed > MotionQualityTests.MAX_HAND_SPEED)
-                failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt} (${phaseAt(arm.handSpeedAt)})');
-            if (arm.maxHandAcceleration > MotionQualityTests.MAX_HAND_ACCELERATION)
-                failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt} (${phaseAt(arm.handAccelerationAt)})');
-            if (!posture) continue;
-            if (arm.elbowAboveShoulder > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
-            if (arm.minElbowAngle < elbowLimit)
-                failures.push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees at sample ${arm.minElbowAt} (step ${stepAt(arm.minElbowAt)})');
-        }
-        if (naturalness.maxSlide > slideLimit)
-            failures.push('$label: a planted foot slid ${r(naturalness.maxSlide)} m');
-        if (naturalness.minSupportMargin < supportLimit)
-            failures.push('$label: the centre of mass stood ${r(-naturalness.minSupportMargin)} m outside the feet');
-        if (!posture) return;
-        var capped = lean >= worker.body.posture.maxLean - 0.01;
-        // A stance the planner itself reports as short of clearing an edge may stand that far inside it, and a little more.
-        var allowed = Math.min(capped ? CAPPED_CLEARANCE : CLEARANCE, -(worker.approachShortfall() + 0.02));
-        if (clearance < allowed)
-            failures.push('$label: the belly stood ${r(-clearance)} m inside a surface (lean ${r(lean)} rad${capped ? ", at its limit" : ""})');
+  public function check(label:String, failures:Array<String>, posture:Bool = true, ?minElbow:Float):Void {
+    var elbowLimit = minElbow == null ? MotionQualityTests.MIN_ELBOW_ANGLE : minElbow;
+    for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
+      var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
+      if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN) failures
+        .push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt} (${phaseAt(arm.planeTurnAt)})');
+      if (arm.maxHandSpeed > MotionQualityTests.MAX_HAND_SPEED) failures
+        .push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt} (${phaseAt(arm.handSpeedAt)})');
+      if (arm.maxHandAcceleration > MotionQualityTests.MAX_HAND_ACCELERATION) failures
+        .push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt} (${phaseAt(arm.handAccelerationAt)})');
+      if (!posture) continue;
+      if (arm.elbowAboveShoulder
+        > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
+      if (arm.minElbowAngle < elbowLimit) failures
+        .push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees at sample ${arm.minElbowAt} (step ${stepAt(arm.minElbowAt)})');
     }
+    if (naturalness.maxSlide > slideLimit) failures.push('$label: a planted foot slid ${r(naturalness.maxSlide)} m');
+    if (naturalness.minSupportMargin < supportLimit) failures
+      .push('$label: the centre of mass stood ${r(-naturalness.minSupportMargin)} m outside the feet');
+    if (!posture) return;
+    var capped = lean >= worker.body.posture.maxLean - 0.01;
+    // A stance the planner itself reports as short of clearing an edge may stand that far inside it, and a little more.
+    var allowed = Math.min(capped ? CAPPED_CLEARANCE : CLEARANCE, -(worker.approachShortfall() + 0.02));
+    if (clearance < allowed) failures
+      .push('$label: the belly stood ${r(-clearance)} m inside a surface (lean ${r(lean)} rad${capped ? ", at its limit" : ""})');
+  }
 
-    /** Where the worst foot slide happened, for a report: the phase when the foot was planted and when it slid furthest. */
-    public function slideReport():String
-        return 'slide ${r(naturalness.maxSlide)} m, planted at sample ${naturalness.maxSlideFrom} (${phaseAt(naturalness.maxSlideFrom)}), furthest at ${naturalness.maxSlideAt} (${phaseAt(naturalness.maxSlideAt)})';
+  /** Where the worst foot slide happened, for a report: the phase when the foot was planted and when it slid furthest. */
+  public function slideReport():String return 'slide ${r(naturalness.maxSlide)} m, planted at sample ${naturalness.maxSlideFrom} (${phaseAt(naturalness.maxSlideFrom)}), furthest at ${naturalness.maxSlideAt} (${phaseAt(naturalness.maxSlideAt)})';
 
-    /** The worst of each arm measure over both arms, for a one-line report. */
-    public function worst():{turn:Float, speed:Float, accel:Float} {
-        var turn = 0.0, speed = 0.0, accel = 0.0;
-        for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
-            var arm = quality.arm(side);
-            turn = Math.max(turn, arm.planeTurnRate);
-            speed = Math.max(speed, arm.maxHandSpeed);
-            accel = Math.max(accel, arm.maxHandAcceleration);
-        }
-        return {turn: turn, speed: speed, accel: accel};
+  /** The worst of each arm measure over both arms, for a one-line report. */
+  public function worst(): {turn: Float, speed: Float, accel: Float} {
+    var turn = 0.0, speed = 0.0, accel = 0.0;
+    for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
+      var arm = quality.arm(side);
+      turn = Math.max(turn, arm.planeTurnRate);
+      speed = Math.max(speed, arm.maxHandSpeed);
+      accel = Math.max(accel, arm.maxHandAcceleration);
     }
+    return {turn: turn, speed: speed, accel: accel};
+  }
 
-    static function r(v:Float):Float return Math.round(v * 100) / 100;
+  static function r(v:Float):Float return Math.round(v * 100) / 100;
 }

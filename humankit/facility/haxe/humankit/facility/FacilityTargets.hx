@@ -40,8 +40,11 @@ class FacilityTargets {
     var center = surface.centerIn(station.pose);
     // The box is the slab under the top, so its top face is at the surface height.
     var slab = Math.min(0.05, surface.top);
-    return {center: [center.x, center.y, surface.top - slab], halfExtents: [surface.halfWidth, surface.halfDepth, slab],
-      yaw: center.yaw};
+    return {
+      center: [center.x, center.y, surface.top - slab],
+      halfExtents: [surface.halfWidth, surface.halfDepth, slab],
+      yaw: center.yaw
+    };
   }
 
   /** The box of the item a rack slot holds, in the facility frame, or null when the facility does not say. */
@@ -56,6 +59,8 @@ class FacilityTargets {
     return {center: [pose.x, pose.y, pose.z], halfExtents: extents.copy(), yaw: pose.yaw};
   }
 
-  public function route(fromStationId:String, toStationId:String):FacilityRoute
-    return router.route(fromStationId, toStationId);
+  public function route(fromStationId:String, toStationId:String):FacilityRoute return router.route(
+    fromStationId,
+    toStationId
+  );
 }

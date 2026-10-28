@@ -51,7 +51,7 @@ class HumanJobSpec {
     var held:Map<String, String> = new Map();
     var normalized:Array<HumanJobStep> = [];
     var index = 0;
-    for (step in(cast steps:Array<Dynamic>)) {
+    for (step in (cast steps:Array<Dynamic>)) {
       var label = 'step $index';
       object(step, label);
       var action = string(step, "action", label);
@@ -68,13 +68,12 @@ class HumanJobSpec {
           var walkTarget:HumanJobTarget = hasObject ? {
             object:string(target, "object", '$label.target')
           }
-          : {point: point(target, "point", '$label.target')}
-          ;
+          : {point: point(target, "point", '$label.target')};
           clean.target = walkTarget;
           if (Reflect.hasField(step, "via")) {
             var via:Dynamic = Reflect.field(step, "via");
             if (!Std.isOfType(via, Array)) throw '$label.via must be an array';
-            Reflect.setField(clean, "via", [for (p in(cast via:Array<Dynamic>)) pointValue(p, '$label.via point')]);
+            Reflect.setField(clean, "via", [for (p in (cast via:Array<Dynamic>)) pointValue(p, '$label.via point')]);
           }
         case "pick":
           fields(step, ["action", "object", "hand", "from"], label);
@@ -102,8 +101,7 @@ class HumanJobSpec {
           if (Reflect.hasField(step, "offset")) Reflect.setField(clean, "offset", point(step, "offset", label));
           if (Reflect.hasField(step, "retreat")) {
             var retreat = string(step, "retreat", label);
-            if (retreat != "backward" && retreat != "turn")
-              throw '$label.retreat must be "backward" or "turn"';
+            if (retreat != "backward" && retreat != "turn") throw '$label.retreat must be "backward" or "turn"';
             Reflect.setField(clean, "retreat", retreat);
           }
         case "press":
@@ -145,40 +143,44 @@ class HumanJobSpec {
   public function toJson():String {
     var values:Array<Dynamic> = [];
     for (step in steps) {
-      var value:Dynamic = {action:step.action};
+      var value:Dynamic = {action: step.action};
       switch step.action {
         case "walkTo", "press":
-          var source:Dynamic = Reflect.field(step,"target");
-          var object:Null<String> = Reflect.field(source,"object");
-          var target:Dynamic = object == null ? {point:Reflect.field(source,"point")} : {object:object};
-          var anchor:Null<String> = Reflect.field(source,"anchor");
-          if (anchor != null) Reflect.setField(target,"anchor",anchor);
-          Reflect.setField(value,"target",target);
+          var source:Dynamic = Reflect.field(step, "target");
+          var object:Null<String> = Reflect.field(source, "object");
+          var target:Dynamic = object == null ? {
+            point:Reflect.field(source, "point")
+          }
+          : {object: object};
+          var anchor:Null<String> = Reflect.field(source, "anchor");
+          if (anchor != null) Reflect.setField(target, "anchor", anchor);
+          Reflect.setField(value, "target", target);
           if (step.action == "walkTo") {
-            var via:Dynamic = Reflect.field(step,"via");
-            if (via != null) Reflect.setField(value,"via",via);
-          } else Reflect.setField(value,"hand",Reflect.field(step,"hand"));
+            var via:Dynamic = Reflect.field(step, "via");
+            if (via != null) Reflect.setField(value, "via", via);
+          } else Reflect.setField(value, "hand", Reflect.field(step, "hand"));
         case "pick":
-          Reflect.setField(value,"object",Reflect.field(step,"object"));
-          Reflect.setField(value,"hand",Reflect.field(step,"hand"));
+          Reflect.setField(value, "object", Reflect.field(step, "object"));
+          Reflect.setField(value, "hand", Reflect.field(step, "hand"));
         case "place":
-          Reflect.setField(value,"onto",Reflect.field(step,"onto"));
-          Reflect.setField(value,"hand",Reflect.field(step,"hand"));
-          var offset:Dynamic = Reflect.field(step,"offset");
-          if (offset != null) Reflect.setField(value,"offset",offset);
-          var retreat:Dynamic = Reflect.field(step,"retreat");
-          if (retreat != null) Reflect.setField(value,"retreat",retreat);
-        case "wait": Reflect.setField(value,"seconds",Reflect.field(step,"seconds"));
+          Reflect.setField(value, "onto", Reflect.field(step, "onto"));
+          Reflect.setField(value, "hand", Reflect.field(step, "hand"));
+          var offset:Dynamic = Reflect.field(step, "offset");
+          if (offset != null) Reflect.setField(value, "offset", offset);
+          var retreat:Dynamic = Reflect.field(step, "retreat");
+          if (retreat != null) Reflect.setField(value, "retreat", retreat);
+        case "wait":
+          Reflect.setField(value, "seconds", Reflect.field(step, "seconds"));
         case "playClip":
-          Reflect.setField(value,"clip",Reflect.field(step,"clip"));
-          Reflect.setField(value,"seconds",Reflect.field(step,"seconds"));
+          Reflect.setField(value, "clip", Reflect.field(step, "clip"));
+          Reflect.setField(value, "seconds", Reflect.field(step, "seconds"));
       }
       values.push(value);
     }
-    return haxe.Json.stringify({version:version,loop:loop,steps:values});
+    return haxe.Json.stringify({version: version, loop: loop, steps: values});
   }
 
-  public static function check(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):Array < String > {
+  public static function check(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):Array<String> {
     var warnings:Array<String> = [];
     var heldByHand:Map<String, String> = new Map();
     for (index in 0...spec.steps.length) {
@@ -202,7 +204,7 @@ class HumanJobSpec {
         var box = targets.box(id);
         if (box == null) warnings.push('step $index: unknown object "$id"');
         else if (action == "pick" || action == "place" || action == "press") {
-          var z = box.center[2] +(action
+          var z = box.center[2] + (action
             == "pick" ? box.halfExtents[2] + 0.01 : action == "place" ? box.halfExtents[2] : 0.0);
           if (action == "place") {
             var hand:String = Reflect.field(step, "hand");
@@ -212,7 +214,7 @@ class HumanJobSpec {
           }
           var shoulder = body.character.pose.bonePosition(UpperArmR);
           if (shoulder != null) {
-            var reach = 0.8 *(body.description.upperArm + body.description.forearm);
+            var reach = 0.8 * (body.description.upperArm + body.description.forearm);
             if (z - shoulder[2] >= reach) warnings.push('step $index: target above reach');
             if (shoulder[2] - z >= reach) warnings.push('step $index: target below standing arm reach');
           }
@@ -220,12 +222,16 @@ class HumanJobSpec {
       }
       if (action == "pick") {
         var hand:String = Reflect.field(step, "hand");
-        if (hand == "both") { heldByHand.set("left", id); heldByHand.set("right", id); }
-        else heldByHand.set(hand, id);
+        if (hand == "both") {
+          heldByHand.set("left", id);
+          heldByHand.set("right", id);
+        } else heldByHand.set(hand, id);
       } else if (action == "place") {
         var hand:String = Reflect.field(step, "hand");
-        if (hand == "both") { heldByHand.remove("left"); heldByHand.remove("right"); }
-        else heldByHand.remove(hand);
+        if (hand == "both") {
+          heldByHand.remove("left");
+          heldByHand.remove("right");
+        } else heldByHand.remove(hand);
       }
     }
     return warnings;
@@ -266,7 +272,7 @@ class HumanJobSpec {
     return result;
   }
 
-  static function point(value:Dynamic, field:String, label:String):Array < Float > return pointValue(
+  static function point(value:Dynamic, field:String, label:String):Array<Float> return pointValue(
     Reflect.field(
       value,
       field
@@ -276,14 +282,13 @@ class HumanJobSpec {
 
   static function point3(value:Dynamic, field:String, label:String):Array<Float> {
     var raw:Dynamic = Reflect.field(value, field);
-    if (!Std.isOfType(raw, Array) || (cast raw:Array<Dynamic>).length != 3)
-      throw '$label.$field needs [x, y, z]';
+    if (!Std.isOfType(raw, Array) || (cast raw:Array<Dynamic>).length != 3) throw '$label.$field needs [x, y, z]';
     var values:Array<Dynamic> = cast raw;
     return [for (index in 0...3) number(values[index], '$label.$field[$index]')];
   }
 
-  static function pointValue(value:Dynamic, label:String):Array < Float > {
-    if (!Std.isOfType(value, Array) ||(cast value:Array<Dynamic>).length != 2) throw '$label needs [x, y]';
+  static function pointValue(value:Dynamic, label:String):Array<Float> {
+    if (!Std.isOfType(value, Array) || (cast value:Array<Dynamic>).length != 2) throw '$label needs [x, y]';
     var pair:Array<Dynamic> = cast value;
     return [number(pair[0], '$label[0]'), number(pair[1], '$label[1]')];
   }
@@ -295,5 +300,5 @@ class HumanJobSpec {
     return result;
   }
 
-  static function hands(hand:String):Array < String > return hand == "both" ?["left", "right"] :[hand];
+  static function hands(hand:String):Array<String> return hand == "both" ? ["left", "right"] : [hand];
 }
