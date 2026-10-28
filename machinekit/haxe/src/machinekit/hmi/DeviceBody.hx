@@ -14,8 +14,16 @@ class DeviceBody extends MachineComponent {
   final purchase:HmiPart;
   final carriesPurchase:Bool;
 
-  public function new(designation:String, description:String, material:String, build:() -> Part, purchase:HmiPart, carriesPurchase:Bool,
-      massKg:Float, centreOfMass:Vector) {
+  public function new(
+    designation:String,
+    description:String,
+    material:String,
+    build:() -> Part,
+    purchase:HmiPart,
+    carriesPurchase:Bool,
+    massKg:Float,
+    centreOfMass:Vector
+  ) {
     super(designation, description, material, true);
     this.build = build;
     this.purchase = purchase;

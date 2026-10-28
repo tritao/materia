@@ -79,11 +79,42 @@ class PendantCase {
   public final ribs:Array<{x:Float, y:Float, w:Float, h:Float}>;
   public final notes:Array<String>;
 
-  function new(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, connectorZ:Float, boardTop:Float,
-      standoffs:Array<{x:Float, y:Float}>, strapSlots:Array<{x:Float, y:Float}>, enabling:Null<{x:Float, y:Float}>,
-      ribs:Array<{x:Float, y:Float, w:Float, h:Float}>, notes:Array<String>) {
-    this.face = face; this.posts = posts; this.connectorX = connectorX; this.connectorZ = connectorZ; this.boardTop = boardTop;
-    this.standoffs = standoffs; this.strapSlots = strapSlots; this.enabling = enabling; this.ribs = ribs; this.notes = notes;
+  function new(
+    face:PanelLayout,
+    posts:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    connectorZ:Float,
+    boardTop:Float,
+    standoffs:Array<{
+      x:Float,
+      y:Float
+    }>,
+    strapSlots:Array<{
+      x:Float,
+      y:Float
+    }>,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    ribs:Array<{
+      x:Float,
+      y:Float,
+      w:Float,
+      h:Float
+    }>,
+    notes:Array<String>
+  ) {
+    this.face = face;
+    this.posts = posts;
+    this.connectorX = connectorX;
+    this.connectorZ = connectorZ;
+    this.boardTop = boardTop;
+    this.standoffs = standoffs;
+    this.strapSlots = strapSlots;
+    this.enabling = enabling;
+    this.ribs = ribs;
+    this.notes = notes;
   }
 
   public static function plan(face:PanelLayout):PendantCase {
@@ -96,15 +127,19 @@ class PendantCase {
     for (step in 0...160) {
       var candidate = (step % 2 == 0 ? 1 : -1) * Math.floor((step + 1) / 2) * 1.5;
       if (Math.abs(candidate) > face.width / 2 - face.wall - 15) continue;
-      if (receptacleClear(face, candidate, connectorZ, wallY)) { connectorX = candidate; found = true; break; }
+      if (receptacleClear(face, candidate, connectorZ, wallY)) {
+        connectorX = candidate;
+        found = true;
+        break;
+      }
     }
     if (!found) throw "No clear place for the M12 receptacle";
     // The board sits just behind the deepest control that ends above it.
     var shallow = 0.0;
     for (c in face.controls) if (c.behind() <= PASS_THROUGH) shallow = Math.max(shallow, c.behind());
     var boardTop = -(shallow + 1.0);
-    if (boardTop - BOARD_THICKNESS - BOARD_COMPONENTS < -(face.caseInnerDepth - 1.0))
-      throw "The case is too shallow for a board behind the controls";
+    if (boardTop - BOARD_THICKNESS - BOARD_COMPONENTS
+      < -(face.caseInnerDepth - 1.0)) throw "The case is too shallow for a board behind the controls";
     var enabling = placeEnabling(face, posts, connectorX, wallY, notes);
     var standoffs = placeStandoffs(face, posts, connectorX, wallY, enabling);
     var ribs = placeRibs(face, posts, standoffs, connectorX, wallY, enabling, boardTop);
@@ -113,7 +148,8 @@ class PendantCase {
   }
 
   static function placePosts(face:PanelLayout):Array<{x:Float, y:Float}> {
-    var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED, hh = face.height / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED;
+    var hw = face.width / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED,
+      hh = face.height / 2 - face.wall - POST_DIAMETER / 2 + POST_EMBED;
     var wanted = [[-hw, hh], [hw, hh], [-hw, 0.0], [hw, 0.0], [-hw, -hh], [hw, -hh]];
     var posts:Array<{x:Float, y:Float}> = [];
     for (target in wanted) {
@@ -123,7 +159,10 @@ class PendantCase {
         var y = -hh;
         while (y <= hh + 1e-9) {
           var d = Math.sqrt((x - target[0]) * (x - target[0]) + (y - target[1]) * (y - target[1]));
-          if (d < bestDistance && postFree(face, x, y, posts)) { best = {x: x, y: y}; bestDistance = d; }
+          if (d < bestDistance && postFree(face, x, y, posts)) {
+            best = {x: x, y: y};
+            bestDistance = d;
+          }
           y += 1.5;
         }
         x += 1.5;
@@ -136,7 +175,8 @@ class PendantCase {
 
   static function postFree(face:PanelLayout, x:Float, y:Float, taken:Array<{x:Float, y:Float}>):Bool {
     for (c in face.controls) {
-      if (FootprintGeometry.distanceTo(c.keepOut(), c.x, c.y, x, y) < PanelFacePlate.COUNTERBORE / 2 + HEAD_CLEARANCE) return false;
+      if (FootprintGeometry.distanceTo(c.keepOut(),
+        c.x, c.y, x, y) < PanelFacePlate.COUNTERBORE / 2 + HEAD_CLEARANCE) return false;
       if (FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, y) < POST_DIAMETER / 2 + BODY_CLEARANCE) return false;
       for (h in c.holes()) if (dist(c.x + h.x, c.y + h.y, x, y) < POST_DIAMETER / 2 + 2.0) return false;
     }
@@ -151,7 +191,8 @@ class PendantCase {
   static function receptacleClear(face:PanelLayout, x:Float, z:Float, wallY:Float):Bool {
     for (c in face.controls) {
       if (c.behind() <= -(z + RECEPTACLE_BODY / 2) - 2.0) continue;
-      if (FootprintGeometry.gap(c.body(), c.x, c.y, receptacleFootprint(), x, receptacleCentreY(face, wallY)) < BODY_CLEARANCE) return false;
+      if (FootprintGeometry.gap(c.body(),
+        c.x, c.y, receptacleFootprint(), x, receptacleCentreY(face, wallY)) < BODY_CLEARANCE) return false;
     }
     return true;
   }
@@ -162,8 +203,16 @@ class PendantCase {
   static function enablingZ(face:PanelLayout):Float return -(face.caseInnerDepth - ENABLING_BODY / 2 - 1.0);
 
   /** The enabling switch lies against a side wall at the back, its button through the wall: left wall first, then right. */
-  static function placeEnabling(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float,
-      notes:Array<String>):Null<{x:Float, y:Float}> {
+  static function placeEnabling(
+    face:PanelLayout,
+    posts:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    wallY:Float,
+    notes:Array<String>
+  ):Null<{
+    x:Float,
+    y:Float
+  }> {
     var limit = face.caseInnerDepth - ENABLING_BODY - 1.0;
     var hh = face.height / 2 - face.wall - ENABLING_BODY / 2 - 2.0;
     for (side in [-1.0, 1.0]) {
@@ -171,11 +220,17 @@ class PendantCase {
       var best:Null<{x:Float, y:Float}> = null;
       var y = -hh;
       while (y <= hh + 1e-9) {
-        if (enablingFree(face, x, y, limit, posts, connectorX, wallY) && (best == null || Math.abs(y) < Math.abs(best.y))) best = {x: x, y: y};
+        if (enablingFree(face,
+          x, y, limit, posts, connectorX, wallY) && (best == null || Math.abs(y) < Math.abs(best.y))) best = {
+            x: x,
+            y: y
+          };
         y += 3.0;
       }
       if (best != null) {
-        if (side > 0) notes.push("The enabling switch has no free place on the left wall; it fits on the right wall at y=" + Math.round(best.y) + " mm.");
+        if (side
+          > 0) notes.push("The enabling switch has no free place on the left wall; it fits on the right wall at y="
+          + Math.round(best.y) + " mm.");
         return best;
       }
     }
@@ -183,23 +238,46 @@ class PendantCase {
     return null;
   }
 
-  static function enablingFree(face:PanelLayout, x:Float, y:Float, limit:Float, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float):Bool {
+  static function enablingFree(
+    face:PanelLayout,
+    x:Float,
+    y:Float,
+    limit:Float,
+    posts:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    wallY:Float
+  ):Bool {
     for (c in face.controls) {
       if (c.behind() <= limit) continue;
       if (FootprintGeometry.gap(c.body(), c.x, c.y, enablingFootprint(), x, y) < BODY_CLEARANCE) return false;
     }
-    for (p in posts) if (FootprintGeometry.distanceTo(enablingFootprint(), x, y, p.x, p.y) < POST_DIAMETER / 2 + 2.0) return false;
-    if (FootprintGeometry.gap(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), enablingFootprint(), x, y) < 2.0) return false;
+    for (p in posts) if (FootprintGeometry.distanceTo(enablingFootprint(),
+      x, y, p.x, p.y) < POST_DIAMETER / 2 + 2.0) return false;
+    if (FootprintGeometry.gap(
+      receptacleFootprint(),
+      connectorX,
+      receptacleCentreY(face, wallY),
+      enablingFootprint(),
+      x,
+      y
+    ) < 2.0) return false;
     return true;
   }
 
   /** The board outline's half extents. */
-  static function boardHalf(face:PanelLayout):{x:Float, y:Float} return {x: face.width / 2 - face.wall - BOARD_MARGIN, y: face.height / 2 - face.wall - BOARD_MARGIN};
+  static function boardHalf(face:PanelLayout): {x: Float, y: Float} return {
+    x: face.width / 2 - face.wall - BOARD_MARGIN,
+    y: face.height / 2 - face.wall - BOARD_MARGIN
+  };
 
   /** Everything the board must leave room for, as footprints at positions (plan view). */
   function notches():Array<{f:Footprint, x:Float, y:Float}> {
     var raw:Array<{f:Footprint, x:Float, y:Float}> = [];
-    for (c in face.controls) if (c.behind() > PASS_THROUGH) raw.push({f: FootprintGeometry.grow(c.body(), 2.0), x: c.x, y: c.y});
+    for (c in face.controls) if (c.behind() > PASS_THROUGH) raw.push({
+      f: FootprintGeometry.grow(c.body(), 2.0),
+      x: c.x,
+      y: c.y
+    });
     for (p in posts) raw.push({f: Circle(POST_DIAMETER + 2.0), x: p.x, y: p.y});
     raw.push({f: receptacleFootprint(), x: connectorX, y: receptacleCentreY(face, -face.height / 2 + face.wall)});
     if (enabling != null) raw.push({f: FootprintGeometry.grow(enablingFootprint(), 2.0), x: enabling.x, y: enabling.y});
@@ -211,7 +289,8 @@ class PendantCase {
       for (i in 0...result.length) {
         for (j in i + 1...result.length) {
           if (merged) break;
-          if (FootprintGeometry.gap(result[i].f, result[i].x, result[i].y, result[j].f, result[j].x, result[j].y) >= SLIVER) continue;
+          if (FootprintGeometry.gap(result[i].f,
+            result[i].x, result[i].y, result[j].f, result[j].x, result[j].y) >= SLIVER) continue;
           result[i] = union(result[i], result[j]);
           result.splice(j, 1);
           merged = true;
@@ -222,7 +301,11 @@ class PendantCase {
     return result;
   }
 
-  static function union(a:{f:Footprint, x:Float, y:Float}, b:{f:Footprint, x:Float, y:Float}):{f:Footprint, x:Float, y:Float} {
+  static function union(a: {f: Footprint, x: Float, y: Float}, b: {f: Footprint, x: Float, y: Float}): {
+    f: Footprint,
+    x: Float,
+    y: Float
+  } {
     var ha = FootprintGeometry.halfExtent(a.f), hb = FootprintGeometry.halfExtent(b.f);
     var x0 = Math.min(a.x - ha.x, b.x - hb.x), x1 = Math.max(a.x + ha.x, b.x + hb.x);
     var y0 = Math.min(a.y - ha.y, b.y - hb.y), y1 = Math.max(a.y + ha.y, b.y + hb.y);
@@ -230,21 +313,55 @@ class PendantCase {
   }
 
   /** A notch that would leave a sliver of board between itself and the outline is widened to the outline. */
-  function reachEdges(f:Footprint, x:Float, y:Float):{f:Footprint, x:Float, y:Float} {
+  function reachEdges(f:Footprint, x:Float, y:Float): {f: Footprint, x: Float, y: Float} {
     var board = boardHalf(face), half = FootprintGeometry.halfExtent(f);
     var x0 = x - half.x, x1 = x + half.x, y0 = y - half.y, y1 = y + half.y;
     var changed = false;
-    if (board.x - x1 < SLIVER) { x1 = board.x + 1.0; changed = true; }
-    if (x0 + board.x < SLIVER) { x0 = -board.x - 1.0; changed = true; }
-    if (board.y - y1 < SLIVER) { y1 = board.y + 1.0; changed = true; }
-    if (y0 + board.y < SLIVER) { y0 = -board.y - 1.0; changed = true; }
-    return changed ? {f: Rect(x1 - x0, y1 - y0), x: (x0 + x1) / 2, y: (y0 + y1) / 2} : {f: f, x: x, y: y};
+    if (board.x - x1 < SLIVER) {
+      x1 = board.x + 1.0;
+      changed = true;
+    }
+    if (x0 + board.x < SLIVER) {
+      x0 = -board.x - 1.0;
+      changed = true;
+    }
+    if (board.y - y1 < SLIVER) {
+      y1 = board.y + 1.0;
+      changed = true;
+    }
+    if (y0 + board.y < SLIVER) {
+      y0 = -board.y - 1.0;
+      changed = true;
+    }
+    return changed ? {
+      f:Rect(x1 - x0, y1 - y0), x:(x0 + x1) / 2, y:(y0 + y1) / 2
+    }
+    : {f: f, x: x, y: y};
   }
 
-  static function placeStandoffs(face:PanelLayout, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float,
-      enabling:Null<{x:Float, y:Float}>):Array<{x:Float, y:Float}> {
+  static function placeStandoffs(
+    face:PanelLayout,
+    posts:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    wallY:Float,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>
+  ):Array<{
+    x:Float,
+    y:Float
+  }> {
     var half = boardHalf(face);
-    var wanted = [[-half.x + 6, half.y - 6], [half.x - 6, half.y - 6], [-half.x + 6, -half.y + 6], [half.x - 6, -half.y + 6]];
+    var wanted = [
+      [-half.x + 6, half.y - 6],
+      [half.x - 6, half.y - 6],
+      [-half.x + 6, -half.y + 6],
+      [
+        half.x - 6,
+        -half.y + 6
+      ]
+    ];
     var result:Array<{x:Float, y:Float}> = [];
     for (target in wanted) {
       var best:Null<{x:Float, y:Float}> = null, bestDistance = 1e9;
@@ -253,7 +370,10 @@ class PendantCase {
         var y = -half.y + 5.0;
         while (y <= half.y - 5.0 + 1e-9) {
           var d = dist(x, y, target[0], target[1]);
-          if (d < bestDistance && standoffFree(face, x, y, posts, connectorX, wallY, enabling, result)) { best = {x: x, y: y}; bestDistance = d; }
+          if (d < bestDistance && standoffFree(face, x, y, posts, connectorX, wallY, enabling, result)) {
+            best = {x: x, y: y};
+            bestDistance = d;
+          }
           y += 1.5;
         }
         x += 1.5;
@@ -264,13 +384,30 @@ class PendantCase {
     return result;
   }
 
-  static function standoffFree(face:PanelLayout, x:Float, y:Float, posts:Array<{x:Float, y:Float}>, connectorX:Float, wallY:Float,
-      enabling:Null<{x:Float, y:Float}>, taken:Array<{x:Float, y:Float}>):Bool {
+  static function standoffFree(
+    face:PanelLayout,
+    x:Float,
+    y:Float,
+    posts:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    wallY:Float,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    taken:Array<{
+      x:Float,
+      y:Float
+    }>
+  ):Bool {
     var need = STANDOFF_DIAMETER / 2 + 3.0;
-    for (c in face.controls) if (c.behind() > PASS_THROUGH && FootprintGeometry.distanceTo(c.body(), c.x, c.y, x, y) < need) return false;
+    for (c in face.controls) if (c.behind() > PASS_THROUGH && FootprintGeometry.distanceTo(c.body(),
+      c.x, c.y, x, y) < need) return false;
     for (p in posts) if (dist(p.x, p.y, x, y) < STANDOFF_DIAMETER / 2 + POST_DIAMETER / 2 + 3.0) return false;
-    if (FootprintGeometry.distanceTo(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), x, y) < need) return false;
-    if (enabling != null && FootprintGeometry.distanceTo(enablingFootprint(), enabling.x, enabling.y, x, y) < need) return false;
+    if (FootprintGeometry.distanceTo(receptacleFootprint(),
+      connectorX, receptacleCentreY(face, wallY), x, y) < need) return false;
+    if (enabling != null && FootprintGeometry.distanceTo(enablingFootprint(),
+      enabling.x, enabling.y, x, y) < need) return false;
     for (t in taken) if (dist(t.x, t.y, x, y) < 20.0) return false;
     return true;
   }
@@ -283,8 +420,23 @@ class PendantCase {
    * that touches a wall is already joined to it, any other gets a thin rib to the nearest wall that is clear of the
    * deep parts, the receptacle, the enabling switch and the other towers.
    */
-  static function placeRibs(face:PanelLayout, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>, connectorX:Float,
-      wallY:Float, enabling:Null<{x:Float, y:Float}>, boardTop:Float):Array<{x:Float, y:Float, w:Float, h:Float}> {
+  static function placeRibs(
+    face:PanelLayout,
+    posts:Array<{x:Float, y:Float}>,
+    standoffs:Array<{x:Float, y:Float}>,
+    connectorX:Float,
+    wallY:Float,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    boardTop:Float
+  ):Array<{
+    x:Float,
+    y:Float,
+    w:Float,
+    h:Float
+  }> {
     var result:Array<{x:Float, y:Float, w:Float, h:Float}> = [];
     var towers:Array<{x:Float, y:Float, r:Float}> = [];
     for (p in posts) towers.push({x: p.x, y: p.y, r: POST_DIAMETER / 2});
@@ -292,7 +444,12 @@ class PendantCase {
     var halfX = face.width / 2 - face.wall, halfY = face.height / 2 - face.wall;
     for (tower in towers) {
       // Distance from the tower's edge to each wall's inner face: left, right, bottom, top.
-      var gaps = [tower.x + halfX - tower.r, halfX - tower.x - tower.r, tower.y + halfY - tower.r, halfY - tower.y - tower.r];
+      var gaps = [
+        tower.x + halfX - tower.r,
+        halfX - tower.x - tower.r,
+        tower.y + halfY - tower.r,
+        halfY - tower.y - tower.r
+      ];
       var smallest = Math.min(Math.min(gaps[0], gaps[1]), Math.min(gaps[2], gaps[3]));
       if (smallest <= 0.0) continue;
       var order = [0, 1, 2, 3];
@@ -302,12 +459,20 @@ class PendantCase {
         if (gaps[direction] > MAX_RIB) continue;
         var length = gaps[direction] + 2 * RIB_OVERLAP;
         var rib = switch direction {
-          case 0: {x: -halfX - RIB_OVERLAP + length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
-          case 1: {x: halfX + RIB_OVERLAP - length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
-          case 2: {x: tower.x, y: -halfY - RIB_OVERLAP + length / 2, w: RIB_THICKNESS, h: length};
-          default: {x: tower.x, y: halfY + RIB_OVERLAP - length / 2, w: RIB_THICKNESS, h: length};
+          case 0:
+            {x: -halfX - RIB_OVERLAP + length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
+          case 1:
+            {x: halfX + RIB_OVERLAP - length / 2, y: tower.y, w: length, h: RIB_THICKNESS};
+          case 2:
+            {x: tower.x, y: -halfY - RIB_OVERLAP + length / 2, w: RIB_THICKNESS, h: length};
+          default:
+            {x: tower.x, y: halfY + RIB_OVERLAP - length / 2, w: RIB_THICKNESS, h: length};
         };
-        if (ribFree(face, rib, tower, towers, connectorX, wallY, enabling, boardTop)) { result.push(rib); placed = true; break; }
+        if (ribFree(face, rib, tower, towers, connectorX, wallY, enabling, boardTop)) {
+          result.push(rib);
+          placed = true;
+          break;
+        }
       }
       // A standoff far from every wall, or with the way blocked, leans on a nearby post that is in line with it.
       if (!placed) for (p in posts) {
@@ -321,28 +486,80 @@ class PendantCase {
         var length = span + 2 * RIB_OVERLAP;
         var sign = horizontal ? (dx > 0 ? 1.0 : -1.0) : (dy > 0 ? 1.0 : -1.0);
         var reach = tower.r - RIB_OVERLAP + length / 2;
-        var rib = horizontal ? {x: tower.x + sign * reach, y: tower.y, w: length, h: RIB_THICKNESS} : {x: tower.x, y: tower.y + sign * reach, w: RIB_THICKNESS, h: length};
+        var rib = horizontal ? {
+          x:tower.x + sign * reach, y:tower.y, w:length, h:RIB_THICKNESS
+        }
+        : {x: tower.x, y: tower.y + sign * reach, w: RIB_THICKNESS, h: length};
         var others = [for (t in towers) if (!(t.x == p.x && t.y == p.y)) t];
-        if (ribFree(face, rib, tower, others, connectorX, wallY, enabling, boardTop)) { result.push(rib); placed = true; break; }
+        if (ribFree(face, rib, tower, others, connectorX, wallY, enabling, boardTop)) {
+          result.push(rib);
+          placed = true;
+          break;
+        }
       }
       if (!placed) throw "No clear rib ties the tower at (" + tower.x + ", " + tower.y + ") to a wall";
     }
     return result;
   }
 
-  static function ribFree(face:PanelLayout, rib:{x:Float, y:Float, w:Float, h:Float}, own:{x:Float, y:Float, r:Float},
-      towers:Array<{x:Float, y:Float, r:Float}>, connectorX:Float, wallY:Float, enabling:Null<{x:Float, y:Float}>, boardTop:Float):Bool {
+  static function ribFree(
+    face:PanelLayout,
+    rib: {x: Float, y: Float, w: Float, h: Float},
+    own: {
+      x: Float,
+      y: Float,
+      r: Float
+    },
+    towers:Array<{
+      x:Float,
+      y:Float,
+      r:Float
+    }>,
+    connectorX:Float,
+    wallY:Float,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    boardTop:Float
+  ):Bool {
     var footprint = Rect(rib.w, rib.h);
     var top = -ribTop(boardTop);
-    for (c in face.controls) if (c.behind() > top && FootprintGeometry.gap(c.body(), c.x, c.y, footprint, rib.x, rib.y) < BODY_CLEARANCE) return false;
-    if (FootprintGeometry.gap(receptacleFootprint(), connectorX, receptacleCentreY(face, wallY), footprint, rib.x, rib.y) < 1.0) return false;
-    if (enabling != null && FootprintGeometry.gap(enablingFootprint(), enabling.x, enabling.y, footprint, rib.x, rib.y) < 1.0) return false;
-    for (t in towers) if (t != own && FootprintGeometry.distanceTo(footprint, rib.x, rib.y, t.x, t.y) < t.r + 0.5) return false;
+    for (c in face.controls) if (c.behind() > top && FootprintGeometry.gap(c.body(),
+      c.x, c.y, footprint, rib.x, rib.y) < BODY_CLEARANCE) return false;
+    if (FootprintGeometry.gap(
+      receptacleFootprint(),
+      connectorX,
+      receptacleCentreY(face, wallY),
+      footprint,
+      rib.x,
+      rib.y
+    ) < 1.0) return false;
+    if (enabling != null && FootprintGeometry.gap(enablingFootprint(),
+      enabling.x, enabling.y, footprint, rib.x, rib.y) < 1.0) return false;
+    for (t in towers) if (t != own && FootprintGeometry.distanceTo(footprint,
+      rib.x, rib.y, t.x, t.y) < t.r + 0.5) return false;
     return true;
   }
 
-  static function placeStrapSlots(face:PanelLayout, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>,
-      enabling:Null<{x:Float, y:Float}>, ribs:Array<{x:Float, y:Float, w:Float, h:Float}>):Array<{x:Float, y:Float}> {
+  static function placeStrapSlots(
+    face:PanelLayout,
+    posts:Array<{x:Float, y:Float}>,
+    standoffs:Array<{x:Float, y:Float}>,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    ribs:Array<{
+      x:Float,
+      y:Float,
+      w:Float,
+      h:Float
+    }>
+  ):Array<{
+    x:Float,
+    y:Float
+  }> {
     var result:Array<{x:Float, y:Float}> = [];
     var halfX = face.width / 2 - face.wall - STRAP_SLOT_WIDTH / 2 - 8.0, halfY = face.height / 2 - face.wall - 10.0;
     for (target in [[0.0, 20.0], [0.0, -20.0]]) {
@@ -352,7 +569,10 @@ class PendantCase {
         var y = -halfY;
         while (y <= halfY + 1e-9) {
           var d = dist(x, y, target[0], target[1]);
-          if (d < bestDistance && slotFree(face, x, y, posts, standoffs, enabling, ribs, result)) { best = {x: x, y: y}; bestDistance = d; }
+          if (d < bestDistance && slotFree(face, x, y, posts, standoffs, enabling, ribs, result)) {
+            best = {x: x, y: y};
+            bestDistance = d;
+          }
           y += 1.5;
         }
         x += 1.5;
@@ -363,20 +583,52 @@ class PendantCase {
     return result;
   }
 
-  static function slotFree(face:PanelLayout, x:Float, y:Float, posts:Array<{x:Float, y:Float}>, standoffs:Array<{x:Float, y:Float}>,
-      enabling:Null<{x:Float, y:Float}>, ribs:Array<{x:Float, y:Float, w:Float, h:Float}>, taken:Array<{x:Float, y:Float}>):Bool {
+  static function slotFree(
+    face:PanelLayout,
+    x:Float,
+    y:Float,
+    posts:Array<{x:Float, y:Float}>,
+    standoffs:Array<{
+      x:Float,
+      y:Float
+    }>,
+    enabling:Null<{
+      x:Float,
+      y:Float
+    }>,
+    ribs:Array<{
+      x:Float,
+      y:Float,
+      w:Float,
+      h:Float
+    }>,
+    taken:Array<{
+      x:Float,
+      y:Float
+    }>
+  ):Bool {
     var slot = Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT);
     // A strap passes behind the parts: keep clear of any that leave less than 8 mm to the back wall.
-    for (c in face.controls) if (c.behind() > face.caseInnerDepth - 8.0 && FootprintGeometry.gap(c.body(), c.x, c.y, slot, x, y) < BODY_CLEARANCE) return false;
+    for (c in face.controls) if (c.behind() > face.caseInnerDepth - 8.0 && FootprintGeometry.gap(
+      c.body(),
+      c.x,
+      c.y,
+      slot,
+      x,
+      y
+    ) < BODY_CLEARANCE) return false;
     for (p in posts) if (FootprintGeometry.distanceTo(slot, x, y, p.x, p.y) < POST_DIAMETER / 2 + 3.0) return false;
-    for (s in standoffs) if (FootprintGeometry.distanceTo(slot, x, y, s.x, s.y) < STANDOFF_DIAMETER / 2 + 3.0) return false;
-    if (enabling != null && FootprintGeometry.gap(slot, x, y, enablingFootprint(), enabling.x, enabling.y) < 3.0) return false;
+    for (s in standoffs) if (FootprintGeometry.distanceTo(slot,
+      x, y, s.x, s.y) < STANDOFF_DIAMETER / 2 + 3.0) return false;
+    if (enabling != null && FootprintGeometry.gap(slot,
+      x, y, enablingFootprint(), enabling.x, enabling.y) < 3.0) return false;
     for (r in ribs) if (FootprintGeometry.gap(slot, x, y, Rect(r.w, r.h), r.x, r.y) < 2.0) return false;
     for (t in taken) if (dist(t.x, t.y, x, y) < 20.0) return false;
     return true;
   }
 
-  static function dist(ax:Float, ay:Float, bx:Float, by:Float):Float return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+  static function dist(ax:Float,
+    ay:Float, bx:Float, by:Float):Float return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
   /** The posts, standoffs, receptacle, enabling switch and strap slots as marks for PanelLayoutSvg. */
   public function marks():Array<SvgMark> {
@@ -386,10 +638,23 @@ class PendantCase {
       result.push({x: post.x, y: post.y, size: PanelFacePlate.COUNTERBORE, height: 0.0, filled: false});
     }
     for (s in standoffs) result.push({x: s.x, y: s.y, size: STANDOFF_DIAMETER, height: 0.0, filled: true});
-    for (s in strapSlots) result.push({x: s.x, y: s.y, size: STRAP_SLOT_WIDTH, height: STRAP_SLOT_HEIGHT, filled: true});
+    for (s in strapSlots) result.push({x: s.x,
+      y: s.y, size: STRAP_SLOT_WIDTH, height: STRAP_SLOT_HEIGHT, filled: true});
     for (r in ribs) result.push({x: r.x, y: r.y, size: r.w, height: r.h, filled: true});
-    if (enabling != null) result.push({x: enabling.x, y: enabling.y, size: ENABLING_DEPTH, height: ENABLING_BODY, filled: false});
-    result.push({x: connectorX, y: -face.height / 2 + face.wall / 2, size: RECEPTACLE_HOLE, height: face.wall, filled: true});
+    if (enabling != null) result.push({
+      x: enabling.x,
+      y: enabling.y,
+      size: ENABLING_DEPTH,
+      height: ENABLING_BODY,
+      filled: false
+    });
+    result.push({
+      x: connectorX,
+      y: -face.height / 2 + face.wall / 2,
+      size: RECEPTACLE_HOLE,
+      height: face.wall,
+      filled: true
+    });
     return result;
   }
 
@@ -399,15 +664,44 @@ class PendantCase {
   public function shell():Part {
     var depth = outerDepth();
     var outer = RoundedRectangle.box(face.width, face.height, PanelFacePlate.CORNER_RADIUS, -depth, 0.0);
-    var cavity = RoundedRectangle.box(face.width - 2 * face.wall, face.height - 2 * face.wall,
-      PanelFacePlate.CORNER_RADIUS - face.wall, -face.caseInnerDepth, 1.0);
+    var cavity = RoundedRectangle.box(
+      face.width - 2 * face.wall,
+      face.height - 2 * face.wall,
+      PanelFacePlate.CORNER_RADIUS - face.wall,
+      -face.caseInnerDepth,
+      1.0
+    );
     var tools:Array<Part> = [cavity];
-    tools.push(Part.cylinderAlongY(RECEPTACLE_HOLE / 2, -face.height / 2 - 1.0, -face.height / 2 + face.wall + 1.0, connectorX, connectorZ));
-    for (s in strapSlots) tools.push(FootprintGeometry.solid(Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT), s.x, s.y, -depth - 1.0, -face.caseInnerDepth + 1.0));
+    tools.push(Part.cylinderAlongY(
+      RECEPTACLE_HOLE / 2,
+      -face.height / 2 - 1.0,
+      -face.height / 2 + face.wall + 1.0,
+      connectorX,
+      connectorZ
+    ));
+    for (s in strapSlots) tools.push(FootprintGeometry.solid(
+      Rect(STRAP_SLOT_WIDTH, STRAP_SLOT_HEIGHT),
+      s.x,
+      s.y,
+      -depth - 1.0,
+      -face.caseInnerDepth + 1.0
+    ));
     if (enabling != null) {
       var side = enabling.x < 0 ? -1.0 : 1.0;
-      tools.push(Part.cylinderAlong(ENABLING_HOLE / 2, new Vector(side * (face.width / 2 + 1.0), enabling.y, enablingZ(face)),
-        new Vector(-side, 0.0, 0.0), face.wall + 2.0));
+      tools.push(Part.cylinderAlong(
+        ENABLING_HOLE / 2,
+        new Vector(
+          side * (face.width / 2 + 1.0),
+          enabling.y,
+          enablingZ(face)
+        ),
+        new Vector(
+          -side,
+          0.0,
+          0.0
+        ),
+        face.wall + 2.0
+      ));
     }
     var current = outer.subtractAll(tools);
     outer.close();
@@ -427,7 +721,8 @@ class PendantCase {
     for (r in ribs) {
       var rib = FootprintGeometry.solid(Rect(r.w, r.h), r.x, r.y, -face.caseInnerDepth - 0.5, top);
       var joined = current.combine(rib);
-      current.close(); rib.close();
+      current.close();
+      rib.close();
       current = joined;
     }
     return current;
@@ -436,7 +731,10 @@ class PendantCase {
   static function fuseThenDrill(body:Part, add:Part, hole:Part):Part {
     var joined = body.combine(add);
     var drilled = joined.subtract(hole);
-    body.close(); add.close(); hole.close(); joined.close();
+    body.close();
+    add.close();
+    hole.close();
+    joined.close();
     return drilled;
   }
 
@@ -445,8 +743,20 @@ class PendantCase {
     var half = boardHalf(face);
     var base = RoundedRectangle.box(half.x * 2, half.y * 2, 3.0, boardTop - BOARD_THICKNESS, boardTop);
     var tools:Array<Part> = [];
-    for (n in notches()) tools.push(FootprintGeometry.solid(n.f, n.x, n.y, boardTop - BOARD_THICKNESS - 1.0, boardTop + 1.0));
-    for (s in standoffs) tools.push(Part.cylinderSpan(BOARD_HOLE / 2, boardTop - BOARD_THICKNESS - 1.0, boardTop + 1.0, s.x, s.y));
+    for (n in notches()) tools.push(FootprintGeometry.solid(
+      n.f,
+      n.x,
+      n.y,
+      boardTop - BOARD_THICKNESS - 1.0,
+      boardTop + 1.0
+    ));
+    for (s in standoffs) tools.push(Part.cylinderSpan(
+      BOARD_HOLE / 2,
+      boardTop - BOARD_THICKNESS - 1.0,
+      boardTop + 1.0,
+      s.x,
+      s.y
+    ));
     var result = base.subtractAll(tools);
     base.close();
     for (t in tools) t.close();
@@ -458,7 +768,8 @@ class PendantCase {
     var plain = PanelFacePlate.part(face, posts);
     var tongue = perimeterTongue();
     var joined = plain.combine(tongue);
-    plain.close(); tongue.close();
+    plain.close();
+    tongue.close();
     return joined;
   }
 
@@ -467,11 +778,31 @@ class PendantCase {
     var inset = face.wall + TONGUE_CLEARANCE;
     var radius = Math.max(PanelFacePlate.CORNER_RADIUS - inset, 1.0);
     var outer = RoundedRectangle.box(face.width - 2 * inset, face.height - 2 * inset, radius, -TONGUE_HEIGHT, 0.0);
-    var inner = RoundedRectangle.box(face.width - 2 * (inset + TONGUE_WIDTH), face.height - 2 * (inset + TONGUE_WIDTH),
-      Math.max(radius - TONGUE_WIDTH, 0.5), -TONGUE_HEIGHT - 1.0, 1.0);
+    var inner = RoundedRectangle.box(
+      face.width - 2 * (inset + TONGUE_WIDTH),
+      face.height - 2 * (inset + TONGUE_WIDTH),
+      Math.max(
+        radius - TONGUE_WIDTH,
+        0.5
+      ),
+      -TONGUE_HEIGHT - 1.0,
+      1.0
+    );
     var tools:Array<Part> = [inner];
-    for (c in face.controls) tools.push(FootprintGeometry.solid(FootprintGeometry.grow(c.body(), 1.0), c.x, c.y, -TONGUE_HEIGHT - 1.0, 1.0));
-    for (p in posts) tools.push(FootprintGeometry.solid(Circle(POST_DIAMETER + 2.0), p.x, p.y, -TONGUE_HEIGHT - 1.0, 1.0));
+    for (c in face.controls) tools.push(FootprintGeometry.solid(
+      FootprintGeometry.grow(c.body(), 1.0),
+      c.x,
+      c.y,
+      -TONGUE_HEIGHT - 1.0,
+      1.0
+    ));
+    for (p in posts) tools.push(FootprintGeometry.solid(
+      Circle(POST_DIAMETER + 2.0),
+      p.x,
+      p.y,
+      -TONGUE_HEIGHT - 1.0,
+      1.0
+    ));
     var ring = outer.subtractAll(tools);
     outer.close();
     for (t in tools) t.close();
