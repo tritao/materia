@@ -25,8 +25,7 @@ class OperatorProfileTests {
     }
     var hobber = ReferenceOperatorProfiles.hobber();
     if (hobber.pendantLabel(5) != "B hob" || hobber.pendantLabel(7) != "") throw "Pendant labels";
-    if (hobber.jogRefusal("b", [GearboxEngaged]) == null || hobber.jogRefusal("x", [GearboxEngaged]) != null ||
-        hobber.jogRefusal("b", []) != null) throw "Jog rules";
+    if (hobber.jogRules.length != 2 || hobber.jogRules[0].blockedWhen != GearboxEngaged) throw "Hobber jog rules";
     var guard = ReferenceOperatorProfiles.drillTap().guard;
     if (guard == null || guard.setupSpeedLimit != 0.25) throw "Guard parameters";
 

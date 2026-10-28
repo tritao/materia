@@ -81,12 +81,6 @@ class OperatorProfile {
     return id == null ? "" : axis(id).label;
   }
 
-  /** The rule that refuses jogging `axisId` under `active` conditions, or null when jogging is allowed. */
-  public function jogRefusal(axisId:String, active:Array<OperatorCondition>):Null<JogRule> {
-    for (rule in jogRules) if (rule.axis == axisId && active.contains(rule.blockedWhen)) return rule;
-    return null;
-  }
-
   public static function requireId(value:Dynamic, what:String):Void {
     if (!Std.isOfType(value, String) || (value:String).length == 0) throw 'Invalid $what';
     for (i in 0...(value:String).length) {
