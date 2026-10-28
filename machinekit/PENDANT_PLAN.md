@@ -108,7 +108,7 @@ The wire schema, the controller-side code, the host link and how it is tested ar
 | Phase | Work |
 |---|---|
 | P0 | This spec; pin budget; message definitions with CC1. |
-| P1 | Bench: Nucleo-G474 with the bought wheel, switches, buttons and an OLED on a proto board; Rust firmware (`embassy-stm32` or similar); CAN-FD to the host. |
+| P1 | Bench: Nucleo-G474 with the bought wheel, switches, buttons and an OLED on a proto board; Rust firmware (`embassy-stm32` or similar); CAN-FD to the host. Parts and checks: `PENDANT_BENCH_PARTS.md`. |
 | P2 | Board v1 in `pcbkit`. |
 | P3 | Case v1 in CadKit, printed. |
 | P4 | Wiring with the v1 chain; ESD and noise tests with the real cable. |
