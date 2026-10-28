@@ -200,7 +200,7 @@ class EditorScene {
     if (cadEdgeMode == mode) return;
     cadEdgeMode = mode;
     var disposedKeys:Array<String> = [];
-    for (key = > entry in cadDisplayGeometry) {
+    for (key => entry in cadDisplayGeometry) {
       if (entry.geometry.isDisposed()) {
         disposedKeys.push(key);
         continue;
@@ -752,7 +752,7 @@ class EditorScene {
   public function dragSketchDraftPoint(x:Float, y:Float):Bool {
     var draft = activeSketchEdit, pointId = sketchPointDrag;
     if (draft == null || pointId == null || !Math.isFinite(x) || !Math.isFinite(y)) return false;
-    var moved = draft.sketch.dragPreview([pointId = > [x, y]]);
+    var moved = draft.sketch.dragPreview([pointId => [x, y]]);
     sketchDraftRevision = sketchDraftRevision + 1;
     refreshSelectionRevision();
     return moved;
@@ -3295,7 +3295,7 @@ class EditorScene {
   public function setRuntimeGeometries(changed:Map<String, GeometryData>):Void {
     var updated:Array<NodeId> = [];
     try {
-      for (id = > data in changed) updateRuntimeGeometry(id, data, updated);
+      for (id => data in changed) updateRuntimeGeometry(id, data, updated);
     } catch (error:Dynamic) {
       // Keep derived caches consistent with any geometry already accepted by SceneKit.
       if (updated.length > 0) publishRuntimeNodes(updated);

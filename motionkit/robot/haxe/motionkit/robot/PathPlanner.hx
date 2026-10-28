@@ -53,7 +53,7 @@ class PathPlanner {
     this.fixedTimestepSeconds = fixedTimestepSeconds;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
-    if (startPositionTolerances != null) for (id = > tolerance in startPositionTolerances) {
+    if (startPositionTolerances != null) for (id => tolerance in startPositionTolerances) {
       if (axis(id) == null || !Math.isFinite(tolerance)
         || tolerance < 0) throw "Path-start tolerances need known axes and finite nonnegative distances";
       this.startPositionTolerances.set(id, tolerance);

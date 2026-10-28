@@ -83,7 +83,7 @@ class MoldSceneSources {
     for (panel in plan.panels.members) assign(panel.panel.id, "Mold shell", [plan.document.input.id]);
     for (former in plan.formers) assign(former.volume.id,
       "Formers/" + former.featureIds.join(" + "), former.featureIds);
-    var supportPanels = [for (panel in plan.supportPanels) panel.panel.id = > true];
+    var supportPanels = [for (panel in plan.supportPanels) panel.panel.id => true];
     for (core in plan.cores) {
       var units = plan.coreUnits.filter(unit -> unit.coreIds.indexOf(core.id) >= 0);
       var sources:Array<String> = [], parents:Array<String> = [];

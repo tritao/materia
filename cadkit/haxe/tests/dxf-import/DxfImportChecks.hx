@@ -83,7 +83,7 @@ class DxfImportChecks {
       5,
       "OUTER"
     ));
-    var operations:Map<String, String> = ["OUTER" = > "profile", "HOLES" = > "profile"];
+    var operations:Map<String, String> = ["OUTER" => "profile", "HOLES" => "profile"];
     result = DxfContours.assemble(all, 0.05, operations);
     check(result.parts.length == 2 && result.parts[0].holes.length == 1, "layer mapping permits holes and islands");
     check(

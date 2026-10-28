@@ -232,7 +232,7 @@ class FlexsplineHobberChecks {
         !FoundationIntegrity.checkMounts(
           machine,
           machine.precisionMounts,
-          [for (mount in machine.precisionMounts) mount.name = > mount.name]
+          [for (mount in machine.precisionMounts) mount.name => mount.name]
         ).hasErrors(),
         "foundation precision mounts all land on inserts"
       );

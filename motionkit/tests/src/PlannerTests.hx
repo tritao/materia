@@ -1367,7 +1367,7 @@ class PlannerTests extends MotionKitTestSupport {
     if (x == null || y == null || z == null) throw "Start-admission fixture needs XYZ";
     var origin = new PathPoint(x.logicalPosition(start), y.logicalPosition(start), z.logicalPosition(start));
     var budget = 1e-5;
-    var allowances = ["x" = > budget];
+    var allowances = ["x" => budget];
     var planner = new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), allowances);
     allowances.set("x", 0.001); // The planner must own its immutable configuration snapshot.
     function path(shift:Float):GeometricPath return GeometricPath.lines([
@@ -1417,12 +1417,12 @@ class PlannerTests extends MotionKitTestSupport {
         0.01,
         Int64.ofInt(1),
         Int64.ofInt(0),
-        ["x" = > invalid]
+        ["x" => invalid]
       ),
       "invalid path-start budgets are rejected"
     );
     throws(
-      () -> new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), ["absent" = > budget]),
+      () -> new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), ["absent" => budget]),
       "unknown-axis path-start budgets are rejected"
     );
     rig.harness.dispose();

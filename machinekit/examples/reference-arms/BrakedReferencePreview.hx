@@ -46,13 +46,13 @@ class BrakedReferencePreview {
     var definition:AssemblyDefinition = scene.assemblyDefinition;
     var occurrences:Array<Dynamic> = layout.occurrences;
     var densities:Map<String, Float> = [
-      "base" = > 2810,
-      "baseCover" = > 2700,
-      "upperArm" = > 2810,
-      "forearm" = > 2700,
-      "elbowOutputAdapter" = > 2810,
-      "elbowHousingAdapter" = > 2810,
-      "toolFlange" = > 2810
+      "base" => 2810,
+      "baseCover" => 2700,
+      "upperArm" => 2810,
+      "forearm" => 2700,
+      "elbowOutputAdapter" => 2810,
+      "elbowHousingAdapter" => 2810,
+      "toolFlange" => 2810
     ];
     for (part in scene.parts) {
       var module:Dynamic = null;

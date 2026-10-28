@@ -74,7 +74,7 @@ import nativekit.scene.Transform;
       visible: true
     }]);
     try {
-      var changed:Map<Int, GeometryData> = [0 = > poseTriangle(0.3)];
+      var changed:Map<Int, GeometryData> = [0 => poseTriangle(0.3)];
       scene.setRuntimeGeometryParts("stock", 2, changed);
       var half = Math.PI / 4;
       var pose:app.ApplicationSimulation.SimulationPoseVisual = {
@@ -101,7 +101,7 @@ import nativekit.scene.Transform;
         ) + ", overrides=" + view.poseOverrideCount()
       );
       check(hit(scene, view, 0.3, 0) == "scene", "stock chunks leave the saved position");
-      scene.setRuntimeGeometryParts("stock", 2, [0 = > poseTriangle(0.5), 1 = > poseTriangle(-0.3)]);
+      scene.setRuntimeGeometryParts("stock", 2, [0 => poseTriangle(0.5), 1 => poseTriangle(-0.3)]);
       view = scene.configureRenderView(new SceneView(), projection, [pose], null, -1, null, false);
       check(
         hit(scene, view, 1, 2.5) == "stock" && hit(scene, view, 1, 1.7) == "stock",
@@ -141,7 +141,7 @@ import nativekit.scene.Transform;
       var second = scene.selectedId, secondAuthored = scene.runtimeFor(second).geometry;
       var revision = scene.revision,
         visualRevision = scene.visualRevision, environmentRevision = scene.environmentRevision;
-      scene.setRuntimeGeometries([id = > triangle(0.04), second = > triangle(0.08)]);
+      scene.setRuntimeGeometries([id => triangle(0.04), second => triangle(0.08)]);
       check(
         scene.revision == revision
         && scene.environmentRevision == environmentRevision && scene.visualRevision == visualRevision + 1,
@@ -159,7 +159,7 @@ import nativekit.scene.Transform;
       );
       revision = scene.revision;
       visualRevision = scene.visualRevision;
-      scene.setRuntimeGeometries([id = > triangle(0.12), second = > triangle(0.16)]);
+      scene.setRuntimeGeometries([id => triangle(0.12), second => triangle(0.16)]);
       check(
         scene.revision == revision
         && scene.visualRevision == visualRevision + 1 && scene.info(id).bounds().minX > firstBounds.maxX,
@@ -172,7 +172,7 @@ import nativekit.scene.Transform;
         "both batched meshes restore their authored geometry"
       );
       scene.select(id);
-      scene.setRuntimeGeometryParts(id, 2, [0 = > triangle(0), 1 = > triangle(0.02)]);
+      scene.setRuntimeGeometryParts(id, 2, [0 => triangle(0), 1 => triangle(0.02)]);
       var parts = scene.runtimePartNodes(id);
       check(
         parts.length == 2 && live(scene, parts[0]) && live(scene, parts[1]),
@@ -180,7 +180,7 @@ import nativekit.scene.Transform;
       );
       check(scene.bridge.idForNode(parts[1]) == id, "a runtime part picks as its object");
       check(scene.runtimeFor(id).geometry != authored, "the object's own geometry is hidden behind its parts");
-      scene.setRuntimeGeometryParts(id, 2, [1 = > triangle(0.03)]);
+      scene.setRuntimeGeometryParts(id, 2, [1 => triangle(0.03)]);
       check(scene.runtimePartNodes(id).join(",") == parts.join(","), "an update replaces a part's geometry in place");
 
       var cached:app.EditorScene.RuntimeGeometryParts = scene.runtimeParts.get(id);
@@ -199,7 +199,7 @@ import nativekit.scene.Transform;
       );
       scene.setRuntimeGeometryPartTransform(id, 0, transform);
       check(scene.visualRevision == beforeTransform + 1, "unchanged transform does not republish");
-      scene.setRuntimeGeometryParts(id, 2, [0 = > triangle(0.01)]);
+      scene.setRuntimeGeometryParts(id, 2, [0 => triangle(0.01)]);
       check(
         Math.abs(scene.renderSnapshot().findNode(parts[0]).bounds().minX - 0.16) < 1e-6,
         "material update retains runtime part transform"
@@ -248,7 +248,7 @@ import nativekit.scene.Transform;
       );
 
       // Deleting the object takes its parts along; the scene does not destroy children with a parent.
-      scene.setRuntimeGeometryParts(id, 1, [0 = > triangle(0)]);
+      scene.setRuntimeGeometryParts(id, 1, [0 => triangle(0)]);
       var orphan = scene.runtimePartNodes(id)[0];
       check(scene.deleteSelected(), "the object deletes");
       check(

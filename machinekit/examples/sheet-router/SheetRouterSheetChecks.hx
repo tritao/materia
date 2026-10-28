@@ -74,7 +74,7 @@ class SheetRouterSheetChecks {
         "native full-load holding check refuses the freed 50 mm part"
       );
       check(Math.abs(stock.volume() - 1.6 * length * 0.018) < 1e-8, "refused candidate is rolled back");
-      var contours:Map<String, CamContour> = ["small" = > small], operations:Array<CamSheetOperation> = [];
+      var contours:Map<String, CamContour> = ["small" => small], operations:Array<CamSheetOperation> = [];
       var rows = bed > 2800 ? 4 : 3, height = (length - 0.15) / rows - 0.05;
       operations.push({id: "small-hole", part: "small", area: 0.0025, kind: "drill", requires: [], releases: false});
       operations.push({

@@ -20,7 +20,7 @@ class OnnxPolicyTests {
     var state = [0.0, 0.0];
     for (step in 1...4) {
       var a = [1.0, 2.0 * step, -1.0];
-      var result = policy.run(["a" = > a, "s" = > state]);
+      var result = policy.run(["a" => a, "s" => state]);
       var y0 = a[0] * 1.0 + a[1] * 0.5 - a[2] * 2.0 + 0.1, y1 = a[0] * 2.0 - a[1] + a[2] * 0.25 - 0.2;
       var y = result.get("y");
       if (!near(y[0], y0, 1e-6) || !near(y[1], y1, 1e-6)) throw 'affine y wrong at step $step: $y';
@@ -34,10 +34,10 @@ class OnnxPolicyTests {
 
   static function rejectsBadInputs():Void {
     var policy = OnnxPolicy.load(Files.robotkit("policy/tests/fixtures/affine_state.onnx"));
-    expectThrow(() -> policy.run(["a" = > [1.0, 2.0, 3.0]]), "missing input");
-    expectThrow(() -> policy.run(["a" = > [1.0, 2.0], "s" = > [0.0, 0.0]]), "wrong size");
+    expectThrow(() -> policy.run(["a" => [1.0, 2.0, 3.0]]), "missing input");
+    expectThrow(() -> policy.run(["a" => [1.0, 2.0], "s" => [0.0, 0.0]]), "wrong size");
     policy.dispose();
-    expectThrow(() -> policy.run(["a" = > [1.0, 2.0, 3.0], "s" = > [0.0, 0.0]]), "disposed policy");
+    expectThrow(() -> policy.run(["a" => [1.0, 2.0, 3.0], "s" => [0.0, 0.0]]), "disposed policy");
     expectThrow(() -> OnnxPolicy.load("no-such-model.onnx"), "missing file");
   }
 
@@ -82,7 +82,7 @@ class OnnxPolicyTests {
     var action:Array<Float> = [];
     for (step in 0...100) {
       var obs = [for (i in 0...47) 0.5 * Math.sin(0.1 * (step * 47 + i))];
-      var result = policy.run(["obs" = > obs, "h_in" = > h, "c_in" = > c]);
+      var result = policy.run(["obs" => obs, "h_in" => h, "c_in" => c]);
       action = result.get("action");
       h = result.get("h_out");
       c = result.get("c_out");

@@ -7,7 +7,7 @@ import materia.assembly.AssemblyBodies;
 class LegacyAssemblyVisibility {
   public static function groups(definition:AssemblyDefinition):Map<String, Array<String>> {
     var result:Map<String, Array<String>> = [], bodies = AssemblyBodies.of(definition);
-    var ownership = [for (o in definition.occurrences) o.id = > o.includePath];
+    var ownership = [for (o in definition.occurrences) o.id => o.includePath];
     function descendants(root:String):Array<String> {
       var ids:Array<String> = [];
       for (body in bodies) if (body.id == root) for (id in body.occurrences) ids.push("project:" + id);

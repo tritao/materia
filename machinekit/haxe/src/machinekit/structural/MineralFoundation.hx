@@ -44,7 +44,7 @@ class MineralFoundation extends MachineAssembly {
     inserts = [];
     var v = machinekit.component.ComponentRecipeSupport.resolve(MineralCasting.parameters(), bodyValues);
     var features = CastingPatterns.decode(v.token("features"));
-    var ids:Map<String, Bool> = ["casting" = > true];
+    var ids:Map<String, Bool> = ["casting" => true];
     for (row in placements) {
       if (row == null || row.id == null || row.id.length == 0
         || ids.exists(row.id) || row.part == null) throw "Foundation inserts need unique ids and steel parts";

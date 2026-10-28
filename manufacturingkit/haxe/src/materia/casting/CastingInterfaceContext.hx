@@ -56,7 +56,7 @@ class CastingInterfaceContexts {
     FoundationJointAnalysis.validate(result.jointSources, result.foundationJoints);
     for (instance in result.foundationJoints) if (instance.joint.lowerBody != body
       && instance.joint.upperBody != body) throw "Foundation joint does not concern this casting: " + instance.id;
-    var ids:Map<String, Bool> = [], members:Map<String, Bool> = [body = > true];
+    var ids:Map<String, Bool> = [], members:Map<String, Bool> = [body => true];
     for (row in bounded(raw, "inserts")) {
       CastingFeatureCodec.fields(row, ["id", "member"]);
       var id = CastingRecordCodec.string(row, "id"), member = CastingRecordCodec.string(row, "member");

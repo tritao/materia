@@ -850,8 +850,8 @@ class FoundationToolingTests {
         declareFixtureOpenings(
           chamfered,
           [
-            "underside" = > ["body.z-min"],
-            "side-opening" = > ["body.x-min"]
+            "underside" => ["body.z-min"],
+            "side-opening" => ["body.x-min"]
           ]
         ),
         placements

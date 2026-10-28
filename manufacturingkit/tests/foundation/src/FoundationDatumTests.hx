@@ -55,9 +55,9 @@ class FoundationDatumTests {
     check(s.primary.frame.x == 0, "datum frame is a defensive copy");
     var sources:FoundationDatumSources = {
       bodyFaces: ["body.z-min"],
-      featureFaces: ["register" = > ["side-0"]],
-      insertInterfaces: ["seat" = > ["edge"]],
-      insertHoles: ["seat" = > ["pin"]],
+      featureFaces: ["register" => ["side-0"]],
+      insertInterfaces: ["seat" => ["edge"]],
+      insertHoles: ["seat" => ["pin"]],
       unsupportedFeatures: []
     };
     var requirement:InterfaceRequirement = {

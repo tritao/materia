@@ -12,7 +12,7 @@ class SketchDragSmoke {
     // A rectangle free to stretch upwards: its corner follows the cursor up, but stays on its vertical edge.
     var stretchy = rectangle(false);
     stretchy.solve();
-    var pulled = stretchy.drag(["p2" = > [12.0, 8.0]]);
+    var pulled = stretchy.drag(["p2" => [12.0, 8.0]]);
     near(pulled.x("p2"), 10, "the corner stays on the vertical edge");
     near(pulled.y("p2"), 8, "and rises to the cursor");
     near(pulled.y("p3"), 8, "the top edge stays horizontal");
@@ -23,7 +23,7 @@ class SketchDragSmoke {
     // A fully constrained rectangle does not move.
     var rigid = rectangle(true);
     rigid.solve();
-    var held = rigid.drag(["p2" = > [14.0, 9.0]]);
+    var held = rigid.drag(["p2" => [14.0, 9.0]]);
     near(held.x("p2"), 10, "a fixed rectangle holds its corner (x)");
     near(held.y("p2"), 5, "a fixed rectangle holds its corner (y)");
 
@@ -51,7 +51,7 @@ class SketchDragSmoke {
     var step = arm.solve();
     for (k in 1...5) {
       var angle = Math.PI / 2 * k / 4;
-      step = swung.drag(["tip" = > [20 * Math.cos(angle), 20 * Math.sin(angle)], "loose" = > [3.0, 4.0]], step);
+      step = swung.drag(["tip" => [20 * Math.cos(angle), 20 * Math.sin(angle)], "loose" => [3.0, 4.0]], step);
     }
     near(step.x("tip"), 0, "the tip swings round to the cursor's direction (x)");
     near(step.y("tip"), 10, "on its circle (y)");

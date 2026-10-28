@@ -83,11 +83,11 @@ class PickPlaceFastenPreview {
     var freed = ["work/flange/housing"];
     if (!housingOnly) freed.push("work/plate");
     var poses:Map<String, materia.assembly.AssemblyRecord.AssemblyFrame> = [
-      "work/flange/housing" = > state.worldConnector(
+      "work/flange/housing" => state.worldConnector(
         "housingTray/seat-r0-c0-x-1-y-1",
         "seat"
       ),
-      "work/plate" = > state.worldConnector(
+      "work/plate" => state.worldConnector(
         "plateTray/seat-r0-c0-x-1-y-1",
         "seat"
       )

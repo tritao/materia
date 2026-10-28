@@ -98,8 +98,8 @@ class SceneSourceMaps {
   public static function validate(map:SceneSourceMap, data:SceneArtifactData):Void {
     if (data.assemblyDefinition == null) throw "Source links require assembly occurrences";
     var flat = AssemblyDefinitionFlattener.flattenView(data.assemblyDefinition);
-    var occurrences = [for (item in flat.occurrences) item.id = > item.definition];
-    var parts = [for (part in data.parts) part.id = > part];
+    var occurrences = [for (item in flat.occurrences) item.id => item.definition];
+    var parts = [for (part in data.parts) part.id => part];
     var sources = new Map<String, Bool>();
     for (feature in map.features) {
       text(feature.id);
@@ -109,7 +109,7 @@ class SceneSourceMaps {
       var part = parts.get(occurrences.get(feature.occurrence));
       if (part == null) throw "Unknown scene source occurrence: " + feature.occurrence;
       if (feature.whole && feature.faces.length > 0) throw "Whole source surface cannot also name faces";
-      var faces = [for (range in part.faceRanges) range.faceIndex = > true], seen = new Map<Int, Bool>();
+      var faces = [for (range in part.faceRanges) range.faceIndex => true], seen = new Map<Int, Bool>();
       for (face in feature.faces) {
         if (!faces.exists(face) || seen.exists(face)) throw "Invalid source face: " + feature.id;
         seen.set(face, true);

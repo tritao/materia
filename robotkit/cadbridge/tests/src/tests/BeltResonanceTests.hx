@@ -29,7 +29,7 @@ class BeltResonanceTests {
       AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState
     ).model;
-    var pose:Map<String, Float> = ["x" = > -0.04, "y" = > 0.03];
+    var pose:Map<String, Float> = ["x" => -0.04, "y" => 0.03];
     function position(id:String):Float {
       var value = pose.get(id);
       if (value == null) throw "Missing calibration pose";

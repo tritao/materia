@@ -29,7 +29,7 @@ class FoundationAssemblyContext {
     if (body == null || !Std.isOfType(body,
       machinekit.structural.MineralCasting)) throw "Interface context body binding needs a source casting: "
       + bodyMember;
-    var local:Map<String, Bool> = [bodyMember = > true];
+    var local:Map<String, Bool> = [bodyMember => true];
     for (binding in inserts) {
       var part = parts.get(binding.member);
       if (part == null || !Std.isOfType(part,

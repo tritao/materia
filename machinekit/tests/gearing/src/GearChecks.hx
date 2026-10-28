@@ -177,7 +177,7 @@ class GearChecks {
     }
     check(missing, "missing process acceleration cannot silently omit geared torque");
     var binding = new MachineBinding("work", "X", "Y", "Z", 0.1, new ToolpathChannels(""));
-    var delays:Map<String, Int> = ["spindle/B" = > 1000000, "table/C" = > 1000000];
+    var delays:Map<String, Int> = ["spindle/B" => 1000000, "table/C" => 1000000];
     var declarations = GearBinding.install(binding, m, 4000, delays, ["table/C"]);
     check(
       declarations.length == 1 && declarations[0].id == GearEvents.channel(1),

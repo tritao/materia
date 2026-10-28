@@ -144,8 +144,8 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
     spindleAtSpeedChannel = binding.channels.spindleAtSpeed;
     binding.spindleJointId = config.axes[4];
     binding.auxiliaryJoints = [config.axes[3], config.axes[5]];
-    var delays:Map<String, Int> = [config.axes[4] = > 0,
-      config.axes[5] = > 0]; // physics samples carry their real timestamp; no extra transport delay
+    var delays:Map<String, Int> = [config.axes[4] => 0,
+      config.axes[5] => 0]; // physics samples carry their real timestamp; no extra transport delay
     GearBinding.install(binding, robot.model, config.controllerHz, delays, [config.axes[5]]);
     var axes = [for (i in 0...3) {
       var j = robot.model.joints[indices[i]], l = robot.model.coupledLimits(j.id, new robotkit.model.SteadyLoads());
@@ -502,7 +502,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
       [for (v in frontDirection) v * front]
     );
     var stockId = "project:" + config.stock, geometry = stock.geometry(blank);
-    if (geometry != null) project.scene.setRuntimeGeometryParts(stockId, 1, [0 = > geometry]);
+    if (geometry != null) project.scene.setRuntimeGeometryParts(stockId, 1, [0 => geometry]);
     project.scene.setRuntimeGeometryPartTransform(
       stockId,
       0,
@@ -552,7 +552,7 @@ class HobbingProgramPlayer implements SessionMember implements SimulationStepObs
               z
             ]
           );
-          project.scene.setRuntimeGeometryParts("project:" + h.sleeve, 1, [0 = > sleeve]);
+          project.scene.setRuntimeGeometryParts("project:" + h.sleeve, 1, [0 => sleeve]);
           sleeveInstalled = true;
           sleeveMeshUploads++;
         }

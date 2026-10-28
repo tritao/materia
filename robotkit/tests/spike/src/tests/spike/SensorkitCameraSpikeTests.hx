@@ -30,7 +30,7 @@ class SensorkitCameraSpikeTests {
     var mount = model.addFrame(new Frame("camera", link, "frame/front-camera"));
     var sensor = model.addSensor(new Sensor("Front camera", "camera", 0, "front_camera"));
     sensor.frame = mount;
-    var ids:Map<String, String> = ["50" = > "front_camera"];
+    var ids:Map<String, String> = ["50" => "front_camera"];
     var frame = SensorkitCameraAdapter.decode(wire, model, ids);
     check(
       frame.sensorId == "front_camera"

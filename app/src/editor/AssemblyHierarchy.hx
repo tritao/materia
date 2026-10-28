@@ -20,7 +20,7 @@ class AssemblyHierarchy {
 
   public function new(source:AssemblyDefinition, objectIds:Array<String>) {
     definition = AssemblyDefinitionFlattener.flattenView(source);
-    var available = [for (id in objectIds) id = > true];
+    var available = [for (id in objectIds) id => true];
     for (occurrence in definition.occurrences) {
       var object = "project:" + occurrence.id;
       if (!available.exists(object)) continue;

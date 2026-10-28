@@ -36,7 +36,7 @@ class AssemblyPreview {
     if (contacts.length > 0) machineMotion.contacts = contacts;
     var definitionByOccurrence = new Map<String, String>();
     var definition = model.definition(assemblyId);
-    var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id = > item];
+    var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id => item];
     var definitionByDesignation = new Map<String, Array<String>>();
     for (entry in assembly.components()) {
       if (Sys.getEnv("MACHINEKIT_PREVIEW_TRACE") == "1") {

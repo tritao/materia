@@ -311,7 +311,7 @@ class MoonrakerClient {
           );
           var authority = (host.indexOf(":") >= 0 ? "[" + host + "]" : host) + ":" + port;
           options.set_url((secure ? "https://" : "http://") + authority + next.request.target);
-          options.set_headers([for (name = > value in next.request.headers) {
+          options.set_headers([for (name => value in next.request.headers) {
             var header = new HttpHeader();
             header.set_name_bytes(Bytes.ofString(name));
             header.set_value_bytes(Bytes.ofString(value));

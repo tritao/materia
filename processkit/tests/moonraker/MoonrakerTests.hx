@@ -483,7 +483,7 @@ class MoonrakerTests {
     check(agreed.mismatches.length == 0, 'Klipper runs what was generated: ${agreed.mismatches}');
     check(
       ConfigReadback.compare(
-        ["extruder" = > ["gear_ratio" = > "54:18"]],
+        ["extruder" => ["gear_ratio" => "54:18"]],
         {extruder: {gear_ratio: [[54.0, 17.0]]}},
         []
       ).length == 1,

@@ -109,7 +109,7 @@ class SketchSolver {
     // Drag targets by variable; a dragged point no constraint touches simply goes there.
     var targetVariables:Array<{variable:Int, value:Float}> = [];
     var dragged = targets;
-    if (dragged != null) for (id = > target in dragged) {
+    if (dragged != null) for (id => target in dragged) {
       var index = layout.pointIndex.get(id);
       if (index == null || target.length != 2) throw layout.invalid("a drag target names a missing point", [id]);
       for (axis in 0...2) {

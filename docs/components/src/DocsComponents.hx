@@ -73,7 +73,7 @@ class DocsComponents {
         });
       }
     }
-    for (file = > bytes in threadTextures) models.set(file, bytes);
+    for (file => bytes in threadTextures) models.set(file, bytes);
     for (phi in PHIS) models.set('environment/${environmentName(phi)}', StudioEnvironment.hdr(look(), THETA, phi));
     // The viewers' display mapping, from the same look (docs/site/src/model-view.json has the rest).
     var exposure = look().exposure;
@@ -92,13 +92,13 @@ class DocsComponents {
       }
       for (directory in [ENVIRONMENTS,
         THREADS]) if (!FileSystem.exists(directory)) FileSystem.createDirectory(directory);
-      for (name = > bytes in models) File.saveBytes('$MODELS/$name', bytes);
+      for (name => bytes in models) File.saveBytes('$MODELS/$name', bytes);
     } else {
       if (!FileSystem.exists(DATA) || File.getContent(DATA) != text) {
         Sys.println('$DATA is stale');
         stale++;
       }
-      for (name = > bytes in models) if (!FileSystem.exists('$MODELS/$name')
+      for (name => bytes in models) if (!FileSystem.exists('$MODELS/$name')
         || File.getBytes('$MODELS/$name').compare(bytes) != 0) {
         Sys.println('$MODELS/$name is stale');
         stale++;

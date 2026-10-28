@@ -279,7 +279,7 @@ class HobberPartTests {
         !FoundationIntegrity.checkMounts(
           fixture,
           [{name: "rail mount", parent: "foundation/railLeft"}],
-          ["rail mount" = > "rail mount"]
+          ["rail mount" => "rail mount"]
         ).hasErrors(),
         "precision rail mount actually lands on steel"
       );
@@ -287,7 +287,7 @@ class HobberPartTests {
         FoundationIntegrity.checkMounts(
           fixture,
           [{name: "rail mount", parent: "foundation/railLeft"}],
-          ["rail mount" = > "missing joint"]
+          ["rail mount" => "missing joint"]
         ).hasErrors(),
         "declared steel support does not excuse a missing physical connection"
       );

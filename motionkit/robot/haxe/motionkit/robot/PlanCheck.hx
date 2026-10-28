@@ -49,8 +49,8 @@ class PlanCheckOptions {
   public function copy():PlanCheckOptions {
     var result = new PlanCheckOptions();
     result.margin = margin;
-    for (id = > effort in resistingEfforts) result.resistingEfforts.set(id, effort);
-    for (id = > value in processAccelerations) result.processAccelerations.set(id, value);
+    for (id => effort in resistingEfforts) result.resistingEfforts.set(id, effort);
+    for (id => value in processAccelerations) result.processAccelerations.set(id, value);
     result.steady = steady.copy();
     result.cuttingForce = cuttingForce;
     result.cuttingFeedLimit = cuttingFeedLimit;
@@ -105,7 +105,7 @@ class PlanCheck {
     gears = new GearCheckState(model);
     this.jointIds = jointIds.copy();
     this.options = options == null ? new PlanCheckOptions() : options.copy();
-    for (id = > effort in this.options.resistingEfforts) {
+    for (id => effort in this.options.resistingEfforts) {
       if (jointIds.indexOf(id) < 0
         || !Math.isFinite(effort) || effort < 0) throw 'Invalid resisting effort for planned joint $id';
     }
@@ -268,7 +268,7 @@ class PlanCheck {
           masterCache.set(joint, result);
           return result;
         }
-        for (follower = > terms in gears.active) {
+        for (follower => terms in gears.active) {
           var v = 0.0, a = 0.0;
           for (term in terms) {
             var motion = masterMotion(term.master);

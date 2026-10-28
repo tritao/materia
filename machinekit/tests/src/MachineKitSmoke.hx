@@ -3346,14 +3346,14 @@ class MachineKitSmoke {
       return model.definition("sharing");
     }
     var merged = model(Solids.axial(0, 0, 0));
-    AssemblyPreview.shareDefinitions(merged, ["b" = > "a"]);
+    AssemblyPreview.shareDefinitions(merged, ["b" => "a"]);
     check(merged.definitions.length == 1, "shared occurrences keep one definition");
     var names = [for (connector in merged.definitions[0].connectors) connector.name];
     names.sort(Reflect.compare);
     check(names.join(",") == "onlyA,onlyB,shared", 'shared definition carries every connector, got $names');
     check([for (occurrence in merged.occurrences) occurrence.definition].join(",") == "a,a", "both occurrences use it");
     throws(
-      () -> AssemblyPreview.shareDefinitions(model(Solids.axial(0, 0, 5)), ["b" = > "a"]),
+      () -> AssemblyPreview.shareDefinitions(model(Solids.axial(0, 0, 5)), ["b" => "a"]),
       'give connector "shared" different frames'
     );
     var assembly = new MachineAssembly();

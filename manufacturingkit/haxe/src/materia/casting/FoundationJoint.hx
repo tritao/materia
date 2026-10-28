@@ -152,7 +152,7 @@ class FoundationJoints {
       };
       unique(ids, anchor.id, "anchor");
       unique(screws, anchor.screw, "anchor screw");
-      var holes:Map<String, Bool> = [key(anchor.target) = > true];
+      var holes:Map<String, Bool> = [key(anchor.target) => true];
       for (value in bounded(row, "through")) {
         var hole = reference(value);
         unique(holes, key(hole), "anchor hole");

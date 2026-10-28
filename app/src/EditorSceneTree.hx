@@ -309,9 +309,9 @@ import materia.assembly.AssemblyDefinition;
     if (definition == null) return;
     var authored = new AssemblyHierarchy(definition, [for (item in scene.items()) item.id]);
     hierarchy = authored;
-    for (key = > group in authored.groups) groups.set(key, group);
-    for (key = > members in authored.children) children.set(key, members);
-    for (key = > parent in authored.parents) if (parent != "scene") parentOf.set(key, parent);
+    for (key => group in authored.groups) groups.set(key, group);
+    for (key => members in authored.children) children.set(key, members);
+    for (key => parent in authored.parents) if (parent != "scene") parentOf.set(key, parent);
     for (occurrence in authored.definition.occurrences) {
       var id = PROJECT + occurrence.id;
       if (parentOf.exists(id)) {
@@ -322,7 +322,7 @@ import materia.assembly.AssemblyDefinition;
       PROJECT + joint.child,
       Std.string(joint.type)
     );
-    var visibilityGroups:Map<String, Array<String>> = ["scene" = > visibilityMembers("scene")];
+    var visibilityGroups:Map<String, Array<String>> = ["scene" => visibilityMembers("scene")];
     for (key in groups.keys()) visibilityGroups.set(key, visibilityMembers(key));
     var legacy = false;
     for (item in scene.items()) for (key in item.hiddenBy) if (StringTools.startsWith(key,

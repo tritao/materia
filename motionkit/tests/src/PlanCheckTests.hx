@@ -745,7 +745,7 @@ class PlanCheckTests extends MotionKitTestSupport {
     var offsets = new Map<Int, Float>();
     var carrying = new StepperSlip(
       [new CoupledJoint(1, 0, SCREW_RATIO, 0.0)],
-      ["slide" = > 0],
+      ["slide" => 0],
       (joint, offset) -> offsets.set(
         joint,
         offset
@@ -883,7 +883,7 @@ class PlanCheckTests extends MotionKitTestSupport {
         coupling.ratio,
         coupling.offset
       )],
-      [for (joint in 0...ids.length) ids[joint] = > joint],
+      [for (joint in 0...ids.length) ids[joint] => joint],
       (
         joint,
         offset

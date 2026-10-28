@@ -15,7 +15,7 @@ import sys.io.File;
  * Usage: ApiXml OUTPUT.xml ROOT...
  */
 class ApiXml {
-  static final DEFINES = ["target" = > "hl", "hl" = > "1", "sys" = > "1", "haxeon" = > "1"];
+  static final DEFINES = ["target" => "hl", "hl" => "1", "sys" => "1", "haxeon" => "1"];
 
   static function main() {
     var arguments = Sys.args();

@@ -23,7 +23,7 @@ private typedef SourceFaceEntry = {id:String, snapshot:String, node:NodeId, face
     var features = selected == null ? [] : selected();
     active = [];
     var stale:Array<String> = [];
-    for (key = > entry in entries) {
+    for (key => entry in entries) {
       var item = owner.object(entry.id);
       if (item == null || item.meshSnapshot != entry.snapshot) stale.push(key);
     }

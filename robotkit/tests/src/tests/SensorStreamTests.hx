@@ -53,7 +53,7 @@ class SensorStreamTests {
     );
     check(snapshot.sensors.length == 1 && snapshot.sensors.get(0).sensorId == "imu");
     check(snapshot.streamSequences.length == 3);
-    var world = new robotkit.world.WorldSnapshot(1, 1, Int64.ofInt(10), ["robot" = > snapshot]);
+    var world = new robotkit.world.WorldSnapshot(1, 1, Int64.ofInt(10), ["robot" => snapshot]);
     var published:RobotSnapshot = cast world.robot("robot");
     check(published.streamSequences.length == 3);
     var copy = snapshot.streamSequences;

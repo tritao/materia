@@ -35,7 +35,7 @@ class HobbingReportData {
   }
 
   public function warnings():Map<String, Array<String>> {
-    var groups:Map<String, Array<String>> = ["Sampling" = > [], "Coverage" = > [], "Assessment" = > []];
+    var groups:Map<String, Array<String>> = ["Sampling" => [], "Coverage" => [], "Assessment" => []];
     if (measurement == null) return groups;
     for (warning in measurement.warnings.concat(measurement.extrapolation)) {
       var text = warning.toLowerCase();

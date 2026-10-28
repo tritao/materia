@@ -641,7 +641,7 @@ class FlexsplineHobber extends MachineAssembly {
     machinekit.structural.FoundationIntegrity.checkMounts(
       this,
       precisionMounts,
-      [for (mount in precisionMounts) mount.name = > mount.name]
+      [for (mount in precisionMounts) mount.name => mount.name]
     ).throwIfErrors();
     exposeConnector("work", "mandrel", "work");
     exposeConnector("hobCentre", "hob", "centre");

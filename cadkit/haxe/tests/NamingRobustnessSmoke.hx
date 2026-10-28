@@ -54,32 +54,32 @@ class NamingRobustnessSmoke {
 
   /** The outcome of every row: the TN0 baseline, raised as stages land (TN3: references by name). */
   static var EXPECTED:Map<String, String> = [
-    "box fillet top/+x | control" = > CORRECT,
-    "box chamfer top/+y | control" = > CORRECT,
-    "box fillet top/+x | width" = > CORRECT,
-    "box chamfer top/+y | width" = > CORRECT,
-    "box fillet top/+x | depth" = > CORRECT,
-    "box chamfer top/+y | depth" = > CORRECT,
-    "box fillet top/+x | height" = > CORRECT,
-    "box chamfer top/+y | height" = > CORRECT,
-    "plate sketch on top face | control" = > CORRECT,
-    "plate sketch on top face | thickness" = > CORRECT,
-    "plate sketch on top face | width" = > CORRECT,
-    "plate sketch on top face | hole inside" = > CORRECT,
-    "plate sketch on top face | slot across" = > REPORTED,
-    "revolve fillet outer top rim | control" = > CORRECT,
-    "revolve fillet outer top rim | width" = > CORRECT,
-    "revolve fillet outer top rim | height" = > CORRECT,
-    "pattern fillet boss 1 rim | control" = > CORRECT,
-    "pattern fillet boss 1 rim | spacing" = > CORRECT,
-    "pattern fillet boss 1 rim | count" = > CORRECT,
-    "part connector on bore B | control" = > CORRECT,
-    "part connector on bore B | widen" = > CORRECT,
-    "part connector on bore B | move bore" = > CORRECT,
-    "sketch-made side face | control" = > CORRECT,
-    "sketch-made side face | move line" = > CORRECT,
-    "sketch-made side face | redraw line" = > CORRECT,
-    "sketch-made side face | split line" = > REPORTED,
+    "box fillet top/+x | control" => CORRECT,
+    "box chamfer top/+y | control" => CORRECT,
+    "box fillet top/+x | width" => CORRECT,
+    "box chamfer top/+y | width" => CORRECT,
+    "box fillet top/+x | depth" => CORRECT,
+    "box chamfer top/+y | depth" => CORRECT,
+    "box fillet top/+x | height" => CORRECT,
+    "box chamfer top/+y | height" => CORRECT,
+    "plate sketch on top face | control" => CORRECT,
+    "plate sketch on top face | thickness" => CORRECT,
+    "plate sketch on top face | width" => CORRECT,
+    "plate sketch on top face | hole inside" => CORRECT,
+    "plate sketch on top face | slot across" => REPORTED,
+    "revolve fillet outer top rim | control" => CORRECT,
+    "revolve fillet outer top rim | width" => CORRECT,
+    "revolve fillet outer top rim | height" => CORRECT,
+    "pattern fillet boss 1 rim | control" => CORRECT,
+    "pattern fillet boss 1 rim | spacing" => CORRECT,
+    "pattern fillet boss 1 rim | count" => CORRECT,
+    "part connector on bore B | control" => CORRECT,
+    "part connector on bore B | widen" => CORRECT,
+    "part connector on bore B | move bore" => CORRECT,
+    "sketch-made side face | control" => CORRECT,
+    "sketch-made side face | move line" => CORRECT,
+    "sketch-made side face | redraw line" => CORRECT,
+    "sketch-made side face | split line" => REPORTED,
   ];
 
   static var outcomes:Array<NamingOutcome> = [];
@@ -416,7 +416,7 @@ class NamingRobustnessSmoke {
   });
 
   static function report():Void {
-    var counts:Map<String, Int> = [CORRECT = > 0, REPORTED = > 0, WRONG = > 0];
+    var counts:Map<String, Int> = [CORRECT => 0, REPORTED => 0, WRONG => 0];
     var failures:Array<String> = [];
     var total = 0.0;
     for (outcome in outcomes) {

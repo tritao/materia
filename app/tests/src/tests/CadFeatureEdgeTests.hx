@@ -89,7 +89,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
       "Display changes leave document and physics revisions unchanged"
     );
     scene.dispose();
-    var generated:Map<String, nativekit.scene.GeometryData> = ["profile" = > data];
+    var generated:Map<String, nativekit.scene.GeometryData> = ["profile" => data];
     var members:Array<app.SceneObjectData> = [for (i in 0...2) {
       id:'post$i', label:'Post $i',
         type:"cad-preview", x:i * 0.1, y:0.0, z:0.0, width:0.04, height:0.8, depth:0.04, collisionEnabled:false,
