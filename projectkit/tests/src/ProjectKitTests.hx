@@ -1,6 +1,5 @@
 import haxe.io.Bytes;
 import haxeon.wire.JsonWire;
-import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyJointStop;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
