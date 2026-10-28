@@ -10,6 +10,7 @@ package machinekit.operator;
  *   the wheel released, so a held button cannot resume motion by itself.
  * - Wheel counts count only while the enable is held in this frame and the previous one, and only
  *   in Jog mode, so enabling cannot produce a jump from counts accumulated earlier.
+ * - A running program (the ProgramRunning condition) always refuses jogging.
  * - A lost frame loses its wheel counts, which under-travels and never over-travels.
  */
 class PendantAuthority {
@@ -63,6 +64,8 @@ class PendantAuthority {
     var pressed = before == null ? 0 : state.buttons & ~before.buttons;
     var authority = state.position != 0;
     if (!state.chainClosed) return new PendantOutput(null, "E-stop open", authority, false, pressed);
+    // A running program blocks the pendant whatever the profile says.
+    if (authority && active.contains(ProgramRunning)) return new PendantOutput(null, "Program running", authority, false, pressed);
     var refusal = "";
     var move:Null<JogMove> = null;
     if (state.position != 0) {

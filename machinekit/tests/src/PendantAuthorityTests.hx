@@ -77,6 +77,22 @@ class PendantAuthorityTests {
     a.accept(frame(0), nx(0.01), Jog, none);
     if (a.holdsAuthority(nx(0.01))) throw "OFF position gives the HMI authority";
 
+    // A running program blocks the pendant whatever the profile says.
+    a = authority(); t = 0.0; seq = 0;
+    a.accept(frame(3), t, Jog, none);
+    out = got(a.accept(frame(3, 4), nx(), Jog, [ProgramRunning]));
+    if (out.move != null || out.refusal != "Program running" || out.spindleJog) throw "Busy";
+    if (got(a.accept(frame(3, 4), nx(), Jog, none)).move == null) throw "Busy clears";
+
+    // Host link fails safe when stale, withdrawn, duplicated or never received.
+    var host = new HostLink(0.25);
+    if (host.jogAllowed(0.0)) throw "No state yet";
+    if (!host.accept(1, true, 0.0) || !host.jogAllowed(0.2) || host.jogAllowed(0.3)) throw "Stale host state";
+    if (host.accept(1, true, 0.31)) throw "Duplicate host state";
+    if (!host.accept(2, true, 0.31) || !host.jogAllowed(0.32)) throw "Fresh host state";
+    if (!host.accept(3, false, 0.33) || host.jogAllowed(0.34)) throw "Withdrawn permission";
+    for (jump in [30000, 60000, 65535, 0]) if (!host.accept(jump, true, 0.4)) throw 'Host sequence $jump';
+
     // Construction checks.
     var failed = false;
     try new PendantState(0, 0, 12, 0, 0, false, true) catch (_:Dynamic) failed = true;
