@@ -1,9 +1,9 @@
 //! Frame of the host to cabinet controller operator channel, beside (not inside) the RKD6 motion
 //! protocol so that protocol's wire revision stays untouched. Marker "OPR1", message type,
 //! reserved zero, little-endian payload length, payload, then CRC-32/IEEE over everything before
-//! it (the same CRC as the RKD6 frames). Mirrors `OperatorFrame` in machinekit.operator.
+//! it (the RKD6 core's `crc32`). Mirrors `OperatorFrame` in machinekit.operator.
 
-use crate::pendant_wire::{OperatorMessage, OperatorState, PendantConfig, PendantEvent, PendantProfile, PendantReasonText};
+use crate::operator_wire::{OperatorMessage, OperatorState, PendantConfig, PendantEvent, PendantProfile, PendantReasonText};
 
 pub const MARKER: [u8; 4] = *b"OPR1";
 pub const HEADER_SIZE: usize = 8;
@@ -13,14 +13,8 @@ pub const MAX_FRAME_SIZE: usize = HEADER_SIZE + PendantProfile::SIZE + CRC_SIZE;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FrameError { ShortBuffer, BadMarker, BadType, BadLength, BadCrc }
 
-pub fn crc32(bytes: &[u8]) -> u32 {
-    let mut crc = 0xFFFF_FFFFu32;
-    for &byte in bytes {
-        crc ^= byte as u32;
-        for _ in 0..8 { crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 }; }
-    }
-    !crc
-}
+/// The same CRC-32/IEEE as the RKD6 frames.
+pub use robotkit_device_protocol::frame6::crc32;
 
 /// The payload size each message type must carry.
 pub fn payload_size(kind: u8) -> Option<usize> {
@@ -130,7 +124,7 @@ mod tests {
         // The profile frame carries exactly the record in profiles.txt.
         let hobber = PROFILES.lines().find(|l| l.starts_with("hobber ")).unwrap().split(' ').nth(2).unwrap();
         assert_eq!(body, &unhex(hobber)[..]);
-        let compiled = crate::authority::CompiledProfile::from_record(body).unwrap();
+        let compiled = crate::profile::CompiledProfile::from_record(body).unwrap();
         assert_eq!(compiled.host_timeout_us(), 250_000);
 
         let reason_frame = frame("reason-hobber-0 ");

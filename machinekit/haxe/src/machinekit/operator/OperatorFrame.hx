@@ -1,6 +1,7 @@
 package machinekit.operator;
 
 import haxe.io.Bytes;
+import machinekit.operator.wire.OperatorMessage;
 import machinekit.operator.wire.OperatorState;
 import machinekit.operator.wire.PendantConfig;
 import machinekit.operator.wire.PendantEvent;
@@ -10,15 +11,15 @@ import machinekit.operator.wire.PendantReasonText;
 /**
  * Frame of the host to cabinet controller operator channel, beside (not inside) the RKD6 motion
  * protocol: marker "OPR1", message type, reserved zero, little-endian payload length, payload, then
- * CRC-32/IEEE over everything before it. The rules mirror pendant_wire/src/operator_frame.rs.
+ * CRC-32/IEEE over everything before it. The rules mirror operator_link/src/operator_frame.rs.
  */
 class OperatorFrame {
-  public static inline final PROFILE:Int = 1;
-  public static inline final REASON_TEXT:Int = 2;
-  public static inline final CONFIG:Int = 3;
-  public static inline final STATE:Int = 4;
+  public static inline final PROFILE:Int = OperatorMessage.profile;
+  public static inline final REASON_TEXT:Int = OperatorMessage.reasonText;
+  public static inline final CONFIG:Int = OperatorMessage.config;
+  public static inline final STATE:Int = OperatorMessage.state;
   /** Controller to host; the others travel host to controller. */
-  public static inline final EVENT:Int = 5;
+  public static inline final EVENT:Int = OperatorMessage.event;
   public static inline final HEADER_SIZE:Int = 8;
 
   public final type:Int;
@@ -29,14 +30,14 @@ class OperatorFrame {
     this.payload = payload;
   }
 
-  public static function payloadSize(type:Int):Int return switch type {
-    case 1: PendantProfile.SIZE;
-    case 2: PendantReasonText.SIZE;
-    case 3: PendantConfig.SIZE;
-    case 4: OperatorState.SIZE;
-    case 5: PendantEvent.SIZE;
-    case _: throw "Unknown operator message type";
-  };
+  public static function payloadSize(type:Int):Int {
+    if (type == PROFILE) return PendantProfile.SIZE;
+    if (type == REASON_TEXT) return PendantReasonText.SIZE;
+    if (type == CONFIG) return PendantConfig.SIZE;
+    if (type == STATE) return OperatorState.SIZE;
+    if (type == EVENT) return PendantEvent.SIZE;
+    throw "Unknown operator message type";
+  }
 
   public function encode():Bytes {
     var out = Bytes.alloc(HEADER_SIZE + payload.length + 4);

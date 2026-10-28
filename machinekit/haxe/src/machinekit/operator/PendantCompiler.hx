@@ -1,6 +1,7 @@
 package machinekit.operator;
 
 import haxe.io.Bytes;
+import machinekit.operator.wire.ConfigKind;
 import machinekit.operator.wire.PendantConfig;
 import machinekit.operator.wire.PendantProfile;
 import machinekit.operator.wire.PendantReasonText;
@@ -15,8 +16,6 @@ import machinekit.operator.wire.PendantReasonText;
 class PendantCompiler {
   public static inline final UNUSED:Int = 255;
   public static inline final MAX_RULES:Int = 8;
-  static inline final KIND_AXIS:Int = 0;
-  static inline final KIND_KEY:Int = 1;
 
   public static function compile(p:OperatorProfile, stepUnits:Array<Int>, timeoutMs:Int, hostTimeoutMs:Int):CompiledPendant {
     if (p == null) throw "A profile is required";
@@ -67,14 +66,14 @@ class PendantCompiler {
     var labels:Array<Bytes> = [];
     for (position in 1...OperatorProfile.PENDANT_POSITIONS + 1) {
       var entry = new PendantConfig();
-      entry.kind = KIND_AXIS;
+      entry.kind = ConfigKind.axis;
       entry.index = position;
       fill(entry.text, p.pendantLabel(position));
       labels.push(entry.encode());
     }
     for (i in 0...OperatorProfile.KEYS) {
       var entry = new PendantConfig();
-      entry.kind = KIND_KEY;
+      entry.kind = ConfigKind.key;
       entry.index = i;
       fill(entry.text, p.keys[i].label);
       labels.push(entry.encode());
@@ -82,7 +81,7 @@ class PendantCompiler {
     return new CompiledPendant(record.encode(), texts, labels);
   }
 
-  /** The bit in the controller's active-condition mask; matches OperatorCondition in pendant.wire.idl. */
+  /** The bit in the controller's active-condition mask; matches OperatorCondition in operator.wire.idl. */
   static function conditionId(c:OperatorCondition):Int return switch c {
     case GearboxEngaged: 0; case DoorOpen: 1; case SpindleRunning: 2; case ProgramRunning: 3;
   };

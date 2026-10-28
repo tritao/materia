@@ -21,6 +21,13 @@ class PackedHaxeTests(unittest.TestCase):
         self.assertIn("if (a < 1 || a > 9) throw", source)
         self.assertIn("out.set(offset + 0, (a >> 8) & 0xFF);", source)  # big endian: high byte first
 
+    def test_enums_become_named_int_constants(self) -> None:
+        schema = Parser("enum Mode : u8 { idle_now = 0 run = 2 } packed P endian little { m : Mode }").parse()
+        files = packed_haxe.files(schema, normalized(schema), root=Path("out"), package="x", label="p")
+        source = files[Path("out/Mode.hx")]
+        self.assertIn("public static inline final idleNow:Int = 0;", source)
+        self.assertIn("public static inline final run:Int = 2;", source)
+
     def test_rejects_types_haxe_int_cannot_hold(self) -> None:
         for type_name in ("u32", "u64", "i64", "f32"):
             schema = Parser(f"packed P endian little {{ a : {type_name} }}").parse()

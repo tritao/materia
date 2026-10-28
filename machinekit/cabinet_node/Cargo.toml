@@ -7,7 +7,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
-pendant-wire = { path = "../pendant_wire" }
+operator-link = { path = "../operator_link" }
 robotkit-device-protocol = { path = "../../robotkit/device_protocol" }
 
 [dev-dependencies]

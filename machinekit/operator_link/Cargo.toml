@@ -1,0 +1,10 @@
+[package]
+name = "operator-link"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+robotkit-device-protocol = { path = "../../robotkit/device_protocol" }

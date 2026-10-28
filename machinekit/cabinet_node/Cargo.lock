@@ -6,14 +6,17 @@ version = 4
 name = "cabinet-node"
 version = "0.1.0"
 dependencies = [
- "pendant-wire",
+ "operator-link",
  "robotkit-device-protocol",
  "robotkit-device-virtual",
 ]
 
 [[package]]
-name = "pendant-wire"
+name = "operator-link"
 version = "0.1.0"
+dependencies = [
+ "robotkit-device-protocol",
+]
 
 [[package]]
 name = "robotkit-device-protocol"

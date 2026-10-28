@@ -7,6 +7,7 @@ from typing import Any
 
 from ..model import Schema
 from ..validate import ValidationError
+from .common import lower_camel
 
 SUPPORTED = {"u8": (1, False), "u16": (2, False), "i8": (1, True), "i16": (2, True), "i32": (4, True)}
 
@@ -38,6 +39,12 @@ def _check(field: dict[str, Any], struct: str, enums: dict[str, list[int]], inde
 def files(schema: Schema, norm: dict[str, Any], *, root: Path, package: str, label: str) -> dict[Path, str]:
     enums = {enum.name: [item.value for item in enum.values] for enum in schema.enums}
     output: dict[Path, str] = {}
+    # Enum values as named Int constants, so code that must agree with the schema cannot drift from it.
+    for enum in schema.enums:
+        lines = [f"package {package};", "", f"/** Generated from {label}. Do not edit by hand. */", f"class {enum.name} {{"]
+        lines += [f"  public static inline final {lower_camel(item.name)}:Int = {item.value};" for item in enum.values]
+        lines += ["}", ""]
+        output[root / f"{enum.name}.hx"] = "\n".join(lines)
     for packed in schema.packed_structs:
         item = norm["packed_structs"][packed.name]
         arrays = {f.name for f in packed.fields if f.type_ref.length is not None}

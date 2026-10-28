@@ -14,6 +14,7 @@ if [[ ! -e "$cadkit_library/libcadkit-core.so" && ! -e "$cadkit_library/libcadki
 	exit 1
 fi
 
+"$repo_root/scripts/test-operator-link"
 "$repo_root/scripts/build-examples"
 
 native_paths="$cadkit_library:$cadkit_build/lin64/gcc/libd"

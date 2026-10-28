@@ -1,6 +1,4 @@
-//! Pendant jog authority for the cabinet controller: the Rust port of `PendantAuthority`
-//! (machinekit.operator), with the same rules and the same scenarios in the tests. Not a safety
-//! function; the E-stop chain is hard wired and `chain_closed` is only an observation.
+//! Pendant jog authority for the cabinet controller. Not a safety function; the E-stop chain is hard wired and `chain_closed` is only an observation.
 //!
 //! - Frames at or behind the last accepted sequence are dropped (16-bit wrap aware).
 //! - No frame within `timeout_us` ends the lease; it returns only after a frame arrives with the
@@ -10,7 +8,7 @@
 //!
 //! Axes are profile indices and conditions are bits of a mask, so no strings reach the controller.
 
-use crate::pendant_wire::{OperatorCondition, OperatorState, PendantEvent, PendantRefusal, PendantState};
+use crate::operator_wire::{OperatorCondition, PendantEvent, PendantRefusal, PendantState};
 use crate::{FLAG_CHAIN_CLOSED, FLAG_WHEEL_ENABLE};
 
 pub const BUTTON_START: u8 = 1;
@@ -70,130 +68,6 @@ pub struct Output {
     pub spindle_jog: bool,
     /// Buttons newly pressed in this frame.
     pub pressed: u8,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ProfileError {
-    Wire(crate::WireError),
-    /// A rule slot at or beyond `rule_count` is not zero.
-    Rule,
-    /// The spindle key is not F1 to F3 or "none", or disagrees with `has_spindle`.
-    SpindleKey,
-}
-
-impl From<crate::WireError> for ProfileError {
-    fn from(e: crate::WireError) -> Self { ProfileError::Wire(e) }
-}
-
-/// A `PendantProfile` record from the host, decoded into the fixed tables `Authority` runs on.
-/// The host builds it with `PendantCompiler` (machinekit.operator); `digest` lets both sides
-/// confirm they hold the same profile before the pendant is accepted.
-#[derive(Clone, Copy, Debug)]
-pub struct CompiledProfile {
-    pendant_axes: [u8; 11],
-    rules: [JogRule; 8],
-    rule_count: usize,
-    has_spindle: bool,
-    spindle_key: Option<u8>,
-    step_units: [i32; 3],
-    timeout_us: u64,
-    host_timeout_us: u64,
-    reasons: [[u8; 21]; 8],
-}
-
-impl CompiledProfile {
-    pub fn from_record(input: &[u8]) -> Result<Self, ProfileError> {
-        let r = crate::pendant_wire::PendantProfile::decode(input)?;
-        let count = r.rule_count as usize;
-        let mut rules = [JogRule { axis: 0, condition: 0, reason: 0 }; 8];
-        for i in 0..8 {
-            if i < count {
-                rules[i] = JogRule { axis: r.rule_axis[i], condition: r.rule_condition[i], reason: r.rule_reason[i] };
-            } else if r.rule_axis[i] != 0 || r.rule_condition[i] != 0 || r.rule_reason[i] != 0 {
-                return Err(ProfileError::Rule);
-            }
-        }
-        let has_spindle = r.has_spindle == 1;
-        let spindle_key = match r.spindle_key {
-            UNUSED => None,
-            k @ 0..=2 if has_spindle => Some(k),
-            _ => return Err(ProfileError::SpindleKey),
-        };
-        Ok(CompiledProfile {
-            pendant_axes: r.axes, rules, rule_count: count, has_spindle, spindle_key, step_units: r.step_units,
-            timeout_us: r.timeout_ms as u64 * 1000, host_timeout_us: r.host_timeout_ms as u64 * 1000,
-            reasons: [[0; 21]; 8],
-        })
-    }
-
-    /// Store one `PendantReasonText` record; the status line for `Refusal::Rule(id)`.
-    pub fn set_reason(&mut self, input: &[u8]) -> Result<(), ProfileError> {
-        let t = crate::pendant_wire::PendantReasonText::decode(input)?;
-        self.reasons[t.index as usize] = t.text;
-        Ok(())
-    }
-
-    /// The status text for a rule reason id, up to its NUL; empty when none was stored.
-    pub fn reason_text(&self, id: u8) -> &[u8] {
-        match self.reasons.get(id as usize) {
-            Some(text) => crate::label(text),
-            None => &[],
-        }
-    }
-
-    /// How long an OperatorState stays fresh; give it to `HostLink::new`.
-    pub fn host_timeout_us(&self) -> u64 { self.host_timeout_us }
-
-    pub fn config(&self) -> Config<'_> {
-        Config {
-            pendant_axes: self.pendant_axes, rules: &self.rules[..self.rule_count], has_spindle: self.has_spindle,
-            spindle_key: self.spindle_key, step_units: self.step_units, timeout_us: self.timeout_us,
-        }
-    }
-}
-
-/// What the host has said it allows. The host sends only intent (`jog_allowed`); machine facts come
-/// from the controller. No fresh state means "not allowed", the same fail-safe as the pendant lease.
-pub struct HostLink {
-    timeout_us: u64,
-    last_sequence: Option<u16>,
-    last_seen: u64,
-    jog_allowed: bool,
-}
-
-impl HostLink {
-    pub fn new(timeout_us: u64) -> Self {
-        HostLink { timeout_us, last_sequence: None, last_seen: 0, jog_allowed: false }
-    }
-
-    /// False when the state was stale or a duplicate and changed nothing.
-    pub fn accept(&mut self, s: &OperatorState, now_us: u64) -> bool {
-        if let Some(last) = self.last_sequence {
-            let ahead = s.sequence.wrapping_sub(last);
-            if ahead == 0 || ahead >= 0x8000 { return false; }
-        }
-        self.last_sequence = Some(s.sequence);
-        self.last_seen = now_us;
-        self.jog_allowed = s.jog_allowed == 1;
-        true
-    }
-
-    /// The `jog_mode` argument of `Authority::accept`.
-    pub fn jog_allowed(&self, now_us: u64) -> bool {
-        self.jog_allowed && self.last_sequence.is_some() && now_us.saturating_sub(self.last_seen) <= self.timeout_us
-    }
-}
-
-/// 32-bit FNV-1a over the records in order: the profile, its reason texts, then its labels.
-pub fn digest(records: &[&[u8]]) -> u32 {
-    let mut h: u32 = 0x811C_9DC5;
-    for record in records {
-        for &b in *record {
-            h ^= b as u32;
-            h = h.wrapping_mul(0x0100_0193);
-        }
-    }
-    h
 }
 
 impl Output {
@@ -301,29 +175,7 @@ impl<'a> Authority<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Drill-tap layout: x y z a spindle at positions 1 to 5; F2 is the spindle jog.
-    const DRILL: Config<'static> = Config {
-        pendant_axes: [0, 1, 2, 3, 4, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED],
-        rules: &[], has_spindle: true, spindle_key: Some(1), step_units: [1, 10, 100], timeout_us: 50_000,
-    };
-    // Hobber: x y z a b c at positions 1 to 6; B and C refused while the gearbox (bit 0) is engaged.
-    const RULES: [JogRule; 2] = [JogRule { axis: 4, condition: 0, reason: 7 }, JogRule { axis: 5, condition: 0, reason: 7 }];
-    const HOBBER: Config<'static> = Config {
-        pendant_axes: [0, 1, 2, 3, 4, 5, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED],
-        rules: &RULES, has_spindle: true, spindle_key: Some(1), step_units: [1, 10, 100], timeout_us: 50_000,
-    };
-
-    struct Bench { seq: u16, t: u64 }
-    impl Bench {
-        fn new() -> Self { Bench { seq: 0, t: 0 } }
-        fn frame(&mut self, position: u8, delta: i16, enable: bool, buttons: u8, step: u8, closed: bool) -> PendantState {
-            self.seq = self.seq.wrapping_add(1);
-            let flags = if enable { FLAG_WHEEL_ENABLE } else { 0 } | if closed { FLAG_CHAIN_CLOSED } else { 0 };
-            PendantState { sequence: self.seq, wheel_delta: delta, position, step, buttons, flags }
-        }
-        fn nx(&mut self, ms: u64) -> u64 { self.t += ms * 1000; self.t }
-    }
+    use crate::testing::{Bench, DRILL, HOBBER};
 
     #[test]
     fn first_enabled_frame_never_jogs() {
@@ -421,93 +273,6 @@ mod tests {
         assert!(!a.holds_authority(t + 90_000));
     }
 
-    // Compiled by the Haxe PendantCompiler; the Haxe tests check the same file byte for byte.
-    const VECTORS: &str = include_str!("../vectors/profiles.txt");
-
-    fn unhex(s: &str) -> std::vec::Vec<u8> {
-        (0..s.len() / 2).map(|i| u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).unwrap()).collect()
-    }
-    fn list(s: &str) -> std::vec::Vec<std::vec::Vec<u8>> {
-        if s == "-" { std::vec::Vec::new() } else { s.split(';').map(unhex).collect() }
-    }
-    struct Vector { digest: u32, profile: std::vec::Vec<u8>, reasons: std::vec::Vec<std::vec::Vec<u8>>, labels: std::vec::Vec<std::vec::Vec<u8>> }
-    fn vector(name: &str) -> Vector {
-        let line = VECTORS.lines().find(|l| l.starts_with(name)).unwrap();
-        let f: std::vec::Vec<&str> = line.split(' ').collect();
-        Vector { digest: u32::from_str_radix(f[1], 16).unwrap(), profile: unhex(f[2]), reasons: list(f[3]), labels: list(f[4]) }
-    }
-    fn same(a: &Config, b: &Config) {
-        assert_eq!(a.pendant_axes, b.pendant_axes);
-        assert_eq!(a.rules, b.rules);
-        assert_eq!((a.has_spindle, a.spindle_key, a.step_units, a.timeout_us), (b.has_spindle, b.spindle_key, b.step_units, b.timeout_us));
-    }
-
-    #[test]
-    fn compiled_profiles_match_the_hand_written_configs() {
-        // The scenarios above run on DRILL and HOBBER, which mirror the Haxe tests; the host-compiled
-        // vectors must decode to exactly those configs.
-        let drill = CompiledProfile::from_record(&vector("drill-tap").profile).unwrap();
-        same(&drill.config(), &DRILL);
-        let hobber = CompiledProfile::from_record(&vector("hobber").profile).unwrap();
-        // The hobber profile indexes its axes c b x y z a, so positions differ from HOBBER's x y z a b c.
-        let c = hobber.config();
-        assert_eq!(c.pendant_axes[..6], [2, 3, 4, 5, 1, 0]);
-        assert_eq!(c.rules, [JogRule { axis: 1, condition: 0, reason: 0 }, JogRule { axis: 0, condition: 0, reason: 0 }]);
-        assert_eq!((c.has_spindle, c.spindle_key, c.step_units, c.timeout_us), (true, Some(1), [1, 10, 100], 50_000));
-        let arm_profile = CompiledProfile::from_record(&vector("arm").profile).unwrap();
-        let arm = arm_profile.config();
-        assert_eq!((arm.has_spindle, arm.spindle_key, arm.rules.len()), (false, None, 0));
-    }
-
-    #[test]
-    fn compiled_hobber_behaves_like_the_scenarios() {
-        let v = vector("hobber");
-        let mut p = CompiledProfile::from_record(&v.profile).unwrap();
-        for r in &v.reasons { p.set_reason(r).unwrap(); }
-        assert_eq!(p.reason_text(0), b"Gearbox engaged");
-        let mut a = Authority::new(p.config());
-        let mut b = Bench::new();
-        let f = b.frame(5, 0, true, 0, 1, true); // position 5 is B
-        a.accept(&f, 0, true, 1);
-        let f = b.frame(5, 3, true, 0, 1, true);
-        let out = a.accept(&f, b.nx(10), true, 1).unwrap();
-        assert_eq!((out.movement, out.refusal), (None, Refusal::Rule(0)));
-        let f = b.frame(3, 3, true, 0, 1, true); // position 3 is Z, index 4
-        assert_eq!(a.accept(&f, b.nx(10), true, 1).unwrap().movement, Some(Move { axis: 4, distance: 30 }));
-        let f = b.frame(5, 3, true, 0, 1, true);
-        assert_eq!(a.accept(&f, b.nx(10), true, 0).unwrap().movement, Some(Move { axis: 1, distance: 30 }));
-    }
-
-    #[test]
-    fn digest_matches_the_host() {
-        for name in ["drill-tap", "hobber", "arm"] {
-            let v = vector(name);
-            let mut records: std::vec::Vec<&[u8]> = std::vec![&v.profile[..]];
-            records.extend(v.reasons.iter().map(|r| &r[..]));
-            records.extend(v.labels.iter().map(|r| &r[..]));
-            assert_eq!(digest(&records), v.digest, "{name}");
-        }
-        assert_eq!(digest(&[b"a"]), 0xE40C_292C); // FNV-1a reference value
-    }
-
-    #[test]
-    fn rejects_inconsistent_records() {
-        let good = vector("hobber").profile;
-        let mut bad = good.clone();
-        bad[11] = 9; // rule_count above 8
-        assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::Wire(crate::WireError::Constraint("PendantProfile.rule_count")));
-        let mut bad = good.clone();
-        bad[12 + 5] = 1; // a rule slot beyond rule_count
-        assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::Rule);
-        let mut bad = good.clone();
-        bad[37] = 3; // spindle key F4
-        assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::SpindleKey);
-        let mut bad = good.clone();
-        bad[36] = 0; // spindle key without a spindle
-        assert_eq!(CompiledProfile::from_record(&bad).unwrap_err(), ProfileError::SpindleKey);
-        assert!(CompiledProfile::from_record(&good[..51]).is_err());
-    }
-
     #[test]
     fn a_clock_slightly_behind_a_frame_timestamp_is_not_a_timeout() {
         let (mut a, mut b) = (Authority::new(DRILL), Bench::new());
@@ -516,27 +281,6 @@ mod tests {
         assert!(a.holds_authority(9_975), "the consumer's clock may read a little earlier than the producer's");
         a.tick(9_975);
         assert!(a.holds_authority(10_020));
-        let mut h = HostLink::new(250_000);
-        h.accept(&OperatorState { sequence: 1, jog_allowed: 1, reserved: 0 }, 10_000);
-        assert!(h.jog_allowed(9_975));
-    }
-
-    #[test]
-    fn host_link_fails_safe_when_stale() {
-        let mut h = HostLink::new(250_000);
-        assert!(!h.jog_allowed(0));
-        let allow = |sequence| OperatorState { sequence, jog_allowed: 1, reserved: 0 };
-        assert!(h.accept(&allow(1), 0));
-        assert!(h.jog_allowed(200_000));
-        assert!(!h.jog_allowed(300_000));
-        assert!(!h.accept(&allow(1), 310_000), "duplicate");
-        assert!(h.accept(&allow(2), 310_000));
-        assert!(h.jog_allowed(320_000));
-        assert!(h.accept(&OperatorState { sequence: 3, jog_allowed: 0, reserved: 0 }, 330_000));
-        assert!(!h.jog_allowed(340_000), "the host withdrew permission");
-        for (i, sequence) in [30_000u16, 60_000, 0xFFFF, 0].into_iter().enumerate() {
-            assert!(h.accept(&allow(sequence), 350_000 + i as u64), "sequence {sequence}");
-        }
     }
 
     #[test]

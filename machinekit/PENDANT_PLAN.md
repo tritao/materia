@@ -72,60 +72,29 @@ its own pendant. If the OLED proves troublesome, the switch and the HMI still wo
 - The case has a blanked mounting hole for a 3-position enabling switch. The certified upgrade
   fills the hole and wires the four reserved pins, with no new pendant.
 
-## Protocol (payloads in `pendant_wire`; CAN identifiers are placeholders)
+## Protocol
 
-CAN-FD frames, at most 64 bytes. These are small pendant messages, not RKD6 frames, which can be
-several KB. Values are placeholders.
+CAN-FD frames, at most 64 bytes, between the pendant and the cabinet controller. These are small
+pendant messages, not RKD6 frames, which can be several KB. CAN identifiers are placeholders until
+the bus plan is fixed.
 
 | Message | Direction | Content |
 |---|---|---|
-| `PENDANT_STATE` | pendant to cabinet controller | Sequence number, wheel count delta, axis index, step index, button bits, wheel-enable held, E-stop chain read-back, flags. Sent at a fixed rate (about 100 Hz) and doubling as the heartbeat. |
-| `PENDANT_CONFIG` | cabinet controller to pendant | Axis names for the profile (short strings, up to about 12), step labels. |
-| `PENDANT_OUTPUT` | cabinet controller to pendant | LED states, status line text, refusal code, lease state. |
+| `PENDANT_STATE` | pendant to cabinet controller | Sequence number, wheel count delta, axis switch position, step, button bits, wheel-enable held, E-stop chain read-back. Sent at a fixed rate (about 100 Hz) and doubling as the heartbeat. |
+| `PENDANT_CONFIG` | cabinet controller to pendant | One label per frame: the axis name for a switch position, or an F-key label, from the machine profile. |
+| `PENDANT_OUTPUT` | cabinet controller to pendant | LED states, lease state, one status line of text. |
 
-- Payloads are defined in `pendant_wire/schema/pendant.wire.idl`, the same `.wire.idl` system as
-  RKD6, with a compatibility lock. `python -m tools.wire generate --config machinekit/pendant_wire.json`
-  writes the `no_std` Rust codec, which enforces the ranges, masks, reserved bytes, enum values and
-  text rules declared in the schema (see `tools/wire/PROFILE.md`); `pendant_wire/src/lib.rs` keeps
-  only the cross-field label index check and pins the byte layout in tests. Each
-  record is exactly a valid CAN-FD length (STATE 8, CONFIG 16, OUTPUT 24 bytes), and CAN provides
-  the identifier, length and CRC.
-- **Profile to controller.** `PendantCompiler` (Haxe) turns an `OperatorProfile` into a
-  `PendantProfile` record (axis indices, condition bits, rule reason ids, step sizes, timeout), the
-  reason texts and the label frames, plus a 32-bit FNV-1a digest of all of them. The host sends them
-  when a session opens and the controller compares digests; `CompiledProfile` in
-  `pendant_wire/src/authority.rs` decodes them. `pendant_wire/vectors/profiles.txt` holds the
-  compiled reference profiles; the Haxe tests assert the compiler produces them byte for byte and the
-  Rust tests decode them, run the jog scenarios on them and recompute the digests.
-- **Operator channel.** Host to controller messages (profile, reason texts, labels, `OperatorState`)
-  travel in their own frame (`OPR1` marker, type, length, CRC-32; `operator_frame.rs` and the Haxe
-  `OperatorFrame`, checked against `vectors/frames.txt`) beside the RKD6 motion protocol, whose wire
-  revision stays untouched.
-- **Who owns what.** Machine facts are evaluated by the controller, never sent by the host: jog rules
-  name a closed `OperatorCondition` set (gearbox engaged, door open, spindle running, program
-  running), each a fixed bit in the mask the controller builds from its own state. A running program
-  always blocks the pendant. The host sends only intent, `OperatorState.jog_allowed` about every
-  100 ms; `HostLink` treats a missing or stale state as "not allowed", the same fail-safe as the
-  pendant lease.
-- **Jog execution.** The host plans jog segments (`purpose = 1`, already in RKD6) and the device
-  executes them. `machinekit/cabinet_node` (`OperatorService`, `enforce_jog`) gates them: a jog may
-  run while the pendant holds authority, or with its switch OFF while the host's `OperatorState`
-  allows it. When that stops being true, and the moment a pendant that held authority loses it, an
-  executing jog is stopped with the existing `StopReason::Stop`; programs and homing are untouched.
-  Pendant decisions go back to the host as `PendantEvent` frames. `cabinet_node/tests/jog_lease.rs`
-  runs this against the real `ScheduledCore`: the lease lapsing stops a jog within 10 ms of the
-  50 ms timeout, even when the host still allows jogging. The RKD6 core defines the hook
-  (`JogGate`, `jog_must_stop` in `device_protocol`, so robotkit never depends on machinekit), the
-  virtual device asks an installed gate every control tick, and `cabinet_node/tests/virtual_device.rs`
-  runs the whole chain headless: RKD6 session and jog segment to a `VirtualDevice`, pendant frames to
-  the service. Gated, the jog stops at the lease; ungated, the same jog runs on.
-- The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.
-  `PendantAuthority` (Haxe) is the reference model and headless test; the controller needs the same
-  rules in Rust.
+Rules the controller enforces (the lease, hold-to-run, jog refusals, fail-safe defaults):
+
 - Sequence numbers reject stale and duplicate frames.
-- Heartbeat loss at the cabinet controller ends the pendant's lease and stops motion. A heartbeat
-  loss at the pendant lights a fault LED.
-- Jog rules (for example "B and C refused while the gearbox is engaged") live on the host.
+- Heartbeat loss at the cabinet controller ends the pendant's lease and stops an executing jog.
+  Heartbeat loss at the pendant lights a fault LED.
+- Jog refusals (for example "B and C refused while the gearbox is engaged") come from the machine
+  profile, compiled to the controller; the controller, not the host, evaluates the machine facts.
+- A running program always blocks the pendant.
+
+The wire schema, the controller-side code, the host link and how it is tested are described in
+`operator_link/README.md`.
 
 ## Mechanics
 

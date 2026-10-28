@@ -1,5 +1,5 @@
-//! Jog pendant CAN-FD payloads. The layouts come from `schema/pendant.wire.idl` and are generated
-//! into `pendant_wire.rs`; this file adds the validation the schema language cannot express
+//! Jog pendant CAN-FD payloads. The layouts come from `schema/operator.wire.idl` and are generated
+//! into `operator_wire.rs`; this file adds the validation the schema language cannot express
 //! (value ranges, reserved bits, NUL-terminated text). `#![no_std]` for the pendant and the
 //! cabinet controller.
 #![no_std]
@@ -8,12 +8,16 @@
 extern crate std;
 
 pub mod authority;
+pub mod host_link;
 pub mod operator_frame;
-pub mod pendant_wire;
+pub mod profile;
+pub mod operator_wire;
+#[cfg(test)]
+mod testing;
 
-use pendant_wire::{ConfigKind, PendantConfig, PendantOutput, PendantState};
+use operator_wire::{ConfigKind, PendantConfig, PendantOutput, PendantState};
 
-pub use pendant_wire::Error as WireError;
+pub use operator_wire::Error as WireError;
 
 pub const STATE_ID: u32 = 0x181;
 pub const CONFIG_ID: u32 = 0x201;
@@ -44,7 +48,7 @@ pub fn decode_state(input: &[u8]) -> Result<PendantState, Invalid> {
 /// Decode a PENDANT_CONFIG payload; the label is `text` up to its NUL.
 pub fn decode_config(input: &[u8]) -> Result<PendantConfig, Invalid> {
     let c = PendantConfig::decode(input)?;
-    let limit = if c.kind == ConfigKind::Axis as u8 { pendant_wire::POSITIONS } else { 2 };
+    let limit = if c.kind == ConfigKind::Axis as u8 { operator_wire::POSITIONS } else { 2 };
     let first = if c.kind == ConfigKind::Axis as u8 { 1 } else { 0 };
     if c.index < first || c.index > limit { return Err(Invalid::Index); }
     Ok(c)

@@ -3,12 +3,12 @@
 //! core is allowed to do.
 
 use cabinet_node::{core_conditions, enforce_jog, OperatorService, ticks_to_us, PURPOSE_JOG, PURPOSE_PROGRAM};
-use pendant_wire::authority::CompiledProfile;
-use pendant_wire::operator_frame;
-use pendant_wire::pendant_wire::{OperatorMessage, OperatorState, PendantState};
+use operator_link::profile::CompiledProfile;
+use operator_link::operator_frame;
+use operator_link::operator_wire::{OperatorMessage, OperatorState, PendantState};
 use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, StopReason};
 
-const VECTORS: &str = include_str!("../../pendant_wire/vectors/profiles.txt");
+const VECTORS: &str = include_str!("../../operator_link/vectors/profiles.txt");
 
 #[derive(Default)]
 struct TestBoard { tick: u64, stopped: bool }
@@ -63,7 +63,7 @@ fn host_frame(sequence: u16, allowed: bool) -> Vec<u8> {
 
 /// Runs the node for `until` ms. The pendant sends every 10 ms while `pendant_until` has not
 /// passed; the host sends an allowing OperatorState every 100 ms until `host_allows_until`, then goes silent.
-struct Run { board: TestBoard, core: ScheduledCore<1, 4>, service_stopped_at: Option<u64>, events: Vec<pendant_wire::pendant_wire::PendantEvent> }
+struct Run { board: TestBoard, core: ScheduledCore<1, 4>, service_stopped_at: Option<u64>, events: Vec<operator_link::operator_wire::PendantEvent> }
 
 fn run(purpose: u8, position: u8, pendant_until: u64, host_allows_until: Option<u64>, until: u64) -> Run {
     let compiled = profile("drill-tap");
@@ -165,7 +165,7 @@ fn bad_frames_are_refused() {
     assert!(service.on_operator_frame(&host, 0).is_err());
     let mut payload = [0u8; 16];
     let mut frame = vec![0u8; operator_frame::MAX_FRAME_SIZE];
-    pendant_wire::pendant_wire::PendantConfig { kind: 0, index: 1, text: [0; 12], reserved: [0; 2] }.encode(&mut payload).unwrap();
+    operator_link::operator_wire::PendantConfig { kind: 0, index: 1, text: [0; 12], reserved: [0; 2] }.encode(&mut payload).unwrap();
     let n = operator_frame::encode(OperatorMessage::Config as u8, &payload, &mut frame).unwrap();
     assert_eq!(service.on_operator_frame(&frame[..n], 0), Err(cabinet_node::ServiceError::WrongType));
 }

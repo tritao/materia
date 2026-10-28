@@ -12,10 +12,12 @@
 #[cfg(test)]
 extern crate std;
 
-use pendant_wire::authority::{condition_bit, Authority, CompiledProfile, HostLink, Output};
-use pendant_wire::operator_frame::{self, FrameError};
-use pendant_wire::pendant_wire::{OperatorCondition, OperatorMessage, OperatorState, PendantEvent};
-use pendant_wire::{decode_state, Invalid, WireError};
+use operator_link::authority::{condition_bit, Authority, Output};
+use operator_link::host_link::HostLink;
+use operator_link::profile::CompiledProfile;
+use operator_link::operator_frame::{self, FrameError};
+use operator_link::operator_wire::{OperatorCondition, OperatorMessage, OperatorState, PendantEvent};
+use operator_link::{decode_state, Invalid, WireError};
 use robotkit_device_protocol::{jog_must_stop, Board, JogGate, JogVerdict, ScheduledCore, StopReason};
 
 /// `Segment6Header.purpose` values (schema/device_wire6.wire.idl).

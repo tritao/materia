@@ -1,7 +1,10 @@
 //! RKD6 length and CRC framing. Payload records live in `device_wire6`.
 
 use crate::device_wire6::*;
-fn crc32(bytes: &[u8]) -> u32 {
+
+/// CRC-32/IEEE (reflected, polynomial 0xEDB88320). Other frames that want the same check, such as
+/// the operator link's, use this one.
+pub fn crc32(bytes: &[u8]) -> u32 {
     let mut value = 0xffff_ffffu32;
     for &byte in bytes {
         value ^= u32::from(byte);

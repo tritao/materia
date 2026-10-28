@@ -29,11 +29,11 @@ class PendantCompilerTests {
   static function vectorPath(name:String = "profiles"):String {
     var dir = Sys.getCwd();
     for (_ in 0...8) {
-      var path = dir + "/machinekit/pendant_wire/vectors/" + name + ".txt";
-      if (FileSystem.exists(dir + "/machinekit/pendant_wire")) return path;
+      var path = dir + "/machinekit/operator_link/vectors/" + name + ".txt";
+      if (FileSystem.exists(dir + "/machinekit/operator_link")) return path;
       dir = dir + "/..";
     }
-    throw "Cannot find machinekit/pendant_wire";
+    throw "Cannot find machinekit/operator_link";
   }
   static function line(name:String, p:OperatorProfile):String {
     var c = PendantCompiler.compile(p, [1, 10, 100], 50, 250);
@@ -44,7 +44,7 @@ class PendantCompilerTests {
     var path = vectorPath(name);
     if (Sys.getEnv("PENDANT_VECTORS") == "write") File.saveContent(path, content);
     else if (!FileSystem.exists(path) || File.getContent(path) != content)
-      throw 'Compiled output differs from pendant_wire/vectors/$name.txt; run with PENDANT_VECTORS=write after reviewing:\n' + content;
+      throw 'Compiled output differs from operator_link/vectors/$name.txt; run with PENDANT_VECTORS=write after reviewing:\n' + content;
   }
 
   public static function run():Void {

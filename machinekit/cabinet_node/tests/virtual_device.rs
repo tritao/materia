@@ -3,8 +3,8 @@
 //! When the pendant lease lapses the device stops the jog; without the gate the same jog runs on.
 
 use cabinet_node::OperatorService;
-use pendant_wire::authority::CompiledProfile;
-use pendant_wire::pendant_wire::PendantState;
+use operator_link::profile::CompiledProfile;
+use operator_link::operator_wire::PendantState;
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{JogGate, JogVerdict};
@@ -12,7 +12,7 @@ use robotkit_device_virtual::VirtualDevice;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-const VECTORS: &str = include_str!("../../pendant_wire/vectors/profiles.txt");
+const VECTORS: &str = include_str!("../../operator_link/vectors/profiles.txt");
 const CONTROLLER: [u8; 16] = [7; 16];
 
 fn profile() -> &'static CompiledProfile {

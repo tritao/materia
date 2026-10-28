@@ -2,7 +2,7 @@ package machinekit.operator.wire;
 
 import haxe.io.Bytes;
 
-/** Generated from pendant_wire/schema/pendant.wire.idl. Do not edit by hand. */
+/** Generated from operator_link/schema/operator.wire.idl. Do not edit by hand. */
 class PendantConfig {
   public static inline final SIZE:Int = 16;
   public var kind:Int = 0;

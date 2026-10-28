@@ -1,0 +1,13 @@
+{
+  "schema": "operator_link/schema/operator.wire.idl",
+  "lock": "operator_link/schema/operator.lock.json",
+  "rust": {},
+  "packed_haxe": {
+    "root": "haxe/src/machinekit/operator/wire",
+    "package": "machinekit.operator.wire",
+    "schema_label": "operator_link/schema/operator.wire.idl"
+  },
+  "outputs": {
+    "rust": "operator_link/src/operator_wire.rs"
+  }
+}

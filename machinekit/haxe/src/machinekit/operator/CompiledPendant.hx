@@ -4,7 +4,7 @@ import haxe.io.Bytes;
 
 /**
  * Everything the cabinet controller needs to serve one pendant for one OperatorProfile, as wire
- * records from pendant_wire/schema/pendant.wire.idl. The host sends `profile`, then `reasons`, then
+ * records from operator_link/schema/operator.wire.idl. The host sends `profile`, then `reasons`, then
  * `labels` when a session opens, and the controller checks `digest` against its own over the same
  * bytes before it accepts the pendant.
  */
