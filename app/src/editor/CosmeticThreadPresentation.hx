@@ -17,23 +17,42 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import materia.project.ThreadSpecData;
 
-private typedef ThreadTextures = {var color:Texture; var normal:Texture; var colorImage:SceneImage; var normalImage:SceneImage; var references:Int;}
-private typedef ThreadNode = {var node:NodeId; var geometry:Geometry; var material:Material; var textureKey:String;}
-private typedef ThreadGroup = {var source:GeometryData; var parent:String; var appearance:String; var nodes:Array<ThreadNode>;}
+private typedef ThreadTextures = {
+  var color:Texture;
+  var normal:Texture;
+  var colorImage:SceneImage;
+  var normalImage:SceneImage;
+  var references:Int;
+}
+private typedef ThreadNode = {
+  var node:NodeId;
+  var geometry:Geometry;
+  var material:Material;
+  var textureKey:String;
+}
+private typedef ThreadGroup = {
+  var source:GeometryData;
+  var parent:String;
+  var appearance:String;
+  var nodes:Array<ThreadNode>;
+}
 
 /** Runtime children derived from the base mesh. They share its pose, appearance and highlight state. */
-@:access(app.EditorScene)
-class CosmeticThreadPresentation {
+@:access(app.EditorScene) class CosmeticThreadPresentation {
   final groups:Map<String, ThreadGroup> = [];
   final textures:Map<String, ThreadTextures> = [];
   var sampler:Null<Sampler>;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function dispose(owner:EditorScene):Void {
     var ids = [for (id in groups.keys()) id];
     for (id in ids) remove(owner, id);
-    if (sampler != null) { sampler.dispose(); sampler = null; }
+    if (sampler != null) {
+      sampler.dispose();
+      sampler = null;
+    }
   }
 
   /** Native owners are rebuilt only when the base geometry or appearance changes. */
@@ -45,7 +64,8 @@ class CosmeticThreadPresentation {
       if (EditorScene.isCadKind(item.kind)) {
         var session = owner.cadSessions.get(item.id);
         if (session != null) source = session.geometry();
-      } else if (item.kind == "cad-preview" && item.meshSnapshot != null) source = owner.previewGeometry(item.meshSnapshot);
+      } else if (item.kind == "cad-preview"
+        && item.meshSnapshot != null) source = owner.previewGeometry(item.meshSnapshot);
       if (!Std.isOfType(source, CadGeometryData)) continue;
       var cad:CadGeometryData = cast source;
       if (cad.threads.length == 0) continue;
@@ -61,19 +81,33 @@ class CosmeticThreadPresentation {
         for (thread in cad.threads) {
           var data = CosmeticThreadMesh.build(cad, thread);
           if (data.triangleCount() == 0) continue;
-          var key = '${thread.source.spec.profile}|${thread.source.spec.majorDiameter}|${thread.source.spec.pitch}|${thread.source.spec.starts}';
+          var key =
+            '${thread.source.spec.profile}|${thread.source.spec.majorDiameter}|${thread.source.spec.pitch}|${thread.source.spec.starts}';
           var pair = acquire(owner, key, thread.source.spec);
           var geometry = owner.scene.createGeometry();
           owner.scene.setGeometryData(geometry, data);
           var material = owner.scene.createMaterial();
-          owner.scene.setMaterialData(material, ScenePresentation.materialFor(item.red, item.green, item.blue, item.appearance, item.kind)
-            .setBaseColorTexture(pair.color, sampler).setNormalTexture(pair.normal));
+          owner.scene.setMaterialData(
+            material,
+            ScenePresentation.materialFor(
+              item.red,
+              item.green,
+              item.blue,
+              item.appearance,
+              item.kind
+            ).setBaseColorTexture(
+              pair.color,
+              sampler
+            ).setNormalTexture(pair.normal)
+          );
           var transaction = owner.scene.beginTransaction();
           var node = transaction.createNode();
           transaction.setName(node, "Thread " + thread.source.faceName);
-          transaction.setParent(node, parent); transaction.setVisibility(node, false);
+          transaction.setParent(node, parent);
+          transaction.setVisibility(node, false);
           transaction.setTransform(node, Transform.identity());
-          transaction.setGeometry(node, geometry); transaction.setMaterial(node, material);
+          transaction.setGeometry(node, geometry);
+          transaction.setMaterial(node, material);
           transaction.commit();
           owner.bridge.mapNode(node, item.id);
           nodes.push({node: node, geometry: geometry, material: material, textureKey: key});
@@ -87,7 +121,10 @@ class CosmeticThreadPresentation {
       }
     }
     var obsolete = [for (id in groups.keys()) if (!seen.exists(id)) id];
-    for (id in obsolete) { remove(owner, id); changed = true; }
+    for (id in obsolete) {
+      remove(owner, id);
+      changed = true;
+    }
     if (changed) owner.publish(null, false);
   }
 
@@ -138,13 +175,18 @@ class CosmeticThreadPresentation {
       if (snapshot.findNode(entry.node) != null) transaction.destroyNode(entry.node);
       owner.bridge.unmapNode(entry.node);
     }
-    snapshot.dispose(); transaction.commit();
+    snapshot.dispose();
+    transaction.commit();
     for (entry in group.nodes) {
-      entry.geometry.dispose(); entry.material.dispose();
+      entry.geometry.dispose();
+      entry.material.dispose();
       var pair:ThreadTextures = cast textures.get(entry.textureKey);
       pair.references--;
       if (pair.references == 0) {
-        pair.color.dispose(); pair.normal.dispose(); pair.colorImage.dispose(); pair.normalImage.dispose();
+        pair.color.dispose();
+        pair.normal.dispose();
+        pair.colorImage.dispose();
+        pair.normalImage.dispose();
         textures.remove(entry.textureKey);
       }
     }

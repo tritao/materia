@@ -17,8 +17,8 @@ private typedef BeltAttachment = {
   var y:Float;
   var z:Float;
   var frame:AssemblyFrame;
-  var world:{x:Float, y:Float, z:Float};
-  var local:{x:Float, y:Float, z:Float};
+  var world: {x: Float, y: Float, z: Float};
+  var local: {x: Float, y: Float, z: Float};
   var currentX:Float;
   var currentY:Float;
 }
@@ -31,13 +31,16 @@ private class BeltDisplay {
   public final mesh = new PackedTimingBeltMesh();
   public final partFrame:AssemblyFrame = emptyFrame();
   public final inverseFrame:AssemblyFrame = emptyFrame();
-  public static function emptyFrame():AssemblyFrame return {x:0, y:0, z:0, qx:0, qy:0, qz:0, qw:1};
+  public static function emptyFrame():AssemblyFrame return {x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1};
   public var belt:Null<TimingBelt> = null;
   public var route:Array<BeltWrap> = [];
   public var phase:Float = Math.NaN;
-  public function new(visual:SceneArtifactBeltVisual, part:AssemblyPart,
-      attachments:Array<BeltAttachment>, driver:Int) {
-    this.visual = visual; this.part = part; this.attachments = attachments; this.driver = driver;
+  public function new(visual:SceneArtifactBeltVisual,
+    part:AssemblyPart, attachments:Array<BeltAttachment>, driver:Int) {
+    this.visual = visual;
+    this.part = part;
+    this.attachments = attachments;
+    this.driver = driver;
   }
 }
 
@@ -53,8 +56,15 @@ class BeltVisuals {
   static inline var DISPLAY_TOLERANCE:Float = 0.01;
   public var updates(default, null):Int = 0;
 
-  public function new(project:ProjectDocumentSession, robot:AssemblyRobot, simulation:robotkit.runtime.Simulation, belts:Array<SceneArtifactBeltVisual>) {
-    this.project = project; this.robot = robot; this.simulation = simulation;
+  public function new(
+    project:ProjectDocumentSession,
+    robot:AssemblyRobot,
+    simulation:robotkit.runtime.Simulation,
+    belts:Array<SceneArtifactBeltVisual>
+  ) {
+    this.project = project;
+    this.robot = robot;
+    this.simulation = simulation;
     driverPositions = [for (_ in 0...robot.model.joints.length) 0.0];
     var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
     if (definition == null || physical == null) throw "Belt visuals need a physical assembly";
@@ -66,9 +76,25 @@ class BeltVisuals {
         var occurrence = [for (value in definition.occurrences) if (value.id == wrap.occurrence) value][0];
         var component = [for (value in definition.definitions) if (value.id == occurrence.definition) value][0];
         var connector = [for (value in component.connectors) if (value.name == wrap.connector) value][0];
-        attachments.push({part: robot.part("project:" + wrap.occurrence),
-          x: connector.frame.x * scale, y: connector.frame.y * scale, z: connector.frame.z * scale,
-          frame:BeltDisplay.emptyFrame(), world:{x:0, y:0, z:0}, local:{x:0, y:0, z:0}, currentX:0, currentY:0});
+        attachments.push({
+          part: robot.part("project:" + wrap.occurrence),
+          x: connector.frame.x * scale,
+          y: connector.frame.y * scale,
+          z: connector.frame.z * scale,
+          frame: BeltDisplay.emptyFrame(),
+          world: {
+            x: 0,
+            y: 0,
+            z: 0
+          },
+          local: {
+            x: 0,
+            y: 0,
+            z: 0
+          },
+          currentX: 0,
+          currentY: 0
+        });
       }
       var driver = [for (i in 0...robot.model.joints.length) if (robot.model.joints[i].id == visual.driverJoint) i][0];
       displays.push(new BeltDisplay(visual, robot.part("project:" + visual.occurrence), attachments, driver));
@@ -77,7 +103,8 @@ class BeltVisuals {
 
   public function reset():Void {
     for (display in displays) {
-      display.belt = null; display.phase = Math.NaN;
+      display.belt = null;
+      display.phase = Math.NaN;
       project.scene.clearRuntimeGeometry("project:" + display.visual.occurrence);
     }
   }
@@ -106,14 +133,24 @@ class BeltVisuals {
       var routeChanged = display.belt == null;
       for (i in 0...display.attachments.length) {
         var attachment = display.attachments[i], wrap = visual.wraps[i];
-        AssemblyFrames.transformPointInto(frame(attachment.part, poses, attachment.frame),
-          attachment.x, attachment.y, attachment.z, attachment.world);
-        AssemblyFrames.transformPointInto(display.inverseFrame, attachment.world.x, attachment.world.y,
-          attachment.world.z, attachment.local);
+        AssemblyFrames.transformPointInto(
+          frame(attachment.part, poses, attachment.frame),
+          attachment.x,
+          attachment.y,
+          attachment.z,
+          attachment.world
+        );
+        AssemblyFrames.transformPointInto(
+          display.inverseFrame,
+          attachment.world.x,
+          attachment.world.y,
+          attachment.world.z,
+          attachment.local
+        );
         var x = attachment.currentX = attachment.local.x / scale;
         var y = attachment.currentY = attachment.local.y / scale;
-        if (display.belt != null && (Math.abs(x - display.route[i].x) > DISPLAY_TOLERANCE ||
-            Math.abs(y - display.route[i].y) > DISPLAY_TOLERANCE)) routeChanged = true;
+        if (display.belt != null && (Math.abs(x - display.route[i].x) > DISPLAY_TOLERANCE
+          || Math.abs(y - display.route[i].y) > DISPLAY_TOLERANCE)) routeChanged = true;
       }
       var side = visual.wraps[visual.driverWrap].side;
       var phase = driverPositions[display.driver] * visual.wraps[visual.driverWrap].radius * side * visual.driverSign;
@@ -127,7 +164,10 @@ class BeltVisuals {
           wraps.push(new BeltWrap(attachment.currentX, attachment.currentY, wrap.radius, wrap.side));
         }
         display.belt = new TimingBelt(
-          machinekit.transmission.TimingBeltProfile.Custom("CUSTOM", visual.pitch, 0.0), visual.width, wraps);
+          machinekit.transmission.TimingBeltProfile.Custom("CUSTOM", visual.pitch, 0.0),
+          visual.width,
+          wraps
+        );
         display.route = wraps;
       }
       var mesh = display.mesh;
@@ -136,8 +176,14 @@ class BeltVisuals {
       geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
       geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
       geometry.setIndexBuffer(mesh.indices, mesh.indexCount);
-      geometry.setBounds(mesh.minimum[0], mesh.minimum[1], mesh.minimum[2],
-        mesh.maximum[0], mesh.maximum[1], mesh.maximum[2]);
+      geometry.setBounds(
+        mesh.minimum[0],
+        mesh.minimum[1],
+        mesh.minimum[2],
+        mesh.maximum[0],
+        mesh.maximum[1],
+        mesh.maximum[2]
+      );
       changed.set("project:" + visual.occurrence, geometry);
       display.phase = phase;
       count++;
@@ -146,7 +192,8 @@ class BeltVisuals {
       try project.scene.setRuntimeGeometries(changed) catch (error:Dynamic) {
         // A failed publication must be retried, even if the physical pose stays unchanged.
         for (display in displays) if (changed.exists("project:" + display.visual.occurrence)) {
-          display.belt = null; display.phase = Math.NaN;
+          display.belt = null;
+          display.phase = Math.NaN;
         }
         throw error;
       }

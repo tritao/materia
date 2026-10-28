@@ -21,47 +21,68 @@ typedef MissionViewState = {
 class MissionController {
   final session:ProjectDocumentSession;
   final simulation:ApplicationSimulation;
-  final inspect:String->Void;
-  final changed:Void->Void;
+  final inspect:String -> Void;
+  final changed:Void -> Void;
   /** The robot controller whose program the views follow; null follows the first. */
   var program:Null<String> = null;
 
-  public function new(session:ProjectDocumentSession,simulation:ApplicationSimulation,changed:Void->Void,inspect:String->Void) {
-    this.session=session;this.simulation=simulation;this.changed=changed;this.inspect=inspect;
+  public function new(
+    session:ProjectDocumentSession,
+    simulation:ApplicationSimulation,
+    changed:Void -> Void,
+    inspect:String -> Void
+  ) {
+    this.session = session;
+    this.simulation = simulation;
+    this.changed = changed;
+    this.inspect = inspect;
   }
 
   public function snapshot():MissionViewState {
     // The one implicit controller of a scene without modelled controllers is "".
-    var programs:Array<String> = session.missions == null ? [] :
-      [for (work in session.missions) work.controllerId == null ? "" : work.controllerId];
-    var chosen:String = program == null || programs.indexOf(program) < 0 ? (programs.length == 0 ? "" : programs[0]) : program;
-    var player = programs.length == 0 ? null : chosen == "" ? simulation.missionPlayer() : simulation.missionPlayer(chosen);
+    var programs:Array<String> = session.missions
+      == null ? [] : [for (work in session.missions) work.controllerId == null ? "" : work.controllerId];
+    var chosen:String = program == null
+      || programs.indexOf(program) < 0 ? (programs.length == 0 ? "" : programs[0]) : program;
+    var player = programs.length
+      == 0 ? null : chosen == "" ? simulation.missionPlayer() : simulation.missionPlayer(chosen);
     var progress:Null<MissionProgress> = player == null ? null : player.progress();
     var status = player == null ? "Ready · Play to start" : player.statusLabel(true);
-    if (progress != null && !simulation.isRunning() && progress.phase != "complete" && progress.phase != "failed")
-      status = "Paused · " + status;
+    if (progress != null && !simulation.isRunning()
+      && progress.phase != "complete" && progress.phase != "failed") status = "Paused · " + status;
     var mission:Null<SceneArtifactMission> = player != null ? player.mission : null;
-    if (mission == null && session.missions != null)
-      for (work in session.missions) if (mission == null && (work.controllerId == null ? "" : work.controllerId) == chosen) mission = work;
+    if (mission == null && session.missions != null) for (work in session.missions) if (mission == null
+      && (work.controllerId == null ? "" : work.controllerId) == chosen) mission = work;
     if (mission != null && mission.loop == true) status += " · Loop " + (progress == null ? 1 : progress.loop);
-    var cncJob=session.cncJob;
-    var machining=cncJob==null?null:cncJob.mission;
-    var machiningStatus="";
-    if(machining!=null) {
-      var cnc=simulation.cncPlayer();
-      machiningStatus=cnc==null?"Ready · Play to start":cnc.failure!=null?"Stopped · "+ProgramErrorMessage.fromFailure(cnc.failure).title:
-        cnc.finished()?"Completed":!cnc.hasStarted()?"Ready · Play to start":!simulation.isRunning()?"Paused":cnc.held()?"Held":
-        "Running"+(cnc.currentLine>0?" · line "+cnc.currentLine:"")+cnc.statusDetail();
+    var cncJob = session.cncJob;
+    var machining = cncJob == null ? null : cncJob.mission;
+    var machiningStatus = "";
+    if (machining != null) {
+      var cnc = simulation.cncPlayer();
+      machiningStatus = cnc == null ? "Ready · Play to start"
+        : cnc.failure != null ? "Stopped · " + ProgramErrorMessage.fromFailure(cnc.failure).title : cnc.finished()
+        ? "Completed" : !cnc.hasStarted() ? "Ready · Play to start" : !simulation.isRunning() ? "Paused" : cnc.held()
+        ? "Held" : "Running" + (cnc.currentLine > 0 ? " · line " + cnc.currentLine : "") + cnc.statusDetail();
     }
-    if(mission==null)status=machining==null?"No mission":machining.label+" · "+machiningStatus;
-    return {generation:session.generation,mission:mission,machining:machining,machiningStatus:machiningStatus,machiningPreview:cncJob!=null&&cncJob.kinematicPreview==true,hasWork:mission!=null||machining!=null,programs:programs,selectedProgram:chosen,
-      progress:progress,status:status};
+    if (mission == null) status = machining == null ? "No mission" : machining.label + " · " + machiningStatus;
+    return {
+      generation: session.generation,
+      mission: mission,
+      machining: machining,
+      machiningStatus: machiningStatus,
+      machiningPreview: cncJob != null && cncJob.kinematicPreview == true,
+      hasWork: mission != null || machining != null,
+      programs: programs,
+      selectedProgram: chosen,
+      progress: progress,
+      status: status
+    };
   }
 
   /** Follow the program of robot controller `id`. */
   public function selectProgram(id:String):Void {
-    if (session.missions == null || [for (work in session.missions) if (work.controllerId == id) work].length != 1)
-      throw 'No program runs on controller "$id"';
+    if (session.missions == null || [for (work in session.missions) if (work.controllerId
+      == id) work].length != 1) throw 'No program runs on controller "$id"';
     program = id;
     changed();
   }

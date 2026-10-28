@@ -20,10 +20,16 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   final part:Null<AssemblyPart>;
   final object:Null<SimObject>;
   var fixedFollower:Null<nksim_joint>;
-  final rigidRetentions:Map<Int,nativekit.sim.SimFixedJoint> = [];
+  final rigidRetentions:Map<Int, nativekit.sim.SimFixedJoint> = [];
 
-  public function new(id:String, simulation:Simulation, center:Array<Float>, pieces:Array<Array<Float>>,
-      part:Null<AssemblyPart>, object:Null<SimObject>) {
+  public function new(
+    id:String,
+    simulation:Simulation,
+    center:Array<Float>,
+    pieces:Array<Array<Float>>,
+    part:Null<AssemblyPart>,
+    object:Null<SimObject>
+  ) {
     if ((part == null) == (object == null)) throw "A simulated assembly part needs exactly one carrier";
     this.id = id;
     this.simulation = simulation;
@@ -33,13 +39,19 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
     this.object = object;
   }
 
-  public function pose():{position:Array<Float>, rotation:Array<Float>} {
+  public function pose(): {position: Array<Float>, rotation: Array<Float>} {
     if (part != null) return AssemblyRobot.partPose(simulation, part);
     var body = object;
     if (body == null) throw 'Assembly occurrence "$id" lost its free-object carrier';
     var live = simulation.objectPose(body);
-    return AssemblyRobot.compose({position: [live.x, live.y, live.z], rotation: [live.qx, live.qy, live.qz, live.qw]},
-      AssemblyFrames.translation(-center[0], -center[1], -center[2]));
+    return AssemblyRobot.compose(
+      {position: [live.x, live.y, live.z], rotation: [live.qx, live.qy, live.qz, live.qw]},
+      AssemblyFrames.translation(
+        -center[0],
+        -center[1],
+        -center[2]
+      )
+    );
   }
 
   /** Whether this exact free body overlaps an oriented volume, using SimKit's shape-level test. */
@@ -67,10 +79,8 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
 
   /** Attach this dynamic CAD occurrence to a robot link while the session is between physics ticks. */
   public function attachFixedToLink(robotIndex:Int, linkIndex:Int):Void {
-    if (part != null || object == null)
-      throw 'Assembly occurrence "$id" is not an independent CAD body';
-    if (fixedFollower != null)
-      throw 'Assembly occurrence "$id" is already attached to a robot link';
+    if (part != null || object == null) throw 'Assembly occurrence "$id" is not an independent CAD body';
+    if (fixedFollower != null) throw 'Assembly occurrence "$id" is already attached to a robot link';
     fixedFollower = simulation.createObjectFixedFollower(robotIndex, linkIndex, object);
   }
 
@@ -88,18 +98,36 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   /** Fasten at the actual seated pose, preserving the member's live carrier and all offsets. */
   public function retain(body:SimObject, world:SimPose):Void {
     var member = part, carrier = object;
-    var parent = member != null ? simulation.linkPose(member.robotIndex,member.linkIndex) : null;
+    var parent = member != null ? simulation.linkPose(member.robotIndex, member.linkIndex) : null;
     if (carrier != null) {
       var live = simulation.objectPose(carrier);
-      parent = {position:[live.x,live.y,live.z],rotation:[live.qx,live.qy,live.qz,live.qw]};
+      parent = {position: [live.x, live.y, live.z], rotation: [live.qx, live.qy, live.qz, live.qw]};
     }
     if (parent == null) throw 'Assembly occurrence "$id" lost its fastening carrier';
     var p = parent.position, q = parent.rotation;
-    var relative = AssemblyFrames.compose(AssemblyFrames.inverse({x:p[0],y:p[1],z:p[2],qx:q[0],qy:q[1],qz:q[2],qw:q[3]}),
-      {x:world.x,y:world.y,z:world.z,qx:world.qx,qy:world.qy,qz:world.qz,qw:world.qw});
-    var pose = new SimPose(relative.x,relative.y,relative.z,relative.qx,relative.qy,relative.qz,relative.qw);
-    if (member != null) simulation.holdObjectOnLink(body,member.robotIndex,member.linkIndex,pose);
-    else if (carrier != null) simulation.holdObjectOnObject(body,carrier,pose);
+    var relative = AssemblyFrames.compose(
+      AssemblyFrames.inverse({
+        x: p[0],
+        y: p[1],
+        z: p[2],
+        qx: q[0],
+        qy: q[1],
+        qz: q[2],
+        qw: q[3]
+      }),
+      {
+        x: world.x,
+        y: world.y,
+        z: world.z,
+        qx: world.qx,
+        qy: world.qy,
+        qz: world.qz,
+        qw: world.qw
+      }
+    );
+    var pose = new SimPose(relative.x, relative.y, relative.z, relative.qx, relative.qy, relative.qz, relative.qw);
+    if (member != null) simulation.holdObjectOnLink(body, member.robotIndex, member.linkIndex, pose);
+    else if (carrier != null) simulation.holdObjectOnObject(body, carrier, pose);
   }
 
   /** Final clamping must not drive a kinematic child against its free dynamic parent. */
@@ -111,8 +139,8 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
       simulation.stopForTopologyChange();
       // A physical-thread seat may still be held by the process. Convert it only at accepted release.
       if (carries(body)) simulation.releaseObject(body);
-      rigidRetentions.set(key,simulation.createObjectMeasuredFixedJoint(carrier,body));
-    } else retain(body,simulation.objectPose(body));
+      rigidRetentions.set(key, simulation.createObjectMeasuredFixedJoint(carrier, body));
+    } else retain(body, simulation.objectPose(body));
   }
 
   public function releaseRigid(body:SimObject):Void {
@@ -128,7 +156,10 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   /** Whether this occurrence's exact native carrier retains the fastened body. */
   public function carries(body:SimObject):Bool {
     var member = part, carrier = object;
-    if (member != null) return simulation.objectCarrier(body) == simulation.linkBody(member.robotIndex,member.linkIndex);
+    if (member != null) return simulation.objectCarrier(body) == simulation.linkBody(
+      member.robotIndex,
+      member.linkIndex
+    );
     return carrier != null && simulation.objectCarrier(body) == simulation.objectBody(carrier);
   }
 
@@ -156,7 +187,12 @@ class SimulationAssemblyParts {
   final components:Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition> = new Map();
   final cache:Map<String, SimulationAssemblyPart> = new Map();
 
-  public function new(simulation:Simulation, robots:Array<AssemblyRobot>, objects:Array<GripObject>, project:ProjectDocumentSession) {
+  public function new(
+    simulation:Simulation,
+    robots:Array<AssemblyRobot>,
+    objects:Array<GripObject>,
+    project:ProjectDocumentSession
+  ) {
     this.simulation = simulation;
     this.robots = robots.copy();
     this.objects = objects;
@@ -176,7 +212,15 @@ class SimulationAssemblyParts {
     var found = [for (connector in component.connectors) if (connector.name == name) connector.frame];
     if (found.length != 1) throw 'No unique named CAD connector "$id/$name"';
     var frame = found[0], scale = physical.metresPerUnit;
-    return {x:frame.x*scale,y:frame.y*scale,z:frame.z*scale,qx:frame.qx,qy:frame.qy,qz:frame.qz,qw:frame.qw};
+    return {
+      x: frame.x * scale,
+      y: frame.y * scale,
+      z: frame.z * scale,
+      qx: frame.qx,
+      qy: frame.qy,
+      qz: frame.qz,
+      qw: frame.qw
+    };
   }
 
   public function get(id:String):SimulationAssemblyPart {
@@ -194,12 +238,18 @@ class SimulationAssemblyParts {
     if (found.length != 1 || component == null) throw 'No CAD physical part for "$id"';
     var source = cadbridge.AssemblySimulationBridge.collisionPieces(id, component, found[0]);
     if (source.length == 0) throw 'No CAD collision hull for "$id"';
-    var pieces = [for (piece in source) [for (value in piece) value * physical.metresPerUnit]];
+    var pieces = [for (piece in source)[for (value in piece) value * physical.metresPerUnit]];
     var parts = [for (robot in robots) for (part in robot.parts) if (part.id == id) part];
     var bodies = [for (entry in objects) if (entry.id == id) entry.object];
     if (parts.length + bodies.length != 1) throw 'No unique simulation carrier for "$id"';
-    var result = new SimulationAssemblyPart(id, simulation, [for (value in centre) value * physical.metresPerUnit],
-      pieces, parts.length == 1 ? parts[0] : null, bodies.length == 1 ? bodies[0] : null);
+    var result = new SimulationAssemblyPart(
+      id,
+      simulation,
+      [for (value in centre) value * physical.metresPerUnit],
+      pieces,
+      parts.length == 1 ? parts[0] : null,
+      bodies.length == 1 ? bodies[0] : null
+    );
     cache.set(id, result);
     return result;
   }

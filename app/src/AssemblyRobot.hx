@@ -30,8 +30,13 @@ import robotkit.simulation.SimulatedRobot;
  * link's frame; several parts of one rigid body share a link), and its scene geometry is centred at
  * `center` in its own frame.
  */
-typedef AssemblyPart = {id:String, robotIndex:Int, linkIndex:Int, offset:materia.assembly.AssemblyRecord.AssemblyFrame,
-  center:Array<Float>};
+typedef AssemblyPart = {
+  id:String,
+  robotIndex:Int,
+  linkIndex:Int,
+  offset:materia.assembly.AssemblyRecord.AssemblyFrame,
+  center:Array<Float>
+};
 
 /**
  * The project's assembly as one simulated robot: a link per rigid body, with
@@ -40,14 +45,17 @@ typedef AssemblyPart = {id:String, robotIndex:Int, linkIndex:Int, offset:materia
  */
 class AssemblyRobot {
   /** The program of `control` (or of the one implicit controller), or null when it runs none. */
-  static function programOf(session:ProjectDocumentSession, control:Null<materia.project.SceneArtifact.SceneArtifactCellController>)
-      :Null<materia.project.SceneArtifact.SceneArtifactMission> {
+  static function programOf(
+    session:ProjectDocumentSession,
+    control:Null<materia.project.SceneArtifact.SceneArtifactCellController>
+  ):Null<materia.project.SceneArtifact.SceneArtifactMission> {
     if (session.missions == null) return null;
     for (program in session.missions) if (control == null || program.controllerId == control.id) return program;
     return null;
   }
 
-  public static function missionFrameName(at:SceneArtifactPlace):String return "mission:" + at.occurrence + "/" + at.connector;
+  public static function missionFrameName(at:SceneArtifactPlace):String return "mission:"
+    + at.occurrence + "/" + at.connector;
   public final robot:SimulatedRobot;
   public final runtime:RobotRuntime;
   public final model:RobotModel;
@@ -74,11 +82,26 @@ class AssemblyRobot {
   /** The heaters of a printer's virtual device, or null when the assembly has none. */
   public final heaters:Null<robotkit.runtime.VirtualHeaters>;
 
-  function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, shapes:Array<RobotRuntimeLinkShape>,
-      jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>, warnings:Array<String>,
-      mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>,
-      heaters:Null<robotkit.runtime.VirtualHeaters>) {
+  function new(
+    robot:SimulatedRobot,
+    runtime:RobotRuntime,
+    model:RobotModel,
+    blueprint:RobotRuntimeBlueprint,
+    parts:Array<AssemblyPart>,
+    shapes:Array<RobotRuntimeLinkShape>,
+    jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>,
+    warnings:Array<String>,
+    mobile:Null<MobileBase>,
+    toolFrames:Map<
+      String,
+      robotkit.model.Frame
+  >,
+    missionFrames:Map<
+      String,
+      robotkit.model.Frame
+  >,
+    heaters:Null<robotkit.runtime.VirtualHeaters>
+  ) {
     this.heaters = heaters;
     this.robot = robot;
     this.runtime = runtime;
@@ -104,34 +127,66 @@ class AssemblyRobot {
   }
 
   /** The world pose of a part's own frame, from its link's pose and its offset on that link. */
-  public static function partPose(simulation:Simulation, part:AssemblyPart):{position:Array<Float>, rotation:Array<Float>}
-    return compose(simulation.linkPose(part.robotIndex, part.linkIndex), part.offset);
+  public static function partPose(simulation:Simulation, part:AssemblyPart): {
+    position: Array<Float>,
+    rotation: Array<Float>
+  } return compose(
+    simulation.linkPose(
+      part.robotIndex,
+      part.linkIndex
+    ),
+    part.offset
+  );
 
   /** `pose` followed by `offset`: positions in metres, rotations as xyzw quaternions. */
-  public static function compose(pose:{position:Array<Float>, rotation:Array<Float>},
-      offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>}
-    return composeComponents(pose.position, pose.rotation, offset);
+  public static function compose(
+    pose: {position: Array<Float>, rotation: Array<Float>},
+    offset:materia.assembly.AssemblyRecord.AssemblyFrame
+  ): {
+    position: Array<Float>,
+    rotation: Array<Float>
+  } return composeComponents(
+    pose.position,
+    pose.rotation,
+    offset
+  );
 
   /** Compose directly from pose components without allocating a temporary pose wrapper. */
-  public static function composeComponents(position:Array<Float>, rotation:Array<Float>,
-      offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>} {
+  public static function composeComponents(
+    position:Array<Float>,
+    rotation:Array<Float>,
+    offset:materia.assembly.AssemblyRecord.AssemblyFrame
+  ): {
+    position: Array<Float>,
+    rotation: Array<Float>
+  } {
     var q = rotation;
     var x = q[0], y = q[1], z = q[2], w = q[3];
     var tx = 2 * (y * offset.z - z * offset.y);
     var ty = 2 * (z * offset.x - x * offset.z);
     var tz = 2 * (x * offset.y - y * offset.x);
-    return {position: [position[0] + (offset.x + w * tx + y * tz - z * ty),
+    return {
+      position: [
+        position[0] + (offset.x + w * tx + y * tz - z * ty),
         position[1] + (offset.y + w * ty + z * tx - x * tz),
-        position[2] + (offset.z + w * tz + x * ty - y * tx)],
-      rotation: [w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy,
+        position[2] + (offset.z + w * tz + x * ty - y * tx)
+      ],
+      rotation: [
+        w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy,
         w * offset.qy - x * offset.qz + y * offset.qw + z * offset.qx,
         w * offset.qz + x * offset.qy - y * offset.qx + z * offset.qw,
-        w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz]};
+        w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz
+      ]
+    };
   }
 
   /** Compose a link pose and part offset into reusable frame storage. */
-  public static function composeComponentsInto(position:Array<Float>, rotation:Array<Float>,
-      offset:materia.assembly.AssemblyRecord.AssemblyFrame, target:AssemblyFrame):Void {
+  public static function composeComponentsInto(
+    position:Array<Float>,
+    rotation:Array<Float>,
+    offset:materia.assembly.AssemblyRecord.AssemblyFrame,
+    target:AssemblyFrame
+  ):Void {
     var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
     var tx = 2 * (y * offset.z - z * offset.y);
     var ty = 2 * (z * offset.x - x * offset.z);
@@ -161,29 +216,42 @@ class AssemblyRobot {
     var definitionId:Null<String> = null;
     for (item in flat.occurrences) if (item.id == at.occurrence) definitionId = item.definition;
     if (definitionId == null) throw 'The assembly has no occurrence "${at.occurrence}"';
-    for (component in flat.definitions) if (component.id == definitionId)
-      for (connector in component.connectors) if (connector.name == at.connector) return connector.frame;
+    for (component in flat.definitions) if (component.id
+      == definitionId) for (connector in component.connectors) if (connector.name
+      == at.connector) return connector.frame;
     throw 'Occurrence "${at.occurrence}" has no connector "${at.connector}"';
   }
 
   /** The id the assembly's robot takes in the world. */
-  public static function idFor(assembly:AssemblyDefinition, ?controllerId:String):String
-    return "assembly:" + assembly.id + (controllerId == null ? "" : ":" + controllerId);
+  public static function idFor(assembly:AssemblyDefinition,
+    ?controllerId:String):String return "assembly:" + assembly.id + (controllerId == null ? "" : ":" + controllerId);
 
   /**
    * The occurrences that are not part of the assembly robot: parts flagged dynamic (a workpiece),
    * and a mobile robot's surroundings, which simulate as objects of their own, moving or held where
    * they stand; the assembly robot has no link for them.
    */
-  static function unownedOccurrences(session:ProjectDocumentSession, assembly:AssemblyDefinition,
-      free:Map<String, Bool>):Map<String, Bool> {
+  static function unownedOccurrences(
+    session:ProjectDocumentSession,
+    assembly:AssemblyDefinition,
+    free:Map<String, Bool>
+  ):Map<
+    String,
+    Bool
+  > {
     var result = new Map<String, Bool>();
     for (id in free.keys()) result.set(id, true);
     var mobile = session.mobileBase;
     if (mobile != null && mobile.robot != null) {
       var prefix = mobile.robot + "/";
-      for (occurrence in materia.assembly.AssemblyDefinitionFlattener.flatten(assembly).occurrences)
-        if (!StringTools.startsWith(occurrence.id, prefix)) result.set(occurrence.id, true);
+      for (occurrence in materia
+        .assembly.AssemblyDefinitionFlattener.flatten(assembly).occurrences) if (!StringTools.startsWith(
+          occurrence.id,
+          prefix
+        )) result.set(
+          occurrence.id,
+          true
+        );
     }
     return result;
   }
@@ -238,10 +306,20 @@ class AssemblyRobot {
     }
   }
 
-  public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
-      assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
-      ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController,
-      ?restContactGroup:haxe.Int64, virtualNutrunner:Bool = false):AssemblyRobot {
+  public static function add(
+    candidate:Simulation,
+    scene:EditorScene,
+    session:ProjectDocumentSession,
+    assembly:AssemblyDefinition,
+    supportsClosures:Bool,
+    revision:Int,
+    robotIndex:Int,
+    ?channels:Array<ProcessChannelDeclaration>,
+    virtualWelder:Bool = false,
+    ?control:SceneArtifactCellController,
+    ?restContactGroup:haxe.Int64,
+    virtualNutrunner:Bool = false
+  ):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -252,42 +330,52 @@ class AssemblyRobot {
     for (record in scene.records()) sceneParts.set(record.id, record);
     var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
     for (part in physical.parts) physicalParts.set(part.id, part);
-    for (part in physical.parts) if (part.collisionWarning != null)
-      warnings.push(part.id + ": " + part.collisionWarning);
+    for (part in physical.parts) if (part.collisionWarning
+      != null) warnings.push(part.id + ": " + part.collisionWarning);
     // A part the user gave another material keeps its volume and takes that material's density.
     var masses = new Map<String, Float>();
     for (occurrence in assembly.occurrences) {
       if (unowned.exists(occurrence.id)) continue;
       var record = sceneParts.get("project:" + occurrence.id);
       var part = physicalParts.get(occurrence.definition);
-      if (record == null || part == null)
-        throw 'Assembly occurrence "${occurrence.id}" is missing its generated part';
-      if (record.collisionEnabled && (part.collisionHull == null || part.collisionHull.length < 12))
-        throw 'Assembly part "${occurrence.definition}" has no convex collision hull';
+      if (record == null || part == null) throw 'Assembly occurrence "${occurrence.id}" is missing its generated part';
+      if (record.collisionEnabled && (part.collisionHull == null || part.collisionHull.length
+        < 12)) throw 'Assembly part "${occurrence.definition}" has no convex collision hull';
       var baseMass = part.volume * part.density * Math.pow(physical.metresPerUnit, 3);
       var chosenMass = record.mass;
-      if (part.physicalMassDeclared != true && record.materialId != null && record.materialId != part.materialId &&
-          Math.abs(record.mass - baseMass) <= 1e-9 * Math.max(1.0, baseMass)) {
+      if (part.physicalMassDeclared != true && record.materialId != null
+        && record.materialId != part.materialId && Math.abs(record.mass - baseMass) <= 1e-9 * Math.max(
+          1.0,
+          baseMass
+        )) {
         var density:Null<Float> = null;
-        for (material in session.customMaterials)
-          if (material.id == record.materialId) { density = material.physical.density; break; }
+        for (material in session.customMaterials) if (material.id == record.materialId) {
+          density = material.physical.density;
+          break;
+        }
         if (density == null) density = MaterialLibrary.require(record.materialId).physical.density;
         chosenMass = part.volume * density * Math.pow(physical.metresPerUnit, 3);
       }
-      if (!Math.isFinite(chosenMass) || chosenMass < 0)
-        throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
+      if (!Math.isFinite(chosenMass)
+        || chosenMass < 0) throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
       masses.set(occurrence.id, chosenMass);
     }
     var ownedJoints = control == null ? null : control.joints;
     if (ownedJoints != null) {
-      var movable = [for (joint in AssemblyDefinitionFlattener.flatten(assembly).joints)
-        if (Std.string(joint.role) == "tree" && Std.string(joint.type) != "fixed") joint.id];
+      var movable = [for (joint in AssemblyDefinitionFlattener.flatten(assembly).joints) if (Std.string(joint.role)
+        == "tree" && Std.string(joint.type) != "fixed") joint.id];
       if (movable.length == ownedJoints.length) ownedJoints = null;
     }
-    var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id),
+    var converted = AssemblySimulationBridge.toRobotModel(
+      assembly,
+      physical,
+      session.projectAssemblyState,
+      [for (id in free.keys()) id],
+      id -> masses.get(id),
       control == null ? session.mobileBase : null,
-      ownedJoints, control == null || ownedJoints == null ? null : control.sensors);
+      ownedJoints,
+      control == null || ownedJoints == null ? null : control.sensors
+    );
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
@@ -297,14 +385,18 @@ class AssemblyRobot {
     var rolling = new Map<Int, Bool>();
     if (converted.profile.mobileBase != null) switch (converted.profile.mobileBase.drive) {
       case Differential(left, right, _, _):
-        for (joint in converted.model.joints)
-          if (joint.id == left || joint.id == right) rolling.set(converted.model.links.indexOf(joint.child), true);
+        for (joint in converted.model.joints) if (joint.id == left || joint.id == right) rolling.set(
+          converted.model.links.indexOf(joint.child),
+          true
+        );
       case _:
     }
     var contacts = new Map<String, materia.project.SceneContactSurface>();
     var motion = session.machineMotion;
-    if (motion != null && motion.contacts != null)
-      for (contact in motion.contacts) contacts.set(contact.occurrence, contact.surface);
+    if (motion != null && motion.contacts != null) for (contact in motion.contacts) contacts.set(
+      contact.occurrence,
+      contact.surface
+    );
     var simulationShapes:Array<RobotRuntimeLinkShape> = [];
     // CAD physical-part hulls retain their exact convex geometry. A pneumatic
     // joint's connected links need an explicit contact response: the simulator's
@@ -313,30 +405,28 @@ class AssemblyRobot {
     // of stiffening every part in the machine.
     var pneumaticContactLinks = new Map<Int, Bool>();
     var hasPneumaticActuator = false;
-    for (actuator in converted.model.actuators)
-      if (actuator.drive != null && actuator.drive.pneumatic() != null) {
-        hasPneumaticActuator = true;
-        switch actuator.transmission {
-          case SimpleTransmission(jointId, _, _):
-            var pending = [jointId];
-            var visited = new Map<String, Bool>();
-            while (pending.length > 0) {
-              var current:Null<String> = pending.pop();
-              if (current == null) continue;
-              if (visited.exists(current)) continue;
-              visited.set(current, true);
-              var joint = [for (candidate in converted.model.joints) if (candidate.id == current) candidate];
-              if (joint.length != 1) throw 'Pneumatic drive references missing joint "$current"';
-              pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].parent), true);
-              pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].child), true);
-              // Pneumatic force enters through the driven coordinate, but every
-              // mechanically coupled jaw must stop against the workpiece with
-              // the same contact response.
-              for (coupling in converted.model.couplings)
-                if (coupling.leader == current) pending.push(coupling.follower);
-            }
-          case _:
-        }
+    for (actuator in converted.model.actuators) if (actuator.drive != null && actuator.drive.pneumatic() != null) {
+      hasPneumaticActuator = true;
+      switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _):
+          var pending = [jointId];
+          var visited = new Map<String, Bool>();
+          while (pending.length > 0) {
+            var current:Null<String> = pending.pop();
+            if (current == null) continue;
+            if (visited.exists(current)) continue;
+            visited.set(current, true);
+            var joint = [for (candidate in converted.model.joints) if (candidate.id == current) candidate];
+            if (joint.length != 1) throw 'Pneumatic drive references missing joint "$current"';
+            pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].parent), true);
+            pneumaticContactLinks.set(converted.model.links.indexOf(joint[0].child), true);
+            // Pneumatic force enters through the driven coordinate, but every
+            // mechanically coupled jaw must stop against the workpiece with
+            // the same contact response.
+            for (coupling in converted.model.couplings) if (coupling.leader == current) pending.push(coupling.follower);
+          }
+        case _:
+      }
     }
     var pneumaticContact = hasPneumaticActuator ? SimulationContactSurfaces.robotPart() : null;
     var fingerPadSurfaces = new Map<String, robotkit.model.CollisionShape.ContactSurface>();
@@ -346,42 +436,50 @@ class AssemblyRobot {
       var surface = SimulationContactSurfaces.gripperFinger(gripper.fingerPadFrictionCoefficient);
       for (member in gripper.padMembers) fingerPadSurfaces.set(member, surface);
     }
-    var hobbingStock=session.machineMotion==null||session.machineMotion.hobbing==null?null:session.machineMotion.hobbing.stock;
+    var hobbingStock = session.machineMotion == null
+      || session.machineMotion.hobbing == null ? null : session.machineMotion.hobbing.stock;
     for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) {
       // RingStock owns removal for this workpiece. Its uncut convex envelope
       // would otherwise resist the cutter as an indestructible solid. Keep mass/inertia.
-      if(hobbingStock!=null&&hull.shape.name==hobbingStock)continue;
+      if (hobbingStock != null && hull.shape.name == hobbingStock) continue;
       var record = sceneParts.get("project:" + hull.shape.name);
       if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
         var simulationShape = hull.shape;
         var surface = contacts.get(hull.shape.name);
         if (surface != null) {
-          simulationShape.surface = new ContactSurface(surface.friction.copy(), surface.frictionDimensions,
-            surface.contactTimeConstant, surface.contactDampingRatio);
+          simulationShape.surface = new ContactSurface(
+            surface.friction.copy(),
+            surface.frictionDimensions,
+            surface.contactTimeConstant,
+            surface.contactDampingRatio
+          );
           simulationShape.contact = switch surface.filter {
-            case Layers: ShapeContact.Layers;
-            case PairsOnly: ShapeContact.PairsOnly;
-            case PairsAndEnvironment: ShapeContact.PairsAndEnvironment;
+            case Layers:
+              ShapeContact.Layers;
+            case PairsOnly:
+              ShapeContact.PairsOnly;
+            case PairsAndEnvironment:
+              ShapeContact.PairsAndEnvironment;
           };
         } else {
           var padSurface = fingerPadSurfaces.get(hull.shape.name);
           if (padSurface != null) simulationShape.surface = padSurface;
-          else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
-            simulationShape.surface = pneumaticContact;
+          else if (pneumaticContact != null
+            && pneumaticContactLinks.exists(hull.link)) simulationShape.surface = pneumaticContact;
         }
         simulationShapes.push(hull);
       }
     }
-    if (converted.closureIds.length > 0 && !supportsClosures)
-      throw "Assembly closures require MuJoCo equality constraints: " +
-        converted.closureIds.join(", ");
+    if (converted.closureIds.length > 0
+      && !supportsClosures) throw "Assembly closures require MuJoCo equality constraints: "
+      + converted.closureIds.join(", ");
     var closures:Array<SimulationClosure> = [];
     for (closure in converted.closures) {
       var type = switch (closure.type) {
         case materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_FIXED;
         case materia.assembly.AssemblyDefinition.AssemblyJointType.Revolute,
-             materia.assembly.AssemblyDefinition.AssemblyJointType.Continuous:
+          materia.assembly.AssemblyDefinition.AssemblyJointType.Continuous:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
         case materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
@@ -391,17 +489,16 @@ class AssemblyRobot {
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_CYLINDRICAL;
         case materia.assembly.AssemblyDefinition.AssemblyJointType.Planar:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PLANAR;
-        default: throw 'Unknown assembly closure "${closure.id}" type';
+        default:
+          throw 'Unknown assembly closure "${closure.id}" type';
       }
       var parent = -1, child = -1;
       for (index in 0...converted.model.links.length) {
         if (converted.model.links[index].id == closure.parent) parent = index;
         if (converted.model.links[index].id == closure.child) child = index;
       }
-      if (parent < 0 || child < 0)
-        throw 'Assembly closure "${closure.id}" references an unknown link';
-      closures.push(new SimulationClosure(parent, child, type,
-        closure.anchorParent, closure.axisParent));
+      if (parent < 0 || child < 0) throw 'Assembly closure "${closure.id}" references an unknown link';
+      closures.push(new SimulationClosure(parent, child, type, closure.anchorParent, closure.axisParent));
     }
     // Each tool reports on its sensor (a suction tool's vacuum, a torch's weld circuit), mounted at the tool's
     // contact on the link that carries it.
@@ -413,13 +510,16 @@ class AssemblyRobot {
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
       if (tool.kind == "gripper") {
         var physical = [for (sensor in converted.model.sensors) if (sensor.id == sensorId) sensor];
-        if (physical.length != 1 || physical[0].kind != "joint_switch")
-          throw 'Gripper sensor "$sensorId" must be a joint switch in the robot assembly';
+        if (physical.length != 1 || physical[0].kind
+          != "joint_switch") throw 'Gripper sensor "$sensorId" must be a joint switch in the robot assembly';
       } else {
-        var kind = tool.kind == "screwdriver" ? robotkit.tool.ScrewdriverContract.SENSOR_KIND :
-          tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
+        var kind = tool.kind == "screwdriver" ? robotkit.tool.ScrewdriverContract.SENSOR_KIND
+          : tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
         var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
-        var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
+        var mount = converted.model.addFrame(new robotkit.model.Frame(
+          sensorId + " mount",
+          converted.model.links[carrier.link]
+        ));
         mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
         sensor.frame = mount;
       }
@@ -427,13 +527,22 @@ class AssemblyRobot {
     // A print job's heaters report on sensors of their own, mounted on the parts that carry the thermistors. In a cell
     // of several controllers, the job runs on the one whose robot drives the extruder.
     var printJob = session.printJob;
-    if (printJob != null && control != null && [for (joint in converted.model.joints) if (joint.id == printJob.extruder) joint].length == 0)
-      printJob = null;
+    if (printJob != null && control != null
+      && [for (joint in converted.model.joints) if (joint.id == printJob.extruder) joint].length == 0) printJob = null;
     if (printJob != null) for (heater in printJob.heaters) {
       var carrier = converted.partLinks.get(heater.mount);
-      if (carrier == null) throw 'Heater "${heater.name}" is mounted on "${heater.mount}", which is not part of the printer';
-      var sensor = converted.model.addSensor(new robotkit.model.Sensor(heater.sensor, robotkit.tool.HeaterSensor.KIND, 0.0, heater.sensor));
-      var mount = converted.model.addFrame(new robotkit.model.Frame(heater.sensor + " mount", converted.model.links[carrier.link]));
+      if (carrier
+        == null) throw 'Heater "${heater.name}" is mounted on "${heater.mount}", which is not part of the printer';
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(
+        heater.sensor,
+        robotkit.tool.HeaterSensor.KIND,
+        0.0,
+        heater.sensor
+      ));
+      var mount = converted.model.addFrame(new robotkit.model.Frame(
+        heater.sensor + " mount",
+        converted.model.links[carrier.link]
+      ));
       mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
       sensor.frame = mount;
     }
@@ -443,9 +552,18 @@ class AssemblyRobot {
       if (carrier == null) throw '"$name" is not mounted on a part of the robot';
       var connector = connectorFrame(assembly, at);
       var scale = physical.metresPerUnit;
-      var placed = AssemblyFrames.compose(carrier.offset,
-        {x: connector.x * scale, y: connector.y * scale, z: connector.z * scale,
-          qx: connector.qx, qy: connector.qy, qz: connector.qz, qw: connector.qw});
+      var placed = AssemblyFrames.compose(
+        carrier.offset,
+        {
+          x: connector.x * scale,
+          y: connector.y * scale,
+          z: connector.z * scale,
+          qx: connector.qx,
+          qy: connector.qy,
+          qz: connector.qz,
+          qw: connector.qw
+        }
+      );
       var frame = converted.model.addFrame(new robotkit.model.Frame(name, converted.model.links[carrier.link]));
       frame.position = [placed.x, placed.y, placed.z];
       frame.rotation = [placed.qx, placed.qy, placed.qz, placed.qw];
@@ -453,25 +571,37 @@ class AssemblyRobot {
     }
     // Each tool's contact is a frame of the robot, where its arm's programs put the tool.
     var toolFrames = new Map<String, robotkit.model.Frame>();
-    for (tool in session.robotTools)
-      if (control == null || converted.partLinks.get(tool.contact.occurrence) != null)
-        toolFrames.set(tool.contact.occurrence, mountFrame(tool.contact.occurrence + " contact", tool.contact));
+    for (tool in session.robotTools) if (control == null
+      || converted.partLinks.get(tool.contact.occurrence) != null) toolFrames.set(
+        tool.contact.occurrence,
+        mountFrame(
+          tool.contact.occurrence + " contact",
+          tool.contact
+        )
+      );
     // Each scanner scans from its mount connector.
     for (scanner in session.robotSensors) {
       if (control != null && converted.partLinks.get(scanner.mount.occurrence) == null) continue;
-      var sensor = converted.model.addSensor(new robotkit.model.Sensor(scanner.id, scanner.kind,
-        scanner.updateRate == null ? 0.0 : cast scanner.updateRate, scanner.id));
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(
+        scanner.id,
+        scanner.kind,
+        scanner.updateRate == null ? 0.0 : cast scanner.updateRate,
+        scanner.id
+      ));
       if (scanner.rayCount != null) sensor.rayCount = cast scanner.rayCount;
       if (scanner.maxRange != null) sensor.maxRange = cast scanner.maxRange;
       sensor.frame = mountFrame(scanner.id + " mount", scanner.mount);
     }
-    if (control != null) for (wire in session.signals)
-      if (wire.to.controller == control.id)
-        converted.model.addSensor(new robotkit.model.Sensor(wire.name, "digital_input", 0.0, wire.name));
+    if (control != null) for (wire in session.signals) if (wire.to.controller
+      == control.id) converted.model.addSensor(new robotkit.model.Sensor(
+        wire.name,
+        "digital_input",
+        0.0,
+        wire.name
+      ));
     var missionFrames = new Map<String, robotkit.model.Frame>();
     var program = programOf(session, control);
-    if (program != null)
-      for (step in program.steps) if (step.kind == "moveJoints" || step.kind == "moveVia") {
+    if (program != null) for (step in program.steps) if (step.kind == "moveJoints" || step.kind == "moveVia") {
       var at:SceneArtifactPlace = cast step.at;
       var name = missionFrameName(at);
       if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
@@ -484,39 +614,52 @@ class AssemblyRobot {
       // The printer's heaters run on the device. Its board has no switch inputs for a CoreXY (a switch joint driven by
       // two motors), so the machine is referenced where its initial pose has it, and its home switches are not wired.
       converted.model.switches.resize(0);
-      var binding = robotkit.device.DeviceBinding.bind(converted.model,
-        robotkit.device.DeviceLayout.forActuators(converted.model), printJob.controller.stepTickHz);
+      var binding = robotkit.device.DeviceBinding.bind(
+        converted.model,
+        robotkit.device.DeviceLayout.forActuators(converted.model),
+        printJob.controller.stepTickHz
+      );
       converted.model = binding.model;
       device = new robotkit.runtime.VirtualDeviceOptions();
       device.actuators = binding.virtualActuators();
       device.baud = PrintProgramPlayer.LINK_BAUD;
       extruder = PrintProgramPlayer.extruderOnDevice(binding, printJob.extruder);
     } else if (machine != null && machine.virtualDevice == true) {
-      var binding = robotkit.device.DeviceBinding.bind(converted.model,
-        robotkit.device.DeviceLayout.forActuators(converted.model), 40000);
+      var binding = robotkit.device.DeviceBinding.bind(
+        converted.model,
+        robotkit.device.DeviceLayout.forActuators(converted.model),
+        40000
+      );
       converted.model = binding.model;
       device = new robotkit.runtime.VirtualDeviceOptions();
       device.actuators = binding.virtualActuators();
     }
-    if (machine != null && (machine.program != null || machine.pressBrake != null)) converted.model.materializeLimits(true);
+    if (machine != null
+      && (machine.program != null || machine.pressBrake != null)) converted.model.materializeLimits(true);
     if (virtualWelder || virtualNutrunner) {
       // The device's braking bound is the same arm-program policy, rather than an invented motor acceleration.
       for (joint in converted.model.joints) {
         var acceleration = joint.limits.maxAcceleration;
-        joint.limits.maxAcceleration = acceleration == null ? MissionPlayer.ARM_ACCELERATION
-          : Math.min(acceleration, MissionPlayer.ARM_ACCELERATION);
+        joint.limits.maxAcceleration = acceleration == null ? MissionPlayer.ARM_ACCELERATION : Math.min(
+          acceleration,
+          MissionPlayer.ARM_ACCELERATION
+        );
       }
     }
-    var hobbing=machine==null?null:machine.hobbing;
-    if(hobbing!=null)for(actuator in converted.model.actuators)switch actuator.transmission {
-      case SimpleTransmission(id,_,_) if(id==hobbing.axes[5]):
-        var drive=actuator.drive==null?null:actuator.drive.servo();
-        if(drive==null)throw "Hobbing table needs a servo drive";
+    var hobbing = machine == null ? null : machine.hobbing;
+    if (hobbing != null) for (actuator in converted.model.actuators) switch actuator.transmission {
+      case SimpleTransmission(id, _, _) if (id == hobbing.axes[5]):
+        var drive = actuator.drive == null ? null : actuator.drive.servo();
+        if (drive == null) throw "Hobbing table needs a servo drive";
         // Measured-master velocity feedforward requires a physical servo target;
         // a position-only computed-torque target has a steady moving-reference lag.
-        if(actuator.servoStiffness<=0)actuator.servoStiffness=drive.defaultStiffness();
-        if(actuator.servoDamping<=0)actuator.servoDamping=robotkit.model.ActuatorDrive.ServoDrive.defaultDamping(actuator.servoStiffness);
-        actuator.assumptions.push({quantity:"servo gains",label:"assumed drive-default table stiffness and 10 ms damping time"});
+        if (actuator.servoStiffness <= 0) actuator.servoStiffness = drive.defaultStiffness();
+        if (actuator.servoDamping
+          <= 0) actuator.servoDamping = robotkit.model.ActuatorDrive.ServoDrive.defaultDamping(actuator.servoStiffness);
+        actuator.assumptions.push({
+          quantity: "servo gains",
+          label: "assumed drive-default table stiffness and 10 ms damping time"
+        });
       case _:
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
@@ -530,17 +673,18 @@ class AssemblyRobot {
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
     if (channels != null) for (channel in channels) blueprint.addChannel(channel);
-    if(hobbing!=null){
-      if(control!=null)throw "Hobbing currently needs a single assembly controller";
-      var index=[for(i in 0...converted.model.joints.length)if(converted.model.joints[i].id==hobbing.axes[5])i];
-      if(index.length!=1)throw "Hobbing table joint is missing";
+    if (hobbing != null) {
+      if (control != null) throw "Hobbing currently needs a single assembly controller";
+      var index = [for (i in 0...converted.model.joints.length) if (converted.model.joints[i].id == hobbing.axes[5]) i];
+      if (index.length != 1) throw "Hobbing table joint is missing";
       blueprint.addChannel(robotkit.execution.GearEvents.declaration(index[0]));
-      blueprint.ownerPeriodNs=haxe.Int64.ofInt(Std.int(Math.round(1e9/hobbing.controllerHz)));
+      blueprint.ownerPeriodNs = haxe.Int64.ofInt(Std.int(Math.round(1e9 / hobbing.controllerHz)));
     }
-    var guardPolicy=machine==null?null:machine.enclosureGuard;
-    if(guardPolicy!=null) {
-      var door=[for(i in 0...converted.model.joints.length)if(converted.model.joints[i].id==guardPolicy.doorJoint)i];
-      if(door.length!=1)throw "Enclosure door actuator joint is missing";
+    var guardPolicy = machine == null ? null : machine.enclosureGuard;
+    if (guardPolicy != null) {
+      var door = [for (i in 0...converted.model.joints.length) if (converted.model.joints[i].id
+        == guardPolicy.doorJoint) i];
+      if (door.length != 1) throw "Enclosure door actuator joint is missing";
       blueprint.processModelJoints.push(door[0]);
     }
     // Each robot tool brings its own channels with the stop policy it needs (RobotKit's `ToolChannels`): a suction tool
@@ -556,15 +700,21 @@ class AssemblyRobot {
           if (index < 0) throw 'Screwdriver process joint "$name" is absent';
           blueprint.processModelJoints.push(index);
         }
-        blueprint.addTool(new robotkit.tool.ScrewdriverChannels(tool.channel, driver.directionChannel,
-          driver.programChannel, driver.vacuumChannel));
+        blueprint.addTool(new robotkit.tool.ScrewdriverChannels(
+          tool.channel,
+          driver.directionChannel,
+          driver.programChannel,
+          driver.vacuumChannel
+        ));
         continue;
       }
       var welder = tool.torch;
-      blueprint.addTool(welder != null
-        ? new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel)
-        : tool.kind == "gripper" ? new robotkit.tool.GripperChannels(tool.channel)
-        : new robotkit.tool.SuctionChannels(tool.channel));
+      blueprint.addTool(welder != null ? new processkit.tool.WeldChannels(
+        tool.channel,
+        welder.wireSpeedChannel,
+        welder.voltageChannel
+      ) : tool.kind == "gripper"
+        ? new robotkit.tool.GripperChannels(tool.channel) : new robotkit.tool.SuctionChannels(tool.channel));
     }
     var heaterSetups:Array<robotkit.runtime.VirtualHeaters.HeaterSetup> = [];
     if (printJob != null && device != null) {
@@ -578,8 +728,16 @@ class AssemblyRobot {
       var torch = torches[0];
       var welding = torch.torch;
       if (welding == null) throw "Virtual welding profile is missing";
-      processkit.simulation.VirtualWelderSupply.configure(device, blueprint,
-        {arc:torch.channel, wireSpeed:welding.wireSpeedChannel, voltage:welding.voltageChannel}, welding.efficiency);
+      processkit.simulation.VirtualWelderSupply.configure(
+        device,
+        blueprint,
+        {
+          arc: torch.channel,
+          wireSpeed: welding.wireSpeedChannel,
+          voltage: welding.voltageChannel
+        },
+        welding.efficiency
+      );
     }
     if (virtualNutrunner) {
       if (virtualWelder) throw "One virtual controller cannot have welding and nutrunner profiles together";
@@ -588,23 +746,53 @@ class AssemblyRobot {
       var tool = drivers[0], driver = tool.screwdriver;
       if (driver == null) throw "Virtual nutrunner capability is missing";
       // Process-owned axes are measured in the physical load, not emulated arm servo commands.
-      device.actuators = [for (actuator in device.actuators) if (blueprint.processModelJoints.indexOf(actuator.jointIndex) < 0) actuator];
-      processkit.simulation.VirtualNutrunnerSupply.configure(device,blueprint,
-        {start:tool.channel,direction:driver.directionChannel,program:driver.programChannel,vacuum:driver.vacuumChannel},
-        processkit.screwdriving.ScrewdriverFrames.MAXIMUM_SILENCE);
+      device.actuators = [for (actuator in device
+        .actuators) if (blueprint.processModelJoints.indexOf(actuator.jointIndex) < 0) actuator];
+      processkit.simulation.VirtualNutrunnerSupply.configure(
+        device,
+        blueprint,
+        {
+          start: tool.channel,
+          direction: driver.directionChannel,
+          program: driver.programChannel,
+          vacuum: driver.vacuumChannel
+        },
+        processkit.screwdriving.ScrewdriverFrames.MAXIMUM_SILENCE
+      );
     }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;
     var position = origin == null ? [0.0, 0.0, 0.0] : [origin.x, origin.y, 0.0];
-    var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
+    var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [
+      0.0,
+      0.0,
+      Math.sin(origin.yaw / 2),
+      Math.cos(origin.yaw / 2)
+    ];
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
-    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, closures, null, null, null, null,
-      true, simulationExcludes(converted.model, simulationShapes), restContactGroup);
-    var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
-      program == null ? null : program.powerUpOffsets;
-    var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
-      program == null ? null : program.powerUpSideOffsets;
+    var runtime = candidate.addRobotAtPose(
+      blueprint,
+      position,
+      rotation,
+      device,
+      null,
+      closures,
+      null,
+      null,
+      null,
+      null,
+      true,
+      simulationExcludes(
+        converted.model,
+        simulationShapes
+      ),
+      restContactGroup
+    );
+    var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset
+      >> = session.cncJob != null ? session.cncJob.powerUpOffsets : program == null ? null : program.powerUpOffsets;
+    var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob
+      != null ? session.cncJob.powerUpSideOffsets : program == null ? null : program.powerUpSideOffsets;
     if ((authored != null && authored.length > 0) || (sideOffsets != null && sideOffsets.length > 0)) {
       var named = new Map<String, Float>();
       if (authored != null) for (entry in authored) {
@@ -622,18 +810,31 @@ class AssemblyRobot {
         candidate.setPowerUpSides(robotIndex, placement.offsets, placement.drives);
       } else candidate.setPowerUpOffsets(robotIndex, base);
     }
-    var robot = new SimulatedRobot(idFor(assembly,
-      control == null || session.controllers.length == 1 ? null : control.id), runtime, converted.model.name,
+    var robot = new SimulatedRobot(
+      idFor(
+        assembly,
+        control == null || session.controllers.length == 1 ? null : control.id
+      ),
+      runtime,
+      converted.model.name,
       [for (link in converted.model.links) link.id],
-      [for (joint in converted.model.joints) joint.id]);
+      [for (joint in converted.model.joints) joint.id]
+    );
     // A wheeled assembly's chassis rolls by the wheel rates the robot applies each tick, whoever commands them.
     var mobile:Null<MobileBase> = null;
     if (converted.profile.mobileBase != null) {
       mobile = MobileBase.fromBlueprint(robot, blueprint);
       var odometry = mobile.driveModel.createOdometry();
       if (odometry == null) throw "Only differential-drive assemblies can drive in the simulation";
-      candidate.setDifferentialDrive(robotIndex, odometry.leftWheelJoint, odometry.rightWheelJoint,
-        odometry.wheelRadius, odometry.trackWidth, odometry.leftDirection, odometry.rightDirection);
+      candidate.setDifferentialDrive(
+        robotIndex,
+        odometry.leftWheelJoint,
+        odometry.rightWheelJoint,
+        odometry.wheelRadius,
+        odometry.trackWidth,
+        odometry.leftDirection,
+        odometry.rightDirection
+      );
     }
     for (occurrence in assembly.occurrences) {
       if (unowned.exists(occurrence.id)) continue;
@@ -641,15 +842,36 @@ class AssemblyRobot {
       if (control != null && placed == null) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
       if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
-      if (placed == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link ' +
-        '(controller=${control == null ? "all" : control.id}, controllers=${session.controllers.length}, ' +
-        'robot=${converted.model.name}, owned joints=${ownedJoints == null ? "all" : ownedJoints.join(",")})';
-      parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
-        offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
+      if (placed == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link '
+        + '(controller=${control == null ? "all" : control.id}, controllers=${session.controllers.length}, '
+        + 'robot=${converted.model.name}, owned joints=${ownedJoints == null ? "all" : ownedJoints.join(",")})';
+      parts.push({
+        id: "project:" + occurrence.id,
+        robotIndex: robotIndex,
+        linkIndex: placed.link,
+        offset: placed.offset,
+        center: [for (coordinate in center) coordinate * physical.metresPerUnit]
+      });
     }
-    var heaters = printJob == null ? null : new robotkit.runtime.VirtualHeaters(candidate, runtime, robotIndex, heaterSetups);
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, cadbridge.AssemblySimulationBridge.shapes(converted.model),
-      converted.jointInterfaces, warnings, mobile,
-      toolFrames, missionFrames, heaters);
+    var heaters = printJob == null ? null : new robotkit.runtime.VirtualHeaters(
+      candidate,
+      runtime,
+      robotIndex,
+      heaterSetups
+    );
+    return new AssemblyRobot(
+      robot,
+      runtime,
+      converted.model,
+      blueprint,
+      parts,
+      cadbridge.AssemblySimulationBridge.shapes(converted.model),
+      converted.jointInterfaces,
+      warnings,
+      mobile,
+      toolFrames,
+      missionFrames,
+      heaters
+    );
   }
 }

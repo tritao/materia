@@ -11,7 +11,8 @@ class PreparedProjectCache {
 
   public function new(artifactHash:String, ?context:PreparedSceneCaches.PreparedSceneCacheContext) {
     this.context = context;
-    key = context == null ? "" : hex(Sha256.make(Bytes.ofString(VERSION + ":" + context.buildIdentity + ":" + artifactHash)));
+    key = context
+      == null ? "" : hex(Sha256.make(Bytes.ofString(VERSION + ":" + context.buildIdentity + ":" + artifactHash)));
   }
 
   public function read(parts:Array<materia.project.SceneArtifact.SceneArtifactPart>):Null<Array<PreparedProjectPart>> {
@@ -31,12 +32,17 @@ class PreparedProjectCache {
     if (context == null) return;
     try {
       context.store.write(key, PreparedSceneCodec.encode(parts));
-    } catch (_:Dynamic) {}
+    } catch (_:Dynamic) {
+    }
   }
 
   public static function hex(bytes:Bytes):String {
     var digits = "0123456789abcdef", result = new StringBuf();
-    for (i in 0...bytes.length) { var value = bytes.get(i); result.add(digits.charAt(value >>> 4)); result.add(digits.charAt(value & 15)); }
+    for (i in 0...bytes.length) {
+      var value = bytes.get(i);
+      result.add(digits.charAt(value >>> 4));
+      result.add(digits.charAt(value & 15));
+    }
     return result.toString();
   }
 }

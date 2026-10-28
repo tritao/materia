@@ -14,48 +14,82 @@ class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 2;
 
-  public static function encode(scene:EditorScene,
-    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
-    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>,
-    ?customMaterials:Array<MaterialDef>, ?recipeDocument:String,
-    ?robotMotions:Array<RobotMotionTrack>):String {
+  public static function encode(
+    scene:EditorScene,
+    ?sensors:SensorConfiguration,
+    ?script:ScriptOwnershipRecord,
+    ?bim:BimDocument,
+    ?project:ProjectSceneRecord,
+    ?authoredObjects:Array<SceneObjectData>,
+    ?customMaterials:Array<MaterialDef>,
+    ?recipeDocument:String,
+    ?robotMotions:Array<RobotMotionTrack>
+  ):String {
     var custom = customMaterials == null ? [] : customMaterials;
     MaterialLibrary.validateCustom(custom);
     var objects = script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) : [];
     var encodedObjects:Array<Dynamic> = [];
     for (object in objects) encodedObjects.push(encodeObject(object, custom));
-    return Json.stringify({format: FORMAT, version: VERSION, objects: encodedObjects,
-      sensors: script == null && sensors != null ? sensors.records() : null,
-      script: script, project: project, materials: Json.parse(JsonWire.encode(MaterialLibrary.all().concat(custom))),
-      bim: bim == null ? null : Json.parse(BimCodec.encode(bim)),
-      recipeDocument: recipeDocument,
-      robotMotions: robotMotions == null || robotMotions.length == 0 ? null :
-        [for (track in robotMotions) track.record()]}, null, "  ") + "\n";
+    return Json.stringify(
+      {
+        format: FORMAT,
+        version: VERSION,
+        objects: encodedObjects,
+        sensors: script == null && sensors != null ? sensors.records() : null,
+        script : script,
+        project : project,
+        materials : Json.parse(JsonWire.encode(MaterialLibrary.all().concat(custom))),
+        bim : bim == null ? null : Json.parse(BimCodec.encode(bim)),
+        recipeDocument : recipeDocument,
+        robotMotions : robotMotions == null
+      || robotMotions.length == 0 ? null : [for (track in robotMotions) track.record()]
+    },
+      null,
+      "  "
+    ) + "\n";
   }
 
   /** Serialize editor color fields as sparse material visuals. */
   public static function encodeObject(object:SceneObjectData, ?customMaterials:Array<MaterialDef>):Dynamic {
     var custom = customMaterials == null ? [] : customMaterials;
     var finish = object.appearance == null ? "neutral" : object.appearance.finish;
-    var id = object.materialId == null ?
-      (hasMaterial(finish, custom) ? finish : "neutral") : object.materialId;
+    var id = object.materialId == null ? (hasMaterial(finish, custom) ? finish : "neutral") : object.materialId;
     var material = resolveMaterial(id, custom);
     var result:Dynamic = {};
-    for (name in Reflect.fields(object)) if (["red", "green", "blue", "appearance", "materialId"].indexOf(name) < 0 &&
-        (name != "worker" || object.worker != null))
-      Reflect.setField(result, name, Reflect.field(object, name));
+    for (name in Reflect.fields(object)) if (["red", "green", "blue",
+      "appearance", "materialId"].indexOf(name) < 0 && (name != "worker" || object.worker != null)) Reflect.setField(
+        result,
+        name,
+        Reflect.field(
+          object,
+          name
+        )
+      );
     Reflect.setField(result, "materialId", id);
     var visual:Dynamic = {};
     var color = material.visual.baseColor;
-    if (Math.abs(object.red - color[0]) > 1e-6 || Math.abs(object.green - color[1]) > 1e-6 ||
-        Math.abs(object.blue - color[2]) > 1e-6)
-      Reflect.setField(visual, "baseColor", [object.red, object.green, object.blue]);
+    if (Math.abs(object.red - color[0]) > 1e-6
+      || Math.abs(object.green - color[1]) > 1e-6 || Math.abs(object.blue - color[2]) > 1e-6) Reflect.setField(
+        visual,
+        "baseColor",
+        [
+          object.red,
+          object.green,
+          object.blue
+        ]
+      );
     var appearance = object.appearance == null ? Appearances.neutral() : object.appearance;
     if (appearance.finish != id) Reflect.setField(visual, "finish", appearance.finish);
-    if (Math.abs(appearance.metallic - material.visual.metallic) > 1e-6)
-      Reflect.setField(visual, "metallic", appearance.metallic);
-    if (Math.abs(appearance.roughness - material.visual.roughness) > 1e-6)
-      Reflect.setField(visual, "roughness", appearance.roughness);
+    if (Math.abs(appearance.metallic - material.visual.metallic) > 1e-6) Reflect.setField(
+      visual,
+      "metallic",
+      appearance.metallic
+    );
+    if (Math.abs(appearance.roughness - material.visual.roughness) > 1e-6) Reflect.setField(
+      visual,
+      "roughness",
+      appearance.roughness
+    );
     if (Reflect.fields(visual).length > 0) Reflect.setField(result, "visualOverrides", visual);
     return result;
   }
@@ -76,8 +110,8 @@ class SceneCodec {
   /** Parse once before decoding independently validated sections. */
   public static function parse(text:String):Dynamic {
     var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
-      throw "Unsupported scene document";
+    if (stringField(root,
+      "format") != FORMAT || numberField(root, "version") != VERSION) throw "Unsupported scene document";
     return root;
   }
 
@@ -104,54 +138,65 @@ class SceneCodec {
     var value:Dynamic = Reflect.field(root, "project");
     if (value == null) return null;
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
-    var version=numberField(value,"version");
-    if(version!=1&&version!=2)throw "Unsupported generated project record version";
+    var version = numberField(value, "version");
+    if (version != 1 && version != 2) throw "Unsupported generated project record version";
     var reference = stringField(value, "reference");
-    var variantId=optionalText(value,"variantId");
-    if(variantId!=null&&(StringTools.trim(variantId).length==0||variantId.length>500||containsNul(variantId)))throw "Invalid project variant ID";
+    var variantId = optionalText(value, "variantId");
+    if (variantId != null && (StringTools.trim(variantId).length == 0
+      || variantId.length > 500 || containsNul(variantId))) throw "Invalid project variant ID";
     var jobId = optionalText(value, "jobId");
-    if(variantId!=null&&version!=2)throw "Project variant selection requires record version 2";
-    if(variantId!=null&&jobId!=null)throw "A project selection cannot contain both variantId and jobId";
+    if (variantId != null && version != 2) throw "Project variant selection requires record version 2";
+    if (variantId != null && jobId != null) throw "A project selection cannot contain both variantId and jobId";
     if (jobId != null && (jobId.length == 0 || jobId.length > 500)) throw "Invalid project job ID";
-    for(name in ["initialView","inspectionCameras","hiddenPrefixes"])
-      if(Reflect.hasField(value,name))throw 'Removed project presentation field "$name"';
-    var presentation=optionalText(value,"presentation");
-    if(presentation!=null){if(presentation.length>2000000)throw "Authored presentation is too large";materia.presentation.PresentationEdits.decode(presentation);}
+    for (name in ["initialView", "inspectionCameras",
+      "hiddenPrefixes"]) if (Reflect.hasField(value, name)) throw 'Removed project presentation field "$name"';
+    var presentation = optionalText(value, "presentation");
+    if (presentation != null) {
+      if (presentation.length > 2000000) throw "Authored presentation is too large";
+      materia.presentation.PresentationEdits.decode(presentation);
+    }
     var assemblyState = optionalText(value, "assemblyState");
-    if (assemblyState != null && assemblyState.length > 2000000)
-      throw "Generated project assembly state is too large";
+    if (assemblyState != null && assemblyState.length > 2000000) throw "Generated project assembly state is too large";
     var assemblyDependentJoints = optionalTextArray(value, "assemblyDependentJoints", 4000);
     var assemblyMates = optionalText(value, "assemblyMates");
-    if (assemblyMates != null && assemblyMates.length > 2000000)
-      throw "Generated project mates are too large";
+    if (assemblyMates != null && assemblyMates.length > 2000000) throw "Generated project mates are too large";
     var overrides:Dynamic = field(value, "overrides");
     var removed:Dynamic = field(value, "removed");
     var instances:Dynamic = field(value, "instances");
-    if (!Std.isOfType(overrides, Array) || !Std.isOfType(removed, Array) ||
-        !Std.isOfType(instances, Array)) throw "Invalid generated project edits";
+    if (!Std.isOfType(overrides, Array) || !Std.isOfType(removed,
+      Array) || !Std.isOfType(instances, Array)) throw "Invalid generated project edits";
     var overrideValues:Array<Dynamic> = cast overrides;
     var removedValues:Array<Dynamic> = cast removed;
     var instanceValues:Array<Dynamic> = cast instances;
-    if (overrideValues.length > 10000 || removedValues.length > 10000 || instanceValues.length > 10000)
-      throw "Generated project has too many edits";
+    if (overrideValues.length > 10000
+      || removedValues.length > 10000 || instanceValues.length > 10000) throw "Generated project has too many edits";
     var seen = new Map<String, Bool>();
     var overrideRecords:Array<app.ProjectSceneRecord.ProjectFieldOverride> = [];
     for (item in overrideValues) {
       var id = stringField(item, "targetId");
       var editKey = id + ":" + stringField(item, "property");
-      if (seen.exists(editKey) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
-        throw "Invalid generated project override";
+      if (seen.exists(editKey) || Reflect.hasField(item,
+        "meshSnapshot") || Reflect.hasField(item, "cadGraph")) throw "Invalid generated project override";
       var kind = stringField(item, "kind");
-      if (["number", "boolean", "text", "vector", "text-list", "appearance"].indexOf(kind) < 0 ||
-          !Reflect.hasField(item, "value")) throw "Invalid generated project field edit";
+      if (["number", "boolean", "text", "vector", "text-list", "appearance"].indexOf(kind) < 0 || !Reflect.hasField(
+        item,
+        "value"
+      )) throw "Invalid generated project field edit";
       seen.set(editKey, true);
-      overrideRecords.push({targetId: id, property: stringField(item, "property"),
-        kind: kind, value: Reflect.field(item, "value")});
+      overrideRecords.push({
+        targetId: id,
+        property: stringField(item, "property"),
+        kind: kind,
+        value: Reflect.field(
+          item,
+          "value"
+        )
+      });
     }
     var removedIds:Array<String> = [];
     for (item in removedValues) {
-      if (!Std.isOfType(item, String) || StringTools.trim(cast item).length == 0 || containsNul(cast item))
-        throw "Invalid generated project removal ID";
+      if (!Std.isOfType(item, String) || StringTools.trim(cast item).length == 0
+        || containsNul(cast item)) throw "Invalid generated project removal ID";
       var id:String = cast item;
       if (seen.exists(id)) throw "Duplicate generated project edit ID";
       seen.set(id, true);
@@ -161,28 +206,42 @@ class SceneCodec {
     for (item in instanceValues) {
       var sourceId = stringField(item, "sourceId");
       var id = stringField(item, "id");
-      if (!Std.isOfType(field(item, "overrides"), Array) || seen.exists(id))
-        throw "Invalid generated project instance";
+      if (!Std.isOfType(field(item, "overrides"), Array) || seen.exists(id)) throw "Invalid generated project instance";
       seen.set(id, true);
       var instanceEdits:Array<app.ProjectSceneRecord.ProjectFieldOverride> = [];
       var rawEdits:Array<Dynamic> = cast field(item, "overrides");
       for (edit in rawEdits) {
         var editKind = stringField(edit, "kind");
-        if (["number", "boolean", "text", "vector", "text-list", "appearance"].indexOf(editKind) < 0 ||
-            !Reflect.hasField(edit, "value")) throw "Invalid generated project instance edit";
-        instanceEdits.push({targetId: stringField(edit, "targetId"),
-          property: stringField(edit, "property"), kind: editKind,
-          value: Reflect.field(edit, "value")});
+        if (["number",
+          "boolean", "text", "vector", "text-list", "appearance"].indexOf(editKind) < 0 || !Reflect.hasField(
+            edit,
+            "value"
+          )) throw "Invalid generated project instance edit";
+        instanceEdits.push({
+          targetId: stringField(edit, "targetId"),
+          property: stringField(edit, "property"),
+          kind: editKind,
+          value: Reflect.field(
+            edit,
+            "value"
+          )
+        });
       }
       instanceRecords.push({sourceId: sourceId, id: id, overrides: instanceEdits});
     }
-    var record:ProjectSceneRecord = {version: Std.int(version), reference: reference, overrides: overrideRecords,
-      removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
-      assemblyDependentJoints: assemblyDependentJoints};
-    if(variantId!=null)record.variantId=variantId;
+    var record:ProjectSceneRecord = {
+      version: Std.int(version),
+      reference: reference,
+      overrides: overrideRecords,
+      removed: removedIds,
+      instances: instanceRecords,
+      assemblyState: assemblyState,
+      assemblyDependentJoints: assemblyDependentJoints
+    };
+    if (variantId != null) record.variantId = variantId;
     if (jobId != null) record.jobId = jobId;
     if (assemblyMates != null) record.assemblyMates = assemblyMates;
-    if(presentation!=null)record.presentation=presentation;
+    if (presentation != null) record.presentation = presentation;
     return record;
   }
 
@@ -219,12 +278,10 @@ class SceneCodec {
         overrideValue
       ));
     }
-    var identityFields = ["identityVersion", "packageId", "packageVersion",
-      "sourceSha256", "configurationSha256"];
+    var identityFields = ["identityVersion", "packageId", "packageVersion", "sourceSha256", "configurationSha256"];
     var identityCount = 0;
     for (name in identityFields) if (Reflect.hasField(value, name)) identityCount++;
-    if (identityCount != 0 && identityCount != identityFields.length)
-      throw "Incomplete setup script identity";
+    if (identityCount != 0 && identityCount != identityFields.length) throw "Incomplete setup script identity";
     var packageId:Null<String> = null, packageVersion:Null<String> = null;
     var sourceSha256:Null<String> = null, configurationSha256:Null<String> = null;
     var identityVersion:Null<Int> = null;
@@ -236,8 +293,7 @@ class SceneCodec {
       sourceSha256 = stringField(value, "sourceSha256");
       configurationSha256 = stringField(value, "configurationSha256");
       if (!Sha256Digest.isHex(sourceSha256)
-        || !Sha256Digest.isHex(configurationSha256))
-        throw "Invalid setup script digest";
+        || !Sha256Digest.isHex(configurationSha256)) throw "Invalid setup script digest";
     }
     return {
       reference: reference,
@@ -304,10 +360,9 @@ class SceneCodec {
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
       ids.set(id, true);
       var kind = stringField(value, "type");
-      if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
-          kind != "cad-part" && kind != "cad-preview" && kind != StockSimulationSession.KIND &&
-          kind != "human-worker")
-        throw "Unsupported scene object type: " + kind;
+      if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket"
+        && kind != "cad-step" && kind != "cad-part" && kind != "cad-preview" && kind != StockSimulationSession.KIND
+        && kind != "human-worker") throw "Unsupported scene object type: " + kind;
       var materialId = stringField(value, "materialId");
       var material = resolveMaterial(materialId, custom);
       var visual:Dynamic = Reflect.field(value, "visualOverrides");
@@ -317,13 +372,29 @@ class SceneCodec {
         if (!Std.isOfType(rawColor, Array)) throw "Invalid scene material color";
         color = cast rawColor;
         if (color.length != 3) throw "Invalid scene material color";
-        for (channel in color) if (!Math.isFinite(channel) || channel < 0 || channel > 1)
-          throw "Invalid scene material color";
+        for (channel in color) if (!Math.isFinite(channel)
+          || channel < 0 || channel > 1) throw "Invalid scene material color";
       }
-      var appearance:Appearance = {finish: visual == null || !Reflect.hasField(visual, "finish")
-        ? materialId : stringField(visual, "finish"),
-        metallic: visual == null ? material.visual.metallic : optionalBounded(visual, "metallic", 0, 1, material.visual.metallic),
-        roughness: visual == null ? material.visual.roughness : optionalBounded(visual, "roughness", 0, 1, material.visual.roughness)};
+      var appearance:Appearance = {
+        finish: visual == null || !Reflect.hasField(visual, "finish") ? materialId : stringField(
+          visual,
+          "finish"
+        ),
+        metallic : visual == null ? material.visual.metallic : optionalBounded(
+          visual,
+          "metallic",
+          0,
+          1,
+          material.visual.metallic
+        ),
+        roughness : visual == null ? material.visual.roughness : optionalBounded(
+          visual,
+          "roughness",
+          0,
+          1,
+          material.visual.roughness
+        )
+      };
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
       var visibleValue:Bool = visible;
@@ -345,24 +416,22 @@ class SceneCodec {
         }
         worker = {asset: stringField(source, "asset"), job: stringField(source, "job"), zones: zones};
         // A malformed job remains editable and is reported by the worker inspector.
-        try HumanJobSpec.parse(worker.job) catch (_:Dynamic) {}
-      } else if (Reflect.hasField(value, "worker") && Reflect.field(value, "worker") != null)
-        throw "Worker data belongs only to human-worker objects";
+        try HumanJobSpec.parse(worker.job) catch (_:Dynamic) {
+        }
+      } else if (Reflect.hasField(value,
+        "worker") && Reflect.field(value, "worker") != null) throw "Worker data belongs only to human-worker objects";
       if ((kind == "cad-plate" || kind == "cad-bracket" || kind == "cad-step" || kind == "cad-part")
-          && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
-      if (kind == "cad-preview" && (meshSnapshot == null || meshSnapshot.length > 50000000))
-        throw "CAD preview object requires a bounded mesh snapshot";
-      if (kind != "cad-preview" && meshSnapshot != null)
-        throw "Mesh snapshots are only valid on CAD preview objects";
+        && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
+      if (kind == "cad-preview" && (meshSnapshot == null
+        || meshSnapshot.length > 50000000)) throw "CAD preview object requires a bounded mesh snapshot";
+      if (kind != "cad-preview" && meshSnapshot != null) throw "Mesh snapshots are only valid on CAD preview objects";
       if (sketchDraft != null) {
         sketchDraftCount++;
         if (sketchDraftCount > 1) throw "Scene documents can contain only one active sketch draft";
-        if (sketchDraft.length > 10000000 ||
-            (kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" && kind != "cad-part"))
-          throw "Invalid sketch draft owner";
+        if (sketchDraft.length > 10000000 || (kind != "cad-plate"
+          && kind != "cad-bracket" && kind != "cad-step" && kind != "cad-part")) throw "Invalid sketch draft owner";
         var draft = SketchDraftCodec.decode(sketchDraft);
-        if (draft.featureIndex < 0 && kind != "cad-part")
-          throw "new sketch drafts require a generic CAD part";
+        if (draft.featureIndex < 0 && kind != "cad-part") throw "new sketch drafts require a generic CAD part";
       }
       result.push({
         id: id,
@@ -381,56 +450,61 @@ class SceneCodec {
           -1000000,
           1000000
         ),
-        width: bounded(
+        width : bounded(
           value,
           "width",
           0.000001,
           1000000
         ),
-        height: bounded(
+        height : bounded(
           value,
           "height",
           0.000001,
           1000000
         ),
-        depth: optionalBounded(
+        depth : optionalBounded(
           value,
           "depth",
           0.000001,
           1000000,
           0.1
         ),
-        collisionEnabled: kind == "human-worker" ? false : collisionEnabled,
-        dynamicBody: kind == "human-worker" ? false : dynamicBody,
-        mass: optionalBounded(
+        collisionEnabled : kind == "human-worker" ? false : collisionEnabled,
+        dynamicBody : kind == "human-worker" ? false : dynamicBody,
+        mass : optionalBounded(
           value,
           "mass",
           0.000001,
           1000000,
           1.0
         ),
-        red: color[0],
-        green: color[1],
-        blue: color[2],
-        appearance: appearance,
-        materialId: materialId,
-        visible: visibleValue,
-        hiddenBy: optionalTextArray(value, "hiddenBy", 256),
-        rotation: kind == "human-worker" ? workerYawRotation(optionalRotation(value)) : optionalRotation(value),
-        cadGraph: cadGraph,
-        meshSnapshot: meshSnapshot,
-        sketchDraft: sketchDraft,
-        worker: worker
-      }
-      );
+        red : color[0],
+        green : color[1],
+        blue : color[2],
+        appearance : appearance,
+        materialId : materialId,
+        visible : visibleValue,
+        hiddenBy : optionalTextArray(
+          value,
+          "hiddenBy",
+          256
+        ),
+        rotation : kind == "human-worker" ? workerYawRotation(optionalRotation(value)) : optionalRotation(value),
+        cadGraph : cadGraph,
+        meshSnapshot : meshSnapshot,
+        sketchDraft : sketchDraft,
+        worker : worker
+      });
     }
     return result;
   }
 
   static function workerYawRotation(rotation:Null<Array<Float>>):Null<Array<Float>> {
     if (rotation == null) return null;
-    var yaw = Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
-      1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    var yaw = Math.atan2(
+      2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+      1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2])
+    );
     return [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)];
   }
 
@@ -478,7 +552,7 @@ class SceneCodec {
     if (!Std.isOfType(result, Bool)) throw 'Scene field must be boolean: $name';
     return cast result;
   }
-  static function optionalText(value:Dynamic, name:String):Null < String > {
+  static function optionalText(value:Dynamic, name:String):Null<String> {
     if (!Reflect.hasField(value, name) || Reflect.field(value, name) == null) return null;
     var result = Reflect.field(value, name);
     if (!Std.isOfType(result, String)) throw 'Scene field must be text: $name';
@@ -496,8 +570,8 @@ class SceneCodec {
     for (item in items) {
       if (!Std.isOfType(item, String)) throw 'Scene field entries must be text: $name';
       var id:String = cast item;
-      if (StringTools.trim(id).length == 0 || containsNul(id) || seen.exists(id))
-        throw 'Scene field contains an invalid or duplicate entry: $name';
+      if (StringTools.trim(id).length == 0
+        || containsNul(id) || seen.exists(id)) throw 'Scene field contains an invalid or duplicate entry: $name';
       seen.set(id, true);
       result.push(id);
     }
@@ -512,12 +586,11 @@ class SceneCodec {
     if (items.length != 4) throw "Object rotation must have four components";
     var result:Array<Float> = [];
     for (item in items) {
-      if ((!Std.isOfType(item, Float) && !Std.isOfType(item, Int)) || !Math.isFinite(cast item))
-        throw "Object rotation must be finite";
+      if ((!Std.isOfType(item,
+        Float) && !Std.isOfType(item, Int)) || !Math.isFinite(cast item)) throw "Object rotation must be finite";
       result.push(cast item);
     }
-    var length = result[0] * result[0] + result[1] * result[1] +
-      result[2] * result[2] + result[3] * result[3];
+    var length = result[0] * result[0] + result[1] * result[1] + result[2] * result[2] + result[3] * result[3];
     if (Math.abs(length - 1) > 1e-4) throw "Object rotation must be normalized";
     return result;
   }

@@ -26,7 +26,7 @@ class ProjectJobs {
       if (seen.exists(id)) throw 'Duplicate project job "$id"';
       if (entries == null || Reflect.field(entries, entrypoint) == null) throw 'Unknown job entrypoint "$entrypoint"';
       seen.set(id, true);
-      result.push({id:id, label:label, entrypoint:entrypoint, summary:text(value, "summary")});
+      result.push({id: id, label: label, entrypoint: entrypoint, summary: text(value, "summary")});
     }
     if (result.length == 0) throw "Project jobs must not be empty";
     var defaultJob = text(root, "defaultJob");
@@ -54,8 +54,8 @@ class ProjectJobs {
     var raw:Dynamic = value == null ? null : Reflect.field(value, name);
     if (!Std.isOfType(raw, String)) throw 'Project job field "$name" must be text';
     var result:String = raw;
-    if (StringTools.trim(result).length == 0 || result.length > 500 || SceneCodec.containsNul(result))
-      throw 'Invalid project job field "$name"';
+    if (StringTools.trim(result).length == 0
+      || result.length > 500 || SceneCodec.containsNul(result)) throw 'Invalid project job field "$name"';
     return result;
   }
 }

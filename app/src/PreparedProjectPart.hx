@@ -8,4 +8,3 @@ typedef PreparedProjectPart = {
   var geometry:PreparedCadGeometry;
   var physical:AssemblyPhysicalPart;
 };
-

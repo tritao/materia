@@ -31,7 +31,7 @@ import sys.io.AtomicFile;
 
 /** Stock selection, manual plan editing, validation, exports, and cut confirmation in Materia. */
 @:access(app.Main.ReferenceEditorApp) class SheetWorkflowPanel {
-  public static function build(app:ReferenceEditorApp):Null < haxeon.ui.core.View > {
+  public static function build(app:ReferenceEditorApp):Null<haxeon.ui.core.View> {
     var projectReference = app.session.projectReference;
     if (projectReference == null) return null;
     var path = projectReference + ".sheet.json";
@@ -92,24 +92,33 @@ import sys.io.AtomicFile;
       app.commands.refresh();
     }
     )));
-    var pieceOptions:Array<SelectOption < String>> = [];
+    var pieceOptions:Array<SelectOption<String>> = [];
     var stockSpec = inventory.stockSpec(selectedPlan.stockSpecId);
-    pieceOptions.push(new SelectOption<String>("nominal",
+    pieceOptions.push(new SelectOption<String>(
+      "nominal",
       "Nominal stock · " + fmt(stockSpec.width) + " × " + fmt(stockSpec.height) + " " + stockSpec.lengthUnit,
-      ""));
+      ""
+    ));
     for (piece in inventory.record.stockPieces) pieceOptions.push(new SelectOption<String>(
       piece.id,
-      piece.id + " · " + piece.state + " · measured " + fmt(piece.width) + " × " + fmt(piece.height) + " " + piece.lengthUnit,
+      piece.id
+      + " · " + piece.state + " · measured " + fmt(piece.width) + " × " + fmt(piece.height) + " " + piece.lengthUnit,
       piece.id
     ));
     planningChildren.push(new KeyedView("source-select",
       new Select<String>("sheet-piece-select", pieceOptions, selectedPieceId, function(value) {
       app.sheetPieceSelection = value;
       app.commands.refresh();
-      }
+    }
     )));
-    planningChildren.push(new KeyedView("stock-description", new Text(stockDescription(inventory, selectedPlan,
-      selectedPieceId == "" ? null : inventory.piece(selectedPieceId)))));
+    planningChildren.push(new KeyedView(
+      "stock-description",
+      new Text(stockDescription(
+        inventory,
+        selectedPlan,
+        selectedPieceId == "" ? null : inventory.piece(selectedPieceId)
+      ))
+    ));
     for (requirementReference in selectedPlan.requirements) {
       var item = inventory.requirement(requirementReference.id);
       planningChildren.push(new KeyedView(
@@ -117,14 +126,14 @@ import sys.io.AtomicFile;
         new Text("Finished-part BOM · " + item.partId + " rev " + item.partRevision + " · quantity " + item.quantity)
       ));
     }
-    var canAllocate = selectedPiece != null && (selectedPiece.state == "available" ||
-      (selectedPiece.state == "allocated" && selectedPiece.allocationPlanId == selectedPlanId));
-    var canRelease = selectedPiece != null && selectedPiece.state == "allocated" &&
-      selectedPiece.allocationPlanId == selectedPlanId;
+    var canAllocate = selectedPiece != null && (selectedPiece.state == "available"
+      || (selectedPiece.state == "allocated" && selectedPiece.allocationPlanId == selectedPlanId));
+    var canRelease = selectedPiece != null
+      && selectedPiece.state == "allocated" && selectedPiece.allocationPlanId == selectedPlanId;
     var canComplete = canRelease;
     operationsChildren.push(new KeyedView("stock-actions", new Row("sheet-stock-actions",
       [new KeyedView("register", button(app, "Register sheet", "sheet-register", function() {
-      var nextId = "sheet-" +(inventory.record.stockPieces.length + 1);
+      var nextId = "sheet-" + (inventory.record.stockPieces.length + 1);
       while (containsPiece(inventory, nextId)) nextId += "-new";
       var sheet = inventory.registerSheet(nextId, selectedPlan.stockSpecId);
       app.sheetPieceSelection = sheet.id;
@@ -138,7 +147,8 @@ import sys.io.AtomicFile;
         function() inventory.allocate(
           selectedPieceId,
           selectedPlanId
-        ), canAllocate
+        ),
+        canAllocate
       )
     ), new KeyedView(
       "release",
@@ -149,7 +159,8 @@ import sys.io.AtomicFile;
         function() inventory.cancelAllocation(
           selectedPieceId,
           selectedPlanId
-        ), canRelease
+        ),
+        canRelease
       )
     )], ReferenceEditorApp.actionRowStyle())));
 
@@ -158,9 +169,8 @@ import sys.io.AtomicFile;
     }
     planningChildren.push(new KeyedView(
       "validation",
-      new Text(validation == null ? "Plan could not be validated."
-      : validation.valid ? "Plan valid · area balance " + fmt(validation.areaBalanceErrorMm2) + " mm²"
-      : "Plan invalid · " + validation.messages.join(" · "))
+      new Text(validation == null ? "Plan could not be validated." : validation.valid ? "Plan valid · area balance "
+      + fmt(validation.areaBalanceErrorMm2) + " mm²" : "Plan invalid · " + validation.messages.join(" · "))
     ));
     if (validation != null) for (region in validation.regions) if (region.retained) planningChildren.push(new KeyedView(
       "remnant-" + region.id,
@@ -238,8 +248,7 @@ import sys.io.AtomicFile;
       var execution = inventory.execute(selectedPlanId, selectedPieceId, id, true);
       app.log("Recorded "
         + execution.id + ": " + execution.blanks.length + " blanks, " + execution.remnantPieceIds.length + " remnants");
-    }, canComplete)
-    ), new KeyedView("revalidate-bom", button(app, "Copy finished BOM to log", "sheet-bom", function() {
+    }, canComplete)), new KeyedView("revalidate-bom", button(app, "Copy finished BOM to log", "sheet-bom", function() {
       var lines:Array<String> = [];
       for (requirementReference in selectedPlan.requirements) {
         var item = inventory.requirement(requirementReference.id);
@@ -376,7 +385,7 @@ import sys.io.AtomicFile;
         inventory,
         selectedPlanId,
         "cut:" + cutId + ":position",
-        "Cut " +(index + 1) + " position",
+        "Cut " + (index + 1) + " position",
         function(current) return cutPosition(
           current,
           cutId
@@ -549,27 +558,61 @@ import sys.io.AtomicFile;
       )
     ));
     for (execution in inventory.record.executions) if (execution.planId == selectedPlanId) {
-      operationsChildren.push(new KeyedView("execution-" + execution.id,
-        new Text("Execution " + execution.id + " · consumed " + execution.consumedPieceId)));
-      for (blank in execution.blanks) operationsChildren.push(new KeyedView("blank-" + blank.id,
-        new Text("Blank " + blank.partId + " · " + blank.widthMm + " × " + blank.heightMm + " mm · from " + blank.sourcePieceId)));
+      operationsChildren.push(new KeyedView(
+        "execution-" + execution.id,
+        new Text("Execution " + execution.id + " · consumed " + execution.consumedPieceId)
+      ));
+      for (blank in execution.blanks) operationsChildren.push(new KeyedView(
+        "blank-" + blank.id,
+        new Text("Blank "
+        + blank.partId + " · " + blank.widthMm + " × " + blank.heightMm + " mm · from " + blank.sourcePieceId)
+      ));
       for (remnantId in execution.remnantPieceIds) {
         var remnant = inventory.piece(remnantId);
-        operationsChildren.push(new KeyedView("output-remnant-" + remnantId,
-          new Text("Remnant " + remnant.id + " · " + fmt(remnant.width) + " × " + fmt(remnant.height) + " " + remnant.lengthUnit + " · " + remnant.state)));
+        operationsChildren.push(new KeyedView(
+          "output-remnant-" + remnantId,
+          new Text("Remnant " + remnant.id
+          + " · " + fmt(remnant.width) + " × " + fmt(remnant.height) + " " + remnant.lengthUnit + " · " + remnant.state)
+        ));
       }
     }
     var operationsSection:Array<KeyedView> = [
       new KeyedView("operations-heading", new Text("Operations")),
-      new KeyedView("operations-toggle", button(app,
-        app.sheetOperationsExpanded ? "Hide operations" : "Show operations",
-        "sheet-operations-toggle", function() app.sheetOperationsExpanded = !app.sheetOperationsExpanded))
+      new KeyedView(
+        "operations-toggle",
+        button(
+          app,
+          app.sheetOperationsExpanded ? "Hide operations" : "Show operations",
+          "sheet-operations-toggle",
+          function() app.sheetOperationsExpanded = !app.sheetOperationsExpanded
+        )
+      )
     ];
-    if (app.sheetOperationsExpanded) operationsSection.push(new KeyedView("operations-content",
-      new Column("sheet-operations-content", operationsChildren, sectionStyle())));
+    if (app.sheetOperationsExpanded) operationsSection.push(new KeyedView(
+      "operations-content",
+      new Column(
+        "sheet-operations-content",
+        operationsChildren,
+        sectionStyle()
+      )
+    ));
     var children:Array<KeyedView> = [
-      new KeyedView("cut-planning-section", new Column("sheet-cut-planning", planningChildren, sectionStyle())),
-      new KeyedView("operations-section", new Column("sheet-operations", operationsSection, sectionStyle()))
+      new KeyedView(
+        "cut-planning-section",
+        new Column(
+          "sheet-cut-planning",
+          planningChildren,
+          sectionStyle()
+        )
+      ),
+      new KeyedView(
+        "operations-section",
+        new Column(
+          "sheet-operations",
+          operationsSection,
+          sectionStyle()
+        )
+      )
     ];
     var contentStyle = sectionStyle();
     var scrollStyle = ReferenceEditorApp.fillStyle();
@@ -593,14 +636,17 @@ import sys.io.AtomicFile;
     return result;
   }
 
-  static function layoutPreview(plan:SheetCutPlan, stock:materia.sheet.SheetStockSpec,
-    piece:Null<materia.sheet.StockPiece>):String {
+  static function layoutPreview(
+    plan:SheetCutPlan,
+    stock:materia.sheet.SheetStockSpec,
+    piece:Null<materia.sheet.StockPiece>
+  ):String {
     var scale = SheetPlanValidator.millimetres(1, plan.lengthUnit);
     var stockUnit = piece == null ? stock.lengthUnit : piece.lengthUnit;
     var widthMm = SheetPlanValidator.millimetres(piece == null ? stock.width : piece.width, stockUnit);
     var heightMm = SheetPlanValidator.millimetres(piece == null ? stock.height : piece.height, stockUnit);
     var columns = 32, rows = 12;
-    var cells:Array<Array < String>> = [];
+    var cells:Array<Array<String>> = [];
     for (_ in 0...rows) {
       var row:Array<String> = [];
       for (_ in 0...columns) row.push(" ");
@@ -613,8 +659,8 @@ import sys.io.AtomicFile;
       var x1 = x0 + placement.width * scale, y1 = y0 + placement.height * scale;
       var symbol = symbols.charAt(placementIndex % symbols.length);
       for (row in 0...rows) for (column in 0...columns) {
-        var x =(column + 0.5) * widthMm / columns;
-        var y = heightMm -(row + 0.5) * heightMm / rows;
+        var x = (column + 0.5) * widthMm / columns;
+        var y = heightMm - (row + 0.5) * heightMm / rows;
         if (x >= x0 && x < x1 && y >= y0 && y < y1) cells[row][column] = symbol;
       }
     }
@@ -622,8 +668,8 @@ import sys.io.AtomicFile;
     for (_ in 0...columns) border += "-";
     border += "+";
     var lines:Array<String> = [
-      "LAYOUT PREVIEW · " + (piece == null ? "Nominal stock" : "Physical sheet " + piece.id) +
-        " · lower-left origin · " + fmt(widthMm) + " × " + fmt(heightMm) + " mm",
+      "LAYOUT PREVIEW · " + (piece == null ? "Nominal stock"
+      : "Physical sheet " + piece.id) + " · lower-left origin · " + fmt(widthMm) + " × " + fmt(heightMm) + " mm",
       border
     ];
     for (row in cells) lines.push("|" + row.join("") + "|");
@@ -634,13 +680,13 @@ import sys.io.AtomicFile;
     return lines.join("\n");
   }
 
-  static function stockDescription(inventory:SheetInventory, plan:SheetCutPlan,
-    piece:Null<materia.sheet.StockPiece>):String {
+  static function stockDescription(inventory:SheetInventory,
+    plan:SheetCutPlan, piece:Null<materia.sheet.StockPiece>):String {
     var stock = inventory.stockSpec(plan.stockSpecId);
     if (piece == null) return "Input · Nominal stock · " + stock.id + " specification dimensions · " + stock.width
       + " × " + stock.height + " × " + stock.thickness + " " + stock.lengthUnit + " · " + stock.materialId;
-    return "Input · Physical sheet " + piece.id + " · measured " + piece.width + " × " + piece.height + " × " + piece.thickness
-      + " " + piece.lengthUnit + " · specification " + stock.id + " · " + stock.materialId;
+    return "Input · Physical sheet " + piece.id + " · measured " + piece.width + " × " + piece.height
+      + " × " + piece.thickness + " " + piece.lengthUnit + " · specification " + stock.id + " · " + stock.materialId;
   }
 
   static function sectionStyle():LayoutStyle {

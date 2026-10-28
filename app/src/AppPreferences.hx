@@ -38,22 +38,23 @@ class AppPreferences {
 
   public static function besideWorkspace(workspacePath:String):AppPreferences {
     var directory = PreferencesPath.directory(workspacePath);
-    return new AppPreferences(PreferencesPath.join([directory, "settings.json"]),
-      PreferencesPath.join([directory, "preferences.json"]));
+    return new AppPreferences(
+      PreferencesPath.join([directory, "settings.json"]),
+      PreferencesPath.join([
+        directory,
+        "preferences.json"
+      ])
+    );
   }
 
-  function get_showStartPage():Bool
-    return store.getBool(AppSettings.SHOW_START_PAGE);
+  function get_showStartPage():Bool return store.getBool(AppSettings.SHOW_START_PAGE);
 
-  function get_antialiasing():Int
-    return store.getInt(AppSettings.ANTIALIASING);
+  function get_antialiasing():Int return store.getInt(AppSettings.ANTIALIASING);
 
-  public function setShowStartPage(value:Bool):Void
-    store.set(AppSettings.SHOW_START_PAGE, PropertyValue.Bool(value));
+  public function setShowStartPage(value:Bool):Void store.set(AppSettings.SHOW_START_PAGE, PropertyValue.Bool(value));
 
   /** Counts outside one to sixteen are refused and leave the saved choice alone. */
-  public function setAntialiasing(value:Int):Void
-    store.set(AppSettings.ANTIALIASING, PropertyValue.Int(value));
+  public function setAntialiasing(value:Int):Void store.set(AppSettings.ANTIALIASING, PropertyValue.Int(value));
 
   /** Moves the path to the front of the recent list, dropping duplicates and the oldest entries. */
   public function addRecent(path:String):Void {
@@ -72,8 +73,8 @@ class AppPreferences {
   /** Copies the paths that are strings, up to the recent-list limit. */
   static function readRecent(stored:Dynamic, into:Array<String>):Void {
     if (!SettingsJsonValue.isArray(stored)) return;
-    for (path in (stored:Array<Dynamic>))
-      if (SettingsJsonValue.isString(path) && into.length < MAX_RECENT) into.push(path);
+    for (path in (stored:Array<Dynamic>)) if (SettingsJsonValue.isString(path)
+      && into.length < MAX_RECENT) into.push(path);
   }
 
   /** Copies the values earlier builds kept in preferences.json; unusable values are skipped. */
@@ -88,6 +89,7 @@ class AppPreferences {
       var paths:Array<String> = [];
       readRecent(Reflect.field(data, "recent"), paths);
       if (paths.length > 0) store.setState(RECENT_STATE, paths);
-    });
+    }
+    );
   }
 }

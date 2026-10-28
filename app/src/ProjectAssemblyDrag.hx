@@ -15,8 +15,12 @@ class ProjectAssemblyDrag implements SceneAssemblyDrag {
   var moved = false;
   var finished = false;
 
-  public function new(session:ProjectDocumentSession, drag:AssemblyDrag, before:AssemblyStateRecord,
-      metresPerUnit:Float) {
+  public function new(
+    session:ProjectDocumentSession,
+    drag:AssemblyDrag,
+    before:AssemblyStateRecord,
+    metresPerUnit:Float
+  ) {
     this.session = session;
     this.drag = drag;
     this.before = before;
@@ -28,8 +32,15 @@ class ProjectAssemblyDrag implements SceneAssemblyDrag {
     if (finished) return;
     if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) return;
     currentTarget = [x, y, z];
-    var result = drag.drag({x: x / metresPerUnit, y: y / metresPerUnit, z: z / metresPerUnit,
-      qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0});
+    var result = drag.drag({
+      x: x / metresPerUnit,
+      y: y / metresPerUnit,
+      z: z / metresPerUnit,
+      qx: 0.0,
+      qy: 0.0,
+      qz: 0.0,
+      qw: 1.0
+    });
     onTarget = result.status == Following;
     lastMessage = result.message;
     moved = true;

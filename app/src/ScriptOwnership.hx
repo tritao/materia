@@ -6,13 +6,15 @@ import robotkit.runtime.RobotRuntimeCompiler;
 import haxe.Json;
 import haxe.crypto.Sha256;
 
-typedef ScriptMaterialization = {var scene: EditorScene;
-var sensors:SensorConfiguration;
-var backend:Int;
-var timestep:Float;
+typedef ScriptMaterialization = {
+  var scene:EditorScene;
+  var sensors:SensorConfiguration;
+  var backend:Int;
+  var timestep:Float;
 }
-private typedef ScriptSettings = {var backend: Int;
-var timestep:Float;
+private typedef ScriptSettings = {
+  var backend:Int;
+  var timestep:Float;
 }
 
 /** Owns a script baseline plus stable-ID document overrides. Scripts are unsandboxed compiled Haxe. */
@@ -31,8 +33,7 @@ class ScriptOwnership {
   var baseline:ScriptedSetup;
   final overrides:Map<String, ScriptOverrideRecord> = new Map();
 
-  public function new(reference:String, ? record:ScriptOwnershipRecord,
-      ?sharedDocument:EditorDocument) {
+  public function new(reference:String, ?record:ScriptOwnershipRecord, ?sharedDocument:EditorDocument) {
     document = sharedDocument == null ? new EditorDocument("script-overrides") : sharedDocument;
     this.reference = reference;
     if (record == null) {
@@ -172,7 +173,7 @@ class ScriptOwnership {
     property
   )) ? "override" : "script";
   public function propertyOrigins(targetId:String,
-    properties:Array<String>):Array < String> return [for (property in properties) property + ": " + origin(
+    properties:Array<String>):Array<String> return [for (property in properties) property + ": " + origin(
       targetId,
       property
     )];
@@ -240,21 +241,24 @@ class ScriptOwnership {
     };
   }
   static function contentHash(value:ScriptedSetup):String {
-    var normalized:Dynamic = Json.parse(Json.stringify({version: value.version,
-      sensors: value.sensors.records(), objects: value.objects,
-      backend: value.backend, timestep: value.timestep}));
+    var normalized:Dynamic = Json.parse(Json.stringify({
+      version: value.version,
+      sensors: value.sensors.records(),
+      objects: value.objects,
+      backend: value.backend,
+      timestep: value.timestep
+    }));
     return Sha256.encode(ScriptCanonicalJson.encode(normalized));
   }
   function verifyIdentity(record:ScriptOwnershipRecord):Void {
     var packageIdentity = SetupScriptRegistry.identity(reference);
     // Earlier files have no identity. They acquire one on their next save.
-    if (record.identityVersion == null && record.packageId == null && record.packageVersion == null
-      && record.sourceSha256 == null && record.configurationSha256 == null) return;
-    if (record.identityVersion != 1 || record.packageId != packageIdentity.packageId
-      || record.packageVersion != packageIdentity.packageVersion
-      || record.sourceSha256 != packageIdentity.sourceSha256
-      || record.configurationSha256 != configurationSha256)
-      identityMismatch = 'Setup script identity mismatch: $reference';
+    if (record.identityVersion == null && record.packageId == null
+      && record.packageVersion == null && record.sourceSha256 == null && record.configurationSha256 == null) return;
+    if (record.identityVersion != 1
+      || record.packageId != packageIdentity.packageId || record.packageVersion != packageIdentity.packageVersion
+      || record.sourceSha256 != packageIdentity.sourceSha256 || record.configurationSha256
+      != configurationSha256) identityMismatch = 'Setup script identity mismatch: $reference';
   }
   function applyOverrides(sensors:SensorConfiguration, objects:Array<SceneObjectData>, settings:ScriptSettings):Void {
     var found = new Map<String, Bool>();
@@ -489,10 +493,10 @@ class ScriptOwnership {
       default:
         throw "Unsupported override type";
     }
-    var numeric:Float =(item.kind == "number" || item.kind == "integer") ? numberValue(overrideValue(item)) : 0.0;
+    var numeric:Float = (item.kind == "number" || item.kind == "integer") ? numberValue(overrideValue(item)) : 0.0;
     switch item.property {
       case "backend":
-        if (item.kind != "integer" ||(numeric != ApplicationSimulation.DETERMINISTIC
+        if (item.kind != "integer" || (numeric != ApplicationSimulation.DETERMINISTIC
           && numeric != ApplicationSimulation.MUJOCO)) throw "Unsupported setup physics backend";
       case "timestep":
         if (item.kind != "number" || numeric <= 0) throw "Simulation timestep must be positive";
@@ -547,12 +551,7 @@ class ScriptOwnership {
     }
   }
   static function copyOverride(parsed:ScriptOverrideRecord):ScriptOverrideRecord {
-    return {
-      targetId: parsed.targetId,
-      property: parsed.property,
-      kind: parsed.kind,
-      encodedValue: parsed.encodedValue
-    };
+    return {targetId: parsed.targetId, property: parsed.property, kind: parsed.kind, encodedValue: parsed.encodedValue};
   }
   static inline function key(target:String, property:String):String return target + "|" + property;
   public function dispose():Void baseline.dispose();

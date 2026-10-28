@@ -13,46 +13,117 @@ import haxeon.ui.widgets.layout.SizedBox;
 import haxeon.ui.widgets.text.Text;
 
 /** One independent presentation cursor, hosted either in a dock or a picture-in-picture layer. */
-@:access(app.Main.ReferenceEditorApp)
-class InspectionCameraPanel {
-  public var overlay(default,null)=false;
+@:access(app.Main.ReferenceEditorApp) class InspectionCameraPanel {
+  public var overlay(default, null) = false;
   var viewport:Null<EditorPerspectiveViewport>;
-  var generation=-1;
-  var zoom=1.0;
-  public function new() {}
-  public function showDocked():Void overlay=false;
-  public function presentationKey():String return overlay+":"+generation+":"+zoom+":"+(viewport==null?"":viewport.presentationKey());
-  public function advancePresentation(seconds:Float):Bool return viewport!=null&&viewport.advancePresentation(seconds);
-  public function dispose():Void {if(viewport!=null)viewport.dispose();viewport=null;}
-  public function build(app:ReferenceEditorApp,inOverlay:Bool=false):View {
-    if(generation!=app.session.generation){dispose();generation=app.session.generation;zoom=1;}
-    var style=new LayoutStyle();style.width=LayoutAxis.grow();style.height=LayoutAxis.grow();style.childGap=4;
-    var rows:Array<KeyedView> = [];
-    if(overlay&&!inOverlay) {
-      var dock=new Button("Dock camera here",null,()->{overlay=false;app.invalidateView();},"inspection-dock-here");
-      return new Column("inspection-overlay-notice",[new KeyedView("notice",new Text("Camera is shown in the main viewport.")),new KeyedView("dock",dock)],style);
+  var generation = -1;
+  var zoom = 1.0;
+  public function new() {
+  }
+  public function showDocked():Void overlay = false;
+  public function presentationKey():String return overlay + ":" + generation + ":" + zoom + ":" + (viewport
+    == null ? "" : viewport.presentationKey());
+  public function advancePresentation(seconds:Float):Bool return viewport != null
+    && viewport.advancePresentation(seconds);
+  public function dispose():Void {
+    if (viewport != null) viewport.dispose();
+    viewport = null;
+  }
+  public function build(app:ReferenceEditorApp, inOverlay:Bool = false):View {
+    if (generation != app.session.generation) {
+      dispose();
+      generation = app.session.generation;
+      zoom = 1;
     }
-    if(app.session.presentation==null)return new Text("Open an assembly to inspect its views.");
-    if(app.hostContext==null)return new Text("Inspection rendering requires the desktop GPU host.");
-    if(viewport==null){viewport=new EditorPerspectiveViewport("inspection-camera-view",app.scene,app.hostContext);viewport.setPlacementOptions(false,0,false);viewport.setSimulationOverlays(false);viewport.setCosmeticThreads(false);}
-    viewport.setPresentation(app.session.presentation,app.session.projectAssemblyDefinition,app.session.presentationCenters(),app.session.assemblyUnitMetres(),true);
-    viewport.solvePresentationJoints=app.session.presentationJointPoses;
-    viewport.presentationGeometryFingerprint=app.session.presentationGeometryFingerprint;
-    var frame=app.framePresentation;
-    viewport.setSimulationState(app.simulation.isActive(),frame==null?[]:frame.environment,frame==null?0:frame.revision);
-    rows.push(new KeyedView("views",PresentationControls.build(viewport,()->app.invalidateView(),"inspection-views")));
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.height = LayoutAxis.grow();
+    style.childGap = 4;
+    var rows:Array<KeyedView> = [];
+    if (overlay && !inOverlay) {
+      var dock = new Button("Dock camera here", null, () -> {overlay = false;
+      app.invalidateView();
+      }, "inspection-dock-here");
+      return new Column(
+        "inspection-overlay-notice",
+        [
+          new KeyedView(
+            "notice",
+            new Text("Camera is shown in the main viewport.")
+          ),
+          new KeyedView(
+            "dock",
+            dock
+          )
+        ],
+        style
+      );
+    }
+    if (app.session.presentation == null) return new Text("Open an assembly to inspect its views.");
+    if (app.hostContext == null) return new Text("Inspection rendering requires the desktop GPU host.");
+    if (viewport == null) {
+      viewport = new EditorPerspectiveViewport("inspection-camera-view", app.scene, app.hostContext);
+      viewport.setPlacementOptions(false, 0, false);
+      viewport.setSimulationOverlays(false);
+      viewport.setCosmeticThreads(false);
+    }
+    viewport.setPresentation(
+      app.session.presentation,
+      app.session.projectAssemblyDefinition,
+      app.session.presentationCenters(),
+      app.session.assemblyUnitMetres(),
+      true
+    );
+    viewport.solvePresentationJoints = app.session.presentationJointPoses;
+    viewport.presentationGeometryFingerprint = app.session.presentationGeometryFingerprint;
+    var frame = app.framePresentation;
+    viewport.setSimulationState(
+      app.simulation.isActive(),
+      frame == null ? [] : frame.environment,
+      frame == null ? 0 : frame.revision
+    );
+    rows.push(new KeyedView(
+      "views",
+      PresentationControls.build(
+        viewport,
+        () -> app.invalidateView(),
+        "inspection-views"
+      )
+    ));
     var tools:Array<KeyedView> = [];
-    function action(id:String,label:String,fn:Void->Void):Void tools.push(new KeyedView(id,new Button(label,null,fn,"inspection-"+id)));
-    action("zoom-in","Zoom +",()->{zoom=Math.max(0.2,viewport.presentationZoom()/1.4);viewport.setPresentationZoom(zoom);app.invalidateView();});
-    action("zoom-out","Zoom -",()->{zoom=Math.min(8,viewport.presentationZoom()*1.4);viewport.setPresentationZoom(zoom);app.invalidateView();});
-    action("presentation",inOverlay?"Dock":"Picture in picture",()->{overlay=!inOverlay;
-      if(overlay){app.workspace.close("inspection-camera");app.workspace.activate("perspective");app.invalidateView();}
-      else app.openInspectionCamera();});
-    rows.push(new KeyedView("tools",new Row("inspection-tools",tools)));
-    viewport.onInspectionZoom=next->{zoom=next;app.invalidateView();};
-    viewport.setSampleCount(app.antialiasing);viewport.setLightingPreset(app.lightingPreset);
-    rows.push(new KeyedView("camera",new SizedBox("inspection-image",viewport,LayoutAxis.grow(),LayoutAxis.grow())));
-    rows.push(new KeyedView("caption",new Text("Orbit / pan / wheel zoom · independent view")));
-    return new Column("inspection-camera",rows,style);
+    function action(id:String, label:String, fn:Void -> Void):Void tools.push(new KeyedView(
+      id,
+      new Button(
+        label,
+        null,
+        fn,
+        "inspection-" + id
+      )
+    ));
+    action("zoom-in", "Zoom +", () -> {zoom = Math.max(0.2, viewport.presentationZoom() / 1.4);
+    viewport.setPresentationZoom(zoom);
+    app.invalidateView();
+    });
+    action("zoom-out", "Zoom -", () -> {zoom = Math.min(8, viewport.presentationZoom() * 1.4);
+    viewport.setPresentationZoom(zoom);
+    app.invalidateView();
+    });
+    action("presentation", inOverlay ? "Dock" : "Picture in picture", () -> {overlay = !inOverlay;
+    if (overlay) {
+      app.workspace.close("inspection-camera");
+      app.workspace.activate("perspective");
+      app.invalidateView();
+    } else app.openInspectionCamera();
+    });
+    rows.push(new KeyedView("tools", new Row("inspection-tools", tools)));
+    viewport.onInspectionZoom = next -> {zoom = next;
+    app.invalidateView();
+    };
+    viewport.setSampleCount(app.antialiasing);
+    viewport.setLightingPreset(app.lightingPreset);
+    rows.push(new KeyedView("camera",
+      new SizedBox("inspection-image", viewport, LayoutAxis.grow(), LayoutAxis.grow())));
+    rows.push(new KeyedView("caption", new Text("Orbit / pan / wheel zoom · independent view")));
+    return new Column("inspection-camera", rows, style);
   }
 }

@@ -14,17 +14,47 @@ import haxeon.ui.widgets.text.Text;
 
 /** Runtime mission status in a dock panel or viewport card. */
 class MissionStatusView {
-  public static function build(controller:MissionController, tokens:ThemeTokens, key:String,
-      ?showSteps:Void->Void):View {
+  public static function build(controller:MissionController,
+    tokens:ThemeTokens, key:String, ?showSteps:Void -> Void):View {
     var state = controller.snapshot();
     var rows:Array<KeyedView> = [];
-    rows.push(new KeyedView("status", new Text(state.status, null,
-      (state.progress != null && state.progress.phase == "failed") || StringTools.startsWith(state.machiningStatus,"Failed") ? tokens.danger : tokens.text, TextStyleOverride.paragraph(TextWrap.WordCharacter))));
-    if(state.machiningPreview)rows.push(new KeyedView("preview",new Text("Kinematic preview · motor loads are not qualified.",null,tokens.textSecondary,
-      TextStyleOverride.paragraph(TextWrap.WordCharacter))));
-    if(state.mission!=null&&state.machining!=null)rows.push(new KeyedView("machining",new Text(state.machining.label+" · "+state.machiningStatus)));
-    if (showSteps != null) rows.push(new KeyedView("steps", new Button(state.mission==null?"Show mission":"Show steps", null, showSteps, key + "-steps")));
-    var style = new LayoutStyle(); style.width = LayoutAxis.grow(); style.childGap = 6.0;
+    rows.push(new KeyedView(
+      "status",
+      new Text(
+        state.status,
+        null,
+        (state.progress != null && state.progress.phase == "failed") || StringTools.startsWith(
+          state.machiningStatus,
+          "Failed"
+        ) ? tokens.danger : tokens.text,
+        TextStyleOverride.paragraph(TextWrap.WordCharacter)
+      )
+    ));
+    if (state.machiningPreview) rows.push(new KeyedView(
+      "preview",
+      new Text(
+        "Kinematic preview · motor loads are not qualified.",
+        null,
+        tokens.textSecondary,
+        TextStyleOverride.paragraph(TextWrap.WordCharacter)
+      )
+    ));
+    if (state.mission != null && state.machining != null) rows.push(new KeyedView(
+      "machining",
+      new Text(state.machining.label + " · " + state.machiningStatus)
+    ));
+    if (showSteps != null) rows.push(new KeyedView(
+      "steps",
+      new Button(
+        state.mission == null ? "Show mission" : "Show steps",
+        null,
+        showSteps,
+        key + "-steps"
+      )
+    ));
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.childGap = 6.0;
     return new Column(key, rows, style);
   }
 }

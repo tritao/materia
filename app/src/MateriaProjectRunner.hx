@@ -34,36 +34,46 @@ class MateriaProjectRunner {
   /** Inspect a project without compiling or executing its entrypoint. */
   public static function executionRequirement(projectPath:String, ?variantId:String):ProjectExecutionRequirement {
     var manifestPath = FileSystem.fullPath(projectPath);
-    if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
-      throw 'Materia project file not found: $manifestPath';
+    if (!FileSystem.exists(manifestPath)
+      || FileSystem.isDirectory(manifestPath)) throw 'Materia project file not found: $manifestPath';
     var root:Dynamic = Json.parse(File.getContent(manifestPath));
-    if (fieldText(root, "format") != "materia.project" || fieldInt(root, "version") != 1)
-      throw "Unsupported Materia project format";
+    if (fieldText(root,
+      "format") != "materia.project" || fieldInt(root, "version") != 1) throw "Unsupported Materia project format";
     var build = field(root, "build");
     if (fieldText(build, "system") != "haxeon") throw "Materia project requires the Haxeon build system";
     var entries = field(root, "entrypoints");
     var entryId = ProjectVariants.entrypoint(root, variantId);
     var entry = Reflect.field(entries, entryId);
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
-    if (fieldText(entry, "kind") != "cad-preview")
-      throw "Unsupported Materia viewport entrypoint kind";
+    if (fieldText(entry, "kind") != "cad-preview") throw "Unsupported Materia viewport entrypoint kind";
     var reconcilesSavedRecipe = Reflect.field(entry, "reconcilesSavedRecipe") == true;
-    if (reconcilesSavedRecipe && Reflect.field(entry, "documentInput") != true)
-      throw "Project recipe reconciliation requires a document input";
-    return {kind: "requires-project-code", projectPath: manifestPath,
-      entrypoint: entryId, module: fieldText(entry, "module"),
-      reconcilesSavedRecipe: reconcilesSavedRecipe};
+    if (reconcilesSavedRecipe && Reflect.field(entry,
+      "documentInput") != true) throw "Project recipe reconciliation requires a document input";
+    return {
+      kind: "requires-project-code",
+      projectPath: manifestPath,
+      entrypoint: entryId,
+      module: fieldText(
+        entry,
+        "module"
+      ),
+      reconcilesSavedRecipe: reconcilesSavedRecipe
+    };
   }
 
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
 
-  public static function loadProject(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
+  public static function loadProject(
+    projectPath:String,
+    ?recipeDocument:String,
+    ?control:ProjectLoadControl,
+    ?variantId:String
+  ):GeneratedAssemblyScene {
     var scene = loadGeneratedProject(projectPath, recipeDocument, control, variantId);
     var manifestPath = FileSystem.fullPath(projectPath);
     var selected = ProjectVariants.selected(Json.parse(File.getContent(manifestPath)), variantId);
-    scene.projectVariant = selected == null || selected.kind=="job" ? null : selected.id;
-    scene.projectJob = selected == null || selected.kind!="job" ? null : selected.id;
+    scene.projectVariant = selected == null || selected.kind == "job" ? null : selected.id;
+    scene.projectJob = selected == null || selected.kind != "job" ? null : selected.id;
     var motion = motionDocument(manifestPath);
     scene.robotMotions = projectMotions(motion, scene);
     applyDynamicParts(manifestPath, scene);
@@ -76,14 +86,13 @@ class MateriaProjectRunner {
     var root:Dynamic = Json.parse(File.getContent(manifestPath));
     var reference:Dynamic = Reflect.field(root, "robotMotions");
     if (reference == null) return null;
-    if (!Std.isOfType(reference, String) || StringTools.trim(reference).length == 0)
-      throw 'Project field "robotMotions" must name a file';
+    if (!Std.isOfType(reference,
+      String) || StringTools.trim(reference).length == 0) throw 'Project field "robotMotions" must name a file';
     var file = resolveProjectPath(directory(manifestPath), reference);
-    if (!FileSystem.exists(file) || FileSystem.isDirectory(file))
-      throw 'Project robot motion file not found: $file';
+    if (!FileSystem.exists(file) || FileSystem.isDirectory(file)) throw 'Project robot motion file not found: $file';
     var document:Dynamic = Json.parse(File.getContent(file));
-    if (Reflect.field(document, "version") != 1 || !Std.isOfType(Reflect.field(document, "tracks"), Array))
-      throw "Unsupported project robot motion file";
+    if (Reflect.field(document, "version") != 1 || !Std.isOfType(Reflect.field(document,
+      "tracks"), Array)) throw "Unsupported project robot motion file";
     return document;
   }
 
@@ -116,41 +125,61 @@ class MateriaProjectRunner {
    */
   static function projectMotions(document:Dynamic, scene:GeneratedAssemblyScene):Array<RobotMotionTrack> {
     if (document == null) return [];
-    if (Reflect.hasField(document, "grips"))
-      throw "Project motion grips are no longer supported: pick and place with the scene's mission";
+    if (Reflect.hasField(document,
+      "grips")) throw "Project motion grips are no longer supported: pick and place with the scene's mission";
     var definition = scene.assemblyDefinition;
     if (definition == null) throw "Project robot motions need a kinematic assembly";
     var raw:Array<Dynamic> = [for (track in (cast Reflect.field(document, "tracks"):Array<Dynamic>)) {
-      version: 1, robotId: "assembly:" + definition.id, jointId: Reflect.field(track, "joint"),
-      loop: Reflect.field(track, "loop"), keys: Reflect.field(track, "keys")
-    }];
+      version:1, robotId:"assembly:" + definition.id, jointId:Reflect.field(track, "joint"), loop:Reflect.field(
+        track,
+        "loop"
+      ), keys:Reflect.field(
+        track,
+        "keys"
+      )
+    }
+    ];
     return RobotMotionTrack.decode(raw);
   }
 
-  static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?variantId:String):GeneratedAssemblyScene {
-    return previewRecords(generateArtifact(projectPath, recipeDocument, control, variantId), control, ProjectSourceLoader.programReader(projectPath));
+  static function loadGeneratedProject(
+    projectPath:String,
+    ?recipeDocument:String,
+    ?control:ProjectLoadControl,
+    ?variantId:String
+  ):GeneratedAssemblyScene {
+    return previewRecords(
+      generateArtifact(projectPath, recipeDocument, control, variantId),
+      control,
+      ProjectSourceLoader.programReader(projectPath)
+    );
   }
 
   /** Produces geometry bytes; external program paths remain relative to the source project. */
-  public static function generateArtifact(projectPath:String, ?recipeDocument:String,
-      ?control:ProjectLoadControl, ?variantId:String):Bytes {
+  public static function generateArtifact(
+    projectPath:String,
+    ?recipeDocument:String,
+    ?control:ProjectLoadControl,
+    ?variantId:String
+  ):Bytes {
     var manifestPath = FileSystem.fullPath(projectPath);
-    if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
-      throw 'Materia project file not found: $manifestPath';
+    if (!FileSystem.exists(manifestPath)
+      || FileSystem.isDirectory(manifestPath)) throw 'Materia project file not found: $manifestPath';
     var projectRoot = directory(manifestPath), root:Dynamic;
-    try root = Json.parse(File.getContent(manifestPath))
-    catch (error:Dynamic) throw "Could not parse Materia project " + manifestPath + ": " + Std.string(error);
-    if (fieldText(root, "format") != "materia.project" || fieldInt(root, "version") != 1)
-      throw "Unsupported Materia project format";
+    try root = Json.parse(File.getContent(manifestPath)) catch (error:Dynamic) throw "Could not parse Materia project "
+      + manifestPath + ": " + Std.string(error);
+    if (fieldText(root,
+      "format") != "materia.project" || fieldInt(root, "version") != 1) throw "Unsupported Materia project format";
     var build = field(root, "build");
     if (fieldText(build, "system") != "haxeon") throw "Materia project requires the Haxeon build system";
     var haxeonManifest = resolveProjectPath(projectRoot, fieldText(build, "manifest"));
-    if (!FileSystem.exists(haxeonManifest) || FileSystem.isDirectory(haxeonManifest))
-      throw 'Haxeon project manifest not found: $haxeonManifest';
-    var entrypoints = field(root, "entrypoints"),
-      entryId = ProjectVariants.entrypoint(root, variantId),
-      entry:Dynamic = Reflect.field(entrypoints, entryId);
+    if (!FileSystem.exists(haxeonManifest)
+      || FileSystem.isDirectory(haxeonManifest)) throw 'Haxeon project manifest not found: $haxeonManifest';
+    var entrypoints = field(root,
+      "entrypoints"), entryId = ProjectVariants.entrypoint(root, variantId), entry:Dynamic = Reflect.field(
+        entrypoints,
+        entryId
+      );
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     var kind = fieldText(entry, "kind");
     if (kind != "cad-preview") throw 'Unsupported Materia viewport entrypoint kind: $kind';
@@ -161,11 +190,24 @@ class MateriaProjectRunner {
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
     if (control != null) control.phase("Checking for a cached build");
-    var buildCache = buildCachePrefix(entry, projectRoot, manifestPath, haxeonManifest,
-      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools, control);
+    var buildCache = buildCachePrefix(
+      entry,
+      projectRoot,
+      manifestPath,
+      haxeonManifest,
+      fieldText(entry, "module"),
+      fieldText(
+        entry,
+        "function"
+      ),
+      haxe,
+      home,
+      tools,
+      control
+    );
     // Compiled code is reusable even when the entrypoint's output is not deterministic.
-    var cache = recipeDocument == null && Reflect.hasField(entry, "cache") && buildCache != null
-      ? buildCache + ".mtrg" : null;
+    var cache = recipeDocument == null && Reflect.hasField(entry,
+      "cache") && buildCache != null ? buildCache + ".mtrg" : null;
     if (control != null) control.throwIfCancelled();
     if (cache != null && FileSystem.exists(cache)) {
       if (control != null) control.phase("Reading the cached build");
@@ -178,20 +220,21 @@ class MateriaProjectRunner {
         return cached;
       } catch (_:Dynamic) {
         if (control != null) control.throwIfCancelled();
-        try FileSystem.deleteFile(cache) catch (_:Dynamic) {}
+        try FileSystem.deleteFile(cache) catch (_:Dynamic) {
+        }
       }
     }
     var tempRootValue = Sys.getEnv("TMPDIR");
-    var temporaryRoot = ProjectPath.join([tempRootValue == null ? "/tmp" : tempRootValue,
-      "materia-project-" + Sys.getPid() + "-" + Std.string(Sys.time())
-        + "-" + Std.random(1000000000)]);
+    var temporaryRoot = ProjectPath.join([
+      tempRootValue == null ? "/tmp" : tempRootValue,
+      "materia-project-" + Sys.getPid() + "-" + Std.string(Sys.time()) + "-" + Std.random(1000000000)
+    ]);
     FileSystem.createDirectory(temporaryRoot);
     var outputPrefix = ProjectPath.join([temporaryRoot, "preview"]);
     var records:Bytes;
     try {
       var acceptsDocument = Reflect.field(entry, "documentInput") == true;
-      if (recipeDocument != null && !acceptsDocument)
-        throw "Project entrypoint does not accept an editable document";
+      if (recipeDocument != null && !acceptsDocument) throw "Project entrypoint does not accept an editable document";
       var compiledCache = buildCache == null ? null : buildCache + ".hl";
       if (compiledCache != null && FileSystem.exists(compiledCache)) {
         if (control != null) control.phase("Reading the compiled generator");
@@ -200,11 +243,21 @@ class MateriaProjectRunner {
       } else {
         Sys.println("Materia project: compiling its entrypoint");
         if (control != null) control.phase("Compiling the project");
-        buildModule(haxe, home, tools, haxeonManifest, fieldText(entry, "module"),
-          fieldText(entry, "function"), outputPrefix, acceptsDocument, control);
+        buildModule(
+          haxe,
+          home,
+          tools,
+          haxeonManifest,
+          fieldText(entry, "module"),
+          fieldText(entry, "function"),
+          outputPrefix,
+          acceptsDocument,
+          control
+        );
         if (control != null) control.throwIfCancelled();
-        if (compiledCache != null) try AtomicFile.writeBytes(compiledCache, File.getBytes(outputPrefix + ".hl"))
-          catch (error:Dynamic) Sys.println("Materia project: could not save compiled generator: " + Std.string(error));
+        if (compiledCache != null) try AtomicFile.writeBytes(compiledCache,
+          File.getBytes(outputPrefix + ".hl")) catch (error:Dynamic) Sys
+          .println("Materia project: could not save compiled generator: " + Std.string(error));
       }
       if (control != null) control.throwIfCancelled();
       Sys.println("Materia project: executing its entrypoint");
@@ -212,23 +265,29 @@ class MateriaProjectRunner {
       var hashlink = ProjectPath.join([home, ".tools", "hashlink", "hl"]);
       if (!FileSystem.exists(hashlink)) throw 'Pinned HashLink executable was not found at $hashlink';
       if (recipeDocument != null) File.saveContent(outputPrefix + ".document.json", recipeDocument);
-      runCommand(hashlink, recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"]
-        : [outputPrefix + ".hl", outputPrefix + ".mtrg", outputPrefix + ".document.json"],
-        "Could not generate Materia project artifact", control);
+      runCommand(
+        hashlink,
+        recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"] : [
+          outputPrefix + ".hl",
+          outputPrefix + ".mtrg",
+          outputPrefix + ".document.json"
+        ],
+        "Could not generate Materia project artifact",
+        control
+      );
       if (control != null) control.throwIfCancelled();
-      if (!FileSystem.exists(outputPrefix + ".mtrg"))
-        throw "Project entrypoint did not write a geometry artifact";
+      if (!FileSystem.exists(outputPrefix + ".mtrg")) throw "Project entrypoint did not write a geometry artifact";
       var metadata = FileSystem.metadata(outputPrefix + ".mtrg");
-      if (metadata == null || metadata.size > MAX_OUTPUT_BYTES)
-        throw "Project geometry preview exceeds the 150 MB limit";
+      if (metadata == null
+        || metadata.size > MAX_OUTPUT_BYTES) throw "Project geometry preview exceeds the 150 MB limit";
       var result = File.getBytes(outputPrefix + ".mtrg");
       Sys.println('Materia project: received binary geometry artifact (${result.length} bytes)');
       if (result.length > MAX_OUTPUT_BYTES) throw "Project geometry preview exceeds the 150 MB limit";
       if (control != null) control.phase("Reading the geometry");
       SceneArtifact.decodeView(result);
       records = result;
-      if (cache != null) try AtomicFile.writeBytes(cache, result)
-        catch (error:Dynamic) Sys.println("Materia project: could not save cache: " + Std.string(error));
+      if (cache != null) try AtomicFile.writeBytes(cache,
+        result) catch (error:Dynamic) Sys.println("Materia project: could not save cache: " + Std.string(error));
     } catch (error:Dynamic) {
       cleanupArtifacts(outputPrefix, temporaryRoot);
       throw error;
@@ -239,18 +298,28 @@ class MateriaProjectRunner {
 
   /** Manifest runtime choices override those fields only; producer provenance
    * and scene navigation survive both portable export routes. */
-  static function mergeProjectSettings(artifact:materia.project.SceneArtifact.SceneArtifactData,manifest:Dynamic,
-      selected:Null<app.ProjectVariants.ProjectVariant>,motion:Dynamic):Void {
-    var dynamicParts:Dynamic=Reflect.field(manifest,"dynamicParts");
-    var parts:Array<Dynamic>=dynamicParts==null?[]:cast dynamicParts;
-    var tracks:Array<Dynamic>=motion==null?[]:cast Reflect.field(motion,"tracks");
-    var resolved=SceneArtifact.decodeProject({variant:selected==null||selected.kind=="job"?null:selected.id,
-      job:selected==null||selected.kind!="job"?null:selected.id,dynamicParts:parts,motions:tracks});
-    var settings=artifact.project;
-    if(settings==null)artifact.project=resolved;
+  static function mergeProjectSettings(
+    artifact:materia.project.SceneArtifact.SceneArtifactData,
+    manifest:Dynamic,
+    selected:Null<app.ProjectVariants.ProjectVariant>,
+    motion:Dynamic
+  ):Void {
+    var dynamicParts:Dynamic = Reflect.field(manifest, "dynamicParts");
+    var parts:Array<Dynamic> = dynamicParts == null ? [] : cast dynamicParts;
+    var tracks:Array<Dynamic> = motion == null ? [] : cast Reflect.field(motion, "tracks");
+    var resolved = SceneArtifact.decodeProject({
+      variant: selected == null || selected.kind == "job" ? null : selected.id,
+      job : selected == null || selected.kind != "job" ? null : selected.id,
+      dynamicParts : parts,
+      motions : tracks
+    });
+    var settings = artifact.project;
+    if (settings == null) artifact.project = resolved;
     else {
-      settings.variant=resolved.variant;settings.job=resolved.job;
-      settings.dynamicParts=resolved.dynamicParts;settings.motions=resolved.motions;
+      settings.variant = resolved.variant;
+      settings.job = resolved.job;
+      settings.dynamicParts = resolved.dynamicParts;
+      settings.motions = resolved.motions;
     }
   }
 
@@ -261,37 +330,46 @@ class MateriaProjectRunner {
     var manifest:Dynamic = Json.parse(File.getContent(path));
     var selected = ProjectVariants.selected(manifest, variantId);
     var motion:Dynamic = motionDocument(path);
-    mergeProjectSettings(artifact,manifest,selected,motion);
-    if (artifact.machining != null && artifact.machining.programFile != null)
-      throw "Use exportArtifactBundle for a project with an external machining program";
+    mergeProjectSettings(artifact, manifest, selected, motion);
+    if (artifact.machining != null && artifact.machining.programFile
+      != null) throw "Use exportArtifactBundle for a project with an external machining program";
     return SceneArtifact.encode(artifact);
   }
 
   /** The artifact remains small; preserve the program's relative path when writing these files. */
-  public static function exportArtifactBundle(projectPath:String, ?variantId:String):Map<String,Bytes> {
+  public static function exportArtifactBundle(projectPath:String, ?variantId:String):Map<String, Bytes> {
     var path = FileSystem.fullPath(projectPath);
-    var bytes = generateArtifact(path,null,null,variantId);
+    var bytes = generateArtifact(path, null, null, variantId);
     var artifact = SceneArtifact.decodeView(bytes);
-    var files = new Map<String,Bytes>();
+    var files = new Map<String, Bytes>();
     if (artifact.machining != null && artifact.machining.programFile != null) {
       var job = artifact.machining;
       var program = ProjectSourceLoader.programReader(path)(job.programFile);
-      materia.project.SceneArtifactProgram.resolve(job,_ -> program);
+      materia.project.SceneArtifactProgram.resolve(job, _ -> program);
       // Reserved top-level artifact name must never overwrite a dependency.
       if (job.programFile == "preview.mtrg") throw "Program path conflicts with the bundle artifact";
-      files.set(job.programFile,program);
+      files.set(job.programFile, program);
       var manifest:Dynamic = Json.parse(File.getContent(path));
-      var selected = ProjectVariants.selected(manifest,variantId);
+      var selected = ProjectVariants.selected(manifest, variantId);
       var motion:Dynamic = motionDocument(path);
-      mergeProjectSettings(artifact,manifest,selected,motion);
-      files.set("preview.mtrg",SceneArtifact.encode(artifact));
-    } else files.set("preview.mtrg",exportArtifact(path,variantId));
+      mergeProjectSettings(artifact, manifest, selected, motion);
+      files.set("preview.mtrg", SceneArtifact.encode(artifact));
+    } else files.set("preview.mtrg", exportArtifact(path, variantId));
     return files;
   }
 
-  static function buildCachePrefix(entry:Dynamic, projectRoot:String, manifestPath:String,
-      haxeonManifest:String, module:String, functionName:String, haxe:String,
-      home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
+  static function buildCachePrefix(
+    entry:Dynamic,
+    projectRoot:String,
+    manifestPath:String,
+    haxeonManifest:String,
+    module:String,
+    functionName:String,
+    haxe:String,
+    home:String,
+    tools:String,
+    ?control:ProjectLoadControl
+  ):Null<String> {
     var inputs:Array<String> = [manifestPath];
     // Explicit non-source resources may supplement the compiler-derived module set.
     var declaration = Reflect.field(entry, "cache");
@@ -300,8 +378,8 @@ class MateriaProjectRunner {
       if (!Std.isOfType(raw, Array)) throw "Project cache inputs must be an array of file paths";
       var resources:Array<Dynamic> = raw;
       for (resource in resources) {
-        if (!Std.isOfType(resource, String) || StringTools.trim(resource).length == 0)
-          throw "Project cache input must be a file path";
+        if (!Std.isOfType(resource,
+          String) || StringTools.trim(resource).length == 0) throw "Project cache input must be a file path";
         inputs.push(resolveProjectPath(projectRoot, resource));
       }
     }
@@ -313,10 +391,23 @@ class MateriaProjectRunner {
     }
     var cacheDirectory = ProjectPath.join([cacheRoot, "materia", "generated-artifacts"]);
     if (!ensureCacheDirectory(cacheDirectory)) return null;
-    var arguments = [haxeonManifest, module, functionName, tools, home,
-      Reflect.field(entry, "documentInput") == true ? "true" : "false"].concat(inputs);
-    var fingerprint = StringTools.trim(runProjectTool("MateriaProjectFingerprint", arguments,
-      haxe, home, tools, "Could not fingerprint Materia project entrypoint", control));
+    var arguments = [
+      haxeonManifest,
+      module,
+      functionName,
+      tools,
+      home,
+      Reflect.field(entry, "documentInput") == true ? "true" : "false"
+    ].concat(inputs);
+    var fingerprint = StringTools.trim(runProjectTool(
+      "MateriaProjectFingerprint",
+      arguments,
+      haxe,
+      home,
+      tools,
+      "Could not fingerprint Materia project entrypoint",
+      control
+    ));
     if (!Sha256Digest.isHex(fingerprint)) throw "Project fingerprint has an invalid result";
     return ProjectPath.join([cacheDirectory, fingerprint]);
   }
@@ -339,27 +430,73 @@ class MateriaProjectRunner {
     if (FileSystem.exists(temporaryRoot)) FileSystem.deleteDirectory(temporaryRoot);
   }
 
-  static function buildModule(haxe:String, home:String, tools:String, manifest:String,
-      module:String, functionName:String, outputPrefix:String, documentInput:Bool,
-      ?control:ProjectLoadControl):Void {
-    runProjectTool("MateriaProjectModuleBuild",
-      [manifest, module, functionName, outputPrefix, home, documentInput ? "true" : "false"],
-      haxe, home, tools, "Could not compile Materia project entrypoint", control);
+  static function buildModule(
+    haxe:String,
+    home:String,
+    tools:String,
+    manifest:String,
+    module:String,
+    functionName:String,
+    outputPrefix:String,
+    documentInput:Bool,
+    ?control:ProjectLoadControl
+  ):Void {
+    runProjectTool(
+      "MateriaProjectModuleBuild",
+      [
+        manifest,
+        module,
+        functionName,
+        outputPrefix,
+        home,
+        documentInput ? "true" : "false"
+      ],
+      haxe,
+      home,
+      tools,
+      "Could not compile Materia project entrypoint",
+      control
+    );
   }
 
   /** Bootstrap tools once per source version, then execute them on HashLink instead of Haxe's interpreter. */
-  static function runProjectTool(mainClass:String, arguments:Array<String>, haxe:String,
-      home:String, tools:String, description:String, ?control:ProjectLoadControl):String {
+  static function runProjectTool(
+    mainClass:String,
+    arguments:Array<String>,
+    haxe:String,
+    home:String,
+    tools:String,
+    description:String,
+    ?control:ProjectLoadControl
+  ):String {
     var cacheRoot = Sys.getEnv("XDG_CACHE_HOME");
     if (cacheRoot == null || cacheRoot.length == 0) {
       var userHome = Sys.getEnv("HOME");
       if (userHome != null && userHome.length > 0) cacheRoot = ProjectPath.join([userHome, ".cache"]);
     }
-    var toolDirectory = cacheRoot == null || cacheRoot.length == 0 ? null
-      : ProjectPath.join([cacheRoot, "materia", "project-tools"]);
-    if (toolDirectory == null || !ensureCacheDirectory(toolDirectory))
-      return runCommand(haxe, ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
-        "--run", mainClass].concat(arguments), description, control);
+    var toolDirectory = cacheRoot == null || cacheRoot.length == 0 ? null : ProjectPath.join([
+      cacheRoot,
+      "materia",
+      "project-tools"
+    ]);
+    if (toolDirectory == null || !ensureCacheDirectory(toolDirectory)) return runCommand(
+      haxe,
+      [
+        "--cwd",
+        home,
+        "-cp",
+        ProjectPath.join([
+          home,
+          "src"
+        ]),
+        "-cp",
+        tools,
+        "--run",
+        mainClass
+      ].concat(arguments),
+      description,
+      control
+    );
     var identificationStarted = Sys.time();
     var sources:Array<String> = [];
     collectToolSources(ProjectPath.join([home, "src"]), sources, control);
@@ -383,8 +520,23 @@ class MateriaProjectRunner {
       if (!FileSystem.exists(artifact)) {
         var temporary = artifact + "." + Sys.getPid() + "." + Std.random(1000000000) + ".tmp";
         try {
-          runCommand(haxe, ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
-            "-main", mainClass, "-hl", temporary], "Could not build " + mainClass, control);
+          runCommand(
+            haxe,
+            [
+              "--cwd",
+              home,
+              "-cp",
+              ProjectPath.join([home, "src"]),
+              "-cp",
+              tools,
+              "-main",
+              mainClass,
+              "-hl",
+              temporary
+            ],
+            "Could not build " + mainClass,
+            control
+          );
           FileSystem.rename(temporary, artifact);
         } catch (error:Dynamic) {
           if (FileSystem.exists(temporary)) FileSystem.deleteFile(temporary);
@@ -396,8 +548,12 @@ class MateriaProjectRunner {
       throw error;
     }
     projectToolMutex.release();
-    return runCommand(ProjectPath.join([home, ".tools", "hashlink", "hl"]),
-      [artifact].concat(arguments), description, control);
+    return runCommand(
+      ProjectPath.join([home, ".tools", "hashlink", "hl"]),
+      [artifact].concat(arguments),
+      description,
+      control
+    );
   }
 
   static function collectToolSources(root:String, paths:Array<String>, control:Null<ProjectLoadControl>):Void {
@@ -409,19 +565,26 @@ class MateriaProjectRunner {
     }
   }
 
-  public static function runCommand(command:String, arguments:Array<String>, description:String,
-      ?control:ProjectLoadControl):String {
+  public static function runCommand(
+    command:String,
+    arguments:Array<String>,
+    description:String,
+    ?control:ProjectLoadControl
+  ):String {
     #if wasm
     // Projects are compiled by child processes, which the browser cannot start. The guard keeps callers'
     // following statements reachable for the compiler's no-return analysis.
     if (command.length >= 0) throw description + ": external commands are not available in the browser build";
     return "";
     #else
-    if (Sys.systemName() == "Linux" || Sys.systemName() == "Mac")
-      return runStreamingCommand(command, arguments, description, control);
+    if (Sys.systemName() == "Linux" || Sys.systemName() == "Mac") return runStreamingCommand(
+      command,
+      arguments,
+      description,
+      control
+    );
     var process:Process;
-    try process = Process.run(command, arguments)
-    catch (error:Dynamic) throw description + ": " + Std.string(error);
+    try process = Process.run(command, arguments) catch (error:Dynamic) throw description + ": " + Std.string(error);
     if (control != null) control.attach(process);
     var mutex = new Mutex();
     var stdout = "", stderr = "", stdoutDone = false, stderrDone = false, processError:Dynamic = null;
@@ -432,7 +595,8 @@ class MateriaProjectRunner {
       if (error != null) processError = error;
       stdoutDone = true;
       mutex.release();
-    });
+    }
+    );
     Thread.create(function() {
       var error:Dynamic = null;
       try stderr = process.readStderr() catch (caught:Dynamic) error = caught;
@@ -440,7 +604,8 @@ class MateriaProjectRunner {
       if (error != null && processError == null) processError = error;
       stderrDone = true;
       mutex.release();
-    });
+    }
+    );
     while (true) {
       mutex.acquire();
       var done = stdoutDone && stderrDone;
@@ -454,8 +619,7 @@ class MateriaProjectRunner {
       control.detach();
       control.throwIfCancelled();
     }
-    if (processError != null)
-      throw description + ": " + Std.string(processError);
+    if (processError != null) throw description + ": " + Std.string(processError);
     if (status != 0) {
       var details = StringTools.trim(stderr + "\n" + stdout);
       if (details.length > 6000) details = details.substr(details.length - 6000);
@@ -468,8 +632,12 @@ class MateriaProjectRunner {
 
   #if !wasm
   /** CLOEXEC pipes prevent resident compiler workers from retaining the helper's output streams. */
-  static function runStreamingCommand(command:String, arguments:Array<String>, description:String,
-      ?control:ProjectLoadControl):String {
+  static function runStreamingCommand(
+    command:String,
+    arguments:Array<String>,
+    description:String,
+    ?control:ProjectLoadControl
+  ):String {
     var process = Process.spawn(command, arguments);
     if (control != null) control.attachChild(process);
     var stdout = new haxe.io.BytesBuffer(), stderr = new haxe.io.BytesBuffer();
@@ -518,46 +686,81 @@ class MateriaProjectRunner {
     if (Sys.systemName() != "Windows" && status >= 0 && (status & 0x40000000) != 0) {
       var signal = status & 0x3fffffff;
       var name = switch signal {
-        case 2: "SIGINT";
-        case 6: "SIGABRT";
-        case 9: "SIGKILL";
-        case 11: "SIGSEGV";
-        case 15: "SIGTERM";
-        case _: null;
+        case 2:
+          "SIGINT";
+        case 6:
+          "SIGABRT";
+        case 9:
+          "SIGKILL";
+        case 11:
+          "SIGSEGV";
+        case 15:
+          "SIGTERM";
+        case _:
+          null;
       };
       return name == null ? 'terminated by signal $signal' : 'terminated by $name (signal $signal)';
     }
     return 'exit $status';
   }
 
-  static function previewRecords(snapshot:Bytes, ?control:ProjectLoadControl, ?programReader:String->Bytes):GeneratedAssemblyScene
-    return new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).load(snapshot, control);
+  static function previewRecords(snapshot:Bytes, ?control:ProjectLoadControl,
+    ?programReader:String -> Bytes):GeneratedAssemblyScene return new ProjectArtifactLoader(
+      PreparedSceneCaches.current(),
+      programReader
+    ).load(
+      snapshot,
+      control
+    );
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
   public static function evaluateAssemblyState(generated:GeneratedAssemblyScene,
-      stateRecord:AssemblyStateRecord):GeneratedAssemblyScene {
+    stateRecord:AssemblyStateRecord):GeneratedAssemblyScene {
     var definition = generated.assemblyDefinition;
     if (definition == null) throw "Generated project has no kinematic assembly definition";
-    var state = generated.assemblyModel != null && generated.assemblyModel.definition == definition
-      ? AssemblyState.fromModel(generated.assemblyModel, stateRecord) : new AssemblyState(definition, stateRecord);
+    var state = generated.assemblyModel != null
+      && generated.assemblyModel.definition == definition ? AssemblyState.fromModel(
+        generated.assemblyModel,
+        stateRecord
+      ) : new AssemblyState(
+        definition,
+        stateRecord
+      );
     var objects:Array<SceneObjectData> = [];
     var byId:Map<String, SceneObjectData> = new Map();
     for (source in generated.objects) {
-      var copy:SceneObjectData = {id: source.id, label: source.label, type: source.type,
-        x: source.x, y: source.y, z: source.z, width: source.width, height: source.height,
-        depth: source.depth, collisionEnabled: source.collisionEnabled, dynamicBody: source.dynamicBody,
-        mass: source.mass, red: source.red, green: source.green, blue: source.blue,
-        appearance: source.appearance, materialId: source.materialId,
-        visible: source.visible, rotation: source.rotation == null ? null : source.rotation.copy(),
-        cadGraph: source.cadGraph, meshSnapshot: source.meshSnapshot, sketchDraft: source.sketchDraft};
+      var copy:SceneObjectData = {
+        id: source.id,
+        label: source.label,
+        type: source.type,
+        x: source.x,
+        y: source.y,
+        z: source.z,
+        width: source.width,
+        height: source.height,
+        depth: source.depth,
+        collisionEnabled: source.collisionEnabled,
+        dynamicBody: source.dynamicBody,
+        mass: source.mass,
+        red: source.red,
+        green: source.green,
+        blue: source.blue,
+        appearance: source.appearance,
+        materialId: source.materialId,
+        visible: source.visible,
+        rotation: source.rotation == null ? null : source.rotation.copy(),
+        cadGraph : source.cadGraph,
+        meshSnapshot : source.meshSnapshot,
+        sketchDraft : source.sketchDraft
+      };
       objects.push(copy);
       byId.set(copy.id, copy);
     }
     for (occurrence in definition.occurrences) {
       var item = byId.get("project:" + occurrence.id);
       var center = generated.localCentersByDefinition.get(occurrence.definition);
-      if (item == null || center == null || center.length != 3)
-        throw 'Generated project is missing preview placement data for "${occurrence.id}"';
+      if (item == null || center == null
+        || center.length != 3) throw 'Generated project is missing preview placement data for "${occurrence.id}"';
       var pose = state.worldPose(occurrence.id);
       var worldCenter = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
       item.x = worldCenter.x * generated.metresPerUnit;
@@ -565,14 +768,33 @@ class MateriaProjectRunner {
       item.z = worldCenter.z * generated.metresPerUnit;
       item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
     }
-    return {objects: objects, sourceMap:generated.sourceMap,navigation:generated.navigation,presentation:generated.presentation, presentationGeometryFingerprint:generated.presentationGeometryFingerprint, projectVariant:generated.projectVariant, projectJob: generated.projectJob,
-      geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: state.definition,
-      assemblyState: state.record(), assemblyModel: state.model, localCentersByDefinition: generated.localCentersByDefinition,
-      faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
-      recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions, cncJob: generated.cncJob,
-      mobileBase: generated.mobileBase, missions: generated.missions, robotTools: generated.robotTools,
-      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion, printJob: generated.printJob};
+    return {
+      objects: objects,
+      sourceMap: generated.sourceMap,
+      navigation: generated.navigation,
+      presentation: generated.presentation,
+      presentationGeometryFingerprint: generated.presentationGeometryFingerprint,
+      projectVariant: generated.projectVariant,
+      projectJob: generated.projectJob,
+      geometryBySnapshot: generated.geometryBySnapshot,
+      assemblyDefinition: state.definition,
+      assemblyState: state.record(),
+      assemblyModel: state.model,
+      localCentersByDefinition: generated.localCentersByDefinition,
+      faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition,
+      metresPerUnit: generated.metresPerUnit,
+      physical: generated.physical,
+      recipeDocument: generated.recipeDocument,
+      recipeDiagnostics: generated.recipeDiagnostics,
+      robotMotions: generated.robotMotions,
+      cncJob: generated.cncJob,
+      mobileBase: generated.mobileBase,
+      missions: generated.missions,
+      robotTools: generated.robotTools,
+      robotSensors: generated.robotSensors,
+      machineMotion: generated.machineMotion,
+      printJob: generated.printJob
+    };
   }
 
   static function projectToolsDirectory():String {
@@ -581,9 +803,8 @@ class MateriaProjectRunner {
 
   public static function installationRoot():String {
     var configured = Sys.getEnv("MATERIA_INSTALL_ROOT");
-    var current = configured == null || configured.length == 0
-      ? ProjectPath.directory(FileSystem.fullPath(Sys.executablePath()))
-      : FileSystem.fullPath(configured);
+    var current = configured == null || configured.length
+      == 0 ? ProjectPath.directory(FileSystem.fullPath(Sys.executablePath())) : FileSystem.fullPath(configured);
     while (true) {
       var tools = ProjectPath.join([current, "app", "tools", "MateriaProjectModuleBuild.hx"]);
       var compiler = ProjectPath.join([current, "haxeon", ".tools", "haxe", "haxe"]);
@@ -605,8 +826,11 @@ class MateriaProjectRunner {
     return result.toString();
   }
 
-  static function resolveProjectPath(root:String, relative:String):String
-    return ProjectPath.isAbsolute(relative) ? relative : ProjectPath.join([root, relative]);
+  static function resolveProjectPath(root:String,
+    relative:String):String return ProjectPath.isAbsolute(relative) ? relative : ProjectPath.join([
+      root,
+      relative
+    ]);
 
   static function directory(path:String):String {
     var separator = path.lastIndexOf("/");
@@ -621,11 +845,9 @@ class MateriaProjectRunner {
 
   static function fieldText(value:Dynamic, name:String):String {
     var result:Dynamic = field(value, name);
-    if (!Std.isOfType(result, String))
-      throw 'Project field "$name" must be non-empty text';
+    if (!Std.isOfType(result, String)) throw 'Project field "$name" must be non-empty text';
     var text:String = result;
-    if (StringTools.trim(text).length == 0)
-      throw 'Project field "$name" must be non-empty text';
+    if (StringTools.trim(text).length == 0) throw 'Project field "$name" must be non-empty text';
     return text;
   }
 

@@ -20,36 +20,35 @@ import robotkit.navigation.Path;
  * lanes carry a dogleg from "dock" through "shelf" to "bench".
  */
 class FacilityRouteDemo {
-	static var facility:Null<Facility> = null;
+  static var facility:Null<Facility> = null;
 
-	/** Floor points along the FacilityRouter route from fromStationId to toStationId. */
-	public static function route(fromStationId:String, toStationId:String):Array<Array<Float>>
-		return FacilityWalk.routeFromFacilityRoute(new FacilityRouter(demoFacility()).route(fromStationId,
-			toStationId));
+  /** Floor points along the FacilityRouter route from fromStationId to toStationId. */
+  public static function route(fromStationId:String, toStationId:String):Array<Array<Float
+    >> return FacilityWalk.routeFromFacilityRoute(new FacilityRouter(demoFacility()).route(
+      fromStationId,
+      toStationId
+    ));
 
-	/** The demo facility's station IDs, for usage and error messages. */
-	public static function stationIds():Array<String>
-		return [for (station in demoFacility().stations()) station.id];
+  /** The demo facility's station IDs, for usage and error messages. */
+  public static function stationIds():Array<String> return [for (station in demoFacility().stations()) station.id];
 
-	public static function demoFacility():Facility {
-		var existing = facility;
-		if (existing != null)
-			return existing;
-		var built = new Facility("preview", "Preview facility");
-		built.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12.0, 12.0)));
-		var dock = new Station("dock", "Dock", "floor", "map", new Pose2(0.0, 0.0, 0.0));
-		var shelf = new Rack("shelf", "Shelf", "floor", "map", new Pose2(3.0, 0.0, 0.0),
-			// B3's pose is where a hand grasps the part in it: 1 cm above the top of
-			// the 8 cm part resting on the 1.06 m shelf at (3.65, -0.2).
-			[new RackSlot("B3", new RackSlotPose(0.65, -0.2, 1.15))]);
-		var bench = new Station("bench", "Bench", "floor", "map", new Pose2(3.0, 2.5, Math.PI / 2));
-		built.addStation(dock);
-		built.addRack(shelf);
-		built.addStation(bench);
-		built.addLane(new Lane("dock-shelf", dock.id, shelf.id, new Path([dock.pose, shelf.pose], "map"), 1.0, 1.4));
-		built.addLane(new Lane("shelf-bench", shelf.id, bench.id, new Path([shelf.pose, bench.pose], "map"), 1.0,
-			1.4));
-		facility = built;
-		return built;
-	}
+  public static function demoFacility():Facility {
+    var existing = facility;
+    if (existing != null) return existing;
+    var built = new Facility("preview", "Preview facility");
+    built.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12.0, 12.0)));
+    var dock = new Station("dock", "Dock", "floor", "map", new Pose2(0.0, 0.0, 0.0));
+    var shelf = new Rack("shelf", "Shelf", "floor", "map", new Pose2(3.0, 0.0, 0.0),
+    // B3's pose is where a hand grasps the part in it: 1 cm above the top of
+    // the 8 cm part resting on the 1.06 m shelf at (3.65, -0.2).
+    [new RackSlot("B3", new RackSlotPose(0.65, -0.2, 1.15))]);
+    var bench = new Station("bench", "Bench", "floor", "map", new Pose2(3.0, 2.5, Math.PI / 2));
+    built.addStation(dock);
+    built.addRack(shelf);
+    built.addStation(bench);
+    built.addLane(new Lane("dock-shelf", dock.id, shelf.id, new Path([dock.pose, shelf.pose], "map"), 1.0, 1.4));
+    built.addLane(new Lane("shelf-bench", shelf.id, bench.id, new Path([shelf.pose, bench.pose], "map"), 1.0, 1.4));
+    facility = built;
+    return built;
+  }
 }

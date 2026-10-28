@@ -45,14 +45,24 @@ class MainWeb {
       #end
       var options = new BrowserUiHostOptions();
       options.title = "Materia";
-      options.onFrameRendered = function() { if (editor != null) editor.projectFrameRendered(); };
+      options.onFrameRendered = function() {
+        if (editor != null) editor.projectFrameRendered();
+      };
       options.width = width;
       options.height = height;
       options.fonts = [
-        new BrowserUiFontAsset("IBMPlexSans-Regular", "assets/IBMPlexSans-Regular.ttf",
-          "/assets/IBMPlexSans-Regular.ttf", FontFamily.Default),
-        new BrowserUiFontAsset("NotoEmoji-Regular", "assets/NotoEmoji-Regular.ttf",
-          "/assets/NotoEmoji-Regular.ttf", FontFamily.Emoji)
+        new BrowserUiFontAsset(
+          "IBMPlexSans-Regular",
+          "assets/IBMPlexSans-Regular.ttf",
+          "/assets/IBMPlexSans-Regular.ttf",
+          FontFamily.Default
+        ),
+        new BrowserUiFontAsset(
+          "NotoEmoji-Regular",
+          "assets/NotoEmoji-Regular.ttf",
+          "/assets/NotoEmoji-Regular.ttf",
+          FontFamily.Emoji
+        )
       ];
       var started = BrowserUiHost.start(options, function(context) {
         var host:DesktopUiHostContext = cast context;
@@ -65,7 +75,8 @@ class MainWeb {
         #end
         editor = created;
         return created;
-      });
+      }
+      );
       session = started;
       return started.state == UiHostLifecycle.Failed ? 2 : 0;
     } catch (error:Dynamic) {
@@ -106,15 +117,27 @@ class MainWeb {
       var path = BrowserFiles.storeArtifact(name.data.toString(), content.data);
       app.documents.requestOpenPath(path);
       return 0;
-    } catch (error:Dynamic) { record(error); return 4; }
+    } catch (error:Dynamic) {
+      record(error);
+      return 4;
+    }
     #else
     return 1;
     #end
   }
 
   /** Commands whose availability the browser tests check. */
-  static final REPORTED_COMMANDS = ["editor.new", "editor.undo", "editor.redo", "scene.create", "scene.delete", "sim.play", "sim.step",
-    "sim.stop", "sim.reset"];
+  static final REPORTED_COMMANDS = [
+    "editor.new",
+    "editor.undo",
+    "editor.redo",
+    "scene.create",
+    "scene.delete",
+    "sim.play",
+    "sim.step",
+    "sim.stop",
+    "sim.reset"
+  ];
 
   /**
    * Prints one `materia-report` line of JSON to the page's console: the editor's mode, scene objects, command
@@ -138,26 +161,21 @@ class MainWeb {
       #if wasm
       stored = storedFiles("/");
       #end
-      Sys.println("materia-report " + haxe.Json.stringify({
-        mode: app.mode.id,
+      Sys.println("materia-report " + haxe.Json.stringify({mode: app.mode.id,
         examples: [for (entry in ExampleCatalog.available()) entry.id],
-        exampleFailure: @:privateAccess app.startFailure,
-        projectVariant:app.session.projectVariant, projectJob: app.session.projectJob,
-        robotMotionCount: app.session.robotMotions.length,
+        exampleFailure: @: privateAccess app.startFailure, projectVariant: app.session.projectVariant,
+        projectJob: app.session.projectJob, robotMotionCount: app.session.robotMotions.length,
         dynamicParts: [for (record in app.scene.records()) if (record.dynamicBody == true) record.id],
-        simulationRunning: app.simulation.isRunning(),
-        simulationActive: app.simulation.isActive(),
-        simulationError: app.simulation.error,
-        collisions: app.collisionSummary,
+        simulationRunning: app.simulation.isRunning(), simulationActive: app.simulation.isActive(),
+        simulationError: app.simulation.error, collisions: app.collisionSummary,
         mission: app.simulation.missionPlayer() == null ? null : app.simulation.missionPlayer().progress(),
-        objects: [for (record in app.scene.records()) {id: record.id, label: record.label, type: record.type, x: record.x, y: record.y}],
-        selected: app.scene.selectedId,
-        commands: [for (id in REPORTED_COMMANDS) {id: id, enabled: commandEnabled(app, id)}],
-        state: state,
-        stateError: stateError,
-        files: stored,
-        widgets: widgets
-      }));
+        objects : [for (record in app.scene.records()) {
+        id:record.id, label:record.label, type:record.type, x:record.x, y:record.y
+      }
+      ], selected:app.scene.selectedId, commands:[for (id in REPORTED_COMMANDS) {
+        id:id, enabled:commandEnabled(app, id)
+      }
+      ], state:state, stateError:stateError, files:stored, widgets:widgets}));
       return 0;
     } catch (error:Dynamic) {
       record(error);
@@ -196,9 +214,17 @@ class MainWeb {
     }
     if (resolved != null && (node.styleKey != null || label != null)) {
       var bounds = resolved.clippedViewportBounds();
-      if (bounds.width > 0 && bounds.height > 0)
-        into.push({key: node.styleKey, label: label, role: role, value: value, x: bounds.x, y: bounds.y,
-          width: bounds.width, height: bounds.height, enabled: node.enabled});
+      if (bounds.width > 0 && bounds.height > 0) into.push({
+        key: node.styleKey,
+        label: label,
+        role: role,
+        value: value,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        enabled: node.enabled
+      });
     }
     for (child in node.children) collectWidgets(child, into);
   }

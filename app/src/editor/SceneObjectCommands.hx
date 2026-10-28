@@ -6,8 +6,7 @@ import haxeon.ui.core.Shortcut;
 import haxeon.ui.core.UiModifier;
 
 /** Object and CAD editing command registrations. */
-@:access(app.Main.ReferenceEditorApp)
-class SceneObjectCommands {
+@:access(app.Main.ReferenceEditorApp) class SceneObjectCommands {
   public static function install(app:ReferenceEditorApp):Void {
     app.commands.register(new Command("scene.create", "Add rectangle", function() {
       app.scene.createRectangle();
@@ -23,26 +22,47 @@ class SceneObjectCommands {
       app.runSceneEdit("Could not create extrusion", function() app.scene.createExtrusion());
     }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
     app.commands.register(new Command("scene.create-sheet-base", "Create sheet base", function() {
-      app.runSceneEdit("Could not create sheet base", function() return app.scene.createSheetBase(app.scene.sheetAuthoring.stock(app.session.customMaterials)));
+      app.runSceneEdit(
+        "Could not create sheet base",
+        function() return app.scene.createSheetBase(app.scene.sheetAuthoring.stock(app.session.customMaterials))
+      );
     }, null, function() return app.canEditObjects() && app.scene.canCreateExtrusion()));
     app.commands.register(new Command("scene.create-sheet-flange", "Create edge flange", function() {
       var input = app.scene.sheetAuthoring;
-      app.runSceneEdit("Could not create sheet flange", function() return app.scene.createSheetFlange(
-        SheetMetalAuthoring.number(input.length, "Flange length"),
-        SheetMetalAuthoring.number(input.angleDegrees, "Bend angle") * Math.PI / 180,
-        SheetMetalAuthoring.number(input.radius, "Inner radius")));
+      app.runSceneEdit(
+        "Could not create sheet flange",
+        function() return app.scene.createSheetFlange(
+          SheetMetalAuthoring.number(
+            input.length,
+            "Flange length"
+          ),
+          SheetMetalAuthoring.number(
+            input.angleDegrees,
+            "Bend angle"
+          ) * Math.PI / 180,
+          SheetMetalAuthoring.number(
+            input.radius,
+            "Inner radius"
+          )
+        )
+      );
     }, null, function() return app.canEditObjects() && app.scene.canCreateSheetFlange()));
     for (format in ["dxf", "svg"]) {
       var extension = format;
-      app.commands.register(new Command("scene.export-sheet-" + extension, "Export flat " + extension.toUpperCase(), function() {
+      app.commands.register(new Command("scene.export-sheet-" + extension,
+        "Export flat " + extension.toUpperCase(), function() {
         var chooser = app.files;
         if (chooser == null) return;
         chooser.chooseExport("Export flat pattern", "Flat pattern." + extension, function(path, error) {
-          if (error != null) { app.log(error); return; }
+          if (error != null) {
+            app.log(error);
+            return;
+          }
           if (path == null) return;
-          try app.scene.exportSelectedSheet(path, extension == "svg")
-          catch (failure:Dynamic) app.log("Flat export failed: " + Std.string(failure));
-        });
+          try app.scene.exportSelectedSheet(path,
+            extension == "svg") catch (failure:Dynamic) app.log("Flat export failed: " + Std.string(failure));
+        }
+        );
       }, null, function() return app.files != null && app.scene.selectedSheetFeature() != null));
     }
     app.commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
@@ -63,20 +83,33 @@ class SceneObjectCommands {
     app.commands.register(new Command("scene.create-worker", "Add worker", function() {
       app.runSceneEdit("Could not add worker", function() app.scene.createWorker());
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));
-    for (command in ["scene.worker-add-step","scene.worker-remove-step",
-        "scene.worker-step-up","scene.worker-step-down"]) {
+    for (command in [
+      "scene.worker-add-step",
+      "scene.worker-remove-step",
+      "scene.worker-step-up",
+      "scene.worker-step-down"
+    ]) {
       var selected = command;
       app.commands.register(new Command(selected, switch selected {
-        case "scene.worker-add-step": "Add job step";
-        case "scene.worker-remove-step": "Remove job step";
-        case "scene.worker-step-up": "Move job step up";
-        default: "Move job step down";
-      }, function() app.runSceneEdit("Could not edit worker job", function()
-        return HumanWorkerKind.command(app.scene, selected)), null,
-        function() {
-          var selectedObject = app.scene.object(app.scene.selectedId);
-          return app.canEditObjects() && selectedObject != null && selectedObject.kind == HumanWorkerKind.KIND;
-        }));
+        case "scene.worker-add-step":
+          "Add job step";
+        case "scene.worker-remove-step":
+          "Remove job step";
+        case "scene.worker-step-up":
+          "Move job step up";
+        default:
+          "Move job step down";
+      }, function() app.runSceneEdit(
+        "Could not edit worker job",
+        function() return HumanWorkerKind.command(
+          app.scene,
+          selected
+        )
+      ), null, function() {
+        var selectedObject = app.scene.object(app.scene.selectedId);
+        return app.canEditObjects() && selectedObject != null && selectedObject.kind == HumanWorkerKind.KIND;
+      }
+      ));
     }
     app.commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
       app.runSceneEdit("Could not add L bracket", function() app.scene.createBracket());
@@ -84,10 +117,11 @@ class SceneObjectCommands {
     app.commands.register(new Command("scene.edit-sketch", "Edit selected sketch", function() {
       try {
         app.scene.beginSelectedSketchEdit();
-        } catch (error:Dynamic) app.log("Could not edit sketch: " + Std.string(error));
+      } catch (error:Dynamic) app.log("Could not edit sketch: " + Std.string(error));
       app.commands.refresh();
     }, null, function() return app.canEditObjects() && app.scene.canBeginSelectedSketchEdit()));
-    app.commands.register(new Command("scene.repair-sketch-support-face", "Repair selected sketch support face", function() {
+    app.commands.register(new Command("scene.repair-sketch-support-face",
+      "Repair selected sketch support face", function() {
       app.runSceneEdit("Could not repair sketch support face", function() app.scene.repairSelectedSketchSupportFace());
       app.commands.refresh();
     }, null, function() return app.canEditObjects() && app.scene.canRepairSelectedSketchSupportFace()));
@@ -108,35 +142,46 @@ class SceneObjectCommands {
       app.commands.refresh();
     }, null, function() return app.canEditObjects() && app.scene.canClearSketchDraft()));
     app.commands.register(new Command("scene.import-step", "Import STEP part", function() {
-      var chooser=app.files;
-      if(chooser==null)return;
-      chooser.chooseImport("Import STEP part",function(path,error) {
-        if(error!=null){app.log(error);return;}
-        if(path==null)return;
+      var chooser = app.files;
+      if (chooser == null) return;
+      chooser.chooseImport("Import STEP part", function(path, error) {
+        if (error != null) {
+          app.log(error);
+          return;
+        }
+        if (path == null) return;
         try {
           app.scene.importStep(path);
-          app.log("Imported STEP part: "+path);
-        } catch(failure:Dynamic) app.log("STEP import failed: "+Std.string(failure));
+          app.log("Imported STEP part: " + path);
+        } catch (failure:Dynamic) app.log("STEP import failed: " + Std.string(failure));
         app.commands.refresh();
-      });
-    },null,function() return app.canEditObjects()&&app.files!=null&&app.scene.canCreate()));
+      }
+      );
+    }, null, function() return app.canEditObjects() && app.files != null && app.scene.canCreate()));
     app.commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
       app.runSceneEdit("Could not add hole", function() app.scene.addHoleOnSelectedFace());
-    },null,function() return app.canEditObjects()&&app.scene.canAddHoleOnSelectedFace()));
+    }, null, function() return app.canEditObjects() && app.scene.canAddHoleOnSelectedFace()));
     app.commands.register(new Command("scene.export-step", "Export STEP", function() {
-      var chooser=app.files;
-      if(chooser==null)return;
-      chooser.chooseExport("Export selected CAD part","CAD part.step",function(path,error) {
-        if(error!=null){app.log(error);return;}
-        if(path==null)return;
-        try { app.scene.exportSelectedCad(path); app.log("Exported STEP: "+path); }
-        catch(failure:Dynamic) app.log("STEP export failed: "+Std.string(failure));
+      var chooser = app.files;
+      if (chooser == null) return;
+      chooser.chooseExport("Export selected CAD part", "CAD part.step", function(path, error) {
+        if (error != null) {
+          app.log(error);
+          return;
+        }
+        if (path == null) return;
+        try {
+          app.scene.exportSelectedCad(path);
+          app.log("Exported STEP: " + path);
+        } catch (failure:Dynamic) app.log("STEP export failed: " + Std.string(failure));
         app.commands.refresh();
-      });
-    },null,function() {
-      var selected=app.scene.object(app.scene.selectedId);
-      return !app.documents.blocked()&&app.files!=null&&selected!=null&&app.scene.isCadPart(selected.id);
-    }));
+      }
+      );
+    }, null, function() {
+      var selected = app.scene.object(app.scene.selectedId);
+      return !app.documents.blocked() && app.files != null && selected != null && app.scene.isCadPart(selected.id);
+    }
+    ));
     app.commands.register(new Command("scene.duplicate", "Duplicate", function() {
       app.runSceneEdit("Could not duplicate object", function() app.scene.duplicateSelected());
     }, new Shortcut(68, UiModifier.Control), function() return app.canEditObjects()

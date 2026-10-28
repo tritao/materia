@@ -9,16 +9,16 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart;
 class ProjectScenePreparation {
   /** Target meshes are comparison data, not physical bodies; used on host and browser worker. */
   public static function components(artifact:materia.project.SceneArtifact.SceneArtifactData):Array<SceneArtifactPart> {
-    var targets = new Map<String,Bool>();
+    var targets = new Map<String, Bool>();
     if (artifact.machining != null) {
-      if (artifact.machining.target != null) targets.set(artifact.machining.target,true);
-      if (artifact.machining.targets != null) for (entry in artifact.machining.targets) targets.set(entry.part,true);
+      if (artifact.machining.target != null) targets.set(artifact.machining.target, true);
+      if (artifact.machining.targets != null) for (entry in artifact.machining.targets) targets.set(entry.part, true);
     }
     return [for (part in artifact.parts) if (!targets.exists(part.id)) part];
   }
 
-  public static function prepare(components:Array<SceneArtifactPart>, scale:Float,
-      ?control:ProjectLoadControl):Array<PreparedProjectPart> {
+  public static function prepare(components:Array<SceneArtifactPart>,
+    scale:Float, ?control:ProjectLoadControl):Array<PreparedProjectPart> {
     var prepared:Array<PreparedProjectPart> = [];
     var physicsSeconds = 0.0;
     for (component in components) {
@@ -35,16 +35,19 @@ class ProjectScenePreparation {
       var physicsStarted = Sys.time();
       var properties = MeshMassProperties.compute(component.vertices, component.indices);
       var materialId = component.materialId == null ? "neutral" : component.materialId;
-      var collision = cadkit.ConvexHullVertices.safeFromMesh(component.vertices,
-        component.vertexCount, 0.0005 / scale);
-      var physical:AssemblyPhysicalPart = {id: component.id, materialId: materialId,
-        collisionHull: collision.vertices, collisionWarning: collision.warning,
+      var collision = cadkit.ConvexHullVertices.safeFromMesh(component.vertices, component.vertexCount, 0.0005 / scale);
+      var physical:AssemblyPhysicalPart = {
+        id: component.id,
+        materialId: materialId,
+        collisionHull: collision.vertices,
+        collisionWarning: collision.warning,
         collisionErrorRatio: collision.errorRatio,
         volume: component.volume == null ? properties.volume : component.volume,
-        centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
-        inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),
-        density: component.materialDensity == null
-          ? MaterialLibrary.require(materialId).physical.density : component.materialDensity};
+        centerOfMass : component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
+        inertia : component.inertia == null ? properties.inertia : component.inertia.copy(),
+        density : component.materialDensity
+        == null ? MaterialLibrary.require(materialId).physical.density : component.materialDensity
+      };
       physicsSeconds += Sys.time() - physicsStarted;
       prepared.push({id: component.id, geometry: geometry, physical: physical});
     }

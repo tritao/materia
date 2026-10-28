@@ -19,8 +19,7 @@ import haxeon.ui.widgets.scroll.ScrollView;
 import haxeon.ui.widgets.text.Text;
 
 /** Sensor dock panel and its script-owned controls. */
-@:access(app.Main.ReferenceEditorApp)
-class SensorPanel {
+@:access(app.Main.ReferenceEditorApp) class SensorPanel {
   public static function build(app:ReferenceEditorApp):View {
     var appearance = app.appearance;
     var world = app.world;
@@ -60,162 +59,383 @@ class SensorPanel {
     var log = function(message:String) app.log(message);
     var documentChanged = function() app.documentChanged();
     var refreshScriptMaterialization = function(message:String) app.refreshScriptMaterialization(message);
-    var style=fillStyle();style.padding=new Insets(12.0,12.0,12.0,12.0);
-    style.background=appearance.theme.tokens.surface;
+    var style = fillStyle();
+    style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
+    style.background = appearance.theme.tokens.surface;
     var robotRows:Array<KeyedView> = [];
     var attachedIds = world.robotIds();
     var worldIds = attachedIds.copy();
-    for(id in sensors.configuredRobotIds())if(worldIds.indexOf(id)<0)worldIds.push(id);
+    for (id in sensors.configuredRobotIds()) if (worldIds.indexOf(id) < 0) worldIds.push(id);
     worldIds.sort(Reflect.compare);
     var simulatedIds = simulation.simulatedRobotIds();
     for (id in worldIds) {
-      var robotButton = new Button(id,null,function(){sensors.selectRobot(id);app.invalidateView();},"sensor-robot:"+id);
+      var robotButton = new Button(id, null, function() {
+        sensors.selectRobot(id);
+        app.invalidateView();
+      }, "sensor-robot:" + id);
       robotButton.selected = id == sensors.robotId;
-      robotButton.enabled = simulatedIds.indexOf(id)>=0 || sensors.configuredRobotIds().indexOf(id)>=0;
-      robotRows.push(new KeyedView("robot:"+id,robotButton));
+      robotButton.enabled = simulatedIds.indexOf(id) >= 0 || sensors.configuredRobotIds().indexOf(id) >= 0;
+      robotRows.push(new KeyedView("robot:" + id, robotButton));
     }
-    if (robotRows.length == 0) robotRows.push(new KeyedView("robot-id",new Text("Robot: "+sensors.robotId)));
+    if (robotRows.length == 0) robotRows.push(new KeyedView("robot-id", new Text("Robot: " + sensors.robotId)));
     var rows:Array<KeyedView> = [];
-    for(index in 0...sensors.model.sensors.length) {
-      var sensor=sensors.model.sensors[index];
-      var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);app.invalidateView();},"sensor:"+sensor.id);
-      button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
+    for (index in 0...sensors.model.sensors.length) {
+      var sensor = sensors.model.sensors[index];
+      var button = new Button(sensor.name + " · " + sensor.kind, null, function() {
+        sensors.select(index);
+        app.invalidateView();
+      }, "sensor:" + sensor.id);
+      button.selected = index == sensors.selectedIndex;
+      rows.push(new KeyedView("sensor:" + sensor.id, button));
     }
-    var ownership=session.scriptOwnership;
-    var addLidar=new Button("LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
-    var addImu=new Button("IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
-    var addCamera=new Button("Camera",null,function(){sensors.add("camera");commands.refresh();},"sensor-add-camera");
-    var removeSensor=new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove");
-    addLidar.leadingIcon=IconName.Plus;addImu.leadingIcon=IconName.Plus;addCamera.leadingIcon=IconName.Plus;
-    removeSensor.leadingIcon=IconName.Trash;
-    addLidar.enabled=ownership==null;addImu.enabled=ownership==null;addCamera.enabled=ownership==null;removeSensor.enabled=ownership==null;
-    var actions=new Row("sensor-actions",[
-      new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),new KeyedView("add-camera",addCamera),
-      new KeyedView("remove",removeSensor)
-    ],actionRowStyle());
-    var applySimulation = new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild", null,
-      function() commands.execute("sim.rebuild"), "sensor-apply");
+    var ownership = session.scriptOwnership;
+    var addLidar = new Button("LiDAR", null, function() {
+      sensors.add("lidar");
+      commands.refresh();
+    }, "sensor-add-lidar");
+    var addImu = new Button("IMU", null, function() {
+      sensors.add("imu");
+      commands.refresh();
+    }, "sensor-add-imu");
+    var addCamera = new Button("Camera", null, function() {
+      sensors.add("camera");
+      commands.refresh();
+    }, "sensor-add-camera");
+    var removeSensor = new Button("Remove", null, function() {
+      sensors.removeSelected();
+      commands.refresh();
+    }, "sensor-remove");
+    addLidar.leadingIcon = IconName.Plus;
+    addImu.leadingIcon = IconName.Plus;
+    addCamera.leadingIcon = IconName.Plus;
+    removeSensor.leadingIcon = IconName.Trash;
+    addLidar.enabled = ownership == null;
+    addImu.enabled = ownership == null;
+    addCamera.enabled = ownership == null;
+    removeSensor.enabled = ownership == null;
+    var actions = new Row(
+      "sensor-actions",
+      [
+        new KeyedView("add-lidar", addLidar),
+        new KeyedView("add-imu", addImu),
+        new KeyedView(
+          "add-camera",
+          addCamera
+        ),
+        new KeyedView(
+          "remove",
+          removeSensor
+        )
+      ],
+      actionRowStyle()
+    );
+    var applySimulation = new Button(
+      simulation.appliedRevision == 0 ? "Apply" : "Rebuild",
+      null,
+      function() commands.execute("sim.rebuild"),
+      "sensor-apply"
+    );
     applySimulation.variant = ButtonVariant.Primary;
-    var runtimeActions=new Column("sensor-runtime-actions",[
-      new KeyedView("configuration",new Row("sensor-configuration-actions",[
-      new KeyedView("undo",new Button("Undo",null,function(){
-        commands.execute("editor.undo");},"sensor-undo")),
-      new KeyedView("redo",new Button("Redo",null,function(){
-        commands.execute("editor.redo");},"sensor-redo")),
-      new KeyedView("apply",applySimulation)],actionRowStyle())),
-      new KeyedView("playback",new Row("sensor-playback-actions",[
-      new KeyedView("run",new Button("Run",null,function() commands.execute("sim.play"),"sensor-run")),
-      new KeyedView("pause",new Button("Pause",null,function() commands.execute("sim.pause"),"sensor-pause")),
-      new KeyedView("step",new Button("Step",null,function() commands.execute("sim.step"),"sensor-step")),
-      new KeyedView("reset",new Button("Reset",null,function() commands.execute("sim.reset"),"sensor-reset")),
-      new KeyedView("design",new Button("Stop",null,function() commands.execute("sim.stop"),"sensor-design"))
-      ],actionRowStyle()))
-    ],actionColumnStyle());
-    var backendActions=new Row("sensor-backend-actions",[
-      new KeyedView("deterministic",new Button("Test backend",null,function(){
-        if(ownership==null)simulation.setBackend(ApplicationSimulation.DETERMINISTIC);else try {
-          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.DETERMINISTIC);
-          refreshScriptMaterialization("Physics backend override changed");
-        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
-      },"sensor-backend-deterministic")),
-      new KeyedView("mujoco",new Button("MuJoCo",null,function(){
-        if(ownership==null)simulation.setBackend(ApplicationSimulation.MUJOCO);else try {
-          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.MUJOCO);
-          refreshScriptMaterialization("Physics backend override changed");
-        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
-      },"sensor-backend-mujoco"))],actionRowStyle());
-    var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
-      new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
-        ? "Pending changes · rebuild required"
-        : "Configuration applied",null,appearance.theme.tokens.textSecondary,TextStyleOverride.text(12.0))),
-      new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
-        ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
-      new KeyedView("ownership",ownership==null?new Text("Origin: document"):
-        textLines("script-origin",["Origin: script",ownership.reference,
-          'configuration v${ownership.configurationVersion}'])),
-      new KeyedView("robots-heading",spacedHeading("ROBOTS")),
-      new KeyedView("robots",new Column("sensor-robots",robotRows,listStyle())),
-      new KeyedView("backend-heading",spacedHeading("PHYSICS · "+simulation.userBackendName().toUpperCase())),
-      new KeyedView("backend-actions",backendActions),
-      new KeyedView("devices-heading",spacedHeading("DEVICES")),
-      new KeyedView("actions",actions),
-      new KeyedView("list",new Column("sensor-list",rows,listStyle())),
-      new KeyedView("runtime-heading",spacedHeading("SIMULATION")),
-      new KeyedView("runtime-actions",runtimeActions)];
-    if (simulation.collisionWarnings.length > 0)
-      content.push(new KeyedView("collision-warnings",
-        textLines("collision-warnings", simulation.collisionWarnings)));
-    if(ownership!=null){
-      var overrideLabel=ownership.overridesEnabled?"Disable overrides":"Enable overrides";
-      content.insert(4,new KeyedView("script-actions",new Column("script-actions",[
-        new KeyedView("source",new Row("script-source-actions",[
-        new KeyedView("reload",new Button("Reload script",null,function(){
-          try {var result=session.reloadScript();simulation.setBackend(result.backend);
-            simulation.setTimestep(result.timestep);documentChanged();log("Script reloaded; Apply/Rebuild restarts simulation");}
-          catch(error:Dynamic)log("Script reload rejected; active simulation unchanged: "+Std.string(error));
-          commands.refresh();},"script-reload")),
-        new KeyedView("overrides",new Button(overrideLabel,null,function(){
-          ownership.setOverridesEnabled(!ownership.overridesEnabled);
-          refreshScriptMaterialization(ownership.overridesEnabled?"Overrides enabled":"Overrides disabled");
-        },"script-overrides"))])),
-        new KeyedView("revert",new Row("script-revert-actions",[
-        new KeyedView("revert-simulation",new Button("Revert simulation",null,function(){
-          if(ownership.revertTarget(ScriptOwnership.SIMULATION_TARGET))
-            refreshScriptMaterialization("Simulation settings reverted to script values");
-        },"script-revert-simulation")),
-        new KeyedView("remove-stale",new Button("Remove stale",null,function(){
-          if(ownership.removeStaleOverrides())refreshScriptMaterialization("Stale overrides removed");
-          },"script-remove-stale"))
-        ]))
-      ])));
-      content.insert(5,new KeyedView("simulation-origins",textLines("script-simulation-origins",
-        ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET,["backend","timestep"]))));
-      content.insert(6,new KeyedView("robot-origins",textLines("script-robot-origins",
-        ["Robot pose"].concat(ownership.propertyOrigins(sensors.robotId,["position","rotation"])))));
+    var runtimeActions = new Column("sensor-runtime-actions", [new KeyedView("configuration",
+      new Row("sensor-configuration-actions", [new KeyedView("undo", new Button("Undo", null, function() {
+      commands.execute("editor.undo");
+    }, "sensor-undo")), new KeyedView("redo", new Button("Redo", null, function() {
+      commands.execute("editor.redo");
+    }, "sensor-redo")), new KeyedView("apply", applySimulation)], actionRowStyle())), new KeyedView(
+      "playback",
+      new Row(
+        "sensor-playback-actions",
+        [
+          new KeyedView(
+            "run",
+            new Button(
+              "Run",
+              null,
+              function() commands.execute("sim.play"),
+              "sensor-run"
+            )
+          ),
+          new KeyedView(
+            "pause",
+            new Button(
+              "Pause",
+              null,
+              function() commands.execute("sim.pause"),
+              "sensor-pause"
+            )
+          ),
+          new KeyedView(
+            "step",
+            new Button(
+              "Step",
+              null,
+              function() commands.execute("sim.step"),
+              "sensor-step"
+            )
+          ),
+          new KeyedView(
+            "reset",
+            new Button(
+              "Reset",
+              null,
+              function() commands.execute("sim.reset"),
+              "sensor-reset"
+            )
+          ),
+          new KeyedView(
+            "design",
+            new Button(
+              "Stop",
+              null,
+              function() commands.execute("sim.stop"),
+              "sensor-design"
+            )
+          )
+        ],
+        actionRowStyle()
+      )
+    )], actionColumnStyle());
+    var backendActions = new Row("sensor-backend-actions",
+      [new KeyedView("deterministic", new Button("Test backend", null, function() {
+      if (ownership == null) simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
+      else try {
+        ownership.setOverride(
+          ScriptOwnership.SIMULATION_TARGET,
+          "backend",
+          "integer",
+          ApplicationSimulation.DETERMINISTIC
+        );
+        refreshScriptMaterialization("Physics backend override changed");
+      } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
+      commands.refresh();
+    }, "sensor-backend-deterministic")), new KeyedView("mujoco", new Button("MuJoCo", null, function() {
+      if (ownership == null) simulation.setBackend(ApplicationSimulation.MUJOCO);
+      else try {
+        ownership.setOverride(ScriptOwnership.SIMULATION_TARGET, "backend", "integer", ApplicationSimulation.MUJOCO);
+        refreshScriptMaterialization("Physics backend override changed");
+      } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
+      commands.refresh();
+    }, "sensor-backend-mujoco"))], actionRowStyle());
+    var content:Array<KeyedView> = [
+      new KeyedView("heading", sectionHeading("SENSORS")),
+      new KeyedView(
+        "apply-state",
+        new Text(
+          simulation.pending(
+            sensors,
+            scene
+          ) ? "Pending changes · rebuild required" : "Configuration applied",
+          null,
+          appearance.theme.tokens.textSecondary,
+          TextStyleOverride.text(12.0)
+        )
+      ),
+      new KeyedView(
+        "simulation-mode",
+        new Text("Mode: " + (simulation.isActive() ? (simulation.isRunning() ? "Running" : "Paused") : "Design"))
+      ),
+      new KeyedView(
+        "ownership",
+        ownership == null ? new Text("Origin: document") : textLines(
+          "script-origin",
+          [
+            "Origin: script",
+            ownership.reference,
+            'configuration v${ownership.configurationVersion}'
+          ]
+        )
+      ),
+      new KeyedView(
+        "robots-heading",
+        spacedHeading("ROBOTS")
+      ),
+      new KeyedView(
+        "robots",
+        new Column(
+          "sensor-robots",
+          robotRows,
+          listStyle()
+        )
+      ),
+      new KeyedView(
+        "backend-heading",
+        spacedHeading("PHYSICS · " + simulation.userBackendName().toUpperCase())
+      ),
+      new KeyedView(
+        "backend-actions",
+        backendActions
+      ),
+      new KeyedView(
+        "devices-heading",
+        spacedHeading("DEVICES")
+      ),
+      new KeyedView(
+        "actions",
+        actions
+      ),
+      new KeyedView(
+        "list",
+        new Column(
+          "sensor-list",
+          rows,
+          listStyle()
+        )
+      ),
+      new KeyedView(
+        "runtime-heading",
+        spacedHeading("SIMULATION")
+      ),
+      new KeyedView(
+        "runtime-actions",
+        runtimeActions
+      )
+    ];
+    if (simulation.collisionWarnings.length > 0) content.push(new KeyedView(
+      "collision-warnings",
+      textLines(
+        "collision-warnings",
+        simulation.collisionWarnings
+      )
+    ));
+    if (ownership != null) {
+      var overrideLabel = ownership.overridesEnabled ? "Disable overrides" : "Enable overrides";
+      content.insert(4, new KeyedView("script-actions", new Column("script-actions", [new KeyedView("source",
+        new Row("script-source-actions", [new KeyedView("reload", new Button("Reload script", null, function() {
+        try {
+          var result = session.reloadScript();
+          simulation.setBackend(result.backend);
+          simulation.setTimestep(result.timestep);
+          documentChanged();
+          log("Script reloaded; Apply/Rebuild restarts simulation");
+        } catch (error:Dynamic) log("Script reload rejected; active simulation unchanged: " + Std.string(error));
+        commands.refresh();
+      }, "script-reload")), new KeyedView("overrides", new Button(overrideLabel, null, function() {
+        ownership.setOverridesEnabled(!ownership.overridesEnabled);
+        refreshScriptMaterialization(ownership.overridesEnabled ? "Overrides enabled" : "Overrides disabled");
+      }, "script-overrides"))])), new KeyedView("revert", new Row("script-revert-actions",
+        [new KeyedView("revert-simulation", new Button("Revert simulation", null, function() {
+        if (ownership.revertTarget(ScriptOwnership
+          .SIMULATION_TARGET)) refreshScriptMaterialization("Simulation settings reverted to script values");
+      }, "script-revert-simulation")), new KeyedView("remove-stale", new Button("Remove stale", null, function() {
+        if (ownership.removeStaleOverrides()) refreshScriptMaterialization("Stale overrides removed");
+      }, "script-remove-stale"))]))])));
+      content.insert(
+        5,
+        new KeyedView(
+          "simulation-origins",
+          textLines(
+            "script-simulation-origins",
+            ownership.propertyOrigins(
+              ScriptOwnership.SIMULATION_TARGET,
+              [
+                "backend",
+                "timestep"
+              ]
+            )
+          )
+        )
+      );
+      content.insert(
+        6,
+        new KeyedView(
+          "robot-origins",
+          textLines(
+            "script-robot-origins",
+            ["Robot pose"].concat(ownership.propertyOrigins(
+              sensors.robotId,
+              [
+                "position",
+                "rotation"
+              ]
+            ))
+          )
+        )
+      );
     }
-    var selected=sensors.selected();
-    if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
-    if(selected!=null){
-      if(ownership!=null){
-        var sensorTarget=sensors.robotId+"/"+selected.id;
-        var sensorProperties=["updateRate","noiseStddev","noiseSeed","mount.frameId","mount.position","mount.rotation"];
-        if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");
-          sensorProperties.push("startAngleRadians");sensorProperties.push("fieldOfViewRadians");}
-        content.push(new KeyedView("sensor-origin",textLines("script-sensor-origins",
-          ["Value origins"].concat(ownership.propertyOrigins(sensorTarget,sensorProperties)))));
-        var decreaseRate=new Button("Rate -1 Hz",null,function(){
-            try {ownership.setSensorRate(sensors.robotId,selected.id,Math.max(0,selected.updateRate-1));
-              refreshScriptMaterialization("Sensor rate override changed");}
-            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
-          },"script-rate-decrease");
-        var increaseRate=new Button("Rate +1 Hz",null,function(){
-            try {ownership.setSensorRate(sensors.robotId,selected.id,selected.updateRate+1);
-              refreshScriptMaterialization("Sensor rate override changed");}
-            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
-          },"script-rate-increase");
-        var revertRate=new Button("Revert rate",null,function(){
-            if(ownership.revertSensorRate(sensors.robotId,selected.id))
-              refreshScriptMaterialization("Sensor rate reverted to script value");
-          },"script-rate-revert");
-        decreaseRate.enabled=ownership.overridesEnabled;
-        increaseRate.enabled=ownership.overridesEnabled;
-        revertRate.enabled=ownership.overridesEnabled;
-        var rateActions=new Row("script-rate-actions",[
-          new KeyedView("decrease",decreaseRate),new KeyedView("increase",increaseRate),
-          new KeyedView("revert",revertRate)]);
-        content.push(new KeyedView("rate-actions",rateActions));
-        var revertSensor=new Button("Revert selected sensor",null,function(){
-          if(ownership.revertTarget(sensorTarget))refreshScriptMaterialization("Sensor overrides reverted");
-        },"script-sensor-revert-all");
-        revertSensor.enabled=ownership.overridesEnabled;
-        content.push(new KeyedView("sensor-revert",revertSensor));
+    var selected = sensors.selected();
+    if (!sensors.isEditable()) content.push(new KeyedView(
+      "read-only",
+      new Text("Remote robot configuration is read-only")
+    ));
+    if (selected != null) {
+      if (ownership != null) {
+        var sensorTarget = sensors.robotId + "/" + selected.id;
+        var sensorProperties = [
+          "updateRate",
+          "noiseStddev",
+          "noiseSeed",
+          "mount.frameId",
+          "mount.position",
+          "mount.rotation"
+        ];
+        if (selected.kind == "lidar") {
+          sensorProperties.push("rayCount");
+          sensorProperties.push("maxRange");
+          sensorProperties.push("startAngleRadians");
+          sensorProperties.push("fieldOfViewRadians");
+        }
+        content.push(new KeyedView(
+          "sensor-origin",
+          textLines(
+            "script-sensor-origins",
+            ["Value origins"].concat(ownership.propertyOrigins(
+              sensorTarget,
+              sensorProperties
+            ))
+          )
+        ));
+        var decreaseRate = new Button("Rate -1 Hz", null, function() {
+          try {
+            ownership.setSensorRate(sensors.robotId, selected.id, Math.max(0, selected.updateRate - 1));
+            refreshScriptMaterialization("Sensor rate override changed");
+          } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
+        }, "script-rate-decrease");
+        var increaseRate = new Button("Rate +1 Hz", null, function() {
+          try {
+            ownership.setSensorRate(sensors.robotId, selected.id, selected.updateRate + 1);
+            refreshScriptMaterialization("Sensor rate override changed");
+          } catch (error:Dynamic) log("Override rejected: " + Std.string(error));
+        }, "script-rate-increase");
+        var revertRate = new Button("Revert rate", null, function() {
+          if (ownership.revertSensorRate(sensors.robotId,
+            selected.id)) refreshScriptMaterialization("Sensor rate reverted to script value");
+        }, "script-rate-revert");
+        decreaseRate.enabled = ownership.overridesEnabled;
+        increaseRate.enabled = ownership.overridesEnabled;
+        revertRate.enabled = ownership.overridesEnabled;
+        var rateActions = new Row(
+          "script-rate-actions",
+          [
+            new KeyedView("decrease", decreaseRate),
+            new KeyedView(
+              "increase",
+              increaseRate
+            ),
+            new KeyedView(
+              "revert",
+              revertRate
+            )
+          ]
+        );
+        content.push(new KeyedView("rate-actions", rateActions));
+        var revertSensor = new Button("Revert selected sensor", null, function() {
+          if (ownership.revertTarget(sensorTarget)) refreshScriptMaterialization("Sensor overrides reverted");
+        }, "script-sensor-revert-all");
+        revertSensor.enabled = ownership.overridesEnabled;
+        content.push(new KeyedView("sensor-revert", revertSensor));
       }
       var editable = ownership == null;
       var inspector = app.sensorInspector;
-      if (inspector == null || app.sensorInspectorSensor != selected ||
-          app.sensorInspectorModel != sensors.model) {
-        inspector = new PropertyInspector("sensor-inspector:" + selected.id,
-          sensors.properties(), null, null, null, null, "Sensor configuration");
+      if (inspector == null || app.sensorInspectorSensor != selected || app.sensorInspectorModel != sensors.model) {
+        inspector = new PropertyInspector(
+          "sensor-inspector:" + selected.id,
+          sensors.properties(),
+          null,
+          null,
+          null,
+          null,
+          "Sensor configuration"
+        );
         app.sensorInspector = inspector;
         app.sensorInspectorSensor = selected;
         app.sensorInspectorModel = sensors.model;
@@ -227,15 +447,24 @@ class SensorPanel {
       inspector.enabled = editable;
       content.push(new KeyedView("properties", inspector));
     }
-    var diagnostics=sensors.diagnostics();
-    if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(
-      diagnostics[0].code+": "+diagnostics[0].message)));
-    if(ownership!=null&&ownership.diagnostics.length>0)
-      content.push(new KeyedView("script-diagnostics",textLines("script-diagnostic-lines",ownership.diagnostics)));
-    var contentStyle=new LayoutStyle();contentStyle.width=LayoutAxis.stretch();
-    contentStyle.height=LayoutAxis.fit();contentStyle.padding=new Insets(8.0,8.0,8.0,8.0);
-    contentStyle.childGap=6.0;
-    return new ScrollView("sensor-scroll",new Column("sensor-panel",content,contentStyle),style);
+    var diagnostics = sensors.diagnostics();
+    if (diagnostics.length > 0) content.push(new KeyedView(
+      "diagnostics",
+      new Text(diagnostics[0].code + ": " + diagnostics[0].message)
+    ));
+    if (ownership != null && ownership.diagnostics.length > 0) content.push(new KeyedView(
+      "script-diagnostics",
+      textLines(
+        "script-diagnostic-lines",
+        ownership.diagnostics
+      )
+    ));
+    var contentStyle = new LayoutStyle();
+    contentStyle.width = LayoutAxis.stretch();
+    contentStyle.height = LayoutAxis.fit();
+    contentStyle.padding = new Insets(8.0, 8.0, 8.0, 8.0);
+    contentStyle.childGap = 6.0;
+    return new ScrollView("sensor-scroll", new Column("sensor-panel", content, contentStyle), style);
   }
 
 }

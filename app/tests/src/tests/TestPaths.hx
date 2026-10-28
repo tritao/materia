@@ -12,12 +12,10 @@ class TestPaths {
   static var root:Null<String> = null;
 
   /** The font the editor tests lay text out with. */
-  public static function font():String
-    return of("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
+  public static function font():String return of("haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf");
 
   /** `relative` (from the repository root) as a path that opens from any working directory. */
-  public static function of(relative:String):String
-    return repository() + "/" + relative;
+  public static function of(relative:String):String return repository() + "/" + relative;
 
   public static function repository():String {
     if (root != null) return root;

@@ -8,9 +8,9 @@ import nativekit.sim.SimSession;
  * Members built with a session, like the document's workers, need no join.
  */
 interface SessionParticipant extends SessionMember {
-	/** Joins a newly built session while it is still stopped. */
-	function join(session:SimSession):Void;
+  /** Joins a newly built session while it is still stopped. */
+  function join(session:SimSession):Void;
 
-	/** Leaves the current session, which is about to be released. */
-	function leave():Void;
+  /** Leaves the current session, which is about to be released. */
+  function leave():Void;
 }

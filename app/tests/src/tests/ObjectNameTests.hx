@@ -5,10 +5,8 @@ import app.ProjectDocumentSession;
 import app.ProjectSceneRecord.ProjectFieldOverride;
 
 /** Generated names and explicit document overrides have one visible value. */
-@:access(app.ProjectDocumentSession)
-@:access(app.EditorSceneTree)
-@:access(app.Main.ReferenceEditorApp)
-class ObjectNameTests {
+@:access(app
+  .ProjectDocumentSession) @:access(app.EditorSceneTree) @:access(app.Main.ReferenceEditorApp) class ObjectNameTests {
   static var assertions = 0;
   static function check(value:Bool, message:String):Void {
     assertions++;
@@ -22,14 +20,28 @@ class ObjectNameTests {
     try {
       var vertices = haxe.io.Bytes.alloc(96), normals = haxe.io.Bytes.alloc(96);
       var indices = haxe.io.Bytes.alloc(48);
-      vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
-      var triangles = [0,2,1,0,1,3,0,3,2,1,2,3];
+      vertices.setDouble(24, 1);
+      vertices.setDouble(56, 1);
+      vertices.setDouble(88, 1);
+      var triangles = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
       for (i in 0...4) normals.setDouble(i * 24 + 16, 1);
       for (i in 0...triangles.length) indices.setInt32(i * 4, triangles[i]);
-      var artifact:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit:1, parts:[{
-        id:"internal-frame-id", name:"Source steel frame", red:0.5, green:0.5, blue:0.5,
-        vertexCount:4, indexCount:12, vertices:vertices, normals:normals, indices:indices, faceRanges:[]
-      }]};
+      var artifact:materia.project.SceneArtifact.SceneArtifactData = {
+        metresPerUnit: 1,
+        parts: [{
+          id: "internal-frame-id",
+          name: "Source steel frame",
+          red: 0.5,
+          green: 0.5,
+          blue: 0.5,
+          vertexCount: 4,
+          indexCount: 12,
+          vertices: vertices,
+          normals: normals,
+          indices: indices,
+          faceRanges: []
+        }]
+      };
       var bytes = materia.project.SceneArtifact.encode(artifact);
       sys.io.File.saveBytes(fixture, bytes);
       var generated = new app.ProjectArtifactLoader().load(bytes);
@@ -50,8 +62,10 @@ class ObjectNameTests {
       check(item.id == id, "Rename preserves identity");
       var edits:Array<ProjectFieldOverride> = [];
       ProjectDocumentSession.addDeltas(edits, id, session.scene.records()[0], source, true);
-      check(edits.length == 1 && edits[0].property == "label" && edits[0].value == "My frame",
-        "A rename persists as a label override on the stable ID");
+      check(
+        edits.length == 1 && edits[0].property == "label" && edits[0].value == "My frame",
+        "A rename persists as a label override on the stable ID"
+      );
       var regenerated = session.scene.records()[0];
       regenerated.label = "Updated source frame";
       var diagnostics:Array<String> = [];

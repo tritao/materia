@@ -27,13 +27,21 @@ class HumanSimulationTests {
     if (!FileSystem.exists(directory)) FileSystem.createDirectory(directory);
     var fonts = FontCollection.create();
     fonts.add(requirePath(TestPaths.font()));
-    var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json", null, null, null,
-      TwoRobotSetupScript.REFERENCE);
+    var editor = new ReferenceEditorApp(
+      fonts,
+      directory + "/workspace.json",
+      null,
+      null,
+      null,
+      TwoRobotSetupScript.REFERENCE
+    );
     editor.enableCharacterPreview(requirePath(TestPaths.of("animkit/assets/quaternius/worker.glb")));
     editor.tick();
     check(editor.simulation.pending(editor.sensors, editor.scene), "a new person requires a rebuild");
-    check(editor.simulation.rebuild(editor.sensors, editor.scene, editor.session),
-      "the simulation builds with a person: " + editor.simulation.error);
+    check(
+      editor.simulation.rebuild(editor.sensors, editor.scene, editor.session),
+      "the simulation builds with a person: " + editor.simulation.error
+    );
     var session = editor.simulation.activeSession();
     check(session != null, "the application simulation has a session");
     var live:SimSession = cast session;
@@ -56,8 +64,13 @@ class HumanSimulationTests {
     editor.dispose();
   }
 
-  static function torsoDistance(session:SimSession):Float
-    return session.raycast(new SimPose(2.5, -3.0, 1.0), 0.0, 1.0, 0.0, 10.0);
+  static function torsoDistance(session:SimSession):Float return session.raycast(
+    new SimPose(2.5, -3.0, 1.0),
+    0.0,
+    1.0,
+    0.0,
+    10.0
+  );
 
   static function requirePath(path:String):String {
     if (!FileSystem.exists(path)) throw "Missing test file: " + path;

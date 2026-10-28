@@ -18,39 +18,60 @@ class SceneFileDialogs {
 
   public function new(host:DesktopUiHostContext) this.host = host;
 
-  public function choose(save:Bool, current:Null<String>,
-      complete:Null<String>->Null<String>->Void):Void {
-    chooseResource(save,save ? "Save scene" : "Open scene",
-      save ? "Untitled.materia.json" : null,current,complete);
+  public function choose(save:Bool, current:Null<String>, complete:Null<String> -> Null<String> -> Void):Void {
+    chooseResource(save, save ? "Save scene" : "Open scene", save ? "Untitled.materia.json" : null, current, complete);
   }
 
-  public function chooseExport(title:String,suggestedName:String,
-      complete:Null<String>->Null<String>->Void):Void
-    chooseResource(true,title,suggestedName,null,complete);
+  public function chooseExport(title:String,
+    suggestedName:String, complete:Null<String> -> Null<String> -> Void):Void chooseResource(
+      true,
+      title,
+      suggestedName,
+      null,
+      complete
+    );
 
-  public function chooseImport(title:String,
-      complete:Null<String>->Null<String>->Void):Void
-    chooseResource(false,title,null,null,complete);
+  public function chooseImport(title:String, complete:Null<String> -> Null<String> -> Void):Void chooseResource(
+    false,
+    title,
+    null,
+    null,
+    complete
+  );
 
-  function chooseResource(save:Bool,title:String,suggestedName:Null<String>,current:Null<String>,
-      complete:Null<String>->Null<String>->Void):Void {
+  function chooseResource(
+    save:Bool,
+    title:String,
+    suggestedName:Null<String>,
+    current:Null<String>,
+    complete:Null<String> -> Null<String> -> Void
+  ):Void {
     var options = new FileDialogOptions();
     options.set_title(title);
     if (save) {
       options.set_flags(DialogFlags.ConfirmOverwrite);
-      if(suggestedName!=null)options.set_suggested_name(suggestedName);
+      if (suggestedName != null) options.set_suggested_name(suggestedName);
     }
     if (current != null) options.set_initial_path(current);
     var parent = new Handle(host.window.rawValue());
-    var id = save ? NativeKit.nk_dialog_save_resource_checked(parent, options)
-      : NativeKit.nk_dialog_open_resource_checked(parent, options);
+    var id = save ? NativeKit.nk_dialog_save_resource_checked(parent,
+      options) : NativeKit.nk_dialog_open_resource_checked(
+        parent,
+        options
+      );
     request = id;
     host.events.requests.track(id, function(event) {
       request = null;
       switch (event) {
         case Resources(_, _, result, accepted, items):
-          if (result != Result.Ok) { complete(null, "The file chooser failed: " + Std.string(result)); return; }
-          if (!accepted || items.length == 0) { complete(null, null); return; }
+          if (result != Result.Ok) {
+            complete(null, "The file chooser failed: " + Std.string(result));
+            return;
+          }
+          if (!accepted || items.length == 0) {
+            complete(null, null);
+            return;
+          }
           #if wasm
           if (!StringTools.startsWith(items[0].uri, "file://")) {
             browserFile(save, items[0], suggestedName, complete);
@@ -58,12 +79,16 @@ class SceneFileDialogs {
           }
           #end
           var path:String;
-          try path = localPath(items[0].uri)
-          catch (failure:Dynamic) { complete(null, Std.string(failure)); return; }
+          try path = localPath(items[0].uri) catch (failure:Dynamic) {
+            complete(null, Std.string(failure));
+            return;
+          }
           complete(path, null);
-        default: complete(null, "Unexpected file chooser response");
+        default:
+          complete(null, "Unexpected file chooser response");
       }
-    });
+    }
+    );
   }
 
   #if wasm
@@ -72,8 +97,12 @@ class SceneFileDialogs {
    * a path. The document becomes /files/<name> in the editor's storage: a picked file is read into it first, and a
    * save target is linked to it, so the writes the editor makes there reach the user's file.
    */
-  function browserFile(save:Bool, item:NativeKitResource, suggestedName:Null<String>,
-      complete:Null<String>->Null<String>->Void):Void {
+  function browserFile(
+    save:Bool,
+    item:NativeKitResource,
+    suggestedName:Null<String>,
+    complete:Null<String> -> Null<String> -> Void
+  ):Void {
     var path = BrowserFiles.pathFor(item.displayName != null ? item.displayName : suggestedName);
     if (save) {
       BrowserFiles.link(path, item.uri);
@@ -87,16 +116,23 @@ class SceneFileDialogs {
       request = null;
       switch (event) {
         case Raw(kind, _, _, result, _, _, data) if (kind == EventKind.ResourceDataComplete):
-          if (result != Result.Ok) { complete(null, "Could not read the chosen file: " + Std.string(result)); return; }
+          if (result != Result.Ok) {
+            complete(null, "Could not read the chosen file: " + Std.string(result));
+            return;
+          }
           try {
             if (ProjectSourceLoader.isPrebuilt(path)) path = BrowserFiles.storeArtifact(item.displayName, data);
             else BrowserFiles.store(path, data);
+          } catch (failure:Dynamic) {
+            complete(null, Std.string(failure));
+            return;
           }
-          catch (failure:Dynamic) { complete(null, Std.string(failure)); return; }
           complete(path, null);
-        default: complete(null, "Unexpected file read response");
+        default:
+          complete(null, "Unexpected file read response");
       }
-    });
+    }
+    );
   }
   #end
 

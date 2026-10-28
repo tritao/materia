@@ -45,8 +45,7 @@ class WorkerVisual {
   function destroyNodes(scene:Scene):Void {
     var snapshot = scene.snapshot();
     var rootExists = snapshot.findNode(character.root) != null;
-    var children = [for (node in character.model.primitiveNodes)
-      if (snapshot.findNode(node) != null) node];
+    var children = [for (node in character.model.primitiveNodes) if (snapshot.findNode(node) != null) node];
     snapshot.dispose();
     if (!rootExists && children.length == 0) return;
     var transaction = scene.beginTransaction();

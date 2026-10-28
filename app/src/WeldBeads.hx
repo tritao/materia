@@ -83,8 +83,15 @@ class WeldBeads implements SessionMember {
    * The mission resolves each weld's metal and reference occurrence; `wireDiameterMm` is the
    * torch's wire and `depositionEfficiency` the fraction of its melted metal that reaches the weld.
    */
-  public function new(mission:MissionPlayer, welder:SimulatedWelder, simulation:Simulation,
-      scene:EditorScene, timestep:Float, wireDiameterMm:Float, depositionEfficiency:Float) {
+  public function new(
+    mission:MissionPlayer,
+    welder:SimulatedWelder,
+    simulation:Simulation,
+    scene:EditorScene,
+    timestep:Float,
+    wireDiameterMm:Float,
+    depositionEfficiency:Float
+  ) {
     this.mission = mission;
     this.welder = welder;
     this.simulation = simulation;
@@ -102,16 +109,20 @@ class WeldBeads implements SessionMember {
         host = new BeadHost(mission.assemblyParts.get(id));
         hosts.push(host);
       }
-      var path = new WeldPathBead([for (segment in weld.path) segment.start.position], [for (segment in weld.path) segment.stop.position],
-        [for (segment in weld.path) segment.normals], wireDiameterMm, depositionEfficiency);
+      var path = new WeldPathBead(
+        [for (segment in weld.path) segment.start.position],
+        [for (segment in weld.path) segment.stop.position],
+        [for (segment in weld.path) segment.normals],
+        wireDiameterMm,
+        depositionEfficiency
+      );
       var frame:Null<SimulationAssemblyPart> = null;
       if (weld.frame != null && weld.frame != "") {
         frame = mission.assemblyParts.get("project:" + weld.frame);
       }
       var entry = {step: index, path: path, frame: frame};
       paths.push(entry);
-      for (bead in path.beads)
-        welder.addWork(new processkit.tool.WeldBeadWork(bead, () -> frameOf(entry)));
+      for (bead in path.beads) welder.addWork(new processkit.tool.WeldBeadWork(bead, () -> frameOf(entry)));
       for (number in 0...path.beads.length) {
         var bead = path.beads[number];
         var chunks = Std.int(Math.ceil(bead.count / CHUNK));
@@ -136,7 +147,14 @@ class WeldBeads implements SessionMember {
           if (points.length == 0) continue;
           var world:Array<Float> = [];
           for (index in 0...Std.int(points.length / 3)) {
-            var point = AssemblyRobot.rotate(frame.rotation, [points[3 * index], points[3 * index + 1], points[3 * index + 2]]);
+            var point = AssemblyRobot.rotate(
+              frame.rotation,
+              [
+                points[3 * index],
+                points[3 * index + 1],
+                points[3 * index + 2]
+              ]
+            );
             for (axis in 0...3) world.push(point[axis] + frame.position[axis]);
           }
           result.push({name: 'weld bead step ${entry.step} seam $number station $station', vertices: world});
@@ -153,13 +171,19 @@ class WeldBeads implements SessionMember {
   }
 
   /** The pose of weld step `step`'s frame in the world now: its reference member's, or the world's own. */
-  function frameOf(entry:{step:Int, path:WeldPathBead, frame:Null<SimulationAssemblyPart>}):{position:Array<Float>, rotation:Array<Float>} {
+  function frameOf(entry: {step: Int, path: WeldPathBead, frame: Null<SimulationAssemblyPart>}): {
+    position: Array<Float>,
+    rotation: Array<Float>
+  } {
     var part = entry.frame;
-    return part == null ? {position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0]} : part.pose();
+    return part == null ? {
+      position:[0.0, 0.0, 0.0], rotation:[0.0, 0.0, 0.0, 1.0]
+    }
+    :part.pose();
   }
 
   /** The world pose, in metres, of the frame weld step `step`'s seams are given in, now. */
-  public function referenceOf(step:Int):{position:Array<Float>, rotation:Array<Float>} {
+  public function referenceOf(step:Int): {position: Array<Float>, rotation: Array<Float>} {
     for (entry in paths) if (entry.step == step) return frameOf(entry);
     throw 'Mission step $step does not weld';
   }
@@ -170,7 +194,7 @@ class WeldBeads implements SessionMember {
     throw 'Mission step $step does not weld';
   }
 
-  static function intoFrame(frame:{position:Array<Float>, rotation:Array<Float>}, point:Array<Float>):Array<Float> {
+  static function intoFrame(frame: {position: Array<Float>, rotation: Array<Float>}, point:Array<Float>):Array<Float> {
     var inverse = [-frame.rotation[0], -frame.rotation[1], -frame.rotation[2], frame.rotation[3]];
     return AssemblyRobot.rotate(inverse, [for (axis in 0...3) point[axis] - frame.position[axis]]);
   }
@@ -181,8 +205,15 @@ class WeldBeads implements SessionMember {
     var index = mission.weldingStep();
     if (index < 0) return;
     var reading = welder.reading();
-    for (entry in paths) if (entry.step == index)
-      entry.path.step(timestep, reading.arc, welder.wireSpeed(), intoFrame(frameOf(entry), welder.tip()));
+    for (entry in paths) if (entry.step == index) entry.path.step(
+      timestep,
+      reading.arc,
+      welder.wireSpeed(),
+      intoFrame(
+        frameOf(entry),
+        welder.tip()
+      )
+    );
     for (seam in beads) if (seam.step == index) {
       var changed = seam.bead.takeChanges();
       if (changed != null) {
@@ -193,7 +224,8 @@ class WeldBeads implements SessionMember {
   }
 
   /** The beads hold no pending runtime action to stop before the reset. */
-  public function beforeReset():Void {}
+  public function beforeReset():Void {
+  }
 
   /** A reset forgets the metal: the workpiece is bare again. */
   public function reset():Void {
@@ -223,8 +255,16 @@ class WeldBeads implements SessionMember {
         // A station's mesh depends on its neighbours' legs, so the chunks beside the changed stretch change too.
         var first = Std.int(Math.max(0, seam.dirtyFrom - 1) / CHUNK);
         var last = Std.int(Math.min(seam.bead.count - 1, seam.dirtyTo + 1) / CHUNK);
-        for (chunk in first...last + 1)
-          changed.set(seam.firstPart + chunk, chunkGeometry(seam.bead, chunk, frame, pose, host.part.center));
+        for (chunk in first...last + 1) changed.set(
+          seam.firstPart + chunk,
+          chunkGeometry(
+            seam.bead,
+            chunk,
+            frame,
+            pose,
+            host.part.center
+          )
+        );
         seam.dirtyFrom = seam.bead.count;
         seam.dirtyTo = -1;
       }
@@ -247,16 +287,33 @@ class WeldBeads implements SessionMember {
    * reference frame, whose world pose this is. Each station is the hypotenuse of its triangular section between the two
    * boundary sections, whose legs are the mean of the stations beside them, with an end cap where the metal stops.
    */
-  static function chunkGeometry(bead:WeldBead, chunk:Int, frame:{position:Array<Float>, rotation:Array<Float>},
-      pose:{position:Array<Float>, rotation:Array<Float>}, center:Array<Float>):GeometryData {
+  static function chunkGeometry(
+    bead:WeldBead,
+    chunk:Int,
+    frame: {position: Array<Float>, rotation: Array<Float>},
+    pose: {
+      position: Array<Float>,
+      rotation: Array<Float>
+    },
+    center:Array<Float>
+  ):GeometryData {
     var first = chunk * CHUNK, end = Std.int(Math.min(bead.count, first + CHUNK));
     var inverse = [-pose.rotation[0], -pose.rotation[1], -pose.rotation[2], pose.rotation[3]];
     function local(point:Array<Float>):Array<Float> {
       var world = AssemblyRobot.rotate(frame.rotation, point);
-      var turned = AssemblyRobot.rotate(inverse, [for (axis in 0...3) world[axis] + frame.position[axis] - pose.position[axis]]);
+      var turned = AssemblyRobot.rotate(
+        inverse,
+        [for (axis in 0...3) world[axis] + frame.position[axis] - pose.position[axis]]
+      );
       return [for (axis in 0...3) turned[axis] - center[axis]];
     }
-    function turn(direction:Array<Float>):Array<Float> return AssemblyRobot.rotate(inverse, AssemblyRobot.rotate(frame.rotation, direction));
+    function turn(direction:Array<Float>):Array<Float> return AssemblyRobot.rotate(
+      inverse,
+      AssemblyRobot.rotate(
+        frame.rotation,
+        direction
+      )
+    );
     function leg(station:Int):Float return station < 0 || station >= bead.count ? 0.0 : bead.leg(station);
     // The leg of the section at the boundary before station `j`.
     function ring(j:Int):Float {
@@ -265,9 +322,11 @@ class WeldBeads implements SessionMember {
     }
     var positions:Array<Float> = [], normals:Array<Float> = [], indices:Array<Int> = [];
     function triangle(p:Array<Array<Float>>, normal:Array<Float>):Void {
-      var cross = [(p[1][1] - p[0][1]) * (p[2][2] - p[0][2]) - (p[1][2] - p[0][2]) * (p[2][1] - p[0][1]),
+      var cross = [
+        (p[1][1] - p[0][1]) * (p[2][2] - p[0][2]) - (p[1][2] - p[0][2]) * (p[2][1] - p[0][1]),
         (p[1][2] - p[0][2]) * (p[2][0] - p[0][0]) - (p[1][0] - p[0][0]) * (p[2][2] - p[0][2]),
-        (p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[1][1] - p[0][1]) * (p[2][0] - p[0][0])];
+        (p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[1][1] - p[0][1]) * (p[2][0] - p[0][0])
+      ];
       var flip = cross[0] * normal[0] + cross[1] * normal[1] + cross[2] * normal[2] < 0;
       var base = Std.int(positions.length / 3);
       for (point in p) {
@@ -283,8 +342,8 @@ class WeldBeads implements SessionMember {
       var near = ring(station), far = ring(station + 1);
       var s0 = station * WeldBead.BIN, s1 = Math.min(bead.length, (station + 1) * WeldBead.BIN);
       var p0 = bead.pointAt(s0), p1 = bead.pointAt(s1);
-      function corner(base:Array<Float>, direction:Array<Float>, size:Float):Array<Float>
-        return local([for (axis in 0...3) base[axis] + direction[axis] * size]);
+      function corner(base:Array<Float>, direction:Array<Float>,
+        size:Float):Array<Float> return local([for (axis in 0...3) base[axis] + direction[axis] * size]);
       var a0 = corner(p0, bead.legA, near), b0 = corner(p0, bead.legB, near);
       var a1 = corner(p1, bead.legA, far), b1 = corner(p1, bead.legB, far);
       // The face of the fillet looks out of the corner, along the sum of the faces' normals.
@@ -294,14 +353,13 @@ class WeldBeads implements SessionMember {
       triangle([a0, b0, b1], normal);
       triangle([a0, b1, a1], normal);
       var along = turn(bead.tangent);
-      if (!(leg(station - 1) > 0))
-        triangle([local(p0), a0, b0], [-along[0], -along[1], -along[2]]);
-      if (!(leg(station + 1) > 0))
-        triangle([local(p1), a1, b1], along);
+      if (!(leg(station - 1) > 0)) triangle([local(p0), a0, b0], [-along[0], -along[1], -along[2]]);
+      if (!(leg(station + 1) > 0)) triangle([local(p1), a1, b1], along);
     }
     var vertices = Std.int(positions.length / 3);
     var data = new GeometryData();
-    var positionBytes = Bytes.alloc(vertices * 12), normalBytes = Bytes.alloc(vertices * 12), colours = Bytes.alloc(vertices * 4);
+    var positionBytes = Bytes.alloc(vertices * 12),
+      normalBytes = Bytes.alloc(vertices * 12), colours = Bytes.alloc(vertices * 4);
     var indexBytes = Bytes.alloc(indices.length * 4);
     for (i in 0...vertices * 3) {
       positionBytes.setFloat(i * 4, positions[i]);

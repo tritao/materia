@@ -36,169 +36,413 @@ typedef ExampleEntry = {
 }
 
 /** One catalog for desktop files and browser resources published by the examples build. */
-@:access(app.Main.ReferenceEditorApp)
-class ExampleCatalog {
+@:access(app.Main.ReferenceEditorApp) class ExampleCatalog {
   public static final entries:Array<ExampleEntry> = [
-    {id: "picking-station", title: "Picking station",
-      description: ["A generated cell with an", "order workflow in the Inspector"],
+    {
+      id: "picking-station",
+      title: "Picking station",
+      description: [
+        "A generated cell with an",
+        "order workflow in the Inspector"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/picking-station/materia.project.json")},
-    {id: "motor-shaft-bearings", title: "Motor, shaft and bearings",
-      description: ["Standard parts assembled", "from MachineKit generators"],
+      kind: Project("machinekit/examples/picking-station/materia.project.json")
+    },
+    {
+      id: "motor-shaft-bearings",
+      title: "Motor, shaft and bearings",
+      description: [
+        "Standard parts assembled",
+        "from MachineKit generators"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/materia.project.json")},
-    {id: "robot-arm", title: "Six-axis robot arm",
-      description: ["A generated arm on a pedestal:", "press Play to run its pick motion"],
+      kind: Project("machinekit/examples/materia.project.json")
+    },
+    {
+      id: "robot-arm",
+      title: "Six-axis robot arm",
+      description: [
+        "A generated arm on a pedestal:",
+        "press Play to run its pick motion"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/robot-arm/materia.project.json")},
-    {id: "reference-arms", title: "UR and FAIRINO reference arms",
-      description: ["22 official robot descriptions", "with selectable model jobs"],
+      kind: Project("machinekit/examples/robot-arm/materia.project.json")
+    },
+    {
+      id: "reference-arms",
+      title: "UR and FAIRINO reference arms",
+      description: [
+        "22 official robot descriptions",
+        "with selectable model jobs"
+      ],
       tag: "Local assets · run preparation first",
-      kind: Project("machinekit/examples/reference-arms/materia.project.json")},
-    {id: "arm-comparison", title: "Robot arm comparison",
-      description: ["Our arm alongside UR5e and FR5", "with a common tool and task"],
+      kind: Project("machinekit/examples/reference-arms/materia.project.json")
+    },
+    {
+      id: "arm-comparison",
+      title: "Robot arm comparison",
+      description: [
+        "Our arm alongside UR5e and FR5",
+        "with a common tool and task"
+      ],
       tag: "Floor, wall and ceiling views",
-      kind: Project("machinekit/examples/reference-arms/comparison.project.json")},
-    {id: "cobot-reach500", title: "Cobot 500 mm",
-      description: ["3 kg payload size class", "running a six-joint motion loop"],
+      kind: Project("machinekit/examples/reference-arms/comparison.project.json")
+    },
+    {
+      id: "cobot-reach500",
+      title: "Cobot 500 mm",
+      description: [
+        "3 kg payload size class",
+        "running a six-joint motion loop"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/cobot-arm/materia.reach500.project.json")},
-    {id: "cobot-reach850", title: "Cobot 850 mm",
-      description: ["5 kg payload size class", "running a six-joint motion loop"],
+      kind: Project("machinekit/examples/cobot-arm/materia.reach500.project.json")
+    },
+    {
+      id: "cobot-reach850",
+      title: "Cobot 850 mm",
+      description: [
+        "5 kg payload size class",
+        "running a six-joint motion loop"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/cobot-arm/materia.project.json")},
-    {id: "cobot-reach900", title: "Cobot 900 mm",
-      description: ["16 kg payload size class", "running a six-joint motion loop"],
+      kind: Project("machinekit/examples/cobot-arm/materia.project.json")
+    },
+    {
+      id: "cobot-reach900",
+      title: "Cobot 900 mm",
+      description: [
+        "16 kg payload size class",
+        "running a six-joint motion loop"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/cobot-arm/materia.reach900.project.json")},
-    {id: "cobot-reach1300", title: "Cobot 1300 mm",
-      description: ["12.5 kg payload size class", "running a six-joint motion loop"],
+      kind: Project("machinekit/examples/cobot-arm/materia.reach900.project.json")
+    },
+    {
+      id: "cobot-reach1300",
+      title: "Cobot 1300 mm",
+      description: [
+        "12.5 kg payload size class",
+        "running a six-joint motion loop"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/cobot-arm/materia.reach1300.project.json")},
-    {id: "flexspline-hobber", title: "Flexspline hobber",
-      description: ["Six-axis precision hobbing machine", "with cast-in steel mounting inserts"],
+      kind: Project("machinekit/examples/cobot-arm/materia.reach1300.project.json")
+    },
+    {
+      id: "flexspline-hobber",
+      title: "Flexspline hobber",
+      description: [
+        "Six-axis precision hobbing machine",
+        "with cast-in steel mounting inserts"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/flexspline-hobber/materia.project.json")},
-    {id: "mill", title: "Mill",
-      description: ["Small and Compact VMC configurations", "with a bearing-block machining mission"],
+      kind: Project("machinekit/examples/flexspline-hobber/materia.project.json")
+    },
+    {
+      id: "mill",
+      title: "Mill",
+      description: [
+        "Small and Compact VMC configurations",
+        "with a bearing-block machining mission"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/bench-mill/materia.project.json")},
-    {id: "bench-mill", title: "Bench mill",
-      description: ["Open and enclosed servo bench mills", "machining a bearing block"],
+      kind: Project("machinekit/examples/bench-mill/materia.project.json")
+    },
+    {
+      id: "bench-mill",
+      title: "Bench mill",
+      description: [
+        "Open and enclosed servo bench mills",
+        "machining a bearing block"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/bench-mill/materia.bench.project.json")},
-    {id: "enclosed-bench-mill", title: "Enclosed bench mill",
-      description: ["A mill enclosure, sliding door", "and preset pneumatic vise"],
+      kind: Project("machinekit/examples/bench-mill/materia.bench.project.json")
+    },
+    {
+      id: "enclosed-bench-mill",
+      title: "Enclosed bench mill",
+      description: [
+        "A mill enclosure, sliding door",
+        "and preset pneumatic vise"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/bench-mill/materia.enclosed.project.json")},
-    {id: "gantry-picker", title: "Gantry picker",
-      description: ["A Cartesian suction gantry", "moves six cartons onto a pallet"],
+      kind: Project("machinekit/examples/bench-mill/materia.enclosed.project.json")
+    },
+    {
+      id: "gantry-picker",
+      title: "Gantry picker",
+      description: [
+        "A Cartesian suction gantry",
+        "moves six cartons onto a pallet"
+      ],
       tag: "Interactive simulation",
-      kind: Project("machinekit/examples/gantry-picker/materia.project.json")},
-    {id: "tending-controllers", title: "Machine tending controllers",
-      description: ["A mill and cobot with separate", "wired controllers and cell I/O"],
+      kind: Project("machinekit/examples/gantry-picker/materia.project.json")
+    },
+    {
+      id: "tending-controllers",
+      title: "Machine tending controllers",
+      description: [
+        "A mill and cobot with separate",
+        "wired controllers and cell I/O"
+      ],
       tag: "Simulation · first build ~30 s",
-      kind: Project("machinekit/examples/machine-tending/materia.controllers.project.json")},
-    {id: "machine-tending", title: "Machine tending cell",
-      description: ["A cobot loads and unloads the mill", "through four unattended cuts"],
+      kind: Project("machinekit/examples/machine-tending/materia.controllers.project.json")
+    },
+    {
+      id: "machine-tending",
+      title: "Machine tending cell",
+      description: [
+        "A cobot loads and unloads the mill",
+        "through four unattended cuts"
+      ],
       tag: "Simulation · first build ~30 s",
-      kind: Project("machinekit/examples/machine-tending/materia.project.json")},
-    {id: "sheet-router", title: "Full-sheet CNC router",
-      description: ["1600 × 2600 mm vacuum bed", "Servo gantry and eight-pocket ATC rack"],
+      kind: Project("machinekit/examples/machine-tending/materia.project.json")
+    },
+    {
+      id: "sheet-router",
+      title: "Full-sheet CNC router",
+      description: [
+        "1600 × 2600 mm vacuum bed",
+        "Servo gantry and eight-pocket ATC rack"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/sheet-router/materia.project.json")},
-    {id: "cnc-router", title: "Desktop CNC router",
-      description: ["A generated three-axis gantry", "router with stock on its bed"],
+      kind: Project("machinekit/examples/sheet-router/materia.project.json")
+    },
+    {
+      id: "cnc-router",
+      title: "Desktop CNC router",
+      description: [
+        "A generated three-axis gantry",
+        "router with stock on its bed"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/cnc-router/materia.project.json")},
-    {id: "press-brake", title: "Sheet metal press brake",
-      description: ["A hydraulic press brake", "with a simulated empty stroke"],
+      kind: Project("machinekit/examples/cnc-router/materia.project.json")
+    },
+    {
+      id: "press-brake",
+      title: "Sheet metal press brake",
+      description: [
+        "A hydraulic press brake",
+        "with a simulated empty stroke"
+      ],
       tag: "Project · first build ~30 s",
-      kind: Project("machinekit/examples/press-brake/materia.project.json")},
-    {id: "printer", title: "CoreXY 3D printer",
-      description: ["A generated CoreXY printer with a", "heated bed and a geared extruder"],
+      kind: Project("machinekit/examples/press-brake/materia.project.json")
+    },
+    {
+      id: "printer",
+      title: "CoreXY 3D printer",
+      description: [
+        "A generated CoreXY printer with a",
+        "heated bed and a geared extruder"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/printer/materia.project.json")},
-    {id: "mobile-base", title: "Mobile base",
-      description: ["A generated differential-drive", "robot base with a lidar"],
+      kind: Project("machinekit/examples/printer/materia.project.json")
+    },
+    {
+      id: "mobile-base",
+      title: "Mobile base",
+      description: [
+        "A generated differential-drive",
+        "robot base with a lidar"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/mobile-base/materia.project.json")},
-    {id: "robot-screwdriver", title: "Robot screwdriver",
-      description: ["Tighten four CAD fastenings in cross order", "with a reject bin and replacement supplies"],
+      kind: Project("machinekit/examples/mobile-base/materia.project.json")
+    },
+    {
+      id: "robot-screwdriver",
+      title: "Robot screwdriver",
+      description: [
+        "Tighten four CAD fastenings in cross order",
+        "with a reject bin and replacement supplies"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-screwdriver/materia.assembly.project.json")},
-    {id: "robot-screw-registration", title: "Robot screwdriver with touch registration",
-      description: ["Probe CAD reference surfaces at the tool TCP", "then fasten from the measured work placement"],
+      kind: Project("machinekit/examples/robot-screwdriver/materia.assembly.project.json")
+    },
+    {
+      id: "robot-screw-registration",
+      title: "Robot screwdriver with touch registration",
+      description: [
+        "Probe CAD reference surfaces at the tool TCP",
+        "then fasten from the measured work placement"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-screwdriver/materia.registered.project.json")},
-    {id: "robot-screw-feeder", title: "Robot screwdriver with bowl feeder",
-      description: ["A buffered bowl supply replenishes one", "sensed pickup nest for four CAD fastenings"],
+      kind: Project("machinekit/examples/robot-screwdriver/materia.registered.project.json")
+    },
+    {
+      id: "robot-screw-feeder",
+      title: "Robot screwdriver with bowl feeder",
+      description: [
+        "A buffered bowl supply replenishes one",
+        "sensed pickup nest for four CAD fastenings"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-screwdriver/materia.feeder.project.json")},
-    {id: "robot-screw-blow-feed", title: "Robot screwdriver with blow feed",
-      description: ["Meter screws into a sensed tool nosepiece", "then tighten CAD fastenings without nest pickup"],
+      kind: Project("machinekit/examples/robot-screwdriver/materia.feeder.project.json")
+    },
+    {
+      id: "robot-screw-blow-feed",
+      title: "Robot screwdriver with blow feed",
+      description: [
+        "Meter screws into a sensed tool nosepiece",
+        "then tighten CAD fastenings without nest pickup"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-screwdriver/materia.blow-feed.project.json")},
-    {id: "robot-pick-place-fasten", title: "Two-arm pick, place and fasten",
-      description: ["Two robot arms assemble a flange housing", "from sensed infeed trays to the outfeed"],
+      kind: Project("machinekit/examples/robot-screwdriver/materia.blow-feed.project.json")
+    },
+    {
+      id: "robot-pick-place-fasten",
+      title: "Two-arm pick, place and fasten",
+      description: [
+        "Two robot arms assemble a flange housing",
+        "from sensed infeed trays to the outfeed"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-screwdriver/materia.pick-place.project.json")},
-    {id: "robot-welder", title: "Robot welder",
-      description: ["A generated MIG welding cell: arm,", "torch, power source and a weldment"],
+      kind: Project("machinekit/examples/robot-screwdriver/materia.pick-place.project.json")
+    },
+    {
+      id: "robot-welder",
+      title: "Robot welder",
+      description: [
+        "A generated MIG welding cell: arm,",
+        "torch, power source and a weldment"
+      ],
       tag: "Editable project",
-      jobId: "complete", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
-    {id: "robot-welder-seam", title: "Robot welder: one seam",
-      description: ["A focused MIG welding mission", "along a plate T-joint"],
+      jobId: "complete",
+      kind: Project("machinekit/examples/robot-welder/materia.project.json")
+    },
+    {
+      id: "robot-welder-seam",
+      title: "Robot welder: one seam",
+      description: [
+        "A focused MIG welding mission",
+        "along a plate T-joint"
+      ],
       tag: "Editable project",
-      jobId: "single-seam", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
-    {id: "robot-welder-post", title: "Robot welder: tube post",
-      description: ["Weld four sides of a tube post", "as one continuous path"],
+      jobId: "single-seam",
+      kind: Project("machinekit/examples/robot-welder/materia.project.json")
+    },
+    {
+      id: "robot-welder-post",
+      title: "Robot welder: tube post",
+      description: [
+        "Weld four sides of a tube post",
+        "as one continuous path"
+      ],
       tag: "Editable project",
-      jobId: "tube-post", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
-    {id: "robot-welder-weave", title: "Robot welder: woven seam",
-      description: ["A 7 mm seam deposited", "with a weaving torch path"],
+      jobId: "tube-post",
+      kind: Project("machinekit/examples/robot-welder/materia.project.json")
+    },
+    {
+      id: "robot-welder-weave",
+      title: "Robot welder: woven seam",
+      description: [
+        "A 7 mm seam deposited",
+        "with a weaving torch path"
+      ],
       tag: "Editable project",
-      jobId: "woven-seam", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
-    {id: "robot-welder-multipass", title: "Robot welder: three passes",
-      description: ["A 10 mm seam built up", "over three welding passes"],
+      jobId: "woven-seam",
+      kind: Project("machinekit/examples/robot-welder/materia.project.json")
+    },
+    {
+      id: "robot-welder-multipass",
+      title: "Robot welder: three passes",
+      description: [
+        "A 10 mm seam built up",
+        "over three welding passes"
+      ],
       tag: "Editable project",
-      jobId: "multipass", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
-    {id: "mobile-robot-welder", title: "Mobile robot welder",
-      description: ["A mobile welding cell", "with an arm and torch"],
+      jobId: "multipass",
+      kind: Project("machinekit/examples/robot-welder/materia.project.json")
+    },
+    {
+      id: "mobile-robot-welder",
+      title: "Mobile robot welder",
+      description: [
+        "A mobile welding cell",
+        "with an arm and torch"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.mobile.project.json")},
-    {id: "mobile-welding-mission", title: "Mobile welding mission",
-      description: ["A planned welding mission", "from mobile work stations"],
+      kind: Project("machinekit/examples/robot-welder/materia.mobile.project.json")
+    },
+    {
+      id: "mobile-welding-mission",
+      title: "Mobile welding mission",
+      description: [
+        "A planned welding mission",
+        "from mobile work stations"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.mobilemission.project.json")},
-    {id: "gantry-welder", title: "Gantry welder",
-      description: ["A Cartesian gantry", "carrying a welding torch"],
+      kind: Project("machinekit/examples/robot-welder/materia.mobilemission.project.json")
+    },
+    {
+      id: "gantry-welder",
+      title: "Gantry welder",
+      description: [
+        "A Cartesian gantry",
+        "carrying a welding torch"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/gantry-welder/materia.project.json")},
-    {id: "track-welder", title: "Coordinated track welding",
-      description: ["An arm on a linear track", "with coordinated welding motion"],
+      kind: Project("machinekit/examples/gantry-welder/materia.project.json")
+    },
+    {
+      id: "track-welder",
+      title: "Coordinated track welding",
+      description: [
+        "An arm on a linear track",
+        "with coordinated welding motion"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/track-arm/materia.welder.project.json")},
-    {id: "overhead-arm", title: "Overhead gantry arm",
-      description: ["An inverted industrial arm", "on three external axes"],
+      kind: Project("machinekit/examples/track-arm/materia.welder.project.json")
+    },
+    {
+      id: "overhead-arm",
+      title: "Overhead gantry arm",
+      description: [
+        "An inverted industrial arm",
+        "on three external axes"
+      ],
       tag: "Editable project",
-      kind: Project("machinekit/examples/overhead-arm/materia.project.json")},
-    {id: "cad-modeling", title: "CAD modelling",
-      description: ["Parametric sketches, extrusions", "and features in CadKit"],
+      kind: Project("machinekit/examples/overhead-arm/materia.project.json")
+    },
+    {
+      id: "cad-modeling",
+      title: "CAD modelling",
+      description: [
+        "Parametric sketches, extrusions",
+        "and features in CadKit"
+      ],
       tag: "Editable project",
-      kind: Project("cadkit/examples/modeling/materia.project.json")},
-    {id: "two-robot", title: "Two robots with sensors",
-      description: ["A script-owned setup: press Play", "to simulate LiDAR and IMUs"],
+      kind: Project("cadkit/examples/modeling/materia.project.json")
+    },
+    {
+      id: "two-robot",
+      title: "Two robots with sensors",
+      description: [
+        "A script-owned setup: press Play",
+        "to simulate LiDAR and IMUs"
+      ],
       tag: "Interactive simulation",
-      kind: Script("materia.examples.two-robot")},
-    {id: "worker-rack-to-table", title: "Worker moves a rack",
-      description: ["A walking human worker in a", "running physics simulation"],
+      kind: Script("materia.examples.two-robot")
+    },
+    {
+      id: "worker-rack-to-table",
+      title: "Worker moves a rack",
+      description: [
+        "A walking human worker in a",
+        "running physics simulation"
+      ],
       tag: "Simulation · starts running",
-      kind: WorkerRackToTable},
-    {id: "worker-gallery", title: "Worker gallery",
-      description: ["Six workers side by side: bending,", "crouching, kneeling, turning, two hands"],
+      kind: WorkerRackToTable
+    },
+    {
+      id: "worker-gallery",
+      title: "Worker gallery",
+      description: [
+        "Six workers side by side: bending,",
+        "crouching, kneeling, turning, two hands"
+      ],
       tag: "Simulation · starts running",
-      kind: WorkerGallery}
+      kind: WorkerGallery
+    }
   ];
 
   /** Id of the entry built for a project named on the command line; it is not part of `entries`. */
@@ -206,8 +450,13 @@ class ExampleCatalog {
 
   /** A project named at launch, opened by the same background build as a Start page example. */
   public static function launchEntry(projectPath:String):ExampleEntry {
-    return {id: LAUNCH_PROJECT_ID, title: projectTitle(projectPath), description: [], tag: "",
-      kind: Project(projectPath)};
+    return {
+      id: LAUNCH_PROJECT_ID,
+      title: projectTitle(projectPath),
+      description: [],
+      tag: "",
+      kind: Project(projectPath)
+    };
   }
 
   /** The manifest's own name, or its folder name when the manifest cannot be read yet. */
@@ -216,14 +465,14 @@ class ExampleCatalog {
     try {
       var name:Dynamic = Reflect.field(Json.parse(File.getContent(projectPath)), "name");
       if (Std.isOfType(name, String) && StringTools.trim(name).length > 0) return name;
-    } catch (_:Dynamic) {}
+    } catch (_:Dynamic) {
+    }
     var folder = Path.withoutDirectory(Path.directory(projectPath));
     return folder.length > 0 ? folder : projectPath;
   }
 
   /** Entries that can actually open on this machine. */
-  public static function available():Array<ExampleEntry>
-    return [for (entry in entries) if (isAvailable(entry)) entry];
+  public static function available():Array<ExampleEntry> return [for (entry in entries) if (isAvailable(entry)) entry];
 
   public static function find(id:String):Null<ExampleEntry> {
     for (entry in entries) if (entry.id == id) return entry;
@@ -235,10 +484,14 @@ class ExampleCatalog {
     return BrowserExamples.has(entry.id);
     #else
     return switch (entry.kind) {
-    case Project(path): FileSystem.exists(path);
-    case Script(reference): SetupScriptRegistry.references().indexOf(reference) >= 0;
-    case WorkerRackToTable: workerAssetExists("app/examples/worker-rack-to-table.materia");
-    case WorkerGallery: workerAssetExists("app/examples/worker-gallery.materia");
+      case Project(path):
+        FileSystem.exists(path);
+      case Script(reference):
+        SetupScriptRegistry.references().indexOf(reference) >= 0;
+      case WorkerRackToTable:
+        workerAssetExists("app/examples/worker-rack-to-table.materia");
+      case WorkerGallery:
+        workerAssetExists("app/examples/worker-gallery.materia");
     };
     #end
   }
@@ -269,10 +522,14 @@ class ExampleCatalog {
   }
 
   /** Replaces the current document with a built project example. */
-  public static function finish(app:ReferenceEditorApp, entry:ExampleEntry, generated:Null<GeneratedAssemblyScene>):Void {
+  public static function finish(app:ReferenceEditorApp,
+    entry:ExampleEntry, generated:Null<GeneratedAssemblyScene>):Void {
     var path = switch (entry.kind) {
-      case Project(projectPath): projectPath;
-      default: open(app, entry); return;
+      case Project(projectPath):
+        projectPath;
+      default:
+        open(app, entry);
+        return;
     };
     #if wasm
     if (BrowserExamples.has(entry.id)) path = BrowserExamples.source(entry.id);

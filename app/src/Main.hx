@@ -152,43 +152,46 @@ class Main {
 
   public static function main():Int {
     var args = Sys.args();
-    for (arg in args)
-      if (arg != "--reset-workspace" && arg != "--snapshot" && arg != "--simulate" &&
-          arg != "--lab" && arg != "--dark" && arg != "--inspection-camera" && arg != "--perspective" && arg != "--demo" &&
-          arg.indexOf("--story=") != 0 &&
-          arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
-          arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
-          arg.indexOf("--capture-seconds=") != 0 && arg.indexOf("--msaa=") != 0 &&
-          arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
-          arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
-          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
-          arg.indexOf("--frame=") != 0 &&
-          arg != "--record" && arg.indexOf("--record=") != 0 &&
-          arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
-          arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
-          arg.indexOf("--character-route=") != 0 && arg.indexOf("--character-facility-route=") != 0 &&
-          arg.indexOf("--character-reach=") != 0 && arg.indexOf("--character-reach-clip=") != 0 &&
-          arg != "--worker-demo=rack-to-table" && arg != "--worker-demo=gallery" && arg.indexOf("--worker-demo-step=") != 0 &&
-          arg != "--worker-demo-trace") {
-        Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
-          "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
-          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] [--frame=OBJECT-ID] " +
-          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
-          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] " +
-          "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
-          "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
-          "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
-          "[--worker-demo=rack-to-table|gallery [--worker-demo-step=N [--worker-demo-trace]]] " +
-          "[--example=ID[,ID...] [--example-settle=SECONDS] [--example-play]]");
-        return 2;
-      }
+    for (arg in args) if (arg != "--reset-workspace" && arg != "--snapshot" && arg != "--simulate"
+      && arg != "--lab" && arg != "--dark" && arg != "--inspection-camera" && arg != "--perspective" && arg != "--demo"
+      && arg.indexOf("--story=") != 0 && arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0
+      && arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 && arg.indexOf("--capture-seconds=") != 0
+      && arg.indexOf("--msaa=") != 0 && arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0
+      && arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 && arg.indexOf("--example=") != 0
+      && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" && arg.indexOf("--frame=") != 0
+      && arg != "--record" && arg.indexOf("--record=") != 0 && arg.indexOf("--character=") != 0
+      && arg.indexOf("--character-clip=") != 0 && arg.indexOf("--character-hold=") != 0
+      && arg.indexOf("--character-display=") != 0 && arg.indexOf("--character-route=") != 0
+      && arg.indexOf("--character-facility-route=") != 0 && arg.indexOf("--character-reach=") != 0
+      && arg.indexOf("--character-reach-clip=") != 0 && arg != "--worker-demo=rack-to-table"
+      && arg != "--worker-demo=gallery" && arg.indexOf("--worker-demo-step=") != 0 && arg != "--worker-demo-trace") {
+      Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] "
+        + "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] "
+        + "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] [--frame=OBJECT-ID] "
+        + "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] "
+        + "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] "
+        + "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] "
+        + "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] "
+        + "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] "
+        + "[--worker-demo=rack-to-table|gallery [--worker-demo-step=N [--worker-demo-trace]]] "
+        + "[--example=ID[,ID...] [--example-settle=SECONDS] [--example-play]]");
+      return 2;
+    }
 
     if (args.indexOf("--snapshot") >= 0) {
       var projectPath:String = "";
       for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = arg.substr(10);
-      var editor = args.indexOf("--demo") >= 0 ?
-        new ReferenceEditorApp(null, null, null, null, null, null, null, null, true) :
-        new ReferenceEditorApp();
+      var editor = args.indexOf("--demo") >= 0 ? new ReferenceEditorApp(
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        true
+      ) : new ReferenceEditorApp();
       if (projectPath.length > 0) {
         var generated = ProjectSourceLoader.load(projectPath);
         editor.session.openGeneratedProject(generated, projectPath);
@@ -196,25 +199,24 @@ class Main {
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
       for (arg in args) if (arg.indexOf("--example-settle=") == 0) settleSeconds = Std.parseFloat(arg.substr(17));
-      for (arg in args) if (arg.indexOf("--example=") == 0)
-        for (id in arg.substr(10).split(",")) {
-          var entry = ExampleCatalog.find(id);
-          if (entry == null) throw 'Unknown example "$id"';
-          ExampleCatalog.open(editor, entry);
-          Sys.println('Opened example ${entry.id}: document "${editor.session.label()}", ' +
-            '${editor.scene.records().length} scene records');
-          if (args.indexOf("--example-play") >= 0) {
-            if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
-              Sys.println('Play rejected: ${editor.simulation.error}');
-            else editor.simulation.start();
-          }
-          // Let a running simulation step, as the interactive editor does between frames.
-          var until = Sys.time() + settleSeconds;
-          while (Sys.time() < until) {
-            editor.tick();
-            Sys.sleep(0.016);
-          }
+      for (arg in args) if (arg.indexOf("--example=") == 0) for (id in arg.substr(10).split(",")) {
+        var entry = ExampleCatalog.find(id);
+        if (entry == null) throw 'Unknown example "$id"';
+        ExampleCatalog.open(editor, entry);
+        Sys.println('Opened example ${entry.id}: document "${editor.session.label()}", '
+          + '${editor.scene.records().length} scene records');
+        if (args.indexOf("--example-play") >= 0) {
+          if (!editor.simulation.rebuild(editor.sensors,
+            editor.scene, editor.session)) Sys.println('Play rejected: ${editor.simulation.error}');
+          else editor.simulation.start();
         }
+        // Let a running simulation step, as the interactive editor does between frames.
+        var until = Sys.time() + settleSeconds;
+        while (Sys.time() < until) {
+          editor.tick();
+          Sys.sleep(0.016);
+        }
+      }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--worker-demo=gallery") >= 0) {
         // Every worker of the gallery runs its job; the tick each finished at is kept, and the run stops when all have.
@@ -231,12 +233,22 @@ class Main {
           for (id in ids) if (!finished.exists(id)) all = false;
           if (all) break;
         }
-        var workers:Array<{id:String, jobDone:Bool, doneAt:Null<Int>, jobFailure:Null<String>, part:Null<Array<Float>>}> = [];
+        var workers:Array<{id:String,
+          jobDone:Bool, doneAt:Null<Int>, jobFailure:Null<String>, part:Null<Array<Float>>}> = [];
         for (id in ids) {
           var worker = editor.simulation.humanWorker(id);
-          var thing = [for (entry in editor.simulation.environmentVisualState()) if (entry.id == StringTools.replace(id, "-worker", "-part")) entry];
-          workers.push({id: id, jobDone: worker != null && worker.currentJobDone(), doneAt: finished.get(id),
-            jobFailure: worker == null ? "missing" : worker.currentJobFailure(), part: thing.length == 0 ? null : thing[0].position});
+          var thing = [for (entry in editor.simulation.environmentVisualState()) if (entry.id == StringTools.replace(
+            id,
+            "-worker",
+            "-part"
+          )) entry];
+          workers.push({
+            id: id,
+            jobDone: worker != null && worker.currentJobDone(),
+            doneAt: finished.get(id),
+            jobFailure: worker == null ? "missing" : worker.currentJobFailure(),
+            part : thing.length == 0 ? null : thing[0].position
+          });
         }
         Sys.println(haxe.Json.stringify({workerDemo: "gallery", workers: workers}));
         editor.dispose();
@@ -258,35 +270,51 @@ class Main {
             var label = worker.currentActionLabel() + "/" + worker.currentStep();
             if (label == last) continue;
             last = label;
-            timeline.push({tick: tick, seconds: tick * editor.simulation.timestep, step: worker.currentStep(),
-              action: worker.currentActionLabel(), crouch: worker.body.crouchAmount(), walking: worker.body.walker.isWalking()});
+            timeline.push({
+              tick: tick,
+              seconds: tick * editor.simulation.timestep,
+              step: worker.currentStep(),
+              action: worker.currentActionLabel(),
+              crouch: worker.body.crouchAmount(),
+              walking: worker.body.walker.isWalking()
+            });
           }
         }
         var signals = editor.simulation.humanSignals("worker-demo");
         var environment = editor.simulation.environmentVisualState();
         var part = [for (entry in environment) if (entry.id == "worker-demo-part") entry];
-        Sys.println(haxe.Json.stringify({workerDemo:"rack-to-table", timeline:timeline, jobDone:worker != null &&
-          worker.currentJobDone(), jobFailure:worker == null ? "missing worker" : worker.currentJobFailure(),
-          part:part.length == 0 ? null : part[0].position,
-          zones:signals == null ? [] : signals.zones,
-          separation:signals == null ? null : signals.separation.get(editor.sensors.robotId)}));
+        Sys.println(haxe.Json.stringify({
+          workerDemo: "rack-to-table",
+          timeline: timeline,
+          jobDone: worker != null && worker.currentJobDone(),
+          jobFailure: worker == null ? "missing worker" : worker.currentJobFailure(),
+          part : part.length == 0 ? null : part[0].position,
+          zones : signals == null ? [] : signals.zones,
+          separation : signals == null ? null : signals.separation.get(editor.sensors.robotId)
+        }));
         editor.dispose();
         return 0;
       }
       if (args.indexOf("--simulate") >= 0) {
-        if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
-          throw "Snapshot simulation rebuild failed: " + editor.simulation.error;
+        if (!editor.simulation.rebuild(editor.sensors,
+          editor.scene, editor.session)) throw "Snapshot simulation rebuild failed: " + editor.simulation.error;
         editor.simulation.start();
         var frame = editor.simulation.capturePresentationSnapshot();
-        Sys.println(haxe.Json.stringify({workspace: haxe.Json.parse(editor.workspace.snapshotJson()),
-          simulation: {running: editor.simulation.isRunning(), error: editor.simulation.error,
-            generatedParts: frame.environment.length}}));
+        Sys.println(haxe.Json.stringify({
+          workspace: haxe.Json.parse(editor.workspace.snapshotJson()),
+          simulation: {
+            running: editor.simulation.isRunning(),
+            error: editor.simulation.error,
+            generatedParts: frame.environment.length
+          }
+        }));
       } else Sys.println(editor.workspace.snapshotJson());
       editor.dispose();
       return 0;
     }
     var live = open(args);
-    while (live.tick()) {}
+    while (live.tick()) {
+    }
     return live.close();
   }
 
@@ -302,7 +330,7 @@ class Main {
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
     host.recordPath = diagnostics.recordPath;
-    host.recordMetadata = {arguments:args.copy(), cwd:Sys.getCwd()};
+    host.recordMetadata = {arguments: args.copy(), cwd: Sys.getCwd()};
     host.frameLimit = diagnostics.frameLimit;
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
@@ -312,7 +340,9 @@ class Main {
     // `--frame=ID` frames the camera on that scene object once the project is open, leaving nothing selected.
     var frameId:Null<String> = null;
     for (arg in args) if (arg.indexOf("--frame=") == 0) frameId = arg.substr(8);
-    host.onFrameRendered = function() { if (activeEditor != null) activeEditor.projectFrameRendered(); };
+    host.onFrameRendered = function() {
+      if (activeEditor != null) activeEditor.projectFrameRendered();
+    };
     host.captureReady = function() {
       var ready = activeEditor == null || !activeEditor.openingProject();
       if (ready && playOnOpen && activeEditor != null) {
@@ -332,9 +362,8 @@ class Main {
       }
       return ready;
     };
-    host.continuousFrames = function() return activeEditor != null &&
-      (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
-        activeEditor.hasCharacterPreview());
+    host.continuousFrames = function() return activeEditor != null
+      && (activeEditor.simulation.isRunning() || diagnostics.robotHost != null || activeEditor.hasCharacterPreview());
     var hosted = DesktopUiHost.open(host, function(context) {
       // --dark overrides the saved color scheme for this run only.
       var activeTheme:Null<Theme> = diagnostics.darkTheme ? Theme.dark() : null;
@@ -342,16 +371,30 @@ class Main {
       var robotHost = diagnostics.robotHost;
       if (robotHost != null) {
         world = new RobotWorld();
-        var remote = new RemoteRobot("warehouse/forklift-17", new robotkit.auth.ClientCredentials(Sys.getEnv("ROBOTKIT_IDENTITY"),Sys.getEnv("ROBOTKIT_TOKEN")));
+        var remote = new RemoteRobot(
+          "warehouse/forklift-17",
+          new robotkit.auth.ClientCredentials(
+            Sys.getEnv("ROBOTKIT_IDENTITY"),
+            Sys.getEnv("ROBOTKIT_TOKEN")
+          )
+        );
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
-      var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
-        diagnostics.setupScript, diagnostics.projectPath, diagnostics.recordPath, diagnostics.demo);
+      var editor = new ReferenceEditorApp(
+        context.fonts,
+        null,
+        activeTheme,
+        world,
+        context,
+        diagnostics.setupScript,
+        diagnostics.projectPath,
+        diagnostics.recordPath,
+        diagnostics.demo
+      );
       activeEditor = editor;
       liveEditor = editor;
-      for (arg in args) if (arg.indexOf("--project-action=") == 0)
-        editor.projectInitialAction = arg.substr(17);
+      for (arg in args) if (arg.indexOf("--project-action=") == 0) editor.projectInitialAction = arg.substr(17);
       for (arg in args) if (arg.indexOf("--msaa=") == 0) {
         var samples = Std.parseInt(arg.substr(7));
         if (samples == null || samples < 1) throw "--msaa takes a sample count of 1 or more";
@@ -369,23 +412,20 @@ class Main {
         for (option in args) {
           if (option.indexOf("--character-clip=") == 0) clip = option.substr(17);
           if (option.indexOf("--character-hold=") == 0) hold = option.substr(17);
-          if (option.indexOf("--character-display=") == 0)
-            display = humankit.HumanDisplays.parse(option.substr(20));
+          if (option.indexOf("--character-display=") == 0) display = humankit.HumanDisplays.parse(option.substr(20));
           if (option.indexOf("--character-route=") == 0) {
-            if (facilityRoute)
-              throw "--character-route cannot be combined with --character-facility-route";
+            if (facilityRoute) throw "--character-route cannot be combined with --character-facility-route";
             route = [for (point in option.substr(18).split(";")) {
               var coordinates = point.split(",");
               if (coordinates.length != 2) throw "--character-route takes X,Y points separated by ;";
               [Std.parseFloat(coordinates[0]), Std.parseFloat(coordinates[1])];
-            }];
+            }
+            ];
           }
           if (option.indexOf("--character-facility-route=") == 0) {
-            if (route != null)
-              throw "--character-facility-route cannot be combined with --character-route";
+            if (route != null) throw "--character-facility-route cannot be combined with --character-route";
             var stations = option.substr(option.indexOf("=") + 1).split(",");
-            if (stations.length != 2)
-              throw "--character-facility-route takes FROM,TO station IDs";
+            if (stations.length != 2) throw "--character-facility-route takes FROM,TO station IDs";
             route = app.editor.FacilityRouteDemo.route(stations[0], stations[1]);
             facilityRoute = true;
           }
@@ -394,26 +434,31 @@ class Main {
             if (coordinates.length != 3) throw "--character-reach takes an X,Y,Z model-space target";
             reachTarget = [for (value in coordinates) Std.parseFloat(value)];
           }
-          if (option.indexOf("--character-reach-clip=") == 0)
-            reachClip = option.substr(option.indexOf("=") + 1);
+          if (option.indexOf("--character-reach-clip=") == 0) reachClip = option.substr(option.indexOf("=") + 1);
         }
         editor.enableCharacterPreview(arg.substr(12), clip, hold, display, route, reachTarget, reachClip);
       }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
-      if (args.indexOf("--worker-demo=rack-to-table") >= 0)
-        editor.enableWorkerDemo(workerDemoSteps(args), true);
-      if (args.indexOf("--worker-demo=gallery") >= 0)
-        editor.enableWorkerDemo(workerDemoSteps(args), true, ReferenceEditorApp.WORKER_GALLERY);
+      if (args.indexOf("--worker-demo=rack-to-table") >= 0) editor.enableWorkerDemo(workerDemoSteps(args), true);
+      if (args.indexOf("--worker-demo=gallery") >= 0) editor.enableWorkerDemo(
+        workerDemoSteps(args),
+        true,
+        ReferenceEditorApp.WORKER_GALLERY
+      );
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
       if (args.indexOf("--inspection-camera") >= 0) editor.requestInspectionCamera();
       // Start shows for a plain launch; explicit documents, demos, and previews go straight to the model.
-      var explicitContent = diagnostics.projectPath != null || diagnostics.setupScript != null ||
-        diagnostics.demo || diagnostics.componentLab || args.indexOf("--perspective") >= 0 || args.indexOf("--inspection-camera") >= 0 ||
-        args.indexOf("--worker-demo=rack-to-table") >= 0 || args.indexOf("--worker-demo=gallery") >= 0 ||
-        Lambda.exists(args, function(arg) return arg.indexOf("--character=") == 0);
+      var explicitContent = diagnostics.projectPath != null || diagnostics.setupScript != null
+        || diagnostics.demo || diagnostics.componentLab || args.indexOf("--perspective") >= 0
+        || args.indexOf("--inspection-camera") >= 0 || args.indexOf("--worker-demo=rack-to-table") >= 0
+        || args.indexOf("--worker-demo=gallery") >= 0 || Lambda.exists(
+          args,
+          function(arg) return arg.indexOf("--character=") == 0
+        );
       if (!explicitContent && editor.preferences.showStartPage) editor.showStartPage();
       return editor;
-    });
+    }
+    );
     return new DesktopUiHostSession(function() {
       var active = hosted.tick();
       if (activeEditor != null) activeEditor.tick();
@@ -446,10 +491,22 @@ private class ReferenceEditorLaunchOptions {
   public final projectPath:Null<String>;
   public final windowWidth:Int;
   public final windowHeight:Int;
-  public function new(captureDirectory:Null<String>, recordPath:Null<String>, frameLimit:Int, captureSeconds:Float,
-      componentLab:Bool, storyId:Null<String>, darkTheme:Bool, demo:Bool,
-      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,projectPath:Null<String>,
-      windowWidth:Int, windowHeight:Int) {
+  public function new(
+    captureDirectory:Null<String>,
+    recordPath:Null<String>,
+    frameLimit:Int,
+    captureSeconds:Float,
+    componentLab:Bool,
+    storyId:Null<String>,
+    darkTheme:Bool,
+    demo:Bool,
+    robotHost:Null<String>,
+    robotPort:Int,
+    setupScript:Null<String>,
+    projectPath:Null<String>,
+    windowWidth:Int,
+    windowHeight:Int
+  ) {
     this.captureDirectory = captureDirectory;
     this.recordPath = recordPath;
     this.frameLimit = frameLimit;
@@ -460,8 +517,8 @@ private class ReferenceEditorLaunchOptions {
     this.demo = demo;
     this.robotHost = robotHost;
     this.robotPort = robotPort;
-    this.setupScript=setupScript;
-    this.projectPath=projectPath;
+    this.setupScript = setupScript;
+    this.projectPath = projectPath;
     this.windowWidth = windowWidth;
     this.windowHeight = windowHeight;
   }
@@ -479,13 +536,13 @@ private class ReferenceEditorLaunchOptions {
     var windowWidth = Main.DEFAULT_WINDOW_WIDTH;
     var windowHeight = Main.DEFAULT_WINDOW_HEIGHT;
     for (arg in args) {
-      if (arg.indexOf("--capture-dir=") == 0)
-        directory = arg.substr(14);
-      else if (arg == "--record")
-        recordPath = "app/build/recordings/materia-" + StringTools.replace(Std.string(Sys.time()), ".", "-") +
-          "-" + Sys.getPid() + ".jsonl";
-      else if (arg.indexOf("--record=") == 0)
-        recordPath = arg.substr(9);
+      if (arg.indexOf("--capture-dir=") == 0) directory = arg.substr(14);
+      else if (arg == "--record") recordPath = "app/build/recordings/materia-" + StringTools.replace(
+        Std.string(Sys.time()),
+        ".",
+        "-"
+      ) + "-" + Sys.getPid() + ".jsonl";
+      else if (arg.indexOf("--record=") == 0) recordPath = arg.substr(9);
       else if (arg.indexOf("--frames=") == 0) {
         var parsed = Std.parseInt(arg.substr(9));
         if (parsed == null || parsed <= 0) {
@@ -519,8 +576,8 @@ private class ReferenceEditorLaunchOptions {
         windowHeight = parsed;
       } else if (arg.indexOf("--robot=") == 0) {
         robotEndpoint = arg.substr(8);
-      } else if(arg.indexOf("--setup-script=")==0) {
-        setupScript=arg.substr(15);
+      } else if (arg.indexOf("--setup-script=") == 0) {
+        setupScript = arg.substr(15);
       } else if (arg.indexOf("--project=") == 0) {
         projectPath = arg.substr(10);
       }
@@ -533,14 +590,17 @@ private class ReferenceEditorLaunchOptions {
       Sys.println("materia: --record requires a non-empty path");
       return null;
     }
-    if(setupScript!=null&&StringTools.trim(setupScript).length==0){
-      Sys.println("materia: --setup-script requires a registered reference");return null;
+    if (setupScript != null && StringTools.trim(setupScript).length == 0) {
+      Sys.println("materia: --setup-script requires a registered reference");
+      return null;
     }
-    if(projectPath!=null&&StringTools.trim(projectPath).length==0){
-      Sys.println("materia: --project requires a path");return null;
+    if (projectPath != null && StringTools.trim(projectPath).length == 0) {
+      Sys.println("materia: --project requires a path");
+      return null;
     }
-    if(setupScript!=null&&projectPath!=null){
-      Sys.println("materia: --project cannot be combined with --setup-script");return null;
+    if (setupScript != null && projectPath != null) {
+      Sys.println("materia: --project cannot be combined with --setup-script");
+      return null;
     }
     if (captureSeconds > 0.0 && (directory == null || frames > 0)) {
       Sys.println("materia: --capture-seconds requires --capture-dir and excludes --frames");
@@ -567,10 +627,22 @@ private class ReferenceEditorLaunchOptions {
       }
       robotPort = parsedPort;
     }
-    return new ReferenceEditorLaunchOptions(directory, recordPath, frames, captureSeconds, lab, story,
-      args.indexOf("--dark") >= 0, args.indexOf("--demo") >= 0,
-      robotHost, robotPort,setupScript,projectPath,
-      windowWidth, windowHeight);
+    return new ReferenceEditorLaunchOptions(
+      directory,
+      recordPath,
+      frames,
+      captureSeconds,
+      lab,
+      story,
+      args.indexOf("--dark") >= 0,
+      args.indexOf("--demo") >= 0,
+      robotHost,
+      robotPort,
+      setupScript,
+      projectPath,
+      windowWidth,
+      windowHeight
+    );
   }
 }
 
@@ -593,8 +665,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final simulation:ApplicationSimulation;
   public var simulationBuild(default, null):Null<SimulationBuildJob>;
   public var simulationStop(default, null):Null<SimulationStopJob>;
-  var closeAfterSimulationStop:Null<Void->Void>;
-  var afterSimulationBuild:Null<Void->Void>;
+  var closeAfterSimulationStop:Null<Void -> Void>;
+  var afterSimulationBuild:Null<Void -> Void>;
   var resumeAfterSimulationBuild = false;
   public var bimModel(get, never):BimDocument;
   function get_bimModel():BimDocument return session.bim;
@@ -622,11 +694,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final telemetry:TelemetryPanel;
   final missionPanel = new app.editor.MissionPanel();
   public var missionController(default, null):MissionController;
-  public var projectVariants(default,null):ProjectVariantController;
+  public var projectVariants(default, null):ProjectVariantController;
   final cncPanel = new app.editor.CncPanel();
   final machineControlPanel = new app.editor.MachineControlPanel();
   final inspectionCamera = new app.editor.InspectionCameraPanel();
-  var inspectionCameraRequested=false;
+  var inspectionCameraRequested = false;
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -738,9 +810,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
 
-  public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String,
-      ?recordPath:String, demo:Bool = false) {
+  public function new(
+    ?fonts:FontCollection,
+    ?workspaceFile:String,
+    ?theme:Theme,
+    ?world:RobotWorld,
+    ?hostContext:DesktopUiHostContext,
+    ?setupScript:String,
+    ?projectPath:String,
+    ?recordPath:String,
+    demo:Bool = false
+  ) {
     this.hostContext = hostContext;
     printerLink = new PrinterLink(hostContext == null ? null : hostContext.events);
     semanticRecordPath = recordPath;
@@ -750,13 +830,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
     if (semanticRecordPath != null) commands.onInvoked = function(id, result) {
-      recordSemantic("command", {id:id, status:Std.string(result.status),
-        changed:result.changed, selected:scene.selectedId,
-        documentPath:session.path, documentDirty:session.isDirty()});
+      recordSemantic(
+        "command",
+        {
+          id: id,
+          status: Std.string(result.status),
+          changed: result.changed,
+          selected: scene.selectedId,
+          documentPath: session.path,
+          documentDirty: session.isDirty()
+        }
+      );
     };
     this.world = world == null ? new RobotWorld() : world;
     externalWorldHasRobots = this.world.robotIds().length > 0;
-    simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
+    simulation = new ApplicationSimulation(this.world, ApplicationSimulation.MUJOCO);
     simulation.backgroundPacing = hostContext != null;
     session = new ProjectDocumentSession(demo ? BimEditorDemo.create() : null, demo);
     attachSceneRecorder();
@@ -765,23 +853,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // The settings dialog edits the store directly; apply what it changes.
     preferences.store.onChanged(AppSettings.ANTIALIASING, function(_) {
       if (preferences.antialiasing != antialiasing) setAntialiasing(preferences.antialiasing, false);
-    });
+    }
+    );
     preferences.store.onChanged(AppSettings.COLOR_SCHEME, function(_) {
       var dark = preferences.store.getString(AppSettings.COLOR_SCHEME) == "dark";
       if (dark != appearance.dark) applyTheme(dark ? Theme.dark() : Theme.light());
-    });
+    }
+    );
     preferences.store.onChanged("editors/3d", function(_) readViewSettings());
-    preferences.store.onChanged("", function(_) { if (settingsPanel != null) invalidateView(); });
-    session.beforeReplace=simulation.clear;
-    if(setupScript!=null){var scripted=session.openScript(setupScript);
-      simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
+    preferences.store.onChanged("", function(_) {
+      if (settingsPanel != null) invalidateView();
+    }
+    );
+    session.beforeReplace = simulation.clear;
+    if (setupScript != null) {
+      var scripted = session.openScript(setupScript);
+      simulation.setBackend(scripted.backend);
+      simulation.setTimestep(scripted.timestep);
+    }
     // A window must paint its first frame before a project builds, so a hosted editor opens the launch
     // project on a worker thread once it is up. Without a window there is nothing to keep responsive.
     var deferredProject:Null<String> = null;
-    if(projectPath!=null){
-      if(hostContext!=null) deferredProject=projectPath;
+    if (projectPath != null) {
+      if (hostContext != null) deferredProject = projectPath;
       else {
-        var generated=ProjectSourceLoader.load(projectPath);
+        var generated = ProjectSourceLoader.load(projectPath);
         session.openGeneratedProject(generated, projectPath);
       }
     }
@@ -792,12 +888,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    projectVariants = new ProjectVariantController(session, simulation, documents.requestRun, invalidateView,
-      function() { documentChanged(); commands.execute("scene.fit-all"); },
-      function() return documents.blocked());
-    missionController = new MissionController(session,simulation,invalidateView,
-      function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
-    documents.busy = function() return startLoading != null || projectVariants.isLoading() || simulationBuild != null || simulationStop != null;
+    projectVariants = new ProjectVariantController(session,
+      simulation, documents.requestRun, invalidateView, function() {
+      documentChanged();
+      commands.execute("scene.fit-all");
+    }, function() return documents.blocked());
+    missionController = new MissionController(session, simulation, invalidateView, function(id) {
+      scene.selectTreeKey("project:" + id);
+      invalidateView();
+    }
+    );
+    documents.busy = function() return startLoading != null
+      || projectVariants.isLoading() || simulationBuild != null || simulationStop != null;
     documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
       projectVariants.cancel();
@@ -809,28 +911,36 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
       // The process may not exit while a program is still being planned on a worker thread (see ProgramPlanner).
       function finishClose():Void documents.requestClose(function() {
-          motionkit.robot.ProgramPlanner.shutdown();
-          close();
-        });
+        motionkit.robot.ProgramPlanner.shutdown();
+        close();
+      }
+      );
       if (simulationStop != null) closeAfterSimulationStop = finishClose;
       else finishClose();
     };
     treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition);
     treeModel.canChangeVisibility = function() return !documents.blocked();
-    treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
+    treeModel.onVisibilityChanged = function() {
+      commands.refresh();
+      invalidateView();
+    };
     if (hostContext != null) {
-      perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
-        hostContext);
-      perspectiveViewport.selectionTree=treeModel;
+      perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
+      perspectiveViewport.selectionTree = treeModel;
       perspectiveViewport.setSampleCount(antialiasing);
       perspectiveViewport.setLightingPreset(lightingPreset);
       configurePresentationViewport();
     }
     telemetry = new TelemetryPanel(demo);
     logLines = [];
-    for (line in demo ? ["Demo scene ready", "Select a box; edit position or visibility",
-        "Middle-drag to orbit; Shift+middle to pan; right-drag + WASD to fly; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
-      log(line);
+    for (line in demo ? [
+      "Demo scene ready",
+      "Select a box; edit position or visibility",
+      "Middle-drag to orbit; Shift+middle to pan; right-drag + WASD to fly; scroll to zoom"
+    ] : [
+      "Scene ready",
+      "Use Add to create an object"
+    ]) log(line);
     readViewSettings();
     paletteVisible = false;
     toolbarMenuVisible = false;
@@ -844,11 +954,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspace = makeWorkspace();
     DockWorkspaceStorage.restoreOrDefault(workspace, storage, WORKSPACE_KEY);
     EditorWorkspaceLayout.migrateLegacyViewport(workspace);
-    if(mode!=EditorMode.Simulate)workspace.close("inspection-camera");
+    if (mode != EditorMode.Simulate) workspace.close("inspection-camera");
     // Layouts saved before transient panels existed can still contain them; they open only on request.
     for (id in TRANSIENT_PANELS) if (workspace.isOpen(id)) workspace.close(id);
-    if(deferredProject!=null) openProjectInBackground(deferredProject);
-    else if(projectPath!=null&&perspectiveViewport!=null){
+    if (deferredProject != null) openProjectInBackground(deferredProject);
+    else if (projectPath != null && perspectiveViewport != null) {
       workspace.activate("perspective");
       scene.select("scene");
       perspectiveViewport.frameSelected();
@@ -865,8 +975,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     framePresentation = null;
     if (componentLab != null) return componentLab.view(ui);
     framePresentation = simulation.capturePresentationSnapshot();
-    var workspaceView = new DockWorkspace("reference-workspace", workspace,
-      workspacePanelContents);
+    var workspaceView = new DockWorkspace("reference-workspace", workspace, workspacePanelContents);
     workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT - STATUS_HEIGHT);
     var layers:Array<StackChild> = [new StackChild(
       "workspace",
@@ -905,28 +1014,74 @@ class ReferenceEditorApp implements DesktopUiApplication {
       layers.push(new StackChild("context-menu", menu, 0.0, 0.0, 20));
     }
     var documentDialog = makeDocumentDialog();
-    if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
-      0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
+    if (documentDialog != null) layers.push(new StackChild(
+      "document-dialog",
+      documentDialog,
+      0.0,
+      0.0,
+      100,
+      LayoutAxis.grow(),
+      LayoutAxis.grow()
+    ));
     var shellStyle = fillStyle();
     shellStyle.background = appearance.canvas;
-    var shell = new AppShell("reference-editor-shell", new Stack("overlay-host", layers),
-      new RetainedView("editor-top-bar", function(_) return topBar(),
-        function() return topBarRevisionKey()),
-      null, null, shellStyle, null,
-      new RetainedView("editor-status-bar", function(_) return statusBar(),
-        function() return statusBarRevisionKey()));
-    var windowLayers:Array<StackChild> = [new StackChild("shell", shell, 0.0, 0.0, 0,
-      LayoutAxis.grow(), LayoutAxis.grow())];
+    var shell = new AppShell(
+      "reference-editor-shell",
+      new Stack("overlay-host", layers),
+      new RetainedView(
+        "editor-top-bar",
+        function(_) return topBar(),
+        function() return topBarRevisionKey()
+      ),
+      null,
+      null,
+      shellStyle,
+      null,
+      new RetainedView(
+        "editor-status-bar",
+        function(_) return statusBar(),
+        function() return statusBarRevisionKey()
+      )
+    );
+    var windowLayers:Array<StackChild> = [new StackChild(
+      "shell",
+      shell,
+      0.0,
+      0.0,
+      0,
+      LayoutAxis.grow(),
+      LayoutAxis.grow()
+    )];
     if (toolbarMenuVisible && documentDialog == null) {
       var toolbarMenu = new CommandMenu("editor-more-menu", [
-        "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
-        "scene.frame-selected", "scene.fit-all", "scene.reset-perspective",
-        "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
-        "scene.toggle-grid", "scene.toggle-simulation-overlays", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
+        "editor.save-as",
+        "scene.export-step",
+        "editor.undo",
+        "editor.redo",
+        "scene.frame-selected",
+        "scene.fit-all",
+        "scene.reset-perspective",
+        "scene.lighting-studio",
+        "scene.lighting-soft",
+        "scene.lighting-contrast",
+        "scene.toggle-grid",
+        "scene.toggle-simulation-overlays",
+        "editor.toggle-dark-theme",
+        "start.show",
+        "editor.command-palette",
+        "editor.settings",
         "workspace.reset"
-      ], Math.max(8.0, viewportWidth - 228.0), FILE_BAR_HEIGHT, commands, ui.commandContext,
-        function() { toolbarMenuVisible = false; invalidateView(); },
-        function(_) { toolbarMenuVisible = false; invalidateView(); });
+      ], Math.max(
+        8.0,
+        viewportWidth - 228.0
+      ), FILE_BAR_HEIGHT, commands, ui.commandContext, function() {
+        toolbarMenuVisible = false;
+        invalidateView();
+      }, function(_) {
+        toolbarMenuVisible = false;
+        invalidateView();
+      }
+      );
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
     }
     if (hierarchyAddVisible && documentDialog == null) {
@@ -947,102 +1102,165 @@ class ReferenceEditorApp implements DesktopUiApplication {
       addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
       addSection("Machining", ObjectKindRegistry.addMenuCommands("Machining"));
       addSection("People", ObjectKindRegistry.addMenuCommands("People"));
-      addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
-        "scene.create-extrusion", "scene.create-sheet-base", "scene.create-sheet-flange",
-        "scene.add-face-hole", "scene.create-pocket",
-        "scene.create-vertical-fillet"]);
+      addSection(
+        "Feature",
+        [
+          "scene.create-sketch",
+          "scene.create-face-sketch",
+          "scene.create-extrusion",
+          "scene.create-sheet-base",
+          "scene.create-sheet-flange",
+          "scene.add-face-hole",
+          "scene.create-pocket",
+          "scene.create-vertical-fillet"
+        ]
+      );
       addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
-      var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,
-        function() { hierarchyAddVisible = false; invalidateView(); });
+      var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY, function() {
+        hierarchyAddVisible = false;
+        invalidateView();
+      }
+      );
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
     }
     if (hierarchyMenuVisible && documentDialog == null) {
-      var sceneLink=projectVariants.navigation(treeModel.selectionKey());
-      var objectItems = [
-        new MenuItem("visibility", "Show / hide (Space)", function() treeModel.toggleVisibility(treeModel.selectionKey()), !documents.blocked()),
-        new MenuItem("isolate", "Isolate selected", function() treeModel.isolateSelected(), !documents.blocked()),
-        new MenuItem("show-all", "Show all", function() treeModel.showAll(), !documents.blocked()),
-        new MenuItem("rename", "Rename (F2)", function() startRename(treeModel.selectionKey()),
-          canEditObjects() && scene.object(treeModel.selectionKey())!=null),
-        new MenuItem("reset-name", "Reset name", function() {
-          session.resetName(treeModel.selectionKey());
-          hierarchyMenuVisible = false;
-          invalidateView();
-        }, canEditObjects() && scene.object(treeModel.selectionKey())!=null && session.generatedName(treeModel.selectionKey())!=null),
-        new MenuItem("duplicate", "Duplicate", function() commands.execute("scene.duplicate"),
-          commands.get("scene.duplicate").isEnabled(ui.commandContext)),
-        new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
-          commands.get("scene.delete").isEnabled(ui.commandContext)),
-        new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"), scene.object(scene.selectedId)!=null)
-      ];
-      if(sceneLink!=null)objectItems.unshift(new MenuItem("open-linked-scene",sceneLink.label,function() {
-        projectVariants.navigate(sceneLink);hierarchyMenuVisible=false;invalidateView();
-      },projectVariants.snapshot().switchAllowed));
-      var objectMenu = new Menu("hierarchy-object-menu",objectItems,hierarchyMenuX,hierarchyMenuY,
-        function() { hierarchyMenuVisible = false; invalidateView(); });
+      var sceneLink = projectVariants.navigation(treeModel.selectionKey());
+      var objectItems = [new MenuItem(
+        "visibility",
+        "Show / hide (Space)",
+        function() treeModel.toggleVisibility(treeModel.selectionKey()),
+        !documents.blocked()
+      ), new MenuItem(
+        "isolate",
+        "Isolate selected",
+        function() treeModel.isolateSelected(),
+        !documents.blocked()
+      ), new MenuItem(
+        "show-all",
+        "Show all",
+        function() treeModel.showAll(),
+        !documents.blocked()
+      ), new MenuItem(
+        "rename",
+        "Rename (F2)",
+        function() startRename(treeModel.selectionKey()),
+        canEditObjects() && scene.object(treeModel.selectionKey()) != null
+      ), new MenuItem("reset-name", "Reset name", function() {
+        session.resetName(treeModel.selectionKey());
+        hierarchyMenuVisible = false;
+        invalidateView();
+      }, canEditObjects() && scene.object(treeModel.selectionKey()) != null
+        && session.generatedName(treeModel.selectionKey()) != null), new MenuItem(
+          "duplicate",
+          "Duplicate",
+          function() commands.execute("scene.duplicate"),
+          commands.get("scene.duplicate").isEnabled(ui.commandContext)
+        ), new MenuItem(
+          "delete",
+          "Delete",
+          function() commands.execute("scene.delete"),
+          commands.get("scene.delete").isEnabled(ui.commandContext)
+        ), new MenuItem(
+          "frame",
+          "Frame selected",
+          function() commands.execute("scene.frame-selected"),
+          scene.object(scene.selectedId) != null
+        )];
+      if (sceneLink != null) objectItems.unshift(new MenuItem("open-linked-scene", sceneLink.label, function() {
+        projectVariants.navigate(sceneLink);
+        hierarchyMenuVisible = false;
+        invalidateView();
+      }, projectVariants.snapshot().switchAllowed));
+      var objectMenu = new Menu("hierarchy-object-menu", objectItems, hierarchyMenuX, hierarchyMenuY, function() {
+        hierarchyMenuVisible = false;
+        invalidateView();
+      }
+      );
       windowLayers.push(new StackChild("hierarchy-object-menu", objectMenu, 0.0, 0.0, 26));
     }
     if (renameId != null && documentDialog == null) {
-      windowLayers.push(new StackChild("hierarchy-rename-dialog", renameDialog(), 0.0, 0.0, 40,
-        LayoutAxis.grow(), LayoutAxis.grow()));
+      windowLayers.push(new StackChild(
+        "hierarchy-rename-dialog",
+        renameDialog(),
+        0.0,
+        0.0,
+        40,
+        LayoutAxis.grow(),
+        LayoutAxis.grow()
+      ));
     }
-    if(visibilityPopupVisible&&documentDialog==null) {
-      treeModel.canChangeVisibility=()->!documents.blocked();
-      treeModel.onVisibilityChanged=()->{commands.refresh();invalidateView();};
-      windowLayers.push(new StackChild("component-visibility",app.editor.VisibilityPanel.popup(treeModel,
-        visibilityPopupX,visibilityPopupY,viewportWidth,viewportHeight,!documents.blocked(),()->{visibilityPopupVisible=false;invalidateView();}),0,0,25,
-        LayoutAxis.grow(),LayoutAxis.grow()));
+    if (visibilityPopupVisible && documentDialog == null) {
+      treeModel.canChangeVisibility = () -> !documents.blocked();
+      treeModel.onVisibilityChanged = () -> {commands.refresh();
+      invalidateView();
+      };
+      windowLayers.push(new StackChild("component-visibility",
+        app.editor.VisibilityPanel.popup(treeModel, visibilityPopupX,
+        visibilityPopupY, viewportWidth, viewportHeight, !documents.blocked(), () -> {visibilityPopupVisible = false;
+      invalidateView();
+      }), 0, 0, 25, LayoutAxis.grow(), LayoutAxis.grow()));
     }
     if (viewportOptionsVisible && documentDialog == null) {
       var optionIds = ["scene.grid-spacing-0.1", "scene.grid-spacing-0.2", "scene.grid-spacing-0.5"];
-      optionIds = optionIds.concat([
-        "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
-      optionIds = optionIds.concat([
-        "scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
+      optionIds = optionIds.concat(["scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
+      optionIds = optionIds.concat(["scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
       optionIds.push("scene.toggle-collisions");
       optionIds.push("scene.toggle-cosmetic-threads");
-      var options = new CommandMenu("viewport-options-menu", optionIds,
-        viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
-        function() { viewportOptionsVisible = false; invalidateView(); },
-        function(_) { viewportOptionsVisible = false; invalidateView(); });
+      var options = new CommandMenu("viewport-options-menu",
+        optionIds, viewportOptionsX, viewportOptionsY, commands, ui.commandContext, function() {
+        viewportOptionsVisible = false;
+        invalidateView();
+      }, function(_) {
+        viewportOptionsVisible = false;
+        invalidateView();
+      }
+      );
       windowLayers.push(new StackChild("viewport-options-menu", options, 0.0, 0.0, 25));
     }
     if (viewAngleMenuVisible && documentDialog == null) {
-      var angleMenu = new Menu("view-angle-menu", [
-        new MenuItem("default", "Default perspective", function() {
-          if (perspectiveViewport != null) perspectiveViewport.resetView();
-        }),
-        new MenuItem("top", "Top view", function() {
-          if (perspectiveViewport != null) perspectiveViewport.setViewAngle(-Math.PI / 2, 1.48);
-        }),
-        new MenuItem("front", "Front view", function() {
-          if (perspectiveViewport != null) perspectiveViewport.setViewAngle(-Math.PI / 2, 0.0);
-        }),
-        new MenuItem("right", "Right view", function() {
-          if (perspectiveViewport != null) perspectiveViewport.setViewAngle(0.0, 0.0);
-        })
-      ], viewAngleMenuX, viewAngleMenuY, function() {
+      var angleMenu = new Menu("view-angle-menu", [new MenuItem("default", "Default perspective", function() {
+        if (perspectiveViewport != null) perspectiveViewport.resetView();
+      }
+      ), new MenuItem("top", "Top view", function() {
+        if (perspectiveViewport != null) perspectiveViewport.setViewAngle(-Math.PI / 2, 1.48);
+      }
+      ), new MenuItem("front", "Front view", function() {
+        if (perspectiveViewport != null) perspectiveViewport.setViewAngle(-Math.PI / 2, 0.0);
+      }
+      ), new MenuItem("right", "Right view", function() {
+        if (perspectiveViewport != null) perspectiveViewport.setViewAngle(0.0, 0.0);
+      }
+      )], viewAngleMenuX, viewAngleMenuY, function() {
         viewAngleMenuVisible = false;
         invalidateView();
-      });
+      }
+      );
       windowLayers.push(new StackChild("view-angle-menu", angleMenu, 0.0, 0.0, 25));
     }
     if (settingsPanel != null && documentDialog == null) {
-      windowLayers.push(new StackChild("editor-settings-dialog", settingsDialog(settingsPanel), 0.0, 0.0, 45,
-        LayoutAxis.grow(), LayoutAxis.grow()));
+      windowLayers.push(new StackChild(
+        "editor-settings-dialog",
+        settingsDialog(settingsPanel),
+        0.0,
+        0.0,
+        45,
+        LayoutAxis.grow(),
+        LayoutAxis.grow()
+      ));
     }
     if (paletteVisible && documentDialog == null) {
       var palette = new CommandPalette("reference-command-palette",
         commands, ui.commandContext, 0.0, 0.0, "", function() {
-          paletteVisible = false;
-          invalidateView();
-        }, function(_) {
-          log("Command executed from palette");
-          invalidateView();
-        });
+        paletteVisible = false;
+        invalidateView();
+      }, function(_) {
+        log("Command executed from palette");
+        invalidateView();
+      }
+      );
       palette.centered = true;
-      windowLayers.push(new StackChild("command-palette", palette, 0.0, 0.0, 1000,
-        LayoutAxis.grow(), LayoutAxis.grow()));
+      windowLayers.push(new StackChild("command-palette",
+        palette, 0.0, 0.0, 1000, LayoutAxis.grow(), LayoutAxis.grow()));
     }
     return new Stack("window-overlay-host", windowLayers);
   }
@@ -1051,13 +1269,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function submit(frame:LayoutFrame):RenderNode {
     if (perspectiveViewport != null) {
       perspectiveViewport.advanceNavigation(frame.deltaSeconds);
-      if(perspectiveViewport.advancePresentation(frame.deltaSeconds))invalidateView();
+      if (perspectiveViewport.advancePresentation(frame.deltaSeconds)) invalidateView();
     }
-    if(inspectionCamera.advancePresentation(frame.deltaSeconds))invalidateView();
+    if (inspectionCamera.advancePresentation(frame.deltaSeconds)) invalidateView();
     var selectionKey = scene.treeSelectionKey();
     if (selectionKey != lastRecordedSelection) {
       lastRecordedSelection = selectionKey;
-      recordSemantic("selection", {id:selectionKey});
+      recordSemantic("selection", {id: selectionKey});
     }
     var saveError = workspaceSaves.takeError();
     if (saveError != null) log("Workspace save failed: " + saveError);
@@ -1070,8 +1288,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
     // of the UI revision counters.
-    if (componentLab != null || startLoading != null || simulationBuild != null || simulationStop != null || simulation.isActive() || externalWorldHasRobots)
-      return ui.submit(view(), frame);
+    if (componentLab != null || startLoading != null || simulationBuild != null
+      || simulationStop != null || simulation.isActive() || externalWorldHasRobots) return ui.submit(
+        view(),
+        frame
+      );
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
   }
 
@@ -1115,8 +1336,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
         invalidateView();
       }
     }
-    var feedback=projectLoadingRevisionKey();
-    if(feedback!=projectFeedbackKey){projectFeedbackKey=feedback;invalidateView();}
+    var feedback = projectLoadingRevisionKey();
+    if (feedback != projectFeedbackKey) {
+      projectFeedbackKey = feedback;
+      invalidateView();
+    }
     if (simulationStop == null && simulation.isActive() && simulation.isRunning()) {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
@@ -1144,15 +1368,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     refinementFrameSubmitted = false;
     var before = scene.visualRevision;
     var needsFrame = scene.advanceCadMeshRefinement();
-    if ((needsFrame || scene.visualRevision != before) && hostContext != null)
-      hostContext.requestFrame();
+    if ((needsFrame || scene.visualRevision != before) && hostContext != null) hostContext.requestFrame();
   }
 
   /** True from launch until the project named on the command line has opened, failed, or been cancelled. */
   public function openingProject():Bool return startLoading != null || simulationBuild != null;
 
   /** Prepare without blocking transport input; install only a complete candidate on this thread. */
-  public function prepareSimulation(?after:Void->Void):Void {
+  public function prepareSimulation(?after:Void -> Void):Void {
     machineControlPanel.commitGesture();
     if (simulationBuild != null || simulationStop != null) return;
     #if !wasm
@@ -1195,7 +1418,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       leaveSimulationMode();
     } catch (error:Dynamic) {
       simulationStop = null;
-      try simulation.recoverFailedStop() catch (recovery:Dynamic) log("Simulation stop recovery failed: " + Std.string(recovery));
+      try simulation.recoverFailedStop() catch (recovery:Dynamic) log("Simulation stop recovery failed: "
+        + Std.string(recovery));
       log("Simulation stop failed: " + Std.string(error));
     }
     commands.refresh();
@@ -1225,7 +1449,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       else if (resume) simulation.start();
     } catch (error:Dynamic) {
       if (prepared != null) prepared.dispose();
-      log(job.control.isCancelled() ? "Cancelled simulation preparation" : "Simulation rebuild rejected: " + Std.string(error));
+      log(job.control.isCancelled()
+        ? "Cancelled simulation preparation" : "Simulation rebuild rejected: " + Std.string(error));
     }
     commands.refresh();
     invalidateView();
@@ -1282,40 +1507,52 @@ class ReferenceEditorApp implements DesktopUiApplication {
       startLoading = entry;
       startLoadDelay = 3;
       invalidateView();
-    });
+    }
+    );
   }
 
   /** Stops a project build that is running for the Start page. */
   function cancelExampleLoad():Void {
     var job = startJob;
-    if (job == null) {startLoading=null;invalidateView();return;}
+    if (job == null) {
+      startLoading = null;
+      invalidateView();
+      return;
+    }
     job.control.phase("Cancelling");
     job.control.cancel();
     invalidateView();
   }
 
   function projectLoadingStatus():Null<app.ProjectLoadingStatus> {
-    var entry=startLoading;
-    if(entry==null)return projectVariants.loadingStatus();
-    var job=startJob;
-    return {title:"Opening "+entry.title,phase:job==null?"Starting":job.control.currentPhase(),
-      elapsedSeconds:job==null?0:Std.int(job.elapsedSeconds()),cancelling:job!=null&&job.control.isCancelled()};
+    var entry = startLoading;
+    if (entry == null) return projectVariants.loadingStatus();
+    var job = startJob;
+    return {
+      title: "Opening " + entry.title,
+      phase: job == null ? "Starting" : job.control.currentPhase(),
+      elapsedSeconds : job == null ? 0 : Std.int(job.elapsedSeconds()),
+      cancelling : job != null && job.control.isCancelled()
+    };
   }
 
-  function projectLoadingFailure():Null<String> return startFailure??projectVariants.snapshot().error;
+  function projectLoadingFailure():Null<String> return startFailure ?? projectVariants.snapshot().error;
 
   function projectLoadingRevisionKey():String {
-    var status=projectLoadingStatus();
-    return status==null?"idle:"+projectLoadingFailure():
-      status.title+":"+status.phase+":"+status.elapsedSeconds+":"+status.cancelling;
+    var status = projectLoadingStatus();
+    return status == null ? "idle:" + projectLoadingFailure()
+      : status.title + ":" + status.phase + ":" + status.elapsedSeconds + ":" + status.cancelling;
   }
 
   function cancelProjectLoading():Void {
-    if(startLoading!=null)cancelExampleLoad();else projectVariants.requestCancel();
+    if (startLoading != null) cancelExampleLoad();
+    else projectVariants.requestCancel();
   }
 
   function dismissProjectLoadingFailure():Void {
-    startFailure=null;projectVariants.dismissFailure();invalidateView();
+    startFailure = null;
+    projectVariants.dismissFailure();
+    invalidateView();
   }
 
   function requestOpenPath(path:String):Void {
@@ -1335,14 +1572,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sensorRevision = session.document.revision;
     var simulationRevision = simulation.appliedRevision;
     var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
-    if (cachedSubmitViewRevision != viewRevision ||
-        cachedSubmitSceneGeneration != sceneGeneration ||
-        cachedSubmitSceneRevision != sceneRevision ||
-        cachedSubmitSelectionRevision != selectionRevision ||
-        cachedSubmitEnvironmentRevision != environmentRevision ||
-        cachedSubmitSensorRevision != sensorRevision ||
-        cachedSubmitSimulationRevision != simulationRevision ||
-        cachedSubmitPerspectiveKey != perspectiveKey) {
+    if (cachedSubmitViewRevision != viewRevision || cachedSubmitSceneGeneration != sceneGeneration
+      || cachedSubmitSceneRevision != sceneRevision || cachedSubmitSelectionRevision != selectionRevision
+      || cachedSubmitEnvironmentRevision != environmentRevision || cachedSubmitSensorRevision != sensorRevision
+      || cachedSubmitSimulationRevision != simulationRevision || cachedSubmitPerspectiveKey != perspectiveKey) {
       cachedSubmitViewRevision = viewRevision;
       cachedSubmitSceneGeneration = sceneGeneration;
       cachedSubmitSceneRevision = sceneRevision;
@@ -1351,29 +1584,44 @@ class ReferenceEditorApp implements DesktopUiApplication {
       cachedSubmitSensorRevision = sensorRevision;
       cachedSubmitSimulationRevision = simulationRevision;
       cachedSubmitPerspectiveKey = perspectiveKey;
-      cachedSubmitKey = buildEditorSubmitKey(sceneGeneration, sceneRevision,
-        environmentRevision, sensorRevision, simulationRevision, perspectiveKey,
-        selectionRevision) + ":view:" + viewRevision;
+      cachedSubmitKey = buildEditorSubmitKey(
+        sceneGeneration,
+        sceneRevision,
+        environmentRevision,
+        sensorRevision,
+        simulationRevision,
+        perspectiveKey,
+        selectionRevision
+      ) + ":view:" + viewRevision;
     }
     return cachedSubmitKey;
   }
 
-  static function buildEditorSubmitKey(sceneGeneration:Int, sceneRevision:Int,
-      environmentRevision:Int, sensorRevision:Int, simulationRevision:Int,
-      perspectiveKey:String, ?selectionRevision:Int = 0):String {
-    return "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
-      environmentRevision + ":" + sensorRevision + ":" + simulationRevision +
-      ":selection:" + selectionRevision + ":perspective:" + perspectiveKey;
+  static function buildEditorSubmitKey(
+    sceneGeneration:Int,
+    sceneRevision:Int,
+    environmentRevision:Int,
+    sensorRevision:Int,
+    simulationRevision:Int,
+    perspectiveKey:String,
+    ?selectionRevision:Int = 0
+  ):String {
+    return "editor:" + sceneGeneration + ":" + sceneRevision + ":" + environmentRevision + ":" + sensorRevision
+      + ":" + simulationRevision + ":selection:" + selectionRevision + ":perspective:" + perspectiveKey;
   }
 
   public function context():UiContext return ui;
 
   public function dispose():Void {
     if (simulationStop != null) {
-      try simulationStop.close() catch (error:Dynamic) log("Simulation stop failed while closing: " + Std.string(error));
+      try simulationStop.close() catch (error:Dynamic) log("Simulation stop failed while closing: "
+        + Std.string(error));
       simulationStop = null;
     }
-    if (simulationBuild != null) { simulationBuild.close(); simulationBuild = null; }
+    if (simulationBuild != null) {
+      simulationBuild.close();
+      simulationBuild = null;
+    }
     projectVariants.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
     if (sceneCollision != null) sceneCollision.dispose();
@@ -1409,9 +1657,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Shows an animated glTF character walking around the origin; it is not saved. */
-  public function enableCharacterPreview(path:String, ?clipName:String, ?propPath:String,
-      display:humankit.HumanDisplay = humankit.HumanDisplay.Mesh, ?route:Array<Array<Float>>,
-      ?reachTarget:Array<Float>, ?reachClip:String):Void {
+  public function enableCharacterPreview(
+    path:String,
+    ?clipName:String,
+    ?propPath:String,
+    display:humankit.HumanDisplay = humankit.HumanDisplay.Mesh,
+    ?route:Array<Array<Float>>,
+    ?reachTarget:Array<Float>,
+    ?reachClip:String
+  ):Void {
     releaseCharacterPreview();
     var preview = new CharacterPreview(path, clipName, propPath, display, route, reachTarget, reachClip);
     characterPreview = preview;
@@ -1425,7 +1679,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public static inline var WORKER_GALLERY = "app/examples/worker-gallery.materia";
 
   /** Opens a saved worker example (the rack-to-table demo unless told otherwise) and steps or starts its simulation. */
-  public function enableWorkerDemo(advanceTicks:Int = 0, realtime:Bool = false, document:String = WORKER_RACK_TO_TABLE):Void {
+  public function enableWorkerDemo(advanceTicks:Int = 0,
+    realtime:Bool = false, document:String = WORKER_RACK_TO_TABLE):Void {
     if (advanceTicks < 0) throw "Worker demo ticks must be non-negative";
     var path = app.editor.WorkerAssetPath.resolve(document);
     session.openExample(path);
@@ -1435,8 +1690,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       break;
     }
     simulation.setBackend(ApplicationSimulation.MUJOCO);
-    if (!simulation.rebuild(sensors, scene, session))
-      throw 'Worker demo simulation failed: ${simulation.error}';
+    if (!simulation.rebuild(sensors, scene, session)) throw 'Worker demo simulation failed: ${simulation.error}';
     for (_ in 0...advanceTicks) simulation.step();
     if (realtime) simulation.start();
   }
@@ -1458,27 +1712,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Machine-readable application state paired with diagnostic frame captures. */
   public function diagnosticState():Dynamic return componentLab == null ? {
-    lastSemanticAction: lastSemanticAction,
-    selectedNode: scene.selectedId,
-    scene: scene.diagnosticState(),
-    document: {path: session.path, label: session.label(), dirty: session.isDirty(),
-      confirmation: documents.needsConfirmation(), choosing: documents.choosing, error: documents.error},
-    selection: ui.commandContext.selection.copy(),
-    gridVisible: gridVisible,
-    gridSnapEnabled: gridSnapEnabled,
-    gridSpacing: gridSpacing,
-    paletteVisible: paletteVisible,
-    settingsVisible: settingsPanel != null,
-    contextMenuVisible: contextMenuVisible,
-    perspective: perspectiveViewport == null ? null : perspectiveViewport.diagnosticState(),
-    robot: robotDiagnosticState(),
-    panels: workspace.panelIds(),
-    workspace: Json.parse(workspace.snapshotJson()),
-    recentLog: logLines.slice(Std.int(Math.max(0, logLines.length - 8)))
-  } : {
-    mode: "component-lab",
-    lab: componentLab.diagnosticState()
-  };
+    lastSemanticAction:lastSemanticAction, selectedNode:scene.selectedId, scene:scene.diagnosticState(), document: {
+      path: session.path,
+      label: session.label(),
+      dirty: session.isDirty(),
+      confirmation: documents.needsConfirmation(),
+      choosing: documents.choosing,
+      error: documents.error
+    }, selection:ui.commandContext.selection.copy(),
+      gridVisible:gridVisible, gridSnapEnabled:gridSnapEnabled, gridSpacing:gridSpacing,
+      paletteVisible:paletteVisible, settingsVisible:settingsPanel != null, contextMenuVisible:contextMenuVisible,
+      perspective:perspectiveViewport == null ? null : perspectiveViewport.diagnosticState(),
+      robot : robotDiagnosticState(), panels : workspace.panelIds(),
+      workspace : Json.parse(workspace.snapshotJson()), recentLog : logLines.slice(Std.int(Math.max(
+        0,
+        logLines.length - 8
+      )))
+  }
+  : {mode: "component-lab", lab: componentLab.diagnosticState()};
 
   public function resetWorkspace():Void {
     modeSnapshots.remove(mode.id);
@@ -1489,8 +1740,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function robotDiagnosticState():Dynamic {
     var currentWorld = world;
-    if (currentWorld == null)
-      return null;
+    if (currentWorld == null) return null;
     var snapshot = currentWorld.snapshot();
     var robots:Array<Dynamic> = [];
     for (id in snapshot.robotIds()) {
@@ -1500,21 +1750,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
       robots.push({
         id: id,
         status: instance == null ? "missing" : Std.string(instance.status()),
-        state: state == null ? null : {
-          robotId: state.id,
-          sequence: Std.string(state.sourceSequence),
-          timestampNs: Std.string(state.timestampNs),
-          q: state.positions.toArray(),
-          dq: state.velocities.toArray(),
-          effort: state.efforts.toArray(),
-          mode: state.mode,
-          fault: state.faultCode
+        state : state == null ? null : {
+          robotId : state.id,
+          sequence : Std.string(state.sourceSequence),
+          timestampNs : Std.string(state.timestampNs),
+          q : state.positions.toArray(),
+          dq : state.velocities.toArray(),
+          effort : state.efforts.toArray(),
+          mode : state.mode,
+          fault : state.faultCode
         },
-        fault: fault == null ? null : {
-          robotId: fault.id,
-          code: fault.code,
-          message: fault.message,
-          fatal: fault.fatal
+        fault : fault == null ? null : {
+          robotId : fault.id,
+          code : fault.code,
+          message : fault.message,
+          fatal : fault.fatal
         }
       });
     }
@@ -1539,11 +1789,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     stack.zIndex = 20;
     var divider = new Spacer("toolbar-tier-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
     divider.style.background = appearance.theme.tokens.border;
-    return new Column("editor-toolbar", [
-      new KeyedView("file", fileBar(compact)),
-      new KeyedView("divider", divider),
-      new KeyedView("context", contextBar(compact))
-    ], stack);
+    return new Column(
+      "editor-toolbar",
+      [
+        new KeyedView("file", fileBar(compact)),
+        new KeyedView("divider", divider),
+        new KeyedView(
+          "context",
+          contextBar(compact)
+        )
+      ],
+      stack
+    );
   }
 
   function toolbarRowStyle(height:Float, background:Color):LayoutStyle {
@@ -1562,18 +1819,58 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
     var items:Array<KeyedView> = [
-      new KeyedView("brand", new Text("MATERIA", titleStyle, appearance.theme.text,
-        TextStyleOverride.text(13.0, 0.5))),
-      new KeyedView("new", toolbarAction("toolbar-new", "editor.new", "New", IconName.NewFile, compact)),
-      new KeyedView("open", toolbarAction("toolbar-open", "editor.open", "Open", IconName.FolderOpen, compact)),
-      new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
+      new KeyedView(
+        "brand",
+        new Text(
+          "MATERIA",
+          titleStyle,
+          appearance.theme.text,
+          TextStyleOverride.text(
+            13.0,
+            0.5
+          )
+        )
+      ),
+      new KeyedView(
+        "new",
+        toolbarAction(
+          "toolbar-new",
+          "editor.new",
+          "New",
+          IconName.NewFile,
+          compact
+        )
+      ),
+      new KeyedView(
+        "open",
+        toolbarAction(
+          "toolbar-open",
+          "editor.open",
+          "Open",
+          IconName.FolderOpen,
+          compact
+        )
+      ),
+      new KeyedView(
+        "save",
+        toolbarAction(
+          "toolbar-save",
+          "editor.save",
+          "Save",
+          IconName.Save,
+          compact,
+          true
+        )
+      )
     ];
     if (!minimal) {
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
       items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
     }
-    items.push(new KeyedView("status", new app.editor.DocumentPathLabel(
-      app.editor.DocumentPathLabel.documentPath(session))));
+    items.push(new KeyedView(
+      "status",
+      new app.editor.DocumentPathLabel(app.editor.DocumentPathLabel.documentPath(session))
+    ));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
       invalidateView();
@@ -1588,34 +1885,86 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   // The mode strip is tinted while a simulation is active, so the non-editing state is obvious.
   function contextBar(compact:Bool):View {
-    var loading=projectLoadingStatus(),failure=projectLoadingFailure();
-    if(loading!=null||failure!=null) {
+    var loading = projectLoadingStatus(), failure = projectLoadingFailure();
+    if (loading != null || failure != null) {
       var items:Array<KeyedView> = [];
       var text:String;
-      if(loading!=null) {
-        items.push(new KeyedView("spinner",new haxeon.ui.widgets.controls.Spinner("project-loading-spinner",loading.title)));
-        text=(viewportWidth>=700?shortenLabel(loading.title,viewportWidth>=1000?30:20)+" · ":"")+
-          shortenLabel(loading.phase,viewportWidth>=1000?40:viewportWidth>=700?24:20)+" · "+loading.elapsedSeconds+" s";
-      }else text=shortenLabel(failure,Std.int(Math.max(16,Math.min(100,(viewportWidth-130)/7))));
-      items.push(new KeyedView("status",new Text(text,null,loading==null?appearance.theme.tokens.danger:appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0))));
-      items.push(new KeyedView("space",new Spacer("project-loading-space",LayoutAxis.grow(),LayoutAxis.fixed(1))));
-      var action=new Button(loading==null?"Dismiss":loading.cancelling?"Cancelling…":"Cancel",null,
-        loading==null?dismissProjectLoadingFailure:cancelProjectLoading,loading==null?"project-loading-dismiss":"project-loading-cancel");
-      action.enabled=loading==null||!loading.cancelling;action.variant=ButtonVariant.Secondary;
-      items.push(new KeyedView("action",action));
-      return new Row("editor-project-loading",items,toolbarRowStyle(CONTEXT_BAR_HEIGHT,appearance.toolbar));
+      if (loading != null) {
+        items.push(new KeyedView(
+          "spinner",
+          new haxeon.ui.widgets.controls.Spinner(
+            "project-loading-spinner",
+            loading.title
+          )
+        ));
+        text = (viewportWidth >= 700 ? shortenLabel(loading.title,
+          viewportWidth >= 1000 ? 30 : 20) + " · " : "") + shortenLabel(
+            loading.phase,
+            viewportWidth >= 1000 ? 40 : viewportWidth >= 700 ? 24 : 20
+          ) + " · " + loading.elapsedSeconds + " s";
+      } else text = shortenLabel(failure, Std.int(Math.max(16, Math.min(100, (viewportWidth - 130) / 7))));
+      items.push(new KeyedView(
+        "status",
+        new Text(
+          text,
+          null,
+          loading == null ? appearance.theme.tokens.danger : appearance.theme.tokens.textSecondary,
+          TextStyleOverride.text(12.0)
+        )
+      ));
+      items.push(new KeyedView("space", new Spacer("project-loading-space", LayoutAxis.grow(), LayoutAxis.fixed(1))));
+      var action = new Button(
+        loading == null ? "Dismiss" : loading.cancelling ? "Cancelling…" : "Cancel",
+        null,
+        loading == null ? dismissProjectLoadingFailure : cancelProjectLoading,
+        loading == null ? "project-loading-dismiss" : "project-loading-cancel"
+      );
+      action.enabled = loading == null || !loading.cancelling;
+      action.variant = ButtonVariant.Secondary;
+      items.push(new KeyedView("action", action));
+      return new Row("editor-project-loading", items, toolbarRowStyle(CONTEXT_BAR_HEIGHT, appearance.toolbar));
     }
     var items:Array<KeyedView> = [
       new KeyedView("modes", modeSwitcher(compact)),
-      new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
-      new KeyedView("transport", transportGroup(compact)),
-      new KeyedView("space-end", new Spacer("context-space-end", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
-      new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
-        "Frame", IconName.Inspect, compact))
+      new KeyedView(
+        "space",
+        new Spacer(
+          "context-space",
+          LayoutAxis.grow(),
+          LayoutAxis.fixed(1.0)
+        )
+      ),
+      new KeyedView(
+        "transport",
+        transportGroup(compact)
+      ),
+      new KeyedView(
+        "space-end",
+        new Spacer(
+          "context-space-end",
+          LayoutAxis.grow(),
+          LayoutAxis.fixed(1.0)
+        )
+      ),
+      new KeyedView(
+        "frame",
+        toolbarAction(
+          "toolbar-frame",
+          "scene.frame-selected",
+          "Frame",
+          IconName.Inspect,
+          compact
+        )
+      )
     ];
-    return new Row("editor-context-bar", items, toolbarRowStyle(CONTEXT_BAR_HEIGHT,
-      simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar));
+    return new Row(
+      "editor-context-bar",
+      items,
+      toolbarRowStyle(
+        CONTEXT_BAR_HEIGHT,
+        simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar
+      )
+    );
   }
 
   /** Segmented mode buttons; the active mode reads as selected through its command's checked state. */
@@ -1625,9 +1974,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 2.0;
     var buttons:Array<KeyedView> = [];
-    for (candidate in EditorMode.all())
-      buttons.push(new KeyedView(candidate.id, toolbarAction("toolbar-mode-" + candidate.id,
-        "editor.mode." + candidate.id, candidate.label, candidate.icon, compact)));
+    for (candidate in EditorMode.all()) buttons.push(new KeyedView(
+      candidate.id,
+      toolbarAction(
+        "toolbar-mode-" + candidate.id,
+        "editor.mode." + candidate.id,
+        candidate.label,
+        candidate.icon,
+        compact
+      )
+    ));
     return new Row("editor-mode-switcher", buttons, style);
   }
 
@@ -1637,42 +1993,131 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
-    if (simulationStop != null) return new Row("editor-transport", [
-      new KeyedView("spinner", new haxeon.ui.widgets.controls.Spinner("simulation-stop-spinner", "Stopping simulation")),
-      new KeyedView("status", new Text("Stopping simulation…", null, appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0)))
-    ], style);
+    if (simulationStop != null) return new Row(
+      "editor-transport",
+      [
+        new KeyedView(
+          "spinner",
+          new haxeon.ui.widgets.controls.Spinner(
+            "simulation-stop-spinner",
+            "Stopping simulation"
+          )
+        ),
+        new KeyedView(
+          "status",
+          new Text(
+            "Stopping simulation…",
+            null,
+            appearance.theme.tokens.textSecondary,
+            TextStyleOverride.text(12.0)
+          )
+        )
+      ],
+      style
+    );
     var pending = simulationBuild;
     if (pending != null) {
       var cancel = new Button("Cancel", null, cancelSimulationBuild, "simulation-build-cancel");
       cancel.variant = ButtonVariant.Secondary;
-      return new Row("editor-transport", [
-        new KeyedView("spinner", new haxeon.ui.widgets.controls.Spinner("simulation-build-spinner", "Preparing simulation")),
-        new KeyedView("status", new Text(pending.control.currentPhase(), null, appearance.theme.tokens.textSecondary,
-          TextStyleOverride.text(12.0))),
-        new KeyedView("cancel", cancel)
-      ], style);
+      return new Row(
+        "editor-transport",
+        [
+          new KeyedView(
+            "spinner",
+            new haxeon.ui.widgets.controls.Spinner(
+              "simulation-build-spinner",
+              "Preparing simulation"
+            )
+          ),
+          new KeyedView(
+            "status",
+            new Text(
+              pending.control.currentPhase(),
+              null,
+              appearance.theme.tokens.textSecondary,
+              TextStyleOverride.text(12.0)
+            )
+          ),
+          new KeyedView(
+            "cancel",
+            cancel
+          )
+        ],
+        style
+      );
     }
     var running = simulation.isRunning();
     // Labels appear when the bar has room; every button always explains itself on hover.
-    var items:Array<KeyedView> = [new KeyedView("play-pause", running
-      ? transportButton("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause,
-        "Pause (F5): freeze time, keeping the simulation", false, compact)
-      : transportButton("toolbar-sim-play", "sim.play", "Play", IconName.Play,
-        "Play (F5): run the simulation", true, compact))];
-    items.push(new KeyedView("step", transportButton("toolbar-sim-step", "sim.step", "Step",
-      IconName.StepForward, "Step (F10): advance the simulation by one step", false, compact)));
-    items.push(new KeyedView("reset", transportButton("toolbar-sim-reset", "sim.reset", "Reset",
-      IconName.Reset, "Reset (Shift+F5): return to the starting state and stay in Simulate", false, compact)));
-    items.push(new KeyedView("stop", transportButton("toolbar-sim-stop", "sim.stop", "Stop",
-      IconName.Stop, "Stop: discard the simulation and return to editing", false, compact)));
+    var items:Array<KeyedView> = [new KeyedView(
+      "play-pause",
+      running ? transportButton(
+        "toolbar-sim-pause",
+        "sim.pause",
+        "Pause",
+        IconName.Pause,
+        "Pause (F5): freeze time, keeping the simulation",
+        false,
+        compact
+      ) : transportButton(
+        "toolbar-sim-play",
+        "sim.play",
+        "Play",
+        IconName.Play,
+        "Play (F5): run the simulation",
+        true,
+        compact
+      )
+    )];
+    items.push(new KeyedView(
+      "step",
+      transportButton(
+        "toolbar-sim-step",
+        "sim.step",
+        "Step",
+        IconName.StepForward,
+        "Step (F10): advance the simulation by one step",
+        false,
+        compact
+      )
+    ));
+    items.push(new KeyedView(
+      "reset",
+      transportButton(
+        "toolbar-sim-reset",
+        "sim.reset",
+        "Reset",
+        IconName.Reset,
+        "Reset (Shift+F5): return to the starting state and stay in Simulate",
+        false,
+        compact
+      )
+    ));
+    items.push(new KeyedView(
+      "stop",
+      transportButton(
+        "toolbar-sim-stop",
+        "sim.stop",
+        "Stop",
+        IconName.Stop,
+        "Stop: discard the simulation and return to editing",
+        false,
+        compact
+      )
+    ));
     if (!compact) items.push(new KeyedView("state", simulationStateChip()));
     return new Row("editor-transport", items, style);
   }
 
   /** A transport button that shows its label when there is room and always has a hover explanation. */
-  function transportButton(key:String, commandId:String, label:String, icon:IconName, explanation:String,
-      primary:Bool, compact:Bool):View {
+  function transportButton(
+    key:String,
+    commandId:String,
+    label:String,
+    icon:IconName,
+    explanation:String,
+    primary:Bool,
+    compact:Bool
+  ):View {
     var action = toolbarAction(key, commandId, label, icon, compact, primary);
     return new Tooltip(key + "-tooltip", action, new Text(explanation), 0.0, 36.0);
   }
@@ -1684,7 +2129,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var mission = simulation.missionPlayer();
     var missionFailed = mission != null && mission.failure != null;
     var text = simulationStateLabel();
-    var dotColor = missionFailed ? tokens.danger : simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
+    var dotColor = missionFailed
+      ? tokens.danger : simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
     var chip = new LayoutStyle();
     chip.direction = LayoutDirection.LeftToRight;
     chip.childAlignY = LayoutAlignmentY.Center;
@@ -1695,12 +2141,23 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Drawn rather than typed: the bullet glyph is not in the UI font and shows as a missing-glyph box.
     var dot = new Spacer("simulation-state-dot", LayoutAxis.fixed(8.0), LayoutAxis.fixed(8.0));
     dot.style.background = dotColor;
-    dot.style.radiusTopLeft = dot.style.radiusTopRight = dot.style.radiusBottomLeft =
-      dot.style.radiusBottomRight = 4.0;
-    return new Row("simulation-state", [
-      new KeyedView("dot", dot),
-      new KeyedView("text", new Text(text, null, tokens.text, TextStyleOverride.text(12.0)))
-    ], chip);
+    dot.style.radiusTopLeft = dot.style.radiusTopRight = dot.style.radiusBottomLeft = dot.style.radiusBottomRight = 4.0;
+    return new Row(
+      "simulation-state",
+      [
+        new KeyedView("dot", dot),
+        new KeyedView(
+          "text",
+          new Text(
+            text,
+            null,
+            tokens.text,
+            TextStyleOverride.text(12.0)
+          )
+        )
+      ],
+      chip
+    );
   }
 
   function simulationStateLabel():String {
@@ -1710,47 +2167,57 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return simulation.isActive() && simulation.pending(sensors, scene) ? text + " · rebuild pending" : text;
   }
 
-  static final topBarCommands:Array<String> = ["editor.new", "editor.open", "editor.save",
-    "editor.undo", "editor.redo", "editor.mode.design", "editor.mode.simulate",
-    "sim.play", "sim.pause", "sim.step", "sim.reset", "sim.stop", "scene.frame-selected"];
+  static final topBarCommands:Array<String> = [
+    "editor.new",
+    "editor.open",
+    "editor.save",
+    "editor.undo",
+    "editor.redo",
+    "editor.mode.design",
+    "editor.mode.simulate",
+    "sim.play",
+    "sim.pause",
+    "sim.step",
+    "sim.reset",
+    "sim.stop",
+    "scene.frame-selected"
+  ];
 
   /** Command predicates can change without a registry refresh (for example after selection). */
   function topBarCommandState():Int {
     var result = 0;
     for (id in topBarCommands) {
       var command = commands.get(id);
-      result = (result << 2) | (command != null && command.isEnabled(ui.commandContext) ? 1 : 0) |
-        (command != null && command.isChecked(ui.commandContext) ? 2 : 0);
+      result = (result << 2) | (command != null && command.isEnabled(ui.commandContext) ? 1 : 0) | (command != null
+        && command.isChecked(ui.commandContext) ? 2 : 0);
     }
     return result;
   }
 
   function topBarRevisionKey():String {
     var mission = simulation.missionPlayer();
-    return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState() +
-      ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
-      ":failed=" + (mission != null && mission.failure != null) + ":chip=" + simulationStateLabel() +
-      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible+":project-load="+projectLoadingRevisionKey();
+    return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState()
+      + ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() + ":failed=" + (mission != null
+      && mission.failure != null) + ":chip=" + simulationStateLabel() + ":density="
+      + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible + ":project-load=" + projectLoadingRevisionKey();
   }
 
   function statusBarRevisionKey():String {
-    return "left=" + statusSelectionLabel() + ":right=" + statusRuntimeLabel() +
-      ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled + ":mates=" + Std.string(session.assemblyMateStatus()) +
-      ":mateProblem=" + (session.assemblyMateProblem != null) + ":error=" + (simulation.error != null);
+    return "left=" + statusSelectionLabel() + ":right=" + statusRuntimeLabel()
+      + ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled + ":mates=" + Std.string(session.assemblyMateStatus())
+      + ":mateProblem=" + (session.assemblyMateProblem != null) + ":error=" + (simulation.error != null);
   }
 
   // The viewport also consumes simulation poses, so its dependencies include presentation revisions.
   function perspectiveRevisionKey():String {
     var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
-    return "generation=" + sceneGeneration + ":scene=" + scene.revision +
-      ":selection=" + scene.selectionRevision + ":simulation=" + simulation.appliedRevision +
-      ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
-      ":error=" + (simulation.error == null ? "" : simulation.error) +
-      ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
-      ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
-      ":scenario=" + session.hobbingScenario + ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
-      ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision +
-      ":mates=" + Std.string(session.assemblyMateStatus());
+    return "generation=" + sceneGeneration + ":scene=" + scene.revision
+      + ":selection=" + scene.selectionRevision + ":simulation=" + simulation.appliedRevision + ":active="
+      + simulation.isActive() + ":running=" + simulation.isRunning() + ":error=" + (simulation.error == null ? ""
+      : simulation.error) + ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision + ":grid="
+      + gridSpacing + ":snap=" + gridSnapEnabled + ":scenario=" + session.hobbingScenario + ":mode=" + mode.id
+      + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible + ":viewport=" + viewportWidth
+      + "x" + viewportHeight + ":view=" + viewRevision + ":mates=" + Std.string(session.assemblyMateStatus());
   }
 
   function statusBar():View {
@@ -1766,36 +2233,71 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var left = statusSelectionLabel();
     var right = statusRuntimeLabel();
     var items:Array<KeyedView> = [
-      new KeyedView("selection", new Text(shortenLabel(left, viewportWidth < 700.0 ? 20 : 48),
-        null, simulation.error == null ? appearance.theme.tokens.textSecondary :
-          appearance.theme.tokens.danger, TextStyleOverride.text(12.0))),
-      new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
+      new KeyedView(
+        "selection",
+        new Text(
+          shortenLabel(
+            left,
+            viewportWidth < 700.0 ? 20 : 48
+          ),
+          null,
+          simulation.error == null ? appearance.theme.tokens.textSecondary : appearance.theme.tokens.danger,
+          TextStyleOverride.text(12.0)
+        )
+      ),
+      new KeyedView(
+        "space",
+        new Spacer(
+          "status-space",
+          LayoutAxis.grow(),
+          LayoutAxis.fixed(1.0)
+        )
+      )
     ];
     var mates = session.assemblyMateStatus();
     if (mates != null) {
       var trouble = StringTools.startsWith(mates, "Mates conflict") || session.assemblyMateProblem != null;
-      items.push(new KeyedView("mates", new Text(shortenLabel(mates, viewportWidth < 900.0 ? 32 : 72), null,
-        trouble ? appearance.theme.tokens.danger : appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+      items.push(new KeyedView(
+        "mates",
+        new Text(
+          shortenLabel(mates, viewportWidth < 900.0 ? 32 : 72),
+          null,
+          trouble ? appearance.theme.tokens.danger : appearance.theme.tokens.textSecondary,
+          TextStyleOverride.text(12.0)
+        )
+      ));
     }
-    if (viewportWidth >= 900.0)
-      items.push(new KeyedView("grid", new Text("Grid " + gridSpacingLabel() +
-        " m · Snap " + (gridSnapEnabled ? "On" : "Off"), null,
-        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
-    items.push(new KeyedView("runtime", new Text(right, null,
-      appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    if (viewportWidth >= 900.0) items.push(new KeyedView(
+      "grid",
+      new Text(
+        "Grid " + gridSpacingLabel() + " m · Snap " + (gridSnapEnabled ? "On" : "Off"),
+        null,
+        appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
+    items.push(new KeyedView(
+      "runtime",
+      new Text(
+        right,
+        null,
+        appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
     return new Row("editor-status-bar", items, style);
   }
 
   function statusSelectionLabel():String {
-    var loading=projectLoadingStatus();
-    if(loading!=null)return loading.title+" · "+loading.phase;
-    if(projectLoadingFailure()!=null)return "Project could not be opened";
+    var loading = projectLoadingStatus();
+    if (loading != null) return loading.title + " · " + loading.phase;
+    if (projectLoadingFailure() != null) return "Project could not be opened";
     var selected = scene.object(scene.selectedId);
-    var left = simulation.error != null ? "Simulation error: " + simulation.error :
-      selected == null ? "Ready" : selected.label + " selected";
+    var left = simulation.error
+      != null ? "Simulation error: " + simulation.error : selected == null ? "Ready" : selected.label + " selected";
     var mission = simulation.missionPlayer();
-    if (mission != null && simulation.isActive() && (simulation.isRunning() || mission.failure != null))
-      left = mission.statusLabel(true);
+    if (mission != null
+      && simulation.isActive() && (simulation.isRunning() || mission.failure != null)) left = mission.statusLabel(true);
     var staleCount = session.staleEdits().length;
     if (staleCount > 0) left = staleCount + " stale project edit" + (staleCount == 1 ? "" : "s");
     return left;
@@ -1805,17 +2307,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
     if (simulation.isActive() && simulation.pending(sensors, scene)) mode += " · Rebuild pending";
     var worldLabel = switch (world.status()) {
-      case RobotStatus.Disconnected: "World Offline";
-      case RobotStatus.Connecting: "World Connecting";
-      case RobotStatus.Ready: "World Ready";
-      case RobotStatus.Fault: "World Fault";
+      case RobotStatus.Disconnected:
+        "World Offline";
+      case RobotStatus.Connecting:
+        "World Connecting";
+      case RobotStatus.Ready:
+        "World Ready";
+      case RobotStatus.Fault:
+        "World Fault";
     };
-    return mode + (viewportWidth >= 700.0 ? " · " + simulation.userBackendName() : "") +
-      " · " + worldLabel;
+    return mode + (viewportWidth >= 700.0 ? " · " + simulation.userBackendName() : "") + " · " + worldLabel;
   }
 
-  function toolbarAction(key:String, commandId:String, label:String, icon:IconName,
-      compact:Bool, primary:Bool = false):CommandButton {
+  function toolbarAction(key:String,
+    commandId:String, label:String, icon:IconName, compact:Bool, primary:Bool = false):CommandButton {
     var action = new CommandButton(key, commandId, commands);
     action.displayLabel = compact ? "" : label;
     action.leadingIcon = icon;
@@ -1823,8 +2328,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return action;
   }
 
-  static function shortenLabel(value:String, maximum:Int):String
-    return value.length <= maximum ? value : value.substr(0, maximum - 3) + "...";
+  static function shortenLabel(value:String, maximum:Int):String return value.length <= maximum ? value : value.substr(
+    0,
+    maximum - 3
+  ) + "...";
 
   function makeWorkspace():DockWorkspaceModel {
     var result = new DockWorkspaceModel();
@@ -1844,44 +2351,90 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
-    workspacePanelContents = [
-      new DockPanelContent("start", function(_) return StartPanel.build(this),
-        function(_, width) return StartPanel.build(this, width)),
-      new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
-        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision +
-          ":simulating=" + simulation.isActive()),
-      new DockPanelContent("bim", function(_) return bimEditor),
-      new DockPanelContent("perspective", function(_) return perspectivePanel(),
-        function(_, width) return perspectivePanel(width),
-        // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
-        // none of its inputs changed: this key includes the current simulation presentation.
-        function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible + ":visibility=" + visibilityPopupVisible +
-          ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
-          ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
-      new DockPanelContent("inspection-camera", function(_) return inspectionCamera.build(this)),
-      new DockPanelContent("machine-control", function(_) return machineControlPanel.build(this)),
-      new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
-        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
-          ":content=" + (sceneInspector == null ? 0 : sceneInspector.contentRevision())),
-      new DockPanelContent("sensors", function(_) return sensorPanel(), null,
-        function() return "generation=" + session.generation + ":document=" + session.document.revision +
-          ":sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
-          ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
-          ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
-      new DockPanelContent("console", function(_) return consolePanel(), null,
-        function() return "log=" + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") +
-          ":dark=" + appearance.dark),
-      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
-        appearance.theme.tokens.textSecondary, simulation)),
-      new DockPanelContent("project", function(_) return app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"project-panel")),
-      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
-        workspace.open("cnc", "inspector");workspace.activate("cnc");invalidateView();
-      })),
-      new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
-        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null, session))
-    ];
+    workspacePanelContents = [new DockPanelContent(
+      "start",
+      function(_) return StartPanel.build(this),
+      function(
+        _,
+        width
+      ) return StartPanel.build(
+        this,
+        width
+      )
+    ), new DockPanelContent(
+      "hierarchy",
+      function(_) return hierarchyPanel(),
+      null,
+      function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision + ":filter="
+      + hierarchySearch + ":expansion=" + hierarchyExpansionRevision + ":simulating=" + simulation.isActive()
+    ), new DockPanelContent(
+      "bim",
+      function(_) return bimEditor
+    ), new DockPanelContent("perspective", function(_) return perspectivePanel(), function(
+      _,
+      width
+    ) return perspectivePanel(width),
+    // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
+    // none of its inputs changed: this key includes the current simulation presentation.
+    function() return perspectiveRevisionKey() + ":inspection=" + inspectionCamera.presentationKey()
+      + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible + ":visibility=" + visibilityPopupVisible
+      + ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())
+      + ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres), new DockPanelContent(
+        "inspection-camera",
+        function(_) return inspectionCamera.build(this)
+      ), new DockPanelContent(
+        "machine-control",
+        function(_) return machineControlPanel.build(this)
+      ), new DockPanelContent(
+        "inspector",
+        function(_) return inspectorPanel(),
+        null,
+        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision
+      + ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() + ":content=" + (sceneInspector
+      == null ? 0 : sceneInspector.contentRevision())
+    ), new DockPanelContent(
+      "sensors",
+      function(_) return sensorPanel(),
+      null,
+      function() return "generation=" + session.generation + ":document=" + session.document.revision + ":sensors="
+      + sensors.revision() + ":robot=" + sensors.robotId + ":selected=" + sensors.selectedIndex + ":simulation="
+      + simulation.appliedRevision + ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()
+    ), new DockPanelContent(
+      "console",
+      function(_) return consolePanel(),
+      null,
+      function() return "log="
+      + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") + ":dark=" + appearance.dark
+    ), new DockPanelContent(
+      "telemetry",
+      function(_) return telemetry.build(
+        framePresentation,
+        appearance.theme.tokens.surface,
+        appearance.theme.tokens.textSecondary,
+        simulation
+      )
+    ), new DockPanelContent(
+      "project",
+      function(_) return app.editor.ProjectVariantView.build(
+        projectVariants,
+        appearance.theme.tokens,
+        "project-panel"
+      )
+    ), new DockPanelContent("mission",
+      function(_) return missionPanel.build(missionController, appearance.theme.tokens, function() {
+      workspace.open("cnc", "inspector");
+      workspace.activate("cnc");
+      invalidateView();
+    }
+    )), new DockPanelContent(
+      "cnc",
+      function(_) return cncPanel.build(
+        simulation,
+        appearance.theme.tokens,
+        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null,
+        session
+      )
+    )];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
     return result;
@@ -1923,8 +2476,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
   }
 
-  function savedTheme():Theme
-    return preferences.store.getString(AppSettings.COLOR_SCHEME) == "dark" ? Theme.dark() : Theme.light();
+  function savedTheme():Theme return preferences.store.getString(AppSettings.COLOR_SCHEME)
+    == "dark" ? Theme.dark() : Theme.light();
 
   function applyTheme(theme:Theme):Void {
     appearance = new EditorAppearance(theme);
@@ -1956,7 +2509,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Opens the Editor Settings dialog on its first category. */
   public function openSettings():Void {
     if (settingsPanel == null) settingsPanel = new SettingsPanel("editor-settings", preferences.store, invalidateView);
-    if (shortcutsPanel == null) shortcutsPanel = new ShortcutsPanel("editor-shortcuts", shortcutBindings, invalidateView);
+    if (shortcutsPanel == null) shortcutsPanel = new ShortcutsPanel(
+      "editor-shortcuts",
+      shortcutBindings,
+      invalidateView
+    );
     paletteVisible = false;
     contextMenuVisible = false;
     toolbarMenuVisible = false;
@@ -1985,15 +2542,69 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var closeRow = new LayoutStyle();
     closeRow.width = LayoutAxis.grow();
     closeRow.childDistribution = LayoutDistribution.Center;
-    var content = new Column("editor-settings-content", [
-      new KeyedView("panel", new Column("editor-settings-body", [new KeyedView("tabs", new Tabs("editor-settings-tabs", [
-        new TabItem("general", "General", panel),
-        new TabItem("shortcuts", "Shortcuts", shortcutsPanel == null ? new Text("") : shortcutsPanel)
-      ], settingsTab, showSettingsTab, fillStyle(), null, null, null, null, TabsSelectionMode.Controlled))], body)),
-      new KeyedView("actions", new Row("editor-settings-actions", [new KeyedView("close", close)], closeRow))
-    ], actionColumnStyle());
-    return new Dialog("editor-settings", "Editor Settings", content, closeSettings,
-      Math.max(360.0, Math.min(960.0, viewportWidth - 80.0)));
+    var content = new Column(
+      "editor-settings-content",
+      [
+        new KeyedView(
+          "panel",
+          new Column(
+            "editor-settings-body",
+            [new KeyedView(
+              "tabs",
+              new Tabs(
+                "editor-settings-tabs",
+                [
+                  new TabItem(
+                    "general",
+                    "General",
+                    panel
+                  ),
+                  new TabItem(
+                    "shortcuts",
+                    "Shortcuts",
+                    shortcutsPanel == null ? new Text("") : shortcutsPanel
+                  )
+                ],
+                settingsTab,
+                showSettingsTab,
+                fillStyle(),
+                null,
+                null,
+                null,
+                null,
+                TabsSelectionMode.Controlled
+              )
+            )],
+            body
+          )
+        ),
+        new KeyedView(
+          "actions",
+          new Row(
+            "editor-settings-actions",
+            [new KeyedView(
+              "close",
+              close
+            )],
+            closeRow
+          )
+        )
+      ],
+      actionColumnStyle()
+    );
+    return new Dialog(
+      "editor-settings",
+      "Editor Settings",
+      content,
+      closeSettings,
+      Math.max(
+        360.0,
+        Math.min(
+          960.0,
+          viewportWidth - 80.0
+        )
+      )
+    );
   }
 
   function renameDialog():View {
@@ -2003,18 +2614,45 @@ class ReferenceEditorApp implements DesktopUiApplication {
     field.onSubmit = function(_) finishRename();
     var confirm = new Button("Rename", null, finishRename, "rename-confirm");
     confirm.variant = ButtonVariant.Primary;
-    var content = new Column("rename-content", [
-      new KeyedView("name", field),
-      new KeyedView("actions", new Row("rename-actions", [
-        new KeyedView("save", confirm),
-        new KeyedView("cancel", new Button("Cancel", null, function() renameId = null, "rename-cancel"))
-      ], actionRowStyle()))
-    ], actionColumnStyle());
+    var content = new Column(
+      "rename-content",
+      [
+        new KeyedView("name", field),
+        new KeyedView(
+          "actions",
+          new Row(
+            "rename-actions",
+            [
+              new KeyedView(
+                "save",
+                confirm
+              ),
+              new KeyedView(
+                "cancel",
+                new Button(
+                  "Cancel",
+                  null,
+                  function() renameId = null,
+                  "rename-cancel"
+                )
+              )
+            ],
+            actionRowStyle()
+          )
+        )
+      ],
+      actionColumnStyle()
+    );
     return new Dialog("rename-object", "Rename object", content, function() renameId = null, 360.0);
   }
 
-  static function textLines(key:String, lines:Array<String>):View return new Column(key,
-    [for (index in 0...lines.length) new KeyedView("line:"+index,new Text(lines[index]))]);
+  static function textLines(key:String, lines:Array<String>):View return new Column(
+    key,
+    [for (index in 0...lines.length) new KeyedView(
+      "line:" + index,
+      new Text(lines[index])
+    )]
+  );
 
   static function actionRowStyle():LayoutStyle {
     var style = new LayoutStyle();
@@ -2035,8 +2673,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function viewportWithControls(content:View, availableWidth:Float):View {
     var compact = availableWidth > 0.0 && availableWidth < 400.0;
     var tiny = availableWidth > 0.0 && availableWidth < 235.0;
-    var options = new Button(gridSpacingLabel() + (tiny ? "" : " m"), null, null,
-      "viewport-options");
+    var options = new Button(gridSpacingLabel() + (tiny ? "" : " m"), null, null, "viewport-options");
     options.variant = ButtonVariant.Navigation;
     options.classes = ["viewport-tool"];
     options.accessibilityLabel = "Grid spacing: " + gridSpacingLabel() + " m";
@@ -2055,52 +2692,114 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportOptionsVisible = true;
       invalidateView();
     };
-    var controls:Array<KeyedView> = [new KeyedView("frame",
-      viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))];
-    controls.push(new KeyedView("fit-all",
-      viewportToolbarAction("viewport-fit-all", "scene.fit-all", "Fit", IconName.Inspect, compact)));
-    if (!tiny) controls.push(new KeyedView("reset",
-      viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)));
-    if(mode==EditorMode.Simulate) {
-      var cameraButton=new Button("Camera",null,openInspectionCamera,"viewport-inspection-camera");
-      cameraButton.accessibilityLabel="Open inspection camera";
-      controls.push(new KeyedView("inspection-camera",cameraButton));
+    var controls:Array<KeyedView> = [new KeyedView(
+      "frame",
+      viewportToolbarAction(
+        "viewport-frame",
+        "scene.frame-selected",
+        "Frame",
+        IconName.Inspect,
+        compact
+      )
+    )];
+    controls.push(new KeyedView(
+      "fit-all",
+      viewportToolbarAction(
+        "viewport-fit-all",
+        "scene.fit-all",
+        "Fit",
+        IconName.Inspect,
+        compact
+      )
+    ));
+    if (!tiny) controls.push(new KeyedView(
+      "reset",
+      viewportToolbarAction(
+        "viewport-reset",
+        "scene.reset-perspective",
+        "Reset",
+        IconName.Cube,
+        compact
+      )
+    ));
+    if (mode == EditorMode.Simulate) {
+      var cameraButton = new Button("Camera", null, openInspectionCamera, "viewport-inspection-camera");
+      cameraButton.accessibilityLabel = "Open inspection camera";
+      controls.push(new KeyedView("inspection-camera", cameraButton));
     }
-    var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0),
-      LayoutAxis.fixed(20.0));
+    var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0), LayoutAxis.fixed(20.0));
     groupDivider.style.background = appearance.theme.tokens.border;
     controls.push(new KeyedView("group-divider", groupDivider));
-    controls.push(new KeyedView("grid", viewportToolbarAction("viewport-grid",
-      "scene.toggle-grid", "Grid", IconName.Grid, compact)));
-    controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
-      "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
+    controls.push(new KeyedView(
+      "grid",
+      viewportToolbarAction(
+        "viewport-grid",
+        "scene.toggle-grid",
+        "Grid",
+        IconName.Grid,
+        compact
+      )
+    ));
+    controls.push(new KeyedView(
+      "snap",
+      viewportToolbarAction(
+        "viewport-snap",
+        "scene.toggle-grid-snap",
+        "Snap",
+        IconName.Magnet,
+        compact
+      )
+    ));
     controls.push(new KeyedView("options", options));
-    var visibility=new Button(compact?"":"Visibility",null,null,"viewport-visibility");
-    visibility.variant=ButtonVariant.Navigation;visibility.leadingIcon=IconName.Inspect;visibility.trailingIcon=IconName.ChevronDown;
-    visibility.classes=["viewport-tool"];visibility.accessibilityLabel="Component visibility";visibility.selected=visibilityPopupVisible;
-    visibility.onClickEvent=event->{
-      var bounds=menuTriggerBounds(event);visibilityPopupX=bounds.x;visibilityPopupY=bounds.y+bounds.height;
-      viewportOptionsVisible=false;viewAngleMenuVisible=false;visibilityPopupVisible=!visibilityPopupVisible;invalidateView();
+    var visibility = new Button(compact ? "" : "Visibility", null, null, "viewport-visibility");
+    visibility.variant = ButtonVariant.Navigation;
+    visibility.leadingIcon = IconName.Inspect;
+    visibility.trailingIcon = IconName.ChevronDown;
+    visibility.classes = ["viewport-tool"];
+    visibility.accessibilityLabel = "Component visibility";
+    visibility.selected = visibilityPopupVisible;
+    visibility.onClickEvent = event -> {var bounds = menuTriggerBounds(event);
+    visibilityPopupX = bounds.x;
+    visibilityPopupY = bounds.y + bounds.height;
+    viewportOptionsVisible = false;
+    viewAngleMenuVisible = false;
+    visibilityPopupVisible = !visibilityPopupVisible;
+    invalidateView();
     };
-    controls.push(new KeyedView("visibility",visibility));
-    var edgeMode=new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),null,()->{
-      scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));invalidateView();
-    },"viewport-cad-edge-mode");
-    edgeMode.leadingIcon=IconName.Cube;
-    edgeMode.variant=ButtonVariant.Navigation;
-    edgeMode.classes=["viewport-tool"];edgeMode.iconSize=12.0;
-    edgeMode.accessibilityLabel="CAD display: "+app.CadEdgeModes.label(scene.cadEdgeMode)+". Cycle Feature edges, All edges, Shaded.";
-    controls.push(new KeyedView("cad-edge-mode",edgeMode));
+    controls.push(new KeyedView("visibility", visibility));
+    var edgeMode = new Button(compact ? "" : app.CadEdgeModes.label(scene.cadEdgeMode),
+      null, () -> {scene.setCadEdgeMode(app.CadEdgeModes.next(scene.cadEdgeMode));
+    invalidateView();
+    }, "viewport-cad-edge-mode");
+    edgeMode.leadingIcon = IconName.Cube;
+    edgeMode.variant = ButtonVariant.Navigation;
+    edgeMode.classes = ["viewport-tool"];
+    edgeMode.iconSize = 12.0;
+    edgeMode.accessibilityLabel = "CAD display: "
+      + app.CadEdgeModes.label(scene.cadEdgeMode) + ". Cycle Feature edges, All edges, Shaded.";
+    controls.push(new KeyedView("cad-edge-mode", edgeMode));
     // While a jointed part is dragged, say whether it follows the cursor and why not.
     var dragMessage = perspectiveViewport == null ? null : perspectiveViewport.assemblyDragMessage();
     var mateMessage = perspectiveViewport == null ? null : perspectiveViewport.matePickMessage();
     if (mateMessage != null) dragMessage = mateMessage;
-    if (dragMessage != null)
-      controls.push(new KeyedView("assembly-drag-status", new Text(dragMessage, null,
-        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
-    else if (collisionSummary != null)
-      controls.push(new KeyedView("collision-status", new Text(collisionSummary, null,
-        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    if (dragMessage != null) controls.push(new KeyedView(
+      "assembly-drag-status",
+      new Text(
+        dragMessage,
+        null,
+        appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
+    else if (collisionSummary != null) controls.push(new KeyedView(
+      "collision-status",
+      new Text(
+        collisionSummary,
+        null,
+        appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
     var barStyle = new LayoutStyle();
     barStyle.width = LayoutAxis.grow();
     barStyle.height = LayoutAxis.fixed(38.0);
@@ -2110,12 +2809,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     barStyle.padding = new Insets(tiny ? 4.0 : 8.0, 4.0, tiny ? 4.0 : 8.0, 4.0);
     barStyle.background = appearance.theme.tokens.surfaceRaised;
     var toolbar = new Row("viewport-toolbar", controls, barStyle);
-    var divider = new Spacer("viewport-toolbar-bottom-divider", LayoutAxis.grow(),
-      LayoutAxis.fixed(1.0));
+    var divider = new Spacer("viewport-toolbar-bottom-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
     divider.style.background = appearance.theme.tokens.border;
     var panelStyle = fillStyle();
-    var viewAngle = new Button(perspectiveViewport == null ? "Perspective" :
-      perspectiveViewport.viewAngleLabel(), null, null, "view-angle-button");
+    var viewAngle = new Button(
+      perspectiveViewport == null ? "Perspective" : perspectiveViewport.viewAngleLabel(),
+      null,
+      null,
+      "view-angle-button"
+    );
     viewAngle.variant = ButtonVariant.Navigation;
     viewAngle.trailingIcon = IconName.ChevronDown;
     viewAngle.accessibilityLabel = "Choose perspective view angle";
@@ -2133,46 +2835,99 @@ class ReferenceEditorApp implements DesktopUiApplication {
     };
     var layers = [
       new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
-      new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
+      new StackChild(
+        "view-angle",
+        viewAngle,
+        10.0,
+        10.0,
+        1
+      )
     ];
-    var missionState = missionController.snapshot(),variantState=projectVariants.snapshot();
+    var missionState = missionController.snapshot(), variantState = projectVariants.snapshot();
     var sceneControls:Array<KeyedView> = [];
-    if(perspectiveViewport!=null&&perspectiveViewport.presentation!=null)
-      sceneControls.push(new KeyedView("presentation",app.editor.PresentationControls.build(perspectiveViewport,
-        ()->invalidateView(),"main-presentation",()->saveViewportView(perspectiveViewport),()->addPresentationStep(perspectiveViewport),()->editPresentationOffset(perspectiveViewport))));
-    if(variantState.variants.length>0||variantState.error!=null)
-      sceneControls.push(new KeyedView("project",app.editor.ProjectVariantView.build(projectVariants,appearance.theme.tokens,"viewport-project")));
-    if(missionState.hasWork)
-      sceneControls.push(new KeyedView("mission",app.editor.MissionStatusView.build(missionController,appearance.theme.tokens,"viewport-mission",function() {
-        workspace.open("mission",workspace.isOpen("sensors")?"sensors":"inspector");
-        workspace.activate("mission");invalidateView();
-      })));
-    if(sceneControls.length>0) {
-      var overlayStyle=new LayoutStyle();overlayStyle.width=LayoutAxis.grow();overlayStyle.childGap=10;
-      overlayStyle.padding=new Insets(10,10,10,10);overlayStyle.background=appearance.theme.tokens.surfaceRaised;
-      var width=Math.max(120.0,Math.min(300.0,(availableWidth>0?availableWidth:400.0)-20.0));
-      layers.push(new StackChild("project-controls",new Column("viewport-project-controls",sceneControls,overlayStyle),
-        10,54,2,LayoutAxis.fixed(width),LayoutAxis.fit(),false));
+    if (perspectiveViewport != null && perspectiveViewport.presentation != null) sceneControls.push(new KeyedView(
+      "presentation",
+      app.editor.PresentationControls.build(
+        perspectiveViewport,
+        () -> invalidateView(),
+        "main-presentation",
+        () -> saveViewportView(perspectiveViewport),
+        () -> addPresentationStep(perspectiveViewport),
+        () -> editPresentationOffset(perspectiveViewport)
+      )
+    ));
+    if (variantState.variants.length > 0 || variantState.error != null) sceneControls.push(new KeyedView(
+      "project",
+      app.editor.ProjectVariantView.build(
+        projectVariants,
+        appearance.theme.tokens,
+        "viewport-project"
+      )
+    ));
+    if (missionState.hasWork) sceneControls.push(new KeyedView("mission",
+      app.editor.MissionStatusView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
+      workspace.open("mission", workspace.isOpen("sensors") ? "sensors" : "inspector");
+      workspace.activate("mission");
+      invalidateView();
     }
-    if(mode==EditorMode.Simulate&&inspectionCamera.overlay) {
-      var cameraWidth=Math.min(360.0,Math.max(180.0,availableWidth>0?availableWidth*0.4:320));
-      layers.push(new StackChild("inspection-camera-overlay",inspectionCamera.build(this,true),
-        Math.max(10,(availableWidth>0?availableWidth:400)-cameraWidth-10),54,3,LayoutAxis.fixed(cameraWidth),LayoutAxis.fixed(280)));
+    )));
+    if (sceneControls.length > 0) {
+      var overlayStyle = new LayoutStyle();
+      overlayStyle.width = LayoutAxis.grow();
+      overlayStyle.childGap = 10;
+      overlayStyle.padding = new Insets(10, 10, 10, 10);
+      overlayStyle.background = appearance.theme.tokens.surfaceRaised;
+      var width = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
+      layers.push(new StackChild(
+        "project-controls",
+        new Column(
+          "viewport-project-controls",
+          sceneControls,
+          overlayStyle
+        ),
+        10,
+        54,
+        2,
+        LayoutAxis.fixed(width),
+        LayoutAxis.fit(),
+        false
+      ));
+    }
+    if (mode == EditorMode.Simulate && inspectionCamera.overlay) {
+      var cameraWidth = Math.min(360.0, Math.max(180.0, availableWidth > 0 ? availableWidth * 0.4 : 320));
+      layers.push(new StackChild(
+        "inspection-camera-overlay",
+        inspectionCamera.build(this, true),
+        Math.max(
+          10,
+          (availableWidth > 0 ? availableWidth : 400) - cameraWidth - 10
+        ),
+        54,
+        3,
+        LayoutAxis.fixed(cameraWidth),
+        LayoutAxis.fixed(280)
+      ));
     }
     var canvas:View = new Stack("perspective-canvas-overlay", layers);
-    var hobberControls=app.editor.HobberScenePanel.build(this);
+    var hobberControls = app.editor.HobberScenePanel.build(this);
     var viewportRows:Array<KeyedView> = [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),
-      new KeyedView("canvas", new SizedBox("viewport-canvas-slot", canvas,
-        LayoutAxis.grow(), LayoutAxis.grow()))
+      new KeyedView(
+        "canvas",
+        new SizedBox(
+          "viewport-canvas-slot",
+          canvas,
+          LayoutAxis.grow(),
+          LayoutAxis.grow()
+        )
+      )
     ];
-    if(hobberControls!=null)viewportRows.insert(1,new KeyedView("machine-scenario",hobberControls));
-    return new Column("perspective-with-toolbar",viewportRows,panelStyle);
+    if (hobberControls != null) viewportRows.insert(1, new KeyedView("machine-scenario", hobberControls));
+    return new Column("perspective-with-toolbar", viewportRows, panelStyle);
   }
 
-  function viewportToolbarAction(key:String, commandId:String, label:String,
-      icon:IconName, compact:Bool):View {
+  function viewportToolbarAction(key:String, commandId:String, label:String, icon:IconName, compact:Bool):View {
     var action = new CommandButton(key, commandId, commands);
     action.displayLabel = compact ? "" : label;
     action.leadingIcon = icon;
@@ -2189,8 +2944,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function menuTriggerBounds(event:UiEvent):Rect {
     var root = ui.root;
     var node = root == null || event.currentTarget == null ? null : root.find(event.currentTarget);
-    return node == null || node.resolved == null
-      ? new Rect(event.x, event.y, 0.0, 0.0) : node.resolved.clippedViewportBounds();
+    return node == null || node.resolved == null ? new Rect(event.x,
+      event.y, 0.0, 0.0) : node.resolved.clippedViewportBounds();
   }
 
   /**
@@ -2202,95 +2957,159 @@ class ReferenceEditorApp implements DesktopUiApplication {
     collisionSummary = null;
     if (!collisionsVisible) return [];
     var collision = sceneCollision;
-    if (collision == null) sceneCollision = collision = new SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    if (collision
+      == null) sceneCollision = collision = new SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
     var pairs:Array<SceneCollision.SceneCollisionPair>;
     var frame = simulation.isActive() ? framePresentation : null;
-    try pairs = frame == null ? collision.query(scene, session, collisionNearMillimetres / 1000.0)
-      : collision.query(scene, session, collisionNearMillimetres / 1000.0, SceneCollision.SIMULATION_CONTACT,
-        frame.environment, frame.revision)
-    catch (error:Dynamic) {
+    try pairs = frame == null ? collision.query(scene, session, collisionNearMillimetres / 1000.0) : collision.query(
+      scene,
+      session,
+      collisionNearMillimetres / 1000.0,
+      SceneCollision.SIMULATION_CONTACT,
+      frame.environment,
+      frame.revision
+    ) catch (error : Dynamic) {
       collisionSummary = "Collisions unavailable: " + Std.string(error);
       return [];
     }
     collisionSummary = SceneCollision.summary(pairs, function(id) {
       var item = scene.object(id);
       return item == null ? id : item.label;
-    });
+    }
+    );
     return pairs;
   }
 
   /** Defer launch requests until Simulate; opening a scene never adds a Design camera. */
   public function requestInspectionCamera():Void {
-    inspectionCameraRequested=true;
-    if(mode==EditorMode.Simulate)openInspectionCamera();
+    inspectionCameraRequested = true;
+    if (mode == EditorMode.Simulate) openInspectionCamera();
   }
   public function openInspectionCamera():Void {
-    if(mode!=EditorMode.Simulate)return;
-    inspectionCameraRequested=false;
+    if (mode != EditorMode.Simulate) return;
+    inspectionCameraRequested = false;
     inspectionCamera.showDocked();
-    if(!workspace.isOpen("inspection-camera")) {
-      var target=workspace.isOpen("inspector")?"inspector":workspace.isOpen("sensors")?"sensors":"perspective";
-      workspace.dock("inspection-camera",target,target=="perspective"?haxeon.ui.docking.DockDropZone.Right:haxeon.ui.docking.DockDropZone.Bottom);
+    if (!workspace.isOpen("inspection-camera")) {
+      var target = workspace.isOpen("inspector")
+        ? "inspector" : workspace.isOpen("sensors") ? "sensors" : "perspective";
+      workspace.dock(
+        "inspection-camera",
+        target,
+        target == "perspective" ? haxeon.ui.docking.DockDropZone.Right : haxeon.ui.docking.DockDropZone.Bottom
+      );
     }
-    workspace.activate("inspection-camera");invalidateView();
+    workspace.activate("inspection-camera");
+    invalidateView();
   }
 
   function configurePresentationViewport():Void {
-    var viewport=perspectiveViewport;if(viewport==null)return;
-    viewport.setPresentation(session.presentation,session.projectAssemblyDefinition,session.presentationCenters(),session.assemblyUnitMetres());
-    viewport.solvePresentationJoints=session.presentationJointPoses;
-    viewport.presentationGeometryFingerprint=session.presentationGeometryFingerprint;
-    viewport.onSectionEdit=planes->saveViewportView(viewport,planes);
+    var viewport = perspectiveViewport;
+    if (viewport == null) return;
+    viewport.setPresentation(
+      session.presentation,
+      session.projectAssemblyDefinition,
+      session.presentationCenters(),
+      session.assemblyUnitMetres()
+    );
+    viewport.solvePresentationJoints = session.presentationJointPoses;
+    viewport.presentationGeometryFingerprint = session.presentationGeometryFingerprint;
+    viewport.onSectionEdit = planes -> saveViewportView(viewport, planes);
   }
   function editPresentationOffset(viewport:EditorPerspectiveViewport):Void {
-    if(viewport.presentationOffsetEditing()){viewport.cancelPresentationOffsetEdit();invalidateView();return;}
-    var selected=scene.selectedId;
-    if(!viewport.beginPresentationOffsetEdit(selected,offset->{
-      session.savePresentationOffset(offset);configurePresentationViewport();invalidateView();
-    }))log("Select an assembly part, then drag its orange offset handle. Orbit if the direction points into the camera.");
+    if (viewport.presentationOffsetEditing()) {
+      viewport.cancelPresentationOffsetEdit();
+      invalidateView();
+      return;
+    }
+    var selected = scene.selectedId;
+    if (!viewport.beginPresentationOffsetEdit(selected, offset -> {session.savePresentationOffset(offset);
+    configurePresentationViewport();
+    invalidateView();
+    })) log("Select an assembly part, then drag its orange offset handle. Orbit if the direction points into the camera.");
     invalidateView();
   }
-  function saveViewportView(viewport:EditorPerspectiveViewport,?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>):Void {
-    var controller=viewport.presentation;if(controller==null)return;
-    var id=controller.cursor.view,existing=controller.record.views.filter(v->v.id==id)[0];
-    if(sections==null||existing.source!=materia.presentation.AssemblyPresentation.PresentationSource.Authored) {
-      var index=1;while(controller.record.views.filter(v->v.id=="view-"+index).length>0)index++;
-      id="view-"+index;
+  function saveViewportView(
+    viewport:EditorPerspectiveViewport,
+    ?sections:Array<materia.presentation.AssemblyPresentation.SectionPlane>
+  ):Void {
+    var controller = viewport.presentation;
+    if (controller == null) return;
+    var id = controller.cursor.view, existing = controller.record.views.filter(v -> v.id == id)[0];
+    if (sections == null || existing.source != materia.presentation.AssemblyPresentation.PresentationSource.Authored) {
+      var index = 1;
+      while (controller.record.views.filter(v -> v.id == "view-" + index).length > 0) index++;
+      id = "view-" + index;
     }
-    var view=viewport.capturePresentationView(id,sections==null?"Saved view "+id:"Section view");
-    if(sections!=null)view.sections=sections;
-    session.savePresentationView(view);configurePresentationViewport();viewport.selectPresentationView(id);
-    commands.refresh();invalidateView();
+    var view = viewport.capturePresentationView(id, sections == null ? "Saved view " + id : "Section view");
+    if (sections != null) view.sections = sections;
+    session.savePresentationView(view);
+    configurePresentationViewport();
+    viewport.selectPresentationView(id);
+    commands.refresh();
+    invalidateView();
   }
 
   function addPresentationStep(viewport:EditorPerspectiveViewport):Void {
-    var controller=viewport.presentation,item=scene.object(scene.selectedId);
-    if(controller==null||item==null||!StringTools.startsWith(item.id,"project:")) {
-      log("Select an assembly part before adding a procedure step.");return;
+    var controller = viewport.presentation, item = scene.object(scene.selectedId);
+    if (controller == null || item == null || !StringTools.startsWith(item.id, "project:")) {
+      log("Select an assembly part before adding a procedure step.");
+      return;
     }
-    var select:materia.presentation.AssemblyPresentation.PartSelector={occurrence:item.id.substr(8),subtree:false};
-    var selected=controller.selectedProcedure();
-    var procedure:materia.presentation.AssemblyPresentation.Procedure=selected==null
-      ? {id:"",label:"Service procedure",kind:Service,start:Assembled,steps:[],source:Authored}
-      : haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(selected));
-    if(procedure.source!=Authored||procedure.id=="") {
-      var index=1;while(controller.record.procedures.filter(p->p.id=="procedure-"+index).length>0)index++;
-      procedure.id="procedure-"+index;procedure.source=Authored;
-      for(step in procedure.steps)for(member in materia.presentation.StepMotions.members(step.action))
-        member.motion.evidence=Illustrative;
+    var select:materia.presentation.AssemblyPresentation.PartSelector = {occurrence: item.id.substr(8), subtree: false};
+    var selected = controller.selectedProcedure();
+    var procedure:materia.presentation.AssemblyPresentation.Procedure = selected == null ? {
+      id:"", label:"Service procedure", kind:Service, start:Assembled, steps:[], source:Authored
     }
-    var direction={x:0.0,y:0.0,z:1.0},distance=Math.max(item.width,Math.max(item.height,item.depth))*2/session.assemblyUnitMetres();
-    for(offset in controller.record.explode)if(offset.select.occurrence==select.occurrence) {
-      direction=offset.direction;distance=offset.distance;break;
+    :haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(selected));
+    if (procedure.source != Authored || procedure.id == "") {
+      var index = 1;
+      while (controller.record.procedures.filter(p -> p.id == "procedure-" + index).length > 0) index++;
+      procedure.id = "procedure-" + index;
+      procedure.source = Authored;
+      for (step in procedure.steps) for (member in materia
+        .presentation.StepMotions.members(step.action)) member.motion.evidence = Illustrative;
     }
-    var index=1;while(procedure.steps.filter(s->s.id=="step-"+index).length>0)index++;
-    procedure.steps.push({id:"step-"+index,title:"Remove "+item.label,instruction:"Withdraw "+item.label+" along the illustrated path.",
-      view:controller.cursor.view,highlight:[select],action:Remove(select,{path:[{x:0,y:0,z:0},
-        {x:direction.x*distance,y:direction.y*distance,z:direction.z*distance}],evidence:Illustrative})});
-    session.savePresentationProcedure(procedure);configurePresentationViewport();
+    var direction = {x: 0.0, y: 0.0,
+      z: 1.0}, distance = Math.max(item.width, Math.max(item.height, item.depth)) * 2 / session.assemblyUnitMetres();
+    for (offset in controller.record.explode) if (offset.select.occurrence == select.occurrence) {
+      direction = offset.direction;
+      distance = offset.distance;
+      break;
+    }
+    var index = 1;
+    while (procedure.steps.filter(s -> s.id == "step-" + index).length > 0) index++;
+    procedure.steps.push({
+      id: "step-" + index,
+      title: "Remove " + item.label,
+      instruction: "Withdraw " + item.label + " along the illustrated path.",
+      view: controller.cursor.view,
+      highlight: [select],
+      action: Remove(
+        select,
+        {
+          path: [
+            {
+              x: 0,
+              y: 0,
+              z: 0
+            },
+            {
+              x: direction.x * distance,
+              y: direction.y * distance,
+              z: direction.z * distance
+            }
+          ],
+          evidence: Illustrative
+        }
+      )
+    });
+    session.savePresentationProcedure(procedure);
+    configurePresentationViewport();
     viewport.selectPresentationProcedure(procedure.id);
-    var current=viewport.presentation;if(current!=null)for(_ in 0...procedure.steps.length-1)current.next(false);
-    commands.refresh();invalidateView();
+    var current = viewport.presentation;
+    if (current != null) for (_ in 0...procedure.steps.length - 1) current.next(false);
+    commands.refresh();
+    invalidateView();
   }
 
   function perspectivePanel(availableWidth:Float = 0.0):View {
@@ -2298,17 +3117,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
       configurePresentationViewport();
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing, gridVisible);
       var frame = framePresentation;
-      perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
-        frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
+      perspectiveViewport.setSimulationState(
+        simulation.isActive(),
+        frame == null ? [] : frame.environment,
+        frame == null ? 0 : frame.revision,
+        frame == null ? [] : frame.robots
+      );
       var mission = simulation.missionPlayer();
       perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
       perspectiveViewport.setCosmeticThreads(cosmeticThreadsVisible);
       perspectiveViewport.setCollisions(editingCollisions());
-      perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
+      perspectiveViewport.setMissionOverlay(mission == null
+        || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
     }
-    return perspectiveViewport == null
-      ? new Text("Perspective rendering requires the desktop GPU host.")
-      : viewportWithControls(perspectiveViewport, availableWidth);
+    return perspectiveViewport
+      == null ? new Text("Perspective rendering requires the desktop GPU host.") : viewportWithControls(
+        perspectiveViewport,
+        availableWidth
+      );
   }
 
   function inspectorPanel():View return InspectorPanel.build(this);
@@ -2321,16 +3147,29 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var stale = session.staleEdits();
     if (stale.length > 0) {
       rows.push(new KeyedView("stale-heading", new Text("Stale project edits: " + stale.length)));
-      for (index in 0...stale.length)
-        rows.push(new KeyedView("stale:" + index, new Text(stale[index])));
-      rows.push(new KeyedView("stale-discard", sceneAction("stale-discard-command",
-        "editor.discard-stale-edits", "Discard stale edits", IconName.Trash)));
+      for (index in 0...stale.length) rows.push(new KeyedView("stale:" + index, new Text(stale[index])));
+      rows.push(new KeyedView(
+        "stale-discard",
+        sceneAction(
+          "stale-discard-command",
+          "editor.discard-stale-edits",
+          "Discard stale edits",
+          IconName.Trash
+        )
+      ));
     }
     var logStyle = fillStyle();
     logStyle.padding = new Insets(4.0, 2.0, 4.0, 2.0);
     logStyle.background = appearance.theme.tokens.surface;
-    var logView = TextArea.withDocument("console-log", consoleDocument, null, logStyle, "Console output", null,
-      appearance.theme.tokens.text);
+    var logView = TextArea.withDocument(
+      "console-log",
+      consoleDocument,
+      null,
+      logStyle,
+      "Console output",
+      null,
+      appearance.theme.tokens.text
+    );
     logView.readOnly = true;
     logView.followTail = true;
     var copyAll = new CommandButton("console-copy-all", "console.copy-all", commands);
@@ -2341,11 +3180,28 @@ class ReferenceEditorApp implements DesktopUiApplication {
     headerStyle.direction = LayoutDirection.LeftToRight;
     headerStyle.childAlignY = LayoutAlignmentY.Center;
     headerStyle.childGap = 8.0;
-    rows.unshift(new KeyedView("header", new Row("console-header", [
-      new KeyedView("heading", sectionHeading("CONSOLE")),
-      new KeyedView("space", new Spacer("console-header-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
-      new KeyedView("copy-all", copyAll)
-    ], headerStyle)));
+    rows.unshift(new KeyedView(
+      "header",
+      new Row(
+        "console-header",
+        [
+          new KeyedView("heading", sectionHeading("CONSOLE")),
+          new KeyedView(
+            "space",
+            new Spacer(
+              "console-header-space",
+              LayoutAxis.grow(),
+              LayoutAxis.fixed(1.0)
+            )
+          ),
+          new KeyedView(
+            "copy-all",
+            copyAll
+          )
+        ],
+        headerStyle
+      )
+    ));
     rows.push(new KeyedView("log", logView));
     return new Column("console-panel", rows, style);
   }
@@ -2358,7 +3214,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
    * Runs an edit that may fail on its CAD document: a rejected parameter, a feature that does not recompute, or
    * a kernel error (in the browser, also a kit with no web build). The failure is logged and the edit dropped.
    */
-  function runSceneEdit(label:String, action:Void->Bool):Void {
+  function runSceneEdit(label:String, action:Void -> Bool):Void {
     try {
       action();
     } catch (error:ParametricError) {
@@ -2378,7 +3234,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("workspace.save", "Save workspace", function() {
       saveWorkspace();
       log("Workspace saved");
-    }));
+    }
+    ));
     commands.register(new Command("editor.toggle-dark-theme", "Toggle dark theme", function() {
       var dark = !appearance.dark;
       preferences.store.set(AppSettings.COLOR_SCHEME, PropertyValue.Enum(dark ? "dark" : "light"));
@@ -2392,8 +3249,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked());
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
-    commands.register(new Command("editor.settings", "Editor Settings...", openSettings,
-      new Shortcut(UiKey.Comma, UiModifier.Control), function() return !documents.blocked()));
+    commands.register(new Command(
+      "editor.settings",
+      "Editor Settings...",
+      openSettings,
+      new Shortcut(
+        UiKey.Comma,
+        UiModifier.Control
+      ),
+      function() return !documents.blocked()
+    ));
     SceneViewCommands.install(this);
     AssemblyCommands.install(this);
     SimulationCommands.install(this);
@@ -2402,18 +3267,26 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("console.copy-all", "Copy console output", function() {
       ui.clipboard.writeText(consoleDocument.text);
       log("Console output copied");
-    }));
+    }
+    ));
     for (candidate in EditorMode.all()) {
       var target = candidate;
-      commands.register(new Command("editor.mode." + target.id, target.label + " mode",
+      commands.register(new Command(
+        "editor.mode." + target.id,
+        target.label + " mode",
         function() switchMode(target),
-        new Shortcut(target == EditorMode.Design ? 49 : 50, UiModifier.Control),
-        function() return !documents.blocked(), function() return mode == target));
+        new Shortcut(
+          target == EditorMode.Design ? 49 : 50,
+          UiModifier.Control
+        ),
+        function() return !documents.blocked(),
+        function() return mode == target
+      ));
     }
   }
 
   function documentChanged():Void {
-    startFailure=null;
+    startFailure = null;
     if (preferences != null && session.path != null && session.path != lastRecordedPath) {
       lastRecordedPath = session.path;
       preferences.addRecent(session.path);
@@ -2426,25 +3299,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
       projectUiExtension = null;
       projectUiReference = null;
       projectUiError = null;
-      var ownership=session.scriptOwnership;
-      if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
+      var ownership = session.scriptOwnership;
+      if (ownership != null) {
+        simulation.setBackend(ownership.backend());
+        simulation.setTimestep(ownership.timestep());
+      }
       log("Document configuration replaced");
       sceneGeneration = session.generation;
-      visibilityPopupVisible=false;
+      visibilityPopupVisible = false;
       if (MachineControlModel.axes(session).length > 0) {
         if (!workspace.isOpen("machine-control")) workspace.open("machine-control", "inspector");
         workspace.activate("machine-control");
       }
       treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition);
       treeModel.canChangeVisibility = function() return !documents.blocked();
-      treeModel.onVisibilityChanged = function() {commands.refresh();invalidateView();};
+      treeModel.onVisibilityChanged = function() {
+        commands.refresh();
+        invalidateView();
+      };
       treeModel.setFilter(hierarchySearch);
       inspectionCamera.dispose();
       if (perspectiveViewport != null) perspectiveViewport.dispose();
-      perspectiveViewport = hostContext == null ? null :
-        new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
+      perspectiveViewport = hostContext == null ? null : new EditorPerspectiveViewport(
+        "scene-perspective",
+        scene,
+        hostContext
+      );
       if (perspectiveViewport != null) {
-        perspectiveViewport.selectionTree=treeModel;
+        perspectiveViewport.selectionTree = treeModel;
         perspectiveViewport.setSampleCount(antialiasing);
         perspectiveViewport.setLightingPreset(lightingPreset);
         configurePresentationViewport();
@@ -2458,18 +3340,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.refresh();
   }
 
-  function makeBimEditor():BimModelEditor return new BimModelEditor("bim-model-editor", session.bim,
-    session.document, function(label, change, undo) session.applyBimEdit(label, change, undo));
+  function makeBimEditor():BimModelEditor return new BimModelEditor(
+    "bim-model-editor",
+    session.bim,
+    session.document,
+    function(
+      label,
+      change,
+      undo
+    ) session.applyBimEdit(
+      label,
+      change,
+      undo
+    )
+  );
 
   function refreshScriptMaterialization(message:String):Void {
-    try {var result=session.refreshScriptOverrides();simulation.setBackend(result.backend);
-      simulation.setTimestep(result.timestep);documentChanged();log(message+"; Apply/Rebuild restarts simulation");}
-    catch(error:Dynamic)log("Script override rejected: "+Std.string(error));
+    try {
+      var result = session.refreshScriptOverrides();
+      simulation.setBackend(result.backend);
+      simulation.setTimestep(result.timestep);
+      documentChanged();
+      log(message + "; Apply/Rebuild restarts simulation");
+    } catch (error:Dynamic) log("Script override rejected: " + Std.string(error));
     commands.refresh();
   }
 
-  function canEditObjects():Bool return session.scriptOwnership==null && !documents.blocked() && !simulation.isActive() &&
-    (perspectiveViewport == null || !perspectiveViewport.dragging());
+  function canEditObjects():Bool return session.scriptOwnership == null && !documents.blocked()
+    && !simulation.isActive() && (perspectiveViewport == null || !perspectiveViewport.dragging());
 
   function commitActiveDrag():Void {
     var changed = machineControlPanel.dragging();
@@ -2496,8 +3394,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function makeDocumentDialog():Null<View> {
-    if (!documents.needsConfirmation() && !documents.needsTrustConfirmation() &&
-        documents.error == null) return null;
+    if (!documents.needsConfirmation() && !documents.needsTrustConfirmation() && documents.error == null) return null;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.childGap = 12.0;
@@ -2510,8 +3407,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       title = "Run project code?";
       message = "Opening this file runs registered code: " + documents.trustReference;
       dismiss = function() documents.resolveTrust(false);
-      var run = new Button("Run code and open", null, function() documents.resolveTrust(true),
-        "document-trust-run");
+      var run = new Button("Run code and open", null, function() documents.resolveTrust(true), "document-trust-run");
       run.variant = ButtonVariant.Primary;
       buttons.push(new KeyedView("run", run));
       buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-trust-cancel")));
@@ -2524,13 +3420,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var save = new Button("Save", null, function() documents.resolve("save"), "document-confirm-save");
       save.variant = ButtonVariant.Primary;
       buttons.push(new KeyedView("save", save));
-      buttons.push(new KeyedView("discard", new Button("Discard", null, function() documents.resolve("discard"), "document-confirm-discard")));
+      buttons.push(new KeyedView(
+        "discard",
+        new Button(
+          "Discard",
+          null,
+          function() documents.resolve("discard"),
+          "document-confirm-discard"
+        )
+      ));
       buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-confirm-cancel")));
     }
-    var content = new Column("document-message", [
-      new KeyedView("message", new Text(message)),
-      new KeyedView("buttons", new Row("document-actions", buttons))
-    ], style);
+    var content = new Column(
+      "document-message",
+      [
+        new KeyedView("message", new Text(message)),
+        new KeyedView(
+          "buttons",
+          new Row(
+            "document-actions",
+            buttons
+          )
+        )
+      ],
+      style
+    );
     var dialog = new Dialog("document-confirmation", title, content, dismiss, 520.0);
     dialog.dismissOnOutside = false;
     return dialog;
@@ -2592,23 +3506,37 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (projectUiExtension == null) return;
     for (colour in projectUiExtension.colours()) {
       var id:String = Reflect.field(colour, "id");
-      if (id != null && scene.object(id) != null)
-        scene.setColour(id, Reflect.field(colour, "r"), Reflect.field(colour, "g"),
-          Reflect.field(colour, "b"));
+      if (id != null && scene.object(id) != null) scene.setColour(
+        id,
+        Reflect.field(colour, "r"),
+        Reflect.field(
+          colour,
+          "g"
+        ),
+        Reflect.field(
+          colour,
+          "b"
+        )
+      );
     }
   }
 
   function attachSceneRecorder():Void {
-    if (semanticRecordPath != null)
-      scene.onSemanticAction = function(action, data) recordSemantic(action, data);
+    if (semanticRecordPath != null) scene.onSemanticAction = function(action, data) recordSemantic(action, data);
   }
 
   function recordSemantic(action:String, data:Dynamic):Void {
     if (semanticRecordPath == null) return;
-    lastSemanticAction = {action:action, data:data};
-    try File.appendContent(semanticRecordPath,
-      Json.stringify({kind:"action", at:Sys.time(), action:action, data:data}) + "\n")
-    catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
+    lastSemanticAction = {action: action, data: data};
+    try File.appendContent(
+      semanticRecordPath,
+      Json.stringify({
+        kind: "action",
+        at: Sys.time(),
+        action: action,
+        data: data
+      }) + "\n"
+    ) catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
   }
 
   /**
@@ -2630,12 +3558,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     modeSnapshots.set(mode.id, layoutSnapshot());
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.
-    workspace.setDefaultLayout(next == EditorMode.Simulate
-      ? EditorWorkspaceLayout.simulateLayout(session.missions != null, MachineControlModel.axes(session).length > 0) : next.layout());
+    workspace.setDefaultLayout(next == EditorMode.Simulate ? EditorWorkspaceLayout.simulateLayout(
+      session.missions != null,
+      MachineControlModel.axes(session).length > 0
+    ) : next.layout());
     var saved = modeSnapshots.get(next.id);
     if (saved != null) workspace.restorePersisted(saved);
-    if(next!=EditorMode.Simulate)workspace.close("inspection-camera");
-    else if(inspectionCameraRequested||saved==null&&session.hobbingScenario!=null)openInspectionCamera();
+    if (next != EditorMode.Simulate) workspace.close("inspection-camera");
+    else if (inspectionCameraRequested || saved == null && session.hobbingScenario != null) openInspectionCamera();
     if (next == EditorMode.Simulate && saved == null && MachineControlModel.axes(session).length > 0) {
       workspace.activate("machine-control");
     } else if (next == EditorMode.Simulate && session.missions != null) {
@@ -2666,9 +3596,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   // Only the Design layout is written, so a session ending in another mode reopens in Design.
-  function persistedWorkspace():DockWorkspaceSnapshot
-    return mode == EditorMode.Design || !modeSnapshots.exists(EditorMode.Design.id)
-      ? layoutSnapshot() : modeSnapshots.get(EditorMode.Design.id);
+  function persistedWorkspace():DockWorkspaceSnapshot return mode == EditorMode.Design
+    || !modeSnapshots.exists(EditorMode.Design.id) ? layoutSnapshot() : modeSnapshots.get(EditorMode.Design.id);
 
   /**
    * Panels that belong to the session rather than to a layout. They are opened by an explicit action
@@ -2694,8 +3623,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     try {
       var error = workspaceSaves.saveNow(persistedWorkspace());
       if (error != null) log("Workspace save failed: " + error);
-    }
-    catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
+    } catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 
   function queueWorkspaceSave():Void {
@@ -2733,7 +3661,7 @@ private class FileDockWorkspacePersistence implements DockWorkspacePersistence {
 
   public function new(path:String) this.path = path;
 
-  public function load(key:String):Null < String > {
+  public function load(key:String):Null<String> {
     return FileSystem.exists(path) ? File.getContent(path) : null;
   }
 

@@ -18,8 +18,7 @@ import haxeon.ui.widgets.text.Text;
 import haxeon.ui.widgets.text.TextField;
 
 /** Selected-object inspector dock panel. */
-@:access(app.Main.ReferenceEditorApp)
-class InspectorPanel {
+@:access(app.Main.ReferenceEditorApp) class InspectorPanel {
   public static function build(app:ReferenceEditorApp):View {
     var appearance = app.appearance;
     var scene = app.scene;
@@ -30,8 +29,12 @@ class InspectorPanel {
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
     var actionRowStyle = function() return ReferenceEditorApp.actionRowStyle();
     var sectionHeading = function(label:String) return app.sectionHeading(label);
-    var sceneAction = function(key:String, commandId:String, label:String, icon:Null<IconName>)
-      return app.sceneAction(key, commandId, label, icon);
+    var sceneAction = function(key:String, commandId:String, label:String, icon:Null<IconName>) return app.sceneAction(
+      key,
+      commandId,
+      label,
+      icon
+    );
     var textLines = function(key:String, lines:Array<String>) return ReferenceEditorApp.textLines(key, lines);
     var refreshScriptMaterialization = function(message:String) app.refreshScriptMaterialization(message);
     var style = fillStyle();
@@ -41,28 +44,54 @@ class InspectorPanel {
     var group = app.treeModel.groupInfo(groupKey);
     if (group != null) {
       var editable = !app.documents.blocked();
-      var visibility = new Button(app.treeModel.visibilityState(groupKey).own ? "Hide assembly" : "Show assembly", null, function() {
+      var visibility = new Button(app.treeModel.visibilityState(groupKey).own ? "Hide assembly" : "Show assembly",
+        null, function() {
         if (!app.documents.blocked()) app.treeModel.toggleVisibility(groupKey);
-      });
+      }
+      );
       var isolate = new Button("Isolate assembly", null, function() {
         if (!app.documents.blocked()) app.treeModel.isolateSelected();
-      });
+      }
+      );
       visibility.enabled = isolate.enabled = editable;
       var rows:Array<KeyedView> = [
-        new KeyedView("heading",sectionHeading(group.label)),
-        new KeyedView("assembly-summary",new Text("Assembly · " + group.count + " part occurrences · " + group.shown + " shown")),
-        new KeyedView("assembly-path",new Text(group.path == "" ? "Root assembly" : group.path)),
-        new KeyedView("frame",sceneAction("assembly-frame","scene.frame-selected","Frame assembly",null)),
-        new KeyedView("visibility",visibility),
-        new KeyedView("isolate",isolate)
+        new KeyedView("heading", sectionHeading(group.label)),
+        new KeyedView(
+          "assembly-summary",
+          new Text("Assembly · " + group.count + " part occurrences · " + group.shown + " shown")
+        ),
+        new KeyedView(
+          "assembly-path",
+          new Text(group.path == "" ? "Root assembly" : group.path)
+        ),
+        new KeyedView(
+          "frame",
+          sceneAction(
+            "assembly-frame",
+            "scene.frame-selected",
+            "Frame assembly",
+            null
+          )
+        ),
+        new KeyedView(
+          "visibility",
+          visibility
+        ),
+        new KeyedView(
+          "isolate",
+          isolate
+        )
       ];
-      return new Column("inspector-assembly",rows,style);
+      return new Column("inspector-assembly", rows, style);
     }
     var selected = scene.object(scene.selectedId);
     if (selected == null) {
       var emptyRows:Array<KeyedView> = [
         new KeyedView("heading", sectionHeading("INSPECTOR")),
-        new KeyedView("hint", new Text("Select an object to edit its properties."))
+        new KeyedView(
+          "hint",
+          new Text("Select an object to edit its properties.")
+        )
       ];
       var sheetWorkflow = SheetWorkflowPanel.build(app);
       var projectPanel = app.projectUiPanel();
@@ -71,59 +100,128 @@ class InspectorPanel {
       return new Column("inspector-empty", emptyRows, style);
     }
     if (app.sceneInspector == null || app.inspectorSelectionRevision != scene.selectionRevision) {
-      app.sceneInspector = new PropertyInspector("scene-inspector:" + scene.selectedId,
-        scene.properties(), style, null, null, null, "Selected object inspector");
+      app.sceneInspector = new PropertyInspector(
+        "scene-inspector:" + scene.selectedId,
+        scene.properties(),
+        style,
+        null,
+        null,
+        null,
+        "Selected object inspector"
+      );
       app.inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = app.sceneInspector;
     inspector.setStyle(style);
-    inspector.labelWidth = viewportWidth < 760.0 ? 56.0 :
-      viewportWidth < 1180.0 ? 76.0 : 108.0;
-    var ownership=session.scriptOwnership;
-    inspector.enabled = ownership==null&&!simulation.isActive() &&
-      (perspectiveViewport == null || !perspectiveViewport.dragging());
-    var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
-    if (simulation.isActive()) rows.push(new KeyedView("simulation-hint",
-      new Text(HierarchyPanel.SIMULATION_LOCK_HINT, null, appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0))));
+    inspector.labelWidth = viewportWidth < 760.0 ? 56.0 : viewportWidth < 1180.0 ? 76.0 : 108.0;
+    var ownership = session.scriptOwnership;
+    inspector.enabled = ownership == null
+      && !simulation.isActive() && (perspectiveViewport == null || !perspectiveViewport.dragging());
+    var rows:Array<KeyedView> = [new KeyedView("heading", sectionHeading(selected.label))];
+    if (simulation.isActive()) rows.push(new KeyedView(
+      "simulation-hint",
+      new Text(
+        HierarchyPanel.SIMULATION_LOCK_HINT,
+        null,
+        appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
     var assembly = session.projectAssemblyDefinition;
     if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
       var instanceId = selected.id.substr(8);
       var jointLines:Array<String> = [];
-      for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)
-        jointLines.push(joint.id + " · " + joint.type + " · " +
-          joint.parentConnector + " → " + joint.childConnector);
-      if (jointLines.length > 0)
-        rows.push(new KeyedView("assembly-joints", textLines("assembly-joint-lines", jointLines)));
+      for (joint in assembly.joints) if (joint.parent == instanceId
+        || joint.child == instanceId) jointLines.push(joint.id
+        + " · " + joint.type + " · " + joint.parentConnector + " → " + joint.childConnector);
+      if (jointLines.length > 0) rows.push(new KeyedView(
+        "assembly-joints",
+        textLines(
+          "assembly-joint-lines",
+          jointLines
+        )
+      ));
     }
     if (StringTools.startsWith(selected.id, "project:")) {
       // When the part's mates leave it one turn or slide, offer the joint they amount to.
       var mateJoint = session.assemblyMateJoint(selected.id);
       var mateJointType = mateJoint == null ? null : mateJoint.type;
-      if (session.assemblyPartStillFree(selected.id))
-        rows.push(new KeyedView("mate-freedom", new Text("Still free to move under its mates", null,
-          appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
-      if (mateJointType != null)
-        rows.push(new KeyedView("convert-mates-to-joint", sceneAction("convert-mates-to-joint", "assembly.convert-to-joint",
-          "Make " + mateJointType + " joint", IconName.Plus)));
+      if (session.assemblyPartStillFree(selected.id)) rows.push(new KeyedView(
+        "mate-freedom",
+        new Text(
+          "Still free to move under its mates",
+          null,
+          appearance.theme.tokens.textSecondary,
+          TextStyleOverride.text(12.0)
+        )
+      ));
+      if (mateJointType != null) rows.push(new KeyedView(
+        "convert-mates-to-joint",
+        sceneAction(
+          "convert-mates-to-joint",
+          "assembly.convert-to-joint",
+          "Make " + mateJointType + " joint",
+          IconName.Plus
+        )
+      ));
     }
     if (scene.canCreateExtrusion() || scene.canCreateSheetFlange()) {
       var input = scene.sheetAuthoring;
-      var entries:Array<{key:String, label:String, read:Void->String, write:String->Void}> = [];
+      var entries:Array<{key:String, label:String, read:Void -> String, write:String -> Void}> = [];
       if (scene.canCreateExtrusion()) {
         var grades = MaterialLibrary.sheetMaterials();
         for (grade in session.customMaterials) if (grade.sheet != null) grades.push(grade);
         var options = [for (grade in grades) new SelectOption<String>(grade.id, grade.name, grade.id)];
-        rows.push(new KeyedView("sheet-material-select", new Select<String>("sheet-material-select", options,
-          input.materialId, function(value) { input.materialId = value; input.kFactor = ""; app.commands.refresh(); })));
-        entries.push({key:"material", label:"Sheet material identity", read:function() return input.materialId, write:function(v) input.materialId = v});
-        entries.push({key:"thickness", label:"Thickness (mm)", read:function() return input.thickness, write:function(v) input.thickness = v});
-        entries.push({key:"k", label:"ANSI K factor override (blank uses sheet grade)", read:function() return input.kFactor, write:function(v) input.kFactor = v});
-        entries.push({key:"grain", label:"Rolling direction in sketch (deg)", read:function() return input.grainDegrees, write:function(v) input.grainDegrees = v});
+        rows.push(new KeyedView("sheet-material-select",
+          new Select<String>("sheet-material-select", options, input.materialId, function(value) {
+          input.materialId = value;
+          input.kFactor = "";
+          app.commands.refresh();
+        }
+        )));
+        entries.push({
+          key: "material",
+          label: "Sheet material identity",
+          read: function() return input.materialId,
+          write: function(v) input.materialId = v
+        });
+        entries.push({
+          key: "thickness",
+          label: "Thickness (mm)",
+          read: function() return input.thickness,
+          write: function(v) input.thickness = v
+        });
+        entries.push({
+          key: "k",
+          label: "ANSI K factor override (blank uses sheet grade)",
+          read: function() return input.kFactor,
+          write: function(v) input.kFactor = v
+        });
+        entries.push({
+          key: "grain",
+          label: "Rolling direction in sketch (deg)",
+          read: function() return input.grainDegrees,
+          write: function(v) input.grainDegrees = v
+        });
       } else {
-        entries.push({key:"length", label:"Flange straight length (mm)", read:function() return input.length, write:function(v) input.length = v});
-        entries.push({key:"angle", label:"Signed bend angle (deg)", read:function() return input.angleDegrees, write:function(v) input.angleDegrees = v});
-        entries.push({key:"radius", label:"Inner radius (mm)", read:function() return input.radius, write:function(v) input.radius = v});
+        entries.push({
+          key: "length",
+          label: "Flange straight length (mm)",
+          read: function() return input.length,
+          write: function(v) input.length = v
+        });
+        entries.push({
+          key: "angle",
+          label: "Signed bend angle (deg)",
+          read: function() return input.angleDegrees,
+          write: function(v) input.angleDegrees = v
+        });
+        entries.push({
+          key: "radius",
+          label: "Inner radius (mm)",
+          read: function() return input.radius,
+          write: function(v) input.radius = v
+        });
       }
       for (entry in entries) {
         var field = new TextField("sheet-authoring-" + entry.key, entry.read(), entry.write);
@@ -133,42 +231,88 @@ class InspectorPanel {
     }
     if (scene.selectedSheetFeature() != null) {
       var bendLines:Array<String> = ["Bend · direction · angle (deg) · radius (mm) · allowance (mm) · length (mm)"];
-      for (bend in scene.selectedSheetBends())
-        bendLines.push("B" + bend.id + " · " + (bend.up() ? "up" : "down") + " · " +
-          Std.string(bend.angle * 180 / Math.PI) + " · " + Std.string(bend.innerRadius) + " · " +
-          Std.string(bend.allowance) + " · " + Std.string(bend.length()));
+      for (bend in scene.selectedSheetBends()) bendLines.push("B" + bend.id + " · " + (bend.up()
+        ? "up" : "down") + " · " + Std.string(bend.angle * 180 / Math.PI) + " · "
+        + Std.string(bend.innerRadius) + " · " + Std.string(bend.allowance) + " · " + Std.string(bend.length()));
       rows.push(new KeyedView("sheet-bend-table", textLines("sheet-bend-rows", bendLines)));
     }
     if (scene.hasActiveSketchEdit()) {
       var summary = scene.sketchEditSummary();
-      if (summary != null)
-        rows.push(new KeyedView("sketch-draft-status", new Text(summary)));
+      if (summary != null) rows.push(new KeyedView("sketch-draft-status", new Text(summary)));
       var sketchTools:Array<KeyedView> = [];
-      if (scene.canAddSketchDraftRectangle())
-        sketchTools.push(new KeyedView("add-rectangle",
-          sceneAction("add-sketch-rectangle", "scene.add-sketch-rectangle", "Add rectangle", IconName.Plus)));
-      if (scene.canClearSketchDraft())
-        sketchTools.push(new KeyedView("clear-sketch",
-          sceneAction("clear-sketch-draft", "scene.clear-sketch-draft", "Clear sketch", IconName.Close)));
-      if (sketchTools.length > 0)
-        rows.push(new KeyedView("sketch-draft-tools", new Row("sketch-draft-tools-row", sketchTools, actionRowStyle())));
-      rows.push(new KeyedView("sketch-draft-actions", new Row("sketch-draft-actions-row", [
-        new KeyedView("apply", sceneAction("apply-sketch-draft", "scene.apply-sketch", "Apply sketch", IconName.Save)),
-        new KeyedView("cancel", sceneAction("cancel-sketch-draft", "scene.cancel-sketch", "Cancel", IconName.Close))
-      ], actionRowStyle())));
+      if (scene.canAddSketchDraftRectangle()) sketchTools.push(new KeyedView(
+        "add-rectangle",
+        sceneAction(
+          "add-sketch-rectangle",
+          "scene.add-sketch-rectangle",
+          "Add rectangle",
+          IconName.Plus
+        )
+      ));
+      if (scene.canClearSketchDraft()) sketchTools.push(new KeyedView(
+        "clear-sketch",
+        sceneAction(
+          "clear-sketch-draft",
+          "scene.clear-sketch-draft",
+          "Clear sketch",
+          IconName.Close
+        )
+      ));
+      if (sketchTools.length > 0) rows.push(new KeyedView(
+        "sketch-draft-tools",
+        new Row(
+          "sketch-draft-tools-row",
+          sketchTools,
+          actionRowStyle()
+        )
+      ));
+      rows.push(new KeyedView(
+        "sketch-draft-actions",
+        new Row(
+          "sketch-draft-actions-row",
+          [
+            new KeyedView(
+              "apply",
+              sceneAction(
+                "apply-sketch-draft",
+                "scene.apply-sketch",
+                "Apply sketch",
+                IconName.Save
+              )
+            ),
+            new KeyedView(
+              "cancel",
+              sceneAction(
+                "cancel-sketch-draft",
+                "scene.cancel-sketch",
+                "Cancel",
+                IconName.Close
+              )
+            )
+          ],
+          actionRowStyle()
+        )
+      ));
     } else if (scene.canBeginSelectedSketchEdit()) {
-      rows.push(new KeyedView("sketch-edit-action",
-        sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
+      rows.push(new KeyedView(
+        "sketch-edit-action",
+        sceneAction(
+          "edit-selected-sketch",
+          "scene.edit-sketch",
+          "Edit sketch",
+          IconName.Inspect
+        )
+      ));
     }
     // An edit waiting for the user to say which element a reference means (TN7).
     var pending = scene.pendingReferenceChoice();
     if (pending != null) {
       rows.push(new KeyedView("pending-choice-status", new Text(pending.message)));
-      for (candidate in 0...pending.candidates.length)
-        rows.push(new KeyedView("pending-choice-" + candidate, new Button("Use " + pending.candidates[candidate], null, function() {
-          app.runSceneEdit("Could not apply the edit", function() app.scene.resolvePendingReferenceChoice(candidate));
-          app.commands.refresh();
-        }, "pending-choice-" + candidate)));
+      for (candidate in 0...pending.candidates.length) rows.push(new KeyedView("pending-choice-" + candidate,
+        new Button("Use " + pending.candidates[candidate], null, function() {
+        app.runSceneEdit("Could not apply the edit", function() app.scene.resolvePendingReferenceChoice(candidate));
+        app.commands.refresh();
+      }, "pending-choice-" + candidate)));
       rows.push(new KeyedView("pending-choice-cancel", new Button("Keep the previous model", null, function() {
         app.scene.cancelPendingReferenceChoice();
         app.commands.refresh();
@@ -181,88 +325,201 @@ class InspectorPanel {
       rows.push(new KeyedView(key + "-status", new Text(issue.message)));
       for (candidate in 0...issue.candidates.length) {
         var referenceIndex = issue.index;
-        rows.push(new KeyedView(key + "-candidate-" + candidate, new Button("Use " + issue.candidates[candidate], null, function() {
-          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReference(referenceIndex, candidate));
+        rows.push(new KeyedView(key + "-candidate-" + candidate,
+          new Button("Use " + issue.candidates[candidate], null, function() {
+          app.runSceneEdit(
+            "Could not repair reference",
+            function() app.scene.repairSelectedReference(
+              referenceIndex,
+              candidate
+            )
+          );
           app.commands.refresh();
         }, "repair-reference-" + referenceIndex + "-" + candidate)));
       }
       if (issue.pickable) {
         var pickedIndex = issue.index;
         rows.push(new KeyedView(key + "-picked", new Button("Use the selected " + issue.kind, null, function() {
-          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReferenceWithPick(pickedIndex));
+          app.runSceneEdit(
+            "Could not repair reference",
+            function() app.scene.repairSelectedReferenceWithPick(pickedIndex)
+          );
           app.commands.refresh();
         }, "repair-reference-" + pickedIndex + "-picked")));
       }
     }
     var supportStatus = scene.selectedSketchSupportStatus();
     if (supportStatus != null) {
-      if (referenceIssues.length == 0)
-        rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
-      if (scene.canRepairSelectedSketchSupportFace())
-        rows.push(new KeyedView("repair-sketch-support",
-          sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",
-            "Repair support face", IconName.Inspect)));
+      if (referenceIssues.length == 0) rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
+      if (scene.canRepairSelectedSketchSupportFace()) rows.push(new KeyedView(
+        "repair-sketch-support",
+        sceneAction(
+          "repair-sketch-support-face",
+          "scene.repair-sketch-support-face",
+          "Repair support face",
+          IconName.Inspect
+        )
+      ));
     }
     var pickedLabel = scene.selectedElementLabel();
-    if (pickedLabel != null)
-      rows.push(new KeyedView("picked-element", new Text(pickedLabel)));
-    if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
-      new Text(scene.selectedCadEdgeIndex>=0?"Selected edge "+(scene.selectedCadEdgeIndex+1):
-        scene.selectedCadFaceIndex<0?"Click a CAD face or edge to select it":
-        selected.kind=="cad-plate"
-          ?"Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location"
-          :"Selected face "+(scene.selectedCadFaceIndex+1))));
-    if(selected.kind=="cad-preview"&&scene.selectedCadEdgeIndex>=0)
-      rows.push(new KeyedView("edge-selection",
-        new Text("Selected edge "+(scene.selectedCadEdgeIndex+1))));
+    if (pickedLabel != null) rows.push(new KeyedView("picked-element", new Text(pickedLabel)));
+    if (scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id)) rows.push(new KeyedView(
+      "face-selection",
+      new Text(scene.selectedCadEdgeIndex >= 0 ? "Selected edge " + (scene.selectedCadEdgeIndex + 1)
+      : scene.selectedCadFaceIndex < 0 ? "Click a CAD face or edge to select it" : selected.kind
+      == "cad-plate" ? "Selected face " + (scene.selectedCadFaceIndex + 1) + " · Add hole uses the picked location"
+      : "Selected face " + (scene.selectedCadFaceIndex + 1))
+    ));
+    if (selected.kind == "cad-preview" && scene.selectedCadEdgeIndex >= 0) rows.push(new KeyedView(
+      "edge-selection",
+      new Text("Selected edge " + (scene.selectedCadEdgeIndex + 1))
+    ));
     var kindProvider = ObjectKindRegistry.find(selected.kind);
     if (kindProvider != null) for (commandId in kindProvider.commands(scene, selected.id)) {
       switch (commandId) {
-        case "scene.create-sketch": rows.push(new KeyedView("create-sketch",
-          sceneAction("create-constrained-sketch", commandId, "Create sketch", IconName.Plus)));
-        case "scene.create-face-sketch": rows.push(new KeyedView("create-face-sketch",
-          sceneAction("create-face-sketch", commandId, "Sketch on face", IconName.Plus)));
-        case "scene.create-extrusion": rows.push(new KeyedView("create-extrusion",
-          sceneAction("create-extrusion", commandId, "Extrude", IconName.Plus)));
-        case "scene.create-sheet-base": rows.push(new KeyedView("create-sheet-base",
-          sceneAction("create-sheet-base", commandId, "Create sheet base", IconName.Plus)));
-        case "scene.create-sheet-flange": rows.push(new KeyedView("create-sheet-flange",
-          sceneAction("create-sheet-flange", commandId, "Create edge flange", IconName.Plus)));
-        case "scene.export-sheet-dxf", "scene.export-sheet-svg": rows.push(new KeyedView(commandId,
-          sceneAction(commandId, commandId, commandId == "scene.export-sheet-dxf" ? "Export flat DXF" : "Export flat SVG", IconName.Save)));
-        case "scene.create-pocket": rows.push(new KeyedView("create-pocket",
-          sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
-        case "scene.create-vertical-fillet": rows.push(new KeyedView("create-vertical-fillet",
-          sceneAction("create-vertical-fillet", commandId, "Fillet vertical edges", IconName.Plus)));
-        case "scene.worker-add-step": rows.push(new KeyedView("worker-add-step",
-          sceneAction("worker-add-step", commandId, "Add step", IconName.Plus)));
-        case "scene.worker-remove-step": rows.push(new KeyedView("worker-remove-step",
-          sceneAction("worker-remove-step", commandId, "Remove step", IconName.Close)));
-        case "scene.worker-step-up": rows.push(new KeyedView("worker-step-up",
-          sceneAction("worker-step-up", commandId, "Move step up", IconName.Plus)));
-        case "scene.worker-step-down": rows.push(new KeyedView("worker-step-down",
-          sceneAction("worker-step-down", commandId, "Move step down", IconName.Plus)));
+        case "scene.create-sketch":
+          rows.push(new KeyedView(
+            "create-sketch",
+            sceneAction(
+              "create-constrained-sketch",
+              commandId,
+              "Create sketch",
+              IconName.Plus
+            )
+          ));
+        case "scene.create-face-sketch":
+          rows.push(new KeyedView(
+            "create-face-sketch",
+            sceneAction(
+              "create-face-sketch",
+              commandId,
+              "Sketch on face",
+              IconName.Plus
+            )
+          ));
+        case "scene.create-extrusion":
+          rows.push(new KeyedView(
+            "create-extrusion",
+            sceneAction(
+              "create-extrusion",
+              commandId,
+              "Extrude",
+              IconName.Plus
+            )
+          ));
+        case "scene.create-sheet-base":
+          rows.push(new KeyedView(
+            "create-sheet-base",
+            sceneAction(
+              "create-sheet-base",
+              commandId,
+              "Create sheet base",
+              IconName.Plus
+            )
+          ));
+        case "scene.create-sheet-flange":
+          rows.push(new KeyedView(
+            "create-sheet-flange",
+            sceneAction(
+              "create-sheet-flange",
+              commandId,
+              "Create edge flange",
+              IconName.Plus
+            )
+          ));
+        case "scene.export-sheet-dxf", "scene.export-sheet-svg":
+          rows.push(new KeyedView(
+            commandId,
+            sceneAction(
+              commandId,
+              commandId,
+              commandId == "scene.export-sheet-dxf" ? "Export flat DXF" : "Export flat SVG",
+              IconName.Save
+            )
+          ));
+        case "scene.create-pocket":
+          rows.push(new KeyedView("create-pocket", sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
+        case "scene.create-vertical-fillet":
+          rows.push(new KeyedView(
+            "create-vertical-fillet",
+            sceneAction(
+              "create-vertical-fillet",
+              commandId,
+              "Fillet vertical edges",
+              IconName.Plus
+            )
+          ));
+        case "scene.worker-add-step":
+          rows.push(new KeyedView(
+            "worker-add-step",
+            sceneAction(
+              "worker-add-step",
+              commandId,
+              "Add step",
+              IconName.Plus
+            )
+          ));
+        case "scene.worker-remove-step":
+          rows.push(new KeyedView(
+            "worker-remove-step",
+            sceneAction(
+              "worker-remove-step",
+              commandId,
+              "Remove step",
+              IconName.Close
+            )
+          ));
+        case "scene.worker-step-up":
+          rows.push(new KeyedView(
+            "worker-step-up",
+            sceneAction(
+              "worker-step-up",
+              commandId,
+              "Move step up",
+              IconName.Plus
+            )
+          ));
+        case "scene.worker-step-down":
+          rows.push(new KeyedView(
+            "worker-step-down",
+            sceneAction(
+              "worker-step-down",
+              commandId,
+              "Move step down",
+              IconName.Plus
+            )
+          ));
         default:
       }
     }
-    if(ownership!=null) {
-      rows.push(new KeyedView("origin",textLines("script-object-origins",
-        ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
-          "mass","collisionEnabled","dynamicBody","visible"])))));
-      rows.push(new KeyedView("revert",new Button("Revert object overrides",null,function(){
-        if(ownership.revertTarget(selected.id))refreshScriptMaterialization("Object overrides reverted");
-      },"script-object-revert")));
+    if (ownership != null) {
+      rows.push(new KeyedView(
+        "origin",
+        textLines(
+          "script-object-origins",
+          ["Script-owned"].concat(ownership.propertyOrigins(
+            selected.id,
+            [
+              "position",
+              "dimensions",
+              "mass",
+              "collisionEnabled",
+              "dynamicBody",
+              "visible"
+            ]
+          ))
+        )
+      ));
+      rows.push(new KeyedView("revert", new Button("Revert object overrides", null, function() {
+        if (ownership.revertTarget(selected.id)) refreshScriptMaterialization("Object overrides reverted");
+      }, "script-object-revert")));
     }
-    rows.push(new KeyedView("properties",inspector));
+    rows.push(new KeyedView("properties", inspector));
     var sheetWorkflow = SheetWorkflowPanel.build(app);
     var projectPanel = app.projectUiPanel();
     if (projectPanel != null) rows.push(new KeyedView("project-ui", projectPanel));
     if (sheetWorkflow != null) rows.push(new KeyedView("sheet-workflow", sheetWorkflow));
-    return new Column(
-      "inspector-panel",
-      rows,
-      style
-    );
+    return new Column("inspector-panel", rows, style);
   }
 
 }

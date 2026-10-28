@@ -6,8 +6,8 @@ import sys.FileSystem;
 class WorkerAssetPath {
   public static function resolve(path:String):String {
     if (FileSystem.exists(path)) return path;
-    for (prefix in ["../", "../../", "../../../", "../../../../"])
-      if (FileSystem.exists(prefix + path)) return prefix + path;
+    for (prefix in ["../",
+      "../../", "../../../", "../../../../"]) if (FileSystem.exists(prefix + path)) return prefix + path;
     return path;
   }
 }

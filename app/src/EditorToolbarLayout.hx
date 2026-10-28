@@ -16,17 +16,14 @@ class EditorToolbarLayout {
   public static function forWidth(previous:EditorToolbarDensity, width:Float):EditorToolbarDensity {
     return switch (previous) {
       case Full:
-        if (width < COMPACT_FIT_WIDTH - RESIZE_MARGIN) Minimal
-        else if (width < FULL_FIT_WIDTH - RESIZE_MARGIN) Compact
-        else Full;
+        if (width < COMPACT_FIT_WIDTH - RESIZE_MARGIN) Minimal else if (width
+          < FULL_FIT_WIDTH - RESIZE_MARGIN) Compact else Full;
       case Compact:
-        if (width < COMPACT_FIT_WIDTH - RESIZE_MARGIN) Minimal
-        else if (width > FULL_FIT_WIDTH + RESIZE_MARGIN) Full
-        else Compact;
+        if (width < COMPACT_FIT_WIDTH - RESIZE_MARGIN) Minimal else if (width
+          > FULL_FIT_WIDTH + RESIZE_MARGIN) Full else Compact;
       case Minimal:
-        if (width > FULL_FIT_WIDTH + RESIZE_MARGIN) Full
-        else if (width > COMPACT_FIT_WIDTH + RESIZE_MARGIN) Compact
-        else Minimal;
+        if (width > FULL_FIT_WIDTH + RESIZE_MARGIN) Full else if (width
+          > COMPACT_FIT_WIDTH + RESIZE_MARGIN) Compact else Minimal;
     };
   }
 }

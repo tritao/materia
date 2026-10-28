@@ -14,16 +14,28 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 
 /** The editor's collision world over plain scene objects (COLLISION.md CL8a) and how it is shown (CL8b). */
-@:access(app.EditorScene)
-@:access(app.editor.ScenePresentation)
-@:access(app.Main.ReferenceEditorApp)
-@:access(app.EditorPerspectiveViewport)
-class SceneCollisionTests {
+@:access(app.EditorScene) @:access(app.editor.ScenePresentation) @:access(app
+  .Main.ReferenceEditorApp) @:access(app.EditorPerspectiveViewport) class SceneCollisionTests {
   static function check(value:Bool, message:String):Void if (!value) throw message;
 
-  static function box(id:String, x:Float):app.SceneObjectData
-    return {id: id, label: id, type: "rectangle", x: x, y: 0.0, z: 0.05, width: 0.1, height: 0.1, depth: 0.1,
-      collisionEnabled: true, dynamicBody: false, mass: 1.0, red: 0.5, green: 0.5, blue: 0.5, visible: true};
+  static function box(id:String, x:Float):app.SceneObjectData return {
+    id: id,
+    label: id,
+    type: "rectangle",
+    x: x,
+    y: 0.0,
+    z: 0.05,
+    width: 0.1,
+    height: 0.1,
+    depth: 0.1,
+    collisionEnabled: true,
+    dynamicBody: false,
+    mass: 1.0,
+    red: 0.5,
+    green: 0.5,
+    blue: 0.5,
+    visible: true
+  };
 
   public static function main():Int {
     try {
@@ -47,23 +59,29 @@ class SceneCollisionTests {
     var scene = new EditorScene([box("a", 0.0), box("b", 0.08)]);
     var collision = new SceneCollision(() -> new NativeCollisionWorld());
     var pairs = collision.query(scene, null, 0.01);
-    check(pairs.length == 1 && pairs[0].a == "a" && pairs[0].b == "b" && pairs[0].colliding(),
-      'overlapping boxes collide (${pairs.length} pairs)');
+    check(
+      pairs.length == 1 && pairs[0].a == "a" && pairs[0].b == "b" && pairs[0].colliding(),
+      'overlapping boxes collide (${pairs.length} pairs)'
+    );
     check(Math.abs(pairs[0].distance + 0.02) < 1e-6, 'the overlap is 20 mm deep (${pairs[0].distance})');
     check(collision.query(scene, null, 0.01) == pairs, "an unchanged scene is not queried again");
 
     // 5 mm apart: near, not colliding; the world is only re-posed.
     scene.setPosition("b", 0, 0.105);
     pairs = collision.query(scene, null, 0.01);
-    check(pairs.length == 1 && !pairs[0].colliding() && Math.abs(pairs[0].distance - 0.005) < 1e-6,
-      'boxes 5 mm apart are near (${pairs.length} pairs)');
+    check(
+      pairs.length == 1 && !pairs[0].colliding() && Math.abs(pairs[0].distance - 0.005) < 1e-6,
+      'boxes 5 mm apart are near (${pairs.length} pairs)'
+    );
     check(Math.abs(pairs[0].pointB[0] - pairs[0].pointA[0] - 0.005) < 1e-6, "the closest points span the gap");
 
     // Face to face, as a box laid on another: touching, shown as near, not colliding.
     scene.setPosition("b", 0, 0.1);
     pairs = collision.query(scene, null, 0.01);
-    check(pairs.length == 1 && !pairs[0].colliding() && Math.abs(pairs[0].distance) < 1e-6,
-      'flush boxes touch without colliding (${pairs.length} pairs)');
+    check(
+      pairs.length == 1 && !pairs[0].colliding() && Math.abs(pairs[0].distance) < 1e-6,
+      'flush boxes touch without colliding (${pairs.length} pairs)'
+    );
     check(collision.query(scene, null, 0.01, 0.0).length == 1, "a zero contact tolerance still finds the pair");
 
     // 50 mm apart: clear.
@@ -76,8 +94,10 @@ class SceneCollisionTests {
     check(collision.query(scene, null, 0.01).length == 1, "moved back, the boxes collide again");
     for (item in scene.items()) if (item.id == "b") item.collisionEnabled = false;
     scene.setPosition("b", 0, 0.081);
-    check(collision.query(scene, null, 0.01).length == 0 && collision.builds == 2,
-      "an object without collision is left out, by a rebuild");
+    check(
+      collision.query(scene, null, 0.01).length == 0 && collision.builds == 2,
+      "an object without collision is left out, by a rebuild"
+    );
     collision.dispose();
   }
 
@@ -87,27 +107,41 @@ class SceneCollisionTests {
     var collision = new SceneCollision(() -> new NativeCollisionWorld());
     var pairs = collision.query(scene, null, 0.01);
     check(pairs.length == 2 && pairs[0].colliding() && !pairs[1].colliding(), "one colliding pair and one near pair");
-    check(SceneCollision.summary(pairs, id -> id.toUpperCase()) == "1 collision, 1 near · A / B 20 mm deep",
-      'the toolbar line names the closest pair (${SceneCollision.summary(pairs, id -> id)})');
+    check(
+      SceneCollision.summary(pairs, id -> id.toUpperCase()) == "1 collision, 1 near · A / B 20 mm deep",
+      'the toolbar line names the closest pair (${SceneCollision.summary(pairs, id -> id)})'
+    );
     check(SceneCollision.summary([], id -> id) == null, "nothing to report, no line");
-    function tinted(?with:Array<app.SceneCollision.SceneCollisionPair>):Int
-      return scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, with).diagnosticTintValues().length;
+    function tinted(?with:Array<app.SceneCollision.SceneCollisionPair>):Int return scene.configureRenderView(
+      new SceneView(),
+      Transform.identity(),
+      null,
+      null,
+      -1,
+      with
+    ).diagnosticTintValues().length;
     scene.select("scene");
     check(tinted(pairs) == 4, 'all four objects are tinted (${tinted(pairs)})');
-    var original=scene.runtimeFor("a").material.id().get_value();
-    var view=scene.configureRenderView(new SceneView(),Transform.identity(),null,null,-1,pairs);
-    check(view.materialOverrideValues().length==0,"Diagnostics tint instead of replacing source materials");
-    check(scene.runtimeFor("a").material.id().get_value()==original,"Diagnostic colours retain source material identity");
-    scene.configureRenderView(view,Transform.identity());
-    check(view.diagnosticTintValues().length==0,"Reusing a view clears retired diagnostic tints");
-    scene.configureRenderView(view,Transform.identity(),null,null,-1,pairs);
+    var original = scene.runtimeFor("a").material.id().get_value();
+    var view = scene.configureRenderView(new SceneView(), Transform.identity(), null, null, -1, pairs);
+    check(view.materialOverrideValues().length == 0, "Diagnostics tint instead of replacing source materials");
+    check(
+      scene.runtimeFor("a").material.id().get_value() == original,
+      "Diagnostic colours retain source material identity"
+    );
+    scene.configureRenderView(view, Transform.identity());
+    check(view.diagnosticTintValues().length == 0, "Reusing a view clears retired diagnostic tints");
+    scene.configureRenderView(view, Transform.identity(), null, null, -1, pairs);
     view.clearOverrides();
-    check(view.diagnosticTintValues().length==0,"Clearing view overrides clears diagnostic tints");
+    check(view.diagnosticTintValues().length == 0, "Clearing view overrides clears diagnostic tints");
     scene.select("a");
     check(tinted(pairs) == 4, "Diagnostic tints stay below the independent selection layer");
     check(tinted() == 0, "without pairs nothing is tinted");
 
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {});
+    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    }, function() {
+    }
+    );
     var viewport = new EditorPerspectiveViewport("collision-test", scene, host);
     var before = viewport.presentationKey();
     viewport.setCollisions(pairs);
@@ -115,8 +149,14 @@ class SceneCollisionTests {
     check(shownKey != before && viewport.collisionPairCount() == 2, "new pairs change the viewport's key");
     viewport.setCollisions(pairs);
     check(viewport.presentationKey() == shownKey, "the same query result keeps the rendered image");
-    var equivalent = [for (pair in pairs) new SceneCollisionPair(pair.a, pair.b,
-      pair.distance, pair.pointA.copy(), pair.pointB.copy(), pair.colliding())];
+    var equivalent = [for (pair in pairs) new SceneCollisionPair(
+      pair.a,
+      pair.b,
+      pair.distance,
+      pair.pointA.copy(),
+      pair.pointB.copy(),
+      pair.colliding()
+    )];
     viewport.setCollisions(equivalent);
     check(viewport.presentationKey() == shownKey, "equivalent query results keep the rendered image");
     viewport.setCollisions([]);
@@ -128,9 +168,9 @@ class SceneCollisionTests {
 
   /** CL8b in the editor: the setting turns it on and off, and a simulation hides it. */
   static function editor():Void {
-    var directory="build/collision-ui-test-"+Std.string(Sys.time());
+    var directory = "build/collision-ui-test-" + Std.string(Sys.time());
     sys.FileSystem.createDirectory(directory);
-    var app = new ReferenceEditorApp(null,directory+"/workspace.json");
+    var app = new ReferenceEditorApp(null, directory + "/workspace.json");
     var ids:Array<String> = [];
     for (x in [0.0, 0.08]) {
       check(app.scene.createRectangle(), "the editor creates a box");
@@ -142,11 +182,15 @@ class SceneCollisionTests {
     }
     app.scene.select(null);
     var pairs = app.editingCollisions();
-    check(pairs.length == 1 && app.collisionSummary != null && app.collisionSummary.indexOf("1 collision") == 0,
-      'the editor finds the overlap (${app.collisionSummary})');
+    check(
+      pairs.length == 1 && app.collisionSummary != null && app.collisionSummary.indexOf("1 collision") == 0,
+      'the editor finds the overlap (${app.collisionSummary})'
+    );
     app.preferences.store.set(AppSettings.COLLISIONS_VISIBLE, PropertyValue.Bool(false));
-    check(!app.collisionsVisible && app.editingCollisions().length == 0 && app.collisionSummary == null,
-      "turned off, nothing is shown");
+    check(
+      !app.collisionsVisible && app.editingCollisions().length == 0 && app.collisionSummary == null,
+      "turned off, nothing is shown"
+    );
     app.commands.execute("scene.toggle-collisions");
     check(app.collisionsVisible && app.editingCollisions().length == 1, "the command turns it back on");
     app.preferences.store.set(AppSettings.COLLISION_NEAR, PropertyValue.Float(0.0));

@@ -7,8 +7,17 @@ import haxe.crypto.Sha256;
 import sys.FileSystem;
 import sys.io.File;
 
-typedef BrowserExampleFile = {var url:String; var sha256:String; var bytes:Int; var path:String;};
-typedef BrowserExample = {var id:String; var source:String; var files:Array<BrowserExampleFile>;};
+typedef BrowserExampleFile = {
+  var url:String;
+  var sha256:String;
+  var bytes:Int;
+  var path:String;
+};
+typedef BrowserExample = {
+  var id:String;
+  var source:String;
+  var files:Array<BrowserExampleFile>;
+};
 
 /** Browser host policy: a tiny index selects immutable resources, never executable project sources. */
 class BrowserExamples {
@@ -19,24 +28,35 @@ class BrowserExamples {
     var root:Dynamic = Json.parse(response.data.toString());
     if (root.version != 1 || !Std.isOfType(root.examples, Array)) throw "Unsupported browser example catalog";
     for (value in (cast root.examples:Array<Dynamic>)) {
-      if (!Std.isOfType(value.id, String) || !Std.isOfType(value.source, String) || !Std.isOfType(value.files, Array))
-        throw "Invalid browser example";
+      if (!Std.isOfType(value.id, String) || !Std.isOfType(value.source,
+        String) || !Std.isOfType(value.files, Array)) throw "Invalid browser example";
       var entry:BrowserExample = {id: value.id, source: value.source, files: []};
-      if (app.editor.ExampleCatalog.find(entry.id) == null || entries.exists(entry.id))
-        throw "Unknown or duplicate browser example";
+      if (app.editor.ExampleCatalog.find(entry.id) == null
+        || entries.exists(entry.id)) throw "Unknown or duplicate browser example";
       for (raw in (cast value.files:Array<Dynamic>)) {
-        if (!Std.isOfType(raw.url, String) || !Std.isOfType(raw.sha256, String) || !Std.isOfType(raw.bytes, Int) ||
-            !Std.isOfType(raw.path, String)) throw "Invalid browser resource fields";
+        if (!Std.isOfType(raw.url,
+          String) || !Std.isOfType(raw.sha256, String) || !Std.isOfType(raw.bytes, Int) || !Std.isOfType(
+            raw.path,
+            String
+          )) throw "Invalid browser resource fields";
         var file:BrowserExampleFile = {url: raw.url, sha256: raw.sha256, bytes: raw.bytes, path: raw.path};
-        if (!validDigest(file.sha256) || file.bytes <= 0 || file.bytes > 150000000 ||
-            !StringTools.startsWith(file.url, "objects/" + file.sha256) ||
-            !(StringTools.startsWith(file.path, "/files/examples/") || StringTools.startsWith(file.path, "/app/examples/") ||
-              StringTools.startsWith(file.path, "/animkit/assets/")) || file.path.indexOf("..") >= 0)
-          throw "Invalid browser example resource";
+        if (!validDigest(file.sha256) || file.bytes <= 0 || file.bytes > 150000000 || !StringTools.startsWith(
+          file.url,
+          "objects/" + file.sha256
+        ) || !(StringTools.startsWith(
+          file.path,
+          "/files/examples/"
+        ) || StringTools.startsWith(
+          file.path,
+          "/app/examples/"
+        ) || StringTools.startsWith(
+          file.path,
+          "/animkit/assets/"
+        )) || file.path.indexOf("..") >= 0) throw "Invalid browser example resource";
         entry.files.push(file);
       }
-      if (entry.source != "" && [for (file in entry.files) if (file.path == entry.source) file].length != 1)
-        throw "Browser example source is missing";
+      if (entry.source != "" && [for (file in entry.files) if (file.path
+        == entry.source) file].length != 1) throw "Browser example source is missing";
       entries.set(entry.id, entry);
     }
   }

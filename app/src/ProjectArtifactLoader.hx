@@ -22,13 +22,14 @@ private typedef ArtifactIndexedMesh = {positions:Array<Float>, indices:Array<Int
 /** Materializes immutable artifact bytes without knowing how they were produced or stored. */
 class ProjectArtifactLoader {
   final cache:Null<PreparedSceneCaches.PreparedSceneCacheContext>;
-  final programReader:Null<String->Bytes>;
-  public function new(?cache:PreparedSceneCaches.PreparedSceneCacheContext, ?programReader:String->Bytes) {
-    this.cache = cache; this.programReader = programReader;
+  final programReader:Null<String -> Bytes>;
+  public function new(?cache:PreparedSceneCaches.PreparedSceneCacheContext, ?programReader:String -> Bytes) {
+    this.cache = cache;
+    this.programReader = programReader;
   }
 
-  public function load(snapshot:Bytes, ?control:ProjectLoadControl, ?preparedBytes:Bytes,
-      persistPrepared:Bool = false):GeneratedAssemblyScene {
+  public function load(snapshot:Bytes,
+    ?control:ProjectLoadControl, ?preparedBytes:Bytes, persistPrepared:Bool = false):GeneratedAssemblyScene {
     var loaded = loadInternal(snapshot, control, preparedBytes, persistPrepared, true);
     if (loaded == null) throw "Project preparation produced no scene";
     return loaded;
@@ -39,8 +40,13 @@ class ProjectArtifactLoader {
     return loadInternal(snapshot, control, null, false, false);
   }
 
-  function loadInternal(snapshot:Bytes, control:Null<ProjectLoadControl>, preparedBytes:Null<Bytes>,
-      persistPrepared:Bool, allowPreparation:Bool):Null<GeneratedAssemblyScene> {
+  function loadInternal(
+    snapshot:Bytes,
+    control:Null<ProjectLoadControl>,
+    preparedBytes:Null<Bytes>,
+    persistPrepared:Bool,
+    allowPreparation:Bool
+  ):Null<GeneratedAssemblyScene> {
     if (control != null) control.throwIfCancelled();
     if (control != null) control.phase("Decoding the artifact");
     var artifact = SceneArtifact.decodeView(snapshot);
@@ -54,8 +60,11 @@ class ProjectArtifactLoader {
     var componentUseCount = new Map<String, Int>();
     var runtimeState:Null<AssemblyState> = null;
     if (artifact.assemblyDefinition != null) {
-      var initialState = artifact.assemblyState == null ? null
-        : materia.assembly.AssemblyDefinitionFlattener.flattenState(artifact.assemblyDefinition, artifact.assemblyState);
+      var initialState = artifact.assemblyState
+        == null ? null : materia.assembly.AssemblyDefinitionFlattener.flattenState(
+          artifact.assemblyDefinition,
+          artifact.assemblyState
+        );
       var model = cadkit.modeling.CompiledAssembly.takeOwnership(artifact.assemblyDefinition);
       artifact.assemblyDefinition = model.definition;
       runtimeState = AssemblyState.fromModel(model, initialState);
@@ -75,7 +84,10 @@ class ProjectArtifactLoader {
     if (control != null) control.phase("Identifying prepared data");
     var preparedCache = new PreparedProjectCache(artifactHash, cache);
     if (control != null) control.phase("Reading prepared geometry and physics");
-    var prepared = preparedBytes == null ? preparedCache.read(components) : PreparedSceneCodec.decode(preparedBytes, components);
+    var prepared = preparedBytes == null ? preparedCache.read(components) : PreparedSceneCodec.decode(
+      preparedBytes,
+      components
+    );
     var cacheHit = prepared != null;
     if (cacheHit && preparedBytes == null) Sys.println("Materia project: reused prepared geometry and physics");
     if (control != null) control.throwIfCancelled();
@@ -98,39 +110,64 @@ class ProjectArtifactLoader {
       var faces = component.faceDescriptors;
       if (faces != null) faceDescriptorsByDefinition.set(component.id, faces);
       geometryKeyByDefinition.set(component.id, geometryKey);
-      localCentersByDefinition.set(component.id, [
-        (minimum[0] + maximum[0]) * 0.5,
-        (minimum[1] + maximum[1]) * 0.5,
-        (minimum[2] + maximum[2]) * 0.5]);
+      localCentersByDefinition.set(
+        component.id,
+        [
+          (minimum[0] + maximum[0]) * 0.5,
+          (minimum[1] + maximum[1]) * 0.5,
+          (minimum[2] + maximum[2]) * 0.5
+        ]
+      );
       physicalParts.push(part.physical);
     }
     if (!cacheHit || persistPrepared) {
-      if (control != null) { control.throwIfCancelled(); control.phase("Saving prepared geometry and physics"); }
+      if (control != null) {
+        control.throwIfCancelled();
+        control.phase("Saving prepared geometry and physics");
+      }
       preparedCache.write(prepared);
     }
 
     if (artifact.assemblyDefinition != null) {
       var assembly:materia.assembly.AssemblyDefinition = artifact.assemblyDefinition;
       var visualOnly = new Map<String, Bool>();
-      for (componentDefinition in assembly.definitions)
-        if (componentDefinition.collisionHulls != null && componentDefinition.collisionHulls.length == 0)
-          visualOnly.set(componentDefinition.id, true);
+      for (componentDefinition in assembly.definitions) if (componentDefinition.collisionHulls != null
+        && componentDefinition.collisionHulls.length == 0) visualOnly.set(
+          componentDefinition.id,
+          true
+        );
       var parts = new Map<String, SceneArtifactPart>();
       for (part in artifact.parts) parts.set(part.id, part);
       for (occurrence in artifact.assemblyDefinition.occurrences) {
         var component = parts.get(occurrence.definition);
         if (component == null) throw 'Missing geometry definition "${occurrence.definition}"';
-        addOccurrenceRecord(records, component, occurrence.id, occurrence.definition,
-          poses.get(occurrence.id), componentUseCount.get(occurrence.definition),
-          boundsByDefinition, geometryKeyByDefinition, scale);
+        addOccurrenceRecord(
+          records,
+          component,
+          occurrence.id,
+          occurrence.definition,
+          poses.get(occurrence.id),
+          componentUseCount.get(occurrence.definition),
+          boundsByDefinition,
+          geometryKeyByDefinition,
+          scale
+        );
         if (occurrence.visible == false) records[records.length - 1].visible = false;
         // Empty authored hulls explicitly mark a visual-only assembly component.
         if (visualOnly.exists(occurrence.definition)) records[records.length - 1].collisionEnabled = false;
       }
     } else {
-      for (component in artifact.parts)
-        addOccurrenceRecord(records, component, component.id, component.id, null, 1,
-          boundsByDefinition, geometryKeyByDefinition, scale);
+      for (component in artifact.parts) addOccurrenceRecord(
+        records,
+        component,
+        component.id,
+        component.id,
+        null,
+        1,
+        boundsByDefinition,
+        geometryKeyByDefinition,
+        scale
+      );
     }
 
     var project = artifact.project;
@@ -138,21 +175,52 @@ class ProjectArtifactLoader {
     if (project != null) {
       for (record in records) if (project.dynamicParts.indexOf(record.id.substr(8)) >= 0) record.dynamicBody = true;
       var definition = artifact.assemblyDefinition;
-      if (definition != null) motions = [for (motion in project.motions)
-        new RobotMotionTrack("assembly:" + definition.id, 0, motion.loop, motion.keys, motion.joint)];
+      if (definition != null) motions = [for (motion in project.motions) new RobotMotionTrack(
+        "assembly:" + definition.id,
+        0,
+        motion.loop,
+        motion.keys,
+        motion.joint
+      )];
     }
 
-    return {objects: records, sourceMap:project==null?null:project.sources, navigation:project==null?null:project.navigation, presentation:artifact.presentation, presentationGeometryFingerprint:materia.presentation.PresentationGeometry.fingerprint(artifact), projectVariant:project==null?null:project.variant, projectJob: project == null ? null : project.job, robotMotions: motions,
-      geometryBySnapshot: geometryBySnapshot,
-      assemblyDefinition: artifact.assemblyDefinition,
-      assemblyState: runtimeState == null ? null : runtimeState.record(),
-      assemblyModel: runtimeState == null ? null : runtimeState.model,
-      localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
-      metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
-      recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
-      cncJob: machiningJob(artifact, records, scale, programReader), mobileBase: artifact.mobileBase, missions: artifact.missions,
-      robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion,
-      controllers: artifact.controllers, signals: artifact.signals, printJob: artifact.printing};
+    return {
+      objects: records,
+      sourceMap: project == null ? null : project.sources,
+      navigation : project == null ? null : project.navigation,
+      presentation : artifact.presentation,
+      presentationGeometryFingerprint : materia.presentation.PresentationGeometry.fingerprint(artifact),
+      projectVariant : project == null ? null : project.variant,
+      projectJob : project == null ? null : project.job,
+      robotMotions : motions,
+      geometryBySnapshot : geometryBySnapshot,
+      assemblyDefinition : artifact.assemblyDefinition,
+      assemblyState : runtimeState == null ? null : runtimeState.record(),
+      assemblyModel : runtimeState == null ? null : runtimeState.model,
+      localCentersByDefinition : localCentersByDefinition,
+      faceDescriptorsByDefinition : faceDescriptorsByDefinition,
+      metresPerUnit : scale,
+      physical : {
+        metresPerUnit : scale,
+        parts : physicalParts
+      },
+      recipeDocument : artifact.recipeDocument,
+      recipeDiagnostics : artifact.recipeDiagnostics,
+      cncJob : machiningJob(
+        artifact,
+        records,
+        scale,
+        programReader
+      ),
+      mobileBase : artifact.mobileBase,
+      missions : artifact.missions,
+      robotTools : artifact.robotTools,
+      robotSensors : artifact.robotSensors,
+      machineMotion : artifact.machineMotion,
+      controllers : artifact.controllers,
+      signals : artifact.signals,
+      printJob : artifact.printing
+    };
   }
 
   /**
@@ -161,7 +229,12 @@ class ProjectArtifactLoader {
    * the job sacrifices) do not collide: the stock simulation cuts and reports what touches them,
    * where physical contact would only stop the tool going in.
    */
-  static function machiningJob(artifact:SceneArtifactData, records:Array<SceneObjectData>, scale:Float, programReader:Null<String->Bytes>):Null<CncJob> {
+  static function machiningJob(
+    artifact:SceneArtifactData,
+    records:Array<SceneObjectData>,
+    scale:Float,
+    programReader:Null<String -> Bytes>
+  ):Null<CncJob> {
     var machining = artifact.machining;
     if (machining == null) return null;
     function partMesh(id:String):ArtifactIndexedMesh {
@@ -185,32 +258,46 @@ class ProjectArtifactLoader {
       }
       var materialId = stockPart.materialId, density = stockPart.materialDensity;
       var material = materialId == null ? "neutral" : materialId;
-      stockSources.push({occurrence: stock,
-        minimum: [for (value in low) value * scale], maximum: [for (value in high) value * scale],
-        center: [for (axis in 0...3) (low[axis] + high[axis]) * 0.5 * scale],
+      stockSources.push({
+        occurrence: stock,
+        minimum: [for (value in low) value * scale],
+        maximum: [for (value in high) value * scale],
+        center: [for (axis in 0...3)(low[axis] + high[axis]) * 0.5 * scale],
         density: density == null ? MaterialLibrary.require(material).physical.density : density,
-        mesh: partMesh(stockPart.id)});
+        mesh : partMesh(stockPart.id)
+      });
     }
     var entered = machining.sacrificial == null ? [] : machining.sacrificial.copy();
     for (stock in machining.stocks) entered.push(stock);
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
-    return {setupJoints:machining.setupJoints,kinematicPreview:machining.kinematicPreview,mission:machining.mission, source: materia.project.SceneArtifactProgram.resolve(machining,programReader), axes: machining.axes, spindle: machining.spindle,
-      channelScope: machining.channelScope, workOffset: machining.workOffset, workOffsets: machining.workOffsets, stockSpacing: machining.stockSpacing, targets: machining.targets == null ? null : [for (entry in machining.targets) {
-        var mesh=partMesh(entry.part), c=Math.cos(entry.angle), s=Math.sin(entry.angle);
-        var positions:Array<Float> = [];
-        for(i in 0...Std.int(mesh.positions.length/3)) {
-          var x=mesh.positions[i*3], y=mesh.positions[i*3+1];
-          positions.push(c*x-s*y+entry.position[0]); positions.push(s*x+c*y+entry.position[1]);
-          positions.push(mesh.positions[i*3+2]+entry.position[2]);
-        }
-        {id:entry.id,stock:entry.stock,positions:positions,indices:mesh.indices};
-      }], loop: machining.loop == true,
-      tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
-      stocks: machining.stocks.copy(), stockSources: stockSources, target: target == null ? null : partMesh(target),
-      toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller,
-      controllerId: machining.controllerId, powerUpOffsets: machining.powerUpOffsets,
-      powerUpSideOffsets: machining.powerUpSideOffsets};
+    return {setupJoints: machining.setupJoints, kinematicPreview: machining.kinematicPreview,
+      mission: machining.mission, source: materia.project.SceneArtifactProgram.resolve(
+        machining,
+        programReader
+      ), axes: machining.axes, spindle: machining.spindle, channelScope: machining.channelScope,
+      workOffset: machining.workOffset, workOffsets: machining.workOffsets, stockSpacing: machining.stockSpacing,
+      targets: machining.targets == null ? null : [for (entry in machining.targets) {
+      var mesh = partMesh(entry.part), c = Math.cos(entry.angle), s = Math.sin(entry.angle);
+      var positions:Array<Float> = [];
+      for (i in 0...Std.int(mesh.positions.length / 3)) {
+        var x = mesh.positions[i * 3], y = mesh.positions[i * 3 + 1];
+        positions.push(c * x - s * y + entry.position[0]);
+        positions.push(s * x + c * y + entry.position[1]);
+        positions.push(mesh.positions[i * 3 + 2] + entry.position[2]);
+      }
+      {
+        id:entry.id, stock:entry.stock, positions:positions, indices:mesh.indices
+      };
+    }
+    ], loop:machining.loop == true, tools:[for (tool in machining.tools) Tool.shaped(
+      tool.number,
+      tool.length,
+      CutterProfile.decode(tool.profile)
+    )], stocks:machining.stocks.copy(),
+      stockSources:stockSources, target:target == null ? null : partMesh(target), toolPart : machining.toolPart,
+      loadedTool : machining.loadedTool, controller : machining.controller, controllerId : machining.controllerId,
+      powerUpOffsets : machining.powerUpOffsets, powerUpSideOffsets : machining.powerUpSideOffsets};
   }
 
   /** An artifact part's triangles, with vertices at the same place welded into one. */
@@ -244,37 +331,81 @@ class ProjectArtifactLoader {
     return {positions: positions, indices: indices};
   }
 
-  static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
-      occurrenceId:String, definitionId:String, pose:Null<AssemblyFrame>, useCount:Null<Int>,
-      boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}>,
-      geometryKeyByDefinition:Map<String, String>, scale:Float):Void {
+  static function addOccurrenceRecord(
+    records:Array<SceneObjectData>,
+    component:SceneArtifactPart,
+    occurrenceId:String,
+    definitionId:String,
+    pose:Null<AssemblyFrame>,
+    useCount:Null<Int>,
+    boundsByDefinition:Map<
+      String,
+      {
+        minimum:Array<Float>,
+        maximum:Array<Float>
+      }
+  >,
+    geometryKeyByDefinition:Map<
+      String,
+      String
+  >,
+    scale:Float
+  ):Void {
     var bounds = boundsByDefinition.get(definitionId);
     if (bounds == null) throw 'Missing bounds for geometry definition "$definitionId"';
     var minimum = bounds.minimum, maximum = bounds.maximum;
     var centerX = (minimum[0] + maximum[0]) * 0.5;
     var centerY = (minimum[1] + maximum[1]) * 0.5;
     var centerZ = (minimum[2] + maximum[2]) * 0.5;
-    var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
-      : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
+    var center = pose == null ? {
+      x:centerX, y:centerY, z:centerZ
+    }
+    :AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
     var label = useCount != null && useCount > 1 ? component.name + " · " + occurrenceId : component.name;
-    var volume = component.volume == null
-      ? MeshMassProperties.compute(component.vertices, component.indices).volume : component.volume;
+    var volume = component.volume == null ? MeshMassProperties.compute(component.vertices,
+      component.indices).volume : component.volume;
     var materialId = component.materialId == null ? "neutral" : component.materialId;
-    var density = component.materialDensity == null
-      ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
-    var mass = component.physicalMassKg == null
-      ? volume * scale * scale * scale * density : cast component.physicalMassKg;
+    var density = component.materialDensity
+      == null ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
+    var mass = component.physicalMassKg
+      == null ? volume * scale * scale * scale * density : cast component.physicalMassKg;
     if (!Math.isFinite(mass) || mass < 0) throw 'Invalid mass for generated part "$occurrenceId"';
-    records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
-      x: center.x * scale, y: center.y * scale, z: center.z * scale,
-      width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
-      height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
-      depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
-      collisionEnabled: true, dynamicBody: false, mass: mass,
-      red: component.red, green: component.green, blue: component.blue,
-      appearance: component.appearance, materialId: component.materialId, visible: true,
+    records.push({
+      id: "project:" + occurrenceId,
+      label: label,
+      type: "cad-preview",
+      x: center.x * scale,
+      y: center.y * scale,
+      z: center.z * scale,
+      width: Math.max(
+        0.000001,
+        (maximum[0] - minimum[0]) * scale
+      ),
+      height: Math.max(
+        0.000001,
+        (maximum[1] - minimum[1]) * scale
+      ),
+      depth: Math.max(
+        0.000001,
+        (maximum[2] - minimum[2]) * scale
+      ),
+      collisionEnabled: true,
+      dynamicBody: false,
+      mass: mass,
+      red: component.red,
+      green: component.green,
+      blue: component.blue,
+      appearance: component.appearance,
+      materialId: component.materialId,
+      visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),
-      rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
+      rotation: pose == null ? null : [
+        pose.qx,
+        pose.qy,
+        pose.qz,
+        pose.qw
+      ]
+    });
   }
 
 

@@ -39,37 +39,41 @@ class PressBrakeControllerPlayer implements SessionMember {
 
   public function new(authored:SceneArtifactPressBrake, robot:AssemblyRobot, session:SimSession) {
     this.authored = JsonWire.decode(JsonWire.encode(authored));
-    this.robot = robot; this.session = session;
+    this.robot = robot;
+    this.session = session;
     readyAt = session.simulationTime() + session.fixedTimestep();
-    ram = joint(authored.ramJoint); depth = joint(authored.depthAxis); gaugeX = joint(authored.gaugeX);
+    ram = joint(authored.ramJoint);
+    depth = joint(authored.depthAxis);
+    gaugeX = joint(authored.gaugeX);
     gaugeR = authored.gaugeR == null ? null : joint(authored.gaugeR);
     cylinders = [];
     for (drive in robot.blueprint.cylinderDrives) {
-      var followsRam = [for (coupling in robot.blueprint.couplings)
-        if (coupling.leader == ram && coupling.follower == drive.joint) coupling].length > 0;
-      if (drive.control == robotkit.runtime.CylinderControl.FlowLimited && (drive.joint == ram || followsRam))
-        cylinders.push(drive);
+      var followsRam = [for (coupling in robot.blueprint.couplings) if (coupling.leader == ram
+        && coupling.follower == drive.joint) coupling].length > 0;
+      if (drive.control == robotkit.runtime.CylinderControl.FlowLimited
+        && (drive.joint == ram || followsRam)) cylinders.push(drive);
     }
-    if (cylinders.length == 0 || [for (drive in cylinders) if (drive.joint == ram) drive].length != 1)
-      throw "Press controller needs its hydraulic ram binding";
+    if (cylinders.length == 0 || [for (drive in cylinders) if (drive.joint
+      == ram) drive].length != 1) throw "Press controller needs its hydraulic ram binding";
     for (drive in cylinders) {
-      if (drive.channelB == null || drive.channelA != cylinders[0].channelA ||
-          drive.channelB != cylinders[0].channelB || drive.extendSign != 1)
-        throw "Press controller needs one shared closed-centre valve and downward-positive ram travel";
-      if (drive.joint != ram && [for (coupling in robot.blueprint.couplings)
-          if (coupling.leader == ram && coupling.follower == drive.joint && coupling.ratio == 1 && coupling.offset == 0) coupling].length != 1)
-        throw "Stop-controlled press cylinders must follow the measured ram";
+      if (drive.channelB == null
+        || drive.channelA != cylinders[0].channelA || drive.channelB != cylinders[0].channelB || drive.extendSign
+        != 1) throw "Press controller needs one shared closed-centre valve and downward-positive ram travel";
+      if (drive.joint != ram && [for (coupling in robot.blueprint.couplings) if (coupling.leader == ram
+        && coupling.follower == drive.joint && coupling.ratio == 1 && coupling.offset
+        == 0) coupling].length != 1) throw "Stop-controlled press cylinders must follow the measured ram";
     }
     for (id in [authored.topSwitch].concat(authored.fingerSwitches)) {
-      var found = [for (sensor in robot.blueprint.sensors) if (sensor.id == id && sensor.kind == "joint_switch") sensor];
+      var found = [for (sensor in robot.blueprint.sensors) if (sensor.id == id
+        && sensor.kind == "joint_switch") sensor];
       if (found.length != 1) throw 'Press controller lost measured switch "$id"';
     }
     for (step in authored.steps) {
-      bound(depth, step.depthTravelMm); bound(gaugeX, step.gaugeXmm);
+      bound(depth, step.depthTravelMm);
+      bound(gaugeX, step.gaugeXmm);
       bound(gaugeX, step.gaugeXmm + step.withdrawalMm);
       if (gaugeR != null) bound(gaugeR, step.gaugeRmm);
-      if (step.depthTravelMm * 0.001 > cylinders[0].stroke)
-        throw "Press program exceeds hydraulic travel";
+      if (step.depthTravelMm * 0.001 > cylinders[0].stroke) throw "Press program exceeds hydraulic travel";
     }
     logic = new PressBrakeInterface(authored.requestTimeoutSeconds);
   }
@@ -81,8 +85,8 @@ class PressBrakeControllerPlayer implements SessionMember {
 
   function bound(index:Int, mm:Float):Void {
     var limit = robot.model.joints[index].limits;
-    if (mm * 0.001 < limit.lower || mm * 0.001 > limit.upper)
-      throw 'Press program exceeds axis "${robot.model.joints[index].id}" travel';
+    if (mm * 0.001 < limit.lower
+      || mm * 0.001 > limit.upper) throw 'Press program exceeds axis "${robot.model.joints[index].id}" travel';
   }
 
   /** A request is sampled unchanged until the robot or script publishes a fresh image. */
@@ -93,29 +97,41 @@ class PressBrakeControllerPlayer implements SessionMember {
 
   public function robotId():String return robot.robot.id();
 
-  function closeTo(actual:Float, targetMm:Float):Bool
-    return Math.abs(actual * 1000 - targetMm) <= authored.positionToleranceMm;
+  function closeTo(actual:Float,
+    targetMm:Float):Bool return Math.abs(actual * 1000 - targetMm) <= authored.positionToleranceMm;
 
   function sensor(snapshot:RobotSnapshot, id:String):Null<Bool> {
     for (i in 0...snapshot.sensors.length) {
       var frame = snapshot.sensors.get(i);
       if (frame.sensorId == id) {
         if (frame.values.length != 1 || !Math.isFinite(frame.values.get(0))) {
-          fail(InvalidFeedback, 'Press switch "$id" has invalid feedback'); return null;
+          fail(InvalidFeedback, 'Press switch "$id" has invalid feedback');
+          return null;
         }
         return frame.values.get(0) >= 0.5;
       }
     }
-    fail(InvalidFeedback, 'Press switch "$id" has no sampled feedback'); return null;
+    fail(InvalidFeedback, 'Press switch "$id" has no sampled feedback');
+    return null;
   }
 
   function move(step:SceneArtifactPressBrakeStep, withdraw:Bool):Void {
     var ids = [authored.depthAxis, authored.gaugeX];
-    var point = [step.depthTravelMm * 0.001,
-      (step.gaugeXmm + (withdraw ? step.withdrawalMm : 0)) * 0.001];
-    if (authored.gaugeR != null) { ids.push(authored.gaugeR); point.push(step.gaugeRmm * 0.001); }
-    axes = new MachineProgramPlayer({axes: ids, waypoints: [point], loop: false,
-      positionTolerance: authored.positionToleranceMm * 0.001}, robot, session);
+    var point = [step.depthTravelMm * 0.001, (step.gaugeXmm + (withdraw ? step.withdrawalMm : 0)) * 0.001];
+    if (authored.gaugeR != null) {
+      ids.push(authored.gaugeR);
+      point.push(step.gaugeRmm * 0.001);
+    }
+    axes = new MachineProgramPlayer(
+      {
+        axes: ids,
+        waypoints: [point],
+        loop: false,
+        positionTolerance: authored.positionToleranceMm * 0.001
+      },
+      robot,
+      session
+    );
   }
 
   public function feed():Void {
@@ -126,39 +142,56 @@ class PressBrakeControllerPlayer implements SessionMember {
       return;
     }
     if (request.programStep < 0 || request.programStep >= authored.steps.length) {
-      fail(InvalidProgramStep, 'Unknown press program step ${request.programStep}'); return;
+      fail(InvalidProgramStep, 'Unknown press program step ${request.programStep}');
+      return;
     }
-    for (index in [ram, depth, gaugeX])
-      if (!Math.isFinite(snapshot.positions.get(index))) { fail(InvalidFeedback, "Press axis feedback is not finite"); return; }
+    for (index in [ram, depth, gaugeX]) if (!Math.isFinite(snapshot.positions.get(index))) {
+      fail(InvalidFeedback, "Press axis feedback is not finite");
+      return;
+    }
     if (gaugeR != null && !Math.isFinite(snapshot.positions.get(gaugeR))) {
-      fail(InvalidFeedback, "Press R feedback is not finite"); return;
+      fail(InvalidFeedback, "Press R feedback is not finite");
+      return;
     }
     for (cylinder in cylinders) if (!Math.isFinite(snapshot.efforts.get(cylinder.joint))) {
-      fail(InvalidFeedback, "Press cylinder effort feedback is not finite"); return;
+      fail(InvalidFeedback, "Press cylinder effort feedback is not finite");
+      return;
     }
     var prior = outputs;
     // Motion consumes events while it runs. The PLC keeps consuming between axis moves,
     // when sampled analogue outputs still generate native process events every tick.
     if (axes == null || !axes.motion.running) {
       var events = robot.runtime.pollEvents();
-      if (events.overflow) { fail(EventOverflow, "Press runtime process event queue overflowed"); return; }
+      if (events.overflow) {
+        fail(EventOverflow, "Press runtime process event queue overflowed");
+        return;
+      }
     }
     if (request.programStep != selected && (prior == null || prior.phase == Idle)) {
-      selected = request.programStep; configured = -1; axes = null; withdrawing = false;
+      selected = request.programStep;
+      configured = -1;
+      axes = null;
+      withdrawing = false;
     }
     var step = authored.steps[selected];
     if (configured != selected && (prior == null || prior.phase == Idle || prior.phase == Positioning)) {
       if (axes == null) move(step, false);
     }
     if (prior != null && prior.retractBackgauge && prior.alarm == None && !withdrawing) {
-      withdrawing = true; move(step, true);
+      withdrawing = true;
+      move(step, true);
     } else if (prior != null && (prior.phase == Idle || prior.phase == Positioning) && withdrawing) {
-      withdrawing = false; configured = -1; move(step, false);
+      withdrawing = false;
+      configured = -1;
+      move(step, false);
     }
     var moving = axes;
     if (moving != null && (prior == null || prior.alarm == None)) {
       moving.feed();
-      if (moving.failure != null) { fail(AxisMotionFailure, 'Press positioning failed: ${moving.failure}'); return; }
+      if (moving.failure != null) {
+        fail(AxisMotionFailure, 'Press positioning failed: ${moving.failure}');
+        return;
+      }
       if (moving.passes > 0 && !withdrawing) configured = selected;
     }
     // Establish axis control before the first physics tick; switch frames arrive afterwards.
@@ -182,14 +215,33 @@ class PressBrakeControllerPlayer implements SessionMember {
     var closingForce = 0.0;
     for (cylinder in cylinders) closingForce += snapshot.efforts.get(cylinder.joint) * cylinder.extendSign;
     var releaseOrigin = releaseFromMm;
-    var unloaded = !wasClosing || releaseOrigin != null && travelMm <= releaseOrigin - authored.releaseTravelMm &&
-      Math.max(0, closingForce) <= authored.releaseClosingForceN &&
-      prior != null && (prior.phase == Decompressing || prior.phase == Opening || prior.phase == Idle || prior.phase == Positioning);
-    var image = new PressBrakeInput(request.requestStroke, request.requestClampOnly, request.requestOpen,
-      request.programStep, request.clear, request.holding, request.faultReset, request.safetyReady,
-      fingerLeft, fingerRight,
-      configured < 0 ? selected : configured, registered, depthInPosition, withdrawn,
-      atTop, atClamp, atBottom, unloaded, travelMm);
+    var unloaded = !wasClosing
+      || releaseOrigin != null && travelMm <= releaseOrigin - authored.releaseTravelMm && Math.max(
+        0,
+        closingForce
+      ) <= authored.releaseClosingForceN && prior != null
+      && (prior.phase == Decompressing || prior.phase == Opening || prior.phase == Idle || prior.phase == Positioning);
+    var image = new PressBrakeInput(
+      request.requestStroke,
+      request.requestClampOnly,
+      request.requestOpen,
+      request.programStep,
+      request.clear,
+      request.holding,
+      request.faultReset,
+      request.safetyReady,
+      fingerLeft,
+      fingerRight,
+      configured < 0 ? selected : configured,
+      registered,
+      depthInPosition,
+      withdrawn,
+      atTop,
+      atClamp,
+      atBottom,
+      unloaded,
+      travelMm
+    );
     var result = logic.update(image, session.fixedTimestep());
     outputs = result;
     if (result.alarm != None && (prior == null || prior.alarm == None)) {
@@ -217,28 +269,48 @@ class PressBrakeControllerPlayer implements SessionMember {
     robot.runtime.writeDigitalOutput(PressBrakeChannels.AT_BOTTOM, image.atBottom);
     robot.runtime.writeDigitalOutput(PressBrakeChannels.DECOMPRESSED, image.decompressed);
     robot.runtime.writeDigitalOutput(PressBrakeChannels.ALARM, image.alarm != None);
-    robot.runtime.writeOutput(PressBrakeChannels.ALARM_CODE, robotkit.execution.ProcessEventValue.Analog(PressBrakeChannels.alarmCode(image.alarm)));
-    robot.runtime.writeOutput(PressBrakeChannels.RAM_POSITION_MM, robotkit.execution.ProcessEventValue.Analog(image.ramPositionMm));
+    robot.runtime.writeOutput(
+      PressBrakeChannels.ALARM_CODE,
+      robotkit.execution.ProcessEventValue.Analog(PressBrakeChannels.alarmCode(image.alarm))
+    );
+    robot.runtime.writeOutput(
+      PressBrakeChannels.RAM_POSITION_MM,
+      robotkit.execution.ProcessEventValue.Analog(image.ramPositionMm)
+    );
   }
 
   function fail(alarm:PressBrakeAlarm, message:String):Void {
-    failure = message; logic.trip(alarm);
+    failure = message;
+    logic.trip(alarm);
     if (axes != null) axes.beforeReset();
     robot.robot.stop(robotkit.core.StopMode.Normal);
     // Retain the last measured feedback; a hosting failure cannot supply a new sample.
     var measured = outputs;
     var nativeReady = robot.robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY;
     if (measured != null) {
-      outputs = new PressBrakeOutputs(Fault, logic.alarm, Hold, false,
-        measured.backgaugeInPosition, measured.atTop, false, measured.atBottom,
-        measured.decompressed, false, measured.ramPositionMm);
+      outputs = new PressBrakeOutputs(
+        Fault,
+        logic.alarm,
+        Hold,
+        false,
+        measured.backgaugeInPosition,
+        measured.atTop,
+        false,
+        measured.atBottom,
+        measured.decompressed,
+        false,
+        measured.ramPositionMm
+      );
       if (nativeReady) publish(outputs);
     }
     if (measured == null || !nativeReady) {
       robot.runtime.writeDigitalOutput(PressBrakeChannels.READY, false);
       robot.runtime.writeDigitalOutput(PressBrakeChannels.ALARM, true);
-      robot.runtime.writeOutput(PressBrakeChannels.ALARM_CODE,
-        robotkit.execution.ProcessEventValue.Analog(PressBrakeChannels.alarmCode(nativeReady ? logic.alarm : RuntimeFailure)));
+      robot.runtime.writeOutput(
+        PressBrakeChannels.ALARM_CODE,
+        robotkit.execution.ProcessEventValue.Analog(PressBrakeChannels.alarmCode(nativeReady
+        ? logic.alarm : RuntimeFailure))
+      );
     }
     robot.runtime.writeDigitalOutput(cylinders[0].channelA, false);
     var channelB = cylinders[0].channelB;
@@ -252,9 +324,17 @@ class PressBrakeControllerPlayer implements SessionMember {
   }
   public function reset():Void {
     logic = new PressBrakeInterface(authored.requestTimeoutSeconds);
-    request = new PressBrakeRobotRequest(); selected = 0; configured = -1;
-    axes = null; withdrawing = false; wasClosing = false; releaseFromMm = null; outputs = null; failure = null;
+    request = new PressBrakeRobotRequest();
+    selected = 0;
+    configured = -1;
+    axes = null;
+    withdrawing = false;
+    wasClosing = false;
+    releaseFromMm = null;
+    outputs = null;
+    failure = null;
     readyAt = session.simulationTime() + session.fixedTimestep();
   }
-  public function present():Void {}
+  public function present():Void {
+  }
 }

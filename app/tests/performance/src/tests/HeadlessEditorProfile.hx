@@ -56,27 +56,26 @@ private typedef InputProbe = {
 }
 
 /** Replays real editor input through UiContext without a window or X server. */
-@:access(app.EditorScene)
-class HeadlessEditorProfile {
+@:access(app.EditorScene) class HeadlessEditorProfile {
   static var profileSpans = false;
   static var frameGc = FrameGcScheduler.fromEnvironment();
   static var idleSeconds = 0.0;
   static var idleMarkMicros = 0.0;
   static function main():Int {
     try {
-      if (Sys.args().length < 2 || Sys.args().length > 4)
-        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|inspector-edits|selection-stress|tab-matrix|primitives] [HEAP_DUMP_PATH]";
+      if (Sys.args().length < 2 || Sys.args().length
+        > 4) throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|inspector-edits|selection-stress|tab-matrix|primitives] [HEAP_DUMP_PATH]";
       var output = Sys.args()[0];
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
-      var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
-        Sys.args()[2] == "inspector-edits" ||
-        Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop" || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag") ? Sys.args()[2] : "tab-inspector";
-      if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
-        throw "Unknown headless scenario: " + Sys.args()[2];
-      var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
-        Sys.args().length == 3 && Sys.args()[2] != scenario ? Sys.args()[2] : null;
+      var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector"
+        || Sys.args()[2] == "inspector-edits" || Sys.args()[2] == "selection-stress" || Sys.args()[2] == "tab-matrix"
+        || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop"
+        || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag") ? Sys.args()[2] : "tab-inspector";
+      if (Sys.args().length == 4 && scenario == "tab-inspector"
+        && Sys.args()[2] != "tab-inspector") throw "Unknown headless scenario: " + Sys.args()[2];
+      var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] : Sys.args().length == 3
+        && Sys.args()[2] != scenario ? Sys.args()[2] : null;
       if (!FileSystem.exists(output)) FileSystem.createDirectory(output);
       run(output, cycles, scenario, heapDumpPath);
       return 0;
@@ -118,8 +117,7 @@ class HeadlessEditorProfile {
       } else if (scenario == "primitives") {
         runPrimitives(editor);
       } else if (scenario == "tab-matrix") {
-        var groups = [["hierarchy", "sensors"],
-          ["console", "telemetry"]];
+        var groups = [["hierarchy", "sensors"], ["console", "telemetry"]];
         for (cycle in 0...cycles) {
           for (group in groups) for (from in group) for (to in group) {
             if (from == to) continue;
@@ -165,17 +163,25 @@ class HeadlessEditorProfile {
         submit(editor, frame, frames, "rename");
         action(actions, "rename", 0);
         var box = editor.scene.object("box");
-        if (box == null || box.label != "Profile box")
-          throw "Inspector rename did not commit";
+        if (box == null || box.label != "Profile box") throw "Inspector rename did not commit";
       }
       File.saveContent(output + "/frame-timeline.jsonl", frames.join("\n") + "\n");
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
-      File.saveContent(output + "/frame-gc.json", Json.stringify({enabled: frameGc.enabled,
-        idleCollections: frameGc.idleCollections, forcedCollections: frameGc.forcedCollections,
-        idleSeconds: idleSeconds, idleMarkMicros: idleMarkMicros, totalCollections: hl.Gc.collections(),
-        totalMarkMicros: hl.Gc.markMicros(), maxPauseMicros: hl.Gc.maxPauseMicros()}));
+      File.saveContent(
+        output + "/frame-gc.json",
+        Json.stringify({
+          enabled: frameGc.enabled,
+          idleCollections: frameGc.idleCollections,
+          forcedCollections: frameGc.forcedCollections,
+          idleSeconds: idleSeconds,
+          idleMarkMicros: idleMarkMicros,
+          totalCollections: hl.Gc.collections(),
+          totalMarkMicros: hl.Gc.markMicros(),
+          maxPauseMicros: hl.Gc.maxPauseMicros()
+        })
+      );
       if (censusInterval > 0) {
         hl.Gc.censusStop();
         hl.Gc.censusDump(cast haxe.io.Bytes.ofString(output + "/census.json").getData());
@@ -196,13 +202,17 @@ class HeadlessEditorProfile {
     fonts.dispose();
   }
 
-  static function runInspectorEditScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
-      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+  static function runInspectorEditScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
     click(editor, "inspector");
     submit(editor, frame, frames, "setup:inspector");
     var initialBox = editor.scene.object("box");
-    if (initialBox == null)
-      throw "Inspector property edit scenario has no box object";
+    if (initialBox == null) throw "Inspector property edit scenario has no box object";
     var initialVisible = initialBox.visible;
     var initialX = initialBox.x;
     for (cycle in 0...cycles) {
@@ -226,8 +236,7 @@ class HeadlessEditorProfile {
       submit(editor, frame, frames, "property-position", cycle, positionInput);
       action(actions, "property-position", cycle);
       var validMetrics = editor.ui.frameMetrics;
-      if (validMetrics == null)
-        throw "Inspector property edit scenario has no valid frame metrics";
+      if (validMetrics == null) throw "Inspector property edit scenario has no valid frame metrics";
       var validPositionNodes = validMetrics.nodeCount;
 
       var invalidInput = measuredClick(editor, positionKey, "property-invalid");
@@ -237,22 +246,28 @@ class HeadlessEditorProfile {
       submit(editor, frame, frames, "property-invalid", cycle, invalidInput);
       action(actions, "property-invalid", cycle);
       var invalidMetrics = editor.ui.frameMetrics;
-      if (invalidMetrics == null || invalidMetrics.nodeCount <= validPositionNodes)
-        throw "Inspector validation error did not reach the submitted tree";
+      if (invalidMetrics == null || invalidMetrics.nodeCount
+        <= validPositionNodes) throw "Inspector validation error did not reach the submitted tree";
     }
     var box = editor.scene.object("box");
     var boxVisibleToggles = Std.int((cycles + 1) / 2);
     var expectedVisible = boxVisibleToggles % 2 == 0 ? initialVisible : !initialVisible;
-    if (box == null || box.x == initialX || box.visible != expectedVisible)
-      throw "Inspector property edit scenario did not apply the expected values";
+    if (box == null || box.x == initialX
+      || box.visible != expectedVisible) throw "Inspector property edit scenario did not apply the expected values";
   }
 
   /**
    * Frames driven by pointer and keyboard input that leave the tree structure alone: what a user does most of the time.
    * Each action reports the bytes allocated across the input events and the frame, and whether a frame was needed.
    */
-  static function runInteractionScenario(editor:ReferenceEditorApp, frame:LayoutFrame, output:String,
-      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+  static function runInteractionScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    output:String,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
     click(editor, "inspector");
     submit(editor, frame, frames, "setup:inspector");
     var nameKey = propertyEditorKey(editor, "name");
@@ -265,15 +280,15 @@ class HeadlessEditorProfile {
     var subtreeNodes:Array<Float> = [];
     // MATERIA_INTERACTION_ONLY=hover-enter,hover-other limits the run to those actions (for the allocation census); the other actions are skipped entirely.
     var only = Sys.getEnv("MATERIA_INTERACTION_ONLY");
-    var measure = function(name:String, input:Void->Void) {
-      if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0)
-        return;
+    var measure = function(name:String, input:Void -> Void) {
+      if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0) return;
       var before = hl.Gc.totalAllocated();
       var stateRevision = editor.ui.stateStore.revision;
       input();
       if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)) {
         var changed = editor.ui.stateStore.idsChangedSince(stateRevision);
-        Sys.println("state-changes " + name + ": " + [for (id in changed) editor.ui.stateStore.describe(new haxeon.ui.core.WidgetId(id))].join(" | "));
+        Sys.println("state-changes " + name
+          + ": " + [for (id in changed) editor.ui.stateStore.describe(new haxeon.ui.core.WidgetId(id))].join(" | "));
       }
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
@@ -300,9 +315,11 @@ class HeadlessEditorProfile {
       var beforeY = targetCenter(editor, nameKey, false).y;
       measure("scroll-inspector", function() editor.ui.scroll(field.x, field.y, 0.0, 30.0 * wobble));
       // A scroll must still move the content: it is applied by layout feedback, not by rebuilding.
-      if (cycle == 0 && (only == null || only.length == 0) && targetCenter(editor, nameKey, false).y == beforeY)
-        throw "Scrolling the inspector did not move its content";
-      measure("idle", function() {});
+      if (cycle == 0 && (only == null || only.length == 0) && targetCenter(editor,
+        nameKey, false).y == beforeY) throw "Scrolling the inspector did not move its content";
+      measure("idle", function() {
+      }
+      );
       action(actions, "interaction", cycle);
     }
     // Focused: typing into the inspector's name field.
@@ -326,15 +343,22 @@ class HeadlessEditorProfile {
         }
       }
       measure("type-backspace", function() editor.ui.key(UiEventKind.KeyDown, UiKey.Backspace));
-      measure("idle-focused", function() {});
+      measure("idle-focused", function() {
+      }
+      );
       action(actions, "typing", cycle);
     }
     var lines:Array<Dynamic> = [];
     for (name in order) {
       var values = results.get(name).slice(Std.int(cycles / 4));
       values.sort(function(a, b) return a < b ? -1 : a > b ? 1 : 0);
-      lines.push({action: name, medianBytes: values[Std.int(values.length / 2)],
-        maxBytes: values[values.length - 1], dirtyFrames: dirtyCounts.get(name), cycles: cycles});
+      lines.push({
+        action: name,
+        medianBytes: values[Std.int(values.length / 2)],
+        maxBytes: values[values.length - 1],
+        dirtyFrames: dirtyCounts.get(name),
+        cycles: cycles
+      });
     }
     File.saveContent(output + "/interaction.json", Json.stringify(lines));
   }
@@ -342,18 +366,25 @@ class HeadlessEditorProfile {
   /** The tab group holding `panelId`, or null when it is not docked. */
   static function tabGroupOf(node:DockNode, panelId:String):Null<Array<String>> {
     switch (node) {
-      case DockNode.Panel(id): return id == panelId ? [id] : null;
-      case DockNode.Tabs(ids, _): return ids.indexOf(panelId) >= 0 ? ids : null;
+      case DockNode.Panel(id):
+        return id == panelId ? [id] : null;
+      case DockNode.Tabs(ids, _):
+        return ids.indexOf(panelId) >= 0 ? ids : null;
       case DockNode.Split(_, _, first, second):
         var found = tabGroupOf(first, panelId);
         return found != null ? found : tabGroupOf(second, panelId);
-      case DockNode.Empty: return null;
+      case DockNode.Empty:
+        return null;
     }
   }
 
   /** Drags a tab onto another pane's tab strip and checks the dock model moved it: the drop targets must survive retained panes. */
-  static function runDockDragScenario(editor:ReferenceEditorApp, frame:LayoutFrame, frames:Array<String>,
-      actions:Array<String>):Void {
+  static function runDockDragScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
     // Warm every pane's cache first: hover each tab so a stale retained pane would show up during the drag.
     for (name in ["hierarchy", "sensors", "console", "telemetry"]) {
       var at = targetCenter(editor, name, true);
@@ -362,7 +393,8 @@ class HeadlessEditorProfile {
     }
     submit(editor, frame, frames, "warm:settle");
     var before = tabGroupOf(editor.workspace.root, "console");
-    if (before == null || before.indexOf("hierarchy") >= 0) throw "Drag scenario expects console and hierarchy in different panes";
+    if (before == null
+      || before.indexOf("hierarchy") >= 0) throw "Drag scenario expects console and hierarchy in different panes";
     var source = targetCenter(editor, "console", true);
     var target = targetCenter(editor, "hierarchy", true);
     editor.ui.pointerDown(source.x, source.y, 0);
@@ -376,13 +408,13 @@ class HeadlessEditorProfile {
     submit(editor, frame, frames, "drag:up");
     submit(editor, frame, frames, "drag:settle");
     var after = tabGroupOf(editor.workspace.root, "console");
-    if (after == null || after.indexOf("hierarchy") < 0)
-      throw "Dragging a tab onto another pane's strip did not dock it there: " + Std.string(after);
+    if (after == null || after.indexOf("hierarchy")
+      < 0) throw "Dragging a tab onto another pane's strip did not dock it there: " + Std.string(after);
     action(actions, "dock-drag", 0);
     Sys.println("dock-drag: console docked with " + after.join(","));
   }
 
-  static function targetCenter(editor:ReferenceEditorApp, key:String, tab:Bool):{x:Float, y:Float} {
+  static function targetCenter(editor:ReferenceEditorApp, key:String, tab:Bool): {x: Float, y: Float} {
     var root = editor.ui.root;
     if (root == null) throw "UI tree is not ready";
     var node = findByStyleKey(root, key, tab);
@@ -391,11 +423,16 @@ class HeadlessEditorProfile {
     return {x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2};
   }
 
-  static function propertyEditorKey(editor:ReferenceEditorApp, property:String):String
-    return "editor:" + editor.scene.selectedId + ":object:" + property;
+  static function propertyEditorKey(editor:ReferenceEditorApp,
+    property:String):String return "editor:" + editor.scene.selectedId + ":object:" + property;
 
-  static function runSelectionStressScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
-      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+  static function runSelectionStressScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
     click(editor, "inspector");
     submit(editor, frame, frames, "setup:inspector");
     for (cycle in 0...cycles) {
@@ -407,13 +444,18 @@ class HeadlessEditorProfile {
   }
 
   /** Exercises the expensive editor boundaries called out in the architecture plan. */
-  static function runArchitectureScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
-      output:String, cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+  static function runArchitectureScenario(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    output:String,
+    cycles:Int,
+    frames:Array<String>,
+    actions:Array<String>
+  ):Void {
     var started = Sys.time();
     editor.scene.createBracket();
     var bracketId = editor.scene.selectedId;
-    for (cycle in 0...cycles)
-      editor.scene.setBracketWallThickness(bracketId, 0.003 + (cycle % 7) * 0.0001);
+    for (cycle in 0...cycles) editor.scene.setBracketWallThickness(bracketId, 0.003 + (cycle % 7) * 0.0001);
     action(actions, "cad-parameter-edits", 0);
     submit(editor, frame, frames, "architecture:cad-parameter-edits", 0);
     var cadSeconds = Sys.time() - started;
@@ -435,18 +477,32 @@ class HeadlessEditorProfile {
     var records:Array<SceneObjectData> = [];
     for (index in 0...10000) {
       var moving = index < 500;
-      records.push({id:"stress-" + index, label:"Stress object " + index,
-        type:"rectangle", x:(index % 100) * 0.15, y:Std.int(index / 100) * 0.15, z:0.0,
-        width:0.1, height:0.1, depth:0.1, collisionEnabled:true,
-        dynamicBody:moving, mass:1.0, red:0.3, green:0.5, blue:0.7, visible:true});
+      records.push({
+        id: "stress-" + index,
+        label: "Stress object " + index,
+        type: "rectangle",
+        x: (index % 100) * 0.15,
+        y: Std.int(index / 100) * 0.15,
+        z: 0.0,
+        width: 0.1,
+        height: 0.1,
+        depth: 0.1,
+        collisionEnabled: true,
+        dynamicBody: moving,
+        mass: 1.0,
+        red: 0.3,
+        green: 0.5,
+        blue: 0.7,
+        visible: true
+      });
     }
     started = Sys.time();
     var sceneLoadPhases = new Map<String, Float>();
     var candidate = new EditorScene(records, null, sceneLoadPhases);
     var sceneLoadSeconds = Sys.time() - started;
     var sceneLoadPhaseSummary = candidate.loadProfileSummary();
-    if (candidate.objects.length != records.length)
-      throw 'Loaded ${candidate.objects.length} scene objects from ${records.length} records';
+    if (candidate.objects.length
+      != records.length) throw 'Loaded ${candidate.objects.length} scene objects from ${records.length} records';
     action(actions, "load-10k-scene", 0);
 
     started = Sys.time();
@@ -455,9 +511,11 @@ class HeadlessEditorProfile {
     action(actions, "single-object-nudge", 0);
 
     started = Sys.time();
-    for (cycle in 0...cycles) for (index in 0...500)
-      candidate.setPositionXY("stress-" + index,
-        (index % 100) * 0.15 + cycle * 0.001, Std.int(index / 100) * 0.15);
+    for (cycle in 0...cycles) for (index in 0...500) candidate.setPositionXY(
+      "stress-" + index,
+      (index % 100) * 0.15 + cycle * 0.001,
+      Std.int(index / 100) * 0.15
+    );
     var movingSeconds = Sys.time() - started;
     action(actions, "move-500-objects", 0);
 
@@ -467,13 +525,23 @@ class HeadlessEditorProfile {
     for (cycle in 0...1000) {
       var fromX = previousX;
       var nextX = 0.25 + (cycle % 2) * 0.01;
-      candidate.document.apply(new EditOperation("Stress move " + cycle,
-        function() candidate.setPositionXY("stress-9999", nextX, position.y),
-        function() candidate.setPositionXY("stress-9999", fromX, position.y)));
+      candidate.document.apply(new EditOperation(
+        "Stress move " + cycle,
+        function() candidate.setPositionXY(
+          "stress-9999",
+          nextX,
+          position.y
+        ),
+        function() candidate.setPositionXY(
+          "stress-9999",
+          fromX,
+          position.y
+        )
+      ));
       previousX = nextX;
     }
-    if (candidate.document.history.undoCount < 1000)
-      throw 'Expected 1,000 distinct moves, found ${candidate.document.history.undoCount}';
+    if (candidate.document.history.undoCount
+      < 1000) throw 'Expected 1,000 distinct moves, found ${candidate.document.history.undoCount}';
     started = Sys.time();
     for (_ in 0...1000) if (!candidate.document.undo()) throw "Undo history ended during stress scenario";
     var undo1000Seconds = Sys.time() - started;
@@ -488,14 +556,12 @@ class HeadlessEditorProfile {
     var structuralHistorySeconds = Sys.time() - started;
     var structuralAllocatedBytes = hl.Gc.totalAllocated() - structuralAllocatedBefore;
     var structuralHistoryOperations = candidate.document.history.undoCount;
-    if (structuralHistoryOperations != 40)
-      throw 'Expected 40 structural history entries, found $structuralHistoryOperations';
+    if (structuralHistoryOperations
+      != 40) throw 'Expected 40 structural history entries, found $structuralHistoryOperations';
     for (_ in 0...40) if (!candidate.document.undo()) throw "Structural history ended before undo";
-    if (candidate.objects.length != 10000)
-      throw "Structural history undo did not restore the 10,000-object scene";
+    if (candidate.objects.length != 10000) throw "Structural history undo did not restore the 10,000-object scene";
     for (_ in 0...40) if (!candidate.document.redo()) throw "Structural history ended before redo";
-    if (candidate.objects.length != 10000)
-      throw "Structural history redo did not restore the 10,000-object scene";
+    if (candidate.objects.length != 10000) throw "Structural history redo did not restore the 10,000-object scene";
     var structuralHistoryEstimatedBytes = candidate.document.history.estimatedRetainedBytes;
     action(actions, "structural-history-40-edits", 0);
 
@@ -567,14 +633,18 @@ class HeadlessEditorProfile {
     for (index in 1...500) {
       var link = editor.sensors.model.addLink(new robotkit.model.Link("Profile link " + index,
         "profile/link-" + index));
-      var joint = new robotkit.model.Joint("Profile joint " + index,
-        robotkit.model.JointType.Fixed, editor.sensors.model.links[index - 1], link,
-        "profile/joint-" + index);
+      var joint = new robotkit.model.Joint(
+        "Profile joint " + index,
+        robotkit.model.JointType.Fixed,
+        editor.sensors.model.links[index - 1],
+        link,
+        "profile/joint-" + index
+      );
       joint.childFramePosition = [0.1, 0.0, 0.0];
       editor.sensors.model.addJoint(joint);
     }
-    if (!editor.simulation.rebuild(editor.sensors, editor.scene))
-      throw "500-link simulation profile could not build: " + editor.simulation.error;
+    if (!editor.simulation.rebuild(editor.sensors,
+      editor.scene)) throw "500-link simulation profile could not build: " + editor.simulation.error;
     for (cycle in 0...cycles) {
       editor.simulation.step();
       editor.simulation.capturePresentationSnapshot();
@@ -584,43 +654,51 @@ class HeadlessEditorProfile {
     editor.simulation.stop();
 
     var projectHistory = editor.session.document.history;
-    for (_ in 0...1100)
-      editor.session.document.apply(new EditOperation("History operation limit", function() {}, function() {}));
+    for (_ in 0...1100) editor.session.document.apply(new EditOperation("History operation limit", function() {
+    }, function() {
+    }
+    ));
     var budgetedOperationCount = projectHistory.undoCount;
-    for (_ in 0...3) editor.session.document.apply(new EditOperation("History byte limit",
-      function() {}, function() {}, null, null, null,
-      Std.int(ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES * 3 / 4)));
+    for (_ in 0...3) editor.session.document.apply(new EditOperation("History byte limit", function() {
+    }, function() {
+    }, null, null, null, Std.int(ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES * 3 / 4)));
     var budgetedEstimatedBytes = projectHistory.estimatedRetainedBytes;
-    if (budgetedOperationCount != ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
-        projectHistory.undoCount > ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
-        projectHistory.undoCount != 1 ||
-        budgetedEstimatedBytes > ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES)
-      throw "Project edit history exceeded its configured budget";
-    if (!projectHistory.undo() || !projectHistory.redo() ||
-        projectHistory.estimatedRetainedBytes != budgetedEstimatedBytes)
-      throw "Project history budget accounting changed across undo/redo";
+    if (budgetedOperationCount != ProjectDocumentSession.MAX_HISTORY_OPERATIONS || projectHistory.undoCount
+      > ProjectDocumentSession.MAX_HISTORY_OPERATIONS || projectHistory.undoCount != 1 || budgetedEstimatedBytes
+      > ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES) throw "Project edit history exceeded its configured budget";
+    if (!projectHistory.undo() || !projectHistory.redo() || projectHistory.estimatedRetainedBytes
+      != budgetedEstimatedBytes) throw "Project history budget accounting changed across undo/redo";
     action(actions, "project-history-budget", 0);
-    File.saveContent(output + "/architecture-summary.json", haxe.Json.stringify({
-      sceneObjects: records.length, movingObjects: 500, articulatedLinks: 500,
-      cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
-      sceneLoadSeconds: sceneLoadSeconds,
-      sceneLoadPhases: sceneLoadPhaseSummary,
-      singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
-      undo1000Seconds: undo1000Seconds,
-      structuralHistoryOperations: structuralHistoryOperations,
-      structuralHistorySeconds: structuralHistorySeconds,
-      structuralAllocatedBytes: structuralAllocatedBytes,
-      structuralHistoryEstimatedBytes: structuralHistoryEstimatedBytes,
-      staticPickMedianSeconds: staticPickMedianSeconds,
-      emptyViewMedianSeconds: emptyViewMedianSeconds,
-      viewBuildMedianSeconds: viewBuildMedianSeconds,
-      viewPickMedianSeconds: viewPickMedianSeconds,
-      budgetedOperationCount: budgetedOperationCount,
-      budgetedFinalOperationCount: projectHistory.undoCount,
-      budgetedEstimatedBytes: budgetedEstimatedBytes,
-      spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
-      spatialIndexMedianSeconds: spatialIndexMedianSeconds,
-      spatialCacheSamples: snapshotSamples.length}));
+    File.saveContent(
+      output + "/architecture-summary.json",
+      haxe.Json.stringify({
+        sceneObjects: records.length,
+        movingObjects: 500,
+        articulatedLinks: 500,
+        cycles: cycles,
+        cadParameterSeconds: cadSeconds,
+        bimOpeningSeconds: bimSeconds,
+        sceneLoadSeconds: sceneLoadSeconds,
+        sceneLoadPhases: sceneLoadPhaseSummary,
+        singleObjectNudgeSeconds: nudgeSeconds,
+        movingObjectEditsSeconds: movingSeconds,
+        undo1000Seconds: undo1000Seconds,
+        structuralHistoryOperations: structuralHistoryOperations,
+        structuralHistorySeconds: structuralHistorySeconds,
+        structuralAllocatedBytes: structuralAllocatedBytes,
+        structuralHistoryEstimatedBytes: structuralHistoryEstimatedBytes,
+        staticPickMedianSeconds: staticPickMedianSeconds,
+        emptyViewMedianSeconds: emptyViewMedianSeconds,
+        viewBuildMedianSeconds: viewBuildMedianSeconds,
+        viewPickMedianSeconds: viewPickMedianSeconds,
+        budgetedOperationCount: budgetedOperationCount,
+        budgetedFinalOperationCount: projectHistory.undoCount,
+        budgetedEstimatedBytes: budgetedEstimatedBytes,
+        spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
+        spatialIndexMedianSeconds: spatialIndexMedianSeconds,
+        spatialCacheSamples: snapshotSamples.length
+      })
+    );
   }
 
   static function medianDuration(samples:Array<Float>):Float {
@@ -629,49 +707,128 @@ class HeadlessEditorProfile {
   }
 
   static function retainedCounts(editor:ReferenceEditorApp, cycle:Int):String {
-    return Json.stringify({cycle: cycle, workspaceListeners: editor.workspace.listenerCount,
+    return Json.stringify({
+      cycle: cycle,
+      workspaceListeners: editor.workspace.listenerCount,
       state: editor.ui.stateStore.diagnosticCounts(),
       styles: editor.ui.buildContext.styleResolver.diagnosticCounts(),
-      keys: editor.ui.buildContext.diagnosticKeyCounts()});
+      keys: editor.ui.buildContext.diagnosticKeyCounts()
+    });
   }
 
-  static function measurePrimitive(name:String, n:Int, body:Int->Void):Void {
+  static function measurePrimitive(name:String, n:Int, body:Int -> Void):Void {
     for (i in 0...200) body(i);
     var before = hl.Gc.totalAllocated();
     var started = Sys.time();
     for (i in 0...n) body(i);
     var elapsed = Sys.time() - started;
     var bytes = (hl.Gc.totalAllocated() - before) / n;
-    Sys.println(StringTools.rpad(name, " ", 34) + " " + StringTools.lpad(Std.string(Math.round(bytes)), " ", 7) + " B/op  "
-      + StringTools.lpad(Std.string(Math.round(elapsed * 1000000000.0 / n)), " ", 8) + " ns/op");
+    Sys.println(StringTools.rpad(name,
+      " ", 34) + " " + StringTools.lpad(Std.string(Math.round(bytes)), " ", 7) + " B/op  " + StringTools.lpad(
+        Std.string(Math.round(elapsed * 1000000000.0 / n)),
+        " ",
+        8
+      ) + " ns/op");
   }
 
   static function runPrimitives(editor:ReferenceEditorApp):Void {
     var ctx = editor.ui.buildContext;
     var n = 5000;
     measurePrimitive("beginFrame", n, function(i) ctx.beginFrame());
-    measurePrimitive("withScope(Key) empty", n, function(i) { ctx.beginFrame(); ctx.withScope(new haxeon.ui.core.Key("a"), function() return 1); });
-    measurePrimitive("scope + id", n, function(i) { ctx.beginFrame(); ctx.withScope(new haxeon.ui.core.Key("a"), function() return ctx.id("x")); });
+    measurePrimitive("withScope(Key) empty", n, function(i) {
+      ctx.beginFrame();
+      ctx.withScope(new haxeon.ui.core.Key("a"), function() return 1);
+    }
+    );
+    measurePrimitive("scope + id", n, function(i) {
+      ctx.beginFrame();
+      ctx.withScope(new haxeon.ui.core.Key("a"), function() return ctx.id("x"));
+    }
+    );
     measurePrimitive("new WidgetId", n, function(i) new haxeon.ui.core.WidgetId(i + 1));
-    measurePrimitive("new RenderNode", n, function(i) new RenderNode(new haxeon.ui.core.WidgetId(i + 1), LayoutVisualKind.Box, null));
-    measurePrimitive("new StyleTarget", n, function(i) new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0));
+    measurePrimitive(
+      "new RenderNode",
+      n,
+      function(i) new RenderNode(
+        new haxeon.ui.core.WidgetId(i + 1),
+        LayoutVisualKind.Box,
+        null
+      )
+    );
+    measurePrimitive(
+      "new StyleTarget",
+      n,
+      function(i) new haxeon.ui.style.StyleTarget(
+        "button",
+        "k",
+        "k",
+        ["a"],
+        ["button"],
+        0
+      )
+    );
     var target = new haxeon.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
-    measurePrimitive("resolve (cache hit)", n, function(i) ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment));
-    var computed = ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment);
+    measurePrimitive(
+      "resolve (cache hit)",
+      n,
+      function(i) ctx.styleResolver.resolve(
+        target,
+        ctx.inheritedStyle,
+        ctx.theme.styles,
+        ctx.styleSheet,
+        null,
+        ctx.environment
+      )
+    );
+    var computed = ctx.styleResolver.resolve(
+      target,
+      ctx.inheritedStyle,
+      ctx.theme.styles,
+      ctx.styleSheet,
+      null,
+      ctx.environment
+    );
     measurePrimitive("computed.toLayoutStyle", n, function(i) computed.toLayoutStyle());
     measurePrimitive("new LayoutStyle", n, function(i) new LayoutStyle());
-    measurePrimitive("new Semantics", n, function(i) new haxeon.ui.semantics.Semantics(haxeon.ui.semantics.AccessibilityRole.Button, "x"));
-    measurePrimitive("Text widget build", n, function(i) { ctx.beginFrame(); new haxeon.ui.widgets.text.Text("hello").build(ctx); });
-    measurePrimitive("Button widget build", n, function(i) { ctx.beginFrame(); new haxeon.ui.widgets.controls.Button("Label", null, null, "b").build(ctx); });
-    measurePrimitive("resolveTextRole", n, function(i) ctx.resolveTextRole(haxeon.ui.theme.TextRole.Button, haxeon.ui.core.TextStyleOverride.paragraph(TextWrap.None)));
+    measurePrimitive(
+      "new Semantics",
+      n,
+      function(i) new haxeon.ui.semantics.Semantics(
+        haxeon.ui.semantics.AccessibilityRole.Button,
+        "x"
+      )
+    );
+    measurePrimitive("Text widget build", n, function(i) {
+      ctx.beginFrame();
+      new haxeon.ui.widgets.text.Text("hello").build(ctx);
+    }
+    );
+    measurePrimitive("Button widget build", n, function(i) {
+      ctx.beginFrame();
+      new haxeon.ui.widgets.controls.Button("Label", null, null, "b").build(ctx);
+    }
+    );
+    measurePrimitive(
+      "resolveTextRole",
+      n,
+      function(i) ctx.resolveTextRole(
+        haxeon.ui.theme.TextRole.Button,
+        haxeon.ui.core.TextStyleOverride.paragraph(TextWrap.None)
+      )
+    );
   }
 
-  static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,
-      output:Array<String>, actionName:String, ?cycle:Int, ?input:InputProbe):Void {
+  static function submit(
+    editor:ReferenceEditorApp,
+    frame:LayoutFrame,
+    output:Array<String>,
+    actionName:String,
+    ?cycle:Int,
+    ?input:InputProbe
+  ):Void {
     var subtrees:Array<Dynamic> = [];
     editor.ui.buildContext.buildProbe = function(name, preparationSeconds, buildSeconds, nodes) {
-      subtrees.push({name: name, preparationSeconds: preparationSeconds,
-        buildSeconds: buildSeconds, nodeCount: nodes});
+      subtrees.push({name: name, preparationSeconds: preparationSeconds, buildSeconds: buildSeconds, nodeCount: nodes});
     };
     if (profileSpans && input != null) haxeon.ProfileSpan.begin("tab/" + actionName + "/frame");
     var started = Sys.time();
@@ -707,38 +864,42 @@ class HeadlessEditorProfile {
       submitGcMarkMicros = markAfter - input.markAfter;
     }
     output.push(Json.stringify({
-      frame: metrics.frameNumber, action: actionName, cycle: cycle,
+      frame: metrics.frameNumber,
+      action: actionName,
+      cycle: cycle,
       inputSeconds: input == null ? null : input.seconds,
-      inputPhases: input == null ? null : input.phases,
-      allocatedBytes: allocatedBytes, gcCollections: gcCollections,
-      gcMarkMicros: gcMarkMicros,
-      inputAllocatedBytes: inputAllocatedBytes,
-      inputGcCollections: inputGcCollections,
-      inputGcMarkMicros: inputGcMarkMicros,
-      submitAllocatedBytes: submitAllocatedBytes,
-      submitGcCollections: submitGcCollections,
-      submitGcMarkMicros: submitGcMarkMicros,
-      startedAtSeconds: started,
-      frameGcEnabled: frameGc.enabled,
-      frameSeconds: elapsed, submitSeconds: metrics.submitSeconds,
-      viewAllocatedBytes: metrics.viewAllocatedBytes,
-      treeBuildAllocatedBytes: metrics.treeBuildAllocatedBytes,
-      treeCompareAllocatedBytes: metrics.treeCompareAllocatedBytes,
-      treeSyncAllocatedBytes: metrics.treeSyncAllocatedBytes,
-      layoutReuseAllocatedBytes: metrics.layoutReuseAllocatedBytes,
-      treeAndStyleAllocatedBytes: metrics.treeAndStyleAllocatedBytes,
-      nativeLayoutAllocatedBytes: metrics.nativeLayoutAllocatedBytes,
-      reconcileAllocatedBytes: metrics.reconcileAllocatedBytes,
-      viewSeconds: metrics.viewSeconds,
-      treeAndStyleSeconds: metrics.treeAndStyleSeconds,
-      nativeLayoutSeconds: metrics.nativeLayoutSeconds,
-      reconcileSeconds: metrics.reconcileSeconds,
-      nodeCount: metrics.nodeCount,
-      styleResolutions: metrics.styleResolutions,
-      styleCacheHits: metrics.styleCacheHits,
-      styleCacheMisses: metrics.styleCacheMisses,
-      styleChangedNodes: metrics.styleChangedNodes,
-      subtrees: subtrees
+      inputPhases : input == null ? null : input.phases,
+      allocatedBytes : allocatedBytes,
+      gcCollections : gcCollections,
+      gcMarkMicros : gcMarkMicros,
+      inputAllocatedBytes : inputAllocatedBytes,
+      inputGcCollections : inputGcCollections,
+      inputGcMarkMicros : inputGcMarkMicros,
+      submitAllocatedBytes : submitAllocatedBytes,
+      submitGcCollections : submitGcCollections,
+      submitGcMarkMicros : submitGcMarkMicros,
+      startedAtSeconds : started,
+      frameGcEnabled : frameGc.enabled,
+      frameSeconds : elapsed,
+      submitSeconds : metrics.submitSeconds,
+      viewAllocatedBytes : metrics.viewAllocatedBytes,
+      treeBuildAllocatedBytes : metrics.treeBuildAllocatedBytes,
+      treeCompareAllocatedBytes : metrics.treeCompareAllocatedBytes,
+      treeSyncAllocatedBytes : metrics.treeSyncAllocatedBytes,
+      layoutReuseAllocatedBytes : metrics.layoutReuseAllocatedBytes,
+      treeAndStyleAllocatedBytes : metrics.treeAndStyleAllocatedBytes,
+      nativeLayoutAllocatedBytes : metrics.nativeLayoutAllocatedBytes,
+      reconcileAllocatedBytes : metrics.reconcileAllocatedBytes,
+      viewSeconds : metrics.viewSeconds,
+      treeAndStyleSeconds : metrics.treeAndStyleSeconds,
+      nativeLayoutSeconds : metrics.nativeLayoutSeconds,
+      reconcileSeconds : metrics.reconcileSeconds,
+      nodeCount : metrics.nodeCount,
+      styleResolutions : metrics.styleResolutions,
+      styleCacheHits : metrics.styleCacheHits,
+      styleCacheMisses : metrics.styleCacheMisses,
+      styleChangedNodes : metrics.styleChangedNodes,
+      subtrees : subtrees
     }));
     // The interaction is over; a real host would now be idle.
     if (input != null) {
@@ -759,10 +920,16 @@ class HeadlessEditorProfile {
     var phases = click(editor, key);
     var seconds = Sys.time() - started;
     if (profileSpans) haxeon.ProfileSpan.end("tab/" + actionName + "/input");
-    return {seconds: seconds, phases: phases,
-      allocatedBefore: allocatedBefore, allocatedAfter: hl.Gc.totalAllocated(),
-      collectionsBefore: collectionsBefore, collectionsAfter: hl.Gc.collections(),
-      markBefore: markBefore, markAfter: hl.Gc.markMicros()};
+    return {
+      seconds: seconds,
+      phases: phases,
+      allocatedBefore: allocatedBefore,
+      allocatedAfter: hl.Gc.totalAllocated(),
+      collectionsBefore: collectionsBefore,
+      collectionsAfter: hl.Gc.collections(),
+      markBefore: markBefore,
+      markAfter: hl.Gc.markMicros()
+    };
   }
 
   static function click(editor:ReferenceEditorApp, key:String):ClickPhases {
@@ -770,45 +937,57 @@ class HeadlessEditorProfile {
     var root = editor.ui.root;
     if (root == null) throw "UI tree is not ready";
     var node = findByStyleKey(root, key, key.indexOf("editor:") != 0);
-    if (node == null || node.resolved == null)
-      throw "Benchmark target is unavailable: " + key;
+    if (node == null || node.resolved == null) throw "Benchmark target is unavailable: " + key;
     var lookupDone = Sys.time();
     var bounds = node.resolved.clippedViewportBounds();
-    if (bounds.width <= 0 || bounds.height <= 0)
-      throw "Benchmark target is outside the viewport: " + key;
+    if (bounds.width <= 0 || bounds.height <= 0) throw "Benchmark target is outside the viewport: " + key;
     var x = bounds.x + bounds.width / 2;
     var y = bounds.y + bounds.height / 2;
     var boundsDone = Sys.time();
     editor.ui.pointerDown(x, y, 0);
     var downDone = Sys.time();
-    var eventPhases:PointerUpPhases = {hitTestSeconds: 0.0,
-      pointerDispatchSeconds: 0.0, clickDispatchSeconds: 0.0,
-      clickCaptureSeconds: 0.0, clickTargetSeconds: 0.0,
+    var eventPhases:PointerUpPhases = {
+      hitTestSeconds: 0.0,
+      pointerDispatchSeconds: 0.0,
+      clickDispatchSeconds: 0.0,
+      clickCaptureSeconds: 0.0,
+      clickTargetSeconds: 0.0,
       clickBubbleSeconds: 0.0,
-      hoverSeconds: 0.0};
+      hoverSeconds: 0.0
+    };
     editor.ui.events.pointerUpProbe = function(stage, seconds) {
       switch (stage) {
-        case "hitTestSeconds": eventPhases.hitTestSeconds = seconds;
-        case "pointerDispatchSeconds": eventPhases.pointerDispatchSeconds = seconds;
-        case "clickDispatchSeconds": eventPhases.clickDispatchSeconds = seconds;
-        case "clickCaptureSeconds": eventPhases.clickCaptureSeconds = seconds;
-        case "clickTargetSeconds": eventPhases.clickTargetSeconds = seconds;
-        case "clickBubbleSeconds": eventPhases.clickBubbleSeconds = seconds;
-        case "hoverSeconds": eventPhases.hoverSeconds = seconds;
+        case "hitTestSeconds":
+          eventPhases.hitTestSeconds = seconds;
+        case "pointerDispatchSeconds":
+          eventPhases.pointerDispatchSeconds = seconds;
+        case "clickDispatchSeconds":
+          eventPhases.clickDispatchSeconds = seconds;
+        case "clickCaptureSeconds":
+          eventPhases.clickCaptureSeconds = seconds;
+        case "clickTargetSeconds":
+          eventPhases.clickTargetSeconds = seconds;
+        case "clickBubbleSeconds":
+          eventPhases.clickBubbleSeconds = seconds;
+        case "hoverSeconds":
+          eventPhases.hoverSeconds = seconds;
       }
     };
     editor.ui.pointerUp(x, y, 0);
     editor.ui.events.pointerUpProbe = null;
     var upDone = Sys.time();
-    return {lookupSeconds: lookupDone - lookupStarted,
+    return {
+      lookupSeconds: lookupDone - lookupStarted,
       boundsSeconds: boundsDone - lookupDone,
       pointerDownSeconds: downDone - boundsDone,
-      pointerUpSeconds: upDone - downDone, eventPhases: eventPhases};
+      pointerUpSeconds: upDone - downDone,
+      eventPhases: eventPhases
+    };
   }
 
   static function findByStyleKey(node:RenderNode, key:String, tab:Bool):Null<RenderNode> {
-    if (node.styleKey == key && (!tab || node.semantics != null &&
-        node.semantics.role == AccessibilityRole.Tab)) return node;
+    if (node.styleKey == key
+      && (!tab || node.semantics != null && node.semantics.role == AccessibilityRole.Tab)) return node;
     for (child in node.children) {
       var found = findByStyleKey(child, key, tab);
       if (found != null) return found;
@@ -817,7 +996,6 @@ class HeadlessEditorProfile {
   }
 
   static function action(output:Array<String>, name:String, cycle:Int):Void {
-    output.push(Json.stringify({action: name, cycle: cycle,
-      timeSeconds: Sys.time()}));
+    output.push(Json.stringify({action: name, cycle: cycle, timeSeconds: Sys.time()}));
   }
 }

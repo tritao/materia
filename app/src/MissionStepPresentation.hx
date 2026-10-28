@@ -13,20 +13,33 @@ class MissionStepPresentation {
 
   public static function label(step:SceneArtifactMissionStep):String {
     var action = switch step.kind {
-      case "goTo": "Move base";
-      case "pick": "Pick";
-      case "place": "Place";
-      case "moveJoints": "Move joints";
-      case "findWork": "Locate workpiece";
-      case "weld": "Weld seam";
-      case "stow": "Return arm";
-      case "screw": step.screw == null ? "Drive screw" : switch step.screw {
-        case Single(_): "Drive screw";
-		case Required(_): "Drive screw";
-        case Snug(_,_): "Snug screw";
-        case Final(_): "Final tightening";
-      };
-      default: step.kind;
+      case "goTo":
+        "Move base";
+      case "pick":
+        "Pick";
+      case "place":
+        "Place";
+      case "moveJoints":
+        "Move joints";
+      case "findWork":
+        "Locate workpiece";
+      case "weld":
+        "Weld seam";
+      case "stow":
+        "Return arm";
+      case "screw":
+        step.screw == null ? "Drive screw" : switch step.screw {
+          case Single(_):
+            "Drive screw";
+          case Required(_):
+            "Drive screw";
+          case Snug(_, _):
+            "Snug screw";
+          case Final(_):
+            "Final tightening";
+        };
+      default:
+        step.kind;
     };
     var target = targetOf(step);
     return action + (target == null ? "" : " · " + target);

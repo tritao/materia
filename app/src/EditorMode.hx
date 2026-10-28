@@ -20,6 +20,6 @@ class EditorMode {
     this.icon = icon;
   }
 
-  public function layout():DockNode
-    return this == Simulate ? EditorWorkspaceLayout.simulateLayout() : EditorWorkspaceLayout.defaultLayout();
+  public function layout():DockNode return this
+    == Simulate ? EditorWorkspaceLayout.simulateLayout() : EditorWorkspaceLayout.defaultLayout();
 }

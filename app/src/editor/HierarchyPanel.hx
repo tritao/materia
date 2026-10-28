@@ -16,8 +16,7 @@ import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.text.Text;
 
 /** Hierarchy dock panel. */
-@:access(app.Main.ReferenceEditorApp)
-class HierarchyPanel {
+@:access(app.Main.ReferenceEditorApp) class HierarchyPanel {
   public static inline var SIMULATION_LOCK_HINT:String = "Simulation active. Press Design to edit.";
 
   public static function build(app:ReferenceEditorApp):View {
@@ -43,8 +42,8 @@ class HierarchyPanel {
     treeStyle.background = app.appearance.theme.tokens.surface;
     treeStyle.childGap = 6.0;
     var treeViewport = ReferenceEditorApp.fillStyle();
-    var tree = new TreeView(app.hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
-      app.treeModel, treeViewport, app.treeModel.scrollController, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
+    var tree = new TreeView(app.hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered", app.treeModel,
+      treeViewport, app.treeModel.scrollController, 420.0, app.treeModel.selectionKey(), ["scene"], function(id) {
       app.treeModel.selectKey(id);
       app.log("Selected " + id);
       app.invalidateView();
@@ -54,7 +53,10 @@ class HierarchyPanel {
       app.log("Framed " + id);
     }, null, null);
     app.treeModel.canChangeVisibility = function() return !app.documents.blocked();
-    app.treeModel.onVisibilityChanged = function() {app.commands.refresh();app.invalidateView();};
+    app.treeModel.onVisibilityChanged = function() {
+      app.commands.refresh();
+      app.invalidateView();
+    };
     tree.onStateReady = app.treeModel.synchronizeSelection;
     tree.onExpandedChanged = function(_, _) app.hierarchyExpansionRevision++;
     tree.onItemContextMenu = function(id, event) {
@@ -66,29 +68,53 @@ class HierarchyPanel {
     };
     tree.onItemRename = app.startRename;
     var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("SCENE"))];
-    if (app.simulation.isActive()) rows.push(new KeyedView("simulation-hint",
-      new Text(SIMULATION_LOCK_HINT, null, app.appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0))));
-    return new Column(
-      "hierarchy-panel",
-      rows.concat([
-        new KeyedView("actions", new Row("scene-object-actions", [
-          new KeyedView("add", addButton),
-          new KeyedView("duplicate", app.sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
-          new KeyedView("delete", app.sceneAction("scene-delete", "scene.delete", "", IconName.Trash))
-        ], ReferenceEditorApp.actionRowStyle())),
-        new KeyedView("search", new SearchField("hierarchy-search", app.hierarchySearch, function(value) {
-          app.hierarchySearch = value;
-          app.treeModel.setFilter(value);
-          app.invalidateView();
-        }, null, "Search objects...")),
-        new KeyedView(
-          "tree",
-          new HierarchyTreeView(tree, function() {if(tree.selectedKey!=null && !app.documents.blocked())app.treeModel.toggleVisibility(tree.selectedKey);})
-        )
-      ]),
-      treeStyle
-    );
+    if (app.simulation.isActive()) rows.push(new KeyedView(
+      "simulation-hint",
+      new Text(
+        SIMULATION_LOCK_HINT,
+        null,
+        app.appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)
+      )
+    ));
+    return new Column("hierarchy-panel", rows.concat([new KeyedView(
+      "actions",
+      new Row(
+        "scene-object-actions",
+        [
+          new KeyedView(
+            "add",
+            addButton
+          ),
+          new KeyedView(
+            "duplicate",
+            app.sceneAction(
+              "scene-duplicate",
+              "scene.duplicate",
+              "",
+              IconName.Copy
+            )
+          ),
+          new KeyedView(
+            "delete",
+            app.sceneAction(
+              "scene-delete",
+              "scene.delete",
+              "",
+              IconName.Trash
+            )
+          )
+        ],
+        ReferenceEditorApp.actionRowStyle()
+      )
+    ), new KeyedView("search", new SearchField("hierarchy-search", app.hierarchySearch, function(value) {
+      app.hierarchySearch = value;
+      app.treeModel.setFilter(value);
+      app.invalidateView();
+    }, null, "Search objects...")), new KeyedView("tree", new HierarchyTreeView(tree, function() {
+      if (tree.selectedKey != null && !app.documents.blocked()) app.treeModel.toggleVisibility(tree.selectedKey);
+    }
+    ))]), treeStyle);
   }
 
 }

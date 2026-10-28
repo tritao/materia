@@ -13,8 +13,8 @@ class ScriptCanonicalJson {
     if (Reflect.isObject(value) && !Std.isOfType(value, String)) {
       var names = Reflect.fields(value);
       names.sort(Reflect.compare);
-      return "{" + [for (name in names) Json.stringify(name) + ":"
-        + encode(Reflect.field(value, name))].join(",") + "}";
+      return "{" + [for (name in names) Json.stringify(name) + ":" + encode(Reflect.field(value,
+        name))].join(",") + "}";
     }
     return Json.stringify(value);
   }

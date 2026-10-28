@@ -21,8 +21,7 @@ import nativekit.scene.MaterialData;
 import nativekit.scene.ChangeSet;
 
 /** SceneKit resources, renderer changes, and hover presentation state. */
-@:access(app.EditorScene)
-class ScenePresentation {
+@:access(app.EditorScene) class ScenePresentation {
   public final sourceFaces:SourceFacePresentation = new SourceFacePresentation();
   public final threads:CosmeticThreadPresentation = new CosmeticThreadPresentation();
   public var bridge:SceneBridge;
@@ -50,7 +49,10 @@ class ScenePresentation {
   public function new() bridge = new SceneBridge();
 
   public function queueRenderChanges(changes:ChangeSet):Void {
-    if (renderNeedsRefresh) { changes.dispose(); return; }
+    if (renderNeedsRefresh) {
+      changes.dispose();
+      return;
+    }
     if (pendingRenderChanges != null) {
       pendingRenderChanges.dispose();
       pendingRenderChanges = null;
@@ -94,8 +96,10 @@ class ScenePresentation {
         spatialFullRebuildCount = spatialFullRebuildCount + 1;
       }
     } catch (_:Dynamic) {
-      if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
-      if (next != null) try next.dispose() catch (_:Dynamic) {}
+      if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {
+      }
+      if (next != null) try next.dispose() catch (_:Dynamic) {
+      }
       presentationStale = true;
       return;
     }
@@ -104,8 +108,10 @@ class ScenePresentation {
     snapshot = next;
     if (nextSpatial != null) spatial = nextSpatial;
     presentationStale = false;
-    if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {}
-    try previousSnapshot.dispose() catch (_:Dynamic) {}
+    if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {
+    }
+    try previousSnapshot.dispose() catch (_:Dynamic) {
+    }
   }
 
   /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
@@ -139,8 +145,7 @@ class ScenePresentation {
   }
 
   /** Common face-hover geometry boundary for live CAD and serialized preview objects. */
-  function faceHoverGeometry(owner:EditorScene, id:String, item:EditorSceneObject,
-      faceIndex:Int):Null<GeometryData> {
+  function faceHoverGeometry(owner:EditorScene, id:String, item:EditorSceneObject, faceIndex:Int):Null<GeometryData> {
     if (EditorScene.isCadKind(item.kind)) {
       var session = owner.cadSessions.get(id);
       if (session == null) return null;
@@ -156,14 +161,21 @@ class ScenePresentation {
         throw error;
       }
     }
-    if (item.kind == "cad-preview" && item.meshSnapshot != null)
-      return owner.previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
+    if (item.kind == "cad-preview"
+      && item.meshSnapshot != null) return owner.previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
     return null;
   }
 
-  public function configureRenderView(owner:EditorScene, view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
-      ?collisions:Array<app.SceneCollision.SceneCollisionPair>, cosmeticThreads:Bool = true):SceneView {
+  public function configureRenderView(
+    owner:EditorScene,
+    view:SceneView,
+    viewProjection:Transform,
+    ?poses:Array<SimulationPoseVisual>,
+    ?hoveredId:String,
+    ?hoveredFaceIndex:Int = -1,
+    ?collisions:Array<app.SceneCollision.SceneCollisionPair>,
+    cosmeticThreads:Bool = true
+  ):SceneView {
     if (cosmeticThreads) threads.ensure(owner);
     view.setViewProjection(viewProjection);
     view.clearDiagnosticTints();
@@ -172,8 +184,10 @@ class ScenePresentation {
       // object keep their own highlight.
       var colliding = new Map<String, Bool>();
       for (pair in collisions) {
-        if (pair.colliding()) { colliding.set(pair.a, true); colliding.set(pair.b, true); }
-        else {
+        if (pair.colliding()) {
+          colliding.set(pair.a, true);
+          colliding.set(pair.b, true);
+        } else {
           if (!colliding.exists(pair.a)) colliding.set(pair.a, false);
           if (!colliding.exists(pair.b)) colliding.set(pair.b, false);
         }
@@ -186,23 +200,23 @@ class ScenePresentation {
         }
       }
     }
-    var selectedObjects=owner.selectionObjects;
-    var selectedIds=selectedObjects==null ? [owner.selectedId] : selectedObjects();
+    var selectedObjects = owner.selectionObjects;
+    var selectedIds = selectedObjects == null ? [owner.selectedId] : selectedObjects();
     var selection = new SelectionSet();
-    var selectedKeys:Map<String,Bool> = [];
-    for(id in selectedIds)selectedKeys.set(id,true);
-    for(selected in owner.objects) {
-      if(!selectedKeys.exists(selected.id))continue;
+    var selectedKeys:Map<String, Bool> = [];
+    for (id in selectedIds) selectedKeys.set(id, true);
+    for (selected in owner.objects) {
+      if (!selectedKeys.exists(selected.id)) continue;
       var workerVisual = owner.workerVisuals.get(selected.id);
       var selectedMaterial = selectionMaterial;
       if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node, selectedMaterial);
       else for (node in workerVisual.character.model.primitiveNodes) selection.add(node, selectedMaterial);
     }
     view.applySelection(selection, selectionMaterial);
-    sourceFaces.apply(owner,view);
+    sourceFaces.apply(owner, view);
     var highlightMaterial = hoverMaterial;
-    var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
-      ? null : faceHoverNodes.get(hoveredId);
+    var faceHoverNode = hoveredId == null
+      || hoveredFaceIndex == null || hoveredFaceIndex < 0 ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
     if (faceHoverShown) {
       // The face node is hidden in the scene and shown only in this presentation view.
@@ -212,10 +226,8 @@ class ScenePresentation {
       var hovered = hoveredId == null ? null : owner.object(hoveredId);
       // A worker's own node is an invisible pick proxy; highlight the character it stands for.
       var hoveredWorker = hovered == null ? null : owner.workerVisuals.get(hovered.id);
-      if (hoveredWorker != null)
-        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, highlightMaterial);
-      else
-        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, highlightMaterial);
+      if (hoveredWorker != null) view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, highlightMaterial);
+      else view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, highlightMaterial);
     }
     threads.show(owner, view, cosmeticThreads);
     if (poses != null) {
@@ -242,12 +254,21 @@ class ScenePresentation {
           poseTransforms.push(transform);
           // Native view overrides are per-node, so cached child meshes need the
           // live parent pose composed with their local display transform too.
-          for(node in owner.runtimePartNodes(pose.id)){
-            var child=owner.renderSnapshot().findNode(node);
-            if(child!=null){poseNodes.push(node);poseTransforms.push(transform.multiplied(child.localTransform()));}
+          for (node in owner.runtimePartNodes(pose.id)) {
+            var child = owner.renderSnapshot().findNode(node);
+            if (child != null) {
+              poseNodes.push(node);
+              poseTransforms.push(transform.multiplied(child.localTransform()));
+            }
           }
-          for(entry in sourceFaces.entries)if(entry.id==pose.id){poseNodes.push(entry.node);poseTransforms.push(transform);}
-          for (node in threads.nodesFor(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
+          for (entry in sourceFaces.entries) if (entry.id == pose.id) {
+            poseNodes.push(entry.node);
+            poseTransforms.push(transform);
+          }
+          for (node in threads.nodesFor(pose.id)) {
+            poseNodes.push(node);
+            poseTransforms.push(transform);
+          }
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
           if (faceHoverShown && pose.id == hoveredId) {
@@ -261,8 +282,8 @@ class ScenePresentation {
     return view;
   }
 
-  public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>,
-      kind:String = ""):MaterialData {
+  public static function materialFor(red:Float,
+    green:Float, blue:Float, appearance:Null<Appearance>, kind:String = ""):MaterialData {
     var finish = appearance == null ? Appearances.neutral() : appearance;
     var result = MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
     var material = materia.project.MaterialLibrary.get(finish.finish);

@@ -15,14 +15,17 @@ typedef GeneratedAssemblyScene = {
   @:optional var presentationGeometryFingerprint:String;
   @:optional var presentation:materia.presentation.AssemblyPresentation;
   var objects:Array<SceneObjectData>;
-  var geometryBySnapshot:Map<String, GeometryData>;
+  var geometryBySnapshot:Map<String,
+  GeometryData>;
   var assemblyDefinition:Null<AssemblyDefinition>;
   var assemblyState:Null<AssemblyStateRecord>;
   /** Immutable topology and compiled kinematics reused when installing or reconfiguring the scene. */
   @:optional var assemblyModel:cadkit.modeling.CompiledAssembly;
-  var localCentersByDefinition:Map<String, Array<Float>>;
+  var localCentersByDefinition:Map<String,
+  Array<Float>>;
   /** What each definition's faces offer a mate (`GeometricConnectors.describeFaces`), when the project wrote it. */
-  @:optional var faceDescriptorsByDefinition:Map<String, String>;
+  @:optional var faceDescriptorsByDefinition:Map<String,
+  String>;
   var metresPerUnit:Float;
   var physical:AssemblyPhysicalData;
   var recipeDocument:Null<String>;

@@ -41,7 +41,10 @@ class StartExamplePreview {
         case "3D printing":
           // A frame, a gantry with a nozzle over a bed, and a part rising on it.
           path.moveTo(59, 74).lineTo(59, 14).lineTo(190, 14).lineTo(190, 74);
-          path.moveTo(59, 26).lineTo(190, 26).moveTo(113, 26).lineTo(113, 40).lineTo(124, 54).lineTo(135, 40).lineTo(135, 26);
+          path.moveTo(59, 26).lineTo(190, 26).moveTo(113, 26).lineTo(113, 40).lineTo(124, 54).lineTo(135, 40).lineTo(
+            135,
+            26
+          );
           path.moveTo(78, 72).lineTo(171, 72).moveTo(105, 72).lineTo(105, 62).lineTo(144, 62).lineTo(144, 72);
         case "CAD & design":
           path.moveTo(83, 34).lineTo(131, 15).lineTo(178, 34).lineTo(178, 64).lineTo(131, 81).lineTo(83, 64).close();

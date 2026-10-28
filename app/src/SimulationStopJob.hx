@@ -19,7 +19,7 @@ class SimulationStopJob {
     launch(function() simulation.quiesceForStop());
   }
 
-  function launch(action:Void->Void):Void {
+  function launch(action:Void -> Void):Void {
     mutex.acquire();
     ready = false;
     mutex.release();
@@ -46,7 +46,7 @@ class SimulationStopJob {
     if (!complete) return false;
     if (problem != null) throw problem;
     if (detached) return true;
-    var releases:Array<Void->Void> = [];
+    var releases:Array<Void -> Void> = [];
     var detachFailure:Null<String> = null;
     try simulation.clearWithReleases(releases) catch (error:Dynamic) detachFailure = Std.string(error);
     detached = true;
@@ -56,7 +56,8 @@ class SimulationStopJob {
         try release() catch (error:Dynamic) if (first == null) first = Std.string(error);
       }
       if (first != null) throw first;
-    });
+    }
+    );
     return false;
   }
 

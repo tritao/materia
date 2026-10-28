@@ -20,9 +20,10 @@ class ProjectLoadControl {
   var measurements:Array<{name:String, milliseconds:Float}> = [];
   var timings:Array<{phase:String, milliseconds:Float}> = [];
   var cancelRequested:Bool = false;
-  var running:Null<Void->Void> = null;
+  var running:Null<Void -> Void> = null;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function phase(text:String):Void {
     mutex.acquire();
@@ -68,7 +69,8 @@ class ProjectLoadControl {
     cancelRequested = true;
     var process = running;
     mutex.release();
-    if (process != null) try process() catch (_:Dynamic) {}
+    if (process != null) try process() catch (_:Dynamic) {
+    }
   }
 
   public function throwIfCancelled():Void {
@@ -76,12 +78,13 @@ class ProjectLoadControl {
   }
 
   /** Installs the execution adapter's cancellation action. Invoked outside the mutex. */
-  public function attachCancellation(action:Void->Void):Void {
+  public function attachCancellation(action:Void -> Void):Void {
     mutex.acquire();
     running = action;
     var stop = cancelRequested;
     mutex.release();
-    if (stop) try action() catch (_:Dynamic) {}
+    if (stop) try action() catch (_:Dynamic) {
+    }
   }
 
   public function detach():Void {
@@ -97,7 +100,8 @@ class ProjectLoadControl {
     running = function() process.kill();
     var stop = cancelRequested;
     mutex.release();
-    if (stop) try process.kill() catch (_:Dynamic) {}
+    if (stop) try process.kill() catch (_:Dynamic) {
+    }
   }
 
   public function attachChild(process:sys.io.ChildProcess):Void {
@@ -105,7 +109,8 @@ class ProjectLoadControl {
     running = function() process.cancel();
     var stop = cancelRequested;
     mutex.release();
-    if (stop) try process.cancel() catch (_:Dynamic) {}
+    if (stop) try process.cancel() catch (_:Dynamic) {
+    }
   }
 
   #end

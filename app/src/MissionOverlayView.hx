@@ -28,7 +28,8 @@ class MissionOverlayView {
   /** Segments added to the path being built; a path with none cannot be stroked. */
   var appended:Int = 0;
 
-  public function new() {}
+  public function new() {
+  }
 
   /** What to draw from now on; null draws nothing. */
   public function set(next:Null<MissionOverlay>):Void {
@@ -49,7 +50,12 @@ class MissionOverlayView {
     var drawn = overlay;
     if (drawn == null) return;
     appended = 0;
-    var blocked = switch drawn.guard { case Blocked(_): true; case _: false; };
+    var blocked = switch drawn.guard {
+      case Blocked(_):
+        true;
+      case _:
+        false;
+    };
 
     var wall = new PathBuilder();
     var index = 0;
@@ -64,9 +70,16 @@ class MissionOverlayView {
     stroke(canvas, sensed, Color.rgba(1.0, 0.3, 0.85, 0.9), 2.0);
 
     var route = new PathBuilder();
-    for (point in 1...drawn.route.length)
-      segment(route, camera, width, height, drawn.route[point - 1].x, drawn.route[point - 1].y,
-        drawn.route[point].x, drawn.route[point].y);
+    for (point in 1...drawn.route.length) segment(
+      route,
+      camera,
+      width,
+      height,
+      drawn.route[point - 1].x,
+      drawn.route[point - 1].y,
+      drawn.route[point].x,
+      drawn.route[point].y
+    );
     stroke(canvas, route, blocked ? Color.rgba(1.0, 0.2, 0.2, 0.95) : Color.rgba(1.0, 0.8, 0.2, 0.95), 2.0);
 
     var ghost = new PathBuilder();
@@ -76,7 +89,16 @@ class MissionOverlayView {
       segment(ghost, camera, width, height, corners[corner].x, corners[corner].y, next.x, next.y);
     }
     var at = drawn.odometry;
-    if (at != null) segment(ghost, camera, width, height, at.x, at.y, at.x + 0.3 * Math.cos(at.yaw), at.y + 0.3 * Math.sin(at.yaw));
+    if (at != null) segment(
+      ghost,
+      camera,
+      width,
+      height,
+      at.x,
+      at.y,
+      at.x + 0.3 * Math.cos(at.yaw),
+      at.y + 0.3 * Math.sin(at.yaw)
+    );
     stroke(canvas, ghost, Color.rgba(0.6, 0.85, 1.0, 0.9), 1.5);
   }
 
@@ -92,8 +114,16 @@ class MissionOverlayView {
       for (step in 0...CIRCLE_SEGMENTS) {
         var from = start + Math.PI * step / CIRCLE_SEGMENTS;
         var to = start + Math.PI * (step + 1) / CIRCLE_SEGMENTS;
-        segment(path, camera, width, height, centre.x + r * Math.cos(from), centre.y + r * Math.sin(from),
-          centre.x + r * Math.cos(to), centre.y + r * Math.sin(to));
+        segment(
+          path,
+          camera,
+          width,
+          height,
+          centre.x + r * Math.cos(from),
+          centre.y + r * Math.sin(from),
+          centre.x + r * Math.cos(to),
+          centre.y + r * Math.sin(to)
+        );
       }
     }
   }
@@ -104,8 +134,16 @@ class MissionOverlayView {
     appended = 0;
   }
 
-  function segment(path:PathBuilder, camera:PerspectiveCamera, width:Float, height:Float, x0:Float, y0:Float,
-      x1:Float, y1:Float):Void {
+  function segment(
+    path:PathBuilder,
+    camera:PerspectiveCamera,
+    width:Float,
+    height:Float,
+    x0:Float,
+    y0:Float,
+    x1:Float,
+    y1:Float
+  ):Void {
     var from = camera.project(x0, y0, LIFT, width, height), to = camera.project(x1, y1, LIFT, width, height);
     if (from != null && to != null) {
       path.moveTo(from.x, from.y).lineTo(to.x, to.y);
@@ -129,8 +167,10 @@ class MissionOverlayView {
         var edgeHere = x < grid.width && blocked(x, y - 1) != blocked(x, y);
         if (edgeHere && start < 0) start = x;
         if (!edgeHere && start >= 0) {
-          result.push(ox + start * res); result.push(oy + y * res);
-          result.push(ox + x * res); result.push(oy + y * res);
+          result.push(ox + start * res);
+          result.push(oy + y * res);
+          result.push(ox + x * res);
+          result.push(oy + y * res);
           start = -1;
         }
       }
@@ -142,8 +182,10 @@ class MissionOverlayView {
         var edgeHere = y < grid.height && blocked(x - 1, y) != blocked(x, y);
         if (edgeHere && start < 0) start = y;
         if (!edgeHere && start >= 0) {
-          result.push(ox + x * res); result.push(oy + start * res);
-          result.push(ox + x * res); result.push(oy + y * res);
+          result.push(ox + x * res);
+          result.push(oy + start * res);
+          result.push(ox + x * res);
+          result.push(oy + y * res);
           start = -1;
         }
       }

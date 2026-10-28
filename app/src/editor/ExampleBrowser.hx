@@ -11,11 +11,21 @@ typedef ExampleFamily = {
 
 /** Start-page navigation state and searchable groups; opening still uses the original catalogue entries. */
 class ExampleBrowser {
-  public static final categories = ["All", "Robotics & handling", "Welding", "Machining", "Gear cutting", "3D printing", "CAD & design", "People & simulation"];
+  public static final categories = [
+    "All",
+    "Robotics & handling",
+    "Welding",
+    "Machining",
+    "Gear cutting",
+    "3D printing",
+    "CAD & design",
+    "People & simulation"
+  ];
   public var query:String = "";
   public var category:String = "All";
 
-  public function new() {}
+  public function new() {
+  }
 
   public function selectCategory(value:String):Void {
     category = value;
@@ -47,55 +57,91 @@ class ExampleBrowser {
     for (family in families(entries)) {
       if (category != "All" && family.category != category) continue;
       var matching = [for (entry in family.examples) if (matches(family, entry, words)) entry];
-      if (matching.length > 0) result.push({id:family.id, title:family.title, category:family.category, examples:matching});
+      if (matching.length > 0) result.push({
+        id: family.id,
+        title: family.title,
+        category: family.category,
+        examples: matching
+      });
     }
     return result;
   }
 
   static function matches(family:ExampleFamily, entry:ExampleEntry, words:Array<String>):Bool {
-    var text = (family.title + " " + family.category + " " + entry.title + " " + variantTitle(entry) + " " +
-      entry.description.join(" ")).toLowerCase();
+    var text = (family.title + " " + family.category
+      + " " + entry.title + " " + variantTitle(entry) + " " + entry.description.join(" ")).toLowerCase();
     for (word in words) if (text.indexOf(word) < 0) return false;
     return true;
   }
 
   public static function familyId(id:String):String return switch id {
-    case "robot-screwdriver", "robot-screw-registration", "robot-screw-feeder", "robot-screw-blow-feed", "robot-pick-place-fasten": "robot-screwdriving";
-    case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass": "robot-welding";
-    case "mobile-robot-welder", "mobile-welding-mission": "mobile-welding";
-    case "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300": "cobots";
-    case "bench-mill", "enclosed-bench-mill": "bench-mills";
-    default: id;
+    case "robot-screwdriver",
+      "robot-screw-registration", "robot-screw-feeder", "robot-screw-blow-feed", "robot-pick-place-fasten":
+      "robot-screwdriving";
+    case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass":
+      "robot-welding";
+    case "mobile-robot-welder", "mobile-welding-mission":
+      "mobile-welding";
+    case "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300":
+      "cobots";
+    case "bench-mill", "enclosed-bench-mill":
+      "bench-mills";
+    default:
+      id;
   };
 
   static function familyTitle(id:String, fallback:String):String return switch id {
-    case "robot-welding": "Robot welding";
-    case "mobile-welding": "Mobile welding";
-    case "cobots": "Collaborative robots";
-    case "bench-mills": "Bench mills";
-    default: fallback;
+    case "robot-welding":
+      "Robot welding";
+    case "mobile-welding":
+      "Mobile welding";
+    case "cobots":
+      "Collaborative robots";
+    case "bench-mills":
+      "Bench mills";
+    default:
+      fallback;
   };
 
   public static function categoryOf(id:String):String return switch id {
-    case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass",
-      "mobile-robot-welder", "mobile-welding-mission", "gantry-welder", "track-welder": "Welding";
-    case "flexspline-hobber": "Gear cutting";
-    case "mill", "bench-mill", "enclosed-bench-mill", "cnc-router", "sheet-router", "press-brake": "Machining";
-    case "printer": "3D printing";
-    case "motor-shaft-bearings", "cad-modeling": "CAD & design";
-    case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";
-    case "robot-screwdriver", "robot-screw-registration", "robot-screw-feeder", "robot-screw-blow-feed", "robot-pick-place-fasten", "picking-station", "robot-arm", "reference-arms", "arm-comparison", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
-    default: throw 'Example "$id" needs a Start-page category';
+    case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave",
+      "robot-welder-multipass", "mobile-robot-welder", "mobile-welding-mission", "gantry-welder", "track-welder":
+      "Welding";
+    case "flexspline-hobber":
+      "Gear cutting";
+    case "mill", "bench-mill", "enclosed-bench-mill", "cnc-router", "sheet-router", "press-brake":
+      "Machining";
+    case "printer":
+      "3D printing";
+    case "motor-shaft-bearings", "cad-modeling":
+      "CAD & design";
+    case "two-robot", "worker-rack-to-table", "worker-gallery":
+      "People & simulation";
+    case "robot-screwdriver", "robot-screw-registration",
+      "robot-screw-feeder", "robot-screw-blow-feed", "robot-pick-place-fasten", "picking-station",
+      "robot-arm", "reference-arms", "arm-comparison", "cobot-reach500", "cobot-reach850", "cobot-reach900",
+      "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending":
+      "Robotics & handling";
+    default:
+      throw 'Example "$id" needs a Start-page category';
   };
 
   public static function variantTitle(entry:ExampleEntry):String return switch entry.id {
-    case "robot-welder": "Complete weldment";
-    case "robot-welder-seam": "Single seam";
-    case "robot-welder-post": "Tube post";
-    case "robot-welder-weave": "Woven seam · 7 mm";
-    case "robot-welder-multipass": "Three-pass seam · 10 mm";
-    case "mobile-robot-welder": "Explore the cell";
-    case "mobile-welding-mission": "Run the welding mission";
-    default: entry.title;
+    case "robot-welder":
+      "Complete weldment";
+    case "robot-welder-seam":
+      "Single seam";
+    case "robot-welder-post":
+      "Tube post";
+    case "robot-welder-weave":
+      "Woven seam · 7 mm";
+    case "robot-welder-multipass":
+      "Three-pass seam · 10 mm";
+    case "mobile-robot-welder":
+      "Explore the cell";
+    case "mobile-welding-mission":
+      "Run the welding mission";
+    default:
+      entry.title;
   };
 }

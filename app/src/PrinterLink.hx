@@ -17,7 +17,7 @@ class PrinterLink {
   /** The port Moonraker listens on unless the endpoint names another. */
   public static inline var DEFAULT_PORT:Int = 7125;
 
-  public var onStatus:Null<MoonrakerStatus->Void> = null;
+  public var onStatus:Null<MoonrakerStatus -> Void> = null;
   public var endpoint(default, null):String = "";
   /** The latest state the machine reported, and when (the clock `poll` is given). */
   public var status(default, null):Null<MoonrakerStatus> = null;
@@ -34,19 +34,22 @@ class PrinterLink {
 
   final events:Null<haxeon.platform.NativeKitEvents>;
 
-  public function new(?events:haxeon.platform.NativeKitEvents) { this.events = events; }
+  public function new(?events:haxeon.platform.NativeKitEvents) {
+    this.events = events;
+  }
 
   /**
    * The host and port of an endpoint, `host` or `host:port`. An IPv6 literal is written in brackets with an optional port
    * (`[fe80::1]:7125`), or bare when it has no port (`::1`); the host comes back without its brackets.
    */
-  public static function parse(endpoint:String):{host:String, port:Int} {
+  public static function parse(endpoint:String): {host: String, port: Int} {
     var text = StringTools.trim(endpoint);
     if (text.length == 0) throw "The printer's address is empty";
     if (text.charAt(0) == "[") {
       var close = text.indexOf("]");
       var rest = close < 0 ? "" : text.substr(close + 1);
-      if (close < 2 || (rest != "" && rest.charAt(0) != ":")) throw 'The printer address "$text" is not [ipv6] or [ipv6]:port';
+      if (close < 2
+        || (rest != "" && rest.charAt(0) != ":")) throw 'The printer address "$text" is not [ipv6] or [ipv6]:port';
       var number = rest == "" ? DEFAULT_PORT : Std.parseInt(rest.substr(1));
       if (number == null || number <= 0 || number > 65535) throw 'The printer address "$text" has no valid port';
       return {host: text.substr(1, close - 1), port: number};
@@ -55,11 +58,13 @@ class PrinterLink {
     var colon = text.lastIndexOf(":");
     if (colon < 0) return {host: text, port: DEFAULT_PORT};
     var port = Std.parseInt(text.substr(colon + 1));
-    if (colon == 0 || port == null || port <= 0 || port > 65535) throw 'The printer address "$text" is not host or host:port';
+    if (colon == 0
+      || port == null || port <= 0 || port > 65535) throw 'The printer address "$text" is not host or host:port';
     return {host: text.substr(0, colon), port: port};
   }
 
-  public function connected():Bool return client != null && client.fault == null && socket != null && socket.fault == null;
+  public function connected():Bool return client != null
+    && client.fault == null && socket != null && socket.fault == null;
 
   /** Opens the connections to `endpoint` (closing any other) and subscribes to the machine's state. */
   public function connect(endpoint:String):Void {
@@ -126,11 +131,19 @@ class PrinterLink {
   }
 
   /** Import explicitly published measurement artifacts. The caller reviews and applies the returned model proposal. */
-  public function readResonance(root:String,spectrum:String,decay:String,axis:String,start:Float,end:Float,
-      complete:materia.assembly.BeltCalibration.ResonanceMeasurement->Void):Void {
-    if (installer != null && !installer.done) throw "Wait for the configuration install before importing resonance data";
-    processkit.moonraker.ResonanceImport.read(live(),root,spectrum,decay,axis,start,end,complete);
-    note="Reading resonance measurement";
+  public function readResonance(
+    root:String,
+    spectrum:String,
+    decay:String,
+    axis:String,
+    start:Float,
+    end:Float,
+    complete:materia.assembly.BeltCalibration.ResonanceMeasurement -> Void
+  ):Void {
+    if (installer != null
+      && !installer.done) throw "Wait for the configuration install before importing resonance data";
+    processkit.moonraker.ResonanceImport.read(live(), root, spectrum, decay, axis, start, end, complete);
+    note = "Reading resonance measurement";
   }
 
   public function pause():Void live().pause(function() note = "Print paused");
@@ -144,11 +157,11 @@ class PrinterLink {
     var seen = status;
     if (error != null) return "Printer link failed: " + error;
     var mismatches = configMismatches;
-    if (mismatches != null) return mismatches.length == 0 ? "Klipper runs the config that was sent" :
-      'Klipper differs from the config that was sent in ${mismatches.length} places: ${mismatches[0]}';
+    if (mismatches != null) return mismatches.length == 0 ? "Klipper runs the config that was sent"
+      : 'Klipper differs from the config that was sent in ${mismatches.length} places: ${mismatches[0]}';
     if (seen == null) return note;
-    return '${seen.state}${seen.filename == "" ? "" : " " + seen.filename} ${Math.round(seen.progress * 100)} %, hotend ' +
-      '${Math.round(seen.extruder.temperature)}/${Math.round(seen.extruder.target)} C, bed ${Math.round(seen.bed.temperature)}/${Math.round(seen.bed.target)} C';
+    return '${seen.state}${seen.filename == "" ? "" : " " + seen.filename} ${Math.round(seen.progress * 100)} %, hotend '
+      + '${Math.round(seen.extruder.temperature)}/${Math.round(seen.extruder.target)} C, bed ${Math.round(seen.bed.temperature)}/${Math.round(seen.bed.target)} C';
   }
 
   /** Moves both conversations on; a fault of either ends the link. */

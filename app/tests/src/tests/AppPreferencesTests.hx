@@ -11,15 +11,21 @@ class AppPreferencesTests {
   static final DIRECTORY = "build/app-preferences-test";
 
   public static function main():Int {
-    try { run(); legacyImport(); Sys.println("App preferences tests passed"); return 0; }
-    catch (error:Dynamic) { Sys.println('App preferences tests failed: $error'); return 1; }
+    try {
+      run();
+      legacyImport();
+      Sys.println("App preferences tests passed");
+      return 0;
+    } catch (error:Dynamic) {
+      Sys.println('App preferences tests failed: $error');
+      return 1;
+    }
   }
 
-  static function check(condition:Bool, message:String):Void
-    if (!condition) throw message;
+  static function check(condition:Bool, message:String):Void if (!condition) throw message;
 
   /** Deletes both files so each case starts from nothing. */
-  static function fresh():{settings:String, legacy:String} {
+  static function fresh(): {settings: String, legacy: String} {
     if (!FileSystem.exists("build")) FileSystem.createDirectory("build");
     if (!FileSystem.exists(DIRECTORY)) FileSystem.createDirectory(DIRECTORY);
     var files = {settings: DIRECTORY + "/settings.json", legacy: DIRECTORY + "/preferences.json"};
@@ -31,13 +37,16 @@ class AppPreferencesTests {
     var file = fresh().settings;
 
     var first = new AppPreferences(file);
-    check(first.antialiasing == AppPreferences.DEFAULT_ANTIALIASING && first.antialiasing == 4,
-      "anti-aliasing defaults to four samples");
+    check(
+      first.antialiasing == AppPreferences.DEFAULT_ANTIALIASING && first.antialiasing == 4,
+      "anti-aliasing defaults to four samples"
+    );
     check(first.showStartPage, "the Start page shows by default");
     check(first.recent.length == 0, "no recent files at first");
     check(first.store.getBool(AppSettings.COSMETIC_THREADS), "cosmetic threads are shown by default");
     first.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(false));
-    check(!new AppPreferences(file).store.getBool(AppSettings.COSMETIC_THREADS), "thread visibility survives a restart");
+    check(!new AppPreferences(file).store.getBool(AppSettings.COSMETIC_THREADS),
+      "thread visibility survives a restart");
 
     first.setAntialiasing(2);
     check(first.antialiasing == 2, "the choice takes effect");
@@ -50,8 +59,10 @@ class AppPreferencesTests {
     reopened.setAntialiasing(0);
     reopened.setAntialiasing(-3);
     reopened.setAntialiasing(17);
-    check(reopened.antialiasing == 1 && new AppPreferences(file).antialiasing == 1,
-      "zero, negative and absurd counts are refused");
+    check(
+      reopened.antialiasing == 1 && new AppPreferences(file).antialiasing == 1,
+      "zero, negative and absurd counts are refused"
+    );
 
     // Another setting saved afterwards keeps the anti-aliasing choice.
     reopened.setShowStartPage(false);
@@ -64,8 +75,10 @@ class AppPreferencesTests {
     both.addRecent("/projects/scene5.json");
     var recent = new AppPreferences(file).recent;
     check(recent.length == AppPreferences.MAX_RECENT, "the recent list is capped");
-    check(recent[0] == "/projects/scene5.json" && recent[1] == "/projects/scene11.json",
-      "reopening a file moves it to the front");
+    check(
+      recent[0] == "/projects/scene5.json" && recent[1] == "/projects/scene11.json",
+      "reopening a file moves it to the front"
+    );
     check(recent.indexOf("/projects/scene0.json") < 0, "the oldest entries fall off");
     both.forgetRecent("/projects/scene5.json");
     check(new AppPreferences(file).recent[0] == "/projects/scene11.json", "a forgotten file is removed");
@@ -78,8 +91,10 @@ class AppPreferencesTests {
     check(new AppPreferences(file).antialiasing == 4, "a non-numeric value is ignored");
     File.saveContent(file, "not json at all");
     var damaged = new AppPreferences(file);
-    check(damaged.antialiasing == 4 && damaged.showStartPage && damaged.recent.length == 0,
-      "a damaged file falls back to the defaults");
+    check(
+      damaged.antialiasing == 4 && damaged.showStartPage && damaged.recent.length == 0,
+      "a damaged file falls back to the defaults"
+    );
   }
 
   /** preferences.json from earlier builds is imported once, and left alone for them. */
@@ -102,8 +117,10 @@ class AppPreferencesTests {
     files = fresh();
     File.saveContent(files.legacy, '{"showStartPage":false,"antialiasing":99,"recent":"nope"}');
     var partial = new AppPreferences(files.settings, files.legacy);
-    check(!partial.showStartPage && partial.antialiasing == 4 && partial.recent.length == 0,
-      "unusable old values fall back to the defaults");
+    check(
+      !partial.showStartPage && partial.antialiasing == 4 && partial.recent.length == 0,
+      "unusable old values fall back to the defaults"
+    );
 
     files = fresh();
     File.saveContent(files.legacy, "not json at all");

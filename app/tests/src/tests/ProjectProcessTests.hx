@@ -14,10 +14,9 @@ class ProjectProcessTests {
 
   static function expect(script:String, status:String, diagnostic:Null<String>):Void {
     var failure:Null<String> = null;
-    try MateriaProjectRunner.runCommand("/bin/sh", ["-c", script], "Project compiler")
-    catch (error:Dynamic) failure = Std.string(error);
-    if (failure == null || failure.indexOf(status) < 0 ||
-        (diagnostic != null && failure.indexOf(diagnostic) < 0))
-      throw 'Incorrect child process diagnostic: $failure';
+    try MateriaProjectRunner.runCommand("/bin/sh",
+      ["-c", script], "Project compiler") catch (error:Dynamic) failure = Std.string(error);
+    if (failure == null || failure.indexOf(status) < 0
+      || (diagnostic != null && failure.indexOf(diagnostic) < 0)) throw 'Incorrect child process diagnostic: $failure';
   }
 }

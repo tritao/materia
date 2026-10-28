@@ -14,16 +14,13 @@ class CadPartModel implements CadSessionModel {
   var lastGeometryConversionSeconds:Float = 0;
 
   function new(document:Document) {
-    if (document == null)
-      throw "generic CAD parts require a document";
+    if (document == null) throw "generic CAD parts require a document";
     this.document = document;
   }
 
-  public static function createEmpty():CadPartModel
-    return new CadPartModel(new Document());
+  public static function createEmpty():CadPartModel return new CadPartModel(new Document());
 
-  public static function decode(graph:String):CadPartModel
-    return new CadPartModel(DocumentCodec.decode(graph));
+  public static function decode(graph:String):CadPartModel return new CadPartModel(DocumentCodec.decode(graph));
 
   public function getDocument():Document return document;
 
@@ -52,8 +49,10 @@ class CadPartModel implements CadSessionModel {
     }
   }
 
-  public function collisionBoundsFor(source:Shape):CadCollisionBounds
-    return CadCollisionBounds.fromKernelBounds(source.bounds(), CadSceneGeometry.METRES_PER_MILLIMETRE);
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds return CadCollisionBounds.fromKernelBounds(
+    source.bounds(),
+    CadSceneGeometry.METRES_PER_MILLIMETRE
+  );
 
   public function tessellationSeconds():Float return lastTessellationSeconds;
 
@@ -61,26 +60,33 @@ class CadPartModel implements CadSessionModel {
 
   public function sceneDimensions():CadModelDimensions {
     var output = document.outputFeatureOrNull();
-    if (output == null || output.currentShape() == null)
-      return {width: 0.05, height: 0.05, depth: 0.01};
+    if (output == null || output.currentShape() == null) return {width: 0.05, height: 0.05, depth: 0.01};
     var bounds = collisionBoundsFor(document.result());
-    return {width: Math.max(bounds.halfExtents.x * 2, 0.000001),
+    return {
+      width: Math.max(bounds.halfExtents.x * 2, 0.000001),
       height: Math.max(bounds.halfExtents.y * 2, 0.000001),
-      depth: Math.max(bounds.halfExtents.z * 2, 0.000001)};
+      depth: Math.max(
+        bounds.halfExtents.z * 2,
+        0.000001
+      )
+    };
   }
 
-  public function setSceneDimensions(width:Float, height:Float, depth:Float):Void
-    throw new ParametricError("Generic CAD dimensions are edited through their authored features");
+  public function setSceneDimensions(width:Float, height:Float,
+    depth:Float):Void throw new ParametricError("Generic CAD dimensions are edited through their authored features");
 
-  public function featureNames():Array<String>
-    return [for (index in 0...document.featureCount())
-      if (document.featureAt(index).active) document.featureAt(index).serializationType()];
+  public function featureNames():Array<String> return [for (index in 0
+    ...document.featureCount()) if (document.featureAt(index).active) document.featureAt(index).serializationType()];
 
-  public function faceFingerprint(index:Int):TopologyFingerprint
-    return CadModelTopology.faceFingerprint(document.result(), index);
+  public function faceFingerprint(index:Int):TopologyFingerprint return CadModelTopology.faceFingerprint(
+    document.result(),
+    index
+  );
 
-  public function remapFace(fingerprint:TopologyFingerprint):Int
-    return CadModelTopology.remapFace(document.result(), fingerprint);
+  public function remapFace(fingerprint:TopologyFingerprint):Int return CadModelTopology.remapFace(
+    document.result(),
+    fingerprint
+  );
 
   public function exportStep(path:String):Void document.result().exportStep(path);
 }

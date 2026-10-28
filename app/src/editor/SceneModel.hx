@@ -16,20 +16,18 @@ typedef SceneRecordChange = {
 }
 
 /** Authored scene records and structural undo deltas. */
-@:access(app.EditorScene)
-class SceneModel {
+@:access(app.EditorScene) class SceneModel {
   public var objects:Array<EditorSceneObject> = [];
   public var nextObjectId:Int = 1;
 
   public function validateLabel(label:String):Void {
-    if (StringTools.trim(label).length == 0 || SceneCodec.containsNul(label))
-      throw "Name cannot be empty or contain NUL";
+    if (StringTools.trim(label).length == 0
+      || SceneCodec.containsNul(label)) throw "Name cannot be empty or contain NUL";
   }
 
-  public function rename(item:EditorSceneObject, label:String):Void
-    item.label = label;
+  public function rename(item:EditorSceneObject, label:String):Void item.label = label;
 
-  public function allocateId(owner:EditorScene, prefix:String="rectangle"):String {
+  public function allocateId(owner:EditorScene, prefix:String = "rectangle"):String {
     var id = prefix + "-" + nextObjectId;
     nextObjectId++;
     while (owner.object(id) != null) {
@@ -54,13 +52,32 @@ class SceneModel {
     for (item in data) if (item.id == owner.selectedId) source = item;
     var id = allocateId(owner);
     var cadGraph = EditorScene.isCadKind(source.type) ? owner.currentCadGraph(source.id) : source.cadGraph;
-    data.push({id: id, label: source.label + " copy", type: source.type,
-      x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
-      width: source.width, height: source.height, red: source.red, green: source.green,
-      blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
-      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation,
-      worker:source.worker});
+    data.push({
+      id: id,
+      label: source.label + " copy",
+      type: source.type,
+      x: Math.min(1000000, source.x + 0.25),
+      y: Math.min(
+        1000000,
+        source.y + 0.25
+      ),
+      z: source.z,
+      width: source.width,
+      height: source.height,
+      red: source.red,
+      green: source.green,
+      blue: source.blue,
+      appearance: source.appearance,
+      visible: source.visible,
+      depth: source.depth,
+      collisionEnabled: source.collisionEnabled,
+      dynamicBody: source.dynamicBody,
+      mass: source.mass,
+      cadGraph: cadGraph,
+      meshSnapshot: source.meshSnapshot,
+      rotation: source.rotation,
+      worker: source.worker
+    });
     return changeObjects(owner, "Duplicate object", data, id);
   }
 
@@ -89,30 +106,36 @@ class SceneModel {
       if (!afterIds.exists(item.id)) {
         var previous = SceneModel.recordForObject(item);
         if (EditorScene.isCadKind(previous.type)) previous.cadGraph = owner.currentCadGraph(previous.id);
-        changes.push({id: previous.id, before: previous, after: null,
-          beforeIndex: index, afterIndex: -1});
+        changes.push({id: previous.id, before: previous, after: null, beforeIndex: index, afterIndex: -1});
       }
     }
     for (index in 0...after.length) {
       var next = after[index];
-      if (!existingIds.exists(next.id))
-        changes.push({id: next.id, before: null, after: next,
-          beforeIndex: -1, afterIndex: index});
+      if (!existingIds.exists(next.id)) changes.push({
+        id: next.id,
+        before: null,
+        after: next,
+        beforeIndex: -1,
+        afterIndex: index
+      });
     }
     var previousSelection = owner.selectedId;
     var initialAfter:Null<Array<SceneObjectData>> = after;
-    return owner.document.apply(new EditOperation(label,
-      function() {
-        var initial = initialAfter;
-        initialAfter = null;
-        if (initial != null) owner.replaceObjects(initial, selection);
-        else applyObjectChanges(owner, changes, true, selection);
-      },
-      function() applyObjectChanges(owner, changes, false, previousSelection),
-      null, null, null, SceneModel.estimateSceneChanges(changes)));
+    return owner.document.apply(new EditOperation(label, function() {
+      var initial = initialAfter;
+      initialAfter = null;
+      if (initial != null) owner.replaceObjects(initial, selection);
+      else applyObjectChanges(owner, changes, true, selection);
+    }, function() applyObjectChanges(owner,
+      changes, false, previousSelection), null, null, null, SceneModel.estimateSceneChanges(changes)));
   }
 
-  public function applyObjectChanges(owner:EditorScene, changes:Array<SceneRecordChange>, forward:Bool, selection:String):Void {
+  public function applyObjectChanges(
+    owner:EditorScene,
+    changes:Array<SceneRecordChange>,
+    forward:Bool,
+    selection:String
+  ):Void {
     owner.replaceObjects(SceneModel.applyChanges(records(), changes, forward), selection);
   }
 
@@ -134,22 +157,30 @@ class SceneModel {
       }
       if (old.collisionEnabled != record.collisionEnabled) return true;
       if (old.kind == "human-worker" || record.type == "human-worker") {
-        if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
-            !EditorScene.sameRotation(old.rotation, record.rotation) ||
-            !sameWorkerData(old.worker, record.worker)) return true;
+        if (old.kind != record.type
+          || old.x != record.x || old.y != record.y || old.z != record.z || !EditorScene.sameRotation(
+            old.rotation,
+            record.rotation
+          ) || !sameWorkerData(
+            old.worker,
+            record.worker
+          )) return true;
         continue;
       }
       if (!record.collisionEnabled) {
-        if (hasWorker && (old.x != record.x || old.y != record.y || old.z != record.z ||
-            old.width != record.width || old.height != record.height || old.depth != record.depth ||
-            !EditorScene.sameRotation(old.rotation, record.rotation))) return true;
+        if (hasWorker && (old.x != record.x || old.y != record.y || old.z != record.z || old.width != record.width
+          || old.height != record.height || old.depth != record.depth || !EditorScene.sameRotation(
+            old.rotation,
+            record.rotation
+          ))) return true;
         continue;
       }
-      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
-          old.width != record.width || old.height != record.height || old.depth != record.depth ||
-          !EditorScene.sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
-          old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
-          old.mass != record.mass || old.materialId != record.materialId) return true;
+      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z || old.width
+        != record.width || old.height != record.height || old.depth != record.depth || !EditorScene.sameRotation(
+          old.rotation,
+          record.rotation
+        ) || old.cadGraph != record.cadGraph || old.meshSnapshot != record.meshSnapshot || old.dynamicBody
+        != record.dynamicBody || old.mass != record.mass || old.materialId != record.materialId) return true;
     }
     for (item in objects) if ((item.collisionEnabled || hasWorker) && !nextIds.exists(item.id)) return true;
     return false;
@@ -163,9 +194,30 @@ class SceneModel {
   }
 
   public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
-    var copy = new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
-      item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId, item.hiddenBy);
+    var copy = new EditorSceneObject(
+      item.id,
+      item.label,
+      item.kind,
+      item.width,
+      item.height,
+      item.depth,
+      item.collisionEnabled,
+      item.dynamicBody,
+      item.mass,
+      item.red,
+      item.green,
+      item.blue,
+      item.cadGraph,
+      item.x,
+      item.y,
+      item.z,
+      item.visible,
+      item.meshSnapshot,
+      item.rotation,
+      item.appearance,
+      item.materialId,
+      item.hiddenBy
+    );
     copy.worker = item.worker;
     return copy;
   }
@@ -173,18 +225,37 @@ class SceneModel {
   public function records():Array<SceneObjectData> {
     var result:Array<SceneObjectData> = [];
     for (item in objects) {
-      result.push({id: item.id, label: item.label, type: item.kind,
-        x: item.x, y: item.y, z: item.z,
-        width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
-        dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        appearance:item.appearance,materialId:item.materialId,
-        visible: item.visible, hiddenBy: SceneVisibility.masks(item.hiddenBy),cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
-        rotation:item.rotation, worker:item.worker});
+      result.push({
+        id: item.id,
+        label: item.label,
+        type: item.kind,
+        x: item.x,
+        y: item.y,
+        z: item.z,
+        width: item.width,
+        height: item.height,
+        depth: item.depth,
+        collisionEnabled: item.collisionEnabled,
+        dynamicBody: item.dynamicBody,
+        mass: item.mass,
+        red: item.red,
+        green: item.green,
+        blue: item.blue,
+        appearance: item.appearance,
+        materialId: item.materialId,
+        visible: item.visible,
+        hiddenBy: SceneVisibility.masks(item.hiddenBy),
+        cadGraph: item.cadGraph,
+        meshSnapshot: item.meshSnapshot,
+        rotation: item.rotation,
+        worker: item.worker
+      });
     }
     return result;
   }
 
-  public static function applyChanges(data:Array<SceneObjectData>, changes:Array<SceneRecordChange>, forward:Bool):Array<SceneObjectData> {
+  public static function applyChanges(data:Array<SceneObjectData>,
+    changes:Array<SceneRecordChange>, forward:Bool):Array<SceneObjectData> {
     var removals:Array<SceneRecordChange> = [];
     for (change in changes) {
       var target = forward ? change.after : change.before;
@@ -192,7 +263,8 @@ class SceneModel {
     }
     removals.sort(function(lhs, rhs) {
       return findRecordIndex(data, rhs.id) - findRecordIndex(data, lhs.id);
-    });
+    }
+    );
     for (change in removals) {
       var index = findRecordIndex(data, change.id);
       if (index >= 0) data.splice(index, 1);
@@ -214,7 +286,8 @@ class SceneModel {
       var left = forward ? lhs.afterIndex : lhs.beforeIndex;
       var right = forward ? rhs.afterIndex : rhs.beforeIndex;
       return left - right;
-    });
+    }
+    );
     for (change in additions) {
       var target = forward ? change.after : change.before;
       var index = forward ? change.afterIndex : change.beforeIndex;
@@ -231,13 +304,30 @@ class SceneModel {
   }
 
   public static function recordForObject(item:EditorSceneObject):SceneObjectData {
-    return {id: item.id, label: item.label, type: item.kind,
-      x: item.x, y: item.y, z: item.z,
-      width: item.width, height: item.height, depth: item.depth,
-      collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
-      visible: item.visible, hiddenBy: SceneVisibility.masks(item.hiddenBy), cadGraph: item.cadGraph,
-      meshSnapshot: item.meshSnapshot, rotation: item.rotation, worker: item.worker};
+    return {
+      id: item.id,
+      label: item.label,
+      type: item.kind,
+      x: item.x,
+      y: item.y,
+      z: item.z,
+      width: item.width,
+      height: item.height,
+      depth: item.depth,
+      collisionEnabled: item.collisionEnabled,
+      dynamicBody: item.dynamicBody,
+      mass: item.mass,
+      red: item.red,
+      green: item.green,
+      blue: item.blue,
+      appearance: item.appearance,
+      visible: item.visible,
+      hiddenBy: SceneVisibility.masks(item.hiddenBy),
+      cadGraph: item.cadGraph,
+      meshSnapshot: item.meshSnapshot,
+      rotation: item.rotation,
+      worker: item.worker
+    };
   }
 
   public static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
@@ -251,19 +341,18 @@ class SceneModel {
 
   static function estimateSceneRecord(record:Null<SceneObjectData>):Int {
     if (record == null) return 0;
-    return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
-      estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
-      estimatedStringBytes(record.sketchDraft) +
-      estimatedMaskBytes(record.hiddenBy) +
-      (record.worker == null ? 0 : estimatedStringBytes(record.worker.asset) +
-      estimatedStringBytes(record.worker.job) + record.worker.zones.length * 32);
+    return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) + estimatedStringBytes(record
+      .type) + estimatedStringBytes(record.cadGraph) + estimatedStringBytes(record.sketchDraft)
+      + estimatedMaskBytes(record.hiddenBy) + (record.worker == null ? 0 : estimatedStringBytes(record.worker.asset)
+      + estimatedStringBytes(record.worker.job) + record.worker.zones.length * 32);
   }
 
   static function estimatedMaskBytes(masks:Null<Array<String>>):Int {
-    var bytes=0;if(masks!=null)for(key in masks)bytes+=16+estimatedStringBytes(key);return bytes;
+    var bytes = 0;
+    if (masks != null) for (key in masks) bytes += 16 + estimatedStringBytes(key);
+    return bytes;
   }
 
-  static function estimatedStringBytes(value:Null<String>):Int
-    return value == null ? 0 : value.length * 2;
+  static function estimatedStringBytes(value:Null<String>):Int return value == null ? 0 : value.length * 2;
 
 }

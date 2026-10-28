@@ -63,7 +63,7 @@ class SceneCollision {
   /** How many times the world was built; a pose-only change must not add one. */
   public var builds(default, null):Int = 0;
 
-  final makeWorld:Void->CollisionWorld;
+  final makeWorld:Void -> CollisionWorld;
   var world:Null<CollisionWorld> = null;
   var build:Null<CollisionBuild> = null;
   var contentKey:Null<String> = null;
@@ -75,7 +75,7 @@ class SceneCollision {
   var queried:Array<SceneCollisionPair> = [];
 
   /** `makeWorld` gives an empty world (a `NativeCollisionWorld`). */
-  public function new(makeWorld:Void->CollisionWorld) {
+  public function new(makeWorld:Void -> CollisionWorld) {
     if (makeWorld == null) throw "Scene collision needs a world";
     this.makeWorld = makeWorld;
   }
@@ -86,9 +86,14 @@ class SceneCollision {
    * a simulation runs, where `poses` (its presentation's geometry-centred poses, by scene id, at
    * `posesRevision`) puts them. `project` supplies the assembly of a generated project, when one is open.
    */
-  public function query(scene:EditorScene, project:Null<ProjectDocumentSession>, near:Float,
-      contact:Float = EDITING_CONTACT, ?poses:Array<ApplicationSimulation.SimulationPoseVisual>,
-      posesRevision:Int = 0):Array<SceneCollisionPair> {
+  public function query(
+    scene:EditorScene,
+    project:Null<ProjectDocumentSession>,
+    near:Float,
+    contact:Float = EDITING_CONTACT,
+    ?poses:Array<ApplicationSimulation.SimulationPoseVisual>,
+    posesRevision:Int = 0
+  ):Array<SceneCollisionPair> {
     if (!Math.isFinite(near) || near < 0) throw "The near distance must be finite and nonnegative";
     if (!Math.isFinite(contact) || contact < 0) throw "The contact tolerance must be finite and nonnegative";
     var revision = scene.revision + ":" + contact + (poses == null ? "" : ":sim" + posesRevision);
@@ -105,7 +110,7 @@ class SceneCollision {
    * The toolbar's line for `pairs`: how many collide and how many are near, and the closest pair by
    * name with its depth or gap in millimetres; null when there are none.
    */
-  public static function summary(pairs:Array<SceneCollisionPair>, name:String->String):Null<String> {
+  public static function summary(pairs:Array<SceneCollisionPair>, name:String -> String):Null<String> {
     if (pairs.length == 0) return null;
     var colliding = [for (pair in pairs) if (pair.colliding()) pair].length, near = pairs.length - colliding;
     var counts:Array<String> = [];
@@ -113,8 +118,8 @@ class SceneCollision {
     if (near > 0) counts.push(near + " near");
     var closest = pairs[0];
     var millimetres = Math.round(Math.abs(closest.distance) * 10000.0) / 10.0;
-    return counts.join(", ") + " · " + name(closest.a) + " / " + name(closest.b) + " " + millimetres +
-      (closest.colliding() ? " mm deep" : " mm apart");
+    return counts.join(", ") + " · " + name(closest.a)
+      + " / " + name(closest.b) + " " + millimetres + (closest.colliding() ? " mm deep" : " mm apart");
   }
 
   public function dispose():Void {
@@ -131,14 +136,14 @@ class SceneCollision {
     if (project != null) {
       var open:ProjectDocumentSession = project;
       var assembly = open.projectAssemblyDefinition;
-      if (assembly != null && open.projectPhysical != null)
-        parts.push('assembly:${open.generation}:${assembly.occurrences.length}');
+      if (assembly != null
+        && open.projectPhysical != null) parts.push('assembly:${open.generation}:${assembly.occurrences.length}');
     }
     for (item in scene.items()) if (item.collisionEnabled) {
       var bounds = scene.isCadPart(item.id) ? scene.cadSession(item.id).collisionBounds : null;
-      parts.push(item.id + "|" + item.kind + "|" + item.width + "|" + item.height + "|" + item.depth +
-        (bounds == null ? "" : "|" + bounds.center.x + "," + bounds.center.y + "," + bounds.center.z + "," +
-          bounds.halfExtents.x + "," + bounds.halfExtents.y + "," + bounds.halfExtents.z));
+      parts.push(item.id + "|" + item.kind + "|" + item.width + "|" + item.height + "|" + item.depth + (bounds
+        == null ? "" : "|" + bounds.center.x + "," + bounds.center.y + ","
+        + bounds.center.z + "," + bounds.halfExtents.x + "," + bounds.halfExtents.y + "," + bounds.halfExtents.z));
     }
     return parts.join(";");
   }
@@ -152,8 +157,18 @@ class SceneCollision {
     for (item in scene.items()) if (item.collisionEnabled && !assemblyObjects.exists(item.id)) {
       var box = boxOf(scene, item);
       var body = description.addBody(item.id, 0, false, posed(item, null));
-      description.addObject(item.id, body, CollisionPose.translation(box.offset[0], box.offset[1], box.offset[2]),
-        CollisionGeometry.Box(box.half[0], box.half[1], box.half[2]), 0.0, "box");
+      description.addObject(
+        item.id,
+        body,
+        CollisionPose.translation(box.offset[0], box.offset[1], box.offset[2]),
+        CollisionGeometry.Box(
+          box.half[0],
+          box.half[1],
+          box.half[2]
+        ),
+        0.0,
+        "box"
+      );
       bodyObjects.push(item.id);
       bodyCentres.push(null);
     }
@@ -168,8 +183,11 @@ class SceneCollision {
    * The open project's assembly occurrences, posed at the as-designed state for the articulation's
    * reference; returns the scene objects it described.
    */
-  function describeAssembly(description:CollisionDescription, scene:EditorScene,
-      project:Null<ProjectDocumentSession>):Map<String, Bool> {
+  function describeAssembly(description:CollisionDescription,
+    scene:EditorScene, project:Null<ProjectDocumentSession>):Map<
+      String,
+      Bool
+  > {
     var described = new Map<String, Bool>();
     if (project == null) return described;
     var open:ProjectDocumentSession = project;
@@ -187,15 +205,35 @@ class SceneCollision {
       var id = "project:" + occurrence.id;
       var item = scene.object(id);
       if (item == null || !item.collisionEnabled) continue;
-      var pieces = AssemblySimulationBridge.collisionPieces(occurrence.id, components.get(occurrence.definition),
-        parts.get(occurrence.definition));
+      var pieces = AssemblySimulationBridge.collisionPieces(
+        occurrence.id,
+        components.get(occurrence.definition),
+        parts.get(occurrence.definition)
+      );
       if (pieces.length == 0) continue;
       var frame = designed.worldPose(occurrence.id);
-      var body = description.addBody(id, 0, false, new CollisionPose(frame.x * scale, frame.y * scale, frame.z * scale,
-        frame.qx, frame.qy, frame.qz, frame.qw));
-      for (index in 0...pieces.length)
-        description.addObject('$id#$index', body, CollisionPose.identity(),
-          CollisionGeometry.Convex([for (value in pieces[index]) value * scale]), 0.0, "assembly hull");
+      var body = description.addBody(
+        id,
+        0,
+        false,
+        new CollisionPose(
+          frame.x * scale,
+          frame.y * scale,
+          frame.z * scale,
+          frame.qx,
+          frame.qy,
+          frame.qz,
+          frame.qw
+        )
+      );
+      for (index in 0...pieces.length) description.addObject(
+        '$id#$index',
+        body,
+        CollisionPose.identity(),
+        CollisionGeometry.Convex([for (value in pieces[index]) value * scale]),
+        0.0,
+        "assembly hull"
+      );
       var centre = open.assemblyPreviewCenter(occurrence.definition);
       if (centre == null) throw 'Assembly component "${occurrence.definition}" has no preview centre';
       bodyObjects.push(id);
@@ -213,12 +251,20 @@ class SceneCollision {
     }
     for (group in rigid) {
       var mine = membersOf(group.id);
-      for (i in 0...mine.length) for (j in i + 1...mine.length)
-        description.setBodyRule(mine[i], mine[j], CollisionPairRule.Allow, CollisionPairStatus.Rigid);
+      for (i in 0...mine.length) for (j in i + 1...mine.length) description.setBodyRule(
+        mine[i],
+        mine[j],
+        CollisionPairRule.Allow,
+        CollisionPairStatus.Rigid
+      );
       // A body's parent is named by its root occurrence, which is the parent group's id.
       var parent = group.parent;
-      if (parent != null) for (x in mine) for (y in membersOf(parent))
-        description.setBodyRule(x, y, CollisionPairRule.Allow, CollisionPairStatus.Adjacent);
+      if (parent != null) for (x in mine) for (y in membersOf(parent)) description.setBodyRule(
+        x,
+        y,
+        CollisionPairRule.Allow,
+        CollisionPairStatus.Adjacent
+      );
     }
     var all = [for (id in bodyOf) id];
     if (all.length > 1) description.addArticulation("assembly", all, "as designed");
@@ -226,8 +272,12 @@ class SceneCollision {
   }
 
   /** The pairs within `near`, with every body posed where the scene has its object now. */
-  function pairs(scene:EditorScene, near:Float, contact:Float,
-      poses:Null<Array<ApplicationSimulation.SimulationPoseVisual>>):Array<SceneCollisionPair> {
+  function pairs(
+    scene:EditorScene,
+    near:Float,
+    contact:Float,
+    poses:Null<Array<ApplicationSimulation.SimulationPoseVisual>>
+  ):Array<SceneCollisionPair> {
     var current = world, built = build;
     if (current == null || built == null || bodyObjects.length == 0) return [];
     var items = new Map<String, EditorSceneObject>();
@@ -238,8 +288,14 @@ class SceneCollision {
       var item = items.get(bodyObjects[index]);
       if (item == null) throw 'Scene object "${bodyObjects[index]}" vanished without a rebuild';
       var live = simulated.get(item.id);
-      current.setBodyPose(built.bodies[index], live == null ? posed(item, bodyCentres[index])
-        : placed(live.position, live.rotation, bodyCentres[index]));
+      current.setBodyPose(
+        built.bodies[index],
+        live == null ? posed(item, bodyCentres[index]) : placed(
+          live.position,
+          live.rotation,
+          bodyCentres[index]
+        )
+      );
     }
     var closest = new Map<String, SceneCollisionPair>();
     for (found in current.distances(near)) {
@@ -249,11 +305,24 @@ class SceneCollision {
       var known = closest.get(key);
       if (known != null && known.distance <= found.distance) continue;
       var overlapping = found.distance < -contact;
-      closest.set(key, swap ? new SceneCollisionPair(b, a, found.distance, found.pointB, found.pointA, overlapping)
-        : new SceneCollisionPair(a, b, found.distance, found.pointA, found.pointB, overlapping));
+      closest.set(
+        key,
+        swap ? new SceneCollisionPair(b,
+        a, found.distance, found.pointB, found.pointA, overlapping) : new SceneCollisionPair(
+          a,
+          b,
+          found.distance,
+          found.pointA,
+          found.pointB,
+          overlapping
+        )
+      );
     }
     var result = [for (pair in closest) pair];
-    result.sort((x, y) -> x.distance < y.distance ? -1 : x.distance > y.distance ? 1 : Reflect.compare(x.a + x.b, y.a + y.b));
+    result.sort((x, y) -> x.distance < y.distance ? -1 : x.distance > y.distance ? 1 : Reflect.compare(
+      x.a + x.b,
+      y.a + y.b
+    ));
     return result;
   }
 
@@ -261,24 +330,51 @@ class SceneCollision {
    * The body's world pose: an object's centre and rotation, or, for an assembly occurrence, its
    * part frame (the centre less the preview centre, rotated).
    */
-  static function posed(item:EditorSceneObject, centre:Null<Array<Float>>):CollisionPose
-    return placed([item.x, item.y, item.z], item.rotation, centre);
+  static function posed(item:EditorSceneObject, centre:Null<Array<Float>>):CollisionPose return placed(
+    [
+      item.x,
+      item.y,
+      item.z
+    ],
+    item.rotation,
+    centre
+  );
 
   /** A geometry-centred pose as the body's pose (less the preview centre, for an assembly occurrence). */
   static function placed(position:Array<Float>, rotation:Null<Array<Float>>, centre:Null<Array<Float>>):CollisionPose {
     var r = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
     if (centre == null) return new CollisionPose(position[0], position[1], position[2], r[0], r[1], r[2], r[3]);
     var offset = ApplicationSimulation.rotateOffset(centre[0], centre[1], centre[2], rotation);
-    return new CollisionPose(position[0] - offset[0], position[1] - offset[1], position[2] - offset[2], r[0], r[1], r[2], r[3]);
+    return new CollisionPose(
+      position[0] - offset[0],
+      position[1] - offset[1],
+      position[2] - offset[2],
+      r[0],
+      r[1],
+      r[2],
+      r[3]
+    );
   }
 
   /** The object's box, as the simulation builds it: its extents, or a CAD part's collision bounds. */
-  static function boxOf(scene:EditorScene, item:EditorSceneObject):{offset:Array<Float>, half:Array<Float>} {
-    if (!scene.isCadPart(item.id))
-      return {offset: [0.0, 0.0, 0.0], half: [item.width / 2.0, item.height / 2.0, item.depth / 2.0]};
+  static function boxOf(scene:EditorScene, item:EditorSceneObject): {offset: Array<Float>, half: Array<Float>} {
+    if (!scene.isCadPart(item.id)) return {
+      offset: [0.0, 0.0, 0.0],
+      half: [
+        item.width / 2.0,
+        item.height / 2.0,
+        item.depth / 2.0
+      ]
+    };
     var bounds = scene.cadSession(item.id).collisionBounds;
     if (bounds == null) throw "CAD collision bounds are unavailable for: " + item.id;
-    return {offset: [bounds.center.x, bounds.center.y, bounds.center.z],
-      half: [bounds.halfExtents.x, bounds.halfExtents.y, bounds.halfExtents.z]};
+    return {
+      offset: [bounds.center.x, bounds.center.y, bounds.center.z],
+      half: [
+        bounds.halfExtents.x,
+        bounds.halfExtents.y,
+        bounds.halfExtents.z
+      ]
+    };
   }
 }

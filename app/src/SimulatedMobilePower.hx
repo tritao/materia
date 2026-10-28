@@ -26,12 +26,18 @@ class SimulatedMobilePower implements SessionMember implements Power {
   final welder:SimulatedWelder;
   var latest:BatteryState;
 
-  public function new(profile:SceneArtifactMobileEnergy, mobileBase:SceneArtifactMobileBase, robot:AssemblyRobot,
-      simulation:robotkit.runtime.Simulation, robotIndex:Int, timestep:Float,
-      welder:SimulatedWelder) {
-    if (profile == null || mobileBase == null || robot == null || simulation == null || robotIndex < 0 ||
-        !Math.isFinite(timestep) || timestep <= 0 || welder == null)
-      throw "Mobile power simulation needs its CAD profile, robot, timestep and welder";
+  public function new(
+    profile:SceneArtifactMobileEnergy,
+    mobileBase:SceneArtifactMobileBase,
+    robot:AssemblyRobot,
+    simulation:robotkit.runtime.Simulation,
+    robotIndex:Int,
+    timestep:Float,
+    welder:SimulatedWelder
+  ) {
+    if (profile == null || mobileBase == null
+      || robot == null || simulation == null || robotIndex < 0 || !Math.isFinite(timestep) || timestep <= 0
+      || welder == null) throw "Mobile power simulation needs its CAD profile, robot, timestep and welder";
     this.profile = profile;
     this.mobileBase = mobileBase;
     this.robot = robot;
@@ -39,15 +45,31 @@ class SimulatedMobilePower implements SessionMember implements Power {
     this.robotIndex = robotIndex;
     this.timestep = timestep;
     this.welder = welder;
-    var storage = new BatteryStorage(profile.nominalVolts, profile.capacityWh,
-      profile.fullVoltage, profile.emptyVoltage, profile.cutoffVoltage,
-      profile.internalResistanceOhms, profile.maxDischargeCurrentA,
-      profile.maxChargePowerW, profile.chargeEfficiency);
+    var storage = new BatteryStorage(
+      profile.nominalVolts,
+      profile.capacityWh,
+      profile.fullVoltage,
+      profile.emptyVoltage,
+      profile.cutoffVoltage,
+      profile.internalResistanceOhms,
+      profile.maxDischargeCurrentA,
+      profile.maxChargePowerW,
+      profile.chargeEfficiency
+    );
     battery = new BatterySimulator(profile.batteryOccurrence, storage, profile.initialChargeFraction);
     var initial = battery.reading();
-    latest = new BatteryState(initial.batteryId, initial.chargeFraction, initial.voltageVolts,
-      initial.currentAmps, initial.temperatureCelsius, initial.sourceTimestampNs,
-      initial.sourceTimestampNs, "simulation", "simulation", initial.remainingEnergyWattHours);
+    latest = new BatteryState(
+      initial.batteryId,
+      initial.chargeFraction,
+      initial.voltageVolts,
+      initial.currentAmps,
+      initial.temperatureCelsius,
+      initial.sourceTimestampNs,
+      initial.sourceTimestampNs,
+      "simulation",
+      "simulation",
+      initial.remainingEnergyWattHours
+    );
   }
 
   public function batteryState():Null<BatteryState> return latest;
@@ -60,11 +82,13 @@ class SimulatedMobilePower implements SessionMember implements Power {
     var base = simulation.linkPose(robotIndex, 0);
     var dx = base.position[0] - profile.dockPose.x;
     var dy = base.position[1] - profile.dockPose.y;
-    var yaw = Math.atan2(2 * (base.rotation[3] * base.rotation[2] + base.rotation[0] * base.rotation[1]),
-      1 - 2 * (base.rotation[1] * base.rotation[1] + base.rotation[2] * base.rotation[2]));
+    var yaw = Math.atan2(
+      2 * (base.rotation[3] * base.rotation[2] + base.rotation[0] * base.rotation[1]),
+      1 - 2 * (base.rotation[1] * base.rotation[1] + base.rotation[2] * base.rotation[2])
+    );
     var difference = Math.atan2(Math.sin(yaw - profile.dockPose.yaw), Math.cos(yaw - profile.dockPose.yaw));
-    return dx * dx + dy * dy <= profile.dockPositionToleranceMeters * profile.dockPositionToleranceMeters &&
-      Math.abs(difference) <= profile.dockHeadingToleranceRadians;
+    return dx * dx + dy * dy <= profile.dockPositionToleranceMeters * profile.dockPositionToleranceMeters
+      && Math.abs(difference) <= profile.dockHeadingToleranceRadians;
   }
 
   public function feed():Void {
@@ -73,32 +97,38 @@ class SimulatedMobilePower implements SessionMember implements Power {
     driveMechanicalWatts = 0;
     var names = robot.robot.description().joints;
     var leftWheel = profileWheel("left"), rightWheel = profileWheel("right");
-    if (names.length != snapshot.efforts.length || names.length != snapshot.velocities.length)
-      throw "Mobile power snapshot and CAD joint map have different lengths";
+    if (names.length != snapshot.efforts.length || names.length
+      != snapshot.velocities.length) throw "Mobile power snapshot and CAD joint map have different lengths";
     for (index in 0...names.length) {
       var mechanical = snapshot.efforts.get(index) * snapshot.velocities.get(index);
       // The stepper drives do not regenerate during braking; negative joint work is dissipated.
       if (mechanical <= 0) continue;
       var name = names[index];
-      if (name == leftWheel || name == rightWheel)
-        driveMechanicalWatts += mechanical;
-      else
-        armMechanicalWatts += mechanical;
+      if (name == leftWheel || name == rightWheel) driveMechanicalWatts += mechanical;
+      else armMechanicalWatts += mechanical;
     }
     var reading = welder.reading();
     weldAcWatts = reading.powerW;
     var armDc = armMechanicalWatts / (profile.armDriveEfficiency * profile.armSupplyEfficiency);
-    var driveDc = driveMechanicalWatts / (profile.driveMotorEfficiency * profile.driveGearEfficiency *
-      profile.driveSupplyEfficiency);
+    var driveDc = driveMechanicalWatts
+      / (profile.driveMotorEfficiency * profile.driveGearEfficiency * profile.driveSupplyEfficiency);
     var computerDc = profile.computerLoadWatts / profile.computerSupplyEfficiency;
     var weldDc = weldAcWatts / profile.inverterEfficiency;
     packLoadWatts = armDc + driveDc + computerDc + weldDc;
     var chargerWatts = charging && atDock() ? profile.chargerPowerWatts : 0.0;
     var result = battery.advance(packLoadWatts, chargerWatts, timestep, snapshot.sourceTimestampNs);
-    latest = new BatteryState(result.batteryId, result.chargeFraction, result.voltageVolts,
-      result.currentAmps, result.temperatureCelsius, result.sourceTimestampNs,
-      snapshot.receivedTimestampNs, snapshot.sourceClockId, snapshot.receivedClockId,
-      result.remainingEnergyWattHours);
+    latest = new BatteryState(
+      result.batteryId,
+      result.chargeFraction,
+      result.voltageVolts,
+      result.currentAmps,
+      result.temperatureCelsius,
+      result.sourceTimestampNs,
+      snapshot.receivedTimestampNs,
+      snapshot.sourceClockId,
+      snapshot.receivedClockId,
+      result.remainingEnergyWattHours
+    );
     welder.supplyReady = battery.supplyAvailable && reading.powerW <= profile.inverterContinuousWatts;
   }
 
@@ -115,12 +145,22 @@ class SimulatedMobilePower implements SessionMember implements Power {
     charging = false;
     battery.reset();
     var initial = battery.reading();
-    latest = new BatteryState(initial.batteryId, initial.chargeFraction, initial.voltageVolts,
-      initial.currentAmps, initial.temperatureCelsius, initial.sourceTimestampNs,
-      initial.sourceTimestampNs, "simulation", "simulation", initial.remainingEnergyWattHours);
+    latest = new BatteryState(
+      initial.batteryId,
+      initial.chargeFraction,
+      initial.voltageVolts,
+      initial.currentAmps,
+      initial.temperatureCelsius,
+      initial.sourceTimestampNs,
+      initial.sourceTimestampNs,
+      "simulation",
+      "simulation",
+      initial.remainingEnergyWattHours
+    );
     armMechanicalWatts = driveMechanicalWatts = weldAcWatts = packLoadWatts = 0;
     welder.supplyReady = battery.supplyAvailable;
   }
 
-  public function present():Void {}
+  public function present():Void {
+  }
 }

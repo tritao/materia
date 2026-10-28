@@ -29,8 +29,7 @@ class CadImportedModel implements CadSessionModel {
     }
   }
 
-  public static function decode(graph:String):CadImportedModel
-    return new CadImportedModel(DocumentCodec.decode(graph));
+  public static function decode(graph:String):CadImportedModel return new CadImportedModel(DocumentCodec.decode(graph));
 
   public function getDocument():Document return document;
 
@@ -59,9 +58,10 @@ class CadImportedModel implements CadSessionModel {
     }
   }
 
-  public function collisionBoundsFor(source:Shape):CadCollisionBounds
-    return CadCollisionBounds.fromKernelBounds(source.bounds(),
-      CadSceneGeometry.METRES_PER_MILLIMETRE);
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds return CadCollisionBounds.fromKernelBounds(
+    source.bounds(),
+    CadSceneGeometry.METRES_PER_MILLIMETRE
+  );
 
   public function tessellationSeconds():Float return lastTessellationSeconds;
 
@@ -69,22 +69,24 @@ class CadImportedModel implements CadSessionModel {
 
   public function sceneDimensions():CadModelDimensions {
     var bounds = collisionBoundsFor(document.result());
-    return {width: bounds.halfExtents.x * 2, height: bounds.halfExtents.y * 2,
-      depth: bounds.halfExtents.z * 2};
+    return {width: bounds.halfExtents.x * 2, height: bounds.halfExtents.y * 2, depth: bounds.halfExtents.z * 2};
   }
 
-  public function setSceneDimensions(width:Float, height:Float, depth:Float):Void
-    throw "Imported STEP geometry has fixed dimensions; edit it with authored features";
+  public function setSceneDimensions(width:Float,
+    height:Float, depth:Float):Void throw "Imported STEP geometry has fixed dimensions; edit it with authored features";
 
-  public function featureNames():Array<String>
-    return [for (index in 0...document.featureCount())
-      if (document.featureAt(index).active) document.featureAt(index).serializationType()];
+  public function featureNames():Array<String> return [for (index in 0
+    ...document.featureCount()) if (document.featureAt(index).active) document.featureAt(index).serializationType()];
 
-  public function faceFingerprint(index:Int):TopologyFingerprint
-    return CadModelTopology.faceFingerprint(document.result(), index);
+  public function faceFingerprint(index:Int):TopologyFingerprint return CadModelTopology.faceFingerprint(
+    document.result(),
+    index
+  );
 
-  public function remapFace(fingerprint:TopologyFingerprint):Int
-    return CadModelTopology.remapFace(document.result(), fingerprint);
+  public function remapFace(fingerprint:TopologyFingerprint):Int return CadModelTopology.remapFace(
+    document.result(),
+    fingerprint
+  );
 
   public function exportStep(path:String):Void document.result().exportStep(path);
 }

@@ -70,22 +70,24 @@ class BrowserFiles implements MemoryFileSystemObserver {
     MemoryFileSystem.observer = new BrowserFiles();
   }
 
-  function new() {}
+  function new() {
+  }
 
-  public function directoryCreated(path:String):Void
-    MateriaWebFiles.materia_files_directory_created(path);
+  public function directoryCreated(path:String):Void MateriaWebFiles.materia_files_directory_created(path);
 
   public function fileWritten(path:String, content:Bytes):Void {
     MateriaWebFiles.materia_files_file_written(path, content);
     export(path, content);
   }
 
-  public function removed(path:String):Void
-    MateriaWebFiles.materia_files_removed(path);
+  public function removed(path:String):Void MateriaWebFiles.materia_files_removed(path);
 
   public function renamed(path:String, newPath:String):Void {
     MateriaWebFiles.materia_files_renamed(path, newPath);
-    if (links.exists(newPath) && !MemoryFileSystem.isDirectory(newPath)) export(newPath, MemoryFileSystem.getBytes(newPath));
+    if (links.exists(newPath) && !MemoryFileSystem.isDirectory(newPath)) export(
+      newPath,
+      MemoryFileSystem.getBytes(newPath)
+    );
   }
 
   /** Writes `content` to the save target linked to `path`, if any. Failures go to the browser console. */
@@ -94,21 +96,23 @@ class BrowserFiles implements MemoryFileSystemObserver {
     if (uri == null) return;
     if (StringTools.startsWith(uri, "nativekit-download://")) links.remove(path);
     var resource = new Resource(uri, null, null, ResourceFlags.Writable).nativeValue();
-    var opened = NativeKit.nk_resource_open(resource,
-      ResourceOpenFlags.Write | ResourceOpenFlags.Create | ResourceOpenFlags.Truncate);
+    var opened = NativeKit.nk_resource_open(
+      resource,
+      ResourceOpenFlags.Write | ResourceOpenFlags.Create | ResourceOpenFlags.Truncate
+    );
     if (opened.status != Result.Ok) {
       trace('Could not write ${path.substr(path.lastIndexOf("/") + 1)} to the chosen file: ${opened.status}');
       return;
     }
     var stream = opened.out_stream;
     var written = NativeKit.nk_resource_write(stream.borrow(), content);
-    if (written.status != Result.Ok || haxe.Int64.toInt(written.out_written) != content.length)
-      trace('Could not write ${path.substr(path.lastIndexOf("/") + 1)} to the chosen file: ${written.status}');
+    if (written.status != Result.Ok || haxe.Int64.toInt(written.out_written) != content
+      .length) trace('Could not write ${path.substr(path.lastIndexOf("/") + 1)} to the chosen file: ${written.status}');
     // Committing hands the bytes to the file handle or starts the download; closing alone would only flush to a
     // file handle. NativeKit reports the outcome asynchronously.
     var committed = NativeKit.nk_resource_commit(stream.borrow());
-    if (committed.status != Result.Ok)
-      trace('Could not save ${path.substr(path.lastIndexOf("/") + 1)} to the chosen file: ${committed.status}');
+    if (committed.status != Result
+      .Ok) trace('Could not save ${path.substr(path.lastIndexOf("/") + 1)} to the chosen file: ${committed.status}');
     stream.close();
   }
 }

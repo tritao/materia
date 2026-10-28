@@ -24,22 +24,24 @@ class HobbingReportData {
   public var materialBasis = "";
   public var measurement:Null<GearMeasurement>;
 
-  public function new() {}
+  public function new() {
+  }
 
   public function quality():String {
     if (measurement == null) return complete ? "Inspection incomplete" : "Inspection pending";
     var grade = measurement.overallGrade;
-    return (grade == null ? "Grade estimate incomplete or worse than 11" : 'Candidate grade $grade') +
-      (measurement.isoClass == null ? " · ISO class not qualified" : ' · ISO class ${measurement.isoClass}');
+    return (grade == null ? "Grade estimate incomplete or worse than 11" : 'Candidate grade $grade')
+      + (measurement.isoClass == null ? " · ISO class not qualified" : ' · ISO class ${measurement.isoClass}');
   }
 
-  public function warnings():Map<String,Array<String>> {
-    var groups:Map<String,Array<String>> = ["Sampling" => [], "Coverage" => [], "Assessment" => []];
+  public function warnings():Map<String, Array<String>> {
+    var groups:Map<String, Array<String>> = ["Sampling" = > [], "Coverage" = > [], "Assessment" = > []];
     if (measurement == null) return groups;
     for (warning in measurement.warnings.concat(measurement.extrapolation)) {
       var text = warning.toLowerCase();
-      var group = text.indexOf("sampl") >= 0 || text.indexOf("spacing") >= 0 || text.indexOf("cutoff") >= 0 ? "Sampling" :
-        text.indexOf("unchecked") >= 0 || text.indexOf("coverage") >= 0 || text.indexOf("covered") >= 0 || text.indexOf("profile control") >= 0 ? "Coverage" : "Assessment";
+      var group = text.indexOf("sampl") >= 0 || text.indexOf("spacing") >= 0
+        || text.indexOf("cutoff") >= 0 ? "Sampling" : text.indexOf("unchecked") >= 0 || text.indexOf("coverage") >= 0
+        || text.indexOf("covered") >= 0 || text.indexOf("profile control") >= 0 ? "Coverage" : "Assessment";
       // Missing face endpoints are a coverage issue as well as missing samples.
       if (text.indexOf("endpoints") >= 0) group = "Coverage";
       groups.get(group).push(warning);
@@ -55,14 +57,14 @@ class HobbingReportData {
     out.add("trace,tooth,flank,position_mm,raw_um,filtered_um\n");
     var measured = measurement;
     if (measured != null) {
-      appendCsv(out,"profile",measured.profiles);
-      appendCsv(out,"lead",measured.helices);
+      appendCsv(out, "profile", measured.profiles);
+      appendCsv(out, "lead", measured.helices);
     }
     return out.toString();
   }
 
   static function appendCsv(out:StringBuf, kind:String, traces:Array<GearTrace>):Void {
-    for (trace in traces) for (i in 0...trace.x.length)
-      out.add('$kind,${trace.tooth},${trace.flank},${trace.x[i]},${trace.raw[i]},${trace.filtered[i]}\n');
+    for (trace in traces) for (i in 0...trace
+      .x.length) out.add('$kind,${trace.tooth},${trace.flank},${trace.x[i]},${trace.raw[i]},${trace.filtered[i]}\n');
   }
 }

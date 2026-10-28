@@ -29,9 +29,10 @@ class MissionPanel {
   var lastOffset = 0.0;
   var following = true;
 
-  public function new() {}
+  public function new() {
+  }
 
-  public function build(controller:MissionController, tokens:ThemeTokens, ?showProgram:Void->Void):View {
+  public function build(controller:MissionController, tokens:ThemeTokens, ?showProgram:Void -> Void):View {
     var state = controller.snapshot();
     var mission = state.mission;
     var style = fill();
@@ -41,25 +42,48 @@ class MissionPanel {
     var items = [new KeyedView("heading", new Text("MISSION", null, tokens.textSecondary))];
     items.push(new KeyedView("status", MissionStatusView.build(controller, tokens, "mission-panel-status")));
     // A cell with several robot controllers runs one program on each; the panel follows one at a time.
-    if (state.programs.length > 1) for (id in state.programs)
-      items.push(new KeyedView("program-" + id, new Button((id == state.selectedProgram ? "● " : "○ ") + id, null,
-        function() controller.selectProgram(id), "mission-program-" + id)));
-    if(state.machining!=null) {
-      items.push(new KeyedView("machining-label",new Text(state.machining.label)));
-      items.push(new KeyedView("machining-status",new Text(state.machiningStatus)));
-      if(showProgram!=null)items.push(new KeyedView("program",new Button("Open CNC program",null,showProgram,"mission-cnc-program")));
-      items.push(new KeyedView("machining-task",new Text("Run the CNC program to completion. Use the CNC panel for feed hold, resume and program details.")));
+    if (state.programs.length > 1) for (id in state.programs) items.push(new KeyedView(
+      "program-" + id,
+      new Button(
+        (id == state.selectedProgram ? "● " : "○ ") + id,
+        null,
+        function() controller.selectProgram(id),
+        "mission-program-" + id
+      )
+    ));
+    if (state.machining != null) {
+      items.push(new KeyedView("machining-label", new Text(state.machining.label)));
+      items.push(new KeyedView("machining-status", new Text(state.machiningStatus)));
+      if (showProgram != null) items.push(new KeyedView(
+        "program",
+        new Button(
+          "Open CNC program",
+          null,
+          showProgram,
+          "mission-cnc-program"
+        )
+      ));
+      items.push(new KeyedView(
+        "machining-task",
+        new Text("Run the CNC program to completion. Use the CNC panel for feed hold, resume and program details.")
+      ));
     }
     if (mission == null || mission.steps.length == 0) {
-      if(!state.hasWork)items.push(new KeyedView("empty", new Text("This project has no mission.")));
+      if (!state.hasWork) items.push(new KeyedView("empty", new Text("This project has no mission.")));
       return new Column("mission-panel", items, style);
     }
     if (mission != source || generation != state.generation) {
-      source = mission; generation = state.generation; selected = -1; followed = -1; following = true;
-      scroll.jumpTo(0, 0); lastOffset = scroll.offsetY;
+      source = mission;
+      generation = state.generation;
+      selected = -1;
+      followed = -1;
+      following = true;
+      scroll.jumpTo(0, 0);
+      lastOffset = scroll.offsetY;
     }
     var progress = state.progress;
-    var active = progress == null || progress.phase == "startup" || progress.phase == "complete" ? -1 : progress.stepIndex;
+    var active = progress == null
+      || progress.phase == "startup" || progress.phase == "complete" ? -1 : progress.stepIndex;
     if (Math.abs(scroll.offsetY - lastOffset) > 0.5) following = false;
     if (following && active >= 0 && active != followed) {
       scroll.jumpTo(0, Math.max(0, (active - 2) * ROW_HEIGHT));
@@ -67,31 +91,45 @@ class MissionPanel {
     }
     lastOffset = scroll.offsetY;
     if (!following) items.push(new KeyedView("follow", new Button("Follow current step", null, function() {
-      following = true; followed = -1; selected = -1;
+      following = true;
+      followed = -1;
+      selected = -1;
     }, "mission-follow")));
     model.show(mission, progress, tokens);
-    var listStyle = fill(); listStyle.clipVertical = true;
-    items.push(new KeyedView("steps", new ListView("mission-steps", model, listStyle, scroll, 300.0,
-      selected, function(index) {
-        selected = index;
-        controller.inspectStep(index);
-      })));
+    var listStyle = fill();
+    listStyle.clipVertical = true;
+    items.push(new KeyedView("steps",
+      new ListView("mission-steps", model, listStyle, scroll, 300.0, selected, function(index) {
+      selected = index;
+      controller.inspectStep(index);
+    }
+    )));
     var detailIndex = selected >= 0 ? selected : active;
     if (detailIndex >= 0) {
       var step = mission.steps[detailIndex];
-      items.push(new KeyedView("detail", new Text((selected >= 0 ? "Selected" : "Current") + " step " +
-        (detailIndex + 1) + " · " + MissionStepPresentation.label(step))));
+      items.push(new KeyedView(
+        "detail",
+        new Text((selected
+        >= 0 ? "Selected" : "Current") + " step " + (detailIndex + 1) + " · " + MissionStepPresentation.label(step))
+      ));
       if (step.at != null) items.push(new KeyedView("connector", new Text("Connector: " + step.at.connector)));
       var pose = step.pose;
-      if (pose != null) items.push(new KeyedView("pose", new Text('Target: ${pose.x}, ${pose.y} m · heading ${Math.round(pose.yaw * 180 / Math.PI)}°')));
-      if (step.joints != null) items.push(new KeyedView("joints", new Text([for (joint in step.joints)
-        joint.joint + ": " + joint.position].join("\n"))));
+      if (pose != null) items.push(new KeyedView(
+        "pose",
+        new Text('Target: ${pose.x}, ${pose.y} m · heading ${Math.round(pose.yaw * 180 / Math.PI)}°')
+      ));
+      if (step.joints != null) items.push(new KeyedView(
+        "joints",
+        new Text([for (joint in step.joints) joint.joint + ": " + joint.position].join("\n"))
+      ));
     }
     return new Column("mission-panel", items, style);
   }
 
   static function fill():LayoutStyle {
-    var style = new LayoutStyle(); style.width = LayoutAxis.grow(); style.height = LayoutAxis.grow();
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.height = LayoutAxis.grow();
     return style;
   }
 }
@@ -102,12 +140,20 @@ private class MissionListModel implements ListViewModel {
   var tokens:ThemeTokens;
   var version = 0;
   var stateKey = "";
-  public function new() {}
-  public function show(mission:SceneArtifactMission, progress:Null<app.MissionPlayer.MissionProgress>, tokens:ThemeTokens):Void {
-    var nextKey = progress == null ? "ready" : progress.phase + ":" + progress.stepIndex + ":" + progress.completedInLoop;
+  public function new() {
+  }
+  public function show(
+    mission:SceneArtifactMission,
+    progress:Null<app.MissionPlayer.MissionProgress>,
+    tokens:ThemeTokens
+  ):Void {
+    var nextKey = progress
+      == null ? "ready" : progress.phase + ":" + progress.stepIndex + ":" + progress.completedInLoop;
     if (this.mission != mission || this.tokens != tokens || stateKey != nextKey) version++;
     stateKey = nextKey;
-    this.mission = mission; this.progress = progress; this.tokens = tokens;
+    this.mission = mission;
+    this.progress = progress;
+    this.tokens = tokens;
   }
   public function count():Int return mission.steps.length;
   public function keyAt(index:Int):String return 'step-$index';
@@ -118,13 +164,18 @@ private class MissionListModel implements ListViewModel {
   public function totalExtent():Null<Float> return count() * MissionPanel.ROW_HEIGHT;
   public function revision():Int return version;
   public function buildItem(index:Int):View {
-    var state = progress == null ? "" : index < progress.completedInLoop ? "Done" :
-      index == progress.stepIndex && progress.phase == "failed" ? "Failed" :
-      index == progress.stepIndex && progress.phase == "executing" ? "Current" : "";
-    var style = new LayoutStyle(); style.width = LayoutAxis.grow(); style.height = LayoutAxis.fixed(MissionPanel.ROW_HEIGHT);
+    var state = progress == null ? "" : index < progress.completedInLoop ? "Done" : index == progress.stepIndex
+      && progress.phase == "failed" ? "Failed" : index == progress.stepIndex
+      && progress.phase == "executing" ? "Current" : "";
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.height = LayoutAxis.fixed(MissionPanel.ROW_HEIGHT);
     style.padding = new Insets(6.0, 6.0, 6.0, 6.0);
     if (state == "Current" || state == "Failed") style.background = tokens.selectionField;
-    return new Text((index + 1) + "  " + MissionStepPresentation.label(mission.steps[index]) +
-      (state == "" ? "" : " · " + state), style, state == "Failed" ? tokens.danger : tokens.text);
+    return new Text(
+      (index + 1) + "  " + MissionStepPresentation.label(mission.steps[index]) + (state == "" ? "" : " · " + state),
+      style,
+      state == "Failed" ? tokens.danger : tokens.text
+    );
   }
 }

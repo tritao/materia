@@ -16,7 +16,7 @@ class ProjectLoadJob {
   var failure:Null<String> = null;
 
   #if wasm
-  var programReader:Null<String->haxe.io.Bytes>;
+  var programReader:Null<String -> haxe.io.Bytes>;
   var workerId:Int = 0;
   var artifactBytes:Null<haxe.io.Bytes>;
   var workerPhase:String = "";
@@ -31,13 +31,16 @@ class ProjectLoadJob {
       if (variantId != null) throw "Browser loading cannot select a source project variant";
       if (!ProjectSourceLoader.isPrebuilt(projectPath)) throw "Browser loading requires a prebuilt .mtrg artifact";
       var metadata = sys.FileSystem.metadata(projectPath);
-      if (metadata == null || sys.FileSystem.isDirectory(projectPath) || metadata.size > 150000000)
-        throw "Project artifact is missing or too large";
+      if (metadata == null || sys.FileSystem.isDirectory(projectPath)
+        || metadata.size > 150000000) throw "Project artifact is missing or too large";
       control.phase("Starting preparation worker");
       var bytes = sys.io.File.getBytes(projectPath);
       artifactBytes = bytes;
       programReader = ProjectSourceLoader.programReader(projectPath);
-      var cachedScene = new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).tryLoadCached(bytes, control);
+      var cachedScene = new ProjectArtifactLoader(PreparedSceneCaches.current(), programReader).tryLoadCached(
+        bytes,
+        control
+      );
       if (cachedScene != null) {
         result = cachedScene;
         artifactBytes = null;
@@ -53,21 +56,26 @@ class ProjectLoadJob {
         self.failure = ProjectLoadControl.CANCELLED;
         self.control.detach();
         self.finished = true;
-      });
-    } catch (error:Dynamic) { failure = Std.string(error); finished = true; }
+      }
+      );
+    } catch (error:Dynamic) {
+      failure = Std.string(error);
+      finished = true;
+    }
     #else
     Thread.create(function() {
       var loaded:Null<GeneratedAssemblyScene> = null;
       var problem:Null<String> = null;
-      try loaded = ProjectSourceLoader.load(projectPath, null, self.control, variantId)
-      catch (error:Dynamic) problem = Std.string(error);
+      try loaded = ProjectSourceLoader.load(projectPath,
+        null, self.control, variantId) catch (error:Dynamic) problem = Std.string(error);
       self.control.phase("Waiting for the editor");
       self.mutex.acquire();
       self.result = loaded;
       self.failure = problem;
       self.finished = true;
       self.mutex.release();
-    });
+    }
+    );
     #end
   }
 
@@ -94,7 +102,10 @@ class ProjectLoadJob {
     var phase = MateriaWebFiles.materia_worker_phase(workerId);
     if (phase.status == 0) {
       var text = phase.data.toString();
-      if (text != workerPhase) { workerPhase = text; control.phase(text); }
+      if (text != workerPhase) {
+        workerPhase = text;
+        control.phase(text);
+      }
     }
     var status = MateriaWebFiles.materia_worker_status(workerId);
     if (status == 0) return;
@@ -104,7 +115,12 @@ class ProjectLoadJob {
       control.throwIfCancelled();
       var bytes = artifactBytes;
       if (bytes == null) throw "Missing artifact input";
-      result = new ProjectArtifactLoader(PreparedSceneCaches.current(),programReader).load(bytes, control, response.data, true);
+      result = new ProjectArtifactLoader(PreparedSceneCaches.current(), programReader).load(
+        bytes,
+        control,
+        response.data,
+        true
+      );
     } catch (error:Dynamic) failure = Std.string(error);
     MateriaWebFiles.materia_worker_cancel(workerId);
     artifactBytes = null;

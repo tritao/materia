@@ -33,7 +33,8 @@ class CadDocumentSession {
     if (feature.document != document) throw "The sheet feature belongs to another document";
     if (flatPatternOwner == feature && flatPatternSnapshot != null) return flatPatternSnapshot;
     var next = FlatPattern.of(feature.sheet());
-    flatPatternOwner = feature; flatPatternSnapshot = next;
+    flatPatternOwner = feature;
+    flatPatternSnapshot = next;
     return next;
   }
 
@@ -47,7 +48,10 @@ class CadDocumentSession {
     if (output == null) throw "The document output is not a sheet";
     var previous = sheetFlatView;
     sheetFlatView = flat;
-    try publishCurrent(beginEvaluation()) catch (error:Dynamic) { sheetFlatView = previous; throw error; }
+    try publishCurrent(beginEvaluation()) catch (error:Dynamic) {
+      sheetFlatView = previous;
+      throw error;
+    }
   }
 
   var publishedShape:Null<Shape>;
@@ -59,13 +63,11 @@ class CadDocumentSession {
   var refinementFrameRequested:Bool = false;
 
   public function new(model:CadSessionModel) {
-    if (model == null)
-      throw "CAD document sessions require a model";
+    if (model == null) throw "CAD document sessions require a model";
     this.model = model;
     document = model.getDocument();
     var output = document.outputFeatureOrNull();
-    if (output != null && output.currentShape() != null)
-      publishCurrent(beginEvaluation());
+    if (output != null && output.currentShape() != null) publishCurrent(beginEvaluation());
   }
 
   public function geometry():GeometryData {
@@ -89,14 +91,16 @@ class CadDocumentSession {
       var vertices = [for (i in 0...hull.vertices.length) hull.vertices[i] * scale - centre[i % 3]];
       source.close();
       return {vertices: vertices, warning: hull.warning, errorRatio: hull.errorRatio};
-    } catch (error:Dynamic) {source.close(); throw error;}
+    } catch (error:Dynamic) {
+      source.close();
+      throw error;
+    }
   }
 
   /** Return an owning snapshot that remains valid across the next recompute. */
   public function copyPublishedShape():Shape {
     ensureOpen();
-    if (publishedShape == null)
-      throw "CAD document has no published shape";
+    if (publishedShape == null) throw "CAD document has no published shape";
     return publishedShape.cloneShape();
   }
 
@@ -109,14 +113,12 @@ class CadDocumentSession {
   public function beginSketchEdit(featureIndex:Int, ?draft:ConstrainedSketch):CadSketchEditSession {
     ensureOpen();
     var candidate = document.featureAt(featureIndex);
-    if (!Std.isOfType(candidate, ConstrainedSketchFeature))
-      throw "selected CAD feature is not a constrained sketch";
+    if (!Std.isOfType(candidate, ConstrainedSketchFeature)) throw "selected CAD feature is not a constrained sketch";
     return new CadSketchEditSession(this, cast candidate, draft);
   }
 
   /** Start an unattached sketch draft; no feature exists until a valid profile is applied. */
-  public function beginNewSketchEdit(?plane:Plane, units:String = "mm",
-      ?draft:ConstrainedSketch):CadSketchEditSession {
+  public function beginNewSketchEdit(?plane:Plane, units:String = "mm", ?draft:ConstrainedSketch):CadSketchEditSession {
     ensureOpen();
     return new CadSketchEditSession(this, null, draft == null ? new ConstrainedSketch(plane, units) : draft);
   }
@@ -125,30 +127,29 @@ class CadDocumentSession {
     ensureOpen();
     var nativeResources = CadKit.resourceCountsGetChecked();
     return {
-      revision:revision,
-      recomputeAttempts:document.recomputeAttemptCount,
-      recomputeSeconds:document.lastRecomputeSeconds,
-      evaluatedFeatures:document.lastRecomputeFeatureCount,
-      sketchSolveSeconds:document.lastSketchSolveSeconds,
-      sketchSolveCount:document.lastSketchSolveCount,
-      sketchProfileSeconds:document.lastSketchProfileSeconds,
-      tessellationSeconds:model.tessellationSeconds(),
-      geometryConversionSeconds:model.geometryConversionSeconds(),
-      publicationSeconds:lastPublicationSeconds,
-      nativeShapeHandles:nativeResources.get_shapeCount(),
-      nativeMeshHandles:nativeResources.get_meshCount(),
-      nativeOperationHandles:nativeResources.get_operationCount()
+      revision: revision,
+      recomputeAttempts: document.recomputeAttemptCount,
+      recomputeSeconds: document.lastRecomputeSeconds,
+      evaluatedFeatures: document.lastRecomputeFeatureCount,
+      sketchSolveSeconds: document.lastSketchSolveSeconds,
+      sketchSolveCount: document.lastSketchSolveCount,
+      sketchProfileSeconds: document.lastSketchProfileSeconds,
+      tessellationSeconds: model.tessellationSeconds(),
+      geometryConversionSeconds: model.geometryConversionSeconds(),
+      publicationSeconds: lastPublicationSeconds,
+      nativeShapeHandles: nativeResources.get_shapeCount(),
+      nativeMeshHandles: nativeResources.get_meshCount(),
+      nativeOperationHandles: nativeResources.get_operationCount()
     };
   }
 
   /** Run an authored edit, stage its render result, then clear CadKit-local history. */
-  public function perform(edit:CadDocumentSession->Void):Void {
+  public function perform(edit:CadDocumentSession -> Void):Void {
     ensureOpen();
     var ticket = beginEvaluation();
     var previousCancellationCheck = document.evaluationCancellationCheck;
     document.evaluationCancellationCheck = function() {
-      return !isEvaluationCurrent(ticket) ||
-        (previousCancellationCheck != null && previousCancellationCheck());
+      return !isEvaluationCurrent(ticket) || (previousCancellationCheck != null && previousCancellationCheck());
     };
     var authored = false;
     try {
@@ -156,10 +157,8 @@ class CadDocumentSession {
       authored = true;
       ensureEvaluationCurrent(ticket);
       var output = document.outputFeatureOrNull();
-      if (output == null || output.currentShape() == null)
-        publishEmpty(ticket);
-      else
-        publishCurrent(ticket);
+      if (output == null || output.currentShape() == null) publishEmpty(ticket);
+      else publishCurrent(ticket);
       document.evaluationCancellationCheck = previousCancellationCheck;
       document.clearHistory();
       diagnostics = [];
@@ -170,7 +169,8 @@ class CadDocumentSession {
         try {
           document.recompute();
           document.clearHistory();
-        } catch (_:Dynamic) {}
+        } catch (_:Dynamic) {
+        }
       }
       throw error;
     }
@@ -185,12 +185,10 @@ class CadDocumentSession {
 
   /** Supersede any in-flight evaluation without touching the last published result. */
   public function cancelPendingEvaluation():Void {
-    if (!closed)
-      evaluationGeneration++;
+    if (!closed) evaluationGeneration++;
   }
 
-  public function isEvaluationCurrent(ticket:Int):Bool
-    return !closed && ticket == evaluationGeneration;
+  public function isEvaluationCurrent(ticket:Int):Bool return !closed && ticket == evaluationGeneration;
 
   /** Start a preview generation. Older preview tickets can no longer publish. */
   public function beginPreview():Int {
@@ -202,15 +200,13 @@ class CadDocumentSession {
   /** Retain and publish a preview only while its generation is still current. */
   public function publishPreview(ticket:Int, shape:Shape):Bool {
     ensureOpen();
-    if (ticket != previewGeneration)
-      return false;
+    if (ticket != previewGeneration) return false;
     var candidate = shape.cloneShape();
     if (ticket != previewGeneration || closed) {
       candidate.close();
       return false;
     }
-    if (previewResult != null)
-      previewResult.close();
+    if (previewResult != null) previewResult.close();
     previewResult = candidate;
     return true;
   }
@@ -226,8 +222,7 @@ class CadDocumentSession {
   }
 
   public function cancelPreview(?ticket:Int):Void {
-    if (ticket != null && ticket != previewGeneration)
-      return;
+    if (ticket != null && ticket != previewGeneration) return;
     previewGeneration++;
     if (previewResult != null) {
       previewResult.close();
@@ -255,8 +250,7 @@ class CadDocumentSession {
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
       lastPublicationSeconds = Sys.time() - publicationStarted;
-      if (nextShape != null)
-        nextShape.close();
+      if (nextShape != null) nextShape.close();
       throw error;
     }
 
@@ -267,11 +261,11 @@ class CadDocumentSession {
     collisionBounds = nextCollisionBounds;
     pendingFineGeometry = true;
     refinementFrameRequested = false;
-    flatPatternOwner = null; flatPatternSnapshot = null;
+    flatPatternOwner = null;
+    flatPatternSnapshot = null;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
-    if (priorShape != null)
-      priorShape.close();
+    if (priorShape != null) priorShape.close();
   }
 
   function publishEmpty(ticket:Int):Void {
@@ -283,33 +277,29 @@ class CadDocumentSession {
     collisionBounds = null;
     pendingFineGeometry = false;
     refinementFrameRequested = false;
-    flatPatternOwner = null; flatPatternSnapshot = null;
+    flatPatternOwner = null;
+    flatPatternSnapshot = null;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
-    if (priorShape != null)
-      priorShape.close();
+    if (priorShape != null) priorShape.close();
   }
 
-  public function needsGeometryRefinement():Bool
-    return !closed && pendingFineGeometry && publishedShape != null;
+  public function needsGeometryRefinement():Bool return !closed && pendingFineGeometry && publishedShape != null;
 
   /** Defer refinement once so the just-published preview can be rendered. */
   public function requestRefinementFrame():Bool {
-    if (!needsGeometryRefinement() || refinementFrameRequested)
-      return false;
+    if (!needsGeometryRefinement() || refinementFrameRequested) return false;
     refinementFrameRequested = true;
     return true;
   }
 
   /** Replace the coarse viewport mesh for the same published shape revision. */
   public function refinePublishedGeometry():Bool {
-    if (!needsGeometryRefinement() || !refinementFrameRequested)
-      return false;
+    if (!needsGeometryRefinement() || !refinementFrameRequested) return false;
     var source = publishedShape;
     if (source == null) return false;
     var nextGeometry = model.geometryFor(source, false);
-    if (closed || !pendingFineGeometry)
-      return false;
+    if (closed || !pendingFineGeometry) return false;
     publishedGeometry = nextGeometry;
     pendingFineGeometry = false;
     refinementFrameRequested = false;
@@ -318,22 +308,18 @@ class CadDocumentSession {
   }
 
   function ensureEvaluationCurrent(ticket:Int):Void {
-    if (!isEvaluationCurrent(ticket))
-      throw new EvaluationCancelled();
+    if (!isEvaluationCurrent(ticket)) throw new EvaluationCancelled();
   }
 
   function ensureOpen():Void {
-    if (closed)
-      throw "CAD document session is closed";
+    if (closed) throw "CAD document session is closed";
   }
 
   public function close():Void {
-    if (closed)
-      return;
+    if (closed) return;
     closed = true;
     cancelPreview();
-    if (publishedShape != null)
-      publishedShape.close();
+    if (publishedShape != null) publishedShape.close();
     publishedShape = null;
     publishedGeometry = null;
     collisionBounds = null;

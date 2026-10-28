@@ -54,7 +54,12 @@ class AppSettings {
     antialiasing.minimum = 1;
     antialiasing.maximum = 16;
     antialiasing.step = 1;
-    registry.define(ANTIALIASING, PropertyType.Int, PropertyValue.Int(AppPreferences.DEFAULT_ANTIALIASING), antialiasing);
+    registry.define(
+      ANTIALIASING,
+      PropertyType.Int,
+      PropertyValue.Int(AppPreferences.DEFAULT_ANTIALIASING),
+      antialiasing
+    );
 
     var scheme = new SettingOptions();
     scheme.options = [new PropertyOption("light", "Light"), new PropertyOption("dark", "Dark")];
@@ -62,8 +67,14 @@ class AppSettings {
 
     var lighting = new SettingOptions();
     lighting.tooltip = "How the 3D viewport lights the scene.";
-    lighting.options = [new PropertyOption("studio", "Studio"), new PropertyOption("soft", "Soft"),
-      new PropertyOption("contrast", "Contrast")];
+    lighting.options = [
+      new PropertyOption("studio", "Studio"),
+      new PropertyOption("soft", "Soft"),
+      new PropertyOption(
+        "contrast",
+        "Contrast"
+      )
+    ];
     registry.define(LIGHTING, PropertyType.Enum, PropertyValue.Enum("studio"), lighting);
 
     var printer = new SettingOptions();
@@ -72,7 +83,8 @@ class AppSettings {
     registry.define(PRINTER_ENDPOINT, PropertyType.Text, PropertyValue.Text(""), printer);
     var config = new SettingOptions();
     config.label = "Klipper Config File";
-    config.tooltip = "The printer.cfg that Install Klipper config uploads to the printer, restarts Klipper on, and reads back.";
+    config.tooltip =
+      "The printer.cfg that Install Klipper config uploads to the printer, restarts Klipper on, and reads back.";
     registry.define(PRINTER_CONFIG, PropertyType.Text, PropertyValue.Text(""), config);
 
     registry.define(GRID_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true));
@@ -82,11 +94,13 @@ class AppSettings {
     registry.define(COSMETIC_THREADS, PropertyType.Bool, PropertyValue.Bool(true), threads);
     var overlays = new SettingOptions();
     overlays.label = "Show Simulation Overlays";
-    overlays.tooltip = "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";
+    overlays.tooltip =
+      "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";
     registry.define(SIMULATION_OVERLAYS, PropertyType.Bool, PropertyValue.Bool(true), overlays);
     var collisions = new SettingOptions();
     collisions.label = "Show Collisions";
-    collisions.tooltip = "While editing, tint objects that collide red and objects nearer than the near distance amber, and join their closest points.";
+    collisions.tooltip =
+      "While editing, tint objects that collide red and objects nearer than the near distance amber, and join their closest points.";
     registry.define(COLLISIONS_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true), collisions);
     var near = new SettingOptions();
     near.label = "Near Distance";

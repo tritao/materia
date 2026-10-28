@@ -6,14 +6,12 @@ import app.EditorToolbarLayout.EditorToolbarDensity;
 class EditorToolbarLayoutTests {
   public static function main():Int {
     var density = Full;
-    for (width in [965.0, 955.0, 965.0, 955.0])
-      density = EditorToolbarLayout.forWidth(density, width);
+    for (width in [965.0, 955.0, 965.0, 955.0]) density = EditorToolbarLayout.forWidth(density, width);
     if (density != Full) return 1;
 
     density = EditorToolbarLayout.forWidth(density, 920.0);
     if (density != Compact) return 2;
-    for (width in [955.0, 965.0, 955.0, 965.0])
-      density = EditorToolbarLayout.forWidth(density, width);
+    for (width in [955.0, 965.0, 955.0, 965.0]) density = EditorToolbarLayout.forWidth(density, width);
     if (density != Compact) return 3;
 
     density = EditorToolbarLayout.forWidth(density, 1000.0);

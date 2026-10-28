@@ -52,15 +52,10 @@ import materia.project.SceneArtifact;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 
-@:access(app.EditorScene)
-@:access(app.EditorPerspectiveViewport)
-@:access(app.ApplicationSimulation)
-@:access(app.Main.ReferenceEditorApp)
-@:access(haxeon.ui.core.RenderNode)
-class SceneEditingTests {
+@:access(app.EditorScene) @:access(app.EditorPerspectiveViewport) @:access(app.ApplicationSimulation) @:access(app
+  .Main.ReferenceEditorApp) @:access(haxeon.ui.core.RenderNode) class SceneEditingTests {
   static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
-    for (candidate in properties)
-      if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
+    for (candidate in properties) if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
     throw "Missing property: " + key;
   }
   static function finishLibrarySelection():Void {
@@ -83,12 +78,16 @@ class SceneEditingTests {
       check(binding.apply(PropertyValue.Enum("bronze")) == PropertyEditResult.Applied,
         "library finish can be selected");
       var selected = scene.object(scene.selectedId);
-      check(selected != null && Appearances.same(selected.appearance, MaterialLibrary.appearance("bronze")),
-        "library finish supplies its visual values");
-      check(new PropertyBinding(metallicProperty, scene.context()).apply(PropertyValue.Float(0.2)) ==
-        PropertyEditResult.Applied, "metallic edit succeeds");
-      check(binding.read() == PropertyValue.Enum("custom"),
-        "edited library finish is shown as Custom");
+      check(
+        selected != null && Appearances.same(selected.appearance, MaterialLibrary.appearance("bronze")),
+        "library finish supplies its visual values"
+      );
+      check(
+        new PropertyBinding(metallicProperty,
+        scene.context()).apply(PropertyValue.Float(0.2)) == PropertyEditResult.Applied,
+        "metallic edit succeeds"
+      );
+      check(binding.read() == PropertyValue.Enum("custom"), "edited library finish is shown as Custom");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -106,21 +105,28 @@ class SceneEditingTests {
     }
     check(name != null && rate != null, "sensor properties are identified by id");
     var before = sensors.revision();
-    check(new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor")) ==
-      PropertyEditResult.Applied && sensors.revision() == before,
-      "sensor rename does not require simulation rebuild");
-    check(new PropertyBinding(rate, sensors.context()).apply(PropertyValue.Float(12.0)) ==
-      PropertyEditResult.Applied && sensors.revision() > before,
-      "sensor acquisition change requires simulation rebuild");
+    check(
+      new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor"))
+      == PropertyEditResult.Applied && sensors.revision() == before,
+      "sensor rename does not require simulation rebuild"
+    );
+    check(
+      new PropertyBinding(rate,
+      sensors.context()).apply(PropertyValue.Float(12.0)) == PropertyEditResult.Applied && sensors.revision() > before,
+      "sensor acquisition change requires simulation rebuild"
+    );
     sensors.dispose();
 
     var shared = new haxeon.ui.editing.EditorDocument("shared");
     var sharedSensors = new SensorConfiguration(null, shared);
     var sharedScene = new EditorScene([], shared);
     var sensorRevision = sharedSensors.revision();
-    check(sharedScene.createRectangle() && sharedSensors.revision() == sensorRevision,
-      "scene edits in the shared document do not change sensor physics revision");
-    sharedScene.dispose(); sharedSensors.dispose();
+    check(
+      sharedScene.createRectangle() && sharedSensors.revision() == sensorRevision,
+      "scene edits in the shared document do not change sensor physics revision"
+    );
+    sharedScene.dispose();
+    sharedSensors.dispose();
   }
 
   static function revisionSeparation():Void {
@@ -130,70 +136,122 @@ class SceneEditingTests {
       scene.onSelectionChanged = function() selectionSignals++;
       var content = scene.revision, visual = scene.visualRevision;
       var environment = scene.environmentRevision, selection = scene.selectionRevision;
-      check(scene.select("tower") && scene.revision == content &&
-        scene.visualRevision > visual && scene.selectionRevision > selection &&
-        scene.environmentRevision == environment && selectionSignals == 1,
-        "selection changes visual and selection revisions only");
+      check(
+        scene.select("tower") && scene.revision == content && scene.visualRevision > visual
+        && scene.selectionRevision > selection && scene.environmentRevision == environment && selectionSignals == 1,
+        "selection changes visual and selection revisions only"
+      );
       environment = scene.environmentRevision;
       scene.setName("tower", "Renamed tower");
       scene.setVisible("tower", false);
       scene.setColour("tower", 0.3, 0.4, 0.5);
-      check(scene.environmentRevision == environment,
-        "name, visibility and colour do not change the physics environment");
+      check(
+        scene.environmentRevision == environment,
+        "name, visibility and colour do not change the physics environment"
+      );
       scene.setPositionXY("tower", 2.0, 0.0);
-      check(scene.environmentRevision > environment,
-        "a collision object's position changes the physics environment");
-    } catch (error:Dynamic) { scene.dispose(); throw error; }
+      check(scene.environmentRevision > environment, "a collision object's position changes the physics environment");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
     scene.dispose();
   }
 
   static function appearanceArtifactRoundTrip():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
-    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    vertices.setDouble(24, 1);
+    vertices.setDouble(56, 1);
+    vertices.setDouble(88, 1);
     var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
     for (index in 0...corners.length) indices.setInt32(index * 4, corners[index]);
-    var encoded = SceneArtifact.encode({metresPerUnit: 0.001, parts: [{
-      id: "shaft", name: "Shaft", red: 0.6, green: 0.62, blue: 0.65,
-      appearance: Appearances.machinedSteel(), vertexCount: 4, indexCount: 12,
-      vertices: vertices, normals: normals, indices: indices, faceRanges: []
-    }]});
+    var encoded = SceneArtifact.encode({
+      metresPerUnit: 0.001,
+      parts: [{
+        id: "shaft",
+        name: "Shaft",
+        red: 0.6,
+        green: 0.62,
+        blue: 0.65,
+        appearance: Appearances.machinedSteel(),
+        vertexCount: 4,
+        indexCount: 12,
+        vertices: vertices,
+        normals: normals,
+        indices: indices,
+        faceRanges: []
+      }]
+    });
     var part = SceneArtifact.decode(encoded).parts[0], steel = Appearances.machinedSteel();
-    check(part.appearance != null && part.appearance.finish == "machined-steel" &&
-      nearValue(part.appearance.metallic, steel.metallic) && nearValue(part.appearance.roughness, steel.roughness),
-      "generated artifact retains surface finish");
+    check(
+      part.appearance != null && part.appearance.finish == "machined-steel" && nearValue(
+        part.appearance.metallic,
+        steel.metallic
+      ) && nearValue(
+        part.appearance.roughness,
+        steel.roughness
+      ),
+      "generated artifact retains surface finish"
+    );
   }
   static function componentFinishReset():Void {
-    var source:app.SceneObjectData = {id:"project:bearing", label:"Bearing", type:"rectangle",
-      x:0, y:0, z:0, width:1, height:1, depth:1, collisionEnabled:false,
-      dynamicBody:false, mass:1, red:0.6, green:0.62, blue:0.64,
-      appearance: Appearances.bearingSteel(), visible:true};
+    var source:app.SceneObjectData = {
+      id: "project:bearing",
+      label: "Bearing",
+      type: "rectangle",
+      x: 0,
+      y: 0,
+      z: 0,
+      width: 1,
+      height: 1,
+      depth: 1,
+      collisionEnabled: false,
+      dynamicBody: false,
+      mass: 1,
+      red: 0.6,
+      green: 0.62,
+      blue: 0.64,
+      appearance: Appearances.bearingSteel(),
+      visible: true
+    };
     var scene = new EditorScene([source]);
     scene.configureComponentFinishes([source]);
     scene.select(source.id);
     scene.setColour(source.id, 0.2, 0.25, 0.3);
     scene.setFinish(source.id, Appearances.blackOxide());
     var finish = new PropertyBinding(property(scene.properties(), "finish"), scene.context());
-    check(finish.apply(PropertyValue.Enum("component")) == PropertyEditResult.Applied,
-      "component finish reset is available in picker");
+    check(
+      finish.apply(PropertyValue.Enum("component")) == PropertyEditResult.Applied,
+      "component finish reset is available in picker"
+    );
     var restored = scene.records()[0];
-    check(restored.appearance != null && restored.appearance.finish == "bearing-steel" &&
-      nearValue(restored.red, 0.6) && nearValue(restored.green, 0.62),
-      "component finish reset restores source finish and color");
+    check(
+      restored.appearance != null && restored.appearance.finish == "bearing-steel" && nearValue(restored.red,
+      0.6) && nearValue(
+        restored.green,
+        0.62
+      ),
+      "component finish reset restores source finish and color"
+    );
     scene.dispose();
   }
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
-  static function near(actual:Float, expected:Float, message:String):Void
-    check(Math.abs(actual - expected) < 0.00001, message);
+  static function near(actual:Float, expected:Float, message:String):Void check(
+    Math.abs(actual - expected) < 0.00001,
+    message
+  );
 
   static function perspectiveCameraMath():Void {
     var camera = new PerspectiveCamera();
     var initialDistance = camera.distance;
     var initialRevision = camera.revision;
     camera.orbit(20, -10);
-    check(camera.revision > initialRevision && camera.pitch > -1.49 && camera.pitch < 1.49,
-      "perspective orbit changes bounded camera state");
+    check(
+      camera.revision > initialRevision && camera.pitch > -1.49 && camera.pitch < 1.49,
+      "perspective orbit changes bounded camera state"
+    );
     var flyCamera = new PerspectiveCamera();
     var flyEye = flyCamera.eyePosition();
     flyCamera.look(40, -20);
@@ -202,8 +260,11 @@ class SceneEditingTests {
     var forward = flyCamera.viewDirection();
     flyCamera.fly(1, 0, 0, 2);
     var movedEye = flyCamera.eyePosition();
-    for (axis in 0...3) near(movedEye[axis], flyEye[axis] - forward[axis] * 2,
-      "fly forward moves in the look direction");
+    for (axis in 0...3) near(
+      movedEye[axis],
+      flyEye[axis] - forward[axis] * 2,
+      "fly forward moves in the look direction"
+    );
     var start = flyCamera.eyePosition();
     flyCamera.fly(1, 1, 0, 2);
     var diagonal = flyCamera.eyePosition();
@@ -211,8 +272,7 @@ class SceneEditingTests {
     near(Math.sqrt(dx * dx + dy * dy + dz * dz), 2, "diagonal fly speed is normalized");
     var targetX = camera.targetX, targetY = camera.targetY;
     camera.pan(30, -15, 600);
-    check(camera.targetX != targetX || camera.targetY != targetY,
-      "perspective pan moves the orbit target");
+    check(camera.targetX != targetX || camera.targetY != targetY, "perspective pan moves the orbit target");
     // A fixed world point follows the pointer on both screen axes, at different angles.
     for (angle in [0.0, 0.8, -0.8]) {
       var panCamera = new PerspectiveCamera();
@@ -220,8 +280,10 @@ class SceneEditingTests {
       var anchor = panCamera.cursorAnchor(400, 300, 800, 600);
       panCamera.pan(30, -15, 600);
       var moved = panCamera.project(anchor[0], anchor[1], anchor[2], 800, 600);
-      check(moved != null && Math.abs(moved.x - 430) < 0.01 && Math.abs(moved.y - 285) < 0.01,
-        "panning moves scene content with the pointer on both axes");
+      check(
+        moved != null && Math.abs(moved.x - 430) < 0.01 && Math.abs(moved.y - 285) < 0.01,
+        "panning moves scene content with the pointer on both axes"
+      );
     }
     camera.zoom(-120);
     check(camera.distance < initialDistance, "perspective wheel zoom moves closer");
@@ -245,10 +307,11 @@ class SceneEditingTests {
     }
     camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 0.5);
     for (ix in 0...2) for (iy in 0...2) for (iz in 0...2) {
-      var corner = camera.project(2 + (ix - 0.5) * 4, -3 + (iy - 0.5) * 2,
-        (iz - 0.5) * 0.1, 300, 600);
-      check(corner != null && corner.x >= 0 && corner.x <= 300 && corner.y >= 0 && corner.y <= 600,
-        "framing fits every corner in a portrait viewport");
+      var corner = camera.project(2 + (ix - 0.5) * 4, -3 + (iy - 0.5) * 2, (iz - 0.5) * 0.1, 300, 600);
+      check(
+        corner != null && corner.x >= 0 && corner.x <= 300 && corner.y >= 0 && corner.y <= 600,
+        "framing fits every corner in a portrait viewport"
+      );
     }
     var matrix = camera.viewProjection(16.0 / 9.0);
     for (index in 0...16) {
@@ -262,50 +325,89 @@ class SceneEditingTests {
       clip.push(value);
     }
     var projected = camera.projectWithMatrix(matrix, source[0], source[1], source[2], 1600, 900);
-    check(projected != null && nearValue(projected.x, (clip[0]/clip[3]*0.5+0.5)*1600) &&
-      nearValue(projected.y, (0.5-clip[1]/clip[3]*0.5)*900) && nearValue(projected.depth, clip[2]/clip[3]),
-      "shared projection agrees with homogeneous matrix multiplication");
-    check(camera.projectWithMatrix(nativekit.scene.Transform.identity().set(15,-1),0,0,0,800,600)==null,
-      "shared projection rejects points behind the camera");
+    check(
+      projected != null && nearValue(projected.x, (clip[0] / clip[3] * 0.5 + 0.5) * 1600) && nearValue(
+        projected.y,
+        (0.5 - clip[1] / clip[3] * 0.5) * 900
+      ) && nearValue(
+        projected.depth,
+        clip[2] / clip[3]
+      ),
+      "shared projection agrees with homogeneous matrix multiplication"
+    );
+    check(
+      camera.projectWithMatrix(nativekit.scene.Transform.identity().set(15, -1), 0, 0, 0, 800, 600) == null,
+      "shared projection rejects points behind the camera"
+    );
     camera.reset();
     camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]]);
-    check(camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
-      "viewport depth range follows nearby scene bounds");
+    check(
+      camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
+      "viewport depth range follows nearby scene bounds"
+    );
     var overlayEye = camera.eyePosition(), backward = camera.viewDirection();
     var beyondScene = camera.clipFar * 1.5;
     var farX = overlayEye[0] - backward[0] * beyondScene;
     var farY = overlayEye[1] - backward[1] * beyondScene;
     var farZ = overlayEye[2] - backward[2] * beyondScene;
-    check(camera.projectSegmentWithMatrix(camera.viewProjection(1.0),
-      farX, farY, farZ, farX - backward[0], farY - backward[1], farZ - backward[2],
-      800, 600) == null,
-      "scene projection clips geometry beyond its fitted range");
-    check(camera.projectSegmentWithMatrix(camera.viewProjection(1.0,
-      Math.max(0.001, camera.distance / 10000.0), Math.max(100.0, camera.distance * 100.0)),
-      farX, farY, farZ, farX - backward[0], farY - backward[1], farZ - backward[2],
-      800, 600) != null,
-      "overlay projection retains grid lines beyond scene geometry");
+    check(
+      camera.projectSegmentWithMatrix(
+        camera.viewProjection(1.0),
+        farX,
+        farY,
+        farZ,
+        farX - backward[0],
+        farY - backward[1],
+        farZ - backward[2],
+        800,
+        600
+      ) == null,
+      "scene projection clips geometry beyond its fitted range"
+    );
+    check(
+      camera.projectSegmentWithMatrix(
+        camera.viewProjection(
+          1.0,
+          Math.max(0.001, camera.distance / 10000.0),
+          Math.max(
+            100.0,
+            camera.distance * 100.0
+          )
+        ),
+        farX,
+        farY,
+        farZ,
+        farX - backward[0],
+        farY - backward[1],
+        farZ - backward[2],
+        800,
+        600
+      ) != null,
+      "overlay projection retains grid lines beyond scene geometry"
+    );
     var eye = camera.eyePosition();
-    camera.fitClipRange([[eye[0]-0.5, eye[1]-0.5, eye[2]-0.5,
-      eye[0]+0.5, eye[1]+0.5, eye[2]+0.5]]);
-    check(camera.clipNear < 0.01 && camera.clipFar > camera.clipNear,
-      "camera inside visible bounds retains nearby geometry");
+    camera.fitClipRange([[eye[0] - 0.5, eye[1] - 0.5, eye[2] - 0.5, eye[0] + 0.5, eye[1] + 0.5, eye[2] + 0.5]]);
+    check(
+      camera.clipNear < 0.01 && camera.clipFar > camera.clipNear,
+      "camera inside visible bounds retains nearby geometry"
+    );
     camera.fitClipRange([]);
-    check(camera.clipNear > 0.0 && camera.clipFar > camera.clipNear,
-      "empty scene retains a valid depth range");
+    check(camera.clipNear > 0.0 && camera.clipFar > camera.clipNear, "empty scene retains a valid depth range");
     var ray = camera.screenRay(800, 450, 1600, 900);
     var planeDistance = (camera.targetZ - ray.originZ) / ray.directionZ;
-    near(ray.originX + ray.directionX * planeDistance, camera.targetX,
-      "center camera ray reaches framed X");
-    near(ray.originY + ray.directionY * planeDistance, camera.targetY,
-      "center camera ray reaches framed Y");
+    near(ray.originX + ray.directionX * planeDistance, camera.targetX, "center camera ray reaches framed X");
+    near(ray.originY + ray.directionY * planeDistance, camera.targetY, "center camera ray reaches framed Y");
     var scene = new EditorScene();
     camera.frame(-1.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
-    check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
-      "perspective ray selects the framed object");
+    check(
+      EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
+      "perspective ray selects the framed object"
+    );
     scene.setVisible("box", false);
-    check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "scene",
-      "perspective ray ignores hidden objects");
+    check(
+      EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "scene",
+      "perspective ray ignores hidden objects"
+    );
     scene.dispose();
     camera.reset();
     var centerRay = camera.screenRay(400, 300, 800, 600);
@@ -315,36 +417,58 @@ class SceneEditingTests {
       centerRay.originZ - centerRay.directionZ,
       centerRay.originX + centerRay.directionX * 4.0,
       centerRay.originY + centerRay.directionY * 4.0,
-      centerRay.originZ + centerRay.directionZ * 4.0, 800, 600);
+      centerRay.originZ + centerRay.directionZ * 4.0,
+      800,
+      600
+    );
     check(clipped != null, "perspective line clipping retains the visible segment");
-    check(Math.abs(clipped[0].x - 400.0) < 1.0 &&
-      Math.abs(clipped[0].y - 300.0) < 1.0 &&
-      Math.abs(clipped[1].x - 400.0) < 1.0 &&
-      Math.abs(clipped[1].y - 300.0) < 1.0,
-      "clipped line stays within a pixel of the viewport center");
-    check(camera.projectSegment(
-      centerRay.originX - centerRay.directionX * 2.0,
-      centerRay.originY - centerRay.directionY * 2.0,
-      centerRay.originZ - centerRay.directionZ * 2.0,
-      centerRay.originX - centerRay.directionX,
-      centerRay.originY - centerRay.directionY,
-      centerRay.originZ - centerRay.directionZ, 800, 600) == null,
-      "perspective line clipping rejects segments behind the camera");
+    check(
+      Math.abs(clipped[0].x - 400.0) < 1.0 && Math.abs(clipped[0].y - 300.0) < 1.0
+      && Math.abs(clipped[1].x - 400.0) < 1.0 && Math.abs(clipped[1].y - 300.0) < 1.0,
+      "clipped line stays within a pixel of the viewport center"
+    );
+    check(
+      camera.projectSegment(
+        centerRay.originX - centerRay.directionX * 2.0,
+        centerRay.originY - centerRay.directionY * 2.0,
+        centerRay.originZ - centerRay.directionZ * 2.0,
+        centerRay.originX - centerRay.directionX,
+        centerRay.originY - centerRay.directionY,
+        centerRay.originZ - centerRay.directionZ,
+        800,
+        600
+      ) == null,
+      "perspective line clipping rejects segments behind the camera"
+    );
     var boxes:Array<app.SceneObjectData> = [];
-    for (entry in [{id:"near", distance:4.0}, {id:"far", distance:6.0}]) boxes.push({
-      id:entry.id, label:entry.id, type:"rectangle",
-      x:centerRay.originX + centerRay.directionX * entry.distance,
-      y:centerRay.originY + centerRay.directionY * entry.distance,
-      z:centerRay.originZ + centerRay.directionZ * entry.distance,
-      width:0.5, height:0.5, depth:0.5, red:0.5, green:0.5, blue:0.5,
-      visible:true, collisionEnabled:true, dynamicBody:false, mass:1.0
+    for (entry in [{id: "near", distance: 4.0}, {id: "far", distance: 6.0}]) boxes.push({
+      id: entry.id,
+      label: entry.id,
+      type: "rectangle",
+      x: centerRay.originX + centerRay.directionX * entry.distance,
+      y: centerRay.originY + centerRay.directionY * entry.distance,
+      z: centerRay.originZ + centerRay.directionZ * entry.distance,
+      width: 0.5,
+      height: 0.5,
+      depth: 0.5,
+      red: 0.5,
+      green: 0.5,
+      blue: 0.5,
+      visible: true,
+      collisionEnabled: true,
+      dynamicBody: false,
+      mass: 1.0
     });
     var stacked = new EditorScene(boxes);
-    check(EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "near",
-      "perspective ray selects the nearest three-dimensional box");
+    check(
+      EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "near",
+      "perspective ray selects the nearest three-dimensional box"
+    );
     stacked.setVisible("near", false);
-    check(EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "far",
-      "perspective ray continues through a hidden front box");
+    check(
+      EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "far",
+      "perspective ray continues through a hidden front box"
+    );
     stacked.dispose();
     camera.reset();
     near(camera.targetX, 0.0, "perspective reset restores target X");
@@ -362,32 +486,43 @@ class SceneEditingTests {
     check(movedX != -1.5 && drag.commit(), "perspective release commits one move");
     check(scene.document.history.undoCount == 1, "perspective drag creates one undo entry");
     scene.document.undo();
-    near(scene.info("box").localTransform().element(12), -1.5,
-      "undo restores the perspective drag origin");
+    near(scene.info("box").localTransform().element(12), -1.5, "undo restores the perspective drag origin");
     scene.document.redo();
-    near(scene.info("box").localTransform().element(12), movedX,
-      "redo restores the perspective move");
+    near(scene.info("box").localTransform().element(12), movedX, "redo restores the perspective move");
     var cancel = PerspectiveSceneDrag.begin(scene, camera, "box", 400, 300, 800, 600, true, 0.2);
-    check(cancel != null && cancel.update(camera, 450, 350, 800, 600),
-      "snapped perspective drag previews movement");
+    check(cancel != null && cancel.update(camera, 450, 350, 800, 600), "snapped perspective drag previews movement");
     check(cancel.cancel(), "perspective drag cancels");
-    near(scene.info("box").localTransform().element(12), movedX,
-      "cancel restores the perspective drag origin");
+    near(scene.info("box").localTransform().element(12), movedX, "cancel restores the perspective drag origin");
     check(scene.document.history.undoCount == 1, "cancel adds no undo entry");
     scene.dispose();
   }
 
   static function assemblyOccurrenceDragging():Void {
-    var scene = new EditorScene([{id:"project:motor", label:"Motor", type:"rectangle",
-      x:0.0, y:0.0, z:0.0, width:1.0, height:1.0, depth:0.2,
-      red:0.5, green:0.5, blue:0.5, visible:true,
-      collisionEnabled:false, dynamicBody:false, mass:1.0}]);
+    var scene = new EditorScene([{
+      id: "project:motor",
+      label: "Motor",
+      type: "rectangle",
+      x: 0.0,
+      y: 0.0,
+      z: 0.0,
+      width: 1.0,
+      height: 1.0,
+      depth: 0.2,
+      red: 0.5,
+      green: 0.5,
+      blue: 0.5,
+      visible: true,
+      collisionEnabled: false,
+      dynamicBody: false,
+      mass: 1.0
+    }]);
     scene.configureAssemblyOccurrences(["motor"], null);
     check(!scene.canMoveObject("project:motor"), "joint-driven occurrence cannot move directly");
     var perspective = new PerspectiveCamera();
-    check(PerspectiveSceneDrag.begin(scene, perspective, "project:motor",
-      400, 300, 800, 600, false, 0.2) == null,
-      "perspective drag does not start for a joint-driven occurrence");
+    check(
+      PerspectiveSceneDrag.begin(scene, perspective, "project:motor", 400, 300, 800, 600, false, 0.2) == null,
+      "perspective drag does not start for a joint-driven occurrence"
+    );
     scene.dispose();
   }
 
@@ -399,8 +534,7 @@ class SceneEditingTests {
       if (action == "drag.commit") moves++;
     };
     scene.setPositionXY("box", -1.4, 0.0);
-    check(scene.recordMove("box", -1.5, 0.0, -1.4, 0.0) && moves == 1,
-      "committed drag emits one semantic action");
+    check(scene.recordMove("box", -1.5, 0.0, -1.4, 0.0) && moves == 1, "committed drag emits one semantic action");
     var edits = 0;
     var context = scene.context();
     context.onPropertyEdit = function(edit) {
@@ -423,47 +557,78 @@ class SceneEditingTests {
     var restored = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
     var restoredPlate:app.EditorSceneObject = restored.object(plate.id);
     check(restoredPlate != null && restoredPlate.kind == "cad-plate", "CAD object kind survives scene encoding");
-    check(restored.pick(0.0, 0.0) == "scene" && restored.pick(0.03, 0.0) == plate.id,
-      "reopened CAD geometry retains its through-hole mesh");
-    restored.dispose(); scene.dispose();
+    check(
+      restored.pick(0.0, 0.0) == "scene" && restored.pick(0.03, 0.0) == plate.id,
+      "reopened CAD geometry retains its through-hole mesh"
+    );
+    restored.dispose();
+    scene.dispose();
   }
 
   static function assemblyPoseComposition():Void {
     for (index in 0...32) {
       var angle = index * 0.137, sine = Math.sin(angle / 2);
-      var pose = {position:[1.5, -2.0, 0.25],
-        rotation:[2*sine/3, -sine/3, 2*sine/3, Math.cos(angle/2)]};
+      var pose = {position: [1.5, -2.0, 0.25], rotation: [2 * sine / 3, -sine / 3, 2 * sine / 3, Math.cos(angle / 2)]};
       var offset:materia.assembly.AssemblyRecord.AssemblyFrame = {
-        x:0.25*index, y:-0.5, z:0.75, qx:Math.sin(angle), qy:0.0, qz:0.0, qw:Math.cos(angle)};
+        x: 0.25 * index,
+        y: -0.5,
+        z: 0.75,
+        qx: Math.sin(angle),
+        qy: 0.0,
+        qz: 0.0,
+        qw: Math.cos(angle)
+      };
       var composed = app.AssemblyRobot.compose(pose, offset);
       var moved = app.AssemblyRobot.rotate(pose.rotation, [offset.x, offset.y, offset.z]);
       var probe = [0.75, -0.25, 1.0];
-      var expected = app.AssemblyRobot.rotate(pose.rotation,
-        app.AssemblyRobot.rotate([offset.qx, offset.qy, offset.qz, offset.qw], probe));
+      var expected = app.AssemblyRobot.rotate(
+        pose.rotation,
+        app.AssemblyRobot.rotate(
+          [
+            offset.qx,
+            offset.qy,
+            offset.qz,
+            offset.qw
+          ],
+          probe
+        )
+      );
       var actual = app.AssemblyRobot.rotate(composed.rotation, probe);
       for (axis in 0...3) {
-        near(composed.position[axis], pose.position[axis]+moved[axis], "composed part position");
+        near(composed.position[axis], pose.position[axis] + moved[axis], "composed part position");
         near(actual[axis], expected[axis], "composed part rotation follows parent then offset");
       }
       var center = [0.3, -0.7, 0.2 * index];
-      var visual = ApplicationSimulation.prepareAssemblyVisual({id:"part", robotIndex:2, linkIndex:3,
-        offset:offset, center:center});
+      var visual = ApplicationSimulation.prepareAssemblyVisual({
+        id: "part",
+        robotIndex: 2,
+        linkIndex: 3,
+        offset: offset,
+        center: center
+      });
       var centred = app.AssemblyRobot.composeComponents(pose.position, pose.rotation, visual.offset);
       var rotatedCenter = ApplicationSimulation.rotateOffset(center[0], center[1], center[2], composed.rotation);
       for (axis in 0...3) {
-        near(centred.position[axis], composed.position[axis] + rotatedCenter[axis],
-          "prepared visual frame matches world-space geometry centre");
+        near(
+          centred.position[axis],
+          composed.position[axis] + rotatedCenter[axis],
+          "prepared visual frame matches world-space geometry centre"
+        );
         near(centred.rotation[axis], composed.rotation[axis], "prepared visual frame preserves rotation");
       }
       near(centred.rotation[3], composed.rotation[3], "prepared visual frame preserves quaternion W");
-      check(visual.id == "part" && visual.robotIndex == 2 && visual.linkIndex == 3 &&
-        offset.x == 0.25 * index && center[0] == 0.3,
-        "preparing visual metadata preserves identity and authored inputs");
+      check(
+        visual.id == "part"
+        && visual.robotIndex == 2 && visual.linkIndex == 3 && offset.x == 0.25 * index && center[0] == 0.3,
+        "preparing visual metadata preserves identity and authored inputs"
+      );
       var next = app.AssemblyRobot.compose(pose, offset);
       composed.position[0] = 999;
       composed.rotation[0] = 999;
-      check(next.position[0] != 999 && next.rotation[0] != 999 && pose.position[0] == 1.5,
-        "composed poses retain independent output and preserve their inputs");
+      check(
+        next.position[0] != 999 && next.rotation[0] != 999 && pose.position[0] == 1.5,
+        "composed poses retain independent output and preserve their inputs"
+      );
     }
   }
 
@@ -472,36 +637,101 @@ class SceneEditingTests {
     scene.select("tower");
     var design = scene.info("tower").worldTransform(), dirty = scene.document.isDirty;
     var half = Math.PI / 8;
-    var pose:{id:String,position:Array<Float>,rotation:Array<Float>} = {
-      id:"tower", position:[3.0,2.0,1.5], rotation:[0.0,0.0,Math.sin(half),Math.cos(half)]};
-    near(scene.info("tower").worldTransform().element(12),design.element(12),
-      "simulation presentation preserves design X");
-    check(scene.document.isDirty==dirty&&scene.document.history.undoCount==0,
-      "simulation presentation creates no dirty state or undo entry");
-    var reopened=new EditorScene(app.SceneCodec.decode(app.SceneCodec.encode(scene)));
-    near(reopened.info("tower").worldTransform().element(12),design.element(12),
-      "save and reopen preserve the design pose instead of the simulation pose");
+    var pose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
+      id: "tower",
+      position: [3.0, 2.0, 1.5],
+      rotation: [
+        0.0,
+        0.0,
+        Math.sin(half),
+        Math.cos(half)
+      ]
+    };
+    near(
+      scene.info("tower").worldTransform().element(12),
+      design.element(12),
+      "simulation presentation preserves design X"
+    );
+    check(
+      scene.document.isDirty == dirty && scene.document.history.undoCount == 0,
+      "simulation presentation creates no dirty state or undo entry"
+    );
+    var reopened = new EditorScene(app.SceneCodec.decode(app.SceneCodec.encode(scene)));
+    near(
+      reopened.info("tower").worldTransform().element(12),
+      design.element(12),
+      "save and reopen preserve the design pose instead of the simulation pose"
+    );
     reopened.dispose();
 
-    var perspective=new PerspectiveCamera();perspective.frame(3.0,2.0,1.5,1.8,1.8,0.2,4.0/3.0);
-    var perspectiveView=scene.configureRenderView(new SceneView(),perspective.viewProjection(4.0/3.0),[pose]);
-    var ray=perspective.screenRay(400,300,800,600);
-    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ)=="tower",
-      "perspective picking follows rotated simulation geometry and stable document IDs");
-    var movedPose:{id:String,position:Array<Float>,rotation:Array<Float>} = {
-      id:"tower", position:[30.0,20.0,15.0], rotation:[0.0,0.0,0.0,1.0]};
-    var nextView = scene.configureRenderView(new SceneView(),perspective.viewProjection(4.0/3.0),[movedPose]);
-    check(scene.pickRayWithView(nextView,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ)=="scene",
-      "next presentation uses the updated simulation pose");
-    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ)=="tower",
-      "reusing pose scratch transforms preserves previously built views");
-    scene.setVisible("tower",false);
-    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ)=="scene",
-      "simulation picking excludes hidden geometry");
+    var perspective = new PerspectiveCamera();
+    perspective.frame(3.0, 2.0, 1.5, 1.8, 1.8, 0.2, 4.0 / 3.0);
+    var perspectiveView = scene.configureRenderView(new SceneView(), perspective.viewProjection(4.0 / 3.0), [pose]);
+    var ray = perspective.screenRay(400, 300, 800, 600);
+    check(
+      scene.pickRayWithView(
+        perspectiveView,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ
+      ) == "tower",
+      "perspective picking follows rotated simulation geometry and stable document IDs"
+    );
+    var movedPose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
+      id: "tower",
+      position: [
+        30.0,
+        20.0,
+        15.0
+      ],
+      rotation: [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    };
+    var nextView = scene.configureRenderView(new SceneView(), perspective.viewProjection(4.0 / 3.0), [movedPose]);
+    check(
+      scene.pickRayWithView(
+        nextView,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ
+      ) == "scene",
+      "next presentation uses the updated simulation pose"
+    );
+    check(
+      scene.pickRayWithView(
+        perspectiveView,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ
+      ) == "tower",
+      "reusing pose scratch transforms preserves previously built views"
+    );
+    scene.setVisible("tower", false);
+    check(
+      scene.pickRayWithView(
+        perspectiveView,
+        ray.originX,
+        ray.originY,
+        ray.originZ,
+        ray.directionX,
+        ray.directionY,
+        ray.directionZ
+      ) == "scene",
+      "simulation picking excludes hidden geometry"
+    );
     scene.dispose();
   }
 
@@ -514,94 +744,149 @@ class SceneEditingTests {
     session.open(file);
     var empty = session.scene;
     var tree = new EditorSceneTree(empty);
-    check(empty.selectedId == "scene" && tree.childCount("scene") == 0,
-      "empty scene starts with synchronized root selection");
-    check(empty.pick(0.0, 0.0) == "scene",
-      "empty viewport has no stale geometry");
+    check(
+      empty.selectedId == "scene" && tree.childCount("scene") == 0,
+      "empty scene starts with synchronized root selection"
+    );
+    check(empty.pick(0.0, 0.0) == "scene", "empty viewport has no stale geometry");
 
     var revision = empty.revision;
     check(empty.createRectangle(), "rectangle creation succeeds");
     var originalId = empty.selectedId;
     check(originalId == "rectangle-1", "created object receives a stable ID");
-    check(tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == originalId,
-      "hierarchy observes created object");
-    check(empty.revision > revision && empty.pick(0.0, 0.0) == originalId,
-      "viewport observes created geometry");
+    check(
+      tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == originalId,
+      "hierarchy observes created object"
+    );
+    check(empty.revision > revision && empty.pick(0.0, 0.0) == originalId, "viewport observes created geometry");
     check(empty.properties().length == 14, "inspector exposes finish and collision properties");
 
     var name = new PropertyBinding(property(empty.properties(), "name"), empty.context());
-    check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
-      "rename succeeds through inspector binding");
+    check(
+      name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
+      "rename succeeds through inspector binding"
+    );
     var renamed = empty.object(originalId);
     check(renamed != null && renamed.label == "Hidden panel", "hierarchy model observes rename");
-    check(new PropertyBinding(property(empty.properties(), "width"), empty.context()).apply(PropertyValue.Float(2.4))
-      == PropertyEditResult.Applied, "width edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "height"), empty.context()).apply(PropertyValue.Float(0.8))
-      == PropertyEditResult.Applied, "height edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "colour"), empty.context()).apply(PropertyValue.Text("#336699"))
-      == PropertyEditResult.Applied, "colour edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "finish"), empty.context()).apply(PropertyValue.Enum("machined-steel"))
-      == PropertyEditResult.Applied, "finish preset edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "metallic"), empty.context()).apply(PropertyValue.Float(0.7))
-      == PropertyEditResult.Applied, "metallic edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "depth"), empty.context()).apply(PropertyValue.Float(0.6))
-      == PropertyEditResult.Applied, "collision depth edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "dynamic"), empty.context()).apply(PropertyValue.Bool(true))
-      == PropertyEditResult.Applied, "dynamic collision mode edit succeeds");
-    check(new PropertyBinding(property(empty.properties(), "mass"), empty.context()).apply(PropertyValue.Float(4.0))
-      == PropertyEditResult.Applied, "collision mass edit succeeds");
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "width"), empty.context()).apply(PropertyValue.Float(2.4)) == PropertyEditResult.Applied,
+      "width edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "height"), empty.context()).apply(PropertyValue.Float(0.8)) == PropertyEditResult.Applied,
+      "height edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "colour"), empty.context()).apply(PropertyValue.Text("#336699")) == PropertyEditResult.Applied,
+      "colour edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "finish"), empty.context()).apply(PropertyValue.Enum("machined-steel")) == PropertyEditResult.Applied,
+      "finish preset edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "metallic"), empty.context()).apply(PropertyValue.Float(0.7)) == PropertyEditResult.Applied,
+      "metallic edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "depth"), empty.context()).apply(PropertyValue.Float(0.6)) == PropertyEditResult.Applied,
+      "collision depth edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "dynamic"), empty.context()).apply(PropertyValue.Bool(true)) == PropertyEditResult.Applied,
+      "dynamic collision mode edit succeeds"
+    );
+    check(
+      new PropertyBinding(property(empty.properties(),
+      "mass"), empty.context()).apply(PropertyValue.Float(4.0)) == PropertyEditResult.Applied,
+      "collision mass edit succeeds"
+    );
     var visible = new PropertyBinding(property(empty.properties(), "visible"), empty.context());
-    check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
-      "visibility edit succeeds through inspector binding");
-    check(empty.pick(0.0, 0.0) == "scene",
-      "hidden object disappears from viewport picking");
+    check(
+      visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
+      "visibility edit succeeds through inspector binding"
+    );
+    check(empty.pick(0.0, 0.0) == "scene", "hidden object disappears from viewport picking");
 
     check(empty.duplicateSelected(), "hidden object duplicates");
     var duplicateId = empty.selectedId;
     var duplicate = empty.object(duplicateId);
-    check(duplicateId != originalId && duplicate != null && duplicate.label == "Hidden panel copy",
-      "duplicate has a distinct stable ID and copied name");
+    check(
+      duplicateId != originalId && duplicate != null && duplicate.label == "Hidden panel copy",
+      "duplicate has a distinct stable ID and copied name"
+    );
     var duplicateState = empty.items()[1];
-    check(!empty.info(duplicateId).visible() && tree.childKeyAt("scene", 0) == originalId
-      && tree.childKeyAt("scene", 1) == duplicateId, "hidden state and hierarchy order duplicate together");
-    check(duplicateState.width == 2.4 && duplicateState.height == 0.8 && duplicateState.depth == 0.6 &&
-      duplicateState.dynamicBody && duplicateState.mass == 4.0 && duplicateState.collisionEnabled &&
-      nearValue(duplicateState.red, 0.2) && duplicateState.appearance != null &&
-      nearValue(duplicateState.appearance.metallic, 0.7),
-      "rendering and collision settings duplicate together");
+    check(
+      !empty.info(duplicateId).visible() && tree.childKeyAt("scene",
+      0) == originalId && tree.childKeyAt("scene", 1) == duplicateId,
+      "hidden state and hierarchy order duplicate together"
+    );
+    check(
+      duplicateState.width == 2.4 && duplicateState.height == 0.8 && duplicateState.depth == 0.6
+      && duplicateState.dynamicBody && duplicateState.mass == 4.0 && duplicateState.collisionEnabled && nearValue(
+        duplicateState.red,
+        0.2
+      ) && duplicateState.appearance != null && nearValue(
+        duplicateState.appearance.metallic,
+        0.7
+      ),
+      "rendering and collision settings duplicate together"
+    );
     check(empty.deleteSelected(), "duplicate deletes");
-    check(empty.object(duplicateId) == null && empty.selectedId == originalId,
-      "delete removes selection and selects its neighbour");
+    check(
+      empty.object(duplicateId) == null && empty.selectedId == originalId,
+      "delete removes selection and selects its neighbour"
+    );
     empty.document.undo();
-    check(empty.object(duplicateId) != null && empty.selectedId == duplicateId,
-      "undo restores duplicate identity and selection");
+    check(
+      empty.object(duplicateId) != null && empty.selectedId == duplicateId,
+      "undo restores duplicate identity and selection"
+    );
     empty.document.redo();
-    check(empty.object(duplicateId) == null && empty.selectedId == originalId,
-      "redo deletes the same stable identity");
+    check(empty.object(duplicateId) == null && empty.selectedId == originalId, "redo deletes the same stable identity");
 
     try {
       session.save(file);
-      check(!empty.document.isDirty && session.label().indexOf("*") < 0,
-        "save marks the action result clean");
+      check(!empty.document.isDirty && session.label().indexOf("*") < 0, "save marks the action result clean");
       empty.document.undo();
-      check(empty.object(duplicateId) != null && empty.document.isDirty,
-        "undo across savepoint restores object and dirty state");
+      check(
+        empty.object(duplicateId) != null && empty.document.isDirty,
+        "undo across savepoint restores object and dirty state"
+      );
       empty.document.redo();
-      check(empty.object(duplicateId) == null && !empty.document.isDirty,
-        "redo returns exactly to saved state");
+      check(empty.object(duplicateId) == null && !empty.document.isDirty, "redo returns exactly to saved state");
       session.open(file);
-      check(session.scene.items().length == 1 && session.scene.items()[0].id == originalId,
-        "reopen preserves surviving stable identity");
-      check(session.scene.items()[0].label == "Hidden panel" && !session.scene.info(originalId).visible(),
-        "reopen preserves rename and hidden state");
+      check(
+        session.scene.items().length == 1 && session.scene.items()[0].id == originalId,
+        "reopen preserves surviving stable identity"
+      );
+      check(
+        session.scene.items()[0].label == "Hidden panel" && !session.scene.info(originalId).visible(),
+        "reopen preserves rename and hidden state"
+      );
       var reopened = session.scene.items()[0];
-      check(reopened.width == 2.4 && reopened.height == 0.8 && reopened.depth == 0.6 &&
-        reopened.dynamicBody && reopened.mass == 4.0 && reopened.collisionEnabled && nearValue(reopened.blue, 0.6) &&
-        reopened.appearance != null && reopened.appearance.finish == "machined-steel" &&
-        nearValue(reopened.appearance.metallic, 0.7),
-        "reopen preserves dimensions, finish, colour, and collision settings");
-      check(!session.scene.document.isDirty && !session.scene.document.canUndo,
-        "reopened document starts clean with fresh history");
+      check(
+        reopened.width == 2.4 && reopened.height == 0.8 && reopened.depth == 0.6
+        && reopened.dynamicBody && reopened.mass == 4.0 && reopened.collisionEnabled && nearValue(
+          reopened.blue,
+          0.6
+        ) && reopened.appearance != null && reopened.appearance.finish == "machined-steel" && nearValue(
+          reopened.appearance.metallic,
+          0.7
+        ),
+        "reopen preserves dimensions, finish, colour, and collision settings"
+      );
+      check(
+        !session.scene.document.isDirty && !session.scene.document.canUndo,
+        "reopened document starts clean with fresh history"
+      );
     } catch (error:Dynamic) {
       session.dispose();
       if (FileSystem.exists(file)) FileSystem.deleteFile(file);
@@ -613,8 +898,7 @@ class SceneEditingTests {
     FileSystem.deleteDirectory(directory);
   }
 
-  static inline function nearValue(actual:Float, expected:Float):Bool
-    return Math.abs(actual - expected) < 0.00001;
+  static inline function nearValue(actual:Float, expected:Float):Bool return Math.abs(actual - expected) < 0.00001;
 
   static function rectangleProperties():Void {
     var scene = new EditorScene();
@@ -624,18 +908,24 @@ class SceneEditingTests {
       var height = new PropertyBinding(property(scene.properties(), "height"), scene.context());
       var colour = new PropertyBinding(property(scene.properties(), "colour"), scene.context());
       check(switch (width.apply(PropertyValue.Float(0.0))) {
-        case PropertyEditResult.Rejected(_): true;
-        default: false;
+        case PropertyEditResult.Rejected(_):
+          true;
+        default:
+          false;
       }, "zero width is rejected");
       var notFinite = 0.0;
       notFinite = notFinite / notFinite;
       check(switch (height.apply(PropertyValue.Float(notFinite))) {
-        case PropertyEditResult.Rejected(_): true;
-        default: false;
+        case PropertyEditResult.Rejected(_):
+          true;
+        default:
+          false;
       }, "non-finite height is rejected");
       check(switch (colour.apply(PropertyValue.Text("#12GG00"))) {
-        case PropertyEditResult.Rejected(_): true;
-        default: false;
+        case PropertyEditResult.Rejected(_):
+          true;
+        default:
+          false;
       }, "invalid colour is rejected");
       check(width.apply(PropertyValue.Float(4.0)) == PropertyEditResult.Applied, "width updates");
       check(height.apply(PropertyValue.Float(0.5)) == PropertyEditResult.Applied, "height updates");
@@ -646,25 +936,30 @@ class SceneEditingTests {
       frameCamera.frame(-1.5, 0.0, 0.0, 4.0, 0.5, 0.2, 4.0 / 3.0);
       near(frameCamera.targetX, -1.5, "framing uses edited object center");
       var item = scene.items()[0];
-      check(nearValue(item.red, 0.2) && nearValue(item.green, 0.8)
-        && nearValue(item.blue, 0.4), "edited colour updates scene material state");
+      check(
+        nearValue(item.red, 0.2) && nearValue(item.green, 0.8) && nearValue(item.blue, 0.4),
+        "edited colour updates scene material state"
+      );
       scene.document.undo();
       item = scene.items()[0];
-      check(nearValue(item.red, 0.22) && nearValue(item.green, 0.52)
-        && nearValue(item.blue, 0.85), "colour undo restores exact source channels");
+      check(
+        nearValue(item.red, 0.22) && nearValue(item.green, 0.52) && nearValue(item.blue, 0.85),
+        "colour undo restores exact source channels"
+      );
       scene.document.undo();
       item = scene.items()[0];
       check(item.height == 1.2, "height undo restores geometry");
       scene.document.undo();
       item = scene.items()[0];
-      check(item.width == 1.6 && scene.pick(0.3, 0.0) == "scene",
-        "width undo restores geometry and picking");
+      check(item.width == 1.6 && scene.pick(0.3, 0.0) == "scene", "width undo restores geometry and picking");
       scene.document.redo();
       scene.document.redo();
       scene.document.redo();
       item = scene.items()[0];
-      check(item.width == 4.0 && item.height == 0.5 && nearValue(item.green, 0.8),
-        "redo restores dimensions and colour");
+      check(
+        item.width == 4.0 && item.height == 0.5 && nearValue(item.green, 0.8),
+        "redo restores dimensions and colour"
+      );
       var nudgeHistory = scene.document.history.undoCount;
       check(scene.nudgeSelected(0.1, 0.0), "arrow-sized nudge applies");
       check(scene.nudgeSelected(0.0, 1.0), "Shift-sized nudge applies");
@@ -685,19 +980,27 @@ class SceneEditingTests {
   static function sensorConfiguration():Void {
     var urdfSensors = new SensorConfiguration();
     var urdfLink = urdfSensors.model.addLink(new Link("Unbounded URDF joint link", "link/unbounded"));
-    var urdfJoint = urdfSensors.model.addJoint(new Joint("unbounded", JointType.Revolute,
-      urdfSensors.model.links[0], urdfLink, "joint/unbounded"));
+    var urdfJoint = urdfSensors.model.addJoint(new Joint(
+      "unbounded",
+      JointType.Revolute,
+      urdfSensors.model.links[0],
+      urdfLink,
+      "joint/unbounded"
+    ));
     urdfJoint.limits = new JointLimits(-1.0, 1.0, null, 5.0, 0.7);
     urdfJoint.mechanicalLimits = new JointLimits(-1.2, 1.2, 2.0, 8.0, 1.2);
     urdfJoint.mechanicalLimits.overtravel = 0.1;
     var urdfRestored = new SensorConfiguration(haxe.Json.parse(haxe.Json.stringify(urdfSensors.records())));
     var restoredLimits = urdfRestored.model.joints[0].limits;
     var restoredMechanical = urdfRestored.model.joints[0].mechanicalLimits;
-    check(restoredLimits.velocity == null && restoredLimits.maxAcceleration == 0.7 &&
-      restoredMechanical != null && restoredMechanical.velocity == 2.0 &&
-      restoredMechanical.maxAcceleration == 1.2 && restoredMechanical.overtravel == 0.1,
-      "sensor document preserves nullable URDF limits and mechanical ceilings");
-    urdfRestored.dispose(); urdfSensors.dispose();
+    check(
+      restoredLimits.velocity == null
+      && restoredLimits.maxAcceleration == 0.7 && restoredMechanical != null && restoredMechanical.velocity == 2.0
+      && restoredMechanical.maxAcceleration == 1.2 && restoredMechanical.overtravel == 0.1,
+      "sensor document preserves nullable URDF limits and mechanical ceilings"
+    );
+    urdfRestored.dispose();
+    urdfSensors.dispose();
     var authored = new SensorConfiguration();
     var base = authored.model.links[0];
     var left = authored.model.addLink(new Link("Left wheel", "link/left"));
@@ -708,8 +1011,7 @@ class SceneEditingTests {
     var configuredLidar:robotkit.model.Sensor = authored.selected();
     configuredLidar.startAngleRadians = -Math.PI * 0.5;
     configuredLidar.fieldOfViewRadians = Math.PI;
-    function addJoint(id:String, name:String, type:JointType, child:Link,
-        lower:Float, upper:Float):Void {
+    function addJoint(id:String, name:String, type:JointType, child:Link, lower:Float, upper:Float):Void {
       var joint = new Joint(name, type, base, child, id);
       // Wheels turn about the base's lateral axis.
       if (type == JointType.Continuous) joint.axis = [0.0, 1.0, 0.0];
@@ -722,172 +1024,251 @@ class SceneEditingTests {
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, carriage, -0.5, 0.5);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, forksLink, 0.0, 0.8);
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Differential("joint/left", "joint/right", 0.1, 0.5),
-      1.0, 1.5, 0.8, 1.0, 2.0, 1.0);
-    authored.profile.forkMechanism = new RobotForkConfiguration("joint/lift",
-      1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
-    var reopenedAuthored = new SensorConfiguration(
-      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+      RobotDriveConfiguration.Differential(
+        "joint/left",
+        "joint/right",
+        0.1,
+        0.5
+      ),
+      1.0,
+      1.5,
+      0.8,
+      1.0,
+      2.0,
+      1.0
+    );
+    authored.profile.forkMechanism = new RobotForkConfiguration(
+      "joint/lift",
+      1000.0,
+      600.0,
+      1.8,
+      "joint/tilt",
+      "joint/spread"
+    );
+    var reopenedAuthored = new SensorConfiguration(haxe.Json.parse(haxe.Json.stringify(authored.records())));
     var reopenedMobile:Null<RobotMobileConfiguration> = reopenedAuthored.profile.mobileBase;
     var reopenedForks:Null<RobotForkConfiguration> = reopenedAuthored.profile.forkMechanism;
-    check(reopenedMobile != null && reopenedForks != null &&
-      reopenedAuthored.diagnostics().length == 0,
-      "Materia robot records preserve and validate authored mechanism roles");
+    check(
+      reopenedMobile != null && reopenedForks != null && reopenedAuthored.diagnostics().length == 0,
+      "Materia robot records preserve and validate authored mechanism roles"
+    );
     var reopenedLidar:robotkit.model.Sensor = reopenedAuthored.selected();
-    check(reopenedLidar.startAngleRadians == -Math.PI * 0.5 &&
-      reopenedLidar.fieldOfViewRadians == Math.PI,
-      "sensor records preserve LiDAR angular coverage");
+    check(
+      reopenedLidar.startAngleRadians == -Math.PI * 0.5 && reopenedLidar.fieldOfViewRadians == Math.PI,
+      "sensor records preserve LiDAR angular coverage"
+    );
     var mobileConfig:RobotMobileConfiguration = cast reopenedMobile;
     var forkConfig:RobotForkConfiguration = cast reopenedForks;
     check(switch mobileConfig.drive {
       case Differential(leftId, rightId, radius, track):
         leftId == "joint/left" && rightId == "joint/right" && radius == 0.1 && track == 0.5;
-      case _: false;
-    } && forkConfig.liftJointId == "joint/lift" &&
-      forkConfig.tiltJointId == "joint/tilt" && forkConfig.spreadJointId == "joint/spread",
-      "save and reopen retain drive geometry and named fork axes");
+      case _:
+        false;
+    }
+    && forkConfig.liftJointId == "joint/lift" && forkConfig.tiltJointId == "joint/tilt"
+      && forkConfig.spreadJointId == "joint/spread", "save and reopen retain drive geometry and named fork axes");
     authored.profile.forkMechanism = null;
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left", 1.2, 0.1, 0.5),
-      1.0, 1.5);
-    var reopenedAckermann = new SensorConfiguration(
-      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+      RobotDriveConfiguration.Ackermann(
+        "joint/tilt",
+        "joint/left",
+        1.2,
+        0.1,
+        0.5
+      ),
+      1.0,
+      1.5
+    );
+    var reopenedAckermann = new SensorConfiguration(haxe.Json.parse(haxe.Json.stringify(authored.records())));
     var ackermannConfig:RobotMobileConfiguration = cast reopenedAckermann.profile.mobileBase;
     check(switch ackermannConfig.drive {
       case Ackermann(steeringId, wheelId, wheelBase, radius, angle):
-        steeringId == "joint/tilt" && wheelId == "joint/left" &&
-          wheelBase == 1.2 && radius == 0.1 && angle == 0.5;
-      case _: false;
+        steeringId == "joint/tilt" && wheelId == "joint/left" && wheelBase == 1.2 && radius == 0.1 && angle == 0.5;
+      case _:
+        false;
     }, "save and reopen retain Ackermann steering roles and dimensions");
     authored.profile.mobileBase = new RobotMobileConfiguration(
-      RobotDriveConfiguration.Holonomic(["joint/left", "joint/right", "joint/tilt"], 0.1, 0.3),
-      1.0, 1.5);
-    var reopenedHolonomic = new SensorConfiguration(
-      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+      RobotDriveConfiguration.Holonomic(
+        [
+          "joint/left",
+          "joint/right",
+          "joint/tilt"
+        ],
+        0.1,
+        0.3
+      ),
+      1.0,
+      1.5
+    );
+    var reopenedHolonomic = new SensorConfiguration(haxe.Json.parse(haxe.Json.stringify(authored.records())));
     var holonomicConfig:RobotMobileConfiguration = cast reopenedHolonomic.profile.mobileBase;
     check(switch holonomicConfig.drive {
       case Holonomic(ids, radius, baseRadius):
-        ids.length == 3 && ids[0] == "joint/left" && ids[1] == "joint/right" &&
-          ids[2] == "joint/tilt" && radius == 0.1 && baseRadius == 0.3;
-      case _: false;
+        ids.length == 3 && ids[0] == "joint/left"
+          && ids[1] == "joint/right" && ids[2] == "joint/tilt" && radius == 0.1 && baseRadius == 0.3;
+      case _:
+        false;
     }, "save and reopen retain holonomic wheel roles and dimensions");
     reopenedHolonomic.dispose();
     reopenedAckermann.dispose();
-    reopenedAuthored.dispose(); authored.dispose();
+    reopenedAuthored.dispose();
+    authored.dispose();
 
-    var historySensors=new SensorConfiguration();
+    var historySensors = new SensorConfiguration();
     historySensors.add("imu");
     historySensors.selectRobot("robot/history-b");
-    var secondCount=historySensors.model.sensors.length;
-    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
-      historySensors.model.sensors.length==2,
-      "undo removes a newly added robot configuration from shared history");
-    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
-      historySensors.model.sensors.length==secondCount,
-      "redo restores the new robot configuration and its selection");
+    var secondCount = historySensors.model.sensors.length;
+    check(
+      historySensors.document.undo()
+      && historySensors.robotId == "materia/robot" && historySensors.model.sensors.length == 2,
+      "undo removes a newly added robot configuration from shared history"
+    );
+    check(
+      historySensors.document.redo()
+      && historySensors.robotId == "robot/history-b" && historySensors.model.sensors.length == secondCount,
+      "redo restores the new robot configuration and its selection"
+    );
     historySensors.selectRobot("materia/robot");
-    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
-      historySensors.model.sensors.length==2,
-      "undo after switching robots removes its creation while preserving the active robot");
-    check(historySensors.document.undo()&&historySensors.model.sensors.length==1,
-      "cross-robot undo removes the sensor from its owning model");
-    check(historySensors.document.redo()&&historySensors.model.sensors.length==2,
-      "cross-robot redo restores the sensor to its owning model");
-    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
-      historySensors.model.sensors.length==secondCount,
-      "cross-robot redo restores the new robot configuration");
+    check(
+      historySensors.document.undo()
+      && historySensors.robotId == "materia/robot" && historySensors.model.sensors.length == 2,
+      "undo after switching robots removes its creation while preserving the active robot"
+    );
+    check(
+      historySensors.document.undo() && historySensors.model.sensors.length == 1,
+      "cross-robot undo removes the sensor from its owning model"
+    );
+    check(
+      historySensors.document.redo() && historySensors.model.sensors.length == 2,
+      "cross-robot redo restores the sensor to its owning model"
+    );
+    check(
+      historySensors.document.redo()
+      && historySensors.robotId == "robot/history-b" && historySensors.model.sensors.length == secondCount,
+      "cross-robot redo restores the new robot configuration"
+    );
     historySensors.dispose();
 
-    var sensors=new SensorConfiguration();
-    check(sensors.model.sensors.length==1&&sensors.model.sensors[sensors.selectedIndex].kind=="lidar",
-      "sensor panel starts with an editable LiDAR");
-    var selectionRevision=sensors.document.revision;
-    check(sensors.selectRobot("robot/selected")&&sensors.robotId=="robot/selected",
-      "sensor configuration selects an explicit robot target");
-    check(sensors.document.revision==selectionRevision+1,
-      "creating a robot configuration creates one shared history entry");
+    var sensors = new SensorConfiguration();
+    check(
+      sensors.model.sensors.length == 1 && sensors.model.sensors[sensors.selectedIndex].kind == "lidar",
+      "sensor panel starts with an editable LiDAR"
+    );
+    var selectionRevision = sensors.document.revision;
+    check(
+      sensors.selectRobot("robot/selected") && sensors.robotId == "robot/selected",
+      "sensor configuration selects an explicit robot target"
+    );
+    check(
+      sensors.document.revision == selectionRevision + 1,
+      "creating a robot configuration creates one shared history entry"
+    );
     sensors.selectRobot("materia/robot");
-    var properties=sensors.properties();
-    var raysProperty=[for(property in properties) if(StringTools.endsWith(property.id,":rays")) property][0];
-    var rays=new PropertyBinding(raysProperty,sensors.context());
-    check(switch rays.apply(PropertyValue.Int(361)){case PropertyEditResult.Rejected(_):true;default:false;},
-      "sensor UI rejects ray counts above runtime capacity");
-    check(rays.apply(PropertyValue.Int(32))==PropertyEditResult.Applied,
-      "sensor UI edits LiDAR resolution");
-    check(sensors.model.sensors[sensors.selectedIndex].rayCount==32,"sensor model receives property edit");
+    var properties = sensors.properties();
+    var raysProperty = [for (property in properties) if (StringTools.endsWith(property.id, ":rays")) property][0];
+    var rays = new PropertyBinding(raysProperty, sensors.context());
+    check(switch rays.apply(PropertyValue.Int(361)) {
+      case PropertyEditResult.Rejected(_):
+        true;
+      default:
+        false;
+    }, "sensor UI rejects ray counts above runtime capacity");
+    check(rays.apply(PropertyValue.Int(32)) == PropertyEditResult.Applied, "sensor UI edits LiDAR resolution");
+    check(sensors.model.sensors[sensors.selectedIndex].rayCount == 32, "sensor model receives property edit");
     sensors.add("imu");
-    check(sensors.model.sensors.length==2&&sensors.model.sensors[sensors.selectedIndex].kind=="imu",
-      "sensor UI adds and selects an IMU");
-    check(sensors.properties().length==14,"IMU hides LiDAR-only range and ray fields");
-    check(sensors.removeSelected()&&sensors.model.sensors.length==1,
-      "sensor UI removes the selected sensor");
-    check(sensors.document.undo()&&sensors.model.sensors.length==2,
-      "sensor add/remove operations participate in undo");
-    var camera=sensors.add("camera");
-    camera.updateRate=30.0;
-    var cameraMount=sensors.model.addFrame(new Frame("Front camera mount",
-      sensors.model.links[0],"front-camera-mount"));
-    cameraMount.position=[0.4,0.0,1.1];
-    camera.frame=cameraMount;
-    check(sensors.model.sensors.length==3&&camera.kind=="camera"&&
-      sensors.diagnostics().length==0,
-      "sensor editor adds a mounted camera");
-    var cameraScene=new EditorScene();
-    var cameraRestored=new SensorConfiguration(SceneCodec.decodeSensors(
-      SceneCodec.encode(cameraScene,sensors)));
-    var restoredCamera=cameraRestored.model.sensors[2];
-    check(restoredCamera.kind=="camera"&&restoredCamera.updateRate==30.0&&
-      restoredCamera.frame!=null&&restoredCamera.frame.id=="front-camera-mount"&&
-      restoredCamera.frame.position[2]==1.1,
-      "scene JSON preserves camera rate and mount");
+    check(
+      sensors.model.sensors.length == 2 && sensors.model.sensors[sensors.selectedIndex].kind == "imu",
+      "sensor UI adds and selects an IMU"
+    );
+    check(sensors.properties().length == 14, "IMU hides LiDAR-only range and ray fields");
+    check(sensors.removeSelected() && sensors.model.sensors.length == 1, "sensor UI removes the selected sensor");
+    check(
+      sensors.document.undo() && sensors.model.sensors.length == 2,
+      "sensor add/remove operations participate in undo"
+    );
+    var camera = sensors.add("camera");
+    camera.updateRate = 30.0;
+    var cameraMount = sensors.model.addFrame(new Frame(
+      "Front camera mount",
+      sensors.model.links[0],
+      "front-camera-mount"
+    ));
+    cameraMount.position = [0.4, 0.0, 1.1];
+    camera.frame = cameraMount;
+    check(
+      sensors.model.sensors.length == 3 && camera.kind == "camera" && sensors.diagnostics().length == 0,
+      "sensor editor adds a mounted camera"
+    );
+    var cameraScene = new EditorScene();
+    var cameraRestored = new SensorConfiguration(SceneCodec.decodeSensors(SceneCodec.encode(cameraScene, sensors)));
+    var restoredCamera = cameraRestored.model.sensors[2];
+    check(
+      restoredCamera.kind == "camera" && restoredCamera.updateRate == 30.0 && restoredCamera.frame != null
+      && restoredCamera.frame.id == "front-camera-mount" && restoredCamera.frame.position[2] == 1.1,
+      "scene JSON preserves camera rate and mount"
+    );
     cameraRestored.dispose();
     cameraScene.dispose();
-    check(sensors.removeSelected()&&sensors.model.sensors.length==2,
-      "sensor editor removes its selected camera");
-    check(sensors.document.undo()&&sensors.model.sensors.length==3,
-      "camera add and remove participate in undo");
-    check(sensors.diagnostics().length==0,"sensor UI produces a runtime-valid model");
-    var scene=new EditorScene();
-    var world=new RobotWorld();
-    var simulation=new ApplicationSimulation(world);
-    check(simulation.rebuild(sensors,scene),"valid sensor edits build a shared simulation: "+simulation.error);
-    check(!simulation.pending(sensors,scene),"successful rebuild clears sensor and environment pending state");
+    check(sensors.removeSelected() && sensors.model.sensors.length == 2, "sensor editor removes its selected camera");
+    check(sensors.document.undo() && sensors.model.sensors.length == 3, "camera add and remove participate in undo");
+    check(sensors.diagnostics().length == 0, "sensor UI produces a runtime-valid model");
+    var scene = new EditorScene();
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    check(simulation.rebuild(sensors, scene), "valid sensor edits build a shared simulation: " + simulation.error);
+    check(!simulation.pending(sensors, scene), "successful rebuild clears sensor and environment pending state");
     scene.select("tower");
-    check(!simulation.pending(sensors,scene),"selection-only changes do not dirty simulation state");
-    scene.setPosition("tower",0,2.0);
-    check(simulation.pending(sensors,scene),"scene-only geometry edits require a rebuild");
-    var appliedRevision=simulation.appliedRevision;
-    sensors.model.sensors[0].rayCount=0;
-    check(!simulation.rebuild(sensors,scene)&&simulation.appliedRevision==appliedRevision,
-      "failed sensor rebuild preserves the running configuration");
-    check(simulation.pending(sensors,scene),"failed replacement retains pending environment state");
-    sensors.model.sensors[0].rayCount=8;
+    check(!simulation.pending(sensors, scene), "selection-only changes do not dirty simulation state");
+    scene.setPosition("tower", 0, 2.0);
+    check(simulation.pending(sensors, scene), "scene-only geometry edits require a rebuild");
+    var appliedRevision = simulation.appliedRevision;
+    sensors.model.sensors[0].rayCount = 0;
+    check(
+      !simulation.rebuild(sensors, scene) && simulation.appliedRevision == appliedRevision,
+      "failed sensor rebuild preserves the running configuration"
+    );
+    check(simulation.pending(sensors, scene), "failed replacement retains pending environment state");
+    sensors.model.sensors[0].rayCount = 8;
     simulation.start();
-    check(simulation.rebuild(sensors,scene)&&simulation.isRunning(),
-      "rebuilding a running simulation preserves realtime state");
+    check(
+      simulation.rebuild(sensors, scene) && simulation.isRunning(),
+      "rebuilding a running simulation preserves realtime state"
+    );
     simulation.stop();
-    var replacement=new EditorScene(scene.records());scene.dispose();scene=replacement;
-    check(simulation.pending(sensors,scene),
-      "replacing a document with equivalent geometry still requires a rebuild");
-    check(simulation.rebuild(sensors,scene),"replacement scene rebuild succeeds");
+    var replacement = new EditorScene(scene.records());
+    scene.dispose();
+    scene = replacement;
+    check(simulation.pending(sensors, scene), "replacing a document with equivalent geometry still requires a rebuild");
+    check(simulation.rebuild(sensors, scene), "replacement scene rebuild succeeds");
     simulation.step();
-    var observation=simulation.snapshot().robot("materia/robot");
-    check(observation!=null&&world.robot("materia/robot").streams().latestFrames().length>0,
-      "applied sensor configuration produces simulated measurements");
-    simulation.dispose();world.close();scene.dispose();sensors.dispose();
+    var observation = simulation.snapshot().robot("materia/robot");
+    check(
+      observation != null && world.robot("materia/robot").streams().latestFrames().length > 0,
+      "applied sensor configuration produces simulated measurements"
+    );
+    simulation.dispose();
+    world.close();
+    scene.dispose();
+    sensors.dispose();
 
     var lifecycleSession = new ProjectDocumentSession(), lifecycleWorld = new RobotWorld();
     var lifecycleSimulation = new ApplicationSimulation(lifecycleWorld);
     var lifecycleRemote = new ReplayRobot("remote/lifecycle", new RobotRecording());
     lifecycleWorld.attach(lifecycleRemote);
-    check(lifecycleSimulation.rebuild(lifecycleSession.sensors,lifecycleSession.scene),
-      "lifecycle fixture builds a simulation");
+    check(
+      lifecycleSimulation.rebuild(lifecycleSession.sensors, lifecycleSession.scene),
+      "lifecycle fixture builds a simulation"
+    );
     lifecycleSession.beforeReplace = lifecycleSimulation.clear;
     lifecycleSession.newDocument();
-    check(lifecycleSimulation.simulatedRobotIds().length == 0 && !lifecycleSimulation.isRunning() &&
-      lifecycleWorld.robot("materia/robot") == null && lifecycleWorld.robot("remote/lifecycle") == lifecycleRemote,
-      "new document stops owned physics while preserving remote adapters");
-    lifecycleSimulation.dispose(); lifecycleWorld.close(); lifecycleSession.dispose();
+    check(
+      lifecycleSimulation.simulatedRobotIds().length == 0 && !lifecycleSimulation.isRunning()
+      && lifecycleWorld.robot("materia/robot") == null && lifecycleWorld.robot("remote/lifecycle") == lifecycleRemote,
+      "new document stops owned physics while preserving remote adapters"
+    );
+    lifecycleSimulation.dispose();
+    lifecycleWorld.close();
+    lifecycleSession.dispose();
   }
 
   static function sensorWorkflow():Void {
@@ -898,216 +1279,309 @@ class SceneEditingTests {
     var recordingPath = directory + "/robot.mcap";
     var session = new ProjectDocumentSession();
     var rate = new PropertyBinding(property(session.sensors.properties(), "rate"), session.sensors.context());
-    var mountXProperty = [for (property in session.sensors.properties())
-      if (StringTools.endsWith(property.id, ":position-x")) property][0];
+    var mountXProperty = [for (property in session.sensors.properties()) if (StringTools.endsWith(
+      property.id,
+      ":position-x"
+    )) property][0];
     var mountX = new PropertyBinding(mountXProperty, session.sensors.context());
     check(rate.apply(PropertyValue.Float(20.0)) == PropertyEditResult.Applied,
       "sensor workflow edits acquisition rate");
     check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
       "sensor workflow edits mount position");
-    check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
-    new PropertyBinding(property(session.sensors.properties(), "rate"),session.sensors.context()).apply(PropertyValue.Float(10.0));
-    var arm=session.sensors.model.addLink(new Link("Arm","arm"));
+    check(session.sensors.selectRobot("materia/robot-b"), "sensor workflow adds a second robot target");
+    new PropertyBinding(property(session.sensors.properties(),
+      "rate"), session.sensors.context()).apply(PropertyValue.Float(10.0));
+    var arm = session.sensors.model.addLink(new Link("Arm", "arm"));
     // The COM shares the X-axis joint's Y coordinate below, so gravity does
     // not mask the commanded arm motion with a static torque around that axis.
-    arm.mass=2.5;arm.centerOfMass=[0.1,0.1,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
-    arm.visualGeometry="geometry/arm-visual";arm.collisionGeometry="geometry/arm-collision";
-    var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
-    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
-    joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
+    arm.mass = 2.5;
+    arm.centerOfMass = [0.1, 0.1, 0.3];
+    arm.inertiaTensor = [2.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0];
+    arm.visualGeometry = "geometry/arm-visual";
+    arm.collisionGeometry = "geometry/arm-collision";
+    var joint = new Joint("Arm joint", JointType.Revolute, session.sensors.model.links[0], arm, "joint/arm");
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.velocity = 2.0;
+    joint.limits.effort = 3.0;
+    joint.parentFramePosition = [0.25, 0.0, 0.0];
+    joint.childFramePosition = [0.0, 0.1, 0.0];
+    joint.axis = [1.0, 0.0, 0.0];
     session.sensors.model.addJoint(joint);
-    var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
-    armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
-    check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
-      "sensor workflow stores an explicit robot pose");
+    var armMount = session.sensors.model.addFrame(new Frame("Arm LiDAR mount", arm, "arm/lidar"));
+    armMount.position = [0.4, 0.0, 0.0];
+    session.sensors.model.sensors[0].frame = armMount;
+    check(
+      session.sensors.setRobotPose("materia/robot-b", [0.0, 3.0, 0.0], [0.0, 0.0, 0.0, 1.0]),
+      "sensor workflow stores an explicit robot pose"
+    );
     check(session.isDirty(), "sensor edits dirty the application document");
     session.save(documentPath);
     session.open(documentPath);
-    check(session.sensors.configuredRobotIds().length==2,"two robot configurations survive reload");
-    check(session.sensors.model.sensors[0].updateRate==10.0,
-      "selected second robot retains its independent sensor rate");
-    check(session.sensors.model.joints.length==1,"joint topology survives reload");
-    var restoredJoint=session.sensors.model.joints[0];
-    check(restoredJoint.id=="joint/arm"&&
-      restoredJoint.parent.id=="base"&&restoredJoint.child.id=="arm"&&restoredJoint.limits.lower==-1.0&&
-      restoredJoint.limits.upper==1.0&&restoredJoint.limits.effort==3.0&&
-      session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
-      session.sensors.robotPosition("materia/robot")[1]==0.0,
-      "joint topology, effort limits, and robot pose survive reload");
-    check(session.sensors.model.links[1].mass==2.5&&
-      session.sensors.model.links[1].centerOfMass[1]==0.1&&
-      session.sensors.model.links[1].centerOfMass[2]==0.3&&
-      session.sensors.model.links[1].inertiaTensor[8]==4.0&&
-      session.sensors.model.links[1].visualGeometry=="geometry/arm-visual"&&
-      session.sensors.model.links[1].collisionGeometry=="geometry/arm-collision"&&
-      restoredJoint.parentFramePosition[0]==0.25&&restoredJoint.childFramePosition[1]==0.1&&
-      restoredJoint.axis[0]==1.0,
-      "RobotModel v2 physical properties, geometry references, joint frames, and axis survive reload");
-    var compiled=RobotRuntimeCompiler.compile(session.sensors.model, new robotkit.profile.RobotProfile());
-    check(compiled.links.length==2&&compiled.links[1].mass==2.5&&
-      compiled.joints[0].axis[0]==1.0&&compiled.identity.visualGeometry(1)=="geometry/arm-visual"&&
-      compiled.identity.collisionGeometry(1)=="geometry/arm-collision",
-      "runtime compiler lowers physical properties and retains geometry asset references");
+    check(session.sensors.configuredRobotIds().length == 2, "two robot configurations survive reload");
+    check(
+      session.sensors.model.sensors[0].updateRate == 10.0,
+      "selected second robot retains its independent sensor rate"
+    );
+    check(session.sensors.model.joints.length == 1, "joint topology survives reload");
+    var restoredJoint = session.sensors.model.joints[0];
+    check(
+      restoredJoint.id == "joint/arm" && restoredJoint.parent.id == "base"
+      && restoredJoint.child.id == "arm" && restoredJoint.limits.lower == -1.0 && restoredJoint.limits.upper == 1.0
+      && restoredJoint.limits.effort == 3.0 && session.sensors.robotPosition("materia/robot-b")[1] == 3.0
+      && session.sensors.robotPosition("materia/robot")[1] == 0.0,
+      "joint topology, effort limits, and robot pose survive reload"
+    );
+    check(
+      session.sensors.model.links[1].mass == 2.5 && session.sensors.model.links[1].centerOfMass[1] == 0.1
+      && session.sensors.model.links[1].centerOfMass[2] == 0.3 && session.sensors.model.links[1].inertiaTensor[8] == 4.0
+      && session.sensors.model.links[1].visualGeometry == "geometry/arm-visual"
+      && session.sensors.model.links[1].collisionGeometry == "geometry/arm-collision"
+      && restoredJoint.parentFramePosition[0] == 0.25
+      && restoredJoint.childFramePosition[1] == 0.1 && restoredJoint.axis[0] == 1.0,
+      "RobotModel v2 physical properties, geometry references, joint frames, and axis survive reload"
+    );
+    var compiled = RobotRuntimeCompiler.compile(session.sensors.model, new robotkit.profile.RobotProfile());
+    check(
+      compiled.links.length == 2 && compiled.links[1].mass == 2.5
+      && compiled.joints[0].axis[0] == 1.0 && compiled.identity.visualGeometry(1) == "geometry/arm-visual"
+      && compiled.identity.collisionGeometry(1) == "geometry/arm-collision",
+      "runtime compiler lowers physical properties and retains geometry asset references"
+    );
     var emptyLegacyFrames:Array<Dynamic> = [];
     var emptyLegacySensors:Array<Dynamic> = [];
-    var legacyLinks:Array<Dynamic> = [{id:"base",name:"Base"},{id:"arm",name:"Arm"}];
-    var legacyJoints:Array<Dynamic> = [{id:"joint/arm",name:"Arm joint",type:"revolute",
-      parentId:"base",childId:"arm",limits:{lower:-1.0,upper:1.0,velocity:2.0,effort:3.0},drive:null}];
-    var legacyRecord:Dynamic={robotId:"legacy/robot",name:"Legacy robot",
-      links:legacyLinks,joints:legacyJoints,
-      frames:emptyLegacyFrames,sensors:emptyLegacySensors};
+    var legacyLinks:Array<Dynamic> = [{id: "base", name: "Base"}, {id: "arm", name: "Arm"}];
+    var legacyJoints:Array<Dynamic> = [{
+      id: "joint/arm",
+      name: "Arm joint",
+      type: "revolute",
+      parentId: "base",
+      childId: "arm",
+      limits: {
+        lower: -1.0,
+        upper: 1.0,
+        velocity: 2.0,
+        effort: 3.0
+      },
+      drive: null
+    }];
+    var legacyRecord:Dynamic = {
+      robotId: "legacy/robot",
+      name: "Legacy robot",
+      links: legacyLinks,
+      joints: legacyJoints,
+      frames: emptyLegacyFrames,
+      sensors: emptyLegacySensors
+    };
     var legacyRejected = false;
-    try new SensorConfiguration(legacyRecord) catch (error:Dynamic)
-      legacyRejected = Std.string(error) == "Unsupported robot authoring schema version";
+    try new SensorConfiguration(legacyRecord) catch (error:Dynamic) legacyRejected = Std.string(error)
+      == "Unsupported robot authoring schema version";
     check(legacyRejected, "the robot authoring record rejects older unversioned formats");
     session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
-    check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
-      restoredFrame.position[0] == 0.25,
-      "sensor settings survive document save and reload");
-    session.scene.setVisible("tower",false);
-    var hiddenObstacle=[for(item in session.scene.records())if(item.id=="tower")item][0];
-    check(!hiddenObstacle.visible&&hiddenObstacle.collisionEnabled&&hiddenObstacle.depth==0.2,
-      "render visibility is independent from persisted collision geometry");
-    var world=new RobotWorld();
-    var simulation=new ApplicationSimulation(world);
-    var monitor=new ReplayRobot("monitor/remote",new RobotRecording());world.attach(monitor);
-    check(simulation.rebuild(session.sensors,session.scene), "reloaded robots build one shared simulation");
+    check(
+      restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 && restoredFrame.position[0] == 0.25,
+      "sensor settings survive document save and reload"
+    );
+    session.scene.setVisible("tower", false);
+    var hiddenObstacle = [for (item in session.scene.records()) if (item.id == "tower") item][0];
+    check(
+      !hiddenObstacle.visible && hiddenObstacle.collisionEnabled && hiddenObstacle.depth == 0.2,
+      "render visibility is independent from persisted collision geometry"
+    );
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    var monitor = new ReplayRobot("monitor/remote", new RobotRecording());
+    world.attach(monitor);
+    check(simulation.rebuild(session.sensors, session.scene), "reloaded robots build one shared simulation");
     simulation.setBackend(ApplicationSimulation.MUJOCO);
-    check(simulation.pending(session.sensors,session.scene),"backend selection requires an explicit rebuild");
+    check(simulation.pending(session.sensors, session.scene), "backend selection requires an explicit rebuild");
     simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
-    check(world.robot("monitor/remote")==monitor,"shared rebuild leaves unrelated remote adapters attached");
-    var appliedRevision=simulation.appliedRevision;
+    check(world.robot("monitor/remote") == monitor, "shared rebuild leaves unrelated remote adapters attached");
+    var appliedRevision = simulation.appliedRevision;
     session.sensors.selectRobot("remote/readonly");
-    world.attach(new ReplayRobot("remote/readonly",new RobotRecording()));
-    session.sensors.setReadOnlyRobots(["remote/readonly","monitor/remote"]);
-    check(!session.sensors.isEditable()&&session.sensors.properties().length==0,
-      "remote robot sensor targets are read-only");
-    check(!simulation.rebuild(session.sensors,session.scene)&&simulation.appliedRevision==appliedRevision&&
-      world.robot("materia/robot")!=null,"remote target rejection preserves active simulated robots");
-    check(session.sensors.removeRobotConfiguration("remote/readonly"),
-      "unsupported remote configuration can be removed without touching the live world");
-    var remote=world.detach("remote/readonly");if(remote!=null)remote.close();
+    world.attach(new ReplayRobot("remote/readonly", new RobotRecording()));
+    session.sensors.setReadOnlyRobots(["remote/readonly", "monitor/remote"]);
+    check(
+      !session.sensors.isEditable() && session.sensors.properties().length == 0,
+      "remote robot sensor targets are read-only"
+    );
+    check(
+      !simulation.rebuild(session.sensors,
+      session.scene) && simulation.appliedRevision == appliedRevision && world.robot("materia/robot") != null,
+      "remote target rejection preserves active simulated robots"
+    );
+    check(
+      session.sensors.removeRobotConfiguration("remote/readonly"),
+      "unsupported remote configuration can be removed without touching the live world"
+    );
+    var remote = world.detach("remote/readonly");
+    if (remote != null) remote.close();
     session.sensors.selectRobot("materia/robot");
-    session.sensors.setReadOnlyRobots(["remote/readonly","monitor/remote"]);
-    session.scene.setPosition("tower",1,0.5);simulation.start();
-    check(simulation.rebuild(session.sensors,session.scene)&&simulation.isRunning()&&
-      world.robot("monitor/remote")==monitor,
-      "running scene rebuild preserves unrelated remote adapters");
+    session.sensors.setReadOnlyRobots(["remote/readonly", "monitor/remote"]);
+    session.scene.setPosition("tower", 1, 0.5);
+    simulation.start();
+    check(
+      simulation.rebuild(session.sensors,
+      session.scene) && simulation.isRunning() && world.robot("monitor/remote") == monitor,
+      "running scene rebuild preserves unrelated remote adapters"
+    );
     simulation.stop();
     for (index in 0...9) simulation.step();
     var observation = simulation.snapshot();
-    check(observation.robotIds().length==3,"shared world publishes two simulated robots and its unchanged remote adapter");
-    var firstRobot=observation.robot("materia/robot");
-    if(firstRobot==null)throw "Shared simulation lost the first robot";
-    var sawObstacle=false;
-    for(frame in world.robot("materia/robot").streams().latestFrames())if(frame.kind=="lidar")
-      for(value in frame.values.toArray())if(value<session.sensors.model.sensors[0].maxRange)sawObstacle=true;
-    check(sawObstacle,"LiDAR observes geometry populated from the Materia scene");
-    var visual=simulation.visualState();
-    check(visual.length==2&&visual[1].position[1]==3.0&&visual[0].sensors.length>0,
-      "runtime visualization exposes robot poses and sensor mounts without editing the document");
-    check(visual[1].links.length==2&&visual[1].sensors[0].linkId=="arm",
-      "articulated visualization exposes the link owning each sensor mount");
-    var presentation=simulation.capturePresentationSnapshot();
-    check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0,
-      "one application presentation snapshot combines a physics revision with robot visuals");
+    check(
+      observation.robotIds().length == 3,
+      "shared world publishes two simulated robots and its unchanged remote adapter"
+    );
+    var firstRobot = observation.robot("materia/robot");
+    if (firstRobot == null) throw "Shared simulation lost the first robot";
+    var sawObstacle = false;
+    for (frame in world.robot("materia/robot").streams().latestFrames()) if (frame.kind
+      == "lidar") for (value in frame.values.toArray()) if (value
+      < session.sensors.model.sensors[0].maxRange) sawObstacle = true;
+    check(sawObstacle, "LiDAR observes geometry populated from the Materia scene");
+    var visual = simulation.visualState();
+    check(
+      visual.length == 2 && visual[1].position[1] == 3.0 && visual[0].sensors.length > 0,
+      "runtime visualization exposes robot poses and sensor mounts without editing the document"
+    );
+    check(
+      visual[1].links.length == 2 && visual[1].sensors[0].linkId == "arm",
+      "articulated visualization exposes the link owning each sensor mount"
+    );
+    var presentation = simulation.capturePresentationSnapshot();
+    check(
+      presentation.revision > 0 && presentation.robots.length == 2 && presentation.environment.length > 0,
+      "one application presentation snapshot combines a physics revision with robot visuals"
+    );
     var writer = new McapRobotRecording(recordingPath);
-    for(robotId in observation.robotIds()) {
-      var robot=observation.robot(robotId);
-      if(robot==null)throw "Shared simulation snapshot lost a robot";
-      for(frame in world.robot(robotId).streams().latestFrames())writer.recordSensor(robotId,frame);
+    for (robotId in observation.robotIds()) {
+      var robot = observation.robot(robotId);
+      if (robot == null) throw "Shared simulation snapshot lost a robot";
+      for (frame in world.robot(robotId).streams().latestFrames()) writer.recordSensor(robotId, frame);
     }
     writer.close();
     var loaded = McapRecordingReader.load(recordingPath);
-    var recordedRobots=new Map<String,Bool>();
-    for(entry in loaded.entries)recordedRobots.set(entry.robotId,true);
-    check(recordedRobots.exists("materia/robot")&&recordedRobots.exists("materia/robot-b"),
-      "recording retains observations for both simulated robots");
+    var recordedRobots = new Map<String, Bool>();
+    for (entry in loaded.entries) recordedRobots.set(entry.robotId, true);
+    check(
+      recordedRobots.exists("materia/robot") && recordedRobots.exists("materia/robot-b"),
+      "recording retains observations for both simulated robots"
+    );
     var replay = new ReplayRobot("materia/robot", loaded);
     var replayed = replay.streams().latestFrames();
-    check(replayed.length > 0 && replayed[0].sensorId == session.sensors.model.sensors[0].id,
-      "record/replay preserves configured sensor identity");
-    check(replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
-      "record/replay preserves sensor mount and measurements");
-    replay.close(); simulation.dispose(); world.close();
+    check(
+      replayed.length > 0 && replayed[0].sensorId == session.sensors.model.sensors[0].id,
+      "record/replay preserves configured sensor identity"
+    );
+    check(
+      replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
+      "record/replay preserves sensor mount and measurements"
+    );
+    replay.close();
+    simulation.dispose();
+    world.close();
 
-    session.scene.setPositionXY("tower",1.0,3.0);
+    session.scene.setPositionXY("tower", 1.0, 3.0);
     session.scene.select("tower");
-    check(new PropertyBinding(property(session.scene.properties(), "dynamic"),session.scene.context())
-      .apply(PropertyValue.Bool(true))==PropertyEditResult.Applied,
-      "physics regression makes the observed obstacle dynamic");
+    check(
+      new PropertyBinding(property(session.scene.properties(),
+      "dynamic"), session.scene.context()).apply(PropertyValue.Bool(true)) == PropertyEditResult.Applied,
+      "physics regression makes the observed obstacle dynamic"
+    );
 
-    var mujocoWorld=new RobotWorld();
-    var mujocoSimulation=new ApplicationSimulation(mujocoWorld,ApplicationSimulation.MUJOCO);
-    check(mujocoSimulation.rebuild(session.sensors,session.scene),
-      "MuJoCo-enabled tests require the MuJoCo backend to execute");
+    var mujocoWorld = new RobotWorld();
+    var mujocoSimulation = new ApplicationSimulation(mujocoWorld, ApplicationSimulation.MUJOCO);
+    check(
+      mujocoSimulation.rebuild(session.sensors, session.scene),
+      "MuJoCo-enabled tests require the MuJoCo backend to execute"
+    );
     mujocoSimulation.step();
-    var mujocoObservation=mujocoSimulation.snapshot();
-    var initialObjects=mujocoSimulation.environmentVisualState();
-    var initialVisual=mujocoSimulation.visualState()[1];
-    var initialArm=[for(link in initialVisual.links)if(link.id=="arm")link][0];
-    var initialObstacleZ=[for(object in initialObjects)if(object.id=="tower")object.position[2]][0];
-    var mountedRobot=mujocoObservation.robot("materia/robot-b");
-    if(mountedRobot==null)throw "MuJoCo world lost the articulated robot";
-    var mountedLidar=mujocoWorld.robot("materia/robot-b").streams().latestFrames()[0],initialHit=false;
-    for(value in mountedLidar.values.toArray())if(value<10.0)initialHit=true;
-    check(mountedLidar.linkId=="arm"&&initialHit,
-      "joint-mounted LiDAR observes the dynamic obstacle in MuJoCo");
-    mujocoWorld.submit("materia/robot-b",RobotCommand.JointTargets([
-      JointTarget.position(0,0.6)
-    ],null));
-    for(index in 0...8)mujocoSimulation.step();
-    mujocoObservation=mujocoSimulation.snapshot();
-    var mujocoRobot=mujocoObservation.robot("materia/robot");
-    if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
+    var mujocoObservation = mujocoSimulation.snapshot();
+    var initialObjects = mujocoSimulation.environmentVisualState();
+    var initialVisual = mujocoSimulation.visualState()[1];
+    var initialArm = [for (link in initialVisual.links) if (link.id == "arm") link][0];
+    var initialObstacleZ = [for (object in initialObjects) if (object.id == "tower") object.position[2]][0];
+    var mountedRobot = mujocoObservation.robot("materia/robot-b");
+    if (mountedRobot == null) throw "MuJoCo world lost the articulated robot";
+    var mountedLidar = mujocoWorld.robot("materia/robot-b").streams().latestFrames()[0], initialHit = false;
+    for (value in mountedLidar.values.toArray()) if (value < 10.0) initialHit = true;
+    check(mountedLidar.linkId == "arm" && initialHit, "joint-mounted LiDAR observes the dynamic obstacle in MuJoCo");
+    mujocoWorld.submit("materia/robot-b", RobotCommand.JointTargets([JointTarget.position(0, 0.6)], null));
+    for (index in 0...8) mujocoSimulation.step();
+    mujocoObservation = mujocoSimulation.snapshot();
+    var mujocoRobot = mujocoObservation.robot("materia/robot");
+    if (mujocoRobot == null) throw "MuJoCo world lost the configured robot";
     var mujocoFrames = mujocoWorld.robot("materia/robot").streams().latestFrames();
-    check(mujocoWorld.robot("materia/robot").streams().latestFrames().length>0&&mujocoSimulation.visualState().length==2,
-      "MuJoCo backend publishes the same observable multi-robot contract");
-    var movedVisual=mujocoSimulation.visualState()[1];
-    var movedArm=[for(link in movedVisual.links)if(link.id=="arm")link][0];
-    var movedObstacleZ=[for(object in mujocoSimulation.environmentVisualState())
-      if(object.id=="tower")object.position[2]][0];
-    var movedMounted=mujocoObservation.robot("materia/robot-b");
-    if(movedMounted==null)throw "MuJoCo world lost the moving articulated robot";
-    var armMoved=false;
-    for(index in 0...4)if(Math.abs(movedArm.rotation[index]-initialArm.rotation[index])>0.00001)armMoved=true;
-    check(movedObstacleZ<initialObstacleZ,
-      'runtime overlay follows falling obstacle (Z: $initialObstacleZ -> $movedObstacleZ)');
-    check(movedMounted.positions.get(0)>mountedRobot.positions.get(0)+0.00001,
+    check(
+      mujocoWorld.robot("materia/robot").streams().latestFrames().length > 0
+      && mujocoSimulation.visualState().length == 2,
+      "MuJoCo backend publishes the same observable multi-robot contract"
+    );
+    var movedVisual = mujocoSimulation.visualState()[1];
+    var movedArm = [for (link in movedVisual.links) if (link.id == "arm") link][0];
+    var movedObstacleZ = [for (object in mujocoSimulation.environmentVisualState()) if (object.id
+      == "tower") object.position[2]][0];
+    var movedMounted = mujocoObservation.robot("materia/robot-b");
+    if (movedMounted == null) throw "MuJoCo world lost the moving articulated robot";
+    var armMoved = false;
+    for (index in 0...4) if (Math.abs(movedArm.rotation[index] - initialArm.rotation[index]) > 0.00001) armMoved = true;
+    check(
+      movedObstacleZ < initialObstacleZ,
+      'runtime overlay follows falling obstacle (Z: $initialObstacleZ -> $movedObstacleZ)'
+    );
+    check(
+      movedMounted.positions.get(0) > mountedRobot.positions.get(0) + 0.00001,
       'position command moves the arm joint (${mountedRobot.positions.get(0)} -> '
-      + '${movedMounted.positions.get(0)}, effort: ${movedMounted.efforts.get(0)})');
-    check(armMoved,
+      + '${movedMounted.positions.get(0)}, effort: ${movedMounted.efforts.get(0)})'
+    );
+    check(
+      armMoved,
       'runtime overlay follows commanded arm (rotation: ${initialArm.rotation} -> '
       + '${movedArm.rotation}; joint position: ${movedMounted.positions.get(0)}, '
-      + 'effort: ${movedMounted.efforts.get(0)}, safety: ${movedMounted.safety})');
-      var resetPosition=[0.4,3.0,0.6];
-      var resetRotation=[0.0,Math.sin(0.2),0.0,Math.cos(0.2)];
-      check(session.sensors.setRobotPose("materia/robot-b",resetPosition,resetRotation),
-        "sensor workflow stores a 3D robot pose");
-      session.save(documentPath);
-      session.open(documentPath);
-      check(mujocoSimulation.rebuild(session.sensors,session.scene),
-        "MuJoCo rebuild applies the persisted 3D robot pose");
-      check(mujocoSimulation.reset(),"MuJoCo simulation resets through the shared lifecycle");
-      var resetRobot=mujocoSimulation.visualState()[1];
-      var persistedPosition=session.sensors.robotPosition("materia/robot-b");
-      var persistedRotation=session.sensors.robotRotation("materia/robot-b");
-      for(axis in 0...3)check(Math.abs(resetRobot.position[axis]-persistedPosition[axis])<0.00001,
-        'MuJoCo reset restores persisted robot position axis $axis');
-      for(axis in 0...4)check(Math.abs(resetRobot.rotation[axis]-persistedRotation[axis])<0.00001,
-        'MuJoCo reset restores persisted robot rotation axis $axis');
-      check(Math.abs([for(object in mujocoSimulation.environmentVisualState())
-        if(object.id=="tower")object.position[2]][0]-0.1)<0.00001,
-        "MuJoCo reset restores the moving obstacle pose");
-      var mujocoPath=recordingPath+".mujoco",mujocoWriter=new McapRobotRecording(mujocoPath);
-      for(frame in mujocoFrames)mujocoWriter.recordSensor("materia/robot",frame);
-      mujocoWriter.close();var mujocoReplay=new ReplayRobot("materia/robot",McapRecordingReader.load(mujocoPath));
-      check(mujocoReplay.streams().latestFrames().length>0,"MuJoCo observations survive MCAP replay");
-      mujocoReplay.close();FileSystem.deleteFile(mujocoPath);
-      var mujocoStatus=mujocoPath+".incomplete.status";
-      if(FileSystem.exists(mujocoStatus))FileSystem.deleteFile(mujocoStatus);
-    mujocoSimulation.dispose();mujocoWorld.close();session.dispose();
+      + 'effort: ${movedMounted.efforts.get(0)}, safety: ${movedMounted.safety})'
+    );
+    var resetPosition = [0.4, 3.0, 0.6];
+    var resetRotation = [0.0, Math.sin(0.2), 0.0, Math.cos(0.2)];
+    check(
+      session.sensors.setRobotPose("materia/robot-b", resetPosition, resetRotation),
+      "sensor workflow stores a 3D robot pose"
+    );
+    session.save(documentPath);
+    session.open(documentPath);
+    check(
+      mujocoSimulation.rebuild(session.sensors, session.scene),
+      "MuJoCo rebuild applies the persisted 3D robot pose"
+    );
+    check(mujocoSimulation.reset(), "MuJoCo simulation resets through the shared lifecycle");
+    var resetRobot = mujocoSimulation.visualState()[1];
+    var persistedPosition = session.sensors.robotPosition("materia/robot-b");
+    var persistedRotation = session.sensors.robotRotation("materia/robot-b");
+    for (axis in 0...3) check(
+      Math.abs(resetRobot.position[axis] - persistedPosition[axis]) < 0.00001,
+      'MuJoCo reset restores persisted robot position axis $axis'
+    );
+    for (axis in 0...4) check(
+      Math.abs(resetRobot.rotation[axis] - persistedRotation[axis]) < 0.00001,
+      'MuJoCo reset restores persisted robot rotation axis $axis'
+    );
+    check(
+      Math.abs([for (object in mujocoSimulation.environmentVisualState()) if (object.id
+      == "tower") object.position[2]][0] - 0.1) < 0.00001,
+      "MuJoCo reset restores the moving obstacle pose"
+    );
+    var mujocoPath = recordingPath + ".mujoco", mujocoWriter = new McapRobotRecording(mujocoPath);
+    for (frame in mujocoFrames) mujocoWriter.recordSensor("materia/robot", frame);
+    mujocoWriter.close();
+    var mujocoReplay = new ReplayRobot("materia/robot", McapRecordingReader.load(mujocoPath));
+    check(mujocoReplay.streams().latestFrames().length > 0, "MuJoCo observations survive MCAP replay");
+    mujocoReplay.close();
+    FileSystem.deleteFile(mujocoPath);
+    var mujocoStatus = mujocoPath + ".incomplete.status";
+    if (FileSystem.exists(mujocoStatus)) FileSystem.deleteFile(mujocoStatus);
+    mujocoSimulation.dispose();
+    mujocoWorld.close();
+    session.dispose();
     FileSystem.deleteFile(recordingPath);
     var statusPath = recordingPath + ".incomplete.status";
     if (FileSystem.exists(statusPath)) FileSystem.deleteFile(statusPath);
@@ -1117,24 +1591,21 @@ class SceneEditingTests {
     var scene = new EditorScene();
     try {
       var view = scene.configureRenderView(new SceneView(), Transform.identity());
-      check(view.selectionOverrideCount() == 1,
-        "perspective view highlights the shared scene selection");
+      check(view.selectionOverrideCount() == 1, "perspective view highlights the shared scene selection");
       view = scene.configureRenderView(new SceneView(), Transform.identity(), null, "tower");
-      check(view.hoverOverrideCount() == 1,
-        "perspective view presents the hovered object");
+      check(view.hoverOverrideCount() == 1, "perspective view presents the hovered object");
       scene.select("scene");
       view = scene.configureRenderView(new SceneView(), Transform.identity());
-      check(view.selectionOverrideCount() == 0,
-        "perspective view clears highlighting with the shared selection");
-      check(view.hoverOverrideCount() == 0,
-        "perspective view clears the hover presentation");
+      check(view.selectionOverrideCount() == 0, "perspective view clears highlighting with the shared selection");
+      check(view.hoverOverrideCount() == 0, "perspective view clears the hover presentation");
       scene.select("tower");
       scene.setVisible("tower", false);
-      check(!scene.info("tower").visible(),
-        "perspective snapshot observes shared visibility");
+      check(!scene.info("tower").visible(), "perspective snapshot observes shared visibility");
       var tower = scene.items()[1];
-      check(nearValue(tower.red, 0.92) && nearValue(tower.green, 0.48) && nearValue(tower.blue, 0.22),
-        "perspective snapshot retains shared object colour");
+      check(
+        nearValue(tower.red, 0.92) && nearValue(tower.green, 0.48) && nearValue(tower.blue, 0.22),
+        "perspective snapshot retains shared object colour"
+      );
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1147,14 +1618,18 @@ class SceneEditingTests {
     root.walk(function(node) {
       var key = node.retainedPaintKey();
       if (key != null && key.indexOf("handler:perspective:") >= 0) found = node;
-    });
+    }
+    );
     if (found == null) throw "Docked viewport paint node is missing";
     return found;
   }
 
   static function styledNode(root:haxeon.ui.core.RenderNode, key:String):haxeon.ui.core.RenderNode {
     var found:Null<haxeon.ui.core.RenderNode> = null;
-    root.walk(function(node) { if (node.styleKey == key) found = node; });
+    root.walk(function(node) {
+      if (node.styleKey == key) found = node;
+    }
+    );
     if (found == null) throw "Missing styled node: " + key;
     return found;
   }
@@ -1163,47 +1638,64 @@ class SceneEditingTests {
     // Force full submissions, as a live simulation does, rather than testing the outer submit cache.
     function submit():haxeon.ui.core.RenderNode return app.ui.submit(app.view(), frame);
     app.scene.createRectangle();
-    check(app.simulation.rebuild(app.sensors, app.scene, app.session),
-      "chrome test builds a shared simulation: " + app.simulation.error);
+    check(
+      app.simulation.rebuild(app.sensors, app.scene, app.session),
+      "chrome test builds a shared simulation: " + app.simulation.error
+    );
     var root = submit();
     var top = styledNode(root, "editor-toolbar"), status = styledNode(root, "editor-status-bar");
     app.simulation.step();
     root = submit();
-    check(styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
-      "new simulation poses retain unchanged top and status render subtrees");
+    check(
+      styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
+      "new simulation poses retain unchanged top and status render subtrees"
+    );
 
     app.simulation.start();
     root = submit();
-    check(styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
-      "starting simulation refreshes transport and status");
-    check(!styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-pause").enabled,
-      "running transport shows Pause and disables Step");
-    top = styledNode(root, "editor-toolbar"); status = styledNode(root, "editor-status-bar");
+    check(
+      styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
+      "starting simulation refreshes transport and status"
+    );
+    check(
+      !styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-pause").enabled,
+      "running transport shows Pause and disables Step"
+    );
+    top = styledNode(root, "editor-toolbar");
+    status = styledNode(root, "editor-status-bar");
     root = submit();
-    check(styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
-      "unchanged running state retains both chrome subtrees");
+    check(
+      styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
+      "unchanged running state retains both chrome subtrees"
+    );
     app.simulation.stop();
     root = submit();
-    check(styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-play").enabled,
-      "pausing refreshes transport availability without a registry refresh");
+    check(
+      styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-play").enabled,
+      "pausing refreshes transport availability without a registry refresh"
+    );
 
-    top = styledNode(root, "editor-toolbar"); status = styledNode(root, "editor-status-bar");
+    top = styledNode(root, "editor-toolbar");
+    status = styledNode(root, "editor-status-bar");
     app.simulation.setTimestep(app.simulation.timestep * 2.0);
     root = submit();
-    check(styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
-      "pending simulation configuration refreshes both state labels");
+    check(
+      styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
+      "pending simulation configuration refreshes both state labels"
+    );
     status = styledNode(root, "editor-status-bar");
     app.simulation.error = "Chrome test failure";
     root = submit();
-    check(styledNode(root, "editor-status-bar") != status,
-      "simulation errors refresh status text and color");
+    check(styledNode(root, "editor-status-bar") != status, "simulation errors refresh status text and color");
     app.simulation.error = null;
 
     // A document confirmation must also block commands inside retained chrome.
     app.documents.requestNew();
     root = submit();
-    check(app.documents.blocked() && !styledNode(root, "toolbar-save").enabled,
-      "document confirmation refreshes retained command enabled states");
+    check(
+      app.documents.blocked() && !styledNode(root, "toolbar-save").enabled,
+      "document confirmation refreshes retained command enabled states"
+    );
     app.documents.resolve("cancel");
     root = submit();
     check(styledNode(root, "toolbar-save").enabled, "dismissing confirmation restores command availability");
@@ -1213,16 +1705,18 @@ class SceneEditingTests {
   static function dockedNavigationInput():Void {
     var fonts = haxeon.ui.FontCollection.create();
     var font:Null<String> = null;
-    for (candidate in ["haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
-      if (FileSystem.exists(candidate)) font = candidate;
+    for (candidate in [
+      "haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"
+    ]) if (FileSystem.exists(candidate)) font = candidate;
     check(font != null, "navigation test font exists");
     fonts.add(cast font);
     var directory = "build/navigation-input-test-" + Std.string(Std.int(Sys.time()));
     FileSystem.createDirectory(directory);
     var app = new ReferenceEditorApp(fonts, directory + "/workspace.json");
     var requests = 0;
-    var host = new UiHostContext(fonts, new NativeKitEvents(), function() {}, function() requests++);
+    var host = new UiHostContext(fonts, new NativeKitEvents(), function() {
+    }, function() requests++);
     var viewport = new EditorPerspectiveViewport("scene-perspective", app.scene, host);
     app.perspectiveViewport = viewport;
     app.workspace.activate("perspective");
@@ -1250,27 +1744,35 @@ class SceneEditingTests {
       app.ui.pointerUp(x + 30, y + 10, 2);
       check(!viewport.orbiting(), "orbit pivot hides on release");
       check(viewport.camera.yaw != yaw, "docked middle drag orbits");
-      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
-        "docked orbit rebuilds retained paint instructions");
+      check(
+        viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "docked orbit rebuilds retained paint instructions"
+      );
       app.ui.pointerMove(x, y);
       viewportPaintNode(app.submit(frame));
       before = viewportPaintNode(app.submit(frame)).retainedPaintKey();
       app.ui.pointerDown(x, y, 2);
-      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
-        "stationary orbit press shows pivot ring through dock cache");
+      check(
+        viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "stationary orbit press shows pivot ring through dock cache"
+      );
       app.ui.pointerUp(x, y, 2);
       var afterOrbitRelease = viewportPaintNode(app.submit(frame)).retainedPaintKey();
-      check(afterOrbitRelease == before,
-        'stationary orbit release removes pivot ring through dock cache; before=$before after=$afterOrbitRelease ' +
-          'presentation=${viewport.presentationKey()} hover=${viewport.hoverRevision} camera=${viewport.camera.revision}');
+      check(
+        afterOrbitRelease == before,
+        'stationary orbit release removes pivot ring through dock cache; before=$before after=$afterOrbitRelease '
+        + 'presentation=${viewport.presentationKey()} hover=${viewport.hoverRevision} camera=${viewport.camera.revision}'
+      );
       var target = viewport.camera.targetX;
       app.ui.pointerDown(x, y, 0, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
       check(!viewport.orbiting(), "panning does not show the orbit pivot");
       app.ui.pointerMove(x + 25, y, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
       app.ui.pointerUp(x + 25, y, 0, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
       check(viewport.camera.targetX != target, "docked Alt+Shift drag pans");
-      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
-        "docked pan rebuilds retained paint instructions");
+      check(
+        viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "docked pan rebuilds retained paint instructions"
+      );
       // Hold RMB: look around the eye, then advance WASD through real app submissions.
       var eye = viewport.camera.eyePosition();
       app.ui.pointerDown(x, y, 1);
@@ -1285,15 +1787,20 @@ class SceneEditingTests {
       frame.deltaSeconds = 0.02;
       app.submit(frame);
       var moved = viewport.camera.eyePosition();
-      for (axis in 0...3) near(moved[axis], eye[axis] - backward[axis] * speed * 0.02,
-        "held W advances camera once per host frame");
-      check(viewportPaintNode(app.submit(new LayoutFrame(1400, 900))).retainedPaintKey() != before,
-        "fly movement invalidates docked paint");
+      for (axis in 0...3) near(
+        moved[axis],
+        eye[axis] - backward[axis] * speed * 0.02,
+        "held W advances camera once per host frame"
+      );
+      check(
+        viewportPaintNode(app.submit(new LayoutFrame(1400, 900))).retainedPaintKey() != before,
+        "fly movement invalidates docked paint"
+      );
       app.ui.key(UiEventKind.KeyDown, 340, UiModifier.Shift);
       app.submit(frame);
       var fast = viewport.camera.eyePosition();
-      for (axis in 0...3) near(fast[axis], moved[axis] - backward[axis] * speed * 0.02 * 4,
-        "Shift boosts flight speed");
+      for (axis in 0...3) near(fast[axis],
+        moved[axis] - backward[axis] * speed * 0.02 * 4, "Shift boosts flight speed");
       app.ui.key(UiEventKind.KeyUp, UiKey.W, UiModifier.Shift);
       var stoppedRevision = viewport.camera.revision;
       app.submit(frame);
@@ -1302,69 +1809,90 @@ class SceneEditingTests {
       app.ui.pointerUp(x + 35, y + 20, 1);
       stoppedRevision = viewport.camera.revision;
       app.submit(frame);
-      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
-        "RMB release clears held movement keys");
+      check(!viewport.flying() && viewport.camera.revision == stoppedRevision, "RMB release clears held movement keys");
       app.ui.pointerDown(x, y, 1);
       app.submit(frame);
       check(viewport.camera.revision == stoppedRevision, "new flight starts without stale keys");
       app.ui.key(UiEventKind.KeyDown, UiKey.W);
       app.ui.key(UiEventKind.KeyDown, UiKey.Escape);
       app.submit(frame);
-      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
-        "Escape cancels flight and capture");
+      check(!viewport.flying() && viewport.camera.revision == stoppedRevision, "Escape cancels flight and capture");
       app.ui.pointerDown(x, y, 1);
       app.ui.key(UiEventKind.KeyDown, UiKey.W);
       app.ui.windowFocusLost();
       app.submit(frame);
-      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
-        "window focus loss cancels flight and held movement");
+      check(
+        !viewport.flying() && viewport.camera.revision == stoppedRevision,
+        "window focus loss cancels flight and held movement"
+      );
 
       chromeRetention(app, frame);
 
     } catch (error:Dynamic) {
-      app.dispose(); fonts.dispose(); throw error;
+      app.dispose();
+      fonts.dispose();
+      throw error;
     }
-    app.dispose(); fonts.dispose();
+    app.dispose();
+    fonts.dispose();
   }
 
   static function perspectiveHoverInput():Void {
     var scene = new EditorScene();
     var frameRequests = 0;
-    var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {
+    var host = new UiHostContext(null, new NativeKitEvents(), function() {
+    }, function() {
       frameRequests++;
-    });
+    }
+    );
     var viewport = new EditorPerspectiveViewport("hover-test", scene, host);
     var ui = new UiContext();
     try {
-      var rotatedBox = nativekit.scene.Transform.identity()
-        .set(0, 0).set(1, 2).set(4, -3).set(5, 0).translated(1, 2, 3);
+      var rotatedBox = nativekit.scene.Transform.identity().set(0,
+        0).set(1, 2).set(4, -3).set(5, 0).translated(1, 2, 3);
       var rotatedBounds = EditorPerspectiveViewport.transformedBounds(rotatedBox, 4, 6, 8);
-      check(nearValue(rotatedBounds[0], -8) && nearValue(rotatedBounds[3], 10) &&
-        nearValue(rotatedBounds[1], -2) && nearValue(rotatedBounds[4], 6) &&
-        nearValue(rotatedBounds[2], -1) && nearValue(rotatedBounds[5], 7),
-        "clip bounds preserve rotated and scaled box extents");
+      check(
+        nearValue(rotatedBounds[0],
+        -8) && nearValue(rotatedBounds[3], 10) && nearValue(rotatedBounds[1], -2) && nearValue(
+          rotatedBounds[4],
+          6
+        ) && nearValue(
+          rotatedBounds[2],
+          -1
+        ) && nearValue(
+          rotatedBounds[5],
+          7
+        ),
+        "clip bounds preserve rotated and scaled box extents"
+      );
       var box:app.EditorScene.EditorSceneObject = scene.object("box");
       if (box == null) throw "missing box fixture";
-      viewport.setSimulationState(true, [{id: "box", position: [1.0, 2.0, 3.0],
-        rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
+      viewport.setSimulationState(true, [{id: "box", position: [1.0, 2.0, 3.0], rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
       var firstTransform = viewport.displayTransform(box);
       var firstBounds = EditorPerspectiveViewport.transformedBounds(firstTransform, 0, 0, 0);
-      check(nearValue(firstBounds[0], 1.0) && nearValue(firstBounds[1], 2.0),
-        "display transform resolves a simulation pose by object id");
-      check(viewport.displayTransform(box) == firstTransform,
-        "clipping and framing reuse a pose transform within one presentation");
-      viewport.setSimulationState(true, [{id: "box", position: [4.0, 5.0, 6.0],
-        rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
-      check(viewport.displayTransform(box) == firstTransform,
-        "successive presentations reuse viewport scratch transforms");
-      var nextBounds = EditorPerspectiveViewport.transformedBounds(viewport.displayTransform(box), 0, 0, 0, firstBounds);
+      check(
+        nearValue(firstBounds[0], 1.0) && nearValue(firstBounds[1], 2.0),
+        "display transform resolves a simulation pose by object id"
+      );
+      check(
+        viewport.displayTransform(box) == firstTransform,
+        "clipping and framing reuse a pose transform within one presentation"
+      );
+      viewport.setSimulationState(true, [{id: "box", position: [4.0, 5.0, 6.0], rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
+      check(
+        viewport.displayTransform(box) == firstTransform,
+        "successive presentations reuse viewport scratch transforms"
+      );
+      var nextBounds = EditorPerspectiveViewport.transformedBounds(viewport.displayTransform(box),
+        0, 0, 0, firstBounds);
       check(nextBounds == firstBounds, "clip bounds reuse caller storage");
-      check(nearValue(nextBounds[0], 4.0),
-        "new pose input invalidates transforms even when the supplied revision is unchanged");
+      check(
+        nearValue(nextBounds[0], 4.0),
+        "new pose input invalidates transforms even when the supplied revision is unchanged"
+      );
       viewport.setSimulationState(false, null, 2);
       var authoredBounds = EditorPerspectiveViewport.transformedBounds(viewport.displayTransform(box), 0, 0, 0);
-      check(nearValue(authoredBounds[0], box.x),
-        "stopping simulation restores the authored display transform");
+      check(nearValue(authoredBounds[0], box.x), "stopping simulation restores the authored display transform");
       viewport.renderedWidth = 800;
       viewport.renderedHeight = 600;
       viewport.frameSelected();
@@ -1373,31 +1901,33 @@ class SceneEditingTests {
       ui.submit(viewport, new LayoutFrame(800.0, 600.0));
 
       ui.events.pointerMove(400.0, 300.0);
-      check(viewport.hoveredId() == "box",
-        "perspective pointer hover resolves the object under the cursor");
-      check(frameRequests == 1,
-        "perspective pointer hover requests a repaint");
-      check(viewport.presentationKey() != beforeKey,
-        "perspective pointer hover changes the presentation cache key");
+      check(viewport.hoveredId() == "box", "perspective pointer hover resolves the object under the cursor");
+      check(frameRequests == 1, "perspective pointer hover requests a repaint");
+      check(viewport.presentationKey() != beforeKey, "perspective pointer hover changes the presentation cache key");
       var beforeSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5, beforeKey);
-      var afterSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5,
-        viewport.presentationKey());
-      check(beforeSubmitKey != afterSubmitKey,
-        "perspective pointer hover invalidates the retained editor submission");
-      var hoveredView = scene.configureRenderView(new SceneView(),
-        viewport.camera.viewProjection(800.0 / 600.0), null, viewport.hoveredId());
-      check(hoveredView.hoverOverrideCount() == 1,
-        "perspective pointer hover reaches the scene presentation layer");
+      var afterSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5, viewport.presentationKey());
+      check(beforeSubmitKey != afterSubmitKey, "perspective pointer hover invalidates the retained editor submission");
+      var hoveredView = scene.configureRenderView(
+        new SceneView(),
+        viewport.camera.viewProjection(800.0 / 600.0),
+        null,
+        viewport.hoveredId()
+      );
+      check(hoveredView.hoverOverrideCount() == 1, "perspective pointer hover reaches the scene presentation layer");
 
       ui.events.pointerMove(0.0, 0.0);
-      check(viewport.hoveredId() == null,
-        "perspective pointer hover clears outside scene geometry");
-      check(frameRequests == 2,
-        "clearing perspective pointer hover requests a repaint");
-      var clearedView = scene.configureRenderView(new SceneView(),
-        viewport.camera.viewProjection(800.0 / 600.0), null, viewport.hoveredId());
-      check(clearedView.hoverOverrideCount() == 0,
-        "cleared perspective pointer hover removes the scene presentation layer");
+      check(viewport.hoveredId() == null, "perspective pointer hover clears outside scene geometry");
+      check(frameRequests == 2, "clearing perspective pointer hover requests a repaint");
+      var clearedView = scene.configureRenderView(
+        new SceneView(),
+        viewport.camera.viewProjection(800.0 / 600.0),
+        null,
+        viewport.hoveredId()
+      );
+      check(
+        clearedView.hoverOverrideCount() == 0,
+        "cleared perspective pointer hover removes the scene presentation layer"
+      );
     } catch (error:Dynamic) {
       ui.dispose();
       scene.dispose();
@@ -1414,15 +1944,14 @@ class SceneEditingTests {
       var hit = scene.hoverHit(0.03, 0.0);
       check(hit.id != "scene", "CAD face hover resolves the object under the cursor (" + hit.id + ")");
       check(hit.faceIndex >= 0, "CAD face hover preserves the picked face identity");
-      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null,
-        hit.id, hit.faceIndex);
-      check(view.visibilityOverrideCount() == 1,
-        "CAD face hover presents a dedicated face overlay node");
-      var overlays=view.hoverOverrideValues(),faceNode=scene.faceHoverNodes.get(hit.id);
-      check(overlays.length==1 && faceNode!=null
-          && overlays[0].get_node().get_value()==faceNode.stableValue()
-          && overlays[0].get_node().get_value()!=scene.info(hit.id).node().stableValue(),
-        "CAD face hover tints the dedicated face node, preserving the whole-object presentation");
+      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null, hit.id, hit.faceIndex);
+      check(view.visibilityOverrideCount() == 1, "CAD face hover presents a dedicated face overlay node");
+      var overlays = view.hoverOverrideValues(), faceNode = scene.faceHoverNodes.get(hit.id);
+      check(
+        overlays.length == 1 && faceNode != null && overlays[0].get_node().get_value() == faceNode.stableValue()
+        && overlays[0].get_node().get_value() != scene.info(hit.id).node().stableValue(),
+        "CAD face hover tints the dedicated face node, preserving the whole-object presentation"
+      );
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1433,9 +1962,15 @@ class SceneEditingTests {
   /** A one-triangle preview object whose only face carries hover identity 7. */
   static function trianglePreviewScene():EditorScene {
     var positions = haxe.io.Bytes.alloc(3 * 12);
-    positions.setFloat(0, -0.1); positions.setFloat(4, -0.1); positions.setFloat(8, 0.0);
-    positions.setFloat(12, 0.1); positions.setFloat(16, -0.1); positions.setFloat(20, 0.0);
-    positions.setFloat(24, 0.0); positions.setFloat(28, 0.1); positions.setFloat(32, 0.0);
+    positions.setFloat(0, -0.1);
+    positions.setFloat(4, -0.1);
+    positions.setFloat(8, 0.0);
+    positions.setFloat(12, 0.1);
+    positions.setFloat(16, -0.1);
+    positions.setFloat(20, 0.0);
+    positions.setFloat(24, 0.0);
+    positions.setFloat(28, 0.1);
+    positions.setFloat(32, 0.0);
     var normals = haxe.io.Bytes.alloc(3 * 12);
     for (index in 0...3) {
       normals.setFloat(index * 12, 0.0);
@@ -1443,7 +1978,9 @@ class SceneEditingTests {
       normals.setFloat(index * 12 + 8, 1.0);
     }
     var indices = haxe.io.Bytes.alloc(3 * 4);
-    indices.setInt32(0, 0); indices.setInt32(4, 1); indices.setInt32(8, 2);
+    indices.setInt32(0, 0);
+    indices.setInt32(4, 1);
+    indices.setInt32(8, 2);
     var geometry = new GeometryData();
     geometry.addStream(1, 2, positions, 3, 12);
     geometry.addStream(2, 2, normals, 3, 12);
@@ -1453,10 +1990,23 @@ class SceneEditingTests {
     var generated = new Map<String, GeometryData>();
     generated.set("preview-mesh", geometry);
     var data:Array<app.SceneObjectData> = [{
-      id: "preview", label: "Preview", type: "cad-preview", x: 0.0, y: 0.0, z: 0.0,
-      width: 0.2, height: 0.2, depth: 0.001, collisionEnabled: false,
-      dynamicBody: false, mass: 1.0, red: 0.4, green: 0.6, blue: 0.8,
-      visible: true, meshSnapshot: "preview-mesh"
+      id: "preview",
+      label: "Preview",
+      type: "cad-preview",
+      x: 0.0,
+      y: 0.0,
+      z: 0.0,
+      width: 0.2,
+      height: 0.2,
+      depth: 0.001,
+      collisionEnabled: false,
+      dynamicBody: false,
+      mass: 1.0,
+      red: 0.4,
+      green: 0.6,
+      blue: 0.8,
+      visible: true,
+      meshSnapshot: "preview-mesh"
     }];
     return new EditorScene(data, null, null, generated);
   }
@@ -1467,15 +2017,14 @@ class SceneEditingTests {
       var hit = scene.hoverHit(0.0, 0.0);
       check(hit.id == "preview", "CAD preview face hover resolves the preview object");
       check(hit.faceIndex == 7, "CAD preview face hover preserves the mesh face identity");
-      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null,
-        hit.id, hit.faceIndex);
-      check(view.visibilityOverrideCount() == 1,
-        "CAD preview face hover presents a dedicated face overlay node");
-      var overlays=view.hoverOverrideValues(),faceNode=scene.faceHoverNodes.get(hit.id);
-      check(overlays.length==1 && faceNode!=null
-          && overlays[0].get_node().get_value()==faceNode.stableValue()
-          && overlays[0].get_node().get_value()!=scene.info(hit.id).node().stableValue(),
-        "CAD preview face hover tints the dedicated face node, preserving the whole-object presentation");
+      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null, hit.id, hit.faceIndex);
+      check(view.visibilityOverrideCount() == 1, "CAD preview face hover presents a dedicated face overlay node");
+      var overlays = view.hoverOverrideValues(), faceNode = scene.faceHoverNodes.get(hit.id);
+      check(
+        overlays.length == 1 && faceNode != null && overlays[0].get_node().get_value() == faceNode.stableValue()
+        && overlays[0].get_node().get_value() != scene.info(hit.id).node().stableValue(),
+        "CAD preview face hover tints the dedicated face node, preserving the whole-object presentation"
+      );
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1487,8 +2036,16 @@ class SceneEditingTests {
     var scene = trianglePreviewScene();
     try {
       var half = Math.PI / 8;
-      var pose:{id:String, position:Array<Float>, rotation:Array<Float>} = {
-        id: "preview", position: [5.0, 0.0, 0.0], rotation: [0.0, 0.0, Math.sin(half), Math.cos(half)]};
+      var pose: {id: String, position: Array<Float>, rotation: Array<Float>} = {
+        id: "preview",
+        position: [5.0, 0.0, 0.0],
+        rotation: [
+          0.0,
+          0.0,
+          Math.sin(half),
+          Math.cos(half)
+        ]
+      };
       var moved = new PerspectiveCamera();
       moved.frame(5.0, 0.0, 0.0, 0.4, 0.4, 0.2, 4.0 / 3.0);
       var rest = new PerspectiveCamera();
@@ -1498,26 +2055,54 @@ class SceneEditingTests {
       var restRay = rest.screenRay(400, 300, 800, 600);
 
       // Hover tests the posed geometry, not the authored placement.
-      var hit = scene.hoverHitRayWithView(view, movedRay.originX, movedRay.originY, movedRay.originZ,
-        movedRay.directionX, movedRay.directionY, movedRay.directionZ);
-      check(hit.id == "preview" && hit.faceIndex == 7,
-        "simulated hover finds the face where the pose put it (" + hit.id + ")");
-      var vacated = scene.hoverHitRayWithView(view, restRay.originX, restRay.originY, restRay.originZ,
-        restRay.directionX, restRay.directionY, restRay.directionZ);
+      var hit = scene.hoverHitRayWithView(
+        view,
+        movedRay.originX,
+        movedRay.originY,
+        movedRay.originZ,
+        movedRay.directionX,
+        movedRay.directionY,
+        movedRay.directionZ
+      );
+      check(
+        hit.id == "preview" && hit.faceIndex == 7,
+        "simulated hover finds the face where the pose put it (" + hit.id + ")"
+      );
+      var vacated = scene.hoverHitRayWithView(
+        view,
+        restRay.originX,
+        restRay.originY,
+        restRay.originZ,
+        restRay.directionX,
+        restRay.directionY,
+        restRay.directionZ
+      );
       check(vacated.id == "scene", "simulated hover ignores the authored placement the pose vacated");
-      var authored = scene.hoverHitRay(movedRay.originX, movedRay.originY, movedRay.originZ,
-        movedRay.directionX, movedRay.directionY, movedRay.directionZ);
+      var authored = scene.hoverHitRay(
+        movedRay.originX,
+        movedRay.originY,
+        movedRay.originZ,
+        movedRay.directionX,
+        movedRay.directionY,
+        movedRay.directionZ
+      );
       check(authored.id == "scene", "unposed hover keeps testing the authored placement");
 
       // The face overlay is a child node, so it needs the object's pose as well.
       check(view.poseOverrideCount() == 1, "an unhovered simulated view poses only the object");
-      var hovered = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose],
-        hit.id, hit.faceIndex);
-      check(hovered.poseOverrideCount() == 2,
-        "the simulated face overlay is posed with its object (" + hovered.poseOverrideCount() + ")");
+      var hovered = scene.configureRenderView(
+        new SceneView(),
+        moved.viewProjection(4.0 / 3.0),
+        [pose],
+        hit.id,
+        hit.faceIndex
+      );
+      check(
+        hovered.poseOverrideCount() == 2,
+        "the simulated face overlay is posed with its object (" + hovered.poseOverrideCount() + ")"
+      );
       check(hovered.visibilityOverrideCount() == 1, "the simulated face overlay is shown");
-      var elsewhere = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose],
-        "scene", -1);
+      var elsewhere = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose], "scene", -1);
       check(elsewhere.poseOverrideCount() == 1, "no overlay pose without a hovered face");
     } catch (error:Dynamic) {
       scene.dispose();
@@ -1557,8 +2142,10 @@ class SceneEditingTests {
     var commandRevision = emptyApp.commands.revision;
     var submitKey = emptyApp.editorSubmitKey();
     emptyApp.invalidateView();
-    check(emptyApp.editorSubmitKey() != submitKey && emptyApp.commands.revision == commandRevision,
-      "view-local invalidation leaves command availability revision unchanged");
+    check(
+      emptyApp.editorSubmitKey() != submitKey && emptyApp.commands.revision == commandRevision,
+      "view-local invalidation leaves command availability revision unchanged"
+    );
     emptyApp.dispose();
     finishLibrarySelection();
     sensorRevisionSeparation();
@@ -1582,15 +2169,18 @@ class SceneEditingTests {
       var contentBeforeSelection = scene.revision;
       var selectionBeforeSelection = scene.selectionRevision;
       check(scene.select("tower"), "selection changes to another object");
-      check(scene.revision == contentBeforeSelection &&
-        scene.selectionRevision > selectionBeforeSelection,
-        "selection leaves scene content revision unchanged");
+      check(
+        scene.revision == contentBeforeSelection && scene.selectionRevision > selectionBeforeSelection,
+        "selection leaves scene content revision unchanged"
+      );
       scene.select("box");
 
       var camera = new PerspectiveCamera();
       camera.frame(-1.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
-      check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
-        "perspective picking after framing");
+      check(
+        EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
+        "perspective picking after framing"
+      );
       var originalTarget = camera.targetX;
       var originalRevision = tree.revision();
       var x = new PropertyBinding(property(scene.properties(), "position-x"), scene.context());
@@ -1629,7 +2219,10 @@ class SceneEditingTests {
       near(camera.targetX, -2.5, "frame selection centers X");
       near(camera.targetY, 0.0, "frame selection centers Y");
       scene.select("scene");
-      check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
+      check(
+        scene.properties().length == 0 && !scene.context().hasSelection,
+        "empty selection has no editable properties"
+      );
       scene.dispose();
       scene.dispose();
       rectangleProperties();

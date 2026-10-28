@@ -8,8 +8,7 @@ import haxeon.ui.LayoutFrame;
 import haxeon.ui.core.RenderNode;
 import sys.FileSystem;
 
-@:access(app.Main.ReferenceEditorApp)
-class StartPageTests {
+@:access(app.Main.ReferenceEditorApp) class StartPageTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -49,43 +48,67 @@ class StartPageTests {
     browser.search("  WOVEN seam  ");
     var matches = browser.filtered(all);
     check(matches.length == 1 && matches[0].id == "robot-welding", "search finds variants regardless of case");
-    check(matches[0].examples.length == 1 && matches[0].examples[0].id == "robot-welder-weave",
-      "search exposes only the matching runnable variant");
+    check(
+      matches[0].examples.length == 1 && matches[0].examples[0].id == "robot-welder-weave",
+      "search exposes only the matching runnable variant"
+    );
     browser.selectCategory("Machining");
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
     var machining = browser.filtered(all);
-    check(machining.length == 5, "mill, bench mills, desktop router, sheet router and press brake form separate machining families");
-    check([for (family in machining) if (family.id == "sheet-router") family].length == 1, "sheet router is directly accessible");
+    check(
+      machining.length == 5,
+      "mill, bench mills, desktop router, sheet router and press brake form separate machining families"
+    );
+    check(
+      [for (family in machining) if (family.id == "sheet-router") family].length == 1,
+      "sheet router is directly accessible"
+    );
     var mills = [for (family in machining) if (family.id == "bench-mills") family];
-    check(mills.length == 1 && mills[0].examples.length == 2 &&
-      mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
-      "both bench mill variants share exactly one card");
+    check(
+      mills.length == 1 && mills[0].examples.length == 2
+      && mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
+      "both bench mill variants share exactly one card"
+    );
     var modernMills = [for (family in machining) if (family.id == "mill") family];
-    check(modernMills.length == 1 && modernMills[0].examples.length == 1,
-      "Small and Compact VMC have their own project card, separate from bench mills");
-    var benchEntry=ExampleCatalog.find("bench-mill");
-    if(benchEntry==null)throw "Bench mill entry is missing";
+    check(
+      modernMills.length == 1 && modernMills[0].examples.length == 1,
+      "Small and Compact VMC have their own project card, separate from bench mills"
+    );
+    var benchEntry = ExampleCatalog.find("bench-mill");
+    if (benchEntry == null) throw "Bench mill entry is missing";
     switch benchEntry.kind {
-      case Project(path): check(StringTools.endsWith(path,"materia.bench.project.json"),"bench mill card opens its own project");
-      default: throw "Bench mill must open a source project";
+      case Project(path):
+        check(StringTools.endsWith(path, "materia.bench.project.json"), "bench mill card opens its own project");
+      default:
+        throw "Bench mill must open a source project";
     }
     var presses = [for (family in machining) if (family.id == "press-brake") family];
-    check(presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
-      "the press brake remains directly accessible in its own machining card");
+    check(
+      presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
+      "the press brake remains directly accessible in its own machining card"
+    );
     browser.selectCategory("Gear cutting");
-    var gears=browser.filtered(all);
-    check(gears.length==1&&gears[0].examples[0].id=="flexspline-hobber","hobber is directly accessible under Gear cutting");
-    var hobber=ExampleCatalog.find("flexspline-hobber");
-    check(hobber!=null&&FileSystem.exists("machinekit/examples/flexspline-hobber/materia.project.json"),"hobber project exists");
+    var gears = browser.filtered(all);
+    check(
+      gears.length == 1 && gears[0].examples[0].id == "flexspline-hobber",
+      "hobber is directly accessible under Gear cutting"
+    );
+    var hobber = ExampleCatalog.find("flexspline-hobber");
+    check(
+      hobber != null && FileSystem.exists("machinekit/examples/flexspline-hobber/materia.project.json"),
+      "hobber project exists"
+    );
     browser.selectCategory("All");
 
     // A partial installation still groups only the variants that are actually available.
     var variant = ExampleCatalog.find("robot-welder-weave");
     check(variant != null, "woven seam exists");
     var partial = browser.filtered([cast variant]);
-    check(partial.length == 1 && partial[0].title == "Robot welding" && partial[0].examples.length == 1,
-      "a family works even when its primary example is absent");
+    check(
+      partial.length == 1 && partial[0].title == "Robot welding" && partial[0].examples.length == 1,
+      "a family works even when its primary example is absent"
+    );
 
     var directory = TestPaths.of("build/start-page-test");
     FileSystem.createDirectory(directory);
@@ -104,15 +127,31 @@ class StartPageTests {
     root = editor.submit(frame);
     check(find(root, "family:robot-welding") != null, "family heading is present");
     var preview:RenderNode = cast find(root, "start-preview:robot-welding");
-    check(preview != null && preview.resolved != null && preview.resolved.width > 0 && preview.resolved.height > 0,
-      "preview illustrations have paintable dimensions");
-    for (id in ["robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass"])
-      check(find(root, "start-open-example:" + id) != null, "family exposes " + id + " directly");
+    check(
+      preview != null && preview.resolved != null && preview.resolved.width > 0 && preview.resolved.height > 0,
+      "preview illustrations have paintable dimensions"
+    );
+    for (id in [
+      "robot-welder",
+      "robot-welder-seam",
+      "robot-welder-post",
+      "robot-welder-weave",
+      "robot-welder-multipass"
+    ]) check(
+      find(
+        root,
+        "start-open-example:" + id
+      ) != null,
+      "family exposes " + id + " directly"
+    );
     check(find(root, "start-examples-back") == null, "examples have no drill-down navigation");
     editor.startExamples.search("Complete weldment");
     editor.invalidateView();
     click(editor, frame, "start-open-example:robot-welder");
-    check(editor.startLoading != null && editor.startLoading.id == "robot-welder", "one card click starts the chosen example");
+    check(
+      editor.startLoading != null && editor.startLoading.id == "robot-welder",
+      "one card click starts the chosen example"
+    );
     editor.cancelExampleLoad();
     editor.startExamples.search("nothing matches 12345");
     editor.invalidateView();
@@ -121,8 +160,10 @@ class StartPageTests {
     check(editor.startExamples.query == "" && editor.startExamples.category == "All", "clear restores all families");
     for (width in [1024, 800]) {
       var narrow = editor.submit(new LayoutFrame(width, 768));
-      check(find(narrow, "start-category:Welding") != null && find(narrow, "start-category:People & simulation") != null,
-        "all categories remain available in a narrower window");
+      check(
+        find(narrow, "start-category:Welding") != null && find(narrow, "start-category:People & simulation") != null,
+        "all categories remain available in a narrower window"
+      );
       var content:RenderNode = cast find(narrow, "start-content");
       check(content != null && content.resolved != null, "start content has bounds");
       checkCardBounds(narrow, content.globalBounds().x + content.globalBounds().width);
@@ -130,48 +171,62 @@ class StartPageTests {
     // Loading feedback belongs to the editor, even when the Start tab is closed.
     editor.workspace.close("start");
     editor.openProjectInBackground("app/tests/fixtures/project-variants/materia.project.json");
-    check(!editor.workspace.isOpen("start"),"opening a project preserves workspace tabs");
-    var pending=new PendingExampleLoadJob();
-    editor.startJob=pending;
+    check(!editor.workspace.isOpen("start"), "opening a project preserves workspace tabs");
+    var pending = new PendingExampleLoadJob();
+    editor.startJob = pending;
     pending.control.phase("Generating geometry");
     editor.tick();
-    check(editor.statusSelectionLabel().indexOf("Generating geometry")>=0,"busy status does not say Ready");
-    for(width in [1600,800,480]) {
-      var loadingFrame=new LayoutFrame(width,768);
-      var loadingRoot=editor.submit(loadingFrame);
-      var cancel=find(loadingRoot,"project-loading-cancel");
-      var status=editor.projectLoadingStatus();if(status==null)throw "Expected pending project status";
-      check(findLabel(loadingRoot,status.title)!=null&&cancel!=null&&cancel.resolved!=null,
-        "global progress and cancel exist without Start at width "+width);
-      var bounds=cancel.globalBounds();
-      check(bounds.width>0&&bounds.x>=0&&bounds.x+bounds.width<=width,"Cancel remains on screen");
+    check(editor.statusSelectionLabel().indexOf("Generating geometry") >= 0, "busy status does not say Ready");
+    for (width in [1600, 800, 480]) {
+      var loadingFrame = new LayoutFrame(width, 768);
+      var loadingRoot = editor.submit(loadingFrame);
+      var cancel = find(loadingRoot, "project-loading-cancel");
+      var status = editor.projectLoadingStatus();
+      if (status == null) throw "Expected pending project status";
+      check(
+        findLabel(loadingRoot, status.title) != null && cancel != null && cancel.resolved != null,
+        "global progress and cancel exist without Start at width " + width
+      );
+      var bounds = cancel.globalBounds();
+      check(bounds.width > 0 && bounds.x >= 0 && bounds.x + bounds.width <= width, "Cancel remains on screen");
     }
-    var before=editor.topBarRevisionKey();
+    var before = editor.topBarRevisionKey();
     pending.control.phase("Preparing geometry and physics");
     editor.tick();
-    check(editor.topBarRevisionKey()!=before,"phase changes invalidate retained toolbar");
-    check(editor.statusSelectionLabel().indexOf("Preparing geometry")>=0,"new phase reaches shared status");
-    check(findLabel(editor.submit(frame),"Preparing geometry and physics",true)!=null,
-      "phase update reaches retained toolbar text");
-    click(editor,frame,"project-loading-cancel");
-    check(pending.control.isCancelled()&&editor.startLoading!=null,"Cancel requests stop and waits for worker completion");
-    pending.finished=true;editor.tick();
-    check(find(editor.submit(frame),"editor-project-loading")==null,"cancelled completion clears global busy state");
-    editor.startFailure="Could not open test project";editor.invalidateView();
-    check(find(editor.submit(frame),"project-loading-dismiss")!=null,"failure stays visible without Start");
-    click(editor,frame,"project-loading-dismiss");
-    check(editor.projectLoadingFailure()==null,"global error is dismissible");
+    check(editor.topBarRevisionKey() != before, "phase changes invalidate retained toolbar");
+    check(editor.statusSelectionLabel().indexOf("Preparing geometry") >= 0, "new phase reaches shared status");
+    check(
+      findLabel(editor.submit(frame), "Preparing geometry and physics", true) != null,
+      "phase update reaches retained toolbar text"
+    );
+    click(editor, frame, "project-loading-cancel");
+    check(
+      pending.control.isCancelled() && editor.startLoading != null,
+      "Cancel requests stop and waits for worker completion"
+    );
+    pending.finished = true;
+    editor.tick();
+    check(find(editor.submit(frame),
+      "editor-project-loading") == null, "cancelled completion clears global busy state");
+    editor.startFailure = "Could not open test project";
+    editor.invalidateView();
+    check(find(editor.submit(frame), "project-loading-dismiss") != null, "failure stays visible without Start");
+    click(editor, frame, "project-loading-dismiss");
+    check(editor.projectLoadingFailure() == null, "global error is dismissible");
     editor.openProjectInBackground("app/tests/fixtures/project-variants/materia.project.json");
-    click(editor,frame,"project-loading-cancel");
-    check(editor.startLoading==null&&editor.startJob==null,"queued load can be cancelled before a worker starts");
+    click(editor, frame, "project-loading-cancel");
+    check(editor.startLoading == null && editor.startJob == null,
+      "queued load can be cancelled before a worker starts");
     editor.dispose();
     fonts.dispose();
   }
 
   static function checkCardBounds(node:RenderNode, right:Float):Void {
     if (StringTools.startsWith(node.styleKey == null ? "" : node.styleKey, "start-open-example:")) {
-      check(node.resolved != null && node.globalBounds().x + node.globalBounds().width <= right + 1.0,
-        "example fits the pane: " + node.styleKey);
+      check(
+        node.resolved != null && node.globalBounds().x + node.globalBounds().width <= right + 1.0,
+        "example fits the pane: " + node.styleKey
+      );
     }
     for (child in node.children) checkCardBounds(child, right);
   }
@@ -185,10 +240,13 @@ class StartPageTests {
     return null;
   }
 
-  static function findLabel(node:RenderNode,label:String,contains:Bool=false):Null<RenderNode> {
-    if(node.semantics!=null&&node.semantics.label!=null&&
-      (contains?node.semantics.label.indexOf(label)>=0:node.semantics.label==label))return node;
-    for(child in node.children){var result=findLabel(child,label,contains);if(result!=null)return result;}
+  static function findLabel(node:RenderNode, label:String, contains:Bool = false):Null<RenderNode> {
+    if (node.semantics != null && node.semantics.label != null
+      && (contains ? node.semantics.label.indexOf(label) >= 0 : node.semantics.label == label)) return node;
+    for (child in node.children) {
+      var result = findLabel(child, label, contains);
+      if (result != null) return result;
+    }
     return null;
   }
 
@@ -206,9 +264,15 @@ class StartPageTests {
 
 /** Deterministic pending operation: no compiler or child process is started. */
 private class PendingExampleLoadJob extends app.ExampleLoadJob {
-  public var finished=false;
+  public var finished = false;
   public function new() {
-    super({id:"loading-test",title:"Test project",description:[],tag:"",kind:app.editor.ExampleCatalog.ExampleKind.WorkerRackToTable});
+    super({
+      id: "loading-test",
+      title: "Test project",
+      description: [],
+      tag: "",
+      kind: app.editor.ExampleCatalog.ExampleKind.WorkerRackToTable
+    });
   }
   override public function isFinished():Bool return finished;
 }

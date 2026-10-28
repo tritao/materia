@@ -57,9 +57,11 @@ class ScriptedSetupTests {
       "script attaches LiDAR to its articulated link"
     );
     var ownership:ScriptOwnership = session.scriptOwnership;
-    check(ownership != null && ownership.document == session.document &&
-      setup.scene.document == session.document && setup.sensors.document == session.document,
-      "script overrides, scene and sensors share the project history instance");
+    check(
+      ownership != null && ownership.document == session.document
+      && setup.scene.document == session.document && setup.sensors.document == session.document,
+      "script overrides, scene and sensors share the project history instance"
+    );
     check(
       ownership != null && ownership.sensorRateOrigin(setup.sensors.robotId, lidar.id) == "script",
       "inspector reports the script value origin"
@@ -69,8 +71,10 @@ class ScriptedSetupTests {
     check(session.document.undo(), "project undo reaches the script sensor override");
     var undoneOverride = session.refreshScriptOverrides();
     var restoredSensor:Sensor = undoneOverride.sensors.selected();
-    check(restoredSensor != null && restoredSensor.updateRate != 33.0,
-      "undo rematerializes the script baseline without its last override");
+    check(
+      restoredSensor != null && restoredSensor.updateRate != 33.0,
+      "undo rematerializes the script baseline without its last override"
+    );
     check(session.document.redo(), "project redo restores the script sensor override");
     var overridden = session.refreshScriptOverrides();
     var overriddenLidar:Sensor = overridden.sensors.selected();
@@ -97,16 +101,17 @@ class ScriptedSetupTests {
     var retainedScene = session.scene;
     var retainedGeneration = session.generation;
     overridden = session.refreshScriptOverrides();
-    check(session.scene == retainedScene && session.generation == retainedGeneration,
-      "script override refresh retains the scene and editor generation");
+    check(
+      session.scene == retainedScene && session.generation == retainedGeneration,
+      "script override refresh retains the scene and editor generation"
+    );
     overriddenLidar = overridden.sensors.selected();
     var obstacle = overridden.scene.records()[0];
     var overriddenFrame:robotkit.model.Frame = cast overriddenLidar.frame;
     check(
-      overriddenLidar.noiseStddev == 0.125 && overriddenLidar.rayCount == 17
-      && overriddenLidar.maxRange == 8.5 && overriddenLidar.startAngleRadians == -1.2
-      && overriddenLidar.fieldOfViewRadians == 2.4
-      && overriddenFrame != null && overriddenFrame.position[0] == 0.6,
+      overriddenLidar.noiseStddev == 0.125
+      && overriddenLidar.rayCount == 17 && overriddenLidar.maxRange == 8.5 && overriddenLidar.startAngleRadians == -1.2
+      && overriddenLidar.fieldOfViewRadians == 2.4 && overriddenFrame != null && overriddenFrame.position[0] == 0.6,
       "typed sensor and mount overrides materialize"
     );
     check(overridden.sensors.robotPosition("materia/robot")[0] == -2.0, "stable robot pose override materializes");
@@ -130,17 +135,23 @@ class ScriptedSetupTests {
     var path = directory + "/scene.materia";
     session.save(path);
     var encoded:Dynamic = Json.parse(File.getContent(path));
-    check(haxe.crypto.Sha256.encode("abc") ==
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-      "script content hash matches SHA-256 known vector");
-    check(app.ScriptCanonicalJson.encode({b: 1, a: 2})
-      == app.ScriptCanonicalJson.encode({a: 2, b: 1}),
-      "script content identity ignores object key order");
+    check(
+      haxe.crypto.Sha256.encode("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "script content hash matches SHA-256 known vector"
+    );
+    check(
+      app.ScriptCanonicalJson.encode({b: 1, a: 2}) == app.ScriptCanonicalJson.encode({a: 2, b: 1}),
+      "script content identity ignores object key order"
+    );
     var identity:Dynamic = Reflect.field(encoded, "script");
-    check(Reflect.field(identity, "packageId") == "materia.examples"
-      && Reflect.field(identity, "sourceSha256") == SetupScriptRegistry.TWO_ROBOT_SOURCE_SHA256
-      && StringTools.trim(Reflect.field(identity, "configurationSha256")).length == 64,
-      "script documents persist package, source, and configuration identities");
+    check(
+      Reflect.field(identity, "packageId") == "materia.examples" && Reflect.field(identity,
+      "sourceSha256") == SetupScriptRegistry.TWO_ROBOT_SOURCE_SHA256 && StringTools.trim(Reflect.field(
+        identity,
+        "configurationSha256"
+      )).length == 64,
+      "script documents persist package, source, and configuration identities"
+    );
     var encodedObjects:Array<Dynamic> = Reflect.field(encoded, "objects");
     check(
       encodedObjects.length == 0 && Reflect.field(encoded, "sensors") == null,
@@ -154,20 +165,26 @@ class ScriptedSetupTests {
       && reopenedLidar.noiseStddev == 0.125 && reopened.scene.records()[0].width == 1.0,
       "typed script overrides survive reopen"
     );
-    check(reopenedLidar.frame != null && reopenedLidar.frame.link.id == "arm"
-      && reopenedLidar.frame.position[0] == 0.6 && reopenedLidar.rayCount == 17,
-      "scripted sensor identity, link mount, and ray count survive reopen");
+    check(
+      reopenedLidar.frame != null
+      && reopenedLidar.frame.link.id == "arm" && reopenedLidar.frame.position[0] == 0.6 && reopenedLidar.rayCount == 17,
+      "scripted sensor identity, link mount, and ray count survive reopen"
+    );
     var incompatible:Dynamic = Json.parse(File.getContent(path));
-    Reflect.setField(Reflect.field(incompatible, "script"), "configurationSha256",
-      "0000000000000000000000000000000000000000000000000000000000000000");
+    Reflect.setField(
+      Reflect.field(incompatible, "script"),
+      "configurationSha256",
+      "0000000000000000000000000000000000000000000000000000000000000000"
+    );
     var incompatiblePath = directory + "/incompatible.materia";
     File.saveContent(incompatiblePath, Json.stringify(incompatible));
     reopened.open(incompatiblePath);
     var mismatchLidar:Sensor = reopened.sensors.selected();
-    check(reopened.scriptOwnership != null &&
-      reopened.scriptOwnership.identityMismatch != null &&
-      mismatchLidar.updateRate == 33.0,
-      "script identity mismatch stays open with a diagnostic and valid overrides");
+    check(
+      reopened.scriptOwnership != null
+      && reopened.scriptOwnership.identityMismatch != null && mismatchLidar.updateRate == 33.0,
+      "script identity mismatch stays open with a diagnostic and valid overrides"
+    );
 
     var legacy = '{"format":"materia.scene","version":2,"objects":[],"sensors":null,"script":{'
       + '"reference":"${TwoRobotSetupScript.REFERENCE}","version":1,"overridesEnabled":true,'
@@ -178,14 +195,20 @@ class ScriptedSetupTests {
       "legacy numeric overrides migrate to the versioned typed contract"
     );
 
-    var stale = new ScriptOwnership(TwoRobotSetupScript.REFERENCE, {reference: TwoRobotSetupScript.REFERENCE,
-      version: 1, overrideVersion: ScriptOwnership.OVERRIDE_VERSION, overridesEnabled: true, overrides:[{
-      targetId: "materia/robot/deleted-sensor",
-      property: "updateRate",
-      kind: "number",
-      encodedValue: "7"
-    }
-    ]}
+    var stale = new ScriptOwnership(
+      TwoRobotSetupScript.REFERENCE,
+      {
+        reference: TwoRobotSetupScript.REFERENCE,
+        version: 1,
+        overrideVersion: ScriptOwnership.OVERRIDE_VERSION,
+        overridesEnabled: true,
+        overrides: [{
+          targetId: "materia/robot/deleted-sensor",
+          property: "updateRate",
+          kind: "number",
+          encodedValue: "7"
+        }]
+      }
     );
     var staleSetup = stale.materialize();
     check(
@@ -216,7 +239,10 @@ class ScriptedSetupTests {
     var observed = simulation.snapshot();
     for (robotId in ["materia/robot", "materia/robot-b"]) {
       var robot = observed.robot(robotId);
-      check(robot != null && world.robot(robotId).streams().latestFrames().length == 3, "scripted robots publish all configured sensors");
+      check(
+        robot != null && world.robot(robotId).streams().latestFrames().length == 3,
+        "scripted robots publish all configured sensors"
+      );
       if (robot != null) {
         writer.recordSnapshot(robot);
         for (frame in world.robot(robotId).streams().latestFrames()) writer.recordSensor(robotId, frame);
@@ -227,29 +253,37 @@ class ScriptedSetupTests {
     for (robotId in ["materia/robot", "materia/robot-b"]) {
       var original = observed.robot(robotId);
       var replay = new ReplayRobot(robotId, loaded);
-      check(original != null && replay.snapshot().id == robotId,
-        "MCAP replay selects the scripted robot by stable ID");
+      check(original != null && replay.snapshot().id == robotId, "MCAP replay selects the scripted robot by stable ID");
       if (original != null) {
         var expected = world.robot(robotId).streams().latestFrames();
         var actual = replay.streams().latestFrames();
         check(actual.length == expected.length, "MCAP replay preserves the scripted sensor count");
-        for (index in 0...expected.length) check(actual[index].sensorId == expected[index].sensorId
-          && actual[index].linkId == expected[index].linkId
-          && actual[index].mountPosition.get(0) == expected[index].mountPosition.get(0)
-          && haxe.Int64.compare(actual[index].sequence, expected[index].sequence) == 0
-          && haxe.Int64.compare(actual[index].sourceTimestampNs, expected[index].sourceTimestampNs) == 0
-          && actual[index].values.length == expected[index].values.length,
-          "MCAP replay preserves sensor IDs, owning links, mounts, and measurements");
-        for (index in 0...expected.length) for (sample in 0...expected[index].values.length)
-          check(actual[index].values.get(sample) == expected[index].values.get(sample),
-            "MCAP replay preserves each scripted sensor measurement");
+        for (index in 0...expected.length) check(
+          actual[index].sensorId == expected[index].sensorId && actual[index].linkId == expected[index].linkId
+          && actual[index].mountPosition.get(0) == expected[index].mountPosition.get(0) && haxe.Int64.compare(
+            actual[index].sequence,
+            expected[index].sequence
+          ) == 0 && haxe.Int64.compare(
+            actual[index].sourceTimestampNs,
+            expected[index].sourceTimestampNs
+          ) == 0 && actual[index].values.length == expected[index].values.length,
+          "MCAP replay preserves sensor IDs, owning links, mounts, and measurements"
+        );
+        for (index in 0...expected.length) for (sample in 0...expected[index].values.length) check(
+          actual[index].values.get(sample) == expected[index].values.get(sample),
+          "MCAP replay preserves each scripted sensor measurement"
+        );
       }
       var liveAdapter = world.robot(robotId);
-      check(liveAdapter != null && new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25)).update(liveAdapter) == 1,
-        "scripted behavior produces a command from live simulation observations");
-      check(new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25)).update(replay) == 1
-        && replay.generatedCommands.commands.length == 1 && loaded.commands.length == 0,
-        "the same behavior consumes replay observations without altering historical commands");
+      check(
+        liveAdapter != null && new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25)).update(liveAdapter) == 1,
+        "scripted behavior produces a command from live simulation observations"
+      );
+      check(
+        new WorldBehaviorRunner(new HoldJointBehavior(0,
+        0.25)).update(replay) == 1 && replay.generatedCommands.commands.length == 1 && loaded.commands.length == 0,
+        "the same behavior consumes replay observations without altering historical commands"
+      );
       replay.close();
     }
     var keepRecording = Sys.getEnv("MATERIA_KEEP_SCRIPT_MCAP") == "1";
@@ -261,16 +295,22 @@ class ScriptedSetupTests {
     }
     simulation.start();
     var generation = session.generation;
-    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new FailingReloadScript(),
-      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE));
+    SetupScriptRegistry.register(
+      TwoRobotSetupScript.REFERENCE,
+      function() return new FailingReloadScript(),
+      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE)
+    );
     var failed = false;
     try session.reloadScript() catch (_:Dynamic) failed = true;
     check(
       failed && session.generation == generation && simulation.isRunning(),
       "failed reload preserves both published configuration and running simulation"
     );
-    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new TwoRobotSetupScript(),
-      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE));
+    SetupScriptRegistry.register(
+      TwoRobotSetupScript.REFERENCE,
+      function() return new TwoRobotSetupScript(),
+      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE)
+    );
 
     simulation.dispose();
     world.close();
@@ -278,8 +318,7 @@ class ScriptedSetupTests {
     session.dispose();
     inspectorInteraction(directory);
     FileSystem.deleteFile(path);
-    if (!keepRecording && Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE") != "1")
-      FileSystem.deleteDirectory(directory);
+    if (!keepRecording && Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE") != "1") FileSystem.deleteDirectory(directory);
   }
 
   static function inspectorInteraction(directory:String):Void {
@@ -288,8 +327,7 @@ class ScriptedSetupTests {
     check(FileSystem.exists(fontPath), "scripted inspector test font is available");
     var fonts = FontCollection.create();
     fonts.add(cast fontPath);
-    var editor = new ReferenceEditorApp(fonts, workspacePath, null, null, null,
-      TwoRobotSetupScript.REFERENCE);
+    var editor = new ReferenceEditorApp(fonts, workspacePath, null, null, null, TwoRobotSetupScript.REFERENCE);
     editor.workspace.activate("sensors");
     var frame = new LayoutFrame(1320.0, 900.0);
     var root = editor.submit(frame);
@@ -297,23 +335,39 @@ class ScriptedSetupTests {
     check(sensorPanel != null && sensorPanel.resolved != null, "Sensors pane is laid out");
     var sensorBounds:ResolvedLayoutItem = cast sensorPanel.resolved;
     var sensorRight = sensorBounds.x + sensorBounds.width;
-    check(checkTextFieldsFit(root, sensorRight, frame.width) >= 3,
-      "scripted scene property fields are present and fit the inspector");
-    for (key in ["script-reload", "script-overrides", "script-revert-simulation",
-      "script-remove-stale", "sensor-undo", "sensor-redo", "sensor-apply",
-      "sensor-run", "sensor-pause", "sensor-reset", "sensor-design"]) {
+    check(
+      checkTextFieldsFit(root, sensorRight, frame.width) >= 3,
+      "scripted scene property fields are present and fit the inspector"
+    );
+    for (key in [
+      "script-reload",
+      "script-overrides",
+      "script-revert-simulation",
+      "script-remove-stale",
+      "sensor-undo",
+      "sensor-redo",
+      "sensor-apply",
+      "sensor-run",
+      "sensor-pause",
+      "sensor-reset",
+      "sensor-design"
+    ]) {
       var button:RenderNode = findByStyleKey(root, key);
-      check(button != null && button.resolved != null && button.resolved.x >= 0
-        && button.resolved.x + button.resolved.width <= sensorRight + 0.01,
-        "scripted inspector actions fit the default Sensors pane: " + key);
+      check(
+        button != null && button.resolved != null
+        && button.resolved.x >= 0 && button.resolved.x + button.resolved.width <= sensorRight + 0.01,
+        "scripted inspector actions fit the default Sensors pane: " + key
+      );
     }
     click(editor, frame, "script-overrides");
     var ownership:ScriptOwnership = cast editor.session.scriptOwnership;
     check(ownership.overridesEnabled, "inspector enables stable-ID overrides");
     click(editor, frame, "script-rate-increase");
     var selected:Sensor = cast editor.sensors.selected();
-    check(selected.updateRate == 21.0 && ownership.sensorRateOrigin("materia/robot", selected.id)
-      == "override", "inspector changes one scripted sensor rate");
+    check(
+      selected.updateRate == 21.0 && ownership.sensorRateOrigin("materia/robot", selected.id) == "override",
+      "inspector changes one scripted sensor rate"
+    );
     click(editor, frame, "sensor-apply");
     // Apply prepares on a worker; pump frames until the UI installs its completed candidate.
     var deadline = Sys.time() + 30;
@@ -322,20 +376,26 @@ class ScriptedSetupTests {
       editor.submit(frame);
       Sys.sleep(0.001);
     }
-    check(!editor.openingProject() && editor.simulation.isActive() && editor.simulation.simulatedRobotIds().length == 2,
-      "inspector applies both scripted robots to the shared simulation: " + editor.simulation.error);
+    check(
+      !editor.openingProject() && editor.simulation.isActive() && editor.simulation.simulatedRobotIds().length == 2,
+      "inspector applies both scripted robots to the shared simulation: " + editor.simulation.error
+    );
     click(editor, frame, "sensor-run");
     check(editor.simulation.isRunning(), "inspector starts the scripted simulation");
     click(editor, frame, "sensor-pause");
-    check(editor.simulation.isActive() && !editor.simulation.isRunning(),
-      "inspector pause preserves the current simulation");
+    check(
+      editor.simulation.isActive() && !editor.simulation.isRunning(),
+      "inspector pause preserves the current simulation"
+    );
     click(editor, frame, "sensor-reset");
-    check(editor.simulation.isActive() && !editor.simulation.isRunning(),
-      "inspector reset restores the simulation without returning to design mode");
+    check(
+      editor.simulation.isActive() && !editor.simulation.isRunning(),
+      "inspector reset restores the simulation without returning to design mode"
+    );
     editor.dispose();
     fonts.dispose();
-    if (Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE") == "1")
-      Sys.println("Materia scripted inspector workspace: " + FileSystem.fullPath(workspacePath));
+    if (Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE")
+      == "1") Sys.println("Materia scripted inspector workspace: " + FileSystem.fullPath(workspacePath));
     else if (FileSystem.exists(workspacePath)) FileSystem.deleteFile(workspacePath);
   }
 
@@ -347,8 +407,7 @@ class ScriptedSetupTests {
       if (bounds.width > 0 && bounds.height > 0) break;
       var location:ResolvedLayoutItem = cast button.resolved;
       // Scroll over the button's own pane: starting the simulation moves the Sensors panel to another dock.
-      editor.ui.scroll(location.x + location.width / 2.0, 500.0, 0.0,
-        location.y >= frame.height ? 250.0 : -250.0);
+      editor.ui.scroll(location.x + location.width / 2.0, 500.0, 0.0, location.y >= frame.height ? 250.0 : -250.0);
       button = cast findByStyleKey(editor.submit(frame), key);
       bounds = button.resolved.clippedViewportBounds();
     }
@@ -373,8 +432,10 @@ class ScriptedSetupTests {
     var count = 0;
     if (node.styleType == "text-field" && bounds != null && bounds.visible && bounds.width > 0) {
       var paneRight = bounds.x < sensorRight ? sensorRight : viewportWidth;
-      check(bounds.x >= 0.0 && bounds.x + bounds.width <= paneRight + 0.01,
-        "scripted inspector field fits its pane: " + node.styleKey);
+      check(
+        bounds.x >= 0.0 && bounds.x + bounds.width <= paneRight + 0.01,
+        "scripted inspector field fits its pane: " + node.styleKey
+      );
       count++;
     }
     for (child in node.children) count += checkTextFieldsFit(child, sensorRight, viewportWidth);

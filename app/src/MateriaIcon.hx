@@ -23,10 +23,8 @@ class MateriaIcon {
           var second = segmentDistance(px, py, 16, 19, 32, 37);
           var third = segmentDistance(px, py, 32, 37, 48, 19);
           var fourth = segmentDistance(px, py, 48, 19, 48, 45);
-          if (Math.min(Math.min(first, second), Math.min(third, fourth)) <= 3)
-            color = 0xf3f7ffff;
-          if ((px - 49) * (px - 49) + (py - 13) * (py - 13) <= 16)
-            color = 0xefa936ff;
+          if (Math.min(Math.min(first, second), Math.min(third, fourth)) <= 3) color = 0xf3f7ffff;
+          if ((px - 49) * (px - 49) + (py - 13) * (py - 13) <= 16) color = 0xefa936ff;
         }
         var offset = (y * size + x) * 4;
         pixels.set(offset, color >>> 24);
@@ -38,12 +36,10 @@ class MateriaIcon {
     return new WindowIcon(size, size, size * 4, pixels);
   }
 
-  static function segmentDistance(x:Float, y:Float, ax:Float, ay:Float,
-      bx:Float, by:Float):Float {
+  static function segmentDistance(x:Float, y:Float, ax:Float, ay:Float, bx:Float, by:Float):Float {
     var vx = bx - ax;
     var vy = by - ay;
-    var t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) /
-      (vx * vx + vy * vy)));
+    var t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy)));
     var dx = x - ax - t * vx;
     var dy = y - ay - t * vy;
     return Math.sqrt(dx * dx + dy * dy);

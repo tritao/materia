@@ -12,8 +12,7 @@ import haxeon.ui.core.UiModifier;
  * Viewport, lighting, grid, and nudge command registrations. Grid and lighting
  * commands change the saved settings; the editor applies them from there.
  */
-@:access(app.Main.ReferenceEditorApp)
-class SceneViewCommands {
+@:access(app.Main.ReferenceEditorApp) class SceneViewCommands {
   public static function install(app:ReferenceEditorApp):Void {
     app.commands.register(new Command("scene.frame-selected", "Frame selected", function() {
       if (app.perspectiveViewport != null) app.perspectiveViewport.frameSelected();
@@ -58,19 +57,16 @@ class SceneViewCommands {
     registerNudgeCommand(app, "scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
     registerNudgeCommand(app, "scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
     registerNudgeCommand(app, "scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
-    registerNudgeCommand(app, "scene.nudge-left-large", "Nudge left (large)", UiKey.Left,
-      UiModifier.Shift, -1.0, 0.0);
-    registerNudgeCommand(app, "scene.nudge-right-large", "Nudge right (large)", UiKey.Right,
-      UiModifier.Shift, 1.0, 0.0);
-    registerNudgeCommand(app, "scene.nudge-up-large", "Nudge up (large)", UiKey.Up,
-      UiModifier.Shift, 0.0, 1.0);
-    registerNudgeCommand(app, "scene.nudge-down-large", "Nudge down (large)", UiKey.Down,
-      UiModifier.Shift, 0.0, -1.0);
+    registerNudgeCommand(app, "scene.nudge-left-large", "Nudge left (large)", UiKey.Left, UiModifier.Shift, -1.0, 0.0);
+    registerNudgeCommand(app,
+      "scene.nudge-right-large", "Nudge right (large)", UiKey.Right, UiModifier.Shift, 1.0, 0.0);
+    registerNudgeCommand(app, "scene.nudge-up-large", "Nudge up (large)", UiKey.Up, UiModifier.Shift, 0.0, 1.0);
+    registerNudgeCommand(app, "scene.nudge-down-large", "Nudge down (large)", UiKey.Down, UiModifier.Shift, 0.0, -1.0);
     app.commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
       app.cancelActiveDrag();
       app.commands.refresh();
-    }, new Shortcut(UiKey.Escape), function() return
-      (app.perspectiveViewport != null && app.perspectiveViewport.dragging()) || app.scene.hasActiveSketchEdit()));
+    }, new Shortcut(UiKey.Escape), function() return (app.perspectiveViewport != null
+      && app.perspectiveViewport.dragging()) || app.scene.hasActiveSketchEdit()));
   }
 
   static function registerGridSpacing(app:ReferenceEditorApp, id:String, label:String, spacing:Float):Void {
@@ -93,18 +89,24 @@ class SceneViewCommands {
       app.setAntialiasing(samples);
       app.log(label);
       app.commands.refresh();
-    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null &&
-      app.perspectiveViewport.supportsSamples(samples),
-      function() return app.antialiasing == samples));
+    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null
+      && app.perspectiveViewport.supportsSamples(samples), function() return app.antialiasing == samples));
   }
 
-  static function registerNudgeCommand(app:ReferenceEditorApp, id:String, label:String, key:Int, modifiers:Int,
-      deltaX:Float, deltaY:Float):Void {
+  static function registerNudgeCommand(
+    app:ReferenceEditorApp,
+    id:String,
+    label:String,
+    key:Int,
+    modifiers:Int,
+    deltaX:Float,
+    deltaY:Float
+  ):Void {
     app.commands.register(new Command(id, label, function() {
       app.scene.nudgeSelected(deltaX, deltaY);
       app.commands.refresh();
-    }, new Shortcut(key, modifiers), function() return app.canEditObjects() &&
-      app.scene.object(app.scene.selectedId) != null));
+    }, new Shortcut(key,
+      modifiers), function() return app.canEditObjects() && app.scene.object(app.scene.selectedId) != null));
   }
 
 }

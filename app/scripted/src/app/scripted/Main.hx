@@ -46,8 +46,7 @@ class Main {
         objects: setup.scene.records().length,
         backend: simulation.userBackendName(),
         timestep: simulation.timestep
-      }
-      ));
+      }));
       setup.scene.dispose();
       setup.sensors.dispose();
       simulation.dispose();

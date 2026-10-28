@@ -35,8 +35,13 @@ class CadBracketModel implements CadSessionModel {
   final holeSketch:ConstrainedSketchFeature;
   final filletFeature:FilletFeature;
 
-  function new(document:Document, anchorX:Float, anchorZ:Float,
-      holeSketch:ConstrainedSketchFeature, filletFeature:FilletFeature) {
+  function new(
+    document:Document,
+    anchorX:Float,
+    anchorZ:Float,
+    holeSketch:ConstrainedSketchFeature,
+    filletFeature:FilletFeature
+  ) {
     this.document = document;
     this.anchorX = anchorX;
     this.anchorZ = anchorZ;
@@ -57,17 +62,14 @@ class CadBracketModel implements CadSessionModel {
     try {
       var profile = bracketProfile(width, height, wall, anchorX, anchorZ);
       var base = document.add(new ConstrainedSketchFeature(profile));
-      document.defineTypedParameter(WIDTH, width, ParameterKind.Length, "mm")
-        .bind(base.dimension("width"));
-      document.defineTypedParameter(HEIGHT, height, ParameterKind.Length, "mm")
-        .bind(base.dimension("height"));
+      document.defineTypedParameter(WIDTH, width, ParameterKind.Length, "mm").bind(base.dimension("width"));
+      document.defineTypedParameter(HEIGHT, height, ParameterKind.Length, "mm").bind(base.dimension("height"));
       document.defineTypedParameter(WALL, wall, ParameterKind.Length, "mm");
       document.parameter(WALL).bind(base.dimension("wall-right"));
       document.parameter(WALL).bind(base.dimension("wall-top"));
 
       var extrusion = document.add(ExtrudeFeature.along(base, depth, Vector.Y(), false, true));
-      document.defineTypedParameter(DEPTH, depth, ParameterKind.Length, "mm")
-        .bind(extrusion.amount);
+      document.defineTypedParameter(DEPTH, depth, ParameterKind.Length, "mm").bind(extrusion.amount);
 
       var faceSupport = new SelectionRecipe("face", "plane", Vector.Y(), "min", Vector.Y(), 1);
       var holeSketchModel = new ConstrainedSketch(Plane.XY(), "mm");
@@ -76,10 +78,9 @@ class CadBracketModel implements CadSessionModel {
       holeSketchModel.addEntity(SketchEntity.circle("mounting-hole", "hole-center", wall * 0.25));
       holeSketchModel.addConstraint(SketchConstraint.fixed("hole-anchor", "hole-center"));
       holeSketchModel.addConstraint(SketchConstraint.radius("hole-radius", "mounting-hole", wall * 0.25));
-      var holeSketch = document.add(new ConstrainedSketchFeature(holeSketchModel, extrusion,
-        faceSupport, Vector.X()));
-      document.defineTypedParameter(HOLE_RADIUS, wall * 0.25, ParameterKind.Length, "mm")
-        .bind(holeSketch.dimension("hole-radius"));
+      var holeSketch = document.add(new ConstrainedSketchFeature(holeSketchModel, extrusion, faceSupport, Vector.X()));
+      document.defineTypedParameter(HOLE_RADIUS,
+        wall * 0.25, ParameterKind.Length, "mm").bind(holeSketch.dimension("hole-radius"));
 
       var pocket = document.add(PocketFeature.throughAll(extrusion, holeSketch));
       var outerEdges = new SelectionRecipe("edge", "line", Vector.Y(), "ends", Vector.X(), 4);
@@ -96,21 +97,19 @@ class CadBracketModel implements CadSessionModel {
   public static function decode(graph:String):CadBracketModel {
     var document = DocumentCodec.decode(graph);
     try {
-      if (document.featureCount() < 5)
-        throw "CAD bracket graph is missing its modeling features";
+      if (document.featureCount() < 5) throw "CAD bracket graph is missing its modeling features";
       var base:ConstrainedSketchFeature = cast document.featureAt(0);
       var hole:ConstrainedSketchFeature = cast document.featureAt(2);
       var fillet:Null<FilletFeature> = null;
-      for(index in 0...document.featureCount()) {
-        var candidate=document.featureAt(index);
-        if(candidate.serializationType()=="fillet")fillet=cast candidate;
+      for (index in 0...document.featureCount()) {
+        var candidate = document.featureAt(index);
+        if (candidate.serializationType() == "fillet") fillet = cast candidate;
       }
-      if(fillet==null)throw "CAD bracket graph is missing its edge fillet";
+      if (fillet == null) throw "CAD bracket graph is missing its edge fillet";
       var points = base.sketch().points();
       var anchor:Null<SketchPoint> = null;
       for (point in points) if (point.id == "p0") anchor = point;
-      if (anchor == null)
-        throw "CAD bracket graph is missing its profile anchor";
+      if (anchor == null) throw "CAD bracket graph is missing its profile anchor";
       return new CadBracketModel(document, anchor.x, anchor.y, hole, fillet);
     } catch (error:Dynamic) {
       document.close();
@@ -124,17 +123,20 @@ class CadBracketModel implements CadSessionModel {
 
   public function featureNames():Array<String> {
     var result:Array<String> = [];
-    for (index in 0...document.featureCount())
-      if (document.featureAt(index).active)
-        result.push(document.featureAt(index).serializationType());
+    for (index in 0...document
+      .featureCount()) if (document.featureAt(index).active) result.push(document.featureAt(index).serializationType());
     return result;
   }
 
-  public function faceFingerprint(index:Int):TopologyFingerprint
-    return CadModelTopology.faceFingerprint(document.result(),index);
+  public function faceFingerprint(index:Int):TopologyFingerprint return CadModelTopology.faceFingerprint(
+    document.result(),
+    index
+  );
 
-  public function remapFace(fingerprint:TopologyFingerprint):Int
-    return CadModelTopology.remapFace(document.result(),fingerprint);
+  public function remapFace(fingerprint:TopologyFingerprint):Int return CadModelTopology.remapFace(
+    document.result(),
+    fingerprint
+  );
 
   public function sceneDimensions():CadModelDimensions return {
     width: document.parameter(WIDTH).valueIn("m"),
@@ -147,44 +149,48 @@ class CadBracketModel implements CadSessionModel {
   public function holeRadius():Float return document.parameter(HOLE_RADIUS).valueIn("m");
 
   public function setHoleRadius(value:Float):Void {
-    var nextMm=value*1000.0;
-    var wall=document.parameter(WALL).valueIn("mm");
-    if(!Math.isFinite(nextMm)||nextMm<=0||nextMm>=wall/2.0)
-      throw new ParametricError("Bracket hole radius must be positive and smaller than half the wall thickness");
-    var previous=document.parameter(HOLE_RADIUS).valueIn("mm");
-    if(nextMm==previous)return;
-    var transaction=document.beginTransaction();
+    var nextMm = value * 1000.0;
+    var wall = document.parameter(WALL).valueIn("mm");
+    if (!Math.isFinite(nextMm) || nextMm <= 0 || nextMm >= wall
+      / 2.0) throw new ParametricError("Bracket hole radius must be positive and smaller than half the wall thickness");
+    var previous = document.parameter(HOLE_RADIUS).valueIn("mm");
+    if (nextMm == previous) return;
+    var transaction = document.beginTransaction();
     try {
-      document.parameter(HOLE_RADIUS).set(value,"m");
+      document.parameter(HOLE_RADIUS).set(value, "m");
       document.recompute();
       transaction.commit();
-    } catch(error:Dynamic) {
+    } catch (error:Dynamic) {
       transaction.cancel();
       throw error;
     }
   }
 
   public function setWallThickness(value:Float):Void {
-    var nextMm=value*1000.0;
-    var width=document.parameter(WIDTH).valueIn("mm");
-    var height=document.parameter(HEIGHT).valueIn("mm");
-    var depth=document.parameter(DEPTH).valueIn("mm");
-    validateDimensions(width,height,depth,nextMm);
-    var previous=document.parameter(WALL).valueIn("mm");
-    if(nextMm==previous)return;
-    var transaction=document.beginTransaction();
+    var nextMm = value * 1000.0;
+    var width = document.parameter(WIDTH).valueIn("mm");
+    var height = document.parameter(HEIGHT).valueIn("mm");
+    var depth = document.parameter(DEPTH).valueIn("mm");
+    validateDimensions(width, height, depth, nextMm);
+    var previous = document.parameter(WALL).valueIn("mm");
+    if (nextMm == previous) return;
+    var transaction = document.beginTransaction();
     try {
-      document.parameter(WALL).set(value,"m");
-      document.parameter(HOLE_RADIUS).set(nextMm*0.25,"mm");
-      filletFeature.radius.set(Math.min(1.0,nextMm*0.12));
-      var center=holeCenter(width,height,nextMm,anchorX,anchorZ);
+      document.parameter(WALL).set(value, "m");
+      document.parameter(HOLE_RADIUS).set(nextMm * 0.25, "mm");
+      filletFeature.radius.set(Math.min(1.0, nextMm * 0.12));
+      var center = holeCenter(width, height, nextMm, anchorX, anchorZ);
       var authoredCenter:Null<SketchPoint> = null;
-      for(point in holeSketch.sketch().points())if(point.id=="hole-center")authoredCenter=point;
-      if(authoredCenter==null||authoredCenter.x!=center.x||authoredCenter.y!=center.y)
-        holeSketch.replacePoint(new SketchPoint("hole-center",center.x,center.y));
+      for (point in holeSketch.sketch().points()) if (point.id == "hole-center") authoredCenter = point;
+      if (authoredCenter == null
+        || authoredCenter.x != center.x || authoredCenter.y != center.y) holeSketch.replacePoint(new SketchPoint(
+          "hole-center",
+          center.x,
+          center.y
+        ));
       document.recompute();
       transaction.commit();
-    } catch(error:Dynamic) {
+    } catch (error:Dynamic) {
       transaction.cancel();
       throw error;
     }
@@ -204,8 +210,12 @@ class CadBracketModel implements CadSessionModel {
       var center = holeCenter(widthMm, heightMm, wall, anchorX, anchorZ);
       var authoredCenter:Null<SketchPoint> = null;
       for (point in holeSketch.sketch().points()) if (point.id == "hole-center") authoredCenter = point;
-      if (authoredCenter == null || authoredCenter.x != center.x || authoredCenter.y != center.y)
-        holeSketch.replacePoint(new SketchPoint("hole-center", center.x, center.y));
+      if (authoredCenter == null
+        || authoredCenter.x != center.x || authoredCenter.y != center.y) holeSketch.replacePoint(new SketchPoint(
+          "hole-center",
+          center.x,
+          center.y
+        ));
       document.recompute();
       transaction.commit();
     } catch (error:Dynamic) {
@@ -235,9 +245,10 @@ class CadBracketModel implements CadSessionModel {
     }
   }
 
-  public function collisionBoundsFor(source:Shape):CadCollisionBounds
-    return CadCollisionBounds.fromKernelBounds(source.bounds(),
-      CadSceneGeometry.METRES_PER_MILLIMETRE);
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds return CadCollisionBounds.fromKernelBounds(
+    source.bounds(),
+    CadSceneGeometry.METRES_PER_MILLIMETRE
+  );
 
   public function tessellationSeconds():Float return lastTessellationSeconds;
 
@@ -245,25 +256,42 @@ class CadBracketModel implements CadSessionModel {
 
   public function exportStep(path:String):Void document.result().exportStep(path);
 
-  static function bracketProfile(width:Float, height:Float, wall:Float,
-      anchorX:Float, anchorZ:Float):ConstrainedSketch {
+  static function bracketProfile(width:Float,
+    height:Float, wall:Float, anchorX:Float, anchorZ:Float):ConstrainedSketch {
     var sketch = new ConstrainedSketch(Plane.XZ(), "mm");
     var points = [
       new SketchPoint("p0", anchorX, anchorZ),
       new SketchPoint("p1", anchorX + width, anchorZ),
-      new SketchPoint("p2", anchorX + width, anchorZ + wall),
-      new SketchPoint("p3", anchorX + wall, anchorZ + wall),
-      new SketchPoint("p4", anchorX + wall, anchorZ + height),
-      new SketchPoint("p5", anchorX, anchorZ + height)
+      new SketchPoint(
+        "p2",
+        anchorX + width,
+        anchorZ + wall
+      ),
+      new SketchPoint(
+        "p3",
+        anchorX + wall,
+        anchorZ + wall
+      ),
+      new SketchPoint(
+        "p4",
+        anchorX + wall,
+        anchorZ + height
+      ),
+      new SketchPoint(
+        "p5",
+        anchorX,
+        anchorZ + height
+      )
     ];
     for (point in points) sketch.addPoint(point);
-    for (index in 0...points.length)
-      sketch.addEntity(SketchEntity.line("edge-" + index, points[index].id,
-        points[(index + 1) % points.length].id));
-    for (id in ["edge-0", "edge-2", "edge-4"])
-      sketch.addConstraint(SketchConstraint.horizontal("horizontal-" + id, id));
-    for (id in ["edge-1", "edge-3", "edge-5"])
-      sketch.addConstraint(SketchConstraint.vertical("vertical-" + id, id));
+    for (index in 0...points.length) sketch.addEntity(SketchEntity.line(
+      "edge-" + index,
+      points[index].id,
+      points[(index + 1) % points.length].id
+    ));
+    for (id in ["edge-0",
+      "edge-2", "edge-4"]) sketch.addConstraint(SketchConstraint.horizontal("horizontal-" + id, id));
+    for (id in ["edge-1", "edge-3", "edge-5"]) sketch.addConstraint(SketchConstraint.vertical("vertical-" + id, id));
     sketch.addConstraint(SketchConstraint.fixed("anchor", "p0"));
     sketch.addConstraint(SketchConstraint.distance("width", "p0", "p1", width));
     sketch.addConstraint(SketchConstraint.distance("wall-right", "p1", "p2", wall));
@@ -272,23 +300,22 @@ class CadBracketModel implements CadSessionModel {
     return sketch;
   }
 
-  static function holeCenter(width:Float, height:Float, wall:Float,
-      anchorX:Float, anchorZ:Float):{x:Float, y:Float} {
+  static function holeCenter(width:Float,
+    height:Float, wall:Float, anchorX:Float, anchorZ:Float): {x: Float, y: Float} {
     var baseArea = width * wall;
     var webArea = wall * (height - wall);
     var totalArea = baseArea + webArea;
-    var centroidX = (baseArea * (anchorX + width / 2.0)
-      + webArea * (anchorX + wall / 2.0)) / totalArea;
-    var centroidZ = (baseArea * (anchorZ + wall / 2.0)
-      + webArea * (anchorZ + wall + (height - wall) / 2.0)) / totalArea;
+    var centroidX = (baseArea * (anchorX + width / 2.0) + webArea * (anchorX + wall / 2.0)) / totalArea;
+    var centroidZ = (baseArea
+      * (anchorZ + wall / 2.0) + webArea * (anchorZ + wall + (height - wall) / 2.0)) / totalArea;
     var targetX = anchorX + wall / 2.0;
     var targetZ = anchorZ + wall + (height - wall) / 2.0;
     return {x: targetX - centroidX, y: targetZ - centroidZ};
   }
 
   static function validateDimensions(width:Float, height:Float, depth:Float, wall:Float):Void {
-    if (!Math.isFinite(width) || !Math.isFinite(height) || !Math.isFinite(depth) || !Math.isFinite(wall)
-        || width <= wall * 2 || height <= wall * 2 || depth <= 0 || wall <= 0)
-      throw new ParametricError("Bracket width and height must exceed twice the wall thickness, and depth must be positive");
+    if (!Math.isFinite(width) || !Math.isFinite(height)
+      || !Math.isFinite(depth) || !Math.isFinite(wall) || width <= wall * 2 || height <= wall * 2 || depth <= 0 || wall
+      <= 0) throw new ParametricError("Bracket width and height must exceed twice the wall thickness, and depth must be positive");
   }
 }

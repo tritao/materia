@@ -64,39 +64,46 @@ class StockSimulationSession {
   var disposed = false;
 
   public function new(width:Float, height:Float, depth:Float) {
-    if (!(width > 0.01) || !(height > 0.01) || !(depth > 0.003) || width > 0.5 || height > 0.5 || depth > 0.2)
-      throw "Stock simulation needs a block between 10 × 10 × 3 mm and 500 × 500 × 200 mm";
+    if (!(width > 0.01) || !(height > 0.01) || !(depth > 0.003) || width > 0.5 || height > 0.5
+      || depth > 0.2) throw "Stock simulation needs a block between 10 × 10 × 3 mm and 500 × 500 × 200 mm";
     this.width = width;
     this.height = height;
     this.depth = depth;
     var program = demoProgram();
     var controller = new CncController(LinuxCnc, program.program.tools);
-    var setup = new Setup("1", new Point3(0, 0, 0),
-      new SetupStock(0, width, 0, height, 0, -depth, program.safeZ));
-    var authored = new ToolpathProgram(program.program.ops,
-      program.program.tools, [setup]);
+    var setup = new Setup("1", new Point3(0, 0, 0), new SetupStock(0, width, 0, height, 0, -depth, program.safeZ));
+    var authored = new ToolpathProgram(program.program.ops, program.program.tools, [setup]);
     var text = CncWriter.write(authored, controller);
     gcode = text.split("\n");
     var compiled = CncCompiler.compileDetailed(text, controller);
-    if (compiled.diagnostics.length > 0)
-      throw "Stock simulation program does not compile: " + compiled.diagnostics[0];
-    if (compiled.program.ops.length != program.program.ops.length)
-      throw "Stock simulation G-code does not match its CAM operations";
+    if (compiled.diagnostics.length > 0) throw "Stock simulation program does not compile: " + compiled.diagnostics[0];
+    if (compiled.program.ops.length
+      != program.program.ops.length) throw "Stock simulation G-code does not match its CAM operations";
     // Compiled ops follow the CAM ops one for one; each CAM op records its operation number.
     operations = [for (op in program.program.ops) {
       var index = provenanceOf(op).operationIndex;
       index == null ? 0 : index;
-    }];
+    }
+    ];
     // Work coordinates put the block's top corner at the origin; the object centres the
     // block, so object = work - (width / 2, height / 2, -depth / 2).
-    moves = CutMoves.fromProgram(compiled.program,
-      new Point3(width / 2, height / 2, -depth / 2));
+    moves = CutMoves.fromProgram(compiled.program, new Point3(width / 2, height / 2, -depth / 2));
     // Rays at cell centres, so none lies exactly on the program's millimetre-round walls,
     // where cut stock and the finished part's mesh could disagree about which side it is on.
-    var lattice = StockLattice.covering(-width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2,
-      SPACING);
-    timeline = new StockTimeline(Stock.box(lattice, -width / 2, -height / 2, -depth / 2, width / 2,
-      height / 2, depth / 2), moves, 250);
+    var lattice = StockLattice.covering(-width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2, SPACING);
+    timeline = new StockTimeline(
+      Stock.box(
+        lattice,
+        -width / 2,
+        -height / 2,
+        -depth / 2,
+        width / 2,
+        height / 2,
+        depth / 2
+      ),
+      moves,
+      250
+    );
     var part = finishedPart(program);
     try {
       target = Stock.fromMesh(lattice, part.shape.tessellate(1e-6, 0.1));
@@ -125,9 +132,28 @@ class StockSimulationSession {
   /** The stock as it is now, in the object's frame, coloured by the current mode. */
   public function geometry():GeometryData {
     var stock = timeline.stock;
-    var mesh = colorBy == "operation"
-      ? stock.contour(0, 0, stock.tilesX(), stock.tilesY(), BySource(operationColour, UNTOUCHED))
-      : stock.contour(0, 0, stock.tilesX(), stock.tilesY(), ByDeviation(target, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
+    var mesh = colorBy == "operation" ? stock.contour(
+      0,
+      0,
+      stock.tilesX(),
+      stock.tilesY(),
+      BySource(
+        operationColour,
+        UNTOUCHED
+      )
+    ) : stock.contour(
+      0,
+      0,
+      stock.tilesX(),
+      stock.tilesY(),
+      ByDeviation(
+        target,
+        TOLERANCE,
+        ON_TARGET,
+        LEFTOVER,
+        GOUGE
+      )
+    );
     var geometry = new GeometryData();
     geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
     geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
@@ -169,8 +195,7 @@ class StockSimulationSession {
   /** Moves whose shank or holder touched stock, over the whole program. */
   public function collisions():Int {
     var count = 0;
-    for (outcome in timeline.outcomes)
-      if (outcome.shankContact > 0.0 || outcome.holderContact > 0.0) count++;
+    for (outcome in timeline.outcomes) if (outcome.shankContact > 0.0 || outcome.holderContact > 0.0) count++;
     return count;
   }
 
@@ -189,24 +214,93 @@ class StockSimulationSession {
     target.dispose();
   }
 
-  static function provenanceOf(op:ToolpathOp):toolpathkit.path.Provenance
-    return switch op {
-      case SetSetup(_, provenance), Move(_, _, _, _, provenance), MachineMove(_, _, _, _, provenance),
-          PositionJoint(_, _, provenance), WaitSignal(_, _, _, provenance), FeedPerRevolution(_, _, _, provenance),
-          ElectronicGear(_, _, provenance), ReleaseGear(_, provenance),
-          Dwell(_, provenance), Spindle(_, _, provenance), Coolant(_, _, provenance),
-          ToolChange(_, provenance), ToolLengthOffset(_, _, provenance), OptionalStop(provenance),
-          ProgramStop(provenance), End(provenance), Deposit(_, _, _, provenance), DepositOff(provenance),
-          FilamentMove(_, _, provenance), Heat(_, _, _, provenance), Fan(_, _, provenance),
-          Layer(_, _, provenance), Feature(_, provenance), PrintObject(_, _, provenance): provenance;
-    };
+  static function provenanceOf(op:ToolpathOp):toolpathkit.path.Provenance return switch op {
+    case SetSetup(_, provenance), Move(_, _, _, _, provenance), MachineMove(_, _, _, _, provenance), PositionJoint(
+      _,
+      _,
+      provenance
+    ), WaitSignal(
+      _,
+      _,
+      _,
+      provenance
+    ), FeedPerRevolution(
+      _,
+      _,
+      _,
+      provenance
+    ), ElectronicGear(
+      _,
+      _,
+      provenance
+    ), ReleaseGear(
+      _,
+      provenance
+    ), Dwell(
+      _,
+      provenance
+    ), Spindle(
+      _,
+      _,
+      provenance
+    ), Coolant(
+      _,
+      _,
+      provenance
+    ), ToolChange(
+      _,
+      provenance
+    ), ToolLengthOffset(
+      _,
+      _,
+      provenance
+    ), OptionalStop(provenance), ProgramStop(provenance), End(provenance), Deposit(
+      _,
+      _,
+      _,
+      provenance
+    ), DepositOff(provenance), FilamentMove(
+      _,
+      _,
+      provenance
+    ), Heat(
+      _,
+      _,
+      _,
+      provenance
+    ), Fan(
+      _,
+      _,
+      provenance
+    ), Layer(
+      _,
+      _,
+      provenance
+    ), Feature(
+      _,
+      provenance
+    ), PrintObject(
+      _,
+      _,
+      provenance
+    ):
+      provenance;
+  };
 
-  function operationColour(move:CutMove):Int
-    return OPERATION_COLOURS[(operationOf(move) - 1) % OPERATION_COLOURS.length];
+  function operationColour(move:CutMove):Int return OPERATION_COLOURS[(operationOf(move)
+    - 1) % OPERATION_COLOURS.length];
 
   /** Work-coordinate geometry of the demo, in metres. */
-  function demoProgram():{program:ToolpathProgram, safeZ:Float, outer:Array<Float>,
-      boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float} {
+  function demoProgram(): {
+    program: ToolpathProgram,
+    safeZ: Float,
+    outer: Array<Float>,
+    boss: Array<Float>,
+    pocketDepth: Float,
+    holes: Array<Point3>,
+    holeDiameter: Float,
+    holeDepth: Float
+  } {
     var size = Math.min(width, height);
     var margin = 0.15 * size;
     var outer = [margin, margin, width - margin, height - margin];
@@ -219,26 +313,74 @@ class StockSimulationSession {
     var drill = Tool.shaped(2, 0.0, CutterProfile.vee(drillDiameter, 118 * Math.PI / 180, 0.02));
     var holeDepth = Math.min(0.8 * depth, 0.008);
     var inset = margin / 2;
-    var holes = [new Point3(inset, inset, 0), new Point3(width - inset, inset, 0),
-      new Point3(width - inset, height - inset, 0), new Point3(inset, height - inset, 0)];
+    var holes = [
+      new Point3(inset, inset, 0),
+      new Point3(width - inset, inset, 0),
+      new Point3(
+        width - inset,
+        height - inset,
+        0
+      ),
+      new Point3(
+        inset,
+        height - inset,
+        0
+      )
+    ];
     var mm = 1000.0;
-    function rectangle(r:Array<Float>):Curve
-      return Curve.polyline([new Vector(r[0] * mm, r[1] * mm), new Vector(r[2] * mm, r[1] * mm),
-        new Vector(r[2] * mm, r[3] * mm), new Vector(r[0] * mm, r[3] * mm)], true);
+    function rectangle(r:Array<Float>):Curve return Curve.polyline(
+      [
+        new Vector(r[0] * mm, r[1] * mm),
+        new Vector(
+          r[2] * mm,
+          r[1] * mm
+        ),
+        new Vector(
+          r[2] * mm,
+          r[3] * mm
+        ),
+        new Vector(
+          r[0] * mm,
+          r[3] * mm
+        )
+      ],
+      true
+    );
     var outerCurve = rectangle(outer), bossCurve = rectangle(boss);
     var sketch = Sketch.face(outerCurve, [bossCurve]);
     var face = sketch.shape.faces().at(0);
     var safeZ = 0.005;
-    var program = new CamJob(safeZ, 10000)
-      .pocketFace(face, mill, -pocketDepth, 0.005, 0.45 * diameter, 0.001, "mm", 0.00005, 0.001)
-      .drill(holes, drill, -holeDepth, 0.002, 0.002)
-      .finish();
+    var program = new CamJob(safeZ, 10000).pocketFace(
+      face,
+      mill,
+      -pocketDepth,
+      0.005,
+      0.45 * diameter,
+      0.001,
+      "mm",
+      0.00005,
+      0.001
+    ).drill(
+      holes,
+      drill,
+      -holeDepth,
+      0.002,
+      0.002
+    ).finish();
     face.close();
     sketch.close();
     outerCurve.close();
     bossCurve.close();
-    return {program: program, safeZ: safeZ, outer: outer, boss: boss, pocketDepth: pocketDepth,
-      holes: holes, holeDiameter: drillDiameter, holeDepth: holeDepth};
+    return {
+      program: program,
+      safeZ: safeZ,
+      outer: outer,
+      boss: boss,
+      pocketDepth: pocketDepth,
+      holes: holes,
+      holeDiameter: drillDiameter,
+      holeDepth: holeDepth
+    };
   }
 
   /**
@@ -247,8 +389,16 @@ class StockSimulationSession {
     fillets there, which show as leftover) and minus the drilled holes as
     cylinders (the drill's cone tip shows as leftover below them).
   **/
-  function finishedPart(program:{program:ToolpathProgram, safeZ:Float, outer:Array<Float>,
-      boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float}):Part {
+  function finishedPart(program: {
+    program: ToolpathProgram,
+    safeZ: Float,
+    outer: Array<Float>,
+    boss: Array<Float>,
+    pocketDepth: Float,
+    holes: Array<Point3>,
+    holeDiameter: Float,
+    holeDepth: Float
+  }):Part {
     var parts:Array<Part> = [];
     function place(part:Part, x:Float, y:Float, z:Float):Part {
       var placed = part.translated(new Vector(x, y, z));
@@ -259,16 +409,29 @@ class StockSimulationSession {
     var ox = -width / 2, oy = -height / 2, top = depth / 2;
     var outer = program.outer, boss = program.boss;
     var result = place(Part.box(width, height, depth, Min, Min, Min), ox, oy, -depth / 2);
-    var cavity = place(Part.box(outer[2] - outer[0], outer[3] - outer[1], program.pocketDepth + 0.001, Min, Min, Min),
-      ox + outer[0], oy + outer[1], top - program.pocketDepth);
-    var island = place(Part.box(boss[2] - boss[0], boss[3] - boss[1], program.pocketDepth + 0.002, Min, Min, Min),
-      ox + boss[0], oy + boss[1], top - program.pocketDepth - 0.001);
+    var cavity = place(
+      Part.box(outer[2] - outer[0], outer[3] - outer[1], program.pocketDepth + 0.001, Min, Min, Min),
+      ox + outer[0],
+      oy + outer[1],
+      top - program.pocketDepth
+    );
+    var island = place(
+      Part.box(boss[2] - boss[0], boss[3] - boss[1], program.pocketDepth + 0.002, Min, Min, Min),
+      ox + boss[0],
+      oy + boss[1],
+      top - program.pocketDepth - 0.001
+    );
     var pocket = cavity.subtract(island);
     parts.push(pocket);
     var next = result.subtract(pocket);
     for (hole in program.holes) {
-      var cylinder = Part.cylinderSpan(program.holeDiameter / 2, top - program.holeDepth, top + 0.001,
-        ox + hole.x, oy + hole.y);
+      var cylinder = Part.cylinderSpan(
+        program.holeDiameter / 2,
+        top - program.holeDepth,
+        top + 0.001,
+        ox + hole.x,
+        oy + hole.y
+      );
       parts.push(cylinder);
       parts.push(next);
       next = next.subtract(cylinder);

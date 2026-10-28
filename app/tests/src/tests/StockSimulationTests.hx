@@ -13,8 +13,10 @@ class StockSimulationTests {
   static function apply(scene:EditorScene, label:String, value:PropertyValue):Void {
     for (descriptor in scene.properties()) if (descriptor.label == label) {
       switch new PropertyBinding(descriptor, scene.context()).apply(value) {
-        case Rejected(message): throw 'Stock simulation property "$label" rejected the edit: $message';
-        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
+        case Rejected(message):
+          throw 'Stock simulation property "$label" rejected the edit: $message';
+        case Pending(_):
+          throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       return;
@@ -23,13 +25,17 @@ class StockSimulationTests {
   }
 
   static function text(scene:EditorScene, label:String):String {
-    for (descriptor in scene.properties()) if (descriptor.label == label)
-      return switch descriptor.readValue(scene.context()) {
-        case PropertyValue.Text(value): value;
-        case PropertyValue.Int(value): Std.string(value);
-        case PropertyValue.Enum(value): value;
-        default: throw 'Unexpected value for "$label"';
-      };
+    for (descriptor in scene.properties()) if (descriptor.label
+      == label) return switch descriptor.readValue(scene.context()) {
+      case PropertyValue.Text(value):
+        value;
+      case PropertyValue.Int(value):
+        Std.string(value);
+      case PropertyValue.Enum(value):
+        value;
+      default:
+        throw 'Unexpected value for "$label"';
+    };
     throw 'Missing stock simulation property: $label';
   }
 
@@ -42,8 +48,10 @@ class StockSimulationTests {
       check(created != null && created.kind == StockSimulationSession.KIND, "the new object is a stock simulation");
       var simulation = scene.stockSimulation(id);
       check(simulation.moveCount() > 50, "the demo program has moves to simulate");
-      check(text(scene, "Moves cut") == Std.string(simulation.moveCount()),
-        "the simulation starts at the program's end");
+      check(
+        text(scene, "Moves cut") == Std.string(simulation.moveCount()),
+        "the simulation starts at the program's end"
+      );
       check(text(scene, "Rapids through stock") == "0", "the demo program never rapids through stock");
       check(text(scene, "Deepest gouge") == "0 mm", "the demo program does not gouge its part");
 
@@ -57,8 +65,10 @@ class StockSimulationTests {
       check(line != null && line > 1 && line <= simulation.gcode.length, "the picked line is in the program");
       check(picked.indexOf("G") > 0, "the picked surface shows its G-code line");
       check(scene.selectAtRay(0.0001, 0.0001, 1, 0, 0, -1) == id, "a ray onto the boss hits the stock");
-      check(text(scene, "Picked surface").indexOf("Click") == 0,
-        'the boss top is untouched stock: ${text(scene, "Picked surface")}');
+      check(
+        text(scene, "Picked surface").indexOf("Click") == 0,
+        'the boss top is untouched stock: ${text(scene, "Picked surface")}'
+      );
 
       // Scrub back to the start: the same point is uncut.
       apply(scene, "Moves cut", PropertyValue.Int(0));
@@ -74,9 +84,11 @@ class StockSimulationTests {
       var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
       try {
         var loaded = reopened.object(id);
-        check(loaded != null && loaded.kind == StockSimulationSession.KIND
+        check(
+          loaded != null && loaded.kind == StockSimulationSession.KIND
           && reopened.stockSimulation(id).moveCount() == simulation.moveCount(),
-          "a saved stock simulation reopens with the same program");
+          "a saved stock simulation reopens with the same program"
+        );
         reopened.dispose();
       } catch (error:Dynamic) {
         reopened.dispose();

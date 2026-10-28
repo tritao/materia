@@ -12,16 +12,15 @@ typedef AssemblyTreeGroup = {
 /** Authored occurrence ownership, independent of the solver's rigid bodies and joint roots. */
 class AssemblyHierarchy {
   public final definition:AssemblyDefinition;
-  public final groups:Map<String,AssemblyTreeGroup> = [];
-  public final children:Map<String,Array<String>> = [];
-  public final parents:Map<String,String> = [];
+  public final groups:Map<String, AssemblyTreeGroup> = [];
+  public final children:Map<String, Array<String>> = [];
+  public final parents:Map<String, String> = [];
 
-  public function key(path:String = ""):String
-    return "assembly:" + definition.id + (path == "" ? "" : ":" + path);
+  public function key(path:String = ""):String return "assembly:" + definition.id + (path == "" ? "" : ":" + path);
 
   public function new(source:AssemblyDefinition, objectIds:Array<String>) {
     definition = AssemblyDefinitionFlattener.flattenView(source);
-    var available = [for (id in objectIds) id => true];
+    var available = [for (id in objectIds) id = > true];
     for (occurrence in definition.occurrences) {
       var object = "project:" + occurrence.id;
       if (!available.exists(object)) continue;
@@ -40,7 +39,7 @@ class AssemblyHierarchy {
     var parentPath = slash < 0 ? "" : path.substr(0, slash);
     if (path != "") ensureGroup(parentPath);
     var label = path == "" ? definition.id : path.substr(slash + 1);
-    groups.set(id, {label:AssemblyBodies.displayName(label), path:path});
+    groups.set(id, {label: AssemblyBodies.displayName(label), path: path});
     children.set(id, []);
     var parent = path == "" ? "scene" : key(parentPath);
     parents.set(id, parent);

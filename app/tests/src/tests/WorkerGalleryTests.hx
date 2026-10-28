@@ -13,8 +13,14 @@ class WorkerGalleryTests {
   static inline var LIMIT = 2400;
 
   public static function main():Int {
-    try { run(); Sys.println("Worker gallery tests passed"); return 0; }
-    catch (error:Dynamic) { Sys.println('Worker gallery tests failed: $error'); return 1; }
+    try {
+      run();
+      Sys.println("Worker gallery tests passed");
+      return 0;
+    } catch (error:Dynamic) {
+      Sys.println('Worker gallery tests failed: $error');
+      return 1;
+    }
   }
 
   /**
@@ -35,8 +41,8 @@ class WorkerGalleryTests {
     for (_ in 0...COST_FRAMES) editor.simulation.runTicks(TICKS_PER_FRAME);
     var perTick = (Sys.cpuTime() - started) * 1000.0 / (COST_FRAMES * TICKS_PER_FRAME);
     Sys.println('worker gallery: ${Math.round(perTick * 100) / 100} ms of CPU per tick (limit $CPU_MS_PER_TICK_LIMIT)');
-    if (perTick > CPU_MS_PER_TICK_LIMIT)
-      throw 'The gallery costs ${Math.round(perTick * 10) / 10} ms of CPU per tick, over the limit of $CPU_MS_PER_TICK_LIMIT ms';
+    if (perTick
+      > CPU_MS_PER_TICK_LIMIT) throw 'The gallery costs ${Math.round(perTick * 10) / 10} ms of CPU per tick, over the limit of $CPU_MS_PER_TICK_LIMIT ms';
     editor.simulation.stop();
   }
 
@@ -58,7 +64,8 @@ class WorkerGalleryTests {
       }
       if (all) break;
     }
-    for (id in ids) if (!editor.simulation.humanWorker(id).currentJobDone()) throw '$id had not finished after $LIMIT ticks';
+    for (id in ids) if (!editor
+      .simulation.humanWorker(id).currentJobDone()) throw '$id had not finished after $LIMIT ticks';
     var state = editor.simulation.environmentVisualState();
     var find = function(wanted:String):Array<Float> {
       for (entry in state) if (entry.id == wanted) return entry.position;
@@ -68,9 +75,10 @@ class WorkerGalleryTests {
       var part = find('gallery-$lane-part'), table = find('gallery-$lane-table');
       // The table's centre is half its thickness (0.05 m) under its top, and the part's half height (0.04 m) above it.
       var across = Math.sqrt(Math.pow(part[0] - table[0], 2) + Math.pow(part[1] - table[1], 2));
-      if (across > 0.15) throw 'Lane $lane: the part came to rest ${Math.round(across * 100) / 100} m from the middle of its table';
-      if (Math.abs(part[2] - (table[2] + 0.09)) > 0.04)
-        throw 'Lane $lane: the part is at height ${part[2]}, not resting on a table whose centre is at ${table[2]}';
+      if (across
+        > 0.15) throw 'Lane $lane: the part came to rest ${Math.round(across * 100) / 100} m from the middle of its table';
+      if (Math.abs(part[2] - (table[2] + 0.09))
+        > 0.04) throw 'Lane $lane: the part is at height ${part[2]}, not resting on a table whose centre is at ${table[2]}';
     }
   }
 }

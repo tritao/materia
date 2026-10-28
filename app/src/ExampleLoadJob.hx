@@ -22,7 +22,10 @@ class ExampleLoadJob {
       #else
       startProject();
       #end
-    } catch (error:Dynamic) { failure = Std.string(error); ready = true; }
+    } catch (error:Dynamic) {
+      failure = Std.string(error);
+      ready = true;
+    }
   }
   function startProject():Void {
     switch entry.kind {
@@ -33,7 +36,8 @@ class ExampleLoadJob {
         #else
         project = new ProjectLoadJob(path, entry.jobId, control);
         #end
-      default: ready = true;
+      default:
+        ready = true;
     }
   }
   public function isFinished():Bool {
@@ -43,14 +47,21 @@ class ExampleLoadJob {
     if (pending != null) {
       if (!pending.isFinished()) return false;
       download = null;
-      try { pending.take(); control.throwIfCancelled(); startProject(); }
-      catch (error:Dynamic) { failure = Std.string(error); ready = true; }
+      try {
+        pending.take();
+        control.throwIfCancelled();
+        startProject();
+      } catch (error:Dynamic) {
+        failure = Std.string(error);
+        ready = true;
+      }
     }
     #end
     var running = project;
     return ready || (running != null && running.isFinished());
   }
-  public function wasCancelled():Bool return control.isCancelled() || failure == ProjectLoadControl.CANCELLED || (project != null && project.wasCancelled());
+  public function wasCancelled():Bool return control.isCancelled()
+    || failure == ProjectLoadControl.CANCELLED || (project != null && project.wasCancelled());
   public function elapsedSeconds():Float return Sys.time() - startedAt;
   public function take():Null<GeneratedAssemblyScene> {
     if (failure != null) throw failure;

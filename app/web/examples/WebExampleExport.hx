@@ -16,8 +16,12 @@ class WebExampleExport {
     var digest = PreparedProjectCache.hex(Sha256.make(bytes));
     var object = "objects/" + digest + extension;
     AtomicFile.writeBytes(destination + "/" + object, bytes);
-    return {url: object, sha256: digest, bytes: bytes.length,
-      path: path == "" ? "/files/examples/" + digest + extension : path};
+    return {
+      url: object,
+      sha256: digest,
+      bytes: bytes.length,
+      path: path == "" ? "/files/examples/" + digest + extension : path
+    };
   }
 
   public static function main():Int {
@@ -41,7 +45,8 @@ class WebExampleExport {
         case Script(_):
           // This setup is already compiled into the guest and needs no downloads.
         case WorkerRackToTable | WorkerGallery:
-          var path = entry.id == "worker-gallery" ? "app/examples/worker-gallery.materia" : "app/examples/worker-rack-to-table.materia";
+          var path = entry.id
+            == "worker-gallery" ? "app/examples/worker-gallery.materia" : "app/examples/worker-rack-to-table.materia";
           source = "/" + path;
           var content = File.getBytes(path);
           files.push(asset(content, source, ".materia"));
@@ -62,14 +67,21 @@ class WebExampleExport {
   }
 
   static function collectAssets(value:Dynamic, assets:Map<String, Bool>):Void {
-    if (value == null || Std.isOfType(value, String) || Std.isOfType(value, Float) || Std.isOfType(value, Int) || Std.isOfType(value, Bool)) return;
+    if (value == null || Std.isOfType(value,
+      String) || Std.isOfType(value, Float) || Std.isOfType(value, Int) || Std.isOfType(
+        value,
+        Bool
+      )) return;
     if (Std.isOfType(value, Array)) {
       for (item in (cast value:Array<Dynamic>)) collectAssets(item, assets);
       return;
     }
     for (name in Reflect.fields(value)) {
       var item:Dynamic = Reflect.field(value, name);
-      if (name == "asset" && Std.isOfType(item, String) && StringTools.startsWith(item, "animkit/assets/")) assets.set(item, true);
+      if (name == "asset" && Std.isOfType(item, String) && StringTools.startsWith(item, "animkit/assets/")) assets.set(
+        item,
+        true
+      );
       else collectAssets(item, assets);
     }
   }

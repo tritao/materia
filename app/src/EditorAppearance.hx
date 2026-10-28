@@ -21,7 +21,9 @@ class EditorAppearance {
     toolbarSimulating = Color.rgba(
       toolbar.red + (accent.red - toolbar.red) * 0.22,
       toolbar.green + (accent.green - toolbar.green) * 0.22,
-      toolbar.blue + (accent.blue - toolbar.blue) * 0.22, 1.0);
+      toolbar.blue + (accent.blue - toolbar.blue) * 0.22,
+      1.0
+    );
 
     theme.body.textStyle.fontSize = 14.0;
     theme.label.textStyle.fontSize = 13.0;
@@ -30,6 +32,5 @@ class EditorAppearance {
     theme.refreshStyles();
   }
 
-  static inline function rgb(red:Float, green:Float, blue:Float):Color
-    return Color.rgba(red, green, blue, 1.0);
+  static inline function rgb(red:Float, green:Float, blue:Float):Color return Color.rgba(red, green, blue, 1.0);
 }

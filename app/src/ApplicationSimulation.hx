@@ -32,14 +32,18 @@ import sys.thread.Thread;
 import sys.thread.Lock;
 #end
 
-typedef SimulationRobotVisual={
+typedef SimulationRobotVisual = {
   var id:String;
   var position:Array<Float>;
   var rotation:Array<Float>;
   var sensors:Array<SensorFrame>;
   var links:Array<SimulationPoseVisual>;
 }
-typedef SimulationPoseVisual={var id:String;var position:Array<Float>;var rotation:Array<Float>;}
+typedef SimulationPoseVisual = {
+  var id:String;
+  var position:Array<Float>;
+  var rotation:Array<Float>;
+}
 
 /** Geometry-centred part frame, prepared once for the active simulation configuration. */
 private typedef AssemblyVisual = {
@@ -55,21 +59,22 @@ private typedef AssemblyVisual = {
  * people take part.
  */
 class ApplicationSimulation {
-  public static inline var DETERMINISTIC:Int=0;
-  public static inline var MUJOCO:Int=1;
+  public static inline var DETERMINISTIC:Int = 0;
+  public static inline var MUJOCO:Int = 1;
   public final world:RobotWorld;
   /** Supply selection belongs to the cell, while its authored mission stays unchanged. */
   public var virtualWelder:Bool = false;
   public var virtualNutrunner:Bool = false;
   var virtualDevicePrepared:Bool = false;
-  public var welderSupplyFactory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply> = null;
+  public var welderSupplyFactory:Null<processkit
+    .simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply> = null;
   public var appliedRevision(default, null):Int = 0;
   public var appliedDocumentRevision(default, null):Int = -1;
   public var appliedEnvironmentRevision(default, null):Int = -1;
-  public var backend(default,null):Int;
-  public var appliedBackend(default,null):Int=-1;
-  public var timestep(default,null):Float=0.01;
-  public var appliedTimestep(default,null):Float=-1.0;
+  public var backend(default, null):Int;
+  public var appliedBackend(default, null):Int = -1;
+  public var timestep(default, null):Float = 0.01;
+  public var appliedTimestep(default, null):Float = -1.0;
   public var error(default, null):Null<String> = null;
   public var collisionWarnings(default, null):Array<String> = [];
   var space:Null<SimulationSpace> = null;
@@ -79,7 +84,7 @@ class ApplicationSimulation {
   var detachedPreparedRobots:Null<Array<Robot>>;
   var preparationOnly = false;
   var simulatedLinks:Array<Array<String>> = [];
-  var simulatedObjects:Array<{id:String,object:SimObject}> = [];
+  var simulatedObjects:Array<{id:String, object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
   /** The simulated tools on the session's robots. */
   var tools:Null<SimulatedTools> = null;
@@ -114,7 +119,7 @@ class ApplicationSimulation {
   var playbackActive = false;
   var retirementFrame:Null<ApplicationPresentationSnapshot>;
   var playbackStop = false;
-  var playbackCommands:Array<Void->Void> = [];
+  var playbackCommands:Array<Void -> Void> = [];
   var playbackFailure:Null<String>;
   var playbackFrame:Null<ApplicationPresentationSnapshot>;
   var presentedPlaybackRevision = -1;
@@ -131,25 +136,30 @@ class ApplicationSimulation {
   var participantRevision:Int = 0;
   var appliedParticipantRevision:Int = -1;
 
-  public function new(world:RobotWorld,?backend:Int=DETERMINISTIC) {
-    this.world=world;this.backend=DETERMINISTIC;setBackend(backend);
+  public function new(world:RobotWorld, ?backend:Int = DETERMINISTIC) {
+    this.world = world;
+    this.backend = DETERMINISTIC;
+    setBackend(backend);
   }
 
   public function setBackend(value:Int):Bool {
-    if(value!=DETERMINISTIC&&value!=MUJOCO)throw "Unsupported simulation backend";
-    if(backend==value)return false;backend=value;return true;
+    if (value != DETERMINISTIC && value != MUJOCO) throw "Unsupported simulation backend";
+    if (backend == value) return false;
+    backend = value;
+    return true;
   }
-  public function backendName():String return backend==MUJOCO?"MuJoCo":"Deterministic";
-  public function userBackendName():String return backend==MUJOCO?"MuJoCo":"Test backend";
+  public function backendName():String return backend == MUJOCO ? "MuJoCo" : "Deterministic";
+  public function userBackendName():String return backend == MUJOCO ? "MuJoCo" : "Test backend";
   public function setTimestep(value:Float):Bool {
-    if(!Math.isFinite(value)||value<=0)throw "Simulation timestep must be finite and positive";
-    if(timestep==value)return false;timestep=value;return true;
+    if (!Math.isFinite(value) || value <= 0) throw "Simulation timestep must be finite and positive";
+    if (timestep == value) return false;
+    timestep = value;
+    return true;
   }
 
-  public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool
-    return appliedDocumentRevision != configuration.revision() ||
-      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend||appliedTimestep!=timestep||
-      appliedParticipantRevision != participantRevision;
+  public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool return appliedDocumentRevision
+    != configuration.revision() || appliedEnvironmentRevision != scene.environmentRevision
+    || appliedBackend != backend || appliedTimestep != timestep || appliedParticipantRevision != participantRevision;
 
   /** Adds a participant to every session built from the next rebuild on. */
   public function addParticipant(participant:SessionParticipant):Void {
@@ -191,8 +201,13 @@ class ApplicationSimulation {
   }
 
   /** Builds the complete candidate before changing any live world adapter. */
-  public function rebuild(configuration:SensorConfiguration, scene:EditorScene,
-      ?session:ProjectDocumentSession, publishVisuals:Bool = true, ?control:ProjectLoadControl):Bool {
+  public function rebuild(
+    configuration:SensorConfiguration,
+    scene:EditorScene,
+    ?session:ProjectDocumentSession,
+    publishVisuals:Bool = true,
+    ?control:ProjectLoadControl
+  ):Bool {
     var candidateSpace:Null<SimulationSpace> = null;
     var environmentTopologyOpen = false;
     var candidate:Null<Simulation> = null;
@@ -202,7 +217,7 @@ class ApplicationSimulation {
     var candidateRuntimes:Array<RobotRuntime> = [];
     var candidateBlueprints:Array<RobotRuntimeBlueprint> = [];
     var candidateZones:Array<SimulatedRobotZoneAdapter> = [];
-    var candidateObjects:Array<{id:String,object:SimObject}> = [];
+    var candidateObjects:Array<{id:String, object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
     var candidateAssemblyParts:Array<AssemblyVisual> = [];
     var candidateWarnings:Array<String> = [];
@@ -210,8 +225,8 @@ class ApplicationSimulation {
     var candidateHobbing:Null<HobbingProgramPlayer> = null;
     var candidateGuard:Null<EnclosureGuardPlayer> = null;
     var candidatePrint:Null<PrintProgramPlayer> = null;
-    var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
-      input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
+    var pendingCnc:Null<{job:CncJob,
+      robot:AssemblyRobot, input:Null<String -> Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
     var candidateChains:Array<CableChainVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
@@ -224,59 +239,67 @@ class ApplicationSimulation {
     var candidateBeads:Null<WeldBeads> = null;
     var candidateAssembly:Null<AssemblyRobot> = null;
     var assemblyIndex = -1;
-		var candidateByController = new Map<String, AssemblyRobot>();
-		var indexByController = new Map<String, Int>();
+    var candidateByController = new Map<String, AssemblyRobot>();
+    var indexByController = new Map<String, Int>();
     var heldBoxes:Array<MissionPlayer.FloorObstacle> = [];
     try {
-      if (control != null) { control.throwIfCancelled(); control.phase("Building controllers"); }
+      if (control != null) {
+        control.throwIfCancelled();
+        control.phase("Building controllers");
+      }
       var models = configuration.robotModels();
       var hasWorkers = false;
-      for (record in scene.records()) if (record.type == "human-worker") { hasWorkers = true; break; }
+      for (record in scene.records()) if (record.type == "human-worker") {
+        hasWorkers = true;
+        break;
+      }
       var assembly = session == null ? null : session.projectAssemblyDefinition;
       var restContactGroup = haxe.Int64.ofInt(1); // This session contains one generated assembly.
-      if (models.length == 0 && assembly == null && participants.length == 0 &&
-          !hasWorkers) throw "Nothing to simulate";
+      if (models.length == 0
+        && assembly == null && participants.length == 0 && !hasWorkers) throw "Nothing to simulate";
       for (configured in models) {
-        var id=configured.id;
+        var id = configured.id;
         var existing = world.robot(id);
-        if (existing != null && simulatedIds.indexOf(id) < 0)
-          throw 'Robot "$id" is remote and read-only';
+        if (existing != null && simulatedIds.indexOf(id) < 0) throw 'Robot "$id" is remote and read-only';
       }
-      var hobbingConfig=session==null||session.machineMotion==null?null:session.machineMotion.hobbing;
-      if(hobbingConfig!=null)timestep=1/hobbingConfig.controllerHz;
+      var hobbingConfig = session == null || session.machineMotion == null ? null : session.machineMotion.hobbing;
+      if (hobbingConfig != null) timestep = 1 / hobbingConfig.controllerHz;
       var createdSpace = SimulationSpace.create(backend, timestep);
       candidateSpace = createdSpace;
       candidate = Simulation.inSpace(createdSpace);
       if (session != null && session.signals.length > 0) {
-        candidateSignals = new CellSignals(session.signals,
-          () -> createdSpace.session.simulationTime(),
-          (controller, channel) -> {
-            var source = candidateByController.get(controller);
-            if (source == null) throw 'Signal source controller "$controller" has no runtime';
-            return switch source.runtime.channelValue(channel) {
-              case Digital(on): on;
-              case _: throw 'Signal "$channel" is not a digital output';
-            };
-          },
-          (controller, channel, on, sequence, stamp) -> {
-            var target = candidateByController.get(controller);
-            if (target == null) throw 'Signal target controller "$controller" has no runtime';
-            target.runtime.publishSensorFrame(channel, [on ? 1.0 : 0.0], sequence, stamp, "cell.controller.tick");
-          },
-          (controller, channel, on) -> {
-            var source = candidateByController.get(controller);
-            if (source == null) throw 'Signal source controller "$controller" has no runtime';
-            source.runtime.writeDigitalOutput(channel, on);
-          });
+        candidateSignals = new CellSignals(session.signals, () -> createdSpace.session.simulationTime(), (
+          controller,
+          channel
+        ) -> {var source = candidateByController.get(controller);
+        if (source == null) throw 'Signal source controller "$controller" has no runtime';
+        return switch source.runtime.channelValue(channel) {
+          case Digital(on):
+            on;
+          case _:
+            throw 'Signal "$channel" is not a digital output';
+        };
+        }, (controller, channel, on, sequence, stamp) -> {var target = candidateByController.get(controller);
+        if (target == null) throw 'Signal target controller "$controller" has no runtime';
+        target.runtime.publishSensorFrame(channel, [on ? 1.0 : 0.0], sequence, stamp, "cell.controller.tick");
+        }, (controller, channel, on) -> {var source = candidateByController.get(controller);
+        if (source == null) throw 'Signal source controller "$controller" has no runtime';
+        source.runtime.writeDigitalOutput(channel, on);
+        });
       }
       for (index in 0...models.length) {
         if (control != null) control.throwIfCancelled();
-        var editable=models[index];
+        var editable = models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, editable.profile, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, editable.position, editable.rotation);
         var id = editable.id;
-        candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
-          [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
+        candidateRobots.push(new SimulatedRobot(
+          id,
+          runtime,
+          editable.model.name,
+          [for (link in editable.model.links) link.id],
+          [for (joint in editable.model.joints) joint.id]
+        ));
         candidateLinks.push([for (link in editable.model.links) link.id]);
         candidateRobotModels.push(editable.model);
         candidateRuntimes.push(runtime);
@@ -284,30 +307,44 @@ class ApplicationSimulation {
       }
       var candidateMotions = session == null ? [] : session.robotMotions;
       if (assembly != null && session != null) {
-        var controls:Array<Null<materia.project.SceneArtifact.SceneArtifactCellController>> =
-          session.controllers.length == 0 ? [null] : [for (control in session.controllers) control];
+        var controls:Array<Null<materia.project.SceneArtifact.SceneArtifactCellController
+          >> = session.controllers.length == 0 ? [null] : [for (control in session.controllers) control];
         for (control in controls) {
           var id = AssemblyRobot.idFor(assembly,
             control == null || session.controllers.length == 1 ? null : control.id);
-          if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
-            throw 'Robot "$id" is remote and read-only';
+          if (world.robot(id) != null && simulatedIds.indexOf(id) < 0) throw 'Robot "$id" is remote and read-only';
           var robotIndex = candidateRobots.length;
-			var job = session.cncJob;
-			var ownsJob = job != null && (control == null || job.controllerId == control.id);
-			var interfaceManaged = ownsJob && control != null && control.kind == "cnc" &&
-				session.controllers.length > 1;
+          var job = session.cncJob;
+          var ownsJob = job != null && (control == null || job.controllerId == control.id);
+          var interfaceManaged = ownsJob && control != null && control.kind == "cnc" && session.controllers.length > 1;
           var pressConfig = session.machineMotion == null ? null : session.machineMotion.pressBrake;
           var ownsPress = pressConfig != null && (control == null || control.id == pressConfig.controllerId);
           if (ownsPress && ownsJob) throw "One controller cannot own both a press and a CNC job";
-          var processChannels = ownsPress ? processkit.pressbrake.PressBrakeChannels.declarations()
-            : ownsJob ? CncProgramPlayer.processChannels(job, interfaceManaged) : null;
-          var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-            appliedRevision + 1, robotIndex, processChannels, virtualWelder, control, restContactGroup, virtualNutrunner);
+          var processChannels = ownsPress
+            ? processkit.pressbrake.PressBrakeChannels.declarations() : ownsJob ? CncProgramPlayer.processChannels(
+              job,
+              interfaceManaged
+            ) : null;
+          var built = AssemblyRobot.add(
+            candidate,
+            scene,
+            session,
+            assembly,
+            backend == MUJOCO,
+            appliedRevision + 1,
+            robotIndex,
+            processChannels,
+            virtualWelder,
+            control,
+            restContactGroup,
+            virtualNutrunner
+          );
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
           if (ownsPress) {
-            if (candidatePress != null || pressConfig == null) throw "Press controller execution ownership is ambiguous";
+            if (candidatePress != null
+              || pressConfig == null) throw "Press controller execution ownership is ambiguous";
             candidatePress = new PressBrakeControllerPlayer(pressConfig, built, createdSpace.session);
           }
           candidateRuntimes.push(built.runtime);
@@ -319,17 +356,20 @@ class ApplicationSimulation {
             indexByController.set(control.id, robotIndex);
           }
           if (built.mobile != null) candidateMobile = built.mobile;
-          if (candidateAssembly == null || control == null ||
-              (session.missions != null && session.missions[0].controllerId == control.id)) {
+          if (candidateAssembly == null
+            || control == null || (session.missions != null && session.missions[0].controllerId == control.id)) {
             candidateAssembly = built;
             assemblyIndex = robotIndex;
           }
-		  if (job != null && ownsJob) {
-		    if (pendingCnc != null) throw "A project simulation can run only one generated CNC job";
-		    pendingCnc = {job: job, robot: built,
-		      input: candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
-		      interfaceManaged: interfaceManaged};
-		  }
+          if (job != null && ownsJob) {
+            if (pendingCnc != null) throw "A project simulation can run only one generated CNC job";
+            pendingCnc = {
+              job: job,
+              robot: built,
+              input: candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
+              interfaceManaged : interfaceManaged
+            };
+          }
           // A bad print program fails the rebuild here, before anything live changes.
           var printJob = session.printJob;
           if (printJob != null && built.heaters != null) {
@@ -342,82 +382,105 @@ class ApplicationSimulation {
             var jointIds = [for (joint in built.model.joints) joint.id];
             var ownedBelts = [for (belt in machine.belts) if (jointIds.indexOf(belt.driverJoint) >= 0) belt];
             if (ownedBelts.length > 0) candidateBelts.push(new BeltVisuals(session, built, candidate, ownedBelts));
-            if(machine.cableChains!=null) {
-              var ownedChains=[for(chain in machine.cableChains)if(jointIds.indexOf(chain.axisJoint)>=0)chain];
-              if(ownedChains.length>0)candidateChains.push(new CableChainVisuals(session,built,candidate,ownedChains));
+            if (machine.cableChains != null) {
+              var ownedChains = [for (chain in machine.cableChains) if (jointIds.indexOf(chain.axisJoint) >= 0) chain];
+              if (ownedChains.length > 0) candidateChains.push(new CableChainVisuals(
+                session,
+                built,
+                candidate,
+                ownedChains
+              ));
             }
-            if (machine.program != null && machine.program.axes.length > 0 &&
-                jointIds.indexOf(machine.program.axes[0]) >= 0) {
+            if (machine.program != null
+              && machine.program.axes.length > 0 && jointIds.indexOf(machine.program.axes[0]) >= 0) {
               if (ownsJob || ownsPress) throw "A controller cannot share CNC or press execution with an axis program";
-              candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session,
-                machine.virtualDevice == true, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
+              candidateProgram = new MachineProgramPlayer(
+                machine.program,
+                built,
+                createdSpace.session,
+                machine.virtualDevice == true,
+                candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id)
+              );
             }
           }
           if (machine != null && machine.digitalProgram != null) {
-            if (candidateDigital != null || session.controllers.length > 1 || job != null ||
-                machine.program != null || session.missions != null || built.mobile != null)
-              throw "Machine digital program needs exclusive assembly execution ownership";
+            if (candidateDigital != null
+              || session.controllers.length > 1 || job != null || machine.program != null || session.missions != null
+              || built.mobile != null) throw "Machine digital program needs exclusive assembly execution ownership";
             candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
           }
         }
-        if (session.machineMotion != null && session.machineMotion.program != null && candidateProgram == null)
-          throw "Machine axis program has no controller owning its axes";
-        if (session.machineMotion != null && session.machineMotion.pressBrake != null && candidatePress == null)
-          throw "Press program has no controller owning its axes";
+        if (session.machineMotion != null && session.machineMotion.program != null
+          && candidateProgram == null) throw "Machine axis program has no controller owning its axes";
+        if (session.machineMotion != null && session.machineMotion.pressBrake != null
+          && candidatePress == null) throw "Press program has no controller owning its axes";
       }
-      var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
-        [for (robot in candidateRobots) robot.id()], candidateRobotModels);
-      if (candidateDigital != null && candidateAssembly != null)
-        for (track in resolvedMotions) if (track.robotId == candidateAssembly.robot.id())
-          throw "Machine digital program cannot share its assembly with a robot motion track";
-      if (candidatePress != null)
-        for (track in resolvedMotions) if (track.robotId == candidatePress.robotId())
-          throw "Press control cannot share its controller with a robot motion track";
+      var resolvedMotions = RobotMotionPlayer.resolve(
+        candidateMotions,
+        [for (robot in candidateRobots) robot.id()],
+        candidateRobotModels
+      );
+      if (candidateDigital != null
+        && candidateAssembly != null) for (track in resolvedMotions) if (track.robotId == candidateAssembly
+        .robot.id()) throw "Machine digital program cannot share its assembly with a robot motion track";
+      if (candidatePress != null) for (track in resolvedMotions) if (track.robotId
+        == candidatePress.robotId()) throw "Press control cannot share its controller with a robot motion track";
       var environmentRecords = scene.records();
-      if (control != null) { control.throwIfCancelled(); control.phase("Building environment"); }
+      if (control != null) {
+        control.throwIfCancelled();
+        control.phase("Building environment");
+      }
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
-      var hasPneumaticActuator = candidateAssembly != null &&
-        hasPneumaticCylinder(candidateAssembly.blueprint);
+      var hasPneumaticActuator = candidateAssembly != null && hasPneumaticCylinder(candidateAssembly.blueprint);
       if (!hasPneumaticActuator && session != null) for (control in session.controllers) {
         var built = candidateByController.get(control.id);
         if (built != null && hasPneumaticCylinder(built.blueprint)) hasPneumaticActuator = true;
       }
-      var pneumaticWorkpieceSurface = hasPneumaticActuator
-        ? SimulationContactSurfaces.environmentPart() : null;
+      var pneumaticWorkpieceSurface = hasPneumaticActuator ? SimulationContactSurfaces.environmentPart() : null;
       // A machining stock has ordinary layer collisions disabled so it can enter the cutter. Keep
       // it as a real free body that still rests on fixtures and contacts its vise; cutter contact is
       // excluded explicitly for the CNC link below.
       var unlayeredWorkpieceSurface = hasPneumaticActuator
-        ? SimulationContactSurfaces.environmentPart(SimContactFilter.PairsAndEnvironment)
-        : new SimContactSurface(null, 0, 0, 0, SimContactFilter.PairsAndEnvironment);
+        ? SimulationContactSurfaces.environmentPart(SimContactFilter.PairsAndEnvironment) : new SimContactSurface(
+          null,
+          0,
+          0,
+          0,
+          SimContactFilter.PairsAndEnvironment
+        );
       var assemblyOwned = new Map<String, Bool>();
       for (part in candidateAssemblyParts) assemblyOwned.set(part.id, true);
       createdSpace.session.beginTopologyUpdate();
       environmentTopologyOpen = true;
-      for (object in environmentRecords) if ((object.collisionEnabled || object.dynamicBody) && !assemblyOwned.exists(object.id)) {
+      for (object in environmentRecords) if ((object.collisionEnabled
+        || object.dynamicBody) && !assemblyOwned.exists(object.id)) {
         if (control != null) control.throwIfCancelled();
-        var centerX=object.x,centerY=object.y,centerZ=object.z;
-        var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
+        var centerX = object.x, centerY = object.y, centerZ = object.z;
+        var halfX = object.width / 2.0, halfY = object.height / 2.0, halfZ = object.depth / 2.0;
         var shape = SimShape.box(halfX, halfY, halfZ);
         var inertial:Null<nativekit.sim.SimInertialProperties> = null;
-        if(scene.isCadPart(object.id)){
-          var bounds=scene.cadSession(object.id).collisionBounds;
-          if(bounds==null)throw "CAD collision bounds are unavailable for: "+object.id;
+        if (scene.isCadPart(object.id)) {
+          var bounds = scene.cadSession(object.id).collisionBounds;
+          if (bounds == null) throw "CAD collision bounds are unavailable for: " + object.id;
           var offset = rotateOffset(bounds.center.x, bounds.center.y, bounds.center.z, object.rotation);
-          centerX+=offset[0];centerY+=offset[1];centerZ+=offset[2];
-          halfX=bounds.halfExtents.x;halfY=bounds.halfExtents.y;halfZ=bounds.halfExtents.z;
+          centerX += offset[0];
+          centerY += offset[1];
+          centerZ += offset[2];
+          halfX = bounds.halfExtents.x;
+          halfY = bounds.halfExtents.y;
+          halfZ = bounds.halfExtents.z;
           var hull:Null<Array<Float>> = null;
           var definition = session == null ? null : session.projectAssemblyDefinition;
           var physical = session == null ? null : session.projectPhysical;
-          if (session != null && definition != null && physical != null) for (occurrence in definition.occurrences)
-            if (object.id == "project:" + occurrence.id) for (part in physical.parts)
-              if (part.id == occurrence.definition) {
-                var vertices = part.collisionHull;
-                if (vertices == null) throw "Environment part has no physical collision hull: " + object.id;
-                var centre = session.assemblyPreviewCenter(occurrence.definition);
-                if (centre == null) throw "Environment part has no preview centre: " + object.id;
-                hull = [for (i in 0...vertices.length) (vertices[i]-centre[i%3])*physical.metresPerUnit];
-              }
+          if (session != null
+            && definition != null && physical != null) for (occurrence in definition.occurrences) if (object.id
+            == "project:" + occurrence.id) for (part in physical.parts) if (part.id == occurrence.definition) {
+            var vertices = part.collisionHull;
+            if (vertices == null) throw "Environment part has no physical collision hull: " + object.id;
+            var centre = session.assemblyPreviewCenter(occurrence.definition);
+            if (centre == null) throw "Environment part has no preview centre: " + object.id;
+            hull = [for (i in 0...vertices.length)(vertices[i] - centre[i % 3]) * physical.metresPerUnit];
+          }
           if (hull == null) {
             var derived = scene.cadSession(object.id).collisionHull();
             hull = derived.vertices;
@@ -427,69 +490,130 @@ class ApplicationSimulation {
         }
         // Generated previews are already centred and have no editable CAD
         // session. Their authored pieces are still component facts.
-        var authored = projectEnvironmentShape(session,object.id);
+        var authored = projectEnvironmentShape(session, object.id);
         if (authored != null) shape = authored;
         // A free project part turns with its own CAD inertia, not a solver's nominal one.
         if (object.dynamicBody) inertial = projectInertial(session, object.id, object.mass);
-        var rotation=object.rotation==null?[0.0,0.0,0.0,1.0]:object.rotation;
+        var rotation = object.rotation == null ? [0.0, 0.0, 0.0, 1.0] : object.rotation;
         var surface = object.collisionEnabled
-          ? (object.dynamicBody ? pneumaticWorkpieceSurface : null)
-          : unlayeredWorkpieceSurface;
-        var created=createdSpace.session.createObject(
-          object.dynamicBody?MotionType.Dynamic:MotionType.Static,shape,
-          new SimPose(centerX,centerY,centerZ,rotation[0],rotation[1],rotation[2],rotation[3]),
-          object.dynamicBody?object.mass:0.0,
-          !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id == "project:" + part.id) part].length == 1 ? restContactGroup : null,
-          surface, inertial);
-        candidateObjects.push({id:object.id,object:created});
-        if (!object.dynamicBody) heldBoxes.push({id: object.id, x: centerX, y: centerY, z: centerZ,
-          halfX: halfX, halfY: halfY, halfZ: halfZ,
-          yaw: Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
-            1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]))});
+          ? (object.dynamicBody ? pneumaticWorkpieceSurface : null) : unlayeredWorkpieceSurface;
+        var created = createdSpace.session.createObject(
+          object.dynamicBody ? MotionType.Dynamic : MotionType.Static,
+          shape,
+          new SimPose(
+            centerX,
+            centerY,
+            centerZ,
+            rotation[0],
+            rotation[1],
+            rotation[2],
+            rotation[3]
+          ),
+          object.dynamicBody ? object.mass : 0.0,
+          !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id
+          == "project:" + part.id) part].length == 1 ? restContactGroup : null,
+          surface,
+          inertial
+        );
+        candidateObjects.push({id: object.id, object: created});
+        if (!object.dynamicBody) heldBoxes.push({
+          id: object.id,
+          x: centerX,
+          y: centerY,
+          z: centerZ,
+          halfX: halfX,
+          halfY: halfY,
+          halfZ: halfZ,
+          yaw: Math.atan2(
+            2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+            1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2])
+          )
+        });
       }
       environmentTopologyOpen = false;
       createdSpace.session.endTopologyUpdate();
       // The robot's tools act on the free objects after each step, as their channels say.
-      var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}], candidate);
-      if (control != null) { control.throwIfCancelled(); control.phase("Preparing programs and mission"); }
+      var candidateTools = new SimulatedTools([for (entry in candidateObjects) {
+        id:entry.id, object:entry.object
+      }
+      ], candidate);
+      if (control != null) {
+        control.throwIfCancelled();
+        control.phase("Preparing programs and mission");
+      }
       var cncToBuild = pendingCnc;
       if (cncToBuild != null) {
-        var cncParts = new SimulationAssemblyParts(candidate, [cncToBuild.robot],
-          candidateTools.objectsByScene(), session);
-        candidateCnc = new CncProgramPlayer(cncToBuild.job, cncToBuild.robot, candidate,
-          session, createdSpace.session, cncParts, cncToBuild.input, null, cncToBuild.interfaceManaged);
+        var cncParts = new SimulationAssemblyParts(
+          candidate,
+          [cncToBuild.robot],
+          candidateTools.objectsByScene(),
+          session
+        );
+        candidateCnc = new CncProgramPlayer(
+          cncToBuild.job,
+          cncToBuild.robot,
+          candidate,
+          session,
+          createdSpace.session,
+          cncParts,
+          cncToBuild.input,
+          null,
+          cncToBuild.interfaceManaged
+        );
         if (cncToBuild.interfaceManaged) {
-          var cutterOccurrence = cncToBuild.job.toolPart == null
-            ? cncToBuild.job.spindle : cncToBuild.job.toolPart;
+          var cutterOccurrence = cncToBuild.job.toolPart == null ? cncToBuild.job.spindle : cncToBuild.job.toolPart;
           var cutter = cncToBuild.robot.part("project:" + cutterOccurrence);
-          for (stock in cncToBuild.job.stocks)
-            cncParts.get("project:" + stock).excludeContactWith(cutter.robotIndex, cutter.linkIndex);
+          for (stock in cncToBuild.job.stocks) cncParts.get("project:" + stock).excludeContactWith(
+            cutter.robotIndex,
+            cutter.linkIndex
+          );
         }
       }
-      if(hobbingConfig!=null){
-        if(candidateAssembly==null||session==null)throw "Hobbing needs its simulated assembly";
-        candidateHobbing=new HobbingProgramPlayer(hobbingConfig,candidateAssembly,candidate,createdSpace.session,session);
+      if (hobbingConfig != null) {
+        if (candidateAssembly == null || session == null) throw "Hobbing needs its simulated assembly";
+        candidateHobbing = new HobbingProgramPlayer(
+          hobbingConfig,
+          candidateAssembly,
+          candidate,
+          createdSpace.session,
+          session
+        );
       }
-      var guardConfig=session==null||session.machineMotion==null?null:session.machineMotion.enclosureGuard;
-      if(guardConfig!=null) {
-        if(candidateAssembly==null)throw "Enclosure guard needs one assembled machine runtime";
-        candidateGuard=new EnclosureGuardPlayer(guardConfig,candidateAssembly,createdSpace.session,session,candidate,candidateHobbing);
+      var guardConfig = session == null || session.machineMotion == null ? null : session.machineMotion.enclosureGuard;
+      if (guardConfig != null) {
+        if (candidateAssembly == null) throw "Enclosure guard needs one assembled machine runtime";
+        candidateGuard = new EnclosureGuardPlayer(
+          guardConfig,
+          candidateAssembly,
+          createdSpace.session,
+          session,
+          candidate,
+          candidateHobbing
+        );
       }
 
       var freeObjects = [for (entry in candidateObjects) entry.object];
       for (index in 0...candidateBlueprints.length) {
         var hasPresenceInput = false;
-        for (sensor in candidateBlueprints[index].externalSensorLayout())
-          if (sensor.kind == "presence_input") hasPresenceInput = true;
-        if (hasPresenceInput) candidate.addStepObserver(new SimulatedPresenceInputAdapter(candidate,
-          candidateRuntimes[index], candidateBlueprints[index], index, freeObjects));
+        for (sensor in candidateBlueprints[index].externalSensorLayout()) if (sensor.kind
+          == "presence_input") hasPresenceInput = true;
+        if (hasPresenceInput) candidate.addStepObserver(new SimulatedPresenceInputAdapter(
+          candidate,
+          candidateRuntimes[index],
+          candidateBlueprints[index],
+          index,
+          freeObjects
+        ));
         var hasZone = false;
-        for (sensor in candidateBlueprints[index].externalSensorLayout()) if (sensor.kind == "zone_input") hasZone = true;
+        for (sensor in candidateBlueprints[index].externalSensorLayout()) if (sensor.kind
+          == "zone_input") hasZone = true;
         // A machine's robot zone watches every other robot's simulated links and the parts they carry.
         if (hasZone) {
           var zone = new SimulatedRobotZoneAdapter(candidate, candidateRuntimes[index],
-            candidateBlueprints[index], index, [for (other in 0...candidateBlueprints.length) if (other != index)
-              {robotIndex: other, shapes: candidateBlueprints[other].linkCollisionShapes}], freeObjects,
+            candidateBlueprints[index], index, [for (other in 0...candidateBlueprints.length) if (other != index) {
+            robotIndex:other, shapes:candidateBlueprints[other].linkCollisionShapes
+          }
+          ], freeObjects,
             robotkit.collision.CollisionClearance.MARGIN, () -> new collisionkit.native.NativeCollisionWorld());
           candidateZones.push(zone);
           candidate.addStepObserver(zone);
@@ -510,17 +634,29 @@ class ApplicationSimulation {
           }
         }
         if (tool.kind == "screwdriver") {
-          var driver = candidateTools.screwdriverFor(candidate,toolRobot,toolIndex,tool,session);
-          if (virtualNutrunner) driver.supply = new processkit.simulation.VirtualNutrunnerSupply(candidate,toolRobot.runtime,
-            toolIndex,tool.sensor,toolRobot.blueprint,driver.channels,@:privateAccess driver.feedJoint,@:privateAccess driver.spindleJoint);
+          var driver = candidateTools.screwdriverFor(candidate, toolRobot, toolIndex, tool, session);
+          if (virtualNutrunner) driver.supply = new processkit.simulation.VirtualNutrunnerSupply(
+            candidate,
+            toolRobot.runtime,
+            toolIndex,
+            tool.sensor,
+            toolRobot.blueprint,
+            driver.channels,
+            @:privateAccess driver.feedJoint,
+            @:privateAccess driver.spindleJoint
+          );
           candidate.addStepObserver(candidateTools.addScrewdriver(driver));
           driverByChannel.set(tool.channel, driver);
           continue;
         }
         if (tool.kind == "torch") {
           var welder = candidateTools.welderFor(candidate, toolRobot, toolIndex, tool, session);
-          if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(candidate,
-            toolRobot.runtime, toolIndex, tool.sensor);
+          if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(
+            candidate,
+            toolRobot.runtime,
+            toolIndex,
+            tool.sensor
+          );
           else if (welderSupplyFactory != null) welder.supply = welderSupplyFactory(welder);
           candidate.addStepObserver(candidateTools.addWelder(welder));
           welderByChannel.set(tool.channel, welder);
@@ -529,12 +665,23 @@ class ApplicationSimulation {
         if (tool.kind == "gripper") {
           if (tool.sensor == null) throw 'Gripper tool "${tool.channel}" has no jaw switch';
           candidate.addStepObserver(candidateTools.addGripper(new robotkit.runtime.SimulatedPneumaticGripper(
-            toolRobot.runtime, toolRobot.blueprint, tool.channel, tool.sensor)));
+            toolRobot.runtime,
+            toolRobot.blueprint,
+            tool.channel,
+            tool.sensor
+          )));
           continue;
         }
         var carrier = toolRobot.part("project:" + tool.contact.occurrence);
-        candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
-          toolRobot.runtime, toolIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
+        candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(
+          candidate,
+          toolRobot.runtime,
+          toolIndex,
+          carrier.linkIndex,
+          tool.channel,
+          freeObjects,
+          tool.sensor
+        )));
       }
       var programs = session == null || session.missions == null ? [] : session.missions;
       var cellTools = session == null ? [] : session.robotTools;
@@ -542,7 +689,8 @@ class ApplicationSimulation {
         // Each program runs on its own controller's robot with that controller's tools, feeders and cell I/O.
         var programRobot = work.controllerId == null ? candidateAssembly : candidateByController.get(work.controllerId);
         var programIndex = work.controllerId == null ? assemblyIndex : indexByController.get(work.controllerId);
-        if (programRobot == null || programIndex == null) throw 'A mission needs the robot of controller "${work.controllerId}"';
+        if (programRobot == null
+          || programIndex == null) throw 'A mission needs the robot of controller "${work.controllerId}"';
         var robotIndex:Int = programIndex;
         var ownTools = [for (tool in cellTools) if (tool.controller == work.controllerId) tool];
         var drivers:Array<processkit.simulation.SimulatedScrewdriver> = [];
@@ -561,25 +709,34 @@ class ApplicationSimulation {
         var feeders:Array<SimulatedScrewFeeder> = [], deliveries:Array<SimulatedBlowFeed> = [];
         if (work.screwFeeders != null) {
           if (drivers.length != 1) throw "Screw feeding needs the program's one mounted screwdriver";
-          var feederParts = new SimulationAssemblyParts(candidate,[programRobot],candidateTools.objectsByScene(),session);
+          var feederParts = new SimulationAssemblyParts(
+            candidate,
+            [programRobot],
+            candidateTools.objectsByScene(),
+            session
+          );
           for (definition in work.screwFeeders) {
-            var feeder = new SimulatedScrewFeeder(definition,candidate,programRobot.runtime,feederParts,drivers[0]);
-            candidateTools.screwFeeders.push(feeder); feeders.push(feeder); candidate.addStepObserver(feeder);
+            var feeder = new SimulatedScrewFeeder(definition, candidate, programRobot.runtime, feederParts, drivers[0]);
+            candidateTools.screwFeeders.push(feeder);
+            feeders.push(feeder);
+            candidate.addStepObserver(feeder);
           }
         }
         if (work.blowFeeds != null) {
           if (drivers.length != 1) throw "Blow feed needs the program's one mounted screwdriver";
-          var parts = new SimulationAssemblyParts(candidate,[programRobot],candidateTools.objectsByScene(),session);
+          var parts = new SimulationAssemblyParts(candidate, [programRobot], candidateTools.objectsByScene(), session);
           for (definition in work.blowFeeds) {
-            var delivery = new SimulatedBlowFeed(definition,programRobot.runtime,parts,drivers[0]);
-            candidateTools.blowFeeds.push(delivery); deliveries.push(delivery); candidate.addStepObserver(delivery);
+            var delivery = new SimulatedBlowFeed(definition, programRobot.runtime, parts, drivers[0]);
+            candidateTools.blowFeeds.push(delivery);
+            deliveries.push(delivery);
+            candidate.addStepObserver(delivery);
           }
         }
-        var pairedScrews:Map<String,Bool> = [];
+        var pairedScrews:Map<String, Bool> = [];
         for (step in work.steps) if (step.kind == "screw") {
-          var job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
-          if (job == null || drivers.length != 1)
-            throw "A screw mission needs its named screw and one declared screwdriver";
+          var job = materia.project.SceneScrewInvocation.job(step.screw, work.steps);
+          if (job == null
+            || drivers.length != 1) throw "A screw mission needs its named screw and one declared screwdriver";
           var identities = [job.screw];
           var recovery = job.recovery;
           if (recovery != null) identities.push(recovery.replacement.screw);
@@ -587,40 +744,77 @@ class ApplicationSimulation {
           // Only declared bit/screw couplings exclude mutual contact; fixture contacts remain physical.
           for (identity in identities) {
             if (pairedScrews.exists(identity)) continue;
-            var screws = [for (object in candidateTools.objectsByScene()) if (object.id == "project:"+identity) object.object];
-            if (screws.length != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body "$identity"';
-            candidate.excludeContactPair(holder.robotIndex,holder.linkIndex,screws[0]);
-            pairedScrews.set(identity,true);
+            var screws = [for (object in candidateTools.objectsByScene()) if (object.id
+              == "project:" + identity) object.object];
+            if (screws.length
+              != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body "$identity"';
+            candidate.excludeContactPair(holder.robotIndex, holder.linkIndex, screws[0]);
+            pairedScrews.set(identity, true);
           }
         }
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         var mobileProfile = session == null ? null : session.mobileBase;
         if (welds && mobileProfile != null && mobileProfile.energy != null) {
           if (welders.length != 1) throw "A powered mobile welding mission needs one simulated welder";
-          candidatePower = new SimulatedMobilePower(mobileProfile.energy, mobileProfile, programRobot,
-            candidate, robotIndex, timestep, welders[0]);
+          candidatePower = new SimulatedMobilePower(
+            mobileProfile.energy,
+            mobileProfile,
+            programRobot,
+            candidate,
+            robotIndex,
+            timestep,
+            welders[0]
+          );
         }
-        var player = new MissionPlayer(work, programRobot, candidate, robotIndex, timestep, heldBoxes,
-          candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
+        var player = new MissionPlayer(
+          work,
+          programRobot,
+          candidate,
+          robotIndex,
+          timestep,
+          heldBoxes,
+          candidateTools.objectsByScene(),
+          session,
+          [for (id in candidateByController.keys()) candidateByController.get(id)],
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
-          candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
-          virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION, candidatePower, drivers, feeders, deliveries);
+          candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId),
+          null,
+          virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION
+          * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE : MissionPlayer.ARM_ACCELERATION,
+          candidatePower,
+          drivers,
+          feeders,
+          deliveries
+        );
         candidateMissions.push(player);
         // A program that welds lays the weld metal as its welder deposits it.
         if (welds) {
           var torch = [for (tool in ownTools) if (tool.kind == "torch") tool][0].torch;
           if (welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
           if (candidateBeads != null) throw "Only one program in a cell may weld";
-          candidateBeads = new WeldBeads(player, welders[0], candidate, scene,
-            timestep, torch.wireDiameterMm, torch.depositionEfficiency);
+          candidateBeads = new WeldBeads(
+            player,
+            welders[0],
+            candidate,
+            scene,
+            timestep,
+            torch.wireDiameterMm,
+            torch.depositionEfficiency
+          );
         }
       }
 
       var objectsById:Map<String, SimObject> = new Map();
       for (entry in candidateObjects) objectsById.set(entry.id, entry.object);
-      candidateWorkforce = HumanWorkforce.build(createdSpace.session, scene, environmentRecords,
-        objectsById, [for (robot in candidateRobots) robot.id()], candidateRobotModels, candidate);
+      candidateWorkforce = HumanWorkforce.build(
+        createdSpace.session,
+        scene,
+        environmentRecords,
+        objectsById,
+        [for (robot in candidateRobots) robot.id()],
+        candidateRobotModels,
+        candidate
+      );
       for (warning in candidateWorkforce.warnings) candidateWarnings.push(warning);
 
       var previousSimulation = simulation;
@@ -637,7 +831,10 @@ class ApplicationSimulation {
       }
       var attached:Array<String> = [];
       try {
-        for (robot in candidateRobots) { world.attach(robot); attached.push(robot.id()); }
+        for (robot in candidateRobots) {
+          world.attach(robot);
+          attached.push(robot.id());
+        }
       } catch (failure:Dynamic) {
         for (id in attached) world.detach(id);
         for (robot in previousRobots) world.attach(robot);
@@ -651,16 +848,19 @@ class ApplicationSimulation {
       virtualDevicePrepared = false;
       space = candidateSpace;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
-      ownedRobots = [for (robot in candidateRobots) (robot:Robot)];
+      ownedRobots = [for (robot in candidateRobots)(robot:Robot)];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
-      motions = resolvedMotions.length == 0 ? null :
-        new RobotMotionPlayer(world, createdSpace.session, resolvedMotions);
+      motions = resolvedMotions.length == 0 ? null : new RobotMotionPlayer(world,
+        createdSpace.session, resolvedMotions);
       tools = candidateTools;
       power = candidatePower;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
-      if(enclosureGuard!=null){enclosureGuard.beforeReset();enclosureGuard=null;}
+      if (enclosureGuard != null) {
+        enclosureGuard.beforeReset();
+        enclosureGuard = null;
+      }
       if (hobbing != null) hobbing.dispose();
       if (print != null) print.dispose();
       for (visual in beltVisuals) visual.reset();
@@ -674,7 +874,7 @@ class ApplicationSimulation {
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
       cnc = candidateCnc;
-      enclosureGuard=candidateGuard;
+      enclosureGuard = candidateGuard;
       hobbing = candidateHobbing;
       var previousZones = zoneMonitors;
       zoneMonitors = candidateZones;
@@ -689,8 +889,8 @@ class ApplicationSimulation {
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
       appliedEnvironmentRevision = scene.environmentRevision;
-      appliedBackend=backend;
-      appliedTimestep=timestep;
+      appliedBackend = backend;
+      appliedTimestep = timestep;
       appliedParticipantRevision = participantRevision;
       error = null;
       collisionWarnings = candidateWarnings;
@@ -704,12 +904,12 @@ class ApplicationSimulation {
       return true;
     } catch (failure:Dynamic) {
       error = Std.string(failure);
-      if (environmentTopologyOpen && candidateSpace != null)
-        try candidateSpace.session.endTopologyUpdate() catch (_:Dynamic) {}
+      if (environmentTopologyOpen
+        && candidateSpace != null) try candidateSpace.session.endTopologyUpdate() catch (_:Dynamic) {
+      }
       if (candidateHobbing != null) candidateHobbing.dispose();
       if (candidateWorkforce != null) candidateWorkforce.dispose();
-      if (candidateSpace != null && candidateSpace != space)
-        releaseSpace(candidateSpace, candidate);
+      if (candidateSpace != null && candidateSpace != space) releaseSpace(candidateSpace, candidate);
       for (zone in candidateZones) zone.dispose();
       return false;
     }
@@ -747,15 +947,14 @@ class ApplicationSimulation {
 
   /** Called on the UI thread after preparation has finished; transport keeps this object's identity. */
   public function installPrepared(prepared:ApplicationSimulation, scene:EditorScene):Void {
-    for (id in prepared.simulatedIds)
-      if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
-        throw 'Robot "$id" is remote and read-only';
+    for (id in prepared.simulatedIds) if (world.robot(id) != null
+      && simulatedIds.indexOf(id) < 0) throw 'Robot "$id" is remote and read-only';
     var readySpace = prepared.space;
     if (readySpace == null) throw "Prepared simulation has no native world";
     readySpace.session.stop(); // Return the prepared native world to this thread.
     var robots = prepared.detachedPreparedRobots;
-    if (robots == null || robots.length != prepared.simulatedIds.length)
-      throw "Prepared robots were not released by their builder";
+    if (robots == null
+      || robots.length != prepared.simulatedIds.length) throw "Prepared robots were not released by their builder";
     clear();
     for (robot in robots) world.attach(robot);
     space = prepared.space;
@@ -816,24 +1015,28 @@ class ApplicationSimulation {
    * hull is built around. The tensor is centroidal, from the resolved kg m^2 inertia or the unit-density one, scaled
    * to the body's mass.
    */
-  static function projectInertial(session:Null<ProjectDocumentSession>, id:String,
-      mass:Float):Null<nativekit.sim.SimInertialProperties> {
+  static function projectInertial(session:Null<ProjectDocumentSession>,
+    id:String, mass:Float):Null<nativekit.sim.SimInertialProperties> {
     var definition = session == null ? null : session.projectAssemblyDefinition;
     var physical = session == null ? null : session.projectPhysical;
     if (session == null || definition == null || physical == null) return null;
-    for (occurrence in definition.occurrences) if (id == "project:" + occurrence.id)
-      for (part in physical.parts) if (part.id == occurrence.definition) {
-        var centre = session.assemblyPreviewCenter(occurrence.definition);
-        if (centre == null) throw "Dynamic project part has no preview centre: " + id;
-        return cadInertial(part, centre, physical.metresPerUnit, mass);
-      }
+    for (occurrence in definition.occurrences) if (id
+      == "project:" + occurrence.id) for (part in physical.parts) if (part.id == occurrence.definition) {
+      var centre = session.assemblyPreviewCenter(occurrence.definition);
+      if (centre == null) throw "Dynamic project part has no preview centre: " + id;
+      return cadInertial(part, centre, physical.metresPerUnit, mass);
+    }
     return null;
   }
 
-  static function cadInertial(part:cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart, centre:Array<Float>,
-      metresPerUnit:Float, mass:Float):nativekit.sim.SimInertialProperties {
+  static function cadInertial(
+    part:cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart,
+    centre:Array<Float>,
+    metresPerUnit:Float,
+    mass:Float
+  ):nativekit.sim.SimInertialProperties {
     if (!Math.isFinite(mass) || mass <= 0) throw 'Dynamic CAD part "${part.id}" needs a positive mass';
-    var center = [for (axis in 0...3) (part.centerOfMass[axis] - centre[axis]) * metresPerUnit];
+    var center = [for (axis in 0...3)(part.centerOfMass[axis] - centre[axis]) * metresPerUnit];
     var resolved = part.physicalInertiaKgM2, resolvedMass = part.physicalMassKg;
     var tensor:Array<Float>;
     if (resolved != null && resolvedMass != null) tensor = [for (value in resolved) value * mass / resolvedMass];
@@ -849,15 +1052,23 @@ class ApplicationSimulation {
     if (rotation == null) return [x, y, z];
     var qx = rotation[0], qy = rotation[1], qz = rotation[2], qw = rotation[3];
     var tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
-    return [x + qw * tx + qy * tz - qz * ty,
-      y + qw * ty + qz * tx - qx * tz,
-      z + qw * tz + qx * ty - qy * tx];
+    return [x + qw * tx + qy * tz - qz * ty, y + qw * ty + qz * tx - qx * tz, z + qw * tz + qx * ty - qy * tx];
   }
 
   static function prepareAssemblyVisual(part:AssemblyPart):AssemblyVisual {
-    return {id:part.id, robotIndex:part.robotIndex, linkIndex:part.linkIndex,
-      offset:AssemblyFrames.compose(part.offset,
-        AssemblyFrames.translation(part.center[0], part.center[1], part.center[2]))};
+    return {
+      id: part.id,
+      robotIndex: part.robotIndex,
+      linkIndex: part.linkIndex,
+      offset: AssemblyFrames.compose(
+        part.offset,
+        AssemblyFrames.translation(
+          part.center[0],
+          part.center[1],
+          part.center[2]
+        )
+      )
+    };
   }
 
   /** Advances the simulation one tick. Read what it produced with `snapshot()`. */
@@ -865,7 +1076,7 @@ class ApplicationSimulation {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
     if (running) throw "Stop realtime simulation before deterministic stepping";
-    if(hobbing!=null)hobbing.advanceHandling(active.session.fixedTimestep());
+    if (hobbing != null) hobbing.advanceHandling(active.session.fixedTimestep());
     feedMembers();
     presentMembers();
     active.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
@@ -877,20 +1088,33 @@ class ApplicationSimulation {
   public function start():Void {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
-    if (!running) { pumpStamp = -1.0; presentationEpoch++; }
-    running = true; presentAssemblyPhysics = true;
-    if(enclosureGuard!=null)enclosureGuard.setRunning(true);
+    if (!running) {
+      pumpStamp = -1.0;
+      presentationEpoch++;
+    }
+    running = true;
+    presentAssemblyPhysics = true;
+    if (enclosureGuard != null) enclosureGuard.setRunning(true);
     #if !wasm
-    if (backgroundPacing && !playbackActive && motions == null && participants.length == 0 &&
-        (workforce == null || workforce.ids().length == 0)) startPlayback();
+    if (backgroundPacing && !playbackActive && motions == null
+      && participants.length == 0 && (workforce == null || workforce.ids().length == 0)) startPlayback();
     #end
   }
-  public function stop():Void { stopPlayback(); var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
-    if(enclosureGuard!=null)enclosureGuard.setRunning(false);
-    if (tools != null) {tools.safeWelders(); tools.safeFeeders();}
+  public function stop():Void {
+    stopPlayback();
+    var active = space;
+    if (active != null) active.session.stop();
+    running = false;
+    pumpStamp = -1.0;
+    if (enclosureGuard != null) enclosureGuard.setRunning(false);
+    if (tools != null) {
+      tools.safeWelders();
+      tools.safeFeeders();
+    }
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false;
-    if(hobbing!=null)hobbing.presentStockFrame(false); }
+    if (hobbing != null) hobbing.presentStockFrame(false);
+  }
   public function reset():Bool {
     var active = space;
     if (active == null) return false;
@@ -898,21 +1122,28 @@ class ApplicationSimulation {
     active.session.stop();
     // Members stop what they run while the robots' runtimes still answer; the session's reset starts them over.
     for (member in members) member.beforeReset();
-    active.session.reset(); virtualDevicePrepared = false; running = false; presentAssemblyPhysics = false;
-    if(enclosureGuard!=null)enclosureGuard.setRunning(false);
+    active.session.reset();
+    virtualDevicePrepared = false;
+    running = false;
+    presentAssemblyPhysics = false;
+    if (enclosureGuard != null) enclosureGuard.setRunning(false);
     pumpStamp = -1.0;
     // The session's own reset has restored its objects and actors; what lives beside it follows.
     for (member in members) member.reset();
     for (visual in beltVisuals) visual.reset();
     for (visual in cableChainVisuals) visual.reset();
     presentMembers();
-    presentationEpoch++; return true;
+    presentationEpoch++;
+    return true;
   }
   public function isRunning():Bool return running;
 
   /** Operator changes execute between ticks on their playback owner. */
-  public function control(action:Void->Void):Void {
-    if (!playbackActive) { action(); return; }
+  public function control(action:Void -> Void):Void {
+    if (!playbackActive) {
+      action();
+      return;
+    }
     playbackMutex.acquire();
     playbackCommands.push(action);
     playbackMutex.release();
@@ -939,9 +1170,8 @@ class ApplicationSimulation {
     var robot = simulation == null || simulatedIds.indexOf(id) < 0 ? null : world.robot(id);
     if (robot == null) return false;
     var safety = robot.snapshot().safety;
-    if (safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ||
-        safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
-      robot.resetSafety();
+    if (safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT
+      || safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP) robot.resetSafety();
     return true;
   }
 
@@ -950,7 +1180,11 @@ class ApplicationSimulation {
     var failed = [for (program in missions) if (program.failure != null) program];
     if (failed.length != 1 || simulation == null) return false;
     var resume = playbackActive;
-    if (resume) { stopPlayback(); var active = space; if (active != null) active.session.stop(); }
+    if (resume) {
+      stopPlayback();
+      var active = space;
+      if (active != null) active.session.stop();
+    }
     if (!resetRobotSafety(failed[0].robotId())) return false;
     var retried = failed[0].retryFailedStep();
     if (resume) start();
@@ -967,15 +1201,15 @@ class ApplicationSimulation {
 
   /** The project's CNC program player, or null when the project has no CNC job. */
   /** Scenario changes start with a fresh runtime/stock, without editing the machine document. */
-  public function selectHobbingScenario(project:ProjectDocumentSession,id:String):Void {
-    if(["idle","cutting","loading"].indexOf(id)<0)throw "Unknown hobbing scenario";
-    if(running)throw "Pause before changing the scenario";
-    var config=project.machineMotion==null?null:project.machineMotion.hobbing;
-    if(config==null||config.scenario==null)throw "This scene does not define hobbing scenarios";
-    if(project.hobbingScenario==id)return;
-    if(space!=null)reset();
-    project.hobbingScenario=id;
-    if(hobbing!=null)hobbing.selectScenario(id);
+  public function selectHobbingScenario(project:ProjectDocumentSession, id:String):Void {
+    if (["idle", "cutting", "loading"].indexOf(id) < 0) throw "Unknown hobbing scenario";
+    if (running) throw "Pause before changing the scenario";
+    var config = project.machineMotion == null ? null : project.machineMotion.hobbing;
+    if (config == null || config.scenario == null) throw "This scene does not define hobbing scenarios";
+    if (project.hobbingScenario == id) return;
+    if (space != null) reset();
+    project.hobbingScenario = id;
+    if (hobbing != null) hobbing.selectScenario(id);
   }
   public function hobbingPlayer():Null<HobbingProgramPlayer> return hobbing;
   public function enclosureController():Null<EnclosureGuardPlayer> return enclosureGuard;
@@ -986,8 +1220,8 @@ class ApplicationSimulation {
   public function toolpathPlayer():Null<ToolpathPlayer> return cnc != null ? cnc : print;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
   static function hasPneumaticCylinder(blueprint:robotkit.runtime.RobotRuntimeBlueprint):Bool {
-    for (drive in blueprint.cylinderDrives)
-      if (drive.control == robotkit.runtime.CylinderControl.PressureEffort) return true;
+    for (drive in blueprint.cylinderDrives) if (drive.control
+      == robotkit.runtime.CylinderControl.PressureEffort) return true;
     return false;
   }
 
@@ -999,7 +1233,9 @@ class ApplicationSimulation {
     return count;
   }
   public function cableChainDisplayUpdates():Int {
-    var count=0;for(visual in cableChainVisuals)count+=visual.updates;return count;
+    var count = 0;
+    for (visual in cableChainVisuals) count += visual.updates;
+    return count;
   }
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
@@ -1017,15 +1253,15 @@ class ApplicationSimulation {
   /** The weld metal the mission has laid, or null when it does not weld. */
   public function weldBeads():Null<WeldBeads> return beads;
   /** The simulated welder on the assembly's torch, or null when it has none. */
-  public function welder():Null<processkit.simulation.SimulatedWelder> return tools == null || tools.welders.length == 0 ? null : tools.welders[0];
+  public function welder():Null<processkit.simulation.SimulatedWelder> return tools == null
+    || tools.welders.length == 0 ? null : tools.welders[0];
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;
   public function humanWorker(id:String):Null<HumanWorker> return workforce == null ? null : workforce.worker(id);
-  public function humanSignals(id:String):Null<HumanWorkerSignals>
-    return workforce == null ? null : workforce.signals(id);
-  public function humanWarnings(id:String):Array<String>
-    return workforce == null ? [] : workforce.warningsFor(id);
+  public function humanSignals(id:String):Null<HumanWorkerSignals
+    > return workforce == null ? null : workforce.signals(id);
+  public function humanWarnings(id:String):Array<String> return workforce == null ? [] : workforce.warningsFor(id);
   public function humanWorkerIds():Array<String> return workforce == null ? [] : workforce.ids();
 
   /**
@@ -1040,7 +1276,11 @@ class ApplicationSimulation {
       playbackMutex.acquire();
       var failure = playbackFailure, frame = playbackFrame;
       playbackMutex.release();
-      if (failure != null) { stop(); error = failure; return; }
+      if (failure != null) {
+        stop();
+        error = failure;
+        return;
+      }
       if (frame != null && frame.revision != presentedPlaybackRevision) {
         // Logical-world events and subscribed streams remain on their UI owner.
         world.pump();
@@ -1063,7 +1303,7 @@ class ApplicationSimulation {
     var now = Sys.time();
     var elapsed = pumpStamp < 0.0 ? 0.0 : Math.max(0.0, now - pumpStamp);
     pumpStamp = now;
-    if(hobbing!=null)hobbing.advanceHandling(elapsed);
+    if (hobbing != null) hobbing.advanceHandling(elapsed);
     var due = active.session.dueTicks(haxe.Int64.fromFloat(elapsed * 1.0e9), MAX_TICKS_PER_PUMP);
     runOwnerTicks(due, present);
   }
@@ -1077,11 +1317,11 @@ class ApplicationSimulation {
     runOwnerTicks(count, true, true);
   }
 
-  function runOwnerTicks(count:Int, present:Bool,deterministic:Bool=false):Void {
+  function runOwnerTicks(count:Int, present:Bool, deterministic:Bool = false):Void {
     var active = space;
     if (active == null || !running) return;
     for (_ in 0...count) {
-      if(deterministic&&hobbing!=null)hobbing.advanceHandling(active.session.fixedTimestep());
+      if (deterministic && hobbing != null) hobbing.advanceHandling(active.session.fixedTimestep());
       feedMembers();
       active.session.stepPaced();
     }
@@ -1127,7 +1367,8 @@ class ApplicationSimulation {
         playbackMutex.release();
       }
       done.release();
-    });
+    }
+    );
   }
   #end
 
@@ -1146,12 +1387,13 @@ class ApplicationSimulation {
   }
 
   function feedMembers():Void {
-    if (virtualWelder && !virtualDevicePrepared && simulation != null && tools != null && tools.welders.length > 0)
-      virtualDevicePrepared = simulation.virtualDeviceReady(tools.welders[0].robotIndex);
-    if (virtualNutrunner && !virtualDevicePrepared && simulation != null && tools != null && tools.screwdrivers.length > 0)
-      virtualDevicePrepared = simulation.virtualDeviceReady(@:privateAccess tools.screwdrivers[0].robotIndex);
+    if (virtualWelder && !virtualDevicePrepared && simulation != null && tools != null
+      && tools.welders.length > 0) virtualDevicePrepared = simulation.virtualDeviceReady(tools.welders[0].robotIndex);
+    if (virtualNutrunner && !virtualDevicePrepared && simulation != null && tools != null && tools.screwdrivers.length
+      > 0) virtualDevicePrepared = simulation.virtualDeviceReady(@:privateAccess tools.screwdrivers[0].robotIndex);
     for (member in members) {
-      if ((virtualWelder || virtualNutrunner) && !virtualDevicePrepared && Std.isOfType(member, MissionPlayer)) continue;
+      if ((virtualWelder || virtualNutrunner) && !virtualDevicePrepared && Std.isOfType(member,
+        MissionPlayer)) continue;
       // The editor's realtime run plans a program's first plan beside the simulation; a deterministic step waits for it.
       if (Std.isOfType(member, ToolpathPlayer)) {
         var toolpath:ToolpathPlayer = cast member;
@@ -1163,18 +1405,22 @@ class ApplicationSimulation {
 
   /** Publishes every member's current state to the scene, once per presented frame. */
   function presentMembers():Void {
-    for (member in members) if(member==hobbing)hobbing.presentStockFrame(presentAssemblyPhysics);else member.present();
+    for (member in members) if (member == hobbing) hobbing.presentStockFrame(presentAssemblyPhysics);
+    else member.present();
   }
 
   /** True in both running and paused simulation modes. */
-  public function isActive():Bool return simulation!=null;
+  public function isActive():Bool return simulation != null;
   /** Where physics has a robot's link, not where the robot's device reports its joints (a machine knows only its motors). */
   public function physicalLinkPosition(robotIndex:Int, linkIndex:Int):Array<Float> {
     if (simulation == null) throw "no simulation is running";
     return simulation.linkPose(robotIndex, linkIndex).position.copy();
   }
   /** The live session, for people and other participants that join it. */
-  public function activeSession():Null<SimSession> { var active = space; return active == null ? null : active.session; }
+  public function activeSession():Null<SimSession> {
+    var active = space;
+    return active == null ? null : active.session;
+  }
   public function environmentObject(id:String):Null<SimObject> {
     for (item in simulatedObjects) if (item.id == id) return item.object;
     return null;
@@ -1228,9 +1474,11 @@ class ApplicationSimulation {
     for (index in 0...simulatedIds.length) {
       var id = simulatedIds[index];
       var sensorFrames = robotSensorFrames[index];
-      robots.push({id:id,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0],
-        sensors:sensorFrames == null ? [] : sensorFrames,links:[for (linkId in simulatedLinks[index])
-          {id:linkId,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0]}]});
+      robots.push({id: id, position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0,
+        0.0, 1.0], sensors: sensorFrames == null ? [] : sensorFrames, links : [for (linkId in simulatedLinks[index]) {
+        id:linkId, position:[0.0, 0.0, 0.0], rotation:[0.0, 0.0, 0.0, 1.0]
+      }
+      ]});
     }
     if (physics != null) for (pose in physics.poses) switch pose.kind {
       case SimulationPresentationSnapshot.ROBOT_BASE:
@@ -1250,8 +1498,16 @@ class ApplicationSimulation {
     if (frame != null) {
       for (object in simulatedObjects) {
         var pose = frame.objectPose(object.object);
-        orderedEnvironment.push({id:object.id,position:[pose.x,pose.y,pose.z],
-          rotation:[pose.qx,pose.qy,pose.qz,pose.qw]});
+        orderedEnvironment.push({
+          id: object.id,
+          position: [pose.x, pose.y, pose.z],
+          rotation: [
+            pose.qx,
+            pose.qy,
+            pose.qz,
+            pose.qw
+          ]
+        });
       }
       frame.dispose();
     }
@@ -1259,10 +1515,9 @@ class ApplicationSimulation {
       // The fixed geometry-centred frame is already expressed on the body's link.
       var link = robots[part.robotIndex].links[part.linkIndex];
       var pose = AssemblyRobot.composeComponents(link.position, link.rotation, part.offset);
-      orderedEnvironment.push({id:part.id, position:pose.position, rotation:pose.rotation});
+      orderedEnvironment.push({id: part.id, position: pose.position, rotation: pose.rotation});
     }
-    return new ApplicationPresentationSnapshot(physics, robots, orderedEnvironment,
-      presentationEpoch);
+    return new ApplicationPresentationSnapshot(physics, robots, orderedEnvironment, presentationEpoch);
   }
 
   /** Compatibility helper; frame consumers should share capturePresentationSnapshot(). */
@@ -1281,19 +1536,19 @@ class ApplicationSimulation {
     if (project == null) return null;
     var definition = project.projectAssemblyDefinition;
     if (definition == null) return null;
-    var occurrences = [for (item in definition.occurrences) if (id == "project:"+item.id) item];
+    var occurrences = [for (item in definition.occurrences) if (id == "project:" + item.id) item];
     if (occurrences.length == 0) return null;
-    if (occurrences.length != 1) throw "Environment body has ambiguous CAD identity: "+id;
+    if (occurrences.length != 1) throw "Environment body has ambiguous CAD identity: " + id;
     var occurrence = occurrences[0];
     var components = [for (item in definition.definitions) if (item.id == occurrence.definition) item];
-    if (components.length != 1) throw "Environment body has no unique CAD component: "+id;
+    if (components.length != 1) throw "Environment body has no unique CAD component: " + id;
     var component = components[0];
     if (component.collisionHulls == null) return null;
     var physical = project.projectPhysical, center = project.assemblyPreviewCenter(occurrence.definition);
-    if (physical == null || center == null) throw "Environment body has no CAD collision frame: "+id;
-    var source = cadbridge.AssemblySimulationBridge.collisionPieces(occurrence.id,component,null);
-    var pieces = [for (vertices in source)
-      [for (i in 0...vertices.length) (vertices[i]-center[i%3])*physical.metresPerUnit]];
+    if (physical == null || center == null) throw "Environment body has no CAD collision frame: " + id;
+    var source = cadbridge.AssemblySimulationBridge.collisionPieces(occurrence.id, component, null);
+    var pieces = [for (vertices in source)[for (i in 0...vertices.length)(vertices[i]
+      - center[i % 3]) * physical.metresPerUnit]];
     return pieces.length == 1 ? SimShape.convex(pieces[0]) : SimShape.compoundConvex(pieces);
   }
 
@@ -1318,9 +1573,10 @@ class ApplicationSimulation {
   /** Scene/world changes stay on their owner; blocking releases can be deferred to a worker. */
   public function clear():Void clearWithReleases(null);
 
-  public function clearWithReleases(releases:Null<Array<Void->Void>>):Void {
-    function release(action:Void->Void):Void {
-      if (releases == null) action(); else releases.push(action);
+  public function clearWithReleases(releases:Null<Array<Void -> Void>>):Void {
+    function release(action:Void -> Void):Void {
+      if (releases == null) action();
+      else releases.push(action);
     }
     stop();
     for (program in missions) program.beforeReset();
@@ -1330,10 +1586,20 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; tools = null; power = null;
+    workforce = null;
+    motions = null;
+    tools = null;
+    power = null;
     if (cnc != null) cnc.dispose(releases);
-    if(enclosureGuard!=null){enclosureGuard.beforeReset();enclosureGuard=null;}
-    if (hobbing != null) { var retiredHobbing=hobbing;release(()->retiredHobbing.dispose());hobbing=null; }
+    if (enclosureGuard != null) {
+      enclosureGuard.beforeReset();
+      enclosureGuard = null;
+    }
+    if (hobbing != null) {
+      var retiredHobbing = hobbing;
+      release(() -> retiredHobbing.dispose());
+      hobbing = null;
+    }
     if (print != null) print.dispose(releases);
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();
@@ -1346,28 +1612,42 @@ class ApplicationSimulation {
     digitalProgram = null;
     if (pressBrake != null) pressBrake.beforeReset();
     pressBrake = null;
-    cnc = null; print = null; mobile = null; missions = []; beads = null; cellSignals = null; refreshMembers();
+    cnc = null;
+    print = null;
+    mobile = null;
+    missions = [];
+    beads = null;
+    cellSignals = null;
+    refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
     if (!preparationOnly) release(function() motionkit.robot.ProgramPlanner.shutdown());
     if (detachedPreparedRobots != null) {
       for (robot in detachedPreparedRobots) release(function() robot.close());
       detachedPreparedRobots = null;
-    } else for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)release(function() robot.close()); }
+    } else for (id in simulatedIds) {
+      var robot = world.detach(id);
+      if (robot != null) release(function() robot.close());
+    }
     ownedRobots = [];
     simulatedIds.resize(0);
-    simulatedLinks.resize(0); simulatedObjects.resize(0);
+    simulatedLinks.resize(0);
+    simulatedObjects.resize(0);
     assemblyParts.resize(0);
     collisionWarnings = [];
     presentAssemblyPhysics = false;
     var retiredSpace = space, retiredSimulation = simulation;
     release(function() releaseSpace(retiredSpace, retiredSimulation));
-    simulation = null; space = null;
+    simulation = null;
+    space = null;
     retirementFrame = null;
     for (zone in zoneMonitors) zone.dispose();
     zoneMonitors = [];
-    appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;
-    appliedParticipantRevision=-1;
+    appliedDocumentRevision = -1;
+    appliedEnvironmentRevision = -1;
+    appliedBackend = -1;
+    appliedTimestep = -1;
+    appliedParticipantRevision = -1;
   }
   public function dispose():Void clear();
 }

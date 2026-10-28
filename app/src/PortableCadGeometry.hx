@@ -12,12 +12,16 @@ typedef PreparedCadGeometry = {
 };
 
 class PortableCadGeometry {
-  public static function prepare(part:SceneArtifactPart, minimum:Array<Float>, maximum:Array<Float>,
-      scale:Float, centered:Bool = true):PreparedCadGeometry {
-    if (!finite(scale) || scale <= 0 || part.vertexCount <= 0 || part.indexCount <= 0 ||
-        part.indexCount % 3 != 0 || part.vertices.length != part.vertexCount * 24 ||
-        part.normals.length != part.vertexCount * 24 || part.indices.length != part.indexCount * 4)
-      throw "CAD mesh has inconsistent streams";
+  public static function prepare(
+    part:SceneArtifactPart,
+    minimum:Array<Float>,
+    maximum:Array<Float>,
+    scale:Float,
+    centered:Bool = true
+  ):PreparedCadGeometry {
+    if (!finite(scale) || scale <= 0 || part.vertexCount <= 0 || part.indexCount <= 0 || part.indexCount % 3 != 0
+      || part.vertices.length != part.vertexCount * 24 || part.normals.length != part.vertexCount * 24
+      || part.indices.length != part.indexCount * 4) throw "CAD mesh has inconsistent streams";
     var positions = Bytes.alloc(part.vertexCount * 12);
     var normals = Bytes.alloc(part.vertexCount * 12);
     var centerX = centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
@@ -28,12 +32,16 @@ class PortableCadGeometry {
       var x = (part.vertices.getDouble(source) - centerX) * scale;
       var y = (part.vertices.getDouble(source + 8) - centerY) * scale;
       var z = (part.vertices.getDouble(source + 16) - centerZ) * scale;
-      var nx = part.normals.getDouble(source), ny = part.normals.getDouble(source + 8),
-        nz = part.normals.getDouble(source + 16);
-      if (!finite(x) || !finite(y) || !finite(z) || !finite(nx) || !finite(ny) || !finite(nz))
-        throw "CAD mesh contains a non-finite vertex or normal";
-      positions.setFloat(target, x); positions.setFloat(target + 4, y); positions.setFloat(target + 8, z);
-      normals.setFloat(target, nx); normals.setFloat(target + 4, ny); normals.setFloat(target + 8, nz);
+      var nx = part.normals.getDouble(source),
+        ny = part.normals.getDouble(source + 8), nz = part.normals.getDouble(source + 16);
+      if (!finite(x) || !finite(y) || !finite(z)
+        || !finite(nx) || !finite(ny) || !finite(nz)) throw "CAD mesh contains a non-finite vertex or normal";
+      positions.setFloat(target, x);
+      positions.setFloat(target + 4, y);
+      positions.setFloat(target + 8, z);
+      normals.setFloat(target, nx);
+      normals.setFloat(target + 4, ny);
+      normals.setFloat(target + 8, nz);
     }
     return {minimum: minimum.copy(), maximum: maximum.copy(), positions: positions, normals: normals};
   }

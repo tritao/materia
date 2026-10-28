@@ -10,7 +10,8 @@ import app.PreparedProjectPart;
 /** Validated portable binary data shared by cache storage and worker messages. */
 class PreparedSceneCodec {
   static inline var LIMIT:Int = 150000000;
-  public static function decode(bytes:Bytes, parts:Array<materia.project.SceneArtifact.SceneArtifactPart>):Array<PreparedProjectPart> {
+  public static function decode(bytes:Bytes,
+    parts:Array<materia.project.SceneArtifact.SceneArtifactPart>):Array<PreparedProjectPart> {
     if (bytes.length > LIMIT) throw "Prepared cache is too large";
     if (bytes.length < 40 || bytes.getInt32(0) != 0x5052544d) throw "Invalid prepared cache header";
     var end = bytes.length - 32;
@@ -26,37 +27,49 @@ class PreparedSceneCodec {
       var source = parts[i], entry = entries[i];
       if (entry.id != source.id) throw "Prepared cache part identity mismatch";
       var hullCount:Int = entry.hullCount;
-      if (hullCount < 12 || hullCount > cadkit.ConvexHullVertices.MAX_VERTICES * 3 || hullCount % 3 != 0)
-        throw "Invalid prepared hull count";
+      if (hullCount < 12 || hullCount > cadkit.ConvexHullVertices.MAX_VERTICES * 3
+        || hullCount % 3 != 0) throw "Invalid prepared hull count";
       var size = source.vertexCount * 12;
-      if (size <= 0 || size > Std.int((end - offset - (21 + hullCount) * 8) / 2))
-        throw "Invalid prepared streams";
+      if (size <= 0 || size > Std.int((end - offset - (21 + hullCount) * 8) / 2)) throw "Invalid prepared streams";
       function numbers(count:Int):Array<Float> {
         var values:Array<Float> = [];
-        for (index in 0...count) { values.push(bytes.getDouble(offset)); offset += 8; }
+        for (index in 0...count) {
+          values.push(bytes.getDouble(offset));
+          offset += 8;
+        }
         return values;
       }
       var minimum = numbers(3), maximum = numbers(3), scalars = numbers(3);
-      finiteArray(minimum, 3); finiteArray(maximum, 3);
+      finiteArray(minimum, 3);
+      finiteArray(maximum, 3);
       for (axis in 0...3) if (minimum[axis] > maximum[axis]) throw "Invalid prepared bounds";
-      var physical:AssemblyPhysicalPart = {id: source.id, materialId: entry.materialId,
-        volume: scalars[0], density: scalars[1], collisionErrorRatio: scalars[2],
-        centerOfMass: numbers(3), inertia: numbers(9), collisionHull: numbers(hullCount),
-        collisionWarning: entry.collisionWarning};
+      var physical:AssemblyPhysicalPart = {
+        id: source.id,
+        materialId: entry.materialId,
+        volume: scalars[0],
+        density: scalars[1],
+        collisionErrorRatio: scalars[2],
+        centerOfMass: numbers(3),
+        inertia: numbers(9),
+        collisionHull: numbers(hullCount),
+        collisionWarning: entry.collisionWarning
+      };
       var positions = Bytes.view(bytes, offset, size), normals = Bytes.view(bytes, offset + size, size);
       offset += size * 2;
-      if (physical.id != source.id || physical.materialId == null || !Math.isFinite(physical.volume) ||
-          physical.volume < 0 || !Math.isFinite(physical.density) || physical.density <= 0)
-        throw "Invalid prepared physical properties";
-      finiteArray(physical.centerOfMass, 3); finiteArray(physical.inertia, 9);
-      if (physical.collisionHull == null || physical.collisionHull.length % 3 != 0 ||
-          physical.collisionHull.length > cadkit.ConvexHullVertices.MAX_VERTICES * 3)
-        throw "Invalid prepared collision hull";
+      if (physical.id != source.id || physical.materialId == null || !Math.isFinite(physical.volume) || physical.volume
+        < 0 || !Math.isFinite(physical.density) || physical.density <= 0) throw "Invalid prepared physical properties";
+      finiteArray(physical.centerOfMass, 3);
+      finiteArray(physical.inertia, 9);
+      if (physical.collisionHull == null || physical.collisionHull.length % 3 != 0 || physical.collisionHull.length
+        > cadkit.ConvexHullVertices.MAX_VERTICES * 3) throw "Invalid prepared collision hull";
       finiteArray(physical.collisionHull, physical.collisionHull.length);
       var errorRatio = physical.collisionErrorRatio;
       if (errorRatio == null || !Math.isFinite(errorRatio)) throw "Invalid prepared hull error";
-      result.push({id: source.id, geometry: {minimum: minimum, maximum: maximum,
-        positions: positions, normals: normals}, physical: physical});
+      result.push({
+        id: source.id,
+        geometry: {minimum: minimum, maximum: maximum, positions: positions, normals: normals},
+        physical: physical
+      });
     }
     if (offset != end) throw "Trailing prepared cache data";
     return result;
@@ -66,9 +79,12 @@ class PreparedSceneCodec {
     var entries = [for (part in parts) {
       var hull = part.physical.collisionHull;
       if (hull == null) throw "Missing collision hull";
-      {id: part.id, materialId: part.physical.materialId,
-        collisionWarning: part.physical.collisionWarning, hullCount: hull.length};
-    }];
+      {
+        id:part.id,
+          materialId:part.physical.materialId, collisionWarning:part.physical.collisionWarning, hullCount:hull.length
+      };
+    }
+    ];
     var metadata = Bytes.ofString(Json.stringify(entries));
     var output = new BytesOutput();
     output.setBigEndian(false);
@@ -80,11 +96,20 @@ class PreparedSceneCodec {
       var hull = part.physical.collisionHull;
       if (errorRatio == null || hull == null) throw "Missing collision properties";
       // Preserve every float64 bit, including small inertias and signed zero. JSON is only for labels.
-      for (values in [part.geometry.minimum, part.geometry.maximum,
-          [part.physical.volume, part.physical.density, errorRatio],
-          part.physical.centerOfMass, part.physical.inertia, hull])
-        for (value in values) output.writeDouble(value);
-      output.write(part.geometry.positions); output.write(part.geometry.normals);
+      for (values in [
+        part.geometry.minimum,
+        part.geometry.maximum,
+        [
+          part.physical.volume,
+          part.physical.density,
+          errorRatio
+        ],
+        part.physical.centerOfMass,
+        part.physical.inertia,
+        hull
+      ]) for (value in values) output.writeDouble(value);
+      output.write(part.geometry.positions);
+      output.write(part.geometry.normals);
     }
     var payload = output.getBytes();
     if (payload.length > LIMIT - 32) throw "Prepared data is too large";

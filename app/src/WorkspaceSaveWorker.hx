@@ -88,8 +88,7 @@ class WorkspaceSaveWorker {
   public function saveNow(snapshot:DockWorkspaceSnapshot):Null<String> {
     var generation = enqueue(snapshot, true);
     state.acquire();
-    while (completedGeneration < generation && !exited)
-      state.wait();
+    while (completedGeneration < generation && !exited) state.wait();
     var error = errorGeneration >= generation ? lastError : null;
     if (error != null) reportedErrorGeneration = errorGeneration;
     state.release();
@@ -111,8 +110,7 @@ class WorkspaceSaveWorker {
     closing = true;
     urgent = true;
     state.broadcast();
-    while (!exited)
-      state.wait();
+    while (!exited) state.wait();
     var error = lastError;
     state.release();
     return error;
@@ -137,8 +135,7 @@ class WorkspaceSaveWorker {
   function run():Void {
     while (true) {
       state.acquire();
-      while (pending == null && !closing)
-        state.wait();
+      while (pending == null && !closing) state.wait();
       if (pending == null && closing) {
         exited = true;
         state.broadcast();

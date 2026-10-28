@@ -14,8 +14,12 @@ class SimulationBuildJob {
   var result:Null<ApplicationSimulation>;
   var failure:Null<String>;
 
-  public function new(source:ApplicationSimulation, configuration:SensorConfiguration,
-      scene:EditorScene, session:ProjectDocumentSession) {
+  public function new(
+    source:ApplicationSimulation,
+    configuration:SensorConfiguration,
+    scene:EditorScene,
+    session:ProjectDocumentSession
+  ) {
     var self = this;
     function prepare():Void {
       var target = source.preparationTarget();
@@ -55,7 +59,10 @@ class SimulationBuildJob {
     mutex.release();
     if (problem != null) throw problem;
     if (target == null) throw "Simulation preparation produced no result";
-    if (control.isCancelled()) { target.dispose(); throw ProjectLoadControl.CANCELLED; }
+    if (control.isCancelled()) {
+      target.dispose();
+      throw ProjectLoadControl.CANCELLED;
+    }
     return target;
   }
 
@@ -63,6 +70,7 @@ class SimulationBuildJob {
   public function close():Void {
     control.cancel();
     while (!isFinished()) Sys.sleep(0.001);
-    try take().dispose() catch (_:Dynamic) {}
+    try take().dispose() catch (_:Dynamic) {
+    }
   }
 }
