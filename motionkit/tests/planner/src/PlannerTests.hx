@@ -1,4 +1,3 @@
-import collisionkit.CollisionBuild;
 import collisionkit.CollisionDescription;
 import collisionkit.CollisionGeometry;
 import collisionkit.CollisionMargins;
@@ -7,13 +6,11 @@ import collisionkit.kinematics.ModelBodies;
 import collisionkit.native.NativeCollisionWorld;
 import haxe.Int64;
 import kinematicskit.JointKind;
-import kinematicskit.KinematicModel;
 import kinematicskit.KinematicModelBuilder;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import kinematicskit.Vector3;
 import motionkit.MotionOptions;
-import motionkit.planner.MotionPlan;
 import motionkit.planner.RrtConnect;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;

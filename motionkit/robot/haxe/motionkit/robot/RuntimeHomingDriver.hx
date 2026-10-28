@@ -5,7 +5,6 @@ import motionkit.AxisTarget;
 import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
 import motionkit.axis.MotionAxisBlueprint;
-import motionkit.trajectory.Trajectory;
 import robotkit.core.Robot;
 import robotkit.core.RobotCommand;
 import robotkit.core.StopMode;

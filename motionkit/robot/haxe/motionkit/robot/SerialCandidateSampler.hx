@@ -1,6 +1,5 @@
 package motionkit.robot;
 
-import motionkit.kinematics.SixAxisConfiguration;
 
 import MotionKitNative;
 import TrajectoryCore;

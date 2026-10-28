@@ -1,6 +1,5 @@
 package motionkit.robot;
 
-import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.PathSolution;
