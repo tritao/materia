@@ -6,6 +6,7 @@ import machinekit.component.ComponentRegistry;
 class TransmissionComponents {
 	public static function register(registry:ComponentRegistry):Void {
 		registry.register(GearRack.recipeType());
+        registry.register(GearRackRun.recipeType());
 		registry.register(HelicalRack.recipeType());
 		registry.register(HelicalPinion.recipeType());
 		registry.register(PreloadedPinionMount.recipeType());

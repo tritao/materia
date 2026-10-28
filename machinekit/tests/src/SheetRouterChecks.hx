@@ -10,8 +10,11 @@ class SheetRouterChecks {
     static function mesh():Void {
         var machine=new SheetRouter(),definition=machine.definition(),state=new AssemblyState(definition);
         var wheel=machine.component("pinionX"),longRack=machine.component("rackX");
-        var rack=new machinekit.transmission.HelicalRack(longRack.values().setInteger("teeth",80));
-        var location=machine.rackPlacement({id:"x",lower:0.0,upper:0.0,initial:0.0},wheel,machine.zeroPose("pinionX"),[0.0,0.0,-1.0],rack);
+        var rack=new machinekit.transmission.HelicalRack(machinekit.transmission.RackGeometry.nominalHelical(longRack).values().setInteger("teeth",80));
+        var mount=machine.rackMountFor({id:"x",lower:0.0,upper:0.0,initial:0.0},longRack,"beam");
+        // Crop a tooth witness only; no cropped rack is installed without support.
+        var location=machinekit.assembly.RackMesh.layout({id:"x",lower:0.0,upper:0.0,initial:0.0},[1.0,0.0,0.0],wheel,
+            machine.zeroPose("pinionX"),F.compose(machine.zeroPose(mount.host),mount.datum),rack);
         var pinion=wheel.geometry(),bar=rack.geometry();
         var placedRack=machinekit.assembly.PosedParts.moved(bar,location.pose);bar.close();
         try {
@@ -63,8 +66,8 @@ class SheetRouterChecks {
             check(machine.gaugeZero.z-machine.routerSpec.longestTool>machine.boardTop+machine.routerSpec.sheetThickness,'longest tool clears full sheet when raised');
             var beam=machine.zeroPose('beam');check(beam.z-100-machine.boardTop>=150,'gantry clears board by at least 150 mm');
             for(binding in machine.cableChainBindings) {
-                check(binding.chain.n('travel')==(binding.axis=='x'?1600:length+300),'chain covers axis travel');
-                for(position in [0.0,binding.chain.n('travel')]) {
+                check(binding.chain.n('travel')==(binding.axis=='x'?1600:length+300)+2*binding.positionOffset,'chain covers axis travel');
+                for(position in [-binding.positionOffset,binding.travel+binding.positionOffset]) {
                     var part=machine.cableChainGeometry(binding.axis,position);check(part.valid()&&part.volume()>0,'posed chain is valid');part.close();
                 }
             }

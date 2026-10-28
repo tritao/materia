@@ -39,6 +39,7 @@ typedef FrontGuideLayout = {
 }
 
 typedef GantryOptions = {
+    @:optional var catalogueRackMount:Bool;
     @:optional var frontGuides:FrontGuideLayout;
     @:optional var beamFootThickness:Null<Float>;
     @:optional var beamFootWelded:Bool;
@@ -72,6 +73,7 @@ enum GantryHead {
 /** Travel is in millimetres. Frame and guide dimensions describe parts, not virtual joints. */
 class GantrySpec {
 	public final travelX:Float;
+    public final catalogueRackMount:Bool;
 	public final travelY:Float;
 	public final travelZ:Float;
 	public final driveX:GantryDrive;
@@ -158,6 +160,7 @@ class GantrySpec {
         motorY=selected.motorY==null?motor:selected.motorY;
         motorZ=selected.motorZ==null?motor:selected.motorZ;
         reducer=selected.reducer;reducerX=selected.reducerX==null?reducer:selected.reducerX;
+        catalogueRackMount=selected.catalogueRackMount==true;
         reducerY=selected.reducerY==null?reducer:selected.reducerY;reducerZ=selected.reducerZ;preload=selected.preload;
         structure=selected.structure==null?Aluminium:selected.structure;
         cableChain=selected.cableChain;supplyCurrent=selected.supplyCurrent;

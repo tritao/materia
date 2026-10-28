@@ -17,7 +17,7 @@ class GantryClearanceChecks {
 	final sensors = new Map<String, Bool>();
 	final rackMeshes:Array<{pinion:String, rack:String}> = [];
 	final shaftSeatings:Array<{parent:String, child:String}> = [];
-    final chains:Array<{id:String,axis:String,chain:machinekit.motion.CableChain}> = [];
+    final chains:Array<{id:String,axis:String,chain:machinekit.motion.CableChain,offset:Float}> = [];
     final chainPositions:Map<String,Float> = [];
     final clearPairs:Map<String,Bool> = [];
     final clearMeshPhases:Map<String,Bool> = [];
@@ -28,7 +28,7 @@ class GantryClearanceChecks {
         if(seatedInterfaces!=null)for(pair in seatedInterfaces)allow(pair.a,pair.b);
 		for (group in AssemblyBodies.of(definition)) for (member in group.occurrences) body.set(member, group.id);
         for(binding in gantry.cableChainBindings) {
-            chains.push({id:binding.member,axis:binding.axis,chain:binding.chain});chainPositions.set(binding.member,0.0);
+            chains.push({id:binding.member,axis:binding.axis,chain:binding.chain,offset:binding.positionOffset});chainPositions.set(binding.member,0.0);
             body.set(binding.member,binding.member);
         }
 		// A shaft is seated inside the motor or journal on its moving mate.
@@ -109,7 +109,7 @@ class GantryClearanceChecks {
                 var position=state.joint(binding.axis);
                 if(chainPositions.get(binding.id)!=position) {
                     var old=localParts.get(binding.id);if(old!=null)old.close();
-                    var routed=binding.chain.geometryAt(position);localParts.set(binding.id,routed);localBoxes.set(binding.id,PosedParts.boxOf(routed));
+                    var routed=binding.chain.geometryAt(position+binding.offset);localParts.set(binding.id,routed);localBoxes.set(binding.id,PosedParts.boxOf(routed));
                     chainPositions.set(binding.id,position);
                 }
             }

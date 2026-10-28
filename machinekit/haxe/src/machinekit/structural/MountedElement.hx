@@ -46,7 +46,12 @@ class MountedElement {
 			var rail:machinekit.motion.LinearRail=cast component;
 			return new MountedElement(rail,rail.mountingConnectors(),rail.mountingHole(),rail.mountingThread());
 		}
-		if (Std.isOfType(component,machinekit.transmission.GearRack)) {
+		if (Std.isOfType(component,machinekit.transmission.GearRackRun)) {
+            var run:machinekit.transmission.GearRackRun=cast component;
+            return new MountedElement(run,[for(i in 0...run.count)for(c in run.section.mountingConnectors())
+                run.connector('section${i+1}-'+c.name)],run.section.mountingHole(),run.section.mountingThread());
+        }
+        if (Std.isOfType(component,machinekit.transmission.GearRack)) {
 			var rack:machinekit.transmission.GearRack=cast component;
 			return new MountedElement(rack,rack.mountingConnectors(),rack.mountingHole(),rack.mountingThread());
 		}

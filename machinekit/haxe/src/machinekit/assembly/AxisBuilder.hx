@@ -370,21 +370,20 @@ class AxisBuilder extends MachineAssembly {
 	}
 
 	/**
-	 * A moving motor's pinion rolls along a rack fixed to `rackParent`. The pinion sits at `pose` with the axis at
+	 * A moving motor's pinion rolls along a rack on its required physical mount. The pinion sits at `pose` with the axis at
 	 * coordinate zero (its axis along the pose's +Z, its face from z = 0 to its face width), and the rack lies on
-	 * `rackSide` of it. The rack's pose comes from `rackPlacement`, and the coupling's sense from the pinion rolling
+	 * side declared by the mount face. The rack's pose comes from `rackPlacement`, and the coupling's sense from the pinion rolling
 	 * on it as the axis slides (`slide` comes first).
 	 */
-	public function driveRack(axis:AxisSpec, id:String, motor:String, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>,
-            rackId:String, rack:MachineComponent, rackParent:Null<String>, driverForMotor:String->String,
+	public function driveRack(axis:AxisSpec, id:String, motor:String, pinion:MachineComponent, pose:AssemblyFrame, rackMount:RackMount,
+            rackId:String, rack:MachineComponent, driverForMotor:String->String,
             ?reducer:MachineComponent, ?preload:PreloadedPinionMount):Void {
+        var placement = rackPlacement(axis,pinion,pose,rackMount,rack);
         var mount=AxisMotor.of(component(motor)), wheel=RackGeometry.pinion(pinion);
         RackGeometry.relation(pinion,rack,1);
         var tip=AssemblyFrames.compose(pose,AssemblyFrames.translation(0,0,wheel.width));
         var stage=mountReducer(id,motor,tip,reducer);
-        var placement = rackPlacement(axis, pinion, pose, rackSide, rack);
-		if (rackParent == null) place(rackId, rack, placement.pose);
-		else attach(rackId, rack, placement.pose, rackParent);
+        attach(rackId,rack,placement.pose,rackMount.attachment);
 		hang(id, pinion, pose, stage.parent);
 		var ratio = addTransmission('$id-rack', axis.id, '$id-turn', Transmission.RackAndPinion(id, rackId), placement.sense);
 		var about = AssemblyFrames.transformVector(pose, 0, 0, 1);
@@ -393,64 +392,39 @@ class AxisBuilder extends MachineAssembly {
         mountOutputShaft(id,id,tip,stage.id,mount);
         if(preload!=null) {
             if(preload.n("shaftClearance")<mount.shaftDiameter+0.5)throw "Preloaded mount does not clear pinion shaft";
-            var target=AssemblyFrames.compose(pose,machinekit.component.Solids.axial(0,0,0));
-            var location=AssemblyFrames.compose(target,AssemblyFrames.inverse(preload.connector("pinion").frame));
-            attach(id+"Preload",preload,location,motor);
+            if(preload.parameterToken("layout")=="radial-fork") {
+                var bound=component(id+"Preload");
+                if(!Std.isOfType(bound,machinekit.transmission.RadialPinionCarrier))throw "Radial preload must carry the actual motor on a pivot";
+                var carrier:machinekit.transmission.RadialPinionCarrier=cast bound;
+                if(carrier.motor!=component(motor))throw "Preload carrier belongs to a different motor";
+                var actual=AssemblyFrames.compose(zeroPose(id+"Preload"),carrier.connector("pinion").frame);
+                var expected=AssemblyFrames.compose(pose,AssemblyFrames.translation(0,0,wheel.width/2));
+                if(Math.abs(actual.x-expected.x)+Math.abs(actual.y-expected.y)+Math.abs(actual.z-expected.z)>1e-6)
+                    throw "Preload pinion datum is not at the axial centre";
+            } else {
+                var target=AssemblyFrames.compose(pose,machinekit.component.Solids.axial(0,0,0));
+                var location=AssemblyFrames.compose(target,AssemblyFrames.inverse(preload.connector("pinion").frame));
+                attach(id+"Preload",preload,location,motor);
+            }
         }
         if(Std.isOfType(pinion,machinekit.transmission.HelicalPinion) &&
                 (preload!=null||Std.isOfType(reducer,machinekit.motion.PlanetaryReducer)))
             setRackDriveParts(id+"-rack",stage.id,preload==null?null:id+"Preload");
 	}
 
-	/**
-	 * Where a rack meshes with `pinion` (at `pose` with the axis at zero, see `driveRack`) on its `rackSide` (a direction
-	 * from the pinion's axis, square to it and to the axis's travel): the rack's pitch line touches the pinion's pitch
-	 * circle, its face is centred on the pinion's, a rack gap faces the pinion tooth nearest the pitch point, and the rack
-	 * covers the pitch point over the whole travel with two teeth to spare at each end (or the rack is too short and
-	 * this throws). `sense` is the coupling sense that makes the pinion roll on it. Machines size the rack's support from
-	 * the pose before calling `driveRack`.
-	 */
-	public function rackPlacement(axis:AxisSpec, pinion:MachineComponent, pose:AssemblyFrame, rackSide:Array<Float>, rack:MachineComponent)
-			:{pose:AssemblyFrame, sense:Sense} {
-        var wheel=RackGeometry.pinion(pinion), bar=RackGeometry.rack(rack);
-		var a = AssemblyFrames.transformVector(pose, 0, 0, 1);
-		var t = axisDirection(axis.id);
-		var length = Math.sqrt(rackSide[0] * rackSide[0] + rackSide[1] * rackSide[1] + rackSide[2] * rackSide[2]);
-		if (!(length > 0)) throw 'Rack of axis ${axis.id} needs a side';
-		var n = [rackSide[0] / length, rackSide[1] / length, rackSide[2] / length];
-		if (Math.abs(dot(n, [a.x, a.y, a.z])) > 1e-9 || Math.abs(dot(n, t)) > 1e-9)
-			throw 'Rack of axis ${axis.id} must lie square to its pinion\'s axis and to the travel';
-		// Rack frame: face along +X (the pinion's axis), teeth along +Y (towards the pinion), length along +Z = X x Y.
-		var x = [a.x, a.y, a.z], y = [-n[0], -n[1], -n[2]];
-		var z = cross(x, y);
-		var radius = wheel.diameter / 2, pitch = Math.PI * wheel.moduleSize;
-		// Pitch point at coordinate zero, on the pinion's face start; the face of the rack centred on the pinion's.
-		var faceShift = (wheel.width - bar.width) / 2;
-		var contact = [pose.x + radius * n[0] + faceShift * x[0], pose.y + radius * n[1] + faceShift * x[1], pose.z + radius * n[2] + faceShift * x[2]];
-		// The pinion's tooth nearest the pitch point: teeth are centred on multiples of 2 pi / teeth from its local +X.
-		var local = AssemblyFrames.transformVector(AssemblyFrames.inverse(pose), n[0], n[1], n[2]);
-		var angle = Math.atan2(local.y, local.x), step = 2 * Math.PI / wheel.teeth;
-		var phase=wheel.hand*wheel.width*Math.tan(wheel.helix)/wheel.diameter;
-        var offset = radius * (angle-phase - Math.round((angle-phase) / step) * step);
-		// That tooth's centre lies `offset` behind the pitch point along the direction the pitch circle turns (a x n).
-		var tangent = cross(x, n);
-		var tooth = -offset * dot(tangent, z)-bar.hand*bar.width/2*Math.tan(bar.helix);
-		// Rack gaps are centred on multiples of the pitch from its start: start the rack a whole number of pitches before
-		// the tooth, as near as that comes to centring the rack on the pitch point's travel.
-		var travel = dot(t, z);
-		var low = Math.min(axis.lower * travel, axis.upper * travel), high = Math.max(axis.lower * travel, axis.upper * travel);
-		var centred = (low + high) / 2 - bar.length / 2;
-		var start = tooth - Math.round((tooth - centred) / pitch) * pitch;
-		if (start > low - 2 * pitch || start + bar.length < high + 2 * pitch)
-			throw 'Rack of axis ${axis.id} is too short: it needs ${Math.ceil((high - low) / pitch) + 5} teeth, has ${bar.teeth}';
-		var origin = [contact[0] + start * z[0], contact[1] + start * z[1], contact[2] + start * z[2]];
-		// Rolling: the pinion's centre moves along a x n per unit turn of radius; it turns by (t . z) / radius per unit
-		// travel, and Rack.relation gives alignment * 2 / pitch diameter.
-		var sense = SenseTools.fromAlignment(travel > 0 ? 1 : -1);
-		if (Math.abs(Math.abs(travel) - 1) > 1e-9) throw 'Rack of axis ${axis.id} must run along the travel';
-		return {pose: AssemblyFrames.fromRotationMatrix(origin[0], origin[1], origin[2], [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]]),
-			sense: sense};
-	}
+    /** Mesh placement from the required physical mount's back plane. Its normal
+     * fixes the side even for mirrored motors. Reject plane/tangent disagreement
+     * and broken native contact paths before installing the drive. */
+    public function rackPlacement(axis:AxisSpec,pinion:MachineComponent,pose:AssemblyFrame,rackMount:RackMount,rack:MachineComponent)
+        :{pose:AssemblyFrame,sense:Sense} {
+        if(rackMount==null)throw 'Rack of axis ${axis.id} requires a physical mount';
+        var datum=AssemblyFrames.compose(zeroPose(rackMount.host),rackMount.datum);
+        var room=axisOvertravel(axis.id);
+        var required:AxisSpec={id:axis.id,lower:axis.lower-room,upper:axis.upper+room,initial:axis.initial};
+        var result=RackMesh.layout(required,axisDirection(axis.id),pinion,pose,datum,rack,rackMount.phaseOffsetMm);
+        rackMount.validate(this,rack,result.pose);
+        return result;
+    }
 
 	/**
 	 * The coupling sense of a lead screw pointing along world `along` (its +Z) that drives axis `axisId`: a screw turning by

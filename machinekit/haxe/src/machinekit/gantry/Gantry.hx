@@ -51,7 +51,8 @@ class Gantry extends AxisBuilder {
 	var headMountZero:Null<AssemblyFrame> = null;
 	var driverIndex:Int = 0;
 
-	public function new(spec:GantrySpec) {
+	public final rackMounts:Map<String,machinekit.assembly.RackMount>=[];
+    public function new(spec:GantrySpec) {
 		super();
 		this.spec = spec;
 		head = switch spec.head { case None: null; case C: new CHead(); case CA: new CaHead(); };
@@ -270,7 +271,7 @@ class Gantry extends AxisBuilder {
         if(spec.cableChain!=null)buildCableChains();
 	}
 
-    public final cableChainBindings:Array<{axis:String,member:String,carrier:String,pose:AssemblyFrame,chain:machinekit.motion.CableChain}> = [];
+    public final cableChainBindings:Array<{axis:String,member:String,carrier:String,pose:AssemblyFrame,chain:machinekit.motion.CableChain,travel:Float,positionOffset:Float}> = [];
     function buildCableChains():Void {
         for(axis in ["y","x"]) {
             var travel=axis=="y"?spec.travelY:spec.travelX,carrier=axis=="y"?"beam":"xCarriage",fixed=axis=="y"?"frameLeft":"beam";
@@ -278,24 +279,25 @@ class Gantry extends AxisBuilder {
             var offset=axis=="x"?spec.cableChainOffsetX:spec.cableChainOffsetY;
             var origin=[start.x+offset.x+direction[0]*travel/2,start.y+offset.y+direction[1]*travel/2,start.z+offset.z-2*r];
             var pose=AxisBuilder.orient(origin[0],origin[1],origin[2],direction,[0.0,0,1]);
-            var member="cableChain"+axis.toUpperCase(),values=spec.cableChain.values().setNumber("travel",travel);
+            var room=axisOvertravel(axis);
+            var member="cableChain"+axis.toUpperCase(),values=spec.cableChain.values().setNumber("travel",travel+2*room);
             var chain=new machinekit.motion.CableChain(values);
-            var routed=new GantryCableChain(chain,fixed,carrier,axis);
+            var routed=new GantryCableChain(chain,fixed,carrier,axis,room);
             addMemberConnector(fixed,routed.endConnector,AssemblyFrames.compose(AssemblyFrames.inverse(zeroPose(fixed)),pose));
-            addMemberConnector(carrier,routed.endConnector,AssemblyFrames.compose(AssemblyFrames.inverse(start),AssemblyFrames.compose(pose,chain.movingFrame(0))));
+            addMemberConnector(carrier,routed.endConnector,AssemblyFrames.compose(AssemblyFrames.inverse(start),AssemblyFrames.compose(pose,chain.movingFrame(room))));
             attach(member,routed,pose,fixed);
-            cableChainBindings.push({axis:axis,member:member,carrier:carrier,pose:pose,chain:chain});
+            cableChainBindings.push({axis:axis,member:member,carrier:carrier,pose:pose,chain:chain,travel:travel,positionOffset:room});
         }
     }
     public function cableChainEnd(axis:String,position:Float):AssemblyFrame {
         for(binding in cableChainBindings)if(binding.axis==axis) {
             var chain=binding.chain;
-            return AssemblyFrames.compose(binding.pose,chain.movingFrame(position));
+            return AssemblyFrames.compose(binding.pose,chain.movingFrame(position+binding.positionOffset));
         }
         throw "No cable chain for axis "+axis;
     }
     public function cableChainGeometry(axis:String,position:Float):cadkit.modeling.Part {
-        for(binding in cableChainBindings)if(binding.axis==axis)return binding.chain.geometryAt(position);
+        for(binding in cableChainBindings)if(binding.axis==axis)return binding.chain.geometryAt(position+binding.positionOffset);
         throw "No cable chain for axis "+axis;
     }
 
@@ -337,6 +339,12 @@ class Gantry extends AxisBuilder {
 			dimensions[outboardAxis] = 20;
 			point[2] = bounds.min[2] + 2;
             if(bounds.max[0]-bounds.min[0]>70)point[outboardAxis]=(sign<0?bounds.max[outboardAxis]:bounds.min[outboardAxis])-sign*7;
+            if(spec.catalogueRackMount) {
+                // Rack supports stay outboard; the sensor and offset flag use
+                // the opposite face, with a short integral attachment tab.
+                point[outboardAxis]=(sign<0?bounds.max[outboardAxis]:bounds.min[outboardAxis])-sign*27;
+                customTrigger=new GantrySwitchTrigger(dimensions[0],dimensions[1],dimensions[2],20,6,sign*17,0);
+            }
 		}
 		// Z workpieces rise in front of the column. Keep the fixed switches
 		// alongside it; the outboard trigger stays clear of the rear beam.
@@ -379,6 +387,11 @@ class Gantry extends AxisBuilder {
 			var sensor = new machinekit.motion.ProximitySwitch();
 			// Sense perpendicular to travel so the trigger can pass the tube safely.
 			var normal = suffix == "X" || suffix == "Z" ? [0.0, 1, 0] : [0.0, 0, 1];
+            // Give home its own side-facing approach. The two independent
+            // sensors remain at their specified Y trip positions; their bored
+            // holders no longer occupy the same 10 mm interval.
+            if(spec.catalogueRackMount && StringTools.startsWith(suffix,"Y") && kind=="home")
+                normal=[suffix=="YLeft"?-1.0:1.0,0,0];
 			var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half) - normal[i] * dimensions[i] / 2];
 			var contact = [for (i in 0...3) face[i] - direction[i] * travel];
 			addMemberConnector(trigger, kind + suffix, AssemblyFrames.translation(
@@ -405,7 +418,7 @@ class Gantry extends AxisBuilder {
 			var carried = movingBounds(moving);
 			var rear = carried.max[1], top = carried.max[2];
 			// Also clear the fixed X drive where a field bracket passes its motor.
-			for (member in ["motorX", "motorXPlate"]) {
+			for (member in ["motorX", spec.catalogueRackMount?"pinionXPreload":"motorXPlate"]) {
 				var envelope = mountBounds(component(member), zeroPose(member));
 				rear = Math.max(rear, envelope.max[1]); top = Math.max(top, envelope.max[2]);
 			}
@@ -419,7 +432,30 @@ class Gantry extends AxisBuilder {
 			path = [[host.min[0] + half, host.min[1] + half, anchorZ],
 				[host.min[0] + half, host.min[1] + half, overhead],
 				[origin[0], host.min[1] + half, overhead], [origin[0], origin[1], overhead], origin];
-		} else {
+		} else if(spec.catalogueRackMount && StringTools.startsWith(suffix,"Y")) {
+            var inboard=suffix=="YLeft"?1.0:-1.0;
+            var anchorX=(inboard>0?host.max[0]:host.min[0])+inboard*half;
+            var baseZ=host.max[2]-2*half;
+            if(StringTools.endsWith(id,"homeMount")) {
+                // Move inboard before returning along Y, away from the
+                // neighbouring negative-limit holder and its root.
+                var anchorY=origin[1]-30;
+                path=[[anchorX,anchorY,baseZ],[origin[0],anchorY,baseZ],
+                    [origin[0],anchorY,origin[2]],origin];
+            } else if(StringTools.endsWith(id,"positiveLimitMount")) {
+                // Rise clear of the rear cross-member at a separate anchor
+                // station, then cross above it. No low arm through frameBack.
+                var anchorY=origin[1]-140,postX=anchorX+inboard*clearance;
+                var overhead=host.max[2]+spec.railPadHeight+2*half+clearance;
+                // Leave the frame face below its pad, then rise 3 mm clear of
+                // the pad edge. A tangent post is not a tolerance clearance.
+                path=[[anchorX,anchorY,baseZ],[postX,anchorY,baseZ],[postX,anchorY,overhead],
+                    [origin[0],anchorY,overhead],[origin[0],origin[1],overhead],origin];
+            } else {
+                var anchor=[anchorX,origin[1],baseZ];
+                path=[anchor,[origin[0],origin[1],anchor[2]],origin];
+            }
+        } else {
 			var anchor = [for (i in 0...3) Math.max(host.min[i], Math.min(host.max[i], origin[i]))];
 			path = [anchor, origin];
 		}
@@ -650,6 +686,10 @@ class Gantry extends AxisBuilder {
 		return id;
 	}
 
+    public function rackMountFor(axis:AxisSpec,rack:MachineComponent,fixed:String):machinekit.assembly.RackMount {
+        var mount=rackMounts.get(fixed);if(mount==null)throw 'Axis ${axis.id} has no built rack mount on $fixed';return mount;
+    }
+
 	function buildDrive(axis:AxisSpec, drive:GantryDrive, suffix:String, fixed:String, moving:String,
 			origin:Array<Float>, direction:Array<Float>):Void {
 		var transverse:Array<Float> = direction[2] == 0 ? [0.0, 0, 1] : [1.0, 0, 0];
@@ -788,20 +828,60 @@ class Gantry extends AxisBuilder {
 						{instanceId: idlerId, connectorName: "attach-" + idlerId}]});
 			case Rack(moduleSize, teeth, width) | HelicalRack(moduleSize,teeth,width,_):
 				var face = [origin[0] - normal[0] * (shaft - width), origin[1] - normal[1] * (shaft - width), origin[2] - normal[2] * (shaft - width)];
+                // Axial clearance for the guide-block skirts and web screw
+                // heads. The longer cleat toe keeps the host bolts unchanged.
+                if(spec.catalogueRackMount) {
+                    for(i in 0...3) {origin[i]-=12.6*normal[i];face[i]-=12.6*normal[i];}
+                }
 				var helix:Null<Float> = switch drive {case HelicalRack(_,_,_,angle):angle;case _:null;};
                 var pinion:MachineComponent=helix==null?new SpurGear(moduleSize,teeth,width,SpurGear.STANDARD_PRESSURE_ANGLE,0,0,selectedMotor.shaftDiameter):
-                    new machinekit.transmission.HelicalPinion(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",teeth).setNumber("faceWidth",width).setNumber("helixAngle",helix).setNumber("bore",selectedMotor.shaftDiameter));
+                    new machinekit.transmission.HelicalPinion(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",teeth).setNumber("faceWidth",width).setNumber("helixAngle",helix).setToken("hand",spec.catalogueRackMount?"left":"right").setNumber("bore",selectedMotor.shaftDiameter));
                 var wheel=RackGeometry.pinion(pinion);
-				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), Math.max(wheel.diameter+2*moduleSize,reducer==null?0:reducer.n("diameter")) + 2);
+                var pinionPose=AxisBuilder.orient(origin[0],origin[1],origin[2],transverse,normal);
+                if(spec.catalogueRackMount) {
+                    if(spec.preload==null)throw "Catalogue router mount requires its physical preload carrier";
+                    var host:GantryPlate=cast component(moving),hostPose=zeroPose(moving);
+                    var hostFace=axis.id=="y"?AssemblyFrames.translation(hostPose.x-normal[0]*host.width/2,
+                        hostPose.y,hostPose.z+host.height):hostPose;
+                    machinekit.transmission.RadialPinionAssembly.build(this,"pinion"+suffix,motorId,moving,
+                        spec.motorPart(axis.id),AxisBuilder.orient(face[0],face[1],face[2],transverse,normal),
+                        AssemblyFrames.compose(pinionPose,AssemblyFrames.translation(0,0,width/2)),spec.preload,hostFace,axis.id=="y");
+                } else mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), Math.max(wheel.diameter+2*moduleSize,reducer==null?0:reducer.n("diameter")) + 2);
 				// driveRack places the rack under the pinion, phases a gap to the pinion's tooth and derives the sense.
 				var rackPitch = Math.PI * wheel.moduleSize;
-				var rackMargin = Math.ceil(railMargin / rackPitch) * rackPitch;
+				var rackMargin = Math.ceil(Math.max(railMargin,axisOvertravel(axis.id)+2*rackPitch) / rackPitch) * rackPitch;
 				var rackTeeth = Std.int(Math.ceil((axis.upper + 2 * rackMargin) / rackPitch));
-				var pinionPose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
-				driveRack(axis, "pinion" + suffix, motorId, pinion, pinionPose, [-transverse[0], -transverse[1], -transverse[2]],
-					"rack" + suffix, helix==null?new Rack(moduleSize,rackTeeth,width):
-                        new machinekit.transmission.HelicalRack(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",rackTeeth).setNumber("faceWidth",width).setNumber("helixAngle",helix)),
-                    fixed,addDriver,reducer,spec.preload);
+
+                var rackPart:MachineComponent=helix==null?new Rack(moduleSize,rackTeeth,width):
+                    new machinekit.transmission.HelicalRack(new ComponentValues().setNumber("normalModule",moduleSize).setInteger("teeth",rackTeeth).setNumber("faceWidth",width).setNumber("helixAngle",helix));
+                var rackMount:machinekit.assembly.RackMount;
+                if(spec.catalogueRackMount) {
+                    if(helix==null || Math.abs(moduleSize-1.5)>1e-9)throw "Router mount requires its reviewed module-1.5 catalogue rack";
+                    var sections=Std.int(Math.ceil((axis.upper-axis.lower+2*axisOvertravel(axis.id)+4*rackPitch)/500));
+                    var run=new machinekit.transmission.GearRackRun(new ComponentValues().setInteger("sections",sections).setNumber("finishPinDiameter",6));
+                    rackPart=run;
+                    var host=axis.id=="y"?"railPad"+suffix:fixed;
+                    var tube:machinekit.structural.RectTubeMember=cast component(fixed);
+                    var facePoint=AssemblyFrames.transformPoint(zeroPose(fixed),0,tube.profile.height/2,0);
+                    if(host!=fixed) {var pad:GantryPlate=cast component(host);var top=AssemblyFrames.transformPoint(zeroPose(host),0,0,pad.height);facePoint=top;}
+                    var mountFace=AxisBuilder.orient(facePoint.x,facePoint.y,facePoint.z,[0.0,0,1],direction);
+                    // Y service comes from inside the table; X service comes
+                    // from the beam front, between its two rail rows.
+                    var serviceSide=suffix=="YRight"?1.0:-1.0;
+                    var servicePoint=AssemblyFrames.transformPoint(zeroPose(fixed),serviceSide*tube.profile.width/2,0,0);
+                    var inward=AssemblyFrames.transformVector(zeroPose(fixed),-serviceSide,0,0);
+                    var serviceFace=AxisBuilder.orient(servicePoint.x,servicePoint.y,servicePoint.z,direction,[inward.x,inward.y,inward.z]);
+                    var built=machinekit.structural.LinearRackMount.build(this,"rackMount"+suffix,axis,direction,pinion,pinionPose,run,"rack"+suffix,host,fixed,mountFace,serviceFace);
+                    rackMount=built.mount;
+                } else {
+                    var host=component(fixed),hostWidth:Float,hostHeight:Float;
+                    if(Std.isOfType(host,GantryExtrusion)){var p:GantryExtrusion=cast host;hostWidth=p.profile.size;hostHeight=p.profile.height;}
+                    else if(Std.isOfType(host,machinekit.structural.RectTubeMember)){var p:machinekit.structural.RectTubeMember=cast host;hostWidth=p.profile.width;hostHeight=p.profile.height;}
+                    else throw "Rack gantry requires an explicitly dimensioned structural host";
+                    rackMount=machinekit.structural.SimpleRackMount.build(this,"rackSupport"+suffix,axis,direction,pinion,pinionPose,rackPart,fixed,hostWidth,hostHeight);
+                }
+                rackMounts.set(fixed,rackMount);
+                driveRack(axis,"pinion"+suffix,motorId,pinion,pinionPose,rackMount,"rack"+suffix,rackPart,addDriver,reducer,spec.preload);
 		}
 	}
 }

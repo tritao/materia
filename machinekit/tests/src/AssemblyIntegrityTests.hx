@@ -1,3 +1,4 @@
+import machinekit.assembly.RackMount;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import machinekit.assembly.AssemblyIntegrity;
@@ -116,18 +117,21 @@ class AssemblyIntegrityTests {
 			builder.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, -20, up, along));
 			builder.slide(spec, "rail", "carriage", LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0});
 			var motor = NemaStepper.frame(17);
-			builder.attach("motor", motor, AxisBuilder.orient(60, -motor.variant.shaftLength, 10, up, [0, 1, 0]), "carriage");
+			builder.attach("motor", motor, AxisBuilder.orient(60, 30-motor.variant.shaftLength, 10, up, [0, 1, 0]), "carriage");
 			var pinion = new SpurGear(1, 20, 8), rack = new Rack(1, 100, 8);
-			var pose = AxisBuilder.orient(60, 0, 10, up, [0, 1, 0]);
+			var pose = AxisBuilder.orient(60, 30, 10, up, [0, 1, 0]);
 			var driver = (motorId:String) -> {
 				builder.attach("driver", new MotorDriver("GENERIC-TMC2209", new machinekit.power.PhaseRmsCurrent(1.5), 16,
 					new machinekit.power.DcVoltage(24)), AssemblyFrames.translation(0, -100, 0), "rail");
 				return "driver";
 			};
-			if (!reversed) builder.driveRack(spec, "pinion", "motor", pinion, pose, [0.0, 0, -1], "rack", rack, "rail", driver);
+            var fixtureTop=10-pinion.pitchDiameter/2-1.25*rack.moduleSize-rack.barHeight;
+            builder.place("rackFixture",new machinekit.gantry.GantryParts.GantryPlate("anchored rack test fixture",rack.length+2*Math.PI*rack.moduleSize,8,10),AssemblyFrames.translation(110,34,fixtureTop-10));
+            var rackMount=new RackMount("rackFixture",AxisBuilder.orient(0,0,10,up,along),"rackFixture",[{first:"$rack",second:"rackFixture"}]);
+			if (!reversed) builder.driveRack(spec, "pinion", "motor", pinion, pose, rackMount, "rack", rack, driver);
 			else {
-				var placement = builder.rackPlacement(spec, pinion, pose, [0.0, 0, -1], rack);
-				builder.attach("rack", rack, placement.pose, "rail");
+				var placement = builder.rackPlacement(spec, pinion, pose, rackMount, rack);
+				builder.attach("rack", rack, placement.pose, "rackFixture");
 				builder.hang("pinion", pinion, pose, "motor");
 				var ratio = builder.addTransmission("pinion-rack", "x", "pinion-turn", RackAndPinion("pinion", "rack"),
 					placement.sense == Same ? Opposite : Same);

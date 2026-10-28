@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": {
+    "name": "router-physical-rack-mount"
+  },
+  "entry": "RouterRackMountChecks",
+  "sourceRoots": [
+    "src",
+    "../src",
+    "../../examples/sheet-router",
+    "../../../projectkit/tests/src"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/router-mount-implementation/release-checks"
+}

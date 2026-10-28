@@ -1,3 +1,4 @@
+import machinekit.assembly.RackMount;
 import machinekit.assembly.AxisBuilder;
 import machinekit.assembly.AxisBuilder.AxisSpec;
 import cadkit.modeling.AssemblyModel;
@@ -24,11 +25,14 @@ class AxisBuilderChecks {
 		builder.slide(axis, "rail", "carriage", LinearRailBlock.metric("MGN12C"),
 			AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0});
 		var motor = NemaStepper.frame(17);
-		builder.attach("motor", motor, AxisBuilder.orient(60, -motor.variant.shaftLength, 10, up, [0, 1, 0]), "carriage");
+		builder.attach("motor", motor, AxisBuilder.orient(60, 30-motor.variant.shaftLength, 10, up, [0, 1, 0]), "carriage");
 		var pinion = new SpurGear(1, 20, 8);
 		var rack = new Rack(1, 100, 8);
-		builder.driveRack(axis, "pinion", "motor", pinion, AxisBuilder.orient(60, 0, 10, up, [0, 1, 0]),
-			[0.0, 0, -1], "rack", rack, "rail",
+        var fixtureTop=10-pinion.pitchDiameter/2-1.25*rack.moduleSize-rack.barHeight;
+        builder.place("rackFixture",new machinekit.gantry.GantryParts.GantryPlate("anchored rack test fixture",rack.length+2*Math.PI*rack.moduleSize,8,10),AssemblyFrames.translation(110,34,fixtureTop-10));
+        var rackMount=new RackMount("rackFixture",AxisBuilder.orient(0,0,10,up,along),"rackFixture",[{first:"$rack",second:"rackFixture"}]);
+		builder.driveRack(axis, "pinion", "motor", pinion, AxisBuilder.orient(60, 30, 10, up, [0, 1, 0]),
+			rackMount, "rack", rack,
 			_ -> {
 				builder.attach("driver", new MotorDriver("GENERIC-TMC2209",
 					new machinekit.power.PhaseRmsCurrent(1.5), 16, new machinekit.power.DcVoltage(24)),
@@ -39,7 +43,7 @@ class AxisBuilderChecks {
 		var model = new AssemblyModel("mm");
 		builder.addTo(model, "");
 		var definition = model.definition("rack-axis");
-		check(definition.occurrences.length == 6, "the rack, pinion, carriage, rail, motor and driver are physical members");
+		check(definition.occurrences.length == 7, "the rack, support, pinion, carriage, rail, motor and driver are physical members");
 		var couplings = definition.couplings;
 		if (couplings == null) throw "Axis builder: missing coupling";
 		var actuators = definition.actuators;
@@ -73,12 +77,12 @@ class AxisBuilderChecks {
 		try builder.slide({id: "overrun", lower: -100.0, upper: 100.0, initial: 0.0}, "rail", "badCarriage",
 			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0})
 		catch (_:Dynamic) rejected = true;
-		check(rejected && builder.components().length == 6, "rail overrun is rejected before adding a carriage");
+		check(rejected && builder.components().length == 7, "rail overrun is rejected before adding a carriage");
 		var multiRejected = false;
 		try builder.slide({id: "multi-overrun", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "badPair",
 			LinearRailBlock.metric("MGN12C"), AxisBuilder.orient(60, 0, -20, up, along), {x: 1.0, y: 0.0, z: 0.0},
 			[AxisBuilder.orient(250, 0, -20, up, along)]) catch (_:Dynamic) multiRejected = true;
-		check(multiRejected && builder.components().length == 6, "a trailing block overrun rejects the whole carriage atomically");
+		check(multiRejected && builder.components().length == 7, "a trailing block overrun rejects the whole carriage atomically");
 		var pair = new AxisBuilder();
 		pair.place("rail", LinearRail.metric("MGN12C", 300), AxisBuilder.orient(0, 0, 0, up, along));
 		pair.slide({id: "x", lower: 0.0, upper: 100.0, initial: 0.0}, "rail", "first", LinearRailBlock.metric("MGN12C"),

@@ -16,6 +16,10 @@ class RackGeometry {
         throw new TransmissionDesignError('Rack drive needs a straight or helical pinion');
     }
     public static function rack(part:MachineComponent):{length:Float,width:Float,teeth:Int,helix:Float,hand:Int} {
+        if(Std.isOfType(part,GearRackRun)) {
+            var run:GearRackRun=cast part;
+            return {length:run.length,width:run.section.spec.faceWidthMm,teeth:run.count*run.section.spec.teeth,helix:run.section.helixAngle(),hand:1};
+        }
         if(Std.isOfType(part,GearRack)) {
             var r:GearRack=cast part;
             return {length:r.spec.lengthMm,width:r.spec.faceWidthMm,teeth:r.spec.teeth,helix:r.helixAngle(),hand:1};
@@ -29,7 +33,15 @@ class RackGeometry {
         }
         throw new TransmissionDesignError('Rack drive needs a straight or helical rack');
     }
+    /** Engineering mesh properties stay explicit assumptions, distinct from sourced stock/ratings. */
+    public static function nominalHelical(part:MachineComponent):HelicalRack {
+        if(Std.isOfType(part,GearRackRun))return cast(part,GearRackRun).nominalRack();
+        if(Std.isOfType(part,GearRack))return cast(part,GearRack).nominalRack();
+        if(Std.isOfType(part,HelicalRack))return cast part;
+        throw new TransmissionDesignError("Rack has no helical mesh model");
+    }
     public static function relation(pinion:MachineComponent,rack:Null<MachineComponent>,alignment:Float):TransmissionRelation {
+        if(Std.isOfType(rack,GearRackRun))return relation(pinion,cast(rack,GearRackRun).nominalRack(),alignment);
         if(Std.isOfType(rack,GearRack))return relation(pinion,cast(rack,GearRack).nominalRack(),alignment);
         if(Std.isOfType(pinion,SpurGear)) {
             if(rack!=null&&!Std.isOfType(rack,Rack))throw new TransmissionDesignError('Straight pinion needs a straight rack');

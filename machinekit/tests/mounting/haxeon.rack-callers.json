@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "package": {
+    "name": "physical-rack-caller-regressions"
+  },
+  "entry": "RackCallerChecks",
+  "sourceRoots": [
+    "src",
+    "../src",
+    "../../examples/robot-arm"
+  ],
+  "dependencies": {
+    "machinekit": {
+      "path": "../.."
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    }
+  },
+  "target": "host",
+  "outputDir": "../../../build/router-mount-implementation/caller-checks"
+}

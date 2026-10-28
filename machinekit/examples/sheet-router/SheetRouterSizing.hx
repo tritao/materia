@@ -60,7 +60,7 @@ class SheetRouterSizing {
         else throw "Sizing requires a selected servo motor: "+motorPart.designation;
         var reducer:PlanetaryReducer=vertical?null:cast machine.component("pinion"+suffix+"Reducer");
         var pinion:HelicalPinion=vertical?null:cast machine.component("pinion"+suffix);
-        var rack:HelicalRack=vertical?null:cast machine.component("rack"+suffix);
+        var rack:HelicalRack=vertical?null:machinekit.transmission.RackGeometry.nominalHelical(machine.component("rack"+suffix));
         var preload:PreloadedPinionMount=vertical?null:cast machine.component("pinion"+suffix+"Preload");
         var ratio=vertical?1:reducer.n("ratio");
         var radius=vertical?cast(machine.component("screwZ"),LeadScrew).thread.lead/1000/(2*Math.PI):pinion.pitchDiameter()/2000;

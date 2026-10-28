@@ -31,7 +31,7 @@ class SheetRouterFemYLoads {
             if(!preload.resists(tooth.separatingN))failures.push("preload: eccentric separating force at reserved peak");
             var reducer:PlanetaryReducer=cast machine.component("pinionYLeftReducer");
             var radius=pinion.pitchDiameter()/2000;
-            var rack:HelicalRack=cast machine.component("rackYLeft");
+            var rack:HelicalRack=machinekit.transmission.RackGeometry.nominalHelical(machine.component("rackYLeft"));
             var rotary:Float=cast baseline.rotatingOutputInertiaKgM2;
             var outputPeak=demand.peakForcePerMotorN*radius/rack.n("efficiency")+rotary*input.acceleration/radius;
             var outputRated=(input.cuttingForceN+input.dragForceN)*radius/rack.n("efficiency");

@@ -58,13 +58,13 @@ class SheetRouterNewAxesChecks {
         state.setJoint('x',300);state.setJoint('y',200);state.setJoint('z',100);state.forwardKinematics();
         var far=state.worldConnector('flange','face');near(far.x-home.x,300,'servo FK X');near(far.y-home.y,200,'servo FK Y');near(far.z-home.z,-100,'servo FK Z');
         for(binding in gantry.cableChainBindings) {
-            var first=gantry.cableChainEnd(binding.axis,0),last=gantry.cableChainEnd(binding.axis,binding.chain.n('travel'));
-            var direction=gantry.axisDirection(binding.axis),travel=binding.chain.n('travel');
+            var first=gantry.cableChainEnd(binding.axis,0),last=gantry.cableChainEnd(binding.axis,binding.travel);
+            var direction=gantry.axisDirection(binding.axis),travel=binding.travel;
             near(last.x-first.x,direction[0]*travel,'chain end X follows axis');near(last.y-first.y,direction[1]*travel,'chain end Y follows axis');
             var parent=gantry.zeroPose(binding.carrier);near(first.x,parent.x,'chain starts at carriage X');near(first.y,parent.y,'chain starts at carriage Y');near(first.z,parent.z,'chain starts at carriage Z');
         }
         check(gantry.cableChainBindings.length==2,'both long-axis cable chains assembled');
-        for(id in ['pinionXReducer','pinionYLeftReducer','pinionYRightReducer','pinionXPreload','pinionXOutputShaft','motorXPlate']) {
+        for(id in ['pinionXReducer','pinionYLeftReducer','pinionYRightReducer','pinionXPreload','pinionXOutputShaft','pinionXAnchor']) {
             var part=gantry.component(id).geometry();check(part.valid()&&part.volume()>0,'new axis hardware geometry '+id);part.close();
         }
         var source:PowerSupply=cast gantry.component('powerSupply');check(source.regenerativePower>0,'supply regeneration derived from motor curves');

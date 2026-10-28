@@ -27,12 +27,12 @@ class SheetRouterSpec {
         var screw:GantryDrive=Screw(new LeadScrewThread(Ball,16,10,1,RightHand,13));
         return new GantrySpec(workX,workY+rackZone,travelZ,rack,rack,screw,true,"HGH20CA",23,
             "HFS5-4040","HFS5-4040",true,None,0.5,new machinekit.power.DcVoltage(560),16,300,100,200,180,{
-                railProfileY:"HGH25CA",yBlockSpacing:280,railPadHeight:12,
+                catalogueRackMount:true,railProfileY:"HGH25CA",yBlockSpacing:280,railPadHeight:12,
                 beamFootThickness:30,beamFootMaterial:"steel",beamFootWelded:true,
                 frontGuides:{zGuideOffset:60,xRailSpacing:150,xBlockSpacing:300,zRailSpacing:180,zBlockSpacing:200,carriageThickness:40,movingThickness:20,zRibDepth:120,zRibWidth:25,zRibWall:6},
                 motor:Servo("GENERIC-HV-SERVO-750W"),motorX:Servo("GENERIC-HV-SERVO-750W"),motorZ:BrakedServo("750"),
                 reducer:new PlanetaryReducer(new ComponentValues().setNumber("backlash",3)),reducerX:new PlanetaryReducer(new ComponentValues().setNumber("bore",19).setNumber("ratio",7.5).setNumber("backlash",3)),
-                preload:new machinekit.transmission.PreloadedPinionMount(new ComponentValues().setNumber("springForce",550).setNumber("springRate",4000).setNumber("stroke",0.5)),
+                preload:new machinekit.transmission.PreloadedPinionMount(new ComponentValues().setToken("layout","radial-fork").setNumber("springForce",550).setNumber("springRate",4000).setNumber("stroke",0.5)),
                 structure:Steel(new RectTube(100,100,6),new RectTube(100,200,6.3)),cableChain:new CableChain(),
                 cableChainOffsetY:{x:-80.0,y:0.0,z:150.0},cableChainOffsetX:{x:0.0,y:200.0,z:400.0}
             });

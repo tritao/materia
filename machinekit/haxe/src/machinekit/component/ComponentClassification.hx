@@ -15,6 +15,7 @@ class ComponentClassification {
 		file(registry, "machinekit.motion.motor-adapter-plate", "Mounts and couplings", ComponentKind.Supplier);
 		file(registry, "machinekit.assembly.motor-plate", "Mounts and couplings", ComponentKind.Generic);
 		file(registry, "machinekit.assembly.screw-axis-coupling", "Mounts and couplings", ComponentKind.Generic);
+        file(registry,"machinekit.transmission.gear-rack-run","Racks and pinions",ComponentKind.MachinePart);
 		// control
 		file(registry, "machinekit.control.cnc-controller", "Controllers and cabinets", ComponentKind.Generic);
 		file(registry, "machinekit.control.control-cabinet", "Controllers and cabinets", ComponentKind.Generic);

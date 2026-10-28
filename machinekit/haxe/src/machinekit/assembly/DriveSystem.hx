@@ -200,7 +200,7 @@ class DriveSystem {
 			case RackAndPinion(pinionId,rackId):
 				if(record.rackReducer!=null||record.rackPreload!=null) {
 					if(rackId==null||!Std.isOfType(flat.member(pinionId),machinekit.transmission.HelicalPinion)||
-							!Std.isOfType(flat.member(rackId),machinekit.transmission.HelicalRack))
+							(!Std.isOfType(flat.member(rackId),machinekit.transmission.HelicalRack) && !Std.isOfType(flat.member(rackId),machinekit.transmission.GearRackRun) && !Std.isOfType(flat.member(rackId),machinekit.transmission.GearRack)))
 						throw new TransmissionDesignError("Series rack allowances need matching helical parts");
 					var reducer:Null<machinekit.motion.PlanetaryReducer> = null;
 					var preload:Null<machinekit.transmission.PreloadedPinionMount> = null;
@@ -214,7 +214,7 @@ class DriveSystem {
 						if(!Std.isOfType(part,machinekit.transmission.PreloadedPinionMount))throw new TransmissionDesignError("Rack preload has no spring allowance");
 						preload=cast part;
 					}
-					var compliance=machinekit.sizing.RackDriveSizing.compliance(cast flat.member(pinionId),cast flat.member(rackId),reducer,preload);
+					var compliance=machinekit.sizing.RackDriveSizing.compliance(cast flat.member(pinionId),machinekit.transmission.RackGeometry.nominalHelical(flat.member(rackId)),reducer,preload);
 					if(record.stiffness==null) {
 						relation.stiffness=compliance.stiffnessNPerM/1000;
 						relation.setBasis("stiffness",ValueBasis.Assumed,"unverified rack mesh, reducer torsion and preload hinge stiffness");
