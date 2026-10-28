@@ -41,14 +41,43 @@ def _resolve(value: Any, constants: dict[str, Any], enums: dict[str, dict[str, i
     return value
 
 
+def _constraint(where: str, field: Any, type_name: str, enum_name: str | None) -> dict[str, Any]:
+    """Lock entries for a packed field's optional constraint; empty (and so lock-neutral) when none."""
+    integer = type_name.startswith(("u", "i"))
+    low, high, _ = PRIMITIVE_RANGES[type_name]
+    if enum_name is not None:
+        return {"enum": enum_name}
+    if field.range is not None:
+        if not integer:
+            raise ValidationError(f"{where} can use range only with an integer type")
+        if not low <= field.range[0] <= field.range[1] <= high:
+            raise ValidationError(f"{where} has an invalid range")
+        return {"range": list(field.range)}
+    if field.mask is not None:
+        if not type_name.startswith("u") or not 0 < field.mask <= high:
+            raise ValidationError(f"{where} can use mask only with an unsigned type and a mask that fits it")
+        return {"mask": field.mask}
+    if field.zero:
+        if not integer:
+            raise ValidationError(f"{where} can use zero only with an integer type")
+        return {"zero": True}
+    if field.text:
+        if type_name != "u8" or field.type_ref.length is None:
+            raise ValidationError(f"{where} can use text only with a u8 array")
+        return {"text": True}
+    return {}
+
+
 def normalized(schema: Schema) -> dict[str, Any]:
     enum_values = {enum.name: {value.name: value.value for value in enum.values} for enum in schema.enums}
     constants = {constant.name: constant.value for constant in schema.constants}
+    enum_underlying = {enum.name: enum.underlying for enum in schema.enums}
     packed_sizes: dict[str, int] = {}
     for packed in schema.packed_structs:
         size = 0
         for field in packed.fields:
-            base_size = PRIMITIVE_RANGES.get(field.type_ref.name, (None, None, None))[2]
+            type_name = enum_underlying.get(field.type_ref.name, field.type_ref.name)
+            base_size = PRIMITIVE_RANGES.get(type_name, (None, None, None))[2]
             if base_size is None or field.type_ref.length is not None and field.type_ref.length <= 0:
                 raise ValidationError(f"{packed.name}.{field.name} has an invalid packed type")
             size += base_size * (field.type_ref.length or 1)
@@ -173,11 +202,20 @@ def normalized(schema: Schema) -> dict[str, Any]:
             if field.name in names:
                 raise ValidationError(f"{packed.name} has duplicate field {field.name}")
             names.add(field.name)
-            if field.type_ref.name not in PRIMITIVE_RANGES:
-                raise ValidationError(f"{packed.name}.{field.name} uses unsupported packed type")
+            where = f"{packed.name}.{field.name}"
+            type_name = field.type_ref.name
+            enum_name = None
+            if type_name in enum_by_name:
+                if field.type_ref.length is not None:
+                    raise ValidationError(f"{where} cannot be an array of enum values")
+                enum_name, type_name = type_name, enum_by_name[type_name].underlying
+            if type_name not in PRIMITIVE_RANGES:
+                raise ValidationError(f"{where} uses unsupported packed type")
             if field.type_ref.length is not None and not 0 < field.type_ref.length <= 1_000_000:
-                raise ValidationError(f"{packed.name}.{field.name} has an invalid fixed-array length")
-            fields.append({"name": field.name, "type": field.type_ref.name, "length": field.type_ref.length or 1})
+                raise ValidationError(f"{where} has an invalid fixed-array length")
+            entry = {"name": field.name, "type": type_name, "length": field.type_ref.length or 1}
+            entry.update(_constraint(where, field, type_name, enum_name))
+            fields.append(entry)
         size = packed_sizes[packed.name]
         if size <= 0:
             raise ValidationError(f"packed struct {packed.name} has zero size")

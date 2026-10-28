@@ -32,6 +32,7 @@
       "endian": "little",
       "fields": [
         {
+          "enum": "ConfigKind",
           "length": 1,
           "name": "kind",
           "type": "u8"
@@ -39,17 +40,23 @@
         {
           "length": 1,
           "name": "index",
+          "range": [
+            0,
+            11
+          ],
           "type": "u8"
         },
         {
           "length": 12,
           "name": "text",
+          "text": true,
           "type": "u8"
         },
         {
           "length": 2,
           "name": "reserved",
-          "type": "u8"
+          "type": "u8",
+          "zero": true
         }
       ],
       "size": 16
@@ -59,10 +66,12 @@
       "fields": [
         {
           "length": 1,
+          "mask": 63,
           "name": "leds",
           "type": "u8"
         },
         {
+          "enum": "LeaseState",
           "length": 1,
           "name": "lease",
           "type": "u8"
@@ -70,12 +79,14 @@
         {
           "length": 21,
           "name": "text",
+          "text": true,
           "type": "u8"
         },
         {
           "length": 1,
           "name": "reserved",
-          "type": "u8"
+          "type": "u8",
+          "zero": true
         }
       ],
       "size": 24
@@ -96,20 +107,30 @@
         {
           "length": 1,
           "name": "position",
+          "range": [
+            0,
+            11
+          ],
           "type": "u8"
         },
         {
           "length": 1,
           "name": "step",
+          "range": [
+            0,
+            2
+          ],
           "type": "u8"
         },
         {
           "length": 1,
+          "mask": 63,
           "name": "buttons",
           "type": "u8"
         },
         {
           "length": 1,
+          "mask": 3,
           "name": "flags",
           "type": "u8"
         }

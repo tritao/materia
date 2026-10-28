@@ -52,6 +52,11 @@ class Message:
 class PackedField:
     name: str
     type_ref: TypeRef
+    # At most one of these may be set; all apply to every element of an array.
+    range: tuple[int, int] | None = None
+    mask: int | None = None
+    zero: bool = False
+    text: bool = False
 
 
 @dataclass

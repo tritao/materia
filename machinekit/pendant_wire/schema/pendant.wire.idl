@@ -20,28 +20,29 @@ packed PendantState endian little {
     sequence : u16
     wheel_delta : i16
     # 0 is OFF, 1 to 11 select a profile axis.
-    position : u8
+    position : u8 range 0..11
     # 0, 1, 2 for x1, x10, x100.
-    step : u8
+    step : u8 range 0..2
     # Bits 0 to 5: Start, Hold, Stop, F1, F2, F3.
-    buttons : u8
+    buttons : u8 mask 0x3F
     # Bit 0 wheel enable, bit 1 E-stop chain closed; other bits reserved zero.
-    flags : u8
+    flags : u8 mask 0x03
 }
 
 # Cabinet controller to pendant: one label per frame, NUL terminated and padded.
 packed PendantConfig endian little {
-    kind : u8
-    index : u8
-    text : u8[12]
-    reserved : u8[2]
+    kind : ConfigKind
+    # Axis: 1 to 11. Key: 0 to 2. The kind-dependent limit is checked by the consumer.
+    index : u8 range 0..11
+    text : u8[12] text
+    reserved : u8[2] zero
 }
 
 # Cabinet controller to pendant: LEDs, lease and the one-line status text.
 packed PendantOutput endian little {
     # One bit per button, in the same order as PendantState.buttons.
-    leds : u8
-    lease : u8
-    text : u8[21]
-    reserved : u8
+    leds : u8 mask 0x3F
+    lease : LeaseState
+    text : u8[21] text
+    reserved : u8 zero
 }

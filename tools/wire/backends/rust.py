@@ -11,11 +11,40 @@ def _variant(name: str) -> str:
     return "".join(part[:1].upper() + part[1:] for part in name.split("_"))
 
 
+def _constrained(item: dict[str, Any]) -> list[dict[str, Any]]:
+    return [f for f in item["fields"] if set(f) - {"name", "type", "length"}]
+
+
+def _violation(field: dict[str, Any], enums: dict[str, list[int]], arrays: set[str]) -> str:
+    """Rust condition that is true when the field breaks its constraint."""
+    name, typ, array = field["name"], field["type"], field["name"] in arrays
+    def test(value: str, body: str) -> str:
+        return (f"self.{name}.iter().any(|&v| {body.replace('@', 'v')})" if array
+                else body.replace("@", f"self.{name}"))
+    if "range" in field:
+        low, high = field["range"]
+        return test(name, f"!({low}..={high}).contains(&@)")
+    if "mask" in field:
+        return test(name, f"@ & !{field['mask']}{typ} != 0")
+    if "zero" in field:
+        return test(name, "@ != 0")
+    if "enum" in field:
+        members = " | ".join(str(v) for v in enums[field["enum"]])
+        return test(name, f"!matches!(@, {members})")
+    end = f"self.{name}.iter().position(|&b| b == 0).unwrap_or(self.{name}.len())"
+    return (f"{{ let end = {end}; self.{name}[..end].iter().any(|&b| !(32..=126).contains(&b)) "
+            f"|| self.{name}[end..].iter().any(|&b| b != 0) }}")
+
+
 def render(schema: Schema, norm: dict[str, Any]) -> str:
+    constrained = any(_constrained(item) for item in norm["packed_structs"].values())
+    error = "pub enum Error { ShortBuffer, WrongLength, Constraint(&'static str) }" if constrained else \
+        "pub enum Error { ShortBuffer, WrongLength }"
+    enums = {enum.name: [item.value for item in enum.values] for enum in schema.enums}
     lines = [
         "// Generated from a .wire.idl schema. Do not edit.",
         "", "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
-        "pub enum Error { ShortBuffer, WrongLength }", "",
+        error, "",
     ]
     for constant in schema.constants:
         value = norm["constants"][constant.name]["value"]
@@ -36,7 +65,7 @@ def render(schema: Schema, norm: dict[str, Any]) -> str:
                 typ = f"[{typ}; {field['length']}]"
             lines.append(f"    pub {field['name']}: {typ},")
         lines.extend(["}", "", f"impl {packed.name} {{", f"    pub const SIZE: usize = {item['size']};", ""])
-        lines.extend(["    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {", "        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }", "        let mut offset = 0usize;"])
+        lines.extend(["    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {", "        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }"] + (["        self.check()?;"] if _constrained(item) else []) + ["        let mut offset = 0usize;"])
         for field in item["fields"]:
             typ = field["type"]
             size = int(typ[1:]) // 8
@@ -66,5 +95,13 @@ def render(schema: Schema, norm: dict[str, Any]) -> str:
                 lines.append("        }")
         lines.append("        let _ = offset;")
         members = ", ".join(field["name"] for field in item["fields"])
-        lines.extend([f"        Ok(Self {{ {members} }})", "    }", "}", ""])
+        if _constrained(item):
+            lines.extend([f"        let value = Self {{ {members} }};", "        value.check()?;", "        Ok(value)", "    }", "",
+                          "    /// Constraints declared in the schema; checked on encode and decode.",
+                          "    pub fn check(&self) -> Result<(), Error> {"])
+            for field in _constrained(item):
+                lines.append(f"        if {_violation(field, enums, array_fields)} {{ return Err(Error::Constraint(\"{packed.name}.{field['name']}\")); }}")
+            lines.extend(["        Ok(())", "    }", "}", ""])
+        else:
+            lines.extend([f"        Ok(Self {{ {members} }})", "    }", "}", ""])
     return "\n".join(lines)

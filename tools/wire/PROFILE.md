@@ -28,6 +28,27 @@ packed structs, with `1 <= count <= 1,000,000`. Each packed struct declares
 `endian little` or `endian big`; its size is the sum of its fields with no
 padding.
 
+## Packed field constraints
+
+A packed field may carry one optional constraint after its type. Constraints are part of the
+compatibility lock (an existing field cannot gain, lose or change one) and the generated Rust and
+C++ codecs enforce them on both encode and decode. Schemas without constraints generate exactly
+the same output and lock as before.
+
+```text
+position : u8 range 0..11      # integer types; applies to each element of an array
+flags    : u8 mask 0x03        # unsigned; bits outside the mask must be zero
+reserved : u8[2] zero          # integer types; must be zero
+text     : u8[12] text         # u8 arrays; printable ASCII to the first NUL, only NULs after it
+mode     : Mode                # an enum type (scalar only): the stored value must be a member
+```
+
+Hex integers (`0x3F`) are accepted wherever an integer is. A field named `range`, `mask`, `zero`
+or `text` still parses, since a modifier is never followed by `:`. Rust adds
+`Error::Constraint(&'static str)` naming `Struct.field` and a `check()` method; C++ adds
+`valid()`, and `decode`/`encode` return false for a violation. Rules involving two fields stay in
+the consumer.
+
 ## Message encoding
 
 Messages are MessagePack maps with positive integer field IDs sorted for
@@ -40,7 +61,7 @@ missing/duplicate behavior; use the generated strict wrapper for this profile.
 MessagePack encodes values only: HMPK and RobotKit framing are outside this
 language.
 
-The current tool does not declare per-field byte limits or nonfinite-float
+The current tool does not declare per-field byte limits for messages or nonfinite-float
 policies. Those must be validated by the consuming protocol until added to
 the language. SensorKit's Haxeon reader applies its own container and nesting
 limits; do not assume those limits are an `.wire.idl` promise.

@@ -9,7 +9,7 @@ from typing import Any
 from .model import Constant, Enum, EnumValue, Field, Message, PackedField, PackedStruct, Schema, TypeRef
 
 
-TOKEN = re.compile(r"\s+|//[^\n]*|\#[^\n]*|(?:\d+\.\d+)|(?:\d+)|(?:[A-Za-z_][A-Za-z_0-9]*)|\.\.|[^\s]")
+TOKEN = re.compile(r"\s+|//[^\n]*|\#[^\n]*|(?:0[xX][0-9A-Fa-f]+)|(?:\d+\.\d+)|(?:\d+)|(?:[A-Za-z_][A-Za-z_0-9]*)|\.\.|[^\s]")
 
 
 class ParseError(ValueError):
@@ -49,9 +49,17 @@ class Parser:
 
     def integer(self) -> int:
         token = self.take()
+        if re.fullmatch(r"0[xX][0-9A-Fa-f]+", token):
+            return int(token, 16)
         if not token.isdigit():
             self.fail("expected non-negative integer")
         return int(token)
+
+    def signed_integer(self) -> int:
+        if self.peek() == "-":
+            self.take()
+            return -self.integer()
+        return self.integer()
 
     def literal(self) -> Any:
         if self.peek() == "-":
@@ -140,13 +148,31 @@ class Parser:
                 while self.peek() != "}":
                     field_name = self.identifier()
                     self.expect(":")
-                    fields.append(PackedField(field_name, self.type_ref()))
+                    fields.append(self.packed_field(field_name))
                     self.optional_semicolon()
                 self.expect("}")
                 schema.packed_structs.append(PackedStruct(name, endian, fields))
             else:
                 self.fail(f"unknown declaration {kind!r}")
         return schema
+
+    def packed_field(self, name: str) -> PackedField:
+        type_ref = self.type_ref()
+        options: dict[str, Any] = {}
+        # A field named like a modifier is told apart by the ':' that follows every field name.
+        while self.peek() in ("range", "mask", "zero", "text") and self.tokens[self.index + 1:self.index + 2] != [":"]:
+            modifier = self.take()
+            if options:
+                self.fail("a packed field takes at most one constraint")
+            if modifier == "range":
+                low = self.signed_integer()
+                self.expect("..")
+                options["range"] = (low, self.signed_integer())
+            elif modifier == "mask":
+                options["mask"] = self.integer()
+            else:
+                options[modifier] = True
+        return PackedField(name, type_ref, **options)
 
     def optional_semicolon(self) -> None:
         if self.peek() == ";":

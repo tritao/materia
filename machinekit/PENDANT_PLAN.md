@@ -85,8 +85,9 @@ several KB. Values are placeholders.
 
 - Payloads are defined in `pendant_wire/schema/pendant.wire.idl`, the same `.wire.idl` system as
   RKD6, with a compatibility lock. `python -m tools.wire generate --config machinekit/pendant_wire/wire.json`
-  writes the `no_std` Rust codec; `pendant_wire/src/lib.rs` adds the validation the schema cannot
-  express (ranges, reserved bits, NUL-terminated text) and pins the byte layout in tests. Each
+  writes the `no_std` Rust codec, which enforces the ranges, masks, reserved bytes, enum values and
+  text rules declared in the schema (see `tools/wire/PROFILE.md`); `pendant_wire/src/lib.rs` keeps
+  only the cross-field label index check and pins the byte layout in tests. Each
   record is exactly a valid CAN-FD length (STATE 8, CONFIG 16, OUTPUT 24 bytes), and CAN provides
   the identifier, length and CRC.
 - The host never sees CAN frames: the pendant talks to the cabinet controller, which owns the lease.

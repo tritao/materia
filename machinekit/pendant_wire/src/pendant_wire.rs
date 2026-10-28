@@ -1,7 +1,7 @@
 // Generated from a .wire.idl schema. Do not edit.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Error { ShortBuffer, WrongLength }
+pub enum Error { ShortBuffer, WrongLength, Constraint(&'static str) }
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const POSITIONS: u8 = 11;
@@ -36,6 +36,7 @@ impl PendantState {
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        self.check()?;
         let mut offset = 0usize;
         out[offset..offset + 2].copy_from_slice(&self.sequence.to_le_bytes());
         offset += 2;
@@ -80,7 +81,18 @@ impl PendantState {
         let flags = u8::from_le_bytes(bytes);
         offset += 1;
         let _ = offset;
-        Ok(Self { sequence, wheel_delta, position, step, buttons, flags })
+        let value = Self { sequence, wheel_delta, position, step, buttons, flags };
+        value.check()?;
+        Ok(value)
+    }
+
+    /// Constraints declared in the schema; checked on encode and decode.
+    pub fn check(&self) -> Result<(), Error> {
+        if !(0..=11).contains(&self.position) { return Err(Error::Constraint("PendantState.position")); }
+        if !(0..=2).contains(&self.step) { return Err(Error::Constraint("PendantState.step")); }
+        if self.buttons & !63u8 != 0 { return Err(Error::Constraint("PendantState.buttons")); }
+        if self.flags & !3u8 != 0 { return Err(Error::Constraint("PendantState.flags")); }
+        Ok(())
     }
 }
 
@@ -97,6 +109,7 @@ impl PendantConfig {
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        self.check()?;
         let mut offset = 0usize;
         out[offset..offset + 1].copy_from_slice(&self.kind.to_le_bytes());
         offset += 1;
@@ -139,7 +152,18 @@ impl PendantConfig {
             offset += 1;
         }
         let _ = offset;
-        Ok(Self { kind, index, text, reserved })
+        let value = Self { kind, index, text, reserved };
+        value.check()?;
+        Ok(value)
+    }
+
+    /// Constraints declared in the schema; checked on encode and decode.
+    pub fn check(&self) -> Result<(), Error> {
+        if !matches!(self.kind, 0 | 1) { return Err(Error::Constraint("PendantConfig.kind")); }
+        if !(0..=11).contains(&self.index) { return Err(Error::Constraint("PendantConfig.index")); }
+        if { let end = self.text.iter().position(|&b| b == 0).unwrap_or(self.text.len()); self.text[..end].iter().any(|&b| !(32..=126).contains(&b)) || self.text[end..].iter().any(|&b| b != 0) } { return Err(Error::Constraint("PendantConfig.text")); }
+        if self.reserved.iter().any(|&v| v != 0) { return Err(Error::Constraint("PendantConfig.reserved")); }
+        Ok(())
     }
 }
 
@@ -156,6 +180,7 @@ impl PendantOutput {
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        self.check()?;
         let mut offset = 0usize;
         out[offset..offset + 1].copy_from_slice(&self.leds.to_le_bytes());
         offset += 1;
@@ -193,6 +218,17 @@ impl PendantOutput {
         let reserved = u8::from_le_bytes(bytes);
         offset += 1;
         let _ = offset;
-        Ok(Self { leds, lease, text, reserved })
+        let value = Self { leds, lease, text, reserved };
+        value.check()?;
+        Ok(value)
+    }
+
+    /// Constraints declared in the schema; checked on encode and decode.
+    pub fn check(&self) -> Result<(), Error> {
+        if self.leds & !63u8 != 0 { return Err(Error::Constraint("PendantOutput.leds")); }
+        if !matches!(self.lease, 0 | 1 | 2) { return Err(Error::Constraint("PendantOutput.lease")); }
+        if { let end = self.text.iter().position(|&b| b == 0).unwrap_or(self.text.len()); self.text[..end].iter().any(|&b| !(32..=126).contains(&b)) || self.text[end..].iter().any(|&b| b != 0) } { return Err(Error::Constraint("PendantOutput.text")); }
+        if self.reserved != 0 { return Err(Error::Constraint("PendantOutput.reserved")); }
+        Ok(())
     }
 }
